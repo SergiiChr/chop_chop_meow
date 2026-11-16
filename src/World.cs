@@ -119,15 +119,6 @@ public readonly record struct Cliff(ThingKind Ore, Vector2 Center, Vector2 Face,
     /// <summary>Distance to the cliff's spine, so the whole wall blocks movement rather than only its middle.</summary>
     public float DistanceTo(Vector2 p) => p.DistanceTo(Center + Along * Math.Clamp((p - Center).Dot(Along), -HalfLength, HalfLength));
 }
-/// <summary>One job a worker does at one place, such as working the bellows of a furnace or hauling for it.</summary>
-public sealed class Duty {
-    public int Thing { get; set; }
-    public string Job { get; set; } = "";
-    /// <summary>For a gather job, the kind of resource it keeps gathering once its spot is spent or gone.</summary>
-    [JsonConverter(typeof(OptionalKind))] public ThingKind? Kind { get; set; }
-    /// <summary>The haul group this haul job is in, or zero: the hauls of one group follow each other in the list and count as one job across their places.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Group { get; set; }
-}
 public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting, Digging, Underground }
 
 public sealed class Worker : IWalker {
@@ -135,12 +126,14 @@ public sealed class Worker : IWalker {
     public string Name { get; set; } = "";
     public float X { get; set; }
     public float Y { get; set; }
-    /// <summary>The place of the job in hand, one of the worker's <see cref="Duties"/>, or of their first job while none can be done.</summary>
+    /// <summary>The place of the job in hand, or of their first job while none can be done.</summary>
     public int Assignment { get; set; }
-    /// <summary>The job in hand at <see cref="Assignment"/>, such as "haul", or empty while none can be done.</summary>
-    public string Job { get; set; } = "";
-    /// <summary>The worker's jobs in the order they come first: the first that can be done is the one in hand.</summary>
-    public List<Duty> Duties { get; set; } = new();
+    /// <summary>The job in hand at <see cref="Assignment"/>, or null while none can be done.</summary>
+    [JsonIgnore] public JobKind? Doing { get; set; }
+    /// <summary>The worker's jobs and haul groups in the order they come first: the first that can be done is the one in hand.</summary>
+    public List<JobEntry> Jobs { get; set; } = new();
+    /// <summary>Every job in <see cref="Jobs"/>, the hauls of each group included.</summary>
+    [JsonIgnore] public DutyList Duties => new(Jobs);
     public string Status { get; set; } = "Available";
     /// <summary>Items a worker carries in all, as many as a wood crate holds.</summary>
     public const int BagStack = 12;
@@ -148,8 +141,8 @@ public sealed class Worker : IWalker {
     public Inventory Bag { get; set; } = new() { Slots = BagStack, StackSize = BagStack, Capacity = BagStack };
     /// <summary>Still filling their hands at a gathering spot or a water source, so what they hold is not carried off yet.</summary>
     [JsonIgnore] public bool Loading { get; set; }
-    /// <summary>Keeping to the job in hand until its round ends: a delivery, a crafted batch or another unit of its work.</summary>
-    [JsonIgnore] public bool Engaged { get; set; }
+    /// <summary>The entry the worker keeps to until its round ends, a delivery, a crafted batch or another unit of its work; null while they keep to none.</summary>
+    [JsonIgnore] public JobEntry? InHand { get; set; }
     /// <summary>The rounds the place of the job in hand had counted when the worker took the job up.</summary>
     [JsonIgnore] public int Mark { get; set; }
     /// <summary>The carry a hauler is on the way to pick up.</summary>
@@ -264,7 +257,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 11;
+    public int Version { get; set; } = 12;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -741,7 +734,7 @@ public sealed partial class World {
     }
     /// <summary>Whether a paid worker is hammering at a station right now.</summary>
     public bool CrewHammers(Thing anvil) {
-        foreach (var w in S.Workers) if (w.Assignment == anvil.Id && w.WageDebt <= 0 && w.WorkState == WorkerWorkState.Hammering && HasDuty(w, anvil.Id, "craft")) return true;
+        foreach (var w in S.Workers) if (w.Assignment == anvil.Id && w.WageDebt <= 0 && w.WorkState == WorkerWorkState.Hammering && HasDuty(w, anvil.Id, JobKind.Craft)) return true;
         return false;
     }
     /// <summary>The room a building keeps from a resource's middle beyond its own footprint, and a yard beyond its own edge.</summary>
@@ -1553,18 +1546,18 @@ public sealed partial class World {
     }
     public string? FetchBlock(Thing sign) {
         bool assigned = false, working = false;
-        foreach (var w in S.Workers) if (HasDuty(w, sign.Id, "deliveries")) { assigned = true; working |= w.WageDebt <= 0; }
+        foreach (var w in S.Workers) if (HasDuty(w, sign.Id, JobKind.Deliveries)) { assigned = true; working |= w.WageDebt <= 0; }
         if (!assigned) return "No worker assigned.";
         if (Dusk) return "Your workers have signed out until morning.";
         if (Lunch) return "Your workers are at lunch.";
-        foreach (var w in S.Workers) if (HasDuty(w, sign.Id, "deliveries") && w.Away > 0) return Phrase(w.Name, " is already on the way.");
+        foreach (var w in S.Workers) if (HasDuty(w, sign.Id, JobKind.Deliveries) && w.Away > 0) return Phrase(w.Name, " is already on the way.");
         return working ? null : "The assigned worker is on strike.";
     }
     /// <summary>Sends the post's worker to the village; the price sheet refreshes when they return.</summary>
     public bool FetchPrices(Thing sign) {
         if (FetchBlock(sign) is string blocked) { Say(blocked); return false; }
         if (Forwarded(Verb.FetchPrices, sign.Id)) return false;
-        var w = S.Workers.First(w => HasDuty(w, sign.Id, "deliveries") && w.WageDebt <= 0);
+        var w = S.Workers.First(w => HasDuty(w, sign.Id, JobKind.Deliveries) && w.WageDebt <= 0);
         w.Assignment = sign.Id; w.Away = Data.TradeSeconds; Say($"{w.Name} set off to Bramblewick for fresh prices."); return true;
     }
     private static readonly string[] WorkerNames = {
@@ -1580,107 +1573,11 @@ public sealed partial class World {
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
         S.Workers.Add(w); S.Milestones.Add("hired"); Play("hire_sign", sign.Pos); Say($"New worker {name} is ready for a task."); Made?.Invoke(S.Actor.Id, w.Id); return w;
     }
-    /// <summary>The jobs a place offers workers, in the order the panel shows them.</summary>
-    public string[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {
-        ThingKind.Reinforced => BellowsJobs,
-        ThingKind.Bench or ThingKind.Anvil or ThingKind.Cooktable or ThingKind.Packer => CraftJobs,
-        ThingKind.Furnace or ThingKind.Cannery => HaulJobs,
-        ThingKind.Signpost => DeliveryJobs,
-        ThingKind.Campfire => FireJobs,
-        ThingKind.Farm => FarmJobs,
-        ThingKind.Mine => MineJobs,
-        ThingKind.Toolstation => StockJobs,
-        ThingKind.Pile when t.Compost => TendJobs,
-        _ => NoJobs
-    };
-    private static readonly string[] GatherJobs = { "gather" }, BellowsJobs = { "bellows", "haul" }, CraftJobs = { "craft", "haul" }, HaulJobs = { "haul" },
-        DeliveryJobs = { "deliveries" }, FireJobs = { "fuel" }, FarmJobs = { "farm", "haul" }, MineJobs = { "build", "haul", "mine" }, StockJobs = { "stock" },
-        TendJobs = { "tend" }, NoJobs = { };
     /// <summary>Workers with any job at a place.</summary>
     public int Crew(Thing t) {
         int crew = 0;
         foreach (var w in S.Workers) if (HasDuty(w, t.Id)) crew++;
         return crew;
-    }
-    /// <summary>Puts a worker on every job at one place, instead of whatever they did before, or takes all their jobs away.</summary>
-    public void Assign(Worker w, Thing? target) {
-        if (target?.Kind == ThingKind.Mine && !HasDuty(w, target.Id) && Crew(target) >= Data.Mine.Workers) { Say($"A mine has room for {Data.Mine.Workers} workers."); return; }
-        if (Forwarded(Verb.Assign, target?.Id ?? 0, w.Id)) return;
-        w.Duties.Clear(); w.ReadAgain = 0;
-        if (target != null) foreach (string job in Jobs(target)) w.Duties.Add(NewDuty(target, job));
-        // A resource has no listed jobs only by mistake; gathering is what a worker does there.
-        if (target != null && w.Duties.Count == 0) w.Duties.Add(NewDuty(target, target.IsResource ? "gather" : "work"));
-        Started(w, target);
-    }
-    /// <summary>Gives a worker one job at a place, at the end of their list, or takes it away, keeping their other jobs.</summary>
-    public void SetDuty(Worker w, Thing target, string job, bool on) {
-        if (on == HasDuty(w, target.Id, job) || Array.IndexOf(Jobs(target), job) < 0) return;
-        if (on && target.Kind == ThingKind.Mine && !HasDuty(w, target.Id) && Crew(target) >= Data.Mine.Workers) { Say($"A mine has room for {Data.Mine.Workers} workers."); return; }
-        if (Forwarded(Verb.Duty, target.Id, w.Id, job, on ? 1 : 0)) return;
-        if (on) w.Duties.Add(NewDuty(target, job));
-        else w.Duties.RemoveAll(d => d.Thing == target.Id && d.Job == job);
-        w.ReadAgain = 0;
-        if (on && w.Duties.Count == 1 || !on && w.Assignment == target.Id && !HasDuty(w, target.Id)) Started(w, w.Duties.Count > 0 ? Find(w.Duties[0].Thing) : null);
-    }
-    private static Duty NewDuty(Thing place, string job) => new() { Thing = place.Id, Job = job, Kind = job == "gather" ? place.Kind : null };
-    /// <summary>The job name of a haul group's own entry in a worker's list: the hauls that follow it with its number count as one job across their places.</summary>
-    public const string HaulGroup = "group";
-    /// <summary>Whether an entry in a worker's list is a haul in some haul group.</summary>
-    public static bool Grouped(Duty d) => d.Group != 0 && d.Job != HaulGroup;
-    /// <summary>What tells one of a worker's entries from the others in a command: its place, or a haul group's own number, given as a negative one.</summary>
-    public static int DutyKey(Duty d) => d.Job == HaulGroup ? -d.Group : d.Thing;
-    /// <summary>The place in a worker's list just past the last haul of the haul group whose own entry is at <paramref name="head"/>.</summary>
-    public static int GroupEnd(List<Duty> duties, int head) {
-        int end = head + 1;
-        while (end < duties.Count && Grouped(duties[end]) && duties[end].Group == duties[head].Group) end++;
-        return end;
-    }
-    /// <summary>Adds an empty haul group to the end of a worker's jobs.</summary>
-    public void AddHaulGroup(Worker w) {
-        if (Forwarded(Verb.HaulGroup, other: w.Id, count: 1)) return;
-        int last = 0;
-        foreach (var d in w.Duties) last = Math.Max(last, d.Group);
-        w.Duties.Add(new Duty { Job = HaulGroup, Group = last + 1 }); w.ReadAgain = 0;
-    }
-    /// <summary>Takes a haul group apart: its hauls stay where they are in the list, as jobs of their own.</summary>
-    public void RemoveHaulGroup(Worker w, int group) {
-        if (group == 0 || Forwarded(Verb.HaulGroup, other: w.Id, at: new Vector2(group, 0))) return;
-        for (int i = w.Duties.Count - 1; i >= 0; i--) {
-            if (w.Duties[i].Group != group) continue;
-            if (w.Duties[i].Job == HaulGroup) w.Duties.RemoveAt(i); else w.Duties[i].Group = 0;
-        }
-        w.ReadAgain = 0;
-    }
-    /// <summary>
-    /// Moves one of a worker's jobs to another place in their list, which is the order the jobs come first in.
-    /// A haul group moves with its hauls.
-    /// A haul moved into a group joins it; a job moved anywhere else stands on its own.
-    /// </summary>
-    /// <param name="index">The job's place in <see cref="Worker.Duties"/>.</param>
-    /// <param name="before">The entry it goes in front of, or the list's length for the end.</param>
-    /// <param name="group">The haul group a haul joins, or zero.</param>
-    public void MoveDuty(Worker w, int index, int before, int group = 0) {
-        if ((uint)index >= (uint)w.Duties.Count) return;
-        var duty = w.Duties[index];
-        if (Forwarded(Verb.MoveDuty, DutyKey(duty), w.Id, duty.Job, index, new Vector2(before, group))) return;
-        int length = duty.Job == HaulGroup ? GroupEnd(w.Duties, index) - index : 1;
-        before = Math.Clamp(before, 0, w.Duties.Count);
-        if (before > index && before < index + length) return;
-        var moved = w.Duties.GetRange(index, length);
-        w.Duties.RemoveRange(index, length);
-        if (before > index) before -= length;
-        int head = duty.Job == "haul" ? w.Duties.FindIndex(d => d.Job == HaulGroup && d.Group == group) : -1;
-        if (head >= 0) {
-            // Inside the group it lands where it was dropped; dropped elsewhere it goes to the group's end.
-            int end = GroupEnd(w.Duties, head);
-            duty.Group = group;
-            if (before <= head || before > end) before = end;
-        } else {
-            if (duty.Job != HaulGroup) duty.Group = 0;
-            // A job never lands among the hauls of a group it is not in: it goes after them.
-            while (before < w.Duties.Count && Grouped(w.Duties[before])) before++;
-        }
-        w.Duties.InsertRange(before, moved); w.ReadAgain = 0;
     }
     /// <summary>The place a worker's job is at: the place itself, or for a gather job whose spot is gone, a stand-in of its kind.</summary>
     public Thing? DutyPlace(Worker w, int place) {
@@ -1804,7 +1701,7 @@ public sealed partial class World {
 
         void Users(ThingKind kind) {
             foreach (var t in S.Things.Of(kind)) {
-                if (t.Id == exclude || Into(t, item, false) == null) continue;
+                if (t.Id == exclude || Intake(t, item, false) == null) continue;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || bestRank > 0 || distance < bestDistance) { best = t; bestRank = 0; bestDistance = distance; }
             }
@@ -2016,11 +1913,6 @@ public sealed partial class World {
             }
         w.Status = "Compost tended"; return false;
     }
-    /// <summary>Whether the worker has a job at a place, or the given job there.</summary>
-    public static bool HasDuty(Worker w, int place, string job = "") {
-        foreach (var d in w.Duties) if (d.Thing == place && (job == "" || d.Job == job)) return true;
-        return false;
-    }
     /// <summary>
     /// Moves a gatherer whose spot is spent or gone to the nearest spot of the same job that any player has seen, even one now under fog, and tells whether there was one.
     /// With none known they say so once, and their status says it.
@@ -2057,12 +1949,6 @@ public sealed partial class World {
     }
     private static bool Crowds(Worker w) => !w.Home && w.Commute == 0 && w.Away == 0 && w.WorkState != WorkerWorkState.Underground;
     private void WaitAtPost(Worker w, float dt) => Walk(w, Nearest(ThingKind.Signpost, w.Pos)?.Pos + Vector2.One ?? Terrain.Spawn, dt);
-    /// <summary>Drops jobs at places that are gone, other than gather jobs and haul groups, saying so when that leaves the worker without a job.</summary>
-    private void TidyDuties(Worker w) {
-        bool had = w.Duties.Count > 0;
-        for (int i = w.Duties.Count - 1; i >= 0; i--) if (w.Duties[i].Kind == null && w.Duties[i].Job != HaulGroup && Find(w.Duties[i].Thing) == null) w.Duties.RemoveAt(i);
-        if (w.Duties.Count == 0) { if (had) Say($"{w.Name} without a job."); w.Assignment = 0; w.Job = ""; }
-    }
     /// <summary>Walks a tool the job no longer needs to the nearest tool station with room, and reports when it is put back; with no such station the worker keeps it.</summary>
     private bool ReturnTool(Worker w, float dt) {
         Thing? station = null; float nearest = 0;
@@ -2567,22 +2453,8 @@ public sealed partial class World {
             if (t.Batches > 0 && t.Keep != "" && t.Keep != t.Asked) return false;
         }
         foreach (var w in save.Workers)
-            if (w?.Duties == null || !ValidGroups(w.Duties) || !ValidInventory(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates)) return false;
+            if (w == null || !ValidJobs(w.Jobs) || !ValidInventory(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates)) return false;
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
-        return true;
-    }
-    /// <summary>Whether a worker's haul groups fit together: each has one entry of its own, and only hauls directly after it carry its number.</summary>
-    private static bool ValidGroups(List<Duty> duties) {
-        var groups = new HashSet<int>();
-        int open = 0;
-        foreach (var d in duties) {
-            if (d?.Job == null) return false;
-            if (d.Job == HaulGroup) {
-                if (d.Group <= 0 || !groups.Add(d.Group)) return false;
-                open = d.Group;
-            } else if (d.Group == 0) open = 0;
-            else if (d.Job != "haul" || d.Group != open) return false;
-        }
         return true;
     }
     /// <summary>Empties the hotbar slots that name nothing the game knows or the player carries, such as a packed crate since sold.</summary>

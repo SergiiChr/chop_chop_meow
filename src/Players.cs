@@ -72,7 +72,7 @@ public sealed class PlayerState {
 public readonly record struct HeldStack(int Box, int Slot, string Item, int Count);
 
 /// <summary>The player actions a guest sends to the host.</summary>
-public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, HaulGroup, Hire, Hold, Leave, LoadBatch, LoadFuel, LoadInput, MoveDuty, MoveInCrate, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, Release, SelectHotbar, SelectInHand, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, Unqueue, UnslotTool }
+public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, HaulGroup, Hire, Hold, Leave, LoadBatch, LoadFuel, LoadInput, MoveJob, MoveInCrate, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, Release, SelectHotbar, SelectInHand, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, Unqueue, UnslotTool }
 
 /// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
 /// <remarks>
@@ -227,11 +227,11 @@ public sealed partial class World {
             case Verb.EndingShown: MarkEndingShown(); break;
             case Verb.SkipMorning: SkipMorning(); break;
             case Verb.Assign: if (w != null) Assign(w, t); break;
-            case Verb.Duty: if (w != null && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, c.Item, c.Count != 0); break;
+            case Verb.Duty: if (w != null && ChopChopMeow.Jobs.TryParse(c.Item, out var job) && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, job, c.Count != 0); break;
             case Verb.Fire: if (w != null) Fire(w); break;
             case Verb.HaulGroup: if (w != null) { if (c.Count != 0) AddHaulGroup(w); else RemoveHaulGroup(w, (int)c.At.X); } break;
             // A stale move, of a job that has left that place in the list, is dropped rather than moving another job.
-            case Verb.MoveDuty: if (w != null && (uint)c.Count < (uint)w.Duties.Count && DutyKey(w.Duties[c.Count]) == c.Target && w.Duties[c.Count].Job == c.Item) MoveDuty(w, c.Count, (int)c.At.X, (int)c.At.Y); break;
+            case Verb.MoveJob: if (w != null && JobAt(w, new JobSpot(c.Target, c.Count)) is JobEntry moved && JobKey(moved) == c.Item) MoveJob(w, new JobSpot(c.Target, c.Count), new JobSpot((int)c.At.X, (int)c.At.Y)); break;
             case Verb.Settle: if (w != null) SettleDebt(w); break;
         }
         if (t == null) return;

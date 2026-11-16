@@ -55,8 +55,8 @@ public static class WorkerStateChecks {
         world.Assign(worker, spent);
         for (int i = 0; i < 600 && worker.Assignment != seen.Id; i++) world.Tick(.1f);
         Require(worker.Assignment == seen.Id, "a worker whose tree is felled should move to the nearest tree a player has seen");
-        Require(worker.Duties.Count == 1, "the worker should keep one duty");
-        Require(worker.Duties[0].Thing == seen.Id, "the worker's duty should be the seen tree");
+        Require(worker.Jobs.Count == 1, "the worker should keep one duty");
+        Require(((Duty)worker.Jobs[0]).Thing == seen.Id, "the worker's duty should be the seen tree");
         Require(unseen.Remaining == 5, "the worker should not go to a closer tree under black fog");
         Require(world.Remembered(seen.Id) != null && !world.Sees(seen.Pos), "the next tree should be one known from memory, now out of sight");
 
@@ -85,8 +85,8 @@ public static class WorkerStateChecks {
         for (int i = 0; i < 300 && world.Find(moreCoal.Id) != null; i++) world.Tick(.1f);
         for (int i = 0; i < 100; i++) world.Tick(.1f);
         Require(world.Find(moreCoal.Id) == null, "a worker who picked up the last known loose coal should have it gone");
-        Require(picker.Duties.Count == 1, "the worker should keep one duty");
-        Require(picker.Duties[0].Kind == ThingKind.LooseCoal, "the worker should keep the loose coal duty");
+        Require(picker.Jobs.Count == 1, "the worker should keep one duty");
+        Require(((Duty)picker.Jobs[0]).Kind == ThingKind.LooseCoal, "the worker should keep the loose coal duty");
         Require(picker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f, "the worker should wait at the trading post");
     }
 
@@ -155,10 +155,10 @@ public static class WorkerStateChecks {
         var raked = world.Add(ThingKind.Leaves, at + new Vector2(-2, -2), 0);
         var bush = world.Add(ThingKind.Berries, at + new Vector2(-4, -2), 6);
         world.Tick(0);
-        raker.Duties.Add(new Duty { Thing = raked.Id, Job = "gather" }); raker.Duties.Add(new Duty { Thing = bush.Id, Job = "gather" }); raker.Assignment = raked.Id;
+        raker.Jobs.Add(new Duty { Thing = raked.Id, Job = JobKind.Gather }); raker.Jobs.Add(new Duty { Thing = bush.Id, Job = JobKind.Gather }); raker.Assignment = raked.Id;
         // A worker with nothing to do reads their list again a quarter of a second later.
         for (int i = 0; i < 4; i++) world.Tick(.1f);
-        Require(raker.Assignment == bush.Id && raker.Duties.Count == 2, "a worker who knows no other raked patch should go on to their other job and keep the patch");
+        Require(raker.Assignment == bush.Id && raker.Jobs.Count == 2, "a worker who knows no other raked patch should go on to their other job and keep the patch");
     }
 
     private static void CheckWorkerWhoseBuildingGoesSaysTheyHaveNoJob(GameData data) {
@@ -171,7 +171,7 @@ public static class WorkerStateChecks {
         world.Assign(crafter, bench);
         world.Tick(.1f); said.Clear();
         RemoveThings(world, t => t == bench); world.Tick(.1f);
-        Require(crafter.Duties.Count == 0 && said.Contains($"{crafter.Name} without a job."), "a worker whose building is removed should be left without a job and say so");
+        Require(crafter.Jobs.Count == 0 && said.Contains($"{crafter.Name} without a job."), "a worker whose building is removed should be left without a job and say so");
     }
 
     private static void CheckStrikeResetsWorkState(GameData data) {

@@ -107,10 +107,10 @@ internal static class WorkerSteps {
     public static void Hire(World world, Thing target) => world.Assign(AddWorker(world, target.Pos + new Vector2(1, 1)), target);
 
     /// <summary>Adds a paid worker beside a place with the given jobs there, in that order.</summary>
-    public static Worker Staff(World world, Thing place, params string[] jobs) {
+    public static Worker Staff(World world, Thing place, params JobKind[] jobs) {
         var worker = AddWorker(world, place.Pos + new Vector2(0, 1.2f));
         worker.Wage = 18;
-        foreach (string job in jobs) world.SetDuty(worker, place, job, true);
+        foreach (var job in jobs) world.SetDuty(worker, place, job, true);
         return worker;
     }
 
@@ -125,22 +125,18 @@ internal static class WorkerSteps {
     /// <summary>Makes a haul group at the end of a worker's jobs and moves their hauls at the given places into it, in that order; returns the group's number.</summary>
     public static int GroupHauls(World world, Worker worker, params Thing[] places) {
         world.AddHaulGroup(worker);
-        int group = worker.Duties[^1].Group;
-        foreach (var place in places) world.MoveDuty(worker, worker.Duties.FindIndex(d => d.Thing == place.Id && d.Job == "haul"), worker.Duties.Count, group);
-        return group;
+        var group = (HaulGroup)worker.Jobs[^1];
+        foreach (var place in places) {
+            int from = worker.Jobs.FindIndex(e => e is Duty { Job: JobKind.Haul } d && d.Thing == place.Id);
+            world.MoveJob(worker, new JobSpot(from), new JobSpot(worker.Jobs.IndexOf(group), group.Hauls.Count));
+        }
+        return group.Id;
     }
 
     /// <summary>A worker's jobs as text, such as "craft@3 group[haul@3 haul@5]", to compare a whole list at once.</summary>
-    public static string JobList(Worker worker) {
-        var parts = new List<string>();
-        for (int i = 0; i < worker.Duties.Count; i++) {
-            var d = worker.Duties[i];
-            if (d.Job != World.HaulGroup) { parts.Add($"{d.Job}@{d.Thing}"); continue; }
-            int end = World.GroupEnd(worker.Duties, i);
-            parts.Add($"group[{string.Join(" ", worker.Duties.Take(end).Skip(i + 1).Select(h => $"{h.Job}@{h.Thing}"))}]"); i = end - 1;
-        }
-        return string.Join(" ", parts);
-    }
+    public static string JobList(Worker worker) => string.Join(" ", worker.Jobs.Select(e => e is HaulGroup group ? $"group[{string.Join(" ", group.Hauls.Select(Text))}]" : Text((Duty)e)));
+
+    private static string Text(Duty d) => $"{d.Job.Id()}@{d.Thing}";
 
     /// <summary>Runs the world until a worker has something in hand, and names it; null when they pick nothing up in a minute.</summary>
     public static string? FirstCarry(World world, Worker worker) {

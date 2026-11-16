@@ -162,14 +162,14 @@ public static class SimulationChecks {
         var bush = world.Add(ThingKind.Berries, new Vector2(24, 20), 30);
         var fire = world.Add(ThingKind.Campfire, new Vector2(20, 24));
         var both = AddWorker(world, new Vector2(22, 22));
-        world.SetDuty(both, bush, "gather", true);
-        world.SetDuty(both, fire, "fuel", true);
-        Require(both.Duties.Count == 2 && both.Assignment == bush.Id, "a worker should keep jobs at two places and start at the first");
+        world.SetDuty(both, bush, JobKind.Gather, true);
+        world.SetDuty(both, fire, JobKind.Fuel, true);
+        Require(both.Jobs.Count == 2 && both.Assignment == bush.Id, "a worker should keep jobs at two places and start at the first");
         SafeTick(world, 60);
         Require(bush.Remaining < 30 && fire.Burn + fire.Inventory["wood"] * world.Data.CampfireSeconds > 0,
                 "a worker with jobs at two places should take turns: picking berries and feeding the fire");
-        world.SetDuty(both, fire, "fuel", false);
-        Require(both.Duties.Count == 1 && World.HasDuty(both, bush.Id, "gather"), "taking one job away should keep the other");
+        world.SetDuty(both, fire, JobKind.Fuel, false);
+        Require(both.Jobs.Count == 1 && World.HasDuty(both, bush.Id, JobKind.Gather), "taking one job away should keep the other");
     }
 
     /// <summary>A bench hauler only stocks it; the work itself waits for a crafter.</summary>
@@ -181,13 +181,13 @@ public static class SimulationChecks {
         bench.Tools!.Add("stone_chisel", 1);
         world.SetRecipe(bench, "planks");
         var hauler = AddWorker(world, new Vector2(27, 23));
-        world.SetDuty(hauler, bench, "haul", true);
+        world.SetDuty(hauler, bench, JobKind.Haul, true);
         SafeTick(world, 20);
         Require(bench.Inventory["wood"] > 0, "a bench hauler should stock the bench with wood");
         Require(bench.Inventory["planks"] == 0, "a bench hauler should not make planks");
         Require(!bench.Processing, "a bench hauler should not start the bench");
         var crafter = AddWorker(world, new Vector2(28, 25));
-        world.SetDuty(crafter, bench, "craft", true);
+        world.SetDuty(crafter, bench, JobKind.Craft, true);
         SafeTick(world, 20);
         Require(bench.Inventory["planks"] + chest.Inventory["planks"] > 0, "a crafter should work the stocked bench");
     }
@@ -198,7 +198,7 @@ public static class SimulationChecks {
         var rack = world.Add(ThingKind.Toolstation, new Vector2(16, 20));
         chest.Inventory.Add("steel_axe", 1);
         var stocker = AddWorker(world, new Vector2(18, 20));
-        world.SetDuty(stocker, rack, "stock", true);
+        world.SetDuty(stocker, rack, JobKind.Stock, true);
         SafeTick(world, 20);
         Require(rack.Inventory["steel_axe"] == 1 && chest.Inventory["steel_axe"] == 0, "a stocker should bring a stored tool to the rack");
     }
@@ -213,7 +213,7 @@ public static class SimulationChecks {
         compost.Inventory.Add("fertilizer", 2);
         chest.Inventory.Add("leaves", 8); chest.Inventory.Add("berries", 6);
         var tender = AddWorker(world, new Vector2(17, 22));
-        world.SetDuty(tender, compost, "tend", true);
+        world.SetDuty(tender, compost, JobKind.Tend, true);
         SafeTick(world, 40);
         Require(chest.Inventory["fertilizer"] == 2, "a tender should carry fertilizer to storage");
         Require(compost.Inventory["leaves"] > 0, "a tender should bring leaves to the compost");
@@ -228,7 +228,7 @@ public static class SimulationChecks {
         var sign = world.Add(ThingKind.Signpost, new Vector2(24, 26));
         sign.Output!.Add("tin_bar", 3); sign.Output.Add(Inventory.Coins, 20);
         var runner = AddWorker(world, new Vector2(24, 25));
-        world.SetDuty(runner, sign, "deliveries", true);
+        world.SetDuty(runner, sign, JobKind.Deliveries, true);
         SafeTick(world, 20);
         Require(store.Inventory["tin_bar"] == 3, "a runner should carry deliveries into storage");
         Require(sign.Output["tin_bar"] == 0, "a runner should leave no delivery in the post's output");
@@ -1636,8 +1636,8 @@ public static class SimulationChecks {
         Require(workerTree != null, "a remaining tree should be available for the hired worker");
         world.Assign(worker!, workerTree);
         Require(worker!.Assignment == workerTree!.Id, "player should assign the hired worker to the resource");
-        Require(worker.Duties.Count == 1, "the hired worker should have one duty");
-        Require(World.HasDuty(worker, workerTree.Id, "gather"), "the hired worker's duty should be gathering from that resource");
+        Require(worker.Jobs.Count == 1, "the hired worker should have one duty");
+        Require(World.HasDuty(worker, workerTree.Id, JobKind.Gather), "the hired worker's duty should be gathering from that resource");
         Require(world.Reached("assigned"), "assigning a worker should reach the assigned milestone");
         for (int i = 0; i < 480 && chest.Inventory["wood"] == 0; i++) SafeTick(world, Step);
         Require(chest.Inventory["wood"] > 0 && worker.Bag["wood"] == 0,

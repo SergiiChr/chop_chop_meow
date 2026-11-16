@@ -301,7 +301,7 @@ public partial class Game {
     private async Task CheckAJobBelowAHaulGroupDragsIntoIt() {
         var (bench, worker) = await OpenBenchWorkerPage();
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-4, 0));
-        Hosted.SetDuty(worker, anvil, "craft", true); Hosted.SetDuty(worker, anvil, "haul", true);
+        Hosted.SetDuty(worker, anvil, JobKind.Craft, true); Hosted.SetDuty(worker, anvil, JobKind.Haul, true);
         await Until(() => OnPage("job_3") != null, "the worker's page listing the anvil's jobs", 2);
         await Click(Named("new_group")!);
         await Until(() => OnPage("group_1") != null, "the new haul group's box", 2);
@@ -310,7 +310,8 @@ public partial class Game {
         // The group goes above the anvil's haul, which is then the row right under its box.
         await LetGo(await HoldOver(await At(OnPage("grip_3")!), await AtFoot(Named($"drop_craft_{anvil.Id}")!)));
         await Until(() => OnPage("group_1") is Control box && Named($"drop_haul_{anvil.Id}") is Button below && box.GlobalPosition.Y < below.GlobalPosition.Y, "the group landing above the anvil's haul", 2);
-        var held = await HoldOver(await At(OnPage("grip_4")!), await At(OnPage("group_1")!));
+        // The anvil's haul is the fourth entry, the group, holding the bench's haul, the third.
+        var held = await HoldOver(await At(OnPage("grip_3")!), await At(OnPage("group_1")!));
         Require(OnPage("lifted") != null, "A job right under a haul group must lift onto the mouse like any other.");
         await LetGo(held);
         await Until(() => OnPage("group_1")?.FindChild($"drop_haul_{anvil.Id}", true, false) != null, "the anvil's haul showing inside the group", 2);
@@ -342,7 +343,7 @@ public partial class Game {
         var forge = Hosted.Add(ThingKind.Reinforced, world.Player + new Vector2(-2, 0));
         var worker = AddWorker(Hosted, world.Player + Vector2.One); Hosted.Assign(worker, forge);
         await KeyStroke(Key.H); await Click(Named($"crew_{worker.Id}")!);
-        string drop = $"drop_{worker.Duties[0].Job}_{forge.Id}";
+        string drop = $"drop_{((Duty)worker.Jobs[0]).Job.Id()}_{forge.Id}";
         await Click(Named(drop)!);
         await Until(() => Named(drop) == null, "the worker's page dropping the job taken away", 2);
         Hosted.Assign(worker, forge);
@@ -374,8 +375,8 @@ public partial class Game {
         var forge = Hosted.Add(ThingKind.Reinforced, world.Player + new Vector2(-2, 0));
         var worker = AddWorker(Hosted, world.Player + Vector2.One); await Frames();
         await ClickOn(forge);
-        string job = world.Jobs(Shown(forge))[0];
-        await Click(Named($"job_{job}")!); await Click(Named($"duty_{worker.Id}")!);
+        var job = world.Jobs(Shown(forge))[0];
+        await Click(Named($"job_{job.Id()}")!); await Click(Named($"duty_{worker.Id}")!);
         await Until(() => World.HasDuty(worker, forge.Id, job), "the tick giving the worker the job", 2);
         await Click(Named($"duty_{worker.Id}")!);
         await Until(() => !World.HasDuty(worker, forge.Id, job), "a second click taking the job away", 2);

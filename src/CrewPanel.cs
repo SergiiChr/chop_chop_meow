@@ -11,7 +11,12 @@ public abstract partial class WorkerPage(PageTools tools) : PagePanel(tools) {
     /// <summary>A number that changes with a worker's jobs, their order and their haul groups.</summary>
     protected static int DutyCode(Worker w) {
         int code = 0;
-        foreach (var duty in w.Duties) code = code * 31 + duty.Thing + duty.Job.GetHashCode() + duty.Group * 7919;
+        foreach (var entry in w.Jobs) {
+            if (entry is Duty duty) { code = code * 31 + duty.Thing * 16 + (int)duty.Job; continue; }
+            var group = (HaulGroup)entry;
+            code = code * 31 + group.Id * 7919;
+            foreach (var haul in group.Hauls) code = code * 31 + haul.Thing;
+        }
         return code;
     }
 
@@ -65,12 +70,9 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
         var wage = Style.Pill($"{w.Wage} /day", Style.BeigePill, Style.Ink, 13); wage.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; top.AddChild(wage);
         var chips = new HFlowContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; chips.AddThemeConstantOverride("h_separation", 6); chips.AddThemeConstantOverride("v_separation", 6); column.AddChild(chips);
         int number = 0;
-        for (int i = 0; i < w.Duties.Count; i++) {
-            var d = w.Duties[i];
-            if (d.Job == World.HaulGroup) {
-                int end = World.GroupEnd(w.Duties, i);
-                chips.AddChild(GroupChip(++number, w.Duties.Take(end).Skip(i + 1).Select(h => world.DutyPlace(w, h.Thing)).OfType<Thing>().ToList())); i = end - 1;
-            } else if (world.DutyPlace(w, d.Thing) is Thing at) chips.AddChild(DutyChip(++number, at, d.Job));
+        foreach (var entry in w.Jobs) {
+            if (entry is HaulGroup group) chips.AddChild(GroupChip(++number, group.Hauls.Select(h => world.DutyPlace(w, h.Thing)).OfType<Thing>().ToList()));
+            else if (world.DutyPlace(w, ((Duty)entry).Thing) is Thing at) chips.AddChild(DutyChip(++number, at, ((Duty)entry).Job));
         }
         if (number == 0) chips.AddChild(Style.Pill("No jobs", Style.Tag(Style.Tan), Style.Rim, 12));
         // A flat button over the whole card takes the click and rings it on hover.
@@ -82,10 +84,10 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
     }
 
     /// <summary>A job as a small chip: its number in the worker's list, the place's icon, the job's name and what the place is set to make.</summary>
-    private Control DutyChip(int number, Thing at, string job) {
+    private Control DutyChip(int number, Thing at, JobKind job) {
         var row = Chip(number, Style.Chip);
         row.AddChild(Style.Icon(JobList.PlaceIcon(at), 20));
-        row.AddChild(Style.Text(JobRow.Title(job), 13, Style.Ink, Style.Bold));
+        row.AddChild(Style.Text(World.Def(job).Title, 13, Style.Ink, Style.Bold));
         var made = Style.Icon(null, 18); row.AddChild(made);
         live.Watch(() => JobList.Made(world, at), item => { made.Texture = item == null ? null : Icons.Of(item); made.Visible = item != null; });
         return row.GetParent<Control>();
@@ -94,7 +96,7 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
     /// <summary>A haul group as one chip: its number in the worker's list and the icons of its places.</summary>
     private static Control GroupChip(int number, List<Thing> places) {
         var row = Chip(number, Style.GroupChip);
-        row.AddChild(Style.Text(JobRow.Title("haul"), 13, Style.Ink, Style.Bold));
+        row.AddChild(Style.Text(World.Def(JobKind.Haul).Title, 13, Style.Ink, Style.Bold));
         foreach (var at in places) row.AddChild(Style.Icon(JobList.PlaceIcon(at), 20));
         return row.GetParent<Control>();
     }

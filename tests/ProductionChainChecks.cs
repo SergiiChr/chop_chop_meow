@@ -140,7 +140,7 @@ public static class ProductionChainChecks {
         world.Add(ThingKind.Pile, bench.Pos + new Vector2(8, 0)).Inventory.Add("wood_parts", 10);
         var worker = AddWorker(world, bench.Pos + new Vector2(0, 1));
         worker.Wage = 18;
-        world.SetDuty(worker, bench, "craft", true); world.SetDuty(worker, bench, "haul", true);
+        world.SetDuty(worker, bench, JobKind.Craft, true); world.SetDuty(worker, bench, JobKind.Haul, true);
         Work(world, 180, () => bench.Inventory["steel_pick"] >= 3);
         Require(bench.Inventory["steel_pick"] >= 3, $"the bench should keep making pickaxes it has nowhere else to put: {bench.Inventory["steel_pick"]} made");
     }
@@ -154,7 +154,7 @@ public static class ProductionChainChecks {
         world.SetRecipe(bench, "steel_hammer");
         var worker = AddWorker(world, bench.Pos + new Vector2(0, 1));
         worker.Wage = 18;
-        world.SetDuty(worker, bench, "haul", true);
+        world.SetDuty(worker, bench, JobKind.Haul, true);
         Work(world, 30, () => bench.Inventory["steel_parts"] > 0);
         Require(bench.Inventory["steel_parts"] == 6 && anvil.Inventory["steel_parts"] == 0, "the bench's hauler should fetch the steel parts from the anvil's finished goods");
     }

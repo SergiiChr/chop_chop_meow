@@ -33,13 +33,14 @@ internal struct Carry {
 /// Inputs and fuel fill to a stack.
 /// </summary>
 public sealed partial class World {
-    private bool Haul(Worker w, Duty duty, float dt) {
-        if (w.Plan.Place == null || !Stands(w.Plan)) w.Plan = NextCarry(w, duty);
-        if (w.Plan.Place is not Thing place) { w.Status = HaulWait(w, duty); return false; }
+    /// <summary>A haul job, alone or a haul group: carries the best load across its places, one at a time.</summary>
+    private bool Haul(Worker w, JobEntry job, float dt) {
+        if (w.Plan.Place == null || !Stands(w.Plan)) w.Plan = NextCarry(w, job);
+        if (w.Plan.Place is not Thing place) { w.Status = HaulWait(job); return false; }
         if (!HandsFree(w, dt)) return true;
         var c = w.Plan;
         // The job in hand is the haul at the place the carry is for, also when a haul group picked it.
-        w.Assignment = place.Id; w.Job = "haul";
+        w.Assignment = place.Id; w.Doing = JobKind.Haul;
         w.Status = CarryStatus(c, place);
         if (!Walk(w, c.From!.Pos, dt)) return true;
         var box = BoxOf(c);
@@ -66,16 +67,14 @@ public sealed partial class World {
     /// <summary>Whether a carry a hauler set out on can still be made: its places stand, the load is still there to take and where it goes still takes it.</summary>
     private bool Stands(in Carry c) =>
         Find(c.Place!.Id) == c.Place && Find(c.From!.Id) == c.From && Find(c.To!.Id) == c.To && BoxOf(c).Free(c.Item) > 0
-        && (c.From == c.To || c.Clears || Into(c.To, c.Item, c.Fuel) != null);
+        && (c.From == c.To || c.Clears || Intake(c.To, c.Item, c.Fuel) != null);
 
     /// <summary>What a hauler with nothing to carry says: what the place lacks, or for a haul group its first place.</summary>
-    private string HaulWait(Worker w, Duty duty) {
-        foreach (var d in w.Duties) if (Covers(duty, d) && Find(d.Thing) is Thing place) return HaulWait(place);
-        return duty.Group == 0 ? "Waiting for the next load" : "No hauls in this group";
+    private string HaulWait(JobEntry job) {
+        if (job is Duty duty) return Find(duty.Thing) is Thing place ? HaulWait(place) : "Waiting for the next load";
+        foreach (var haul in ((HaulGroup)job).Hauls) if (Find(haul.Thing) is Thing place) return HaulWait(place);
+        return "No hauls in this group";
     }
-
-    /// <summary>Whether a haul job covers one of a worker's entries: itself, or for a haul group every haul in the group.</summary>
-    private static bool Covers(Duty job, Duty entry) => job.Group == 0 ? entry == job : Grouped(entry) && entry.Group == job.Group;
 
     private string HaulWait(Thing place) => place.Kind switch {
         ThingKind.Mine when place.MineStage == MineStage.Dug => MineWants(place),
@@ -93,10 +92,11 @@ public sealed partial class World {
         return null;
     }
 
-    /// <summary>The best carry across a haul job's places: one place, or every place of its haul group.</summary>
-    private Carry NextCarry(Worker w, Duty duty) {
+    /// <summary>The best carry across a haul job's places: one place, or every place of a haul group.</summary>
+    private Carry NextCarry(Worker w, JobEntry job) {
         Carry best = default;
-        foreach (var d in w.Duties) if (Covers(duty, d) && Find(d.Thing) is Thing place) Carries(w, place, ref best);
+        if (job is Duty duty) { if (Find(duty.Thing) is Thing place) Carries(w, place, ref best); } else
+            foreach (var haul in ((HaulGroup)job).Hauls) if (Find(haul.Thing) is Thing place) Carries(w, place, ref best);
         return best;
     }
 

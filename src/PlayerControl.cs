@@ -194,7 +194,7 @@ public sealed class PlayerControl {
         var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);
         if (worker == null || t?.IsResource != true) { kit.Notify("Choose a tree, stump, bush, leaves, stone, ore, coal, berry bush or water source."); return; }
         if (world.GatherBlock(t, true) is string blocked) { kit.Notify(blocked); return; }
-        world.SetDuty(worker, t, "gather", true); Mode = new ClickMode.Normal(); panel.Select(worker);
+        world.SetDuty(worker, t, JobKind.Gather, true); Mode = new ClickMode.Normal(); panel.Select(worker);
     }
 
     private void ClickThing(Thing t) {

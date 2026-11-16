@@ -206,14 +206,14 @@ public static class MineChecks {
         var cliff = World.CliffAt(mine.Pos);
         var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
         var builder = AddWorker(world, mine.Pos);
-        world.SetDuty(builder, mine, "build", true);
+        world.SetDuty(builder, mine, JobKind.Build, true);
         var elsewhere = AddWorker(world, chest.Pos);
         var tree = world.Add(ThingKind.Tree, chest.Pos + cliff.Face * 3, 100);
-        world.SetDuty(elsewhere, tree, "gather", true);
-        world.SetDuty(elsewhere, mine, "mine", true);
+        world.SetDuty(elsewhere, tree, JobKind.Gather, true);
+        world.SetDuty(elsewhere, mine, JobKind.Mine, true);
         // This earlier-hired worker has no axe for the tree and no pickaxe for the mine.
         var miner = AddWorker(world, World.MineDoor(mine)); miner.Tool = "steel_pick";
-        world.SetDuty(miner, mine, "mine", true);
+        world.SetDuty(miner, mine, JobKind.Mine, true);
         mine.Output!.Add("iron_ore", mine.Output.StackSize);
         Work(world, 15, () => chest.Inventory["iron_ore"] > 0);
         Require(chest.Inventory["iron_ore"] == 12 && miner.Bag.Count == 0,
