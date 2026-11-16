@@ -21,7 +21,7 @@ this project turns them into the movie.
    ```
 
    Put them on one sheet and look at the sheet, not at each still (see [Tools](#tools)).
-3. When the stills are right, draw the whole film (about 4.5 minutes) and look at each changed shot as a strip of
+3. When the stills are right, draw the whole film (about half a minute) and look at each changed shot as a strip of
    frames:
 
    ```sh

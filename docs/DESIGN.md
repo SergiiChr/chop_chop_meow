@@ -906,6 +906,8 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 - The film is a list of shots in `WorldView.IntroShots`, each a method that poses everything for a moment of its own
   clock.
   The clock moves one frame at a time, so frames are evenly spaced however long each takes to draw and save.
+  Frames are drawn without waiting for the screen to refresh, and each is saved in the background while the next is
+  drawn.
 - It reuses the game's own models: the player's rig, the pack, flask, axe and torch, the trees, the valley with its
   shore and sea, and the fire pit. Walking and running go through the game's gaits.
 - New for the film: the office, the rented room and the train car (`IntroSets`), a baseball bat, the boss

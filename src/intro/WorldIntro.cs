@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Threading.Tasks;
 using Godot;
 using static ChopChopMeow.ModelKit;
 using RigPose = ChopChopMeow.Pose;
@@ -71,9 +72,12 @@ public partial class WorldView {
     /// <summary>
     /// Plays the film and saves every frame to <paramref name="folder"/>, or only the frames at <paramref name="stills"/> seconds when given.
     /// The film's clock moves one frame at a time, so the frames are evenly spaced however long each takes to draw and save.
+    /// Each frame is drawn without waiting for the screen to refresh and saved in the background while the next one is drawn.
     /// </summary>
     public async void RenderIntro(string folder, float[]? stills) {
         try {
+            DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+            var saves = new List<(string Name, Task<Error> Save)>();
             DirAccess.MakeDirRecursiveAbsolute(folder);
             BuildFilm();
             var shots = IntroShots;
@@ -93,9 +97,13 @@ public partial class WorldView {
                 // After a cut the ground's detail and the lights settle for a few frames before one is kept.
                 for (int settle = cut || still ? 4 : 1; settle > 0; settle--) await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
                 string name = still ? string.Create(CultureInfo.InvariantCulture, $"still_{filmTime:00.00}.png") : $"{saved:D5}.png";
-                var result = GetViewport().GetTexture().GetImage().SavePng($"{folder}/{name}");
-                if (result != Error.Ok) throw new InvalidOperationException($"Intro frame {name} was not saved: {result}");
+                var image = GetViewport().GetTexture().GetImage();
+                saves.Add((name, Task.Run(() => image.SavePng($"{folder}/{name}"))));
                 saved++;
+            }
+            foreach (var (name, save) in saves) {
+                var result = await save;
+                if (result != Error.Ok) throw new InvalidOperationException($"Intro frame {name} was not saved: {result}");
             }
             using (var sheet = FileAccess.Open($"{folder}/{IntroCues}", FileAccess.ModeFlags.Write)) sheet.StoreString(cues.ToString());
             GD.Print($"INTRO RENDERED {saved} frames, {starts[^1] * IntroStep:0.00} s");
