@@ -134,9 +134,7 @@ internal static class WorkerSteps {
     }
 
     /// <summary>A worker's jobs as text, such as "craft@3 group[haul@3 haul@5]", to compare a whole list at once.</summary>
-    public static string JobList(Worker worker) => string.Join(" ", worker.Jobs.Select(e => e is HaulGroup group ? $"group[{string.Join(" ", group.Hauls.Select(Text))}]" : Text((Duty)e)));
-
-    private static string Text(Duty d) => $"{d.Job.Id()}@{d.Thing}";
+    public static string JobsText(Worker worker) => string.Join(" ", worker.Jobs.Select(e => e is HaulGroup group ? $"group[{string.Join(" ", group.Hauls.Select(World.JobKey))}]" : World.JobKey(e)));
 
     /// <summary>Runs the world until a worker has something in hand, and names it; null when they pick nothing up in a minute.</summary>
     public static string? FirstCarry(World world, Worker worker) {

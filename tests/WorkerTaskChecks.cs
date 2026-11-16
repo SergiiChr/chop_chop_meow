@@ -286,17 +286,17 @@ public static class WorkerTaskChecks {
         world.SetDuty(worker, b, JobKind.Craft, true); world.SetDuty(worker, b, JobKind.Haul, true);
         string A = a.Id.ToString(), B = b.Id.ToString();
         int group = GroupHauls(world, worker, a, b);
-        Require(JobList(worker) == $"craft@{A} craft@{B} group[haul@{A} haul@{B}]", $"hauls moved into a new group should be in it in the order they were added: {JobList(worker)}");
+        Require(JobsText(worker) == $"craft@{A} craft@{B} group[haul@{A} haul@{B}]", $"hauls moved into a new group should be in it in the order they were added: {JobsText(worker)}");
         world.MoveJob(worker, new JobSpot(2), new JobSpot(0));
-        Require(JobList(worker) == $"group[haul@{A} haul@{B}] craft@{A} craft@{B}", $"a group moved to the top should take its hauls along: {JobList(worker)}");
+        Require(JobsText(worker) == $"group[haul@{A} haul@{B}] craft@{A} craft@{B}", $"a group moved to the top should take its hauls along: {JobsText(worker)}");
         world.MoveJob(worker, new JobSpot(2), new JobSpot(0, 1));
-        Require(JobList(worker) == $"group[haul@{A} haul@{B}] craft@{A} craft@{B}", $"a craft job should not go into a haul group: {JobList(worker)}");
+        Require(JobsText(worker) == $"group[haul@{A} haul@{B}] craft@{A} craft@{B}", $"a craft job should not go into a haul group: {JobsText(worker)}");
         world.MoveJob(worker, new JobSpot(0, 1), new JobSpot(3));
-        Require(JobList(worker) == $"group[haul@{A}] craft@{A} craft@{B} haul@{B}", $"a haul moved out of its group should be a job of its own: {JobList(worker)}");
+        Require(JobsText(worker) == $"group[haul@{A}] craft@{A} craft@{B} haul@{B}", $"a haul moved out of its group should be a job of its own: {JobsText(worker)}");
         world.RemoveHaulGroup(worker, group);
-        Require(JobList(worker) == $"haul@{A} craft@{A} craft@{B} haul@{B}", $"a group taken apart should leave its hauls in its place: {JobList(worker)}");
+        Require(JobsText(worker) == $"haul@{A} craft@{A} craft@{B} haul@{B}", $"a group taken apart should leave its hauls in its place: {JobsText(worker)}");
         world.AddHaulGroup(worker);
-        Require(JobList(worker) == $"haul@{A} craft@{A} craft@{B} haul@{B} group[]", $"a new group should start empty at the end of the list: {JobList(worker)}");
+        Require(JobsText(worker) == $"haul@{A} craft@{A} craft@{B} haul@{B} group[]", $"a new group should start empty at the end of the list: {JobsText(worker)}");
     }
 
     private static void CheckPlayerTakesWhatAWorkerCarries(GameData data) {

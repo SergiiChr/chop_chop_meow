@@ -12,7 +12,7 @@ public sealed partial class World {
     private void WorkJobs(Worker w, float dt) {
         if (w.Bag.Count > 0 && !w.Loading) { Deliver(w, dt); return; }
         if (w.InHand is JobEntry doing) {
-            if (Holds(w, doing) && Rounds(doing) == w.Mark && Do(w, doing, dt)) return;
+            if (w.Jobs.Contains(doing) && Rounds(doing) == w.Mark && Do(w, doing, dt)) return;
             w.InHand = null;
         }
         w.Plan = default;
@@ -35,12 +35,6 @@ public sealed partial class World {
 
     /// <summary>Seconds a worker with nothing to do waits before reading their job list again.</summary>
     private const float JobListSeconds = .25f;
-
-    /// <summary>Whether an entry is still in a worker's list.</summary>
-    private static bool Holds(Worker w, JobEntry entry) {
-        foreach (var e in w.Jobs) if (e == entry) return true;
-        return false;
-    }
 
     /// <summary>The rounds a job's place has counted, for the jobs whose round is a unit of the place's work; a delivery ends the round of the others.</summary>
     private int Rounds(JobEntry entry) => entry is Duty duty && Def(duty.Job).Rounds && Find(duty.Thing) is Thing place ? place.Rounds : 0;

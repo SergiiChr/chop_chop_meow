@@ -153,9 +153,9 @@ public sealed partial class World {
 
     /// <summary>Puts a worker on every job at one place, instead of whatever they did before, or takes all their jobs away.</summary>
     public void Assign(Worker w, Thing? target) {
-        if (target?.Kind == ThingKind.Mine && !HasDuty(w, target.Id) && Crew(target) >= Data.Mine.Workers) { Say($"A mine has room for {Data.Mine.Workers} workers."); return; }
+        if (target != null && NoRoomAt(w, target)) return;
         if (Forwarded(Verb.Assign, target?.Id ?? 0, w.Id)) return;
-        w.Jobs.Clear(); w.ReadAgain = 0;
+        w.Jobs.Clear(); ListChanged(w);
         if (target != null) foreach (var job in Jobs(target)) w.Jobs.Add(NewDuty(target, job));
         Started(w, target);
     }
@@ -163,24 +163,34 @@ public sealed partial class World {
     /// <summary>Gives a worker one job at a place, at the end of their list, or takes it away wherever it is, keeping their other jobs.</summary>
     public void SetDuty(Worker w, Thing target, JobKind job, bool on) {
         if (on == HasDuty(w, target.Id, job) || Array.IndexOf(Jobs(target), job) < 0) return;
-        if (on && target.Kind == ThingKind.Mine && !HasDuty(w, target.Id) && Crew(target) >= Data.Mine.Workers) { Say($"A mine has room for {Data.Mine.Workers} workers."); return; }
+        if (on && NoRoomAt(w, target)) return;
         if (Forwarded(Verb.Duty, target.Id, w.Id, job.Id(), on ? 1 : 0)) return;
         if (on) w.Jobs.Add(NewDuty(target, job));
         else {
             w.Jobs.RemoveAll(e => e is Duty d && d.Thing == target.Id && d.Job == job);
             foreach (var e in w.Jobs) if (e is HaulGroup group) group.Hauls.RemoveAll(d => d.Thing == target.Id && d.Job == job);
         }
-        w.ReadAgain = 0;
+        ListChanged(w);
         bool first = on && w.Jobs.Count == 1 && w.Jobs[0] is Duty;
         if (first || !on && w.Assignment == target.Id && !HasDuty(w, target.Id)) Started(w, Find(FirstPlace(w)));
     }
+
+    /// <summary>Whether a place is a mine with a full crew that the worker is not in, which the player is told.</summary>
+    private bool NoRoomAt(Worker w, Thing place) {
+        if (place.Kind != ThingKind.Mine || HasDuty(w, place.Id) || Crew(place) < Data.Mine.Workers) return false;
+        Say($"A mine has room for {Data.Mine.Workers} workers.");
+        return true;
+    }
+
+    /// <summary>Has a worker read their changed list on the next tick, even one waiting with nothing to do.</summary>
+    private static void ListChanged(Worker w) => w.ReadAgain = 0;
 
     /// <summary>Adds an empty haul group to the end of a worker's jobs.</summary>
     public void AddHaulGroup(Worker w) {
         if (Forwarded(Verb.HaulGroup, other: w.Id, count: 1)) return;
         int last = 0;
         foreach (var e in w.Jobs) if (e is HaulGroup group) last = Math.Max(last, group.Id);
-        w.Jobs.Add(new HaulGroup { Id = last + 1 }); w.ReadAgain = 0;
+        w.Jobs.Add(new HaulGroup { Id = last + 1 }); ListChanged(w);
     }
 
     /// <summary>Takes a worker's haul group apart: its hauls take its place in the list, as jobs of their own.</summary>
@@ -189,7 +199,7 @@ public sealed partial class World {
         int at = w.Jobs.FindIndex(e => e is HaulGroup group && group.Id == id);
         if (at < 0) return;
         var hauls = ((HaulGroup)w.Jobs[at]).Hauls;
-        w.Jobs.RemoveAt(at); w.Jobs.InsertRange(at, hauls); w.ReadAgain = 0;
+        w.Jobs.RemoveAt(at); w.Jobs.InsertRange(at, hauls); ListChanged(w);
     }
 
     /// <summary>The entry at a spot of a worker's list, or null when there is none there.</summary>
@@ -223,7 +233,7 @@ public sealed partial class World {
             var hauls = ((HaulGroup)w.Jobs[to.Entry]).Hauls;
             hauls.Insert(Math.Clamp(to.Haul, 0, hauls.Count), (Duty)entry);
         } else w.Jobs.Insert(Math.Clamp(to.Entry, 0, w.Jobs.Count), entry);
-        w.ReadAgain = 0;
+        ListChanged(w);
     }
 
     /// <summary>Drops jobs at places that are gone, other than gather jobs, saying so when that leaves the worker without a job; haul groups stay, emptied or not.</summary>

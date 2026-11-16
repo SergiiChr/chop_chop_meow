@@ -1701,9 +1701,10 @@ public sealed partial class World {
 
         void Users(ThingKind kind) {
             foreach (var t in S.Things.Of(kind)) {
-                if (t.Id == exclude || Intake(t, item, false) == null) continue;
+                // Distance first: asking a station what it takes costs more than a nearer place already found saves.
                 float distance = t.Pos.DistanceSquaredTo(origin);
-                if (best == null || bestRank > 0 || distance < bestDistance) { best = t; bestRank = 0; bestDistance = distance; }
+                if (t.Id == exclude || best != null && bestRank == 0 && distance >= bestDistance || Intake(t, item, false) == null) continue;
+                best = t; bestRank = 0; bestDistance = distance;
             }
         }
     }
@@ -1780,7 +1781,7 @@ public sealed partial class World {
         int end = -1;
         // A walker beside a building, with the building between them and where they go, may stand on a square near enough to it while they are not:
         // that square then never ends the search, and they step round. One already as near as a walk's usual reach finds no route and counts as there.
-        bool near = from.DistanceTo(destination) < 1.2f;
+        bool near = from.DistanceTo(destination) < WalkReach;
         while (routeQueue.Count > 0) {
             var current = routeQueue.Dequeue();
             if ((near || current != start) && ((Vector2)current).DistanceTo(destination) <= 1.15f) { end = RouteIndex(current); break; }
@@ -1798,12 +1799,14 @@ public sealed partial class World {
     }
     /// <summary>Moves a worker toward a destination and reports arrival within <paramref name="reach"/>.
     /// A spot closer than the usual reach is a preference: if it cannot be reached, the usual reach counts as arrival.</summary>
-    private bool Walk(Worker w, Vector2 destination, float dt, float reach = 1.2f) {
+    /// <summary>How near a worker counts as at a place: the reach of a walk, and how near a closer spot they cannot get to counts as there.</summary>
+    private const float WalkReach = 1.2f;
+    private bool Walk(Worker w, Vector2 destination, float dt, float reach = WalkReach) {
         float distance = w.Pos.DistanceTo(destination);
         if (distance < reach) return true;
         // Stop at arrival range rather than overshooting into the target's footprint, where the step would be refused.
         if (Travel(w, destination, Math.Min(dt * WorkerSpeed, distance - reach + .05f), dt * WorkerSpeed)) return false;
-        if (distance < 1.2f) return true;
+        if (distance < WalkReach) return true;
         w.Status = "Path blocked · clear a route"; w.WorkState = WorkerWorkState.Blocked;
         return false;
     }

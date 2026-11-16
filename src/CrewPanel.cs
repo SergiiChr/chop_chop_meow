@@ -71,7 +71,7 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
         var chips = new HFlowContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; chips.AddThemeConstantOverride("h_separation", 6); chips.AddThemeConstantOverride("v_separation", 6); column.AddChild(chips);
         int number = 0;
         foreach (var entry in w.Jobs) {
-            if (entry is HaulGroup group) chips.AddChild(GroupChip(++number, group.Hauls.Select(h => world.DutyPlace(w, h.Thing)).OfType<Thing>().ToList()));
+            if (entry is HaulGroup group) chips.AddChild(GroupChip(++number, w, group));
             else if (world.DutyPlace(w, ((Duty)entry).Thing) is Thing at) chips.AddChild(DutyChip(++number, at, ((Duty)entry).Job));
         }
         if (number == 0) chips.AddChild(Style.Pill("No jobs", Style.Tag(Style.Tan), Style.Rim, 12));
@@ -94,10 +94,10 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
     }
 
     /// <summary>A haul group as one chip: its number in the worker's list and the icons of its places.</summary>
-    private static Control GroupChip(int number, List<Thing> places) {
+    private Control GroupChip(int number, Worker w, HaulGroup group) {
         var row = Chip(number, Style.GroupChip);
         row.AddChild(Style.Text(World.Def(JobKind.Haul).Title, 13, Style.Ink, Style.Bold));
-        foreach (var at in places) row.AddChild(Style.Icon(JobList.PlaceIcon(at), 20));
+        foreach (var haul in group.Hauls) if (world.DutyPlace(w, haul.Thing) is Thing at) row.AddChild(Style.Icon(JobList.PlaceIcon(at), 20));
         return row.GetParent<Control>();
     }
 
