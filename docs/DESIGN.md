@@ -385,7 +385,8 @@ A station takes water as a liquid in liters, `Water.Liquid`, with a drawn drople
 `GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
 a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
-Every move between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
+Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
+Loading a station by hand and a worker's delivery pass it what the input slot has left (`Inventory.SlotRoom`).
 Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
 No hand recipe takes a liquid, which `GameData` checks.
 
@@ -778,7 +779,7 @@ Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, 
 3. the input or fuel covering the fewest batches;
 4. the output holding the most.
 
-Inputs and fuel fill to a stack (`World.SlotRoom`); a farm plot's slots hold one sowing (`World.SowRoom`) and a mine site what it lacks.
+Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold one sowing (`World.SowRoom`) and a mine site what it lacks.
 A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
 Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
 

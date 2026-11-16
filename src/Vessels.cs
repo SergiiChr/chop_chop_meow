@@ -59,14 +59,18 @@ public sealed partial class World {
 
     /// <summary>
     /// Moves items between two boxes, by hand or by a worker; <paramref name="quantity"/> counts liters of a liquid and vessels of anything else.
-    /// A liquid fills vessels in the box it goes to, unless that box is a station that takes it;
-    /// a vessel dropped into a station that takes its liquid pours what it holds there and stays behind, emptier.
+    /// Every move of a liquid goes through here.
+    /// A liquid fills vessels in the box it goes to, unless that box is a station that takes it: there it comes as it is, or poured from the vessels that hold it.
+    /// A vessel dropped into a station that takes its liquid pours what it holds there and stays behind, emptier.
     /// </summary>
     /// <param name="into">The thing that owns <paramref name="to"/>, or null for the backpack or a worker's bag.</param>
-    private int Carry(Inventory from, Inventory to, Thing? into, string item, int quantity) {
-        if (Data.VesselFor(item) is VesselDef held && !(into != null && to == into.Inventory && Pending(into, item))) return Fill(from, to, held, quantity);
-        if (PoursInto(into, to, item) is VesselDef poured) return PourVessels(from, item, to, poured, quantity, int.MaxValue);
-        return from.TransferTo(to, item, quantity);
+    /// <param name="room">Most units, or liters of a liquid, that may land in <paramref name="to"/>, such as what a station's input slot has left.</param>
+    private int Carry(Inventory from, Inventory to, Thing? into, string item, int quantity, int room = int.MaxValue) {
+        bool takes = into != null && to == into.Inventory && Pending(into, item);
+        if (Data.VesselFor(item) is VesselDef held)
+            return !takes ? Fill(from, to, held, quantity) : from[item] > 0 ? from.TransferTo(to, item, Math.Min(quantity, room)) : PourLiters(from, to, held, Math.Min(quantity, room));
+        if (PoursInto(into, to, item) is VesselDef poured) return PourVessels(from, item, to, poured, quantity, room);
+        return from.TransferTo(to, item, Math.Min(quantity, room));
     }
 
     /// <summary>Why a liquid cannot leave a box for the backpack or another box now, or null: it goes only into vessels there with room for it.</summary>
@@ -101,7 +105,7 @@ public sealed partial class World {
         string spilled = "";
         foreach (var v in Data.Vessels) {
             if (box[v.Liquid] == 0) continue;
-            Fill(box, S.Backpack, v, box[v.Liquid]);
+            Carry(box, S.Backpack, null, v.Liquid, box[v.Liquid]);
             if (box.Remove(v.Liquid, box[v.Liquid]) is > 0 and int lost) spilled += $" {lost}L of {Lower(Data.Name(v.Liquid))} spilled.";
         }
         return spilled;
@@ -137,7 +141,7 @@ public sealed partial class World {
     private bool FillsLeftover(Worker w, Thing? dest, string item, float dt) {
         if (dest == null || Data.VesselOf(item) is not VesselDef v || item == v.Full || dest.Inventory[v.Liquid] == 0 || Pending(dest, v.Liquid)) return false;
         w.Status = Phrase("Taking ", Lower(Data.Name(v.Liquid)), " out");
-        if (Walk(w, dest.Pos, dt)) { Fill(dest.Inventory, w.Bag, v, dest.Inventory[v.Liquid]); w.Destination = 0; }
+        if (Walk(w, dest.Pos, dt)) { Carry(dest.Inventory, w.Bag, null, v.Liquid, dest.Inventory[v.Liquid]); w.Destination = 0; }
         return true;
     }
 }

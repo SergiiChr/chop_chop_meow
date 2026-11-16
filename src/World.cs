@@ -1046,7 +1046,7 @@ public sealed partial class World {
         if (r.Burns && (fuel = FuelFromBackpack(t, r, cost)) == null) return;
         for (int i = 0; i < batches; i++) {
             if (!CarriesBatch(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
-            if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
+            if (cost.Any(pair => t.Inventory.SlotRoom(pair.Key) < pair.Value) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
             foreach (var pair in cost) Load(t, pair.Key, pair.Value);
             if (fuel != null) S.Backpack.TransferTo(t.Burner!, fuel, 1);
         }
@@ -1070,13 +1070,8 @@ public sealed partial class World {
     /// Loads units of a station input from the backpack while its input slot has room, and says nothing.
     /// A vessel pours what it holds, and a liquid asked for by name, as when a batch is queued, pours from the backpack's vessels.
     /// </summary>
-    private int Load(Thing t, string item, int quantity) {
-        var vessel = PoursInto(t, t.Inventory, item);
-        int room = t.Inventory.StackSize - t.Inventory[vessel?.Liquid ?? item];
-        return vessel != null ? PourVessels(S.Backpack, item, t.Inventory, vessel, quantity, room)
-            : Data.VesselFor(item) is VesselDef held ? PourLiters(S.Backpack, t.Inventory, held, Math.Min(quantity, room))
-            : S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, room));
-    }
+    private int Load(Thing t, string item, int quantity) =>
+        Carry(S.Backpack, t.Inventory, t, item, quantity, t.Inventory.SlotRoom(PoursInto(t, t.Inventory, item)?.Liquid ?? item));
     /// <summary>Manual loading of the fuel slot, which holds one kind of fuel at a time.</summary>
     public int LoadFuel(Thing t, string item, int quantity) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
@@ -2189,7 +2184,7 @@ public sealed partial class World {
             if (t.Progress >= recipe.Seconds) {
                 // Manual loading or another hauler can fill the station while a batch cooks.
                 // Retain the completed batch until the one-stack output slot has room rather than discarding output.
-                if (SlotRoom(t.Inventory, recipe.Output) < recipe.Amount) return;
+                if (t.Inventory.SlotRoom(recipe.Output) < recipe.Amount) return;
                 t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Making = ""; t.Progress = 0; t.Rounds++; stillBurning.Add(t.Id);
                 Crafted(recipe.Output);
             }

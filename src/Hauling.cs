@@ -129,8 +129,6 @@ public sealed partial class World {
     private static Carry TakeOut(Thing place, Thing to, CarryBox box, string item, int count, bool full) =>
         new() { Place = place, From = place, To = to, Box = box, Item = item, Count = count, Rule = full ? 2 : 4, Order = -count };
 
-    /// <summary>The room an input slot has left up to a stack.</summary>
-    private static int SlotRoom(Inventory box, string item) => Math.Min(box.Room(item), Math.Max(box.StackSize, box.StackOf(item)) - box[item]);
 
     private void StationCarries(Worker w, Thing t, ref Carry best) {
         RecipeDef? recipe = Data.Recipes.GetValueOrDefault(t.Recipe);
@@ -138,7 +136,7 @@ public sealed partial class World {
             int free = t.Inventory.Free(item);
             if (free == 0 || Pending(t, item)) continue;
             // What another recipe left keeps the station from starting a batch, so it leaves as a full output does.
-            bool full = recipe != null && (item != recipe.Output || SlotRoom(t.Inventory, item) < recipe.Amount);
+            bool full = recipe != null && (item != recipe.Output || t.Inventory.SlotRoom(item) < recipe.Amount);
             if (Data.VesselFor(item) is VesselDef v) {
                 // A liquid leaves in vessels with room for it, which the hauler brings, fills here and stores.
                 if (DepositFor(v.Full, t.Pos, t.Id) == null || RoomySource(v, w.Pos) is not (string roomy, Thing holder)) continue;
@@ -147,7 +145,7 @@ public sealed partial class World {
         }
         if (recipe == null) return;
         foreach (var (input, batch) in recipe.Inputs) {
-            int have = t.Inventory[input], room = SlotRoom(t.Inventory, input);
+            int have = t.Inventory[input], room = t.Inventory.SlotRoom(input);
             if (room <= 0) continue;
             // A liquid comes in the vessels that pour it, enough of them for the liters of room.
             if (Data.VesselFor(input) is VesselDef carrier) {
@@ -159,7 +157,7 @@ public sealed partial class World {
             // Fuel the recipe does not burn leaves the fuel slot, so the right one can go in.
             if (!t.Processing && DepositFor(held, t.Pos, t.Id) is Thing store) Offer(ref best, new Carry { Place = t, From = t, To = store, Box = CarryBox.Burner, Item = held, Count = burner.Free(held), Rule = 1 });
         } else if (FuelSource(t, w.Pos) is (string fuel, Thing from))
-            Offer(ref best, Bring(t, from, fuel, burner.Room(fuel) + (recipe.Inputs.ContainsKey(fuel) ? Math.Max(0, SlotRoom(t.Inventory, fuel)) : 0), burner[fuel], 1) with { Fuel = true });
+            Offer(ref best, Bring(t, from, fuel, burner.Room(fuel) + (recipe.Inputs.ContainsKey(fuel) ? Math.Max(0, t.Inventory.SlotRoom(fuel)) : 0), burner[fuel], 1) with { Fuel = true });
     }
 
     /// <summary>The room a station's fuel slot has for an input that its recipe also burns; a load of it is shared between the two slots.</summary>
@@ -205,8 +203,8 @@ public sealed partial class World {
             bool full = farm.Output.Room(item) < Data.Farm.Yield.GetValueOrDefault(item);
             if (DepositFor(item, farm.Pos, farm.Id) is Thing store) Offer(ref best, TakeOut(farm, store, CarryBox.Output, item, free, full));
             // With no storage for it, spare seed stacks up in the plot's own input slots.
-            else if (Data.Farm.Sow.ContainsKey(item) && SlotRoom(farm.Inventory, item) > 0)
-                Offer(ref best, TakeOut(farm, farm, CarryBox.Output, item, Math.Min(free, SlotRoom(farm.Inventory, item)), full));
+            else if (Data.Farm.Sow.ContainsKey(item) && farm.Inventory.SlotRoom(item) > 0)
+                Offer(ref best, TakeOut(farm, farm, CarryBox.Output, item, Math.Min(free, farm.Inventory.SlotRoom(item)), full));
         }
     }
 
@@ -229,9 +227,9 @@ public sealed partial class World {
         }
         if (t.Packs == "") return;
         // A batch is one crate: a crate's worth of the good and one empty crate.
-        if (SlotRoom(t.Inventory, t.Packs) is > 0 and int room && PackerTakes(t, t.Packs) && SourceFor(t.Packs, w.Pos, t.Id) is Thing goods)
+        if (t.Inventory.SlotRoom(t.Packs) is > 0 and int room && PackerTakes(t, t.Packs) && SourceFor(t.Packs, w.Pos, t.Id) is Thing goods)
             Offer(ref best, Bring(t, goods, t.Packs, room, t.Inventory[t.Packs], Data.CrateCapacity));
-        if (SlotRoom(t.Inventory, "crate") is > 0 and int crates && SourceFor("crate", w.Pos, t.Id) is Thing stack)
+        if (t.Inventory.SlotRoom("crate") is > 0 and int crates && SourceFor("crate", w.Pos, t.Id) is Thing stack)
             Offer(ref best, Bring(t, stack, "crate", crates, t.Inventory["crate"], 1));
     }
 }
