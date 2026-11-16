@@ -77,7 +77,7 @@ public partial class WorldView {
     public async void RenderIntro(string folder, float[]? stills) {
         try {
             DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
-            var saves = new List<(string Name, Task<Error> Save)>();
+            var saves = new List<Task>();
             DirAccess.MakeDirRecursiveAbsolute(folder);
             BuildFilm();
             var shots = IntroShots;
@@ -98,13 +98,15 @@ public partial class WorldView {
                 for (int settle = cut || still ? 4 : 1; settle > 0; settle--) await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
                 string name = still ? string.Create(CultureInfo.InvariantCulture, $"still_{filmTime:00.00}.png") : $"{saved:D5}.png";
                 var image = GetViewport().GetTexture().GetImage();
-                saves.Add((name, Task.Run(() => image.SavePng($"{folder}/{name}"))));
+                saves.Add(Task.Run(() => {
+                    using (image) {
+                        var result = image.SavePng($"{folder}/{name}");
+                        if (result != Error.Ok) throw new InvalidOperationException($"Intro frame {name} was not saved: {result}");
+                    }
+                }));
                 saved++;
             }
-            foreach (var (name, save) in saves) {
-                var result = await save;
-                if (result != Error.Ok) throw new InvalidOperationException($"Intro frame {name} was not saved: {result}");
-            }
+            await Task.WhenAll(saves);
             using (var sheet = FileAccess.Open($"{folder}/{IntroCues}", FileAccess.ModeFlags.Write)) sheet.StoreString(cues.ToString());
             GD.Print($"INTRO RENDERED {saved} frames, {starts[^1] * IntroStep:0.00} s");
             GetTree().Quit();

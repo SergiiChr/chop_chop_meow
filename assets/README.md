@@ -217,7 +217,7 @@ Each cut is faded at both ends, and the cuts of one sound are brought to one mea
 `wolf_howl` (a lone wolf, the night's first howl), `wolf_howl_group` (the pack answering) and `hire_sign` (a pen signing paper, cleaned of rumble and room noise) were supplied for this project.
 
 `footsteps_default` is cut with ffmpeg from "Footsteps_Grass_1" by freesound_community (Pixabay 6810, artist SilentStrikeZ on Freesound), a recording supplied for this project: six single steps, each 0.34 seconds from just before the foot lands, faded in over 15 ms and out over its last 120 ms.
-Each step's loudest 400 ms of heard loudness is brought to -23.3 LUFS, the mean of the steps it replaced.
+Each step's loudest 400 ms of heard loudness, counting the silence after it, is brought to -23.3 LUFS, the mean of the steps it replaced.
 
 `stomach_growl` is "yet more stomach sounds" by freesound_community (Pixabay 97719, artist Darsycho on Freesound), a recording supplied for this project, with the silence cut from both ends: four seconds of three rumbles.
 
