@@ -63,11 +63,13 @@ Play accepts Godot arguments after `--`:
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
+| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and bangs), `occupied` (one bangs while the other is inside, who then steps out), `wolf` (wolves drag each out of the doorway at night) or `wounded` (a badly hurt player dragged out and pinned) |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
 | `--animation-review` | Show every actor action on rotating rigs |
-| `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection, evenly spaced at 30 a second |
+| `--animation-capture /absolute/directory` | Capture 96 frames of the animation review or a showcase scene for visual inspection, evenly spaced at 30 a second of game time |
+| `--animation-frames 240` | Capture this many frames instead of 96 |
 | `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following; a felling clip such as `"player steel axe"` plays against a trunk |
 | `--animation-review --animation-clip "wolf leap"` | Show one wolf clip close up; the leap, hit and feed play against a player |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |

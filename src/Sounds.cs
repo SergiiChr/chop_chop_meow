@@ -44,6 +44,7 @@ public partial class Sounds : Node {
         ["close_chest"] = -13,
         ["hut_door_normal"] = -6.5f,
         ["hut_door_escaping"] = -8,
+        ["door_bang"] = -11,
         ["open_steel_smelter"] = -9,
         ["meat_inventory"] = -6.5f,
         ["move_coins_inventory"] = -1,

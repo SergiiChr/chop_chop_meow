@@ -5,10 +5,10 @@ namespace ChopChopMeow;
 
 public partial class Game {
     // Developer review fixture: capture the exact runtime clips, never alter a playable save.
-    private async void CaptureAnimations(string directory) {
+    private async void CaptureAnimations(string directory, int frames) {
         try {
             DirAccess.MakeDirRecursiveAbsolute(directory);
-            for (int frame = 0; frame < 96; frame++) {
+            for (int frame = 0; frame < frames; frame++) {
                 await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
                 var result = GetViewport().GetTexture().GetImage().SavePng($"{directory}/{frame:D3}.png");
                 if (result != Error.Ok) throw new InvalidOperationException($"Animation capture failed: {result}");

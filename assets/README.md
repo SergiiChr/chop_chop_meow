@@ -216,6 +216,8 @@ Each cut is faded at both ends, and the cuts of one sound are brought to one mea
 
 `wolf_howl` (a lone wolf, the night's first howl), `wolf_howl_group` (the pack answering) and `hire_sign` (a pen signing paper, cleaned of rumble and room noise) were supplied for this project.
 
+`door_bang` is "Door bang 1.wav" by freesound_community (Pixabay 14449), a recording supplied for this project: its three bangs on a door, each cut into its own variant, faded at both ends and brought to one mean level.
+
 `stomach_growl` is "yet more stomach sounds" by freesound_community (Pixabay 97719, artist Darsycho on Freesound), a recording supplied for this project, with the silence cut from both ends: four seconds of three rumbles.
 
 The tree sounds are cut and mixed with ffmpeg from three recordings supplied for this project, a tree bending and two trees falling:

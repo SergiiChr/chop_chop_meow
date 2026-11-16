@@ -110,15 +110,13 @@ public partial class Game : Node, IGameFlow {
                 panel.Close(); ui.Visible = false; AudioServer.SetBusMute(0, true);
                 view.RenderIntro(introFolder, stills);
             }
-            if (Launch.Has("--animation-review")) {
-                panel.Close(); ui.Visible = false; view.AnimationReview = true;
-                if (Launch.Value("--animation-capture") is string captures) {
-                    // Thirty frames a second of animation time, slowed by --animation-slow for a closer look.
-                    float slow = Launch.Number("--animation-slow", 1);
-                    if (!(slow > 0 && float.IsFinite(slow))) throw new ArgumentException($"--animation-slow must be a positive number: {slow}");
-                    view.CaptureStep = 1f / 30 / slow;
-                    CaptureAnimations(captures);
-                }
+            if (Launch.Has("--animation-review")) { panel.Close(); ui.Visible = false; view.AnimationReview = true; }
+            if (Launch.Value("--animation-capture") is string captures) {
+                // Thirty frames a second of game time, slowed by --animation-slow for a closer look.
+                float slow = Launch.Number("--animation-slow", 1);
+                if (!(slow > 0 && float.IsFinite(slow))) throw new ArgumentException($"--animation-slow must be a positive number: {slow}");
+                view.CaptureStep = 1f / 30 / slow;
+                CaptureAnimations(captures, (int)Launch.Number("--animation-frames", 96));
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
@@ -342,7 +340,7 @@ public partial class Game : Node, IGameFlow {
     public override void _Process(double delta) {
         // Drawing the intro film takes no input and runs no game under it.
         if (world == null || view == null || introFolder != null) return;
-        float dt = Math.Min((float)delta, .1f); runTime += dt;
+        float dt = view.CaptureStep ?? Math.Min((float)delta, .1f); runTime += dt;
         player.Update(dt, GetViewport().GuiGetHoveredControl() != null); panel.ShowAwaited();
         if (session is Session.Launching launching) AwaitServer(launching);
         // The server holds the world still while every player has a menu open, which in a game alone is whenever this one does.
