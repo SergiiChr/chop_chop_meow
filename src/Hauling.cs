@@ -35,12 +35,12 @@ internal struct Carry {
 public sealed partial class World {
     /// <summary>A haul job, alone or a haul group: carries the best load across its places, one at a time.</summary>
     private bool Haul(Worker w, JobEntry job, float dt) {
-        if (w.Plan.Place == null || !Stands(w.Plan)) w.Plan = NextCarry(w, job);
+        if (w.Plan.Place is not Thing planned || !Covers(job, planned) || !Stands(w.Plan)) w.Plan = NextCarry(w, job);
         if (w.Plan.Place is not Thing place) { w.Status = HaulWait(job); return false; }
-        if (!HandsFree(w, dt)) return true;
-        var c = w.Plan;
         // The job in hand is the haul at the place the carry is for, also when a haul group picked it.
         w.Assignment = place.Id; w.Doing = JobKind.Haul;
+        if (!HandsFree(w, dt)) return true;
+        var c = w.Plan;
         w.Status = CarryStatus(c, place);
         if (!Walk(w, c.From!.Pos, dt)) return true;
         var box = BoxOf(c);
@@ -60,6 +60,13 @@ public sealed partial class World {
         if (c.From == place) return c.Item.StartsWith(PackedPrefix) ? "Carrying out a packed crate" : Phrase("Carrying out ", Data.Name(c.Item));
         if (c.Fuel) return Phrase("Fetching ", Data.Name(c.Item), " for the fire");
         return place.Kind == ThingKind.Mine ? Phrase("Fetching ", Data.Name(c.Item), " for the ", MineName(place)) : Phrase("Fetching ", Data.Name(c.Item));
+    }
+
+    /// <summary>Whether a haul job still holds a place: its own, or one of a haul group's.</summary>
+    private static bool Covers(JobEntry job, Thing place) {
+        if (job is Duty duty) return duty.Thing == place.Id;
+        foreach (var haul in ((HaulGroup)job).Hauls) if (haul.Thing == place.Id) return true;
+        return false;
     }
 
     private static Inventory BoxOf(in Carry c) => c.Box switch { CarryBox.Output => c.From!.Output!, CarryBox.Burner => c.From!.Burner!, _ => c.From!.Inventory };

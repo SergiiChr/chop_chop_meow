@@ -196,7 +196,8 @@ public partial class JobList(UiKit kit, LiveUpdates live, Worker w) : VBoxContai
         var from = dragged!.Value;
         bool haul = World.JobAt(w, from) is Duty { Job: JobKind.Haul };
         int into = -1;
-        if (haul) foreach (var (entry, parts) in groups) if (parts.Box.GetGlobalRect().HasPoint(at)) into = entry;
+        // The rows can be out of date for a moment, so a box counts only while a group still stands at its place in the list.
+        if (haul) foreach (var (entry, parts) in groups) if (parts.Box.GetGlobalRect().HasPoint(at) && World.JobAt(w, new JobSpot(entry)) is HaulGroup) into = entry;
         if (into != over) {
             over = into;
             foreach (var (entry, parts) in groups) {

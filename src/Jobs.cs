@@ -14,13 +14,13 @@ public enum JobKind { Gather, Haul, Craft, Bellows, Farm, Build, Mine, Deliverie
 public sealed class JobConverter() : JsonStringEnumConverter<JobKind>(JsonNamingPolicy.SnakeCaseLower);
 
 /// <summary>What a job is called, what it does and how a worker goes about it.</summary>
-/// <param name="Id">The job's id in saves, commands and the names of controls, such as "haul".</param>
+/// <param name="Job">The job the row is for.</param>
 /// <param name="Title">The job's name on buttons and rows.</param>
 /// <param name="Hint">What the job does, on its button.</param>
 /// <param name="Rounds">Whether a round of it is a unit of the place's work, such as a batch, rather than a delivery.</param>
 /// <param name="Tools">The tool kinds the job itself takes; a gather job takes what its spot needs.</param>
 /// <param name="Do">Does the job for a tick at its place, which is null only for a gather job whose spot is gone; tells whether there was anything to do.</param>
-public sealed record JobDef(string Id, string Title, string Hint, bool Rounds, string[] Tools, Func<World, Worker, Duty, Thing?, float, bool> Do);
+public sealed record JobDef(JobKind Job, string Title, string Hint, bool Rounds, string[] Tools, Func<World, Worker, Duty, Thing?, float, bool> Do);
 
 /// <summary>One entry of a worker's job list: a job at one place, or a haul group.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "Entry")]
@@ -68,35 +68,57 @@ public readonly struct DutyList(List<JobEntry> jobs) {
     }
 }
 
-public static class Jobs {
-    public static string Id(this JobKind job) => World.Def(job).Id;
+/// <summary>Converts jobs to and from the ids that saves, commands and the names of controls use, such as "haul".</summary>
+public static class JobKinds {
+    private static readonly string[] ids;
+    private static readonly Dictionary<string, JobKind> byId = new();
 
-    public static bool TryParse(string id, out JobKind job) {
-        foreach (var kind in Enum.GetValues<JobKind>()) if (kind.Id() == id) { job = kind; return true; }
-        job = default; return false;
+    static JobKinds() {
+        var all = Enum.GetValues<JobKind>();
+        ids = new string[all.Length];
+        foreach (var job in all) {
+            ids[(int)job] = JsonNamingPolicy.SnakeCaseLower.ConvertName(job.ToString());
+            byId[ids[(int)job]] = job;
+        }
     }
+
+    /// <summary>The job's id, the one its converter reads and writes; cached, so asking every frame allocates nothing.</summary>
+    public static string Id(this JobKind job) => ids[(int)job];
+
+    public static bool TryParse(string id, out JobKind job) => byId.TryGetValue(id, out job);
 }
 
 /// <summary>A worker's job list: the table of jobs, and adding, moving and grouping the entries.</summary>
 public sealed partial class World {
-    private static readonly JobDef[] JobDefs = {
-        new("gather", "Gather", "Gathers and carries to storage.", false, [],
+    private static readonly JobDef[] JobDefs = ByKind(
+        new(JobKind.Gather, "Gather", "Gathers and carries to storage.", false, [],
             static (world, w, d, place, dt) => place?.Kind == ThingKind.Water ? world.WaterWork(w, place, dt) : world.Gather(w, d, place, dt)),
-        new("haul", "Haul", "Brings ingredients and fuel and carries what is made to storage.", false, [], static (world, w, d, _, dt) => world.Haul(w, d, dt)),
-        new("craft", "Craft", "Works the station; it only makes progress while someone works it.", true, [],
+        new(JobKind.Haul, "Haul", "Brings ingredients and fuel and carries what is made to storage.", false, [], static (world, w, d, _, dt) => world.Haul(w, d, dt)),
+        new(JobKind.Craft, "Craft", "Works the station; it only makes progress while someone works it.", true, [],
             static (world, w, _, place, dt) => place!.Kind == ThingKind.Packer ? world.PackWork(w, place, dt) : world.Craft(w, place, dt)),
-        new("bellows", "Bellows", "Keeps the fire hot. Only one worker pumps at a time.", true, [], static (world, w, _, place, dt) => world.Pump(w, place!, dt)),
-        new("farm", "Farm", "Harvests the ripe wheat.", true, [], static (world, w, _, place, dt) => world.Reap(w, place!, dt)),
-        new("build", "Build", "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.", true, ["pickaxe", "hammer"], static (world, w, _, place, dt) => world.BuildSite(w, place!, dt)),
-        new("mine", "Mine", "Mines ore and stone underground with a pickaxe.", true, ["pickaxe"], static (world, w, _, place, dt) => world.Dig(w, place!, dt)),
-        new("deliveries", "Manage deliveries", "Fetches fresh prices on request and carries deliveries to storage.", false, [], static (world, w, _, place, dt) => world.ManageDeliveries(w, place!, dt)),
-        new("fuel", "Tend fire", "Keeps the fire fed with wood from storage.", false, [], static (world, w, _, place, dt) => world.TendFire(w, place!, dt)),
-        new("stock", "Stock", "Brings tools from storage to the rack.", false, [], static (world, w, _, place, dt) => world.StockTools(w, place!, dt)),
-        new("tend", "Tend", "Brings what the compost takes from storage and carries fertilizer back.", false, [], static (world, w, _, place, dt) => world.TendCompost(w, place!, dt)),
-    };
+        new(JobKind.Bellows, "Bellows", "Keeps the fire hot. Only one worker pumps at a time.", true, [], static (world, w, _, place, dt) => world.Pump(w, place!, dt)),
+        new(JobKind.Farm, "Farm", "Harvests the ripe wheat.", true, [], static (world, w, _, place, dt) => world.Reap(w, place!, dt)),
+        new(JobKind.Build, "Build", "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.", true, ["pickaxe", "hammer"], static (world, w, _, place, dt) => world.BuildSite(w, place!, dt)),
+        new(JobKind.Mine, "Mine", "Mines ore and stone underground with a pickaxe.", true, ["pickaxe"], static (world, w, _, place, dt) => world.Dig(w, place!, dt)),
+        new(JobKind.Deliveries, "Manage deliveries", "Fetches fresh prices on request and carries deliveries to storage.", false, [], static (world, w, _, place, dt) => world.ManageDeliveries(w, place!, dt)),
+        new(JobKind.Fuel, "Tend fire", "Keeps the fire fed with wood from storage.", false, [], static (world, w, _, place, dt) => world.TendFire(w, place!, dt)),
+        new(JobKind.Stock, "Stock", "Brings tools from storage to the rack.", false, [], static (world, w, _, place, dt) => world.StockTools(w, place!, dt)),
+        new(JobKind.Tend, "Tend", "Brings what the compost takes from storage and carries fertilizer back.", false, [], static (world, w, _, place, dt) => world.TendCompost(w, place!, dt))
+    );
 
     /// <summary>A job's row in the table.</summary>
     public static JobDef Def(JobKind job) => JobDefs[(int)job];
+
+    /// <summary>The table's rows by job, for <see cref="Def"/> to look up; the game does not start with a job that has no row or two.</summary>
+    private static JobDef[] ByKind(params JobDef[] rows) {
+        var byKind = new JobDef?[Enum.GetValues<JobKind>().Length];
+        foreach (var row in rows) {
+            if (byKind[(int)row.Job] != null) throw new InvalidOperationException($"The job {row.Job} has two rows in the job table.");
+            byKind[(int)row.Job] = row;
+        }
+        for (int i = 0; i < byKind.Length; i++) if (byKind[i] == null) throw new InvalidOperationException($"The job {(JobKind)i} has no row in the job table.");
+        return byKind!;
+    }
 
     /// <summary>The jobs a place offers workers, in the order the panel shows them.</summary>
     public JobKind[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {
@@ -224,7 +246,8 @@ public sealed partial class World {
         if (jobs == null) return false;
         var groups = new HashSet<int>();
         foreach (var entry in jobs) {
-            if (entry is Duty) continue;
+            // The job converter also reads a number, which may name no job.
+            if (entry is Duty duty) { if (!Enum.IsDefined(duty.Job)) return false; continue; }
             if (entry is not HaulGroup { Hauls: not null } group || group.Id <= 0 || !groups.Add(group.Id)) return false;
             foreach (var haul in group.Hauls) if (haul?.Job != JobKind.Haul) return false;
         }

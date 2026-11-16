@@ -227,7 +227,7 @@ public sealed partial class World {
             case Verb.EndingShown: MarkEndingShown(); break;
             case Verb.SkipMorning: SkipMorning(); break;
             case Verb.Assign: if (w != null) Assign(w, t); break;
-            case Verb.Duty: if (w != null && ChopChopMeow.Jobs.TryParse(c.Item, out var job) && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, job, c.Count != 0); break;
+            case Verb.Duty: if (w != null && JobKinds.TryParse(c.Item, out var job) && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, job, c.Count != 0); break;
             case Verb.Fire: if (w != null) Fire(w); break;
             case Verb.HaulGroup: if (w != null) { if (c.Count != 0) AddHaulGroup(w); else RemoveHaulGroup(w, (int)c.At.X); } break;
             // A stale move, of a job that has left that place in the list, is dropped rather than moving another job.

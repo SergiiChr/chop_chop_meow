@@ -30,6 +30,7 @@ public static class WorkerTaskChecks {
         CheckACrafterLowerInTheListGivesWayAfterOneBatch(data);
         CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(data);
         CheckAWorkerBesideAStationWalksRoundItToWorkIt(data);
+        CheckAWorkerWhoseWorkSpotIsBlockedWorksFromAsNearAsTheyGet(data);
         CheckSaveWithAJobOtherThanAHaulInAGroupIsRefused(data);
         CheckAJobMovedUpComesFirst(data);
         CheckAHaulGroupBringsTheShortestInputAcrossItsPlaces(data);
@@ -451,5 +452,16 @@ public static class WorkerTaskChecks {
         worker.Pos = packer.Pos + new Vector2(-.49f, .5f);
         Work(world, 10, () => worker.WorkState == WorkerWorkState.Hammering);
         Require(worker.WorkState == WorkerWorkState.Hammering, $"a packer beside the far side of the station should walk round it and pack, not \"{worker.Status}\"");
+    }
+
+    /// <summary>A chest stands on the spot a pumper works the bellows from; they pump from as near to it as they get, rather than walking to and fro.</summary>
+    private static void CheckAWorkerWhoseWorkSpotIsBlockedWorksFromAsNearAsTheyGet(GameData data) {
+        var world = EmptyWorld(data);
+        var forge = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 6));
+        forge.Inventory.Add("iron_bar", 20); forge.Inventory.Add("coal", 20); forge.Burner!.Add("coal", 10);
+        world.Add(ThingKind.Chest, forge.Pos + World.BellowsStand);
+        var pumper = Staff(world, forge, JobKind.Bellows);
+        Work(world, 10, () => pumper.WorkState == WorkerWorkState.Pumping);
+        Require(pumper.WorkState == WorkerWorkState.Pumping, $"a pumper whose spot a chest stands on should pump from beside it, not \"{pumper.Status}\"");
     }
 }

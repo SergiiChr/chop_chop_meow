@@ -1778,11 +1778,12 @@ public sealed partial class World {
         routeQueue.Clear(); routeQueue.Enqueue(start);
         routeSeen[RouteIndex(start)] = search;
         int end = -1;
+        // A walker beside a building, with the building between them and where they go, may stand on a square near enough to it while they are not:
+        // that square then never ends the search, and they step round. One already as near as a walk's usual reach finds no route and counts as there.
+        bool near = from.DistanceTo(destination) < 1.2f;
         while (routeQueue.Count > 0) {
             var current = routeQueue.Dequeue();
-            // A search starts only when the straight way is blocked, so the walker's own square never ends it, however near the destination:
-            // a walker beside a building, with the building between them and where they go, then steps round it.
-            if (current != start && ((Vector2)current).DistanceTo(destination) <= 1.15f) { end = RouteIndex(current); break; }
+            if ((near || current != start) && ((Vector2)current).DistanceTo(destination) <= 1.15f) { end = RouteIndex(current); break; }
             foreach (var step in RouteSteps) {
                 var next = current + step;
                 if (!OnMap(next) || routeSeen[RouteIndex(next)] == search || !RouteOpen(next)) continue;

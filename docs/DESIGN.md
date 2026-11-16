@@ -739,7 +739,7 @@ Workers are tracked individually.
 
 #### Jobs
 
-The kinds of work are `JobKind`, and one table holds each job's id, title, hint, whether a round of it is a unit of the place's work, the tools it takes and what it does (`World.Def`, `JobDef`).
+The kinds of work are `JobKind`, each with an id in saves and commands (`JobKinds.Id`), and one table holds each job's title, hint, whether a round of it is a unit of the place's work, the tools it takes and what it does (`World.Def`, `JobDef`).
 A place offers some of them (`World.Jobs`), such as Craft and Haul at a crafting bench.
 
 - Stock brings tools from storage to a tool station.
