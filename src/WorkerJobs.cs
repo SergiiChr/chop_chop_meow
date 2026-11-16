@@ -93,7 +93,7 @@ public sealed partial class World {
         w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
         if (!Walk(w, dest.Pos, dt)) return;
         // Every vessel carried pours, whatever it holds; the vessels stay in hand, emptier.
-        if (PoursInto(dest, into, item) is VesselDef pours) PourLiters(w.Bag, into, pours, room);
+        if (PoursInto(dest, into, item) is VesselDef pours) Carry(w.Bag, into, dest, pours.Liquid, room, room);
         else if (FuelSplit(dest, item, w.Bag[item]) is (int fuel, int input)) {
             w.Bag.TransferTo(dest.Burner!, item, fuel, true);
             w.Bag.TransferTo(dest.Inventory, item, input, true);
@@ -148,7 +148,7 @@ public sealed partial class World {
     private int InputRoom(Thing t, string item) {
         string lands = PoursInto(t, t.Inventory, item)?.Liquid ?? item;
         if (Data.VesselFor(lands) != null && lands == item || !BatchCost(t).ContainsKey(lands)) return 0;
-        return Math.Max(0, SlotRoom(t.Inventory, lands));
+        return Math.Max(0, t.Inventory.SlotRoom(lands));
     }
 
     private bool IsStation(ThingKind kind) => Array.IndexOf(stationKinds, kind) >= 0;
@@ -252,7 +252,7 @@ public sealed partial class World {
 
     /// <summary>Whether a station's finished batch waits for room in its output slot, so working it does nothing.</summary>
     private static bool Stalled(Thing station, RecipeDef recipe) =>
-        station.Processing && station.Progress >= recipe.Seconds && SlotRoom(station.Inventory, recipe.Output) < recipe.Amount;
+        station.Processing && station.Progress >= recipe.Seconds && station.Inventory.SlotRoom(recipe.Output) < recipe.Amount;
 
     /// <summary>The first input a station is short of for a batch, or the fuel it lacks, named for a status; null when something else keeps it from starting.</summary>
     private string? Lacks(Thing station, RecipeDef recipe) {

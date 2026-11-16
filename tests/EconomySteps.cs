@@ -18,6 +18,9 @@ internal static class EconomySteps {
         return cost;
     }
 
+    /// <summary>What a full crate of a good sells for at the full price, the crate included.</summary>
+    public static float CrateSells(GameData data, string item) => data.CrateCapacity * data.Market.Goods[item].Price + data.Market.CratePrice;
+
     /// <summary>Recipe steps from gathered materials: raw goods are 0, and a recipe is one more than its deepest input.</summary>
     public static int Depth(GameData data, string item) =>
         data.Recipes.Values.FirstOrDefault(r => r.Output == item) is RecipeDef r ? 1 + r.Inputs.Keys.Max(input => Depth(data, input)) : 0;
@@ -64,6 +67,27 @@ internal static class EconomySteps {
         return chest.Inventory[Water.Full] * data.Vessels[0].Capacity;
     }
 
+    /// <summary>Crates of a good one worker packs in a day at a packing station between a supply chest of the good and empty crates, and a chest for full crates.</summary>
+    public static float Pack(GameData data, string item) {
+        var world = WorkDay(data);
+        var packer = world.Add(ThingKind.Packer, new Vector2(20, 20));
+        world.SetPacking(packer, item);
+        var supply = world.Add(ThingKind.Chest, new Vector2(23, 20));
+        // Room for more than a day's packing, since tools take a slot each.
+        supply.Inventory.Slots = 900;
+        supply.Inventory.Add(item, 600); supply.Inventory.Add("crate", 100);
+        supply.Inventory.OutputFilter.Add(item); supply.Inventory.OutputFilter.Add("crate");
+        // Full crates go to the store, not back into the supply.
+        supply.Inventory.InputFilter.Add(item);
+        var store = world.Add(ThingKind.Chest, new Vector2(20, 23));
+        store.Inventory.Slots = 200;
+        Hire(world, packer);
+        Work(world, data.DaySeconds);
+        // Units packed, in the store's crates and the one still open on the station.
+        int packed = store.Inventory.Items.Keys.Append(packer.Output!.First() ?? "").Sum(crate => world.Packed(crate)?[item] ?? 0);
+        return packed / (float)data.CrateCapacity;
+    }
+
     /// <summary>Units one worker makes in a day at a station between a well-stocked supply chest and an output chest; a liquid comes in full vessels.</summary>
     public static float Station(GameData data, string recipe) {
         var world = WorkDay(data);
@@ -89,13 +113,15 @@ internal static class EconomySteps {
 
 /// <summary>
 /// What a good costs from the ground up, per unit: worker-days, coins spent buying what goes into it, and days its chain waits on something growing.
-/// Gathering and station work are measured by running real workers through whole days; a farm plot's work and growing time come from its data.
+/// A crate of it adds the empty crate and the packing.
+/// Gathering, station work and packing are measured by running real workers through whole days; a farm plot's work and growing time come from its data.
 /// Meat comes from wolves the player kills at night, which no worker's day accounts for, so goods made from it are left out.
 /// </summary>
 internal sealed class ChainCost {
     private readonly GameData data;
     private readonly World world;
     private readonly Dictionary<string, float> made = new();
+    private readonly Dictionary<string, float> packed = new();
     /// <summary>Units of each gathered good, and liters of water, one worker brings in a day.</summary>
     public Dictionary<string, float> Gathered { get; }
     /// <summary>The farm plot's crop, whose work and growing time come from <see cref="FarmDef"/>.</summary>
@@ -111,6 +137,13 @@ internal sealed class ChainCost {
     /// <summary>Units of a recipe's output one worker makes in a day, measured the first time it is asked for.</summary>
     public float Made(string recipe) => made.TryGetValue(recipe, out float perDay) ? perDay : made[recipe] = EconomySteps.Station(data, recipe);
     public IReadOnlyDictionary<string, float> MadePerDay => made;
+
+    /// <summary>Crates of a good one worker packs in a day, measured the first time it is asked for.</summary>
+    public float Packed(string item) => packed.TryGetValue(item, out float perDay) ? perDay : packed[item] = EconomySteps.Pack(data, item);
+    public IReadOnlyDictionary<string, float> PackedPerDay => packed;
+
+    /// <summary>Worker-days a full crate of a good takes: its contents, making the empty crate and packing it.</summary>
+    public float CrateWorkerDays(string item) => data.CrateCapacity * WorkerDays(item) + WorkerDays("crate") + 1 / Packed(item);
 
     /// <summary>Whether every step of a good's chain is gathered by a hire, made at a station or grown on a farm plot.</summary>
     public bool Measurable(string item) => Gathered.ContainsKey(item) || item == Crop || data.RecipeIdOf(item) is string key && EconomySteps.BatchCost(world, key).Keys.All(Measurable);
