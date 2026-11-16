@@ -32,7 +32,9 @@ public enum ActorAction {
     AxeSwing,
     SteelAxeSwing,
     Knock,
-    Brake
+    Brake,
+    /// <summary>Dragged back by the waist by a wolf, bent over and stepping back with each tug.</summary>
+    Tugged
 }
 
 /// <summary>
@@ -86,6 +88,7 @@ public static class ActorAnimation {
         ActorAction.Attack => .875f,
         ActorAction.Knock => World.KnockSeconds / World.Knocks,
         ActorAction.Brake => Momentum.BrakeSeconds,
+        ActorAction.Tugged => 2 * World.PullSeconds / World.Tugs,
         ActorAction.Kindle => World.KindleSeconds,
         ActorAction.TorchSwing => .6f,
         ActorAction.Sit or ActorAction.Perch => 4,
@@ -409,6 +412,18 @@ public static class ActorAnimation {
                 // leg and leans back against the run, arms thrown forward for balance, the weight rocking a little as it holds.
                 return new Pose(Lean: -14 + wave * 2, Head: 10 + MathF.Cos(p * Mathf.Tau) * 2, RaiseL: 55, OutL: 18, ElbowL: 45, RaiseR: 40, OutR: 22, ElbowR: 55,
                     SwingL: 42, KneeL: 6, FootL: -18, SwingR: -18, KneeR: 58, Splay: 4);
+            case ActorAction.Tugged: {
+                    // Dragged back by the waist: bent over at the hips with the arms reaching for the doorway and the head up to keep it in sight.
+                    // Each tug, half the loop, jerks the hips back and the trunk lower; the front foot steps back in the air while the other stays
+                    // planted, the hips passing back over it until it is in front.
+                    float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / .4f)), heave = half < .4f ? MathF.Sin(MathF.PI * half / .4f) : 0;
+                    float stepping = Mathf.Lerp(18, -8, jerk), planted = Mathf.Lerp(-8, 18, jerk), lift = 45 * heave, struggle = MathF.Sin(half * Mathf.Tau);
+                    bool left = p < .5f;
+                    // Between tugs the player strains toward the door, the arms clawing at it.
+                    return new Pose(Lean: 42 + 8 * heave - 3 * struggle, Head: -28 - 4 * heave, RaiseL: 105 - 10 * heave + 8 * struggle, OutL: 14, ElbowL: 22,
+                        RaiseR: 115 - 10 * heave - 8 * struggle, OutR: 12, ElbowR: 16,
+                        SwingL: left ? stepping : planted, KneeL: 24 + (left ? lift : 0), SwingR: left ? planted : stepping, KneeR: 24 + (left ? 0 : lift), Splay: 3);
+                }
             case ActorAction.Knock: {
                     // The right fist beats on a door at head height, landing as each loop starts: drawn back with the elbow bent, then thrown at the boards.
                     float drawn = p < .7f ? Mathf.SmoothStep(0, 1, p / .7f) : 1 - Mathf.SmoothStep(0, 1, (p - .7f) / .3f);

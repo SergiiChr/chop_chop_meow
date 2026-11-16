@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What a wolf model shows; a change blends from the pose it had into the new one.</summary>
-public enum WolfMotion { Stand, Walk, Trot, Gallop, Leap, Feed, Pin, Recoil, Fall, Howl }
+public enum WolfMotion { Stand, Walk, Trot, Gallop, Leap, Feed, Pin, Recoil, Fall, Howl, Tug }
 
 /// <summary>
 /// A leg's joint angles in degrees, each swinging the segment below forward from its parent's line; Splay swings the whole leg out from the body.
@@ -247,6 +247,24 @@ public sealed class WolfModel {
             body = Planted(body, 1.25f, 0, .1f);
         }
         Show(pinning ? WolfMotion.Pin : WolfMotion.Feed, body, dt);
+    }
+
+    /// <summary>
+    /// Dragging a player back by the waist like a dog at tug of war: low on bent hind legs with the forelegs propped out ahead,
+    /// it throws its weight back in sharp tugs, hopping its paws back as it goes, and shakes its head while it holds between them.
+    /// <paramref name="progress"/> runs 0 to 1 over the drag, timed as <see cref="World.Dragged"/> moves the player.
+    /// </summary>
+    public void Tug(float progress, float time, float dt) {
+        float tugs = Math.Clamp(progress, 0, 1) * World.Tugs, u = tugs - MathF.Min(MathF.Floor(tugs), World.Tugs - 1);
+        float heave = u < .4f ? MathF.Sin(MathF.PI * u / .4f) : 0, shake = u < .4f ? 0 : MathF.Sin(time * 15);
+        var body = new WolfPose(Lift: -.06f - .04f * heave, Pitch: -4 - 8 * heave, Surge: -.05f * heave, Flex: 8 + 6 * heave, Neck: 6 - 8 * heave, Head: 6,
+            HeadTurn: 12 * shake, HeadTilt: 10 * shake, Jaw: 10, Ears: -16, Tail: -36 + 10 * heave, Wag: 6 * shake, Curl: 4);
+        for (int leg = 0; leg < 4; leg++) {
+            bool hind = leg >= 2;
+            var at = new Vector3(WolfShape.Pivot(leg).X * 1.3f, WolfShape.Sole + (hind ? .03f : .05f) * heave, Home(leg) + (hind ? -.05f : .16f));
+            body = body.WithLeg(leg, Reach(body, leg, at, hind ? 8 : -10, 0));
+        }
+        Show(WolfMotion.Tug, body, dt);
     }
 
     /// <summary>

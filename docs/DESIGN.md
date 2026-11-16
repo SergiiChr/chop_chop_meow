@@ -156,7 +156,7 @@ Rendering and sound:
 | `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake and sea surfaces and their sand and stony shores |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
-| `src/WolfModel.cs` | Poses the wolf: its gaits, leap, howl, recoil and fall |
+| `src/WolfModel.cs` | Poses the wolf: its gaits, leap, howl, tug, recoil and fall |
 | `src/IconRender.cs` | Renders item and building icons from the models (`./build.py icons`) |
 | `src/Sounds.cs` | Plays sound effects |
 
@@ -475,7 +475,8 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`).
 - **Strength.** A wolf's health, bite and pace are `GameData.WolfHealth`, `WolfBite` and `WolfTrot`, the same every night: the fourth bite brings a healthy player to half health.
 - **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at `PatrolPace` (half) of the trot it stalks at, a walk, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
-- **Smell and howl.** A patrolling or called wolf within `SmellRadius` of a player out in the open takes them as its target and howls, standing still, for as long as the howl recording plays (`LoneHowlSeconds` or `PackHowlSeconds`, `Wolf.Howl` counting down `Wolf.HowlLength`).
+- **Smell and howl.** A patrolling or called wolf within `SmellRadius` of a player out in the open takes them as its target.
+  One that finds them beyond `WolfSightRange` howls, standing still, for as long as the howl recording plays (`LoneHowlSeconds` or `PackHowlSeconds`, `Wolf.Howl` counting down `Wolf.HowlLength`); one that finds them within sight goes for them at once.
   The night's first howl plays `wolf_howl`, a lone wolf, and later ones `wolf_howl_group` (`SaveState.Howled`).
   A howl is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it fades with distance from the player and pans with its direction.
   The howl calls every patrolling wolf within `HowlRadius` to where it stood (`WolfMode.Called`, `Wolf.Call`); a called wolf still smells on its way and goes back to patrolling once there.
@@ -495,14 +496,16 @@ A click on a cabin walks the player to `World.DoorPoint` along `World.TowardDoor
 What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they cannot move, swing or light a torch.
 
 - `Entering` takes `World.EnterSeconds`, or `World.RushSeconds` for a player who sprinted there (`PlayerState.DoorRush`), then shelters them.
-- A player who arrives while someone else steps in is `Following` until that one is inside, then `Knocking`: `World.Knocks` bangs over `World.KnockSeconds`, and free.
-  At the door of a cabin someone is in or stepping out of, they knock at once.
+- A player who arrives while someone else steps in is `Following` until that one is inside, then `Knocking`: the door swings shut over `World.ShutSeconds`, they step up to it, and from `World.KnockLead` bang `World.Knocks` times over `World.KnockSeconds`, then stand free.
+  At the door of a cabin someone is in or stepping out of, they knock straight away, with the same lead.
+  Each arrival at a door is numbered (`SaveState.DoorArrivals`, `PlayerState.DoorQueued`), so players dragged back out go in again in the order they came.
 - `World.Indoors` is what wolves go by: inside, through the second half of `Entering` and the first half of `Leaving`.
-- A bite or a leap landing on a player out in the open at a door (`World.PullOut`) drags them back out for `World.PullSeconds` (`Pulled`, or `PulledOff` while knocking).
-  At half health or less the nearest hunter then pins them; otherwise a pulled player steps in again at a run, and one pulled off the door stands free.
+- A bite or a leap landing on a player out in the open at a door (`World.PullOut`) has that wolf take them by the waist (`Wolf.Tugging`) and drag them `World.DragDistance` back out along `World.OutOfDoor` in `World.Tugs` tugs over `World.PullSeconds` (`Pulled`, or `PulledOff` while knocking), the way `World.Dragged` paces it.
+  The world moves the player there when the drag ends; meanwhile the wolf stands `World.TugReach` behind them and no other wolf leaps.
+  The wolf then lets go and bites no sooner than a second later; at half health or less it pins them, otherwise a pulled player steps in again at a run, and one pulled off the door stands free.
 - `Leaving` puts the player on the doorstep and takes `World.LeaveSeconds`.
 
-The view walks the player through the doorway over the stage (`WorldView.AtDoor`), up the two treads of the step onto the floor (`WorldView.DoorFloor`), and drags a pulled one back out facing the door.
+The view walks the player through the doorway over the stage (`WorldView.AtDoor`), up the two treads of the step onto the floor (`WorldView.DoorFloor`), and drags a pulled one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws and throws its weight back (`WolfModel.Tug`).
 A player banging on the door stands on the lower tread.
 The animation review's `player cabin` clip plays every stage at a cabin, `player jog back` and `player run back` a run braking and turning round, and `player jog turns` and `player run turns` the keys A, W, D and S pressed in quick turn.
 The door opens while someone steps in or out: it swings with `hut_door_normal` after a walk, and slams shut with `hut_door_escaping` after a run.

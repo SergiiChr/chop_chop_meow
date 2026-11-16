@@ -13,7 +13,7 @@ public enum Doorway {
     Following,
     /// <summary>Banging on the shut door of a cabin someone is in.</summary>
     Knocking,
-    /// <summary>Dragged back out of the doorway by a wolf, to step in again at a run.</summary>
+    /// <summary>Dragged back out of the doorway by a wolf holding them by the waist, to step in again at a run.</summary>
     Pulled,
     /// <summary>Dragged off the door they banged on by a wolf, to stand free.</summary>
     PulledOff,
@@ -27,7 +27,19 @@ public enum Doorway {
 /// </summary>
 public sealed partial class World {
     /// <summary>Seconds stepping in through a cabin door at a walk and at a sprint, stepping out, banging on a shut door, and being dragged back out.</summary>
-    public const float EnterSeconds = 1.5f, RushSeconds = .7f, LeaveSeconds = 1.5f, KnockSeconds = 1, PullSeconds = .3f;
+    public const float EnterSeconds = 1.5f, RushSeconds = .7f, LeaveSeconds = 1.5f, KnockSeconds = 1, PullSeconds = 1.5f;
+    /// <summary>
+    /// Seconds a cabin's door takes to swing shut, and before the first bang on it: a player left outside waits for the
+    /// door to shut, then steps up to it.
+    /// </summary>
+    public const float ShutSeconds = .4f, KnockLead = .5f;
+    /// <summary>How far, in metres, a wolf drags a player back out from a cabin's door, in how many tugs.</summary>
+    public const float DragDistance = 1;
+    public const int Tugs = 3;
+    /// <summary>The way out of a cabin's door, which is in its front wall.</summary>
+    public static readonly Vector2 OutOfDoor = Vector2.Down;
+    /// <summary>How far behind a dragged player a tugging wolf stands, with its jaws at their waist.</summary>
+    public const float TugReach = .75f;
     /// <summary>Bangs on a shut door, spread over <see cref="KnockSeconds"/>.</summary>
     public const int Knocks = 3;
     /// <summary>How far, in metres, from <see cref="DoorPoint"/> a player can start stepping in.</summary>
@@ -44,7 +56,7 @@ public sealed partial class World {
     public static float DoorSeconds(PlayerState p) => p.Door switch {
         Doorway.Entering => p.DoorRush ? RushSeconds : EnterSeconds,
         Doorway.Leaving => LeaveSeconds,
-        Doorway.Knocking => KnockSeconds,
+        Doorway.Knocking => KnockLead + KnockSeconds,
         Doorway.Pulled or Doorway.PulledOff => PullSeconds,
         _ => 0
     };
@@ -59,7 +71,7 @@ public sealed partial class World {
     /// </summary>
     public bool Enter(Thing hut, bool rush) {
         if (hut.Kind != ThingKind.Hut || Downed || S.Sheltered != 0 || S.Actor.Door != Doorway.None || Player.DistanceTo(DoorPoint(hut)) > DoorReach) return false;
-        if (!Forwarded(Verb.Enter, hut.Id, count: rush ? 1 : 0)) StepIn(hut.Id, rush);
+        if (!Forwarded(Verb.Enter, hut.Id, count: rush ? 1 : 0)) { S.Actor.DoorQueued = ++S.DoorArrivals; StepIn(hut.Id, rush); }
         return true;
     }
 
@@ -107,15 +119,14 @@ public sealed partial class World {
         foreach (var p in S.Players) {
             if (p == arriving) continue;
             if (p.Sheltered == cabin || p.DoorCabin == cabin && p.Door == Doorway.Leaving) return Doorway.Knocking;
-            if (p.DoorCabin == cabin && p.Door is Doorway.Entering or Doorway.Pulled) door = Doorway.Following;
+            // Someone dragged back out stays ahead only if they came to the door first.
+            if (p.DoorCabin == cabin && (p.Door == Doorway.Entering || p.Door == Doorway.Pulled && p.DoorQueued < arriving.DoorQueued)) door = Doorway.Following;
         }
         return door;
     }
 
     private void StepIn(int cabin, bool rush) {
-        var door = Ahead(cabin, S.Actor);
-        Stage(door, cabin, rush);
-        if (door == Doorway.Knocking) Play("door_bang", Player);
+        Stage(Ahead(cabin, S.Actor), cabin, rush);
     }
 
     private void Stage(Doorway door, int cabin, bool rush = false) {
@@ -123,10 +134,25 @@ public sealed partial class World {
         p.Door = door; p.DoorCabin = cabin; p.DoorTime = 0; p.DoorRush = rush;
     }
 
-    /// <summary>Plays the bangs on a shut door after the first that fall after <paramref name="from"/> seconds and by <paramref name="to"/>.</summary>
+    /// <summary>Plays the bangs on a shut door that fall after <paramref name="from"/> seconds of knocking and by <paramref name="to"/>.</summary>
     private void Knock(float from, float to) {
-        for (int i = 1; i < Knocks; i++)
-            if (from < i * KnockSeconds / Knocks && i * KnockSeconds / Knocks <= to) Play("door_bang", Player);
+        for (int i = 0; i < Knocks; i++)
+            if (from < KnockLead + i * KnockSeconds / Knocks && KnockLead + i * KnockSeconds / Knocks <= to) Play("door_bang", Player);
+    }
+
+    /// <summary>
+    /// How much of the way a wolf has dragged a player, 0 to 1, <paramref name="done"/> of the way through the drag: each of
+    /// its tugs pulls them back sharply, then holds while the wolf gets a new grip.
+    /// </summary>
+    public static float Dragged(float done) {
+        float tugs = Math.Clamp(done, 0, 1) * Tugs, tug = MathF.Min(MathF.Floor(tugs), Tugs - 1);
+        return (tug + Mathf.SmoothStep(0, 1, Math.Clamp((tugs - tug) / .4f, 0, 1))) / Tugs;
+    }
+
+    /// <summary>The wolf dragging the acting player out of a doorway, or null.</summary>
+    private Wolf? Tugger() {
+        foreach (var w in S.Wolves) if (w.Tugging && w.Target == S.Actor.Id) return w;
+        return null;
     }
 
     /// <summary>Moves the acting player's doorway stage on: inside once stepped in, banging once the door shuts in front, and free once done.</summary>
@@ -150,8 +176,12 @@ public sealed partial class World {
                 if (done) p.Door = Doorway.None;
                 break;
             case Doorway.Pulled or Doorway.PulledOff when done:
-                // Out of the doorway, a badly hurt player is knocked down; anyone else steps in again at a run, or stops banging.
-                if (S.Health <= 50 && NearestHunter() is Wolf wolf) Pin(wolf, Hunters.Skip(1).Any());
+                // Dragged a metre out, the player is let go: a badly hurt one is knocked down, anyone else steps in again at a run, or stops banging.
+                // The wolf bites again no sooner than after any other bite.
+                Player += OutOfDoor * DragDistance; p.Warp++;
+                var tugger = Tugger();
+                if (tugger != null) { tugger.Tugging = false; tugger.Attack = 1; tugger.Pos = Player + OutOfDoor * TugReach; }
+                if (S.Health <= 50 && (tugger ?? NearestHunter()) is Wolf wolf) Pin(wolf, Hunters.Skip(1).Any());
                 else if (p.Door == Doorway.Pulled) StepIn(p.DoorCabin, true);
                 else p.Door = Doorway.None;
                 break;
@@ -161,13 +191,28 @@ public sealed partial class World {
         }
     }
 
-    /// <summary>A wolf reaching a player in the open part of a doorway drags them back out of it; returns whether it did.</summary>
-    private bool PullOut() {
+    /// <summary>A wolf reaching a player in the open part of a doorway takes them by the waist to drag them back out of it; returns whether it did.</summary>
+    private bool PullOut(Wolf wolf) {
         var p = S.Actor;
         if (p.Door is not (Doorway.Entering or Doorway.Following or Doorway.Knocking) || Indoors(p)) return false;
         Stage(p.Door == Doorway.Knocking ? Doorway.PulledOff : Doorway.Pulled, p.DoorCabin);
+        wolf.Tugging = true; wolf.Leap = 0;
         return true;
     }
+
+    /// <summary>
+    /// Holds a tugging wolf at the waist of the player it drags back, who is shown there; returns false once the drag has
+    /// ended some other way, such as the player dying, and lets go.
+    /// </summary>
+    private bool Tug(Wolf wolf) {
+        if (S.Actor.Door is not (Doorway.Pulled or Doorway.PulledOff)) { wolf.Tugging = false; return false; }
+        wolf.Pos = Player + OutOfDoor * (DragDistance * Dragged(S.Actor.DoorTime / PullSeconds) + TugReach);
+        wolf.Attack = 1;
+        return true;
+    }
+
+    /// <summary>Whether a wolf is dragging the acting player out of a doorway, when only it may take them down.</summary>
+    private bool Tugged => S.Actor.Door is Doorway.Pulled or Doorway.PulledOff && Tugger() != null;
 
     private Wolf? NearestHunter() {
         Wolf? best = null;

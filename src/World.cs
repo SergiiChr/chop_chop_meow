@@ -201,6 +201,8 @@ public sealed class Wolf : IWalker {
     public bool Feeding { get; set; }
     /// <summary>The wolf whose leap landed; it holds the player's throat.</summary>
     public bool Pinning { get; set; }
+    /// <summary>The wolf dragging its player out of a cabin's doorway by the waist.</summary>
+    public bool Tugging { get; set; }
     /// <summary>The wolf has growled at the player while closing in; it growls only once.</summary>
     [JsonIgnore] public bool Growled { get; set; }
     /// <summary>The wolf has broken from a walk into a sprint at the player; it growls once as it does.</summary>
@@ -268,6 +270,8 @@ public sealed class SaveState {
     public int DenHours { get; set; }
     /// <summary>A wolf has howled tonight.</summary>
     public bool Howled { get; set; }
+    /// <summary>How many times players have come to a cabin's door, which numbers each arrival.</summary>
+    public int DoorArrivals { get; set; }
     [JsonIgnore] public Inventory Backpack { get => Actor.Backpack; set => Actor.Backpack = value; }
     public Dictionary<string, float> Demand { get; set; } = new();
     /// <summary>Sale prices as last reported by someone arriving from the village, and when that was.</summary>
@@ -2264,8 +2268,8 @@ public sealed partial class World {
         bool torch = Torchlit, pack = torch && PackAround >= PackSize, wary = torch && !pack;
         if (pack && !packAttack) Say("The pack has you surrounded. They attack!");
         packAttack = pack;
-        // A wounded player away from fire and shelter invites a leap for the throat.
-        if (!Downed && S.Health <= 50 && !lit && !wary && !AnyLeaping(hunters)) {
+        // A wounded player away from fire and shelter invites a leap for the throat, unless a wolf already drags them out of a doorway.
+        if (!Downed && S.Health <= 50 && !lit && !wary && !Tugged && !AnyLeaping(hunters)) {
             Wolf? hunter = null;
             foreach (var w in hunters)
                 if (!Protected(w.Pos) && w.Howl <= 0 && w.Flee <= 0 && w.Stagger <= 0 && w.Pos.DistanceTo(Player) < LeapRange && (hunter == null || w.Pos.DistanceTo(Player) < hunter.Pos.DistanceTo(Player))) hunter = w;
@@ -2275,6 +2279,7 @@ public sealed partial class World {
         float speed = Data.WolfTrot, chase = Data.WalkSpeed * Data.WolfChase;
         foreach (var wolf in hunters) {
             wolf.Attack -= dt;
+            if (wolf.Tugging && Tug(wolf)) continue;
             if (wolf.Howl > 0) { wolf.Howl = Math.Max(0, wolf.Howl - dt); continue; }
             if (wolf.Leap > 0) {
                 // Closing the remaining gap evenly makes every leap last LeapSeconds.
@@ -2282,7 +2287,7 @@ public sealed partial class World {
                 wolf.Pos = wolf.Pos.MoveToward(landing, wolf.Pos.DistanceTo(landing) * Math.Min(1, dt / wolf.Leap));
                 wolf.Leap = Math.Max(0, wolf.Leap - dt);
                 // A player in a doorway is dragged back out of it first, and pinned once out.
-                if (wolf.Leap == 0 && !PullOut()) Pin(wolf, hunters.Count > 1);
+                if (wolf.Leap == 0 && !PullOut(wolf)) Pin(wolf, hunters.Count > 1);
             } else if (S.Mauled) {
                 if (wolf.Feeding) continue;
                 var seat = Player + (wolf.Pos - Player).Normalized() * FeastSeat;
@@ -2303,7 +2308,7 @@ public sealed partial class World {
                 wolf.Chase = 0;
                 Travel(wolf, Player, dt * speed * .35f, dt * speed * .35f, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(); }
+                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(wolf); }
             } else if ((lit || Protected(wolf.Pos)) is var safe && safe && wolf.Chase <= 0) {
                 // Firelight turns a wolf back, unless it is already on the player's heels: then it follows in briefly.
                 wolf.Chase = 0; wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * 3);
@@ -2315,7 +2320,7 @@ public sealed partial class World {
                 wolf.Chase = safe ? wolf.Chase - dt : ChaseSeconds;
                 Travel(wolf, Player, dt * chase, dt * chase, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(); }
+                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(wolf); }
             }
         }
         // Feeding wolves crowd around the player without stacking on one spot.

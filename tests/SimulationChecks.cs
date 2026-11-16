@@ -91,10 +91,14 @@ public static class SimulationChecks {
         Test(CheckSteppingInTakesLongerAtAWalkThanAtASprint, data);
         Test(CheckAWolfDragsAPlayerOutOfTheDoorwayAndTheyRunBackIn, data);
         Test(CheckAWoundedPlayerDraggedOutOfTheDoorwayIsPinned, data);
+        Test(CheckPlayersDraggedOutOfACabinDoorGoBackInInTheOrderTheyCame, data);
+        Test(CheckOnlyTheTuggingWolfTakesDownAWoundedPlayerItDrags, data);
+        Test(CheckAWolfLetsGoOfAPlayerWhoLeavesTheGameWhileItDragsThem, data);
         Test(CheckWolvesCannotReachAPlayerHalfWayIn, data);
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
         Test(CheckACabinHoldsOnePlayerAndTheNextBangsOnTheDoor, data);
         Test(CheckAPlayerRespawnsInTheNearestFreeCabin, data);
+        Test(CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
         Test(CheckARandomDenLetsOneMoreWolfOutEveryHour, data);
@@ -2662,9 +2666,9 @@ public static class SimulationChecks {
         SafeTick(world, .1f);
         Require(howler.Target == 0 && howler.Mode == WolfMode.Patrol && howler.Howl == 0 && howler.Flee == 0 && howler.Stagger == 0,
                 "a wolf whose player took shelter should drop its howl and flight and patrol");
-        // A wolf whose player left the game lets go of them.
+        // A wolf whose player left the game lets go of them; out of sight of the one still playing, it howls before it hunts them.
         var gone = NightWorld(data);
-        var feeder = PlaceWolf(gone, new Wolf { Pos = gone.Player + new Vector2(5, 0), Target = 999, Feeding = true, Pinning = true, Leap = 1, Chase = 3 });
+        var feeder = PlaceWolf(gone, new Wolf { Pos = gone.Player + new Vector2(20, 0), Target = 999, Feeding = true, Pinning = true, Leap = 1, Chase = 3 });
         SafeTick(gone, .1f);
         Require(feeder.Target != 999 && !feeder.Feeding && !feeder.Pinning && feeder.Leap == 0 && feeder.Chase == 0,
                 "a wolf whose player left should stop feeding, leaping and chasing");
@@ -2793,8 +2797,12 @@ public static class SimulationChecks {
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         for (float time = 0; time < .7f && world.Door == Doorway.Entering; time += .05f) world.Tick(.05f);
         Require(world.Door == Doorway.Pulled && world.Health == 85, $"a wolf biting a player in the first half of stepping in should drag them out, not {world.Door} at {world.Health} health");
-        world.Tick(World.PullSeconds);
-        Require(world.Door == Doorway.Entering && world.Me.DoorRush, "a player dragged out should step in again at a run");
+        var wolf = world.Wolves[0];
+        world.Tick(1.4f);
+        Require(world.Door == Doorway.Pulled && wolf.Tugging, "a wolf should hold a player it drags out of a doorway for a second and a half");
+        world.Tick(.1f);
+        Require(world.Door == Doorway.Entering && world.Me.DoorRush && !wolf.Tugging, "a player dragged out should be let go and step in again at a run");
+        Require(world.Player.DistanceTo(World.DoorPoint(hut) + new Vector2(0, 1)) < .01f, $"a wolf should drag a player a metre out from the door, not to {world.Player - World.DoorPoint(hut)}");
         world.Tick(World.RushSeconds);
         Require(world.Sheltered == hut.Id && !world.Mauled, "a player dragged out above half health should get inside");
     }
@@ -2808,8 +2816,56 @@ public static class SimulationChecks {
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2, 0) });
         for (float time = 0; time < .7f && world.Door == Doorway.Entering; time += .05f) world.Tick(.05f);
         Require(world.Door == Doorway.Pulled && !world.Mauled, $"a wolf leaping at a wounded player stepping in should first drag them out, not {world.Door}");
-        world.Tick(World.PullSeconds);
-        Require(world.Mauled && world.Sheltered == 0, "a wounded player dragged out should then be pinned");
+        world.Tick(1.4f);
+        Require(world.Door == Doorway.Pulled && !world.Mauled, "a wounded player should be dragged out for a second and a half before being pinned");
+        world.Tick(.1f);
+        Require(world.Mauled && world.Sheltered == 0 && world.Player.DistanceTo(World.DoorPoint(hut) + new Vector2(0, 1)) < .01f, "a wounded player dragged a metre out should then be pinned");
+    }
+
+    private static void CheckPlayersDraggedOutOfACabinDoorGoBackInInTheOrderTheyCame(GameData data) {
+        var world = NightWorld(data);
+        var guest = world.Arrive("guest", 2);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = World.DoorPoint(hut);
+        Require(world.Enter(hut, false), "the host at the door should step in");
+        world.As(guest, () => { world.Player = World.DoorPoint(hut) + new Vector2(.3f, 0); Require(world.Enter(hut, false), "the guest at the door should follow the host"); });
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-.8f, 0) });
+        PlaceWolf(world, new Wolf { Pos = guest.Pos + new Vector2(.8f, 0), Target = guest.Id });
+        world.Tick(.05f);
+        Require(world.Door == Doorway.Pulled && guest.Door == Doorway.Pulled, $"wolves should drag both players out of the doorway, not {world.Door} and {guest.Door}");
+        for (float time = 0; time < World.PullSeconds + .05f; time += .05f) world.Tick(.05f);
+        Require(world.Door == Doorway.Entering && guest.Door == Doorway.Following, $"players dragged out of a cabin's door should go back in in the order they came, not {world.Door} and {guest.Door}");
+    }
+
+    private static void CheckOnlyTheTuggingWolfTakesDownAWoundedPlayerItDrags(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = World.DoorPoint(hut);
+        SetNeeds(world, health: 60);
+        Require(world.Enter(hut, false), "a player at the door should step in");
+        var tugger = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        var other = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-2.5f, 0) });
+        world.Tick(.05f);
+        Require(world.Door == Doorway.Pulled && world.Health <= 50, $"a bite should leave the player dragged out below half health, not {world.Door} at {world.Health}");
+        for (float time = .05f; time < 1.4f; time += .05f) {
+            world.Tick(.05f);
+            Require(!world.Mauled && other.Leap == 0, $"no wolf should take down a player another wolf is dragging out, {time:0.00} s in");
+        }
+        world.Tick(.15f);
+        Require(world.Mauled && tugger.Pinning && !tugger.Tugging, "the wolf dragging a wounded player out should take them down once they are out");
+    }
+
+    private static void CheckAWolfLetsGoOfAPlayerWhoLeavesTheGameWhileItDragsThem(GameData data) {
+        var world = NightWorld(data);
+        var guest = world.Arrive("guest", 2);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.As(guest, () => { world.Player = World.DoorPoint(hut); Require(world.Enter(hut, false), "the guest at the door should step in"); });
+        var tugger = PlaceWolf(world, new Wolf { Pos = guest.Pos + new Vector2(.8f, 0), Target = guest.Id });
+        world.Tick(.05f);
+        Require(guest.Door == Doorway.Pulled && tugger.Tugging, "a wolf should drag the guest out of the doorway");
+        world.Depart(guest.Id);
+        world.Tick(.05f);
+        Require(!tugger.Tugging, "a wolf dragging a player out should let go of them once they leave the game");
     }
 
     private static void CheckWolvesCannotReachAPlayerHalfWayIn(GameData data) {
@@ -2850,10 +2906,20 @@ public static class SimulationChecks {
         Require(guest.Pos == World.DoorPoint(hut) + new Vector2(.3f, 0), "a player following someone in should not walk away");
         world.Tick(World.EnterSeconds);
         Require(world.Sheltered == hut.Id && guest.Door == Doorway.Knocking && guest.Sheltered == 0, $"the door should shut on the follower, who bangs on it, not {guest.Door}");
-        world.Tick(World.KnockSeconds);
+        world.Tick(.4f);
+        Require(!heard.Contains("door_bang"), "a follower should bang only once the door has swung shut");
+        world.Tick(1.1f);
         Require(guest.Door == Doorway.None && guest.Sheltered == 0 && heard.Count(name => name == "door_bang") == 3, $"the follower should bang 3 times over a second and stand free: heard {string.Join(", ", heard)}");
         world.As(guest, () => Require(world.Enter(hut, false), "a player at the door of a cabin someone is in should bang on it"));
         Require(guest.Door == Doorway.Knocking, "a player at the door of a cabin someone is in should bang on it");
+    }
+
+    private static void CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl(GameData data) {
+        var world = NightWorld(data);
+        var heard = Listen(world);
+        var wolf = PatrolWolf(world, new Wolf { Pos = world.Player + new Vector2(4, 0) });
+        world.Tick(.1f);
+        Require(wolf.Target == world.Me.Id && wolf.Howl == 0 && !heard.Any(name => name.StartsWith("wolf_howl", StringComparison.Ordinal)), "a wolf that finds a player within its sight should go for them without a howl");
     }
 
     private static void CheckAPlayerRespawnsInTheNearestFreeCabin(GameData data) {

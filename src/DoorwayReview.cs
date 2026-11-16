@@ -6,7 +6,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// Developer review fixture for <c>--doorway</c>: two players and, at night, a wolf at a cabin's door, moved by a script
+/// Developer review fixture for <c>--doorway</c>: two players and, at dusk, wolves at a cabin's door, moved by a script
 /// and run by the game's own rules, for a look at how they queue, bang on the door and get dragged out.
 /// </summary>
 public sealed partial class DoorwayReview : Node {
@@ -25,7 +25,8 @@ public sealed partial class DoorwayReview : Node {
     public override void _Ready() {
         if (!Scenes.Contains(Scene)) throw new ArgumentException($"--doorway takes {string.Join(", ", Scenes)}, not {Scene}");
         bool night = Scene is "wolf" or "wounded";
-        World.S.Time = World.Data.DaySeconds * (night ? World.Data.NightStarts + .02f : .3f);
+        // Wolves come out at dusk, while there is still light to see them by.
+        World.S.Time = World.Data.DaySeconds * (night ? World.Data.DuskStarts + .02f : .3f);
         // Only the scene's own wolf comes: every den stays shut tonight.
         World.S.Wolves.Clear(); World.S.DensOut = (1 << World.Dens.Length) - 1; World.S.DenHours = 24;
         foreach (var w in World.Workers) World.Assign(w, null);

@@ -63,7 +63,7 @@ Play accepts Godot arguments after `--`:
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
-| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and bangs), `occupied` (one bangs while the other is inside, who then steps out), `wolf` (wolves drag each out of the doorway at night) or `wounded` (a badly hurt player dragged out and pinned) |
+| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and bangs), `occupied` (one bangs while the other is inside, who then steps out), `wolf` (wolves drag each out of the doorway at dusk) or `wounded` (a badly hurt player dragged out and pinned) |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -788,8 +788,9 @@ After that one den, picked at random, lets one more wolf out every hour until th
 They patrol the valley at a walk, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
 Wolves are the same every night: two blows of a steel axe fell one, and its fourth bite brings a healthy player down to half health.
 
-A wolf that smells you within 30 metres while you are out in the open howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
+A wolf that smells you within 30 metres while you are out in the open, but too far off to see you, howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
 After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
+A wolf that finds you already within sight goes for you without a howl.
 A sprinting wolf gallops faster than you walk, but sprinting outruns it.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
@@ -819,15 +820,17 @@ A direct hit with the torch hurts a wolf and sends it running for a moment.
 Click a cabin, or press Enter in its panel, and you walk round it to its door and step in; the door shuts behind you.
 Once you set off you cannot walk away, and the keys do nothing until you are in.
 Stepping in takes about 1.5 seconds at a walk, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
-For the first half of it you are still out in the open: a wolf that bites or leaps at you drags you back out, and you run in again at once.
-At half health or less, the wolf that drags you out knocks you onto your back.
+For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and drags you a metre back out in three tugs over 1.5 seconds, you bent over and reaching for the door.
+It then lets go and you run in again at once, or, at half health or less, it knocks you onto your back.
+No other wolf takes you down while one drags you.
 
 Wolves cannot smell you inside: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
 Stepping out takes about 1.5 seconds, and wolves can reach you for its second half, once you are out of the doorway.
 
 A cabin holds one player.
-Someone who walks up behind a player stepping in follows them, and the door shuts in their face; they bang on it three times and stand free.
+Someone who walks up behind a player stepping in follows them; once that player is in, they wait for the door to swing shut, step up to it, bang on it three times and stand free.
 At the door of a cabin someone is in, you bang on it the same way.
+Players a wolf drags back out go in again in the order they came to the door.
 
 ### Wolf kills
 
@@ -921,7 +924,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), banging on a cabin door and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), banging on a cabin door, being dragged back out of one and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 A tree is felled with strokes from the side into its trunk, while an axe swung in the air comes down from overhead.
 

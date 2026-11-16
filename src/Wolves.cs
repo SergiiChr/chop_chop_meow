@@ -121,17 +121,18 @@ public sealed partial class World {
     /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
     private static void Calm(Wolf wolf) {
         wolf.Target = 0; wolf.Howl = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
-        wolf.Feeding = wolf.Pinning = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.Route.Clear();
+        wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.Route.Clear();
     }
     /// <summary>
-    /// A wolf that smells a player out in the open within <see cref="GameData.SmellRadius"/> takes them as its prey and howls before it goes after them.
-    /// The howl calls every patrolling wolf within <see cref="GameData.HowlRadius"/> to where it stands.
+    /// A wolf that smells a player out in the open within <see cref="GameData.SmellRadius"/> takes them as its prey.
+    /// One that finds them out of its sight howls before it goes after them, which calls every patrolling wolf within <see cref="GameData.HowlRadius"/> to where it stands.
     /// </summary>
     private void Smell(Wolf wolf) {
         PlayerState? prey = null;
         foreach (var p in S.Players)
             if (p.RespawnIn <= 0 && !Indoors(p) && p.Pos.DistanceTo(wolf.Pos) <= Data.SmellRadius && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
         if (prey == null) return;
+        if (prey.Pos.DistanceTo(wolf.Pos) <= Data.WolfSightRange) { wolf.Target = prey.Id; wolf.Mode = WolfMode.Patrol; wolf.Route.Clear(); return; }
         // The night's first howl is a lone wolf; every later one sounds like the pack answering.
         // The wolf holds its howl as long as the recording plays.
         bool answer = S.Howled;

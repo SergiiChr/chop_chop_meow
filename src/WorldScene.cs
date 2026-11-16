@@ -202,8 +202,11 @@ public partial class WorldView {
     private Momentum reviewMomentum;
     /// <summary>The cabin clip's stages and when each starts, in seconds of its loop: up to the door, in at a walk, out, bang on the door, in at a run.</summary>
     private static readonly (float At, Doorway Stage)[] ReviewDoorway = { (0, Doorway.None), (2, Doorway.Entering), (4, Doorway.Leaving), (6, Doorway.Knocking), (7.5f, Doorway.Pulled) };
-    private const float ReviewDoorwayLoop = 9.5f;
+    private const float ReviewDoorwayLoop = 10.5f;
     private HutProp? reviewCabin;
+    /// <summary>The cabin clip's doorway stage drawn last frame, and where the actor stood when it began.</summary>
+    private Doorway reviewStage;
+    private Vector2 reviewStageFrom;
     /// <summary>Seconds each key is held in a turns clip, which presses A, W, D and S in turn.</summary>
     private const float ReviewKeySeconds = .35f;
     private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall", "wolf hit" };
@@ -305,14 +308,20 @@ public partial class WorldView {
             var from = door - IntoCabin * 2;
             shown = (from.Lerp(door, walked), door + IntoCabin, walked < 1 ? ActorAction.Jog : ActorAction.Idle, false);
         } else if (now == Doorway.Pulled) {
-            // Half way into a run in, the player is dragged back out, then runs in again.
-            float run = time - start;
-            shown = run < World.RushSeconds / 2 ? DoorStep(Doorway.Entering, door, door, run / World.RushSeconds, true, reviewActor.Position, dt)
-                : run < World.RushSeconds / 2 + World.PullSeconds ? DoorStep(Doorway.Pulled, door, door, 0, true, reviewActor.Position, dt)
-                : DoorStep(Doorway.Entering, door, door, Math.Min(1, (run - World.RushSeconds / 2 - World.PullSeconds) / World.RushSeconds), true, reviewActor.Position, dt);
-        } else shown = DoorStep(now, door, door, Math.Clamp((time - start) / (now == Doorway.Knocking ? World.KnockSeconds : World.EnterSeconds), 0, 1), false, reviewActor.Position, dt);
+            // Half way into a run in, the player is dragged back out a metre, then runs in again from there.
+            float run = time - start, pulled = run - World.RushSeconds / 2;
+            var dragged = door + World.OutOfDoor * World.DragDistance;
+            var part = run < World.RushSeconds / 2 ? Doorway.Entering : pulled < World.PullSeconds ? Doorway.Pulled : Doorway.Entering;
+            if (part != reviewStage) { reviewStage = part; reviewStageFrom = reviewActor.Position; }
+            shown = run < World.RushSeconds / 2 ? DoorStep(Doorway.Entering, door, door, reviewStageFrom, run, World.RushSeconds, true)
+                : pulled < World.PullSeconds ? DoorStep(Doorway.Pulled, door, door, reviewStageFrom, pulled, World.PullSeconds, true)
+                : DoorStep(Doorway.Entering, door, dragged, reviewStageFrom, pulled - World.PullSeconds, World.RushSeconds, true);
+        } else {
+            if (now != reviewStage) { reviewStage = now; reviewStageFrom = reviewActor.Position; }
+            shown = DoorStep(now, door, door, reviewStageFrom, time - start, now == Doorway.Knocking ? World.KnockLead + World.KnockSeconds : World.EnterSeconds, false);
+        }
         bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Pulled && shown.At.DistanceTo(door) < 1.75f;
-        reviewCabin.Open = Mathf.MoveToward(reviewCabin.Open, open ? 1 : 0, dt * 2.5f);
+        reviewCabin.Open = Mathf.MoveToward(reviewCabin.Open, open ? 1 : 0, dt / World.ShutSeconds);
         reviewCabin.Door.RotationDegrees = new Vector3(0, -100 * Ease(reviewCabin.Open), 0);
         reviewActor.Update(shown.At, shown.Action, shown.Facing, dt, shown.Backing);
         Pose(reviewRigs[0], reviewActor, null);

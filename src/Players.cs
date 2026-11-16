@@ -46,6 +46,8 @@ public sealed class PlayerState {
     public float DoorTime { get; set; }
     /// <summary>The player sprinted to the door, so they step in at a run and slam it.</summary>
     public bool DoorRush { get; set; }
+    /// <summary>When the player came to the door, numbered by <see cref="SaveState.DoorArrivals"/>, which sets who of those dragged back out goes in first.</summary>
+    public int DoorQueued { get; set; }
     /// <summary>The resource the player is working on, so other machines can show it.</summary>
     public int GatherTarget { get; set; }
     /// <summary>The item selected on the hotbar, which shows in the player's hand, so other machines can show it.</summary>
