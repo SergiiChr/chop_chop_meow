@@ -184,9 +184,9 @@ public static class AnimationChecks {
     private static void CheckPlayerHeadTurnsBeforeTheBody() {
         var turning = new Turning();
         float yaw = 0, quarter = Mathf.Pi / 2;
-        for (int i = 0; i < 6; i++) turning.Step(ref yaw, quarter, 3, 1 / 60f);
+        for (int i = 0; i < 6; i++) turning.Step(ref yaw, quarter, 3, 1 / 60f, running: false);
         Require(Mathf.RadToDeg(turning.Look) > 20 && Mathf.RadToDeg(yaw) < 45, $"0.1 s into a quarter turn the head should look well ahead of a body still under half way round: look {Mathf.RadToDeg(turning.Look):0}°, body {Mathf.RadToDeg(yaw):0}°");
-        for (int i = 0; i < 15; i++) turning.Step(ref yaw, quarter, 3, 1 / 60f);
+        for (int i = 0; i < 15; i++) turning.Step(ref yaw, quarter, 3, 1 / 60f, running: false);
         Require(Mathf.RadToDeg(yaw) > 81, $"0.35 s into a quarter turn the body should face nearly the new way: {Mathf.RadToDeg(yaw):0}°");
     }
 
@@ -196,7 +196,7 @@ public static class AnimationChecks {
         float yaw = 0, turned = 0;
         for (int i = 0; i < 30; i++) {
             float before = yaw;
-            turning.Step(ref yaw, Mathf.Pi, 3, 1 / 60f);
+            turning.Step(ref yaw, Mathf.Pi, 3, 1 / 60f, running: false);
             float step = Mathf.AngleDifference(before, yaw);
             Require(i == 0 || step * turned >= 0, $"a half turn should keep turning the same way, step {i}: {Mathf.RadToDeg(step):0.0}°");
             turned += step;
@@ -204,18 +204,24 @@ public static class AnimationChecks {
         Require(Math.Abs(turned) > Mathf.DegToRad(170), $"0.5 s into a half turn the body should face nearly back: turned {Mathf.RadToDeg(turned):0}°");
     }
 
-    /// <summary>A runner leans toward the inside of a turn, and someone standing still turns upright.</summary>
+    /// <summary>A sprinter leans toward the inside of a turn, a jogger barely leans, and someone standing still turns upright.</summary>
     private static void CheckPlayerLeansIntoATurn() {
         var turning = new Turning();
         float yaw = 0;
-        for (int i = 0; i < 6; i++) turning.Step(ref yaw, Mathf.Pi / 2, 6, 1 / 60f);
+        for (int i = 0; i < 6; i++) turning.Step(ref yaw, Mathf.Pi / 2, 6.7f, 1 / 60f, running: true);
         // Turning from +Z toward +X, the inside of the turn is the way the forward line swings.
         var inside = new Vector3(MathF.Cos(yaw), 0, -MathF.Sin(yaw));
         float tilt = (Basis.FromEuler(new Vector3(0, yaw, turning.Bank)) * Vector3.Up).Dot(inside);
-        Require(tilt > MathF.Sin(Mathf.DegToRad(5)), $"a runner turning should lean over 5° into the turn: {Mathf.RadToDeg(MathF.Asin(tilt)):0.0}°");
+        Require(tilt > MathF.Sin(Mathf.DegToRad(5)), $"a sprinter turning should lean over 5° into the turn: {Mathf.RadToDeg(MathF.Asin(tilt)):0.0}°");
+        var jogging = new Turning();
+        yaw = 0;
+        for (int i = 0; i < 30; i++) {
+            jogging.Step(ref yaw, Mathf.Pi / 2, 4.2f, 1 / 60f, running: false);
+            Require(Math.Abs(jogging.Bank) <= Mathf.DegToRad(1.01f), $"a jogger turning should lean at most 1°, step {i}: {Mathf.RadToDeg(jogging.Bank):0.0}°");
+        }
         var standing = new Turning();
         yaw = 0;
-        for (int i = 0; i < 30; i++) standing.Step(ref yaw, Mathf.Pi / 2, 0, 1 / 60f);
+        for (int i = 0; i < 30; i++) standing.Step(ref yaw, Mathf.Pi / 2, 0, 1 / 60f, running: false);
         Require(standing.Bank == 0, "someone turning on the spot should stay upright");
     }
 

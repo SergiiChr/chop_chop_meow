@@ -52,7 +52,7 @@ public partial class WorldView : Node3D {
     private Node3D scene = null!;
     private Overlay overlay = null!;
     private readonly Dictionary<int, Prop> props = new();
-    private readonly ActorState player = new() { HeadFirst = true };
+    private readonly ActorState player = new();
     private ActorRig playerRig = null!;
     private string playerShirt = "";
     /// <summary>The other players in the game, keyed by their id.</summary>
@@ -231,7 +231,7 @@ public partial class WorldView : Node3D {
     private sealed class Avatar(ActorRig rig, string shirt) {
         public readonly ActorRig Rig = rig;
         public readonly string Shirt = shirt;
-        public readonly ActorState State = new() { HeadFirst = true };
+        public readonly ActorState State = new();
         public ActorAction Pulse;
         public Vector2 PulseTarget;
         public float PulseRemaining;
@@ -252,11 +252,9 @@ public partial class WorldView : Node3D {
         public Vector2 Position;
         public float Yaw;
         /// <summary>
-        /// Turns as a player does: the head turns toward a new heading first and the body follows with weight, easing into
-        /// and out of the turn and leaning into it; others turn quickly and stay upright.
+        /// How the body is turning: the head turns toward a new heading first and the body follows with weight, easing into
+        /// and out of the turn and leaning into it.
         /// </summary>
-        public bool HeadFirst { get; init; }
-        /// <summary>How a <see cref="HeadFirst"/> body is turning: its speed, the head's look and the lean.</summary>
         public Turning Turning;
         public ActorAction Action;
         public float Time;
@@ -273,7 +271,7 @@ public partial class WorldView : Node3D {
             bool moving = moved > .001f;
             float yaw = ActorAnimation.Yaw(moving && !backing ? position - Position : facingTarget - position, Yaw);
             // A jump such as a respawn is no speed to lean into.
-            if (HeadFirst) Turning.Step(ref Yaw, yaw, dt > 0 ? Math.Min(moved / dt, 8) : 0, dt); else Yaw = Mathf.LerpAngle(Yaw, yaw, Math.Min(1, dt * 14));
+            Turning.Step(ref Yaw, yaw, dt > 0 ? Math.Min(moved / dt, 8) : 0, dt, action == ActorAction.Run);
             Position = position;
             if (Action != action) {
                 From = Action; FromTime = Time; FromMoving = Moving; Blend = 0;

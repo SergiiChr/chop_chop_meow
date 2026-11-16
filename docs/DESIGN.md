@@ -312,10 +312,9 @@ A sprint and a jog share their mechanics and differ in timing and form:
 - The feet land close to one line, and the trunk leans into the run, more in a sprint.
 - The elbows stay bent, most in front, bringing the hand up toward the chin.
 
-A player turns as people do (`Turning`): the head turns toward a new heading first, about 0.2 seconds ahead of the body, which follows on a critically damped spring and covers 90% of a quarter turn in 0.3 seconds.
-The body leans about the feet toward the inside of the turn, by the angle that balances turning at its speed against gravity, up to `Turning.MaxBank` (8°).
+Players and workers turn as people do (`Turning`): the head turns toward a new heading first, about 0.2 seconds ahead of the body, which follows on a critically damped spring and covers 90% of a quarter turn in 0.3 seconds.
+The body leans about the feet toward the inside of the turn, by the angle that balances turning at its speed against gravity, up to `Turning.MaxBank` (8°) in a sprint and `Turning.MaxJogBank` (1°) at a walk or jog.
 A half turn swings round the way the body already turns, or the way the head looks.
-Workers keep the quick turn.
 
 The window moves its own player through `Momentum`: a key for about the opposite way brakes the run to a stop over `Momentum.BrakeSeconds`, stands `Momentum.TurnSeconds` to turn round and builds back up to full pace over `Momentum.StartSeconds`; any other change of keys turns at once, and letting go stops at once.
 While it brakes, `PlayerState.Braking` is set and carried to other machines, and the view shows the `Brake` lunge: front heel planted ahead, the weight sunk onto the bent back leg, leaning back with the arms forward.

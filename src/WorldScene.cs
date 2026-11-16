@@ -226,7 +226,7 @@ public partial class WorldView {
     /// <summary>How far ahead of someone felling a tree the middle of its trunk stands, and the trunk's radius, for the close-up's trunk.</summary>
     private const float ReviewTrunkAhead = 1.33f, ReviewTrunkRadius = .13f;
     /// <summary>The close-up clip's actor, moved and posed the way the game moves and poses everyone.</summary>
-    private readonly ActorState reviewActor = new() { HeadFirst = ReviewClip >= 0 && ReviewClips[ReviewClip].Name.StartsWith("player ", StringComparison.Ordinal) && ReviewClips[ReviewClip].Name.EndsWith(" turns") || ReviewClip >= 0 && ReviewClips[ReviewClip].Name.EndsWith(" back") || ReviewClip >= 0 && ReviewClips[ReviewClip].Name == "player cabin" };
+    private readonly ActorState reviewActor = new();
 
     /// <summary>Tiles a second an action carries an actor across the ground.</summary>
     private float ReviewSpeed(ActorAction action) => action switch {
