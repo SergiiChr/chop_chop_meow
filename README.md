@@ -960,8 +960,9 @@ Sound credits:
 
 - Kenney ([www.kenney.nl](https://www.kenney.nl))
 - Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com))
-- kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the digging,
-  the stomach growl and the intro film's train and office recordings ([assets/README.md](assets/README.md#intro-film))
+- kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the grass
+  footsteps, the digging, the stomach growl and the intro film's train and office recordings
+  ([assets/README.md](assets/README.md#intro-film))
 
 Music credits:
 
