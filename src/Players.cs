@@ -39,6 +39,13 @@ public sealed class PlayerState {
     public bool Mauled { get; set; }
     /// <summary>Id of the cabin the player is inside, or zero; inside, wolves back off and the player is hidden.</summary>
     public int Sheltered { get; set; }
+    /// <summary>What the player is doing at a cabin's door, which <see cref="DoorCabin"/> names.</summary>
+    public Doorway Door { get; set; }
+    public int DoorCabin { get; set; }
+    /// <summary>Seconds into <see cref="Door"/>.</summary>
+    public float DoorTime { get; set; }
+    /// <summary>The player sprinted to the door, so they step in at a run and slam it.</summary>
+    public bool DoorRush { get; set; }
     /// <summary>The resource the player is working on, so other machines can show it.</summary>
     public int GatherTarget { get; set; }
     /// <summary>The item selected on the hotbar, which shows in the player's hand, so other machines can show it.</summary>
@@ -47,6 +54,8 @@ public sealed class PlayerState {
     public HeldStack? HeldStack { get; set; }
     /// <summary>Moving with Shift held, which drains food and drink faster; carried so other machines show the run.</summary>
     public bool Sprinting { get; set; }
+    /// <summary>Braking against a key for the other way (<see cref="Momentum"/>); carried so other machines show the lunge.</summary>
+    public bool Braking { get; set; }
     /// <summary>Seconds left of the brighter flare that follows a torch swing.</summary>
     public float TorchFlare { get; set; }
     /// <summary>Counts moves the simulation made, such as a respawn; a guest only takes its own position from the host when it changes.</summary>
@@ -251,7 +260,7 @@ public sealed partial class World {
             case Verb.LoadInput: LoadInput(t, c.Item, c.Count); break;
             case Verb.LoadFuel: LoadFuel(t, c.Item, c.Count); break;
             case Verb.Collect: Collect(t); break;
-            case Verb.Enter: Enter(t); break;
+            case Verb.Enter: Enter(t, c.Count == 1); break;
             case Verb.Sleep: Sleep(t); break;
             case Verb.Sell: Sell(t); break;
             case Verb.AutoSell: SetAutoSell(t, c.Count != 0); break;
@@ -388,7 +397,7 @@ public sealed partial class World {
 
     /// <summary>Host: puts a guest where their own machine walked them, as <see cref="MovePlayer"/> does for the host.</summary>
     public void MoveTo(Vector2 p) {
-        if (Downed || S.Sheltered != 0 || p == Player) return;
+        if (Downed || S.Sheltered != 0 || S.Actor.Door != Doorway.None || p == Player) return;
         playerBusy = true; Player = p;
     }
 
@@ -400,10 +409,12 @@ public sealed partial class World {
         var p = S.Absent.Remove(key, out var back) ? back : S.Absent.Remove("", out var unclaimed) ? unclaimed : Newcomer();
         p.Key = key; p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(0, 4).First(i => S.Players.All(o => o.Shirt != i));
         // What only made sense while they played: a cabin may have gone and a building gone up where they stood, a wolf that had them pinned has moved on, and the other properties follow input they no longer give.
-        if (Find(p.Sheltered)?.Kind != ThingKind.Hut) p.Sheltered = 0;
+        // A cabin holds one player, so one someone else went into meanwhile leaves the newcomer at its door.
+        if (Find(p.Sheltered)?.Kind != ThingKind.Hut || S.Players.Any(o => o.Sheltered == p.Sheltered)) p.Sheltered = 0;
+        p.Door = Doorway.None;
         if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
         Forget(p);
-        p.Mauled = false; p.GatherTarget = 0; p.Selected = ""; p.Sprinting = false; p.TorchKindling = 0;
+        p.Mauled = false; p.GatherTarget = 0; p.Selected = ""; p.Sprinting = p.Braking = false; p.TorchKindling = 0;
         S.Players.Add(p);
         // A packed crate's own name is no item, so it leaves no mark.
         foreach (var pair in p.Backpack.Items) if (Data.Items.ContainsKey(pair.Key)) Got(pair.Key);

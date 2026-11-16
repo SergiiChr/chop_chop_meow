@@ -30,7 +30,9 @@ public enum ActorAction {
     Grind,
     Dig,
     AxeSwing,
-    SteelAxeSwing
+    SteelAxeSwing,
+    Knock,
+    Brake
 }
 
 /// <summary>
@@ -82,6 +84,8 @@ public static class ActorAnimation {
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
+        ActorAction.Knock => World.KnockSeconds / World.Knocks,
+        ActorAction.Brake => Momentum.BrakeSeconds,
         ActorAction.Kindle => World.KindleSeconds,
         ActorAction.TorchSwing => .6f,
         ActorAction.Sit or ActorAction.Perch => 4,
@@ -400,6 +404,16 @@ public static class ActorAnimation {
                 return kneel with { RaiseR = 52 + strike * 18, ElbowR = 80 - strike * 34, Twist = strike * 4, RaiseL = 40 + MathF.Sin(p * Mathf.Tau) * 4 };
             case ActorAction.TorchSwing:
                 return Keys(p, TorchSwingKeys);
+            case ActorAction.Brake:
+                // A runner stopping hard plants the front heel well ahead with the leg nearly straight, sinks onto the bent back
+                // leg and leans back against the run, arms thrown forward for balance, the weight rocking a little as it holds.
+                return new Pose(Lean: -14 + wave * 2, Head: 10 + MathF.Cos(p * Mathf.Tau) * 2, RaiseL: 55, OutL: 18, ElbowL: 45, RaiseR: 40, OutR: 22, ElbowR: 55,
+                    SwingL: 42, KneeL: 6, FootL: -18, SwingR: -18, KneeR: 58, Splay: 4);
+            case ActorAction.Knock: {
+                    // The right fist beats on a door at head height, landing as each loop starts: drawn back with the elbow bent, then thrown at the boards.
+                    float drawn = p < .7f ? Mathf.SmoothStep(0, 1, p / .7f) : 1 - Mathf.SmoothStep(0, 1, (p - .7f) / .3f);
+                    return Stance with { Lean = 7 - drawn * 3, Head = 4, RaiseR = 104 - drawn * 12, OutR = -6, ElbowR = 30 + drawn * 75 };
+                }
             case ActorAction.Sit or ActorAction.Perch:
                 var eating = Keys(p, action == ActorAction.Sit ? SitKeys : PerchKeys);
                 return eating with { Lean = eating.Lean + wave * 1.2f, Head = eating.Head + wave * 1.5f };
@@ -764,7 +778,7 @@ public struct Turning {
     /// </summary>
     public const float BodyRate = 13, HeadRate = 30;
     /// <summary>How far, in radians, the head turns from the body, and the most a turning body leans into the turn.</summary>
-    public static readonly float MaxLook = Mathf.DegToRad(70), MaxBank = Mathf.DegToRad(20);
+    public static readonly float MaxLook = Mathf.DegToRad(70), MaxBank = Mathf.DegToRad(8);
 
     /// <summary>
     /// Moves <paramref name="angle"/> in radians toward <paramref name="target"/> as a critically damped spring of <paramref name="rate"/>

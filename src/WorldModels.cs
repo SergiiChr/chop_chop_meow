@@ -123,6 +123,8 @@ public sealed class HutProp : Prop {
     public MeshInstance3D Window = null!;
     public OmniLight3D Light = null!;
     public float Open;
+    /// <summary>The last one through the door ran, so it slams shut behind them.</summary>
+    public bool Slam;
     /// <summary>Whether the hut shows its night window glow and lamp.</summary>
     public bool Lit;
 }

@@ -125,6 +125,8 @@ UI and input:
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
 | `src/CabinPanel.cs` | A cabin: its door, sleep and the needs a night would leave |
+| `src/Cabins.cs` | Cabin doors: walking round to the door, stepping in and out, following, knocking and being dragged out |
+| `src/Momentum.cs` | How the player's movement answers the keys: braking, turning round and running back on a key for the other way |
 | `src/CampfirePanel.cs` | A campfire |
 | `src/ResourcePanel.cs` | A resource in the world |
 | `src/PilePanel.cs` | A pile or compost heap |
@@ -310,6 +312,14 @@ A sprint and a jog share their mechanics and differ in timing and form:
 - The feet land close to one line, and the trunk leans into the run, more in a sprint.
 - The elbows stay bent, most in front, bringing the hand up toward the chin.
 
+A player turns as people do (`Turning`): the head turns toward a new heading first, about 0.2 seconds ahead of the body, which follows on a critically damped spring and covers 90% of a quarter turn in 0.3 seconds.
+The body leans about the feet toward the inside of the turn, by the angle that balances turning at its speed against gravity, up to `Turning.MaxBank` (8°).
+A half turn swings round the way the body already turns, or the way the head looks.
+Workers keep the quick turn.
+
+The window moves its own player through `Momentum`: a key for about the opposite way brakes the run to a stop over `Momentum.BrakeSeconds`, stands `Momentum.TurnSeconds` to turn round and builds back up to full pace over `Momentum.StartSeconds`; any other change of keys turns at once, and letting go stops at once.
+While it brakes, `PlayerState.Braking` is set and carried to other machines, and the view shows the `Brake` lunge: front heel planted ahead, the weight sunk onto the bent back leg, leaning back with the arms forward.
+
 Digging (`ActorAction.Dig`) holds the shovel in both hands: the right on top of the handle and the left `ActorAnimation.ShovelGrip` down the shaft.
 `ActorAnimation.DigKeys` give where the blade's tip is and how the shaft leans at each moment: driven into the ground ahead, leant on, levered up and thrown aside to the left.
 Both arms are solved from there with `ActorAnimation.ArmTo`, and `ActorRig.Show` lays the shaft from the right fist through the left, so the blade goes where the keys take it.
@@ -429,7 +439,7 @@ As food falls under 20% (`GameData.GrowlBelow`), and with every further 5% gone 
 
 #### Death and recovery boxes
 
-Death moves carried items to a recovery box and respawns the player after a 30-second timer in the cabin nearest to where they fell, or at the clearing without one.
+Death moves carried items to a recovery box and respawns the player after a 30-second timer in the free cabin nearest to where they fell, or at the clearing without one.
 Recovery boxes are never automation storage and disappear once empty.
 
 ### Sight and fog of war
@@ -477,6 +487,25 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
 A wolf already chasing the player still follows into the light for a few seconds.
 Inside a cabin (`SaveState.Sheltered`) the player is hidden: their hunters give up at once and patrol on away from it.
+
+#### Cabin doors
+
+`src/Cabins.cs` runs a cabin's door, which holds one player at a time.
+A click on a cabin walks the player to `World.DoorPoint` along `World.TowardDoor`, round the walls when the cabin is in the way, and `World.Enter` starts there.
+What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they cannot move, swing or light a torch.
+
+- `Entering` takes `World.EnterSeconds`, or `World.RushSeconds` for a player who sprinted there (`PlayerState.DoorRush`), then shelters them.
+- A player who arrives while someone else steps in is `Following` until that one is inside, then `Knocking`: `World.Knocks` bangs over `World.KnockSeconds`, and free.
+  At the door of a cabin someone is in or stepping out of, they knock at once.
+- `World.Indoors` is what wolves go by: inside, through the second half of `Entering` and the first half of `Leaving`.
+- A bite or a leap landing on a player out in the open at a door (`World.PullOut`) drags them back out for `World.PullSeconds` (`Pulled`, or `PulledOff` while knocking).
+  At half health or less the nearest hunter then pins them; otherwise a pulled player steps in again at a run, and one pulled off the door stands free.
+- `Leaving` puts the player on the doorstep and takes `World.LeaveSeconds`.
+
+The view walks the player through the doorway over the stage (`WorldView.AtDoor`), up the two treads of the step onto the floor (`WorldView.DoorFloor`), and drags a pulled one back out facing the door.
+A player banging on the door stands on the lower tread.
+The animation review's `player cabin` clip plays every stage at a cabin, `player jog back` and `player run back` a run braking and turning round, and `player jog turns` and `player run turns` the keys A, W, D and S pressed in quick turn.
+The door opens while someone steps in or out: it swings with `hut_door_normal` after a walk, and slams shut with `hut_door_escaping` after a run.
 
 #### Torch
 

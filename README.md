@@ -150,11 +150,11 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 
 | Input | Action |
 | --- | --- |
-| WASD or arrow keys | Move in screen directions |
+| WASD or arrow keys | Move in screen directions; pressing about the opposite way while running brakes to a stop in a lunge, turns round and runs back |
 | Shift while moving | Sprint 1.6× as fast; food and drink drain 1.7× as fast; not under 15% food or drink |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
-| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you inside; on open ground, use the item selected on the hotbar (swing a tool or torch, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
+| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you round to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans |
 | Tab | Open or close the backpack |
@@ -381,7 +381,7 @@ The cabin's page shows, under "Stats after sleep", the health, hunger and thirst
 ### Death and recovery
 
 Death drops your backpack, coins included, in a recovery box marked by a bobbing gold gem.
-You respawn after 30 seconds inside the cabin nearest to where you fell, or in the clearing without one.
+You respawn after 30 seconds inside the cabin nearest to where you fell that nobody is in, or in the clearing without one.
 Emptied boxes disappear, and workers never use them as storage.
 During the respawn countdown, if no cabin exists, “Skip to morning?” lets you advance the world to dawn.
 In multiplayer, every player must be downed before skipping.
@@ -814,8 +814,18 @@ A direct hit with the torch hurts a wolf and sends it running for a moment.
 
 ### Cabins
 
-Click a cabin to step inside, even while walking; the door shuts behind you.
-Wolves cannot smell you there: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
+Click a cabin, or press Enter in its panel, and you walk round it to its door and step in; the door shuts behind you.
+Once you set off you cannot walk away, and the keys do nothing until you are in.
+Stepping in takes about 1.5 seconds at a walk, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
+For the first half of it you are still out in the open: a wolf that bites or leaps at you drags you back out, and you run in again at once.
+At half health or less, the wolf that drags you out knocks you onto your back.
+
+Wolves cannot smell you inside: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
+Stepping out takes about 1.5 seconds, and wolves can reach you for its second half, once you are out of the doorway.
+
+A cabin holds one player.
+Someone who walks up behind a player stepping in follows them, and the door shuts in their face; they bang on it three times and stand free.
+At the door of a cabin someone is in, you bang on it the same way.
 
 ### Wolf kills
 
@@ -858,7 +868,7 @@ A guest that loses the connection tries to get back in on its own for up to 120 
 ### Shared world
 
 Everyone shares the world, the market and the workers.
-Sleep needs every other player inside a cabin, and everyone with enough food and water.
+Sleep needs every other player inside a cabin of their own, and everyone with enough food and water.
 Night wolves hunt each player separately.
 
 Thirty times a second the server sends each player only what changed since the last update that player confirmed, usually a few hundred bytes, so it plays over the internet as well as at home.
@@ -909,7 +919,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), banging on a cabin door and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 A tree is felled with strokes from the side into its trunk, while an axe swung in the air comes down from overhead.
 
@@ -921,7 +931,7 @@ The world reacts too:
 - the bellows board travels with each press, and the heat gauge tracks the forge;
 - a bar under the reinforced furnace and its panel dial mark the heat steel needs;
 - furnaces smoke (the reinforced furnace darker and thicker), and anvils spark;
-- storage lids open on transfers, and the cabin door opens as you approach and shuts once you are inside;
+- storage lids open on transfers, and the cabin door opens for someone stepping in or out and shuts behind them;
 - the market mailbox flag rises while a cart is out;
 - wolves trot, leap, feed and fall dead, and a pinned player struggles on their back;
 - couriers pull the trade cart.

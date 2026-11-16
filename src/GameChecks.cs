@@ -442,7 +442,7 @@ public partial class Game {
     /// <summary>A new packing station opens its list of goods; picking one sets what it packs, Shift on a backpack stack loads it, and the idle player beside it packs.</summary>
     private async Task CheckPackingStationListsGoodsAndTakesBackpackClicks() {
         await CloseWithEsc();
-        var packer = Hosted.Add(ThingKind.Packer, world.Player + new Vector2(2, 0));
+        var packer = Hosted.Add(ThingKind.Packer, world.Player + new Vector2(1.6f, 0));
         Give(Hosted, "berries", 5);
         await Click(view.Screen(packer.Pos, .8f));
         Require(Shows(packer) && Named("pack_berries") != null, "A packing station with nothing chosen must open its list of goods.");
@@ -1229,7 +1229,7 @@ public partial class Game {
         var start = world.Player;
         var farm = Hosted.Add(ThingKind.Farm, start + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
         Warp(Hosted, farm.Pos + new Vector2(.9f, -.9f)); await Frames();
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -2.2f)); anvil.Inventory.Add("steel_bar", 1);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -1.2f)); anvil.Inventory.Add("steel_bar", 1);
         await Until(() => view.PlayerAnimation == ActorAction.Hammer, "the idle player hammering at the anvil beside it", 3);
         var point = RightPress(farm.Pos);
         await Until(() => farm.Progress > 0, "holding RMB on a ripe farm plot beside the anvil harvesting by hand", 3);
@@ -1334,7 +1334,7 @@ public partial class Game {
     }
     /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
     private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(2, 0)); anvil.Inventory.Add("steel_bar", 4);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 4);
         var smith = AddWorker(Hosted, anvil.Pos + new Vector2(0, 1.2f)); Hosted.Assign(smith, anvil);
         await Until(() => anvil.Processing && smith.WorkState == WorkerWorkState.Hammering, "the smith hammering a batch at the anvil", 3);
         smith.WageDebt = 1;

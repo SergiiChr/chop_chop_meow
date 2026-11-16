@@ -34,6 +34,7 @@ public sealed class PlayerControl {
     private Thing? gathering;
     /// <summary>A cabin the player is walking to after clicking it; they step inside on arrival.</summary>
     private Thing? entering;
+    private Momentum momentum;
     /// <summary>A crate held under the right mouse button; it is lifted once held for <see cref="LiftSeconds"/>.</summary>
     private Thing? lifting;
     private float liftClock;
@@ -91,12 +92,16 @@ public sealed class PlayerControl {
     /// <summary>The ground direction for right <paramref name="x"/> and down <paramref name="y"/> on screen, each -1, 0 or 1 as movement keys give them.</summary>
     public static Vector2 KeyDirection(float x, float y) => new Vector2(x + y * 2, y * 2 - x).Normalized();
 
-    /// <summary>A clicked cabin draws the player to its door, even with a movement key still held from walking there.</summary>
+    /// <summary>
+    /// A clicked cabin draws the player round it to its door and in, whatever keys are held; a sprint there, with Shift
+    /// held, steps in at a run.
+    /// </summary>
     private Vector2 TowardCabin(Vector2 direction) {
         if (world.Downed || entering != null && world.Find(entering.Id) == null) entering = null;
-        if (entering == null) return direction;
-        if (world.Enter(entering)) { entering = null; return direction; }
-        return (entering.Pos - world.Player).Normalized();
+        if (entering == null) return world.Door == Doorway.None ? direction : Vector2.Zero;
+        var toward = World.TowardDoor(entering, world.Player);
+        if (toward == Vector2.Zero && world.Enter(entering, world.Me.Sprinting)) { entering = null; return Vector2.Zero; }
+        return toward;
     }
 
     /// <summary>Carries on a gather; a loose piece needs only one click: the player keeps walking to it after the button is released.</summary>
@@ -138,7 +143,9 @@ public sealed class PlayerControl {
     private void Walk(Vector2 direction, bool right, float dt) {
         // Under 15% food or drink the player is too weak to sprint.
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
-        world.MovePlayer(direction * dt * world.Data.MoveSpeed(world.Me.Sprinting)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
+        var step = momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
+        world.Me.Braking = momentum.Braking;
+        world.MovePlayer(step * dt * world.Data.MoveSpeed(world.Me.Sprinting)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
         // A tool in hand that has left the backpack leaves the hand empty.
         if (world.InHand != "" && world.Backpack[world.InHand] == 0) world.SelectInHand("");

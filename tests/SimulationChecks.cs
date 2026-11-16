@@ -86,6 +86,15 @@ public static class SimulationChecks {
         Test(CheckSleepHealsOnlyWhileFed, data);
         Test(CheckSprintBurnsFood, data);
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
+        Test(CheckPlayerBehindACabinWalksRoundItToTheDoor, data);
+        Test(CheckPressingTheOppositeWayBrakesBeforeRunningBack, data);
+        Test(CheckSteppingInTakesLongerAtAWalkThanAtASprint, data);
+        Test(CheckAWolfDragsAPlayerOutOfTheDoorwayAndTheyRunBackIn, data);
+        Test(CheckAWoundedPlayerDraggedOutOfTheDoorwayIsPinned, data);
+        Test(CheckWolvesCannotReachAPlayerHalfWayIn, data);
+        Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
+        Test(CheckACabinHoldsOnePlayerAndTheNextBangsOnTheDoor, data);
+        Test(CheckAPlayerRespawnsInTheNearestFreeCabin, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
         Test(CheckARandomDenLetsOneMoreWolfOutEveryHour, data);
@@ -271,8 +280,7 @@ public static class SimulationChecks {
 
         Give(world, "wood", 12); Give(world, "stone", 8);
         var cabin = world.Build(ThingKind.Hut, world.Player + new Vector2(-4, 0))!;
-        world.Player = cabin.Pos + new Vector2(2, 0);
-        Require(world.Enter(cabin), "the player should step into the cabin");
+        StepInside(world, cabin);
         Require(!world.Dismantle(cabin) && world.Find(cabin.Id) != null, "a cabin someone shelters in should not come down");
     }
 
@@ -2306,7 +2314,7 @@ public static class SimulationChecks {
         Give(world, Inventory.Coins, 500);
         // The player waits out the nights in a cabin, out of the wolves' reach.
         var hut = world.Add(ThingKind.Hut, new Vector2(40, 40));
-        world.Player = hut.Pos + new Vector2(0, 2); world.Enter(hut);
+        StepInside(world, hut);
         for (int i = 0; i < 4 * data.DaySeconds && farm.FarmStage == FarmStage.Ripe; i++) SafeTick(world, 1);
         Require(farm.FarmStage == FarmStage.Fallow && farm.Output!["wheat_seeds"] + farm.Inventory["wheat_seeds"] == 2, "a worker should finish the shared harvest into the plot");
         SafeTick(world, 30);
@@ -2538,7 +2546,7 @@ public static class SimulationChecks {
     private static void CheckARandomDenLetsOneMoreWolfOutEveryHour(GameData data) {
         // Inside a cabin the player is never smelled, so every wolf let out stays out until the retreat.
         var world = EmptyWorld(data);
-        Require(world.Enter(world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0))), "the player should step into the cabin");
+        StepInside(world, world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0)));
         RunUntilDusk(world);
         SafeTick(world, data.HourSeconds - 1);
         Require(world.Wolves.Count == World.Dens.Length, "only the wolves of dusk should be out through the first hour");
@@ -2650,7 +2658,7 @@ public static class SimulationChecks {
         var world = NightWorld(data);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
         var howler = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-8, 0), Howl = 5, HowlLength = 5, Flee = 2, Stagger = 1 });
-        Require(world.Enter(hut), "the player should step into the cabin");
+        StepInside(world, hut);
         SafeTick(world, .1f);
         Require(howler.Target == 0 && howler.Mode == WolfMode.Patrol && howler.Howl == 0 && howler.Flee == 0 && howler.Stagger == 0,
                 "a wolf whose player took shelter should drop its howl and flight and patrol");
@@ -2723,13 +2731,149 @@ public static class SimulationChecks {
         Require(Gap(true) > 4.1f, "a sprinting player must outrun a chasing wolf");
     }
 
+    private static void CheckPressingTheOppositeWayBrakesBeforeRunningBack(GameData data) {
+        var momentum = new Momentum();
+        Require(momentum.Step(Vector2.Right, 1 / 60f) == Vector2.Right, "a player setting off from a stand should run at full pace at once");
+        Require(momentum.Step(Vector2.Down, 1 / 60f) == Vector2.Down, "a key at right angles should turn the run at once");
+        var step = Vector2.Zero;
+        for (int i = 0; i < 6; i++) step = momentum.Step(Vector2.Up, 1 / 60f);
+        Require(momentum.Braking && step.Dot(Vector2.Down) is > 0 and < 1, $"0.1 s after pressing the opposite way the player should still slide on, slower, not {step}");
+        for (int i = 0; i < 21; i++) step = momentum.Step(Vector2.Up, 1 / 60f);
+        Require(!momentum.Braking && step.Dot(Vector2.Up) > 0, $"0.45 s after pressing the opposite way the player should be running back, not {step}");
+        for (int i = 0; i < 12; i++) step = momentum.Step(Vector2.Up, 1 / 60f);
+        Require(step == Vector2.Up, "the player should be back to full pace soon after turning round");
+        Require(momentum.Step(Vector2.Zero, 1 / 60f) == Vector2.Zero && momentum.Step(Vector2.Down, 1 / 60f) == Vector2.Down, "letting go should stop the player at once, and the next key start a fresh run");
+    }
+
+    private static void CheckPlayerBehindACabinWalksRoundItToTheDoor(GameData data) {
+        var world = EmptyWorld(data);
+        var hut = world.Add(ThingKind.Hut, new Vector2(20, 20));
+        // The door faces +Y, so this is straight behind the cabin.
+        world.Player = hut.Pos + new Vector2(0, -3);
+        float widest = 0;
+        for (int i = 0; i < 600 && World.TowardDoor(hut, world.Player) is var way && way != Vector2.Zero; i++) {
+            var before = world.Player;
+            world.MovePlayer(way * data.MoveSpeed(false) / 60);
+            Require(world.Player != before, $"the walk to the door should never stall against the cabin, at {world.Player}");
+            widest = Math.Max(widest, Math.Abs(world.Player.X - hut.Pos.X));
+        }
+        Require(world.Player.DistanceTo(World.DoorPoint(hut)) < .2f, $"the walk should end at the cabin's door, not at {world.Player}");
+        Require(widest > 1.5f, "the walk should go round the side of the cabin");
+        Require(world.Enter(hut, false) && world.Door == Doorway.Entering, "a player at the door should step in");
+    }
+
+    private static void CheckSteppingInTakesLongerAtAWalkThanAtASprint(GameData data) {
+        var world = EmptyWorld(data);
+        var hut = world.Add(ThingKind.Hut, new Vector2(20, 20));
+        world.Player = World.DoorPoint(hut);
+        Require(world.Enter(hut, false), "a player at the door should step in");
+        world.Tick(1.4f);
+        Require(world.Sheltered == 0, "stepping in at a walk should take longer than 1.4 s");
+        world.Tick(.15f);
+        Require(world.Sheltered == hut.Id, "stepping in at a walk should be done by 1.55 s");
+        world.Leave();
+        Require(world.Door == Doorway.Leaving && world.Player == World.DoorPoint(hut), "stepping out should start at the door");
+        world.Tick(1.4f);
+        Require(world.Door == Doorway.Leaving, "stepping out should take longer than 1.4 s");
+        world.Tick(.15f);
+        Require(world.Door == Doorway.None && world.Sheltered == 0, "stepping out should be done by 1.55 s");
+        Require(world.Enter(hut, true), "a player who sprinted to the door should step in");
+        world.Tick(.65f);
+        Require(world.Sheltered == 0, "stepping in at a sprint should take longer than 0.65 s");
+        world.Tick(.1f);
+        Require(world.Sheltered == hut.Id, "stepping in at a sprint should be done by 0.75 s");
+    }
+
+    /// <summary>A wolf bite takes 15 health, which leaves a healthy player above half.</summary>
+    private static void CheckAWolfDragsAPlayerOutOfTheDoorwayAndTheyRunBackIn(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = World.DoorPoint(hut);
+        Require(world.Enter(hut, false), "a player at the door should step in");
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        for (float time = 0; time < .7f && world.Door == Doorway.Entering; time += .05f) world.Tick(.05f);
+        Require(world.Door == Doorway.Pulled && world.Health == 85, $"a wolf biting a player in the first half of stepping in should drag them out, not {world.Door} at {world.Health} health");
+        world.Tick(World.PullSeconds);
+        Require(world.Door == Doorway.Entering && world.Me.DoorRush, "a player dragged out should step in again at a run");
+        world.Tick(World.RushSeconds);
+        Require(world.Sheltered == hut.Id && !world.Mauled, "a player dragged out above half health should get inside");
+    }
+
+    private static void CheckAWoundedPlayerDraggedOutOfTheDoorwayIsPinned(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = World.DoorPoint(hut);
+        SetNeeds(world, health: 45);
+        Require(world.Enter(hut, false), "a player at the door should step in");
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2, 0) });
+        for (float time = 0; time < .7f && world.Door == Doorway.Entering; time += .05f) world.Tick(.05f);
+        Require(world.Door == Doorway.Pulled && !world.Mauled, $"a wolf leaping at a wounded player stepping in should first drag them out, not {world.Door}");
+        world.Tick(World.PullSeconds);
+        Require(world.Mauled && world.Sheltered == 0, "a wounded player dragged out should then be pinned");
+    }
+
+    private static void CheckWolvesCannotReachAPlayerHalfWayIn(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = World.DoorPoint(hut);
+        Require(world.Enter(hut, false), "a player at the door should step in");
+        world.Tick(World.EnterSeconds / 2 + .05f);
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        world.Tick(.5f);
+        Require(world.Health == 100 && world.Door == Doorway.Entering && wolf.Target == 0, "a wolf should give up on a player past the first half of stepping in");
+    }
+
+    private static void CheckSteppingOutIsSafeOnlyInTheDoorway(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        StepInside(world, hut);
+        world.Leave();
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        world.Tick(.5f);
+        Require(world.Health == 100 && wolf.Target == 0, "a wolf should not reach a player in the first half of stepping out");
+        world.Tick(.3f);
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        world.Tick(.3f);
+        Require(world.Health < 100 && world.Door == Doorway.Leaving, "a wolf should bite a player in the second half of stepping out, who walks on out");
+    }
+
+    private static void CheckACabinHoldsOnePlayerAndTheNextBangsOnTheDoor(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var heard = Listen(world);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        world.Player = World.DoorPoint(hut);
+        Require(world.Enter(hut, false), "the host at the door should step in");
+        world.Tick(.2f);
+        world.As(guest, () => { world.Player = World.DoorPoint(hut) + new Vector2(.3f, 0); Require(world.Enter(hut, false), "the guest at the door should start after the host"); });
+        Require(guest.Door == Doorway.Following, $"a player at the door behind someone stepping in should follow them, not {guest.Door}");
+        world.As(guest, () => world.MoveTo(guest.Pos + Vector2.Right));
+        Require(guest.Pos == World.DoorPoint(hut) + new Vector2(.3f, 0), "a player following someone in should not walk away");
+        world.Tick(World.EnterSeconds);
+        Require(world.Sheltered == hut.Id && guest.Door == Doorway.Knocking && guest.Sheltered == 0, $"the door should shut on the follower, who bangs on it, not {guest.Door}");
+        world.Tick(World.KnockSeconds);
+        Require(guest.Door == Doorway.None && guest.Sheltered == 0 && heard.Count(name => name == "door_bang") == 3, $"the follower should bang 3 times over a second and stand free: heard {string.Join(", ", heard)}");
+        world.As(guest, () => Require(world.Enter(hut, false), "a player at the door of a cabin someone is in should bang on it"));
+        Require(guest.Door == Doorway.Knocking, "a player at the door of a cabin someone is in should bang on it");
+    }
+
+    private static void CheckAPlayerRespawnsInTheNearestFreeCabin(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var near = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -6));
+        var far = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -14));
+        StepInside(world, near, guest);
+        world.Player = near.Pos + new Vector2(4, 0);
+        SetNeeds(world, health: 0);
+        SafeTick(world, data.RespawnSeconds + 1);
+        Require(world.Sheltered == far.Id, "a player should respawn in the nearest cabin nobody is in");
+    }
+
     private static void CheckCabinShelterAndChasingWolfGivesUpInLight(GameData data) {
         var world = NightWorld(data);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
         var wolf = new Wolf { Pos = world.Player + new Vector2(-4, 0) };
         PlaceWolf(world, wolf);
         SafeTick(world, .5f);
-        Require(world.Enter(hut) && world.Sheltered == hut.Id, "clicking a nearby cabin should take the player inside");
+        StepInside(world, hut);
         float before = wolf.Pos.DistanceTo(world.Player);
         SetNeeds(world, health: 40);
         SafeTick(world, 1);

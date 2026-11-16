@@ -26,7 +26,7 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
             var (inside, blocked, _) = now;
             tag.Text = inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);
-            door.Text = inside ? "Step outside" : "Go inside";
+            door.Text = inside ? "Step outside" : "Enter";
             sleep.TooltipText = blocked ?? "Sleep until dawn. Production, hunger, trade and wages advance.";
             sleep.Modulate = blocked == null ? Colors.White : Style.Unready;
             block.Visible = blocked != null; block.Text = blocked == null ? "" : ShortBlock(blocked);

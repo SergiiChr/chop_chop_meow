@@ -649,7 +649,7 @@ public sealed partial class World {
     public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
     public void MovePlayer(Vector2 delta) {
         // Inside a cabin the player stays put until they step outside on purpose.
-        if (Downed || S.Sheltered != 0) return;
+        if (Downed || S.Sheltered != 0 || S.Actor.Door != Doorway.None) return;
         if (delta == Vector2.Zero) return;
         playerBusy = true;
         Player = Slide(Player, delta);
@@ -790,7 +790,7 @@ public sealed partial class World {
     }
     /// <summary>Why a building cannot come down now, or null: someone shelters in it, or a cart is out from it.</summary>
     private string? DismantleBlock(Thing t) {
-        foreach (var p in S.Players) if (p.Sheltered == t.Id) return "Someone is inside. It can come down once they step out.";
+        foreach (var p in S.Players) if (p.Sheltered == t.Id || p.Door != Doorway.None && p.DoorCabin == t.Id) return "Someone is inside. It can come down once they step out.";
         foreach (var order in S.Orders) if (order.Signpost == t.Id) return "A cart is out from this trading post. Wait for it to come back.";
         return null;
     }
@@ -1093,13 +1093,6 @@ public sealed partial class World {
     }
     /// <summary>Finished goods plus anything neither the recipe the station is on nor the kept one takes.</summary>
     public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));
-    /// <summary>Steps inside a cabin, out of reach of wolves; any movement steps back out.</summary>
-    public bool Enter(Thing hut) {
-        if (hut.Kind != ThingKind.Hut || !Near(hut, 2.6f)) return false;
-        if (!Forwarded(Verb.Enter, hut.Id)) S.Sheltered = hut.Id;
-        return true;
-    }
-    public void Leave() { if (!Forwarded(Verb.Leave)) S.Sheltered = 0; }
     /// <summary>Bedtime comes a little before night falls, so the player can turn in without waiting for the dark.</summary>
     public const int SleepHour = 22;
     public float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
@@ -1173,7 +1166,7 @@ public sealed partial class World {
     /// A torch put out before, by wild swinging, lights again with the burn time it had left.
     /// </summary>
     public void UseTorch(Vector2 aim) {
-        if (Downed || S.Sheltered != 0 || S.TorchKindling > 0 || Forwarded(Verb.Torch, at: aim)) return;
+        if (Downed || S.Sheltered != 0 || S.Actor.Door != Doorway.None || S.TorchKindling > 0 || Forwarded(Verb.Torch, at: aim)) return;
         if (S.TorchLit) { SwingTorch(aim); return; }
         if (S.Backpack["torch"] == 0) { Say("No torch in your backpack."); return; }
         if (S.Torch <= 0) S.Torch = Data.CampfireSeconds;
@@ -1216,7 +1209,7 @@ public sealed partial class World {
         foreach (var w in Hunters) w.Scared = false;
     }
     public void Attack() {
-        if (attackClock > 0 || Downed || S.Sheltered != 0 || Forwarded(Verb.Attack)) return;
+        if (attackClock > 0 || Downed || S.Sheltered != 0 || S.Actor.Door != Doorway.None || Forwarded(Verb.Attack)) return;
         attackClock = .6f;
         var wolf = S.Wolves.OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         string? axe = BestTool("axe");
@@ -1244,18 +1237,10 @@ public sealed partial class World {
         Say(wolfKill ? ate : $"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
     }
     private void Respawn() {
-        // The player wakes inside the cabin nearest to where they fell, or in the clearing without one.
-        var cabin = Nearest(ThingKind.Hut, Player);
-        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Terrain.Spawn : Doorstep(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
+        // The player wakes inside the free cabin nearest to where they fell, or in the clearing without one.
+        var cabin = NearestFreeCabin(Player);
+        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Terrain.Spawn : DoorPoint(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
         Say(cabin == null ? "You wake in the clearing. Recover your belongings from the box." : "You wake in the cabin. Recover your belongings from the box.");
-    }
-    /// <summary>Open ground just outside a cabin's walls, where its occupant stands when they step out.</summary>
-    private Vector2 Doorstep(Thing cabin) {
-        for (int i = 0; i < 8; i++) {
-            var p = cabin.Pos + Vector2.Down.Rotated(i * MathF.PI / 4) * (Footprint(ThingKind.Hut) + .6f);
-            if (CanStand(p)) return p;
-        }
-        return cabin.Pos + Vector2.Down * (Footprint(ThingKind.Hut) + .6f);
     }
     // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.
     public float UnitPrice(string item, bool buying) => Data.Market.Goods[item].Price * (buying ? 1.25f : Math.Min(1, Demand(item)));
@@ -2146,6 +2131,7 @@ public sealed partial class World {
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
             using (ActAs(p)) {
+                if (!sleeping) TickDoorway(dt);
                 if (!Dusk) {
                     if (!Dead) S.Mauled = false;
                 } else if (!sleeping) {
@@ -2269,7 +2255,7 @@ public sealed partial class World {
         // A wolf that let go, such as one heading home before dawn, frees the player it pinned.
         if (S.Mauled && !Dead && !AnyPinning(hunters)) S.Mauled = false;
         // A sheltered player is out of reach and out of smell: the pack gives up at once and patrols on away from the cabin.
-        if (S.Sheltered != 0) {
+        if (Indoors(S.Actor)) {
             foreach (var wolf in hunters) Patrol(wolf, AwayFromPlayer(wolf).Angle());
             return;
         }
@@ -2295,7 +2281,8 @@ public sealed partial class World {
                 var landing = Player + (wolf.Pos - Player).Normalized() * PinDistance;
                 wolf.Pos = wolf.Pos.MoveToward(landing, wolf.Pos.DistanceTo(landing) * Math.Min(1, dt / wolf.Leap));
                 wolf.Leap = Math.Max(0, wolf.Leap - dt);
-                if (wolf.Leap == 0) { wolf.Feeding = wolf.Pinning = true; S.Mauled = true; Say(hunters.Count > 1 ? "You are pinned. The pack closes in." : "You are pinned."); Play("wolf_bite", Player); }
+                // A player in a doorway is dragged back out of it first, and pinned once out.
+                if (wolf.Leap == 0 && !PullOut()) Pin(wolf, hunters.Count > 1);
             } else if (S.Mauled) {
                 if (wolf.Feeding) continue;
                 var seat = Player + (wolf.Pos - Player).Normalized() * FeastSeat;
@@ -2316,7 +2303,7 @@ public sealed partial class World {
                 wolf.Chase = 0;
                 Travel(wolf, Player, dt * speed * .35f, dt * speed * .35f, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); }
+                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(); }
             } else if ((lit || Protected(wolf.Pos)) is var safe && safe && wolf.Chase <= 0) {
                 // Firelight turns a wolf back, unless it is already on the player's heels: then it follows in briefly.
                 wolf.Chase = 0; wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * 3);
@@ -2328,7 +2315,7 @@ public sealed partial class World {
                 wolf.Chase = safe ? wolf.Chase - dt : ChaseSeconds;
                 Travel(wolf, Player, dt * chase, dt * chase, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); }
+                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(); }
             }
         }
         // Feeding wolves crowd around the player without stacking on one spot.
@@ -2343,6 +2330,11 @@ public sealed partial class World {
             foreach (var w in hunters) if (w.Feeding) feeding++;
             S.Health -= dt * (16 + 8 * feeding);
         }
+    }
+    /// <summary>A wolf that has reached the player knocks them onto their back and holds them down.</summary>
+    private void Pin(Wolf wolf, bool pack) {
+        wolf.Leap = 0; wolf.Pos = Player + (wolf.Pos - Player).Normalized() * PinDistance; wolf.Feeding = wolf.Pinning = true; S.Mauled = true;
+        Say(pack ? "You are pinned. The pack closes in." : "You are pinned."); Play("wolf_bite", Player);
     }
     /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>
     private Vector2 AwayFromPlayer(Wolf wolf) => wolf.Pos == Player ? Vector2.Right : (wolf.Pos - Player).Normalized();
