@@ -169,7 +169,7 @@ public partial class NeedsPlate : PanelContainer {
             bankDue.Text = bank.DailyWages > 0 ? $"−{bank.DailyWages} /day" : "";
             bankDue.AddThemeColorOverride("font_color", bank.DailyWages > bank.WageCoins ? Style.Warn : Style.Beige);
             bankDue.TooltipText = bank.DailyWages > bank.WageCoins ? "More than the bank holds; the rest comes from your backpack at dawn" : "Paid from the bank at dawn";
-            bankRevenue.Text = $"+{bank.DayRevenue} today";
+            bankRevenue.Text = $"+{bank.DayRevenue}";
             // Green once today's sales are above a day's wages.
             bankRevenue.AddThemeColorOverride("font_color", bank.DayRevenue > bank.DailyWages ? Style.Ready : Style.Warn);
             bankRevenue.TooltipText = "Coins sales brought in since dawn";

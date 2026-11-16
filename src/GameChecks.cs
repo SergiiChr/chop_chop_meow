@@ -224,10 +224,10 @@ public partial class Game {
         Require(Named("pick_berries") == null, "The post's filter must not offer loose berries.");
         await Click(Named("filters_close")!);
         int before = world.DayRevenue;
-        Require(world.DailyWages == 0 && BankRevenue() == ($"+{before} today", Style.Warn), "With no sale today the bank must show today's coins in red, under the wages.");
+        Require(world.DailyWages == 0 && BankRevenue() == ($"+{before}", Style.Warn), "With no sale today the bank must show today's coins in red, under the wages.");
         Hosted.Tick(world.Data.TradeSeconds);
         // A crate of 12 berries at 0.82 and the crate at 3.15 pay 12 coins.
-        await Until(() => BankRevenue() == ($"+{before + 12} today", Style.Ready), "the bank showing the sale's 12 coins in green, above no wages", 2);
+        await Until(() => BankRevenue() == ($"+{before + 12}", Style.Ready), "the bank showing the sale's 12 coins in green, above no wages", 2);
         RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 999);
         await CloseWithEsc();
     }
@@ -2051,11 +2051,7 @@ public partial class Game {
             await Test(CheckStationSlotsShakeWhenTheBackpackHasNoRoomForThem);
             await Test(CheckUnmarkedStationStaysOnItsRecipe);
             await Test(CheckRefusedDoubleClickKeepsTheWorkerMark);
-            await Test(CheckEveryRecipeIsReadyToStartAfterADoubleClickWithAllItsItemsCarried);
-            await Test(CheckNoRecipeIsReadyToStartAfterADoubleClickWithOneOfItsItems);
-            await Test(CheckNoRecipeIsReadyToStartAfterADoubleClickWithoutFuel);
-            await Test(CheckNoRecipeIsReadyToStartAfterADoubleClickWithFuelAlone);
-            await Test(CheckEveryRecipeIsReadyToStartWhenLoadedByHand);
+            await RunRecipeReadyChecks();
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
             await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
             await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
