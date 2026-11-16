@@ -915,7 +915,7 @@ public partial class Game {
     /// <summary>Sounds rotate through variants, a howl plays as long as a wolf holds it, and music hands over and crossfades by time of day.</summary>
     private async Task CheckSoundsRotateAndMusicCrossfades() {
         Require(Sounds.Names.All(name => sounds.VariantCount(name) > 0), "Every sound must load.");
-        Require(sounds.VariantCount("footsteps_default") == 3, "Numbered footstep files must group as three variants.");
+        Require(sounds.VariantCount("footsteps_default") == 6, "Numbered footstep files must group as six variants.");
         Require(sounds.VariantCount("chop_tree") == 1, "A single chop file must count as one variant.");
         Require(Math.Abs(sounds.Length("wolf_howl") - world.Data.LoneHowlSeconds) < .1 && Math.Abs(sounds.Length("wolf_howl_group") - world.Data.PackHowlSeconds) < .1,
             "A wolf must hold its howl as long as the howl recording plays.");
