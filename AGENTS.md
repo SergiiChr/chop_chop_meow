@@ -62,6 +62,8 @@ CI runs the same command.
 Treat Godot error output as a failure even when the process exits zero; `build.py` does.
 
 To wait for a `./build.py` run, run it in the background and wait for it to exit.
+Wait on the process ending, not on a line in its log: a line printed after the run, such as `echo EXIT $?` after
+`./build.py check > log`, goes to the shell's output, not to the log, so a wait for it never ends.
 Never find or stop its processes with `pgrep -f` or `pkill -f`: both match the calling shell's own command line, so a
 wait loop on `pgrep -f` never ends and `pkill -f` kills that shell.
 Find them by name instead: `pgrep -a Godot` for a check run, `pgrep -a ChopChopMeow` for the exported game.
