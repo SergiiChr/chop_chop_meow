@@ -2167,7 +2167,11 @@ public static class SimulationChecks {
         world.SetFilter(pile, World.CrateOf("raw_meat"), false, true); world.SetFilter(pile, "stone", false, false);
         Require(pile.Inventory.InputFilter.SetEquals(new[] { World.CrateOf("raw_meat") }) && world.HoldBlock(pile, "stone") == "This is a crate of raw meat pile.",
             "a pile set to crates of a good should name that good, and keep it when another resource is taken off");
-        world.ClearFilters(pile);
+        world.SetFilter(pile, "wood", false, true);
+        Require(!world.SetCompost(pile, true) && said.Contains("Take the pile's filter off before composting."), "an empty pile with a filter should not turn into compost");
+        world.ClearFilters(pile); pile.Inventory.Add("leaves", 2);
+        Require(!world.SetCompost(pile, true) && said.Contains("Empty the pile before composting."), "a pile holding leaves should not turn into compost");
+        pile.Inventory.Remove("leaves", 2); world.ClearFilters(pile);
 
         Require(world.SetCompost(east, true), "compost should be set on the pile");
         Require(east.Inventory.InputFilter.Contains("leaves"), "compost should take leaves");

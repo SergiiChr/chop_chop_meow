@@ -14,7 +14,7 @@ public sealed class FilterState {
 /// Drop an item on a row to add it, click one to take it off; an empty row allows anything.
 /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
 /// A plain pile has only the row of what workers bring, naming one resource, which also sets what they take.
-/// Water at any fill is one entry, apart from empty bottles.
+/// Water at any fill is one entry, apart from empty bottles, and a pile can name crates of mixed goods.
 /// </summary>
 /// <param name="redraw">Draws the page again after a change to this window; the page does so itself when the filters change.</param>
 /// <param name="scrolls">Takes the item list's scroll area and the list, so the panel fits it to the screen.</param>
@@ -51,7 +51,8 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             // A held stack goes back where it was: a filter only names it, or for a packed crate the kind of crate it is.
             add.Controls = new SlotInput(cursor) {
                 Click = () => { state.Picking = !state.Picking; state.Output = output; redraw(); },
-                Takes = held => held.Stack is HeldStack stack && (!World.PackedKind(stack.Item).IsEmpty || !post && world.Data.Items.ContainsKey(stack.Item)),
+                // Only a pile names crates of mixed goods.
+                Takes = held => held.Stack is HeldStack stack && (World.PackedKind(stack.Item) is var kind && !kind.IsEmpty && (pile || !kind.SequenceEqual(World.MixedCrate)) || !post && world.Data.Items.ContainsKey(stack.Item)),
                 Put = (held, _) => {
                     var kind = World.PackedKind(held.Item!);
                     world.SetFilter(t, kind.IsEmpty ? held.Item! : new string(kind), output, true); held.Release();
@@ -66,6 +67,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             list.AddChild(picker); AddChild(Style.InWell(list));
             scrolls(list, picker);
             var crates = world.Data.Market.Sells.Keys.Select(World.CrateOf).Where(id => post || world.Holds(t, id));
+            if (pile) crates = crates.Append(World.MixedCrate);
             var items = world.Data.Items.Keys.Where(id => world.Holds(t, id));
             if (pile) items = items.Select(world.PileEntry).Distinct();
             foreach (var id in (post ? crates : items.Concat(crates)).OrderBy(world.FilterName)) {

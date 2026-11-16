@@ -1382,11 +1382,13 @@ public sealed partial class World {
     public static int PackedId(string item) => item.StartsWith(PackedPrefix, StringComparison.Ordinal) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
     /// <summary>The filter entry that stands for any packed crate of one good, such as <c>crate_bread</c>.</summary>
     public static string CrateOf(string item) => PackedPrefix + item;
-    /// <summary>The <see cref="CrateOf"/> entry a packed crate of one good matches, or empty for anything else.</summary>
+    /// <summary>The filter entry that stands for any packed crate of mixed goods; only a pile's filter names it.</summary>
+    public const string MixedCrate = PackedPrefix;
+    /// <summary>The <see cref="CrateOf"/> entry a packed crate of one good matches, <see cref="MixedCrate"/> for a crate of mixed goods, or empty for anything else.</summary>
     public static ReadOnlySpan<char> PackedKind(string item) {
         if (!item.StartsWith(PackedPrefix, StringComparison.Ordinal)) return default;
         int last = item.LastIndexOf('_');
-        return last > PackedPrefix.Length ? item.AsSpan(0, last) : default;
+        return item.AsSpan(0, Math.Max(last, PackedPrefix.Length));
     }
     /// <summary>The good a filter entry from <see cref="CrateOf"/> asks crates of, or null for any other entry.</summary>
     public string? CrateGood(string entry) => entry.StartsWith(PackedPrefix) && Data.Items.ContainsKey(entry[PackedPrefix.Length..]) ? entry[PackedPrefix.Length..] : null;
@@ -1408,8 +1410,8 @@ public sealed partial class World {
     }
     /// <summary>Whether a pile is a plain one, whose filter names one resource, rather than compost.</summary>
     public static bool IsPlainPile(Thing t) => t.Kind == ThingKind.Pile && !t.Compost;
-    /// <summary>What a filter entry names: an item, or a crate of a good.</summary>
-    public string FilterName(string entry) => CrateGood(entry) is string good ? $"Crate of {Data.Name(good).ToLowerInvariant()}" : Data.Name(entry);
+    /// <summary>What a filter entry names: an item, a crate of a good, or a crate of mixed goods.</summary>
+    public string FilterName(string entry) => entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? $"Crate of {Data.Name(good).ToLowerInvariant()}" : Data.Name(entry);
     /// <summary>The contents of a packed crate item, or null for anything else.</summary>
     public Inventory? Packed(string item) => S.Crates.GetValueOrDefault(PackedId(item));
     public Inventory NewCrate() => new() { Slots = Data.CrateCapacity, StackSize = Data.CrateCapacity, Capacity = Data.CrateCapacity };
@@ -1651,7 +1653,8 @@ public sealed partial class World {
     public bool SetCompost(Thing pile, bool on) {
         if (pile.Kind != ThingKind.Pile || pile.Compost == on) return false;
         var items = pile.Inventory.Items.Keys.ToList();
-        if (on ? items.Any(i => !Compostable(i) && i != "fertilizer") : items.Count > 1) { Say(on ? "Empty the pile before composting." : "Empty the compost down to one resource first."); return false; }
+        if (on ? items.Count > 0 : items.Count > 1) { Say(on ? "Empty the pile before composting." : "Empty the compost down to one resource first."); return false; }
+        if (on && pile.Inventory.InputFilter.Count > 0) { Say("Take the pile's filter off before composting."); return false; }
         if (Forwarded(Verb.SetCompost, pile.Id, count: on ? 1 : 0)) return true;
         pile.Compost = on; pile.Progress = 0;
         // Compost starts out taking everything that rots and giving fertilizer; its filters are then the player's to change.

@@ -567,12 +567,13 @@ From then on workers store and take only that, and anything else is refused, by 
 The filter stays when the pile is emptied.
 It can be taken off or changed only while the pile is empty, and a new resource goes on only once the old one is off.
 Water is one resource at any fill, so a water pile holds full and part-full bottles; empty bottles go on a pile of their own.
+Crates of one good are one resource per good, and crates of mixed goods are one resource, "Mixed crate".
 
 Piles are walkable and snap edge to edge to a pile beside them, so they line up in neat grids.
 
 ### Compost
 
-The compost switch in an empty pile's header makes it take leaves, grass and any food, cooked, raw or half-made, and turn 4 of them into 1 fertilizer every in-game hour.
+The compost switch in the header of an empty pile with no filter makes it take leaves, grass and any food, cooked, raw or half-made, and turn 4 of them into 1 fertilizer every in-game hour.
 It keeps its own filters.
 
 Workers bring leaves and grass to it first, and food only when no other storage takes it.

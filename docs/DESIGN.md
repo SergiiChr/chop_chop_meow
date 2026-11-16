@@ -695,13 +695,14 @@ Piles (`pile`) are 3×3 yards (`World.IsZone`, `ZoneSize`) that do not block wal
 `World.Snap` puts a new yard on the grid of the nearest yard within reach, and `ZoneBlock` lets yards touch but not overlap.
 
 A pile takes part in automation like a chest.
-Its input and output filters name the same one `World.PileEntry`: an item, a kind of crate, or a vessel's liquid for every fill of that vessel holding some, apart from the empty vessel.
+Its input and output filters name the same one `World.PileEntry`: an item, a kind of crate (`World.MixedCrate` for crates of mixed goods), or a vessel's liquid for every fill of that vessel holding some, apart from the empty vessel.
 The player sets it on an empty pile through `SetFilter`, or `World.PileFilters` sets it on a tick from the first resource put in.
 It stays when the pile empties, and `SetFilter` and `ClearFilters` refuse to change it while the pile holds anything.
 `HoldBlock` refuses any other resource, including for manual transfers.
 
 #### Compost
 
+`World.SetCompost` turns only an empty pile with no filter into compost.
 A compost pile (`Thing.Compost`) instead takes `Compostable` items (leaves, grass and anything with `food`) and gives `fertilizer`.
 It turns `CompostBatch` of them into one fertilizer each in-game hour.
 It keeps the player's filters rather than setting its own, and `Thing.SkipFood` keeps workers from delivering food to it.
