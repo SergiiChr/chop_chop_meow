@@ -24,14 +24,12 @@ def render(env: dict[str, str], folder: Path, stills: str | None) -> None:
     flags: list[str | Path] = ["--render-intro", folder]
     if stills:
         flags += ["--intro-stills", stills]
-    # A native Wayland window draws about one frame a second; XWayland draws at full speed.
-    window = {key: value for key, value in env.items() if key != "WAYLAND_DISPLAY"}
     # The optimized release export draws the film several times faster than the debug build.
     build.run_godot(
         f"intro-{folder.name}",
         [build.export_play(env), "--", *flags],
-        window,
-        timeout=1800,
+        env,
+        timeout=300,
         success_marker=MARKER,
     )
 

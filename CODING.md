@@ -12,6 +12,7 @@ Project rules on top of the global coding and testing guides.
 - A Godot node with constructor arguments builds its children in `_Ready`, or in the constructor when it lives as long as the game. A primary constructor parameter never shares a name with a base class field.
 - `SetProcess(false)` goes in `_Ready`: Godot turns processing on just before calling it, so a call in the constructor does nothing.
 - Godot API calls run on the main thread. Pure data work may run in parallel (`Parallel.For` in `Terrain3DView`) when the result is the same as running it in order.
+  A Godot object only one thread uses, such as an intro frame's `Image` saved to PNG in the background, may be used off the main thread.
 
 ## Python
 
