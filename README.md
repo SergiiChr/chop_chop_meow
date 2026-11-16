@@ -302,6 +302,9 @@ It starts no batch while its slots hold something another recipe left there, suc
 A station page opens with the group of the recipe the station is on open.
 A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
+A bench, anvil, cooking table or packing station with a batch running is worked by a player standing still within 1 m of its edge, or by a worker.
+Pumping the reinforced furnace's bellows needs the same 1 m.
+
 Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
 A station that burns fuel has its own fuel slot under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
 Fuel the recipe cannot burn shows in brick; workers carry it back to storage and bring a fuel it burns.

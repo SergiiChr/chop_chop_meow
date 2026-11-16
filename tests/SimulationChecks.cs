@@ -63,6 +63,7 @@ public static class SimulationChecks {
         Test(CheckQueuingSeveralBatchesLoadsEachOfThem, data);
         Test(CheckStationLoadsMidBatchAndFinishesIt, data);
         Test(CheckAnvilNeedsHammering, data);
+        Test(CheckPlayerWorksAStationOnlyWithinAMetreOfItsEdge, data);
         Test(CheckFinishedBatchWaitsForOutputRoom, data);
         Test(CheckToolsGateMiningAndFelling, data);
         Test(CheckCliffsHaveDepositsAndLooseCoal, data);
@@ -1001,17 +1002,38 @@ public static class SimulationChecks {
         Require(reinforced.Burner["coal"] == 1, "a cooled forge should keep burning coal from its fuel slot");
     }
 
+    /// <summary>The anvil's edge is 0.45 m from its middle and the reinforced furnace's 0.8 m.</summary>
+    private static void CheckPlayerWorksAStationOnlyWithinAMetreOfItsEdge(GameData data) {
+        var world = EmptyWorld(data);
+        var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
+        anvil.Inventory.Add("steel_bar", 3);
+        world.Player = anvil.Pos + new Vector2(1.6f, 0);
+        for (int i = 0; i < 4; i++) world.Tick(.25f);
+        Require(!anvil.Processing, "a player standing 1.15 m from the anvil's edge must not hammer it");
+        world.Player = anvil.Pos + new Vector2(1.35f, 0);
+        for (int i = 0; i < 4; i++) world.Tick(.25f);
+        Require(anvil.Processing && anvil.Progress > 0, "a player standing 0.9 m from the anvil's edge should hammer it");
+
+        var forge = world.Add(ThingKind.Reinforced, new Vector2(20, 10));
+        world.Player = forge.Pos + new Vector2(1.95f, 0);
+        world.Pump(forge);
+        Require(forge.Heat == 0, "a player 1.15 m from the furnace's edge must not pump its bellows");
+        world.Player = forge.Pos + new Vector2(1.7f, 0);
+        world.Pump(forge);
+        Require(forge.Heat > 0, "a player 0.9 m from the furnace's edge should pump its bellows");
+    }
+
     private static void CheckAnvilNeedsHammering(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
         anvil.Inventory.Add("steel_bar", 3);
-        world.Player = anvil.Pos + new Vector2(1.5f, 0);
+        world.Player = anvil.Pos + new Vector2(1.2f, 0);
         for (int i = 0; i < 8; i++) { world.MovePlayer(new Vector2(i % 2 == 0 ? .1f : -.1f, 0)); world.Tick(.25f); }
         Require(!anvil.Processing && anvil.Inventory["steel_bar"] == 3, "an anvil must not start while the player only walks past it");
         world.Tick(.25f);
         Require(anvil.Processing && anvil.Progress > 0, "a player standing at the anvil should hammer the batch");
         float progress = anvil.Progress;
-        world.Player = anvil.Pos + new Vector2(1.5f, 0);
+        world.Player = anvil.Pos + new Vector2(1.2f, 0);
         for (int i = 0; i < 4; i++) { world.Gather(anvil, .25f); world.Tick(.25f); }
         Require(anvil.Progress == progress, "a busy player must not advance the anvil");
 

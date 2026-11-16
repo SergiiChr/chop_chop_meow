@@ -52,7 +52,7 @@ public partial class WorldView : Node3D {
     private Node3D scene = null!;
     private Overlay overlay = null!;
     private readonly Dictionary<int, Prop> props = new();
-    private readonly ActorState player = new();
+    private readonly ActorState player = new() { HeadFirst = true };
     private ActorRig playerRig = null!;
     private string playerShirt = "";
     /// <summary>The other players in the game, keyed by their id.</summary>
@@ -231,7 +231,7 @@ public partial class WorldView : Node3D {
     private sealed class Avatar(ActorRig rig, string shirt) {
         public readonly ActorRig Rig = rig;
         public readonly string Shirt = shirt;
-        public readonly ActorState State = new();
+        public readonly ActorState State = new() { HeadFirst = true };
         public ActorAction Pulse;
         public Vector2 PulseTarget;
         public float PulseRemaining;
@@ -251,6 +251,13 @@ public partial class WorldView : Node3D {
     private sealed class ActorState {
         public Vector2 Position;
         public float Yaw;
+        /// <summary>
+        /// Turns as a player does: the head turns toward a new heading first and the body follows with weight, easing into
+        /// and out of the turn and leaning into it; others turn quickly and stay upright.
+        /// </summary>
+        public bool HeadFirst { get; init; }
+        /// <summary>How a <see cref="HeadFirst"/> body is turning: its speed, the head's look and the lean.</summary>
+        public Turning Turning;
         public ActorAction Action;
         public float Time;
         public float PreviousTime = -1;
@@ -264,7 +271,8 @@ public partial class WorldView : Node3D {
             float moved = position.DistanceTo(Position);
             bool moving = moved > .001f;
             float yaw = ActorAnimation.Yaw(moving ? position - Position : facingTarget - position, Yaw);
-            Yaw = Mathf.LerpAngle(Yaw, yaw, Math.Min(1, dt * 14));
+            // A jump such as a respawn is no speed to lean into.
+            if (HeadFirst) Turning.Step(ref Yaw, yaw, dt > 0 ? Math.Min(moved / dt, 8) : 0, dt); else Yaw = Mathf.LerpAngle(Yaw, yaw, Math.Min(1, dt * 14));
             Position = position;
             if (Action != action) {
                 From = Action; FromTime = Time; FromMoving = Moving; Blend = 0;
@@ -543,7 +551,7 @@ public partial class WorldView : Node3D {
         if (p.GatherTarget != 0) return null;
         using var acting = World.ActAs(p);
         foreach (var kind in World.WorkedKinds)
-            foreach (var t in World.ThingsOf(kind)) if (World.Worked(t) && t.Processing && World.Near(t) && !World.CrewHammers(t)) return t;
+            foreach (var t in World.ThingsOf(kind)) if (World.Worked(t) && t.Processing && World.AtStation(t) && !World.CrewHammers(t)) return t;
         return null;
     }
 
@@ -641,11 +649,13 @@ public partial class WorldView : Node3D {
 
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false) {
         rig.Root.Position = To3(state.Position);
-        rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
+        // The body leans about its feet into a turn, and the head looks ahead of it.
+        rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
         var pose = state.Pose;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
         rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
+        if (state.Turning.Look != 0) rig.Head.Rotation += new Vector3(0, state.Turning.Look, 0);
     }
 
     /// <summary>Shows a bench slot's model of the slotted tool's grade: the first child for the lower grade, the second for steel.</summary>

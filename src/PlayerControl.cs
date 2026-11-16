@@ -85,8 +85,11 @@ public sealed class PlayerControl {
     private static Vector2 HeldDirection() {
         float x = (Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left) ? 1 : 0);
         float y = (Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up) ? 1 : 0);
-        return new Vector2(x + y * 2, y * 2 - x).Normalized();
+        return KeyDirection(x, y);
     }
+
+    /// <summary>The ground direction for right <paramref name="x"/> and down <paramref name="y"/> on screen, each -1, 0 or 1 as movement keys give them.</summary>
+    public static Vector2 KeyDirection(float x, float y) => new Vector2(x + y * 2, y * 2 - x).Normalized();
 
     /// <summary>A clicked cabin draws the player to its door, even with a movement key still held from walking there.</summary>
     private Vector2 TowardCabin(Vector2 direction) {
@@ -152,7 +155,7 @@ public sealed class PlayerControl {
     /// <summary>Space: pumps a selected reinforced furnace in reach, else swings what is selected on the hotbar.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
-        if (station != null && station.Kind == ThingKind.Reinforced && world.Near(station)) world.Pump(station); else world.Attack();
+        if (station != null && station.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station); else world.Attack();
     }
 
     /// <summary>A mouse button over the world; <paramref name="overPanel"/> tells that the pointer is on a panel, which passes the wheel on when it has nothing to scroll, but must not zoom the world behind.</summary>

@@ -721,7 +721,11 @@ public sealed partial class World {
     public void ResetGather() { gatherClock = 0; S.Actor.GatherTarget = 0; }
     /// <summary>The player hammers an anvil while standing by it with nothing else to do.</summary>
     /// <remarks>Input calls <see cref="MovePlayer"/> and <see cref="Gather"/> before each tick, so a tick without them counts as standing still.</remarks>
-    public bool PlayerHammers(Thing anvil) => !playerBusy && Near(anvil);
+    public bool PlayerHammers(Thing anvil) => !playerBusy && AtStation(anvil);
+    /// <summary>How far, in metres from a station's edge, the player stands to work it: hammering, crafting or packing at it, or pumping its bellows.</summary>
+    public const float WorkReach = 1;
+    /// <summary>Whether the player stands within <see cref="WorkReach"/> of a station's edge.</summary>
+    public bool AtStation(Thing t) => Near(t, Footprint(t.Kind) + WorkReach);
     /// <summary>Stations that can need someone working at them.</summary>
     public static bool Worked(ThingKind kind) => kind is ThingKind.Anvil or ThingKind.Bench or ThingKind.Cooktable or ThingKind.Packer;
     public static readonly ThingKind[] WorkedKinds = Array.FindAll(Kinds.All, Worked);
@@ -830,7 +834,7 @@ public sealed partial class World {
         if (def.Food) Play("eat_berry", Player);
     }
     public void Pump(Thing t) {
-        if (!Near(t) || t.Kind != ThingKind.Reinforced || Forwarded(Verb.Pump, t.Id)) return;
+        if (!AtStation(t) || t.Kind != ThingKind.Reinforced || Forwarded(Verb.Pump, t.Id)) return;
         playerBusy = true;
         t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos);
     }

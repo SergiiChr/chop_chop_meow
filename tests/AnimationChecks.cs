@@ -13,6 +13,9 @@ public static class AnimationChecks {
         data = gameData;
         CheckActionsLoopAndWrapByTheirDuration();
         CheckActorsTurnToFaceTheirMovement();
+        CheckPlayerHeadTurnsBeforeTheBody();
+        CheckPlayerTurnsHalfwayRoundOneWay();
+        CheckPlayerLeansIntoATurn();
         CheckPlayerActionFollowsToolAndTarget();
         CheckWorkerHoldingALoadCarriesIt();
         CheckStationWorkFollowsWorkStateNotItsWording();
@@ -175,6 +178,45 @@ public static class AnimationChecks {
         Require(Math.Abs(ActorAnimation.Yaw(new Vector2(1, 0), 0) - Mathf.Pi / 2) < 1e-5f, "eastward movement should turn a quarter turn");
         Require(Math.Abs(Math.Abs(ActorAnimation.Yaw(new Vector2(0, -1), 0)) - Mathf.Pi) < 1e-5f, "northward movement should face backward");
         Require(ActorAnimation.Yaw(Vector2.Zero, 2) == 2, "zero movement should retain the previous facing");
+    }
+
+    /// <summary>People turning while walking or running turn the head about 0.2 s before the trunk, which follows within about 0.3 s.</summary>
+    private static void CheckPlayerHeadTurnsBeforeTheBody() {
+        var turning = new Turning();
+        float yaw = 0, quarter = Mathf.Pi / 2;
+        for (int i = 0; i < 6; i++) turning.Step(ref yaw, quarter, 3, 1 / 60f);
+        Require(Mathf.RadToDeg(turning.Look) > 20 && Mathf.RadToDeg(yaw) < 45, $"0.1 s into a quarter turn the head should look well ahead of a body still under half way round: look {Mathf.RadToDeg(turning.Look):0}°, body {Mathf.RadToDeg(yaw):0}°");
+        for (int i = 0; i < 15; i++) turning.Step(ref yaw, quarter, 3, 1 / 60f);
+        Require(Mathf.RadToDeg(yaw) > 81, $"0.35 s into a quarter turn the body should face nearly the new way: {Mathf.RadToDeg(yaw):0}°");
+    }
+
+    /// <summary>A key for straight back turns the body round through one side, never stalling or swinging between the two.</summary>
+    private static void CheckPlayerTurnsHalfwayRoundOneWay() {
+        var turning = new Turning();
+        float yaw = 0, turned = 0;
+        for (int i = 0; i < 30; i++) {
+            float before = yaw;
+            turning.Step(ref yaw, Mathf.Pi, 3, 1 / 60f);
+            float step = Mathf.AngleDifference(before, yaw);
+            Require(i == 0 || step * turned >= 0, $"a half turn should keep turning the same way, step {i}: {Mathf.RadToDeg(step):0.0}°");
+            turned += step;
+        }
+        Require(Math.Abs(turned) > Mathf.DegToRad(170), $"0.5 s into a half turn the body should face nearly back: turned {Mathf.RadToDeg(turned):0}°");
+    }
+
+    /// <summary>A runner leans toward the inside of a turn, and someone standing still turns upright.</summary>
+    private static void CheckPlayerLeansIntoATurn() {
+        var turning = new Turning();
+        float yaw = 0;
+        for (int i = 0; i < 6; i++) turning.Step(ref yaw, Mathf.Pi / 2, 6, 1 / 60f);
+        // Turning from +Z toward +X, the inside of the turn is the way the forward line swings.
+        var inside = new Vector3(MathF.Cos(yaw), 0, -MathF.Sin(yaw));
+        float tilt = (Basis.FromEuler(new Vector3(0, yaw, turning.Bank)) * Vector3.Up).Dot(inside);
+        Require(tilt > MathF.Sin(Mathf.DegToRad(5)), $"a runner turning should lean over 5° into the turn: {Mathf.RadToDeg(MathF.Asin(tilt)):0.0}°");
+        var standing = new Turning();
+        yaw = 0;
+        for (int i = 0; i < 30; i++) standing.Step(ref yaw, Mathf.Pi / 2, 0, 1 / 60f);
+        Require(standing.Bank == 0, "someone turning on the spot should stay upright");
     }
 
     private static void CheckPlayerActionFollowsToolAndTarget() {

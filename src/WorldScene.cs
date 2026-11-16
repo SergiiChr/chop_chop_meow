@@ -193,7 +193,10 @@ public partial class WorldView {
         ("worker sit", ActorSkin.Worker, ActorAction.Sit), ("worker sit on rock", ActorSkin.Worker, ActorAction.Perch), ("player pick up", ActorSkin.Player, ActorAction.PickUp), ("player craft", ActorSkin.Player, ActorAction.Craft),
         ("player grind", ActorSkin.Player, ActorAction.Grind), ("worker grind", ActorSkin.Worker, ActorAction.Grind),
         ("player shovel", ActorSkin.Player, ActorAction.Dig), ("worker shovel", ActorSkin.Worker, ActorAction.Dig),
+        ("player jog turns", ActorSkin.Player, ActorAction.Jog), ("player run turns", ActorSkin.Player, ActorAction.Run),
     };
+    /// <summary>Seconds each key is held in a turns clip, which presses A, W, D and S in turn.</summary>
+    private const float ReviewKeySeconds = .35f;
     private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall", "wolf hit" };
     private readonly List<ActorRig> reviewRigs = new();
     private readonly List<WolfModel> reviewWolves = new();
@@ -214,7 +217,7 @@ public partial class WorldView {
     /// <summary>How far ahead of someone felling a tree the middle of its trunk stands, and the trunk's radius, for the close-up's trunk.</summary>
     private const float ReviewTrunkAhead = 1.33f, ReviewTrunkRadius = .13f;
     /// <summary>The close-up clip's actor, moved and posed the way the game moves and poses everyone.</summary>
-    private readonly ActorState reviewActor = new();
+    private readonly ActorState reviewActor = new() { HeadFirst = ReviewClip >= 0 && ReviewClips[ReviewClip].Name.EndsWith(" turns") };
 
     /// <summary>Tiles a second an action carries an actor across the ground.</summary>
     private float ReviewSpeed(ActorAction action) => action switch {
@@ -247,6 +250,14 @@ public partial class WorldView {
             review.AddChild(rig.Root); reviewRigs.Add(rig);
             // A felling stroke plays against a trunk standing where a tree does when the player stops to chop it.
             if (action is ActorAction.Chop or ActorAction.SteelChop) Post(review, ReviewTrunkRadius, ReviewTrunkRadius, 3, ScreenRight * ReviewTrunkAhead, Mat("6b4a32", 1), 12);
+        }
+        if (ReviewClips[ReviewClip].Name.EndsWith(" turns")) {
+            // A, W, D then S, each held a moment, turn the actor about a small square the way the keys turn the player.
+            int key = (int)(Elapsed / ReviewKeySeconds) % 4;
+            var heading = key switch { 0 => PlayerControl.KeyDirection(-1, 0), 1 => PlayerControl.KeyDirection(0, -1), 2 => PlayerControl.KeyDirection(1, 0), _ => PlayerControl.KeyDirection(0, 1) };
+            reviewActor.Update(reviewActor.Position + heading * ReviewSpeed(action) * dt, action, reviewActor.Position + heading, dt);
+            Pose(reviewRigs[0], reviewActor, null);
+            return;
         }
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);

@@ -618,7 +618,7 @@ The canning station (`cannery`) seals meat stew or jam and a `tin_can` into a ca
 
 #### Anvil
 
-An anvil only progresses while someone hammers it: a player standing within reach without walking or gathering, or a paid assigned worker hammering at the station.
+An anvil only progresses while someone hammers it: a player standing within `World.WorkReach` (1 m) of its edge without walking or gathering (`World.AtStation`), or a paid assigned worker hammering at the station.
 A smith stays with a running batch and fetches the next load once it is done.
 
 #### Furnaces and steel
@@ -647,7 +647,7 @@ Item totals change only through `Inventory` methods, which keep them in line wit
 Stacks are rebuilt from totals once, where the two can disagree: when a save loads, since one edited by hand can hold both.
 A window's copy takes totals and stacks together from the server, so it does not rebuild.
 
-The player moves items in and out of storage and stations within `World.ItemReach` (15 m, `World.Reaches`); gathering, working a station and pumping need `World.Near`'s 3.2 m.
+The player moves items in and out of storage and stations within `World.ItemReach` (15 m, `World.Reaches`); gathering needs `World.Near`'s 3.2 m, and working a station and pumping need 1 m from its edge (`World.AtStation`).
 
 Input rule for every item slot, in the backpack, storage and stations alike (`SlotInput`):
 
