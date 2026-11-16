@@ -367,7 +367,7 @@ public sealed partial class World {
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null)) return;
         bool pile = IsPlainPile(chest);
-        if (pile && !PileFilterChanges(chest, allowed) || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
+        if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         if (pile) SetPileFilter(chest.Inventory, allowed ? PileEntry(item) : null);
         else chest.Inventory.Filter(item, output, allowed);
     }

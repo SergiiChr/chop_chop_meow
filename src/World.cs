@@ -1392,14 +1392,15 @@ public sealed partial class World {
     public string? CrateGood(string entry) => entry.StartsWith(PackedPrefix) && Data.Items.ContainsKey(entry[PackedPrefix.Length..]) ? entry[PackedPrefix.Length..] : null;
     /// <summary>Whether two items share a pile: the same item, crates of the same good, or one vessel holding some of its liquid at any fill.</summary>
     private bool SamePileEntry(string a, string b) => a == b || !PackedKind(a).IsEmpty && PackedKind(a).SequenceEqual(PackedKind(b)) || Data.VesselOf(a) is VesselDef v && v == Data.VesselOf(b) && a != v.Empty && b != v.Empty;
-    /// <summary>What a pile's filter names for an item: the kind of crate for a packed crate of one good, a vessel's liquid for a vessel holding some, or the item itself.</summary>
+    /// <summary>What a pile's filter names for an item: the kind of crate for a packed crate of one good, a vessel's liquid for a vessel holding some, or the item itself, a <see cref="CrateOf"/> entry included.</summary>
     public string PileEntry(string item) {
+        if (CrateGood(item) != null) return item;
         var kind = PackedKind(item);
         if (!kind.IsEmpty) return new string(kind);
         return Data.VesselOf(item) is VesselDef v && item != v.Empty ? v.Liquid : item;
     }
     /// <summary>The items a pile's filter lists for a <see cref="PileEntry"/>: every fill of a vessel that holds its liquid, or the entry itself.</summary>
-    private IEnumerable<string> PileItems(string entry) => Data.Vessels.Find(v => v.Liquid == entry) is VesselDef v ? v.States.Skip(1) : new[] { entry };
+    private IEnumerable<string> PileItems(string entry) => Data.VesselFor(entry) is VesselDef v ? v.States.Skip(1) : new[] { entry };
     /// <summary>The <see cref="PileEntry"/> a pile's filter names, or null while it names none.</summary>
     public string? PileFilter(Thing pile) {
         foreach (string item in pile.Inventory.InputFilter) return PileEntry(item);
@@ -1631,7 +1632,7 @@ public sealed partial class World {
     public string? HoldBlock(Thing t, string item) => HoldCheck(t, item) switch {
         HoldRefusal.ToolsOnly => "The tool station only holds tools.",
         HoldRefusal.CompostOnly => "The compost takes leaves, grass and food.",
-        HoldRefusal.OtherResource => PileName(t)! is var name && "aeiou".Contains(name[0]) ? $"This is an {name} pile." : $"This is a {name} pile.",
+        HoldRefusal.OtherResource => Phrase("This is ", A(PileName(t)!), " pile."),
         HoldRefusal.PackerOnly => t.Packs == "" ? "Choose what to pack first." : $"The packing station takes {Data.Name(t.Packs).ToLowerInvariant()} and empty crates.",
         HoldRefusal.SellOnly => "The village only takes packed crates.",
         HoldRefusal.WoodOnly => "The campfire burns only wood.",
@@ -1644,7 +1645,7 @@ public sealed partial class World {
         return pile.First() is not string held || SamePileEntry(held, item);
     }
     /// <summary>The resource a plain pile is for, in lower case, as its filter names it or, until the next tick sets the filter, as it holds it.</summary>
-    public string? PileName(Thing pile) => (PileFilter(pile) ?? (pile.Inventory.First() is string held ? PileEntry(held) : null)) is string entry ? FilterName(entry).ToLowerInvariant() : null;
+    public string? PileName(Thing pile) => (PileFilter(pile) ?? (pile.Inventory.First() is string held ? PileEntry(held) : null)) is string entry ? Lower(FilterName(entry)) : null;
     public bool Compostable(string item) => item is "leaves" or "grass" || Data.IsFood(item);
     /// <summary>Turns a pile into compost or back; refused while it holds something the new use would not take.</summary>
     public bool SetCompost(Thing pile, bool on) {
