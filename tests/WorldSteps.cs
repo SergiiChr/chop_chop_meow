@@ -87,7 +87,7 @@ internal static class WorldSteps {
 
     /// <summary>
     /// A cooking table by the lake on meat stew, with a hauler bringing water bottles and carrying them back,
-    /// a pile of bottles at mixed fills, a water collector refilling them, and a chest of meat, wood and stew.
+    /// a pile of water bottles at mixed fills and one of empty bottles, a water collector refilling them, and a chest of meat, wood and stew.
     /// </summary>
     public static World WaterKitchen(GameData data, out Thing stock) {
         var world = new World(data, false);
@@ -97,7 +97,8 @@ internal static class WorldSteps {
         world.Player = shore + inland * 6;
         var pond = world.Add(ThingKind.Water, shore, 9999);
         var bottles = world.Add(ThingKind.Pile, shore + inland * 4);
-        bottles.Inventory.Add(Water.Full, 4); bottles.Inventory.Add(Water.TwoLiters, 2); bottles.Inventory.Add(Water.Empty, 4);
+        bottles.Inventory.Add(Water.Full, 4); bottles.Inventory.Add(Water.TwoLiters, 2);
+        world.Add(ThingKind.Pile, shore + inland * 4 + new Vector2(-3, 0)).Inventory.Add(Water.Empty, 4);
         stock = world.Add(ThingKind.Chest, shore + inland * 4 + new Vector2(3, 0));
         stock.Inventory.Slots = 40; stock.Inventory.Add("raw_meat", 64); stock.Inventory.Add("wood", 64);
         var table = world.Add(ThingKind.Cooktable, shore + inland * 4 + new Vector2(0, 3));

@@ -561,9 +561,12 @@ A pile of crates takes more crates of the same good.
 ### Piles
 
 A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that show as a heap of the resource itself, bigger the more it holds.
-The first resource put in sets it: from then on workers store and take only that, and anything else is refused.
-Bottles count as one resource at any fill, so one pile holds them full, part-full and empty.
-Emptying it frees it again.
+Its resource is set by its filter, which has one row and one item: what workers bring is also what they take.
+Set the filter on an empty pile, or put a first resource in and the filter is set to it.
+From then on workers store and take only that, and anything else is refused, by hand too: "This is a wood pile."
+The filter stays when the pile is emptied.
+It can be taken off or changed only while the pile is empty, and a new resource goes on only once the old one is off.
+Water is one resource at any fill, so a water pile holds full and part-full bottles; empty bottles go on a pile of their own.
 
 Piles are walkable and snap edge to edge to a pile beside them, so they line up in neat grids.
 
@@ -580,6 +583,7 @@ A worker on its Tend job fetches what its filters take from storage and carries 
 
 Storage input filters govern automated deposits; output filters govern worker withdrawals.
 Empty filters allow all items.
+**Clear** takes everything off both rows.
 Manual inventory transfers ignore these automation filters.
 
 A load a worker carries goes to the nearest place that asks for it:

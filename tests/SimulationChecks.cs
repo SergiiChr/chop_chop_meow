@@ -2116,7 +2116,10 @@ public static class SimulationChecks {
         Require(worker.Tool == "rake" && leaves.Remaining < World.LeafPatch, "a worker should fetch the rake and rake leaves");
     }
 
-    /// <summary>Piles snap into grids, hold one resource whose filters follow what is in them, and compost turns leaves and food into fertilizer.</summary>
+    /// <summary>
+    /// Piles snap into grids and hold one resource: the first put in, or the one their filter is set to while empty, which stays after emptying.
+    /// Compost turns leaves and food into fertilizer.
+    /// </summary>
     private static void CheckPilesSnapTogetherHoldOneResourceAndMakeCompost(GameData data) {
         var world = EmptyWorld(data);
         var origin = new Vector2(20, 20);
@@ -2135,14 +2138,31 @@ public static class SimulationChecks {
         Require(world.CanStand(origin), "a pile should be walkable");
 
         world.Player = origin;
-        Require(world.Transfer(world.Backpack, pile!.Inventory, "wood", 10) == 10 && world.HoldBlock(pile, "stone") != null, "the first resource in should be the only one the pile takes");
+        var said = new List<string>();
+        world.Notify += said.Add;
+        Require(world.Transfer(world.Backpack, pile!.Inventory, "wood", 10) == 10 && world.HoldBlock(pile, "stone") == "This is a wood pile.", "the first resource in should be the only one the pile takes");
         world.Tick(.1f);
-        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && pile.Inventory.OutputFilter.SetEquals(new[] { "wood" }), "a pile's filters should follow its one resource");
+        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && pile.Inventory.OutputFilter.SetEquals(new[] { "wood" }), "the first resource in should set the pile's filters, in and out");
         var chest = world.Add(ThingKind.Chest, origin + new Vector2(0, 5));
         Require(world.DepositFor("wood", chest.Pos) == pile && world.DepositFor("stone", origin) != pile, "workers should prefer the matching pile and keep other goods out of it");
+        world.SetFilter(pile, "wood", false, false); world.ClearFilters(pile);
+        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && said.Count(m => m == "Can't change filter on a non-empty pile.") == 2,
+            "a pile holding something should refuse to have its filter taken off or cleared");
         pile.Inventory.Remove("wood", 10);
         world.Tick(.1f);
-        Require(pile.Inventory.InputFilter.Count == 0 && world.Holds(pile, "stone"), "emptying a pile should clear its filters");
+        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && world.HoldBlock(pile, "stone") == "This is a wood pile." && world.DepositFor("wood", chest.Pos) == pile,
+            "an emptied pile should keep its filter and still ask for its resource");
+        world.SetFilter(pile, "stone", false, true);
+        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }), "an empty pile should keep its resource until it is taken off");
+        world.SetFilter(pile, "wood", false, false);
+        Require(pile.Inventory.InputFilter.Count == 0 && world.Holds(pile, "stone"), "taking an empty pile's filter off should free it");
+        world.SetFilter(pile, "stone", false, true);
+        Require(pile.Inventory.InputFilter.SetEquals(new[] { "stone" }) && pile.Inventory.OutputFilter.SetEquals(new[] { "stone" }) && world.HoldBlock(pile, "wood") == "This is a stone pile.",
+            "a filter set on an empty pile should make it a pile of that resource, in and out");
+        Require(world.DepositFor("stone", chest.Pos) == pile, "workers should bring stone to an empty pile set to stone");
+        Require(world.Transfer(world.Backpack, pile.Inventory, "wood", 1) == 0, "a pile set to stone should refuse wood put in by hand");
+        world.ClearFilters(pile);
+        Require(pile.Inventory.InputFilter.Count == 0, "clearing an empty pile's filter should free it");
 
         Require(world.SetCompost(east, true), "compost should be set on the pile");
         Require(east.Inventory.InputFilter.Contains("leaves"), "compost should take leaves");

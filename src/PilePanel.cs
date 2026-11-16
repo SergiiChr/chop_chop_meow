@@ -4,18 +4,18 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// A pile: fourteen stacks of the one resource it holds, filled left to right and top to bottom, and a switch that turns it into compost.
+/// A pile: fourteen stacks of the one resource its filter names, filled left to right and top to bottom, and a switch that turns it into compost.
 /// Compost shows the same grid; under its bar is what it is composting and how long that lasts, and the fertilizer it makes.
 /// </summary>
 public partial class PilePanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        headingTitle.Text = thing.Compost ? "Compost" : thing.Inventory.First() is string held ? $"Pile · {world.Data.Name(held).ToLowerInvariant()}" : "Pile";
+        headingTitle.Text = thing.Compost ? "Compost" : world.PileName(thing) is string name ? $"Pile · {name}" : "Pile";
         if (thing.Compost) { headingIcon.Texture = Icons.Of("leaves"); headingIcon.Visible = true; }
         var compost = new CheckButton { ButtonPressed = thing.Compost, FocusMode = Control.FocusModeEnum.None, TooltipText = "Compost: turns leaves, grass and food into fertilizer", Name = "compost" };
         live.Tick(compost, () => thing.Compost, on => world.SetCompost(thing, on));
         panel.AddToHeader(compost);
-        if (thing.Compost) FilterButton();
-        else HeaderAction("stash", "Store everything this pile takes", () => moves.StoreAll(thing, moves.Materials), Style.ActionRound, "deposit");
+        FilterButton();
+        if (!thing.Compost) HeaderAction("stash", "Store everything this pile takes", () => moves.StoreAll(thing, moves.Materials), Style.ActionRound, "deposit");
         Well(new VBoxContainer()).AddChild(StorageGrid(7, 44));
         if (!thing.Compost) {
             Dynamic(text => text.Append(thing.Inventory.UsedSlots).Append(" of ").Append(thing.Inventory.Slots).Append(" stacks"), 14, Style.Beige);

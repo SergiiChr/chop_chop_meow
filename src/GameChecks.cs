@@ -227,6 +227,28 @@ public partial class Game {
         await CloseWithEsc();
     }
 
+    /// <summary>An empty pile's filter window has one row naming one resource: water there is one entry for every fill, shows in the heading, and comes off with a click.</summary>
+    private async Task CheckPileFilterNamesOneResource() {
+        await CloseWithEsc();
+        var pile = Hosted.Add(ThingKind.Pile, world.Player + new Vector2(4, 0)); await Frames();
+        panel.Select(Shown(pile)); await Frames();
+        await Click(Named("filters")!);
+        Require(OnPage("filter_in") != null && OnPage("filter_out") == null, "A pile's filter must show only the row of what workers bring.");
+        await Click(Named("filter_add_in")!);
+        Require(Named($"pick_{Water.OneLiter}") == null && Named($"pick_{Water.Full}") == null && Named($"pick_{Water.Empty}") != null,
+            "A pile's filter must offer water at any fill as one entry, apart from empty bottles.");
+        await Click(Named($"pick_{Water.Liquid}")!);
+        await Until(() => pile.Inventory.InputFilter.SetEquals(new[] { Water.OneLiter, Water.TwoLiters, Water.Full }) && ShownPage() == "Pile · water",
+            "picking water making the empty pile a water pile, named in its heading", 2);
+        Require(Named("filter_add_in") == null, "A pile whose filter names a resource must offer no second one.");
+        await Click(Named($"filter_in_{Water.Liquid}")!);
+        await Until(() => pile.Inventory.InputFilter.Count == 0 && ShownPage() == "Pile" && Named("filter_add_in") != null, "clicking water taking it off the empty pile", 2);
+        Require(FindButton(panel, "Clear") != null, "The filter window's clear button must read Clear.");
+        await Click(Named("filters_close")!);
+        RemoveThings(Hosted, t => t == pile);
+        await CloseWithEsc();
+    }
+
     /// <summary>The autosave comes every five minutes, more than this stage has, so the check asks for it.</summary>
     private async Task CheckAutosaveTellsTheOwner() {
         await CloseWithEsc();
@@ -2037,6 +2059,7 @@ public partial class Game {
             await Test(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
             await Test(CheckFelledTreeBreaksThenCrashesAsItLands);
             await Test(CheckTradingPostSendsOnlyCratesOffOnACart);
+            await Test(CheckPileFilterNamesOneResource);
             await Test(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await Test(CheckPackingStationListsGoodsAndTakesBackpackClicks);
             await Test(CheckEndGoalsShowEndingOnceAndKeepPlaying);
