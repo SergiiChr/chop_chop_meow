@@ -27,7 +27,7 @@ public enum Doorway {
 /// </summary>
 public sealed partial class World {
     /// <summary>Seconds stepping in through a cabin door at a walk and at a sprint, stepping out, banging on a shut door, and being dragged back out.</summary>
-    public const float EnterSeconds = 1.5f, RushSeconds = .7f, LeaveSeconds = 1.5f, KnockSeconds = 1, PullSeconds = 1.5f;
+    public const float EnterSeconds = 1.3f, RushSeconds = .7f, LeaveSeconds = 1.5f, KnockSeconds = 1, PullSeconds = 1.5f;
     /// <summary>
     /// Seconds a cabin's door takes to swing shut, and before the first bang on it: a player left outside waits for the
     /// door to shut, then steps up to it.
@@ -40,6 +40,11 @@ public sealed partial class World {
     public static readonly Vector2 OutOfDoor = Vector2.Down;
     /// <summary>How far behind a dragged player a tugging wolf stands, with its jaws at their waist.</summary>
     public const float TugReach = .75f;
+    /// <summary>
+    /// How far further out a player dragged out of a doorway has their throat once they fall onto their back, and how far
+    /// to the side of it the wolf that pins them stands.
+    /// </summary>
+    public const float FallenThroat = .66f, AsideReach = .7f;
     /// <summary>Bangs on a shut door, spread over <see cref="KnockSeconds"/>.</summary>
     public const int Knocks = 3;
     /// <summary>How far, in metres, from <see cref="DoorPoint"/> a player can start stepping in.</summary>
@@ -134,10 +139,13 @@ public sealed partial class World {
         p.Door = door; p.DoorCabin = cabin; p.DoorTime = 0; p.DoorRush = rush;
     }
 
-    /// <summary>Plays the bangs on a shut door that fall after <paramref name="from"/> seconds of knocking and by <paramref name="to"/>.</summary>
-    private void Knock(float from, float to) {
-        for (int i = 0; i < Knocks; i++)
-            if (from < KnockLead + i * KnockSeconds / Knocks && KnockLead + i * KnockSeconds / Knocks <= to) Play("door_bang", Player);
+    /// <summary>
+    /// Plays <paramref name="sound"/> at each of <paramref name="count"/> beats <paramref name="every"/> seconds apart from
+    /// <paramref name="first"/> seconds into a doorway stage that fall after <paramref name="from"/> seconds of it and by <paramref name="to"/>.
+    /// </summary>
+    private void Beats(string sound, float from, float to, float first, float every, int count) {
+        for (int i = 0; i < count; i++)
+            if (from < first + i * every && first + i * every <= to) Play(sound, Player);
     }
 
     /// <summary>
@@ -172,17 +180,23 @@ public sealed partial class World {
                 if (Ahead(p.DoorCabin, p) is var next && next != Doorway.Following) StepIn(p.DoorCabin, p.DoorRush);
                 break;
             case Doorway.Knocking:
-                Knock(before, p.DoorTime);
+                Beats("door_bang", before, p.DoorTime, KnockLead, KnockSeconds / Knocks, Knocks);
                 if (done) p.Door = Doorway.None;
                 break;
-            case Doorway.Pulled or Doorway.PulledOff when done:
+            case Doorway.Pulled or Doorway.PulledOff:
+                // The player screams at the grab and at each tug after it.
+                Beats("pulled_scream", before, p.DoorTime, PullSeconds / Tugs, PullSeconds / Tugs, Tugs - 1);
+                if (!done) break;
                 // Dragged a metre out, the player is let go: a badly hurt one is knocked down, anyone else steps in again at a run, or stops banging.
                 // The wolf bites again no sooner than after any other bite.
                 Player += OutOfDoor * DragDistance; p.Warp++;
                 var tugger = Tugger();
                 if (tugger != null) { tugger.Tugging = false; tugger.Attack = 1; tugger.Pos = Player + OutOfDoor * TugReach; }
-                if (S.Health <= 50 && (tugger ?? NearestHunter()) is Wolf wolf) Pin(wolf, Hunters.Skip(1).Any());
-                else if (p.Door == Doorway.Pulled) StepIn(p.DoorCabin, true);
+                // The wolf that dragged them steps aside, to their left, as they fall back toward it.
+                if (S.Health <= 50 && (tugger ?? NearestHunter()) is Wolf wolf) {
+                    Pin(wolf, Hunters.Skip(1).Any(), tugger != null ? -OutOfDoor.Orthogonal() : default);
+                    p.Door = Doorway.None;
+                } else if (p.Door == Doorway.Pulled) StepIn(p.DoorCabin, true);
                 else p.Door = Doorway.None;
                 break;
             case Doorway.Leaving when done:
@@ -197,6 +211,7 @@ public sealed partial class World {
         if (p.Door is not (Doorway.Entering or Doorway.Following or Doorway.Knocking) || Indoors(p)) return false;
         Stage(p.Door == Doorway.Knocking ? Doorway.PulledOff : Doorway.Pulled, p.DoorCabin);
         wolf.Tugging = true; wolf.Leap = 0;
+        Play("pulled_scream", Player);
         return true;
     }
 

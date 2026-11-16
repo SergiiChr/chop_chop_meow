@@ -203,6 +203,8 @@ public sealed class Wolf : IWalker {
     public bool Pinning { get; set; }
     /// <summary>The wolf dragging its player out of a cabin's doorway by the waist.</summary>
     public bool Tugging { get; set; }
+    /// <summary>The way from a player's throat to the side a wolf pinning them stands on, or zero for one standing over them.</summary>
+    public Vector2 Beside { get; set; }
     /// <summary>The wolf has growled at the player while closing in; it growls only once.</summary>
     [JsonIgnore] public bool Growled { get; set; }
     /// <summary>The wolf has broken from a walk into a sprint at the player; it growls once as it does.</summary>
@@ -2337,9 +2339,11 @@ public sealed partial class World {
         }
     }
     /// <summary>A wolf that has reached the player knocks them onto their back and holds them down.</summary>
-    private void Pin(Wolf wolf, bool pack) {
-        wolf.Leap = 0; wolf.Pos = Player + (wolf.Pos - Player).Normalized() * PinDistance; wolf.Feeding = wolf.Pinning = true; S.Mauled = true;
-        Say(pack ? "You are pinned. The pack closes in." : "You are pinned."); Play("wolf_bite", Player);
+    /// <summary>Pins the acting player under a wolf, standing over them, or to the side <paramref name="beside"/> of their throat once it has dragged them back out of a doorway.</summary>
+    private void Pin(Wolf wolf, bool pack, Vector2 beside = default) {
+        wolf.Leap = 0; wolf.Beside = beside; wolf.Feeding = wolf.Pinning = true; S.Mauled = true;
+        wolf.Pos = beside == Vector2.Zero ? Player + (wolf.Pos - Player).Normalized() * PinDistance : Player + OutOfDoor * FallenThroat + beside * AsideReach;
+        Say(pack ? "You are pinned. The pack closes in." : "You are pinned."); Play("wolf_bite", Player); Play("takedown_scream", Player);
     }
     /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>
     private Vector2 AwayFromPlayer(Wolf wolf) => wolf.Pos == Player ? Vector2.Right : (wolf.Pos - Player).Normalized();

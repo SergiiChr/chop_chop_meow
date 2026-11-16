@@ -21,6 +21,8 @@ public sealed partial class DoorwayReview : Node {
     private (float At, Action Do)[] script = Array.Empty<(float, Action)>();
     private int next;
     private float time;
+    /// <summary>Metres round the cabin cleared of everything else.</summary>
+    private const float Clearing = 15;
 
     public override void _Ready() {
         if (!Scenes.Contains(Scene)) throw new ArgumentException($"--doorway takes {string.Join(", ", Scenes)}, not {Scene}");
@@ -30,6 +32,8 @@ public sealed partial class DoorwayReview : Node {
         // Only the scene's own wolf comes: every den stays shut tonight.
         World.S.Wolves.Clear(); World.S.DensOut = (1 << World.Dens.Length) - 1; World.S.DenHours = 24;
         foreach (var w in World.Workers) World.Assign(w, null);
+        // Nothing else stands near the cabin, so a camera turned round or brought low sees the players and wolves clearly.
+        World.S.Things.RemoveAll(t => t != Cabin && t.Pos.DistanceTo(Cabin.Pos) < Clearing);
         // The fixture's hand crafting would crouch the host the moment they are outside.
         World.S.Crafting.Clear(); World.S.Making = "";
         // A burning fire keeps wolves off everyone near it, the cabin's door included.
@@ -39,7 +43,9 @@ public sealed partial class DoorwayReview : Node {
         World.Player = door + new Vector2(-2.5f, 1.5f);
         // The neighbor comes from behind the cabin, so they walk round it to the door.
         World.As(guest, () => World.Player = Cabin.Pos + new Vector2(1, -3.5f));
-        View.Zoom = 2.4f;
+        View.Zoom = Launch.Number("--zoom", 2.4f);
+        View.CameraTurn = Launch.Number("--camera-turn", 0);
+        if (Launch.Value("--camera-pitch") != null) View.CameraPitch = Launch.Number("--camera-pitch", 30);
         script = Scene switch {
             // Both walk up; the host gets there first and steps in, the neighbor follows, finds the door shut and bangs on it.
             "queue" => new (float, Action)[] { (0, () => Walk(host)), (.4f, () => Walk(guest)) },

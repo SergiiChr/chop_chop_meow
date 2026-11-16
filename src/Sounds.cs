@@ -65,6 +65,8 @@ public partial class Sounds : Node {
         ["wolf_howl_group"] = -11,
         ["wolf_growl_approaching"] = -3,
         ["wolf_bite"] = -3,
+        ["pulled_scream"] = -5,
+        ["takedown_scream"] = -5,
         ["wolf_hit"] = -5.5f,
     };
     private const float MusicDb = -14;

@@ -324,8 +324,7 @@ public partial class WorldView {
         reviewCabin.Open = Mathf.MoveToward(reviewCabin.Open, open ? 1 : 0, dt / World.ShutSeconds);
         reviewCabin.Door.RotationDegrees = new Vector3(0, -100 * Ease(reviewCabin.Open), 0);
         reviewActor.Update(shown.At, shown.Action, shown.Facing, dt, shown.Backing);
-        Pose(reviewRigs[0], reviewActor, null);
-        reviewRigs[0].Root.Position += Vector3.Up * DoorFloor(door, shown.At);
+        Pose(reviewRigs[0], reviewActor, null, door: door);
         reviewRigs[0].Root.Visible = shown.At.DistanceTo(door) < 1.75f || now is Doorway.None or Doorway.Knocking;
     }
 

@@ -63,7 +63,7 @@ Play accepts Godot arguments after `--`:
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
-| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and bangs), `occupied` (one bangs while the other is inside, who then steps out), `wolf` (wolves drag each out of the doorway at dusk) or `wounded` (a badly hurt player dragged out and pinned) |
+| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and bangs), `occupied` (one bangs while the other is inside, who then steps out), `wolf` (wolves drag each out of the doorway at dusk) or `wounded` (a badly hurt player dragged out and pinned); `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -819,8 +819,8 @@ A direct hit with the torch hurts a wolf and sends it running for a moment.
 
 Click a cabin, or press Enter in its panel, and you walk round it to its door and step in; the door shuts behind you.
 Once you set off you cannot walk away, and the keys do nothing until you are in.
-Stepping in takes about 1.5 seconds at a walk, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
-For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and drags you a metre back out in three tugs over 1.5 seconds, you bent over and reaching for the door.
+Stepping in takes about 1.3 seconds at a walk, hurrying up the second tread, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
+For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and drags you a metre back out in three tugs over 1.5 seconds, you bent over, reaching for the door and screaming at each tug.
 It then lets go and you run in again at once, or, at half health or less, it knocks you onto your back.
 No other wolf takes you down while one drags you.
 
@@ -957,7 +957,8 @@ Sound effects follow the same actions:
 - a building knocks into place, and one taken down clatters apart;
 - buying jingles coins, and hiring signs the worker on;
 - your stomach growls when food runs low;
-- wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, bite, and thud when struck.
+- wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, bite, and thud when struck;
+- you scream at each tug of a wolf dragging you out of a cabin's doorway, and when a wolf takes you down.
 
 Repeated sounds rotate between variants.
 A sound is loudest at your character and fades with distance, to silence 16 metres away, whatever the zoom.

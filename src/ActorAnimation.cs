@@ -34,7 +34,9 @@ public enum ActorAction {
     Knock,
     Brake,
     /// <summary>Dragged back by the waist by a wolf, bent over and stepping back with each tug.</summary>
-    Tugged
+    Tugged,
+    /// <summary>Yanked off the feet backward by a wolf behind, falling onto the back.</summary>
+    FallBack
 }
 
 /// <summary>
@@ -89,6 +91,7 @@ public static class ActorAnimation {
         ActorAction.Knock => World.KnockSeconds / World.Knocks,
         ActorAction.Brake => Momentum.BrakeSeconds,
         ActorAction.Tugged => 2 * World.PullSeconds / World.Tugs,
+        ActorAction.FallBack => FallBackSeconds,
         ActorAction.Kindle => World.KindleSeconds,
         ActorAction.TorchSwing => .6f,
         ActorAction.Sit or ActorAction.Perch => 4,
@@ -162,6 +165,62 @@ public static class ActorAnimation {
         (.66f, TwoHanded(Stance with { Lean = 20, Twist = -16, Sway = 2, RaiseR = 74, OutR = -40, ElbowR = 30, Grip = 90, KneeL = 24, KneeR = 16 })),
     };
     private static readonly Pose MineGuard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
+    /// <summary>Seconds a player yanked off their feet backward takes to land on their back and lie there under the wolf.</summary>
+    public const float FallBackSeconds = .8f;
+    // Shares of the fall: the yank before the hips drop, the seat landing, and the back landing.
+    private const float FallDrops = .2f, FallSits = .55f, FallLies = .72f;
+    /// <summary>How high the hips stand above the boots in the rig through a fall backward.</summary>
+    public const float FallHips = .77f;
+    // How high the hips lie once down, and how far the rig tips back by the time the seat lands.
+    private const float LyingHips = .17f, SittingTip = 30;
+
+    /// <summary>
+    /// A player yanked backward off their feet a share <paramref name="u"/> through <see cref="FallBackSeconds"/>, posed as
+    /// <paramref name="pose"/>: the hips drop onto the seat faster and faster with the boots sliding out ahead along the ground,
+    /// then the body rolls back onto the back, the legs coming up, and lies with the hips <paramref name="lying"/> back from where they stood.
+    /// Gives the pose with its legs solved to the ground, how far the rig tips back in degrees, and where the hips are: ahead of where the player stood, and up.
+    /// </summary>
+    public static (Pose Pose, float Tip, Vector2 Hips) FallingBack(Pose pose, float u, float lying) {
+        u = Math.Clamp(u, 0, 1);
+        float drop = Math.Clamp((u - FallDrops) / (FallSits - FallDrops), 0, 1), roll = Math.Clamp((u - FallSits) / (FallLies - FallSits), 0, 1);
+        float top = FallHips - .05f * Mathf.SmoothStep(0, FallDrops, u);
+        float bounce = u > FallSits && u < FallSits + .1f ? .025f * MathF.Sin(MathF.PI * (u - FallSits) / .1f) : 0;
+        float up = top - (top - LyingHips) * drop * drop + bounce, back = lying * Mathf.SmoothStep(FallDrops - .05f, FallSits, u);
+        float tip = SittingTip * drop * drop + (90 - SittingTip) * roll * roll;
+        var fitted = pose with { Hips = FallHips };
+        // The boots are held to the ground from the yank until the body rolls back, sliding out ahead as the seat drops.
+        float planted = Mathf.SmoothStep(.1f, FallDrops + .04f, u) * (1 - Mathf.SmoothStep(FallSits - .05f, FallLies - .05f, u));
+        if (planted <= 0) return (fitted, tip, new Vector2(back, up));
+        float t = Mathf.DegToRad(tip), slide = Mathf.SmoothStep(FallDrops, FallSits, u);
+        var left = OnGround(Mathf.Lerp(.42f, .62f, slide) - back, up, t);
+        var right = OnGround(Mathf.Lerp(-.12f, .42f, slide) - back, up, t);
+        return (fitted with {
+            SwingL = Mathf.Lerp(pose.SwingL, left.Swing, planted),
+            KneeL = Mathf.Lerp(pose.KneeL, left.Knee, planted),
+            FootL = Mathf.Lerp(pose.FootL, left.Foot, planted),
+            SwingR = Mathf.Lerp(pose.SwingR, right.Swing, planted),
+            KneeR = Mathf.Lerp(pose.KneeR, right.Knee, planted),
+            FootR = Mathf.Lerp(pose.FootR, right.Foot, planted),
+        }, tip, new Vector2(back, up));
+    }
+
+    /// <summary>The leg angles that stand a boot flat on the ground <paramref name="ahead"/> of hips <paramref name="up"/> above it, in a rig tipped back <paramref name="tip"/> radians.</summary>
+    private static LegAngles OnGround(float ahead, float up, float tip) {
+        // The ankle stands a sole's height above the ground; in the tipped rig, ahead tilts up and down tilts back.
+        float below = up - Sole;
+        var (swing, knee) = LegTo(ahead * MathF.Cos(tip) - below * MathF.Sin(tip), ahead * MathF.Sin(tip) + below * MathF.Cos(tip));
+        return new LegAngles(swing, knee, -Mathf.RadToDeg(tip) + swing - knee);
+    }
+    // Yanked back off the feet from bent over: the trunk is jerked upright and back, the head snaps forward, the arms fling up
+    // for the door and the front foot slips out ahead; the knees fold as the body drops onto its seat and back, the arms thrown
+    // wide at the landing, and then it lies fighting the wolf as Mauled has it. The rig tips back as WorldView.FallBack has it.
+    private static readonly (float At, Pose Pose)[] FallBackKeys = {
+        (0, new Pose(Lean: 40, Head: -26, RaiseL: 105, OutL: 14, ElbowL: 22, RaiseR: 115, OutR: 12, ElbowR: 16, SwingL: 6, KneeL: 24, SwingR: 6, KneeR: 24, Splay: 3)),
+        (.18f, new Pose(Lean: -8, Head: 26, RaiseL: 140, OutL: 20, ElbowL: 30, RaiseR: 128, OutR: 24, ElbowR: 40, SwingL: 38, KneeL: 8, FootL: -20, SwingR: 4, KneeR: 34, Splay: 5)),
+        (.45f, new Pose(Lean: -14, Head: 32, RaiseL: 125, OutL: 34, ElbowL: 40, RaiseR: 105, OutR: 38, ElbowR: 48, SwingL: 70, KneeL: 42, FootL: -10, SwingR: 58, KneeR: 70, Splay: 6)),
+        (.7f, new Pose(Lean: 0, Head: 18, RaiseL: 150, OutL: 46, ElbowL: 34, RaiseR: 145, OutR: 50, ElbowR: 30, SwingL: 58, KneeL: 46, SwingR: 46, KneeR: 58, Splay: 6)),
+        (.999f, new Pose(Head: -26, RaiseL: 128, OutL: -8, ElbowL: 55, RaiseR: 128, OutR: -8, ElbowR: 55, SwingL: 24, KneeL: 40, SwingR: 24, KneeR: 40)),
+    };
     private static readonly (float At, Pose Pose)[] MineKeys = {
         (0, MineGuard),
         (.4f, MineGuard with { Lean = -6, RaiseL = 160, OutL = -24, ElbowL = 50, RaiseR = 175, OutR = -10, ElbowR = 35 }),
@@ -432,6 +491,9 @@ public static class ActorAnimation {
             case ActorAction.Sit or ActorAction.Perch:
                 var eating = Keys(p, action == ActorAction.Sit ? SitKeys : PerchKeys);
                 return eating with { Lean = eating.Lean + wave * 1.2f, Head = eating.Head + wave * 1.5f };
+            case ActorAction.FallBack:
+                // A fall happens once: past its end, as while blending out of it, it holds its last pose.
+                return Keys(Math.Min(elapsed / FallBackSeconds, .999f), FallBackKeys);
             // Both downed poses are drawn with the rig tipped onto its back, so Raise points the arms at the sky.
             case ActorAction.Mauled:
                 // Pushing at the jaws over the throat with the head forced back while the legs kick.
@@ -539,6 +601,81 @@ public static class ActorAnimation {
     private static LegAngles OnHeel(float heel, float hips, float tilt) {
         var (swing, knee) = LegTo(heel + Heel * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt), hips - LegDrop - AboveSole * MathF.Cos(tilt) + Heel * MathF.Sin(tilt));
         return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
+    }
+
+    // ---------- Steps ----------
+
+    // A leg hangs this far to the side of the hips' middle, toward the body's left for the left leg.
+    private const float LegSide = .09f;
+    // A swinging boot rises onto a tread over this far ahead of its edge, so it clears the edge rather than snapping up at it.
+    private const float StepClearance = .12f;
+    // A boot this much higher than the other has left the ground: the body stands on the other one.
+    private const float OffTheGround = .03f;
+    // The body eases onto a lifting boot's tread this many metres per metre the boot rises, so the hips never jump.
+    private const float LiftEase = 3;
+
+    /// <summary>How high steps rising <paramref name="rise"/> at each of <paramref name="edges"/>, depths along the way up, are at <paramref name="depth"/>.</summary>
+    public static float StepGround(float depth, ReadOnlySpan<float> edges, float rise) => StepGround(depth, edges, rise, 0);
+
+    /// <summary>The steps' height at <paramref name="depth"/>, rising onto each tread over <paramref name="ahead"/> before its edge.</summary>
+    private static float StepGround(float depth, ReadOnlySpan<float> edges, float rise, float ahead) {
+        float ground = 0;
+        foreach (float edge in edges)
+            ground += depth >= edge ? rise : ahead > 0 && depth > edge - ahead ? rise * Mathf.SmoothStep(0, 1, (depth - edge + ahead) / ahead) : 0;
+        return ground;
+    }
+
+    /// <summary>
+    /// For each leg of a pose, how high its boot sole's lower end is above the ground the pose stands on, and how high that
+    /// ground would have to be for the boot to rest on the steps with neither end in them.
+    /// Once the boot is off the ground, each tread's rise is counted over <see cref="StepClearance"/> ahead of its edge.
+    /// </summary>
+    private static ((float Clear, float Rests) Left, (float Clear, float Rests) Right) Boots(Pose pose, float depth, Vector2 up, ReadOnlySpan<float> edges, float rise) {
+        float hips = pose.HipHeight;
+        var (toeL, heelL) = SoleOf(pose.SwingL, pose.KneeL, pose.FootL);
+        var (toeR, heelR) = SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
+        float clearL = hips - Math.Max(toeL.Y, heelL.Y), clearR = hips - Math.Max(toeR.Y, heelR.Y), lower = Math.Min(clearL, clearR);
+        float aheadL = StepClearance * Math.Clamp((clearL - lower) / OffTheGround, 0, 1), aheadR = StepClearance * Math.Clamp((clearR - lower) / OffTheGround, 0, 1);
+        float restsL = Math.Max(StepGround(depth + up.Y * toeL.X + up.X * LegSide, edges, rise, aheadL) - hips + toeL.Y, StepGround(depth + up.Y * heelL.X + up.X * LegSide, edges, rise, aheadL) - hips + heelL.Y);
+        float restsR = Math.Max(StepGround(depth + up.Y * toeR.X - up.X * LegSide, edges, rise, aheadR) - hips + toeR.Y, StepGround(depth + up.Y * heelR.X - up.X * LegSide, edges, rise, aheadR) - hips + heelR.Y);
+        return ((clearL, restsL), (clearR, restsR));
+    }
+
+    /// <summary>
+    /// How high above the ground under it to stand a pose on steps: on the boot that bears the weight, easing onto the
+    /// other boot's tread as the first one lifts off.
+    /// <paramref name="depth"/> is how far along the way up the hips are and <paramref name="up"/> that way in the body's
+    /// own frame, X toward its left and Y ahead; the steps rise <paramref name="rise"/> at each of <paramref name="edges"/>.
+    /// </summary>
+    public static float StepLift(Pose pose, float depth, Vector2 up, ReadOnlySpan<float> edges, float rise) {
+        var (left, right) = Boots(pose, depth, up, edges, rise);
+        float lower = Math.Min(left.Clear, right.Clear);
+        return Math.Min(left.Rests + LiftEase * (left.Clear - lower), right.Rests + LiftEase * (right.Clear - lower));
+    }
+
+    /// <summary>
+    /// A pose's legs fitted to steps with the body <paramref name="lift"/> above the ground it is posed on, as <see cref="StepLift"/> gives:
+    /// a boot that would sink into a tread bends its knee to stand on it instead, keeping its angle to the ground.
+    /// </summary>
+    public static Pose OnSteps(Pose pose, float lift, float depth, Vector2 up, ReadOnlySpan<float> edges, float rise) {
+        var (left, right) = Boots(pose, depth, up, edges, rise);
+        var fitted = pose with { Hips = pose.HipHeight };
+        if (left.Rests > lift) {
+            var leg = Raised(new LegAngles(pose.SwingL, pose.KneeL, pose.FootL), left.Rests - lift);
+            fitted = fitted with { SwingL = leg.Swing, KneeL = leg.Knee, FootL = leg.Foot };
+        }
+        if (right.Rests > lift) {
+            var leg = Raised(new LegAngles(pose.SwingR, pose.KneeR, pose.FootR), right.Rests - lift);
+            fitted = fitted with { SwingR = leg.Swing, KneeR = leg.Knee, FootR = leg.Foot };
+        }
+        return fitted;
+    }
+
+    /// <summary>A leg with its ankle drawn <paramref name="by"/> metres straight up toward the hip, the boot keeping its angle to the ground.</summary>
+    private static LegAngles Raised(LegAngles leg, float by) {
+        var ankle = Ankle(leg.Swing, leg.Knee);
+        var (swing, knee) = LegTo(ankle.X, ankle.Y - by);
+        return new LegAngles(swing, knee, leg.Foot - leg.Swing + leg.Knee + swing - knee);
     }
 
     // ---------- Walking ----------
