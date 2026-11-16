@@ -9,6 +9,9 @@ public enum FarmStage { Fallow, Growing, Ripe }
 
 /// <summary>Farm plots: sown with seeds and fertilizer, growing wheat for days, then harvested by hand with shared progress.</summary>
 public sealed partial class World {
+    /// <summary>What a farm plot grows: the first item of its yield.</summary>
+    public string Crop => crop ??= Data.Farm.Yield.Keys.First();
+    private string? crop;
     public float GrowSeconds => Data.Farm.GrowDays * Data.DaySeconds;
     public float HarvestSeconds => Data.Farm.HarvestWorkdays * Data.WorkdaySeconds;
 
@@ -33,46 +36,30 @@ public sealed partial class World {
         if (farm.FarmStage != FarmStage.Ripe) return;
         farm.Progress = Math.Min(HarvestSeconds, farm.Progress + dt);
         if (farm.Progress < HarvestSeconds) return;
+        if (!YieldFits(farm)) return;
         var yield = farm.Output ?? farm.Inventory;
-        foreach (var pair in Data.Farm.Yield) if (yield.Room(pair.Key) < pair.Value) return;
         foreach (var (item, amount) in Data.Farm.Yield) { yield.Add(item, amount); Got(item); }
-        farm.FarmStage = FarmStage.Fallow; farm.Progress = 0;
+        farm.FarmStage = FarmStage.Fallow; farm.Progress = 0; farm.Rounds++;
+    }
+
+    /// <summary>How many more of an item a plot's input slots take: what one sowing still lacks.</summary>
+    private int SowRoom(Thing farm, string item) => Data.Farm.Sow.TryGetValue(item, out int sowing) ? Math.Max(0, sowing - farm.Inventory[item]) : 0;
+
+    /// <summary>Whether a plot has room for a whole harvest.</summary>
+    private bool YieldFits(Thing farm) {
+        var yield = farm.Output ?? farm.Inventory;
+        foreach (var pair in Data.Farm.Yield) if (yield.Room(pair.Key) < pair.Value) return false;
+        return true;
     }
 
     /// <summary>
-    /// A farmer harvests the ripe wheat.
-    /// A hauler first moves seed from the plot's own harvest into its input slots, then carries the rest of the harvest out and fetches what the next sowing still lacks.
-    /// Nothing sows from the harvest on its own: seed only goes back in by a hauler's or the player's hand.
+    /// A farmer harvests ripe wheat; each finished harvest is a round.
+    /// A harvest the plot's output has no room for waits for a hauler.
     /// </summary>
-    private bool FarmWork(Worker w, Thing farm, float dt) {
-        if (HasDuty(w, farm.Id, "haul")) {
-            if (farm.Output != null) foreach (var (item, amount) in Data.Farm.Sow) {
-                int missing = amount - farm.Inventory[item];
-                if (missing <= 0 || farm.Output[item] == 0) continue;
-                w.Status = Phrase("Sowing back ", Data.Name(item));
-                if (Walk(w, farm.Pos, dt)) farm.Output.TransferTo(farm.Inventory, item, missing);
-                return true;
-            }
-            // Each pass ends with a return, so the transfer never changes the stacks while they are still being walked.
-            if (farm.Output != null) foreach (var (item, count) in farm.Output.Items) {
-                if (DepositFor(item, farm.Pos) is not Thing dest) continue;
-                w.Status = Phrase("Carrying out ", Data.Name(item));
-                if (Walk(w, farm.Pos, dt)) { farm.Output.TransferTo(w.Bag, item, Math.Min(count, w.Bag.StackSize), true); w.Destination = dest.Id; }
-                return true;
-            }
-            if (farm.FarmStage == FarmStage.Fallow)
-                foreach (var (item, amount) in Data.Farm.Sow) {
-                    if (farm.Inventory[item] >= amount) continue;
-                    var source = SourceFor(item, w.Pos);
-                    if (source == null) { w.Status = Phrase("Needs ", Data.Name(item), " in output-enabled storage"); return false; }
-                    w.Status = Phrase("Fetching ", Data.Name(item));
-                    if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, item, amount - farm.Inventory[item], true); w.Destination = farm.Id; }
-                    return true;
-                }
-        }
-        bool farms = HasDuty(w, farm.Id, "farm");
-        if (farm.FarmStage != FarmStage.Ripe) { w.Status = "Waiting for the wheat to grow"; if (farms) Walk(w, farm.Pos, dt); return false; }
-        if (!farms) { w.Status = "Waiting for the harvest"; return false; }
+    private bool Reap(Worker w, Thing farm, float dt) {
+        if (farm.FarmStage != FarmStage.Ripe) { w.Status = "Waiting for the wheat to grow"; return false; }
+        if (farm.Progress >= HarvestSeconds && !YieldFits(farm)) { w.Status = "Harvest waiting for room on the plot"; return false; }
+        if (!HandsFree(w, dt)) return true;
         w.Status = Phrase("Harvesting wheat · ", Number(farm.Progress / HarvestSeconds * 100), "%");
         if (!Walk(w, farm.Pos, dt)) return true;
         w.WorkState = WorkerWorkState.Gathering;

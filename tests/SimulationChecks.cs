@@ -27,6 +27,7 @@ public static class SimulationChecks {
         Test(PileModelChecks.Heaps, data);
         Test(MineRockChecks.Run);
         Test(WorkerStateChecks.Run, data);
+        Test(WorkerJobChecks.Run, data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
         Test(CheckDismantlingABuildingReturnsItsCostAndContents, data);
@@ -161,14 +162,14 @@ public static class SimulationChecks {
         var bush = world.Add(ThingKind.Berries, new Vector2(24, 20), 30);
         var fire = world.Add(ThingKind.Campfire, new Vector2(20, 24));
         var both = AddWorker(world, new Vector2(22, 22));
-        world.SetDuty(both, bush, "gather", true);
-        world.SetDuty(both, fire, "fuel", true);
-        Require(both.Duties.Count == 2 && both.Assignment == bush.Id, "a worker should keep jobs at two places and start at the first");
+        world.SetDuty(both, bush, JobKind.Gather, true);
+        world.SetDuty(both, fire, JobKind.Fuel, true);
+        Require(both.Jobs.Count == 2 && both.Assignment == bush.Id, "a worker should keep jobs at two places and start at the first");
         SafeTick(world, 60);
         Require(bush.Remaining < 30 && fire.Burn + fire.Inventory["wood"] * world.Data.CampfireSeconds > 0,
-                "a worker with jobs at two places should take turns: picking berries and feeding the fire");
-        world.SetDuty(both, fire, "fuel", false);
-        Require(both.Duties.Count == 1 && World.HasDuty(both, bush.Id, "gather"), "taking one job away should keep the other");
+                "a worker with jobs at two places should do both: picking berries, and feeding the fire once it runs low");
+        world.SetDuty(both, fire, JobKind.Fuel, false);
+        Require(both.Jobs.Count == 1 && World.HasDuty(both, bush.Id, JobKind.Gather), "taking one job away should keep the other");
     }
 
     /// <summary>A bench hauler only stocks it; the work itself waits for a crafter.</summary>
@@ -180,13 +181,13 @@ public static class SimulationChecks {
         bench.Tools!.Add("stone_chisel", 1);
         world.SetRecipe(bench, "planks");
         var hauler = AddWorker(world, new Vector2(27, 23));
-        world.SetDuty(hauler, bench, "haul", true);
+        world.SetDuty(hauler, bench, JobKind.Haul, true);
         SafeTick(world, 20);
         Require(bench.Inventory["wood"] > 0, "a bench hauler should stock the bench with wood");
         Require(bench.Inventory["planks"] == 0, "a bench hauler should not make planks");
         Require(!bench.Processing, "a bench hauler should not start the bench");
         var crafter = AddWorker(world, new Vector2(28, 25));
-        world.SetDuty(crafter, bench, "craft", true);
+        world.SetDuty(crafter, bench, JobKind.Craft, true);
         SafeTick(world, 20);
         Require(bench.Inventory["planks"] + chest.Inventory["planks"] > 0, "a crafter should work the stocked bench");
     }
@@ -197,7 +198,7 @@ public static class SimulationChecks {
         var rack = world.Add(ThingKind.Toolstation, new Vector2(16, 20));
         chest.Inventory.Add("steel_axe", 1);
         var stocker = AddWorker(world, new Vector2(18, 20));
-        world.SetDuty(stocker, rack, "stock", true);
+        world.SetDuty(stocker, rack, JobKind.Stock, true);
         SafeTick(world, 20);
         Require(rack.Inventory["steel_axe"] == 1 && chest.Inventory["steel_axe"] == 0, "a stocker should bring a stored tool to the rack");
     }
@@ -212,7 +213,7 @@ public static class SimulationChecks {
         compost.Inventory.Add("fertilizer", 2);
         chest.Inventory.Add("leaves", 8); chest.Inventory.Add("berries", 6);
         var tender = AddWorker(world, new Vector2(17, 22));
-        world.SetDuty(tender, compost, "tend", true);
+        world.SetDuty(tender, compost, JobKind.Tend, true);
         SafeTick(world, 40);
         Require(chest.Inventory["fertilizer"] == 2, "a tender should carry fertilizer to storage");
         Require(compost.Inventory["leaves"] > 0, "a tender should bring leaves to the compost");
@@ -227,7 +228,7 @@ public static class SimulationChecks {
         var sign = world.Add(ThingKind.Signpost, new Vector2(24, 26));
         sign.Output!.Add("tin_bar", 3); sign.Output.Add(Inventory.Coins, 20);
         var runner = AddWorker(world, new Vector2(24, 25));
-        world.SetDuty(runner, sign, "deliveries", true);
+        world.SetDuty(runner, sign, JobKind.Deliveries, true);
         SafeTick(world, 20);
         Require(store.Inventory["tin_bar"] == 3, "a runner should carry deliveries into storage");
         Require(sign.Output["tin_bar"] == 0, "a runner should leave no delivery in the post's output");
@@ -249,7 +250,8 @@ public static class SimulationChecks {
         Require(cutter.Missing == "axe", "a worker with no axe to take should say an axe is missing");
         Require(heldRack.Inventory["steel_axe"] == 1, "the station should keep the held back axe");
         world.SetFilter(heldRack, "steel_pick", true, false);
-        SafeTick(world, 10);
+        // The cutter waited in the clearing, with no trading post to wait at, and walks back for the axe.
+        Work(world, 90, () => cutter.Tool == "steel_axe");
         Require(cutter.Tool == "steel_axe", "with the filter cleared, the worker should take the axe");
     }
 
@@ -394,7 +396,8 @@ public static class SimulationChecks {
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
 
-        SafeTick(world, data.GatherSeconds * 1.6f / data.Items[worker.Tool].Speed + .3f);
+        // Two gather cycles at the player's pace: 4 wood, then the last one.
+        SafeTick(world, data.GatherSeconds * 2 / data.Items[worker.Tool].Speed + .3f);
         Require(worker.Bag["wood"] == 5 && tree.Remaining == 0,
                 "gathering worker should collect actual wood from its assigned resource");
         SafeTick(world, .1f);
@@ -1023,8 +1026,9 @@ public static class SimulationChecks {
         worker.WageDebt = 0;
         SafeTick(world, 1);
         Require(worker.WorkState == WorkerWorkState.Hammering && anvil.Progress > progress, "a lone smith should hammer the running batch before fetching the next load");
-        SafeTick(world, 45);
-        Require(chest.Inventory["steel_parts"] >= 1, "a worker hammering at the anvil should finish the batch and store it");
+        // The smith hammers what the anvil holds, brings the bars left in the chest, hammers those, and only then has parts to carry out.
+        Work(world, 120, () => chest.Inventory["steel_parts"] >= 1);
+        Require(chest.Inventory["steel_parts"] >= 1, "a worker hammering at the anvil should finish the batches and store the parts");
     }
 
     private static void CheckFinishedBatchWaitsForOutputRoom(GameData data) {
@@ -1632,8 +1636,8 @@ public static class SimulationChecks {
         Require(workerTree != null, "a remaining tree should be available for the hired worker");
         world.Assign(worker!, workerTree);
         Require(worker!.Assignment == workerTree!.Id, "player should assign the hired worker to the resource");
-        Require(worker.Duties.Count == 1, "the hired worker should have one duty");
-        Require(World.HasDuty(worker, workerTree.Id, "gather"), "the hired worker's duty should be gathering from that resource");
+        Require(worker.Jobs.Count == 1, "the hired worker should have one duty");
+        Require(World.HasDuty(worker, workerTree.Id, JobKind.Gather), "the hired worker's duty should be gathering from that resource");
         Require(world.Reached("assigned"), "assigning a worker should reach the assigned milestone");
         for (int i = 0; i < 480 && chest.Inventory["wood"] == 0; i++) SafeTick(world, Step);
         Require(chest.Inventory["wood"] > 0 && worker.Bag["wood"] == 0,
@@ -1861,12 +1865,12 @@ public static class SimulationChecks {
         var chest = world.Add(ThingKind.Chest, new Vector2(10, 10));
         Require(crate.TransferTo(chest.Inventory, "steel_pick", 8) == World.ChestStacks, "a chest should take one tool per slot");
         var hands = new Worker().Bag;
-        Require(hands.Add("steel_axe", 9) == Worker.BagStack && hands.Add("wood", 1) == 0, "a worker should carry five tools, one per slot");
+        Require(hands.Add("steel_axe", 20) == 12 && hands.Add("wood", 1) == 0, "a worker should carry twelve tools, one per slot");
         var mixed = new Worker().Bag;
-        Require(mixed.Add("wood", 3) == 3, "a worker should carry three wood");
+        Require(mixed.Add("wood", 10) == 10, "a worker should carry ten wood");
         Require(mixed.Add("stone", 1) == 1, "a worker should carry a stone beside the wood");
         Require(mixed.Add("steel_pick", 1) == 1, "a worker should carry a tool beside the other things");
-        Require(mixed.Add("coal", 1) == 0, "a worker should carry no more than five things in all");
+        Require(mixed.Add("coal", 1) == 0, "a worker should carry no more than twelve things in all");
     }
 
     private static void CheckBenchWorksWithACarriedOrSlottedTool(GameData data) {
@@ -2302,8 +2306,8 @@ public static class SimulationChecks {
         chest.Inventory.Add("fertilizer", 1);
         SafeTick(world, 60);
         Require(farm.FarmStage == FarmStage.Growing, "the worker should sow again");
-        Require(farm.Inventory["wheat_seeds"] == 0, "the worker should use the seeds moved back in");
         Require(chest.Inventory["fertilizer"] == 0, "the worker should bring the fertilizer");
+        Require(farm.Inventory["wheat_seeds"] == 1 && chest.Inventory["wheat_seeds"] == 0, "the worker should use the seeds moved back in and bring the spare seed for the next sowing");
     }
 
     /// <summary>Foods restore the hunger and thirst their data says and no health, and raw ones only say they need cooking.</summary>
@@ -2819,7 +2823,7 @@ public static class SimulationChecks {
         world.Add(ThingKind.Anvil, new Vector2(10, 10));
         string json = world.Serialize();
         EmptyWorld(data).Deserialize(json);
-        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"Tool\": \"steel_hammer\"", "\"Tool\": \"unobtainium\""), ("\"wood\": 2", "\"unobtainium\": 2"), ("\"Keep\": \"steel_parts\"", "\"Keep\": \"steel_pick\""), ("\"Goal\": 0", "\"Goal\": -1") }) {
+        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"steel_hammer\": 1", "\"unobtainium\": 1"), ("\"wood\": 2", "\"unobtainium\": 2"), ("\"Keep\": \"steel_parts\"", "\"Keep\": \"steel_pick\""), ("\"Goal\": 0", "\"Goal\": -1") }) {
             bool refused = false;
             try { EmptyWorld(data).Deserialize(Patch(json, edit)); } catch (InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
             Require(refused, $"a save with {edit.Item2} in place of {edit.Item1} should be refused with a clear reason");
@@ -2840,6 +2844,8 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         var furnace = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
         furnace.Heat = World.SteelHeat + 5;
+        // Bellows are pumped only while there is something to smelt.
+        furnace.Inventory.Add("iron_bar", 20); furnace.Inventory.Add("coal", 20); furnace.Burner!.Add("coal", 10);
         // The worker starts far off, so the forge would cool past the bar before they arrive to pump.
         world.Assign(AddWorker(world, new Vector2(30, 30)), furnace);
         SafeTick(world, 4);
@@ -2876,7 +2882,8 @@ public static class SimulationChecks {
         Require(hauler.Assignment == forge.Id, "lunch should keep the hauler's assignment");
         Require(forge.Heat < World.SteelHeat, "with the crew at lunch the forge should cool below the clear bar");
         SafeTick(world, At(data.LunchHour + 1) - world.Time + 10);
-        Require(cutter.WorkState == WorkerWorkState.Gathering && pumper.WorkState == WorkerWorkState.Pumping,
+        // Both forge workers hold the bellows and the haul job: whichever gets to the bellows first pumps.
+        Require(cutter.WorkState == WorkerWorkState.Gathering && new[] { pumper, hauler }.Count(w => w.WorkState == WorkerWorkState.Pumping) == 1,
                 "after lunch workers should walk back to their jobs");
     }
 

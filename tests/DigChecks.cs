@@ -104,8 +104,9 @@ public static class DigChecks {
         Work(lot.World, 300, () => lot.Cutter.Assignment == lot.Next.Id);
         Require(lot.Cutter.Assignment == lot.Next.Id, $"the woodcutter should get to the next tree: {lot.Cutter.Status}");
         Require(lot.World.Things.All(t => t.Kind != ThingKind.Stump), "a woodcutter with a shovel to take should dig up the stump before the next tree");
-        // The felled tree held 5 wood, and its stump 3 more.
-        Require(lot.Chest.Inventory["wood"] == 8, $"the tree's 5 wood and its stump's 3 should reach storage: {lot.Chest.Inventory["wood"]}");
+        // The felled tree held 5 wood and its stump 3 more; the woodcutter tops their hands up to 12 at the next tree before storing.
+        Work(lot.World, 60, () => lot.Chest.Inventory["wood"] > 0);
+        Require(lot.Chest.Inventory["wood"] == 12 && lot.Next.Remaining == 396, $"the tree's 5 wood, its stump's 3 and 4 from the next tree should reach storage in one load: {lot.Chest.Inventory["wood"]}");
     }
 
     private static void CheckWoodcutterWithoutAShovelGoesOnChopping(GameData data) {
@@ -113,7 +114,8 @@ public static class DigChecks {
         Work(lot.World, 300, () => lot.Next.Remaining < 400);
         Require(lot.Next.Remaining < 400, $"a woodcutter with no shovel to take should chop the next tree: {lot.Cutter.Status}");
         Require(lot.World.Things.Count(t => t.Kind == ThingKind.Stump) == 1, "the stump should stay in the ground without a shovel");
-        Require(lot.Chest.Inventory["wood"] >= 5 && lot.Chest.Inventory["wood"] % 5 == 0, $"only chopped wood should reach storage, 5 at a time: {lot.Chest.Inventory["wood"]}");
+        Work(lot.World, 60, () => lot.Chest.Inventory["wood"] > 0);
+        Require(lot.Chest.Inventory["wood"] == 12, $"only chopped wood should reach storage, 12 at a time: {lot.Chest.Inventory["wood"]}");
     }
 
     private static void CheckBushDiggerGoesToTheNextBushNotToLeaves(GameData data) {

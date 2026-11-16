@@ -72,6 +72,9 @@ Simulation and data:
 | `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/Packing.cs` | Packing stations |
+| `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
+| `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the gather, craft, bellows and fire jobs |
+| `src/Hauling.cs` | The four haul rules, what each kind of place offers a hauler, and the carry in hand |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
@@ -117,7 +120,8 @@ UI and input:
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
-| `src/CrewPanel.cs` | The crew cards and a worker's own panel |
+| `src/CrewPanel.cs` | The crew cards and a worker's own panel, with their hands and tool slot |
+| `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
 | `src/CabinPanel.cs` | A cabin: its door, sleep and the needs a night would leave |
@@ -382,7 +386,7 @@ A station takes water as a liquid in liters, `Water.Liquid`, with a drawn drople
 a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
-Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.LiquidToClear`), and a dismantled station fills the backpack's vessels and spills the rest.
+Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
 No hand recipe takes a liquid, which `GameData` checks.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
@@ -672,12 +676,16 @@ Another player who tries is told so (`World.HeldByAnother`).
 The server keeps only the slot each player's held stack lies in (`PlayerState.HeldSlot`), and builds the `PlayerState.HeldStack` a window shows from it each time it sends the player (`World.ShareHeldStacks`).
 It lets go of the stack when the player is down, walks out of reach of the building it lies in, or leaves, and when its crate is put down or sold; a load starts with nothing held.
 
-A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (5) items in all, one stack or up to five kinds; `Worker.Hands` widens them for a full mine or market stack.
+A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (12) items in all, one stack or up to twelve kinds, for every load.
+The one tool a worker holds lies in `Worker.ToolSlot`, which `Worker.Tool` names.
+Both are boxes a player in reach of the worker (`World.Reaches`) picks up from and puts into as with a building's slots: anything goes into the hands, only a tool into the tool slot.
 
 #### Chests
 
 Chests have separate item allowlists for input and output, and empty lists allow all items.
-Automated deposits prefer a chest with a matching input filter, or a packing station packing the item, then a nearby unrestricted chest.
+Automated deposits go to the nearest place that asks for the item, then to the nearest unrestricted storage (`World.DepositFor`).
+Asking for it are a chest, pile or trading post whose input filter names it, a packing station packing it, a station whose recipe takes it as an input or burns it, a farm plot short of it for a sowing and a mine site short of it.
+`World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
 Manual transfers ignore those filters.
 
@@ -713,9 +721,9 @@ Its inventory takes only that good and empty crates; `Thing.Output` holds the cr
 While worked like an anvil, it moves one item every `PackSeconds` into that crate, opening an empty crate for the first.
 A full crate, or one of another good after the choice changes, waits in the output.
 
-- Haul carries that crate to `DepositFor` and the station's leftovers to storage, then keeps a crate's worth of the good and two empty crates there.
+- Haul carries that crate to `DepositFor` and the station's leftovers to storage, and brings the good and empty crates up to a stack of each (`World.PackerCarries`); a batch is one crate.
 - `DepositFor` counts the station as storage for its good, ranked with explicit filters, while a stack's delivery still leaves a slot for empty crates (`World.PackerTakes`).
-- A worker with both jobs fetches only once the station runs dry, crates first.
+- A crate packed full is a round of the Craft job.
 
 Putting a packed crate into a placed crate asks for confirmation.
 If confirmed, it ends the run in a black hole with a reload or main-menu choice.
@@ -729,34 +737,70 @@ A tool station (`toolstation`) is storage for tools only: `World.ToolSlots` (4) 
 Workers are tracked individually.
 `HireOffers` in `GameTables` lists hiring deals, and each worker keeps the daily wage of the deal they were hired on (`Worker.Wage`).
 
-#### Duties
+#### Jobs
 
-Workers hold duties (`Worker.Duties`): a place and one of the jobs `World.Jobs` offers there, such as gather, craft, haul, bellows, farm, build, mine, deliveries, fuel, stock or tend.
-`World.SetDuty` adds or drops one.
-`Worker.Assignment` is the place being worked now.
-`World.NextPlace` moves on to the worker's next place when the current one has nothing to do or after a delivery, so one worker can cover several places in turn.
+The kinds of work are `JobKind`, each with an id in saves and commands (`JobKinds.Id`), and one table holds each job's title, hint, whether a round of it is a unit of the place's work, the tools it takes and what it does (`World.Def`, `JobDef`).
+A place offers some of them (`World.Jobs`), such as Craft and Haul at a crafting bench.
 
 - Stock brings tools from storage to a tool station.
 - Tend fetches what a compost pile's filters take from storage and carries its fertilizer out.
 - Deliveries runs price errands and carries the trading post's mail, other than coins, to storage.
 
+A worker's list (`Worker.Jobs`) holds entries in order: a job at one place (`Duty`), or a haul group (`HaulGroup`) holding hauls.
+`Worker.Duties` goes through every job in it, the hauls of each group included, without allocating.
+`World.SetDuty` adds a job at the end of the list or drops it wherever it is, and `World.HasDuty` asks for one.
+
+`World.WorkJobs` reads the list from the top each time: the first entry with something to do is kept to (`Worker.InHand`) for one round, then the list is read again.
+The job in hand is `Worker.Assignment` and `Worker.Doing`.
+
+- a delivery ends the round of a job that carries (`World.Deliver`);
+- a crafted batch, a furnace batch at the bellows, a crate packed full, a piece mined, a harvest and a mine building stage end it for the jobs the table marks, counted by the place (`Thing.Rounds`, `Worker.Mark`).
+
+A job with nothing to do sets the status to what it lacks.
+With none to do the worker waits at the nearest trading post (`World.Idle`), shows the first job's status and reads the list again every `JobListSeconds`, or at once when the list changes.
+A tool none of their jobs uses goes back to a tool station first (`World.JobUses`).
+
+`World.MoveJob` moves an entry from one `JobSpot` to another: a place in the list, or a place among a group's hauls.
+Only a haul goes into a group, and a group moves with its hauls.
+`World.AddHaulGroup` adds an empty group, and `RemoveHaulGroup` puts its hauls in its place as jobs of their own.
+A haul group counts as one job, and its next carry is picked across all its places.
+A command names the entry it moves (`World.JobKey`), so a move sent before the list changed is dropped rather than moving another entry.
+
+On a worker's page `JobList` draws the list and turns a row dragged by its `JobGrip` into a `MoveJob`; each row shows what its place is set to make (`JobList.Made`).
+
+#### Hauling
+
+A haul job carries one load at a time (`World.Haul`).
+Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, `FarmCarries`, `MineCarries`), and the best is the hauler's plan (`Worker.Plan`, a `Carry`) until the load is picked up:
+
+1. an input or the fuel slot holding less than one batch, and fuel the recipe does not burn, which leaves the slot;
+2. an output that is full, or anything another recipe left in the slots;
+3. the input or fuel covering the fewest batches;
+4. the output holding the most.
+
+Inputs and fuel fill to a stack (`World.SlotRoom`); a farm plot's slots hold one sowing (`World.SowRoom`) and a mine site what it lacks.
+A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
+Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
+
+#### Gathering and the bellows
+
+A gatherer works at the player's pace, `World.GatherYield` pieces a cycle, until their hands are full (`Worker.Loading`), then delivers.
 A gatherer whose spot is spent moves the duty to the nearest spot of the same job in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
 Spots that need a tool count only while the worker can get one (`World.CanWork`), and loose pieces come only after every other spot; a gatherer with no tool to be had for their spot goes to the nearest spot they can work at once (`World.OtherSpot`).
 A woodcutter who fells a tree takes its stump as their spot while a shovel is to be had, without waiting for a player to see it; other stumps count once a player has seen them.
 A worker carries one tool, so going between a tree and a stump takes a walk to a tool station to swap.
-With none known they say so once and go on to their other places, or wait at the nearest trading post until one is seen or the spot comes back.
+With none known they say so once, carry off what they hold and go on to their other jobs.
 A worker with no duties waits at the nearest trading post.
 
-Only one worker ever pumps a reinforced furnace.
-Of those with the bellows job, the first pumps and the rest haul if they also hold haul.
-A lone worker with both alternates.
+Only one worker ever pumps a reinforced furnace: the bellows job has nothing to do while another worker has it in hand (`World.Pump`).
+It also has nothing to do while the furnace neither smelts nor holds a batch to smelt, so a worker with both jobs hauls then.
 
 #### Worker tools
 
 A worker without the tool a job needs walks to the nearest station holding one, takes the best (`Worker.Tool`), and gathers at that tool's speed.
 With none available they wait, show what they need and say it once in a message at the top of the screen.
 
-`World.ReturnTool` walks a tool the job no longer needs, or any tool at dusk, back to the nearest station with room.
+`World.ReturnTool` walks a tool the job in hand has no use for, or any tool at dusk, back to the nearest station with room.
 With no station the worker keeps it.
 A dismissed worker's tool goes into their recovery box.
 
@@ -831,7 +875,7 @@ Workers fetch the pickaxe or hammer a stage needs from a tool station, like any 
 Up to `Mine.Workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).
 Each adds one ore and one stone to the mine's two-slot `Thing.Output` every `Mine.Seconds`.
 Mining stops while either slot holds a full stack.
-The first free miner then carries the whole stack to storage (`Worker.Bag` grows to the stack size until emptied), and with no storage the mine reports once that it is full.
+A miner then carries a load of it to the nearest place that takes it (`World.Dig`), and with none the mine reports once that it is full and the mine job has nothing to do.
 
 ### Farming
 
@@ -843,11 +887,11 @@ A farm plot (`farm`, `src/Farm.cs`) is a zone like a pile and snaps with piles.
 A fallow plot sows itself from its own inventory.
 `World.CropLook` gives the look: bare, soil, straws, green plants or wheat.
 
-The player harvests through `World.Gather` and assigned workers through `World.FarmWork`, both adding to the one progress.
+The player harvests through `World.Gather` and assigned workers through `World.Reap`, both adding to the one progress.
 The yield goes into the plot's `Thing.Output`; nothing moves seed back into the plot's input slots on its own.
 
 - A worker on Farm harvests.
-- A worker on Haul first moves seed from the output into the plot's input slots, then carries out the rest and fetches what the next sowing lacks.
+- A worker on Haul keeps the input slots at one sowing, from the plot's own output first and then from storage, and carries out the rest (`World.FarmCarries`).
 
 ## Intro film
 

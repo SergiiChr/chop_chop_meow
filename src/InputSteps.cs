@@ -39,6 +39,12 @@ public partial class Game {
         return WindowPoint(control);
     }
 
+    /// <summary>Window position of a spot just inside a control's lower edge, scrolled into view first.</summary>
+    private async Task<Vector2> AtFoot(Control control) {
+        await At(control);
+        return WindowPoint(control, new Vector2(control.Size.X / 2, control.Size.Y - 2));
+    }
+
     /// <summary>Where a control's centre is in the window, through its canvas layer and the window's stretch.</summary>
     public static Vector2 WindowPoint(Control control) => WindowPoint(control, control.Size / 2);
 

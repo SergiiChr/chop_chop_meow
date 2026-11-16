@@ -33,45 +33,22 @@ public sealed partial class World {
         if (t.Progress < Data.PackSeconds) return;
         t.Progress = 0;
         t.Inventory.Remove(t.Packs, 1);
-        if (t.Output!.First() is string crate) { Packed(crate)!.Add(t.Packs, 1); return; }
+        if (t.Output!.First() is string crate) {
+            Packed(crate)!.Add(t.Packs, 1);
+            if (!OpenCrate(t, crate)) t.Rounds++;
+            return;
+        }
         t.Inventory.Remove("crate", 1);
         var box = NewCrate(); box.Add(t.Packs, 1);
         t.Output.Add(Pack(box), 1);
     }
 
-    /// <summary>
-    /// A packer's hauler carries out a finished crate and anything the station no longer packs, then keeps a crate's worth of goods and two empty crates there.
-    /// A packer working the station stays at it while there is something to pack.
-    /// </summary>
+    /// <summary>A packer works the station while it has its good and a crate to pack it into; each crate filled is a round.</summary>
     private bool PackWork(Worker w, Thing t, float dt) {
-        bool packs = HasDuty(w, t.Id, "craft") && CanPack(t);
-        if (HasDuty(w, t.Id, "haul")) {
-            if (t.Output!.First() is string crate && !OpenCrate(t, crate)) {
-                if (DepositFor(crate, t.Pos) is not Thing dest) { w.Status = "Full crate waiting · needs accepting storage"; return false; }
-                w.Status = "Carrying out a packed crate";
-                if (Walk(w, t.Pos, dt)) { t.Output.TransferTo(w.Bag, crate, 1, true); w.Destination = dest.Id; }
-                return true;
-            }
-            foreach (var pair in t.Inventory.Items) {
-                if (pair.Key == t.Packs || pair.Key == "crate" || DepositFor(pair.Key, t.Pos) is not Thing store) continue;
-                w.Status = Phrase("Carrying out ", Data.Name(pair.Key));
-                // Returns straight after the move, so the changed inventory is not enumerated further.
-                if (Walk(w, t.Pos, dt)) { t.Inventory.TransferTo(w.Bag, pair.Key, w.Bag.StackSize, true); w.Destination = store.Id; }
-                return true;
-            }
-            // A lone worker who also packs fetches only once the station runs dry, crates first when there is none to pack into.
-            if (!packs && (t.Inventory["crate"] == 0 && Fetch("crate", 2) || t.Packs != "" && Fetch(t.Packs, Data.CrateCapacity) || Fetch("crate", 2))) return true;
-        }
-        w.Status = t.Packs == "" ? "Choose what to pack" : packs ? "Packing crates" : "Waiting for goods and crates";
-        if (!packs) return false;
+        if (!CanPack(t)) { w.Status = t.Packs == "" ? "Choose what to pack" : "Waiting for goods and crates"; return false; }
+        if (!HandsFree(w, dt)) return true;
+        w.Status = "Packing crates";
         if (Walk(w, t.Pos + PackStand, dt, .1f)) w.WorkState = WorkerWorkState.Hammering;
         return true;
-
-        bool Fetch(string item, int keep) {
-            if (t.Inventory[item] >= keep || SourceFor(item, w.Pos) is not Thing source) return false;
-            w.Status = Phrase("Fetching ", Data.Name(item));
-            if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, item, keep - t.Inventory[item], true); w.Destination = t.Id; }
-            return true;
-        }
     }
 }

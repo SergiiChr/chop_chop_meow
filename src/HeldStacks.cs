@@ -34,7 +34,7 @@ public sealed partial class World {
         int code = Locate(box);
         if (code == -1 || Downed || (uint)slot >= (uint)box.Layout.Count || box.Layout[slot] is not { Item: not "" } cell) return;
         if (Forwarded(Verb.Hold, code, count, cell.Item, slot)) return;
-        if (Building(code) is Thing owner && !Reaches(owner)) { Say("Walk closer first."); return; }
+        if (!InReach(code)) { Say("Walk closer first."); return; }
         if (cell.HeldByOther(S.Actor.Id)) { Say(HeldByAnother); return; }
         Release();
         if (box.Hold(slot, count, S.Actor.Id) == 0) return;
@@ -107,11 +107,8 @@ public sealed partial class World {
         _ => null
     };
 
-    /// <summary>The building a number from <see cref="Locate"/> names a box of, or null.</summary>
-    private Thing? Building(int code) => code > 0 ? Find(code / BoxCodes) : null;
-
     /// <summary>
-    /// Server: lets go of held stacks whose player can no longer hold them: one that is down, out of reach of the building the stack lies in, or whose slot has gone.
+    /// Server: lets go of held stacks whose player can no longer hold them: one that is down, out of reach of the building or worker the stack lies with, or whose slot has gone.
     /// A stack whose inventory has gone, such as a packed crate's contents once the crate is sold, is let go of too.
     /// </summary>
     private void KeepHolds() {
@@ -120,7 +117,7 @@ public sealed partial class World {
             using (ActAs(p)) {
                 if (!HeldCell(p, out var box, out _, out _)) continue;
                 int code = Locate(box);
-                if (code == -1 || Downed || Building(code) is Thing owner && !Reaches(owner)) Release();
+                if (code == -1 || Downed || !InReach(code)) Release();
             }
         }
     }

@@ -26,12 +26,12 @@ Measured, at 25 coins a worker-day, a crate of 12 and full price:
 
 | Good | Worker-days | Labor | Bought | Cost | Sells for | Profit | Waits |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Berries | 0.55 | 14 | 0 | 14 | 15 | 2 | |
-| Bread | 0.41 | 10 | 0.8 | 11 | 30 | 19 | 3 days |
-| Berry jam | 1.52 | 38 | 0 | 38 | 70 | 32 | |
-| Canned jam | 1.87 | 47 | 0 | 47 | 143 | 96 | |
-| Steel axe, pickaxe, shovel | 1.57 | 39 | 0 | 39 | 471 | 432 | |
-| Steel hammer | 0.97 | 24 | 0 | 24 | 243 | 219 | |
+| Berries | 0.53 | 13 | 0 | 13 | 15 | 2 | |
+| Bread | 0.37 | 9 | 0.8 | 10 | 30 | 20 | 3 days |
+| Berry jam | 1.36 | 34 | 0 | 34 | 70 | 36 | |
+| Canned jam | 1.57 | 39 | 0 | 39 | 143 | 104 | |
+| Steel axe, pickaxe, shovel | 1.16 | 29 | 0 | 29 | 471 | 442 | |
+| Steel hammer | 0.71 | 18 | 0 | 18 | 243 | 225 | |
 
 Not costed: raw meat, burnt steak, meat stew and canned meat stew.
 The `Economy:` lines print this table on every run.

@@ -144,7 +144,20 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         // --map-item also clicks an item's slot, to show its details.
         if (Launch.Has("--map")) { panel.Map.Open(); if (Launch.Value("--map-item") is string item) panel.Map.NodeOf(item)?.GetNode<Button>("slot").EmitSignal(BaseButton.SignalName.Pressed); }
         if (Launch.Has("--crew")) panel.Open(Page.Crew);
-        if (Launch.Has("--worker")) panel.Select(world.Workers[0]);
+        if (Launch.Has("--worker")) {
+            // Worker review: jobs at three stations in order, their hauls in one group, a load in hand and a tool.
+            var hand = world.Workers[0];
+            var anvil = world.Things.First(t => t.Kind == ThingKind.Anvil);
+            world.Assign(hand, anvil); world.SetDuty(hand, bench, JobKind.Craft, true); world.SetDuty(hand, bench, JobKind.Haul, true); world.SetDuty(hand, bellows, JobKind.Haul, true);
+            world.AddHaulGroup(hand);
+            foreach (var place in new[] { bellows, anvil, bench }) {
+                int from = hand.Jobs.FindIndex(e => e is Duty { Job: JobKind.Haul } d && d.Thing == place.Id);
+                world.MoveJob(hand, new JobSpot(from), new JobSpot(hand.Jobs.Count - 1, int.MaxValue));
+            }
+            hand.Bag.Add("steel_parts", 6); hand.Tool = "steel_pick";
+            world.Player = hand.Pos + Vector2.One;
+            if (Launch.Has("--crew")) panel.Open(Page.Crew); else panel.Select(hand);
+        }
         if (Launch.Has("--guide")) panel.Open(Page.Guide);
         if (Launch.Has("--menu")) { panel.Close(); menu.Open(); }
         if (Launch.Has("--furnace")) { world.Player = bellows.Pos + Vector2.One; panel.Select(bellows); }
@@ -225,7 +238,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // --packer puts a worker at the table packing, with the player stepped back.
             if (Launch.Has("--packer")) { world.S.Backpack.Add(Inventory.Coins, 500); world.Player = sign.Pos + Vector2.One; }
             if (Launch.Has("--packer") && world.Hire(sign, world.Data.HireOffers[1]) is Worker packing) {
-                world.SetDuty(packing, packer, "craft", true); packing.Pos = at + World.PackStand;
+                world.SetDuty(packing, packer, JobKind.Craft, true); packing.Pos = at + World.PackStand;
                 world.Player = at + new Vector2(.4f, -2.6f); view.Zoom = 3.4f; world.Tick(.1f);
             }
             world.SetFilter(sign, World.CrateOf("bread"), false, true); world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);

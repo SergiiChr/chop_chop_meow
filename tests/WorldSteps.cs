@@ -102,7 +102,7 @@ internal static class WorldSteps {
         stock.Inventory.Slots = 40; stock.Inventory.Add("raw_meat", 64); stock.Inventory.Add("wood", 64);
         var table = world.Add(ThingKind.Cooktable, shore + inland * 4 + new Vector2(0, 3));
         world.SetRecipe(table, "meat_stew");
-        world.SetDuty(AddWorker(world, table.Pos), table, "haul", true);
+        world.SetDuty(AddWorker(world, table.Pos), table, JobKind.Haul, true);
         world.Assign(AddWorker(world, pond.Pos), pond);
         return world;
     }

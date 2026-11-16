@@ -157,14 +157,13 @@ public static class MineChecks {
         int stone = mine.Output["stone"];
         var hauler = crew.First();
         Work(world, 3, () => hauler.Bag.Count > 0);
-        Require(hauler.Bag["iron_ore"] == mine.Output.StackSize && mine.Output["iron_ore"] == 0, "the first miner must carry the whole full ore stack out");
+        Require(hauler.Bag["iron_ore"] == 12 && mine.Output["iron_ore"] == mine.Output.StackSize - 12, "the first miner must carry a load of 12 ore out of the full stack");
         Require(mine.Output["stone"] <= stone + 3, "mining must stop once a slot is full");
-        Work(world, 60, () => chest.Inventory["iron_ore"] >= mine.Output.StackSize);
-        Require(chest.Inventory["iron_ore"] == mine.Output.StackSize, "the full stack must reach the nearest storage");
+        Work(world, 60, () => chest.Inventory["iron_ore"] >= 12);
+        Require(chest.Inventory["iron_ore"] == 12, "the load must reach the nearest storage");
         Require(hauler.Bag.Count == 0, "the miner must leave nothing in their hands");
-        Require(hauler.Bag.StackSize == Worker.BagStack, "the miner's hands must go back to a normal load");
         Work(world, 10);
-        Require(mine.Output["iron_ore"] > 0, "mining must resume once the full stack is out");
+        Require(mine.Output["iron_ore"] > mine.Output.StackSize - 12, "mining must resume once a load is out");
 
         // Without storage for it, the output stays put and the corner message shows once.
         RemoveThings(world, t => t == chest);
@@ -179,12 +178,13 @@ public static class MineChecks {
         var loaded = saved.Find(mine.Id)!;
         Require(loaded.MineStage == MineStage.Open && loaded.Output!.Count == held, "a save must keep the mine's stage and output");
 
-        // A miner dismissed mid-haul leaves the whole stack in a recovery box.
+        // A miner dismissed mid-haul leaves their load in a recovery box.
         world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
-        Work(world, 3, () => crew.Any(w => w.Bag.Count > 0));
+        // The miners waited in the clearing while the mine had nowhere to unload, and walk back.
+        Work(world, 90, () => crew.Any(w => w.Bag.Count > 0));
         var carrier = crew.First(w => w.Bag.Count > 0);
         world.Fire(carrier);
-        Require(world.Things.Any(t => t.Kind == ThingKind.Grave && t.Inventory["stone"] == mine.Output.StackSize), "dismissing a miner must not lose the stack they carry");
+        Require(world.Things.Any(t => t.Kind == ThingKind.Grave && t.Inventory["stone"] == 12), "dismissing a miner must not lose the load they carry");
     }
 
     private static void CheckFullMineUnloadsIntoAPackingStationPackingItsOre(GameData data) {
@@ -197,7 +197,7 @@ public static class MineChecks {
         miner.Tool = "steel_pick"; world.Assign(miner, mine);
         mine.Output!.Add("iron_ore", mine.Output.StackSize);
         Work(world, 60, () => packer.Inventory["iron_ore"] > 0);
-        Require(packer.Inventory["iron_ore"] == mine.Output.StackSize, "with no chest, a full mine's ore should go to a packing station packing iron ore");
+        Require(packer.Inventory["iron_ore"] == 12, "with no chest, a load of a full mine's ore should go to a packing station packing iron ore");
     }
 
     private static void CheckOnlyAvailableMinersUnload(GameData data) {
@@ -206,20 +206,20 @@ public static class MineChecks {
         var cliff = World.CliffAt(mine.Pos);
         var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
         var builder = AddWorker(world, mine.Pos);
-        world.SetDuty(builder, mine, "build", true);
+        world.SetDuty(builder, mine, JobKind.Build, true);
         var elsewhere = AddWorker(world, chest.Pos);
         var tree = world.Add(ThingKind.Tree, chest.Pos + cliff.Face * 3, 100);
-        world.SetDuty(elsewhere, tree, "gather", true);
-        world.SetDuty(elsewhere, mine, "mine", true);
-        // This earlier-hired miner remains at another job waiting for an axe.
+        world.SetDuty(elsewhere, tree, JobKind.Gather, true);
+        world.SetDuty(elsewhere, mine, JobKind.Mine, true);
+        // This earlier-hired worker has no axe for the tree and no pickaxe for the mine.
         var miner = AddWorker(world, World.MineDoor(mine)); miner.Tool = "steel_pick";
-        world.SetDuty(miner, mine, "mine", true);
+        world.SetDuty(miner, mine, JobKind.Mine, true);
         mine.Output!.Add("iron_ore", mine.Output.StackSize);
-        Work(world, 15, () => chest.Inventory["iron_ore"] == mine.Output.StackSize);
-        Require(chest.Inventory["iron_ore"] == mine.Output.StackSize && miner.Bag.Count == 0,
+        Work(world, 15, () => chest.Inventory["iron_ore"] > 0);
+        Require(chest.Inventory["iron_ore"] == 12 && miner.Bag.Count == 0,
             "an active miner must unload even when earlier workers only build or have a mine duty while working elsewhere");
         Require(builder.Bag.Count == 0 && elsewhere.Bag.Count == 0,
-            "workers without an active mining job must not take the full mine stack");
+            "workers without an active mining job must not take the full mine's ore");
     }
 
     private static void CheckMiningIsSlowerThanDeposits(GameData data) {

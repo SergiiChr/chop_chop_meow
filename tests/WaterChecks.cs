@@ -191,7 +191,7 @@ public static class WaterChecks {
         var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
         world.SetRecipe(table, "dough");
         var hauler = AddWorker(world, new Vector2(24, 21));
-        world.SetDuty(hauler, table, "haul", true); world.SetDuty(hauler, table, "craft", true);
+        world.SetDuty(hauler, table, JobKind.Haul, true); world.SetDuty(hauler, table, JobKind.Craft, true);
         SafeTick(world, 40);
         Require(chest.Inventory["dough"] == 3 && table.Inventory[Water.Full] + table.Inventory[Water.Empty] == 0,
             "a hauler must pour a full bottle into the table for its dough, leaving no bottle there");
@@ -205,7 +205,7 @@ public static class WaterChecks {
         var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
         world.SetRecipe(table, "berry_jam"); table.Inventory.Add(Water.Liquid, 1);
         var hauler = AddWorker(world, new Vector2(24, 21));
-        world.SetDuty(hauler, table, "haul", true);
+        world.SetDuty(hauler, table, JobKind.Haul, true);
         SafeTick(world, 40);
         Require(table.Inventory[Water.Liquid] == 0, "a hauler must clear water the table's recipe no longer takes");
         Require(chest.Inventory[Water.OneLiter] == 1 && chest.Inventory[Water.Empty] == 0 && hauler.Bag.Count == 0,

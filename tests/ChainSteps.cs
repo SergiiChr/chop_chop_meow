@@ -29,16 +29,11 @@ internal sealed class ChainSite(World world) {
     public void Store(string item) => Place(ThingKind.Chest).Inventory.InputFilter.Add(item);
 
     /// <summary>Adds a worker at a building with the given duties.</summary>
-    public Worker Employ(Thing place, params string[] jobs) {
-        var w = AddWorker(world, place.Pos + new Vector2(0, 1.2f));
-        w.Wage = 18;
-        foreach (string job in jobs) world.SetDuty(w, place, job, true);
-        return w;
-    }
+    public Worker Employ(Thing place, params JobKind[] jobs) => Staff(world, place, jobs);
 
     /// <summary>
     /// The player's cabin far away, the trading post that sells each product by cart, the tool rack and a fire.
-    /// Storage follows: a chest asking for each material, a pile of empty bottles and three open piles.
+    /// Storage follows: a chest asking for each made material, a pile of empty bottles and three open piles.
     /// Returns the chest that takes raw meat.
     /// </summary>
     public Thing AddSettlement(string[] products) {
@@ -56,62 +51,65 @@ internal sealed class ChainSite(World world) {
         spare.Inventory.Add("steel_pick", 1); spare.Inventory.Add("rake", 1);
         Place(ThingKind.Campfire);
 
-        foreach (string item in new[] { "wood", "planks", "crate", "iron_ore", "coal", "tin_ore", "iron_bar", "tin_bar", "steel_bar", "steel_parts", "wood_parts", "tin_can",
-                     "raw_meat", "meat_stew", "canned_meat_stew", "leaves", "wheat", "wheat_seeds", "grass", "fertilizer", "flour", "dough", "bread", "berries", "steel_pick" }) Store(item);
+        foreach (string item in new[] { "planks", "crate", "iron_bar", "tin_bar", "steel_bar", "steel_parts", "wood_parts", "tin_can",
+                     "raw_meat", "meat_stew", "canned_meat_stew", "wheat", "wheat_seeds", "grass", "fertilizer", "flour", "dough", "bread", "steel_pick" }) Store(item);
         var empties = Place(ThingKind.Pile); empties.Inventory.Add("empty_bottle", 8);
         Place(ThingKind.Pile); Place(ThingKind.Pile); Place(ThingKind.Pile);
         return world.Things.Single(t => t.Kind == ThingKind.Chest && t.Inventory.InputFilter.Contains("raw_meat"));
     }
 
-    /// <summary>Raw materials: deposits, a tree, berries, leaves and the lake, each gathered by a worker.</summary>
+    /// <summary>
+    /// Raw materials: deposits, two trees, berries, leaves and the lake, each gathered by a worker.
+    /// A chest asking for each material stands beside its source: a load goes to the nearest of that chest and the stations that use it, so the chest fills first and haulers stock the stations from it.
+    /// </summary>
     public void AddGatherers() {
-        Employ(world.Add(ThingKind.Tree, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Tree, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Iron, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Coal, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Tin, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Berries, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Leaves, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Water, Terrain.WaterPoint(origin), 9999), "gather");
+        Store("wood");
+        Employ(world.Add(ThingKind.Tree, Spot(), 9999), JobKind.Gather);
+        Employ(world.Add(ThingKind.Tree, Spot(), 9999), JobKind.Gather);
+        foreach (var (item, kind) in new[] { ("iron_ore", ThingKind.Iron), ("coal", ThingKind.Coal), ("tin_ore", ThingKind.Tin), ("berries", ThingKind.Berries), ("leaves", ThingKind.Leaves) }) {
+            Store(item);
+            Employ(world.Add(kind, Spot(), 9999), JobKind.Gather);
+        }
+        Employ(world.Add(ThingKind.Water, Terrain.WaterPoint(origin), 9999), JobKind.Gather);
     }
 
     /// <summary>Crates from wood.</summary>
     public void AddCrateBenches() {
-        var planks = Place(ThingKind.Bench, "planks"); planks.Tools!.Add("steel_chisel", 1); Employ(planks, "craft", "haul");
-        var crates = Place(ThingKind.Bench, "crate"); crates.Tools!.Add("steel_hammer", 1); Employ(crates, "craft", "haul");
+        var planks = Place(ThingKind.Bench, "planks"); planks.Tools!.Add("steel_chisel", 1); Employ(planks, JobKind.Craft, JobKind.Haul);
+        var crates = Place(ThingKind.Bench, "crate"); crates.Tools!.Add("steel_hammer", 1); Employ(crates, JobKind.Craft, JobKind.Haul);
     }
 
     /// <summary>Canned meat stew: stew from meat and water, cans from tin, sealed over a wood fire.</summary>
     public void AddCannedStewChain() {
-        Employ(Place(ThingKind.Cooktable, "meat_stew"), "haul");
-        Employ(Place(ThingKind.Furnace, "tin_bar"), "haul");
-        var cans = Place(ThingKind.Bench, "tin_can"); cans.Tools!.Add("steel_hammer", 1); Employ(cans, "craft", "haul");
-        Employ(Place(ThingKind.Cannery, "canned_meat_stew"), "haul");
+        Employ(Place(ThingKind.Cooktable, "meat_stew"), JobKind.Haul);
+        Employ(Place(ThingKind.Furnace, "tin_bar"), JobKind.Haul);
+        var cans = Place(ThingKind.Bench, "tin_can"); cans.Tools!.Add("steel_hammer", 1); Employ(cans, JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Cannery, "canned_meat_stew"), JobKind.Haul);
     }
 
     /// <summary>Bread: compost from raked leaves, wheat from the farm, flour, dough and the oven. Returns the two farms.</summary>
     public Thing[] AddBreadChain() {
-        var compost = Place(ThingKind.Pile); world.SetCompost(compost, true); world.SetSkipFood(compost, true); Employ(compost, "tend");
+        var compost = Place(ThingKind.Pile); world.SetCompost(compost, true); world.SetSkipFood(compost, true); Employ(compost, JobKind.Tend);
         var farms = new[] { Place(ThingKind.Farm), Place(ThingKind.Farm) };
-        foreach (var farm in farms) { farm.FarmStage = FarmStage.Growing; farm.Progress = world.GrowSeconds - 30; Employ(farm, "farm", "haul"); }
-        var flour = Place(ThingKind.Cooktable, "flour"); flour.Tools!.Add("mortar", 1); Employ(flour, "craft", "haul");
-        Employ(Place(ThingKind.Cooktable, "dough"), "craft", "haul");
-        Employ(Place(ThingKind.Furnace, "bread"), "haul");
+        foreach (var farm in farms) { farm.FarmStage = FarmStage.Growing; farm.Progress = world.GrowSeconds - 30; Employ(farm, JobKind.Farm, JobKind.Haul); }
+        var flour = Place(ThingKind.Cooktable, "flour"); flour.Tools!.Add("mortar", 1); Employ(flour, JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Cooktable, "dough"), JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Furnace, "bread"), JobKind.Haul);
         return farms;
     }
 
     /// <summary>Steel pickaxes: iron bars, steel at the forge with one on the bellows and one hauling, parts at the anvil, handles and the pickaxe at benches.</summary>
     public void AddSteelPickChain() {
-        Employ(Place(ThingKind.Furnace, "iron_bar"), "haul");
+        Employ(Place(ThingKind.Furnace, "iron_bar"), JobKind.Haul);
         var forge = Place(ThingKind.Reinforced);
-        Employ(forge, "bellows"); Employ(forge, "haul");
-        Employ(Place(ThingKind.Anvil), "craft", "haul");
-        var handles = Place(ThingKind.Bench, "wood_parts"); handles.Tools!.Add("steel_chisel", 1); Employ(handles, "craft", "haul");
-        var picks = Place(ThingKind.Bench, "steel_pick"); picks.Tools!.Add("steel_hammer", 1); Employ(picks, "craft", "haul");
+        Employ(forge, JobKind.Bellows); Employ(forge, JobKind.Haul);
+        Employ(Place(ThingKind.Anvil), JobKind.Craft, JobKind.Haul);
+        var handles = Place(ThingKind.Bench, "wood_parts"); handles.Tools!.Add("steel_chisel", 1); Employ(handles, JobKind.Craft, JobKind.Haul);
+        var picks = Place(ThingKind.Bench, "steel_pick"); picks.Tools!.Add("steel_hammer", 1); Employ(picks, JobKind.Craft, JobKind.Haul);
     }
 
     /// <summary>One packing station for each product.</summary>
     public void AddPackers(string[] products) {
-        foreach (string product in products) { var packer = Place(ThingKind.Packer); world.SetPacking(packer, product); Employ(packer, "craft", "haul"); }
+        foreach (string product in products) { var packer = Place(ThingKind.Packer); world.SetPacking(packer, product); Employ(packer, JobKind.Craft, JobKind.Haul); }
     }
 }

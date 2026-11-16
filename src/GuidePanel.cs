@@ -47,7 +47,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
         },
         ["crew"] = new[] {
             ("line_crew", "Hire at a trading post: more coins up front means a lower daily wage."),
-            ("bench", "Every building has job buttons at the bottom. Tick workers for each job; one with several jobs takes turns."),
+            ("bench", "Every building has job buttons at the bottom. Tick workers for each job; one with several does the first in their list that can be done, and drags on their page change the order."),
             ("chest", "Workers fetch from and store in storage. Filters decide what goes where; empty means anything."),
             ("toolstation", "Workers take the tools their jobs need from a tool station and wait if there is none."),
             ("campfire", "Lunch at noon by the campfire. Home at dusk, back at dawn, loads kept."),

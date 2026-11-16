@@ -33,8 +33,12 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole, HeldCursor cursor)
         if (!InReach(near)) return;
         if (world.BoxBlock(near, to, item) is string refused) { kit.Notify(refused); return; }
         if (blackHole.CrateIntoCrate(near, to, item)) return;
-        world.Transfer(from, to, item, Input.IsKeyPressed(Key.Ctrl) ? Amount(from, item) : Math.Min(Amount(from, item), to.StackOf(item)));
+        Stack(from, to, item);
     }
+
+    /// <summary>The same move with no building to answer for the box, such as a worker's hands: the world checks reach and what the box takes.</summary>
+    public void Stack(Inventory from, Inventory to, string item) =>
+        world.Transfer(from, to, item, Input.IsKeyPressed(Key.Ctrl) ? Amount(from, item) : Math.Min(Amount(from, item), to.StackOf(item)));
 
     /// <summary>
     /// Puts units of the held stack into an inventory with the slot's own <paramref name="command"/>, marked "from held stack" (<see cref="World.FromHeldStack"/>).
