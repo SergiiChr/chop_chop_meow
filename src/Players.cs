@@ -368,7 +368,8 @@ public sealed partial class World {
         bool pile = IsPlainPile(chest);
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate)) return;
         if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
-        if (pile) SetPileFilter(chest.Inventory, allowed ? PileEntry(item) : null);
+        if (pile && allowed) SetPileFilter(chest.Inventory, PileEntry(item));
+        else if (pile) chest.Inventory.ClearFilters();
         else chest.Inventory.Filter(item, output, allowed);
     }
     /// <summary>Whether a plain pile's filter may change: only while it is empty, and to a new resource only once the one it names is taken off.</summary>
