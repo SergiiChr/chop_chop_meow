@@ -137,18 +137,20 @@ public sealed partial class World {
     /// </summary>
     private bool Dig(Worker w, Thing mine, float dt) {
         if (mine.MineStage != MineStage.Open) { w.Status = mine.MineStage == MineStage.Marked ? "Waiting for the entrance to be dug" : "Waiting for the frame to be fitted"; return false; }
+        string ore = MineOre(mine);
+        // A full mine with nowhere to unload has nothing to do, so no pickaxe is fetched for it.
+        string full = mine.Output![ore] >= mine.Output.StackSize ? ore : "stone";
+        var dest = MineFull(mine) ? DepositFor(full, mine.Pos, mine.Id) : null;
+        if (MineFull(mine) && dest == null) {
+            w.Status = Phrase("Mine full · no storage takes ", Data.Name(full));
+            if (mineFullReported.Add(mine.Id)) Say($"The {MineName(mine)} is full with no output available.");
+            return false;
+        }
         switch (Equip(w, "pickaxe", mine, dt)) {
             case Kit.Busy: return true;
             case Kit.Lacking: return false;
         }
-        string ore = MineOre(mine);
-        if (MineFull(mine)) {
-            string full = mine.Output![ore] >= mine.Output.StackSize ? ore : "stone";
-            if (DepositFor(full, mine.Pos, mine.Id) is not Thing dest) {
-                w.Status = Phrase("Mine full · no storage takes ", Data.Name(full));
-                if (mineFullReported.Add(mine.Id)) Say($"The {MineName(mine)} is full with no output available.");
-                return false;
-            }
+        if (dest != null) {
             w.Status = Phrase("Bringing out ", Data.Name(full));
             if (Walk(w, MineDoor(mine), dt, .5f)) { mine.Output.TransferTo(w.Bag, full, Worker.BagStack); w.Destination = dest.Id; }
             return true;

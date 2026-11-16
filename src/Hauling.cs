@@ -81,9 +81,17 @@ public sealed partial class World {
         ThingKind.Mine when place.MineStage == MineStage.Dug => MineWants(place),
         ThingKind.Packer when place.Packs == "" => "Choose what to pack",
         ThingKind.Packer => "Waiting for goods and crates",
+        ThingKind.Farm when Short(place.Inventory, Data.Farm.Sow) is string seed => Phrase("Needs ", Data.Name(seed), " in output-enabled storage"),
         _ when IsStation(place.Kind) && !Data.Recipes.ContainsKey(place.Recipe) => "Nothing queued or marked to make",
+        _ when IsStation(place.Kind) && !place.Processing && Short(place.Inventory, BatchCost(place)) is string input => Phrase("Needs ", Data.Name(input), " in output-enabled storage"),
         _ => "Waiting for the next load"
     };
+
+    /// <summary>The first item a box holds less of than one batch takes, or null.</summary>
+    private static string? Short(Inventory box, Dictionary<string, int> batch) {
+        foreach (var (item, needed) in batch) if (box[item] < needed) return item;
+        return null;
+    }
 
     /// <summary>The best carry across a haul job's places: one place, or every place of its haul group.</summary>
     private Carry NextCarry(Worker w, Duty duty) {

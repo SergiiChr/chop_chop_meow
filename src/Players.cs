@@ -231,7 +231,7 @@ public sealed partial class World {
             case Verb.Fire: if (w != null) Fire(w); break;
             case Verb.HaulGroup: if (w != null) { if (c.Count != 0) AddHaulGroup(w); else RemoveHaulGroup(w, (int)c.At.X); } break;
             // A stale move, of a job that has left that place in the list, is dropped rather than moving another job.
-            case Verb.MoveDuty: if (w != null && (uint)c.Count < (uint)w.Duties.Count && w.Duties[c.Count].Thing == c.Target && w.Duties[c.Count].Job == c.Item) MoveDuty(w, c.Count, (int)c.At.X, (int)c.At.Y); break;
+            case Verb.MoveDuty: if (w != null && (uint)c.Count < (uint)w.Duties.Count && DutyKey(w.Duties[c.Count]) == c.Target && w.Duties[c.Count].Job == c.Item) MoveDuty(w, c.Count, (int)c.At.X, (int)c.At.Y); break;
             case Verb.Settle: if (w != null) SettleDebt(w); break;
         }
         if (t == null) return;

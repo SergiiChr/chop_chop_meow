@@ -25,6 +25,10 @@ public static class WorkerTaskChecks {
         CheckWorkerWithNothingToDoWaitsAtTheTradingPost(data);
         CheckGathererWithNoRoomToPutBackTheWrongToolKeepsTheirSpot(data);
         CheckWorkerPutsBackAToolNoneOfTheirJobsUses(data);
+        CheckALoadOfCoalForSteelIsSharedBetweenInputAndFuel(data);
+        CheckSpareSeedWithNoStorageStacksInThePlot(data);
+        CheckACrafterLowerInTheListGivesWayAfterOneBatch(data);
+        CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(data);
         CheckSaveWithAHaulOutsideItsGroupIsRefused(data);
         CheckAJobMovedUpComesFirst(data);
         CheckAHaulGroupBringsTheShortestInputAcrossItsPlaces(data);
@@ -381,5 +385,55 @@ public static class WorkerTaskChecks {
         bool refused = false;
         try { EmptyWorld(data).Deserialize(world.Serialize()); } catch (System.InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
         Require(refused, "a save whose haul stands before its group's own entry should be refused with a clear reason");
+    }
+
+    /// <summary>A batch of steel takes 2 coal as input and burns 1, so of a hand load of 12, 8 go in as input and 4 as fuel.</summary>
+    private static void CheckALoadOfCoalForSteelIsSharedBetweenInputAndFuel(GameData data) {
+        var world = EmptyWorld(data);
+        var forge = world.Add(ThingKind.Reinforced, new Vector2(10, 10));
+        forge.Inventory.Add("iron_bar", 64);
+        world.Add(ThingKind.Chest, new Vector2(13, 10)).Inventory.Add("coal", 100);
+        var hauler = Staff(world, forge, "haul");
+        FirstCarry(world, hauler);
+        Work(world, 30, () => hauler.Bag.Count == 0);
+        Require(forge.Inventory["coal"] == 8 && forge.Burner!["coal"] == 4, $"a load of 12 coal should go 8 into the input slot and 4 into the fuel slot: {forge.Inventory["coal"]} and {forge.Burner!["coal"]}");
+    }
+
+    /// <summary>A harvest gives 2 seeds; one goes back for the next sowing and, with no storage anywhere, the other stays in the plot's seed slot.</summary>
+    private static void CheckSpareSeedWithNoStorageStacksInThePlot(GameData data) {
+        var world = EmptyWorld(data);
+        var farm = world.Add(ThingKind.Farm, new Vector2(10, 10));
+        farm.Output!.Add("wheat_seeds", 2);
+        Staff(world, farm, "haul");
+        Work(world, 30, () => farm.Output["wheat_seeds"] == 0);
+        Require(farm.Inventory["wheat_seeds"] == 2 && farm.Output["wheat_seeds"] == 0, $"with no storage, both seeds should end up in the plot's seed slot: {farm.Inventory["wheat_seeds"]} in it, {farm.Output["wheat_seeds"]} left in the output");
+    }
+
+    /// <summary>Haul at the first table has nothing to do until wood reaches storage; the crafter at the second finishes the batch under way, then hauls.</summary>
+    private static void CheckACrafterLowerInTheListGivesWayAfterOneBatch(GameData data) {
+        var world = EmptyWorld(data);
+        var first = Bench(world, new Vector2(10, 10), "planks");
+        var second = Bench(world, new Vector2(10, 16), "planks", "steel_chisel");
+        second.Inventory.Add("wood", 5);
+        var chest = world.Add(ThingKind.Chest, new Vector2(13, 13));
+        var worker = Staff(world, first, "haul");
+        world.SetDuty(worker, second, "craft", true);
+        Work(world, 10, () => second.Processing);
+        Require(second.Processing, "with nothing to haul, the worker should work the second table");
+        chest.Inventory.Add("wood", 40);
+        FirstCarry(world, worker);
+        Require(worker.Bag["wood"] > 0 && second.Inventory["planks"] == 4 && !second.Processing,
+            $"the worker should finish the batch under way, one round, then haul for the first table: {second.Inventory["planks"]} planks made");
+    }
+
+    private static void CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(GameData data) {
+        var world = FundedWorld(data);
+        var mine = MarkMine(world); OpenMine(mine);
+        mine.Output!.Add(World.MineOre(mine), mine.Output.StackSize);
+        var rack = world.Add(ThingKind.Toolstation, mine.Pos + World.CliffAt(mine.Pos).Face * 4);
+        rack.Inventory.Add("steel_pick", 1);
+        var miner = Staff(world, mine, "mine");
+        Work(world, 20);
+        Require(rack.Inventory["steel_pick"] == 1 && miner.Tool == "", "a miner should not fetch a pickaxe for a full mine with nowhere to unload");
     }
 }

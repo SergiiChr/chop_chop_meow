@@ -1627,6 +1627,8 @@ public sealed partial class World {
     public const string HaulGroup = "group";
     /// <summary>Whether an entry in a worker's list is a haul in some haul group.</summary>
     public static bool Grouped(Duty d) => d.Group != 0 && d.Job != HaulGroup;
+    /// <summary>What tells one of a worker's entries from the others in a command: its place, or a haul group's own number, given as a negative one.</summary>
+    public static int DutyKey(Duty d) => d.Job == HaulGroup ? -d.Group : d.Thing;
     /// <summary>The place in a worker's list just past the last haul of the haul group whose own entry is at <paramref name="head"/>.</summary>
     public static int GroupEnd(List<Duty> duties, int head) {
         int end = head + 1;
@@ -1660,7 +1662,7 @@ public sealed partial class World {
     public void MoveDuty(Worker w, int index, int before, int group = 0) {
         if ((uint)index >= (uint)w.Duties.Count) return;
         var duty = w.Duties[index];
-        if (Forwarded(Verb.MoveDuty, duty.Thing, w.Id, duty.Job, index, new Vector2(before, group))) return;
+        if (Forwarded(Verb.MoveDuty, DutyKey(duty), w.Id, duty.Job, index, new Vector2(before, group))) return;
         int length = duty.Job == HaulGroup ? GroupEnd(w.Duties, index) - index : 1;
         before = Math.Clamp(before, 0, w.Duties.Count);
         if (before > index && before < index + length) return;
@@ -2310,7 +2312,7 @@ public sealed partial class World {
         return null;
     }
     private bool Crewed(Thing t) {
-        foreach (var w in S.Workers) if (w.Assignment == t.Id && w.Job == "bellows" && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w)) return true;
+        foreach (var w in S.Workers) if (AtBellows(w, t)) return true;
         return false;
     }
     /// <summary>How many times a stomach has growled by the time its food has fallen this low.</summary>

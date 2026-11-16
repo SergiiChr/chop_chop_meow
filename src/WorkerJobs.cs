@@ -277,14 +277,17 @@ public sealed partial class World {
     /// With nothing to smelt, or someone else at the bellows, there is nothing to do.
     /// </summary>
     private bool Pump(Worker w, Thing forge, float dt) {
-        foreach (var other in S.Workers)
-            if (other != w && other.Assignment == forge.Id && other.Job == "bellows" && other.WageDebt <= 0 && OnDuty(other)) { w.Status = "Bellows are manned"; return false; }
+        foreach (var other in S.Workers) if (other != w && AtBellows(other, forge)) { w.Status = "Bellows are manned"; return false; }
         if (!forge.Processing && !Stocked(forge) || Data.Recipes.TryGetValue(forge.Recipe, out var recipe) && Stalled(forge, recipe)) { w.Status = "Nothing to smelt"; return false; }
         if (!HandsFree(w, dt)) return true;
         w.Status = "Operating bellows";
         if (Walk(w, forge.Pos + BellowsStand, dt, .1f)) { w.WorkState = WorkerWorkState.Pumping; forge.Heat = Math.Min(100, forge.Heat + dt * 18); }
         return true;
     }
+
+    /// <summary>Whether a worker has a furnace's bellows in hand, on duty and with nothing to carry off first.</summary>
+    private bool AtBellows(Worker w, Thing forge) =>
+        w.Assignment == forge.Id && w.Job == "bellows" && w.Bag.Count == 0 && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w);
 
     /// <summary>A campfire's keeper brings wood from storage once the fire runs low.</summary>
     private bool TendFire(Worker w, Thing fire, float dt) {
