@@ -7,8 +7,6 @@ namespace ChopChopMeow;
 
 public sealed class ItemDef {
     public string Name { get; set; } = "";
-    /// <summary>What the village pays or asks for one, for goods it trades and the crate they travel in; nothing else has a price.</summary>
-    public float Price { get; set; }
     public string Color { get; set; } = "ffffff";
     /// <summary>The kind of tool this item is (axe, pickaxe, shovel, hammer, chisel, rake or mortar), or empty for materials.</summary>
     public string Tool { get; set; } = "";
@@ -92,10 +90,21 @@ public sealed class DemandDef {
     /// <summary>Fraction of the full price each crate's worth sold past the steady amount takes off; small for staples, large for tools.</summary>
     public float Drop { get; set; }
 }
-/// <summary>What the village takes in crates with its demand, and what it sells with how many units make one purchase.</summary>
+/// <summary>A good the village trades: its full price, its demand if the village takes it, and how many units make one purchase if the village sells it.</summary>
+public sealed class TradeDef {
+    public float Price { get; set; }
+    public DemandDef? Sells { get; set; }
+    public int? Buys { get; set; }
+}
+/// <summary>
+/// Every good the village trades, each with its price, and the price of the crate goods travel in; nothing else has a price.
+/// <see cref="Sells"/> and <see cref="Buys"/> list the goods the village takes and sells, filled from <see cref="Goods"/> when the game starts.
+/// </summary>
 public sealed class MarketDef {
-    public Dictionary<string, DemandDef> Sells { get; set; } = new();
-    public Dictionary<string, int> Buys { get; set; } = new();
+    public Dictionary<string, TradeDef> Goods { get; set; } = new();
+    public float CratePrice { get; set; }
+    public Dictionary<string, DemandDef> Sells { get; } = new();
+    public Dictionary<string, int> Buys { get; } = new();
 }
 /// <summary>A hiring deal: a larger payment up front buys a lower daily wage.</summary>
 public sealed class HireOffer {
@@ -234,33 +243,35 @@ public sealed partial class GameData {
             if (recipe.Value.Fuels.Any(fuel => !Items.ContainsKey(fuel)) || recipe.Value.Burns && recipe.Value.Station == null)
                 throw new InvalidOperationException($"Invalid fuel for {recipe.Key}.");
         }
-        if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Hunger > 0 && !i.Food) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
+        foreach (var (id, trade) in Market.Goods) {
+            if (trade.Sells is DemandDef demand) Market.Sells.Add(id, demand);
+            if (trade.Buys is int lot) Market.Buys.Add(id, lot);
+        }
+        if (Market.CratePrice <= 0 || Market.Goods.Any(p => p.Value.Price <= 0 || p.Value.Sells == null && p.Value.Buys == null))
+            throw new InvalidOperationException("Invalid market in GameData: every good it lists has a price and is taken or sold, and the crate has a price.");
+        if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Hunger > 0 && !i.Food) || Market.Goods.Keys.Any(id => !Items.ContainsKey(id) || id == "coins" || id == "crate") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in GameData.");
         if (Mine.Materials.Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Mine.StageWorkdays <= 0 || Mine.Seconds <= 0 || Mine.Workers <= 0 || Goals.DailyProfit <= 0 || Goals.ProfitDays <= 0)
             throw new InvalidOperationException("Invalid mine or goals in GameData.");
         if (Farm.Sow.Count == 0 || Farm.Yield.Count == 0 || Farm.Sow.Concat(Farm.Yield).Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Farm.GrowDays <= 0 || Farm.HarvestWorkdays <= 0)
             throw new InvalidOperationException("Invalid farm in GameData.");
-        // Only the trade sets value: a good is judged by its whole chain against what it sells for, never step by step.
-        if (Items.FirstOrDefault(p => p.Value.Price < 0 || p.Value.Price > 0 != (Market.Sells.ContainsKey(p.Key) || Market.Buys.ContainsKey(p.Key) || p.Key == "crate")).Key is string mispriced)
-            throw new InvalidOperationException($"{mispriced}: only goods the village trades, and the crate, have a price.");
         if (Recipes.FirstOrDefault(p => p.Value.Worked && p.Value.Station != ThingKind.Cooktable).Key is string misplaced)
             throw new InvalidOperationException($"{misplaced}: only cooking table recipes choose whether they are worked.");
-        foreach (var v in Vessels)
+        foreach (var v in Vessels) {
             if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
                 || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Output == v.Liquid || r.Hand && r.Inputs.ContainsKey(v.Liquid)))
                 throw new InvalidOperationException($"Invalid vessel: {v.Full}. Its liquid is only poured into stations, and no hand recipe takes it.");
+            if (!vesselFor.TryAdd(v.Liquid, v) || !v.States.All(id => vesselOf.TryAdd(id, v)))
+                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Each liquid, and each fill of a vessel, belongs to one vessel.");
+        }
         ValidateMap();
     }
     /// <summary>The vessel that carries a liquid, or null for an item that is not one.</summary>
-    public VesselDef? VesselFor(string liquid) {
-        foreach (var v in Vessels) if (v.Liquid == liquid) return v;
-        return null;
-    }
+    public VesselDef? VesselFor(string liquid) => vesselFor.GetValueOrDefault(liquid);
     /// <summary>The vessel an item is a state of, at any fill, or null.</summary>
-    public VesselDef? VesselOf(string item) {
-        foreach (var v in Vessels) if (v.States.Contains(item)) return v;
-        return null;
-    }
+    public VesselDef? VesselOf(string item) => vesselOf.GetValueOrDefault(item);
+    // Filled by Validate: each liquid's vessel and each fill's vessel.
+    private readonly Dictionary<string, VesselDef> vesselFor = new(), vesselOf = new();
     // Filled by Validate: the id of the recipe that makes each item, and what the recipe map hangs under each item.
     private readonly Dictionary<string, string> recipeIdOf = new();
     private readonly Dictionary<string, List<string>> madeOutOf = new();

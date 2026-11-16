@@ -372,7 +372,7 @@ The intended fresh-start loop starts by securing water, shelter and fire, then u
 6. Mine iron and coal, and smelt iron in a stone furnace.
 7. Build and operate a reinforced furnace (`reinforced`) to make steel.
 8. Hammer steel into steel parts at the anvil and make steel tools.
-9. Pack a steel tool into a crate, sell it through the trading post and use the proceeds to hire and assign a worker.
+9. Pack a steel tool into a crate, sell it with another crate of berries through the trading post and use the proceeds to hire and assign a worker, with enough left for their first wage.
 
 There are no iron tools; iron bars only go into buildings and steel.
 
@@ -385,7 +385,8 @@ A station takes water as a liquid in liters, `Water.Liquid`, with a drawn drople
 `GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
 a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
-Every move between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
+Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
+Loading a station by hand and a worker's delivery pass it what the input slot has left (`Inventory.SlotRoom`).
 Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
 No hand recipe takes a liquid, which `GameData` checks.
 
@@ -778,7 +779,7 @@ Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, 
 3. the input or fuel covering the fewest batches;
 4. the output holding the most.
 
-Inputs and fuel fill to a stack (`World.SlotRoom`); a farm plot's slots hold one sowing (`World.SowRoom`) and a mine site what it lacks.
+Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold one sowing (`World.SowRoom`) and a mine site what it lacks.
 A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
 Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
 
@@ -825,15 +826,18 @@ Prices, wages and demand follow the rules in [ECONOMY.md](ECONOMY.md).
 #### Market
 
 The market accepts any packed crate.
+`Market.Goods` lists every good the village trades with its price: a `Sells` entry for one it takes, a `Buys` lot for one it sells.
+The game gathers them into `Market.Sells` and `Market.Buys` when it starts.
 Goods outside `Market.Sells` are donated: they pay nothing and leave demand alone.
 The returning cart names them.
-A sale pays for the contents unit by unit plus the crate.
+A sale pays for every unit of its contents at the pre-sale price, plus the crates.
 
 `Market.Buys` lists what the village sells and in what lot, as the [README price sheet](../README.md#price-sheet) shows.
 
 #### Demand and prices
 
-In `Market.Sells` each good's first `Steady` units sell at the full price, and each crate's worth past them takes `Drop` off it.
+In `Market.Sells` each good's first `Steady` units sold keep the full price, and each crate's worth past them takes `Drop` off it.
+A sale lowers the price only after it is paid.
 A day restores what selling `Daily` units takes (`World.Demand`, which runs above 1 by the steady amount).
 Buying costs a fixed 1.25× the base price.
 

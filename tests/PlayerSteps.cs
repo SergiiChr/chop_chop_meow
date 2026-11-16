@@ -96,6 +96,17 @@ internal static class PlayerSteps {
         return built!;
     }
 
+    /// <summary>Packs an empty crate from the backpack beside the post with goods from the backpack, picks it up and puts it on the post's cart.</summary>
+    public static void LoadCrate(World world, Thing sign, string item, int count) {
+        world.Player = sign.Pos;
+        var box = world.PlaceCrate("crate", sign.Pos + new Vector2(0, 2));
+        Require(box != null, "an empty crate should be placed from the backpack");
+        Require(world.Transfer(world.Backpack, box!.Inventory, item, count) == count, $"{count} {item} should move from the backpack into the crate");
+        Require(world.PickUpCrate(box), "the packed crate should be picked up");
+        string packed = world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix));
+        Require(world.Packed(packed)?[item] == count && world.Transfer(world.Backpack, sign.Inventory, packed, 1) == 1, $"the crate of {item} should go on the cart");
+    }
+
     public static void CompleteBatches(World world, Thing station, string output, int quantity, bool pump = false) {
         int limit = 3000;
         while (station.Inventory[output] < quantity && limit-- > 0) {

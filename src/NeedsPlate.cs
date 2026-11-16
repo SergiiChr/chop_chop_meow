@@ -90,7 +90,7 @@ public partial class NeedsPlate : PanelContainer {
     private readonly UiKit kit;
     private readonly World world;
     private readonly DamageEdges edges;
-    private readonly Label bankDue;
+    private readonly Label bankDue, bankRevenue;
     private readonly Badge bankCount;
     private readonly ItemSlot bankSlot;
     // The capsules, whose tooltips name each need's level.
@@ -129,7 +129,10 @@ public partial class NeedsPlate : PanelContainer {
             Click = () => kit.Notify("Take coins out at a trading post."),
         };
         line.AddChild(slot);
-        bankDue = Style.Text("", 14, Style.Beige); line.AddChild(bankDue);
+        // Wages due a day, with what sales brought in today under them.
+        var money = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; money.AddThemeConstantOverride("separation", 2); line.AddChild(money);
+        bankDue = Style.Text("", 14, Style.Beige); money.AddChild(bankDue);
+        bankRevenue = Style.Text("", 14, Style.Warn); bankRevenue.Name = "bank_revenue"; money.AddChild(bankRevenue);
     }
 
     /// <summary>The trading post within reach that has coins or room for them, or null.</summary>
@@ -148,7 +151,7 @@ public partial class NeedsPlate : PanelContainer {
 
     // The rounded values the tooltips show, so their text is built only when one changes.
     private (int Health, int Hunger, int Thirst) shownNeeds = (-1, -1, -1);
-    private (int Bank, int Due) shownBank = (-1, -1);
+    private (int Bank, int Due, int Revenue) shownBank = (-1, -1, -1);
     public void Refresh() {
         var needs = ((int)MathF.Round(world.Health, MidpointRounding.AwayFromZero), (int)MathF.Round(world.Hunger, MidpointRounding.AwayFromZero), (int)MathF.Round(world.Thirst, MidpointRounding.AwayFromZero));
         if (needs != shownNeeds) {
@@ -158,14 +161,18 @@ public partial class NeedsPlate : PanelContainer {
             Health.Warn = world.Health <= 25; Hunger.Warn = world.Hunger <= 25; Thirst.Warn = world.Thirst <= 25;
             Health.QueueRedraw(); Hunger.QueueRedraw(); Thirst.QueueRedraw();
         }
-        var bank = (world.WageCoins, world.DailyWages);
+        var bank = (world.WageCoins, world.DailyWages, world.DayRevenue);
         if (bank != shownBank) {
             shownBank = bank;
             bankCount.Text = bank.WageCoins > 0 ? bank.WageCoins.ToString() : "";
             bankSlot.AddThemeColorOverride(ItemSlot.IconNormal, bank.WageCoins > 0 ? Colors.White : Style.Ghost);
-            bankDue.Text = bank.Item2 > 0 ? $"−{bank.Item2} /day" : "";
-            bankDue.AddThemeColorOverride("font_color", bank.Item2 > bank.WageCoins ? Style.Warn : Style.Beige);
-            bankDue.TooltipText = bank.Item2 > bank.WageCoins ? "More than the bank holds; the rest comes from your backpack at dawn" : "Paid from the bank at dawn";
+            bankDue.Text = bank.DailyWages > 0 ? $"−{bank.DailyWages} /day" : "";
+            bankDue.AddThemeColorOverride("font_color", bank.DailyWages > bank.WageCoins ? Style.Warn : Style.Beige);
+            bankDue.TooltipText = bank.DailyWages > bank.WageCoins ? "More than the bank holds; the rest comes from your backpack at dawn" : "Paid from the bank at dawn";
+            bankRevenue.Text = $"+{bank.DayRevenue}";
+            // Green once today's sales are above a day's wages.
+            bankRevenue.AddThemeColorOverride("font_color", bank.DayRevenue > bank.DailyWages ? Style.Ready : Style.Warn);
+            bankRevenue.TooltipText = "Coins sales brought in since dawn";
         }
     }
 }

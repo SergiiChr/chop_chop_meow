@@ -107,6 +107,11 @@ public sealed class Inventory {
     public static readonly HashSet<string> Unstacked = new();
     /// <summary>Coins stack to the container's coin stack, packed crates and tools never stack; every other item uses the container's stack size.</summary>
     public int StackOf(string item) => item == Coins ? CoinStack : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) ? 1 : StackSize;
+    /// <summary>
+    /// Units of an item that still fit in the one stack a station's input slot holds, as far as the box has room.
+    /// Below zero when the box holds more than a stack of it.
+    /// </summary>
+    public int SlotRoom(string item) => Math.Min(Room(item), Math.Max(StackSize, StackOf(item)) - this[item]);
     /// <summary>Units of an item that still fit: empty slots plus the unfilled part of its last stack.</summary>
     public int Room(string item) {
         int stack = StackOf(item), room = 0, used = 0;

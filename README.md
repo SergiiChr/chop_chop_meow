@@ -181,6 +181,7 @@ Health, hunger and thirst are three upright vials in the top-left corner with a 
 Each empties as its level falls and turns red at 25% or less.
 
 Beside them the bank shows the coins in the trading post's wage slot, which has no limit, and the wages due each day, in red when they exceed the bank.
+Under the wages it shows the coins sales brought in since dawn, green once they are above a day's wages and red until then.
 Beside a trading post, put coins on it to pay in, or click it to pick up all its coins and put them in your backpack.
 
 The day dial in the top-right corner shows the sun crossing its arc from sunrise to sunset; then the moon crosses the same arc until dawn.
@@ -707,7 +708,7 @@ Errand runners only walk a short way down the valley before fading from view.
 
 ### Prices
 
-Selling lowers an item's price unit by unit, and a day restores one day's worth.
+A sale pays every unit at the price before it, then lowers the price by what it sold; a day restores one day's worth.
 The village pays the full price for three crates of berries and two of each meat a day before food prices slowly slip.
 Every steel tool sold lowers its price sharply, and about a crate of each a day keeps them steady ([docs/ECONOMY.md](docs/ECONOMY.md)).
 

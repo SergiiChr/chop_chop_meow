@@ -1046,7 +1046,7 @@ public sealed partial class World {
         if (r.Burns && (fuel = FuelFromBackpack(t, r, cost)) == null) return;
         for (int i = 0; i < batches; i++) {
             if (!CarriesBatch(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
-            if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
+            if (cost.Any(pair => t.Inventory.SlotRoom(pair.Key) < pair.Value) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
             foreach (var pair in cost) Load(t, pair.Key, pair.Value);
             if (fuel != null) S.Backpack.TransferTo(t.Burner!, fuel, 1);
         }
@@ -1070,13 +1070,8 @@ public sealed partial class World {
     /// Loads units of a station input from the backpack while its input slot has room, and says nothing.
     /// A vessel pours what it holds, and a liquid asked for by name, as when a batch is queued, pours from the backpack's vessels.
     /// </summary>
-    private int Load(Thing t, string item, int quantity) {
-        var vessel = PoursInto(t, t.Inventory, item);
-        int room = t.Inventory.StackSize - t.Inventory[vessel?.Liquid ?? item];
-        return vessel != null ? PourVessels(S.Backpack, item, t.Inventory, vessel, quantity, room)
-            : Data.VesselFor(item) is VesselDef held ? PourLiters(S.Backpack, t.Inventory, held, Math.Min(quantity, room))
-            : S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, room));
-    }
+    private int Load(Thing t, string item, int quantity) =>
+        Carry(S.Backpack, t.Inventory, t, item, quantity, t.Inventory.SlotRoom(PoursInto(t, t.Inventory, item)?.Liquid ?? item));
     /// <summary>Manual loading of the fuel slot, which holds one kind of fuel at a time.</summary>
     public int LoadFuel(Thing t, string item, int quantity) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
@@ -1259,7 +1254,7 @@ public sealed partial class World {
         return cabin.Pos + Vector2.Down * (Footprint(ThingKind.Hut) + .6f);
     }
     // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.
-    public float UnitPrice(string item, bool buying) => Data.Items[item].Price * (buying ? 1.25f : Math.Min(1, Demand(item)));
+    public float UnitPrice(string item, bool buying) => Data.Market.Goods[item].Price * (buying ? 1.25f : Math.Min(1, Demand(item)));
     // Demand runs above 1 by the steady amount's worth, so those units sell at the full price; past it, each unit takes a share of a crate's drop.
     private float DemandStep(string item) => Data.Market.Sells[item].Drop / Data.CrateCapacity;
     private float FullDemand(string item) => Data.Market.Sells.TryGetValue(item, out var demand) ? 1 + demand.Steady * DemandStep(item) : 1;
@@ -1267,7 +1262,7 @@ public sealed partial class World {
     /// <summary>Units in one purchase of a good the village sells; more than one arrive packed in a crate.</summary>
     public int Lot(string item) => Data.Market.Buys.GetValueOrDefault(item, 1);
     /// <summary>The whole coins one purchase costs, crate included for boxed goods.</summary>
-    public int LotPrice(string item) => (int)MathF.Ceiling(1.25f * (Data.Items[item].Price * Lot(item) + (Lot(item) > 1 ? Data.Items["crate"].Price : 0)));
+    public int LotPrice(string item) => (int)MathF.Ceiling(1.25f * (Data.Market.Goods[item].Price * Lot(item) + (Lot(item) > 1 ? Data.Market.CratePrice : 0)));
     public const int MarketSlots = 6;
     /// <summary>Tools a tool station holds, one in each slot and any kind in any of them.</summary>
     public const int ToolSlots = 4;
@@ -1316,7 +1311,7 @@ public sealed partial class World {
     public bool CanSell(string item) => Packed(item) is { Count: > 0 };
     private bool VillageBuys(string item) => Data.Market.Sells.ContainsKey(item);
     /// <summary>The sale price as last reported from the village; it goes stale until someone arrives with news.</summary>
-    public float KnownPrice(string item) => S.Prices.TryGetValue(item, out float price) ? price : Data.Items[item].Price;
+    public float KnownPrice(string item) => S.Prices.TryGetValue(item, out float price) ? price : Data.Market.Goods[item].Price;
     public int PriceAge => Day - (int)(S.PricesTime / Data.DaySeconds) - 1;
     private void UpdatePrices() {
         S.Prices = Data.Market.Sells.Keys.ToDictionary(item => item, item => UnitPrice(item, false)); S.PricesTime = S.Time;
@@ -1338,23 +1333,24 @@ public sealed partial class World {
         if (sign.Kind != ThingKind.Signpost || Forwarded(Verb.AutoSell, sign.Id, count: on ? 1 : 0)) return;
         sign.AutoSell = on;
     }
+    /// <summary>The goods packed in these crates, added up by kind.</summary>
+    public Dictionary<string, int> Contents(IEnumerable<string> crates) {
+        var goods = new Dictionary<string, int>();
+        foreach (var crate in crates)
+            if (Packed(crate) is Inventory packed) foreach (var (item, quantity) in packed.Items) goods[item] = goods.GetValueOrDefault(item) + quantity;
+        return goods;
+    }
+    /// <summary>What a sale pays at the given unit prices: every unit of a good the village takes, plus the crates, which go with the goods.</summary>
+    public float SaleValue(Dictionary<string, int> goods, int crates, Func<string, float> price) =>
+        crates * Data.Market.CratePrice + goods.Where(p => VillageBuys(p.Key)).Sum(p => p.Value * price(p.Key));
     private bool Ship(Thing sign) {
         var crates = sign.Inventory.Items.Keys.Where(CanSell).ToList();
         if (crates.Count == 0) return false;
-        var goods = new Dictionary<string, int>();
-        foreach (var crate in crates) {
-            foreach (var (item, quantity) in Packed(crate)!.Items) goods[item] = goods.GetValueOrDefault(item) + quantity;
-            sign.Inventory.Remove(crate, 1); S.Crates.Remove(PackedId(crate));
-        }
-        // The crates go with the goods.
-        float price = crates.Count * Data.Items["crate"].Price;
-        foreach (var (item, quantity) in goods) {
-            if (!VillageBuys(item)) continue;
-            // A sale lowers demand unit by unit, so a bulk sale is not paid entirely at the pre-sale price.
-            float demand = Demand(item);
-            for (int i = 0; i < quantity; i++) { price += Data.Items[item].Price * Math.Min(1, demand); demand = Math.Max(.25f, demand - DemandStep(item)); }
-            S.Demand[item] = demand;
-        }
+        var goods = Contents(crates);
+        // The whole sale is paid at the pre-sale price, so selling in bulk loses nothing; demand drops after it.
+        float price = SaleValue(goods, crates.Count, item => UnitPrice(item, false));
+        foreach (var (item, quantity) in goods) if (VillageBuys(item)) S.Demand[item] = Math.Max(.25f, Demand(item) - quantity * DemandStep(item));
+        foreach (var crate in crates) { sign.Inventory.Remove(crate, 1); S.Crates.Remove(PackedId(crate)); }
         // Coins are whole: sales round down and purchases round up, so a round trip never profits.
         S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count });
         Say($"Goods sent: {string.Join(", ", goods.Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;
@@ -2188,7 +2184,7 @@ public sealed partial class World {
             if (t.Progress >= recipe.Seconds) {
                 // Manual loading or another hauler can fill the station while a batch cooks.
                 // Retain the completed batch until the one-stack output slot has room rather than discarding output.
-                if (SlotRoom(t.Inventory, recipe.Output) < recipe.Amount) return;
+                if (t.Inventory.SlotRoom(recipe.Output) < recipe.Amount) return;
                 t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Making = ""; t.Progress = 0; t.Rounds++; stillBurning.Add(t.Id);
                 Crafted(recipe.Output);
             }
