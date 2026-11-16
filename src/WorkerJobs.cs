@@ -77,7 +77,10 @@ public sealed partial class World {
     /// Emptied hands end the round.
     /// </summary>
     private void Deliver(Worker w, float dt) {
-        string item = w.Bag.First()!;
+        // A stack a player holds on the cursor stays in hand; the rest goes on its way.
+        string? item = null;
+        foreach (var (held, _) in w.Bag.Items) if (w.Bag.Free(held) > 0) { item = held; break; }
+        if (item == null) { w.Status = "Waiting for the player to let go"; return; }
         var dest = Find(w.Destination);
         if (FillsLeftover(w, dest, item, dt)) return;
         // Rules are read again every tick, so a filter changed or a slot filled while a load is on its way sends it elsewhere.
@@ -102,7 +105,8 @@ public sealed partial class World {
     /// <summary>
     /// Which box of a place takes a carried item now, and how many of it, or null when none does:
     /// a station's input slot up to a stack, or its fuel slot; what a mine site or a farm plot is short of;
-    /// storage that holds the item, as far as it has room.
+    /// storage that holds the item, as far as it has room: a trading post only crates its filter asks for, a packing station its good only while a slot stays left for crates,
+    /// and compost set to skip food no food.
     /// A vessel's room is the liters its liquid has room for.
     /// </summary>
     /// <param name="fueling">The load was fetched for the fuel slot, so it goes there even when the recipe also takes the item as an input.</param>
@@ -115,6 +119,10 @@ public sealed partial class World {
         room = dest.Kind switch {
             ThingKind.Mine => MineNeed(dest, item),
             ThingKind.Farm => SowRoom(dest, item),
+            // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
+            ThingKind.Signpost when !dest.Inventory.Wants(item) => 0,
+            ThingKind.Packer when item == dest.Packs && !PackerTakes(dest, item) => 0,
+            _ when dest.Compost && dest.SkipFood && Data.IsFood(item) => 0,
             _ => dest.Inventory.Accepts(item) && Holds(dest, item) ? dest.Inventory.Room(item) : 0
         };
         return room > 0 ? (dest.Inventory, room) : null;

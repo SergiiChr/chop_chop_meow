@@ -27,7 +27,7 @@ public static class SimulationChecks {
         Test(PileModelChecks.Heaps, data);
         Test(MineRockChecks.Run);
         Test(WorkerStateChecks.Run, data);
-        Test(WorkerTaskChecks.Run, data);
+        Test(WorkerJobChecks.Run, data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
         Test(CheckDismantlingABuildingReturnsItsCostAndContents, data);
@@ -167,7 +167,7 @@ public static class SimulationChecks {
         Require(both.Jobs.Count == 2 && both.Assignment == bush.Id, "a worker should keep jobs at two places and start at the first");
         SafeTick(world, 60);
         Require(bush.Remaining < 30 && fire.Burn + fire.Inventory["wood"] * world.Data.CampfireSeconds > 0,
-                "a worker with jobs at two places should take turns: picking berries and feeding the fire");
+                "a worker with jobs at two places should do both: picking berries, and feeding the fire once it runs low");
         world.SetDuty(both, fire, JobKind.Fuel, false);
         Require(both.Jobs.Count == 1 && World.HasDuty(both, bush.Id, JobKind.Gather), "taking one job away should keep the other");
     }

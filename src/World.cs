@@ -1571,7 +1571,7 @@ public sealed partial class World {
         if (!PayWage(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from the bank or your backpack."); return null; }
         string name = WorkerNames.FirstOrDefault(n => S.Workers.All(w => w.Name != n)) ?? "Neighbor";
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
-        S.Workers.Add(w); S.Milestones.Add("hired"); Play("hire_sign", sign.Pos); Say($"New worker {name} is ready for a task."); Made?.Invoke(S.Actor.Id, w.Id); return w;
+        S.Workers.Add(w); S.Milestones.Add("hired"); Play("hire_sign", sign.Pos); Say($"New worker {name} is ready for a job."); Made?.Invoke(S.Actor.Id, w.Id); return w;
     }
     /// <summary>Workers with any job at a place.</summary>
     public int Crew(Thing t) {
@@ -1686,10 +1686,8 @@ public sealed partial class World {
         Thing? best = null; int bestRank = 0; float bestDistance = 0;
         foreach (var kind in Depots)
             foreach (var t in S.Things.Of(kind)) {
-                // A trading post takes deliveries only of crates its filter asks for, which is how it asks for goods to sell.
-                if (kind == ThingKind.Signpost && !t.Inventory.Wants(item) || kind == ThingKind.Packer && !PackerTakes(t, item) || t.Id == exclude || t.Inventory.Room(item) <= 0 || !t.Inventory.Accepts(item) || !Holds(t, item)) continue;
+                if (t.Id == exclude || Intake(t, item, false) == null) continue;
                 // Compost names every food in its filter, but takes food only when nothing else will, so harvests and picked berries are not left to rot.
-                if (t.Compost && t.SkipFood && Data.IsFood(item)) continue;
                 int rank = t.Compost && Data.IsFood(item) ? 2 : kind == ThingKind.Packer || t.Inventory.Wants(item) ? 0 : 1;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || rank < bestRank || rank == bestRank && distance < bestDistance) { best = t; bestRank = rank; bestDistance = distance; }
@@ -1797,10 +1795,12 @@ public sealed partial class World {
         for (int node = end; node != RouteIndex(start); node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
         route.Reverse(first, route.Count - first);
     }
-    /// <summary>Moves a worker toward a destination and reports arrival within <paramref name="reach"/>.
-    /// A spot closer than the usual reach is a preference: if it cannot be reached, the usual reach counts as arrival.</summary>
     /// <summary>How near a worker counts as at a place: the reach of a walk, and how near a closer spot they cannot get to counts as there.</summary>
     private const float WalkReach = 1.2f;
+    /// <summary>
+    /// Moves a worker toward a destination and reports arrival within <paramref name="reach"/>.
+    /// A spot closer than the usual reach is a preference: if it cannot be reached, the usual reach counts as arrival.
+    /// </summary>
     private bool Walk(Worker w, Vector2 destination, float dt, float reach = WalkReach) {
         float distance = w.Pos.DistanceTo(destination);
         if (distance < reach) return true;
@@ -2459,10 +2459,14 @@ public sealed partial class World {
             if (t.Batches > 0 && t.Keep != "" && t.Keep != t.Asked) return false;
         }
         foreach (var w in save.Workers)
-            if (w == null || !ValidJobs(w.Jobs) || !ValidInventory(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates)) return false;
+            if (w == null || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates)) return false;
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }
+    /// <summary>Whether a worker's tool slot from a save is one slot holding nothing or one tool.</summary>
+    private bool ValidToolSlot(Inventory? slot, Dictionary<int, Inventory> crates) =>
+        ValidInventory(slot, crates) && slot.Slots == 1 && slot.Count <= 1 && (slot.First() is not string item || Data.Items.TryGetValue(item, out var def) && def.Tool != "");
+
     /// <summary>Empties the hotbar slots that name nothing the game knows or the player carries, such as a packed crate since sold.</summary>
     private void TidyHotbar(PlayerState p) {
         p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
@@ -2475,7 +2479,7 @@ public sealed partial class World {
     private static void RebuildAllStacks(SaveState save) {
         foreach (var player in save.Players.Concat(save.Absent.Values)) player?.Backpack?.RebuildStacks();
         RebuildAll(save.Crates?.Values);
-        foreach (var worker in save.Workers) worker?.Bag?.RebuildStacks();
+        foreach (var worker in save.Workers) { worker?.Bag?.RebuildStacks(); worker?.ToolSlot?.RebuildStacks(); }
         foreach (var thing in save.Things) RebuildThing(thing);
         foreach (var thing in save.Remembered?.Values ?? Enumerable.Empty<Thing>()) RebuildThing(thing);
         static void RebuildAll(IEnumerable<Inventory>? boxes) { if (boxes != null) foreach (var box in boxes) box.RebuildStacks(); }

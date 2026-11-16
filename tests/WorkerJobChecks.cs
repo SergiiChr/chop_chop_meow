@@ -1,3 +1,4 @@
+using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -7,7 +8,7 @@ using static WorkerSteps;
 using static WorldSteps;
 
 /// <summary>Checks for how a worker carries, picks the next job from their list and hauls for a station.</summary>
-public static class WorkerTaskChecks {
+public static class WorkerJobChecks {
     public static void Run(GameData data) {
         CheckWorkerGathersFourPiecesACycleUntilTwelveAreInHand(data);
         CheckGathererGoesOnToTheNextSpotUntilTheirHandsAreFull(data);
@@ -31,6 +32,10 @@ public static class WorkerTaskChecks {
         CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(data);
         CheckAWorkerBesideAStationWalksRoundItToWorkIt(data);
         CheckAWorkerWhoseWorkSpotIsBlockedWorksFromAsNearAsTheyGet(data);
+        CheckASaveKeepsTheJobOrderGroupsAndTool(data);
+        CheckAToolHeldFromAWorkerIsLetGoOnLoad(data);
+        CheckALoadForATradingPostGoesElsewhereOnceItsFilterNoLongerAsks(data);
+        CheckAWorkerDeliversWhatAPlayerDoesNotHold(data);
         CheckSaveWithAJobOtherThanAHaulInAGroupIsRefused(data);
         CheckAJobMovedUpComesFirst(data);
         CheckAHaulGroupBringsTheShortestInputAcrossItsPlaces(data);
@@ -289,6 +294,10 @@ public static class WorkerTaskChecks {
         Require(JobsText(worker) == $"craft@{A} craft@{B} group[haul@{A} haul@{B}]", $"hauls moved into a new group should be in it in the order they were added: {JobsText(worker)}");
         world.MoveJob(worker, new JobSpot(2), new JobSpot(0));
         Require(JobsText(worker) == $"group[haul@{A} haul@{B}] craft@{A} craft@{B}", $"a group moved to the top should take its hauls along: {JobsText(worker)}");
+        world.MoveJob(worker, new JobSpot(0, 1), new JobSpot(0, 0));
+        Require(JobsText(worker) == $"group[haul@{B} haul@{A}] craft@{A} craft@{B}", $"a haul moved up inside its group should come first there: {JobsText(worker)}");
+        world.MoveJob(worker, new JobSpot(0, 0), new JobSpot(0, 2));
+        Require(JobsText(worker) == $"group[haul@{A} haul@{B}] craft@{A} craft@{B}", $"a haul moved to the end of its group should come last there: {JobsText(worker)}");
         world.MoveJob(worker, new JobSpot(2), new JobSpot(0, 1));
         Require(JobsText(worker) == $"group[haul@{A} haul@{B}] craft@{A} craft@{B}", $"a craft job should not go into a haul group: {JobsText(worker)}");
         world.MoveJob(worker, new JobSpot(0, 1), new JobSpot(3));
@@ -463,5 +472,61 @@ public static class WorkerTaskChecks {
         var pumper = Staff(world, forge, JobKind.Bellows);
         Work(world, 10, () => pumper.WorkState == WorkerWorkState.Pumping);
         Require(pumper.WorkState == WorkerWorkState.Pumping, $"a pumper whose spot a chest stands on should pump from beside it, not \"{pumper.Status}\"");
+    }
+
+    private static void CheckASaveKeepsTheJobOrderGroupsAndTool(GameData data) {
+        var world = EmptyWorld(data);
+        var a = Bench(world, new Vector2(10, 10), "planks");
+        var b = Bench(world, new Vector2(10, 16), "planks");
+        var worker = Staff(world, a, JobKind.Craft, JobKind.Haul);
+        world.SetDuty(worker, b, JobKind.Haul, true);
+        GroupHauls(world, worker, b, a);
+        worker.Tool = "steel_axe";
+        string saved = JobsText(worker);
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(world.Serialize());
+        var back = loaded.Workers.Single(w => w.Id == worker.Id);
+        Require(JobsText(back) == saved && back.Tool == "steel_axe", $"a save should keep a worker's job order, haul groups and tool: {JobsText(back)} with \"{back.Tool}\"");
+    }
+
+    /// <summary>The autosave can run while a player holds a worker's tool on the cursor; after loading, the slot works as any other.</summary>
+    private static void CheckAToolHeldFromAWorkerIsLetGoOnLoad(GameData data) {
+        var world = EmptyWorld(data);
+        var worker = AddWorker(world, world.Player + Vector2.One);
+        worker.Tool = "steel_axe";
+        world.Hold(worker.ToolSlot, 0, 1);
+        Require(world.Held is { Item: "steel_axe" }, "the player should hold the worker's axe");
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(world.Serialize());
+        var back = loaded.Workers.Single(w => w.Id == worker.Id);
+        var rack = loaded.Add(ThingKind.Toolstation, back.Pos + new Vector2(3, 0));
+        Work(loaded, 30, () => rack.Inventory["steel_axe"] == 1);
+        Require(rack.Inventory["steel_axe"] == 1 && back.Tool == "" && back.ToolSlot.Room("steel_pick") == 1,
+            $"after loading, a worker with no job should put the axe back and have room for another tool: rack {rack.Inventory["steel_axe"]}, tool \"{back.Tool}\"");
+    }
+
+    private static void CheckALoadForATradingPostGoesElsewhereOnceItsFilterNoLongerAsks(GameData data) {
+        var world = EmptyWorld(data);
+        var post = world.Add(ThingKind.Signpost, new Vector2(10, 10));
+        string crate = World.CrateOf("berries");
+        world.SetFilter(post, crate, false, true);
+        var chest = world.Add(ThingKind.Chest, new Vector2(20, 10));
+        var worker = AddWorker(world, new Vector2(15, 12));
+        worker.Bag.Add(PackCrate(world, ("berries", 12)), 1);
+        world.Tick(.1f);
+        Require(worker.Destination == post.Id, "a worker should carry a crate of berries to the trading post asking for it");
+        world.ClearFilters(post);
+        Work(world, 30, () => worker.Bag.Count == 0);
+        Require(post.Inventory.Count == 0 && chest.Inventory.Count == 1, "a crate on its way to a post whose filter no longer asks for it should go to storage");
+    }
+
+    private static void CheckAWorkerDeliversWhatAPlayerDoesNotHold(GameData data) {
+        var world = EmptyWorld(data);
+        var chest = world.Add(ThingKind.Chest, world.Player + new Vector2(3, 0));
+        var worker = AddWorker(world, world.Player + Vector2.One);
+        worker.Bag.Add("wood", 6); worker.Bag.Add("stone", 6);
+        world.Hold(worker.Bag, worker.Bag.Layout.FindIndex(s => s.Item == "wood"), 6);
+        Work(world, 20, () => chest.Inventory["stone"] > 0);
+        Require(chest.Inventory["stone"] == 6 && worker.Bag["wood"] == 6, "a worker should store the stone while the player holds the wood");
     }
 }
