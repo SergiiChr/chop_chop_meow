@@ -29,6 +29,7 @@ public static class WorkerTaskChecks {
         CheckSpareSeedWithNoStorageStacksInThePlot(data);
         CheckACrafterLowerInTheListGivesWayAfterOneBatch(data);
         CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(data);
+        CheckAWorkerBesideAStationWalksRoundItToWorkIt(data);
         CheckSaveWithAJobOtherThanAHaulInAGroupIsRefused(data);
         CheckAJobMovedUpComesFirst(data);
         CheckAHaulGroupBringsTheShortestInputAcrossItsPlaces(data);
@@ -435,5 +436,20 @@ public static class WorkerTaskChecks {
         var miner = Staff(world, mine, JobKind.Mine);
         Work(world, 20);
         Require(rack.Inventory["steel_pick"] == 1 && miner.Tool == "", "a miner should not fetch a pickaxe for a full mine with nowhere to unload");
+    }
+
+    /// <summary>
+    /// From a player's save: a packer stood on the far side of their packing station, close enough to the packing spot to count as there for the path search,
+    /// with the station between them; they stood still with "Path blocked".
+    /// </summary>
+    private static void CheckAWorkerBesideAStationWalksRoundItToWorkIt(GameData data) {
+        var world = EmptyWorld(data);
+        var packer = world.Add(ThingKind.Packer, Terrain.Spawn + new Vector2(6, 6));
+        world.SetPacking(packer, "berries");
+        packer.Inventory.Add("berries", 12); packer.Inventory.Add("crate", 2);
+        var worker = Staff(world, packer, JobKind.Craft);
+        worker.Pos = packer.Pos + new Vector2(-.49f, .5f);
+        Work(world, 10, () => worker.WorkState == WorkerWorkState.Hammering);
+        Require(worker.WorkState == WorkerWorkState.Hammering, $"a packer beside the far side of the station should walk round it and pack, not \"{worker.Status}\"");
     }
 }
