@@ -143,7 +143,7 @@ public sealed partial class World {
     /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
     private static void Calm(Wolf wolf) {
         wolf.Target = 0; wolf.Howl = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
-        wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.Beside = Vector2.Zero; wolf.Route.Clear();
+        wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();
     }
     /// <summary>
     /// A wolf that smells a player out in the open within <see cref="GameData.SmellRadius"/> takes them as its prey.

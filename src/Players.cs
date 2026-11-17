@@ -137,6 +137,13 @@ public sealed partial class World {
     /// In a guest's copy, sends the action to the host and tells the caller to stop.
     /// On the server, a marked action (<see cref="FromHeldStack"/>, <see cref="FromSpares"/>) goes through the same checks a guest's does first, then comes back here to run.
     /// </summary>
+    /// <summary>Whether the acting player is occupied, telling them so: anything they try then does nothing.</summary>
+    private bool Busy() {
+        if (!Occupied) return false;
+        Say("You are busy.");
+        return true;
+    }
+
     private bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
         var c = new Command(verb, target, other, item, count, at, fromHeld, fromSpares);
         if (Host != null) { Host(c); return true; }
@@ -183,7 +190,7 @@ public sealed partial class World {
         if (slot is < 0 or > 8) return;
         if (MarkedSource == null) { Unbind(slot); S.HotbarSlots[slot] = item; }
         S.ActiveHotbar = slot; S.InHand = "";
-        if (Forwarded(Verb.SetHotbar, count: slot, item: item)) return;
+        if (Busy() || Forwarded(Verb.SetHotbar, count: slot, item: item)) return;
         if (heldSource != null) BindHeld(slot);
     }
 
@@ -319,7 +326,7 @@ public sealed partial class World {
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {
         int a = Locate(from), b = Locate(to);
-        if (a < 0 || b < 0 || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
+        if (a < 0 || b < 0 || Busy() || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
         if (!InReach(a) || !InReach(b)) { Say("Walk closer first."); return 0; }
         if (BoxBlock(b, to, item) is string refused) { Say(refused); return 0; }
         if (FillBlock(from, to, item) is string dry) { Say(dry); return 0; }
@@ -340,7 +347,7 @@ public sealed partial class World {
     public int Transfer(Inventory from, InventoryView to, string item, int quantity) => Transfer(from, to.Inventory, item, quantity);
 
     public void SortBackpack() {
-        if (Downed || Forwarded(Verb.SortBag)) return;
+        if (Busy() || Forwarded(Verb.SortBag)) return;
         Release();
         S.Backpack.Sort();
     }
@@ -355,7 +362,7 @@ public sealed partial class World {
         int a = Locate(from), b = Locate(to);
         if (a < 0 || b < 0 || Downed) return 0;
         if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
-        if (Forwarded(Verb.TransferSlot, a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
+        if (Busy() || Forwarded(Verb.TransferSlot, a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
         if (!InReach(a) || !InReach(b)) { Say("Walk closer first."); return 0; }
         // Reject a stale move rather than moving a different item.
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
@@ -378,7 +385,7 @@ public sealed partial class World {
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
         bool pile = IsPlainPile(chest);
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate)) return;
-        if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
+        if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Busy() || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         if (pile && allowed) SetPileFilter(chest.Inventory, PileEntry(item));
         else if (pile) chest.Inventory.ClearFilters();
         else chest.Inventory.Filter(item, output, allowed);
@@ -391,12 +398,12 @@ public sealed partial class World {
 
     /// <summary>Stops or restarts workers bringing food to a compost.</summary>
     public void SetSkipFood(Thing pile, bool skip) {
-        if (!pile.Compost || Forwarded(Verb.SkipFood, pile.Id, count: skip ? 1 : 0)) return;
+        if (!pile.Compost || Busy() || Forwarded(Verb.SkipFood, pile.Id, count: skip ? 1 : 0)) return;
         pile.SkipFood = skip;
     }
 
     public void ClearFilters(Thing chest) {
-        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || IsPlainPile(chest) && !PileFilterChanges(chest, false) || Forwarded(Verb.ClearFilters, chest.Id)) return;
+        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || IsPlainPile(chest) && !PileFilterChanges(chest, false) || Busy() || Forwarded(Verb.ClearFilters, chest.Id)) return;
         chest.Inventory.ClearFilters();
     }
 
@@ -408,7 +415,7 @@ public sealed partial class World {
 
     /// <summary>Host: puts a guest where their own machine walked them, as <see cref="MovePlayer"/> does for the host.</summary>
     public void MoveTo(Vector2 p) {
-        if (Occupied || p == Player) return;
+        if (Occupied || S.Sheltered != 0 || p == Player) return;
         playerBusy = true; Player = p;
     }
 

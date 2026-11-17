@@ -93,7 +93,7 @@ public sealed partial class World {
     /// the door when someone is inside. A player who sprinted there, <paramref name="rush"/>, steps in at a run and slams the door.
     /// </summary>
     public bool Enter(Thing hut, bool rush) {
-        if (hut.Kind != ThingKind.Hut || Occupied || Player.DistanceTo(DoorPoint(hut)) > DoorReach) return false;
+        if (hut.Kind != ThingKind.Hut || Occupied || S.Sheltered != 0 || Player.DistanceTo(DoorPoint(hut)) > DoorReach) return false;
         if (!Forwarded(Verb.Enter, hut.Id, count: rush ? 1 : 0)) { S.Actor.DoorQueued = ++S.DoorArrivals; StepIn(hut.Id, rush); }
         return true;
     }

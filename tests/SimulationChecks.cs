@@ -101,7 +101,8 @@ public static class SimulationChecks {
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
         Test(CheckACabinHoldsOnePlayerAndTheNextKnocksOnTheDoor, data);
         Test(CheckAPlayerKnockingOnACabinDoorStepsAsideForOneComingOutThenGoesIn, data);
-        Test(CheckAPlayerAtACabinDoorCannotGatherOrPickUp, data);
+        Test(CheckAPlayerAtACabinDoorIsBusyAndCanDoNothingElse, data);
+        Test(CheckAPlayerInsideACabinCanStillEat, data);
         Test(CheckOnlyAPlayerKnockingOnTheDoorGoesInWhenSomeoneStepsOut, data);
         Test(CheckHittingAWolfThatTugsAPlayerOutKnocksItBack, data);
         Test(CheckAWolfTugsAPlayerStandingAsideAtACabinDoorOffIt, data);
@@ -685,13 +686,13 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         world.Player = new Vector2(12, 10);
         Give(world, "wood", 5);
-        world.Die();
-        var box = world.Things.Last(t => t.Kind == ThingKind.Grave);
         var tree = world.Add(ThingKind.Tree, new Vector2(13, 10), 30);
         var chest = world.Add(ThingKind.Chest, new Vector2(20, 10));
         var worker = AddWorker(world, new Vector2(14, 10));
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
+        world.Die();
+        var box = world.Things.Last(t => t.Kind == ThingKind.Grave);
         SafeTick(world, 25);
         Require(box.Inventory["wood"] == 5 && chest.Inventory["wood"] > 0,
                 "workers must store gathered goods in chests, not in the player's recovery box");
@@ -1358,7 +1359,7 @@ public static class SimulationChecks {
         Require(maul.Mauled, "the leap should pin the player");
         Require(heard.Count(name => name == "takedown_scream") == 1, $"a player pinned by a leap should scream once: heard {string.Join(", ", heard)}");
         Require(leaper.Feeding, "the leap should make the wolf feed");
-        Require(leaper.Pinning && leaper.Beside == Vector2.Zero, "the leap should make the wolf pin, over the player");
+        Require(leaper.Pinning && leaper.LungeFrom == Vector2.Zero, "the leap should make the wolf pin, over the player");
         Require(leaper.Pos.DistanceTo(maul.Player) < 1.6f, "the leap should land at the throat");
         var pinned = maul.Player;
         maul.MovePlayer(Vector2.Right);
@@ -2965,7 +2966,7 @@ public static class SimulationChecks {
         world.Tick(.1f);
         Require(world.Mauled && tugger.Pinning && !tugger.Tugging, "the wolf tugging a wounded player out should take them down once they are out");
         float across = Math.Abs((tugger.Pos - world.Player).Dot(World.OutOfDoor.Orthogonal()));
-        Require(across > .5f && tugger.Beside != Vector2.Zero, $"the wolf should step aside to pin a player it tugged out from beside them, not stand {across:0.00} m to the side");
+        Require(across > .5f && tugger.LungeFrom != Vector2.Zero, $"the wolf should step aside to pin a player it tugged out from beside them, not stand {across:0.00} m to the side");
     }
 
     private static void CheckAWolfLetsGoOfAPlayerWhoLeavesTheGameWhileItTugsThem(GameData data) {
@@ -3006,18 +3007,35 @@ public static class SimulationChecks {
         Require(world.Health < 100 && world.Door == Doorway.Leaving, "a wolf should bite a player in the second half of stepping out, who walks on out");
     }
 
-    private static void CheckAPlayerAtACabinDoorCannotGatherOrPickUp(GameData data) {
+    private static void CheckAPlayerAtACabinDoorIsBusyAndCanDoNothingElse(GameData data) {
         var (world, guest, _) = Hosted(data);
+        var told = new List<string>();
+        world.Relay += (_, message) => told.Add(message);
         var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
         StepInside(world, hut);
         world.As(guest, () => {
             world.Player = World.DoorPoint(hut);
             Require(world.Enter(hut, false) && guest.Door == Doorway.Knocking, "a player at the door of a cabin someone is in should knock on it");
             var stone = world.Add(ThingKind.LooseStone, world.Player + new Vector2(.5f, 0), 1);
-            int before = world.Backpack["stone"];
+            int stones = world.Backpack["stone"];
             for (int i = 0; i < 4; i++) world.Gather(stone, .25f);
-            Require(world.Backpack["stone"] == before && world.Find(stone.Id) != null, "a player knocking on a cabin door should not pick anything up");
+            Require(world.Backpack["stone"] == stones && world.Find(stone.Id) != null, "a player knocking on a cabin door should not pick anything up");
+            SetNeeds(world, hunger: 20); Give(world, "berries", 3);
+            world.Consume("berries");
+            Require(world.Backpack["berries"] == 3, "a player knocking on a cabin door should not eat");
+            Give(world, data.Buildings[ThingKind.Chest].Cost);
+            Require(world.Build(ThingKind.Chest, world.Player + new Vector2(-3, 2)) == null, "a player knocking on a cabin door should not build");
         });
+        Require(told.Count > 0 && told.All(message => message == "You are busy."), $"a player at a cabin door should be told they are busy, not {string.Join(" | ", told)}");
+    }
+
+    private static void CheckAPlayerInsideACabinCanStillEat(GameData data) {
+        var world = EmptyWorld(data);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        StepInside(world, hut);
+        SetNeeds(world, hunger: 20); Give(world, "berries", 3);
+        world.Consume("berries");
+        Require(world.Backpack["berries"] == 2, "a player inside a cabin should still eat");
     }
 
     private static void CheckAPlayerKnockingOnACabinDoorStepsAsideForOneComingOutThenGoesIn(GameData data) {

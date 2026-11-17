@@ -387,6 +387,7 @@ The cabin's page shows, under "Stats after sleep", the health, hunger and thirst
 ### Death and recovery
 
 Death drops your backpack, coins included, in a recovery box marked by a bobbing gold gem.
+Until you respawn you can do nothing but skip to morning: anything else you try says "You are busy."
 You respawn after 30 seconds inside the cabin nearest to where you fell that nobody is in, or in the clearing without one.
 Emptied boxes disappear, and workers never use them as storage.
 During the respawn countdown, if no cabin exists, “Skip to morning?” lets you advance the world to dawn.
@@ -844,7 +845,7 @@ Anyone knocking on the door steps aside to their right to let you out, and you k
 Once you are through the doorway, they squeeze past you in, in the order they came: both of you turn sideways, chest to chest, arms at your sides, and the one going in puts their right palm on the door frame.
 
 A cabin holds one player.
-While you are at its door, knocking, following or stepping in, you cannot move, swing, gather or pick anything up.
+While you are at its door, knocking, following or stepping in, you can do nothing else: anything you try says "You are busy."
 Someone who walks up behind a player stepping in follows them; once that player is in, they wait for the door to swing shut, step up to it, knock on it three times and stand free.
 At the door of a cabin someone is in, you knock on it the same way.
 Players a wolf tugs back out go in again in the order they came to the door.

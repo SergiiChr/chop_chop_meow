@@ -32,8 +32,8 @@ public sealed partial class World {
     /// <summary>Picks up <paramref name="count"/> units of a slot onto the cursor, letting go of any stack held before.</summary>
     public void Hold(Inventory box, int slot, int count) {
         int code = Locate(box);
-        if (code == -1 || Downed || (uint)slot >= (uint)box.Layout.Count || box.Layout[slot] is not { Item: not "" } cell) return;
-        if (Forwarded(Verb.Hold, code, count, cell.Item, slot)) return;
+        if (code == -1 || (uint)slot >= (uint)box.Layout.Count || box.Layout[slot] is not { Item: not "" } cell) return;
+        if (Busy() || Forwarded(Verb.Hold, code, count, cell.Item, slot)) return;
         if (!InReach(code)) { Say("Walk closer first."); return; }
         if (cell.HeldByOther(S.Actor.Id)) { Say(HeldByAnother); return; }
         Release();

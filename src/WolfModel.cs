@@ -247,10 +247,10 @@ public sealed class WolfModel {
 
     /// <summary>
     /// Feeding at a downed player: braced over the body, tearing with sharp pulls back.
-    /// A pinning wolf stands astride the player with its forepaws on the chest, at <paramref name="chest"/> in the model when given, and its hind paws wide of their legs, or <paramref name="beside"/> them with its forepaws by their shoulder;
+    /// A pinning wolf stands astride the player with its forepaws on the chest, at <paramref name="chest"/> in the model when given, and its hind paws wide of their legs, or, having <paramref name="lunged"/> onto the throat from beside them, with its forepaws by their shoulder;
     /// <paramref name="down"/> runs 0 to 1 as the player goes down under it.
     /// </summary>
-    public void Feed(float time, float dt, bool pinning, float down = 1, bool beside = false, (Vector3 Left, Vector3 Right)? chest = null) {
+    public void Feed(float time, float dt, bool pinning, float down = 1, bool lunged = false, (Vector3 Left, Vector3 Right)? chest = null) {
         float pull = MathF.Pow(Math.Max(0, MathF.Sin(time * 2.6f)), 3), shake = MathF.Sin(time * 13) * (1 - pull * .6f), bite = Math.Max(0, MathF.Sin(time * 4.5f));
         WolfPose body;
         if (pinning) {
@@ -259,9 +259,9 @@ public sealed class WolfModel {
             body = new WolfPose(Lift: -.05f + .3f * up - .02f * pull, Pitch: 14 - 34 * up - 4 * pull, Surge: -.03f * pull, Flex: 4,
                 Neck: 52 - 60 * up - 12 * pull, Head: 14 + 4 * shake, HeadTurn: 12 * shake, HeadTilt: 6 * shake, Jaw: 10 + 6 * bite, Ears: 26, Tail: -70 + 6 * MathF.Sin(time * 1.7f), Wag: 8 * MathF.Sin(time * 2.1f));
             // Beside the player it keeps its forepaws on the ground by their shoulder.
-            body = beside ? Planted(body, 1.4f, 0, .05f) : Planted(body, 2.4f, 0, .05f, ChestTop + .5f * up, 3.2f);
+            body = lunged ? Planted(body, 1.4f, 0, .05f) : Planted(body, 2.4f, 0, .05f, ChestTop + .5f * up, 3.2f);
             // Astride, its forepaws stay on the player's chest as they go down under it and once they lie.
-            if (!beside && chest is var (left, right)) {
+            if (!lunged && chest is var (left, right)) {
                 float lower = Mathf.Lerp(10, 50, up);
                 body = body.WithLeg(0, Reach(body, 0, left, lower, lower - 20)).WithLeg(1, Reach(body, 1, right, lower, lower - 20));
             }

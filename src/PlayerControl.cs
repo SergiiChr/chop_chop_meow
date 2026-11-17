@@ -117,12 +117,15 @@ public sealed class PlayerControl {
         if (!world.Near(gathering, gathering.Kind == ThingKind.Water ? 2.5f : 1.35f)) return (world.GatherAt(gathering, world.Player) - world.Player).Normalized();
         if (gathering.IsLoose) {
             world.Gather(gathering, dt);
+            if (world.Occupied) { gathering = null; return direction; }
             if (world.Find(gathering.Id) == null) panel.Deselect(gathering.Id);
             gathering = null;
             return direction;
         }
         // Emptying it shows on the bare bush or raked patch; a target that was already empty or out of reach still says why.
         bool had = gathering.Remaining > 0; world.Gather(gathering, dt);
+        // A busy player is told once per click, not every frame the button is held.
+        if (world.Occupied) { gathering = null; return direction; }
         if (world.GatherBlock(gathering) is string blocked) { if (!had || gathering.Remaining > 0) kit.Notify(blocked); gathering = null; }
         return direction;
     }
