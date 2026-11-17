@@ -162,7 +162,6 @@ public sealed class DoorVisits(World world) {
         if (victim == null) { End(wolf); return; }
         using (world.ActAs(victim)) {
             victim.Sheltered = 0; world.Player = Doorways.DoorPoint(cabin); victim.Warp++;
-            world.Doorways.UnlockEmpty(cabin.Id);
             Doorways.Stage(victim, Doorway.Tugged, cabin.Id);
             victim.Health -= world.Data.WolfBite;
             world.Play("wolf_bite", world.Player); world.Play("tug_scream", world.Player);
