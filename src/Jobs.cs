@@ -154,7 +154,7 @@ public sealed partial class World {
     /// <summary>Puts a worker on every job at one place, instead of whatever they did before, or takes all their jobs away.</summary>
     public void Assign(Worker w, Thing? target) {
         if (target != null && NoRoomAt(w, target)) return;
-        if (Forwarded(Verb.Assign, target?.Id ?? 0, w.Id)) return;
+        if (Busy() || Forwarded(Verb.Assign, target?.Id ?? 0, w.Id)) return;
         w.Jobs.Clear(); ListChanged(w);
         if (target != null) foreach (var job in Jobs(target)) w.Jobs.Add(NewDuty(target, job));
         Started(w, target);
@@ -164,7 +164,7 @@ public sealed partial class World {
     public void SetDuty(Worker w, Thing target, JobKind job, bool on) {
         if (on == HasDuty(w, target.Id, job) || Array.IndexOf(Jobs(target), job) < 0) return;
         if (on && NoRoomAt(w, target)) return;
-        if (Forwarded(Verb.Duty, target.Id, w.Id, job.Id(), on ? 1 : 0)) return;
+        if (Busy() || Forwarded(Verb.Duty, target.Id, w.Id, job.Id(), on ? 1 : 0)) return;
         if (on) w.Jobs.Add(NewDuty(target, job));
         else {
             w.Jobs.RemoveAll(e => e is Duty d && d.Thing == target.Id && d.Job == job);
@@ -187,7 +187,7 @@ public sealed partial class World {
 
     /// <summary>Adds an empty haul group to the end of a worker's jobs.</summary>
     public void AddHaulGroup(Worker w) {
-        if (Forwarded(Verb.HaulGroup, other: w.Id, count: 1)) return;
+        if (Busy() || Forwarded(Verb.HaulGroup, other: w.Id, count: 1)) return;
         int last = 0;
         foreach (var e in w.Jobs) if (e is HaulGroup group) last = Math.Max(last, group.Id);
         w.Jobs.Add(new HaulGroup { Id = last + 1 }); ListChanged(w);
@@ -195,7 +195,7 @@ public sealed partial class World {
 
     /// <summary>Takes a worker's haul group apart: its hauls take its place in the list, as jobs of their own.</summary>
     public void RemoveHaulGroup(Worker w, int id) {
-        if (Forwarded(Verb.HaulGroup, other: w.Id, at: new Vector2(id, 0))) return;
+        if (Busy() || Forwarded(Verb.HaulGroup, other: w.Id, at: new Vector2(id, 0))) return;
         int at = w.Jobs.FindIndex(e => e is HaulGroup group && group.Id == id);
         if (at < 0) return;
         var hauls = ((HaulGroup)w.Jobs[at]).Hauls;
@@ -220,7 +220,7 @@ public sealed partial class World {
     public void MoveJob(Worker w, JobSpot from, JobSpot to) {
         if (JobAt(w, from) is not JobEntry entry) return;
         if (to.InGroup && ((uint)to.Entry >= (uint)w.Jobs.Count || w.Jobs[to.Entry] is not HaulGroup || entry is not Duty { Job: JobKind.Haul })) return;
-        if (Forwarded(Verb.MoveJob, from.Entry, w.Id, JobKey(entry), from.Haul, new Vector2(to.Entry, to.Haul))) return;
+        if (Busy() || Forwarded(Verb.MoveJob, from.Entry, w.Id, JobKey(entry), from.Haul, new Vector2(to.Entry, to.Haul))) return;
         // Taking the entry out moves what came after it in the same list up by one.
         if (from.InGroup) {
             ((HaulGroup)w.Jobs[from.Entry]).Hauls.RemoveAt(from.Haul);

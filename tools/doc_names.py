@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ["*.md", "docs/*.md", "assets/*.md", ".claude/skills/*/SKILL.md"]
 # What the names are looked up in: the game and its checks, then the launcher, the tools and the skills' own scripts.
-CSHARP = ["src/**/*.cs", "tests/*.cs"]
+CSHARP = ["src/**/*.cs", "tests/**/*.cs"]
 OTHER_CODE = [
     "build.py",
     "tools/*.py",
@@ -34,6 +34,8 @@ TYPE = re.compile(
     r"\b(?:class|struct|record struct|record|enum|interface)\s+([A-Z]\w*)"
 )
 WORD = re.compile(r"\w+")
+# A name a file writes with no owner in front of it, as a member is declared; `Other.Member` belongs to `Other`.
+OWN_WORD = re.compile(r"(?<![.\w])\w+")
 FLAG = re.compile(r"--[a-z][a-z0-9-]*")
 NAME = r"[A-Za-z_]\w*"
 DOTTED = re.compile(rf"^{NAME}(?:\.{NAME})+$")
@@ -90,9 +92,10 @@ class Code:
         ).stdout.split()
         self.endings = {Path(name).suffix[1:] for name in tracked}
         # A partial class is declared in several files, and its members are in any of them.
+        # A file's calls into other types, such as `ArmReach.ArmTo(` in `ActorAnimation.cs`, do not make those names its own.
         self.types: dict[str, set[str]] = {}
         for text in csharp.values():
-            words = set(WORD.findall(text))
+            words = set(OWN_WORD.findall(text))
             for name in set(TYPE.findall(text)):
                 self.types.setdefault(name, set()).update(words)
 

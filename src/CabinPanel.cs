@@ -19,14 +19,14 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         var dawn = NeedColumn.All();
         foreach (var need in dawn) vials.AddChild(need);
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == thing.Id) world.Leave(); else panel.Player.WalkInto(thing); });
+        var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == thing.Id) world.Doorways.Leave(); else panel.Player.WalkInto(thing); });
         var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(thing)); sleep.Name = "sleep";
         buttons.AddChild(door); buttons.AddChild(sleep);
         live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), world.Data.GameMinutes(world.SecondsToDawn)), now => {
             var (inside, blocked, _) = now;
             tag.Text = inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);
-            door.Text = inside ? "Step outside" : "Go inside";
+            door.Text = inside ? "Step outside" : "Enter";
             sleep.TooltipText = blocked ?? "Sleep until dawn. Production, hunger, trade and wages advance.";
             sleep.Modulate = blocked == null ? Colors.White : Style.Unready;
             block.Visible = blocked != null; block.Text = blocked == null ? "" : ShortBlock(blocked);

@@ -150,4 +150,7 @@ internal static class SetupSteps {
         world.S.Workers.Add(worker);
         return worker;
     }
+
+    /// <summary>Puts the acting player inside a cabin as a saved game has them, without the walk in.</summary>
+    public static void SetSheltered(World world, Thing hut) => world.S.Sheltered = hut.Id;
 }

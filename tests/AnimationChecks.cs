@@ -13,6 +13,9 @@ public static class AnimationChecks {
         data = gameData;
         CheckActionsLoopAndWrapByTheirDuration();
         CheckActorsTurnToFaceTheirMovement();
+        CheckPlayerHeadTurnsBeforeTheBody();
+        CheckPlayerTurnsHalfwayRoundOneWay();
+        CheckPlayerLeansIntoATurn();
         CheckPlayerActionFollowsToolAndTarget();
         CheckWorkerHoldingALoadCarriesIt();
         CheckStationWorkFollowsWorkStateNotItsWording();
@@ -24,7 +27,10 @@ public static class AnimationChecks {
         CheckChangingActionBlendsBetweenPoses();
         CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning();
         CheckDiggingKeepsBothFeetWhereTheyStand();
+        CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem();
+        CheckAHandReachesItsPointWithTheElbowTheWayAsked();
         CheckWolfGaitsPlantEachPaw();
+        CheckAWolfReversingAtAGallopLooksRoundFirstAndBrakesUntilItsBodyComesRound();
         CheckPosingAllocatesNothing();
     }
 
@@ -54,6 +60,31 @@ public static class AnimationChecks {
             lowest = Math.Min(lowest, pose.Hips); highest = Math.Max(highest, pose.Hips);
         }
         Require(highest - lowest > .1f, $"the digger should bend down onto the shovel and straighten to throw: the hips moved {highest - lowest:0.00} m");
+    }
+
+    private static void CheckAWolfReversingAtAGallopLooksRoundFirstAndBrakesUntilItsBodyComesRound() {
+        var wolf = new WolfModel();
+        const float dt = 1f / 60, speed = 6.3f;
+        var ahead = new Vector2(0, 1);
+        for (int i = 0; i < 60; i++) {
+            var moved = ahead * speed * dt;
+            Require(!wolf.TurnToward(moved, moved, dt, true, true, false), "a wolf galloping on in a straight line should not brake");
+            wolf.Move(moved.Length(), dt, true, false);
+        }
+        bool braked = false, stillBraking = true;
+        float lookAhead = 0;
+        // The body takes 0.3 s to come most of the way round; half a second later it gallops on.
+        for (int i = 0; i < 48; i++) {
+            var moved = -ahead * speed * dt;
+            bool braking = wolf.TurnToward(moved, moved, dt, true, true, false);
+            if (braking) wolf.Brake(moved.Length(), dt); else wolf.Move(moved.Length(), dt, true, false);
+            if (i < 6) lookAhead = Math.Max(lookAhead, Math.Abs(wolf.Turning.Look));
+            braked |= braking; stillBraking = braking;
+        }
+        Require(lookAhead > Mathf.DegToRad(20), $"a wolf turning round should turn its head ahead of its body, not {Mathf.RadToDeg(lookAhead):0} degrees");
+        Require(braked, "a wolf reversing at a gallop should brake while its body still faces the way it came");
+        Require(!stillBraking && wolf.Motion == WolfMotion.Gallop, $"a wolf whose body has come round should gallop on, not {wolf.Motion}");
+        wolf.Root.Free();
     }
 
     /// <summary>At each gait's pace a paw on the ground holds its place while the body moves on over it, and no paw sinks into the ground.</summary>
@@ -162,6 +193,62 @@ public static class AnimationChecks {
         }
     }
 
+    /// <summary>
+    /// A cabin's door has two treads 14 cm high and then the floor, 40, 62 and 80 cm in from where a player stands at it,
+    /// as the cabin model builds them; a player walks, runs and is tugged over them and knocks on the door from the lower one.
+    /// </summary>
+    private static void CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem() {
+        ReadOnlySpan<float> edges = stackalloc float[] { .4f, .62f, .8f };
+        const float rise = .14f;
+        // How far in from the door point the hips go, facing in or out, over how many seconds, and whether the lowest boot must stay on the ground.
+        foreach (var (action, from, to, facingIn, seconds, grounded) in new[] {
+            (ActorAction.Walk, 0f, 1.8f, true, 1.5f, true), (ActorAction.Walk, 1.8f, 0f, false, 1.5f, true), (ActorAction.Jog, 0f, 1.8f, true, .7f, false),
+            (ActorAction.Walk, .1f, .5f, true, .3f, true), (ActorAction.Knock, .5f, .5f, true, 1f, true), (ActorAction.Tugged, .7f, -.3f, true, 1.5f, true) }) {
+            var up = new Vector2(0, facingIn ? 1 : -1);
+            float time = 0, deepest = 0, highest = 0;
+            for (int i = 0; i <= 300; i++) {
+                float depth = Mathf.Lerp(from, to, i / 300f), travelled = Math.Abs(to - from) * i / 300f;
+                time = seconds * i / 300f;
+                var pose = ActorAnimation.PoseAt(action, ActorAnimation.Stride(action) > 0 ? ActorAnimation.Advance(action, 0, travelled) : time, from != to);
+                (pose, float lift) = StairSteps.OnSteps(pose, depth, up, edges, rise);
+                float lowest = float.MaxValue;
+                for (int side = 0; side < 2; side++) {
+                    var (toe, heel) = side == 0 ? ActorAnimation.SoleOf(pose.SwingL, pose.KneeL, pose.FootL) : ActorAnimation.SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
+                    foreach (var point in new[] { toe, heel }) {
+                        // Facing out, a point ahead of the hips is further out from the door.
+                        float clear = lift + pose.HipHeight - point.Y - StairSteps.StepGround(depth + up.Y * point.X, edges, rise);
+                        deepest = Math.Min(deepest, clear); lowest = Math.Min(lowest, clear);
+                    }
+                }
+                if (grounded) highest = Math.Max(highest, lowest);
+            }
+            Require(deepest > -.003f, $"{action} from {from} m to {to} m in from a cabin's door should never sink a boot into its steps: {deepest:0.000} m");
+            Require(highest < .01f, $"{action} from {from} m to {to} m in from a cabin's door should keep a boot on the steps: the lowest rose {highest:0.000} m off them");
+        }
+    }
+
+    /// <summary>Hands pushed at points in front of the chest and face reach them, the elbow on its own side and down, outside the trunk rather than across or in it.</summary>
+    private static void CheckAHandReachesItsPointWithTheElbowTheWayAsked() {
+        var rig = new ActorRig(ActorSkin.Player);
+        foreach (bool left in new[] { true, false })
+            foreach (var target in new[] { new Vector3(.05f, .5f, .3f), new Vector3(-.05f, .6f, .25f), new Vector3(.1f, .35f, .35f), new Vector3(0, .55f, .4f) }) {
+                float side = left ? 1 : -1;
+                var aim = target with { X = target.X * side };
+                var (raise, outward, elbow, roll) = ArmReach.ArmTo(aim, left, new Vector3(side, -1, 0), ActorRig.Palm);
+                var pose = left ? new Pose(RaiseL: raise, OutL: outward, ElbowL: elbow) : new Pose(RaiseR: raise, OutR: outward, ElbowR: elbow);
+                rig.Show(pose, null, false);
+                rig.RollArm(left, roll);
+                var hips = Vector3.Up * pose.HipHeight;
+                float miss = (rig.Fist(left) - hips).DistanceTo(aim);
+                var at = rig.Elbow(left) - hips;
+                Require(miss < .005f, $"a {(left ? "left" : "right")} hand should reach {aim}: it missed by {miss:0.000} m");
+                // Its own side of the body and below the shoulder, beside the trunk or in front of the chest, never in it.
+                bool outside = at.X * side > ActorRig.ShoulderOut || at.Z > .2f;
+                Require(at.X * side > .05f && at.Y < ActorRig.ShoulderUp && outside, $"a {(left ? "left" : "right")} elbow should stay out and down, reaching {aim}: it is at {at}");
+            }
+        rig.Root.Free();
+    }
+
     private static void CheckActionsLoopAndWrapByTheirDuration() {
         Require(ActorAnimation.Phase(ActorAction.Chop, .25f) == .25f, "a one-second chop should be a quarter through after .25s");
         Require(ActorAnimation.Phase(ActorAction.Chop, 1) == 0, "action loops should wrap after their duration");
@@ -175,6 +262,51 @@ public static class AnimationChecks {
         Require(Math.Abs(ActorAnimation.Yaw(new Vector2(1, 0), 0) - Mathf.Pi / 2) < 1e-5f, "eastward movement should turn a quarter turn");
         Require(Math.Abs(Math.Abs(ActorAnimation.Yaw(new Vector2(0, -1), 0)) - Mathf.Pi) < 1e-5f, "northward movement should face backward");
         Require(ActorAnimation.Yaw(Vector2.Zero, 2) == 2, "zero movement should retain the previous facing");
+    }
+
+    /// <summary>People turning while walking or running turn the head about 0.2 s before the trunk, which follows within about 0.3 s.</summary>
+    private static void CheckPlayerHeadTurnsBeforeTheBody() {
+        var turning = new Turning();
+        float yaw = 0, quarter = Mathf.Pi / 2;
+        for (int i = 0; i < 6; i++) turning.Step(ref yaw, quarter, 3, 1 / 60f, running: false);
+        Require(Mathf.RadToDeg(turning.Look) > 20 && Mathf.RadToDeg(yaw) < 45, $"0.1 s into a quarter turn the head should look well ahead of a body still under half way round: look {Mathf.RadToDeg(turning.Look):0}°, body {Mathf.RadToDeg(yaw):0}°");
+        for (int i = 0; i < 15; i++) turning.Step(ref yaw, quarter, 3, 1 / 60f, running: false);
+        Require(Mathf.RadToDeg(yaw) > 81, $"0.35 s into a quarter turn the body should face nearly the new way: {Mathf.RadToDeg(yaw):0}°");
+    }
+
+    /// <summary>A key for straight back turns the body round through one side, never stalling or swinging between the two.</summary>
+    private static void CheckPlayerTurnsHalfwayRoundOneWay() {
+        var turning = new Turning();
+        float yaw = 0, turned = 0;
+        for (int i = 0; i < 30; i++) {
+            float before = yaw;
+            turning.Step(ref yaw, Mathf.Pi, 3, 1 / 60f, running: false);
+            float step = Mathf.AngleDifference(before, yaw);
+            Require(i == 0 || step * turned >= 0, $"a half turn should keep turning the same way, step {i}: {Mathf.RadToDeg(step):0.0}°");
+            turned += step;
+        }
+        Require(Math.Abs(turned) > Mathf.DegToRad(170), $"0.5 s into a half turn the body should face nearly back: turned {Mathf.RadToDeg(turned):0}°");
+    }
+
+    /// <summary>A sprinter leans toward the inside of a turn, a jogger barely leans, and someone standing still turns upright.</summary>
+    private static void CheckPlayerLeansIntoATurn() {
+        var turning = new Turning();
+        float yaw = 0;
+        for (int i = 0; i < 6; i++) turning.Step(ref yaw, Mathf.Pi / 2, 6.7f, 1 / 60f, running: true);
+        // Turning from +Z toward +X, the inside of the turn is the way the forward line swings.
+        var inside = new Vector3(MathF.Cos(yaw), 0, -MathF.Sin(yaw));
+        float tilt = (Basis.FromEuler(new Vector3(0, yaw, turning.Bank)) * Vector3.Up).Dot(inside);
+        Require(tilt > MathF.Sin(Mathf.DegToRad(5)), $"a sprinter turning should lean over 5° into the turn: {Mathf.RadToDeg(MathF.Asin(tilt)):0.0}°");
+        var jogging = new Turning();
+        yaw = 0;
+        for (int i = 0; i < 30; i++) {
+            jogging.Step(ref yaw, Mathf.Pi / 2, 4.2f, 1 / 60f, running: false);
+            Require(Math.Abs(jogging.Bank) <= Mathf.DegToRad(1.01f), $"a jogger turning should lean at most 1°, step {i}: {Mathf.RadToDeg(jogging.Bank):0.0}°");
+        }
+        var standing = new Turning();
+        yaw = 0;
+        for (int i = 0; i < 30; i++) standing.Step(ref yaw, Mathf.Pi / 2, 0, 1 / 60f, running: false);
+        Require(standing.Bank == 0, "someone turning on the spot should stay upright");
     }
 
     private static void CheckPlayerActionFollowsToolAndTarget() {
@@ -295,6 +427,12 @@ public static class AnimationChecks {
             for (int step = 0; step < 8; step++)
                 poses.Add(ActorAnimation.PoseAt(action, ActorAnimation.Duration(action) * step / 8, action == ActorAction.Carry));
             Require(poses.Count >= 6, $"{action} should move through at least six distinct poses per loop, found {poses.Count}");
+            // A fall happens once, from standing to lying down, and stays down after.
+            if (action == ActorAction.FallBack) {
+                Require(ActorAnimation.PoseAt(action, ActorAnimation.Duration(action) * 1.5f, false) == ActorAnimation.PoseAt(action, ActorAnimation.Duration(action), false),
+                    "a fall backward should stay lying down after it ends, as it blends into the next action");
+                continue;
+            }
             var start = ActorAnimation.PoseAt(action, 0, false);
             var end = ActorAnimation.PoseAt(action, ActorAnimation.Duration(action) - .001f, false);
             Require(Math.Abs(start.RaiseR - end.RaiseR) < 2,

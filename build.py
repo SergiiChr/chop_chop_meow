@@ -61,6 +61,7 @@ BASE_URL = (
 OUTPUT = BUILD / "ChopChopMeow.x86_64"
 # Each play launch exports into a folder named after its process id, which the game keeps after exec.
 PLAY_EXPORTS = BUILD / "play"
+RECORD_EXPORTS = BUILD / "record"
 PYTHON_TOOLS = TOOLS / "python"
 REQUIREMENTS = ROOT / "requirements-dev.txt"
 # Seconds all test stages together may take, so a run that hangs outside any check still stops.
@@ -686,7 +687,7 @@ def check_raw_save() -> None:
     """Fail when a check or step outside tests/SetupSteps.cs uses a world's raw save."""
     raw = re.compile(r"\b(?!Key\b)\w+\.S\b")
     files = [
-        *ROOT.glob("tests/*.cs"),
+        *ROOT.glob("tests/**/*.cs"),
         *ROOT.glob("src/*Checks.cs"),
         *ROOT.glob("src/*Steps.cs"),
     ]
@@ -766,6 +767,86 @@ def export_play(env: dict[str, str]) -> Path:
     return output
 
 
+# Files that never go into the game: its docs, the launcher's tools and agent skills.
+NOT_EXPORTED = re.compile(rb"\.md$|^(docs|tools|\.claude|\.github)/")
+
+
+def source_fingerprint() -> str:
+    """A fingerprint of every file git tracks or would track here that goes into the game, by path, size and change time."""
+    listed = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    ).stdout.split(b"\0")
+    digest = hashlib.sha256()
+    for name in sorted(
+        name for name in listed if name and not NOT_EXPORTED.search(name)
+    ):
+        try:
+            stat = (ROOT / os.fsdecode(name)).stat()
+        except FileNotFoundError:
+            continue
+        digest.update(name + f"\0{stat.st_size}\0{stat.st_mtime_ns}\0".encode())
+    return digest.hexdigest()[:16]
+
+
+def export_record() -> tuple[Path, dict[str, str]]:
+    """The export to record from, and the environment to run it in.
+
+    An export of these exact sources is reused; otherwise the project is set up and exported again into a folder named by
+    the sources' fingerprint, and folders of older exports that no recording is running from are removed.
+    """
+    fingerprint = source_fingerprint()
+    output = RECORD_EXPORTS / fingerprint / OUTPUT.name
+    if output.is_file():
+        print(
+            f"Reusing the export of unchanged sources {output.relative_to(ROOT)}",
+            flush=True,
+        )
+        return output, dotnet_env()
+    env = setup()
+    busy = running_folders()
+    for folder in RECORD_EXPORTS.glob("*"):
+        if folder.name != fingerprint and folder not in busy:
+            shutil.rmtree(folder, ignore_errors=True)
+    staging = RECORD_EXPORTS / f"{fingerprint}.partial" / OUTPUT.name
+    staging.parent.mkdir(parents=True, exist_ok=True)
+    export_release("record-export", staging, env)
+    # A finished export appears under its fingerprint all at once, so a run that fails halfway is never reused.
+    shutil.rmtree(output.parent, ignore_errors=True)
+    staging.parent.rename(output.parent)
+    return output, env
+
+
+def run_record(movie: Path, fps: int, game_args: list[str]) -> None:
+    """Record the exported game to a movie at a fixed frame rate, with its sound, through Godot's Movie Maker.
+
+    Each frame advances the window by exactly 1/fps seconds, however long it takes to draw, so recordings of the same flags
+    match frame for frame when the world runs in the window, as with --showcase or --animation-review; a normal game's
+    server runs on real time in its own process. The game's own flags end the run, such as --frames.
+    """
+    movie = movie if movie.is_absolute() else ROOT / movie
+    if movie.suffix != ".avi":
+        raise SystemExit(f"record writes an .avi movie, not {movie.name}")
+    movie.parent.mkdir(parents=True, exist_ok=True)
+    movie.unlink(missing_ok=True)
+    game, env = export_record()
+    # A native Wayland window draws about one frame a second; XWayland draws at full speed.
+    env.pop("WAYLAND_DISPLAY", None)
+    run_godot(
+        "record",
+        [game, "--write-movie", movie, "--fixed-fps", str(fps), "--", *game_args],
+        env,
+        timeout=600,
+    )
+    if not movie.is_file() or movie.stat().st_size == 0:
+        raise SystemExit(
+            f"record wrote no movie; see {(BUILD / 'record.log').relative_to(ROOT)}"
+        )
+    print(f"Recorded {movie} at {fps} frames a second")
+
+
 def run_build(env: dict[str, str]) -> None:
     """Run every check, export the Linux build, smoke-test it and bundle it."""
     run_check(env)
@@ -815,6 +896,9 @@ def build_parser() -> argparse.ArgumentParser:
         "stage of them.",
         "build": "Check, export, and smoke-test build/ChopChopMeow.x86_64.",
         "icons": "Render item and building icons from their models into assets/icons.",
+        "record": "Record the optimized release export to an .avi movie at a fixed frame "
+        "rate, reusing the last export while the sources are unchanged. Forward flags after "
+        "--, such as --frames to end it.",
     }
     for name, text in helps.items():
         subparser = commands.add_parser(name, help=text, description=text)
@@ -822,6 +906,17 @@ def build_parser() -> argparse.ArgumentParser:
             subparser.usage = "build.py play [-h] [-- GAME_ARGS ...]"
         if name == "test":
             subparser.add_argument("stage", nargs="?", choices=TEST_STAGES)
+        if name == "record":
+            subparser.usage = (
+                "build.py record [-h] [--fps FPS] MOVIE.avi -- GAME_ARGS ..."
+            )
+            subparser.add_argument("movie", type=Path, help="the .avi movie to write")
+            subparser.add_argument(
+                "--fps",
+                type=int,
+                default=30,
+                help="frames a second (default %(default)s)",
+            )
     return parser
 
 
@@ -835,10 +930,15 @@ def main() -> int:
     if args.action is None:
         parser.print_help()
         return 2
-    if game_args and args.action != "play":
+    if game_args and args.action not in {"play", "record"}:
         parser.error(f"{args.action} does not take arguments after --")
     if args.action in {"check", "build"}:
         python_checks()
+    if args.action == "record":
+        if "--frames" not in game_args:
+            parser.error("record needs --frames after -- to end the movie")
+        run_record(args.movie, args.fps, game_args)
+        return 0
     env = setup()
     match args.action:
         case "play":

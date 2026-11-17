@@ -1,0 +1,220 @@
+using System;
+using System.Linq;
+using Godot;
+
+namespace ChopChopMeow;
+
+/// <summary>
+/// Cabin doors in <paramref name="world"/>: one player at a time steps in through the door, the next one at the door
+/// knocks on it, and players standing aside let someone step out. What a wolf does to a player in the doorway is
+/// <see cref="DoorTug"/>'s.
+/// </summary>
+public sealed class Doorways(World world) {
+    /// <summary>Seconds stepping in through a cabin door at a walk and at a sprint, stepping out, and knocking on a shut door.</summary>
+    public const float EnterSeconds = 1.3f, RushSeconds = .7f, LeaveSeconds = 1.5f, KnockSeconds = 1;
+    /// <summary>
+    /// Seconds a cabin's door takes to swing shut, and before the first knock on it: a player left outside waits for the
+    /// door to shut, then steps up to it.
+    /// </summary>
+    public const float ShutSeconds = .4f, KnockLead = .5f;
+    /// <summary>The way out of a cabin's door, which is in its front wall.</summary>
+    public static readonly Vector2 OutOfDoor = Vector2.Down;
+    /// <summary>Knocks on a shut door, spread over <see cref="KnockSeconds"/>.</summary>
+    public const int Knocks = 3;
+    /// <summary>How far, in metres, from <see cref="DoorPoint"/> a player can start stepping in.</summary>
+    public const float DoorReach = .5f;
+    /// <summary>Where a player stands at a cabin's door, from the cabin's middle: in front of the doorway in the model's front wall, past its step and clear of the door as it swings open.</summary>
+    private static readonly Vector2 DoorOffset = new(-.34f, 2f);
+
+    /// <summary>The spot just outside a cabin's door where a player steps in and out.</summary>
+    public static Vector2 DoorPoint(Thing cabin) => cabin.Pos + DoorOffset;
+
+    /// <summary>
+    /// Where a player stepping out of or waking in a cabin stands: at its door, or, with that blocked, as in a cabin from an
+    /// older save built before its door had to be clear, on the first open ground round the cabin.
+    /// </summary>
+    public Vector2 Doorstep(Thing cabin) {
+        if (world.CanStand(DoorPoint(cabin))) return DoorPoint(cabin);
+        for (int i = 0; i < 8; i++) {
+            var p = cabin.Pos + Vector2.Down.Rotated(i * MathF.PI / 4) * (World.Footprint(ThingKind.Hut) + .6f);
+            if (world.CanStand(p)) return p;
+        }
+        return DoorPoint(cabin);
+    }
+
+    /// <summary>Seconds a player's doorway stage lasts.</summary>
+    public static float DoorSeconds(PlayerState p) => p.Door switch {
+        Doorway.Entering => p.DoorRush ? RushSeconds : EnterSeconds,
+        Doorway.Leaving => LeaveSeconds,
+        Doorway.Knocking => KnockLead + KnockSeconds,
+        Doorway.Tugged or Doorway.TuggedOff => DoorTug.Seconds(p),
+        _ => 0
+    };
+
+    /// <summary>Whether wolves can neither smell nor reach a player: inside a cabin, through the second half of stepping in and the first half of stepping out.</summary>
+    public static bool Indoors(PlayerState p) =>
+        p.Sheltered != 0 || p.Door == Doorway.Entering && p.DoorTime >= DoorSeconds(p) / 2 || p.Door == Doorway.Leaving && !Through(p);
+
+    /// <summary>
+    /// Starts stepping into a cabin from its door: in when it is free, up behind someone already stepping in, or knocking on
+    /// the door when someone is inside. A player who sprinted there, <paramref name="rush"/>, steps in at a run and slams the door.
+    /// </summary>
+    public bool Enter(Thing hut, bool rush) {
+        var s = world.S;
+        if (hut.Kind != ThingKind.Hut || world.Occupied || s.Sheltered != 0 || world.Player.DistanceTo(DoorPoint(hut)) > DoorReach) return false;
+        if (!world.Forwarded(Verb.Enter, hut.Id, count: rush ? 1 : 0)) { s.Actor.DoorQueued = ++s.DoorArrivals; StepIn(hut.Id, rush); }
+        return true;
+    }
+
+    /// <summary>Starts stepping out of the cabin the acting player is in, onto its doorstep.</summary>
+    public void Leave() {
+        var s = world.S;
+        if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None || world.Forwarded(Verb.Leave)) return;
+        s.Sheltered = 0; world.Player = Doorstep(cabin); s.Actor.Warp++;
+        Stage(s.Actor, Doorway.Leaving, cabin.Id);
+        // Whoever knocks on the door steps aside to let them out, keeping the order they came in,
+        // and the one stepping out keeps to the other side of the door, to pass them as they squeeze in.
+        foreach (var other in s.Players.Where(o => o != s.Actor && Waiting(o, cabin)).OrderBy(o => o.DoorQueued).ToList()) {
+            Stage(other, Doorway.Aside, cabin.Id); other.DoorQueued = ++s.DoorArrivals;
+            other.Pos = AsideSpot(other, cabin); other.Warp++;
+        }
+        if (s.Players.Any(o => o.Door == Doorway.Aside && o.DoorCabin == cabin.Id)) world.Player = DoorPoint(cabin) - AsideWay * MakeWay;
+        // Someone just standing at the door stays where they are, and the one stepping out ends beside them instead.
+        foreach (var other in s.Players)
+            if (other != s.Actor && other.Sheltered == 0 && other.Door == Doorway.None && other.Pos.DistanceTo(world.Player) < ClearOf) {
+                float side = (other.Pos - DoorPoint(cabin)).Dot(AsideWay) > 0 ? -1 : 1;
+                world.Player = other.Pos + AsideWay * (side * ClearOf);
+            }
+    }
+    /// <summary>How far apart, in metres, someone stepping out of a cabin keeps from a player standing at its door.</summary>
+    public const float ClearOf = .6f;
+    /// <summary>How far to the other side of a cabin's door point someone stepping out past a player standing aside keeps.</summary>
+    public const float MakeWay = .1f;
+
+    /// <summary>Whether a player stepping out of a cabin is through its doorway, out in the open on the step.</summary>
+    public static bool Through(PlayerState p) => p.DoorTime >= ThroughSeconds;
+    /// <summary>Seconds into stepping out at which a player is through the doorway.</summary>
+    public const float ThroughSeconds = LeaveSeconds / 2;
+
+    /// <summary>Whether someone in the doorway on their way out of the cabin a player stands aside at, or standing aside there before them, still keeps them from stepping in.</summary>
+    private bool Blocked(PlayerState aside) {
+        foreach (var o in world.S.Players)
+            if (o.DoorCabin == aside.DoorCabin && (o.Door == Doorway.Leaving && !Through(o) || o.Door == Doorway.Aside && o.DoorQueued < aside.DoorQueued)) return true;
+        return false;
+    }
+
+    /// <summary>Whether a player waits at a cabin's door: knocking on it.</summary>
+    private static bool Waiting(PlayerState p, Thing cabin) => p.Door == Doorway.Knocking && p.DoorCabin == cabin.Id;
+
+    /// <summary>
+    /// Where a player standing aside at a cabin's door stands: a step to the right of the door point, away from the door as it
+    /// swings open, a further step out for each player who stood aside before them.
+    /// </summary>
+    private Vector2 AsideSpot(PlayerState p, Thing cabin) {
+        int before = world.S.Players.Count(o => o != p && o.Door == Doorway.Aside && o.DoorCabin == cabin.Id && o.DoorQueued < p.DoorQueued);
+        return DoorPoint(cabin) + AsideWay * (AsideStep + AsideGap * before);
+    }
+    /// <summary>The way players at a cabin's door step aside: to their right as they face the door.</summary>
+    public static readonly Vector2 AsideWay = OutOfDoor.Orthogonal();
+    /// <summary>How far to the side of a cabin's door point the first player standing aside stands, and how far apart the next ones stand.</summary>
+    public const float AsideStep = .7f, AsideGap = .6f;
+
+    /// <summary>A step of <paramref name="move"/> for the acting player walking to a cabin's door, cut short to stop on the door rather than past it.</summary>
+    public Vector2 StepToDoor(Thing cabin, Vector2 move) => move.LimitLength(world.Player.DistanceTo(DoorPoint(cabin)));
+
+    /// <summary>
+    /// The way to walk from <paramref name="from"/> to a cabin's door: straight there when the cabin is not in the way, else
+    /// to the edge of the cabin's walls and round them on the shorter side; zero once at the door.
+    /// </summary>
+    public static Vector2 TowardDoor(Thing cabin, Vector2 from) {
+        var door = DoorPoint(cabin);
+        if (from.DistanceTo(door) < .15f) return Vector2.Zero;
+        // The circle a walk round the cabin keeps to, a little outside what blocks a walker.
+        float round = World.Footprint(ThingKind.Hut) + .3f;
+        var centre = cabin.Pos;
+        var line = door - from;
+        float along = Math.Clamp((centre - from).Dot(line) / line.LengthSquared(), 0, 1);
+        if ((from + line * along).DistanceTo(centre) >= round) return line.Normalized();
+        var outward = from - centre;
+        float distance = outward.Length(), side = Mathf.AngleDifference(outward.Angle(), (door - centre).Angle()) >= 0 ? 1 : -1;
+        // Out past the circle, head for where a line from here touches it on the door's side; on it, walk along it, held at its radius.
+        if (distance > round + .1f) return (centre + outward.Rotated(side * MathF.Acos(round / distance)) / distance * round - from).Normalized();
+        return (outward.Rotated(side * MathF.PI / 2) / distance + outward / distance * (round - distance)).Normalized();
+    }
+
+    /// <summary>The nearest cabin nobody is in or at the door of, or null.</summary>
+    public Thing? NearestFreeCabin(Vector2 from) {
+        Thing? best = null;
+        foreach (var t in world.S.Things.Of(ThingKind.Hut))
+            if (Ahead(t.Id, world.S.Actor) == Doorway.Entering && (best == null || t.Pos.DistanceSquaredTo(from) < best.Pos.DistanceSquaredTo(from))) best = t;
+        return best;
+    }
+
+    /// <summary>
+    /// What a player arriving at a cabin's door does, given who is there before them: steps in when nobody is, knocks on the
+    /// door when someone is inside or stepping out, and follows someone stepping in.
+    /// </summary>
+    public Doorway Ahead(int cabin, PlayerState arriving) {
+        var door = Doorway.Entering;
+        // A player not at any door, such as one waking or rejoining, comes after everyone already there.
+        int queued = arriving.Door == Doorway.None ? int.MaxValue : arriving.DoorQueued;
+        foreach (var p in world.S.Players) {
+            if (p == arriving) continue;
+            // Someone still in the doorway on their way out keeps the door; once they are through it, the next one squeezes past them in.
+            if (p.Sheltered == cabin || p.DoorCabin == cabin && p.Door == Doorway.Leaving && !Through(p)) return Doorway.Knocking;
+            // Someone tugged back out, or standing aside for someone stepping out, stays ahead only if they came to the door first.
+            if (p.DoorCabin == cabin && (p.Door == Doorway.Entering || p.Door is Doorway.Tugged or Doorway.Aside && p.DoorQueued < queued)) door = Doorway.Following;
+        }
+        return door;
+    }
+
+    /// <summary>Starts the acting player stepping into a cabin, or following or knocking as whoever is there before them leaves them.</summary>
+    public void StepIn(int cabin, bool rush) => Stage(world.S.Actor, Ahead(cabin, world.S.Actor), cabin, rush);
+
+    /// <summary>Starts a player on a doorway stage at a cabin.</summary>
+    public static void Stage(PlayerState p, Doorway door, int cabin, bool rush = false) {
+        p.Door = door; p.DoorCabin = cabin; p.DoorTime = 0; p.DoorRush = rush;
+    }
+
+    /// <summary>
+    /// Plays <paramref name="sound"/> at each of <paramref name="count"/> beats <paramref name="every"/> seconds apart from
+    /// <paramref name="first"/> seconds into a doorway stage that fall after <paramref name="from"/> seconds of it and by <paramref name="to"/>.
+    /// </summary>
+    private void Beats(string sound, float from, float to, float first, float every, int count) {
+        for (int i = 0; i < count; i++)
+            if (from < first + i * every && first + i * every <= to) world.Play(sound, world.Player);
+    }
+
+    /// <summary>Moves the acting player's doorway stage on: inside once stepped in, knocking once the door shuts in front, and free once done.</summary>
+    public void Tick(float dt) {
+        var p = world.S.Actor;
+        if (p.Door == Doorway.None) return;
+        if (world.Downed || world.Find(p.DoorCabin)?.Kind != ThingKind.Hut) { p.Door = Doorway.None; return; }
+        float before = p.DoorTime;
+        p.DoorTime += dt;
+        bool done = p.DoorTime >= DoorSeconds(p);
+        switch (p.Door) {
+            case Doorway.Entering when done:
+                p.Sheltered = p.DoorCabin; p.Door = Doorway.None;
+                break;
+            case Doorway.Following:
+                // The door shuts in front of a follower once the player ahead is inside; with nobody ahead any more, it is their turn.
+                if (Ahead(p.DoorCabin, p) != Doorway.Following) StepIn(p.DoorCabin, p.DoorRush);
+                break;
+            case Doorway.Knocking:
+                Beats("door_knock", before, p.DoorTime, KnockLead, KnockSeconds / Knocks, Knocks);
+                if (done) p.Door = Doorway.None;
+                break;
+            case Doorway.Tugged or Doorway.TuggedOff when done:
+                world.DoorTug.End();
+                break;
+            case Doorway.Leaving when done:
+                p.Door = Doorway.None;
+                break;
+            case Doorway.Aside:
+                // Once the one stepping out is through the doorway, whoever stood aside first squeezes past them in.
+                if (!Blocked(p)) StepIn(p.DoorCabin, false);
+                break;
+        }
+    }
+}

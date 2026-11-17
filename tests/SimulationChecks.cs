@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static CabinSteps;
 using static SetupSteps;
 using static WorldSteps;
 using static EconomySteps;
@@ -63,6 +64,7 @@ public static class SimulationChecks {
         Test(CheckQueuingSeveralBatchesLoadsEachOfThem, data);
         Test(CheckStationLoadsMidBatchAndFinishesIt, data);
         Test(CheckAnvilNeedsHammering, data);
+        Test(CheckPlayerWorksAStationOnlyWithinAMetreOfItsEdge, data);
         Test(CheckFinishedBatchWaitsForOutputRoom, data);
         Test(CheckToolsGateMiningAndFelling, data);
         Test(CheckCliffsHaveDepositsAndLooseCoal, data);
@@ -77,6 +79,7 @@ public static class SimulationChecks {
         Test(CheckWolvesHuntAndCarcassesYieldMeat, data);
         Test(CheckWolvesLeaveHealthyOrFirelitPlayersAlone, data);
         Test(CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth, data);
+        WolfBodiesChecks.Run(data);
         Test(CheckWolfThatBitesAPlayerToDeathEatsTheirFood, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
         Test(CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst, data);
@@ -85,6 +88,10 @@ public static class SimulationChecks {
         Test(CheckSleepHealsOnlyWhileFed, data);
         Test(CheckSprintBurnsFood, data);
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
+        CabinChecks.Run(data);
+        Test(CheckPressingTheOppositeWayBrakesBeforeRunningBack, data);
+        DoorTugChecks.Run(data);
+        Test(CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
         Test(CheckARandomDenLetsOneMoreWolfOutEveryHour, data);
@@ -272,8 +279,7 @@ public static class SimulationChecks {
 
         Give(world, "wood", 12); Give(world, "stone", 8);
         var cabin = world.Build(ThingKind.Hut, world.Player + new Vector2(-4, 0))!;
-        world.Player = cabin.Pos + new Vector2(2, 0);
-        Require(world.Enter(cabin), "the player should step into the cabin");
+        StepInside(world, cabin);
         Require(!world.Dismantle(cabin) && world.Find(cabin.Id) != null, "a cabin someone shelters in should not come down");
     }
 
@@ -659,13 +665,13 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         world.Player = new Vector2(12, 10);
         Give(world, "wood", 5);
-        world.Die();
-        var box = world.Things.Last(t => t.Kind == ThingKind.Grave);
         var tree = world.Add(ThingKind.Tree, new Vector2(13, 10), 30);
         var chest = world.Add(ThingKind.Chest, new Vector2(20, 10));
         var worker = AddWorker(world, new Vector2(14, 10));
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
+        world.Die();
+        var box = world.Things.Last(t => t.Kind == ThingKind.Grave);
         SafeTick(world, 25);
         Require(box.Inventory["wood"] == 5 && chest.Inventory["wood"] > 0,
                 "workers must store gathered goods in chests, not in the player's recovery box");
@@ -1003,17 +1009,38 @@ public static class SimulationChecks {
         Require(reinforced.Burner["coal"] == 1, "a cooled forge should keep burning coal from its fuel slot");
     }
 
+    /// <summary>The anvil's edge is 0.45 m from its middle and the reinforced furnace's 0.8 m.</summary>
+    private static void CheckPlayerWorksAStationOnlyWithinAMetreOfItsEdge(GameData data) {
+        var world = EmptyWorld(data);
+        var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
+        anvil.Inventory.Add("steel_bar", 3);
+        world.Player = anvil.Pos + new Vector2(1.6f, 0);
+        for (int i = 0; i < 4; i++) world.Tick(.25f);
+        Require(!anvil.Processing, "a player standing 1.15 m from the anvil's edge must not hammer it");
+        world.Player = anvil.Pos + new Vector2(1.35f, 0);
+        for (int i = 0; i < 4; i++) world.Tick(.25f);
+        Require(anvil.Processing && anvil.Progress > 0, "a player standing 0.9 m from the anvil's edge should hammer it");
+
+        var forge = world.Add(ThingKind.Reinforced, new Vector2(20, 10));
+        world.Player = forge.Pos + new Vector2(1.95f, 0);
+        world.Pump(forge);
+        Require(forge.Heat == 0, "a player 1.15 m from the furnace's edge must not pump its bellows");
+        world.Player = forge.Pos + new Vector2(1.7f, 0);
+        world.Pump(forge);
+        Require(forge.Heat > 0, "a player 0.9 m from the furnace's edge should pump its bellows");
+    }
+
     private static void CheckAnvilNeedsHammering(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
         anvil.Inventory.Add("steel_bar", 3);
-        world.Player = anvil.Pos + new Vector2(1.5f, 0);
+        world.Player = anvil.Pos + new Vector2(1.2f, 0);
         for (int i = 0; i < 8; i++) { world.MovePlayer(new Vector2(i % 2 == 0 ? .1f : -.1f, 0)); world.Tick(.25f); }
         Require(!anvil.Processing && anvil.Inventory["steel_bar"] == 3, "an anvil must not start while the player only walks past it");
         world.Tick(.25f);
         Require(anvil.Processing && anvil.Progress > 0, "a player standing at the anvil should hammer the batch");
         float progress = anvil.Progress;
-        world.Player = anvil.Pos + new Vector2(1.5f, 0);
+        world.Player = anvil.Pos + new Vector2(1.2f, 0);
         for (int i = 0; i < 4; i++) { world.Gather(anvil, .25f); world.Tick(.25f); }
         Require(anvil.Progress == progress, "a busy player must not advance the anvil");
 
@@ -1264,12 +1291,14 @@ public static class SimulationChecks {
         var leaper = new Wolf { Pos = maul.Player + new Vector2(3, 0), Attack = 5 };
         var packmate = new Wolf { Pos = maul.Player + new Vector2(-9, 4), Attack = 5 };
         PlaceWolf(maul, leaper); PlaceWolf(maul, packmate);
+        var heard = Listen(maul);
         maul.Tick(.1f);
         Require(leaper.Leap > 0 && !maul.Mauled, "a nearby wolf should leap at a player on half health");
         maul.Tick(World.LeapSeconds);
         Require(maul.Mauled, "the leap should pin the player");
+        Require(heard.Count(name => name == "takedown_scream") == 1, $"a player pinned by a leap should scream once: heard {string.Join(", ", heard)}");
         Require(leaper.Feeding, "the leap should make the wolf feed");
-        Require(leaper.Pinning, "the leap should make the wolf pin");
+        Require(leaper.Pinning && leaper.LungeFrom == Vector2.Zero, "the leap should make the wolf pin, over the player");
         Require(leaper.Pos.DistanceTo(maul.Player) < 1.6f, "the leap should land at the throat");
         var pinned = maul.Player;
         maul.MovePlayer(Vector2.Right);
@@ -1615,8 +1644,8 @@ public static class SimulationChecks {
         var data = world.Data;
         var worker = world.Hire(sign, offer);
         Require(worker != null, "sale proceeds should fund a new worker");
-        // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning.
-        for (int i = 0; i < 4000 && !world.OnDuty(worker!); i++) { SafeTick(world, Step); SetNeeds(world, health: 100); }
+        // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning; the night's wolves are not what this checks.
+        for (int i = 0; i < 4000 && !world.OnDuty(worker!); i++) { SafeTick(world, Step); RemoveWolves(world, _ => true); }
         var chest = BuildAt(world, ThingKind.Chest, Site(37, 25));
         // A woodcutter takes an axe from a tool station, so the player racks theirs: a station is 8 planks and 4 stone.
         GatherUntil(world, tree, "wood", 2);
@@ -2332,7 +2361,7 @@ public static class SimulationChecks {
         Give(world, Inventory.Coins, 500);
         // The player waits out the nights in a cabin, out of the wolves' reach.
         var hut = world.Add(ThingKind.Hut, new Vector2(40, 40));
-        world.Player = hut.Pos + new Vector2(0, 2); world.Enter(hut);
+        StepInside(world, hut);
         for (int i = 0; i < 4 * data.DaySeconds && farm.FarmStage == FarmStage.Ripe; i++) SafeTick(world, 1);
         Require(farm.FarmStage == FarmStage.Fallow && farm.Output!["wheat_seeds"] + farm.Inventory["wheat_seeds"] == 2, "a worker should finish the shared harvest into the plot");
         SafeTick(world, 30);
@@ -2420,7 +2449,6 @@ public static class SimulationChecks {
         Require(world.KnownPrice("raw_meat") > 0 && !world.Priced("wheat_seeds"), "the price sheet only tracks goods the village buys");
         Require(!data.Items.ContainsKey("canned_food") && data.Recipes.Values.All(r => !r.Inputs.ContainsKey("raw_meat") || r.Station != ThingKind.Cannery), "raw meat should sell in crates and never go into a can");
     }
-
 
     private static void CheckStationBatchesAndMarkSurviveALoad(GameData data) {
         var old = EmptyWorld(data);
@@ -2564,7 +2592,7 @@ public static class SimulationChecks {
     private static void CheckARandomDenLetsOneMoreWolfOutEveryHour(GameData data) {
         // Inside a cabin the player is never smelled, so every wolf let out stays out until the retreat.
         var world = EmptyWorld(data);
-        Require(world.Enter(world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0))), "the player should step into the cabin");
+        StepInside(world, world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0)));
         RunUntilDusk(world);
         SafeTick(world, data.HourSeconds - 1);
         Require(world.Wolves.Count == World.Dens.Length, "only the wolves of dusk should be out through the first hour");
@@ -2676,13 +2704,13 @@ public static class SimulationChecks {
         var world = NightWorld(data);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
         var howler = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-8, 0), Howl = 5, HowlLength = 5, Flee = 2, Stagger = 1 });
-        Require(world.Enter(hut), "the player should step into the cabin");
+        StepInside(world, hut);
         SafeTick(world, .1f);
         Require(howler.Target == 0 && howler.Mode == WolfMode.Patrol && howler.Howl == 0 && howler.Flee == 0 && howler.Stagger == 0,
                 "a wolf whose player took shelter should drop its howl and flight and patrol");
-        // A wolf whose player left the game lets go of them.
+        // A wolf whose player left the game lets go of them; out of sight of the one still playing, it howls before it hunts them.
         var gone = NightWorld(data);
-        var feeder = PlaceWolf(gone, new Wolf { Pos = gone.Player + new Vector2(5, 0), Target = 999, Feeding = true, Pinning = true, Leap = 1, Chase = 3 });
+        var feeder = PlaceWolf(gone, new Wolf { Pos = gone.Player + new Vector2(20, 0), Target = 999, Feeding = true, Pinning = true, Leap = 1, Chase = 3 });
         SafeTick(gone, .1f);
         Require(feeder.Target != 999 && !feeder.Feeding && !feeder.Pinning && feeder.Leap == 0 && feeder.Chase == 0,
                 "a wolf whose player left should stop feeding, leaping and chasing");
@@ -2749,13 +2777,35 @@ public static class SimulationChecks {
         Require(Gap(true) > 4.1f, "a sprinting player must outrun a chasing wolf");
     }
 
+    private static void CheckPressingTheOppositeWayBrakesBeforeRunningBack(GameData data) {
+        var momentum = new Momentum();
+        Require(momentum.Step(Vector2.Right, 1 / 60f) == Vector2.Right, "a player setting off from a stand should run at full pace at once");
+        Require(momentum.Step(Vector2.Down, 1 / 60f) == Vector2.Down, "a key at right angles should turn the run at once");
+        var step = Vector2.Zero;
+        for (int i = 0; i < 6; i++) step = momentum.Step(Vector2.Up, 1 / 60f);
+        Require(momentum.Braking && step.Dot(Vector2.Down) is > 0 and < 1, $"0.1 s after pressing the opposite way the player should still slide on, slower, not {step}");
+        for (int i = 0; i < 21; i++) step = momentum.Step(Vector2.Up, 1 / 60f);
+        Require(!momentum.Braking && step.Dot(Vector2.Up) > 0, $"0.45 s after pressing the opposite way the player should be running back, not {step}");
+        for (int i = 0; i < 12; i++) step = momentum.Step(Vector2.Up, 1 / 60f);
+        Require(step == Vector2.Up, "the player should be back to full pace soon after turning round");
+        Require(momentum.Step(Vector2.Zero, 1 / 60f) == Vector2.Zero && momentum.Step(Vector2.Down, 1 / 60f) == Vector2.Down, "letting go should stop the player at once, and the next key start a fresh run");
+    }
+
+    private static void CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl(GameData data) {
+        var world = NightWorld(data);
+        var heard = Listen(world);
+        var wolf = PatrolWolf(world, new Wolf { Pos = world.Player + new Vector2(4, 0) });
+        world.Tick(.1f);
+        Require(wolf.Target == world.Me.Id && wolf.Howl == 0 && !heard.Any(name => name.StartsWith("wolf_howl", StringComparison.Ordinal)), "a wolf that finds a player within its sight should go for them without a howl");
+    }
+
     private static void CheckCabinShelterAndChasingWolfGivesUpInLight(GameData data) {
         var world = NightWorld(data);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
         var wolf = new Wolf { Pos = world.Player + new Vector2(-4, 0) };
         PlaceWolf(world, wolf);
         SafeTick(world, .5f);
-        Require(world.Enter(hut) && world.Sheltered == hut.Id, "clicking a nearby cabin should take the player inside");
+        StepInside(world, hut);
         float before = wolf.Pos.DistanceTo(world.Player);
         SetNeeds(world, health: 40);
         SafeTick(world, 1);
@@ -2771,7 +2821,7 @@ public static class SimulationChecks {
         PlaceWolf(world, caught);
         SafeTick(world, 10);
         Require(caught.Target == 0 && wolf.Target == 0 && caught.Mode == WolfMode.Patrol, "wolves should give up on the player and patrol on once they have been inside long enough");
-        world.Leave();
+        world.Doorways.Leave();
         Require(world.Sheltered == 0, "stepping outside should leave the cabin");
         world.Player = hut.Pos + new Vector2(12, 0);
         SetNeeds(world, health: -1);

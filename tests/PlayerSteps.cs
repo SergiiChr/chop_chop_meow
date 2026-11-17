@@ -90,7 +90,7 @@ internal static class PlayerSteps {
     }
 
     public static Thing BuildAt(World world, ThingKind kind, Vector2 position) {
-        world.Player = position + new Vector2(-2, 0);
+        world.Player = position + new Vector2(-1.5f, 0);
         var built = world.Build(kind, position);
         Require(built != null, $"build {kind} at a clear nearby location");
         return built!;

@@ -61,6 +61,8 @@ public partial class Game : Node, IGameFlow {
     /// <summary>Health as last shown, so a guest flashes the damage its updates bring.</summary>
     private float shownHealth;
     private float runTime;
+    /// <summary>Frames left before a recording ends the game, from <c>--frames</c>; zero runs on.</summary>
+    private int framesLeft;
     private bool capturing;
     private bool quitting;
     /// <summary>The window fills the screen; review runs and checks start in a window whatever the player chose.</summary>
@@ -72,6 +74,8 @@ public partial class Game : Node, IGameFlow {
             if (Launch.Has("--server")) { Server.Run(this, data); return; }
             // A check run that stopped half way leaves its settings and saves behind; they go before anything here reads them.
             if (Launch.Args.Any(a => a is "--ui-test" or "--net-check" or "--server-check")) RemoveCheckFiles();
+            // A driven playtest starts from every option at its default, in a window at the design size, whatever the last one changed.
+            if (Launch.Has("--drive")) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(Settings.Path));
             world = new World(data);
             if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             if (Launch.Value("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
@@ -112,15 +116,14 @@ public partial class Game : Node, IGameFlow {
                 panel.Close(); ui.Visible = false; AudioServer.SetBusMute(0, true);
                 view.RenderIntro(introFolder, stills);
             }
-            if (Launch.Has("--animation-review")) {
-                panel.Close(); ui.Visible = false; view.AnimationReview = true;
-                if (Launch.Value("--animation-capture") is string captures) {
-                    // Thirty frames a second of animation time, slowed by --animation-slow for a closer look.
-                    float slow = Launch.Number("--animation-slow", 1);
-                    if (!(slow > 0 && float.IsFinite(slow))) throw new ArgumentException($"--animation-slow must be a positive number: {slow}");
-                    view.CaptureStep = 1f / 30 / slow;
-                    CaptureAnimations(captures);
-                }
+            if (Launch.Has("--animation-review")) { panel.Close(); ui.Visible = false; view.AnimationReview = true; }
+            // A recording slows game time for a closer look, and ends after so many frames.
+            float slow = Launch.Number("--slow", 1);
+            if (!(slow > 0 && float.IsFinite(slow))) throw new ArgumentException($"--slow must be a positive number: {slow}");
+            Engine.TimeScale = 1 / slow;
+            if (Launch.Value("--frames") != null) {
+                framesLeft = (int)Launch.Number("--frames", 0);
+                if (framesLeft <= 0) throw new ArgumentException($"--frames must be a positive whole number: {Launch.Value("--frames")}");
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
@@ -345,6 +348,8 @@ public partial class Game : Node, IGameFlow {
     public override void _Process(double delta) {
         // Drawing the intro film takes no input and runs no game under it.
         if (world == null || view == null || introFolder != null) return;
+        // A recording ends on its last frame, with no sound left playing to hold its stream at exit.
+        if (framesLeft > 0 && --framesLeft == 0) { LeaveServer(); sounds.StopAll(); GetTree().Quit(); }
         float dt = Math.Min((float)delta, .1f); runTime += dt;
         player.Update(dt, GetViewport().GuiGetHoveredControl() != null); panel.ShowAwaited();
         if (session is Session.Launching launching) AwaitServer(launching);
@@ -360,7 +365,9 @@ public partial class Game : Node, IGameFlow {
         }
         view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection; view.Placing = player.Mode.Placing;
         view.Mouse = GetViewport().GetMousePosition();
-        var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
+        // A recording leaves the pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
+        bool recording = Engine.GetWriteMoviePath() != "";
+        var hover = recording ? null : view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = recording ? 0 : view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt;
         if (uiClock > .2f || net.AwaitingAnswer && net.ShownUpdate != refreshedUpdate) {
             uiClock = 0; refreshedUpdate = net.ShownUpdate; RefreshLive();

@@ -30,7 +30,13 @@ public enum ActorAction {
     Grind,
     Dig,
     AxeSwing,
-    SteelAxeSwing
+    SteelAxeSwing,
+    Knock,
+    Brake,
+    /// <summary>Tugged back by the waist by a wolf, bent over and stepping back with each tug.</summary>
+    Tugged,
+    /// <summary>Knocked or yanked off the feet backward by a wolf, falling onto the back.</summary>
+    FallBack
 }
 
 /// <summary>
@@ -82,6 +88,10 @@ public static class ActorAnimation {
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
+        ActorAction.Knock => Doorways.KnockSeconds / Doorways.Knocks,
+        ActorAction.Brake => Momentum.BrakeSeconds,
+        ActorAction.Tugged => 2 * DoorTug.TugSeconds / DoorTug.Tugs,
+        ActorAction.FallBack => FallBackSeconds,
         ActorAction.Kindle => World.KindleSeconds,
         ActorAction.TorchSwing => .6f,
         ActorAction.Sit or ActorAction.Perch => 4,
@@ -118,6 +128,8 @@ public static class ActorAnimation {
         return phase < 0 ? phase + 1 : phase;
     }
 
+    /// <summary>The ground direction a body facing <paramref name="yaw"/> faces.</summary>
+    public static Vector2 Forward(float yaw) => new(MathF.Sin(yaw), MathF.Cos(yaw));
     /// <summary>Turns world-plane movement into a rig yaw in radians; the rig faces +Z, which is world +Y.</summary>
     public static float Yaw(Vector2 movement, float previous) =>
         movement.LengthSquared() < 0.0001f ? previous : MathF.Atan2(movement.X, movement.Y);
@@ -155,6 +167,19 @@ public static class ActorAnimation {
         (.66f, TwoHanded(Stance with { Lean = 20, Twist = -16, Sway = 2, RaiseR = 74, OutR = -40, ElbowR = 30, Grip = 90, KneeL = 24, KneeR = 16 })),
     };
     private static readonly Pose MineGuard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
+    /// <summary>Seconds a player knocked or yanked off their feet backward takes to land on their back and lie there under the wolf.</summary>
+    public const float FallBackSeconds = .8f;
+
+    // Knocked or yanked back off the feet: the trunk is jerked upright and back, the head snaps forward, the arms fling up
+    // for the door and the front foot slips out ahead; the knees fold as the body drops onto its seat and back, the arms thrown
+    // wide at the landing, and then it lies fighting the wolf as Mauled has it. The rig tips back as FallBackView.FallBack has it.
+    private static readonly (float At, Pose Pose)[] FallBackKeys = {
+        (0, new Pose(Lean: 12, Head: -10, RaiseL: 80, OutL: 14, ElbowL: 30, RaiseR: 85, OutR: 12, ElbowR: 26, SwingL: 6, KneeL: 16, SwingR: 6, KneeR: 16, Splay: 3)),
+        (.18f, new Pose(Lean: -8, Head: 26, RaiseL: 140, OutL: 20, ElbowL: 30, RaiseR: 128, OutR: 24, ElbowR: 40, SwingL: 38, KneeL: 8, FootL: -20, SwingR: 4, KneeR: 34, Splay: 5)),
+        (.45f, new Pose(Lean: -14, Head: 32, RaiseL: 125, OutL: 34, ElbowL: 40, RaiseR: 105, OutR: 38, ElbowR: 48, SwingL: 70, KneeL: 42, FootL: -10, SwingR: 58, KneeR: 70, Splay: 6)),
+        (.7f, new Pose(Lean: 0, Head: 18, RaiseL: 150, OutL: 46, ElbowL: 34, RaiseR: 145, OutR: 50, ElbowR: 30, SwingL: 26, KneeL: 40, SwingR: 20, KneeR: 48, Splay: 6)),
+        (.999f, new Pose(Head: -26, RaiseL: 128, OutL: -8, ElbowL: 55, RaiseR: 128, OutR: -8, ElbowR: 55, SwingL: 10, KneeL: 22, SwingR: 10, KneeR: 22)),
+    };
     private static readonly (float At, Pose Pose)[] MineKeys = {
         (0, MineGuard),
         (.4f, MineGuard with { Lean = -6, RaiseL = 160, OutL = -24, ElbowL = 50, RaiseR = 175, OutR = -10, ElbowR = 35 }),
@@ -245,26 +270,9 @@ public static class ActorAnimation {
         float tilt = Mathf.DegToRad(PestleLean);
         // Measured upright, then turned into the leaning trunk's frame.
         var toFist = new Vector3(aside.X - PestleGrip * MathF.Sin(tilt), BowlOverFist + CookShape.BowlFloor + lift + PestleGrip * MathF.Cos(tilt), aside.Y);
-        var bowl = ArmTo(BowlHand, left: true, ActorRig.Palm);
-        var pestle = ArmTo(BowlHand + toFist.Rotated(Vector3.Right, -Mathf.DegToRad(GrindLean)), left: false, ActorRig.Palm);
+        var bowl = ArmReach.ArmTo(BowlHand, left: true, ActorRig.Palm);
+        var pestle = ArmReach.ArmTo(BowlHand + toFist.Rotated(Vector3.Right, -Mathf.DegToRad(GrindLean)), left: false, ActorRig.Palm);
         return Stance with { Lean = GrindLean, RaiseL = bowl.Raise, OutL = bowl.Out, ElbowL = bowl.Elbow, RaiseR = pestle.Raise, OutR = pestle.Out, ElbowR = pestle.Elbow };
-    }
-
-    /// <summary>
-    /// The arm raise, outward swing and elbow bend, in degrees, that put a fist at <paramref name="grip"/>, measured from the hips in the trunk's own frame.
-    /// With <paramref name="palm"/> it is what the fist holds that goes there, that far ahead of the forearm's line.
-    /// </summary>
-    public static (float Raise, float Out, float Elbow) ArmTo(Vector3 grip, bool left, float palm = 0) {
-        var reach = grip - new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
-        // A held thing ahead of the forearm's line is reached by a slightly longer forearm bent a little further.
-        const float upper = ActorRig.UpperArm;
-        float fore = MathF.Sqrt(ActorRig.Forearm * ActorRig.Forearm + palm * palm);
-        // The elbow folds until the fist is that far from the shoulder, then the shoulder swings the bent arm onto the point.
-        float bend = MathF.Acos(Math.Clamp((reach.LengthSquared() - upper * upper - fore * fore) / (2 * upper * fore), -1, 1));
-        float along = upper + fore * MathF.Cos(bend), ahead = fore * MathF.Sin(bend);
-        float outward = MathF.Asin(Math.Clamp((left ? reach.X : -reach.X) / along, -1, 1));
-        float raise = Mathf.RadToDeg(MathF.Atan2(reach.Z, -reach.Y) - MathF.Atan2(ahead, along * MathF.Cos(outward)));
-        return (Mathf.PosMod(raise + 180, 360) - 180, Mathf.RadToDeg(outward), Mathf.RadToDeg(bend - MathF.Atan2(palm, ActorRig.Forearm)));
     }
 
     /// <summary>How far past the right fist, along the handle it holds, the left fist grips in a two-handed swing, in metres.</summary>
@@ -277,7 +285,7 @@ public static class ActorAnimation {
         var shoulder = Basis.FromEuler(new Vector3(Mathf.DegToRad(-pose.RaiseR), 0, Mathf.DegToRad(-pose.OutR)));
         var arm = shoulder * new Basis(Vector3.Right, Mathf.DegToRad(-pose.ElbowR));
         var fist = new Vector3(-ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0) + shoulder * new Vector3(0, -ActorRig.UpperArm, 0) + arm * new Vector3(0, -ActorRig.Forearm, ActorRig.Palm);
-        var (raise, outward, elbow) = ArmTo(fist + arm * Vector3.Down * SecondGrip, left: true);
+        var (raise, outward, elbow) = ArmReach.ArmTo(fist + arm * Vector3.Down * SecondGrip, left: true);
         return pose with { RaiseL = raise, OutL = outward, ElbowL = elbow };
     }
 
@@ -330,8 +338,8 @@ public static class ActorAnimation {
         var hips = new Vector3(0, height, 0);
         // Measured from the ground under the hips, then turned into the leaning, twisted trunk's frame.
         Vector3 InTrunk(Vector3 point) => (point - hips).Rotated(Vector3.Up, -Mathf.DegToRad(twist)).Rotated(Vector3.Right, -Mathf.DegToRad(lean));
-        var right = ArmTo(InTrunk(top), left: false, ActorRig.Palm);
-        var left = ArmTo(InTrunk(top + along * ShovelGrip), left: true, ActorRig.Palm);
+        var right = ArmReach.ArmTo(InTrunk(top), left: false, ActorRig.Palm);
+        var left = ArmReach.ArmTo(InTrunk(top + along * ShovelGrip), left: true, ActorRig.Palm);
         return new Pose(Lean: lean, Twist: twist, Head: 14 + lean * .3f, Hips: height,
             RaiseL: left.Raise, OutL: left.Out, ElbowL: left.Elbow, RaiseR: right.Raise, OutR: right.Out, ElbowR: right.Elbow,
             SwingL: front.Swing, KneeL: front.Knee, FootL: front.Foot, SwingR: back.Swing, KneeR: back.Knee, FootR: back.Foot);
@@ -400,15 +408,40 @@ public static class ActorAnimation {
                 return kneel with { RaiseR = 52 + strike * 18, ElbowR = 80 - strike * 34, Twist = strike * 4, RaiseL = 40 + MathF.Sin(p * Mathf.Tau) * 4 };
             case ActorAction.TorchSwing:
                 return Keys(p, TorchSwingKeys);
+            case ActorAction.Brake:
+                // A runner stopping hard plants the front heel well ahead with the leg nearly straight, sinks onto the bent back
+                // leg and leans back against the run, arms thrown forward for balance, the weight rocking a little as it holds.
+                return new Pose(Lean: -14 + wave * 2, Head: 10 + MathF.Cos(p * Mathf.Tau) * 2, RaiseL: 55, OutL: 18, ElbowL: 45, RaiseR: 40, OutR: 22, ElbowR: 55,
+                    SwingL: 42, KneeL: 6, FootL: -18, SwingR: -18, KneeR: 58, Splay: 4);
+            case ActorAction.Tugged: {
+                    // Tugged back by the waist: bent over at the hips with the arms reaching for the doorway and the head up to keep it in sight.
+                    // Each tug, half the loop, jerks the hips back and the trunk lower; the front foot steps back in the air while the other stays
+                    // planted, the hips passing back over it until it is in front.
+                    float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / DoorTug.Heave)), heave = DoorTug.HeavePulse(half);
+                    float stepping = Mathf.Lerp(18, -8, jerk), planted = Mathf.Lerp(-8, 18, jerk), lift = 45 * heave, struggle = MathF.Sin(half * Mathf.Tau);
+                    bool left = p < .5f;
+                    // Between tugs the player strains toward the door, the arms clawing at it.
+                    return new Pose(Lean: 42 + 8 * heave - 3 * struggle, Head: -28 - 4 * heave, RaiseL: 105 - 10 * heave + 8 * struggle, OutL: 14, ElbowL: 22,
+                        RaiseR: 115 - 10 * heave - 8 * struggle, OutR: 12, ElbowR: 16,
+                        SwingL: left ? stepping : planted, KneeL: 24 + (left ? lift : 0), SwingR: left ? planted : stepping, KneeR: 24 + (left ? 0 : lift), Splay: 3);
+                }
+            case ActorAction.Knock: {
+                    // The right fist beats on a door at head height, landing as each loop starts: drawn back with the elbow bent, then thrown at the boards.
+                    float drawn = p < .7f ? Mathf.SmoothStep(0, 1, p / .7f) : 1 - Mathf.SmoothStep(0, 1, (p - .7f) / .3f);
+                    return Stance with { Lean = 7 - drawn * 3, Head = 4, RaiseR = 104 - drawn * 12, OutR = -6, ElbowR = 30 + drawn * 75 };
+                }
             case ActorAction.Sit or ActorAction.Perch:
                 var eating = Keys(p, action == ActorAction.Sit ? SitKeys : PerchKeys);
                 return eating with { Lean = eating.Lean + wave * 1.2f, Head = eating.Head + wave * 1.5f };
+            case ActorAction.FallBack:
+                // A fall happens once: past its end, as while blending out of it, it holds its last pose.
+                return Keys(Math.Min(elapsed / FallBackSeconds, .999f), FallBackKeys);
             // Both downed poses are drawn with the rig tipped onto its back, so Raise points the arms at the sky.
             case ActorAction.Mauled:
-                // Pushing at the jaws over the throat with the head forced back while the legs kick.
+                // Pushing at the jaws over the throat with the head forced back while the legs kick low, under the wolf standing over them.
                 return new Pose(Head: -32 + MathF.Cos(p * Mathf.Tau) * 6, Twist: wave * 8,
                     RaiseL: 128 + wave * 18, OutL: -8, ElbowL: 55 - wave * 20, RaiseR: 128 - wave * 18, OutR: -8, ElbowR: 55 + wave * 20,
-                    SwingL: 24 + wave * 22, KneeL: 40 + wave * 25, SwingR: 24 - wave * 22, KneeR: 40 - wave * 25);
+                    SwingL: 10 + wave * 10, KneeL: 22 + wave * 14, SwingR: 10 - wave * 10, KneeR: 22 - wave * 14);
             case ActorAction.Devoured:
                 // A limp body that only twitches as the pack tears at it.
                 float tug = .7f * MathF.Sin(p * Mathf.Tau + .5f) + .3f * MathF.Sin(p * Mathf.Tau * 2 + 1.1f);
@@ -446,7 +479,7 @@ public static class ActorAnimation {
     public static float Reach(float swing, float knee) => Ankle(swing, knee).Y;
 
     /// <summary>Where a leg's ankle is, ahead of the hip and below it, for a thigh swung forward and a knee folded back by these angles.</summary>
-    private static Vector2 Ankle(float swing, float knee) {
+    internal static Vector2 Ankle(float swing, float knee) {
         float thigh = Mathf.DegToRad(swing), shin = Mathf.DegToRad(swing - knee);
         return new Vector2(Thigh * MathF.Sin(thigh) + Shin * MathF.Sin(shin), Thigh * MathF.Cos(thigh) + Shin * MathF.Cos(shin));
     }
@@ -463,7 +496,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>A leg's thigh swing, knee bend and foot tip in degrees, as in <see cref="Pose"/>.</summary>
-    private readonly record struct LegAngles(float Swing, float Knee, float Foot) {
+    internal readonly record struct LegAngles(float Swing, float Knee, float Foot) {
         public static LegAngles operator +(LegAngles a, LegAngles b) => new(a.Swing + b.Swing, a.Knee + b.Knee, a.Foot + b.Foot);
         public static LegAngles operator -(LegAngles a, LegAngles b) => new(a.Swing - b.Swing, a.Knee - b.Knee, a.Foot - b.Foot);
         public static LegAngles operator *(LegAngles a, float by) => new(a.Swing * by, a.Knee * by, a.Foot * by);
@@ -493,7 +526,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>The thigh swing and knee bend, in degrees, that put the ankle <paramref name="ahead"/> of the hip and <paramref name="below"/> it, knee forward.</summary>
-    private static (float Swing, float Knee) LegTo(float ahead, float below) {
+    internal static (float Swing, float Knee) LegTo(float ahead, float below) {
         float reach = Math.Min(MathF.Sqrt(ahead * ahead + below * below), Thigh + Shin - 1e-4f);
         float knee = MathF.Acos(Math.Clamp((Thigh * Thigh + Shin * Shin - reach * reach) / (2 * Thigh * Shin), -1, 1));
         float thigh = MathF.Acos(Math.Clamp((Thigh * Thigh + reach * reach - Shin * Shin) / (2 * Thigh * reach), -1, 1));
@@ -511,6 +544,9 @@ public static class ActorAnimation {
         var (swing, knee) = LegTo(heel + Heel * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt), hips - LegDrop - AboveSole * MathF.Cos(tilt) + Heel * MathF.Sin(tilt));
         return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
     }
+
+    /// <summary>How far a leg hangs to the side of the hips' middle, toward the body's left for the left leg.</summary>
+    public const float LegSide = .09f;
 
     // ---------- Walking ----------
 
@@ -749,3 +785,4 @@ public static class ActorAnimation {
         };
     }
 }
+

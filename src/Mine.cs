@@ -80,7 +80,7 @@ public sealed partial class World {
     public int SupplyMine(Thing mine, string item, int quantity) {
         if (!Reaches(mine)) { Say("Walk closer to the mine."); return 0; }
         if (MineNeed(mine, item) == 0) { Say(MineNeeds(mine) is { Count: > 0 } needs ? $"The mine still needs {Goods(needs)}." : "The mine needs nothing now."); return 0; }
-        if (Forwarded(Verb.SupplyMine, mine.Id, item: item, count: quantity)) return 0;
+        if (Busy() || Forwarded(Verb.SupplyMine, mine.Id, item: item, count: quantity)) return 0;
         return S.Backpack.TransferTo(mine.Inventory, item, Math.Min(quantity, MineNeed(mine, item)));
     }
 

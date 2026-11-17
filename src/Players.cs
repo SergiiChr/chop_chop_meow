@@ -7,80 +7,6 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>One player's body and belongings, saved with the world under the key of the machine they play from.</summary>
-public sealed class PlayerState {
-    /// <summary>The key of the machine this player plays from, which the save stores them under; empty until a machine claims them.</summary>
-    [JsonIgnore] public string Key { get; set; } = "";
-    /// <summary>Network peer id while playing on a server; 1 in a world this machine runs itself.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Id { get; set; } = 1;
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float PlayerX { get; set; } = Terrain.Spawn.X;
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float PlayerY { get; set; } = Terrain.Spawn.Y;
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Health { get; set; } = 100;
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Hunger { get; set; } = 100;
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Thirst { get; set; } = 100;
-    public Inventory Backpack { get; set; } = new() { Slots = 24 };
-    public List<string> HotbarSlots { get; set; } = new() { "steel_axe", "steel_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", Water.Full };
-    public int ActiveHotbar { get; set; }
-    /// <summary>A tool selected in hand from the backpack without a hotbar slot, or empty; while one is, no hotbar slot is selected.</summary>
-    public string InHand { get; set; } = "";
-    /// <summary>Recipes waiting in the personal crafting menu, one entry per recipe in the order first queued; their inputs are already taken from the backpack.</summary>
-    [JsonConverter(typeof(QueueJson))] public List<Queued> Crafting { get; set; } = new();
-    /// <summary>The hand recipe being made now, taken off the queue when work on it started, or empty.</summary>
-    public string Making { get; set; } = "";
-    /// <summary>Seconds spent on <see cref="Making"/>, at the speed of the tool used.</summary>
-    public float CraftTime { get; set; }
-    /// <summary>Burn time left on the backpack torch the player has lit, shown in the left hand, or zero for none; it only burns while lit, and goes once the backpack has no torch.</summary>
-    public float Torch { get; set; }
-    public bool TorchLit { get; set; }
-    /// <summary>Seconds left striking flint and steel before the torch catches.</summary>
-    public float TorchKindling { get; set; }
-    public float RespawnIn { get; set; }
-    /// <summary>A wolf has pinned the player; it stays set through the following death until respawn.</summary>
-    public bool Mauled { get; set; }
-    /// <summary>Id of the cabin the player is inside, or zero; inside, wolves back off and the player is hidden.</summary>
-    public int Sheltered { get; set; }
-    /// <summary>The resource the player is working on, so other machines can show it.</summary>
-    public int GatherTarget { get; set; }
-    /// <summary>The item selected on the hotbar, which shows in the player's hand, so other machines can show it.</summary>
-    public string Selected { get; set; } = "";
-    /// <summary>The stack this player holds on the cursor, or null, for their own window to show; the server builds it from <see cref="HeldSlot"/> each time it sends the player.</summary>
-    public HeldStack? HeldStack { get; set; }
-    /// <summary>Moving with Shift held, which drains food and drink faster; carried so other machines show the run.</summary>
-    public bool Sprinting { get; set; }
-    /// <summary>Seconds left of the brighter flare that follows a torch swing.</summary>
-    public float TorchFlare { get; set; }
-    /// <summary>Counts moves the simulation made, such as a respawn; a guest only takes its own position from the host when it changes.</summary>
-    public int Warp { get; set; }
-    /// <summary>Which shirt colour tells this player apart: the first one no other player wears when they join.</summary>
-    public int Shirt { get; set; }
-    [JsonIgnore] public Vector2 Pos { get => new(PlayerX, PlayerY); set { PlayerX = value.X; PlayerY = value.Y; } }
-    // Only the host's simulation uses these.
-    internal float GatherClock, AttackClock;
-    /// <summary>Seconds since the player last moved or gathered; hand crafting only goes on while they stand still.</summary>
-    internal float Still;
-    internal bool Busy, PackAttack;
-    internal readonly List<float> TorchSwings = new();
-    /// <summary>Server: the inventory and slot the held stack lies in; the slot keeps its identity when a swap or a sort moves it.</summary>
-    internal Inventory? HeldBox;
-    internal Inventory.Slot? HeldSlot;
-}
-
-/// <summary>
-/// A stack a player holds on the cursor.
-/// Its units stay in their cell, <see cref="Slot"/> of the inventory that <see cref="Box"/> names as <see cref="World.Locate"/> does, and nobody else can take them.
-/// </summary>
-public readonly record struct HeldStack(int Box, int Slot, string Item, int Count);
-
-/// <summary>The player actions a guest sends to the host.</summary>
-public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, HaulGroup, Hire, Hold, Leave, LoadBatch, LoadFuel, LoadInput, MoveJob, MoveInCrate, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, Release, SelectHotbar, SelectInHand, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, Unqueue, UnslotTool }
-
-/// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
-/// <remarks>
-/// <see cref="Held"/> is the mark "from held stack": the command takes its units from the player's held stack (<see cref="World.FromHeldStack"/>).
-/// <see cref="Spares"/> is the mark "spares only": it takes none from backpack stacks bound to the hotbar (<see cref="World.FromSpares"/>).
-/// </remarks>
-public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At, bool Held = false, bool Spares = false);
-
 /// <summary>The players in the world and the guest side of actions.</summary>
 public sealed partial class World {
     /// <summary>The player at this machine: 1 in a world it runs itself, its peer id in a server's world, and 0 on a server, which has none.</summary>
@@ -126,7 +52,14 @@ public sealed partial class World {
     /// In a guest's copy, sends the action to the host and tells the caller to stop.
     /// On the server, a marked action (<see cref="FromHeldStack"/>, <see cref="FromSpares"/>) goes through the same checks a guest's does first, then comes back here to run.
     /// </summary>
-    private bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
+    /// <summary>Whether the acting player is occupied, telling them so: anything they try then does nothing.</summary>
+    private bool Busy() {
+        if (!Occupied) return false;
+        Say("You are busy.");
+        return true;
+    }
+
+    internal bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
         var c = new Command(verb, target, other, item, count, at, fromHeld, fromSpares);
         if (Host != null) { Host(c); return true; }
         if (!(c.Held || c.Spares) || runningMarked) return false;
@@ -172,7 +105,7 @@ public sealed partial class World {
         if (slot is < 0 or > 8) return;
         if (MarkedSource == null) { Unbind(slot); S.HotbarSlots[slot] = item; }
         S.ActiveHotbar = slot; S.InHand = "";
-        if (Forwarded(Verb.SetHotbar, count: slot, item: item)) return;
+        if (Busy() || Forwarded(Verb.SetHotbar, count: slot, item: item)) return;
         if (heldSource != null) BindHeld(slot);
     }
 
@@ -209,7 +142,7 @@ public sealed partial class World {
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
             case Verb.Torch: UseTorch(c.At); break;
             case Verb.Attack: Attack(); break;
-            case Verb.Leave: Leave(); break;
+            case Verb.Leave: Doorways.Leave(); break;
             case Verb.Craft: Craft(c.Item, c.Count); break;
             case Verb.CancelCraft: CancelCraft(c.Item, c.Count); break;
             case Verb.Transfer:
@@ -251,7 +184,7 @@ public sealed partial class World {
             case Verb.LoadInput: LoadInput(t, c.Item, c.Count); break;
             case Verb.LoadFuel: LoadFuel(t, c.Item, c.Count); break;
             case Verb.Collect: Collect(t); break;
-            case Verb.Enter: Enter(t); break;
+            case Verb.Enter: Doorways.Enter(t, c.Count == 1); break;
             case Verb.Sleep: Sleep(t); break;
             case Verb.Sell: Sell(t); break;
             case Verb.AutoSell: SetAutoSell(t, c.Count != 0); break;
@@ -308,7 +241,7 @@ public sealed partial class World {
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {
         int a = Locate(from), b = Locate(to);
-        if (a < 0 || b < 0 || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
+        if (a < 0 || b < 0 || Busy() || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
         if (!InReach(a) || !InReach(b)) { Say("Walk closer first."); return 0; }
         if (BoxBlock(b, to, item) is string refused) { Say(refused); return 0; }
         if (FillBlock(from, to, item) is string dry) { Say(dry); return 0; }
@@ -329,7 +262,7 @@ public sealed partial class World {
     public int Transfer(Inventory from, InventoryView to, string item, int quantity) => Transfer(from, to.Inventory, item, quantity);
 
     public void SortBackpack() {
-        if (Downed || Forwarded(Verb.SortBag)) return;
+        if (Busy() || Forwarded(Verb.SortBag)) return;
         Release();
         S.Backpack.Sort();
     }
@@ -344,7 +277,7 @@ public sealed partial class World {
         int a = Locate(from), b = Locate(to);
         if (a < 0 || b < 0 || Downed) return 0;
         if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
-        if (Forwarded(Verb.TransferSlot, a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
+        if (Busy() || Forwarded(Verb.TransferSlot, a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
         if (!InReach(a) || !InReach(b)) { Say("Walk closer first."); return 0; }
         // Reject a stale move rather than moving a different item.
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
@@ -367,7 +300,7 @@ public sealed partial class World {
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
         bool pile = IsPlainPile(chest);
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate)) return;
-        if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
+        if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Busy() || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         if (pile && allowed) SetPileFilter(chest.Inventory, PileEntry(item));
         else if (pile) chest.Inventory.ClearFilters();
         else chest.Inventory.Filter(item, output, allowed);
@@ -380,12 +313,12 @@ public sealed partial class World {
 
     /// <summary>Stops or restarts workers bringing food to a compost.</summary>
     public void SetSkipFood(Thing pile, bool skip) {
-        if (!pile.Compost || Forwarded(Verb.SkipFood, pile.Id, count: skip ? 1 : 0)) return;
+        if (!pile.Compost || Busy() || Forwarded(Verb.SkipFood, pile.Id, count: skip ? 1 : 0)) return;
         pile.SkipFood = skip;
     }
 
     public void ClearFilters(Thing chest) {
-        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || IsPlainPile(chest) && !PileFilterChanges(chest, false) || Forwarded(Verb.ClearFilters, chest.Id)) return;
+        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || IsPlainPile(chest) && !PileFilterChanges(chest, false) || Busy() || Forwarded(Verb.ClearFilters, chest.Id)) return;
         chest.Inventory.ClearFilters();
     }
 
@@ -397,7 +330,7 @@ public sealed partial class World {
 
     /// <summary>Host: puts a guest where their own machine walked them, as <see cref="MovePlayer"/> does for the host.</summary>
     public void MoveTo(Vector2 p) {
-        if (Downed || S.Sheltered != 0 || p == Player) return;
+        if (Occupied || S.Sheltered != 0 || p == Player) return;
         playerBusy = true; Player = p;
     }
 
@@ -409,10 +342,12 @@ public sealed partial class World {
         var p = S.Absent.Remove(key, out var back) ? back : S.Absent.Remove("", out var unclaimed) ? unclaimed : Newcomer();
         p.Key = key; p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(0, 4).First(i => S.Players.All(o => o.Shirt != i));
         // What only made sense while they played: a cabin may have gone and a building gone up where they stood, a wolf that had them pinned has moved on, and the other properties follow input they no longer give.
-        if (Find(p.Sheltered)?.Kind != ThingKind.Hut) p.Sheltered = 0;
+        // A cabin holds one player, so one someone else went into or is at the door of meanwhile leaves the newcomer at its door.
+        if (Find(p.Sheltered)?.Kind != ThingKind.Hut || Doorways.Ahead(p.Sheltered, p) != Doorway.Entering) p.Sheltered = 0;
+        p.Door = Doorway.None;
         if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
         Forget(p);
-        p.Mauled = false; p.GatherTarget = 0; p.Selected = ""; p.Sprinting = false; p.TorchKindling = 0;
+        p.Mauled = false; p.GatherTarget = 0; p.Selected = ""; p.Sprinting = p.Braking = false; p.TorchKindling = 0;
         S.Players.Add(p);
         // A packed crate's own name is no item, so it leaves no mark.
         foreach (var pair in p.Backpack.Items) if (Data.Items.ContainsKey(pair.Key)) Got(pair.Key);

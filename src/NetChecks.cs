@@ -12,7 +12,7 @@ namespace ChopChopMeow;
 /// Both drive their menus and the world through Input.ParseInputEvent, and each prints its own pass marker.
 /// </summary>
 public partial class Game {
-    private static readonly Vector2 NetOre = Terrain.Spawn + new Vector2(2.5f, 2), NetCoal = Terrain.Spawn + new Vector2(-1.5f, 3.5f), NetChest = Terrain.Spawn + new Vector2(.5f, 3), NetHut = Terrain.Spawn + new Vector2(-3.5f, -3), NetAnvil = Terrain.Spawn + new Vector2(2.5f, -1.5f);
+    private static readonly Vector2 NetOre = Terrain.Spawn + new Vector2(2.5f, 2), NetCoal = Terrain.Spawn + new Vector2(-1.5f, 3.5f), NetChest = Terrain.Spawn + new Vector2(.5f, 3), NetHut = Terrain.Spawn + new Vector2(-3.5f, -3), NetAnvil = Terrain.Spawn + new Vector2(1.2f, -.6f);
 
     private async void RunNetCheck(bool hosting) {
         try {
