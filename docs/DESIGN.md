@@ -481,6 +481,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   A howl is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it fades with distance from the player and pans with its direction.
   The howl calls every patrolling wolf within `HowlRadius` to where it stood (`WolfMode.Called`, `Wolf.Call`); a called wolf still smells on its way and goes back to patrolling once there.
 - **Approach.** After its howl a wolf trots at its player out of firelight until within `WolfSightRange`, then sprints (`Wolf.Chase` above zero) at `WolfChase` times `WalkSpeed` with one distant growl (`Wolf.Sprinted`), which data validation keeps above walking and below `SprintSpeed`.
+  Within sight it closes in only to `World.StandOff`, within biting reach, and backs off to it from a player another wolf drags toward it (`World.Hauled`).
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
   A player a wolf had pinned goes free as it leaves.
   Patrolling, going home or losing its player (who sheltered or left the game) clears everything a wolf was doing to them (`World.Calm`).
@@ -504,7 +505,9 @@ What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed b
   The world moves the player there when the drag ends; meanwhile the wolf stands `World.TugReach` behind them and no other wolf leaps.
   The wolf then lets go and bites no sooner than a second later; at half health or less it pins them, otherwise a pulled player steps in again at a run, and one pulled off the door stands free.
 - `Leaving` puts the player on the doorstep and takes `World.LeaveSeconds`.
-  Anyone waiting at that door, banging on it or standing free within `World.DoorReach`, goes `Aside` to `World.AsideSpot`, a step along `World.AsideWay`, and steps in once the leaver is out, in the order they came; the view walks them in from there round the front of the step (`WorldView.Inward`).
+  Anyone waiting at that door, banging on it or standing free within `World.DoorReach`, goes `Aside` to `World.AsideSpot`, a step along `World.AsideWay`, and steps in once the leaver is through the doorway, in the order they came, while the leaver keeps `World.MakeWay` to the other side.
+  The view walks them in from there up the side of the step (`WorldView.Inward`), the two turning chest to chest with their arms hanging as they pass (`WorldView.SqueezePast`), the one going in with the right palm on the door frame (`WorldView.Reaching`).
+- A follower waits aside, out of the way, while the one ahead is dragged back out (`WorldView.Behind`).
 
 The view walks the player through the doorway over the stage (`WorldView.AtDoor`), hurrying from the second tread, and drags a pulled one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
 On the two treads of the step and the floor (`WorldView.StepEdges`) the body stands on the boot that bears its weight and the other knee bends to put its boot on its tread, a swinging boot rising ahead of each edge (`ActorAnimation.StepLift`, `ActorAnimation.OnSteps`), so no boot sinks into the step.

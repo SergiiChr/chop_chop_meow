@@ -78,6 +78,8 @@ public static class SimulationChecks {
         Test(CheckWolvesHuntAndCarcassesYieldMeat, data);
         Test(CheckWolvesLeaveHealthyOrFirelitPlayersAlone, data);
         Test(CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth, data);
+        Test(CheckAWolfClosingInStopsAtBitingDistanceRatherThanOnThePlayer, data);
+        Test(CheckAWolfClosingInKeepsOffWhereAnotherDragsThePlayer, data);
         Test(CheckWolfThatBitesAPlayerToDeathEatsTheirFood, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
         Test(CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst, data);
@@ -1287,6 +1289,33 @@ public static class SimulationChecks {
         var box = world.Things.Single(t => t.Kind == ThingKind.Grave);
         Require(box.Inventory["berries"] == 0, "a wolf that bites a player to death should eat their berries");
         Require(box.Inventory["wood"] == 4, "a wolf that bites a player to death should leave the rest in the recovery box");
+    }
+
+    private static void CheckAWolfClosingInStopsAtBitingDistanceRatherThanOnThePlayer(GameData data) {
+        var world = NightWorld(data);
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(3, 0) });
+        float nearest = float.MaxValue;
+        for (int i = 0; i < 60; i++) { world.Tick(.05f); nearest = Math.Min(nearest, wolf.Pos.DistanceTo(world.Player)); }
+        Require(world.Health < 100, "a wolf closing in should still bite a player standing still");
+        Require(nearest > .8f, $"a wolf should stop at biting distance rather than stand on the player, not come {nearest:0.00} m from them");
+    }
+
+    private static void CheckAWolfClosingInKeepsOffWhereAnotherDragsThePlayer(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = World.DoorPoint(hut);
+        Require(world.Enter(hut, false), "a player at the door should step in");
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        world.Tick(.05f);
+        Require(world.Door == Doorway.Pulled, "a wolf should drag the player out of the doorway");
+        // A second wolf waits just past where the drag ends, its last bite still fresh.
+        var other = PlaceWolf(world, new Wolf { Pos = World.DoorPoint(hut) + World.OutOfDoor * 2, Attack = 5 });
+        float nearest = float.MaxValue;
+        for (float time = 0; time < World.PullSeconds - .1f; time += .05f) {
+            world.Tick(.05f);
+            nearest = Math.Min(nearest, other.Pos.DistanceTo(World.DoorPoint(hut) + World.OutOfDoor * (World.DragDistance * World.Dragged(world.Me.DoorTime / World.PullSeconds))));
+        }
+        Require(nearest > .8f, $"a wolf closing in should keep off where another wolf has dragged the player, not come {nearest:0.00} m from them");
     }
 
     private static void CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth(GameData data) {

@@ -196,6 +196,9 @@ public sealed partial class World {
         return (tug + Mathf.SmoothStep(0, 1, Math.Clamp((tugs - tug) / .4f, 0, 1))) / Tugs;
     }
 
+    /// <summary>Where the acting player is: their place, or as far back from it as a wolf dragging them out of a doorway has hauled them.</summary>
+    private Vector2 Hauled => S.Actor.Door is Doorway.Pulled or Doorway.PulledOff ? Player + OutOfDoor * (DragDistance * Dragged(S.Actor.DoorTime / PullSeconds)) : Player;
+
     /// <summary>The wolf dragging the acting player out of a doorway, or null.</summary>
     private Wolf? Tugger() {
         foreach (var w in S.Wolves) if (w.Tugging && w.Target == S.Actor.Id) return w;

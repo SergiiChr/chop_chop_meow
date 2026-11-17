@@ -2308,7 +2308,7 @@ public sealed partial class World {
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
             } else if (wary) {
                 wolf.Chase = 0;
-                Travel(wolf, Player, dt * speed * .35f, dt * speed * .35f, RouteSlack);
+                Travel(wolf, Hauled, Closing(wolf, dt * speed * .35f), dt * speed * .35f, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(wolf); }
             } else if ((lit || Protected(wolf.Pos)) is var safe && safe && wolf.Chase <= 0) {
@@ -2320,7 +2320,7 @@ public sealed partial class World {
             } else {
                 if (!wolf.Sprinted && !safe) { wolf.Sprinted = true; Play("wolf_growl_distance", wolf.Pos); }
                 wolf.Chase = safe ? wolf.Chase - dt : ChaseSeconds;
-                Travel(wolf, Player, dt * chase, dt * chase, RouteSlack);
+                Travel(wolf, Hauled, Closing(wolf, dt * chase), dt * chase, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(wolf); }
             }
@@ -2345,6 +2345,13 @@ public sealed partial class World {
         wolf.Pos = beside == Vector2.Zero ? Player + (wolf.Pos - Player).Normalized() * PinDistance : Player + OutOfDoor * FallenThroat + beside * AsideReach;
         Say(pack ? "You are pinned. The pack closes in." : "You are pinned."); Play("wolf_bite", Player); Play("takedown_scream", Player);
     }
+    /// <summary>
+    /// How far a wolf closing in on the acting player goes straight at them this tick, up to <paramref name="step"/>: on to
+    /// <see cref="StandOff"/>, where its jaws reach them, or back to it when they come closer.
+    /// </summary>
+    private float Closing(Wolf wolf, float step) => Math.Clamp(wolf.Pos.DistanceTo(Hauled) - StandOff, -step, step);
+    /// <summary>How far from a player a wolf closing in on them stops, within biting reach of them.</summary>
+    public const float StandOff = .9f;
     /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>
     private Vector2 AwayFromPlayer(Wolf wolf) => wolf.Pos == Player ? Vector2.Right : (wolf.Pos - Player).Normalized();
     /// <summary>Whether no player can see a spot.</summary>

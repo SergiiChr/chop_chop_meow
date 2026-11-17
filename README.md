@@ -792,6 +792,7 @@ A wolf that smells you within 30 metres while you are out in the open, but too f
 After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
 A wolf that finds you already within sight goes for you without a howl.
 A sprinting wolf gallops faster than you walk, but sprinting outruns it.
+A wolf that reaches you stops at biting distance, about a metre off, and keeps that distance while another wolf drags you.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
 
@@ -826,7 +827,8 @@ No other wolf takes you down while one drags you.
 
 Wolves cannot smell you inside: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
 Stepping out takes about 1.5 seconds, and wolves can reach you for its second half, once you are out of the doorway.
-Anyone banging on the door or standing at it steps aside to their right to let you out, then goes in once you are out, in the order they came.
+Anyone banging on the door or standing at it steps aside to their right to let you out, and you keep to the left of the step.
+Once you are through the doorway, they squeeze past you in, in the order they came: both of you turn sideways, chest to chest, arms at your sides, and the one going in puts their right palm on the door frame.
 
 A cabin holds one player.
 Someone who walks up behind a player stepping in follows them; once that player is in, they wait for the door to swing shut, step up to it, bang on it three times and stand free.
