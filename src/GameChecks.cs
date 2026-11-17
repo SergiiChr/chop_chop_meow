@@ -232,6 +232,29 @@ public partial class Game {
         await CloseWithEsc();
     }
 
+    /// <summary>An empty pile's filter window has one row naming one resource: water there is one entry for every fill, shows in the heading, and comes off with a click.</summary>
+    private async Task CheckPileFilterNamesOneResource() {
+        await CloseWithEsc();
+        var pile = Hosted.Add(ThingKind.Pile, world.Player + new Vector2(4, 0)); await Frames();
+        panel.Select(Shown(pile)); await Frames();
+        await Click(Named("filters")!);
+        Require(OnPage("filter_in") != null && OnPage("filter_out") == null, "A pile's filter must show only the row of what workers bring.");
+        await Click(Named("filter_add_in")!);
+        Require(Named($"pick_{Water.OneLiter}") == null && Named($"pick_{Water.Full}") == null && Named($"pick_{Water.Empty}") != null,
+            "A pile's filter must offer water at any fill as one entry, apart from empty bottles.");
+        Require(Named($"pick_{World.MixedCrate}") != null, "A pile's filter must offer crates of mixed goods.");
+        await Click(Named($"pick_{Water.Liquid}")!);
+        await Until(() => pile.Inventory.InputFilter.SetEquals(new[] { Water.OneLiter, Water.TwoLiters, Water.Full }) && ShownPage() == "Pile · water",
+            "picking water making the empty pile a water pile, named in its heading", 2);
+        Require(Named("filter_add_in") == null, "A pile whose filter names a resource must offer no second one.");
+        await Click(Named($"filter_in_{Water.Liquid}")!);
+        await Until(() => pile.Inventory.InputFilter.Count == 0 && ShownPage() == "Pile" && Named("filter_add_in") != null, "clicking water taking it off the empty pile", 2);
+        Require(FindButton(panel, "Clear") != null, "The filter window's clear button must read Clear.");
+        await Click(Named("filters_close")!);
+        RemoveThings(Hosted, t => t == pile);
+        await CloseWithEsc();
+    }
+
     /// <summary>The autosave comes every five minutes, more than this stage has, so the check asks for it.</summary>
     private async Task CheckAutosaveTellsTheOwner() {
         await CloseWithEsc();
@@ -837,6 +860,22 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
+    /// <summary>The paint filter switch starts on, hides the filter at once when switched off and keeps its choice.</summary>
+    private async Task CheckPaintFilterSwitchDrawsTheFilter() {
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        var paint = (CheckButton)startMenu.Screen.FindChild("paint_filter", true, false);
+        Require(paint.ButtonPressed && paintFilter.Visible, "The paint filter must start on.");
+        await Click(paint);
+        Require(!paintFilter.Visible, "Switching the paint filter off must hide it at once.");
+        await KeyStroke(Key.Escape);
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        paint = (CheckButton)startMenu.Screen.FindChild("paint_filter", true, false);
+        Require(!paint.ButtonPressed, "Reopened options must show the paint filter off.");
+        await Click(paint);
+        Require(paintFilter.Visible, "Switching the paint filter on must draw it again.");
+        await KeyStroke(Key.Escape);
+    }
+
     /// <summary>At 4K the interface keeps its share of the screen, and its text is drawn at the size it shows rather than drawn small and stretched.</summary>
     private async Task CheckInterfaceTextIsDrawnAtTheSizeItShows() {
         await Click(FindButton(startMenu.Screen, "Options")!);
@@ -925,7 +964,7 @@ public partial class Game {
     /// <summary>Sounds rotate through variants, a howl plays as long as a wolf holds it, and music hands over and crossfades by time of day.</summary>
     private async Task CheckSoundsRotateAndMusicCrossfades() {
         Require(Sounds.Names.All(name => sounds.VariantCount(name) > 0), "Every sound must load.");
-        Require(sounds.VariantCount("footsteps_default") == 3, "Numbered footstep files must group as three variants.");
+        Require(sounds.VariantCount("footsteps_default") == 6, "Numbered footstep files must group as six variants.");
         Require(sounds.VariantCount("chop_tree") == 1, "A single chop file must count as one variant.");
         Require(Math.Abs(sounds.Length("wolf_howl") - world.Data.LoneHowlSeconds) < .1 && Math.Abs(sounds.Length("wolf_howl_group") - world.Data.PackHowlSeconds) < .1,
             "A wolf must hold its howl as long as the howl recording plays.");
@@ -2001,6 +2040,7 @@ public partial class Game {
             await Test(CheckLaunchOpensTheStartMenuWithNoSaveToContinue);
             await Test(CheckOptionsApplyAndKeepTheirChoices);
             await Test(CheckAntiAliasingChoicesNameTheSizeTheWorldIsDrawnAt);
+            await Test(CheckPaintFilterSwitchDrawsTheFilter);
             await Test(CheckInterfaceTextIsDrawnAtTheSizeItShows);
             await Test(CheckNewGameStartsTheWelcomePage);
             await Test(CheckPauseMenuAsksBeforeNewGameAndQuit);
@@ -2048,6 +2088,7 @@ public partial class Game {
             await Test(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
             await Test(CheckFelledTreeBreaksThenCrashesAsItLands);
             await Test(CheckTradingPostSendsOnlyCratesOffOnACart);
+            await Test(CheckPileFilterNamesOneResource);
             await Test(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await Test(CheckPackingStationListsGoodsAndTakesBackpackClicks);
             await Test(CheckEndGoalsShowEndingOnceAndKeepPlaying);

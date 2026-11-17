@@ -17,7 +17,7 @@ These came from the user; change them only after asking.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
 - **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, shovel for stumps and bushes, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they go to another spot of the job that they can work, loose pieces last, or wait and say so once.
-- **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. Piles set their own filters from what they hold. Manual transfers bypass automation filters.
+- **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
 - **Wolves:** the same every night, never stronger or faster with the days; three or four bites bring a healthy player to half health. After the five let out at dusk, one den picked at random lets one more out every hour.
@@ -154,6 +154,7 @@ Rendering and sound:
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
 | `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake and sea surfaces and their sand and stony shores |
+| `src/PaintFilter.cs` | The paint filter over the drawn world ([assets/environment/paint_filter](../assets/environment/paint_filter/README.md)) |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
 | `src/WolfModel.cs` | Poses the wolf: its gaits, leap, howl, tug, recoil and fall |
@@ -738,11 +739,14 @@ Piles (`pile`) are 3×3 yards (`World.IsZone`, `ZoneSize`) that do not block wal
 `World.Snap` puts a new yard on the grid of the nearest yard within reach, and `ZoneBlock` lets yards touch but not overlap.
 
 A pile takes part in automation like a chest.
-`World.PileFilters` sets its input and output filters each tick from what it holds: its one resource, every fill of a vessel, or nothing while empty.
-`HoldBlock` refuses a second resource, including for manual transfers.
+Its input and output filters name the same one `World.PileEntry`: an item, a kind of crate (`World.MixedCrate` for crates of mixed goods), or a vessel's liquid for every fill of that vessel holding some, apart from the empty vessel.
+The player sets it on an empty pile through `SetFilter`, or `World.PileFilters` sets it on a tick from the first resource put in.
+It stays when the pile empties, and `SetFilter` and `ClearFilters` refuse to change it while the pile holds anything.
+`HoldBlock` refuses any other resource, including for manual transfers.
 
 #### Compost
 
+`World.SetCompost` turns only an empty pile with no filter into compost.
 A compost pile (`Thing.Compost`) instead takes `Compostable` items (leaves, grass and anything with `food`) and gives `fertilizer`.
 It turns `CompostBatch` of them into one fertilizer each in-game hour.
 It keeps the player's filters rather than setting its own, and `Thing.SkipFood` keeps workers from delivering food to it.
@@ -754,7 +758,8 @@ A wood crate holds `CrateCapacity` (12) units.
 A picked-up crate becomes an item `crate_<n>` whose contents live in `SaveState.Crates`; an empty one is the stackable item `crate`.
 `World.MoveInCrate` moves items between a packed crate in the backpack and the backpack, and renames the crate after what it then holds under the same number; emptied, it becomes a plain `crate`.
 A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
-A pile of crates holds crates of one good.
+`World.PackedKind` gives `World.MixedCrate` for a crate of mixed goods, which only a pile's filter can name.
+A pile of crates holds crates of one good, or crates of mixed goods.
 Placed crates are manual storage only.
 
 #### Packing station
@@ -952,6 +957,8 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 - The film is a list of shots in `WorldView.IntroShots`, each a method that poses everything for a moment of its own
   clock.
   The clock moves one frame at a time, so frames are evenly spaced however long each takes to draw and save.
+  Frames are drawn without waiting for the screen to refresh, and each is saved in the background while the next is
+  drawn.
 - It reuses the game's own models: the player's rig, the pack, flask, axe and torch, the trees, the valley with its
   shore and sea, and the fire pit. Walking and running go through the game's gaits.
 - New for the film: the office, the rented room and the train car (`IntroSets`), a baseball bat, the boss

@@ -1381,17 +1381,34 @@ public sealed partial class World {
     public static int PackedId(string item) => item.StartsWith(PackedPrefix, StringComparison.Ordinal) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
     /// <summary>The filter entry that stands for any packed crate of one good, such as <c>crate_bread</c>.</summary>
     public static string CrateOf(string item) => PackedPrefix + item;
-    /// <summary>The <see cref="CrateOf"/> entry a packed crate of one good matches, or empty for anything else.</summary>
+    /// <summary>The filter entry that stands for any packed crate of mixed goods; only a pile's filter names it.</summary>
+    public const string MixedCrate = PackedPrefix;
+    /// <summary>The <see cref="CrateOf"/> entry a packed crate of one good matches, <see cref="MixedCrate"/> for a crate of mixed goods, or empty for anything else.</summary>
     public static ReadOnlySpan<char> PackedKind(string item) {
         if (!item.StartsWith(PackedPrefix, StringComparison.Ordinal)) return default;
         int last = item.LastIndexOf('_');
-        return last > PackedPrefix.Length ? item.AsSpan(0, last) : default;
+        return item.AsSpan(0, Math.Max(last, PackedPrefix.Length));
     }
     /// <summary>The good a filter entry from <see cref="CrateOf"/> asks crates of, or null for any other entry.</summary>
     public string? CrateGood(string entry) => entry.StartsWith(PackedPrefix) && Data.Items.ContainsKey(entry[PackedPrefix.Length..]) ? entry[PackedPrefix.Length..] : null;
-    /// <summary>Whether two items are the same resource for a pile: the same item, or packed crates of the same good.</summary>
-    /// <summary>Whether two items share a pile: the same item, crates of the same goods, or one vessel at any fill.</summary>
-    private bool SameResource(string a, string b) => a == b || !PackedKind(a).IsEmpty && PackedKind(a).SequenceEqual(PackedKind(b)) || Data.VesselOf(a) is VesselDef v && v == Data.VesselOf(b);
+    /// <summary>What a pile's filter names for an item: the kind of crate for a packed crate of one good, a vessel's liquid for a vessel holding some, or the item itself, a <see cref="CrateOf"/> entry included.</summary>
+    public string PileEntry(string item) {
+        if (CrateGood(item) != null) return item;
+        var kind = PackedKind(item);
+        if (!kind.IsEmpty) return new string(kind);
+        return Data.VesselOf(item) is VesselDef v && item != v.Empty ? v.Liquid : item;
+    }
+    /// <summary>The items a pile's filter lists for a <see cref="PileEntry"/>: every fill of a vessel that holds its liquid, or the entry itself.</summary>
+    private IEnumerable<string> PileItems(string entry) => Data.VesselFor(entry) is VesselDef v ? v.States.Skip(1) : new[] { entry };
+    /// <summary>The <see cref="PileEntry"/> a pile's filter names, or null while it names none.</summary>
+    public string? PileFilter(Thing pile) {
+        foreach (string item in pile.Inventory.InputFilter) return PileEntry(item);
+        return null;
+    }
+    /// <summary>Whether a pile is a plain one, whose filter names one resource, rather than compost.</summary>
+    public static bool IsPlainPile(Thing t) => t.Kind == ThingKind.Pile && !t.Compost;
+    /// <summary>What a filter entry names: an item, a crate of a good, or a crate of mixed goods.</summary>
+    public string FilterName(string entry) => entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good))) : Data.Name(entry);
     /// <summary>The contents of a packed crate item, or null for anything else.</summary>
     public Inventory? Packed(string item) => S.Crates.GetValueOrDefault(PackedId(item));
     public Inventory NewCrate() => new() { Slots = Data.CrateCapacity, StackSize = Data.CrateCapacity, Capacity = Data.CrateCapacity };
@@ -1601,7 +1618,7 @@ public sealed partial class World {
     private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
         ThingKind.Toolstation when !(Data.Items.TryGetValue(item, out var def) && def.Tool != "") => HoldRefusal.ToolsOnly,
         ThingKind.Pile when t.Compost && !Compostable(item) && item != "fertilizer" => HoldRefusal.CompostOnly,
-        ThingKind.Pile when !t.Compost && HeldOtherThan(t.Inventory, item) != null => HoldRefusal.OtherResource,
+        ThingKind.Pile when !t.Compost && !PileTakes(t.Inventory, item) => HoldRefusal.OtherResource,
         ThingKind.Farm when !Data.Farm.Sow.ContainsKey(item) => HoldRefusal.FarmOnly,
         ThingKind.Packer when item != "crate" && item != t.Packs => HoldRefusal.PackerOnly,
         ThingKind.Signpost when !CanSell(item) => HoldRefusal.SellOnly,
@@ -1614,23 +1631,26 @@ public sealed partial class World {
     public string? HoldBlock(Thing t, string item) => HoldCheck(t, item) switch {
         HoldRefusal.ToolsOnly => "The tool station only holds tools.",
         HoldRefusal.CompostOnly => "The compost takes leaves, grass and food.",
-        HoldRefusal.OtherResource => $"This pile holds {Data.Name(HeldOtherThan(t.Inventory, item)!)}. Empty it to store something else.",
+        HoldRefusal.OtherResource => Phrase("This is ", A(PileName(t)!), " pile."),
         HoldRefusal.PackerOnly => t.Packs == "" ? "Choose what to pack first." : $"The packing station takes {Data.Name(t.Packs).ToLowerInvariant()} and empty crates.",
         HoldRefusal.SellOnly => "The village only takes packed crates.",
         HoldRefusal.WoodOnly => "The campfire burns only wood.",
         HoldRefusal.FarmOnly => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}.",
         _ => null
     };
-    private string? HeldOtherThan(Inventory inventory, string item) {
-        foreach (var pair in inventory.Items) if (!SameResource(pair.Key, item)) return pair.Key;
-        return null;
+    /// <summary>Whether a pile takes an item: what its filter names, or with no filter yet, what it holds or anything while empty.</summary>
+    private bool PileTakes(Inventory pile, string item) {
+        if (pile.InputFilter.Count > 0) return pile.Wants(item);
+        return pile.First() is not string held || PileEntry(held) == PileEntry(item);
     }
+    /// <summary>The resource a plain pile is for, in lower case, as its filter names it or, until the next tick sets the filter, as it holds it.</summary>
+    public string? PileName(Thing pile) => (PileFilter(pile) ?? (pile.Inventory.First() is string held ? PileEntry(held) : null)) is string entry ? Lower(FilterName(entry)) : null;
     public bool Compostable(string item) => item is "leaves" or "grass" || Data.IsFood(item);
     /// <summary>Turns a pile into compost or back; refused while it holds something the new use would not take.</summary>
     public bool SetCompost(Thing pile, bool on) {
         if (pile.Kind != ThingKind.Pile || pile.Compost == on) return false;
-        var items = pile.Inventory.Items.Keys.ToList();
-        if (on ? items.Any(i => !Compostable(i) && i != "fertilizer") : items.Count > 1) { Say(on ? "Empty the pile before composting." : "Empty the compost down to one resource first."); return false; }
+        if (pile.Inventory.Items.Count > (on ? 0 : 1)) { Say(on ? "Empty the pile before composting." : "Empty the compost down to one resource first."); return false; }
+        if (on && pile.Inventory.InputFilter.Count > 0) { Say("Take the pile's filter off before composting."); return false; }
         if (Forwarded(Verb.SetCompost, pile.Id, count: on ? 1 : 0)) return true;
         pile.Compost = on; pile.Progress = 0;
         // Compost starts out taking everything that rots and giving fertilizer; its filters are then the player's to change.
@@ -1638,30 +1658,17 @@ public sealed partial class World {
         if (on) { foreach (var item in compostables ??= Data.Items.Keys.Where(Compostable).ToArray()) pile.Inventory.InputFilter.Add(item); pile.Inventory.OutputFilter.Add("fertilizer"); }
         PileFilters(pile); return true;
     }
-    /// <summary>Piles keep their automation filters in step with what they hold, one resource in and out, a vessel at every fill; compost keeps the filters it was given.</summary>
     private string[]? compostables;
+    /// <summary>The first resource put in an unfiltered pile sets its filters, in and out; they then stay, emptied or not, until the player takes them off. Compost keeps the filters it was given.</summary>
     private void PileFilters(Thing pile) {
-        if (pile.Compost) return;
-        var inv = pile.Inventory;
-        if (inv.First() is not string item) { inv.InputFilter.Clear(); inv.OutputFilter.Clear(); return; }
-        // Set only when what it holds changes, since a crate's entry is a new string.
-        if (Data.VesselOf(item) is VesselDef vessel) {
-            if (FiltersName(inv, vessel.States)) return;
-            inv.InputFilter.Clear(); inv.OutputFilter.Clear();
-            foreach (string state in vessel.States) { inv.InputFilter.Add(state); inv.OutputFilter.Add(state); }
-            return;
-        }
-        if (inv.InputFilter.Count == 1 && inv.OutputFilter.Count == 1 && inv.Wants(item) && inv.AllowsWithdrawal(item)) return;
-        var kind = PackedKind(item);
-        string entry = kind.IsEmpty ? item : new string(kind);
-        inv.InputFilter.Clear(); inv.OutputFilter.Clear();
-        inv.InputFilter.Add(entry); inv.OutputFilter.Add(entry);
+        if (pile.Compost || pile.Inventory.InputFilter.Count > 0 || pile.Inventory.First() is not string item) return;
+        SetPileFilter(pile.Inventory, PileEntry(item));
     }
-    /// <summary>Whether a box's input and output filters both name exactly these items; it runs every tick, so it allocates nothing.</summary>
-    private static bool FiltersName(Inventory box, List<string> items) {
-        if (box.InputFilter.Count != items.Count || box.OutputFilter.Count != items.Count) return false;
-        foreach (string item in items) if (!box.InputFilter.Contains(item) || !box.OutputFilter.Contains(item)) return false;
-        return true;
+    /// <summary>Makes a pile's filters, in and out, name the items of one <see cref="PileEntry"/>.</summary>
+    private void SetPileFilter(Inventory pile, string entry) {
+        pile.InputFilter.Clear(); pile.OutputFilter.Clear();
+        foreach (string item in PileItems(entry)) { pile.InputFilter.Add(item); pile.OutputFilter.Add(item); }
+        pile.Changed?.Invoke();
     }
     /// <summary>Compost turns 4 units of whatever it holds into 1 fertilizer each in-game hour.</summary>
     public const int CompostBatch = 4;

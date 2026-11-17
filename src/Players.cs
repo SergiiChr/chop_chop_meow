@@ -376,8 +376,17 @@ public sealed partial class World {
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
-        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null) || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
-        chest.Inventory.Filter(item, output, allowed);
+        bool pile = IsPlainPile(chest);
+        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate)) return;
+        if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
+        if (pile && allowed) SetPileFilter(chest.Inventory, PileEntry(item));
+        else if (pile) chest.Inventory.ClearFilters();
+        else chest.Inventory.Filter(item, output, allowed);
+    }
+    /// <summary>Whether a plain pile's filter may change: only while it is empty, saying so to the player otherwise, and to a new resource only once the one it names is taken off.</summary>
+    private bool PileFilterChanges(Thing pile, bool adding) {
+        if (pile.Inventory.First() != null) { Say("Can't change filter on a non-empty pile."); return false; }
+        return !adding || pile.Inventory.InputFilter.Count == 0;
     }
 
     /// <summary>Stops or restarts workers bringing food to a compost.</summary>
@@ -387,7 +396,7 @@ public sealed partial class World {
     }
 
     public void ClearFilters(Thing chest) {
-        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || Forwarded(Verb.ClearFilters, chest.Id)) return;
+        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || IsPlainPile(chest) && !PileFilterChanges(chest, false) || Forwarded(Verb.ClearFilters, chest.Id)) return;
         chest.Inventory.ClearFilters();
     }
 

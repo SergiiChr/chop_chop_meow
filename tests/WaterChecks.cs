@@ -22,7 +22,7 @@ public static class WaterChecks {
         CheckTakingWaterOutNeedsABottleWithRoom(data);
         CheckQueuedBatchPoursWaterFromBottles(data);
         CheckQueuedBatchSaysWhatItIsMissing(data);
-        CheckPileHoldsBottlesAtEveryFill(data);
+        CheckPileHoldsWaterAtAnyFillApartFromEmptyBottles(data);
         CheckQueuedBatchCountsOnlyCarriedFuel(data);
         CheckFullBottleQueuedForOneLiterKeepsTheRest(data);
         CheckSwitchingRecipeTakesWaterIntoBottles(data);
@@ -280,17 +280,28 @@ public static class WaterChecks {
         }
     }
 
-    private static void CheckPileHoldsBottlesAtEveryFill(GameData data) {
+    /// <summary>A pile of water takes bottles holding any of it and no empty bottle, and a pile of empty bottles takes only those.</summary>
+    private static void CheckPileHoldsWaterAtAnyFillApartFromEmptyBottles(GameData data) {
         var world = new World(data, false);
-        var pile = world.Add(ThingKind.Pile, world.Player + Vector2.Right);
-        Give(world, Water.Full, 1); Give(world, Water.Empty, 1); Give(world, Water.OneLiter, 1); Give(world, "wood", 1);
-        Require(world.Transfer(world.Backpack, pile.Inventory, Water.Full, 1) == 1, "a pile should take a full bottle");
+        var water = world.Add(ThingKind.Pile, world.Player + Vector2.Right);
+        var empties = world.Add(ThingKind.Pile, world.Player + Vector2.Left);
+        Give(world, Water.Full, 1); Give(world, Water.Empty, 2); Give(world, Water.OneLiter, 1); Give(world, Water.TwoLiters, 1); Give(world, "wood", 1);
+        Require(world.Transfer(world.Backpack, water.Inventory, Water.Full, 1) == 1, "a pile should take a full bottle");
+        Require(world.Transfer(world.Backpack, water.Inventory, Water.Empty, 1) == 0, "a pile of water should refuse an empty bottle before its filter is set");
         world.Tick(.1f);
-        Require(world.Transfer(world.Backpack, pile.Inventory, Water.Empty, 1) == 1 && world.Transfer(world.Backpack, pile.Inventory, Water.OneLiter, 1) == 1,
-            "a pile of bottles should take them empty and part-full too");
-        Require(world.Transfer(world.Backpack, pile.Inventory, "wood", 1) == 0, "a pile of bottles should take nothing else");
+        Require(water.Inventory.InputFilter.SetEquals(new[] { Water.OneLiter, Water.TwoLiters, Water.Full }) && world.PileFilter(water) == Water.Liquid,
+            "a full bottle should set the pile's filter to water at any fill");
+        Require(world.Transfer(world.Backpack, water.Inventory, Water.OneLiter, 1) == 1 && world.Transfer(world.Backpack, water.Inventory, Water.TwoLiters, 1) == 1,
+            "a pile of water should take part-full bottles");
+        Require(world.HoldBlock(water, Water.Empty) == "This is a water pile." && world.HoldBlock(water, "wood") == "This is a water pile.",
+            "a pile of water should take no empty bottle and nothing else");
+        Require(world.Transfer(world.Backpack, empties.Inventory, Water.Empty, 2) == 2, "a pile should take empty bottles");
         world.Tick(.1f);
-        Require(pile.Inventory.Accepts(Water.Empty) && pile.Inventory.AllowsWithdrawal(Water.Full), "workers should store and fetch bottles at any fill there");
+        Require(empties.Inventory.InputFilter.SetEquals(new[] { Water.Empty }) && world.HoldBlock(empties, Water.Full) == "This is an empty bottle pile.",
+            "a pile of empty bottles should take no bottle holding water");
+        empties.Inventory.Remove(Water.Empty, 2);
+        world.SetFilter(empties, Water.Empty, false, false); world.SetFilter(empties, Water.TwoLiters, false, true);
+        Require(world.PileFilter(empties) == Water.Liquid, "picking a part-full bottle for an empty pile should set it to water at any fill");
     }
 
     private static void CheckQueuedBatchCountsOnlyCarriedFuel(GameData data) {

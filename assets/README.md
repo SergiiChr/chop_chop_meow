@@ -220,6 +220,9 @@ Each cut is faded at both ends, and the cuts of one sound are brought to one mea
 
 `pulled_scream` is the first second and a half of "Male horror scream" (Pixabay 123080), and `takedown_scream` is "Man pain scream 02" (Pixabay 567205) with the silence cut from both ends: recordings supplied for this project, faded at the ends and brought to one mean level.
 
+`footsteps_default` is cut with ffmpeg from "Footsteps_Grass_1" by freesound_community (Pixabay 6810, artist SilentStrikeZ on Freesound), a recording supplied for this project: six single steps, each 0.34 seconds from just before the foot lands, faded in over 15 ms and out over its last 120 ms.
+Each step's loudest 400 ms of heard loudness, counting the silence after it, is brought to -23.3 LUFS, the mean of the steps it replaced.
+
 `stomach_growl` is "yet more stomach sounds" by freesound_community (Pixabay 97719, artist Darsycho on Freesound), a recording supplied for this project, with the silence cut from both ends: four seconds of three rumbles.
 
 The tree sounds are cut and mixed with ffmpeg from three recordings supplied for this project, a tree bending and two trees falling:
