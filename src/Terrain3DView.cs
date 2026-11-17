@@ -122,7 +122,7 @@ public partial class WorldView {
             }
         }
         foreach (var (scan, tile) in GroundScans) Scan(scan, tile, map => GD.Load<Texture2D>($"res://assets/environment/terrain3d/{scan}_{map}.jpg"));
-        foreach (var look in new[] { ShorelineAppearance.Rocks, ShorelineAppearance.Sand }) {
+        foreach (var look in new[] { ShoreLook.Rocks, ShoreLook.Sand }) {
             Scan(look.Name, look.Tile, map => ShorelineAppearance.Map(look, map));
             RenderingServer.MaterialSetParam(terrainMaterialRid, $"{look.Name}_wet", look.Wet);
         }

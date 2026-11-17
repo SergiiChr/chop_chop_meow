@@ -8,17 +8,11 @@ namespace ChopChopMeow;
 public static class LakeAppearance {
     private const string ShaderPath = "res://assets/environment/lake/lake.gdshader";
     private const string LilyPadShaderPath = "res://assets/environment/lake/lily_pad.gdshader";
-    /// <summary>The three waves on the water: direction across the world in x and y, steepness in z and length in w.</summary>
-    private static readonly Vector4[] Waves = { new(1, 1, .35f, 3), new(1, .6f, .3f, 1.55f), new(1, 1.3f, .25f, .9f) };
-    /// <summary>How fast the waves run, as a share of the speed their length gives them.</summary>
-    private const float WaveSpeed = .5f;
     /// <summary>Seconds the waves show in still screenshots, for comparable pictures.</summary>
     private const float ReviewSeconds = 1.25f;
     private static readonly StringName ReviewTime = "review_time";
     /// <summary>Height of the water's surface at rest over the valley floor.</summary>
     internal const float Level = .025f;
-    /// <summary>World units between the surface's vertices: three to the shortest wave.</summary>
-    internal static readonly float Spacing = Waves.Min(wave => wave.W) / 3;
     /// <summary>Columns and rows of vertices in one tile of a large surface, which Godot leaves undrawn while it is off screen.</summary>
     private const int TileVertices = 100;
     private static Shader? shader;
@@ -26,7 +20,7 @@ public static class LakeAppearance {
     /// <summary>Adds the pond's water surface, which ends at the shore that bounds walking.</summary>
     public static void BuildLakeAppearance(Node3D parent, bool still) {
         float reach = Terrain.LakeRadius * 1.05f;
-        var mesh = Grid(Steps(0, Mathf.Tau, Spacing / reach), Steps(0, 1, Spacing / reach), (angle, share) => {
+        var mesh = Grid(Steps(0, Mathf.Tau, Waves.Spacing / reach), Steps(0, 1, Waves.Spacing / reach), (angle, share) => {
             float shore = Terrain.Shore(angle) * share;
             return new Vector3(MathF.Cos(angle) * shore, 0, MathF.Sin(angle) * shore);
         });
@@ -65,10 +59,10 @@ public static class LakeAppearance {
 
     /// <summary>Gives a material the water's waves; <paramref name="still"/> holds them at one moment.</summary>
     private static void UseWaves(ShaderMaterial material, bool still) {
-        material.SetShaderParameter("wave_speed", WaveSpeed);
-        material.SetShaderParameter("wave_a", Waves[0]);
-        material.SetShaderParameter("wave_b", Waves[1]);
-        material.SetShaderParameter("wave_c", Waves[2]);
+        material.SetShaderParameter("wave_speed", Waves.Speed);
+        material.SetShaderParameter("wave_a", Waves.All[0]);
+        material.SetShaderParameter("wave_b", Waves.All[1]);
+        material.SetShaderParameter("wave_c", Waves.All[2]);
         if (still) SetWaveTime(material, ReviewSeconds);
     }
 

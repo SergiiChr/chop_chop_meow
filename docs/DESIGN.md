@@ -151,7 +151,10 @@ Rendering and sound:
 | `src/Terrain3DView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
-| `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake and sea surfaces and their sand and stony shores |
+| `src/water/display/LakeAppearance.cs` | The pond and sea surfaces, their tiles, and the water and lily pad materials |
+| `src/water/display/ShorelineAppearance.cs` | The sand and stony bank strips along the pond and the coast, and the coast's water |
+| `src/water/display/PondDressing.cs` | The pond's stones, reeds and lily pads |
+| `src/water/model/ShoreLook.cs`, `src/water/model/Waves.cs` | The shore photoscans' looks, and the waves the water and lily pads share |
 | `src/PaintFilter.cs` | The paint filter over the drawn world ([assets/environment/paint_filter](../assets/environment/paint_filter/README.md)) |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
