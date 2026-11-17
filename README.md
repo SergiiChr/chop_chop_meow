@@ -823,11 +823,12 @@ Once you set off you cannot walk away, and the keys do nothing until you are in.
 Stepping in takes about 1.3 seconds at a walk, hurrying up the second tread, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
 For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and drags you a metre back out in three tugs over 1.5 seconds, you bent over, reaching for the door and screaming.
 It then lets go and you run in again at once, or, at half health or less, its third tug pulls you straight over onto your back.
+Hit the wolf while it drags someone and it lets go of them.
 No other wolf takes you down while one drags you.
 
 Wolves cannot smell you inside: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
 Stepping out takes about 1.5 seconds, and wolves can reach you for its second half, once you are out of the doorway.
-Anyone banging on the door or standing at it steps aside to their right to let you out, and you keep to the left of the step.
+Anyone banging on the door steps aside to their right to let you out, and you keep to the left of the step; you step out beside anyone just standing at the door.
 Once you are through the doorway, they squeeze past you in, in the order they came: both of you turn sideways, chest to chest, arms at your sides, and the one going in puts their right palm on the door frame.
 
 A cabin holds one player.

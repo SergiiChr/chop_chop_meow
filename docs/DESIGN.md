@@ -504,9 +504,10 @@ What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed b
 - `World.Indoors` is what wolves go by: inside, through the second half of `Entering` and the first half of `Leaving`.
 - A bite or a leap landing on a player out in the open at a door (`World.PullOut`) has that wolf take them by the waist (`Wolf.Tugging`) and drag them `World.DragDistance` back out along `World.OutOfDoor` in `World.Tugs` tugs over `World.PullSeconds` (`Pulled`, or `PulledOff` while knocking), the way `World.Dragged` paces it, with one `pulled_scream` through the drag.
   The world moves the player there when the drag ends; meanwhile the wolf stands `World.TugReach` behind them and no other wolf leaps.
+  A hit knocks the wolf off (`Wolf.Stagger`): the player stays as far out as it got them and steps in again at a run.
   The wolf then lets go and bites no sooner than a second later; at half health or less the drag ends as the last tug lands (`World.Heave`) and it pins them, otherwise a pulled player steps in again at a run, and one pulled off the door stands free.
 - `Leaving` puts the player on the doorstep and takes `World.LeaveSeconds`.
-  Anyone waiting at that door, banging on it or standing free within `World.DoorReach`, goes `Aside` to `World.AsideSpot`, a step along `World.AsideWay`, and steps in once the leaver is through the doorway, in the order they came, while the leaver keeps `World.MakeWay` to the other side.
+  Anyone banging on that door goes `Aside` to `World.AsideSpot`, a step along `World.AsideWay`, and steps in once the leaver is through the doorway, in the order they came, while the leaver keeps `World.MakeWay` to the other side; a player just standing at the door stays put, and the leaver ends `World.ClearOf` beside them.
   The view walks them in from there up the side of the step (`WorldView.Inward`), the two turning chest to chest with their arms hanging as they pass (`WorldView.SqueezePast`), the one going in with the right palm on the door frame (`WorldView.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
 - A follower waits aside, out of the way, while the one ahead is dragged back out (`WorldView.Behind`).
 
