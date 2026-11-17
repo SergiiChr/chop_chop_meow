@@ -371,7 +371,7 @@ public partial class WorldView {
             case "wolf feed": {
                     // Tearing at the side of the fallen player's belly.
                     wolf.Feed(Elapsed, dt, false);
-                    (place, wolf.Yaw) = AtTheBody(reviewPerson, new Vector2(track.Y, -track.X) * World.FeastSeat - track * .6f);
+                    (place, wolf.Yaw) = OnTheBody(reviewPerson, .4f, 1);
                     wolf.Root.Rotation = new Vector3(0, wolf.Yaw, 0);
                     person = ActorAction.Devoured; downed = 1;
                     break;

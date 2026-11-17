@@ -1650,18 +1650,19 @@ public partial class WorldView : Node3D {
                 if (model.Toward == Vector2.Zero) model.Toward = (wolf.Pos - hunted).Normalized();
                 place = AtTheThroat(model, hunted, place, flight, InTheDoorway(wolf));
             } else model.Toward = Vector2.Zero;
-            if (wolf.Feeding && !wolf.Pinning && Fallen(wolf) is ActorState lying) {
-                // A feeding wolf eases from where it stood to the lying body, its jaws on the nearest part of it.
-                if (model.Fed == 0) model.StepFrom = model.Root.Position;
+            if (wolf.Feeding && !wolf.Pinning && Fallen(wolf) is var (lying, lyingRig)) {
+                // A feeding wolf stands perpendicular to the lying body at the part of it nearest to it that leaves it touching neither
+                // another wolf nor the player's arms, keeping that spot while it stays free; it eases there from where it stood, and to
+                // any new spot it has to move to.
+                var spot = FreeSpot(wolf, model, lying, lyingRig);
+                if (model.Fed == 0 || spot.Along != model.FeedAlong || spot.Side != model.FeedSide) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; model.Fed = 0; }
+                (model.FeedAlong, model.FeedSide) = (spot.Along, spot.Side);
                 model.Fed += dt;
-                // With another wolf astride the body from the throat to the knees, it takes the lower legs.
-                bool astride = PinningWolf(wolf.Target) is { Beside: var b } && b == Vector2.Zero;
-                var (on, yaw) = AtTheBody(lying, wolf.Pos, astride ? LegsTo : BiteTo);
                 float ease = Ease(Math.Min(1, model.Fed / FeedEasing));
-                model.Yaw = Mathf.LerpAngle(model.Yaw, yaw, ease);
+                model.Yaw = Mathf.LerpAngle(model.FromYaw, spot.Yaw, ease);
                 model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-                place = model.StepFrom.Lerp(on, ease);
-            } else model.Fed = 0;
+                place = model.StepFrom.Lerp(spot.At, ease);
+            } else { model.Fed = 0; model.FeedSide = 0; }
             model.Root.Position = place;
         }
         foreach (var (wolf, model) in wolves)
@@ -1682,39 +1683,89 @@ public partial class WorldView : Node3D {
     }
 
     /// <summary>
-    /// Where a feeding wolf at <paramref name="from"/> stands and which way it faces so its jaws close on the side of a player
-    /// lying on their back as <paramref name="fallen"/> is drawn, at the point of their hips or belly nearest it.
+    /// Where a feeding wolf stands, and which way it faces, to bite a player lying on their back as <paramref name="fallen"/> is
+    /// drawn at <paramref name="along"/> of the way from their feet to their throat, from the side <paramref name="side"/>: 1 to
+    /// their left, -1 to their right, standing perpendicular to the body.
     /// </summary>
-    private static (Vector3 At, float Yaw) AtTheBody(ActorState fallen, Vector2 from, float upTo = BiteTo) {
+    private static (Vector3 At, float Yaw) OnTheBody(ActorState fallen, float along, int side) {
         var forward = new Vector2(MathF.Sin(fallen.Yaw), MathF.Cos(fallen.Yaw));
         var feet = fallen.Position + forward * KnockSlide;
         var throat = Throat(fallen.Position, forward, float.MaxValue);
-        var along = new Vector2(throat.X, throat.Z) - feet;
-        // The jaws go to the belly and hips, clear of the arms raised over the chest.
-        var near = feet + along * Math.Clamp((from - feet).Dot(along) / along.LengthSquared(), Math.Min(BiteFrom, upTo), upTo);
-        // It faces the body square on from the side it stands on, so its forepaws stay off the body.
-        var across = new Vector2(along.Y, -along.X).Normalized();
-        var outward = (from - near).Dot(across) >= 0 ? across : -across;
+        var length = new Vector2(throat.X, throat.Z) - feet;
+        var near = feet + length * along;
+        var outward = new Vector2(length.Y, -length.X).Normalized() * side;
+        // The legs are lower and narrower than the trunk.
+        bool legs = along < LegsEnd;
         float yaw = ActorAnimation.Yaw(-outward, 0);
-        var at = To3(near + outward * BodySide, BodyTop) - new Basis(Vector3.Up, yaw) * WolfModel.FeedingBite;
+        var at = To3(near + outward * (legs ? LegSide : BodySide), legs ? LegTop : BodyTop) - new Basis(Vector3.Up, yaw) * WolfModel.FeedingBite;
         return (at with { Y = 0 }, yaw);
     }
     /// <summary>
-    /// How far out from the middle of a body lying on its back, and how high, its side is where a feeding wolf's jaws close, and
-    /// seconds a feeding wolf takes to ease onto it.
+    /// How far out from the middle of a body lying on its back, and how high, the side of its trunk and of its legs are, where a
+    /// feeding wolf's jaws close; the share of the way from the feet to the throat where the legs end; and seconds a feeding wolf
+    /// takes to ease onto its spot.
     /// </summary>
-    private const float BodySide = .17f, BodyTop = .2f, FeedEasing = .4f;
-    /// <summary>Shares of the way from a lying body's feet to its throat between which a feeding wolf bites: hips to belly.</summary>
-    private const float BiteFrom = .3f, BiteTo = .55f;
-    /// <summary>The share of the way from a lying body's feet to its throat up to which a feeding wolf bites the lower legs, while another stands astride the rest.</summary>
-    private const float LegsTo = .12f;
+    private const float BodySide = .17f, BodyTop = .2f, LegSide = .15f, LegTop = .1f, LegsEnd = .45f, FeedEasing = .4f;
     /// <summary>The drawn player a wolf hunts once they lie fallen, or null.</summary>
-    private ActorState? Fallen(Wolf wolf) {
-        foreach (var p in World.Players)
-            if (p.Id == wolf.Target && (p.Id == World.Me.Id ? player : others.TryGetValue(p.Id, out var other) ? other.State : null) is ActorState state
-                && state.Action is ActorAction.Mauled or ActorAction.Devoured) return state;
+    private (ActorState State, ActorRig Rig)? Fallen(Wolf wolf) {
+        foreach (var p in World.Players) {
+            if (p.Id != wolf.Target) continue;
+            var (state, rig) = p.Id == World.Me.Id ? (player, playerRig) : others.TryGetValue(p.Id, out var other) ? (other.State, other.Rig) : (null, null);
+            if (state is { Action: ActorAction.Mauled or ActorAction.Devoured } && rig != null) return (state, rig);
+        }
         return null;
     }
+
+    /// <summary>
+    /// The spot a feeding wolf takes at a lying player: perpendicular to the body at the part nearest to the wolf, on either
+    /// side, where it touches neither another wolf as drawn nor the player's arms; its last spot while that stays free.
+    /// With no free spot it keeps its last one.
+    /// </summary>
+    private (Vector3 At, float Yaw, int Along, int Side) FreeSpot(Wolf wolf, WolfModel model, ActorState lying, ActorRig rig) {
+        if (model.FeedSide != 0) {
+            var (at, yaw) = OnTheBody(lying, model.FeedAlong / (float)FeedSpots, model.FeedSide);
+            if (Free(wolf, at, yaw, rig)) return (at, yaw, model.FeedAlong, model.FeedSide);
+        }
+        var forward = new Vector2(MathF.Sin(lying.Yaw), MathF.Cos(lying.Yaw));
+        var feet = lying.Position + forward * KnockSlide;
+        (Vector3 At, float Yaw, int Along, int Side) best = default;
+        float nearest = float.MaxValue;
+        for (int i = 0; i <= FeedSpots; i++)
+            for (int side = -1; side <= 1; side += 2) {
+                var (at, yaw) = OnTheBody(lying, i / (float)FeedSpots, side);
+                float away = new Vector2(at.X, at.Z).DistanceTo(wolf.Pos);
+                if (away >= nearest || !Free(wolf, at, yaw, rig)) continue;
+                nearest = away; best = (at, yaw, i, side);
+            }
+        if (best.Side != 0) return best;
+        var (last, lastYaw) = OnTheBody(lying, model.FeedAlong / (float)FeedSpots, model.FeedSide == 0 ? 1 : model.FeedSide);
+        return (last, lastYaw, model.FeedAlong, model.FeedSide == 0 ? 1 : model.FeedSide);
+    }
+
+    /// <summary>Whether a feeding wolf placed at <paramref name="at"/> facing <paramref name="yaw"/> touches no other wolf as drawn and none of the lying player's arms.</summary>
+    private bool Free(Wolf feeder, Vector3 at, float yaw, ActorRig rig) {
+        var place = new Transform3D(new Basis(Vector3.Up, yaw), at);
+        Span<(Vector3 At, float Radius)> theirs = stackalloc (Vector3, float)[WolfModel.VolumeCount];
+        foreach (var (wolf, model) in wolves) {
+            if (wolf == feeder || !World.Wolves.Contains(wolf)) continue;
+            model.Volumes(theirs);
+            var other = model.Root.Transform;
+            foreach (var mine in WolfModel.FeedingVolumes)
+                foreach (var their in theirs)
+                    if ((place * mine.At).DistanceTo(other * their.At) < mine.Radius + their.Radius) return false;
+        }
+        var body = rig.Root.Transform;
+        for (int arm = 0; arm < 2; arm++) {
+            Vector3 fist = body * rig.Fist(arm == 0), elbow = body * rig.Elbow(arm == 0);
+            foreach (var mine in WolfModel.FeedingVolumes)
+                if ((place * mine.At).DistanceTo(fist) < mine.Radius + ArmRadius || (place * mine.At).DistanceTo(fist.Lerp(elbow, .5f)) < mine.Radius + ArmRadius
+                    || (place * mine.At).DistanceTo(elbow) < mine.Radius + ArmRadius) return false;
+        }
+        return true;
+    }
+    /// <summary>How many spots along a lying body, feet to throat, a feeding wolf chooses among, and how thick an arm is, in metres.</summary>
+    private const int FeedSpots = 20;
+    private const float ArmRadius = .06f;
 
     /// <summary>The rig's throat: above the feet and a little in front, before a knockdown tips it back.</summary>
     private const float ThroatHeight = 1.31f, ThroatAhead = .06f;

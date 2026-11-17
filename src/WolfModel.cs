@@ -69,8 +69,10 @@ public sealed class WolfModel {
     public Vector2 Drift;
     /// <summary>Which way the wolf faced as it took hold of a player to drag them, to turn from as it lunges in.</summary>
     public float FromYaw;
-    /// <summary>Seconds a wolf has fed at a fallen player, easing it from where it stood onto the body.</summary>
+    /// <summary>Seconds a wolf has fed at its spot at a fallen player, easing it there from where it stood.</summary>
     public float Fed;
+    /// <summary>The spot a feeding wolf holds at a fallen player: how far along the body, in WorldView's steps, and from which side; zero side for none yet.</summary>
+    public int FeedAlong, FeedSide;
 
     /// <summary>How far ahead of its root a leaping wolf's jaws reach the throat of a standing player: the reach of the bite plus the throat's own depth.</summary>
     public const float ContactReach = .65f;
@@ -357,12 +359,52 @@ public sealed class WolfModel {
     }
 
     /// <summary>Where a paw bone is, in the model, under the pose shown; it stands WolfShape.Sole above the ground when the paw is planted.</summary>
-    public Vector3 Paw(int leg) {
-        var l = shown.Leg(leg);
+    public Vector3 Paw(int leg) => PawOf(shown, leg);
+
+    private static Vector3 PawOf(WolfPose pose, int leg) {
+        var l = pose.Leg(leg);
         int bone = WolfShape.Leg(leg);
-        var at = Frame(shown, leg >= 2) * Posed(bone, Vector3.Zero, Turn(-l.Upper, 0, l.Splay)) * Posed(bone + 1, Vector3.Zero, Turn(-l.Middle))
+        var at = Frame(pose, leg >= 2) * Posed(bone, Vector3.Zero, Turn(-l.Upper, 0, l.Splay)) * Posed(bone + 1, Vector3.Zero, Turn(-l.Middle))
             * Posed(bone + 2, Vector3.Zero, Turn(-l.Lower)) * Posed(bone + 3, Vector3.Zero, Turn(-l.Paw));
         return at.Origin;
+    }
+
+    /// <summary>How many spheres <see cref="Volumes(Span{ValueTuple{Vector3, float}})"/> gives.</summary>
+    public const int VolumeCount = 16;
+
+    /// <summary>Spheres roughly filling the wolf's body, neck, head and legs, in the model, under the pose shown: centre and radius.</summary>
+    public void Volumes(Span<(Vector3 At, float Radius)> into) => VolumesOf(shown, into);
+
+    /// <summary>Spheres roughly filling a wolf's body, neck, head and legs, in the model, under a pose.</summary>
+    public static void VolumesOf(WolfPose pose, Span<(Vector3 At, float Radius)> into) {
+        Transform3D chest = Frame(pose, false), pelvis = Frame(pose, true);
+        // The trunk from the rump to the front of the chest.
+        into[0] = (pelvis * new Vector3(0, 0, -.12f), .14f);
+        into[1] = (pelvis.Origin, .16f);
+        into[2] = (pelvis.Origin.Lerp(chest.Origin, .5f), .16f);
+        into[3] = (chest.Origin, .17f);
+        into[4] = (chest * new Vector3(0, 0, .14f), .15f);
+        var neck = chest * Posed(WolfShape.Neck, Vector3.Zero, Turn(pose.Neck, pose.NeckTurn));
+        var bite = BiteOf(pose);
+        into[5] = (neck.Origin, .1f);
+        into[6] = (neck.Origin.Lerp(bite, .5f), .08f);
+        into[7] = (bite, .06f);
+        // Each leg from the shoulder or hip down: its middle and its paw.
+        for (int leg = 0; leg < 4; leg++) {
+            bool hind = leg >= 2;
+            var top = (hind ? pelvis : chest) * (WolfShape.Pivot(leg) - WolfShape.Bones[hind ? WolfShape.Pelvis : WolfShape.Chest].At);
+            var paw = PawOf(pose, leg);
+            into[8 + leg * 2] = (top.Lerp(paw, .5f), .06f);
+            into[9 + leg * 2] = (paw, .05f);
+        }
+    }
+
+    /// <summary>The spheres of a feeding wolf between its pulls, in the model.</summary>
+    public static readonly (Vector3 At, float Radius)[] FeedingVolumes = Feeding();
+    private static (Vector3 At, float Radius)[] Feeding() {
+        var volumes = new (Vector3 At, float Radius)[VolumeCount];
+        VolumesOf(Tearing(0, 0, 0, 0), volumes);
+        return volumes;
     }
 
     /// <summary>Where the jaws close, in the model, under the pose shown.</summary>
