@@ -1,6 +1,6 @@
 ---
 name: animation
-description: Make a character or creature animation look physically right, check it frame by frame and show a before/after video. Use when changing or reviewing a walk, run, work action, idle or wolf motion.
+description: Make a character or creature animation look physically right, check every frame of it and show a before/after video. Use when changing or reviewing any motion: a walk, run, work action, idle, wolf motion, or bodies meeting each other or the scene.
 ---
 
 # Animation
@@ -12,13 +12,39 @@ description: Make a character or creature animation look physically right, check
    how long a foot is down, how long the body is in the air.
 3. Work out the geometry first: leg reach, foot placement, hip height.
    A short script in the scratchpad that solves the poses is quicker to iterate than the game.
-4. Change the poses, record again and compare from the side in slow motion, frame by frame, then from the front and the
-   game camera.
+4. Change the poses, record again and go through it as [Frame by frame](#frame-by-frame) says, until every frame passes.
 5. Add or extend a check in `tests/AnimationChecks.cs` for what can be measured: feet on the ground, no sliding, nothing
    below it, time in the air. `CheckWolfGaitsPlantEachPaw` and
    `CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning` show how.
 6. Play it in the real window with the `playtest` skill: speeds, blends into and out of the motion, and turns.
-7. Share a before/after video made with the `frame-compare` skill.
+7. Share a before/after video made with the `frame-compare` skill, only once every frame passes.
+
+## Frame by frame
+
+Every new or changed motion is checked on every frame before anyone is shown it.
+A frame that fails sends the motion back for another pass, as many passes as it takes.
+
+- Record at a fixed frame rate with `./build.py record` (see [Review](#review)), so a frame number is the same moment in
+  every recording, before and after a change.
+  When recording is slow or unreliable, fix the tooling first, then carry on.
+- Cover every scenario the motion plays in, not only the one asked about: each way into and out of it, one player and
+  two, with and without wolves, on flat ground and on steps.
+- Look at every frame of the new motion, not samples, from more than one side: the game camera, from above for where
+  bodies stand, and low from the side for heights.
+  Two bodies that overlap in one view may still be apart; judge from a view where they would show apart.
+- Every frame must pass all of these:
+  - Nothing passes through anything: feet through steps or ground, bodies through walls or door frames, one character or
+    wolf through another, a limb through a body.
+  - Poses a body could hold: joints bend the way they bend and no further, no stiff limbs where a real one would give,
+    weight over what carries it.
+  - The right part makes contact: a palm on a door frame, not an elbow; jaws at the waist; a boot flat on its tread.
+  - Smooth motion: no jumps between frames; a reach starts early enough to arrive without a snap, and a release eases.
+  - Each body acts on the other where that one is drawn: a leap lands on the player as shown, not on where the world
+    keeps their place.
+- What can be measured, such as a sole's height over the tread under it or the gap between two bodies, is measured on
+  every frame of the real recording with a temporary print, and kept as a check where a seam allows.
+- Show the motion only when every frame of it passes. Say what was checked and from which views, and name anything still
+  failing as open.
 
 ## References
 
