@@ -172,7 +172,7 @@ public partial class WorldView {
         UpdateFog();
     }
 
-    /// <summary>The sea's and the pond's materials and the lily pads', whose waves the film moves by its own clock.</summary>
+    /// <summary>The sea's and the lake's materials and the lily pads', whose waves the film moves by its own clock.</summary>
     private void FindWaters(Node node) {
         if (node is MeshInstance3D { MaterialOverride: ShaderMaterial material } && LakeAppearance.FollowsWaves(material) && !waters.Contains(material)) waters.Add(material);
         for (int i = 0; i < node.GetChildCount(); i++) FindWaters(node.GetChild(i));

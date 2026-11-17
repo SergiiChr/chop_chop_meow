@@ -42,7 +42,7 @@ uniform float woods_reach;
 uniform float woods_band;
 
 // The shore photoscans the beds under the water take, with the world units one tile spans and how dark they are, as a
-// share of the dry shore's: mossy stones in the pond, sand under the sea.
+// share of the dry shore's: mossy stones in the lake, sand under the sea.
 uniform sampler2D rocks_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D rocks_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D rocks_height : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -53,7 +53,7 @@ uniform sampler2D sand_normal : hint_normal, filter_linear_mipmap_anisotropic, r
 uniform sampler2D sand_height : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float sand_tile;
 uniform float sand_wet;
-// Red under the pond's drawn water and green under the sea's, on the same texels as the woods map.
+// Red under the lake's drawn water and green under the sea's, on the same texels as the woods map.
 uniform sampler2D beds : filter_linear, repeat_disable;
 
 // Shifts a photoscan at uv, in tiles, along the view given along world x and z and up, by the depth its height map

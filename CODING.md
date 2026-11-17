@@ -78,6 +78,7 @@ Building mid-game is for rare events: a new building, a hire, a wolf.
 Build-mode placement previews and their faded materials are setup work, made while loading.
 A material builds its shader on its first draw, which stalls that frame, unless loading asks for its RID first (`ModelKit.BuildShaders`, faded copies in `ModelKit`).
 Drawing builds a pipeline the first time too, up to a second on a machine with empty caches, and asking for a RID does not: `WorldView` draws one of every model behind the ground for its first frames (`WorldModels.Warm`).
+A `ShaderMaterial` made outside the models goes on that warm stage too, on a small mesh of the kind it draws (`LakeDressing.Warm` for the water and lily pads): asking for its RID alone still stalls the first frame that shows it.
 Sounds load when the game starts, and music pauses rather than stopping: starting an MP3 partway through decodes it from the beginning.
 
 Code that runs every frame or tick allocates nothing once warmed up: every byte is garbage the runtime collects later in a pause that stalls a frame.
@@ -100,7 +101,7 @@ Allocation budgets:
 - The server's network updates, thirty a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
-`./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a sprint from the sea past a staffed camp and the pond to the valley's top corner, by day and at night with a lit torch, split by leg.
+`./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a sprint from the sea past a staffed camp and the lake to the valley's top corner, by day and at night with a lit torch, split by leg.
 That run plays on a real server process and measures the window, merging its updates included.
 
 Keep models under the triangle ceilings in [assets/README.md](assets/README.md#changing-a-model).

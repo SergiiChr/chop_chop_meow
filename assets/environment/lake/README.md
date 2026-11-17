@@ -1,29 +1,33 @@
 # Lake and coastal water
 
-The pond and the sea lie over real beds, which `Terrain.BedDepth` digs into the ground from where walking stops, so
+The lake and the sea lie over real beds, which `Terrain.BedDepth` digs into the ground from where walking stops, so
 the ground people walk on stays flat.
-The pond is a bowl 2.5 units deep at its middle; the sea floor drops one unit for every four out, to 6 units deep.
+The lake is a bowl 2.5 units deep at its middle, level at the shore and deepening gently; the sea floor drops one
+unit for every eight out, to 6 units deep.
 The terrain draws the ground under the drawn water with the shore photoscan, at the wet shade of the waterline: mossy
-stones in the pond, sand under the sea, also where the sea's waterline wanders inland of where walking stops.
+stones in the lake, sand under the sea, also where the sea's waterline wanders inland of where walking stops.
 `BedMap`, baked while loading at one texel a world unit, tells it where the drawn water lies.
 
 `lake.gdshader` is a Godot 4 port of the [Realistic Water Shader](https://godotshaders.com/shader/realistic-water/) by
 UnionBytes (Achim Menzel), released under the MIT licence in `LICENSE`, with its contributors in `AUTHORS.md`.
 Its header lists what the port changes.
-Three Gerstner waves move the surface; two scrolling normal maps ripple it.
+Three Gerstner waves move the surface, a twelfth as steep on the lake as on the sea; two scrolling normal maps ripple
+it.
 The water reads the ground under it from Godot's depth and screen textures: it bends the view of the bed by the
-ripples, tints it from pale shallows to a grey-blue deep by how much water the view passes through, and lays
+ripples, tints it from its shallow colour to its deep one by how much water the view passes through, and lays
 animated caustics and foam over the shallows.
+The sea goes from light cyan shallows to a cyan deep, the lake from lighter shallows to a lighter deep still; only the
+sea has foam.
 Things standing in the water are not part of what it shows through, and the sand and stone bank strips are not either:
 Godot copies the screen for the water before it draws anything see-through.
 `waves.gdshaderinc` holds the waves, which `lily_pad.gdshader` shares so the pads rise and fall with the water.
-`Waves` holds the three waves and their speed, and spaces the surfaces' vertices by the shortest; `LakeAppearance`
-gives them to the water and lily pad materials.
+`WaterBody` holds each body's waves and colours, the waves' speed, and spaces the surfaces' vertices by the shortest
+wave; `LakeAppearance` gives them to the water and lily pad materials.
 The textures are the shader's demo project's (`water_*.png`), downloaded by `tools/water_textures.py`, which pins
 their commit and SHA-256; `water_caustics.png` imports as an array of its 16 frames, four by four.
 
 The surfaces have a vertex every 0.3 units, three to the shortest wave.
-The pond's is a ring of quads out to its shore.
+The lake's is a ring of quads out to its shore.
 The sea's starts inland of its line by as far as the waterline wanders and reaches 400 units out; it is dense
 within 150 units either side of the valley's middle line and 90 units out, and coarser beyond.
 It is cut into tiles of 100 by 100 vertices, so Godot skips the tiles off screen, and the screen copy the water reads
@@ -32,7 +36,7 @@ The coast's waterline wanders in lobes and small bites, up to 0.6 units either s
 cuts the surface along it, showing the sand.
 
 `bank.gdshader` draws irregular-width bank strips with a shore photoscan: rippled sand on the coast, mossy ground with
-stones around the pond.
+stones around the lake.
 The shore darkens toward the waterline as if wet and thins out into the grass along a ragged line.
 The coast's sand runs from about 2 to 8 units wide by `Terrain.SandWidth`, which also keeps grass and trees off it.
 The grass edge bites in and out by up to 1.2 units more on the coast.

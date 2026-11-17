@@ -76,9 +76,9 @@ internal static class ShorelineAppearance {
 
         // The water starts inland of its line by as far as the waterline wanders, and its shader cuts the wandering edge.
         // It is dense wherever the map can show it, and coarser out at sea and along the coast past the map's ends.
-        float[] sides = [.. LakeAppearance.Steps(-300, -150, 3).SkipLast(1), .. LakeAppearance.Steps(-150, 150, Waves.Spacing), .. LakeAppearance.Steps(150, 300, 3).Skip(1)];
-        float[] distances = [.. LakeAppearance.Steps(-ShoreLook.Sand.Wander / 2, 90, Waves.Spacing), 120, 200, 400];
-        var material = LakeAppearance.CreateMaterial(still);
+        float[] sides = [.. LakeAppearance.Steps(-300, -150, 3).SkipLast(1), .. LakeAppearance.Steps(-150, 150, WaterBody.Spacing), .. LakeAppearance.Steps(150, 300, 3).Skip(1)];
+        float[] distances = [.. LakeAppearance.Steps(-ShoreLook.Sand.Wander / 2, 90, WaterBody.Spacing), 120, 200, 400];
+        var material = LakeAppearance.CreateMaterial(WaterBody.Sea, still);
         material.SetShaderParameter("shore_wander", ShoreLook.Sand.Wander);
         var water = new Node3D { Name = "CoastalWater" };
         parent.AddChild(water);

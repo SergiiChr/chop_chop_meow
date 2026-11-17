@@ -75,7 +75,7 @@ Simulation and data:
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
 | `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the gather, craft, bellows and fire jobs |
 | `src/Hauling.cs` | The four haul rules, what each kind of place offers a hauler, and the carry in hand |
-| `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the pond and the sea |
+| `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
 | `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
@@ -159,10 +159,10 @@ Rendering and sound:
 | `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
-| `src/water/display/LakeAppearance.cs` | The pond and sea surfaces, their tiles, and the water and lily pad materials |
-| `src/water/display/ShorelineAppearance.cs` | The sand and stony bank strips along the pond and the coast, and the coast's water |
-| `src/water/display/PondDressing.cs` | The pond's bank, water, stones, reeds and lily pads |
-| `src/water/model/ShoreLook.cs`, `src/water/model/Waves.cs` | The shore photoscans' looks, and the waves the water and lily pads share |
+| `src/water/display/LakeAppearance.cs` | The lake and sea surfaces, their tiles, and the water and lily pad materials |
+| `src/water/display/ShorelineAppearance.cs` | The sand and stony bank strips along the lake and the coast, and the coast's water |
+| `src/water/display/LakeDressing.cs` | The lake's bank, water, stones, reeds and lily pads |
+| `src/water/model/ShoreLook.cs`, `src/water/model/WaterBody.cs` | The shore photoscans' looks, and the sea's and the lake's waves and colours |
 | `src/PaintFilter.cs` | The paint filter over the drawn world ([assets/environment/paint_filter](../assets/environment/paint_filter/README.md)) |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
@@ -194,7 +194,7 @@ Checks and review tools:
 | `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
 | `src/performance/PerformanceRun.cs` | The rendered performance run's window half: sprinting the route by day and night, sampling frames, writing results |
 | `src/performance/PerformanceStage.cs`, `src/performance/PerformanceFixture.cs` | The run's server half, and the staffed camp it plays |
-| `src/performance/PerformanceRoute.cs` | The run's sprint from the beach past the camp and the pond to the valley's top corner |
+| `src/performance/PerformanceRoute.cs` | The run's sprint from the beach past the camp and the lake to the valley's top corner |
 | `src/performance/ResidentMemory.cs`, `src/performance/model/PerformanceSample.cs` | Reading resident memory without allocating, and one sampled frame |
 | `src/cabins/DoorwayReview.cs` | The `--doorway` scenes: two players and wolves at a cabin's door, moved by a script and run by the game's rules |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
@@ -413,7 +413,7 @@ There are no iron tools; iron bars only go into buildings and steel.
 
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
 Filling it or drinking straight from the source takes one `GatherSeconds`.
-Every point on the pond shore is a collection target.
+Every point on the lake shore is a collection target.
 A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many liters.
 `GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
 a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);

@@ -8,25 +8,25 @@ namespace ChopChopMeow;
 internal static class PerformanceRoute {
     /// <summary>Where both sprints start: on the beach below the fixture's camp.</summary>
     public static readonly Vector2 Start = Terrain.Point(Terrain.Coast(Terrain.Across(Terrain.Spawn)) - 2, Terrain.Across(Terrain.Spawn));
-    /// <summary>The pond's shore facing the camp, where the sprint touches the pond.</summary>
-    private static readonly Vector2 Pond = Terrain.WaterPoint(Terrain.Spawn);
-    /// <summary>Units from the pond's middle, along or across the valley, that the sprint keeps clear of it by.</summary>
-    private const float PondClearance = Terrain.LakeRadius * 1.2f;
-    /// <summary>Across the valley, the line clear of the pond on its left that the sprint follows up past it.</summary>
-    private static readonly float BesidePond = Terrain.Across(Terrain.Lake) - PondClearance;
+    /// <summary>The lake's shore facing the camp, where the sprint touches the lake.</summary>
+    private static readonly Vector2 LakeShore = Terrain.WaterPoint(Terrain.Spawn);
+    /// <summary>Units from the lake's middle, along or across the valley, that the sprint keeps clear of it by.</summary>
+    private const float LakeClearance = Terrain.LakeRadius * 1.2f;
+    /// <summary>Across the valley, the line clear of the lake on its left that the sprint follows up past it.</summary>
+    private static readonly float BesideLake = Terrain.Across(Terrain.Lake) - LakeClearance;
     /// <summary>Where the sprint stops in the camp: between the two furnaces seaward of the fixture's middle.</summary>
     public static readonly Vector2 Camp = Terrain.Spawn + Terrain.Point(2, .35f);
     /// <summary>The valley's top corner, where the sprint ends.</summary>
     private static readonly Vector2 Corner = Terrain.Point(22, 0);
     /// <summary>
-    /// The sprint's legs, each through its stops: up into the camp, across to the pond's shore, then round the pond's
+    /// The sprint's legs, each through its stops: up into the camp, across to the lake's shore, then round the lake's
     /// left side, up past it and on to the valley's top corner.
-    /// Out of the camp the sprint first steps three units across toward the pond, so its diagonal clears the bench.
+    /// Out of the camp the sprint first steps three units across toward the lake, so its diagonal clears the bench.
     /// </summary>
     public static readonly (string Name, Vector2[] Stops)[] Legs = {
         ("ocean-camp", [Camp]),
-        ("camp-pond", [Camp + Terrain.Point(0, 3), Pond]),
-        ("pond-corner", [Terrain.Point(Terrain.Along(Pond), BesidePond), Terrain.Point(Terrain.Along(Terrain.Lake) - PondClearance, BesidePond), Corner]),
+        ("camp-lake", [Camp + Terrain.Point(0, 3), LakeShore]),
+        ("lake-corner", [Terrain.Point(Terrain.Along(LakeShore), BesideLake), Terrain.Point(Terrain.Along(Terrain.Lake) - LakeClearance, BesideLake), Corner]),
     };
     /// <summary>Units along and across the valley within which a stop counts as reached.</summary>
     private const float AxisReach = .15f;

@@ -59,10 +59,10 @@ internal static class EconomySteps {
     public static float WaterPerDay(GameData data) {
         var world = WorkDay(data);
         var shore = Terrain.WaterPoint(Terrain.Spawn);
-        var pond = world.Add(ThingKind.Water, shore, 9999);
+        var lake = world.Add(ThingKind.Water, shore, 9999);
         var chest = world.Add(ThingKind.Chest, shore + (shore - Terrain.Lake).Normalized() * 2.5f);
         chest.Inventory.Slots = 600; chest.Inventory.Add(Water.Empty, 500); chest.Inventory.OutputFilter.Add(Water.Empty);
-        Hire(world, pond);
+        Hire(world, lake);
         Work(world, data.DaySeconds);
         return chest.Inventory[Water.Full] * data.Vessels[0].Capacity;
     }

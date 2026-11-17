@@ -46,7 +46,7 @@ internal partial class PerformanceStage(World world) : Node {
 
     /// <summary>
     /// Puts a first appearance in front of the player: the carts at the signpost, and the buildings and drops at fixed
-    /// spots left of the camp stop, off the sprint, which comes up the camp's middle and turns right toward the pond.
+    /// spots left of the camp stop, off the sprint, which comes up the camp's middle and turns right toward the lake.
     /// </summary>
     private void Show(string name) {
         static Vector2 NearCamp(float along, float across) => PerformanceRoute.Camp + Terrain.Point(along, across);

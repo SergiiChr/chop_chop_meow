@@ -54,27 +54,28 @@ public static class Terrain {
         return offset.Length() < Shore(MathF.Atan2(offset.Y, offset.X)) + margin;
     }
 
-    /// <summary>The dry collecting point on the pond's irregular shore in this direction.</summary>
+    /// <summary>The dry collecting point on the lake's irregular shore in this direction.</summary>
     public static Vector2 WaterPoint(Vector2 from) {
         var offset = from - Lake;
         float angle = MathF.Atan2(offset.Y, offset.X);
         return Lake + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (Shore(angle) + .35f);
     }
 
-    /// <summary>Depth of the pond's bowl at its middle.</summary>
-    private const float PondDepth = 2.5f;
+    /// <summary>Depth of the lake's bowl at its middle.</summary>
+    private const float LakeDepth = 2.5f;
     /// <summary>Deepest the sea floor gets.</summary>
     private const float SeaDepth = 6;
     /// <summary>Units out over which the sea floor drops one unit.</summary>
-    private const float SeaSlope = 4;
+    private const float SeaSlope = 8;
 
-    /// <summary>How far the ground lies below the valley floor: a bowl under the pond and a floor under the sea, each
+    /// <summary>How far the ground lies below the valley floor: a bowl under the lake and a floor under the sea, each
     /// falling from where walking stops, so the ground people walk on stays flat; zero everywhere else.</summary>
     public static float BedDepth(Vector2 p) {
         var offset = p - Lake;
         float reach = offset.Length() / Shore(MathF.Atan2(offset.Y, offset.X));
-        float pond = reach < 1 ? PondDepth * (1 - reach * reach) : 0;
-        return Math.Max(pond, Math.Clamp(OutToSea(p) / SeaSlope, 0, SeaDepth));
+        // The bowl leaves the shore level and deepens gently, so the shallows reach well in.
+        float lake = reach < 1 ? LakeDepth * (1 - reach * reach) * (1 - reach * reach) : 0;
+        return Math.Max(lake, Math.Clamp(OutToSea(p) / SeaSlope, 0, SeaDepth));
     }
 
     public static bool WaterRing(Vector2 p) => p.DistanceTo(WaterPoint(p)) <= 1.6f;

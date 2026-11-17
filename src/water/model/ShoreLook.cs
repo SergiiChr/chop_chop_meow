@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 internal sealed record ShoreLook(string Name, float Tile, float Wet, float GrassFade, float Wander) {
     /// <summary>Rippled beach sand along the sea coast.</summary>
     internal static readonly ShoreLook Sand = new("sand", 15, .6f, 2.2f, 1.2f);
-    /// <summary>Mossy ground with stones and bare earth around the pond.</summary>
+    /// <summary>Mossy ground with stones and bare earth around the lake.</summary>
     internal static readonly ShoreLook Rocks = new("rocks", 15, .6f, 1.5f, 0);
 
     /// <summary>Along the valley, the most inland the sea's drawn water reaches, where its waterline wanders furthest in.</summary>

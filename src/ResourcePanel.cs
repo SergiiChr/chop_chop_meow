@@ -12,7 +12,7 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
             if (thing.Kind != ThingKind.Water) line.Append(thing.Remaining).Append(" left · ");
             line.Append(world.GatherBlock(thing) ?? (thing.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
         });
-        if (thing.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
+        if (thing.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the lake shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
         JobButtons();
     }
 }

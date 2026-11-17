@@ -49,6 +49,10 @@ Icons and models are committed; playing does not call an image-generation servic
   with a fix pending in [godotengine/godot#123998](https://github.com/godotengine/godot/pull/123998).
   Remove this note after upgrading.
 - For a visual change, look at a rendered screenshot (`./build.py play -- --showcase --screenshot /absolute/path.png`); headless checks cannot verify presentation.
+- Two renders of one build differ slightly, from wind and edge smoothing caught at another moment. To check that a
+  change leaves a view alone, compare its render with the one before by overall difference
+  (`magick compare -metric RMSE before.png after.png null:`) against a second render of the same build, not pixel by
+  pixel.
   For motion, record a movie at a fixed frame rate with `./build.py record` (`animation` skill), which reuses the last export while the sources are unchanged.
 - To play the real window with keyboard and mouse, use the `playtest` skill (`.claude/skills/playtest`).
 - After a scripted rename, run `python3 tools/compare_strings.py <base>`: checks do not read most text, and a rename can reach into it.

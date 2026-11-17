@@ -804,7 +804,7 @@ public sealed partial class World {
     public void Consume(string item) {
         if (!Data.Items.TryGetValue(item, out var def) || Busy() || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
         if (Water.IsBottle(item)) {
-            if (!Water.DrinkLiter(this, item)) Say("Your bottle is empty. Collect water at the pond to refill it.");
+            if (!Water.DrinkLiter(this, item)) Say("Your bottle is empty. Collect water at the lake to refill it.");
             return;
         }
         if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
@@ -2350,7 +2350,7 @@ public sealed partial class World {
     public static int GoalCount => Milestones.Length;
     public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
     public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch {
-        0 => ("Carry fresh water", "Collect water around the pond shore. It holds three liters and stays with you when empty; without a bottle, drink at the source."),
+        0 => ("Carry fresh water", "Collect water around the lake shore. It holds three liters and stays with you when empty; without a bottle, drink at the source."),
         1 => ("A safe place", "Gather wood and stone, then build a cabin before dusk. Step inside to shelter from wolves."),
         2 => ("Keep the fire lit", "Build and light a campfire. Firelight keeps wolves away; feed it wood to keep it burning."),
         3 => ("Gather by hand", "You start with a steel axe. Hold right mouse on trees to fell them; gather stone and berries by hand."),

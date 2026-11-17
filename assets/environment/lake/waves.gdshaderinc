@@ -1,6 +1,6 @@
 // The water's waves, from the Realistic Water Shader port in lake.gdshader (MIT; copyright and permission notice in this
 // folder's LICENSE), shared by the water and what floats on it so both rise and fall together.
-// LakeAppearance gives them the waves and speed that Waves holds.
+// LakeAppearance gives them the waves and speed that WaterBody holds.
 
 // Seconds the waves show when zero or more, for still screenshots and the intro film's frames; TIME when negative.
 uniform float review_time = -1.0;

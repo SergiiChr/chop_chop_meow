@@ -4,7 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The water surfaces of the pond and the sea, with the waves, refraction, caustics and foam of one shader.</summary>
+/// <summary>The water surfaces of the lake and the sea, with the waves, refraction, caustics and foam of one shader.</summary>
 public static class LakeAppearance {
     private const string ShaderPath = "res://assets/environment/lake/lake.gdshader";
     private const string LilyPadShaderPath = "res://assets/environment/lake/lily_pad.gdshader";
@@ -17,24 +17,24 @@ public static class LakeAppearance {
     private const int TileVertices = 100;
     private static Shader? shader;
 
-    /// <summary>Adds the pond's water surface, which ends at the shore that bounds walking.</summary>
+    /// <summary>Adds the lake's water surface, which ends at the shore that bounds walking.</summary>
     public static void BuildLakeAppearance(Node3D parent, bool still) {
         float reach = Terrain.LakeRadius * 1.05f;
-        var mesh = Grid(Steps(0, Mathf.Tau, Waves.Spacing / reach), Steps(0, 1, Waves.Spacing / reach), (angle, share) => {
+        var mesh = Grid(Steps(0, Mathf.Tau, WaterBody.Spacing / reach), Steps(0, 1, WaterBody.Spacing / reach), (angle, share) => {
             float shore = Terrain.Shore(angle) * share;
             return new Vector3(MathF.Cos(angle) * shore, 0, MathF.Sin(angle) * shore);
         });
         parent.AddChild(new MeshInstance3D {
             Name = "lake_water_surface",
             Mesh = mesh,
-            MaterialOverride = CreateMaterial(still),
+            MaterialOverride = CreateMaterial(WaterBody.Lake, still),
             Position = new Vector3(Terrain.Lake.X, Level, Terrain.Lake.Y),
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         });
     }
 
-    /// <summary>The water material; <paramref name="still"/> holds its waves at one moment.</summary>
-    internal static ShaderMaterial CreateMaterial(bool still) {
+    /// <summary>The material of <paramref name="body"/>'s water; <paramref name="still"/> holds its waves at one moment.</summary>
+    internal static ShaderMaterial CreateMaterial(WaterBody body, bool still) {
         shader ??= GD.Load<Shader>(ShaderPath);
         if (shader == null) throw new InvalidOperationException($"Could not load lake shader at {ShaderPath}");
         // Drawn after the see-through bank strips that run under its edge, so its foam lies over them wherever the
@@ -45,24 +45,27 @@ public static class LakeAppearance {
         material.SetShaderParameter("normalmap_b_sampler", Texture("water_normal_b.png"));
         material.SetShaderParameter("foam_sampler", Texture("water_foam.png"));
         material.SetShaderParameter("caustic_sampler", GD.Load<TextureLayered>("res://assets/environment/lake/water_caustics.png"));
-        UseWaves(material, still);
+        material.SetShaderParameter("color_deep", body.Deep);
+        material.SetShaderParameter("color_shallow", body.Shallow);
+        material.SetShaderParameter("foam", body.Foam);
+        UseWaves(material, body, still);
         return material;
     }
 
-    /// <summary>A lily pad's material: flat <paramref name="color"/>, rising and falling with the water's waves.</summary>
+    /// <summary>A lily pad's material: flat <paramref name="color"/>, rising and falling with the lake's waves.</summary>
     internal static ShaderMaterial LilyPadMaterial(Color color, bool still) {
         var material = new ShaderMaterial { Shader = GD.Load<Shader>(LilyPadShaderPath) };
         material.SetShaderParameter("color", color);
-        UseWaves(material, still);
+        UseWaves(material, WaterBody.Lake, still);
         return material;
     }
 
-    /// <summary>Gives a material the water's waves; <paramref name="still"/> holds them at one moment.</summary>
-    private static void UseWaves(ShaderMaterial material, bool still) {
-        material.SetShaderParameter("wave_speed", Waves.Speed);
-        material.SetShaderParameter("wave_a", Waves.All[0]);
-        material.SetShaderParameter("wave_b", Waves.All[1]);
-        material.SetShaderParameter("wave_c", Waves.All[2]);
+    /// <summary>Gives a material <paramref name="body"/>'s waves; <paramref name="still"/> holds them at one moment.</summary>
+    private static void UseWaves(ShaderMaterial material, WaterBody body, bool still) {
+        material.SetShaderParameter("wave_speed", WaterBody.Speed);
+        material.SetShaderParameter("wave_a", body.Waves[0]);
+        material.SetShaderParameter("wave_b", body.Waves[1]);
+        material.SetShaderParameter("wave_c", body.Waves[2]);
         if (still) SetWaveTime(material, ReviewSeconds);
     }
 

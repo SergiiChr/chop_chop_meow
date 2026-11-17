@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The map of where the drawn water lies, one texel a world unit, which the terrain draws the beds by: red under the
-/// pond's water and green under the sea's.
+/// lake's water and green under the sea's.
 /// </summary>
 internal static class BedMap {
     /// <summary>

@@ -197,7 +197,7 @@ public partial class WorldView : Node3D {
         BuildLook();
         BuildEffects(scene);
         PileShape.Warm(World.Data);
-        warmStage = new Node3D(); WorldModels.Warm(warmStage); PileShape.Stage(warmStage, World.Data); PondDressing.Warm(warmStage); scene.AddChild(warmStage);
+        warmStage = new Node3D(); WorldModels.Warm(warmStage); PileShape.Stage(warmStage, World.Data); LakeDressing.Warm(warmStage); scene.AddChild(warmStage);
         BuildGhosts();
         for (int i = 0; i < World.Carts; i++) idleCarts.Push(NewCart());
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
@@ -1374,7 +1374,7 @@ public partial class WorldView : Node3D {
             selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = placeTile.Visible = false;
             return;
         }
-        // The pond is one thing all along its shore, so its selection ring shows only while the player collects water there.
+        // The lake is one thing all along its shore, so its selection ring shows only while the player collects water there.
         var selected = World.Find(Selection.Thing);
         if (selected?.Kind == ThingKind.Water && !(Gathering && GatheringTarget?.Kind == ThingKind.Water)) selected = null;
         Mark(selectRing, selected, 0);

@@ -19,7 +19,7 @@ public static class SimulationChecks {
         Test(HeldStackChecks.Run, data);
         Test(HotbarStackChecks.Run, data);
         Test(ChopChopMeow.Tests.WaterChecks.Run, data);
-        Test(PondChecks.Run, data);
+        Test(LakeChecks.Run, data);
         Test(EconomyChecks.Run, data);
         Test(AnimationChecks.Run, data);
         Test(HumanModelChecks.Run);
@@ -460,16 +460,16 @@ public static class SimulationChecks {
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
 
-        bool stayedOutOfPond = true;
+        bool stayedOutOfLake = true;
         for (int i = 0; i < 700 && chest.Inventory["wood"] == 0; i++) {
             SafeTick(world, Step);
-            stayedOutOfPond &= !Terrain.InLake(worker.Pos);
+            stayedOutOfLake &= !Terrain.InLake(worker.Pos);
         }
 
-        Require(stayedOutOfPond,
-                "worker pathing should route around the pond without entering its blocked radius");
+        Require(stayedOutOfLake,
+                "worker pathing should route around the lake without entering its blocked radius");
         Require(chest.Inventory["wood"] >= worker.Bag.StackSize && worker.Bag["wood"] == 0,
-                "worker assigned across the pond should eventually gather wood and deliver it to accepting storage");
+                "worker assigned across the lake should eventually gather wood and deliver it to accepting storage");
     }
 
     private static void CheckCampfireWorkerFetchesFuelFromAllowedStorage(GameData data) {
@@ -1668,9 +1668,9 @@ public static class SimulationChecks {
         world.Player = chest.Pos;
         Require(world.Transfer(chest.Inventory, world.Backpack, "wood", 26) == 26, "worker output should fund the shelter and fire");
         GatherUntil(world, stone, "stone", 12);
-        var pond = world.Add(ThingKind.Water, Terrain.WaterPoint(Terrain.Spawn), 9999);
+        var lake = world.Add(ThingKind.Water, Terrain.WaterPoint(Terrain.Spawn), 9999);
         world.Player = Terrain.WaterPoint(Terrain.Spawn);
-        world.Gather(pond, data.GatherSeconds);
+        world.Gather(lake, data.GatherSeconds);
         world.Player = Site(3, 3);
         Require(world.Build(ThingKind.Hut, Site(5, 3)) != null, "gathered materials should build the opening shelter");
         Require(world.Build(ThingKind.Campfire, Site(3, 6)) != null, "gathered materials should build the opening fire");

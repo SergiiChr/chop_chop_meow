@@ -72,7 +72,7 @@
         ALBEDO = mix(ALBEDO, vec3(0.2, 0.17, 0.11), objectShade.g * 0.6 * (1.0 - bare));
         ALBEDO *= 1.0 - min(scenery * (1.0 - wear) * 0.6 + objectShade.r * 0.6, 0.65) * (1.0 - bare);
     }
-    // The bed takes the shore photoscan as it is, as dark as the shore at its wet waterline: mossy stones in the pond,
+    // The bed takes the shore photoscan as it is, as dark as the shore at its wet waterline: mossy stones in the lake,
     // sand under the sea.
     if (submerged > 0.0) {
         vec3 bed_normal, bed_albedo;

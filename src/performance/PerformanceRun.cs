@@ -71,7 +71,7 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
         world.Player = PerformanceRoute.Start;
         lastPosition = world.Player;
         start = previous = Time.GetTicksUsec();
-        GD.Print($"PERFORMANCE START: {PerformanceStage.WarmupSeconds:0}s warmup on the beach, then sprints ocean -> camp -> pond -> top corner by day from {Clock(PerformanceStage.DayStart)} and at night from {Clock(PerformanceStage.NightStart)} with a lit torch; 2560x1440, uncapped, vsync off; GPU {RenderingServer.GetVideoAdapterName()}");
+        GD.Print($"PERFORMANCE START: {PerformanceStage.WarmupSeconds:0}s warmup on the beach, then sprints ocean -> camp -> lake -> top corner by day from {Clock(PerformanceStage.DayStart)} and at night from {Clock(PerformanceStage.NightStart)} with a lit torch; 2560x1440, uncapped, vsync off; GPU {RenderingServer.GetVideoAdapterName()}");
         return State.Running;
     }
 

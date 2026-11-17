@@ -9,7 +9,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 -- YouTube: www.youtube.com/user/UnionBytes
 */
 
-// Ported to Godot 4 for the pond and the sea. Changes from the original:
+// Ported to Godot 4 for the lake and the sea. Changes from the original:
 // - The depth and the ground's position under the water come from the inverse projection, which works for the game's
 //   orthographic camera and the intro film's perspective one, with Godot 4's reversed depth.
 // - The refraction bends by how far the ripples tilt the surface, on screen: the original's bend by the normal's own
@@ -19,7 +19,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 // - The caustics lie in world x and z, at the original's 300 tiles per 1024 units.
 // - The foam drops a test that always passed.
 // - The coast's waterline wanders and cuts the mesh along it.
-// - The defaults take the demo material's colours and sampler scale.
+// - The sampler scale is the demo material's; LakeAppearance gives each body of water its colours, waves and how much
+//   foam it has.
 // - The waves live in waves.gdshaderinc, which the lily pads share, and review_time can hold them at one moment.
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx, blend_mix;
@@ -37,11 +38,13 @@ uniform sampler2D normalmap_a_sampler : hint_normal, filter_linear_mipmap_anisot
 uniform sampler2D normalmap_b_sampler : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable; // Normalmap sampler B
 
 uniform sampler2D foam_sampler : hint_default_black, filter_linear_mipmap, repeat_enable; // Foam sampler
+// How much of the foam lies over the shallow water, from none at zero to all of it at one.
+uniform float foam = 1.0;
 
 uniform float refraction = 0.075; // Refraction of the water
 
-uniform vec4 color_deep : source_color = vec4(0.3255, 0.4078, 0.5059, 1.0); // Color for deep places in the water, medium to dark blue
-uniform vec4 color_shallow : source_color = vec4(0.6667, 0.7529, 0.7686, 1.0); // Color for lower places in the water, bright blue - green
+uniform vec4 color_deep : source_color; // Color for deep places in the water, medium to dark blue
+uniform vec4 color_shallow : source_color; // Color for lower places in the water, bright blue - green
 uniform float beers_law = 2.0; // Beers law value, regulates the blending size to the deep water level
 uniform float depth_offset = -0.75; // Offset for the blending
 
@@ -52,7 +55,7 @@ uniform sampler2D depth_texture : hint_depth_texture, filter_nearest, repeat_dis
 
 // Units over which the coast's waterline wanders in broad lobes and small bites; the water is cut away inland of it,
 // showing the sand, along its UV.y, the distance out from its line, which starts half of this inland.
-// Zero for the pond, which keeps its whole surface.
+// Zero for the lake, which keeps its whole surface.
 uniform float shore_wander;
 
 varying vec2 surface_uv; // Where the surface's maps are read, from its world position
@@ -133,7 +136,7 @@ void fragment() {
 
 	// Foam:
 	float foam_noise = clamp(pow(texture(foam_sampler, (uv * 4.0) - uv_offset).r, 10.0) * 40.0, 0.0, 0.2);
-	float foam_mix = clamp(pow((1.0 - thickness + foam_noise), 8.0) * foam_noise * 0.4, 0.0, 1.0);
+	float foam_mix = clamp(pow((1.0 - thickness + foam_noise), 8.0) * foam_noise * 0.4, 0.0, 1.0) * foam;
 	color = mix(color, vec3(1.0), foam_mix);
 
 	ALBEDO = color;

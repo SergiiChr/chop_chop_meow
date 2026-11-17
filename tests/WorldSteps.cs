@@ -95,7 +95,7 @@ internal static class WorldSteps {
         var shore = Terrain.WaterPoint(Terrain.Spawn);
         var inland = (shore - Terrain.Lake).Normalized();
         world.Player = shore + inland * 6;
-        var pond = world.Add(ThingKind.Water, shore, 9999);
+        var lake = world.Add(ThingKind.Water, shore, 9999);
         var bottles = world.Add(ThingKind.Pile, shore + inland * 4);
         bottles.Inventory.Add(Water.Full, 4); bottles.Inventory.Add(Water.TwoLiters, 2);
         world.Add(ThingKind.Pile, shore + inland * 4 + new Vector2(-3, 0)).Inventory.Add(Water.Empty, 4);
@@ -104,7 +104,7 @@ internal static class WorldSteps {
         var table = world.Add(ThingKind.Cooktable, shore + inland * 4 + new Vector2(0, 3));
         world.SetRecipe(table, "meat_stew");
         world.SetDuty(AddWorker(world, table.Pos), table, JobKind.Haul, true);
-        world.Assign(AddWorker(world, pond.Pos), pond);
+        world.Assign(AddWorker(world, lake.Pos), lake);
         return world;
     }
 

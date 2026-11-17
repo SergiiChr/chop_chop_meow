@@ -4,10 +4,10 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-/// <summary>The pond's bank, water, stones, reeds and lily pads, along the shore that bounds walking.</summary>
-internal static class PondDressing {
+/// <summary>The lake's bank, water, stones, reeds and lily pads, along the shore that bounds walking.</summary>
+internal static class LakeDressing {
     /// <summary>
-    /// Adds the pond: its bank, its water, and its stones, reeds and lily pads.
+    /// Adds the lake: its bank, its water, and its stones, reeds and lily pads.
     /// <paramref name="still"/> holds the waves at one moment.
     /// </summary>
     internal static void Build(Node3D parent, bool still) {
@@ -45,10 +45,10 @@ internal static class PondDressing {
 
     /// <summary>
     /// Puts a patch of water and a lily pad on the stage drawn behind the ground while loading, so their shaders and
-    /// pipelines are built before the player first sees the pond or the sea.
+    /// pipelines are built before the player first sees the lake or the sea.
     /// </summary>
     internal static void Warm(Node3D stage) {
-        stage.AddChild(new MeshInstance3D { Mesh = LakeAppearance.Grid([0, 1], [0, 1], (x, z) => new Vector3(x, 0, z)), MaterialOverride = LakeAppearance.CreateMaterial(false) });
+        stage.AddChild(new MeshInstance3D { Mesh = LakeAppearance.Grid([0, 1], [0, 1], (x, z) => new Vector3(x, 0, z)), MaterialOverride = LakeAppearance.CreateMaterial(WaterBody.Lake, false) });
         LilyPad(stage, Vector3.Zero, LakeAppearance.LilyPadMaterial(LilyPadColor, false));
     }
 

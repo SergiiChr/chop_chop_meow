@@ -19,7 +19,7 @@ public partial class WorldView {
         terrainView = new TerrainView(parent, camera, sun, grass, disturbanceTexture, sceneryShadeTexture, objectShadeTexture, World.Player);
         // Sea and its feathered bank follow the coastline at the valley's mouth.
         ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
-        PondDressing.Build(parent, EnvironmentReview);
+        LakeDressing.Build(parent, EnvironmentReview);
         foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
         foreach (var den in World.Dens) BuildDen(parent, den);
         BuildPlacedEnvironment(parent);
