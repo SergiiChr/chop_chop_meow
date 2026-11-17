@@ -183,14 +183,13 @@ public static class ActorAnimation {
     public static (Pose Pose, float Tip, Vector2 Hips) FallingBack(Pose pose, float u, float lying) {
         u = Math.Clamp(u, 0, 1);
         var (tip, hips) = FallPath(u, lying);
-        float back = hips.X, up = hips.Y;
         var fitted = pose with { Hips = FallHips };
         // The boots are held to the ground from the yank until the body rolls back, sliding out ahead as the seat drops.
         float planted = Mathf.SmoothStep(.1f, FallDrops + .04f, u) * (1 - Mathf.SmoothStep(FallSits - .05f, FallLies - .05f, u));
-        if (planted <= 0) return (fitted, tip, new Vector2(back, up));
+        if (planted <= 0) return (fitted, tip, hips);
         float t = Mathf.DegToRad(tip), slide = Mathf.SmoothStep(FallDrops, FallSits, u);
-        var left = OnGround(Mathf.Lerp(.42f, .62f, slide) - back, up, t);
-        var right = OnGround(Mathf.Lerp(-.12f, .42f, slide) - back, up, t);
+        var left = OnGround(Mathf.Lerp(.42f, .62f, slide) - hips.X, hips.Y, t);
+        var right = OnGround(Mathf.Lerp(-.12f, .42f, slide) - hips.X, hips.Y, t);
         return (fitted with {
             SwingL = Mathf.Lerp(pose.SwingL, left.Swing, planted),
             KneeL = Mathf.Lerp(pose.KneeL, left.Knee, planted),
@@ -198,7 +197,7 @@ public static class ActorAnimation {
             SwingR = Mathf.Lerp(pose.SwingR, right.Swing, planted),
             KneeR = Mathf.Lerp(pose.KneeR, right.Knee, planted),
             FootR = Mathf.Lerp(pose.FootR, right.Foot, planted),
-        }, tip, new Vector2(back, up));
+        }, tip, hips);
     }
 
     /// <summary>
@@ -517,7 +516,7 @@ public static class ActorAnimation {
                     // Dragged back by the waist: bent over at the hips with the arms reaching for the doorway and the head up to keep it in sight.
                     // Each tug, half the loop, jerks the hips back and the trunk lower; the front foot steps back in the air while the other stays
                     // planted, the hips passing back over it until it is in front.
-                    float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / World.Heave)), heave = half < World.Heave ? MathF.Sin(MathF.PI * half / World.Heave) : 0;
+                    float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / World.Heave)), heave = World.HeavePulse(half);
                     float stepping = Mathf.Lerp(18, -8, jerk), planted = Mathf.Lerp(-8, 18, jerk), lift = 45 * heave, struggle = MathF.Sin(half * Mathf.Tau);
                     bool left = p < .5f;
                     // Between tugs the player strains toward the door, the arms clawing at it.
@@ -647,8 +646,8 @@ public static class ActorAnimation {
 
     // ---------- Steps ----------
 
-    // A leg hangs this far to the side of the hips' middle, toward the body's left for the left leg.
-    private const float LegSide = .09f;
+    /// <summary>How far a leg hangs to the side of the hips' middle, toward the body's left for the left leg.</summary>
+    public const float LegSide = .09f;
     // A swinging boot rises onto a tread over this far ahead of its edge, so it clears the edge rather than snapping up at it.
     private const float StepClearance = .12f;
     // A boot this much higher than the other has left the ground: the body stands on the other one.
@@ -963,9 +962,10 @@ public static class ActorAnimation {
 /// the turn and leaning into it.
 /// </summary>
 public struct Turning {
-    /// <summary>How fast the body turns, in radians a second; the head's turn from the body, and the body's roll about its forward line, in radians.</summary>
-    public float Speed, Look, Bank;
-    private float head, headSpeed;
+    /// <summary>The head's turn from the body, and the body's roll about its forward line, in radians.</summary>
+    public float Look, Bank;
+    // How fast the body and the head turn, in radians a second.
+    private float speed, head, headSpeed;
     /// <summary>
     /// How quickly a player's body and head turn to a new heading, as the rate of a critically damped spring a second:
     /// the body covers 90% of a turn in 0.3 s, and the head about 0.2 s before it, as people turning while walking or running do.
@@ -994,11 +994,11 @@ public struct Turning {
     /// up to <see cref="MaxBank"/> when <paramref name="running"/> and <see cref="MaxJogBank"/> otherwise.
     /// </summary>
     public void Step(ref float yaw, float heading, float pace, float dt, bool running) {
-        head = Spring(head, heading, HeadRate, dt, ref headSpeed, Speed);
-        yaw = Spring(yaw, heading, BodyRate, dt, ref Speed, Look);
+        head = Spring(head, heading, HeadRate, dt, ref headSpeed, speed);
+        yaw = Spring(yaw, heading, BodyRate, dt, ref speed, Look);
         Look = Math.Clamp(Mathf.AngleDifference(yaw, head), -MaxLook, MaxLook);
         // Turning toward +X, the rig's left, tips it that way: a negative roll about its forward line.
-        float most = running ? MaxBank : MaxJogBank, lean = Math.Clamp(-MathF.Atan(pace * Speed / 9.8f), -most, most);
+        float most = running ? MaxBank : MaxJogBank, lean = Math.Clamp(-MathF.Atan(pace * speed / 9.8f), -most, most);
         Bank = Mathf.Lerp(Bank, lean, Math.Min(1, dt * 12));
     }
 }

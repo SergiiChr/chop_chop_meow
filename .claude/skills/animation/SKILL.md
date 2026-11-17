@@ -158,7 +158,8 @@ git fetch origin
 ```
 
 - Movies land in `build/animation-review/<clip>/<current or ref>/<view>.avi`, 96 frames a view at 30 a second of
-  slowed game time. Recordings of the same sources match frame for frame, and so do a branch and its base.
+  slowed game time. Recordings of the same sources match frame for frame, and so do a branch and its base; anything
+  that varies by run, such as an object's hash code, breaks that, so key motion off saved ids instead.
 - The first frames show the start from standing: pick frames after it for a steady cycle.
 - `--base` records a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
   A ref without the close-up review (`--animation-clip`) cannot be recorded.

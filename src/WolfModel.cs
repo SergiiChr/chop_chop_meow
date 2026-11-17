@@ -63,11 +63,11 @@ public sealed class WolfModel {
     /// <summary>A leap's bearing from the player to the wolf, and where it holds the throat once the player is down.</summary>
     public Vector2 Toward;
     public Vector3 Held;
-    /// <summary>Where a wolf that dragged its player out stood as it let go, to step round to their side from.</summary>
+    /// <summary>Where the wolf was drawn as its latest move began, to ease from: lunging in to take hold, stepping round to pin, or onto a feeding spot.</summary>
     public Vector3 StepFrom;
     /// <summary>How far the wolf is drawn from its place in the world after letting go of a player it dragged; it closes as the wolf walks.</summary>
     public Vector2 Drift;
-    /// <summary>Which way the wolf faced as it took hold of a player to drag them, to turn from as it lunges in.</summary>
+    /// <summary>Which way the wolf faced as its latest move began, to turn from.</summary>
     public float FromYaw;
     /// <summary>Seconds a wolf has fed at its spot at a fallen player, easing it there from where it stood.</summary>
     public float Fed;
@@ -286,15 +286,15 @@ public sealed class WolfModel {
     /// view holds the jaws at their waist.
     /// </summary>
     public void Tug(float progress, float time, float dt) {
-        float tugs = Math.Clamp(progress, 0, 1) * World.Tugs, tug = MathF.Min(MathF.Floor(tugs), World.Tugs - 1), u = tugs - tug;
-        float heave = u < World.Heave ? MathF.Sin(MathF.PI * u / World.Heave) : 0, shake = u < World.Heave ? 0 : MathF.Sin(time * 15) * Mathf.SmoothStep(World.Heave, World.Heave + .15f, u);
+        var (tug, u) = World.TugPhase(progress);
+        float heave = World.HeavePulse(u), shake = u < World.Heave ? 0 : MathF.Sin(time * 15) * Mathf.SmoothStep(World.Heave, World.Heave + .15f, u);
         // Each tug wrenches the other way.
         float side = tug % 2 == 0 ? 1 : -1;
         var body = Tugging(heave, side, shake);
         // How far the player, and so the jaws, have come back in this tug: planted paws come that far forward against the body.
-        float pulled = World.DragDistance * (World.Dragged(progress) - tug / World.Tugs);
+        float pulled = World.DragDistance * (World.Dragged(progress) - (float)tug / World.Tugs);
         // The jaws hold still at the waist, so a body that rears back carries its paws with it unless they make up the difference.
-        var drift = BiteOf(body) - BiteOf(Tugging(0, side, 0));
+        var drift = BiteOf(body) - TuggingBite;
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
             // The forepaws hop back to where they started once the heave has pulled the player most of the way; each hind paw steps back after it in turn.
@@ -310,6 +310,9 @@ public sealed class WolfModel {
 
     /// <summary>Shares of a tug between which a tugging wolf's forepaws hop back, once the heave has pulled the player about half way.</summary>
     private const float HopFrom = .18f, HopTo = .34f;
+
+    /// <summary>Where a tugging wolf's jaws close between heaves, in the model; which way the next heave wrenches makes no difference at rest.</summary>
+    private static readonly Vector3 TuggingBite = BiteOf(Tugging(0, 1, 0));
 
     /// <summary>A tugging wolf's body: <paramref name="heave"/> 0 to 1 through a tug, wrenching toward <paramref name="side"/>, and its head shaking.</summary>
     private static WolfPose Tugging(float heave, float side, float shake) =>
@@ -414,9 +417,9 @@ public sealed class WolfModel {
         return volumes;
     }
 
-    /// <summary>A point along the neck, in the model, under the pose shown: <paramref name="share"/> of the way from its root to the jaws.</summary>
-    public Vector3 AlongNeck(float share) => (Frame(shown, false) * Posed(WolfShape.Neck, Vector3.Zero, Turn(shown.Neck, shown.NeckTurn))).Origin.Lerp(BiteOf(shown), share);
-    /// <summary>How far from the root of the neck to the jaws the back of the jaw is, where a player pushing the wolf's head off takes hold.</summary>
+    /// <summary>Where the root of the neck and the jaws are, in the model, under the pose shown; a player pushing the wolf off takes hold between them.</summary>
+    public (Vector3 Root, Vector3 Jaws) NeckLine => ((Frame(shown, false) * Posed(WolfShape.Neck, Vector3.Zero, Turn(shown.Neck, shown.NeckTurn))).Origin, BiteOf(shown));
+    /// <summary>How far from the root of the neck to the jaws, 0 to 1, the back of the jaw is, where a player pushing the wolf's head off takes hold.</summary>
     public const float JawShare = .75f;
 
     /// <summary>Where the jaws close, in the model, under the pose shown.</summary>

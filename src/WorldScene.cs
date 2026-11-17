@@ -204,9 +204,10 @@ public partial class WorldView {
     private static readonly (float At, Doorway Stage)[] ReviewDoorway = { (0, Doorway.None), (2, Doorway.Entering), (4, Doorway.Leaving), (6, Doorway.Knocking), (7.5f, Doorway.Pulled) };
     private const float ReviewDoorwayLoop = 10.5f;
     private HutProp? reviewCabin;
-    /// <summary>The cabin clip's doorway stage drawn last frame, and where the actor stood when it began.</summary>
-    private Doorway reviewStage;
-    private Vector2 reviewStageFrom;
+    /// <summary>The cabin the cabin clip plays at, at the middle of the ground.</summary>
+    private static readonly Thing ReviewHut = new() { Kind = ThingKind.Hut };
+    /// <summary>How far from the cabin clip's door the player is still seen, before the walls hide them.</summary>
+    private const float ReviewSeen = 1.75f;
     /// <summary>Seconds each key is held in a turns clip, which presses A, W, D and S in turn.</summary>
     private const float ReviewKeySeconds = .35f;
     private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall", "wolf hit" };
@@ -295,8 +296,8 @@ public partial class WorldView {
     /// in at a walk, out, banging on the shut door, and in at a run after a moment of being dragged back.
     /// </summary>
     private void ReviewCabin(float dt) {
-        if (reviewCabin == null) { reviewCabin = (HutProp)WorldModels.Build(new Thing { Kind = ThingKind.Hut }); review!.AddChild(reviewCabin.Root); }
-        var door = World.DoorPoint(new Thing { Kind = ThingKind.Hut });
+        if (reviewCabin == null) { reviewCabin = (HutProp)WorldModels.Build(ReviewHut); review!.AddChild(reviewCabin.Root); }
+        var door = World.DoorPoint(ReviewHut);
         float time = Elapsed % ReviewDoorwayLoop;
         int stage = ReviewDoorway.Length - 1;
         while (ReviewDoorway[stage].At > time) stage--;
@@ -312,20 +313,20 @@ public partial class WorldView {
             float run = time - start, pulled = run - World.RushSeconds / 2;
             var dragged = door + World.OutOfDoor * World.DragDistance;
             var part = run < World.RushSeconds / 2 ? Doorway.Entering : pulled < World.PullSeconds ? Doorway.Pulled : Doorway.Entering;
-            if (part != reviewStage) { reviewStage = part; reviewStageFrom = reviewActor.Position; }
-            shown = run < World.RushSeconds / 2 ? DoorStep(Doorway.Entering, door, door, reviewStageFrom, run, World.RushSeconds, true)
-                : pulled < World.PullSeconds ? DoorStep(Doorway.Pulled, door, door, reviewStageFrom, pulled, World.PullSeconds, true)
-                : DoorStep(Doorway.Entering, door, dragged, reviewStageFrom, pulled - World.PullSeconds, World.RushSeconds, true);
+            if (part != reviewActor.Stage) { reviewActor.Stage = part; reviewActor.StageFrom = reviewActor.Position; }
+            shown = run < World.RushSeconds / 2 ? DoorStep(Doorway.Entering, door, door, reviewActor.StageFrom, run, World.RushSeconds, true)
+                : pulled < World.PullSeconds ? DoorStep(Doorway.Pulled, door, door, reviewActor.StageFrom, pulled, World.PullSeconds, true)
+                : DoorStep(Doorway.Entering, door, dragged, reviewActor.StageFrom, pulled - World.PullSeconds, World.RushSeconds, true);
         } else {
-            if (now != reviewStage) { reviewStage = now; reviewStageFrom = reviewActor.Position; }
-            shown = DoorStep(now, door, door, reviewStageFrom, time - start, now == Doorway.Knocking ? World.KnockLead + World.KnockSeconds : World.EnterSeconds, false);
+            if (now != reviewActor.Stage) { reviewActor.Stage = now; reviewActor.StageFrom = reviewActor.Position; }
+            float seconds = now switch { Doorway.Knocking => World.KnockLead + World.KnockSeconds, Doorway.Leaving => World.LeaveSeconds, _ => World.EnterSeconds };
+            shown = DoorStep(now, door, door, reviewActor.StageFrom, time - start, seconds, false);
         }
-        bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Pulled && shown.At.DistanceTo(door) < 1.75f;
-        reviewCabin.Open = Mathf.MoveToward(reviewCabin.Open, open ? 1 : 0, dt / World.ShutSeconds);
-        reviewCabin.Door.RotationDegrees = new Vector3(0, -100 * Ease(reviewCabin.Open), 0);
+        bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Pulled && shown.At.DistanceTo(door) < ReviewSeen;
+        SwingDoor(reviewCabin, open, dt / World.ShutSeconds);
         reviewActor.Update(shown.At, shown.Action, shown.Facing, dt, shown.Backing);
-        Pose(reviewRigs[0], reviewActor, null, door: door);
-        reviewRigs[0].Root.Visible = shown.At.DistanceTo(door) < 1.75f || now is Doorway.None or Doorway.Knocking;
+        Pose(reviewRigs[0], reviewActor, null, door: new DoorShown(shown.At, shown.Facing, shown.Action, door, shown.Backing, 0, 0, 0));
+        reviewRigs[0].Root.Visible = shown.At.DistanceTo(door) < ReviewSeen || now is Doorway.None or Doorway.Knocking;
     }
 
     private WolfModel? reviewWolf;
@@ -373,7 +374,7 @@ public partial class WorldView {
             case "wolf feed": {
                     // Tearing at the side of the fallen player's belly.
                     wolf.Feed(Elapsed, dt, false);
-                    (place, wolf.Yaw) = OnTheBody(reviewPerson, .4f, 1);
+                    (place, wolf.Yaw) = OnTheBody(BodyLine(reviewPerson), .4f, 1);
                     wolf.Root.Rotation = new Vector3(0, wolf.Yaw, 0);
                     person = ActorAction.Devoured; downed = 1;
                     break;

@@ -48,7 +48,7 @@ def require_clip(ref: str | None, clip: str) -> None:
         raise SystemExit(f"No clip {clip!r} in {where}; clips: {', '.join(names)}")
 
 
-def capture(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> None:
+def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> None:
     """Records a checkout's clip from one view to a movie of FRAMES frames at 30 a second of slowed game time."""
     pitch, turn = VIEWS[view]
     movie.parent.mkdir(parents=True, exist_ok=True)
@@ -62,7 +62,8 @@ def capture(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> N
         str(turn),
     ]
     log = movie.with_suffix(".log")
-    if '"record"' in (checkout / "build.py").read_text():
+    records = '"record"' in (checkout / "build.py").read_text()
+    if records:
         command = [
             sys.executable,
             checkout / "build.py",
@@ -99,7 +100,7 @@ def capture(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> N
         raise SystemExit(
             f"Recording {view} failed (exit {result.returncode}); see {log}"
         )
-    if command[2] == "play":
+    if not records:
         subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-framerate", "30", "-i", frames / "%03d.png", "-c:v", "mjpeg", "-q:v", "2", movie],
             check=True,
@@ -113,12 +114,12 @@ def slug(text: str) -> str:
     return re.sub(r"[^\w.-]", "-", text)
 
 
-def capture_all(
+def record_all(
     checkout: Path, clip: str, name: str, options: argparse.Namespace
 ) -> None:
     """Records a checkout's clip into the folder of the clip named on the command line, a movie a view."""
     for view in options.views:
-        capture(
+        record(
             checkout,
             clip,
             view,
@@ -127,7 +128,7 @@ def capture_all(
         )
 
 
-def capture_base(ref: str, options: argparse.Namespace) -> None:
+def record_base(ref: str, options: argparse.Namespace) -> None:
     """Captures a ref from a temporary worktree that shares this checkout's tools."""
     with tempfile.TemporaryDirectory(prefix="animation-base-") as folder:
         checkout = Path(folder) / "checkout"
@@ -136,7 +137,7 @@ def capture_base(ref: str, options: argparse.Namespace) -> None:
         )
         try:
             (checkout / ".tools").symlink_to(build.TOOLS.resolve())
-            capture_all(checkout, options.base_clip, slug(ref), options)
+            record_all(checkout, options.base_clip, slug(ref), options)
         finally:
             subprocess.run(
                 ["git", "worktree", "remove", "--force", checkout], cwd=ROOT, check=True
@@ -153,13 +154,13 @@ def main() -> None:
         nargs="+",
         choices=VIEWS,
         default=list(VIEWS),
-        help="camera views to capture",
+        help="camera views to record",
     )
     parser.add_argument(
         "--slow", type=float, default=4, help="slow motion factor (default %(default)s)"
     )
     parser.add_argument(
-        "--base", metavar="REF", help="also capture this branch or commit, such as main"
+        "--base", metavar="REF", help="also record this branch or commit, such as main"
     )
     parser.add_argument(
         "--base-clip",
@@ -175,9 +176,9 @@ def main() -> None:
         require_clip(options.base, options.base_clip)
     elif options.base_clip != options.clip:
         parser.error("--base-clip needs --base")
-    capture_all(ROOT, options.clip, "current", options)
+    record_all(ROOT, options.clip, "current", options)
     if options.base:
-        capture_base(options.base, options)
+        record_base(options.base, options)
     print(
         f"{FRAMES} frames a view at 30 a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
     )

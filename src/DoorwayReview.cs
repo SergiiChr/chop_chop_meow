@@ -53,10 +53,10 @@ public sealed partial class DoorwayReview : Node {
         if (Launch.Value("--camera-pitch") != null) View.CameraPitch = Launch.Number("--camera-pitch", 30);
         script = Scene switch {
             // Both walk up; the host gets there first and steps in, the neighbor follows, finds the door shut and bangs on it.
-            "queue" => new (float, Action)[] { (0, () => Walk(host)), (.4f, () => Walk(guest)) },
+            "queue" => new (float, Action)[] { (0, () => walking.Add(host)), (.4f, () => walking.Add(guest)) },
             // The host is inside; the neighbor walks up and bangs, and while they bang the host steps out, the neighbor standing aside for them, and the neighbor goes in.
             "occupied" => new (float, Action)[] {
-                (0, () => { World.Player = door; World.S.Sheltered = Cabin.Id; }), (0, () => Walk(guest)),
+                (0, () => { World.Player = door; World.S.Sheltered = Cabin.Id; }), (0, () => walking.Add(guest)),
             },
             // The host steps in at a walk with a wolf close by and the neighbor at the door behind them; a second wolf comes for the neighbor while they wait.
             "wolf" => new (float, Action)[] {
@@ -74,7 +74,6 @@ public sealed partial class DoorwayReview : Node {
         };
     }
 
-    private void Walk(PlayerState p) => walking.Add(p);
 
     /// <summary>Runs the script up to this frame, then walks each player sent to the door a step toward it and steps them in on arrival, as a click on the cabin does.</summary>
     public override void _Process(double delta) {

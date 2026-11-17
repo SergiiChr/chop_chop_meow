@@ -264,6 +264,8 @@ public partial class WorldView : Node3D {
         public float SteppingDown;
         /// <summary>How high the steps of a cabin's door lift the actor as last drawn.</summary>
         public float Lift;
+        /// <summary>How high the actor's hips stand above the ground it is posed on, as last drawn.</summary>
+        public float HipHeight;
         public ActorAction Action;
         public float Time;
         public float PreviousTime = -1;
@@ -503,8 +505,8 @@ public partial class WorldView : Node3D {
         if (World.Me.Braking && moving) action = ActorAction.Brake;
         // A leaping wolf knocks the player over as its jaws reach them, before it lands; a pinned player stays down.
         var knocker = Knocking(World.Me);
-        bool fallsBack = FallsBack(World.Me.Id);
         if (World.Mauled || knocker != null) {
+            bool fallsBack = FallsBack(World.Me.Id);
             mauledFrom = (knocker ?? PinningWolf(World.Me.Id))?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
             // Facing the wolf, the player goes over backwards with it on top; one yanked out of a doorway falls back still facing the door.
             action = World.Dead ? ActorAction.Devoured : downedFor < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled;
@@ -513,16 +515,17 @@ public partial class WorldView : Node3D {
         } else downedFor = 0;
         var at = World.Player;
         var door = AtDoor(World.Me, player, dt);
-        if (door is var (doorAt, doorFacing, doorAction, _, _, _, _, _)) { at = doorAt; target = doorFacing; action = doorAction; subject = null; }
+        if (door is DoorShown shown) { at = shown.At; target = shown.Facing; action = shown.Action; subject = null; }
         player.Update(at, action, target, dt, door?.Backing ?? false);
         // A foot lands at each extreme of the stride.
         if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
-        Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door?.Door, door?.Twist ?? 0, door?.Grip ?? 0, door?.Tuck ?? 0);
-        Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
+        // A downed player is posed by the fall alone.
         if (downedFor > 0) FallBack(playerRig, player, downedFor, torch, World.Dead ? null : HoldingOff(World.Me.Id));
+        else Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door);
+        Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject, playerRig);
         UpdateOthers(dt);
@@ -618,21 +621,22 @@ public partial class WorldView : Node3D {
             if (action == ActorAction.Idle && StationToHammer(p) is Thing station) { action = ActorAnimation.StationAction(station, World.Data); facing = station.Pos; subject = station; }
             if (p.Braking && moving) action = ActorAction.Brake;
             var knocker = Knocking(p);
-            bool fallsBack = FallsBack(p.Id);
             if (p.Mauled || knocker != null) {
+                bool fallsBack = FallsBack(p.Id);
                 action = p.RespawnIn > 0 ? ActorAction.Devoured : other.DownedFor < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled;
                 facing = fallsBack ? p.Pos - World.OutOfDoor : (knocker ?? PinningWolf(p.Id))?.Pos ?? p.Pos + Vector2.Down;
                 other.DownedFor += dt;
             } else other.DownedFor = 0;
             var at = p.Pos;
             var door = AtDoor(p, state, dt);
-            if (door is var (doorAt, doorFacing, doorAction, _, _, _, _, _)) { at = doorAt; facing = doorFacing; action = doorAction; subject = null; }
+            if (door is DoorShown shown) { at = shown.At; facing = shown.Facing; action = shown.Action; subject = null; }
             state.Update(at, action, facing, dt, door?.Backing ?? false);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
-            Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), p.Torch > 0 && p.RespawnIn <= 0, door?.Door, door?.Twist ?? 0, door?.Grip ?? 0, door?.Tuck ?? 0);
+            bool torch = p.Torch > 0 && p.RespawnIn <= 0;
+            if (other.DownedFor > 0) FallBack(other.Rig, state, other.DownedFor, torch, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
+            else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
-            if (other.DownedFor > 0) FallBack(other.Rig, state, other.DownedFor, p.Torch > 0 && p.RespawnIn <= 0, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, subject, other.Rig);
         }
@@ -657,37 +661,32 @@ public partial class WorldView : Node3D {
     private const float StepRise = .14f;
 
     /// <summary>
-    /// A player at a cabin's door as their doorway stage shows them: where they stand, what they face, what they do, the
-    /// door point whose steps they stand on, whether they move backward, how far their shoulders turn and how far their right
-    /// hand has gone to the door frame and their arms drawn in to pass someone, each 0 to 1; null when they are at no door.
+    /// A player at a cabin's door as their doorway stage shows them, null when they are at no door.
     /// </summary>
-    private (Vector2 At, Vector2 Facing, ActorAction Action, Vector2 Door, bool Backing, float Twist, float Grip, float Tuck)? AtDoor(PlayerState p, ActorState state, float dt) {
+    private DoorShown? AtDoor(PlayerState p, ActorState state, float dt) {
         if (state.Stage != p.Door) {
             if (state.Stage == Doorway.Knocking && p.Door == Doorway.None) state.SteppingDown = StepUpSeconds;
             state.Stage = p.Door; state.StageFrom = state.Position;
         }
-        if (World.Find(p.DoorCabin) is not Thing cabin) return null;
+        if (p.Door == Doorway.None && state.SteppingDown <= 0 || World.Find(p.DoorCabin) is not Thing cabin) return null;
         var door = World.DoorPoint(cabin);
         if (p.Door == Doorway.None && state.SteppingDown > 0) {
             // Done banging, the player steps back down off the step to where they stand, still facing the door.
             state.SteppingDown = Math.Max(0, state.SteppingDown - dt);
             var down = state.StageFrom.Lerp(p.Pos, Mathf.SmoothStep(0, 1, 1 - state.SteppingDown / StepUpSeconds));
-            return (down, door + IntoCabin, ActorAction.Walk, door, true, 0, 0, 0);
+            return new DoorShown(down, door + IntoCabin, ActorAction.Walk, door, true, 0, 0, 0);
         }
-        if (p.Door == Doorway.None) return null;
         (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) shown = p.Door == Doorway.Following ? (Behind(p, state, door, dt), door + IntoCabin, ActorAction.Walk, false)
             : p.Door == Doorway.Aside ? StandAside(state.StageFrom, p.Pos, door, p.DoorTime)
-            : DoorStep(p.Door, door, p.Pos, state.StageFrom, p.DoorTime, World.DoorSeconds(p), p.DoorRush, p.Door == Doorway.Leaving && Math.Abs((p.Pos - door).Dot(World.AsideWay)) > .05f);
+            : DoorStep(p.Door, door, p.Pos, state.StageFrom, p.DoorTime, World.DoorSeconds(p), p.DoorRush);
         float twist = 0, grip = 0;
         // Waiting aside, the right hand starts up toward the door frame as the one coming out nears the doorway; squeezing in
         // from beside the step, it goes on to the frame.
         if (p.Door == Doorway.Aside && LeftToGo(p) is float left) grip = AsideRaise * Mathf.SmoothStep(RaiseLead, 0, left);
         if (p.Door == Doorway.Entering && Math.Abs((state.StageFrom - door).Dot(World.AsideWay)) > SideLane)
             grip = Mathf.Lerp(AsideRaise, 1, Mathf.SmoothStep(0, RaiseSeconds, p.DoorTime));
-        float tuck = 0;
-        if (p.Door is Doorway.Entering or Doorway.Leaving && SqueezePast(p, shown.At) is var (squeeze, way, drawn)) {
-            tuck = drawn;
-            if (squeeze <= 0) return (shown.At, shown.Facing, shown.Action, door, shown.Backing, 0, grip, tuck);
+        var (squeeze, way, tuck) = p.Door is Doorway.Entering or Doorway.Leaving ? SqueezePast(p, shown.At) : default;
+        if (squeeze > 0) {
             // Turned sideways to squeeze past someone coming the other way through the door, still stepping on.
             // The one going in keeps facing the way they walk and only turns the shoulders a little, keeping the door frame ahead
             // of the right shoulder for the hand; the one coming out turns sideways.
@@ -698,15 +697,22 @@ public partial class WorldView : Node3D {
             }
             twist = way * (p.Door == Doorway.Entering ? EnterTwist : SqueezeTwist) * squeeze;
         }
-        return (shown.At, shown.Facing, shown.Action, door, shown.Backing, twist, grip, tuck);
+        return new DoorShown(shown.At, shown.Facing, shown.Action, door, shown.Backing, twist, grip, tuck);
     }
+
+    /// <summary>
+    /// A player at a cabin's door as their doorway stage shows them: where they stand, what they face, what they do, the
+    /// door point whose steps they stand on, whether they move backward, how far their shoulders turn and how far their right
+    /// hand has gone to the door frame and their arms drawn in to pass someone, each 0 to 1.
+    /// </summary>
+    private readonly record struct DoorShown(Vector2 At, Vector2 Facing, ActorAction Action, Vector2 Door, bool Backing, float Twist, float Grip, float Tuck);
 
     /// <summary>
     /// Where a player <paramref name="time"/> seconds into a doorway stage of <paramref name="seconds"/> other than following stands, what
     /// they face and do, and whether they move backward: <paramref name="from"/> is where the world has them and <paramref name="start"/>
     /// where they were drawn as the stage began.
     /// </summary>
-    private static (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) DoorStep(Doorway stage, Vector2 door, Vector2 from, Vector2 start, float time, float seconds, bool rush, bool keepLeft = false) {
+    private static (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) DoorStep(Doorway stage, Vector2 door, Vector2 from, Vector2 start, float time, float seconds, bool rush) {
         var inside = door + IntoCabin;
         float done = Math.Clamp(time / Math.Max(seconds, .01f), 0, 1);
         // Left outside, a player waits for the door to swing shut, then steps up to it and bangs.
@@ -714,7 +720,7 @@ public partial class WorldView : Node3D {
         return stage switch {
             // From beside the step the player sidesteps into the doorway still facing it.
             Doorway.Entering => (Inward(start, door, rush ? done : WalkedIn(time)), inside, rush ? ActorAction.Jog : ActorAction.Walk, Math.Abs((start - door).Dot(World.AsideWay)) > SideLane),
-            Doorway.Leaving => (Outward(door, from, done, keepLeft), door - IntoCabin, ActorAction.Walk, false),
+            Doorway.Leaving => (Outward(door, from, done), door - IntoCabin, ActorAction.Walk, false),
             Doorway.Knocking => (start.Lerp(door + KnockSpot, up), inside, time >= World.KnockLead ? ActorAction.Knock : up > 0 ? ActorAction.Walk : ActorAction.Idle, false),
             _ => (start.Lerp(from + World.OutOfDoor * World.DragDistance, World.Dragged(time / World.PullSeconds)), inside, ActorAction.Tugged, true),
         };
@@ -737,7 +743,7 @@ public partial class WorldView : Node3D {
         if (Math.Abs(across) <= SideLane) return start.Lerp(inside, done);
         var side = World.AsideWay * (Math.Sign(across) * SideLane);
         var front = door + side + IntoCabin.Normalized() * .25f;
-        var tread = door + side + IntoCabin.Normalized() * .62f;
+        var tread = door + side + IntoCabin.Normalized() * StepEdges[1];
         float first = start.DistanceTo(front), second = front.DistanceTo(tread), last = tread.DistanceTo(inside), along = done * (first + second + last);
         return along < first ? start.Lerp(front, along / first)
             : along < first + second ? front.Lerp(tread, (along - first) / second)
@@ -759,7 +765,7 @@ public partial class WorldView : Node3D {
     /// How far ahead of the right shoulder, along the chest, the door frame is when a player squeezing in lets go of it, and
     /// has let go: any nearer and the arm would have to swing its elbow up to keep the palm on it.
     /// </summary>
-    private const float LetGoAt = .3f, LetGo = 0;
+    private const float ReleaseAt = .3f, Released = 0;
     /// <summary>Where, in the trunk's frame from the hips, the right hand waits raised in front of its shoulder before it takes the door frame.</summary>
     private static readonly Vector3 ReadyHand = new(-ActorRig.ShoulderOut - .03f, ActorRig.ShoulderUp - .08f, .32f);
     /// <summary>How far to the body's right, in metres from its middle, the door frame is when the hand starts going to it, and when it can go all the way.</summary>
@@ -771,12 +777,12 @@ public partial class WorldView : Node3D {
     /// Where a player stepping out of a cabin to <paramref name="end"/> is, <paramref name="done"/> of the way: straight out,
     /// or, ending to one side of the door point, down that side of the step and across.
     /// </summary>
-    private static Vector2 Outward(Vector2 door, Vector2 end, float done, bool keepLeft) {
+    private static Vector2 Outward(Vector2 door, Vector2 end, float done) {
         var inside = door + IntoCabin;
-        if (!keepLeft) return inside.Lerp(end, done);
+        float offside = (end - door).Dot(World.AsideWay);
+        if (Math.Abs(offside) <= .05f) return inside.Lerp(end, done);
         // Down the step inside its width, then across to where they stop.
-        float across = Math.Clamp((end - door).Dot(World.AsideWay), -SideLane, SideLane);
-        var side = door + World.AsideWay * across + IntoCabin.Normalized() * .62f;
+        var side = door + World.AsideWay * Math.Clamp(offside, -SideLane, SideLane) + IntoCabin.Normalized() * StepEdges[1];
         float first = inside.DistanceTo(side), along = done * (first + side.DistanceTo(end));
         return along < first ? inside.Lerp(side, along / first) : side.Lerp(end, (along - first) / side.DistanceTo(end));
     }
@@ -785,7 +791,7 @@ public partial class WorldView : Node3D {
     /// <summary>Seconds until someone stepping out of the cabin a player stands aside at is through its doorway, or null with nobody stepping out.</summary>
     private float? LeftToGo(PlayerState aside) {
         foreach (var p in World.Players)
-            if (p.DoorCabin == aside.DoorCabin && p.Door == Doorway.Leaving) return Math.Max(0, World.LeaveSeconds / 2 - p.DoorTime);
+            if (p.DoorCabin == aside.DoorCabin && p.Door == Doorway.Leaving) return Math.Max(0, World.ThroughSeconds - p.DoorTime);
         return null;
     }
 
@@ -879,12 +885,11 @@ public partial class WorldView : Node3D {
     /// Poses a player knocked or yanked off their feet backward as <see cref="ActorAnimation.FallingBack"/> has them, onto
     /// their back, <see cref="KnockSlide"/> on from where they stood, where <see cref="Throat"/> finds their throat.
     /// </summary>
-    private static void FallBack(ActorRig rig, ActorState state, float downedFor, bool torch, WolfModel? wolf = null) {
+    private static void FallBack(ActorRig rig, ActorState state, float downedFor, bool torch, WolfModel? wolf) {
         var (pose, tip, hips) = ActorAnimation.FallingBack(state.Pose, downedFor / ActorAnimation.FallBackSeconds, KnockSlide - ActorAnimation.FallHips);
-        // The rig turns about its feet, so they go where the tipped hips need them.
+        state.HipHeight = pose.HipHeight; state.Lift = 0;
         float t = Mathf.DegToRad(tip);
-        var forward = new Vector3(MathF.Sin(state.Yaw), 0, MathF.Cos(state.Yaw));
-        rig.Root.Position = To3(state.Position) + forward * (hips.X + pose.HipHeight * MathF.Sin(t)) + Vector3.Up * (hips.Y - pose.HipHeight * MathF.Cos(t));
+        rig.Root.Position = FallRoot(state.Position, Forward(state.Yaw), t, hips);
         rig.Root.Rotation = new Vector3(-t, state.Yaw, 0);
         // The hands push the wolf's head off by the back of the jaw, while it is in their reach; with the head too close for the
         // arm to stay out at the side, a hand takes the neck further back instead.
@@ -892,13 +897,13 @@ public partial class WorldView : Node3D {
         if (wolf != null) {
             var place = wolf.Root.Transform;
             var across = place.Basis.X.Normalized() * JawHold;
-            var trunk = Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway)));
+            var (neckRoot, jaws) = wolf.NeckLine;
             for (int arm = 0; arm < 2; arm++) {
                 bool left = arm == 0;
-                var shoulder = rig.Root.Transform * (Vector3.Up * pose.HipHeight + trunk * new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0));
+                var shoulder = Shoulder(pose, rig.Root.Transform, left);
                 Vector3 hold = Vector3.Zero;
                 for (float share = WolfModel.JawShare; share >= 0; share -= .05f) {
-                    var on = place * wolf.AlongNeck(share);
+                    var on = place * neckRoot.Lerp(jaws, share);
                     // Each hand takes the side of the neck nearer its own shoulder.
                     hold = shoulder.DistanceTo(on + across) < shoulder.DistanceTo(on - across) ? on + across : on - across;
                     if (shoulder.DistanceTo(hold) >= HoldFrom) break;
@@ -906,11 +911,8 @@ public partial class WorldView : Node3D {
                 float grip = Mathf.SmoothStep(ArmReach + .08f, ArmReach - .04f, shoulder.DistanceTo(hold)) * Mathf.SmoothStep(HoldFrom - .08f, HoldFrom, shoulder.DistanceTo(hold));
                 if (grip <= 0) continue;
                 // The elbow stays out at its own side and down.
-                var inTrunk = trunk.Inverse() * (rig.Root.Transform.AffineInverse() * hold - Vector3.Up * pose.HipHeight);
-                var (raise, outward, elbow, roll) = ActorAnimation.ArmTo(inTrunk, left, new Vector3(left ? 1 : -1, -1, 0), ActorRig.Palm);
-                pose = left ? pose with { RaiseL = Mathf.Lerp(pose.RaiseL, raise, grip), OutL = Mathf.Lerp(pose.OutL, outward, grip), ElbowL = Mathf.Lerp(pose.ElbowL, elbow, grip) }
-                    : pose with { RaiseR = Mathf.Lerp(pose.RaiseR, raise, grip), OutR = Mathf.Lerp(pose.OutR, outward, grip), ElbowR = Mathf.Lerp(pose.ElbowR, elbow, grip) };
-                if (left) rollL = roll * grip; else rollR = roll * grip;
+                (pose, float roll) = Reaching(pose, hold, rig.Root.Transform, left, grip, new Vector3(left ? 1 : -1, -1, 0));
+                if (left) rollL = roll; else rollR = roll;
             }
         }
         rig.Show(pose, null, false, false, torch);
@@ -922,43 +924,53 @@ public partial class WorldView : Node3D {
     /// <summary>How far from its shoulder a hand pushing a wolf off holds it at least, with the elbow out at the side rather than folded across the chest.</summary>
     private const float HoldFrom = .3f;
 
-    /// <summary>A pose with a fist, the right one unless <paramref name="left"/>, <paramref name="weight"/> of the way to <paramref name="aim"/> in the world, for a rig placed at <paramref name="root"/>.</summary>
-    private static Pose Reaching(Pose pose, Vector3 aim, Transform3D root, bool left = false, float weight = 1) {
-        var hips = root.AffineInverse() * aim - Vector3.Up * pose.HipHeight;
-        var trunk = Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway))).Inverse() * hips;
-        var (raise, outward, elbow) = ActorAnimation.ArmTo(trunk, left, ActorRig.Palm);
-        return left ? pose with { RaiseL = Mathf.Lerp(pose.RaiseL, raise, weight), OutL = Mathf.Lerp(pose.OutL, outward, weight), ElbowL = Mathf.Lerp(pose.ElbowL, elbow, weight) }
-            : pose with { RaiseR = Mathf.Lerp(pose.RaiseR, raise, weight), OutR = Mathf.Lerp(pose.OutR, outward, weight), ElbowR = Mathf.Lerp(pose.ElbowR, elbow, weight) };
+    /// <summary>
+    /// A pose with a fist, the right one unless <paramref name="left"/>, <paramref name="weight"/> of the way to <paramref name="aim"/>
+    /// in the world, for a rig placed at <paramref name="root"/>; with <paramref name="elbowToward"/>, in the trunk's frame, the
+    /// elbow points that way as far as the arm allows, and the roll of the arm to apply after the pose is returned too.
+    /// </summary>
+    private static (Pose Pose, float Roll) Reaching(Pose pose, Vector3 aim, Transform3D root, bool left = false, float weight = 1, Vector3? elbowToward = null) {
+        var inTrunk = TrunkBasis(pose).Inverse() * (root.AffineInverse() * aim - Vector3.Up * pose.HipHeight);
+        var (raise, outward, elbow, roll) = elbowToward is Vector3 way ? ActorAnimation.ArmTo(inTrunk, left, way, ActorRig.Palm) : ActorAnimation.ArmTo(inTrunk, left, ActorRig.Palm) is var (r, o, e) ? (r, o, e, 0f) : default;
+        return (WithArm(pose, left, raise, outward, elbow, weight), roll * weight);
     }
 
+    /// <summary>A pose with one arm's raise, outward swing and elbow bend moved <paramref name="weight"/> of the way to these.</summary>
+    private static Pose WithArm(Pose pose, bool left, float raise, float outward, float elbow, float weight) => left
+        ? pose with { RaiseL = Mathf.Lerp(pose.RaiseL, raise, weight), OutL = Mathf.Lerp(pose.OutL, outward, weight), ElbowL = Mathf.Lerp(pose.ElbowL, elbow, weight) }
+        : pose with { RaiseR = Mathf.Lerp(pose.RaiseR, raise, weight), OutR = Mathf.Lerp(pose.OutR, outward, weight), ElbowR = Mathf.Lerp(pose.ElbowR, elbow, weight) };
+
+    /// <summary>How a pose turns the trunk on the hips, as <see cref="ActorRig.Show"/> applies it.</summary>
+    private static Basis TrunkBasis(Pose pose) => Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway)));
+
+    /// <summary>Where a shoulder is in the world for a pose, on a rig placed at <paramref name="root"/>.</summary>
+    private static Vector3 Shoulder(Pose pose, Transform3D root, bool left) =>
+        root * (Vector3.Up * pose.HipHeight + TrunkBasis(pose) * new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0));
+
+    /// <summary>The ground direction a body facing <paramref name="yaw"/> faces.</summary>
+    private static Vector2 Forward(float yaw) => new(MathF.Sin(yaw), MathF.Cos(yaw));
+
     /// <summary>Poses an actor's rig; one at the steps of the cabin door at <paramref name="door"/> stands on them.</summary>
-    private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, Vector2? door = null, float twist = 0, float grip = 0, float tuck = 0) {
+    private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null) {
         rig.Root.Position = To3(state.Position);
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
-        var pose = state.Pose with { Twist = state.Pose.Twist + twist };
+        var pose = state.Pose;
         state.Lift = 0;
         Vector3? jamb = null;
-        if (tuck > 0) {
+        if (door is DoorShown at) {
+            pose = pose with { Twist = pose.Twist + at.Twist };
             // Passing someone in a doorway, the arms hang at the sides, a tool held low and pointing ahead, instead of swinging out.
-            pose = pose with {
-                RaiseL = Mathf.Lerp(pose.RaiseL, TuckRaise, tuck),
-                OutL = Mathf.Lerp(pose.OutL, TuckOut, tuck),
-                ElbowL = Mathf.Lerp(pose.ElbowL, TuckElbow, tuck),
-                RaiseR = Mathf.Lerp(pose.RaiseR, TuckRaise, tuck),
-                OutR = Mathf.Lerp(pose.OutR, TuckOut, tuck),
-                ElbowR = Mathf.Lerp(pose.ElbowR, TuckElbow, tuck),
-            };
-        }
-        if (door is Vector2 steps) {
+            if (at.Tuck > 0) pose = WithArm(WithArm(pose, true, TuckRaise, TuckOut, TuckElbow, at.Tuck), false, TuckRaise, TuckOut, TuckElbow, at.Tuck);
             // The way up the steps, in the body's frame: X toward its left and Y ahead.
             var inward = IntoCabin.Normalized();
-            var up = new Vector2(new Vector2(MathF.Cos(state.Yaw), -MathF.Sin(state.Yaw)).Dot(inward), new Vector2(MathF.Sin(state.Yaw), MathF.Cos(state.Yaw)).Dot(inward));
-            float depth = (state.Position - steps).Dot(inward), lift = ActorAnimation.StepLift(pose, depth, up, StepEdges, StepRise);
+            var up = inward.Rotated(state.Yaw);
+            float depth = (state.Position - at.Door).Dot(inward), lift = ActorAnimation.StepLift(pose, depth, up, StepEdges, StepRise);
             pose = ActorAnimation.OnSteps(pose, lift, depth, up, StepEdges, StepRise);
             rig.Root.Position += Vector3.Up * lift; state.Lift = lift;
-            if (grip > 0) jamb = To3(steps + World.AsideWay * JambOut + inward * JambIn, JambUp);
+            if (at.Grip > 0) jamb = To3(at.Door + World.AsideWay * JambOut + inward * JambIn, JambUp);
         }
+        state.HipHeight = pose.HipHeight;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
         rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
@@ -966,16 +978,17 @@ public partial class WorldView : Node3D {
             // The right hand rises from where the walk swings it to in front of the right shoulder, and goes on to the door frame
             // only once the frame is to that shoulder's right, so the arm never crosses the body; it lets go while the frame is
             // still ahead of the shoulder, so the elbow stays down.
-            var swung = rig.Root.Transform * rig.Fist(false);
-            var trunk = Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway))).Inverse();
-            var local = trunk * (rig.Root.Transform.AffineInverse() * frame - Vector3.Up * pose.HipHeight);
-            float hold = Mathf.SmoothStep(0, 1, grip) * Mathf.SmoothStep(LetGo, LetGoAt, local.Z);
-            var ready = rig.Root.Transform * (Vector3.Up * pose.HipHeight + trunk.Inverse() * ReadyHand);
+            var root = rig.Root.Transform;
+            var swung = root * rig.Fist(false);
+            var trunk = TrunkBasis(pose);
+            var local = trunk.Inverse() * (root.AffineInverse() * frame - Vector3.Up * pose.HipHeight);
+            float hold = Mathf.SmoothStep(0, 1, door!.Value.Grip) * Mathf.SmoothStep(Released, ReleaseAt, local.Z);
+            var ready = root * (Vector3.Up * pose.HipHeight + trunk * ReadyHand);
             float rightward = Mathf.SmoothStep(ReachableFrom, ReachableAt, -local.X);
             var aim = swung.Lerp(ready, Math.Min(1, hold / AsideRaise)).Lerp(frame, Math.Max(0, hold - AsideRaise) / (1 - AsideRaise) * rightward);
             // While the step still keeps them low, the hand goes no higher than just over the shoulder, and the climb brings it up to the frame.
-            float shoulder = (rig.Root.Transform * (Vector3.Up * pose.HipHeight + trunk.Inverse() * new Vector3(-ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0))).Y;
-            if (hold > 0) rig.Show(Reaching(pose, aim with { Y = Math.Min(aim.Y, shoulder + AboveShoulder) }, rig.Root.Transform), tool, false, false, torch);
+            float shoulder = Shoulder(pose, root, false).Y;
+            if (hold > 0) rig.Show(Reaching(pose, aim with { Y = Math.Min(aim.Y, shoulder + AboveShoulder) }, root).Pose, tool, false, false, torch);
         }
         if (state.Turning.Look != 0) rig.Head.Rotation += new Vector3(0, state.Turning.Look, 0);
     }
@@ -1395,8 +1408,7 @@ public partial class WorldView : Node3D {
                 if (through != null) hut.Slam = through.DoorRush;
                 if (dt > 0 && through != null && hut.Open == 0 && !through.DoorRush) Sounds?.Play("hut_door_normal", t.Pos);
                 if (dt > 0 && through == null && hut.Open == 1 && hut.Slam) Sounds?.Play("hut_door_escaping", t.Pos);
-                hut.Open = Mathf.MoveToward(hut.Open, through != null ? 1 : 0, Math.Max(dt, .016f) * (through == null && hut.Slam ? 8 : 1 / World.ShutSeconds));
-                hut.Door.RotationDegrees = new Vector3(0, -100 * Ease(hut.Open), 0);
+                SwingDoor(hut, through != null, Math.Max(dt, .016f) * (through == null && hut.Slam ? 8 : 1 / World.ShutSeconds));
                 bool lit = Dark;
                 if (lit != hut.Lit) {
                     hut.Lit = lit;
@@ -1439,43 +1451,28 @@ public partial class WorldView : Node3D {
         return null;
     }
     /// <summary>The back of the waist of the player a wolf hunts as drawn, while they are out in the open in a cabin's doorway, or null.</summary>
-    private Vector3? InTheDoorway(Wolf wolf) {
-        foreach (var p in World.Players)
-            if (p.Id == wolf.Target && p.Door is Doorway.Entering or Doorway.Following or Doorway.Knocking && !World.Indoors(p) && StateOf(p.Id) is ActorState held) {
-                return To3(held.Position - new Vector2(MathF.Sin(held.Yaw), MathF.Cos(held.Yaw)) * WaistBehind) + Vector3.Up * (held.Pose.HipHeight + held.Lift);
-            }
-        return null;
-    }
+    private Vector3? InTheDoorway(Wolf wolf) =>
+        World.PlayerById(wolf.Target) is { Door: Doorway.Entering or Doorway.Following or Doorway.Knocking } p && !World.Indoors(p) && StateOf(p.Id) is ActorState held ? Waist(held) : null;
     /// <summary>The player a tugging wolf drags as drawn, and how far through the drag they are, 0 to 1; null once they are not being dragged.</summary>
-    private (ActorState Held, float Progress)? Dragged(Wolf wolf) {
-        foreach (var p in World.Players)
-            if (p.Id == wolf.Target && p.Door is Doorway.Pulled or Doorway.PulledOff && StateOf(p.Id) is ActorState held)
-                return (held, Math.Clamp(p.DoorTime / World.PullSeconds, 0, 1));
-        return null;
-    }
+    private (ActorState Held, float Progress)? DraggedBy(Wolf wolf) =>
+        World.PlayerById(wolf.Target) is { Door: Doorway.Pulled or Doorway.PulledOff } p && StateOf(p.Id) is ActorState held ? (held, Math.Clamp(p.DoorTime / World.PullSeconds, 0, 1)) : null;
+    /// <summary>The back of a drawn player's waist, where a wolf takes hold of them.</summary>
+    private static Vector3 Waist(ActorState held) => To3(held.Position - Forward(held.Yaw) * WaistBehind) + Vector3.Up * (held.HipHeight + held.Lift);
     /// <summary>
     /// How far beside a fallen player's throat a wolf that dragged them out waits while they fall, and the shares of
     /// <see cref="ActorAnimation.FallBackSeconds"/> over which it then lunges onto the throat.
     /// </summary>
     private const float WaitAside = 1.2f, LungeFrom = .74f, LungeTo = .92f;
-    /// <summary>The drawn player a wolf pins from beside them, or null.</summary>
-    private ActorState? Felled(Wolf wolf) {
-        foreach (var p in World.Players)
-            if (p.Id == wolf.Target) return StateOf(p.Id);
-        return null;
-    }
     /// <summary>Whether a player is pinned by a wolf beside them, which dragged them back out of a doorway, so they fall back rather than turn to it.</summary>
     private bool FallsBack(int player) => PinningWolf(player) is { Beside: var beside } && beside != Vector2.Zero;
     /// <summary>
     /// Which way a wolf dragging <paramref name="held"/> turns from another wolf dragging someone within <see cref="TuggersApart"/>
     /// of them: 1 to the held player's left, -1 to their right, 0 with nobody there.
     /// </summary>
-    private float Beside(Wolf tugger, ActorState held) {
+    private float ApartFrom(Wolf tugger, ActorState held) {
         foreach (var other in World.Wolves)
-            if (other != tugger && other.Tugging && Dragged(other) is var (them, _) && them != held && them.Position.DistanceTo(held.Position) < TuggersApart) {
-                var left = new Vector2(MathF.Cos(held.Yaw), -MathF.Sin(held.Yaw));
-                return (held.Position - them.Position).Dot(left) >= 0 ? -1 : 1;
-            }
+            if (other != tugger && other.Tugging && DraggedBy(other) is var (them, _) && them != held && them.Position.DistanceTo(held.Position) < TuggersApart)
+                return (held.Position - them.Position).Dot(Forward(held.Yaw).Orthogonal()) >= 0 ? -1 : 1;
         return 0;
     }
     /// <summary>Seconds a wolf taking hold of a player to drag them takes to lunge in to their waist.</summary>
@@ -1570,6 +1567,8 @@ public partial class WorldView : Node3D {
     }
 
     private void SyncWolves(float dt) {
+        liveWolves.Clear();
+        foreach (var wolf in World.Wolves) liveWolves.Add(wolf);
         foreach (var wolf in World.Wolves) {
             if (!wolves.TryGetValue(wolf, out var model)) {
                 model = new WolfModel { Last = wolf.Pos, Yaw = ActorAnimation.Yaw(Hunted(wolf) - wolf.Pos, 0) };
@@ -1578,29 +1577,28 @@ public partial class WorldView : Node3D {
             var hunted = Hunted(wolf);
             var moved = wolf.Pos - model.Last;
             model.Last = wolf.Pos;
-            if (wolf.Tugging && Dragged(wolf) is var (held, through)) {
+            if (wolf.Tugging && DraggedBy(wolf) is var (held, through)) {
                 // Its jaws hold the back of the player's hips as they are drawn, the wolf facing the way they face,
                 // or angled away from another wolf dragging someone beside them so the two bodies keep clear.
                 // Taking hold, it lunges in to the waist from where it stood rather than appearing there.
                 if (model.Motion != WolfMotion.Tug) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; }
                 float lunge = Ease(Math.Min(1, through * World.PullSeconds / TugLunge));
-                model.Yaw = Mathf.LerpAngle(model.FromYaw, held.Yaw + Mathf.DegToRad(SplayTugger) * Beside(wolf, held), lunge);
+                model.Yaw = Mathf.LerpAngle(model.FromYaw, held.Yaw + Mathf.DegToRad(SplayTugger) * ApartFrom(wolf, held), lunge);
                 model.Knock = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
                 model.Root.Rotation = new Vector3(0, model.Yaw, 0);
                 model.Root.Visible = World.Sees(wolf.Pos);
                 model.Tug(through, Elapsed, dt);
-                var waist = To3(held.Position - new Vector2(MathF.Sin(held.Yaw), MathF.Cos(held.Yaw)) * WaistBehind) + Vector3.Up * (held.Pose.HipHeight + held.Lift);
-                var grip = waist - model.Root.Basis * model.Bite;
+                var grip = Waist(held) - model.Root.Basis * model.Bite;
                 model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);
                 model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
                 continue;
             }
-            if (wolf.Pinning && wolf.Beside != Vector2.Zero && Felled(wolf) is ActorState fallen) {
+            if (wolf.Pinning && wolf.Beside != Vector2.Zero && StateOf(wolf.Target) is ActorState fallen) {
                 // Having dragged its player out, it lets go as they fall back toward it, steps round to their side and lunges onto the throat as they land.
                 if (model.Pinned == 0) model.StepFrom = model.Root.Position;
                 model.Pinned += dt;
                 float fell = model.Pinned / ActorAnimation.FallBackSeconds;
-                var throat = Throat(fallen.Position, new Vector2(MathF.Sin(fallen.Yaw), MathF.Cos(fallen.Yaw)), float.MaxValue);
+                var throat = Throat(fallen.Position, Forward(fallen.Yaw), float.MaxValue);
                 var wait = (throat + To3(wolf.Beside) * WaitAside) with { Y = 0 };
                 model.Knock = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero;
                 model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(-wolf.Beside, model.Yaw), Math.Min(1, dt * 8));
@@ -1615,7 +1613,7 @@ public partial class WorldView : Node3D {
                     model.Root.Position = at;
                     continue;
                 }
-                model.Feed(Elapsed + wolf.GetHashCode() % 7, dt, true, 1, beside: true);
+                model.Feed(Elapsed + wolf.Id % 7, dt, true, 1, beside: true);
                 if (fell < LungeTo) {
                     var bite = (throat - model.Root.Basis * model.Bite) with { Y = 0 };
                     model.Root.Position = model.Held = wait.Lerp(bite, Ease((fell - LungeFrom) / (LungeTo - LungeFrom)));
@@ -1671,10 +1669,10 @@ public partial class WorldView : Node3D {
                 if (model.Pinned == 0) model.Toward = (wolf.Pos - hunted).Normalized();
             } else if (wolf.Feeding) {
                 if (wolf.Pinning) model.Pinned += dt;
-                model.Feed(Elapsed + wolf.GetHashCode() % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? PawsOnChest(model, RigOf(wolf.Target)) : null);
+                model.Feed(Elapsed + wolf.Id % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? PawsOnChest(model, RigOf(wolf.Target)) : null);
             } else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (running) model.Move(backing ? -moved.Length() : moved.Length(), dt, wolf.Chase > 0 && !backing, wary);
-            else model.Stand(Elapsed + wolf.GetHashCode() % 7, dt, wary);
+            else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
             var place = To3(wolf.Pos + model.Knock + model.Drift);
             if (wolf.Leap > 0 || wolf.Pinning) {
                 if (model.Toward == Vector2.Zero) model.Toward = (wolf.Pos - hunted).Normalized();
@@ -1712,18 +1710,22 @@ public partial class WorldView : Node3D {
         return path.Lerp(held, Ease(Math.Clamp(flight, 0, 1)));
     }
 
-    /// <summary>
-    /// Where a feeding wolf stands, and which way it faces, to bite a player lying on their back as <paramref name="fallen"/> is
-    /// drawn at <paramref name="along"/> of the way from their feet to their throat, from the side <paramref name="side"/>: 1 to
-    /// their left, -1 to their right, standing perpendicular to the body.
-    /// </summary>
-    private static (Vector3 At, float Yaw) OnTheBody(ActorState fallen, float along, int side) {
-        var forward = new Vector2(MathF.Sin(fallen.Yaw), MathF.Cos(fallen.Yaw));
+    /// <summary>Where a player lying on their back as <paramref name="fallen"/> is drawn has their feet, and the way from there to their throat.</summary>
+    private static (Vector2 Feet, Vector2 Length) BodyLine(ActorState fallen) {
+        var forward = Forward(fallen.Yaw);
         var feet = fallen.Position + forward * KnockSlide;
         var throat = Throat(fallen.Position, forward, float.MaxValue);
-        var length = new Vector2(throat.X, throat.Z) - feet;
-        var near = feet + length * along;
-        var outward = new Vector2(length.Y, -length.X).Normalized() * side;
+        return (feet, new Vector2(throat.X, throat.Z) - feet);
+    }
+
+    /// <summary>
+    /// Where a feeding wolf stands, and which way it faces, to bite a lying player's <paramref name="body"/>
+    /// at <paramref name="along"/> of the way from their feet to their throat, from the side <paramref name="side"/>: 1 to
+    /// their left, -1 to their right, standing perpendicular to the body.
+    /// </summary>
+    private static (Vector3 At, float Yaw) OnTheBody((Vector2 Feet, Vector2 Length) body, float along, int side) {
+        var near = body.Feet + body.Length * along;
+        var outward = body.Length.Orthogonal().Normalized() * side;
         // The legs are lower and narrower than the trunk.
         bool legs = along < LegsEnd;
         float yaw = ActorAnimation.Yaw(-outward, 0);
@@ -1741,6 +1743,12 @@ public partial class WorldView : Node3D {
         foreach (var w in World.Wolves)
             if (w.Target == player && (w.Leap > 0 || w.Pinning) && wolves.TryGetValue(w, out var model)) return model;
         return null;
+    }
+
+    /// <summary>Swings a cabin's door <paramref name="step"/> of the way further open, or shut.</summary>
+    private static void SwingDoor(HutProp hut, bool open, float step) {
+        hut.Open = Mathf.MoveToward(hut.Open, open ? 1 : 0, step);
+        hut.Door.RotationDegrees = new Vector3(0, -100 * Ease(hut.Open), 0);
     }
 
     /// <summary>The rig of a player as drawn, or null.</summary>
@@ -1764,13 +1772,8 @@ public partial class WorldView : Node3D {
     private static readonly Vector3 ChestSpot = new(.05f, .3f, .18f);
 
     /// <summary>The drawn player a wolf hunts once they lie fallen, or null.</summary>
-    private (ActorState State, ActorRig Rig)? Fallen(Wolf wolf) {
-        foreach (var p in World.Players) {
-            if (p.Id != wolf.Target) continue;
-            if (StateOf(p.Id) is { Action: ActorAction.Mauled or ActorAction.Devoured } state && RigOf(p.Id) is ActorRig rig) return (state, rig);
-        }
-        return null;
-    }
+    private (ActorState State, ActorRig Rig)? Fallen(Wolf wolf) =>
+        StateOf(wolf.Target) is { Action: ActorAction.Mauled or ActorAction.Devoured } state && RigOf(wolf.Target) is ActorRig rig ? (state, rig) : null;
 
     /// <summary>
     /// The spot a feeding wolf takes at a lying player: perpendicular to the body at the part nearest to the wolf, on either
@@ -1779,24 +1782,28 @@ public partial class WorldView : Node3D {
     /// </summary>
     private (Vector3 At, float Yaw, int Along, int Side) FreeSpot(Wolf wolf, WolfModel model, ActorState lying, ActorRig rig) {
         FillObstacles(wolf, rig);
+        var body = BodyLine(lying);
         if (model.FeedSide != 0) {
-            var (at, yaw) = OnTheBody(lying, model.FeedAlong / (float)FeedSpots, model.FeedSide);
+            var (at, yaw) = OnTheBody(body, model.FeedAlong / (float)FeedSpots, model.FeedSide);
             if (Free(at, yaw)) return (at, yaw, model.FeedAlong, model.FeedSide);
         }
         (Vector3 At, float Yaw, int Along, int Side) best = default;
         float nearest = float.MaxValue;
         for (int i = 0; i <= FeedSpots; i++)
             for (int side = -1; side <= 1; side += 2) {
-                var (at, yaw) = OnTheBody(lying, i / (float)FeedSpots, side);
+                var (at, yaw) = OnTheBody(body, i / (float)FeedSpots, side);
                 float away = new Vector2(at.X, at.Z).DistanceTo(wolf.Pos);
                 if (away >= nearest || !Free(at, yaw)) continue;
                 nearest = away; best = (at, yaw, i, side);
             }
         if (best.Side != 0) return best;
-        var (last, lastYaw) = OnTheBody(lying, model.FeedAlong / (float)FeedSpots, model.FeedSide == 0 ? 1 : model.FeedSide);
-        return (last, lastYaw, model.FeedAlong, model.FeedSide == 0 ? 1 : model.FeedSide);
+        int lastSide = model.FeedSide == 0 ? 1 : model.FeedSide;
+        var (last, lastYaw) = OnTheBody(body, model.FeedAlong / (float)FeedSpots, lastSide);
+        return (last, lastYaw, model.FeedAlong, lastSide);
     }
 
+    /// <summary>The wolves still in the world this frame; a dead one's model stays drawn a while after.</summary>
+    private readonly HashSet<Wolf> liveWolves = new();
     /// <summary>What a feeding wolf must not touch, as spheres in the world: every other wolf as drawn and the lying player's arms.</summary>
     private readonly List<(Vector3 At, float Radius)> obstacles = new();
 
@@ -1805,7 +1812,7 @@ public partial class WorldView : Node3D {
         obstacles.Clear();
         Span<(Vector3 At, float Radius)> theirs = stackalloc (Vector3, float)[WolfModel.VolumeCount];
         foreach (var (wolf, model) in wolves) {
-            if (wolf == feeder || !World.Wolves.Contains(wolf)) continue;
+            if (wolf == feeder || !liveWolves.Contains(wolf)) continue;
             model.Volumes(theirs);
             var other = model.Root.Transform;
             foreach (var (at, radius) in theirs) obstacles.Add((other * at, radius));
@@ -1822,7 +1829,7 @@ public partial class WorldView : Node3D {
         var place = new Transform3D(new Basis(Vector3.Up, yaw), at);
         foreach (var mine in WolfModel.FeedingVolumes) {
             var centre = place * mine.At;
-            foreach (var (them, radius) in obstacles) if (centre.DistanceTo(them) < mine.Radius + radius) return false;
+            foreach (var (them, radius) in obstacles) if (centre.DistanceSquaredTo(them) < (mine.Radius + radius) * (mine.Radius + radius)) return false;
         }
         return true;
     }
@@ -1833,14 +1840,20 @@ public partial class WorldView : Node3D {
     /// <summary>The rig's throat: above the feet and a little in front, before a knockdown tips it back.</summary>
     private const float ThroatHeight = 1.31f, ThroatAhead = .06f;
 
+    /// <summary>
+    /// Where the root of a player's rig is <paramref name="tip"/> radians into a fall backward with the hips at
+    /// <paramref name="hips"/>, ahead of where they stood at <paramref name="at"/> facing <paramref name="forward"/> and up: the rig
+    /// turns about its feet, so they go where the tipped hips need them.
+    /// </summary>
+    private static Vector3 FallRoot(Vector2 at, Vector2 forward, float tip, Vector2 hips) =>
+        To3(at) + To3(forward) * (hips.X + ActorAnimation.FallHips * MathF.Sin(tip)) + Vector3.Up * (hips.Y - ActorAnimation.FallHips * MathF.Cos(tip));
+
     /// <summary>Where the throat of a player at <paramref name="at"/> facing <paramref name="toward"/> is, <paramref name="downedFor"/> seconds into being knocked down; it follows FallBack.</summary>
     public static Vector3 Throat(Vector2 at, Vector2 toward, float downedFor) {
         var (tip, hips) = ActorAnimation.FallPath(downedFor / ActorAnimation.FallBackSeconds, KnockSlide - ActorAnimation.FallHips);
         float back = Mathf.DegToRad(tip);
-        var forward = To3(toward.Normalized());
-        // The rig's root, which FallBack places so the hips are where the fall has them, then the throat tipped back about it.
-        var root = To3(at) + forward * (hips.X + ActorAnimation.FallHips * MathF.Sin(back)) + Vector3.Up * (hips.Y - ActorAnimation.FallHips * MathF.Cos(back));
-        return root + forward * (ThroatAhead * MathF.Cos(back) - ThroatHeight * MathF.Sin(back)) + Vector3.Up * (ThroatHeight * MathF.Cos(back) + ThroatAhead * MathF.Sin(back));
+        var forward = toward.Normalized();
+        return FallRoot(at, forward, back, hips) + To3(forward) * (ThroatAhead * MathF.Cos(back) - ThroatHeight * MathF.Sin(back)) + Vector3.Up * (ThroatHeight * MathF.Cos(back) + ThroatAhead * MathF.Sin(back));
     }
 
     /// <summary>Tufts of fur knocked loose by a hit, and embers off a burning torch.</summary>

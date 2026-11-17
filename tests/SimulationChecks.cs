@@ -3049,7 +3049,7 @@ public static class SimulationChecks {
         SetNeeds(world, health: 0);
         world.Tick(.05f);
         Require(world.Dead, "a player with no health left should fall");
-        for (int i = 0; i < 4000 && world.S.RespawnIn > .9f; i++) { world.Tick(.05f); NourishEveryone(world); }
+        for (int i = 0; i < 4000 && world.RespawnIn > .9f; i++) { world.Tick(.05f); NourishEveryone(world); }
         // The guest, who came to a door after the fallen player last did, is dragged out of the near cabin's doorway as the fallen player wakes.
         world.As(guest, () => { world.Player = World.DoorPoint(near); Require(world.Enter(near, false), "the guest at the door should step in"); });
         PlaceWolf(world, new Wolf { Pos = guest.Pos + new Vector2(.8f, 0), Target = guest.Id });

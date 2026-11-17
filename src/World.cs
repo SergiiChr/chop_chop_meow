@@ -2271,7 +2271,7 @@ public sealed partial class World {
         if (pack && !packAttack) Say("The pack has you surrounded. They attack!");
         packAttack = pack;
         // A wounded player away from fire and shelter invites a leap for the throat, unless a wolf already drags them out of a doorway.
-        if (!Downed && S.Health <= 50 && !lit && !wary && !Tugged && !AnyLeaping(hunters)) {
+        if (!Downed && S.Health <= TakedownHealth && !lit && !wary && !Tugged && !AnyLeaping(hunters)) {
             Wolf? hunter = null;
             foreach (var w in hunters)
                 if (!Protected(w.Pos) && w.Howl <= 0 && w.Flee <= 0 && w.Stagger <= 0 && w.Pos.DistanceTo(Player) < LeapRange && (hunter == null || w.Pos.DistanceTo(Player) < hunter.Pos.DistanceTo(Player))) hunter = w;
@@ -2310,7 +2310,7 @@ public sealed partial class World {
                 wolf.Chase = 0;
                 Travel(wolf, Hauled, Closing(wolf, dt * speed * .35f, dt), dt * speed * .35f, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(wolf); }
+                Bite(wolf);
             } else if ((lit || Protected(wolf.Pos)) is var safe && safe && wolf.Chase <= 0) {
                 // Firelight turns a wolf back, unless it is already on the player's heels: then it follows in briefly.
                 wolf.Chase = 0; wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * 3);
@@ -2322,7 +2322,7 @@ public sealed partial class World {
                 wolf.Chase = safe ? wolf.Chase - dt : ChaseSeconds;
                 Travel(wolf, Hauled, Closing(wolf, dt * chase, dt), dt * chase, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(wolf); }
+                Bite(wolf);
             }
         }
         // Wolves at the player crowd round them without their bodies running into each other: one that overlaps another steps
@@ -2331,7 +2331,8 @@ public sealed partial class World {
         for (int i = 0; i < hunters.Count; i++) for (int j = i + 1; j < hunters.Count; j++) {
             var a = hunters[i]; var b = hunters[j];
             bool holdsA = Holds(a), holdsB = Holds(b);
-            if (holdsA && holdsB) continue;
+            // Bodies this far apart cannot touch.
+            if (holdsA && holdsB || a.Pos.DistanceSquaredTo(b.Pos) > (2 * (WolfNose + WolfHalfWidth)) * (2 * (WolfNose + WolfHalfWidth))) continue;
             var (aTail, aNose) = Body(a, at); var (bTail, bNose) = Body(b, at);
             var (onA, onB) = Closest(aTail, aNose, bTail, bNose);
             float overlap = 2 * WolfHalfWidth - onA.DistanceTo(onB);
@@ -2350,9 +2351,15 @@ public sealed partial class World {
     /// <summary>Pins the acting player under a wolf, standing over them, or to the side <paramref name="beside"/> of their throat once it has dragged them back out of a doorway.</summary>
     private void Pin(Wolf wolf, bool pack, Vector2 beside = default) {
         wolf.Leap = 0; wolf.Beside = beside; wolf.Feeding = wolf.Pinning = true; S.Mauled = true;
-        wolf.Pos = beside == Vector2.Zero ? Player + (wolf.Pos - Player).Normalized() * PinDistance : Player + OutOfDoor * FallenThroat + beside * AsideReach;
+        wolf.Pos = beside == Vector2.Zero ? Player + AwayFromPlayer(wolf) * PinDistance : Player + OutOfDoor * FallenThroat + beside * AsideReach;
         Say(pack ? "You are pinned. The pack closes in." : "You are pinned."); Play("wolf_bite", Player); Play("takedown_scream", Player);
     }
+    /// <summary>A wolf within reach of the acting player whose last bite is behind it bites them, and drags them out of a doorway they are in.</summary>
+    private void Bite(Wolf wolf) {
+        if (wolf.Pos.DistanceTo(Player) >= 1.1f || wolf.Attack > 0) return;
+        wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); PullOut(wolf);
+    }
+
     /// <summary>
     /// How far a wolf closing in on the acting player goes straight at them this tick, up to <paramref name="step"/>: on to
     /// <see cref="StandOff"/>, where its jaws reach them, or back to it at a walk when they come closer.
