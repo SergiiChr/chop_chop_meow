@@ -47,8 +47,8 @@ public sealed class ActorRig {
         };
         shirt = shirtColor ?? shirt;
         hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
-        (legL, kneeL, footL) = Leg(.09f, legs, boots);
-        (legR, kneeR, footR) = Leg(-.09f, legs, boots);
+        (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, legs, boots);
+        (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, legs, boots);
         torso = Pivot(hips, Vector3.Zero);
         HumanShape.Torso(torso, shirt, legs);
         Cylinder(torso, .055f, .05f, .08f, new Vector3(0, .54f, 0), Mat(skinTone));

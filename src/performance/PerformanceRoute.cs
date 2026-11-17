@@ -48,7 +48,7 @@ internal static class PerformanceRoute {
         for (int leg = 0; leg < Legs.Length; leg++)
             foreach (var stop in Legs[leg].Stops)
                 for (var heading = Heading(at, stop); heading != (0, 0); heading = Heading(at, stop)) {
-                    at += PlayerControl.KeysDirection(heading.Across, heading.Along) * .1f;
+                    at += PlayerControl.KeyDirection(heading.Across, heading.Along) * .1f;
                     yield return (at, leg);
                 }
     }

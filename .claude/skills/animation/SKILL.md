@@ -1,24 +1,49 @@
 ---
 name: animation
-description: Make a character or creature animation look physically right, check it frame by frame and show a before/after video. Use when changing or reviewing a walk, run, work action, idle or wolf motion.
+description: Make a character or creature animation look physically right, check every frame of it and show a before/after video. Use when changing or reviewing any motion: a walk, run, work action, idle, wolf motion, or bodies meeting each other or the scene.
 ---
 
 # Animation
 
 ## Workflow
 
-1. Capture the clip as it is now, before changing it (see [Review](#review)).
+1. Record the clip as it is now, before changing it (see [Review](#review)).
 2. Find references for the motion and write down its key poses and timings: contact, mid-stance, push-off, mid-swing,
    how long a foot is down, how long the body is in the air.
 3. Work out the geometry first: leg reach, foot placement, hip height.
    A short script in the scratchpad that solves the poses is quicker to iterate than the game.
-4. Change the poses, capture again and compare from the side in slow motion, frame by frame, then from the front and the
-   game camera.
+4. Change the poses, record again and go through it as [Frame by frame](#frame-by-frame) says, until every frame passes.
 5. Add or extend a check in `tests/AnimationChecks.cs` for what can be measured: feet on the ground, no sliding, nothing
    below it, time in the air. `CheckWolfGaitsPlantEachPaw` and
    `CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning` show how.
 6. Play it in the real window with the `playtest` skill: speeds, blends into and out of the motion, and turns.
-7. Share a before/after video made with the `frame-compare` skill.
+7. Share a before/after video made with the `frame-compare` skill, only once every frame passes.
+
+## Frame by frame
+
+Every new or changed motion is checked on every frame before anyone is shown it.
+A frame that fails sends the motion back for another pass, as many passes as it takes.
+
+- Record at a fixed frame rate with `./build.py record` (see [Review](#review)), so a frame number is the same moment in
+  every recording, before and after a change.
+  When recording is slow or unreliable, fix the tooling first, then carry on.
+- Cover every scenario the motion plays in, not only the one asked about: each way into and out of it, one player and
+  two, with and without wolves, on flat ground and on steps.
+- Look at every frame of the new motion, not samples, from more than one side: the game camera, from above for where
+  bodies stand, and low from the side for heights.
+  Two bodies that overlap in one view may still be apart; judge from a view where they would show apart.
+- Every frame must pass all of these:
+  - Nothing clips through anything.
+  - Physiologically possible poses.
+  - The right part touches the target: feet touch the ground and steps, a palm touches the target described, a wolf's
+    jaws touch the bite target.
+  - Smooth motion: no jumps between frames; every animation is evenly filled with intermediate motion.
+  - Each body acts on the other where that one is drawn: a leap lands on the player as shown, not on where the world
+    keeps their place.
+- What can be measured, such as a sole's height over the tread under it or the gap between two bodies, is measured on
+  every frame of the real recording with a temporary print, and kept as a check where a seam allows.
+- Show the motion only when every frame of it passes. Say what was checked and from which views, and name anything still
+  failing as open.
 
 ## References
 
@@ -92,7 +117,8 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 ## Two bodies meeting
 
 - Place one body from the other's contact point, not from a tuned distance. A leaping wolf is moved so `WolfModel.Bite`
-  lands on `WorldView.Throat`, which follows the knocked-down player's tip, so the jaws stay on the throat as both go down.
+  lands on `FallBackView.Throat`, which follows the knocked-down player's tip, so the jaws stay on the throat as both go
+  down.
 - Time a reaction to the moment of contact, not the start of the action: a struck wolf recoils at
   `ActorAnimation.Contact`, when the swing lands.
 - A body moves across the ground only while its feet are planted and stepping, or while it is in the air. A knockback
@@ -106,12 +132,13 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 - People: `Pose` in `src/ActorAnimation.cs` lists joint angles, and `src/ActorRig.cs` applies them to hips, torso, head,
   shoulders, elbows, thighs, knees and ankles. [docs/DESIGN.md](../../../docs/DESIGN.md) describes the walk, jog and
   sprint.
-- To put a hand on a point, use `ActorAnimation.ArmTo`: it gives the shoulder and elbow angles for a fist, or for what
+- To put a hand on a point, use `ArmReach.ArmTo`: it gives the shoulder and elbow angles for a fist, or for what
   the fist holds, at a point in the trunk's frame. Grinding places both arms with it. The intro film's `Reaching` in
   `src/intro/WorldIntro.cs` wraps it for a point in the rig's own space. Do not write another arm solver.
-- Wolves: `src/WolfShape.cs` builds one skinned mesh on a skeleton, and `WolfModel` in `src/WolfModel.cs` poses it from
-  a `WolfPose` of spine, neck, head, jaw, ears, tail and leg angles. Gait legs are solved by IK from where each paw stands
-  (`Reach`), and `WolfModel.Paw` and `WolfModel.Bite` give where a paw and the jaws are under the pose shown.
+- Wolves: `src/actors/enemies/wolf/display/WolfShape.cs` builds one skinned mesh on a skeleton, and `WolfModel` in
+  `src/actors/enemies/wolf/display/WolfModel.cs` poses it from a `WolfPose` of spine, neck, head, jaw, ears, tail and leg
+  angles. Gait legs are solved by IK from where each paw stands (`Reach`), and `WolfModel.Paw` and `WolfModel.Bite` give
+  where a paw and the jaws are under the pose shown.
   `SyncWolves` in `src/WorldView.cs` times the wolf against the player.
 - The pelvis is part of the torso model, so it cannot turn or drop on its own.
 - Only the walk, jog and sprint set the ankle. Other actions leave the boot square to the shin, so toes can dip into the
@@ -123,7 +150,7 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 
 ## Review
 
-`tools/animation_review.py` captures one clip close up, moving over marked ground, from the side, the front, the game
+`tools/animation_review.py` records one clip close up, moving over marked ground, from the side, the front, the game
 camera and the game camera with the actor facing it (`facing`):
 
 ```sh
@@ -132,14 +159,35 @@ git fetch origin
 ./tools/animation_review.py "player run" --base origin/main --views side --slow 1  # add the same views from main
 ```
 
-- Frames land in `build/animation-review/<clip>/<current or ref>/<view>/`, 96 a view at 30 a second.
+- Movies land in `build/animation-review/<clip>/<current or ref>/<view>.avi`, 96 frames a view at 30 a second of
+  slowed game time. Recordings of the same sources match frame for frame, and so do a branch and its base; anything
+  that varies by run, such as an object's hash code, breaks that, so key motion off saved ids instead.
 - The first frames show the start from standing: pick frames after it for a steady cycle.
-- `--base` captures a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
-  A ref without the close-up review (`--animation-clip`) cannot be captured.
+- `--base` records a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
+  A ref without the close-up review (`--animation-clip`) cannot be recorded.
 - `--base-clip` names the clip in `--base` when it was renamed since, such as `--base-clip "player walk"` for
   `"player jog"`; both land in the current clip's folder.
 - Wolves have close-ups too: `wolf idle`, `wolf walk`, `wolf trot`, `wolf gallop`, `wolf speeds` (stand to gallop and
-  back, for blends), `wolf leap`, `wolf hit`, `wolf feed` and `wolf fall`. The last four play against a player, as
-  `SyncWolves` sets them up. `./build.py play -- --animation-review` shows every clip on one screen.
-- A machine without a display, such as a cloud container, captures under `xvfb-run -a ./tools/animation_review.py ...`.
-- Turn the frames into a video or a numbered contact sheet with the `frame-compare` skill.
+  back, for blends), `wolf turn` (a gallop reversing every 2 s, for the head-first turn and the brake), `wolf leap`,
+  `wolf hit`, `wolf feed` and `wolf fall`. The last four play against a player, as `SyncWolves` sets them up.
+  `./build.py play -- --animation-review` shows every clip on one screen.
+- A machine without a display, such as a cloud container, records under `xvfb-run -a ./tools/animation_review.py ...`.
+- Turn the movies into a side-by-side video or a numbered contact sheet with the `frame-compare` skill, which takes
+  them as they are.
+
+Any scene records the same way, such as a showcase, with `./build.py record`:
+
+```sh
+./build.py record build/recordings/queue.avi -- --showcase --hide-ui --doorway queue --zoom 5 --frames 120
+./build.py record build/recordings/queue-slow.avi -- --showcase --hide-ui --doorway queue --slow 4 --frames 480
+```
+
+- Each frame moves the game on by exactly 1/30 of a second (`--fps` sets another rate), however long it takes to draw,
+  and `--slow` slows game time. The movie carries the game's sound too.
+- That holds for scenes whose world runs inside the window: `--showcase`, its `--doorway` scenes and
+  `--animation-review`. A normal game's world runs in its own server process on real time, so a recording of one
+  neither repeats frame for frame nor slows down.
+- A recording leaves the mouse pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
+- The first recording after a change exports the game; later ones reuse that export while the sources stay the same,
+  and take seconds. Doc and tool edits do not count as changes.
+- Record into `build/`, not a temporary folder: frames of many recordings fill a small `/tmp` fast.

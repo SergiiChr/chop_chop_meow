@@ -414,7 +414,7 @@ public partial class Net : Node {
         } else if (welcomed && sendClock >= InputInterval) {
             sendClock = 0;
             var me = World.Me;
-            RpcId(ServerId, MethodName.Walked, ++stamp, me.Pos, me.Warp, me.GatherTarget, me.Selected, me.Sprinting, appliedSequence);
+            RpcId(ServerId, MethodName.Walked, ++stamp, me.Pos, me.Warp, me.GatherTarget, me.Selected, me.Sprinting, me.Braking, appliedSequence);
         }
     }
 
@@ -430,14 +430,14 @@ public partial class Net : Node {
     private PlayerState? Guest() => World.PlayerById(Multiplayer.GetRemoteSenderId());
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = StreamChannel)]
-    private void Walked(int order, Vector2 at, int warp, int gathering, string selected, bool sprinting, int seen) {
+    private void Walked(int order, Vector2 at, int warp, int gathering, string selected, bool sprinting, bool braking, int seen) {
         if (!Hosting || Guest() is not PlayerState p) return;
         if (sent.ContainsKey(seen) && seen > acked.GetValueOrDefault(p.Id)) acked[p.Id] = seen;
         // An action on the other channel may have overtaken this report and already put the guest further along.
         if (order < heard.GetValueOrDefault(p.Id)) return;
         heard[p.Id] = order;
         Stand(p, at, warp);
-        p.GatherTarget = gathering; p.Selected = selected; p.Sprinting = sprinting;
+        p.GatherTarget = gathering; p.Selected = selected; p.Sprinting = sprinting; p.Braking = braking;
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -567,10 +567,10 @@ public partial class Net : Node {
         // Hotbar slots come from the server, which binds them to backpack stacks.
         // The welcome's first update brings all of it, over the stand-in this copy started with.
         bool joining = applied.Count == 0;
-        var own = (me.Pos, me.Warp, me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting);
+        var own = (me.Pos, me.Warp, me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting, me.Braking);
         Sync(s.Players, EntryKey.Player, static p => p.Id, entries, true, me);
         if (!joining && me.Warp == own.Warp) me.Pos = own.Pos;
-        if (!joining) (me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting) = (own.ActiveHotbar, own.InHand, own.GatherTarget, own.Selected, own.Sprinting);
+        if (!joining) (me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting, me.Braking) = (own.ActiveHotbar, own.InHand, own.GatherTarget, own.Selected, own.Sprinting, own.Braking);
         gone.Clear();
         foreach (var o in goals.Keys) if (o is Worker w ? !s.Workers.Contains(w) : o is Wolf wolf ? !s.Wolves.Contains(wolf) : o is PlayerState p && !s.Players.Contains(p)) gone.Add(o);
         foreach (var o in gone) goals.Remove(o);

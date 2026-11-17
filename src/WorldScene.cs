@@ -162,7 +162,23 @@ public partial class WorldView {
         ("worker sit", ActorSkin.Worker, ActorAction.Sit), ("worker sit on rock", ActorSkin.Worker, ActorAction.Perch), ("player pick up", ActorSkin.Player, ActorAction.PickUp), ("player craft", ActorSkin.Player, ActorAction.Craft),
         ("player grind", ActorSkin.Player, ActorAction.Grind), ("worker grind", ActorSkin.Worker, ActorAction.Grind),
         ("player shovel", ActorSkin.Player, ActorAction.Dig), ("worker shovel", ActorSkin.Worker, ActorAction.Dig),
+        ("player jog turns", ActorSkin.Player, ActorAction.Jog), ("player run turns", ActorSkin.Player, ActorAction.Run),
+        ("player cabin", ActorSkin.Player, ActorAction.Walk), ("player jog back", ActorSkin.Player, ActorAction.Jog), ("player run back", ActorSkin.Player, ActorAction.Run),
     };
+    /// <summary>Seconds each key is held in a back clip, which presses D and A in turn.</summary>
+    private const float ReviewBackSeconds = 1.2f;
+    /// <summary>The back clips' movement, braking at each change of key as the player's does.</summary>
+    private Momentum reviewMomentum;
+    /// <summary>The cabin clip's stages and when each starts, in seconds of its loop: up to the door, in at a walk, out, knock on the door, in at a run.</summary>
+    private static readonly (float At, Doorway Stage)[] ReviewDoorway = { (0, Doorway.None), (2, Doorway.Entering), (4, Doorway.Leaving), (6, Doorway.Knocking), (7.5f, Doorway.Tugged) };
+    private const float ReviewDoorwayLoop = 10.5f;
+    private HutProp? reviewCabin;
+    /// <summary>The cabin the cabin clip plays at, at the middle of the ground.</summary>
+    private static readonly Thing ReviewHut = new() { Kind = ThingKind.Hut };
+    /// <summary>How far from the cabin clip's door the player is still seen, before the walls hide them.</summary>
+    private const float ReviewSeen = 1.75f;
+    /// <summary>Seconds each key is held in a turns clip, which presses A, W, D and S in turn.</summary>
+    private const float ReviewKeySeconds = .35f;
     private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall", "wolf hit" };
     private readonly List<ActorRig> reviewRigs = new();
     private readonly List<WolfModel> reviewWolves = new();
@@ -173,7 +189,9 @@ public partial class WorldView {
     /// <summary>The clip <c>--animation-clip</c> names, shown alone and close up, moving across marked ground at its speed in the world; -1 shows every clip.</summary>
     private static readonly int ReviewClip = Array.FindIndex(ReviewClips, clip => clip.Name == Launch.Value("--animation-clip"));
     /// <summary>Wolf close-ups for <c>--animation-clip</c>; the leap, hit and feed play against a player the way SyncWolves sets them up.</summary>
-    private static readonly string[] WolfClips = { "wolf idle", "wolf howl", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf leap", "wolf hit", "wolf feed", "wolf fall" };
+    /// <summary>How fast, in metres a second, a wolf in the review gallops, and how many seconds the turn clip takes to go out and back.</summary>
+    private const float ReviewGallop = 6.3f, ReviewTurnLoop = 4;
+    private static readonly string[] WolfClips = { "wolf idle", "wolf howl", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf turn", "wolf leap", "wolf hit", "wolf feed", "wolf fall" };
     private static readonly int ReviewWolfClip = Array.IndexOf(WolfClips, Launch.Value("--animation-clip"));
     private string? ReviewCloseUpName => ReviewClip >= 0 ? ReviewClips[ReviewClip].Name : ReviewWolfClip >= 0 ? WolfClips[ReviewWolfClip] : null;
     /// <summary>The camera's pitch in degrees for <c>--animation-pitch</c>, low for a side view; the game's otherwise.</summary>
@@ -217,6 +235,24 @@ public partial class WorldView {
             // A felling stroke plays against a trunk standing where a tree does when the player stops to chop it.
             if (action is ActorAction.Chop or ActorAction.SteelChop) Post(review, ReviewTrunkRadius, ReviewTrunkRadius, 3, ScreenRight * ReviewTrunkAhead, Mat("6b4a32", 1), 12);
         }
+        if (ReviewClips[ReviewClip].Name == "player cabin") { ReviewCabin(dt); return; }
+        if (ReviewClips[ReviewClip].Name.EndsWith(" back")) {
+            // D then A, each held a while, run the actor one way, brake it, turn it round and run it back.
+            var wanted = PlayerControl.KeyDirection((int)(Elapsed / ReviewBackSeconds) % 2 == 0 ? 1 : -1, 0);
+            var step = reviewMomentum.Step(wanted, dt) * ReviewSpeed(action) * dt;
+            var shown = reviewMomentum.Braking ? ActorAction.Brake : action;
+            reviewActor.Update(reviewActor.Position + step, shown, reviewActor.Position + reviewMomentum.Heading, dt);
+            Pose(reviewRigs[0], reviewActor, null);
+            return;
+        }
+        if (ReviewClips[ReviewClip].Name.EndsWith(" turns")) {
+            // A, W, D then S, each held a moment, turn the actor about a small square the way the keys turn the player.
+            int key = (int)(Elapsed / ReviewKeySeconds) % 4;
+            var heading = key switch { 0 => PlayerControl.KeyDirection(-1, 0), 1 => PlayerControl.KeyDirection(0, -1), 2 => PlayerControl.KeyDirection(1, 0), _ => PlayerControl.KeyDirection(0, 1) };
+            reviewActor.Update(reviewActor.Position + heading * ReviewSpeed(action) * dt, action, reviewActor.Position + heading, dt);
+            Pose(reviewRigs[0], reviewActor, null);
+            return;
+        }
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);
         float along = Mathf.PosMod(Elapsed * ReviewSpeed(action) + 20, 40) - 20;
@@ -224,6 +260,44 @@ public partial class WorldView {
         reviewActor.Update(track * along, action, track * (along + 1), dt);
         Pose(reviewRigs[0], reviewActor, ActorAnimation.Tool(action));
         reviewRigs[0].Root.Rotation += new Vector3(0, Mathf.DegToRad(ReviewTurn), 0);
+    }
+
+    /// <summary>
+    /// A player walks up to a cabin at the middle of the ground and through each doorway stage as the game shows them:
+    /// in at a walk, out, knocking on the shut door, and in at a run after a moment of being tugged back.
+    /// </summary>
+    private void ReviewCabin(float dt) {
+        if (reviewCabin == null) { reviewCabin = (HutProp)WorldModels.Build(ReviewHut); review!.AddChild(reviewCabin.Root); }
+        var door = Doorways.DoorPoint(ReviewHut);
+        float time = Elapsed % ReviewDoorwayLoop;
+        int stage = ReviewDoorway.Length - 1;
+        while (ReviewDoorway[stage].At > time) stage--;
+        float start = ReviewDoorway[stage].At, end = stage + 1 < ReviewDoorway.Length ? ReviewDoorway[stage + 1].At : ReviewDoorwayLoop;
+        var now = ReviewDoorway[stage].Stage;
+        (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) shown;
+        if (now == Doorway.None) {
+            float walked = Math.Clamp((time - start) / 1.6f, 0, 1);
+            var from = door - DoorwayView.IntoCabin * 2;
+            shown = (from.Lerp(door, walked), door + DoorwayView.IntoCabin, walked < 1 ? ActorAction.Jog : ActorAction.Idle, false);
+        } else if (now == Doorway.Tugged) {
+            // Half way into a run in, the player is tugged back out a metre, then runs in again from there.
+            float run = time - start, tugged = run - Doorways.RushSeconds / 2;
+            var tuggedTo = door + Doorways.OutOfDoor * DoorTug.TugDistance;
+            var part = run < Doorways.RushSeconds / 2 ? Doorway.Entering : tugged < DoorTug.TugSeconds ? Doorway.Tugged : Doorway.Entering;
+            if (part != reviewActor.Stage) { reviewActor.Stage = part; reviewActor.StageFrom = reviewActor.Position; }
+            shown = run < Doorways.RushSeconds / 2 ? DoorwayView.DoorStep(Doorway.Entering, door, door, reviewActor.StageFrom, run, Doorways.RushSeconds, true, 0)
+                : tugged < DoorTug.TugSeconds ? DoorwayView.DoorStep(Doorway.Tugged, door, door, reviewActor.StageFrom, tugged, DoorTug.TugSeconds, true, DoorTug.TugDistance)
+                : DoorwayView.DoorStep(Doorway.Entering, door, tuggedTo, reviewActor.StageFrom, tugged - DoorTug.TugSeconds, Doorways.RushSeconds, true, 0);
+        } else {
+            if (now != reviewActor.Stage) { reviewActor.Stage = now; reviewActor.StageFrom = reviewActor.Position; }
+            float seconds = now switch { Doorway.Knocking => Doorways.KnockLead + Doorways.KnockSeconds, Doorway.Leaving => Doorways.LeaveSeconds, _ => Doorways.EnterSeconds };
+            shown = DoorwayView.DoorStep(now, door, door, reviewActor.StageFrom, time - start, seconds, false, 0);
+        }
+        bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Tugged && shown.At.DistanceTo(door) < ReviewSeen;
+        DoorwayView.SwingDoor(reviewCabin, open, dt / Doorways.ShutSeconds);
+        reviewActor.Update(shown.At, shown.Action, shown.Facing, dt, shown.Backing);
+        Pose(reviewRigs[0], reviewActor, null, door: new DoorShown(shown.At, shown.Facing, shown.Action, door, shown.Backing, 0, 0, 0));
+        reviewRigs[0].Root.Visible = shown.At.DistanceTo(door) < ReviewSeen || now is Doorway.None or Doorway.Knocking;
     }
 
     private WolfModel? reviewWolf;
@@ -249,6 +323,8 @@ public partial class WorldView {
             review = ReviewTrack();
             reviewWolf = new WolfModel(); review.AddChild(reviewWolf.Root);
             if (clip is "wolf leap" or "wolf hit" or "wolf feed") { var rig = new ActorRig(ActorSkin.Player); review.AddChild(rig.Root); reviewRigs.Add(rig); }
+            // The player starts facing the wolf, rather than turning to it on the spot, or on the ground in the feeding clip.
+            reviewPerson.Yaw = ActorAnimation.Yaw(track, 0);
         }
         var wolf = reviewWolf!;
         // Moving wolves head along the track; the rest face back toward the player at the middle.
@@ -266,10 +342,14 @@ public partial class WorldView {
                     wolf.Fall(dying); place = To3(track * (.7f * thrown * (2 - thrown) - .35f));
                     break;
                 }
-            case "wolf feed":
-                wolf.Feed(Elapsed, dt, false); place = To3(track * World.FeastSeat);
-                person = ActorAction.Devoured; downed = 1;
-                break;
+            case "wolf feed": {
+                    // Tearing at the side of the fallen player's belly.
+                    wolf.Feed(Elapsed, dt, false);
+                    (place, wolf.Yaw) = FeedingSpots.OnTheBody(FeedingSpots.BodyLine(reviewPerson), .4f, 1);
+                    wolf.Root.Rotation = new Vector3(0, wolf.Yaw, 0);
+                    person = ActorAction.Devoured; downed = 1;
+                    break;
+                }
             case "wolf leap": {
                     // From 3 tiles off the leap closes on PinDistance in LeapSeconds, the jaws reaching the throat on the way.
                     float c = Elapsed % 3.2f, start = 3, progress = Math.Clamp((c - .6f) / World.LeapSeconds, 0, 1), flight = 0;
@@ -277,11 +357,12 @@ public partial class WorldView {
                     wolf.Toward = track;
                     if (c < .6f) { wolf.Pinned = 0; wolf.Stand(Elapsed, dt, true); } else {
                         wolf.Pinned = gap <= WolfModel.ContactReach ? wolf.Pinned + dt : 0;
-                        if (wolf.Pinned > 0) wolf.Feed(Elapsed, dt, true, wolf.Pinned / KnockSeconds);
-                        else { wolf.Leap(progress, contact, dt); flight = progress / contact; }
+                        var chest = FeedingSpots.PawsOnChest(wolf, reviewRigs[0]);
+                        if (wolf.Pinned > 0) wolf.Feed(Elapsed, dt, true, wolf.Pinned / ActorAnimation.FallBackSeconds, chest: chest);
+                        else { wolf.Leap(progress, contact, dt, chest); flight = progress / contact; }
                     }
                     place = c < .6f ? To3(track * start) : AtTheThroat(wolf, Vector2.Zero, To3(track * gap), flight);
-                    if (wolf.Pinned > 0) { person = ActorAction.Mauled; downed = wolf.Pinned; }
+                    if (wolf.Pinned > 0) { person = wolf.Pinned < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled; downed = wolf.Pinned; }
                     break;
                 }
             case "wolf hit": {
@@ -296,8 +377,19 @@ public partial class WorldView {
                     if (punch >= 0 && punch < ActorAnimation.Duration(ActorAction.Attack)) person = ActorAction.Attack;
                     break;
                 }
+            case "wolf turn": {
+                    // Galloping along the track, then running back the other way: the head turns first, the body follows
+                    // leaning in, and it brakes while its body still faces the way it came.
+                    float way = Elapsed % ReviewTurnLoop < ReviewTurnLoop / 2 ? 1 : -1;
+                    var moved = track * (way * ReviewGallop * dt);
+                    reviewGround += way * ReviewGallop * dt;
+                    if (wolf.TurnToward(moved, moved, dt, true, true, false)) wolf.Brake(moved.Length(), dt); else wolf.Move(moved.Length(), dt, true, false);
+                    wolf.Root.Rotation += new Vector3(0, Mathf.DegToRad(ReviewTurn), 0);
+                    place = To3(track * reviewGround);
+                    break;
+                }
             default: {
-                    float speed = clip switch { "wolf walk" => 1.5f, "wolf trot" => 3, "wolf gallop" => 6.3f, _ => ReviewSpeeds(Elapsed % 11) };
+                    float speed = clip switch { "wolf walk" => 1.5f, "wolf trot" => 3, "wolf gallop" => ReviewGallop, _ => ReviewSpeeds(Elapsed % 11) };
                     // The wolf crosses 40 tiles of track, then starts over.
                     reviewGround = Mathf.PosMod(reviewGround + speed * dt + 20, 40) - 20;
                     if (speed < .05f) wolf.Stand(Elapsed, dt, false); else wolf.Move(speed * dt, dt, speed > 4.5f, false);
@@ -311,7 +403,7 @@ public partial class WorldView {
         if (reviewRigs.Count == 0) return;
         reviewPerson.Update(Vector2.Zero, person, track, dt);
         Pose(reviewRigs[0], reviewPerson, null);
-        if (downed > 0) KnockDown(reviewRigs[0], reviewPerson, downed);
+        if (downed > 0) FallBackView.FallBack(reviewRigs[0], reviewPerson, downed, false, clip == "wolf leap" ? wolf : null);
     }
 
     private void UpdateReview(float dt) {
@@ -333,7 +425,7 @@ public partial class WorldView {
         // Moving wolves stride as they would at their speed in the world: a trot at 3 tiles a second and a gallop at a chase's 6.3.
         reviewWolves[0].Stand(Elapsed, dt, false); reviewWolves[1].Move(3 * dt, dt, false, false); reviewWolves[2].Move(6.3f * dt, dt, true, false);
         float leap = Elapsed % 1.2f / World.LeapSeconds;
-        if (leap < .7f) reviewWolves[3].Leap(leap, .7f, dt); else reviewWolves[3].Feed(Elapsed, dt, true, (leap - .7f) * World.LeapSeconds / KnockSeconds);
+        if (leap < .7f) reviewWolves[3].Leap(leap, .7f, dt); else reviewWolves[3].Feed(Elapsed, dt, true, (leap - .7f) * World.LeapSeconds / ActorAnimation.FallBackSeconds);
         reviewWolves[4].Feed(Elapsed, dt, false); reviewWolves[5].Fall(Elapsed % 2 / WolfModel.FallSeconds);
         reviewWolves[6].Recoil(Elapsed % 1.2f / WolfModel.RecoilSeconds, dt);
         foreach (var wolf in reviewWolves) wolf.Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);

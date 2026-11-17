@@ -141,13 +141,13 @@ public static class WaterChecks {
 
     private static void CheckRecipesReturnReusableBottles(GameData data) {
         var world = new World(data, false);
-        var bench = world.Add(ThingKind.Bench, world.Player + Vector2.Right * 2);
+        var bench = world.Add(ThingKind.Bench, world.Player + Vector2.Right * 1.4f);
         bench.Tools!.Add("steel_hammer", 1); world.SetRecipe(bench, "water_bottle");
         bench.Inventory.Add("tin_bar", 1); bench.Inventory.Add("wood_parts", 1);
         for (int i = 0; i < 100; i++) world.Tick(.25f, true);
         Require(bench.Inventory["empty_bottle"] == 1 && bench.Inventory["water"] == 0,
             "the actual bench recipe must make exactly one empty bottle without creating water");
-        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Left * 2);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Left * 1.4f);
         world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 3); table.Inventory.Add("flour", 1);
         for (int i = 0; i < 100; i++) world.Tick(.25f, true);
         Require(table.Inventory[Water.Empty] == 0, "cooking must leave no bottle on the table: the bottle stayed with whoever poured it");

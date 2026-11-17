@@ -1,0 +1,59 @@
+using System;
+using Godot;
+
+namespace ChopChopMeow;
+
+/// <summary>How an actor, a player or worker, is drawn: where, facing which way, doing what and how far into it.</summary>
+public sealed class ActorState {
+    public Vector2 Position;
+    public float Yaw;
+    /// <summary>
+    /// How the body is turning: the head turns toward a new heading first and the body follows with weight, easing into
+    /// and out of the turn and leaning into it.
+    /// </summary>
+    public Turning Turning;
+
+    /// <summary>The doorway stage drawn last frame, where the actor stood when it began, and the stage before it.</summary>
+    public Doorway Stage;
+    public Vector2 StageFrom;
+    public Doorway StageBefore;
+    /// <summary>Seconds left stepping back down off a cabin's step after knocking on its door.</summary>
+    public float SteppingDown;
+    /// <summary>How high the steps of a cabin's door lift the actor as last drawn.</summary>
+    public float Lift;
+    /// <summary>How high the actor's hips stand above the ground it is posed on, as last drawn.</summary>
+    public float HipHeight;
+    public ActorAction Action;
+    public float Time;
+    public float PreviousTime = -1;
+    public bool Moving;
+    // The action blended out of after a change, where it was, and how far the blend into the new one has gone.
+    public ActorAction From;
+    public float FromTime;
+    public bool FromMoving;
+    public float Blend = 1;
+    /// <summary>Moves and poses the actor for a frame; it faces where it moves, or <paramref name="facingTarget"/> while standing or <paramref name="backing"/> away from it.</summary>
+    public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt, bool backing = false) {
+        float moved = position.DistanceTo(Position);
+        bool moving = moved > .001f;
+        float yaw = ActorAnimation.Yaw(moving && !backing ? position - Position : facingTarget - position, Yaw);
+        // A jump such as a respawn is no speed to lean into.
+        Turning.Step(ref Yaw, yaw, dt > 0 ? Math.Min(moved / dt, 8) : 0, dt, action == ActorAction.Run);
+        Position = position;
+        if (Action != action) {
+            From = Action; FromTime = Time; FromMoving = Moving; Blend = 0;
+            Action = action; Time = 0; PreviousTime = -1;
+        } else { PreviousTime = Time; Time += ActorAnimation.Advance(action, dt, moved); }
+        FromTime += ActorAnimation.Advance(From, dt, moved);
+        Blend = Math.Min(1, Blend + dt / ActorAnimation.BlendSeconds);
+        Moving = moving;
+    }
+    public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend);
+
+    /// <summary>True on the frame an action loop passes its impact moment.</summary>
+    public bool Struck(float at) {
+        if (PreviousTime < 0) return false;
+        float before = ActorAnimation.Phase(Action, PreviousTime), now = ActorAnimation.Phase(Action, Time);
+        return before <= now ? before < at && at <= now : at > before || at <= now;
+    }
+}

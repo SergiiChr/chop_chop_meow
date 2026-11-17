@@ -1,0 +1,141 @@
+using System;
+using System.Linq;
+using Godot;
+
+namespace ChopChopMeow;
+
+/// <summary>
+/// A wolf in <paramref name="world"/> that reaches a player out in the open in a cabin's doorway takes them by the waist
+/// and tugs them back out of it, then lets go: a badly hurt player falls back and is pinned, anyone else steps in again.
+/// </summary>
+public sealed class DoorTug(World world) {
+    /// <summary>Seconds a wolf takes to tug a player back out of a doorway.</summary>
+    public const float TugSeconds = 1.5f;
+    /// <summary>How far, in metres, a wolf tugs a player back out from a cabin's door, in how many tugs.</summary>
+    public const float TugDistance = 1;
+    public const int Tugs = 3;
+    /// <summary>The share of each tug spent tugging; the wolf holds for the rest of it.</summary>
+    public const float Heave = .4f;
+    /// <summary>How far behind a tugged player a tugging wolf stands, with its jaws at their waist.</summary>
+    public const float TugReach = .75f;
+    /// <summary>
+    /// How far further out a player tugged out of a doorway has their throat once they fall onto their back, and how far
+    /// to the side of it the wolf that pins them stands.
+    /// </summary>
+    public const float FallenThroat = .66f, AsideReach = .7f;
+
+    /// <summary>Seconds a tug out of a doorway lasts: a wounded player is taken down as the last tug lands, with no hold after it.</summary>
+    public static float Seconds(PlayerState p) => p.Health <= World.TakedownHealth ? TugSeconds * (Tugs - 1 + Heave) / Tugs : TugSeconds;
+
+    /// <summary>
+    /// How much of the way a wolf has tugged a player, 0 to 1, <paramref name="done"/> of the way through the tug: each of
+    /// its tugs jerks them back sharply, then holds while the wolf gets a new grip.
+    /// </summary>
+    public static float TugProgress(float done) {
+        var (tug, u) = TugPhase(done);
+        return (tug + Mathf.SmoothStep(0, 1, Math.Min(1, u / Heave))) / Tugs;
+    }
+
+    /// <summary>Which tug a tug <paramref name="done"/> of the way through is in, from 0, and how far through that tug, 0 to 1.</summary>
+    public static (int Tug, float U) TugPhase(float done) {
+        float tugs = Math.Clamp(done, 0, 1) * Tugs, tug = MathF.Min(MathF.Floor(tugs), Tugs - 1);
+        return ((int)tug, tugs - tug);
+    }
+
+    /// <summary>How hard a tug is tugging <paramref name="u"/> of the way through it: rising and falling over its heave, then nothing while the wolf holds.</summary>
+    public static float HeavePulse(float u) => u < Heave ? MathF.Sin(MathF.PI * u / Heave) : 0;
+
+    /// <summary>Where the acting player is: their place, or as far back from it as a wolf tugging them out of a doorway has taken them.</summary>
+    public Vector2 TuggedTo {
+        get {
+            var p = world.S.Actor;
+            return p.Door is Doorway.Tugged or Doorway.TuggedOff ? world.Player + Doorways.OutOfDoor * (TugDistanceFrom(world.Player) * TugProgress(p.DoorTime / TugSeconds)) : world.Player;
+        }
+    }
+
+    /// <summary>
+    /// How far a wolf tugs a player standing at <paramref name="from"/> straight out of a doorway: <see cref="TugDistance"/>, cut
+    /// short where open ground ends, leaving room on it for the wolf behind them where there is any.
+    /// </summary>
+    public float TugDistanceFrom(Vector2 from) {
+        float both = OpenOut(from, TugDistance + TugReach) - TugReach;
+        return both >= 0 ? both : OpenOut(from, TugDistance);
+    }
+
+    /// <summary>How far open ground runs from <paramref name="from"/> straight out of a doorway, up to <paramref name="most"/> metres.</summary>
+    private float OpenOut(Vector2 from, float most) {
+        float open = 0;
+        while (open < most && world.CanStand(from + Doorways.OutOfDoor * Math.Min(open + OpenStep, most))) open = Math.Min(open + OpenStep, most);
+        return open;
+    }
+    private const float OpenStep = .05f;
+
+    /// <summary>Puts a wolf tugging the acting player behind them, where it holds on; with no open ground there, it stays where it stands.</summary>
+    private void StandBehind(Wolf wolf) {
+        var spot = TuggedTo + Doorways.OutOfDoor * TugReach;
+        if (world.CanStand(spot)) wolf.Pos = spot;
+    }
+
+    /// <summary>The wolf tugging the acting player out of a doorway, or null.</summary>
+    private Wolf? Tugger() {
+        foreach (var w in world.S.Wolves) if (w.Tugging && w.Target == world.S.Actor.Id) return w;
+        return null;
+    }
+
+    /// <summary>Whether a wolf is tugging the acting player out of a doorway, when only it may take them down.</summary>
+    public bool Tugged => world.S.Actor.Door is Doorway.Tugged or Doorway.TuggedOff && Tugger() != null;
+
+    /// <summary>A wolf reaching a player in the open part of a doorway takes them by the waist to tug them back out of it; returns whether it did.</summary>
+    public bool TugOut(Wolf wolf) {
+        var p = world.S.Actor;
+        if (p.Door is not (Doorway.Entering or Doorway.Following or Doorway.Knocking or Doorway.Aside) || Doorways.Indoors(p)) return false;
+        Doorways.Stage(p, p.Door is Doorway.Knocking or Doorway.Aside ? Doorway.TuggedOff : Doorway.Tugged, p.DoorCabin);
+        wolf.Tugging = true; wolf.Leap = 0;
+        // The player screams through the whole tug.
+        world.Play("tug_scream", world.Player);
+        return true;
+    }
+
+    /// <summary>
+    /// Holds a tugging wolf at the waist of the player it tugs back, who is shown there; returns false once the tug has
+    /// ended some other way, such as the player dying, and lets go. A wolf hit while it tugs is knocked back: the player
+    /// stays as far out as it got them and steps in again at a run, or stops knocking.
+    /// </summary>
+    public bool Tug(Wolf wolf) {
+        var p = world.S.Actor;
+        if (p.Door is not (Doorway.Tugged or Doorway.TuggedOff)) { wolf.Tugging = false; return false; }
+        if (wolf.Stagger > 0) {
+            wolf.Tugging = false;
+            LetGo(null);
+            return false;
+        }
+        StandBehind(wolf);
+        wolf.Attack = 1;
+        return true;
+    }
+
+    /// <summary>
+    /// Ends a tug that has run its time: the player is let go, a badly hurt one knocked down, anyone else stepping in again
+    /// at a run, or stopping knocking. The wolf bites again no sooner than after any other bite.
+    /// </summary>
+    public void End() {
+        var tugger = Tugger();
+        if (tugger != null) { tugger.Tugging = false; tugger.Attack = 1; StandBehind(tugger); }
+        LetGo(tugger != null && world.S.Health <= World.TakedownHealth ? tugger : null);
+    }
+
+    /// <summary>
+    /// Ends the acting player's tug out of a doorway where it has got them: <paramref name="takedown"/>, the wolf that tugged
+    /// them, pins them from their left as they fall back toward it; otherwise a tugged player steps in again at a run, and
+    /// one tugged off the door stands free.
+    /// </summary>
+    private void LetGo(Wolf? takedown) {
+        var p = world.S.Actor;
+        world.Player = TuggedTo; p.Warp++;
+        if (takedown != null) {
+            world.Pin(takedown, world.Hunters.Skip(1).Any(), -Doorways.OutOfDoor.Orthogonal());
+            p.Door = Doorway.None;
+        } else if (p.Door == Doorway.Tugged) world.Doorways.StepIn(p.DoorCabin, true);
+        else p.Door = Doorway.None;
+    }
+}

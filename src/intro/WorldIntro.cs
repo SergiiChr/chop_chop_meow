@@ -261,7 +261,7 @@ public partial class WorldView {
         var to = torso.Inverse() * (target - hips) - shoulder;
         to = to.Normalized() * Math.Clamp(to.Length(), .1f, ActorRig.UpperArm + ActorRig.Forearm - .005f);
         fist = hips + torso * (shoulder + to);
-        var (raise, outward, elbow) = ActorAnimation.ArmTo(shoulder + to, left);
+        var (raise, outward, elbow) = ArmReach.ArmTo(shoulder + to, left);
         return left ? pose with { RaiseL = raise, OutL = outward, ElbowL = elbow } : pose with { RaiseR = raise, OutR = outward, ElbowR = elbow };
     }
 

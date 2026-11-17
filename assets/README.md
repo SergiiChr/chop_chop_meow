@@ -95,8 +95,8 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 - `src/HumanShape.cs` — the common neutral torso and continuous skinned limb profiles for players, workers and couriers. It shares five neutral mesh resources (hips, torso, leg, left arm and right arm) across all human roles and player shirt colors. Each actor keeps its own skeletons and pose. Cached three-color texture palettes preserve sleeve/skin, trousers/boots and sole transitions using the fade-compatible StandardMaterial3D path.
 - `src/ActorShape.cs` — profile, skinning and curved strap builders. Outfit colors use cached palette materials rather than duplicating body geometry. These meshes are cached across actors while each rig poses its own joints.
 - `CourierShape` — fits a reflective hi-vis vest and curved cap to the same core, with the common face details.
-- `src/WolfShape.cs` — one cached skinned wolf mesh on a skeleton: deep chest, full belly with a slight tuck, a croup sloping into heavy thighs, thick maned neck, wedge muzzle with a jaw and teeth, upright ears, legs with elbows, hocks and paws, and a three-bone brush tail. The coat darkens along the back, warms to tan on the flanks and pales underneath.
-- `src/WolfModel.cs` — poses the wolf skeleton for gaits, standing, leaping, pinning, feeding, recoil and falling, with IK legs and blending between motions.
+- `src/actors/enemies/wolf/display/WolfShape.cs` — one cached skinned wolf mesh on a skeleton: deep chest, full belly with a slight tuck, a croup sloping into heavy thighs, thick maned neck, wedge muzzle with a jaw and teeth, upright ears, legs with elbows, hocks and paws, and a three-bone brush tail. The coat darkens along the back, warms to tan on the flanks and pales underneath.
+- `src/actors/enemies/wolf/display/WolfModel.cs` — poses the wolf skeleton for gaits, standing, leaping, pinning, feeding, recoil and falling, with IK legs and blending between motions.
 
 ### Buildings and stations
 
@@ -215,6 +215,10 @@ These were made with ffmpeg from Kenney's sounds:
 Each cut is faded at both ends, and the cuts of one sound are brought to one mean level.
 
 `wolf_howl` (a lone wolf, the night's first howl), `wolf_howl_group` (the pack answering) and `hire_sign` (a pen signing paper, cleaned of rumble and room noise) were supplied for this project.
+
+`door_knock` is "Door bang 1.wav" by freesound_community (Pixabay 14449), a recording supplied for this project: its three knocks on a door, each cut into its own variant, faded at both ends and brought to one mean level.
+
+`tug_scream` is the first second and a half of "Male horror scream" (Pixabay 123080), and `takedown_scream` is "Man pain scream 02" (Pixabay 567205) with the silence cut from both ends: recordings supplied for this project, faded at the ends and brought to one mean level.
 
 `footsteps_default` is cut with ffmpeg from "Footsteps_Grass_1" by freesound_community (Pixabay 6810, artist SilentStrikeZ on Freesound), a recording supplied for this project: six single steps, each 0.34 seconds from just before the foot lands, faded in over 15 ms and out over its last 120 ms.
 Each step's loudest 400 ms of heard loudness, counting the silence after it, is brought to -23.3 LUFS, the mean of the steps it replaced.

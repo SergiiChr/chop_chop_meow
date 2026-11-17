@@ -38,6 +38,7 @@ The project uses Godot's Forward+ renderer, which picks a discrete GPU over an i
 ./build.py test     # run only the tests
 ./build.py build    # check, export, and smoke-test build/ChopChopMeow.x86_64
 ./build.py icons    # re-render item and building icons from their models (opens a window)
+./build.py record build/recordings/out.avi -- --showcase --frames 120  # record the game to a movie at 30 frames a second
 ```
 
 ### Release bundle
@@ -63,16 +64,17 @@ Play accepts Godot arguments after `--`:
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
+| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk) or `wounded` (a badly hurt player tugged out and pinned); `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
 | `--animation-review` | Show every actor action on rotating rigs |
-| `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection, evenly spaced at 30 a second |
+| `--frames 240` | Quit after this many frames, to end a recording (`./build.py record`) |
+| `--slow 4` | Slow game time this many times, for a recording in slow motion |
 | `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following; a felling clip such as `"player steel axe"` plays against a trunk |
 | `--animation-review --animation-clip "wolf leap"` | Show one wolf clip close up; the leap, hit and feed play against a player |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
-| `--animation-slow 4` | Slow a capture down this many times |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
 | `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
 | `--performance-run /absolute/directory` | Record a benchmark: sprinting from the sea past a staffed camp and the pond to the valley's top corner, by day and again at night with a lit torch; summarise it with `python3 tools/performance_report.py /absolute/directory` |
@@ -83,10 +85,10 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 ```sh
 ./build.py play -- --showcase --screenshot /tmp/chop-chop-meow.png
-./build.py play -- --animation-review --animation-capture /tmp/chop-chop-meow-animation
+./build.py record build/recordings/review.avi -- --animation-review --frames 96  # a movie at 30 frames a second
 ./tools/environment_review.py             # landscape views, saved in build/environment-review/
 ./tools/environment_review.py --shoreline # coast, lake edge and mine views
-./tools/animation_review.py "player run"   # one clip from the side, front and game camera, in build/animation-review/
+./tools/animation_review.py "player run"   # one clip from the side, front and game camera, as movies in build/animation-review/
 ./tools/intro_film.py                     # the intro film's frames and sound cue sheet, in build/intro/frames/
 ./tools/intro_film.py --stills 1.5,9.2    # single frames of the film, in build/intro/stills/
 ```
@@ -154,11 +156,11 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 
 | Input | Action |
 | --- | --- |
-| WASD or arrow keys | Move in screen directions |
+| WASD or arrow keys | Move in screen directions; pressing about the opposite way while running brakes to a stop in a lunge, turns round and runs back |
 | Shift while moving | Sprint 1.6× as fast; food and drink drain 1.7× as fast; not under 15% food or drink |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
-| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you inside; on open ground, use the item selected on the hotbar (swing a tool or torch, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
+| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you round to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans |
 | Tab | Open or close the backpack |
@@ -307,6 +309,9 @@ It starts no batch while its slots hold something another recipe left there, suc
 A station page opens with the group of the recipe the station is on open.
 A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
+A bench, anvil, cooking table or packing station with a batch running is worked by a player standing still within 1 m of its edge, or by a worker.
+Pumping the reinforced furnace's bellows needs the same 1 m.
+
 Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
 A station that burns fuel has its own fuel slot under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
 Fuel the recipe cannot burn shows in brick; workers carry it back to storage and bring a fuel it burns.
@@ -383,7 +388,8 @@ The cabin's page shows, under "Stats after sleep", the health, hunger and thirst
 ### Death and recovery
 
 Death drops your backpack, coins included, in a recovery box marked by a bobbing gold gem.
-You respawn after 30 seconds inside the cabin nearest to where you fell, or in the clearing without one.
+Until you respawn, anything you try in the world says "You are busy."; you can still skip to morning and pick a hotbar slot.
+You respawn after 30 seconds inside the cabin nearest to where you fell that nobody is in, or in the clearing without one.
 Emptied boxes disappear, and workers never use them as storage.
 During the respawn countdown, if no cabin exists, “Skip to morning?” lets you advance the world to dawn.
 In multiplayer, every player must be downed before skipping.
@@ -423,6 +429,7 @@ The opening progression prioritizes water, shelter and fire, then hand gathering
 ### Buildings
 
 A building, yard or crate goes up over stumps and plain bushes and clears them away, giving nothing for them.
+A cabin needs dry, open ground in front of its door, and no other building goes up on that spot.
 
 | Building | Cost |
 | --- | --- |
@@ -793,9 +800,11 @@ After that one den, picked at random, lets one more wolf out every hour until th
 They patrol the valley at a walk, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
 Wolves are the same every night: two blows of a steel axe fell one, and its fourth bite brings a healthy player down to half health.
 
-A wolf that smells you within 30 metres while you are out in the open howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
+A wolf that smells you within 30 metres while you are out in the open, but too far off to see you, howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
 After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
+A wolf that finds you already within sight goes for you without a howl.
 A sprinting wolf gallops faster than you walk, but sprinting outruns it.
+A wolf that reaches you stops at biting distance, about a metre off, and keeps that distance while another wolf tugs you.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
 
@@ -821,8 +830,26 @@ A direct hit with the torch hurts a wolf and sends it running for a moment.
 
 ### Cabins
 
-Click a cabin to step inside, even while walking; the door shuts behind you.
-Wolves cannot smell you there: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
+Click a cabin, or press Enter in its panel, and you walk round it to its door and step in; the door shuts behind you.
+Once you set off you cannot walk away, and the keys do nothing until you are in.
+Stepping in takes about 1.3 seconds at a walk, hurrying up the second tread, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
+For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and tugs you a metre back out in three tugs over 1.5 seconds, less where water or a building is in the way, you bent over, reaching for the door and screaming.
+It then lets go and you run in again at once.
+At half health or less, its third tug takes you straight over onto your back about 1.2 seconds in.
+Hit the wolf while it tugs someone and it lets go of them.
+No other wolf takes you down while one tugs you.
+
+Wolves cannot smell you inside: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
+Stepping out takes about 1.5 seconds, and wolves can reach you for its second half, once you are out of the doorway.
+At a cabin from an older save whose door spot is under water or a building, you step out onto open ground beside it.
+Anyone knocking on the door steps aside to their right to let you out, and you keep to the left of the step; you step out beside anyone just standing at the door.
+Once you are through the doorway, they squeeze past you in, in the order they came: both of you turn sideways, chest to chest, arms at your sides, and the one going in puts their right palm on the door frame.
+
+A cabin holds one player.
+While you are at its door, knocking, following or stepping in, anything you try in the world says "You are busy."; you can still pick a hotbar slot.
+Someone who walks up behind a player stepping in follows them; once that player is in, they wait for the door to swing shut, step up to it, knock on it three times and stand free.
+At the door of a cabin someone is in, you knock on it the same way.
+Players a wolf tugs back out go in again in the order they came to the door.
 
 ### Wolf kills
 
@@ -865,7 +892,7 @@ A guest that loses the connection tries to get back in on its own for up to 120 
 ### Shared world
 
 Everyone shares the world, the market and the workers.
-Sleep needs every other player inside a cabin, and everyone with enough food and water.
+Sleep needs every other player inside a cabin of their own, and everyone with enough food and water.
 Night wolves hunt each player separately.
 
 Thirty times a second the server sends each player only what changed since the last update that player confirmed, usually a few hundred bytes, so it plays over the internet as well as at home.
@@ -916,7 +943,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), knocking on a cabin door, being tugged back out of one and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 A tree is felled with strokes from the side into its trunk, while an axe swung in the air comes down from overhead.
 
@@ -928,7 +955,7 @@ The world reacts too:
 - the bellows board travels with each press, and the heat gauge tracks the forge;
 - a bar under the reinforced furnace and its panel dial mark the heat steel needs;
 - furnaces smoke (the reinforced furnace darker and thicker), and anvils spark;
-- storage lids open on transfers, and the cabin door opens as you approach and shuts once you are inside;
+- storage lids open on transfers, and the cabin door opens for someone stepping in or out and shuts behind them;
 - the market mailbox flag rises while a cart is out;
 - wolves trot, leap, feed and fall dead, and a pinned player struggles on their back;
 - couriers pull the trade cart.
@@ -949,7 +976,8 @@ Sound effects follow the same actions:
 - a building knocks into place, and one taken down clatters apart;
 - buying jingles coins, and hiring signs the worker on;
 - your stomach growls when food runs low;
-- wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, bite, and thud when struck.
+- wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, bite, and thud when struck;
+- you scream as a wolf tugs you out of a cabin's doorway, and when a wolf takes you down.
 
 Repeated sounds rotate between variants.
 A sound is loudest at your character and fades with distance, to silence 16 metres away, whatever the zoom.
