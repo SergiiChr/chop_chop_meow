@@ -522,7 +522,7 @@ public partial class WorldView : Node3D {
         bool torch = World.Torch > 0 && !World.Dead;
         Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door?.Door, door?.Twist ?? 0, door?.Grip ?? 0, door?.Tuck ?? 0);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
-        if (downedFor > 0) FallBack(playerRig, player, downedFor, torch);
+        if (downedFor > 0) FallBack(playerRig, player, downedFor, torch, World.Dead ? null : HoldingOff(World.Me.Id));
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject, playerRig);
         UpdateOthers(dt);
@@ -632,7 +632,7 @@ public partial class WorldView : Node3D {
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
             Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), p.Torch > 0 && p.RespawnIn <= 0, door?.Door, door?.Twist ?? 0, door?.Grip ?? 0, door?.Tuck ?? 0);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
-            if (other.DownedFor > 0) FallBack(other.Rig, state, other.DownedFor, p.Torch > 0 && p.RespawnIn <= 0);
+            if (other.DownedFor > 0) FallBack(other.Rig, state, other.DownedFor, p.Torch > 0 && p.RespawnIn <= 0, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, subject, other.Rig);
         }
@@ -716,7 +716,7 @@ public partial class WorldView : Node3D {
             Doorway.Entering => (Inward(from, door, rush ? done : WalkedIn(time)), inside, rush ? ActorAction.Jog : ActorAction.Walk, Math.Abs((from - door).Dot(World.AsideWay)) > SideLane),
             Doorway.Leaving => (Outward(door, from, done, keepLeft), door - IntoCabin, ActorAction.Walk, false),
             Doorway.Knocking => (start.Lerp(door + KnockSpot, up), inside, time >= World.KnockLead ? ActorAction.Knock : up > 0 ? ActorAction.Walk : ActorAction.Idle, false),
-            _ => (start.Lerp(from + World.OutOfDoor * World.DragDistance, World.Dragged(done)), inside, ActorAction.Tugged, true),
+            _ => (start.Lerp(from + World.OutOfDoor * World.DragDistance, World.Dragged(time / World.PullSeconds)), inside, ActorAction.Tugged, true),
         };
     }
 
@@ -884,22 +884,39 @@ public partial class WorldView : Node3D {
     /// Poses a player knocked or yanked off their feet backward as <see cref="ActorAnimation.FallingBack"/> has them, onto
     /// their back, <see cref="KnockSlide"/> on from where they stood, where <see cref="Throat"/> finds their throat.
     /// </summary>
-    private static void FallBack(ActorRig rig, ActorState state, float downedFor, bool torch) {
+    private static void FallBack(ActorRig rig, ActorState state, float downedFor, bool torch, WolfModel? wolf = null) {
         var (pose, tip, hips) = ActorAnimation.FallingBack(state.Pose, downedFor / ActorAnimation.FallBackSeconds, KnockSlide - ActorAnimation.FallHips);
-        rig.Show(pose, null, false, false, torch);
         // The rig turns about its feet, so they go where the tipped hips need them.
         float t = Mathf.DegToRad(tip);
         var forward = new Vector3(MathF.Sin(state.Yaw), 0, MathF.Cos(state.Yaw));
         rig.Root.Position = To3(state.Position) + forward * (hips.X + pose.HipHeight * MathF.Sin(t)) + Vector3.Up * (hips.Y - pose.HipHeight * MathF.Cos(t));
         rig.Root.Rotation = new Vector3(-t, state.Yaw, 0);
+        // The hands push the wolf's head off by the back of the jaw, while it is in their reach.
+        if (wolf != null) {
+            var neck = wolf.Root.Transform * wolf.JawBack;
+            var across = wolf.Root.Transform.Basis.X.Normalized() * JawHold;
+            var trunk = Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway)));
+            for (int arm = 0; arm < 2; arm++) {
+                bool left = arm == 0;
+                var shoulder = rig.Root.Transform * (Vector3.Up * pose.HipHeight + trunk * new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0));
+                // Each hand takes the side of the jaw nearer its own shoulder.
+                var hold = shoulder.DistanceTo(neck + across) < shoulder.DistanceTo(neck - across) ? neck + across : neck - across;
+                float grip = Mathf.SmoothStep(ArmReach + .08f, ArmReach - .04f, shoulder.DistanceTo(hold));
+                if (grip > 0) pose = Reaching(pose, hold, rig.Root.Transform, left, grip);
+            }
+        }
+        rig.Show(pose, null, false, false, torch);
     }
+    /// <summary>How far to either side of the middle of a wolf's jaw a player's hands push at it, and how far a hand reaches from its shoulder.</summary>
+    private const float JawHold = .07f, ArmReach = ActorRig.UpperArm + ActorRig.Forearm;
 
-    /// <summary>A pose with the right fist on <paramref name="aim"/> in the world, for a rig placed at <paramref name="root"/>.</summary>
-    private static Pose Reaching(Pose pose, Vector3 aim, Transform3D root) {
+    /// <summary>A pose with a fist, the right one unless <paramref name="left"/>, <paramref name="weight"/> of the way to <paramref name="aim"/> in the world, for a rig placed at <paramref name="root"/>.</summary>
+    private static Pose Reaching(Pose pose, Vector3 aim, Transform3D root, bool left = false, float weight = 1) {
         var hips = root.AffineInverse() * aim - Vector3.Up * pose.HipHeight;
         var trunk = Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway))).Inverse() * hips;
-        var (raise, outward, elbow) = ActorAnimation.ArmTo(trunk, left: false, ActorRig.Palm);
-        return pose with { RaiseR = raise, OutR = outward, ElbowR = elbow };
+        var (raise, outward, elbow) = ActorAnimation.ArmTo(trunk, left, ActorRig.Palm);
+        return left ? pose with { RaiseL = Mathf.Lerp(pose.RaiseL, raise, weight), OutL = Mathf.Lerp(pose.OutL, outward, weight), ElbowL = Mathf.Lerp(pose.ElbowL, elbow, weight) }
+            : pose with { RaiseR = Mathf.Lerp(pose.RaiseR, raise, weight), OutR = Mathf.Lerp(pose.OutR, outward, weight), ElbowR = Mathf.Lerp(pose.ElbowR, elbow, weight) };
     }
 
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, Vector2? door = null, float twist = 0, float grip = 0, float tuck = 0) {
@@ -1636,12 +1653,13 @@ public partial class WorldView : Node3D {
                 float start = progress < 1 ? (gap - World.PinDistance * progress) / (1 - progress) : gap;
                 float contact = start <= WolfModel.ContactReach ? 0 : (start - WolfModel.ContactReach) / (start - World.PinDistance);
                 model.Pinned = gap <= WolfModel.ContactReach ? model.Pinned + dt : 0;
-                if (model.Pinned > 0) model.Feed(Elapsed, dt, true, model.Pinned / ActorAnimation.FallBackSeconds);
-                else { model.Leap(progress, contact, dt); flight = contact > 0 ? progress / contact : 1; }
+                var chest = PawsOnChest(model, RigOf(wolf.Target));
+                if (model.Pinned > 0) model.Feed(Elapsed, dt, true, model.Pinned / ActorAnimation.FallBackSeconds, chest: chest);
+                else { model.Leap(progress, contact, dt, chest); flight = contact > 0 ? progress / contact : 1; }
                 if (model.Pinned == 0) model.Toward = (wolf.Pos - hunted).Normalized();
             } else if (wolf.Feeding) {
                 if (wolf.Pinning) model.Pinned += dt;
-                model.Feed(Elapsed + wolf.GetHashCode() % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds);
+                model.Feed(Elapsed + wolf.GetHashCode() % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? PawsOnChest(model, RigOf(wolf.Target)) : null);
             } else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (running) model.Move(backing ? -moved.Length() : moved.Length(), dt, wolf.Chase > 0 && !backing, wary);
             else model.Stand(Elapsed + wolf.GetHashCode() % 7, dt, wary);
@@ -1706,6 +1724,31 @@ public partial class WorldView : Node3D {
     /// takes to ease onto its spot.
     /// </summary>
     private const float BodySide = .17f, BodyTop = .2f, LegSide = .15f, LegTop = .1f, LegsEnd = .45f, FeedEasing = .4f;
+    /// <summary>The wolf a downed player pushes at: the one knocking them down or pinning them, as drawn, or null.</summary>
+    private WolfModel? HoldingOff(int player) {
+        foreach (var w in World.Wolves)
+            if (w.Target == player && (w.Leap > 0 || w.Pinning) && wolves.TryGetValue(w, out var model)) return model;
+        return null;
+    }
+
+    /// <summary>The rig of a player as drawn, or null.</summary>
+    private ActorRig? RigOf(int id) => id == World.Me.Id ? playerRig : others.TryGetValue(id, out var other) ? other.Rig : null;
+
+    /// <summary>
+    /// Where a wolf's left and right forepaws stand on a player's chest, in the wolf's model as last placed: on the front of the
+    /// chest either side of the breastbone, a paw's thickness off it.
+    /// </summary>
+    private static (Vector3 Left, Vector3 Right)? PawsOnChest(WolfModel model, ActorRig? rig) {
+        if (rig == null) return null;
+        var chest = rig.Torso.GlobalTransform;
+        var toModel = model.Root.GlobalTransform.AffineInverse();
+        Vector3 a = toModel * (chest * ChestSpot), b = toModel * (chest * (ChestSpot with { X = -ChestSpot.X }));
+        // The wolf's left forepaw takes the side of the chest to its left.
+        return a.X >= b.X ? (a, b) : (b, a);
+    }
+    /// <summary>Where on the trunk, from the hips, a forepaw on the chest stands: toward the shoulder, outside the player's forearms pushing at the jaw, out from the shirt by a paw.</summary>
+    private static readonly Vector3 ChestSpot = new(.13f, .3f, .18f);
+
     /// <summary>The drawn player a wolf hunts once they lie fallen, or null.</summary>
     private (ActorState State, ActorRig Rig)? Fallen(Wolf wolf) {
         foreach (var p in World.Players) {

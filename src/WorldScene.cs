@@ -351,6 +351,8 @@ public partial class WorldView {
             review = ReviewTrack();
             reviewWolf = new WolfModel(); review.AddChild(reviewWolf.Root);
             if (clip is "wolf leap" or "wolf hit" or "wolf feed") { var rig = new ActorRig(ActorSkin.Player); review.AddChild(rig.Root); reviewRigs.Add(rig); }
+            // The player starts facing the wolf, rather than turning to it on the spot, or on the ground in the feeding clip.
+            reviewPerson.Yaw = ActorAnimation.Yaw(track, 0);
         }
         var wolf = reviewWolf!;
         // Moving wolves head along the track; the rest face back toward the player at the middle.
@@ -383,8 +385,9 @@ public partial class WorldView {
                     wolf.Toward = track;
                     if (c < .6f) { wolf.Pinned = 0; wolf.Stand(Elapsed, dt, true); } else {
                         wolf.Pinned = gap <= WolfModel.ContactReach ? wolf.Pinned + dt : 0;
-                        if (wolf.Pinned > 0) wolf.Feed(Elapsed, dt, true, wolf.Pinned / ActorAnimation.FallBackSeconds);
-                        else { wolf.Leap(progress, contact, dt); flight = progress / contact; }
+                        var chest = PawsOnChest(wolf, reviewRigs[0]);
+                        if (wolf.Pinned > 0) wolf.Feed(Elapsed, dt, true, wolf.Pinned / ActorAnimation.FallBackSeconds, chest: chest);
+                        else { wolf.Leap(progress, contact, dt, chest); flight = progress / contact; }
                     }
                     place = c < .6f ? To3(track * start) : AtTheThroat(wolf, Vector2.Zero, To3(track * gap), flight);
                     if (wolf.Pinned > 0) { person = wolf.Pinned < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled; downed = wolf.Pinned; }
@@ -417,7 +420,7 @@ public partial class WorldView {
         if (reviewRigs.Count == 0) return;
         reviewPerson.Update(Vector2.Zero, person, track, dt);
         Pose(reviewRigs[0], reviewPerson, null);
-        if (downed > 0) FallBack(reviewRigs[0], reviewPerson, downed, false);
+        if (downed > 0) FallBack(reviewRigs[0], reviewPerson, downed, false, clip == "wolf leap" ? wolf : null);
     }
 
     private void UpdateReview(float dt) {

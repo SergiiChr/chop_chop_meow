@@ -38,6 +38,8 @@ public sealed partial class World {
     /// <summary>How far, in metres, a wolf drags a player back out from a cabin's door, in how many tugs.</summary>
     public const float DragDistance = 1;
     public const int Tugs = 3;
+    /// <summary>The share of each tug spent pulling; the wolf holds for the rest of it.</summary>
+    public const float Heave = .4f;
     /// <summary>The way out of a cabin's door, which is in its front wall.</summary>
     public static readonly Vector2 OutOfDoor = Vector2.Down;
     /// <summary>How far behind a dragged player a tugging wolf stands, with its jaws at their waist.</summary>
@@ -64,7 +66,8 @@ public sealed partial class World {
         Doorway.Entering => p.DoorRush ? RushSeconds : EnterSeconds,
         Doorway.Leaving => LeaveSeconds,
         Doorway.Knocking => KnockLead + KnockSeconds,
-        Doorway.Pulled or Doorway.PulledOff => PullSeconds,
+        // A wounded player is taken down as the last tug lands, with no hold after it.
+        Doorway.Pulled or Doorway.PulledOff => p.Health <= 50 ? PullSeconds * (Tugs - 1 + Heave) / Tugs : PullSeconds,
         _ => 0
     };
 
@@ -194,7 +197,7 @@ public sealed partial class World {
     /// </summary>
     public static float Dragged(float done) {
         float tugs = Math.Clamp(done, 0, 1) * Tugs, tug = MathF.Min(MathF.Floor(tugs), Tugs - 1);
-        return (tug + Mathf.SmoothStep(0, 1, Math.Clamp((tugs - tug) / .4f, 0, 1))) / Tugs;
+        return (tug + Mathf.SmoothStep(0, 1, Math.Clamp((tugs - tug) / Heave, 0, 1))) / Tugs;
     }
 
     /// <summary>Where the acting player is: their place, or as far back from it as a wolf dragging them out of a doorway has hauled them.</summary>

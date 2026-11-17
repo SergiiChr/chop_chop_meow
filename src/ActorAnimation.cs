@@ -228,8 +228,8 @@ public static class ActorAnimation {
         (0, new Pose(Lean: 12, Head: -10, RaiseL: 80, OutL: 14, ElbowL: 30, RaiseR: 85, OutR: 12, ElbowR: 26, SwingL: 6, KneeL: 16, SwingR: 6, KneeR: 16, Splay: 3)),
         (.18f, new Pose(Lean: -8, Head: 26, RaiseL: 140, OutL: 20, ElbowL: 30, RaiseR: 128, OutR: 24, ElbowR: 40, SwingL: 38, KneeL: 8, FootL: -20, SwingR: 4, KneeR: 34, Splay: 5)),
         (.45f, new Pose(Lean: -14, Head: 32, RaiseL: 125, OutL: 34, ElbowL: 40, RaiseR: 105, OutR: 38, ElbowR: 48, SwingL: 70, KneeL: 42, FootL: -10, SwingR: 58, KneeR: 70, Splay: 6)),
-        (.7f, new Pose(Lean: 0, Head: 18, RaiseL: 150, OutL: 46, ElbowL: 34, RaiseR: 145, OutR: 50, ElbowR: 30, SwingL: 58, KneeL: 46, SwingR: 46, KneeR: 58, Splay: 6)),
-        (.999f, new Pose(Head: -26, RaiseL: 128, OutL: -8, ElbowL: 55, RaiseR: 128, OutR: -8, ElbowR: 55, SwingL: 24, KneeL: 40, SwingR: 24, KneeR: 40)),
+        (.7f, new Pose(Lean: 0, Head: 18, RaiseL: 150, OutL: 46, ElbowL: 34, RaiseR: 145, OutR: 50, ElbowR: 30, SwingL: 26, KneeL: 40, SwingR: 20, KneeR: 48, Splay: 6)),
+        (.999f, new Pose(Head: -26, RaiseL: 128, OutL: -8, ElbowL: 55, RaiseR: 128, OutR: -8, ElbowR: 55, SwingL: 10, KneeL: 22, SwingR: 10, KneeR: 22)),
     };
     private static readonly (float At, Pose Pose)[] MineKeys = {
         (0, MineGuard),
@@ -485,7 +485,7 @@ public static class ActorAnimation {
                     // Dragged back by the waist: bent over at the hips with the arms reaching for the doorway and the head up to keep it in sight.
                     // Each tug, half the loop, jerks the hips back and the trunk lower; the front foot steps back in the air while the other stays
                     // planted, the hips passing back over it until it is in front.
-                    float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / .4f)), heave = half < .4f ? MathF.Sin(MathF.PI * half / .4f) : 0;
+                    float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / World.Heave)), heave = half < World.Heave ? MathF.Sin(MathF.PI * half / World.Heave) : 0;
                     float stepping = Mathf.Lerp(18, -8, jerk), planted = Mathf.Lerp(-8, 18, jerk), lift = 45 * heave, struggle = MathF.Sin(half * Mathf.Tau);
                     bool left = p < .5f;
                     // Between tugs the player strains toward the door, the arms clawing at it.

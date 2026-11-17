@@ -223,9 +223,9 @@ public sealed class WolfModel {
 
     /// <summary>
     /// The leap at a standing player's throat, from the push off at <paramref name="progress"/> 0 to the moment the jaws reach it at <paramref name="contact"/>.
-    /// The hind legs drive while the forelegs fold up, then reach out for the chest with the jaws wide.
+    /// The hind legs drive while the forelegs fold up, then reach out for the chest, landing at <paramref name="chest"/> in the model when given, with the jaws wide.
     /// </summary>
-    public void Leap(float progress, float contact, float dt) {
+    public void Leap(float progress, float contact, float dt, (Vector3 Left, Vector3 Right)? chest = null) {
         float t = Math.Clamp(progress / Math.Max(contact, .05f), 0, 1);
         float push = Mathf.SmoothStep(0, .3f, t), air = Mathf.SmoothStep(.15f, 1, t), reach = Mathf.SmoothStep(.4f, 1, t);
         // The body arcs up and comes down onto the throat, which sits lower than the top of the leap.
@@ -238,6 +238,8 @@ public sealed class WolfModel {
             var at = hind ? new Vector3(x, WolfShape.Sole + Mathf.Lerp(0, .3f, air), Mathf.Lerp(-.3f, -.78f, air))
                 : new Vector3(x, Mathf.Lerp(WolfShape.Sole, .45f, push) + .55f * reach, Mathf.Lerp(.36f, .3f, push) + .45f * reach);
             float lower = hind ? Mathf.Lerp(-10, -70, air) : Mathf.Lerp(10, -90, push * (1 - reach)) + 60 * reach;
+            // Reaching out, the forepaws come down onto the player's chest as the jaws reach the throat.
+            if (!hind && chest is var (left, right)) at = at.Lerp(leg == 0 ? left : right, reach);
             body = body.WithLeg(leg, Reach(body, leg, at, lower, hind ? lower - 30 * air : lower - 20));
         }
         Show(WolfMotion.Leap, body, dt);
@@ -245,10 +247,10 @@ public sealed class WolfModel {
 
     /// <summary>
     /// Feeding at a downed player: braced over the body, tearing with sharp pulls back.
-    /// A pinning wolf stands astride the player with its forepaws on the chest and its hind paws wide of their legs, or <paramref name="beside"/> them with its forepaws by their shoulder;
+    /// A pinning wolf stands astride the player with its forepaws on the chest, at <paramref name="chest"/> in the model when given, and its hind paws wide of their legs, or <paramref name="beside"/> them with its forepaws by their shoulder;
     /// <paramref name="down"/> runs 0 to 1 as the player goes down under it.
     /// </summary>
-    public void Feed(float time, float dt, bool pinning, float down = 1, bool beside = false) {
+    public void Feed(float time, float dt, bool pinning, float down = 1, bool beside = false, (Vector3 Left, Vector3 Right)? chest = null) {
         float pull = MathF.Pow(Math.Max(0, MathF.Sin(time * 2.6f)), 3), shake = MathF.Sin(time * 13) * (1 - pull * .6f), bite = Math.Max(0, MathF.Sin(time * 4.5f));
         WolfPose body;
         if (pinning) {
@@ -258,6 +260,11 @@ public sealed class WolfModel {
                 Neck: 52 - 60 * up - 12 * pull, Head: 14 + 4 * shake, HeadTurn: 12 * shake, HeadTilt: 6 * shake, Jaw: 10 + 6 * bite, Ears: 26, Tail: -70 + 6 * MathF.Sin(time * 1.7f), Wag: 8 * MathF.Sin(time * 2.1f));
             // Beside the player it keeps its forepaws on the ground by their shoulder.
             body = beside ? Planted(body, 1.4f, 0, .05f) : Planted(body, 2.4f, 0, .05f, ChestTop + .5f * up, 3.2f);
+            // Astride, its forepaws stay on the player's chest as they go down under it and once they lie.
+            if (!beside && chest is var (left, right)) {
+                float lower = Mathf.Lerp(10, 50, up);
+                body = body.WithLeg(0, Reach(body, 0, left, lower, lower - 20)).WithLeg(1, Reach(body, 1, right, lower, lower - 20));
+            }
         } else body = Tearing(time, pull, shake, bite);
         Show(pinning ? WolfMotion.Pin : WolfMotion.Feed, body, dt);
     }
@@ -280,7 +287,7 @@ public sealed class WolfModel {
     /// </summary>
     public void Tug(float progress, float time, float dt) {
         float tugs = Math.Clamp(progress, 0, 1) * World.Tugs, tug = MathF.Min(MathF.Floor(tugs), World.Tugs - 1), u = tugs - tug;
-        float heave = u < .4f ? MathF.Sin(MathF.PI * u / .4f) : 0, shake = u < .4f ? 0 : MathF.Sin(time * 15) * Mathf.SmoothStep(.4f, .55f, u);
+        float heave = u < World.Heave ? MathF.Sin(MathF.PI * u / World.Heave) : 0, shake = u < World.Heave ? 0 : MathF.Sin(time * 15) * Mathf.SmoothStep(World.Heave, World.Heave + .15f, u);
         // Each tug wrenches the other way.
         float side = tug % 2 == 0 ? 1 : -1;
         var body = Tugging(heave, side, shake);
@@ -406,6 +413,11 @@ public sealed class WolfModel {
         VolumesOf(Tearing(0, 0, 0, 0), volumes);
         return volumes;
     }
+
+    /// <summary>Where the back of the jaw is, in the model, under the pose shown, where a player pushing the wolf's head off takes hold.</summary>
+    public Vector3 JawBack => (Frame(shown, false) * Posed(WolfShape.Neck, Vector3.Zero, Turn(shown.Neck, shown.NeckTurn))).Origin.Lerp(BiteOf(shown), JawShare);
+    /// <summary>How far from the root of the neck to the jaws the back of the jaw is.</summary>
+    private const float JawShare = .75f;
 
     /// <summary>Where the jaws close, in the model, under the pose shown.</summary>
     public Vector3 Bite => BiteOf(shown);

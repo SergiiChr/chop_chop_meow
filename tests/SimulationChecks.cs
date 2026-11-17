@@ -2866,9 +2866,10 @@ public static class SimulationChecks {
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2, 0) });
         for (float time = 0; time < .7f && world.Door == Doorway.Entering; time += .05f) world.Tick(.05f);
         Require(world.Door == Doorway.Pulled && !world.Mauled, $"a wolf leaping at a wounded player stepping in should first drag them out, not {world.Door}");
-        world.Tick(1.4f);
-        Require(world.Door == Doorway.Pulled && !world.Mauled, "a wounded player should be dragged out for a second and a half before being pinned");
+        world.Tick(1.15f);
+        Require(world.Door == Doorway.Pulled && !world.Mauled, "a wounded player should be dragged out through all three tugs before being pinned");
         Require(!heard.Contains("takedown_scream"), "a player should not scream at a takedown before it");
+        // The third tug, done 1.2 s in, goes straight into the takedown.
         world.Tick(.1f);
         Require(world.Mauled && world.Sheltered == 0 && world.Player.DistanceTo(World.DoorPoint(hut) + new Vector2(0, 1)) < .01f, "a wounded player dragged a metre out should then be pinned");
         Require(world.Door == Doorway.None, $"a player pinned outside a cabin should be out of its doorway, not {world.Door}");
@@ -2900,11 +2901,11 @@ public static class SimulationChecks {
         var other = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-2.5f, 0) });
         world.Tick(.05f);
         Require(world.Door == Doorway.Pulled && world.Health <= 50, $"a bite should leave the player dragged out below half health, not {world.Door} at {world.Health}");
-        for (float time = .05f; time < 1.4f; time += .05f) {
+        for (float time = .05f; time < 1.15f; time += .05f) {
             world.Tick(.05f);
             Require(!world.Mauled && other.Leap == 0, $"no wolf should take down a player another wolf is dragging out, {time:0.00} s in");
         }
-        world.Tick(.15f);
+        world.Tick(.1f);
         Require(world.Mauled && tugger.Pinning && !tugger.Tugging, "the wolf dragging a wounded player out should take them down once they are out");
         float across = Math.Abs((tugger.Pos - world.Player).Dot(World.OutOfDoor.Orthogonal()));
         Require(across > .5f && tugger.Beside != Vector2.Zero, $"the wolf should step aside to pin a player it dragged out from beside them, not stand {across:0.00} m to the side");
