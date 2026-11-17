@@ -16,10 +16,10 @@ public partial class WorldView {
         var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
         var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
         var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
-        BuildTerrain3D(parent, grass);
+        terrainView = new TerrainView(parent, camera, sun, grass, disturbanceTexture, sceneryShadeTexture, objectShadeTexture, World.Player);
         // Sea and its feathered bank follow the coastline at the valley's mouth.
         ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
-        BuildLake(parent);
+        LakeDressing.Build(parent, EnvironmentReview);
         foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
         foreach (var den in World.Dens) BuildDen(parent, den);
         BuildPlacedEnvironment(parent);
@@ -60,37 +60,6 @@ public partial class WorldView {
                 Box(wall, new Vector3(.35f + R() * .3f, .08f + R() * .06f, .12f), new Vector3(x + (R() - .5f) * .5f, .5f + R() * (height - .9f), z + .95f), seam, new Vector3(0, 0, (R() - .5f) * 40));
             for (int i = 0; i < 2; i++)
                 Sphere(wall, .14f + R() * .16f, new Vector3(x + (R() - .5f) * .8f, .06f, 1.1f + R() * .6f), Stone(rock[rng.Next(rock.Length)]), new Vector3(1.2f, .6f, 1), 5);
-        }
-    }
-
-    private void BuildLake(Node3D parent) {
-        var at = To3(Terrain.Lake);
-        // The bank and water follow the same shore line that bounds walking.
-        ShorelineAppearance.BuildLakeBank(parent);
-        LakeAppearance.BuildLakeAppearance(parent, EnvironmentReview);
-        var rng = new Random(77);
-        const int stones = 150;
-        for (int i = 0; i < stones; i++) {
-            float angle = i * Mathf.Tau / stones + (float)rng.NextDouble() * .03f;
-            // Stones collect in irregular patches instead of forming an evenly spaced border.
-            if (MathF.Sin(angle * 7 + 1.2f) + .55f * MathF.Sin(angle * 13) < -.05f) continue;
-            float r = Terrain.Shore(angle) + .12f + (float)rng.NextDouble() * .95f;
-            var stone = Sphere(parent, .1f + (float)rng.NextDouble() * .14f, at + new Vector3(MathF.Cos(angle) * r, .03f, MathF.Sin(angle) * r), Stone(i % 3 == 0 ? "a3a7a3" : "8d918e", .9f), new Vector3(1.2f, .5f, 1), 6);
-            stone.RotationDegrees = new Vector3(0, i * 47, 0);
-        }
-        // Reed clumps with cattails along the banks, lily pads near the shore.
-        for (float angle = .2f; angle < Mathf.Tau; angle += .45f + (float)rng.NextDouble() * .5f) {
-            var clump = at + new Vector3(MathF.Cos(angle) * (Terrain.Shore(angle) - .1f), 0, MathF.Sin(angle) * (Terrain.Shore(angle) - .1f));
-            for (int i = 0; i < 7; i++) {
-                var offset = new Vector3((float)rng.NextDouble() - .5f, 0, (float)rng.NextDouble() - .5f) * .6f;
-                float height = .7f + (float)rng.NextDouble() * .6f;
-                Cylinder(parent, .02f, .01f, height, clump + offset + new Vector3(0, height / 2, 0), Mat("6b8a3e"), new Vector3(((float)rng.NextDouble() - .5f) * 14, 0, ((float)rng.NextDouble() - .5f) * 14), 4);
-                if (i % 3 == 0) Cylinder(parent, .035f, .035f, .16f, clump + offset + new Vector3(0, height - .05f, 0), Mat("6e4a2e"), null, 6);
-            }
-        }
-        for (int i = 0; i < 24; i++) {
-            float angle = (float)rng.NextDouble() * Mathf.Tau, r = Terrain.Shore(angle) - 1 - (float)rng.NextDouble() * 3;
-            Cylinder(parent, .28f, .28f, .01f, at + new Vector3(MathF.Cos(angle) * r, .035f, MathF.Sin(angle) * r), Mat("5b8a3e", .7f), null, 9);
         }
     }
 

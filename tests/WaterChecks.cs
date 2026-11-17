@@ -157,10 +157,10 @@ public static class WaterChecks {
         world = new World(data, false);
         var shore = Terrain.WaterPoint(Terrain.Spawn);
         var outward = (shore - Terrain.Lake).Normalized();
-        var pond = world.Add(ThingKind.Water, shore, 9999);
+        var lake = world.Add(ThingKind.Water, shore, 9999);
         var chest = world.Add(ThingKind.Chest, shore + outward * 5); chest.Inventory.Add("empty_bottle", 1);
         var worker = AddWorker(world, chest.Pos);
-        world.Assign(worker, pond);
+        world.Assign(worker, lake);
         for (int i = 0; i < 240; i++) world.Tick(.25f, true);
         Require(chest.Inventory["water"] == 1, "an assigned collector must deliver the refilled bottle");
         Require(chest.Inventory["empty_bottle"] == 0, "an assigned collector must refill the existing bottle");

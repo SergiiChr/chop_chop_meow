@@ -64,7 +64,7 @@ public sealed partial class World {
     /// A water collector takes bottles with room from storage, as many as their hands hold, fills one each gather at the water and stores them.
     /// Gathering never creates packaging.
     /// </summary>
-    private bool WaterWork(Worker worker, Thing pond, float dt) {
+    private bool WaterWork(Worker worker, Thing lake, float dt) {
         string? carried = Water.FindBottle(worker.Bag);
         if (carried != null && carried != Water.Full) {
             worker.Loading = true;

@@ -40,7 +40,7 @@ public partial class WorldView {
     private ColorRect black = null!;
     private Thing campfire = null!;
     private readonly List<ShaderMaterial> waters = new();
-    private static readonly StringName ReviewTime = "review_time", SkyTop = "top", SkyHorizon = "horizon", SkyStars = "stars";
+    private static readonly StringName SkyTop = "top", SkyHorizon = "horizon", SkyStars = "stars";
 
     // A dome around the camera: the game's own sky is one flat colour, which only a view from above can hide.
     private const string SkyShader = """
@@ -172,9 +172,9 @@ public partial class WorldView {
         UpdateFog();
     }
 
-    /// <summary>The sea's and the pond's materials, whose waves the film moves by its own clock.</summary>
+    /// <summary>The sea's and the lake's materials and the lily pads', whose waves the film moves by its own clock.</summary>
     private void FindWaters(Node node) {
-        if (node is MeshInstance3D { MaterialOverride: ShaderMaterial material } && material.Shader?.ResourcePath.EndsWith("lake.gdshader") == true) waters.Add(material);
+        if (node is MeshInstance3D { MaterialOverride: ShaderMaterial material } && LakeAppearance.FollowsWaves(material) && !waters.Contains(material)) waters.Add(material);
         for (int i = 0; i < node.GetChildCount(); i++) FindWaters(node.GetChild(i));
     }
 
@@ -221,7 +221,7 @@ public partial class WorldView {
         sun.DirectionalShadowMaxDistance = 70;
         PaintSky(skyTop, skyHorizon, stars);
         environment.FogEnabled = true; environment.FogDensity = haze; environment.FogLightColor = new Color(skyHorizon);
-        foreach (var water in waters) water.SetShaderParameter(ReviewTime, filmTime);
+        foreach (var water in waters) LakeAppearance.SetWaveTime(water, filmTime);
     }
 
     /// <summary>Walks or runs a rig to <paramref name="at"/> the way the game does, with its footfalls on the cue sheet.</summary>
@@ -550,14 +550,13 @@ public partial class WorldView {
     // ---------- The valley ----------
 
     /// <summary>How far along the valley the coast lies where the hero's route down the valley reaches it.</summary>
-    private static float TrailCoast => Terrain.Coast(Terrain.Across(Terrain.Spawn));
 
     /// <summary>The middle of the hero's route from the clearing down the valley to the shore, at a distance along the valley.</summary>
     private static Vector2 Trail(float along) =>
         Terrain.Point(along, Terrain.Across(Terrain.Spawn) + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f);
 
     /// <summary>Where the route meets the water.</summary>
-    private static float TrailShore => TrailCoast - 1.2f;
+    private static float TrailShore => Terrain.Waterline(Terrain.Across(Terrain.Spawn));
 
     /// <summary>Walking the trail through the forest, the pack on his back.</summary>
     private void ForestShot(float t, float dt) {

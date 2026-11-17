@@ -19,7 +19,7 @@ The full license from the archive is in [LICENSE.txt](LICENSE.txt).
 The installer extracts only the Linux extension, its manifest, icon and license.
 No separate repository checkout is needed.
 
-`Terrain3DView` builds nine heightmap regions in a 3×3 grid around the map, each with 256×256 `RF` samples.
+`TerrainView` builds nine heightmap regions in a 3×3 grid around the map, each with 256×256 `RF` samples.
 Samples come from `MountainShape.Height`, clamped to zero and lowered by 0.03 to sit below the separately rendered mine shells.
 The playable valley floor stays level at height zero.
 Terrain3D supplies the clipmaps, height interpolation, generated normals and terrain UVs.
@@ -42,10 +42,12 @@ washed out the meadow. The height-based ambient occlusion comes from Terrain3D's
 `tools/ground_textures.py` packs the sets from the pinned ambientCG archives; the `.import` files keep the alpha
 channels (VRAM compressed, high quality, no normal-map compression, no alpha border fix).
 
-The shader insertion in `Terrain3DView` keeps the pinned generated Terrain3D shader core.
+The shader insertion in `TerrainView` keeps the pinned generated Terrain3D shader core.
 It adds the meadow and stone palette with lusher and drier patches, the photoscan grain over it, the moss patches, the
 woods' floor, the footpath photoscan blended into worn ground and footpaths by its height, baked shade, and fragment
 clipping for the five mine openings so their separately modeled rock shells stay open.
+Ground under the drawn water is a bed, drawn with the shore photoscan of the lake or the sea from `BedMap`,
+with the meadow's work skipped where the water covers it whole ([lake README](../lake/README.md)).
 
 Three Poly Haven photoscans are drawn in their own colours, each at about real size and pinned by
 `tools/polyhaven_textures.py`:
@@ -54,7 +56,7 @@ Three Poly Haven photoscans are drawn in their own colours, each at about real s
   at the photoscan's moss.
 - The woods take `forrest_ground_01` (`forest_*.jpg`, 2K, one tile 2 world units) out to 10 units from the foot of
   the ranges, where trees grow at better than even odds (`World` scatters them by `Terrain.FromMountains`).
-  `Terrain3DView` bakes that distance into a map of one texel a world unit; the band's edge wanders in broad patches
+  `TerrainView` bakes that distance into a map of one texel a world unit; the band's edge wanders in broad patches
   and reaches further out at the photoscan's litter, and it stops where the slopes turn to stone.
 - Worn ground takes `brown_mud_leaves_01` (`path_*.jpg`, 2K, one tile 2 world units), over all of these.
 

@@ -15,6 +15,8 @@ public partial class Game : Node, IGameFlow {
     /// <summary>Where <c>--render-intro</c> saves the intro film's frames; the film is drawn in place of a game.</summary>
     private static readonly string? introFolder = Launch.Value("--render-intro");
     private World world = null!;
+    /// <summary>The performance run this window plays behind --performance-run, while it runs.</summary>
+    private PerformanceRun? performanceRun;
     private WorldView view = null!;
     private Sounds sounds = null!;
     private Control ui = null!;
@@ -211,6 +213,21 @@ public partial class Game : Node, IGameFlow {
         if (Launch.Has("--performance-run")) StartPerformanceRun();
     }
 
+    /// <summary>Starts the performance run behind --performance-run, once this window has joined the server playing the fixture.</summary>
+    private void StartPerformanceRun() {
+        startMenu.Close(); panel.Close();
+        ApplyResolution(new Vector2I(2560, 1440));
+        performanceRun = new PerformanceRun(world, GetViewport(), Launch.Value("--performance-run") ?? "build/performance");
+        EndPerformanceRun(performanceRun.Start());
+    }
+
+    /// <summary>Once the performance run is over, quits: with its final screenshot when it finished, with a failure when it did not.</summary>
+    private void EndPerformanceRun(PerformanceRun.State state) {
+        if (state == PerformanceRun.State.Running || performanceRun is not { } run) return;
+        performanceRun = null;
+        if (state == PerformanceRun.State.Finished) Capture(run.Screenshot); else Quit(1);
+    }
+
     public void ApplyResolution(Vector2I size) { Settings.ApplyResolution(GetWindow(), size, fullscreen); FitInterface(); }
     public void ApplyFullscreen(bool on) { fullscreen = on; ApplyResolution(GetWindow().ContentScaleSize); }
     public void ShowFrameRate(bool on) => corner.FrameRate.Visible = on;
@@ -380,7 +397,7 @@ public partial class Game : Node, IGameFlow {
         if (messages.OffsetLeft != messagesLeft || messages.OffsetRight != messagesRight) { messages.OffsetLeft = messagesLeft; messages.OffsetRight = messagesRight; }
         if (smokeTest && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
         if (screenshotPath != null && runTime > shotDelay && !capturing) { capturing = true; Capture(screenshotPath); }
-        if (performanceRunning) SamplePerformance();
+        if (performanceRun != null) EndPerformanceRun(performanceRun.Sample());
     }
     private async void Capture(string path) {
         await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);

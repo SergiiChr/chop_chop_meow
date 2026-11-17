@@ -75,7 +75,7 @@ Simulation and data:
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
 | `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the gather, craft, bellows and fire jobs |
 | `src/Hauling.cs` | The four haul rules, what each kind of place offers a hauler, and the carry in hand |
-| `src/Terrain.cs` | The fixed valley map |
+| `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
 | `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
@@ -155,10 +155,14 @@ Rendering and sound:
 | --- | --- |
 | `src/WorldView.cs` | The 3D scene, orthographic camera, picking, lighting and world animation |
 | `src/WorldScene.cs` | Ground dressing, particles and the animation review |
-| `src/Terrain3DView.cs` | Mountain and valley terrain through the Terrain3D plugin |
+| `src/terrain/display/TerrainView.cs` | Mountain and valley terrain through the Terrain3D plugin |
+| `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
-| `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake and sea surfaces and their sand and stony shores |
+| `src/water/display/LakeAppearance.cs` | The lake and sea surfaces, their tiles, and the water and lily pad materials |
+| `src/water/display/ShorelineAppearance.cs` | The sand and stony bank strips along the lake and the coast, and the coast's water |
+| `src/water/display/LakeDressing.cs` | The lake's bank, water, stones, reeds and lily pads |
+| `src/water/model/ShoreLook.cs`, `src/water/model/WaterBody.cs` | The shore photoscans' looks, and the sea's and the lake's waves and colours |
 | `src/PaintFilter.cs` | The paint filter over the drawn world ([assets/environment/paint_filter](../assets/environment/paint_filter/README.md)) |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
@@ -188,7 +192,10 @@ Checks and review tools:
 | `src/RecipeSteps.cs` | Steps that open a fresh station for a recipe, give and load its items and fuel, and expect a batch to start or be refused |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
-| `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
+| `src/performance/PerformanceRun.cs` | The rendered performance run's window half: sprinting the route by day and night, sampling frames, writing results |
+| `src/performance/PerformanceStage.cs`, `src/performance/PerformanceFixture.cs` | The run's server half, and the staffed camp it plays |
+| `src/performance/PerformanceRoute.cs` | The run's sprint from the beach past the camp and the lake to the valley's top corner |
+| `src/performance/ResidentMemory.cs`, `src/performance/model/PerformanceSample.cs` | Reading resident memory without allocating, and one sampled frame |
 | `src/cabins/DoorwayReview.cs` | The `--doorway` scenes: two players and wolves at a cabin's door, moved by a script and run by the game's rules |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
 | `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
@@ -406,7 +413,7 @@ There are no iron tools; iron bars only go into buildings and steel.
 
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
 Filling it or drinking straight from the source takes one `GatherSeconds`.
-Every point on the pond shore is a collection target.
+Every point on the lake shore is a collection target.
 A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many liters.
 `GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
 a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
@@ -1039,7 +1046,7 @@ The options screen sets the music volume, stored in the settings file.
 
 ## World map
 
-The world is a fixed 216-tile valley defined in `src/Terrain.cs`:
+The world is a fixed 216-tile valley defined in `src/terrain/Terrain.cs`:
 
 - sea past the coast;
 - mountain ranges beyond a valley half-width that narrows inland;
