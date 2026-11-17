@@ -14,7 +14,10 @@ public partial class PaintFilter : CanvasLayer {
     public PaintFilter() {
         // Below the world's overlay on layer 0, but still drawn after the 3D view, so it filters only the world.
         Layer = -1;
-        var cover = new ColorRect { Name = "paint_filter", Material = new ShaderMaterial { Shader = GD.Load<Shader>(ShaderPath) }, MouseFilter = Control.MouseFilterEnum.Ignore };
+        var material = new ShaderMaterial { Shader = GD.Load<Shader>(ShaderPath) };
+        // Builds the shader while loading, so switching the filter on mid-game doesn't stall that frame on it.
+        _ = material.GetRid();
+        var cover = new ColorRect { Material = material, MouseFilter = Control.MouseFilterEnum.Ignore };
         cover.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         AddChild(cover);
     }

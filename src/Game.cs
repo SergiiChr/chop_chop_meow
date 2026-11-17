@@ -80,7 +80,7 @@ public partial class Game : Node, IGameFlow {
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
             view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = Launch.Has("--environment-review") }; AddChild(view);
-            paintFilter = new PaintFilter { Visible = Settings.PaintFilter && !Launch.Has("--no-paint-filter") }; AddChild(paintFilter);
+            paintFilter = new PaintFilter { Visible = Settings.PaintFilter }; AddChild(paintFilter);
             kit = new UiKit(world, sounds, Notify, RefreshLive);
             net = new Net { Name = "Net", World = world, Key = Settings.MachineKey }; AddChild(net);
             saves = new Saves(kit, net, this);

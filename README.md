@@ -63,7 +63,6 @@ Play accepts Godot arguments after `--`:
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
-| `--no-paint-filter` | Turn the paint filter off for this run, whatever the stored choice |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |

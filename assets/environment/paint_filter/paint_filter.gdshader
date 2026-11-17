@@ -1,5 +1,5 @@
 // Paint filter, a generalized Kuwahara filter.
-// Each pixel takes the average colour of whichever of eight wedges around it varies least, so flat areas turn into
+// Each pixel takes the average colour of whichever of eight wedges around it varies least, so even areas turn into
 // patches of one paint while edges stay sharp.
 // Ported from Acerola's Unity filter (MIT, Copyright (c) 2022 Garrett Gunnell) via Firerabbit's Godot 4 port (MIT).
 shader_type canvas_item;
