@@ -100,7 +100,7 @@ Allocation budgets:
 - The server's network updates, thirty a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
-`./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a walking, day/night and staffed-settlement run.
+`./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a sprint from the sea past a staffed camp and the pond to the valley's top corner, by day and at night with a lit torch, split by leg.
 That run plays on a real server process and measures the window, merging its updates included.
 
 Keep models under the triangle ceilings in [assets/README.md](assets/README.md#changing-a-model).

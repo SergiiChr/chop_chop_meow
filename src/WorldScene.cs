@@ -80,7 +80,8 @@ public partial class WorldView {
         }
         // Reed clumps with cattails along the banks, lily pads near the shore.
         for (float angle = .2f; angle < Mathf.Tau; angle += .45f + (float)rng.NextDouble() * .5f) {
-            var clump = at + new Vector3(MathF.Cos(angle) * (Terrain.Shore(angle) - .1f), 0, MathF.Sin(angle) * (Terrain.Shore(angle) - .1f));
+            var reach = new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (Terrain.Shore(angle) - .1f);
+            var clump = at + new Vector3(reach.X, -Terrain.BedDepth(Terrain.Lake + reach), reach.Y);
             for (int i = 0; i < 7; i++) {
                 var offset = new Vector3((float)rng.NextDouble() - .5f, 0, (float)rng.NextDouble() - .5f) * .6f;
                 float height = .7f + (float)rng.NextDouble() * .6f;
@@ -88,9 +89,12 @@ public partial class WorldView {
                 if (i % 3 == 0) Cylinder(parent, .035f, .035f, .16f, clump + offset + new Vector3(0, height - .05f, 0), Mat("6e4a2e"), null, 6);
             }
         }
+        var lilyPad = LakeAppearance.LilyPadMaterial(new Color("5b8a3e"), EnvironmentReview);
+        // Built while loading, so the first look at the pond does not stall on it.
+        _ = lilyPad.GetRid();
         for (int i = 0; i < 24; i++) {
             float angle = (float)rng.NextDouble() * Mathf.Tau, r = Terrain.Shore(angle) - 1 - (float)rng.NextDouble() * 3;
-            Cylinder(parent, .28f, .28f, .01f, at + new Vector3(MathF.Cos(angle) * r, .035f, MathF.Sin(angle) * r), Mat("5b8a3e", .7f), null, 9);
+            Cylinder(parent, .28f, .28f, .01f, at + new Vector3(MathF.Cos(angle) * r, LakeAppearance.Level + .01f, MathF.Sin(angle) * r), lilyPad, null, 9);
         }
     }
 

@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>A staffed production camp used only by the local rendered performance harness.</summary>
 internal static class PerformanceFixture {
-    /// <summary>Creates a valley with eight assigned workers, four working stations, a fire, fuel, supplies and wage reserves.</summary>
+    /// <summary>Creates a valley with eight assigned workers, four working stations, a fire, fuel, supplies, wage reserves and a torch in the player's backpack.</summary>
     internal static World Create(GameData data) {
         var world = new World(data);
         world.S.Time = data.DaySeconds * .3f;
@@ -34,6 +34,8 @@ internal static class PerformanceFixture {
         var wagePost = Place(ThingKind.Signpost, new Vector2(-7, -4));
         wagePost.Wages!.Add(Inventory.Coins, 1000);
         world.S.Backpack.Add(Inventory.Coins, 1000);
+        // Lit for the night sprint.
+        world.S.Backpack.Add("torch", 1);
 
         var tools = Place(ThingKind.Toolstation, new Vector2(-7, 0));
         tools.Inventory.Add("steel_chisel", 1);

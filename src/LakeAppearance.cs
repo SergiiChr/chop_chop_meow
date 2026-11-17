@@ -1,78 +1,144 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Flat-shore lake geometry and a small, lake-specific animated material.</summary>
+/// <summary>The water surfaces of the pond and the sea, with the waves, refraction, caustics and foam of one shader.</summary>
 public static class LakeAppearance {
     private const string ShaderPath = "res://assets/environment/lake/lake.gdshader";
-    private const int Segments = 192;
-    private const int Rings = 8;
+    private const string LilyPadShaderPath = "res://assets/environment/lake/lily_pad.gdshader";
+    /// <summary>The three waves on the water: direction across the world in x and y, steepness in z and length in w.</summary>
+    private static readonly Vector4[] Waves = { new(1, 1, .35f, 3), new(1, .6f, .3f, 1.55f), new(1, 1.3f, .25f, .9f) };
+    /// <summary>How fast the waves run, as a share of the speed their length gives them.</summary>
+    private const float WaveSpeed = .5f;
+    /// <summary>Seconds the waves show in still screenshots, for comparable pictures.</summary>
+    private const float ReviewSeconds = 1.25f;
+    private static readonly StringName ReviewTime = "review_time";
+    /// <summary>Height of the water's surface at rest over the valley floor.</summary>
+    internal const float Level = .025f;
+    /// <summary>World units between the surface's vertices: three to the shortest wave.</summary>
+    internal static readonly float Spacing = Waves.Min(wave => wave.W) / 3;
+    /// <summary>Columns and rows of vertices in one tile of a large surface, which Godot leaves undrawn while it is off screen.</summary>
+    private const int TileVertices = 100;
     private static Shader? shader;
 
-    /// <summary>Adds the lake's single water surface. Banks and shoreline props stay with the caller.</summary>
+    /// <summary>Adds the pond's water surface, which ends at the shore that bounds walking.</summary>
     public static void BuildLakeAppearance(Node3D parent, bool still) {
-        shader ??= GD.Load<Shader>(ShaderPath);
-        if (shader == null) throw new InvalidOperationException($"Could not load lake shader at {ShaderPath}");
-
-        var material = CreateMaterial(still);
-        ShorelineAppearance.UseShore(material, ShorelineAppearance.Rocks);
-        material.SetShaderParameter("shore_depth", ShorelineAppearance.Rocks.Depth);
-
-        var surface = new MeshInstance3D {
+        float reach = Terrain.LakeRadius * 1.05f;
+        var mesh = Grid(Steps(0, Mathf.Tau, Spacing / reach), Steps(0, 1, Spacing / reach), (angle, share) => {
+            float shore = Terrain.Shore(angle) * share;
+            return new Vector3(MathF.Cos(angle) * shore, 0, MathF.Sin(angle) * shore);
+        });
+        parent.AddChild(new MeshInstance3D {
             Name = "lake_water_surface",
-            Mesh = BuildSurface(),
-            MaterialOverride = material,
-            Position = new Vector3(Terrain.Lake.X, .025f, Terrain.Lake.Y),
-        };
-        parent.AddChild(surface);
+            Mesh = mesh,
+            MaterialOverride = CreateMaterial(still),
+            Position = new Vector3(Terrain.Lake.X, Level, Terrain.Lake.Y),
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        });
     }
 
     /// <summary>The water material; <paramref name="still"/> holds its waves at one moment.</summary>
     internal static ShaderMaterial CreateMaterial(bool still) {
         shader ??= GD.Load<Shader>(ShaderPath);
-        var material = new ShaderMaterial { Shader = shader };
-        if (still) material.SetShaderParameter("review_time", 1.25f);
+        if (shader == null) throw new InvalidOperationException($"Could not load lake shader at {ShaderPath}");
+        // Drawn after the see-through bank strips that run under its edge, so its foam lies over them wherever the
+        // tiles sit in Godot's back-to-front order.
+        var material = new ShaderMaterial { Shader = shader, RenderPriority = 1 };
+        material.SetShaderParameter("uv_sampler", Texture("water_flow.png"));
+        material.SetShaderParameter("normalmap_a_sampler", Texture("water_normal_a.png"));
+        material.SetShaderParameter("normalmap_b_sampler", Texture("water_normal_b.png"));
+        material.SetShaderParameter("foam_sampler", Texture("water_foam.png"));
+        material.SetShaderParameter("caustic_sampler", GD.Load<TextureLayered>("res://assets/environment/lake/water_caustics.png"));
+        UseWaves(material, still);
         return material;
     }
 
-    private static ArrayMesh BuildSurface() {
-        var tool = new SurfaceTool();
-        tool.Begin(Mesh.PrimitiveType.Triangles);
-        for (int ring = 0; ring < Rings; ring++) {
-            float innerRadius = ring / (float)Rings;
-            float outerRadius = (ring + 1) / (float)Rings;
-            for (int segment = 0; segment < Segments; segment++) {
-                float angleA = segment * Mathf.Tau / Segments;
-                float angleB = (segment + 1) * Mathf.Tau / Segments;
-                var innerA = Vertex(innerRadius, angleA);
-                var outerA = Vertex(outerRadius, angleA);
-                var outerB = Vertex(outerRadius, angleB);
-                var innerB = Vertex(innerRadius, angleB);
-                AddTriangle(tool, innerA, outerA, outerB);
-                if (ring > 0) AddTriangle(tool, innerA, outerB, innerB);
+    /// <summary>A lily pad's material: flat <paramref name="color"/>, rising and falling with the water's waves.</summary>
+    internal static ShaderMaterial LilyPadMaterial(Color color, bool still) {
+        var material = new ShaderMaterial { Shader = GD.Load<Shader>(LilyPadShaderPath) };
+        material.SetShaderParameter("color", color);
+        UseWaves(material, still);
+        return material;
+    }
+
+    /// <summary>Gives a material the water's waves; <paramref name="still"/> holds them at one moment.</summary>
+    private static void UseWaves(ShaderMaterial material, bool still) {
+        material.SetShaderParameter("wave_speed", WaveSpeed);
+        material.SetShaderParameter("wave_a", Waves[0]);
+        material.SetShaderParameter("wave_b", Waves[1]);
+        material.SetShaderParameter("wave_c", Waves[2]);
+        if (still) SetWaveTime(material, ReviewSeconds);
+    }
+
+    /// <summary>Holds a water or lily pad material's waves at <paramref name="seconds"/>.</summary>
+    internal static void SetWaveTime(ShaderMaterial material, float seconds) => material.SetShaderParameter(ReviewTime, seconds);
+
+    /// <summary>Whether a material's waves follow the water's clock: the water's own, and a lily pad's.</summary>
+    internal static bool FollowsWaves(ShaderMaterial material) => material.Shader?.ResourcePath is ShaderPath or LilyPadShaderPath;
+
+    private static Texture2D Texture(string name) => GD.Load<Texture2D>($"res://assets/environment/lake/{name}");
+
+    /// <summary>
+    /// Adds a large surface as tiles of <see cref="Grid"/>, each sharing its edge columns and rows with its neighbours so
+    /// they meet without cracks, which Godot leaves undrawn while they are off screen.
+    /// </summary>
+    internal static void AddTiles(Node3D parent, string name, float[] columns, float[] rows, Func<float, float, Vector3> at, Material material) {
+        for (int column = 0; column + 1 < columns.Length; column += TileVertices - 1)
+            for (int row = 0; row + 1 < rows.Length; row += TileVertices - 1)
+                parent.AddChild(new MeshInstance3D {
+                    Name = $"{name}_{column}_{row}",
+                    Mesh = Grid(columns[column..Math.Min(columns.Length, column + TileVertices)], rows[row..Math.Min(rows.Length, row + TileVertices)], at),
+                    MaterialOverride = material,
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                    // The waves move the surface a little past the mesh's own bounds.
+                    ExtraCullMargin = 1,
+                });
+    }
+
+    /// <summary>
+    /// A surface of quads over every pair of neighbouring columns and rows, with each vertex where <paramref name="at"/>
+    /// puts its column and row values and those values as its UV.
+    /// Every row shares the columns, so a grid denser in some places than others has no cracks between them.
+    /// </summary>
+    internal static ArrayMesh Grid(float[] columns, float[] rows, Func<float, float, Vector3> at) {
+        int width = columns.Length;
+        var vertices = new Vector3[width * rows.Length];
+        var uvs = new Vector2[vertices.Length];
+        for (int row = 0; row < rows.Length; row++)
+            for (int column = 0; column < width; column++) {
+                vertices[row * width + column] = at(columns[column], rows[row]);
+                uvs[row * width + column] = new Vector2(columns[column], rows[row]);
             }
-        }
-        return tool.Commit();
+        var normals = new Vector3[vertices.Length];
+        Array.Fill(normals, Vector3.Up);
+        var indices = new int[(width - 1) * (rows.Length - 1) * 6];
+        // Godot draws a triangle's front where its corners run clockwise; the last quad, never a point, tells which way
+        // round the columns and rows run seen from above.
+        int last = vertices.Length - 1;
+        bool upward = (vertices[last - width] - vertices[last - width - 1]).Cross(vertices[last - 1] - vertices[last - width - 1]).Y < 0;
+        int next = 0;
+        for (int row = 0; row + 1 < rows.Length; row++)
+            for (int column = 0; column + 1 < width; column++) {
+                int a = row * width + column, b = a + 1, c = a + width, d = c + 1;
+                indices[next++] = a; indices[next++] = upward ? b : d; indices[next++] = upward ? d : b;
+                indices[next++] = a; indices[next++] = upward ? d : c; indices[next++] = upward ? c : d;
+            }
+        var arrays = new Godot.Collections.Array();
+        arrays.Resize((int)Mesh.ArrayType.Max);
+        arrays[(int)Mesh.ArrayType.Vertex] = vertices;
+        arrays[(int)Mesh.ArrayType.Normal] = normals;
+        arrays[(int)Mesh.ArrayType.TexUV] = uvs;
+        arrays[(int)Mesh.ArrayType.Index] = indices;
+        var mesh = new ArrayMesh();
+        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+        return mesh;
     }
 
-    private static Vector3 Vertex(float normalizedRadius, float angle) {
-        float shore = Terrain.Shore(angle) * normalizedRadius;
-        return new Vector3(MathF.Cos(angle) * shore, 0, MathF.Sin(angle) * shore);
-    }
-
-    private static void AddTriangle(SurfaceTool tool, Vector3 a, Vector3 b, Vector3 c) {
-        AddVertex(tool, a, Uv(a));
-        AddVertex(tool, b, Uv(b));
-        AddVertex(tool, c, Uv(c));
-    }
-
-    private static Vector2 Uv(Vector3 position) =>
-        new Vector2(position.X / Terrain.Shore(MathF.Atan2(position.Z, position.X)), position.Z / Terrain.Shore(MathF.Atan2(position.Z, position.X)));
-
-    private static void AddVertex(SurfaceTool tool, Vector3 position, Vector2 uv) {
-        tool.SetNormal(Vector3.Up);
-        tool.SetUV(uv);
-        tool.AddVertex(position);
+    /// <summary>Values from <paramref name="from"/> to <paramref name="to"/> at most <paramref name="step"/> apart, both ends included.</summary>
+    internal static float[] Steps(float from, float to, float step) {
+        int count = (int)MathF.Ceiling((to - from) / step);
+        return Enumerable.Range(0, count + 1).Select(i => from + (to - from) * i / count).ToArray();
     }
 }

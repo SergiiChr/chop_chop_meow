@@ -15,6 +15,12 @@ public partial class WorldView {
     /// <summary>The ground photoscans drawn as they are, each with its colour, OpenGL normal and height maps beside the terrain, and the world units one tile spans, about its real size.</summary>
     private static readonly (string Name, float Tile)[] GroundScans = { ("path", 2), ("moss", 15), ("forest", 2) };
     private ImageTexture? woodsDistance;
+    private ImageTexture? bedMap;
+    /// <summary>
+    /// World units past the drawn water's edge that the beds map still marks as bed, so filtering keeps the bed whole up
+    /// to the water's edge; the banks cover the ground there.
+    /// </summary>
+    private const float BedMargin = 1;
     /// <summary>World units out from the foot of the ranges that the woods' floor reaches, where <see cref="World"/> scatters trees at better than even odds.</summary>
     private const float WoodsBand = 10;
     /// <summary>World units out from the foot of the ranges that the woods map measures; the shader's frayed band ends within it.</summary>
@@ -51,7 +57,7 @@ public partial class WorldView {
                 int originX = rx * regionSize, originZ = rz * regionSize;
                 Parallel.For(0, regionSize, z => {
                     for (int x = 0; x < regionSize; x++)
-                        samples[z * regionSize + x] = Math.Max(0, MountainShape.Height(new Vector2(originX + x, originZ + z)) - .03f);
+                        samples[z * regionSize + x] = GroundHeight(new Vector2(originX + x, originZ + z));
                 });
                 MemoryMarshal.AsBytes(samples.AsSpan()).CopyTo(bytes);
                 using var heights = Image.CreateFromData(regionSize, regionSize, false, Image.Format.Rf, bytes);
@@ -62,8 +68,8 @@ public partial class WorldView {
         data.Call("update_maps");
         float floor = data.Call("get_height", To3(Terrain.Spawn)).AsSingle();
         if (!float.IsFinite(floor) || Math.Abs(floor) > .001f) throw new InvalidOperationException($"Terrain3D playable floor moved to {floor}");
-        foreach (var p in new[] { new Vector2(-20, 80), new Vector2(70, 30), new Vector2(260, 150) }) {
-            float expected = Math.Max(0, MountainShape.Height(p) - .03f), actual = data.Call("get_height", To3(p)).AsSingle();
+        foreach (var p in new[] { new Vector2(-20, 80), new Vector2(70, 30), new Vector2(260, 150), Terrain.Lake }) {
+            float expected = GroundHeight(p), actual = data.Call("get_height", To3(p)).AsSingle();
             if (!float.IsFinite(actual) || Math.Abs(actual - expected) > .001f)
                 throw new InvalidOperationException($"Terrain3D region height mismatch at {p}: {actual} instead of {expected}");
         }
@@ -107,13 +113,18 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "disturbance", disturbanceTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "shade", sceneryShadeTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "contact", objectShadeTexture.GetRid());
-        foreach (var (scan, tile) in GroundScans) {
-            RenderingServer.MaterialSetParam(terrainMaterialRid, $"{scan}_tile", tile);
+        void Scan(string name, float tile, Func<string, Texture2D> load) {
+            RenderingServer.MaterialSetParam(terrainMaterialRid, $"{name}_tile", tile);
             foreach (var map in new[] { "albedo", "normal", "height" }) {
-                var texture = GD.Load<Texture2D>($"res://assets/environment/terrain3d/{scan}_{map}.jpg");
+                var texture = load(map);
                 groundScanMaps.Add(texture);
-                RenderingServer.MaterialSetParam(terrainMaterialRid, $"{scan}_{map}", texture.GetRid());
+                RenderingServer.MaterialSetParam(terrainMaterialRid, $"{name}_{map}", texture.GetRid());
             }
+        }
+        foreach (var (scan, tile) in GroundScans) Scan(scan, tile, map => GD.Load<Texture2D>($"res://assets/environment/terrain3d/{scan}_{map}.jpg"));
+        foreach (var look in new[] { ShorelineAppearance.Rocks, ShorelineAppearance.Sand }) {
+            Scan(look.Name, look.Tile, map => ShorelineAppearance.Map(look, map));
+            RenderingServer.MaterialSetParam(terrainMaterialRid, $"{look.Name}_wet", look.Wet);
         }
         RenderingServer.MaterialSetParam(terrainMaterialRid, "scan_relief", ModelKit.ScanRelief);
         // One texel a world unit over all nine regions: how far each texel's middle, where filtering reads it, lies from
@@ -132,6 +143,17 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_span", (float)span);
         RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_reach", WoodsReach);
         RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_band", WoodsBand);
+        // On the same texels, red under the pond's drawn water and green under the sea's, out to BedMargin past it.
+        var beds = new byte[span * span * 2];
+        Parallel.For(0, span, z => {
+            for (int x = 0; x < span; x++) {
+                var p = new Vector2(x - regionSize + .5f, z - regionSize + .5f);
+                beds[(z * span + x) * 2] = (byte)(Terrain.InLake(p, BedMargin) ? 255 : 0);
+                beds[(z * span + x) * 2 + 1] = (byte)(Terrain.Along(p) > ShorelineAppearance.SeaWaterEdge(Terrain.Across(p)) - BedMargin ? 255 : 0);
+            }
+        });
+        bedMap = ImageTexture.CreateFromImage(Image.CreateFromData(span, span, false, Image.Format.Rg8, beds));
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "beds", bedMap.GetRid());
         // The shader's tunnel cut-outs hold exactly one entry per cliff.
         if (World.Cliffs.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {World.Cliffs.Length}.");
         var mines = new Vector4[World.Cliffs.Length];
@@ -142,6 +164,9 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "mines", mines);
         GD.Print($"TERRAIN3D: v1.1.0-rc1, 9 regions, {regionSize}² samples/region; playable floor {floor:0.000}");
     }
+
+    /// <summary>The ground's height: the mountains, the flat valley floor between them, and the beds under the water.</summary>
+    private static float GroundHeight(Vector2 p) => Math.Max(0, MountainShape.Height(p) - .03f) - Terrain.BedDepth(p);
 
     /// <summary>Keeps Terrain3D's finest detail under the view.</summary>
     private void UpdateTerrainTarget() {

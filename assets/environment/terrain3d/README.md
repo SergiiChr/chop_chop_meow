@@ -46,6 +46,8 @@ The shader insertion in `Terrain3DView` keeps the pinned generated Terrain3D sha
 It adds the meadow and stone palette with lusher and drier patches, the photoscan grain over it, the moss patches, the
 woods' floor, the footpath photoscan blended into worn ground and footpaths by its height, baked shade, and fragment
 clipping for the five mine openings so their separately modeled rock shells stay open.
+Ground under the drawn water is a bed, drawn with the shore photoscan of the pond or the sea from a baked beds map,
+with the meadow's work skipped where the water covers it whole ([lake README](../lake/README.md)).
 
 Three Poly Haven photoscans are drawn in their own colours, each at about real size and pinned by
 `tools/polyhaven_textures.py`:

@@ -85,8 +85,15 @@ public sealed class PlayerControl {
     private static Vector2 HeldDirection() {
         float x = (Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left) ? 1 : 0);
         float y = (Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up) ? 1 : 0);
-        return new Vector2(x + y * 2, y * 2 - x).Normalized();
+        return KeysDirection(x, y);
     }
+
+    /// <summary>
+    /// The unit step on the ground that the movement keys give, from 1, 0 or -1 for D or A on <paramref name="right"/>
+    /// and S or W on <paramref name="down"/>: S runs seaward, D across the valley, and both at once along the screen's
+    /// diagonal; zero when none is held.
+    /// </summary>
+    internal static Vector2 KeysDirection(float right, float down) => new Vector2(right + down * 2, down * 2 - right).Normalized();
 
     /// <summary>A clicked cabin draws the player to its door, even with a movement key still held from walking there.</summary>
     private Vector2 TowardCabin(Vector2 direction) {

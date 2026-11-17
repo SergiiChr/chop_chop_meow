@@ -269,6 +269,10 @@ Worn ground and the woods' floor in `environment/terrain3d/` are the Poly Haven 
 Forest Ground 01 by Rob Tuytel at 2K, and the meadow's moss patches are Aerial Grass Rock by Rob Tuytel at 4K, all
 released under CC0 1.0 and drawn with their own colours and parallax.
 `tools/polyhaven_textures.py` downloads the pinned JPEG colour, OpenGL normal and height maps and checks their SHA-256.
+The water in `environment/lake/` is a port of the
+[Realistic Water Shader](https://godotshaders.com/shader/realistic-water/) by UnionBytes (Achim Menzel), with its demo
+project's normal, flow, foam and caustic textures, all released under the MIT licence in `environment/lake/LICENSE`.
+`tools/water_textures.py` downloads the pinned textures and checks their SHA-256.
 The meshes in `models/food/` are baked from four models of [Kenney's Food Kit](https://kenney.nl/assets/food-kit), released under CC0 1.0, as [Patch's asset library](https://patch.gg) serves them: re-packed, with the texture inside the file, and scaled to real size.
 `tools/food_models.py` downloads the pinned files, checks their SHA-256 and bakes them with `tools/bake_models.gd`.
 No other external game art or third-party packs are used.

@@ -36,13 +36,17 @@ public static class Terrain {
         float along = Along(p), across = Across(p);
         return Math.Min(HalfWidth(along, Math.Sign(across)) - Math.Abs(across), along - 14);
     }
+    /// <summary>Along the valley, the line where the drawn sea meets the sand, a little inland of where walking stops.</summary>
+    public static float Waterline(float across) => Coast(across) - 1.2f;
+    /// <summary>Units out to sea past where walking stops, just past the drawn waterline; negative inland.</summary>
+    public static float OutToSea(Vector2 p) => Along(p) - Coast(Across(p)) + 1;
     /// <summary>Water, from just past the line where the drawn sea meets the sand.</summary>
-    public static bool Sea(Vector2 p) => Along(p) > Coast(Across(p)) - 1;
+    public static bool Sea(Vector2 p) => OutToSea(p) > 0;
     /// <summary>How far the drawn sand reaches inland from the line where the drawn sea meets it, from about 2 to 8 units.</summary>
     public static float SandWidth(float across) =>
         5.15f + 1.6f * MathF.Sin(across * .13f + .4f) + .9f * MathF.Sin(across * .41f) + .4f * MathF.Sin(across * 1.1f);
     /// <summary>The sandy strip along the shore, where nothing grows; grass may stand where the sand thins out inland.</summary>
-    public static bool Beach(Vector2 p) => Along(p) > Coast(Across(p)) - 1.2f - SandWidth(Across(p)) + 1.35f;
+    public static bool Beach(Vector2 p) => Along(p) > Waterline(Across(p)) - SandWidth(Across(p)) + 1.35f;
     /// <summary>The lake's irregular shore as a distance from its centre; the water and the walkable edge share it.</summary>
     public static float Shore(float angle) => LakeRadius * (.9f + .05f * MathF.Sin(angle * 3 + 1) + .04f * MathF.Sin(angle * 5 + 2.3f) + .05f * MathF.Sin(angle * 2 + .4f));
     public static bool InLake(Vector2 p, float margin = 0) {
@@ -55,6 +59,22 @@ public static class Terrain {
         var offset = from - Lake;
         float angle = MathF.Atan2(offset.Y, offset.X);
         return Lake + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (Shore(angle) + .35f);
+    }
+
+    /// <summary>Depth of the pond's bowl at its middle.</summary>
+    private const float PondDepth = 2.5f;
+    /// <summary>Deepest the sea floor gets.</summary>
+    private const float SeaDepth = 6;
+    /// <summary>Units out over which the sea floor drops one unit.</summary>
+    private const float SeaSlope = 4;
+
+    /// <summary>How far the ground lies below the valley floor: a bowl under the pond and a floor under the sea, each
+    /// falling from where walking stops, so the ground people walk on stays flat; zero everywhere else.</summary>
+    public static float BedDepth(Vector2 p) {
+        var offset = p - Lake;
+        float reach = offset.Length() / Shore(MathF.Atan2(offset.Y, offset.X));
+        float pond = reach < 1 ? PondDepth * (1 - reach * reach) : 0;
+        return Math.Max(pond, Math.Clamp(OutToSea(p) / SeaSlope, 0, SeaDepth));
     }
 
     public static bool WaterRing(Vector2 p) => p.DistanceTo(WaterPoint(p)) <= 1.6f;

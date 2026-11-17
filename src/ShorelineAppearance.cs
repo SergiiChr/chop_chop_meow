@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -12,25 +13,28 @@ internal static class ShorelineAppearance {
     /// <param name="Tile">World units one tile of the photoscan spans.</param>
     /// <param name="Wet">Brightness at the waterline, where it is wet, as a share of the dry shore's.</param>
     /// <param name="GrassFade">Units over which the shore thins out into the grass.</param>
-    /// <param name="Depth">Units of water over which the shore sinks out of sight.</param>
     /// <param name="Wander">Units over which the shore's edges wander in small bites: the waterline half that either side
     /// of its line, the grass edge that much on top of its broad patches.</param>
-    internal sealed record ShoreLook(string Name, float Tile, float Wet, float GrassFade, float Depth, float Wander);
+    internal sealed record ShoreLook(string Name, float Tile, float Wet, float GrassFade, float Wander);
 
     /// <summary>Rippled beach sand along the sea coast.</summary>
-    internal static readonly ShoreLook Sand = new("sand", 15, .6f, 2.2f, 3.5f, 1.2f);
+    internal static readonly ShoreLook Sand = new("sand", 15, .6f, 2.2f, 1.2f);
     /// <summary>Mossy ground with stones and bare earth around the pond.</summary>
-    internal static readonly ShoreLook Rocks = new("rocks", 15, .6f, 1.5f, 2.5f, 0);
+    internal static readonly ShoreLook Rocks = new("rocks", 15, .6f, 1.5f, 0);
 
-    private static Texture2D Map(ShoreLook look, string map) => GD.Load<Texture2D>($"res://assets/environment/lake/{look.Name}_{map}.jpg");
+    /// <summary>One of a shore photoscan's maps: albedo, normal or height.</summary>
+    internal static Texture2D Map(ShoreLook look, string map) => GD.Load<Texture2D>($"res://assets/environment/lake/{look.Name}_{map}.jpg");
 
-    /// <summary>Gives a bank or water material the shore photoscan, at the same scale and wet shade in both.</summary>
+    /// <summary>Gives a bank material the shore photoscan, at the scale and wet shade the bed under the water has too.</summary>
     internal static void UseShore(ShaderMaterial material, ShoreLook look) {
         material.SetShaderParameter("shore_albedo", Map(look, "albedo"));
         material.SetShaderParameter("shore_tile", look.Tile);
         material.SetShaderParameter("shore_wet", look.Wet);
         material.SetShaderParameter("shore_wander", look.Wander);
     }
+
+    /// <summary>Along the valley, the most inland the sea's drawn water reaches, where its waterline wanders furthest in.</summary>
+    internal static float SeaWaterEdge(float across) => Terrain.Waterline(across) - Sand.Wander / 2;
 
     /// <summary>Distance from the drawn waterline, seaward, where a bank strip starts under the water.</summary>
     private static float BankStart(ShoreLook look) => -.35f - look.Wander / 2;
@@ -49,7 +53,7 @@ internal static class ShorelineAppearance {
     private static void Vertex(SurfaceTool tool, Vector2 p, float distance, float width) {
         tool.SetNormal(Vector3.Up);
         tool.SetUV(new Vector2(distance, width));
-        tool.AddVertex(new Vector3(p.X, .013f, p.Y));
+        tool.AddVertex(new Vector3(p.X, .013f - Terrain.BedDepth(p), p.Y));
     }
 
     public static void BuildLakeBank(Node3D parent) {
@@ -77,7 +81,7 @@ internal static class ShorelineAppearance {
         void At(float across, float t) {
             float width = Terrain.SandWidth(across);
             float distance = Mathf.Lerp(BankStart(Sand), width, t);
-            Vertex(bank, Terrain.Point(Terrain.Coast(across) - 1.2f - distance, across), distance, width);
+            Vertex(bank, Terrain.Point(Terrain.Waterline(across) - distance, across), distance, width);
         }
         for (float across = -300; across < 300; across += step)
             for (int strip = 0; strip < 6; strip++) {
@@ -87,24 +91,17 @@ internal static class ShorelineAppearance {
             }
         parent.AddChild(new MeshInstance3D { Name = "SoftCoastalBank", Mesh = bank.Commit(), MaterialOverride = BankMaterial(Sand), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 
-        var water = new SurfaceTool(); water.Begin(Mesh.PrimitiveType.Triangles);
         // The water starts inland of its line by as far as the waterline wanders, and its shader cuts the wandering edge.
-        float[] bands = { -Sand.Wander / 2, .3f, 1, 2.5f, 6, 14, 40, 400 };
-        void WaterAt(float across, float distance) {
-            var p = Terrain.Point(Terrain.Coast(across) - 1.2f + distance, across);
-            water.SetNormal(Vector3.Up); water.SetUV(new Vector2(across, distance));
-            water.AddVertex(new Vector3(p.X, .025f, p.Y));
-        }
-        for (float across = -300; across < 300; across += step)
-            for (int strip = 0; strip + 1 < bands.Length; strip++) {
-                float a = bands[strip], b = bands[strip + 1];
-                WaterAt(across, a); WaterAt(across + step, b); WaterAt(across, b);
-                WaterAt(across, a); WaterAt(across + step, a); WaterAt(across + step, b);
-            }
+        // It is dense wherever the map can show it, and coarser out at sea and along the coast past the map's ends.
+        float[] sides = [.. LakeAppearance.Steps(-300, -150, 3).SkipLast(1), .. LakeAppearance.Steps(-150, 150, LakeAppearance.Spacing), .. LakeAppearance.Steps(150, 300, 3).Skip(1)];
+        float[] distances = [.. LakeAppearance.Steps(-Sand.Wander / 2, 90, LakeAppearance.Spacing), 120, 200, 400];
         var material = LakeAppearance.CreateMaterial(still);
-        material.SetShaderParameter("coastal", true);
-        UseShore(material, Sand);
-        material.SetShaderParameter("shore_depth", Sand.Depth);
-        parent.AddChild(new MeshInstance3D { Name = "CoastalWater", Mesh = water.Commit(), MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        material.SetShaderParameter("shore_wander", Sand.Wander);
+        var water = new Node3D { Name = "CoastalWater" };
+        parent.AddChild(water);
+        LakeAppearance.AddTiles(water, "CoastalWater", sides, distances, (side, distance) => {
+            var p = Terrain.Point(Terrain.Waterline(side) + distance, side);
+            return new Vector3(p.X, LakeAppearance.Level, p.Y);
+        }, material);
     }
 }

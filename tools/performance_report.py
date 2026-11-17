@@ -26,9 +26,8 @@ COLUMNS = {
     "primitives",
     "workers_active",
     "machines_active",
-    "site",
-    "night",
-    "settlement",
+    "part",
+    "leg",
     "pipelines_total",
 }
 
@@ -89,20 +88,14 @@ def main() -> None:
         if missing:
             raise SystemExit(f"{frames} lacks columns: {', '.join(missing)}")
         rows = list(reader)
-    groups = {
-        "all": rows,
-        "day-walking": [
-            r for r in rows if r["settlement"] == "False" and r["night"] == "False"
-        ],
-        "night-walking": [
-            r for r in rows if r["settlement"] == "False" and r["night"] == "True"
-        ],
-        "production": [r for r in rows if r["settlement"] == "True"],
-    }
-    for site in sorted({r["site"] for r in rows}):
-        groups[site] = [
-            r for r in rows if r["site"] == site and r["settlement"] == "False"
-        ]
+    groups = {"all": rows}
+    for part in ("day", "settle", "night"):
+        groups[part] = [r for r in rows if r["part"] == part]
+    for part in ("day", "night"):
+        for leg in dict.fromkeys(r["leg"] for r in rows):
+            groups[f"{part} {leg}"] = [
+                r for r in rows if r["part"] == part and r["leg"] == leg
+            ]
     result = {name: summarize(group) for name, group in groups.items() if group}
     slowest = sorted(rows, key=lambda r: float(r["frame_ms"]), reverse=True)[:20]
     summary = {**result, "slowest_frames": slowest}

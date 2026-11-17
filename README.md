@@ -75,7 +75,7 @@ Play accepts Godot arguments after `--`:
 | `--animation-slow 4` | Slow a capture down this many times |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
 | `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
-| `--performance-run /absolute/directory` | Record a walking, day/night and staffed-settlement benchmark; summarise it with `python3 tools/performance_report.py /absolute/directory` |
+| `--performance-run /absolute/directory` | Record a benchmark: sprinting from the sea past a staffed camp and the pond to the valley's top corner, by day and again at night with a lit torch; summarise it with `python3 tools/performance_report.py /absolute/directory` |
 | `--drive /absolute/directory` | Play the window from command files written to that directory, as keys and mouse, and save screenshots there; it keeps `playtest-` saves and settings of its own (`playtest` skill) |
 
 Other showcase flags are parsed in `src/Showcase.cs`.
@@ -110,7 +110,8 @@ The game draws the film itself, so a change to a model or a shot means making th
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
 from their pinned CC0 sources, `./tools/polyhaven_textures.py` downloads the shore and ground photoscans drawn as they
-are, and `./tools/food_models.py` bakes the committed food models from theirs.
+are, `./tools/water_textures.py` downloads the water's textures, and `./tools/food_models.py` bakes the committed
+food models from theirs.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
