@@ -152,7 +152,7 @@ public sealed partial class World {
     private void Smell(Wolf wolf) {
         PlayerState? prey = null;
         foreach (var p in S.Players)
-            if (p.RespawnIn <= 0 && !Indoors(p) && p.Pos.DistanceTo(wolf.Pos) <= Data.SmellRadius && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
+            if (p.RespawnIn <= 0 && !Doorways.Indoors(p) && p.Pos.DistanceTo(wolf.Pos) <= Data.SmellRadius && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
         if (prey == null) return;
         if (prey.Pos.DistanceTo(wolf.Pos) <= Data.WolfSightRange) { wolf.Target = prey.Id; wolf.Mode = WolfMode.Patrol; wolf.Route.Clear(); return; }
         // The night's first howl is a lone wolf; every later one sounds like the pack answering.

@@ -282,17 +282,17 @@ public sealed class WolfModel {
     /// either side of the player's feet. Each tug it throws its weight back: the forelegs straighten and push against the ground, the chest
     /// rears and the head wrenches to one side, the next tug to the other, while its paws stay where they stand until the
     /// forepaws hop back at the end of the heave; between tugs the hind paws step back after it and it shakes its head.
-    /// <paramref name="progress"/> runs 0 to 1 over the tug, timed as <see cref="World.TugProgress"/> moves the player and the
+    /// <paramref name="progress"/> runs 0 to 1 over the tug, timed as <see cref="DoorTug.TugProgress"/> moves the player and the
     /// view holds the jaws at their waist.
     /// </summary>
     public void Tug(float progress, float time, float dt) {
-        var (tug, u) = World.TugPhase(progress);
-        float heave = World.HeavePulse(u), shake = u < World.Heave ? 0 : MathF.Sin(time * 15) * Mathf.SmoothStep(World.Heave, World.Heave + .15f, u);
+        var (tug, u) = DoorTug.TugPhase(progress);
+        float heave = DoorTug.HeavePulse(u), shake = u < DoorTug.Heave ? 0 : MathF.Sin(time * 15) * Mathf.SmoothStep(DoorTug.Heave, DoorTug.Heave + .15f, u);
         // Each tug wrenches the other way.
         float side = tug % 2 == 0 ? 1 : -1;
         var body = Tugging(heave, side, shake);
         // How far the player, and so the jaws, have come back in this tug: planted paws come that far forward against the body.
-        float moved = World.TugDistance * (World.TugProgress(progress) - (float)tug / World.Tugs);
+        float moved = DoorTug.TugDistance * (DoorTug.TugProgress(progress) - (float)tug / DoorTug.Tugs);
         // The jaws hold still at the waist, so a body that rears back carries its paws with it unless they make up the difference.
         var drift = BiteOf(body) - TuggingBite;
         for (int leg = 0; leg < 4; leg++) {

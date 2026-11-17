@@ -88,9 +88,9 @@ public static class ActorAnimation {
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
-        ActorAction.Knock => World.KnockSeconds / World.Knocks,
+        ActorAction.Knock => Doorways.KnockSeconds / Doorways.Knocks,
         ActorAction.Brake => Momentum.BrakeSeconds,
-        ActorAction.Tugged => 2 * World.TugSeconds / World.Tugs,
+        ActorAction.Tugged => 2 * DoorTug.TugSeconds / DoorTug.Tugs,
         ActorAction.FallBack => FallBackSeconds,
         ActorAction.Kindle => World.KindleSeconds,
         ActorAction.TorchSwing => .6f,
@@ -516,7 +516,7 @@ public static class ActorAnimation {
                     // Tugged back by the waist: bent over at the hips with the arms reaching for the doorway and the head up to keep it in sight.
                     // Each tug, half the loop, jerks the hips back and the trunk lower; the front foot steps back in the air while the other stays
                     // planted, the hips passing back over it until it is in front.
-                    float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / World.Heave)), heave = World.HeavePulse(half);
+                    float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / DoorTug.Heave)), heave = DoorTug.HeavePulse(half);
                     float stepping = Mathf.Lerp(18, -8, jerk), planted = Mathf.Lerp(-8, 18, jerk), lift = 45 * heave, struggle = MathF.Sin(half * Mathf.Tau);
                     bool left = p < .5f;
                     // Between tugs the player strains toward the door, the arms clawing at it.

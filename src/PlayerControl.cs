@@ -99,8 +99,8 @@ public sealed class PlayerControl {
     private Vector2 TowardCabin(Vector2 direction) {
         if (world.Downed || entering != null && world.Find(entering.Id) == null) entering = null;
         if (entering == null) return world.Door == Doorway.None ? direction : Vector2.Zero;
-        var toward = World.TowardDoor(entering, world.Player);
-        if (toward == Vector2.Zero && world.Enter(entering, world.Me.Sprinting)) { entering = null; return Vector2.Zero; }
+        var toward = Doorways.TowardDoor(entering, world.Player);
+        if (toward == Vector2.Zero && world.Doorways.Enter(entering, world.Me.Sprinting)) { entering = null; return Vector2.Zero; }
         return toward;
     }
 
@@ -150,7 +150,7 @@ public sealed class PlayerControl {
         world.Me.Braking = momentum.Braking;
         var move = step * dt * world.Data.MoveSpeed(world.Me.Sprinting);
         // Walking to a cabin's door, the last step stops on it rather than past it, however long the frame.
-        if (entering != null) move = world.StepToDoor(entering, move);
+        if (entering != null) move = world.Doorways.StepToDoor(entering, move);
         world.MovePlayer(move); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
         // A tool in hand that has left the backpack leaves the hand empty.

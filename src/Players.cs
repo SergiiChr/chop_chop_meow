@@ -59,7 +59,7 @@ public sealed partial class World {
         return true;
     }
 
-    private bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
+    internal bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
         var c = new Command(verb, target, other, item, count, at, fromHeld, fromSpares);
         if (Host != null) { Host(c); return true; }
         if (!(c.Held || c.Spares) || runningMarked) return false;
@@ -142,7 +142,7 @@ public sealed partial class World {
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
             case Verb.Torch: UseTorch(c.At); break;
             case Verb.Attack: Attack(); break;
-            case Verb.Leave: Leave(); break;
+            case Verb.Leave: Doorways.Leave(); break;
             case Verb.Craft: Craft(c.Item, c.Count); break;
             case Verb.CancelCraft: CancelCraft(c.Item, c.Count); break;
             case Verb.Transfer:
@@ -184,7 +184,7 @@ public sealed partial class World {
             case Verb.LoadInput: LoadInput(t, c.Item, c.Count); break;
             case Verb.LoadFuel: LoadFuel(t, c.Item, c.Count); break;
             case Verb.Collect: Collect(t); break;
-            case Verb.Enter: Enter(t, c.Count == 1); break;
+            case Verb.Enter: Doorways.Enter(t, c.Count == 1); break;
             case Verb.Sleep: Sleep(t); break;
             case Verb.Sell: Sell(t); break;
             case Verb.AutoSell: SetAutoSell(t, c.Count != 0); break;
@@ -343,7 +343,7 @@ public sealed partial class World {
         p.Key = key; p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(0, 4).First(i => S.Players.All(o => o.Shirt != i));
         // What only made sense while they played: a cabin may have gone and a building gone up where they stood, a wolf that had them pinned has moved on, and the other properties follow input they no longer give.
         // A cabin holds one player, so one someone else went into or is at the door of meanwhile leaves the newcomer at its door.
-        if (Find(p.Sheltered)?.Kind != ThingKind.Hut || Ahead(p.Sheltered, p) != Doorway.Entering) p.Sheltered = 0;
+        if (Find(p.Sheltered)?.Kind != ThingKind.Hut || Doorways.Ahead(p.Sheltered, p) != Doorway.Entering) p.Sheltered = 0;
         p.Door = Doorway.None;
         if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
         Forget(p);

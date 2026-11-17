@@ -731,7 +731,7 @@ public partial class Game {
         await CloseWithEsc();
         await Click(view.Screen(hut.Pos, 1.5f));
         await Click(FindButton(panel, "Step outside")!);
-        await Seconds(World.LeaveSeconds + 1);
+        await Seconds(Doorways.LeaveSeconds + 1);
         Require(world.Sheltered == 0 && world.Door == Doorway.None, "A player who clicked the cabin they were in and stepped out must stay outside.");
         RemoveThings(Hosted, t => t == hut); await CloseWithEsc();
 

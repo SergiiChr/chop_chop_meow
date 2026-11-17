@@ -93,8 +93,8 @@ internal static class PlayerSteps {
     public static void StepInside(World world, Thing hut, PlayerState? who = null) {
         who ??= world.Me;
         world.As(who, () => {
-            world.Player = World.DoorPoint(hut);
-            Require(world.Enter(hut, true), "a player at the cabin's door should start stepping in");
+            world.Player = Doorways.DoorPoint(hut);
+            Require(world.Doorways.Enter(hut, true), "a player at the cabin's door should start stepping in");
         });
         for (float time = 0; time < 2 && who.Sheltered != hut.Id; time += .05f) world.Tick(.05f);
         Require(who.Sheltered == hut.Id, $"the player should be inside the cabin, not {who.Door}");

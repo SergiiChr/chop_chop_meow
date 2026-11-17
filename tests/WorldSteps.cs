@@ -224,10 +224,10 @@ internal static class WorldSteps {
         for (float x = 0; x < 200; x += .5f)
             for (float y = 0; y < 200; y += .5f) {
                 var at = new Vector2(x, y);
-                var door = World.DoorPoint(new Thing { Pos = at });
-                if (!world.CanStand(at) || Terrain.InLake(at, .8f) || world.CanStand(door + World.OutOfDoor * open)) continue;
+                var door = Doorways.DoorPoint(new Thing { Pos = at });
+                if (!world.CanStand(at) || Terrain.InLake(at, .8f) || world.CanStand(door + Doorways.OutOfDoor * open)) continue;
                 bool clear = true;
-                for (float ahead = 0; ahead < open - .05f && clear; ahead += .1f) clear = world.CanStand(door + World.OutOfDoor * ahead);
+                for (float ahead = 0; ahead < open - .05f && clear; ahead += .1f) clear = world.CanStand(door + Doorways.OutOfDoor * ahead);
                 if (clear) return at;
             }
         throw new InvalidOperationException($"the valley should have a dry spot whose cabin door has {open} m of open ground in front");

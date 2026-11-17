@@ -44,7 +44,7 @@ public sealed partial class DoorwayReview : Node {
         // A burning fire keeps wolves off everyone near it, the cabin's door included.
         if (night) foreach (var fire in World.Things.Where(t => t.Kind == ThingKind.Campfire)) fire.Burn = 0;
         host = World.Me; guest = World.Arrive("neighbor", 2);
-        var door = World.DoorPoint(Cabin);
+        var door = Doorways.DoorPoint(Cabin);
         World.Player = door + new Vector2(-2.5f, 1.5f);
         // The neighbor comes from behind the cabin, so they walk round it to the door.
         World.As(guest, () => World.Player = Cabin.Pos + new Vector2(1, -3.5f));
@@ -61,14 +61,14 @@ public sealed partial class DoorwayReview : Node {
             // The host steps in at a walk with a wolf close by and the neighbor at the door behind them; a second wolf comes for the neighbor while they wait.
             "wolf" => new (float, Action)[] {
                 (0, () => { World.Player = door; World.As(guest, () => World.Player = door + new Vector2(.4f, 0)); }),
-                (0, () => World.Enter(Cabin, false)), (.1f, () => World.As(guest, () => World.Enter(Cabin, false))),
+                (0, () => World.Doorways.Enter(Cabin, false)), (.1f, () => World.As(guest, () => World.Doorways.Enter(Cabin, false))),
                 (.15f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.6f, 1.2f), Target = host.Id })),
                 (.9f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(2.2f, 1.4f), Target = guest.Id })),
             },
             // A badly hurt host is tugged out of the doorway and pinned.
             _ => new (float, Action)[] {
                 (0, () => { World.Player = door; World.S.Health = 45; World.As(guest, () => World.Player = door + new Vector2(2.5f, 2)); }),
-                (0, () => World.Enter(Cabin, false)),
+                (0, () => World.Doorways.Enter(Cabin, false)),
                 (.1f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-2.5f, 1.5f), Target = host.Id })),
             },
         };
@@ -80,12 +80,12 @@ public sealed partial class DoorwayReview : Node {
         float dt = Math.Min((float)delta, .1f);
         time += dt;
         while (next < script.Length && script[next].At <= time) script[next++].Do();
-        if (Scene == "occupied" && !hostLeft && guest.Door == Doorway.Knocking && guest.DoorTime >= World.KnockLead + LeaveAfterKnocks) { World.Leave(); hostLeft = true; }
+        if (Scene == "occupied" && !hostLeft && guest.Door == Doorway.Knocking && guest.DoorTime >= Doorways.KnockLead + LeaveAfterKnocks) { World.Doorways.Leave(); hostLeft = true; }
         foreach (var p in walking.ToArray())
             World.As(p, () => {
-                var toward = World.TowardDoor(Cabin, World.Player);
-                if (toward != Vector2.Zero) World.MovePlayer(World.StepToDoor(Cabin, toward * dt * World.Data.MoveSpeed(false)));
-                else if (World.Enter(Cabin, false)) walking.Remove(p);
+                var toward = Doorways.TowardDoor(Cabin, World.Player);
+                if (toward != Vector2.Zero) World.MovePlayer(World.Doorways.StepToDoor(Cabin, toward * dt * World.Data.MoveSpeed(false)));
+                else if (World.Doorways.Enter(Cabin, false)) walking.Remove(p);
             });
     }
 }
