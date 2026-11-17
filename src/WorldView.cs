@@ -1646,7 +1646,7 @@ public partial class WorldView : Node3D {
             } else model.KnockBack = Vector2.Zero;
             bool struck = model.HitIn > 0 || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;
             // Easing back from its player to biting distance, a wolf steps backward still facing them.
-            bool backing = running && wolf.Flee <= 0 && !wolf.Scared && moved.Dot(hunted - wolf.Pos) < 0 && moved.Length() <= dt * World.BackOffSpeed + 1e-4f;
+            bool backing = running && wolf.Flee <= 0 && !wolf.Scared && moved.Dot(hunted - wolf.Pos) < 0 && moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
             // Where it was drawn when it let go of a player it tugged closes up only as it walks, so it never slides.
             model.Drift = model.Drift.MoveToward(Vector2.Zero, moved.Length());
             // A struck wolf keeps facing whoever hit it; a running one turns into its path.

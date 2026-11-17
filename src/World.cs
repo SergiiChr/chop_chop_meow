@@ -318,7 +318,7 @@ public sealed partial class World {
     private bool playerBusy { get => S.Actor.Busy; set => S.Actor.Busy = value; }
     public World(GameData data, bool generate = true) {
         Data = data;
-        Doorways = new Doorways(this); DoorTug = new DoorTug(this);
+        Doorways = new Doorways(this); DoorTug = new DoorTug(this); WolfBodies = new WolfBodies(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
     }
@@ -330,6 +330,8 @@ public sealed partial class World {
     public Doorways Doorways { get; }
     /// <summary>Wolves tugging players back out of cabin doorways.</summary>
     public DoorTug DoorTug { get; }
+    /// <summary>How wolves at a player keep their distance from them and from each other.</summary>
+    public WolfBodies WolfBodies { get; }
     /// <summary>At this much health or less, a wolf's attack takes a player down rather than biting.</summary>
     public const float TakedownHealth = 50;
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
@@ -2286,7 +2288,7 @@ public sealed partial class World {
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
             } else if (wary) {
                 wolf.Chase = 0;
-                Travel(wolf, DoorTug.TuggedTo, Closing(wolf, dt * speed * .35f, dt), dt * speed * .35f, RouteSlack);
+                Travel(wolf, DoorTug.TuggedTo, WolfBodies.Closing(wolf, dt * speed * .35f, dt), dt * speed * .35f, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 Bite(wolf);
             } else if ((lit || Protected(wolf.Pos)) is var safe && safe && wolf.Chase <= 0) {
@@ -2298,28 +2300,12 @@ public sealed partial class World {
             } else {
                 if (!wolf.Sprinted && !safe) { wolf.Sprinted = true; Play("wolf_growl_distance", wolf.Pos); }
                 wolf.Chase = safe ? wolf.Chase - dt : ChaseSeconds;
-                Travel(wolf, DoorTug.TuggedTo, Closing(wolf, dt * chase, dt), dt * chase, RouteSlack);
+                Travel(wolf, DoorTug.TuggedTo, WolfBodies.Closing(wolf, dt * chase, dt), dt * chase, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 Bite(wolf);
             }
         }
-        // Wolves at the player crowd round them without their bodies running into each other: one that overlaps another steps
-        // aside, unless it holds the player, by the jaws or in the air.
-        var at = DoorTug.TuggedTo;
-        for (int i = 0; i < hunters.Count; i++) for (int j = i + 1; j < hunters.Count; j++) {
-            var a = hunters[i]; var b = hunters[j];
-            bool holdsA = Holds(a), holdsB = Holds(b);
-            // Bodies this far apart cannot touch.
-            if (holdsA && holdsB || a.Pos.DistanceSquaredTo(b.Pos) > (2 * (WolfNose + WolfHalfWidth)) * (2 * (WolfNose + WolfHalfWidth))) continue;
-            var (aTail, aNose) = Body(a, at); var (bTail, bNose) = Body(b, at);
-            var (onA, onB) = Closest(aTail, aNose, bTail, bNose);
-            float overlap = 2 * WolfHalfWidth - onA.DistanceTo(onB);
-            if (overlap <= 0) continue;
-            var apart = onA.DistanceSquaredTo(onB) > 1e-6f ? (onA - onB).Normalized() : (a.Pos - b.Pos).LengthSquared() > 1e-6f ? (a.Pos - b.Pos).Normalized() : Vector2.Right;
-            var push = apart * Math.Min(overlap / 2, dt * SideStepSpeed);
-            if (!holdsA) a.Pos = Slide(a.Pos, holdsB ? push * 2 : push);
-            if (!holdsB) b.Pos = Slide(b.Pos, holdsA ? -push * 2 : -push);
-        }
+        WolfBodies.KeepApart(hunters, dt);
         if (S.Mauled && !Dead) {
             int feeding = 0;
             foreach (var w in hunters) if (w.Feeding) feeding++;
@@ -2338,15 +2324,6 @@ public sealed partial class World {
         wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); DoorTug.TugOut(wolf);
     }
 
-    /// <summary>
-    /// How far a wolf closing in on the acting player goes straight at them this tick, up to <paramref name="step"/>: on to
-    /// <see cref="StandOff"/>, where its jaws reach them, or back to it at a walk when they come closer.
-    /// </summary>
-    private float Closing(Wolf wolf, float step, float dt) => Math.Clamp(wolf.Pos.DistanceTo(DoorTug.TuggedTo) - StandOff, -Math.Min(step, dt * BackOffSpeed), step);
-    /// <summary>Metres a second a wolf steps back from a player who comes too close, and steps aside from another wolf in its way.</summary>
-    public const float BackOffSpeed = 1.2f, SideStepSpeed = 3;
-    /// <summary>How far from a player a wolf closing in on them stops, within biting reach of them.</summary>
-    public const float StandOff = 1.05f;
     /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>
     private Vector2 AwayFromPlayer(Wolf wolf) => wolf.Pos == Player ? Vector2.Right : (wolf.Pos - Player).Normalized();
     /// <summary>Whether no player can see a spot.</summary>

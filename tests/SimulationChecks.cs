@@ -1337,11 +1337,11 @@ public static class SimulationChecks {
         var first = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(3, 0), Attack = 5 });
         var second = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(3.5f, .3f), Attack = 5 });
         for (int i = 0; i < 60; i++) world.Tick(.05f);
-        var a = World.Body(first, world.Player); var b = World.Body(second, world.Player);
+        var a = WolfBodies.Body(first, world.Player); var b = WolfBodies.Body(second, world.Player);
         float gap = float.MaxValue;
         // Sample points along each body, nose to tail.
         for (int i = 0; i <= 20; i++) for (int j = 0; j <= 20; j++) gap = Math.Min(gap, a.Tail.Lerp(a.Nose, i / 20f).DistanceTo(b.Tail.Lerp(b.Nose, j / 20f)));
-        Require(gap >= 2 * World.WolfHalfWidth - .01f, $"two wolves at one player should keep their bodies apart, not come {gap:0.00} m from each other");
+        Require(gap >= 2 * WolfBodies.WolfHalfWidth - .01f, $"two wolves at one player should keep their bodies apart, not come {gap:0.00} m from each other");
     }
 
     private static void CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth(GameData data) {

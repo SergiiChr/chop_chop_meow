@@ -127,6 +127,7 @@ UI and input:
 | `src/CabinPanel.cs` | A cabin: its door, sleep and the needs a night would leave |
 | `src/cabins/Doorways.cs` | Cabin doors: walking round to the door, stepping in and out, following, knocking and standing aside |
 | `src/actors/enemies/wolf/DoorTug.cs` | A wolf tugging a player back out of a cabin's doorway, letting go and handing a badly hurt one to the takedown |
+| `src/actors/enemies/wolf/WolfBodies.cs` | How wolves at a player keep their distance: closing in only to biting reach, and stepping aside from another wolf's body |
 | `src/cabins/model/Doorway.cs` | `Doorway`, what a player is doing at a cabin's door |
 | `src/actors/Momentum.cs` | How the player's movement answers the keys: braking, turning round and running back on a key for the other way |
 | `src/actors/player/model/PlayerState.cs`, `src/actors/player/model/HeldStack.cs`, `src/actors/player/model/Command.cs` | One player's saved body and belongings, a held stack, and the commands a guest sends its host |
@@ -486,8 +487,8 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   A howl is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it fades with distance from the player and pans with its direction.
   The howl calls every patrolling wolf within `HowlRadius` to where it stood (`WolfMode.Called`, `Wolf.Call`); a called wolf still smells on its way and goes back to patrolling once there.
 - **Approach.** After its howl a wolf trots at its player out of firelight until within `WolfSightRange`, then sprints (`Wolf.Chase` above zero) at `WolfChase` times `WalkSpeed` with one distant growl (`Wolf.Sprinted`), which data validation keeps above walking and below `SprintSpeed`.
-  Within sight it closes in only to `World.StandOff`, within biting reach, and backs off to it at a walk (`World.BackOffSpeed`) from a player another wolf tugs toward it (`DoorTug.TuggedTo`).
-  Wolves at a player keep their bodies apart (`World.Body`, `World.WolfHalfWidth`): one in another's way steps aside at `World.SideStepSpeed`, unless it holds the player.
+  Within sight it closes in only to `WolfBodies.StandOff`, within biting reach, and backs off to it at a walk (`WolfBodies.BackOffSpeed`) from a player another wolf tugs toward it (`DoorTug.TuggedTo`).
+  Wolves at a player keep their bodies apart (`WolfBodies.Body`, `WolfBodies.WolfHalfWidth`): one in another's way steps aside at `WolfBodies.SideStepSpeed`, unless it holds the player.
   A wolf leaping at a player in a cabin's doorway lands at their waist (`WorldView.InTheDoorway`), and one taking hold of a player lunges in to the waist rather than appearing there.
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
   A player a wolf had pinned goes free as it leaves.
