@@ -71,15 +71,17 @@ public sealed partial class World {
             var wolf = S.Wolves[i];
             if (WolvesRetreat && wolf.Mode != WolfMode.Home) GoHome(wolf);
             if (wolf.Target != 0) continue;
+            if (wolf.Visit != WolfVisit.None) { DoorVisits.Tick(wolf, dt); continue; }
             float step = dt * Data.WolfTrot;
             switch (wolf.Mode) {
                 case WolfMode.Patrol:
-                    Wander(wolf, step * PatrolPace); Smell(wolf);
+                    Wander(wolf, step * PatrolPace);
+                    if (!Smell(wolf, Data.SmellRadius)) DoorVisits.Smell(wolf);
                     break;
                 case WolfMode.Called:
-                    // A called wolf still noses the air on the way, so it does not run past a player it meets.
+                    // A called wolf still noses the air on the way, so it does not run past a player or a cabin with someone inside.
                     if (!Travel(wolf, wolf.Call, step, step) || wolf.Pos.DistanceTo(wolf.Call) < 2) Patrol(wolf, wolf.Heading);
-                    Smell(wolf);
+                    if (!Smell(wolf, Data.SmellRadius)) DoorVisits.Smell(wolf);
                     break;
                 case WolfMode.Home:
                     var door = NearestDen(wolf.Pos).Door;
@@ -111,7 +113,7 @@ public sealed partial class World {
     }
     private bool Roams(Vector2 p, bool lit) => CanStand(p) && (lit || !Protected(p));
     /// <summary>Sends a wolf back to patrolling on a heading, hunting nobody.</summary>
-    private static void Patrol(Wolf wolf, float heading) {
+    internal static void Patrol(Wolf wolf, float heading) {
         Calm(wolf); wolf.Mode = WolfMode.Patrol; wolf.Heading = heading;
     }
     /// <summary>Calls a wolf off whatever it is doing and sends it to the nearest den.</summary>
@@ -122,24 +124,28 @@ public sealed partial class World {
     private static void Calm(Wolf wolf) {
         wolf.Target = 0; wolf.Howl = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
         wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();
+        wolf.Visit = WolfVisit.None; wolf.VisitCabin = 0; wolf.VisitTime = 0;
     }
     /// <summary>
-    /// A wolf that smells a player out in the open within <see cref="GameData.SmellRadius"/> takes them as its prey.
+    /// A wolf that smells a player out in the open <paramref name="within"/> metres takes them as its prey, dropping whatever it did at a
+    /// cabin's door; returns whether it did.
     /// One that finds them out of its sight howls before it goes after them, which calls every patrolling wolf within <see cref="GameData.HowlRadius"/> to where it stands.
     /// </summary>
-    private void Smell(Wolf wolf) {
+    internal bool Smell(Wolf wolf, float within) {
         PlayerState? prey = null;
         foreach (var p in S.Players)
-            if (p.RespawnIn <= 0 && !Doorways.Indoors(p) && p.Pos.DistanceTo(wolf.Pos) <= Data.SmellRadius && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
-        if (prey == null) return;
-        if (prey.Pos.DistanceTo(wolf.Pos) <= Data.WolfSightRange) { wolf.Target = prey.Id; wolf.Mode = WolfMode.Patrol; wolf.Route.Clear(); return; }
+            if (p.RespawnIn <= 0 && !Doorways.Indoors(p) && p.Pos.DistanceTo(wolf.Pos) <= within && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
+        if (prey == null) return false;
+        Patrol(wolf, wolf.Heading);
+        if (prey.Pos.DistanceTo(wolf.Pos) <= Data.WolfSightRange) { wolf.Target = prey.Id; return true; }
         // The night's first howl is a lone wolf; every later one sounds like the pack answering.
         // The wolf holds its howl as long as the recording plays.
         bool answer = S.Howled;
-        wolf.Target = prey.Id; wolf.Mode = WolfMode.Patrol; wolf.Howl = wolf.HowlLength = answer ? Data.PackHowlSeconds : Data.LoneHowlSeconds; wolf.Route.Clear();
+        wolf.Target = prey.Id; wolf.Howl = wolf.HowlLength = answer ? Data.PackHowlSeconds : Data.LoneHowlSeconds;
         Play(answer ? "wolf_howl_group" : "wolf_howl", wolf.Pos);
         S.Howled = true;
         foreach (var other in S.Wolves)
             if (other.Target == 0 && other.Mode != WolfMode.Home && other.Pos.DistanceTo(wolf.Pos) <= Data.HowlRadius) { other.Mode = WolfMode.Called; other.Call = wolf.Pos; other.Route.Clear(); }
+        return true;
     }
 }

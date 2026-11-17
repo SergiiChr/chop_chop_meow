@@ -218,6 +218,8 @@ Each cut is faded at both ends, and the cuts of one sound are brought to one mea
 
 `door_knock` is "Door bang 1.wav" by freesound_community (Pixabay 14449), a recording supplied for this project: its three knocks on a door, each cut into its own variant, faded at both ends and brought to one mean level.
 
+`door_lock` (a key turning in a lock, with the silence cut from both ends) and `door_scratch` (four scratches on a door) were recorded for this project by its author, faded at the ends and peak-normalised.
+
 `tug_scream` is the first second and a half of "Male horror scream" (Pixabay 123080), and `takedown_scream` is "Man pain scream 02" (Pixabay 567205) with the silence cut from both ends: recordings supplied for this project, faded at the ends and brought to one mean level.
 
 `footsteps_default` is cut with ffmpeg from "Footsteps_Grass_1" by freesound_community (Pixabay 6810, artist SilentStrikeZ on Freesound), a recording supplied for this project: six single steps, each 0.34 seconds from just before the foot lands, faded in over 15 ms and out over its last 120 ms.

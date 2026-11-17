@@ -124,8 +124,9 @@ UI and input:
 | `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
-| `src/CabinPanel.cs` | A cabin: its door, sleep and the needs a night would leave |
-| `src/cabins/Doorways.cs` | Cabin doors: walking round to the door, stepping in and out, following, knocking and standing aside |
+| `src/CabinPanel.cs` | A cabin: its door and key, sleep and the needs a night would leave |
+| `src/cabins/Doorways.cs` | Cabin doors: walking round to the door, stepping in and out, following, knocking, standing aside and the key |
+| `src/actors/enemies/wolf/DoorVisits.cs`, `src/actors/enemies/wolf/model/WolfVisit.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
 | `src/actors/enemies/wolf/DoorTug.cs` | A wolf tugging a player back out of a cabin's doorway, letting go and handing a badly hurt one to the takedown |
 | `src/actors/enemies/wolf/WolfBodies.cs` | How wolves at a player keep their distance: closing in only to biting reach, and stepping aside from another wolf's body |
 | `src/cabins/model/Doorway.cs` | `Doorway`, what a player is doing at a cabin's door |
@@ -172,7 +173,10 @@ Rendering and sound:
 | `src/actors/display/ArmReach.cs` | Putting a hand on a point: the arm's joint angles for it, and a pose with the arm moved there |
 | `src/actors/player/display/FallBackView.cs` | A player knocked or tugged off their feet falling onto their back, their throat as they go over and their hands at the wolf |
 | `src/cabins/display/DoorwayView.cs`, `src/cabins/model/DoorShown.cs` | Players at cabin doors: stepping in and out, following, knocking, standing aside and squeezing past with a palm on the frame |
-| `src/cabins/display/StairSteps.cs` | The cabin's steps, and a pose's boots fitted onto them |
+| `src/cabins/display/StairSteps.cs` | The cabin's steps, how high they stand at a spot, and a pose's boots fitted onto them |
+| `src/cabins/display/DoorKeyView.cs` | The keyhole and key of a cabin's door, drawn into a picture for the cabin's page |
+| `src/cabins/display/InsideSet.cs`, `src/cabins/display/InsideWindow.cs` | What a player inside sees of a wolf forcing the door: a dark cabin with copies of the wolves and the player taken out, and the window that shows it as an old tape ([assets/environment/vhs](../assets/environment/vhs/README.md)) |
+| `src/actors/enemies/wolf/display/VisitView.cs` | A wolf at a cabin's door: its stands, scratching paw, steps, launch, and how far it has pushed the door open |
 | `src/actors/enemies/wolf/display/TugView.cs` | A wolf tugging a player out of a doorway, and lunging onto them as they fall |
 | `src/actors/enemies/wolf/display/FeedingSpots.cs` | Where wolves stand round a fallen player: feeders side-on to the body, a pinner's paws on the chest |
 | `src/IconRender.cs` | Renders item and building icons from the models (`./build.py icons`) |
@@ -196,7 +200,7 @@ Checks and review tools:
 | `src/performance/PerformanceStage.cs`, `src/performance/PerformanceFixture.cs` | The run's server half, and the staffed camp it plays |
 | `src/performance/PerformanceRoute.cs` | The run's sprint from the beach past the camp and the lake to the valley's top corner |
 | `src/performance/ResidentMemory.cs`, `src/performance/model/PerformanceSample.cs` | Reading resident memory without allocating, and one sampled frame |
-| `src/cabins/DoorwayReview.cs` | The `--doorway` scenes: two players and wolves at a cabin's door, moved by a script and run by the game's rules |
+| `src/cabins/DoorwayReview.cs` | The `--doorway` scenes: two players and wolves at a cabin's door, outside it or inside behind it, moved by a script and run by the game's rules |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
 | `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
 | `src/intro/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
@@ -452,6 +456,7 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
 Sleeping in a cabin advances time toward dawn.
 It is allowed from `World.SleepHour` (22:00), a little before night falls.
 It is refused if hunger or thirst would run out first.
+Wolves patrol on through a slept night, and one that starts scratching at an unlocked door with someone inside stops the night there (`DoorVisits.Waking`); a tick that only skips ahead (`World.Tick` with `sleeping`) leaves wolves where they are.
 
 #### Sprinting
 
@@ -513,19 +518,21 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 
 Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
 A wolf already chasing the player still follows into the light for a few seconds.
-Inside a cabin (`SaveState.Sheltered`) the player is hidden: their hunters give up at once and patrol on away from it.
+Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters go to its door (`DoorVisits.Follow`), or give up and patrol on away from a cabin they leave alone.
 
 #### Cabin doors
 
-`Doorways` (`src/cabins/Doorways.cs`) runs a cabin's door, which holds one player at a time, and `DoorTug` (`src/actors/enemies/wolf/DoorTug.cs`) a wolf tugging a player out of it; `World` holds one of each (`World.Doorways`, `World.DoorTug`) and ticks the doorway with the acting player.
+`Doorways` (`src/cabins/Doorways.cs`) runs a cabin's door, which lets one player through at a time into a cabin that holds `Doorways.Places`, and `DoorTug` (`src/actors/enemies/wolf/DoorTug.cs`) a wolf tugging a player out of it; `World` holds one of each (`World.Doorways`, `World.DoorTug`) and ticks the doorway with the acting player.
 A click on a cabin walks the player to `Doorways.DoorPoint` along `Doorways.TowardDoor`, round the walls when the cabin is in the way, and `Doorways.Enter` starts there.
 What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they are occupied (`World.Occupied`), as when downed, and any action they try is refused with "You are busy." (`World.Busy`); inside a cabin they are not.
 Picking a hotbar slot, putting a held stack back, marking the ending seen and skipping to morning are not refused.
 Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin needs dry, open ground there; stepping out and waking in a cabin put the player on it, or, for a cabin from an older save with it blocked, on the first open ground round the cabin (`Doorways.Doorstep`).
 
 - `Entering` takes `Doorways.EnterSeconds`, or `Doorways.RushSeconds` for a player who sprinted there (`PlayerState.DoorRush`), then shelters them.
-- A player who arrives while someone else steps in is `Following` until that one is inside, then `Knocking`: the door swings shut over `Doorways.ShutSeconds`, they step up to it, and from `Doorways.KnockLead` knock `Doorways.Knocks` times over `Doorways.KnockSeconds`, then stand free.
-  At the door of a cabin someone is in or stepping out of, they knock straight away, with the same lead.
+- A player who arrives while someone else steps in is `Following` until that one is inside, then steps in themselves (`Doorways.Ahead`).
+  At the door of a cabin that is full (`Doorways.Inside`), locked with someone inside (`Thing.Locked`) or being stepped out of, they are `Knocking`: the door swings shut over `Doorways.ShutSeconds`, they step up to it, and from `Doorways.KnockLead` knock `Doorways.Knocks` times over `Doorways.KnockSeconds`, then stand free.
+- `Doorways.TurnKey` locks or unlocks the door of the cabin the acting player is in, with `door_lock`; `Doorways.Leave` unlocks it first, and a cabin nobody is left inside is unlocked (`Doorways.UnlockEmpty`).
+  A player wakes after death in the nearest cabin with a place left (`Doorways.HasPlace`), locked or not.
   Each arrival at a door is numbered (`SaveState.DoorArrivals`, `PlayerState.DoorQueued`), so players tugged back out go in again in the order they came.
 - `Doorways.Indoors` is what wolves go by: inside, through the second half of `Entering` and the first half of `Leaving`.
 - A bite or a leap landing on a player out in the open at a door (`DoorTug.TugOut`) has that wolf take them by the waist (`Wolf.Tugging`) and tug them back out along `Doorways.OutOfDoor`, `DoorTug.TugDistance` or as far as open ground runs with room for the wolf behind them (`DoorTug.TugDistanceFrom`), in `DoorTug.Tugs` tugs over `DoorTug.TugSeconds` (`Tugged`, or `TuggedOff` while knocking), the way `DoorTug.TugProgress` paces it, with one `tug_scream` through the tug.
@@ -542,6 +549,31 @@ On the two treads of the step and the floor (`StairSteps.StepEdges`) the body st
 Every takedown falls the player backward onto their seat and back (`ActorAction.FallBack`, `FallBackView.FallBack`, `FallBackView.FallPath`), facing the wolf after a leap; a leaping or pinning wolf puts its forepaws on the player's chest (`FeedingSpots.PawsOnChest`), astride with its hind paws wide of the legs, while the player's hands push its head off by the jaw within reach, or by the neck when the jaw is too close, elbows out at the sides (`WolfModel.NeckLine`, `ArmReach.ArmTo` with an elbow direction and `ActorRig.RollArm`), and every other wolf feeding there stands perpendicular to the body at the part of it nearest to it where it touches neither another wolf nor the player's arms (`FeedingSpots.FreeSpot`, `WolfModel.Volumes`), keeping that spot while it stays free.
 A wounded player tugged out falls backward still facing the door, and the wolf lets go, steps round to their left (`Wolf.LungeFrom`) and lunges onto the throat from there as they land.
 A player knocking on the door stands on the lower tread, with the front boot on the upper one, and steps back down off it when done.
+#### Wolves at a cabin's door
+
+`DoorVisits` (`src/actors/enemies/wolf/DoorVisits.cs`, `World.DoorVisits`) runs a wolf's visit to the door of a cabin with someone inside, a `WolfVisit` stage on `Wolf.Visit` at `Wolf.VisitCabin`, timed by `Wolf.VisitTime`.
+A wolf whose player got inside goes there (`DoorVisits.Follow`), and so does a patrolling or called wolf within `SmellRadius` of such a cabin (`DoorVisits.Smell`), without a howl; a campfire lighting the door keeps both off it.
+
+- `Coming`: the wolf nearest the door goes to `Doorways.DoorPoint`; the others wait `DoorVisits.WaitBehind` out from it, `DoorVisits.WaitApart` apart.
+- `Scratching` lasts `DoorVisits.ScratchSeconds` with `door_scratch`.
+  From a locked door every wolf there goes away (`Wolf.Tried`), leaving that cabin alone until it has been out of smell range of it.
+  Until its snout is in the door a wolf turns to a player out in the open within `WolfSightRange`.
+- `Prying`, `Opening`, `Staring` (with a growl) and `Launching` last `PrySeconds`, `OpenSeconds`, `StareSeconds` and `LaunchSeconds`.
+  From `Prying` on the key does not turn, nobody steps in past the wolf, and nobody steps out from the first scratch on (`DoorVisits.Forcing`, `DoorVisits.AtDoor`).
+- `TakingOut`: the wolf bites the last player who came in (`PlayerState.DoorQueued`), puts them at the door point as `Doorway.Tugged` and tugs them out as `DoorTug` does; the wolves that waited hunt that player.
+- A struck wolf, an emptied cabin or a fire lit at the door ends the visit.
+
+`VisitView` (`src/actors/enemies/wolf/display/VisitView.cs`) draws the visit from the stage and its seconds alone (`VisitView.Clock`), so the world and the inside view agree.
+The wolf stands in front of the door to scratch, its right forepaw raking the boards once for each scratch of the recording, steps over to the door's free edge, works its snout in, steps round the door into the doorway and springs in (`VisitView.PoseAt`, `VisitView.Placement`).
+Its paws stay where they stand while the body moves over them and step one at a time, timed by how far the body has come, each paw's height running from what it left to what it lands on (`StairSteps.HeightAt`, `WolfModel.Stood`, `WolfModel.ReachTo`).
+The door stands as far open as the wolf's body has pushed it (`VisitView.DoorDegrees`, `DoorwayView.PushDoor`): a table made once of the least opening that clears every part of the wolf behind the door, which only grows.
+A player the wolf takes out is drawn from where they stood inside (`DoorwayView.IntoCabin`).
+
+A player inside the cabin sees the door from in there in `InsideWindow`, a fifth of the screen wide and four fifths tall in its left third, from `Prying` until the wolf has them; one left inside sees the other taken out for `WorldView.TakenOutSeconds` more.
+`InsideSet` is a cabin of its own in a viewport with its own world, lit only by dim moonlight through the door, where `WorldView.SyncInside` copies the poses of the wolves at the door and of the player taken out as the world draws them (`ModelKit.CopyPose`); its camera closes in as the wolf launches.
+The window draws that picture through the VHS shader.
+`DoorKeyView` draws the keyhole and key the cabin's page shows, the key turning as the lock's sound plays.
+
 The animation review's `player cabin` clip plays every stage at a cabin, `player jog back` and `player run back` a run braking and turning round, and `player jog turns` and `player run turns` the keys A, W, D and S pressed in quick turn.
 The door opens while someone steps in or out: it swings with `hut_door_normal` after a walk, and slams shut with `hut_door_escaping` after a run.
 

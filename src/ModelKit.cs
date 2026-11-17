@@ -253,6 +253,18 @@ public static class ModelKit {
         return copy;
     }
 
+    /// <summary>
+    /// Poses a model as another one built the same way stands: every part's place, turn and whether it shows, and every
+    /// bone of its skeletons.
+    /// </summary>
+    public static void CopyPose(Node3D from, Node3D to) {
+        to.Transform = from.Transform; to.Visible = from.Visible;
+        if (from is Skeleton3D bones && to is Skeleton3D copy)
+            for (int bone = 0; bone < bones.GetBoneCount(); bone++) copy.SetBonePose(bone, bones.GetBonePose(bone));
+        for (int i = 0; i < from.GetChildCount() && i < to.GetChildCount(); i++)
+            if (from.GetChild(i) is Node3D part && to.GetChild(i) is Node3D other) CopyPose(part, other);
+    }
+
     /// <summary>Builds the shaders of every material in a model now, while loading, rather than on its first draw.</summary>
     public static void BuildShaders(Node node) {
         if (node is MeshInstance3D mesh) {

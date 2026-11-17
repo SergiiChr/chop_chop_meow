@@ -18,6 +18,18 @@ public static class StairSteps {
     // The body eases onto a lifting boot's tread this many metres per metre the boot rises, so the hips never jump.
     private const float LiftEase = 3;
 
+    /// <summary>Half the width of a cabin's step, which lies centred on its door point, and how far in from the door point the door itself is.</summary>
+    public const float StepHalfWidth = .5f, DoorDepth = .925f;
+
+    /// <summary>
+    /// How high a cabin's step, or its floor past the door, stands over the ground at <paramref name="from"/>, a spot measured from
+    /// the cabin's door point. A paw or boot in the air, <paramref name="lifted"/>, rises onto a tread ahead of its edge.
+    /// </summary>
+    public static float HeightAt(Vector2 from, bool lifted = false) {
+        float depth = -from.Dot(Doorways.OutOfDoor);
+        return Math.Abs(from.Dot(Doorways.AsideWay)) > StepHalfWidth && depth < DoorDepth ? 0 : StepGround(depth, StepEdges, StepRise, lifted ? StepClearance : 0);
+    }
+
     /// <summary>How high steps rising <paramref name="rise"/> at each of <paramref name="edges"/>, depths along the way up, are at <paramref name="depth"/>.</summary>
     public static float StepGround(float depth, ReadOnlySpan<float> edges, float rise) => StepGround(depth, edges, rise, 0);
 

@@ -706,6 +706,10 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
         await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind the player once they are inside", 3);
+        // The door's key shows under the door's button for a player inside; a click turns it, which locks the door.
+        await Until(() => Named("key") is { Visible: true }, "the cabin page showing the door's key to a player inside", 2);
+        await Click(Named("key")!);
+        await Until(() => world.Find(hut.Id) is { Locked: true }, "a click on the key locking the cabin's door", 2);
         RunUntilNight(Hosted); SetNeeds(Hosted, hunger: 5);
         await Until(() => Named("sleep")?.TooltipText.Contains("too hungry") == true, "the sleep button explaining that the player is too hungry to sleep", 2);
         // Under "Stats after sleep" the page shows only what a night would leave, each capsule over its icon as in the corner; a fed night heals.
@@ -723,6 +727,7 @@ public partial class Game {
         Require(world.Sheltered == hut.Id, "Moving must not step the player out of the cabin.");
         await Click(FindButton(panel, "Step outside")!);
         Require(world.Sheltered == 0, "Step outside must leave the cabin.");
+        await Until(() => world.Find(hut.Id) is { Locked: false } && Named("key") is { Visible: false }, "stepping out unlocking the door and hiding its key", 2);
         // With no key held the player stops where they stepped in, right by the door.
         await Click(view.Screen(hut.Pos, 1.5f));
         await Until(() => world.Sheltered == hut.Id, "a click on the cabin taking a standing player inside", 4);

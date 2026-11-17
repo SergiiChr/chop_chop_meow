@@ -103,6 +103,8 @@ public partial class SidePanel : MovableWindow {
     /// <summary>The open page, or nothing while the panel is closed.</summary>
     public Page Page { get; private set; }
     public Selection Selection { get; private set; }
+    /// <summary>The picture of a cabin door's keyhole and key, which the cabin's page shows.</summary>
+    public DoorKeyView DoorKey { get; } = new();
     public TextureRect HeadingIcon { get; }
     public Label HeadingTitle { get; }
     public float ScreenWidth => ui.Size.X;
@@ -115,6 +117,7 @@ public partial class SidePanel : MovableWindow {
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top; Visible = false;
         Bag = new BackpackDrawer(kit, this);
+        AddChild(DoorKey);
         Aside = new PanelContainer { Name = "aside", Visible = false }; Aside.AddThemeStyleboxOverride("panel", Style.Board);
         asideContent = new VBoxContainer(); asideContent.AddThemeConstantOverride("separation", 12); Aside.AddChild(asideContent);
         var frame = new HBoxContainer(); frame.AddThemeConstantOverride("separation", 20); AddChild(frame);

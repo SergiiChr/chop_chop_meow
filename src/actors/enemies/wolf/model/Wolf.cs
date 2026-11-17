@@ -21,6 +21,12 @@ public sealed class Wolf : IWalker {
     public bool Pinning { get; set; }
     /// <summary>The wolf tugging its player out of a cabin's doorway by the waist.</summary>
     public bool Tugging { get; set; }
+    /// <summary>What the wolf is doing at the door of the cabin <see cref="VisitCabin"/>, and for how many seconds.</summary>
+    public WolfVisit Visit { get; set; }
+    public int VisitCabin { get; set; }
+    public float VisitTime { get; set; }
+    /// <summary>The cabin whose locked door this wolf last left; it leaves that cabin alone until it is out of smell range of it.</summary>
+    public int Tried { get; set; }
     /// <summary>The way from a player's throat to where a wolf that tugged them out lunges onto it from, or zero for one that pins them standing over them.</summary>
     public Vector2 LungeFrom { get; set; }
     /// <summary>The wolf has growled at the player while closing in; it growls only once.</summary>

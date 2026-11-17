@@ -7,11 +7,12 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// Developer review fixture for <c>--doorway</c>: two players and, at dusk, wolves at a cabin's door, moved by a script
-/// and run by the game's own rules, for a look at how they queue, knock on the door and get tugged out.
+/// and run by the game's own rules, for a look at how they queue, knock on the door and get tugged out, and at wolves
+/// scratching at the door of a cabin with someone inside and forcing it.
 /// </summary>
 public sealed partial class DoorwayReview : Node {
     /// <summary>The scenes <c>--doorway</c> takes.</summary>
-    public static readonly string[] Scenes = { "queue", "occupied", "wolf", "wounded" };
+    public static readonly string[] Scenes = { "queue", "occupied", "wolf", "wounded", "locked", "forced", "pair", "pack" };
     public World World = null!;
     public WorldView View = null!;
     public Thing Cabin = null!;
@@ -29,7 +30,7 @@ public sealed partial class DoorwayReview : Node {
 
     public override void _Ready() {
         if (!Scenes.Contains(Scene)) throw new ArgumentException($"--doorway takes {string.Join(", ", Scenes)}, not {Scene}");
-        bool night = Scene is "wolf" or "wounded";
+        bool night = Scene is not ("queue" or "occupied");
         // Wolves come out at dusk, while there is still light to see them by.
         World.S.Time = World.Data.DaySeconds * (night ? World.Data.DuskStarts + .02f : .3f);
         // Only the scene's own wolf comes: every den stays shut tonight.
@@ -64,6 +65,29 @@ public sealed partial class DoorwayReview : Node {
                 (0, () => World.Doorways.Enter(Cabin, false)), (.1f, () => World.As(guest, () => World.Doorways.Enter(Cabin, false))),
                 (.15f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.6f, 1.2f), Target = host.Id })),
                 (.9f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(2.2f, 1.4f), Target = guest.Id })),
+            },
+            // The host is inside behind a locked door; a wolf comes, scratches at it and goes away.
+            "locked" => new (float, Action)[] {
+                (0, () => { World.Player = door; World.S.Sheltered = Cabin.Id; Cabin.Locked = true; World.As(guest, () => World.Player = door + new Vector2(60, 0)); }),
+                (.2f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.5f, 4) })),
+            },
+            // The host is inside with the door unlocked; a wolf scratches, forces the door and takes them out, and they run back in.
+            "forced" => new (float, Action)[] {
+                (0, () => { World.Player = door; World.S.Sheltered = Cabin.Id; World.As(guest, () => World.Player = door + new Vector2(60, 0)); }),
+                (.2f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.5f, 4) })),
+            },
+            // Both are inside, the neighbor last; the wolf takes the neighbor out while the host watches from inside.
+            "pair" => new (float, Action)[] {
+                (0, () => { World.Player = door; World.S.Sheltered = Cabin.Id; World.S.Actor.DoorQueued = ++World.S.DoorArrivals; }),
+                (0, () => World.As(guest, () => { World.Player = door; World.S.Sheltered = Cabin.Id; World.S.Actor.DoorQueued = ++World.S.DoorArrivals; })),
+                (.2f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.5f, 4) })),
+            },
+            // The host is inside with the door unlocked; three wolves come, one forces the door while the others wait behind it.
+            "pack" => new (float, Action)[] {
+                (0, () => { World.Player = door; World.S.Sheltered = Cabin.Id; World.As(guest, () => World.Player = door + new Vector2(60, 0)); }),
+                (.2f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.5f, 4) })),
+                (.6f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(3, 6) })),
+                (1, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-4, 7) })),
             },
             // A badly hurt host is tugged out of the doorway and pinned.
             _ => new (float, Action)[] {

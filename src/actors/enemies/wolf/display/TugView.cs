@@ -54,6 +54,8 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
         model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
         model.Root.Visible = world().Sees(wolf.Pos);
+        // A wolf taking a player out of their cabin starts in its doorway, with its paws on the step and the floor.
+        model.Steps = wolf.Visit == WolfVisit.TakingOut && world().Find(wolf.VisitCabin) is Thing cabin ? Doorways.DoorPoint(cabin) : null;
         model.Tug(through, elapsed, dt);
         var grip = Waist(held) - model.Root.Basis * model.Bite;
         model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);

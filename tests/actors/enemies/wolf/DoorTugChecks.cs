@@ -131,7 +131,8 @@ public static class DoorTugChecks {
         var guest = world.Arrive("guest", 2);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
         StepInside(world, hut);
-        world.As(guest, () => { world.Player = Doorways.DoorPoint(hut); Require(world.Doorways.Enter(hut, false) && guest.Door == Doorway.Knocking, "the guest should knock on the taken cabin's door"); });
+        world.Doorways.TurnKey();
+        world.As(guest, () => { world.Player = Doorways.DoorPoint(hut); Require(world.Doorways.Enter(hut, false) && guest.Door == Doorway.Knocking, "the guest should knock on the locked cabin's door"); });
         world.Doorways.Leave();
         Require(guest.Door == Doorway.Aside, "the guest should stand aside for the host stepping out");
         var wolf = PlaceWolf(world, new Wolf { Pos = guest.Pos + new Vector2(.8f, 0), Target = guest.Id });

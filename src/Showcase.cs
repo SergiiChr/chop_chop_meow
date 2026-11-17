@@ -32,7 +32,12 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     public void Run() {
         Place();
         view.Zoom = Launch.Number("--zoom", view.Zoom);
-        if (Launch.Value("--doorway") is string scene) view.AddChild(new DoorwayReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = scene });
+        if (Launch.Value("--doorway") is string scene) {
+            var cabin = world.Things.First(t => t.Kind == ThingKind.Hut);
+            view.AddChild(new DoorwayReview { World = world, View = view, Cabin = cabin, Scene = scene });
+            // With --panel the cabin's page shows beside the scene, for a look at its key.
+            if (Launch.Has("--panel")) panel.Select(cabin);
+        }
     }
 
     private void Place() {

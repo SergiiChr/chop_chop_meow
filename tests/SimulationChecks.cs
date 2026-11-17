@@ -91,6 +91,8 @@ public static class SimulationChecks {
         CabinChecks.Run(data);
         Test(CheckPressingTheOppositeWayBrakesBeforeRunningBack, data);
         DoorTugChecks.Run(data);
+        DoorVisitsChecks.Run(data);
+        VisitViewChecks.Run();
         Test(CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
@@ -2590,9 +2592,10 @@ public static class SimulationChecks {
     }
 
     private static void CheckARandomDenLetsOneMoreWolfOutEveryHour(GameData data) {
-        // Inside a cabin the player is never smelled, so every wolf let out stays out until the retreat.
+        // Behind a locked cabin door the player is never reached, so every wolf let out stays out until the retreat.
         var world = EmptyWorld(data);
         StepInside(world, world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0)));
+        world.Doorways.TurnKey();
         RunUntilDusk(world);
         SafeTick(world, data.HourSeconds - 1);
         Require(world.Wolves.Count == World.Dens.Length, "only the wolves of dusk should be out through the first hour");
@@ -2806,21 +2809,21 @@ public static class SimulationChecks {
         PlaceWolf(world, wolf);
         SafeTick(world, .5f);
         StepInside(world, hut);
-        float before = wolf.Pos.DistanceTo(world.Player);
+        world.Doorways.TurnKey();
         SetNeeds(world, health: 40);
         SafeTick(world, 1);
-        Require(wolf.Pos.DistanceTo(world.Player) > before,
-            "a wolf must back off at once when the player is inside a cabin");
+        Require(wolf.Target == 0, "a wolf must stop hunting a player who is inside a cabin");
         Require(wolf.Leap <= 0, "a wolf must stop its leap when the player is inside a cabin");
         Require(world.Health >= 40, "a wolf must not hurt a player inside a cabin");
         var inside = world.Player;
         world.MovePlayer(new Vector2(0, .1f));
         Require(world.Sheltered == hut.Id && world.Player == inside, "moving should not take the player back outside");
-        // A chaser that caught up stands right on the player; it must still back off and give up.
+        // A chaser that caught up stands right on the player; it must still give up once it has scratched at the locked door.
         var caught = new Wolf { Pos = world.Player, Target = world.Me.Id };
         PlaceWolf(world, caught);
         SafeTick(world, 10);
-        Require(caught.Target == 0 && wolf.Target == 0 && caught.Mode == WolfMode.Patrol, "wolves should give up on the player and patrol on once they have been inside long enough");
+        Require(caught.Target == 0 && wolf.Target == 0 && caught.Mode == WolfMode.Patrol && caught.Visit == WolfVisit.None && wolf.Visit == WolfVisit.None, "wolves should give up on the player and patrol on once they have been inside behind a locked door long enough");
+        Require(world.Health >= 40, "a wolf must not hurt a player behind a locked door");
         world.Doorways.Leave();
         Require(world.Sheltered == 0, "stepping outside should leave the cabin");
         world.Player = hut.Pos + new Vector2(12, 0);

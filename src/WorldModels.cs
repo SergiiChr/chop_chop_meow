@@ -530,7 +530,7 @@ public static class WorldModels {
     }
 
     /// <summary>Small OSB cabin on block piers with a corrugated shed roof, solar panel and rain barrel.</summary>
-    private static HutProp Cabin() {
+    internal static HutProp Cabin() {
         var prop = new HutProp();
         var body = prop.Body;
         foreach (var (x, z) in new[] { (-1.1f, -1f), (1.1f, -1f), (-1.1f, 1f), (1.1f, 1f) }) Box(body, new Vector3(.3f, .3f, .3f), new Vector3(x, .15f, z), Stone("9a9b97", .85f));

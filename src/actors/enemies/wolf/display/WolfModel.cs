@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What a wolf model shows; a change blends from the pose it had into the new one.</summary>
-public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug }
+public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Door }
 
 /// <summary>
 /// A leg's joint angles in degrees, each swinging the segment below forward from its parent's line; Splay swings the whole leg out from the body.
@@ -71,6 +71,10 @@ public sealed class WolfModel {
     public Vector2 Drift;
     /// <summary>Which way the wolf faced as its latest move began, to turn from.</summary>
     public float FromYaw;
+    /// <summary>How far a wolf at a cabin's door has settled into its stand there from where it arrived, 0 to 1.</summary>
+    public float Settled;
+    /// <summary>The door point of the cabin whose step the wolf stands at, when it does: its paws are set on the treads and the floor past the door, and its body lifted and tipped to stand on them.</summary>
+    public Vector2? Steps;
     /// <summary>Seconds a wolf has fed at its spot at a fallen player, easing it there from where it stood.</summary>
     public float Fed;
     /// <summary>The spot a feeding wolf holds at a fallen player: how far along the body, in WorldView's steps, and from which side; zero side for none yet.</summary>
@@ -118,7 +122,7 @@ public sealed class WolfModel {
     private static readonly Gait GallopGait = new(2.42f, .25f, 0, .1f, .6f, .5f, .2f, .16f, .14f, .85f);
 
     /// <summary>Where each paw stands at rest under its shoulder or hip.</summary>
-    private static float Home(int leg) => leg < 2 ? .33f : -.34f;
+    internal static float Home(int leg) => leg < 2 ? .33f : -.34f;
 
     /// <summary>
     /// Moves over <paramref name="distance"/> tiles this frame: a walk while slow, a trot when quicker and a gallop for a chase.
@@ -239,7 +243,7 @@ public sealed class WolfModel {
     /// All four paws flat on the ground at home, spread by <paramref name="spread"/>, the hind ones by <paramref name="hindSpread"/>
     /// when given; <paramref name="shift"/> moves the hind paws forward.
     /// </summary>
-    private static WolfPose Planted(WolfPose body, float spread, float shift = 0, float frontAhead = 0, float frontUp = 0, float hindSpread = 0) {
+    internal static WolfPose Planted(WolfPose body, float spread, float shift = 0, float frontAhead = 0, float frontUp = 0, float hindSpread = 0) {
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
             var at = new Vector3(WolfShape.Pivot(leg).X * (hind && hindSpread > 0 ? hindSpread : spread), WolfShape.Sole + (hind ? 0 : frontUp), Home(leg) + (hind ? shift * (leg == 2 ? 1 : -1) : frontAhead));
@@ -252,7 +256,10 @@ public sealed class WolfModel {
     /// The leap at a standing player's throat, from the push off at <paramref name="progress"/> 0 to the moment the jaws reach it at <paramref name="contact"/>.
     /// The hind legs drive while the forelegs fold up, then reach out for the chest, landing at <paramref name="chest"/> in the model when given, with the jaws wide.
     /// </summary>
-    public void Leap(float progress, float contact, float dt, (Vector3 Left, Vector3 Right)? chest = null) {
+    public void Leap(float progress, float contact, float dt, (Vector3 Left, Vector3 Right)? chest = null) => Show(WolfMotion.Leap, Leaping(progress, contact, chest), dt);
+
+    /// <summary>A leaping wolf's pose, <paramref name="progress"/> of the way through the leap, with its jaws reaching their mark at <paramref name="contact"/>.</summary>
+    internal static WolfPose Leaping(float progress, float contact, (Vector3 Left, Vector3 Right)? chest = null) {
         float t = Math.Clamp(progress / Math.Max(contact, .05f), 0, 1);
         float push = Mathf.SmoothStep(0, .3f, t), air = Mathf.SmoothStep(.15f, 1, t), reach = Mathf.SmoothStep(.4f, 1, t);
         // The body arcs up and comes down onto the throat, which sits lower than the top of the leap.
@@ -269,7 +276,7 @@ public sealed class WolfModel {
             if (!hind && chest is var (left, right)) at = at.Lerp(leg == 0 ? left : right, reach);
             body = body.WithLeg(leg, Reach(body, leg, at, lower, hind ? lower - 30 * air : lower - 20));
         }
-        Show(WolfMotion.Leap, body, dt);
+        return body;
     }
 
     /// <summary>
@@ -398,7 +405,7 @@ public sealed class WolfModel {
     /// <summary>Where a paw bone is, in the model, under the pose shown; it stands WolfShape.Sole above the ground when the paw is planted.</summary>
     public Vector3 Paw(int leg) => PawOf(shown, leg);
 
-    private static Vector3 PawOf(WolfPose pose, int leg) {
+    internal static Vector3 PawOf(WolfPose pose, int leg) {
         var l = pose.Leg(leg);
         int bone = WolfShape.Leg(leg);
         var at = Frame(pose, leg >= 2) * Posed(bone, Vector3.Zero, Turn(-l.Upper, 0, l.Splay)) * Posed(bone + 1, Vector3.Zero, Turn(-l.Middle))
@@ -453,7 +460,7 @@ public sealed class WolfModel {
     public Vector3 Bite => BiteOf(shown);
 
     /// <summary>Where the jaws close, in the model, under a pose.</summary>
-    private static Vector3 BiteOf(WolfPose pose) {
+    internal static Vector3 BiteOf(WolfPose pose) {
         var neck = Frame(pose, false) * Posed(WolfShape.Neck, Vector3.Zero, Turn(pose.Neck, pose.NeckTurn));
         var head = neck * Posed(WolfShape.Head, Vector3.Zero, Turn(pose.Head, pose.HeadTurn, pose.HeadTilt));
         return head * (WolfShape.Bite - WolfShape.Bones[WolfShape.Head].At);
@@ -461,7 +468,67 @@ public sealed class WolfModel {
 
     // ---------- Blending and posing ----------
 
+    /// <summary>
+    /// Shows a pose worked out elsewhere, with each paw standing <paramref name="ground"/> metres higher than the ground under
+    /// the model, as on a step, blending into it from the pose shown when the motion changes.
+    /// </summary>
+    public void Pose(WolfMotion motion, WolfPose pose, ReadOnlySpan<float> ground, float dt) {
+        Steps = null;
+        Show(motion, Stood(pose, ground), dt);
+    }
+
+    /// <summary>Shows the pose another wolf model shows, as it is.</summary>
+    public void CopyPose(WolfModel other) {
+        shown = other.shown; motion = other.motion; blend = 1;
+        Apply(shown);
+    }
+
+    /// <summary>A pose stood on the step of the cabin whose door point is <paramref name="door"/>, each paw on the tread or floor under it.</summary>
+    private WolfPose OnSteps(WolfPose pose, Vector2 door) {
+        Span<float> ground = stackalloc float[4];
+        var root = Root.Transform;
+        for (int leg = 0; leg < 4; leg++) {
+            var paw = PawOf(pose, leg);
+            var at = root * paw;
+            ground[leg] = StairSteps.HeightAt(new Vector2(at.X, at.Z) - door, paw.Y - WolfShape.Sole > .01f);
+        }
+        return Stood(pose, ground);
+    }
+
+    /// <summary>
+    /// A pose with each paw raised <paramref name="ground"/> metres, onto what it stands on, and the body lifted and tipped
+    /// to stand over them, keeping each leg's lowest joints at their angles.
+    /// </summary>
+    internal static WolfPose Stood(WolfPose pose, ReadOnlySpan<float> ground) {
+        Span<float> raised = stackalloc float[4];
+        Span<Vector3> paws = stackalloc Vector3[4];
+        float front = 0, hind = 0, frontDown = 0, hindDown = 0;
+        for (int leg = 0; leg < 4; leg++) {
+            paws[leg] = PawOf(pose, leg);
+            // A paw held well off the ground, such as one scratching at the door, stands on nothing.
+            float down = 1 - Mathf.SmoothStep(HeldFrom, HeldBy, paws[leg].Y - WolfShape.Sole);
+            raised[leg] = down * ground[leg];
+            if (leg < 2) { front += down * raised[leg]; frontDown += down; } else { hind += down * raised[leg]; hindDown += down; }
+        }
+        // The chest stands over the forepaws that are down and the hips over the hind ones; with a pair in the air, over the other pair.
+        if (frontDown > 0) front /= frontDown;
+        if (hindDown > 0) hind /= hindDown;
+        if (frontDown == 0) front = hind; else if (hindDown == 0) hind = front;
+        if (front == 0 && hind == 0) return pose;
+        var stood = pose with { Lift = pose.Lift + (front + hind) / 2, Pitch = pose.Pitch - Mathf.RadToDeg(MathF.Atan2(front - hind, Home(0) - Home(2))) };
+        for (int leg = 0; leg < 4; leg++) {
+            var l = pose.Leg(leg);
+            var down = Frame(pose, leg >= 2).Basis * Vector3.Down;
+            float lean = Mathf.RadToDeg(MathF.Atan2(down.Z, -down.Y)), lower = l.Upper + l.Middle + l.Lower + lean;
+            stood = stood.WithLeg(leg, ReachTo(stood, leg, paws[leg] + Vector3.Up * raised[leg], lower, lower + l.Paw));
+        }
+        return stood;
+    }
+    /// <summary>How high off the ground, in metres, a paw starts to count as held up rather than stepping, and counts as held up.</summary>
+    private const float HeldFrom = .12f, HeldBy = .3f;
+
     private void Show(WolfMotion next, WolfPose target, float dt) {
+        if (Steps is Vector2 door) target = OnSteps(target, door);
         // The head turns ahead of the body, the neck taking most of the turn.
         if (Turning.Look != 0) {
             float look = Mathf.RadToDeg(Turning.Look);
@@ -469,8 +536,8 @@ public sealed class WolfModel {
         }
         if (next != motion) {
             from = shown; blend = 0;
-            // A leap and a blow happen fast; changes of gait and settling down take longer.
-            blendSeconds = next is WolfMotion.Leap or WolfMotion.Recoil ? .08f : next == WolfMotion.Pin ? .12f : motion == WolfMotion.Recoil ? .3f : .25f;
+            // A leap and a blow happen fast, and a wolf at a door stands still before its first scratch; changes of gait and settling down take longer.
+            blendSeconds = next is WolfMotion.Leap or WolfMotion.Recoil ? .08f : next is WolfMotion.Pin or WolfMotion.Door ? .12f : motion == WolfMotion.Recoil ? .3f : .25f;
             motion = next;
         }
         blend = Math.Min(1, blend + dt / blendSeconds);
@@ -505,10 +572,24 @@ public sealed class WolfModel {
     }
 
     /// <summary>
+    /// Solves a leg as <see cref="Reach"/> does, then corrects it until the paw bone is at <paramref name="paw"/>: the plain
+    /// solve leaves a paw that stands out to the side of its shoulder or hip a few centimetres off.
+    /// </summary>
+    internal static WolfLeg ReachTo(WolfPose body, int leg, Vector3 paw, float lowerAngle, float pawAngle) {
+        var aim = paw;
+        var solved = Reach(body, leg, aim, lowerAngle, pawAngle);
+        for (int pass = 0; pass < 3; pass++) {
+            aim += paw - PawOf(body.WithLeg(leg, solved), leg);
+            solved = Reach(body, leg, aim, lowerAngle, pawAngle);
+        }
+        return solved;
+    }
+
+    /// <summary>
     /// Solves a leg so its paw bone reaches <paramref name="paw"/> in the model, with the lowest segment and the paw at the given angles forward of straight down.
     /// The foreleg's elbow bends back and the hind stifle forward, as a dog's do; a paw out of reach is reached for as far as the leg goes.
     /// </summary>
-    private static WolfLeg Reach(WolfPose body, int leg, Vector3 paw, float lowerAngle, float pawAngle) {
+    internal static WolfLeg Reach(WolfPose body, int leg, Vector3 paw, float lowerAngle, float pawAngle) {
         bool hind = leg >= 2;
         var frame = Frame(body, hind);
         var local = frame.AffineInverse() * paw;

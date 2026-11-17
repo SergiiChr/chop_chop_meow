@@ -49,6 +49,8 @@ public sealed class Thing {
     public Inventory? Burner { get; set; }
     /// <summary>A crafting bench's chisel and hammer slots; automation never touches them.</summary>
     public Inventory? Tools { get; set; }
+    /// <summary>A cabin's door locked from inside with its key, which keeps out players and wolves; only a cabin with someone inside is locked.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Locked { get; set; }
     /// <summary>How far a mine is built.</summary>
     public MineStage MineStage { get; set; }
     /// <summary>Where a farm plot is in its growing cycle.</summary>
@@ -318,7 +320,7 @@ public sealed partial class World {
     private bool playerBusy { get => S.Actor.Busy; set => S.Actor.Busy = value; }
     public World(GameData data, bool generate = true) {
         Data = data;
-        Doorways = new Doorways(this); DoorTug = new DoorTug(this); WolfBodies = new WolfBodies(this);
+        Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorVisits = new DoorVisits(this); WolfBodies = new WolfBodies(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
     }
@@ -330,6 +332,8 @@ public sealed partial class World {
     public Doorways Doorways { get; }
     /// <summary>Wolves tugging players back out of cabin doorways.</summary>
     public DoorTug DoorTug { get; }
+    /// <summary>Wolves at the doors of cabins with someone inside: scratching, forcing an unlocked door and taking a player out.</summary>
+    public DoorVisits DoorVisits { get; }
     /// <summary>How wolves at a player keep their distance from them and from each other.</summary>
     public WolfBodies WolfBodies { get; }
     /// <summary>At this much health or less, a wolf's attack takes a player down rather than biting.</summary>
@@ -1099,15 +1103,19 @@ public sealed partial class World {
         if (Forwarded(Verb.Sleep, hut.Id)) return;
         PassNight();
     }
-    /// <summary>Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.</summary>
+    /// <summary>
+    /// Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.
+    /// A wolf that starts scratching at an unlocked cabin door stops the night there and wakes everyone.
+    /// </summary>
     private void PassNight() {
         float seconds = SecondsToDawn;
         asleep = true;
         try {
-            while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
+            while (seconds > 0 && !DoorVisits.Waking) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
         } finally {
             asleep = false;
         }
+        if (DoorVisits.Waking) { SayToAll("Scratching at a cabin door wakes you."); return; }
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
     /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
@@ -1205,7 +1213,9 @@ public sealed partial class World {
         // The player falls backwards facing the wolf that leapt, so the feet point back the way it came.
         var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
         var box = Add(ThingKind.Grave, killer == null ? Player : Player + (killer.Pos - Player).Normalized() * 1.5f); box.Inventory = S.Backpack;
+        int cabin = S.Sheltered;
         S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
+        Doorways.UnlockEmpty(cabin);
         // A wolf that pinned the player, or bit them down without a leap, eats every scrap of food.
         bool wolfKill = S.Mauled || Hunters.Any(w => w.Pos.DistanceTo(Player) < LeapRange);
         if (wolfKill) foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
@@ -1216,8 +1226,9 @@ public sealed partial class World {
         Say(wolfKill ? ate : $"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
     }
     private void Respawn() {
-        // The player wakes inside the free cabin nearest to where they fell, or in the clearing without one.
+        // The player wakes inside the cabin with a place left nearest to where they fell, the last one in, or in the clearing without one.
         var cabin = Doorways.NearestFreeCabin(Player);
+        if (cabin != null) S.Actor.DoorQueued = ++S.DoorArrivals;
         S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Terrain.Spawn : Doorways.Doorstep(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
         Say(cabin == null ? "You wake in the clearing. Recover your belongings from the box." : "You wake in the cabin. Recover your belongings from the box.");
     }
@@ -1786,7 +1797,7 @@ public sealed partial class World {
     /// otherwise <paramref name="step"/> along a route around what blocks it, found again once the destination has moved more than <paramref name="repath"/>.
     /// False when no way leads there.
     /// </summary>
-    private bool Travel(IWalker walker, Vector2 destination, float direct, float step, float repath = .2f) {
+    internal bool Travel(IWalker walker, Vector2 destination, float direct, float step, float repath = .2f) {
         if (walker.RouteTarget.DistanceTo(destination) > repath) { walker.Route.Clear(); walker.RouteTarget = destination; walker.RouteRetry = 0; }
         var next = walker.Pos.MoveToward(destination, direct);
         if (walker.Route.Count == 0 && CanStand(next)) { walker.Pos = next; return true; }
@@ -2113,14 +2124,17 @@ public sealed partial class World {
                 if (CanStand(b.Pos - push)) b.Pos -= push;
             }
         }
-        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.DenHours = 0; S.Howled = false; } else if (!sleeping) TickDens(dt);
+        // Wolves patrol on through a slept night, so one can come to a sleeper's door; a tick that only skips ahead
+        // leaves them where they are.
+        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.DenHours = 0; S.Howled = false; } else if (!sleeping || asleep) TickDens(dt);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
             using (ActAs(p)) {
                 if (!sleeping) Doorways.Tick(dt);
                 if (!Dusk) {
                     if (!Dead) S.Mauled = false;
-                } else if (!sleeping) {
+                } else if (!sleeping || asleep && Doorways.Indoors(p)) {
+                    // Through a slept night, wolves that hunted a sleeper go to their cabin's door; one sleeping out in the open is left alone.
                     hunting.Clear();
                     foreach (var w in S.Wolves) if (w.Target == p.Id) hunting.Add(w);
                     TickWolves(dt, hunting);
@@ -2240,9 +2254,10 @@ public sealed partial class World {
     private void TickWolves(float dt, List<Wolf> hunters) {
         // A wolf that let go, such as one heading home before dawn, frees the player it pinned.
         if (S.Mauled && !Dead && !AnyPinning(hunters)) S.Mauled = false;
-        // A sheltered player is out of reach and out of smell: the pack gives up at once and patrols on away from the cabin.
+        // A sheltered player is out of reach: the pack goes to the cabin's door, or gives up and patrols on away from a cabin it leaves alone.
         if (Doorways.Indoors(S.Actor)) {
-            foreach (var wolf in hunters) Patrol(wolf, AwayFromPlayer(wolf).Angle());
+            var cabin = Find(S.Sheltered != 0 ? S.Sheltered : S.Actor.DoorCabin);
+            foreach (var wolf in hunters) if (!DoorVisits.Follow(wolf, cabin)) Patrol(wolf, AwayFromPlayer(wolf).Angle());
             return;
         }
         bool lit = Protected(Player);

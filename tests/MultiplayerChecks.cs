@@ -367,9 +367,12 @@ public static class MultiplayerChecks {
         var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(3, 0));
         StepInside(world, hut);
         Require(world.SleepBlock() == "Everyone has to be inside a cabin to sleep.", $"sleeping should wait for a guest still outside: {world.SleepBlock()}");
-        // A cabin holds one player, so the guest takes another.
+        // The guest sleeps in a cabin of their own, and both lock their doors against the night's wolves.
         var guestHut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(3, 6));
         StepInside(world, guestHut, guest);
+        world.Doorways.TurnKey();
+        world.Run(guest, new Command(Verb.TurnKey, 0, 0, "", 0, default));
+        Require(hut.Locked && guestHut.Locked, "each player should lock the door of the cabin they are in");
         SetNeeds(guest, hunger: 1);
         Require(world.SleepBlock() == "Someone is too hungry or thirsty to sleep.", "sleeping should wait for a hungry guest");
         SetNeeds(guest, hunger: 100);

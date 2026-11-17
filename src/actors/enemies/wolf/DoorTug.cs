@@ -103,9 +103,9 @@ public sealed class DoorTug(World world) {
     /// </summary>
     public bool Tug(Wolf wolf) {
         var p = world.S.Actor;
-        if (p.Door is not (Doorway.Tugged or Doorway.TuggedOff)) { wolf.Tugging = false; return false; }
+        if (p.Door is not (Doorway.Tugged or Doorway.TuggedOff)) { Release(wolf); return false; }
         if (wolf.Stagger > 0) {
-            wolf.Tugging = false;
+            Release(wolf);
             LetGo(null);
             return false;
         }
@@ -114,13 +114,16 @@ public sealed class DoorTug(World world) {
         return true;
     }
 
+    /// <summary>A wolf lets go of the player it tugged, which also ends the visit to a cabin's door that took them out of it.</summary>
+    private static void Release(Wolf wolf) { wolf.Tugging = false; wolf.Visit = WolfVisit.None; wolf.VisitCabin = 0; wolf.VisitTime = 0; }
+
     /// <summary>
     /// Ends a tug that has run its time: the player is let go, a badly hurt one knocked down, anyone else stepping in again
     /// at a run, or stopping knocking. The wolf bites again no sooner than after any other bite.
     /// </summary>
     public void End() {
         var tugger = Tugger();
-        if (tugger != null) { tugger.Tugging = false; tugger.Attack = 1; StandBehind(tugger); }
+        if (tugger != null) { Release(tugger); tugger.Attack = 1; StandBehind(tugger); }
         LetGo(tugger != null && world.S.Health <= World.TakedownHealth ? tugger : null);
     }
 

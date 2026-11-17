@@ -5,11 +5,14 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// Cabin doors in <paramref name="world"/>: one player at a time steps in through the door, the next one at the door
-/// knocks on it, and players standing aside let someone step out. What a wolf does to a player in the doorway is
-/// <see cref="DoorTug"/>'s.
+/// Cabin doors in <paramref name="world"/>: players step in through the door one at a time until the cabin is full, anyone
+/// at the door of a full or locked cabin knocks on it, and players standing aside let someone step out.
+/// What a wolf does to a player in the doorway is <see cref="DoorTug"/>'s, and what it does at the door of a cabin with
+/// someone inside is <see cref="DoorVisits"/>'.
 /// </summary>
 public sealed class Doorways(World world) {
+    /// <summary>How many players a cabin holds.</summary>
+    public const int Places = 2;
     /// <summary>Seconds stepping in through a cabin door at a walk and at a sprint, stepping out, and knocking on a shut door.</summary>
     public const float EnterSeconds = 1.3f, RushSeconds = .7f, LeaveSeconds = 1.5f, KnockSeconds = 1;
     /// <summary>
@@ -55,9 +58,41 @@ public sealed class Doorways(World world) {
     public static bool Indoors(PlayerState p) =>
         p.Sheltered != 0 || p.Door == Doorway.Entering && p.DoorTime >= DoorSeconds(p) / 2 || p.Door == Doorway.Leaving && !Through(p);
 
+    /// <summary>How many players are inside a cabin.</summary>
+    public int Inside(int cabin) {
+        int inside = 0;
+        foreach (var p in world.S.Players) if (p.Sheltered == cabin) inside++;
+        return inside;
+    }
+
+    /// <summary>Whether a cabin has a place left for <paramref name="one"/> more player: fewer than <see cref="Places"/> others are inside it or at its door on their way in.</summary>
+    public bool HasPlace(int cabin, PlayerState one) {
+        int taken = 0;
+        foreach (var p in world.S.Players)
+            if (p != one && (p.Sheltered == cabin || p.DoorCabin == cabin && p.Door is Doorway.Entering or Doorway.Following or Doorway.Tugged or Doorway.Aside)) taken++;
+        return taken < Places;
+    }
+
+    /// <summary>Unlocks the door of a cabin nobody is left inside.</summary>
+    public void UnlockEmpty(int cabin) {
+        if (world.Find(cabin) is Thing hut && Inside(cabin) == 0) hut.Locked = false;
+    }
+
     /// <summary>
-    /// Starts stepping into a cabin from its door: in when it is free, up behind someone already stepping in, or knocking on
-    /// the door when someone is inside. A player who sprinted there, <paramref name="rush"/>, steps in at a run and slams the door.
+    /// Turns the key in the door of the cabin the acting player is in, which locks it or unlocks it.
+    /// The key does nothing once a wolf has its snout in the door.
+    /// </summary>
+    public void TurnKey() {
+        var s = world.S;
+        if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None) return;
+        if (world.DoorVisits.Forcing(cabin.Id)) { world.Say("A wolf is forcing the door."); return; }
+        if (world.Forwarded(Verb.TurnKey)) return;
+        cabin.Locked = !cabin.Locked; world.Play("door_lock", DoorPoint(cabin));
+    }
+
+    /// <summary>
+    /// Starts stepping into a cabin from its door: in when it has a place and its door is not locked, up behind someone
+    /// already stepping in, or knocking on the door. A player who sprinted there, <paramref name="rush"/>, steps in at a run and slams the door.
     /// </summary>
     public bool Enter(Thing hut, bool rush) {
         var s = world.S;
@@ -66,10 +101,16 @@ public sealed class Doorways(World world) {
         return true;
     }
 
-    /// <summary>Starts stepping out of the cabin the acting player is in, onto its doorstep.</summary>
+    /// <summary>
+    /// Starts stepping out of the cabin the acting player is in, onto its doorstep, unlocking its door first; nobody steps
+    /// out while a wolf is at the door.
+    /// </summary>
     public void Leave() {
         var s = world.S;
-        if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None || world.Forwarded(Verb.Leave)) return;
+        if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None) return;
+        if (world.DoorVisits.AtDoor(cabin.Id) != null) { world.Say("A wolf is at the door."); return; }
+        if (world.Forwarded(Verb.Leave)) return;
+        if (cabin.Locked) { cabin.Locked = false; world.Play("door_lock", DoorPoint(cabin)); }
         s.Sheltered = 0; world.Player = Doorstep(cabin); s.Actor.Warp++;
         Stage(s.Actor, Doorway.Leaving, cabin.Id);
         // Whoever knocks on the door steps aside to let them out, keeping the order they came in,
@@ -142,30 +183,36 @@ public sealed class Doorways(World world) {
         return (outward.Rotated(side * MathF.PI / 2) / distance + outward / distance * (round - distance)).Normalized();
     }
 
-    /// <summary>The nearest cabin nobody is in or at the door of, or null.</summary>
+    /// <summary>The nearest cabin with a place left for the acting player, locked or not, or null.</summary>
     public Thing? NearestFreeCabin(Vector2 from) {
         Thing? best = null;
         foreach (var t in world.S.Things.Of(ThingKind.Hut))
-            if (Ahead(t.Id, world.S.Actor) == Doorway.Entering && (best == null || t.Pos.DistanceSquaredTo(from) < best.Pos.DistanceSquaredTo(from))) best = t;
+            if (HasPlace(t.Id, world.S.Actor) && (best == null || t.Pos.DistanceSquaredTo(from) < best.Pos.DistanceSquaredTo(from))) best = t;
         return best;
     }
 
     /// <summary>
-    /// What a player arriving at a cabin's door does, given who is there before them: steps in when nobody is, knocks on the
-    /// door when someone is inside or stepping out, and follows someone stepping in.
+    /// What a player arriving at a cabin's door does, given who is there before them: follows someone stepping in, knocks on
+    /// the door of a cabin that is full, locked or being stepped out of, and steps in otherwise.
     /// </summary>
     public Doorway Ahead(int cabin, PlayerState arriving) {
-        var door = Doorway.Entering;
         // A player not at any door, such as one waking or rejoining, comes after everyone already there.
         int queued = arriving.Door == Doorway.None ? int.MaxValue : arriving.DoorQueued;
+        int inside = 0;
+        bool leaving = false, ahead = world.DoorVisits.Forcing(cabin);
         foreach (var p in world.S.Players) {
             if (p == arriving) continue;
+            if (p.Sheltered == cabin) inside++;
+            if (p.DoorCabin != cabin) continue;
             // Someone still in the doorway on their way out keeps the door; once they are through it, the next one squeezes past them in.
-            if (p.Sheltered == cabin || p.DoorCabin == cabin && p.Door == Doorway.Leaving && !Through(p)) return Doorway.Knocking;
+            if (p.Door == Doorway.Leaving && !Through(p)) leaving = true;
             // Someone tugged back out, or standing aside for someone stepping out, stays ahead only if they came to the door first.
-            if (p.DoorCabin == cabin && (p.Door == Doorway.Entering || p.Door is Doorway.Tugged or Doorway.Aside && p.DoorQueued < queued)) door = Doorway.Following;
+            if (p.Door == Doorway.Entering || p.Door is Doorway.Tugged or Doorway.Aside && p.DoorQueued < queued) ahead = true;
         }
-        return door;
+        if (leaving || inside >= Places) return Doorway.Knocking;
+        // A wolf with its snout in the door is in the way too.
+        if (ahead) return Doorway.Following;
+        return inside > 0 && world.Find(cabin) is { Locked: true } ? Doorway.Knocking : Doorway.Entering;
     }
 
     /// <summary>Starts the acting player stepping into a cabin, or following or knocking as whoever is there before them leaves them.</summary>
