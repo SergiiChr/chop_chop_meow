@@ -73,6 +73,8 @@ public sealed class WolfModel {
     public float FromYaw;
     /// <summary>How far a wolf at a cabin's door has settled into its stand there from where it arrived, 0 to 1.</summary>
     public float Settled;
+    /// <summary>Seconds into its visit to a cabin's door the wolf is drawn at, which runs on between the world's updates.</summary>
+    public float VisitClock;
     /// <summary>The door point of the cabin whose step the wolf stands at, when it does: its paws are set on the treads and the floor past the door, and its body lifted and tipped to stand on them.</summary>
     public Vector2? Steps;
     /// <summary>Seconds a wolf has fed at its spot at a fallen player, easing it there from where it stood.</summary>

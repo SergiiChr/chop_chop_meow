@@ -44,6 +44,8 @@ public static class VisitView {
     private const float Leaf = .82f;
     /// <summary>How many degrees clear of the wolf's body the door stands, for its thickness and the fur.</summary>
     private const float Clear = 1.5f;
+    /// <summary>How many seconds the clock a wolf is drawn by may run from the world's.</summary>
+    private const float ClockSlack = .05f;
     /// <summary>Seconds a wolf takes to settle into its stand at the door from where it arrived.</summary>
     private const float SettleSeconds = .3f;
 
@@ -256,8 +258,10 @@ public static class VisitView {
     /// <summary>Shows a wolf at a cabin's door as its visit has it, settling into its stand from where it arrived.</summary>
     public static void Show(Wolf wolf, WolfModel model, Thing cabin, float time, float dt, bool visible) {
         var door = Doorways.DoorPoint(cabin);
-        float clock = Clock(wolf.Visit, wolf.VisitTime);
-        if (model.Motion != WolfMotion.Door) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; model.Settled = 0; }
+        float world = Clock(wolf.Visit, wolf.VisitTime);
+        if (model.Motion != WolfMotion.Door) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; model.Settled = 0; model.VisitClock = world; }
+        // A world on a server moves the visit on only with each update, so the model runs on between them, kept close to the world's clock.
+        float clock = model.VisitClock = Math.Clamp(model.VisitClock + dt, world - ClockSlack, world + ClockSlack);
         model.Settled = Math.Min(1, model.Settled + dt / SettleSeconds);
         var (at, yaw) = Placement(door, clock);
         float settle = WorldView.Ease(model.Settled);

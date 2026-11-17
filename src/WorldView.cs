@@ -1065,7 +1065,7 @@ public partial class WorldView : Node3D {
                 // The door stands open while someone steps in or out, and shuts behind them: swung shut after a walk, slammed after a run.
                 // A wolf forcing the door holds it as far open as its body has pushed it.
                 if (live && World.DoorVisits.AtDoor(t.Id) is { Visit: <= WolfVisit.Launching } caller) {
-                    DoorwayView.PushDoor(hut, VisitView.DoorDegrees(VisitView.Clock(caller.Visit, caller.VisitTime)));
+                    DoorwayView.PushDoor(hut, VisitView.DoorDegrees(VisitClock(caller)));
                     break;
                 }
                 var through = live ? doorways.Passing(t.Id) : null;
@@ -1287,6 +1287,9 @@ public partial class WorldView : Node3D {
             if (!World.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
     }
 
+    /// <summary>Seconds into its visit to a cabin's door a wolf is drawn at, or as the world has it for one not drawn at the door yet.</summary>
+    private float VisitClock(Wolf wolf) => wolves.TryGetValue(wolf, out var model) && model.Motion == WolfMotion.Door ? model.VisitClock : VisitView.Clock(wolf.Visit, wolf.VisitTime);
+
     /// <summary>Seconds a player left inside a cabin goes on seeing the one a wolf takes out of it.</summary>
     private const float TakenOutSeconds = .9f;
 
@@ -1299,7 +1302,7 @@ public partial class WorldView : Node3D {
         if (World.Sheltered != 0 && World.DoorVisits.AtDoor(World.Sheltered) is { Visit: >= WolfVisit.Prying } caller && props.TryGetValue(World.Sheltered, out var prop) && prop is HutProp hut) {
             var taken = caller.Visit == WolfVisit.TakingOut ? World.PlayerById(caller.Target) : null;
             if (caller.Visit != WolfVisit.TakingOut || taken is { Door: Doorway.Tugged, DoorTime: < TakenOutSeconds }) {
-                Inside.Show(hut.Look.Pos, hut.Door, caller.Visit == WolfVisit.Launching ? VisitView.Launched(VisitView.Clock(caller.Visit, caller.VisitTime)) : 0, dt);
+                Inside.Show(hut.Look.Pos, hut.Door, caller.Visit == WolfVisit.Launching ? VisitView.Launched(VisitClock(caller)) : 0, dt);
                 if (wolves.TryGetValue(caller, out var lead)) Inside.Add(lead);
                 foreach (var wolf in World.Wolves)
                     if (wolf != caller && (wolf.VisitCabin == World.Sheltered || taken != null && wolf.Target == taken.Id) && wolves.TryGetValue(wolf, out var model)) Inside.Add(model);
