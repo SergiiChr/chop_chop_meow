@@ -226,10 +226,7 @@ public sealed partial class World {
                 Beats("door_bang", before, p.DoorTime, KnockLead, KnockSeconds / Knocks, Knocks);
                 if (done) p.Door = Doorway.None;
                 break;
-            case Doorway.Pulled or Doorway.PulledOff:
-                // The player screams at the grab and at each tug after it.
-                Beats("pulled_scream", before, p.DoorTime, PullSeconds / Tugs, PullSeconds / Tugs, Tugs - 1);
-                if (!done) break;
+            case Doorway.Pulled or Doorway.PulledOff when done:
                 // Dragged a metre out, the player is let go: a badly hurt one is knocked down, anyone else steps in again at a run, or stops banging.
                 // The wolf bites again no sooner than after any other bite.
                 Player += OutOfDoor * DragDistance; p.Warp++;
@@ -258,6 +255,7 @@ public sealed partial class World {
         if (p.Door is not (Doorway.Entering or Doorway.Following or Doorway.Knocking) || Indoors(p)) return false;
         Stage(p.Door == Doorway.Knocking ? Doorway.PulledOff : Doorway.Pulled, p.DoorCabin);
         wolf.Tugging = true; wolf.Leap = 0;
+        // The player screams through the whole drag.
         Play("pulled_scream", Player);
         return true;
     }

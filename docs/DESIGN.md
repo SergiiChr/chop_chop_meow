@@ -502,7 +502,7 @@ What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed b
   At the door of a cabin someone is in or stepping out of, they knock straight away, with the same lead.
   Each arrival at a door is numbered (`SaveState.DoorArrivals`, `PlayerState.DoorQueued`), so players dragged back out go in again in the order they came.
 - `World.Indoors` is what wolves go by: inside, through the second half of `Entering` and the first half of `Leaving`.
-- A bite or a leap landing on a player out in the open at a door (`World.PullOut`) has that wolf take them by the waist (`Wolf.Tugging`) and drag them `World.DragDistance` back out along `World.OutOfDoor` in `World.Tugs` tugs over `World.PullSeconds` (`Pulled`, or `PulledOff` while knocking), the way `World.Dragged` paces it, with a `pulled_scream` at each tug.
+- A bite or a leap landing on a player out in the open at a door (`World.PullOut`) has that wolf take them by the waist (`Wolf.Tugging`) and drag them `World.DragDistance` back out along `World.OutOfDoor` in `World.Tugs` tugs over `World.PullSeconds` (`Pulled`, or `PulledOff` while knocking), the way `World.Dragged` paces it, with one `pulled_scream` through the drag.
   The world moves the player there when the drag ends; meanwhile the wolf stands `World.TugReach` behind them and no other wolf leaps.
   The wolf then lets go and bites no sooner than a second later; at half health or less it pins them, otherwise a pulled player steps in again at a run, and one pulled off the door stands free.
 - `Leaving` puts the player on the doorstep and takes `World.LeaveSeconds`.
@@ -512,7 +512,8 @@ What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed b
 
 The view walks the player through the doorway over the stage (`WorldView.AtDoor`), hurrying from the second tread, and drags a pulled one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
 On the two treads of the step and the floor (`WorldView.StepEdges`) the body stands on the boot that bears its weight and the other knee bends to put its boot on its tread, a swinging boot rising ahead of each edge (`ActorAnimation.StepLift`, `ActorAnimation.OnSteps`), so no boot sinks into the step.
-A wounded player dragged out falls backward still facing the door (`ActorAction.FallBack`, `WorldView.FallBack`), and the wolf lets go, steps round to their left (`Wolf.Beside`) and lunges onto the throat from there as they land.
+Every takedown falls the player backward onto their seat and back (`ActorAction.FallBack`, `WorldView.FallBack`, `ActorAnimation.FallPath`), facing the wolf after a leap; a pinning wolf stands astride with its forepaws on the chest and its hind paws wide of the legs, and a feeding wolf stands square on to the body's side with its jaws at the hips or belly (`WorldView.AtTheBody`).
+A wounded player dragged out falls backward still facing the door, and the wolf lets go, steps round to their left (`Wolf.Beside`) and lunges onto the throat from there as they land.
 A player banging on the door stands on the lower tread, with the front boot on the upper one, and steps back down off it when done.
 The animation review's `player cabin` clip plays every stage at a cabin, `player jog back` and `player run back` a run braking and turning round, and `player jog turns` and `player run turns` the keys A, W, D and S pressed in quick turn.
 The door opens while someone steps in or out: it swings with `hut_door_normal` after a walk, and slams shut with `hut_door_escaping` after a run.

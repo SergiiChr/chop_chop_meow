@@ -2849,7 +2849,7 @@ public static class SimulationChecks {
         world.Tick(1.4f);
         Require(world.Door == Doorway.Pulled && wolf.Tugging, "a wolf should hold a player it drags out of a doorway for a second and a half");
         world.Tick(.1f);
-        Require(heard.Count(name => name == "pulled_scream") == 3, $"a dragged player should scream at each of the 3 tugs: heard {string.Join(", ", heard)}");
+        Require(heard.Count(name => name == "pulled_scream") == 1, $"a dragged player should scream once, through the whole drag: heard {string.Join(", ", heard)}");
         Require(world.Door == Doorway.Entering && world.Me.DoorRush && !wolf.Tugging, "a player dragged out should be let go and step in again at a run");
         Require(world.Player.DistanceTo(World.DoorPoint(hut) + new Vector2(0, 1)) < .01f, $"a wolf should drag a player a metre out from the door, not to {world.Player - World.DoorPoint(hut)}");
         world.Tick(World.RushSeconds);

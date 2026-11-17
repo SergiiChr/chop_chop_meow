@@ -218,7 +218,7 @@ Each cut is faded at both ends, and the cuts of one sound are brought to one mea
 
 `door_bang` is "Door bang 1.wav" by freesound_community (Pixabay 14449), a recording supplied for this project: its three bangs on a door, each cut into its own variant, faded at both ends and brought to one mean level.
 
-`pulled_scream` is the first half second of "Male horror scream" (Pixabay 123080), and `takedown_scream` is "Man pain scream 02" (Pixabay 567205) with the silence cut from both ends: recordings supplied for this project, faded at the ends and brought to one mean level.
+`pulled_scream` is the first second and a half of "Male horror scream" (Pixabay 123080), and `takedown_scream` is "Man pain scream 02" (Pixabay 567205) with the silence cut from both ends: recordings supplied for this project, faded at the ends and brought to one mean level.
 
 `stomach_growl` is "yet more stomach sounds" by freesound_community (Pixabay 97719, artist Darsycho on Freesound), a recording supplied for this project, with the silence cut from both ends: four seconds of three rumbles.
 

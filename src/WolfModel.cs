@@ -69,6 +69,8 @@ public sealed class WolfModel {
     public Vector2 Drift;
     /// <summary>Which way the wolf faced as it took hold of a player to drag them, to turn from as it lunges in.</summary>
     public float FromYaw;
+    /// <summary>Seconds a wolf has fed at a fallen player, easing it from where it stood onto the body.</summary>
+    public float Fed;
 
     /// <summary>How far ahead of its root a leaping wolf's jaws reach the throat of a standing player: the reach of the bite plus the throat's own depth.</summary>
     public const float ContactReach = .65f;
@@ -78,6 +80,8 @@ public sealed class WolfModel {
     public const float RecoilSeconds = .6f, HopShare = .4f;
     /// <summary>How long a killed wolf takes to go down, and the share of that it is thrown through the air before it hits the ground.</summary>
     public const float FallSeconds = .7f, ThrowShare = .35f;
+    /// <summary>How high off the ground the chest of a player lying on their back is, where a pinning wolf's forepaws stand.</summary>
+    private const float ChestTop = .3f;
 
     private WolfMotion motion = WolfMotion.Stand;
     private WolfPose shown, from;
@@ -202,11 +206,14 @@ public sealed class WolfModel {
         Show(WolfMotion.Howl, Planted(body, 1.05f, .04f * up), dt);
     }
 
-    /// <summary>All four paws flat on the ground at home, spread by <paramref name="spread"/>; <paramref name="shift"/> moves the hind paws forward.</summary>
-    private static WolfPose Planted(WolfPose body, float spread, float shift = 0, float frontAhead = 0, float frontUp = 0) {
+    /// <summary>
+    /// All four paws flat on the ground at home, spread by <paramref name="spread"/>, the hind ones by <paramref name="hindSpread"/>
+    /// when given; <paramref name="shift"/> moves the hind paws forward.
+    /// </summary>
+    private static WolfPose Planted(WolfPose body, float spread, float shift = 0, float frontAhead = 0, float frontUp = 0, float hindSpread = 0) {
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
-            var at = new Vector3(WolfShape.Pivot(leg).X * spread, WolfShape.Sole + (hind ? 0 : frontUp), Home(leg) + (hind ? shift * (leg == 2 ? 1 : -1) : frontAhead));
+            var at = new Vector3(WolfShape.Pivot(leg).X * (hind && hindSpread > 0 ? hindSpread : spread), WolfShape.Sole + (hind ? 0 : frontUp), Home(leg) + (hind ? shift * (leg == 2 ? 1 : -1) : frontAhead));
             body = body.WithLeg(leg, Reach(body, leg, at, hind ? 2 : 10, 0));
         }
         return body;
@@ -236,7 +243,7 @@ public sealed class WolfModel {
 
     /// <summary>
     /// Feeding at a downed player: braced over the body, tearing with sharp pulls back.
-    /// A pinning wolf stands astride the player with its forepaws on the chest, or <paramref name="beside"/> them with its forepaws by their shoulder;
+    /// A pinning wolf stands astride the player with its forepaws on the chest and its hind paws wide of their legs, or <paramref name="beside"/> them with its forepaws by their shoulder;
     /// <paramref name="down"/> runs 0 to 1 as the player goes down under it.
     /// </summary>
     public void Feed(float time, float dt, bool pinning, float down = 1, bool beside = false) {
@@ -248,14 +255,18 @@ public sealed class WolfModel {
             body = new WolfPose(Lift: -.05f + .3f * up - .02f * pull, Pitch: 14 - 34 * up - 4 * pull, Surge: -.03f * pull, Flex: 4,
                 Neck: 52 - 60 * up - 12 * pull, Head: 14 + 4 * shake, HeadTurn: 12 * shake, HeadTilt: 6 * shake, Jaw: 10 + 6 * bite, Ears: 26, Tail: -70 + 6 * MathF.Sin(time * 1.7f), Wag: 8 * MathF.Sin(time * 2.1f));
             // Beside the player it keeps its forepaws on the ground by their shoulder.
-            body = beside ? Planted(body, 1.4f, 0, .05f) : Planted(body, 1.9f, 0, .05f, .14f + .5f * up);
-        } else {
-            body = new WolfPose(Lift: -.07f, Pitch: 12 - 4 * pull, Surge: -.05f * pull, Flex: 6, Neck: 46 - 14 * pull + 6 * MathF.Sin(time * 9), Head: 18,
-                HeadTurn: 18 * shake, HeadTilt: 6 * shake, Jaw: 6 + 18 * bite, Ears: 22, Tail: -74 + 5 * MathF.Sin(time * 1.7f), Wag: 12 * MathF.Sin(time * 2.1f));
-            body = Planted(body, 1.25f, 0, .1f);
-        }
+            body = beside ? Planted(body, 1.4f, 0, .05f) : Planted(body, 2.4f, 0, .05f, ChestTop + .5f * up, 3.2f);
+        } else body = Tearing(time, pull, shake, bite);
         Show(pinning ? WolfMotion.Pin : WolfMotion.Feed, body, dt);
     }
+
+    /// <summary>A feeding wolf's pose: head down, pulling back by <paramref name="pull"/>, shaking and biting, with all four paws planted.</summary>
+    private static WolfPose Tearing(float time, float pull, float shake, float bite) =>
+        Planted(new WolfPose(Lift: -.07f, Pitch: 12 - 4 * pull, Surge: -.05f * pull, Flex: 6, Neck: 46 - 14 * pull + 6 * MathF.Sin(time * 9), Head: 18,
+            HeadTurn: 18 * shake, HeadTilt: 6 * shake, Jaw: 6 + 18 * bite, Ears: 22, Tail: -74 + 5 * MathF.Sin(time * 1.7f), Wag: 12 * MathF.Sin(time * 2.1f)), 1.25f, 0, .1f);
+
+    /// <summary>Where a feeding wolf's jaws close, in the model, between its pulls.</summary>
+    public static readonly Vector3 FeedingBite = BiteOf(Tearing(0, 0, 0, 0));
 
     /// <summary>
     /// Dragging a player back by the waist like a dog at tug of war, low on bent hind legs with the forelegs braced wide

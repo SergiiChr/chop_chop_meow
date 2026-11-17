@@ -1580,7 +1580,8 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
         Require(world.Player == pinnedAt, "A pinned player must not move.");
-        Require(view.PlayerAnimation == ActorAction.Mauled, "A pinned player must show the mauled struggle.");
+        await Seconds(ActorAnimation.FallBackSeconds);
+        Require(view.PlayerAnimation == ActorAction.Mauled, "A pinned player must show the mauled struggle once down.");
         Require(deathLabel.Text == "", "A pinned player must leave the message to the pinned notice.");
         SetMauled(Hosted, false); RunUntilMorning(Hosted); SetNeeds(Hosted, health: 100);
         Hosted.Die(); await Until(() => world.Dead && deathLabel.Text.Contains("Respawning in"), "death showing the respawn countdown", 2);
