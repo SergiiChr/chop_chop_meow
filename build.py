@@ -822,8 +822,9 @@ def export_record() -> tuple[Path, dict[str, str]]:
 def run_record(movie: Path, fps: int, game_args: list[str]) -> None:
     """Record the exported game to a movie at a fixed frame rate, with its sound, through Godot's Movie Maker.
 
-    Each frame advances the game by exactly 1/fps seconds, however long it takes to draw, so recordings of the same flags
-    match frame for frame. The game's own flags end the run, such as --frames.
+    Each frame advances the window by exactly 1/fps seconds, however long it takes to draw, so recordings of the same flags
+    match frame for frame when the world runs in the window, as with --showcase or --animation-review; a normal game's
+    server runs on real time in its own process. The game's own flags end the run, such as --frames.
     """
     movie = movie if movie.is_absolute() else ROOT / movie
     if movie.suffix != ".avi":

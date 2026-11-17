@@ -15,7 +15,7 @@ public enum Doorway {
     Knocking,
     /// <summary>Dragged back out of the doorway by a wolf holding them by the waist, to step in again at a run.</summary>
     Pulled,
-    /// <summary>Dragged off the door they banged on by a wolf, to stand free.</summary>
+    /// <summary>Dragged off the door they banged on, or stood aside at, by a wolf, to stand free.</summary>
     PulledOff,
     /// <summary>Stepping out through the door, out in the open for the second half.</summary>
     Leaving,
@@ -58,6 +58,19 @@ public sealed partial class World {
 
     /// <summary>The spot just outside a cabin's door where a player steps in and out.</summary>
     public static Vector2 DoorPoint(Thing cabin) => cabin.Pos + DoorOffset;
+
+    /// <summary>
+    /// Where a player stepping out of or waking in a cabin stands: at its door, or, with that blocked, as in a cabin from an
+    /// older save built before its door had to be clear, on the first open ground round the cabin.
+    /// </summary>
+    private Vector2 Doorstep(Thing cabin) {
+        if (CanStand(DoorPoint(cabin))) return DoorPoint(cabin);
+        for (int i = 0; i < 8; i++) {
+            var p = cabin.Pos + Vector2.Down.Rotated(i * MathF.PI / 4) * (Footprint(ThingKind.Hut) + .6f);
+            if (CanStand(p)) return p;
+        }
+        return DoorPoint(cabin);
+    }
     /// <summary>What the acting player is doing at a cabin's door.</summary>
     public Doorway Door => S.Actor.Door;
 
@@ -88,7 +101,7 @@ public sealed partial class World {
     /// <summary>Starts stepping out of the cabin the acting player is in, onto its doorstep.</summary>
     public void Leave() {
         if (Find(S.Sheltered) is not Thing cabin || S.Actor.Door != Doorway.None || Forwarded(Verb.Leave)) return;
-        S.Sheltered = 0; Player = DoorPoint(cabin); S.Actor.Warp++;
+        S.Sheltered = 0; Player = Doorstep(cabin); S.Actor.Warp++;
         Stage(S.Actor, Doorway.Leaving, cabin.Id);
         // Whoever bangs on the door steps aside to let them out, keeping the order they came in,
         // and the one stepping out keeps to the other side of the door, to pass them as they squeeze in.
@@ -220,7 +233,30 @@ public sealed partial class World {
     public static float HeavePulse(float u) => u < Heave ? MathF.Sin(MathF.PI * u / Heave) : 0;
 
     /// <summary>Where the acting player is: their place, or as far back from it as a wolf dragging them out of a doorway has hauled them.</summary>
-    private Vector2 Hauled => S.Actor.Door is Doorway.Pulled or Doorway.PulledOff ? Player + OutOfDoor * (DragDistance * Dragged(S.Actor.DoorTime / PullSeconds)) : Player;
+    private Vector2 Hauled => S.Actor.Door is Doorway.Pulled or Doorway.PulledOff ? Player + OutOfDoor * (DragReach(Player) * Dragged(S.Actor.DoorTime / PullSeconds)) : Player;
+
+    /// <summary>
+    /// How far a wolf drags a player standing at <paramref name="from"/> straight out of a doorway: <see cref="DragDistance"/>, cut
+    /// short where open ground ends, leaving room on it for the wolf behind them where there is any.
+    /// </summary>
+    public float DragReach(Vector2 from) {
+        float both = OpenOut(from, DragDistance + TugReach) - TugReach;
+        return both >= 0 ? both : OpenOut(from, DragDistance);
+    }
+
+    /// <summary>How far open ground runs from <paramref name="from"/> straight out of a doorway, up to <paramref name="most"/> metres.</summary>
+    private float OpenOut(Vector2 from, float most) {
+        float open = 0;
+        while (open < most && CanStand(from + OutOfDoor * Math.Min(open + OpenStep, most))) open = Math.Min(open + OpenStep, most);
+        return open;
+    }
+    private const float OpenStep = .05f;
+
+    /// <summary>Puts a wolf dragging the acting player behind them, where it holds on; with no open ground there, it stays where it stands.</summary>
+    private void StandBehind(Wolf wolf) {
+        var spot = Hauled + OutOfDoor * TugReach;
+        if (CanStand(spot)) wolf.Pos = spot;
+    }
 
     /// <summary>The wolf dragging the acting player out of a doorway, or null.</summary>
     private Wolf? Tugger() {
@@ -249,10 +285,10 @@ public sealed partial class World {
                 if (done) p.Door = Doorway.None;
                 break;
             case Doorway.Pulled or Doorway.PulledOff when done:
-                // Dragged a metre out, the player is let go: a badly hurt one is knocked down, anyone else steps in again at a run, or stops banging.
+                // Dragged out, the player is let go: a badly hurt one is knocked down, anyone else steps in again at a run, or stops banging.
                 // The wolf bites again no sooner than after any other bite.
                 var tugger = Tugger();
-                if (tugger != null) { tugger.Tugging = false; tugger.Attack = 1; tugger.Pos = Hauled + OutOfDoor * TugReach; }
+                if (tugger != null) { tugger.Tugging = false; tugger.Attack = 1; StandBehind(tugger); }
                 LetGo(tugger != null && S.Health <= TakedownHealth ? tugger : null);
                 break;
             case Doorway.Leaving when done:
@@ -268,8 +304,8 @@ public sealed partial class World {
     /// <summary>A wolf reaching a player in the open part of a doorway takes them by the waist to drag them back out of it; returns whether it did.</summary>
     private bool PullOut(Wolf wolf) {
         var p = S.Actor;
-        if (p.Door is not (Doorway.Entering or Doorway.Following or Doorway.Knocking) || Indoors(p)) return false;
-        Stage(p, p.Door == Doorway.Knocking ? Doorway.PulledOff : Doorway.Pulled, p.DoorCabin);
+        if (p.Door is not (Doorway.Entering or Doorway.Following or Doorway.Knocking or Doorway.Aside) || Indoors(p)) return false;
+        Stage(p, p.Door is Doorway.Knocking or Doorway.Aside ? Doorway.PulledOff : Doorway.Pulled, p.DoorCabin);
         wolf.Tugging = true; wolf.Leap = 0;
         // The player screams through the whole drag.
         Play("pulled_scream", Player);
@@ -289,7 +325,7 @@ public sealed partial class World {
             LetGo(null);
             return false;
         }
-        wolf.Pos = Hauled + OutOfDoor * TugReach;
+        StandBehind(wolf);
         wolf.Attack = 1;
         return true;
     }

@@ -211,7 +211,7 @@ public sealed class PlayerControl {
     }
 
     private void ClickThing(Thing t) {
-        if (t.Kind == ThingKind.Hut) entering = t;
+        if (t.Kind == ThingKind.Hut && world.Sheltered == 0) entering = t;
         panel.Select(t);
     }
 

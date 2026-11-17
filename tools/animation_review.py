@@ -97,6 +97,11 @@ def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> No
             check=False,
         )
     if result.returncode:
+        text = log.read_text(errors="replace")
+        errors = dict.fromkeys(
+            line.strip() for line in text.splitlines() if build.ERRORS.search(line)
+        )
+        print("\n".join(list(errors)[:20]), file=sys.stderr)
         raise SystemExit(
             f"Recording {view} failed (exit {result.returncode}); see {log}"
         )

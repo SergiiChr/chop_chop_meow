@@ -314,13 +314,13 @@ public partial class WorldView {
             var dragged = door + World.OutOfDoor * World.DragDistance;
             var part = run < World.RushSeconds / 2 ? Doorway.Entering : pulled < World.PullSeconds ? Doorway.Pulled : Doorway.Entering;
             if (part != reviewActor.Stage) { reviewActor.Stage = part; reviewActor.StageFrom = reviewActor.Position; }
-            shown = run < World.RushSeconds / 2 ? DoorStep(Doorway.Entering, door, door, reviewActor.StageFrom, run, World.RushSeconds, true)
-                : pulled < World.PullSeconds ? DoorStep(Doorway.Pulled, door, door, reviewActor.StageFrom, pulled, World.PullSeconds, true)
-                : DoorStep(Doorway.Entering, door, dragged, reviewActor.StageFrom, pulled - World.PullSeconds, World.RushSeconds, true);
+            shown = run < World.RushSeconds / 2 ? DoorStep(Doorway.Entering, door, door, reviewActor.StageFrom, run, World.RushSeconds, true, 0)
+                : pulled < World.PullSeconds ? DoorStep(Doorway.Pulled, door, door, reviewActor.StageFrom, pulled, World.PullSeconds, true, World.DragDistance)
+                : DoorStep(Doorway.Entering, door, dragged, reviewActor.StageFrom, pulled - World.PullSeconds, World.RushSeconds, true, 0);
         } else {
             if (now != reviewActor.Stage) { reviewActor.Stage = now; reviewActor.StageFrom = reviewActor.Position; }
             float seconds = now switch { Doorway.Knocking => World.KnockLead + World.KnockSeconds, Doorway.Leaving => World.LeaveSeconds, _ => World.EnterSeconds };
-            shown = DoorStep(now, door, door, reviewActor.StageFrom, time - start, seconds, false);
+            shown = DoorStep(now, door, door, reviewActor.StageFrom, time - start, seconds, false, 0);
         }
         bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Pulled && shown.At.DistanceTo(door) < ReviewSeen;
         SwingDoor(reviewCabin, open, dt / World.ShutSeconds);

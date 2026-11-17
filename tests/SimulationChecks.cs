@@ -101,10 +101,16 @@ public static class SimulationChecks {
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
         Test(CheckACabinHoldsOnePlayerAndTheNextBangsOnTheDoor, data);
         Test(CheckAPlayerBangingOnACabinDoorStepsAsideForOneComingOutThenGoesIn, data);
+        Test(CheckAPlayerAtACabinDoorCannotGatherOrPickUp, data);
         Test(CheckOnlyAPlayerBangingOnTheDoorGoesInWhenSomeoneStepsOut, data);
         Test(CheckHittingAWolfThatDragsAPlayerOutKnocksItOff, data);
+        Test(CheckAWolfDragsAPlayerStandingAsideAtACabinDoorOffIt, data);
+        Test(CheckAWolfDragsAPlayerOutOnlyAsFarAsOpenGroundGoes, data);
         Test(CheckAPlayerRespawnsInTheNearestFreeCabin, data);
         Test(CheckAPlayerDoesNotRespawnInACabinSomeoneIsDraggedOutOfTheDoorOf, data);
+        Test(CheckACabinCannotBeBuiltWithItsDoorOnGroundNobodyCanStandOn, data);
+        Test(CheckNothingCanBeBuiltOnACabinsDoorSpot, data);
+        Test(CheckSteppingOutOfACabinWhoseDoorIsBlockedLandsOnOpenGround, data);
         Test(CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
@@ -2952,6 +2958,20 @@ public static class SimulationChecks {
         Require(world.Health < 100 && world.Door == Doorway.Leaving, "a wolf should bite a player in the second half of stepping out, who walks on out");
     }
 
+    private static void CheckAPlayerAtACabinDoorCannotGatherOrPickUp(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        StepInside(world, hut);
+        world.As(guest, () => {
+            world.Player = World.DoorPoint(hut);
+            Require(world.Enter(hut, false) && guest.Door == Doorway.Knocking, "a player at the door of a cabin someone is in should bang on it");
+            var stone = world.Add(ThingKind.LooseStone, world.Player + new Vector2(.5f, 0), 1);
+            int before = world.Backpack["stone"];
+            for (int i = 0; i < 4; i++) world.Gather(stone, .25f);
+            Require(world.Backpack["stone"] == before && world.Find(stone.Id) != null, "a player banging on a cabin door should not pick anything up");
+        });
+    }
+
     private static void CheckAPlayerBangingOnACabinDoorStepsAsideForOneComingOutThenGoesIn(GameData data) {
         var (world, guest, _) = Hosted(data);
         var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
@@ -2981,6 +3001,35 @@ public static class SimulationChecks {
         Require(world.Player.DistanceTo(guest.Pos) >= World.ClearOf, $"someone stepping out should end clear of a player standing at the door, not {world.Player.DistanceTo(guest.Pos):0.00} m from them");
         world.Tick(World.LeaveSeconds + .05f);
         Require(guest.Sheltered == 0, "a player who never clicked a cabin should not end up inside it");
+    }
+
+    private static void CheckAWolfDragsAPlayerStandingAsideAtACabinDoorOffIt(GameData data) {
+        var world = NightWorld(data);
+        var guest = world.Arrive("guest", 2);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        StepInside(world, hut);
+        world.As(guest, () => { world.Player = World.DoorPoint(hut); Require(world.Enter(hut, false) && guest.Door == Doorway.Knocking, "the guest should bang on the taken cabin's door"); });
+        world.Leave();
+        Require(guest.Door == Doorway.Aside, "the guest should stand aside for the host stepping out");
+        var wolf = PlaceWolf(world, new Wolf { Pos = guest.Pos + new Vector2(.8f, 0), Target = guest.Id });
+        world.Tick(.05f);
+        Require(guest.Door == Doorway.PulledOff && wolf.Tugging, $"a wolf should drag a player standing aside at the door off it, not leave them {guest.Door}");
+    }
+
+    private static void CheckAWolfDragsAPlayerOutOnlyAsFarAsOpenGroundGoes(GameData data) {
+        var world = NightWorld(data);
+        // Water starts half a metre in front of the door.
+        var hut = world.Add(ThingKind.Hut, ShoreForACabin(world, .5f));
+        world.Player = World.DoorPoint(hut);
+        Require(world.Enter(hut, false), "a player at the door should step in");
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        for (float time = 0; time < .6f && world.Door == Doorway.Entering; time += .05f) world.Tick(.05f);
+        Require(world.Door == Doorway.Pulled, $"a wolf should drag the player out of the doorway, not {world.Door}");
+        for (float time = 0; time < World.PullSeconds + .1f && world.Door == Doorway.Pulled; time += .05f) {
+            world.Tick(.05f);
+            Require(world.CanStand(wolf.Pos), $"a wolf dragging a player out should stand on open ground, not at {wolf.Pos - World.DoorPoint(hut)} from the door");
+        }
+        Require(world.CanStand(world.Player), $"a player dragged out should end on ground they can stand on, not at {world.Player - World.DoorPoint(hut)} from the door");
     }
 
     private static void CheckHittingAWolfThatDragsAPlayerOutKnocksItOff(GameData data) {
@@ -3038,6 +3087,35 @@ public static class SimulationChecks {
         SetNeeds(world, health: 0);
         SafeTick(world, data.RespawnSeconds + 1);
         Require(world.Sheltered == far.Id, "a player should respawn in the nearest cabin nobody is in");
+    }
+
+    private static void CheckACabinCannotBeBuiltWithItsDoorOnGroundNobodyCanStandOn(GameData data) {
+        var world = EmptyWorld(data);
+        var shore = ShoreForACabin(world);
+        world.Player = shore + new Vector2(-2.5f, -1.5f);
+        Give(world, data.Buildings[ThingKind.Hut].Cost);
+        Require(world.PlacementBlock(ThingKind.Hut, shore) != null && world.Build(ThingKind.Hut, shore) == null, "a cabin should not go up with its door where nobody can stand");
+    }
+
+    private static void CheckNothingCanBeBuiltOnACabinsDoorSpot(GameData data) {
+        var world = EmptyWorld(data);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        // A bench just in front of the door, clear of the cabin itself.
+        var spot = World.DoorPoint(hut) + World.OutOfDoor * .6f;
+        world.Player = spot + new Vector2(2.5f, 0);
+        Give(world, data.Buildings[ThingKind.Bench].Cost);
+        Require(world.PlacementBlock(ThingKind.Bench, spot + World.OutOfDoor * 2) == null, "a bench well clear of the cabin's door should go up");
+        Require(world.PlacementBlock(ThingKind.Bench, spot) != null && world.Build(ThingKind.Bench, spot) == null, "a bench should not go up on a cabin's door spot");
+    }
+
+    private static void CheckSteppingOutOfACabinWhoseDoorIsBlockedLandsOnOpenGround(GameData data) {
+        var world = EmptyWorld(data);
+        // A cabin from an older save, built before its door had to be clear.
+        var hut = world.Add(ThingKind.Hut, ShoreForACabin(world));
+        SetSheltered(world, hut);
+        world.Leave();
+        world.Tick(World.LeaveSeconds + .05f);
+        Require(world.Sheltered == 0 && world.CanStand(world.Player), $"a player stepping out of a cabin whose door is blocked should land on open ground, not at {world.Player}");
     }
 
     private static void CheckAPlayerDoesNotRespawnInACabinSomeoneIsDraggedOutOfTheDoorOf(GameData data) {

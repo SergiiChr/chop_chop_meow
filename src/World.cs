@@ -684,8 +684,8 @@ public sealed partial class World {
     public void Gather(Thing t, float dt) {
         // A loose piece is a single pick-up; anything else the host works on for as long as the player holds on to it.
         if (t.IsLoose ? Forwarded(Verb.PickUp, t.Id) : Remote) { S.Actor.GatherTarget = t.IsLoose ? 0 : t.Id; return; }
-        // A felled tree or a dug up bush is no longer there to work on.
-        if (Find(t.Id) != t) { ResetGather(); return; }
+        // A felled tree or a dug up bush is no longer there to work on, and a player at a cabin door has their hands on it.
+        if (Find(t.Id) != t || S.Actor.Door != Doorway.None) { ResetGather(); return; }
         S.Actor.GatherTarget = t.Id;
         playerBusy = true;
         if (!Near(t)) { gatherClock = 0; return; }
@@ -763,9 +763,17 @@ public sealed partial class World {
         if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         foreach (var t in S.Things)
             if (!BuiltOver(t.Kind) && t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + ResourceRoom : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
+        if (kind == ThingKind.Hut) {
+            var door = DoorPoint(new Thing { Pos = p });
+            if (!CanStand(door) || Terrain.InLake(door, .8f) || S.Things.Any(t => !BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < Footprint(t.Kind) + DoorRoom))
+                return "Leave open ground in front of the door.";
+        }
+        foreach (var hut in S.Things.Of(ThingKind.Hut)) if (DoorPoint(hut).DistanceTo(p) < Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
         if (crate ? item != null && (MarkedSource ?? S.Backpack)[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
         return null;
     }
+    /// <summary>How far past their own footprint buildings keep from a cabin's door spot, where players step in and out.</summary>
+    private const float DoorRoom = .45f;
     private string? ZoneBlock(ThingKind kind, Vector2 p) {
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
         // Every tile the yard covers.
@@ -1245,7 +1253,7 @@ public sealed partial class World {
     private void Respawn() {
         // The player wakes inside the free cabin nearest to where they fell, or in the clearing without one.
         var cabin = NearestFreeCabin(Player);
-        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Terrain.Spawn : DoorPoint(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
+        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Terrain.Spawn : Doorstep(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
         Say(cabin == null ? "You wake in the clearing. Recover your belongings from the box." : "You wake in the cabin. Recover your belongings from the box.");
     }
     // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.

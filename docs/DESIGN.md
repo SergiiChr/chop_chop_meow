@@ -495,15 +495,16 @@ Inside a cabin (`SaveState.Sheltered`) the player is hidden: their hunters give 
 
 `src/Cabins.cs` runs a cabin's door, which holds one player at a time.
 A click on a cabin walks the player to `World.DoorPoint` along `World.TowardDoor`, round the walls when the cabin is in the way, and `World.Enter` starts there.
-What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they cannot move, swing or light a torch.
+What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they cannot move, swing, gather, pick up or light a torch.
+Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin needs dry, open ground there; stepping out and waking in a cabin put the player on it, or, for a cabin from an older save with it blocked, on the first open ground round the cabin (`World.Doorstep`).
 
 - `Entering` takes `World.EnterSeconds`, or `World.RushSeconds` for a player who sprinted there (`PlayerState.DoorRush`), then shelters them.
 - A player who arrives while someone else steps in is `Following` until that one is inside, then `Knocking`: the door swings shut over `World.ShutSeconds`, they step up to it, and from `World.KnockLead` bang `World.Knocks` times over `World.KnockSeconds`, then stand free.
   At the door of a cabin someone is in or stepping out of, they knock straight away, with the same lead.
   Each arrival at a door is numbered (`SaveState.DoorArrivals`, `PlayerState.DoorQueued`), so players dragged back out go in again in the order they came.
 - `World.Indoors` is what wolves go by: inside, through the second half of `Entering` and the first half of `Leaving`.
-- A bite or a leap landing on a player out in the open at a door (`World.PullOut`) has that wolf take them by the waist (`Wolf.Tugging`) and drag them `World.DragDistance` back out along `World.OutOfDoor` in `World.Tugs` tugs over `World.PullSeconds` (`Pulled`, or `PulledOff` while knocking), the way `World.Dragged` paces it, with one `pulled_scream` through the drag.
-  The world moves the player there when the drag ends; meanwhile the wolf stands `World.TugReach` behind them and no other wolf leaps.
+- A bite or a leap landing on a player out in the open at a door (`World.PullOut`) has that wolf take them by the waist (`Wolf.Tugging`) and drag them back out along `World.OutOfDoor`, `World.DragDistance` or as far as open ground runs with room for the wolf behind them (`World.DragReach`), in `World.Tugs` tugs over `World.PullSeconds` (`Pulled`, or `PulledOff` while knocking), the way `World.Dragged` paces it, with one `pulled_scream` through the drag.
+  The world moves the player there when the drag ends; meanwhile the wolf stands `World.TugReach` behind them, or where it stood with no open ground there, and no other wolf leaps.
   A hit knocks the wolf off (`Wolf.Stagger`): the player stays as far out as it got them and steps in again at a run.
   The wolf then lets go and bites no sooner than a second later; at half health or less the drag ends as the last tug lands (`World.Heave`) and it pins them, otherwise a pulled player steps in again at a run, and one pulled off the door stands free.
 - `Leaving` puts the player on the doorstep and takes `World.LeaveSeconds`.
