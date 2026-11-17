@@ -117,7 +117,8 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 ## Two bodies meeting
 
 - Place one body from the other's contact point, not from a tuned distance. A leaping wolf is moved so `WolfModel.Bite`
-  lands on `WorldView.Throat`, which follows the knocked-down player's tip, so the jaws stay on the throat as both go down.
+  lands on `FallBackView.Throat`, which follows the knocked-down player's tip, so the jaws stay on the throat as both go
+  down.
 - Time a reaction to the moment of contact, not the start of the action: a struck wolf recoils at
   `ActorAnimation.Contact`, when the swing lands.
 - A body moves across the ground only while its feet are planted and stepping, or while it is in the air. A knockback

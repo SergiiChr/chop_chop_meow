@@ -169,62 +169,10 @@ public static class ActorAnimation {
     private static readonly Pose MineGuard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
     /// <summary>Seconds a player knocked or yanked off their feet backward takes to land on their back and lie there under the wolf.</summary>
     public const float FallBackSeconds = .8f;
-    // Shares of the fall: the yank before the hips drop, the seat landing, and the back landing.
-    private const float FallDrops = .2f, FallSits = .55f, FallLies = .72f;
-    /// <summary>How high the hips stand above the boots in the rig through a fall backward.</summary>
-    public const float FallHips = .77f;
-    // How high the hips lie once down, and how far the rig tips back by the time the seat lands.
-    private const float LyingHips = .17f, SittingTip = 30;
 
-    /// <summary>
-    /// A player yanked backward off their feet a share <paramref name="u"/> through <see cref="FallBackSeconds"/>, posed as
-    /// <paramref name="pose"/>: the hips drop onto the seat faster and faster with the boots sliding out ahead along the ground,
-    /// then the body rolls back onto the back, the legs coming up, and lies with the hips <paramref name="lying"/> back from where they stood.
-    /// Gives the pose with its legs solved to the ground, how far the rig tips back in degrees, and where the hips are: ahead of where the player stood, and up.
-    /// </summary>
-    public static (Pose Pose, float Tip, Vector2 Hips) FallingBack(Pose pose, float u, float lying) {
-        u = Math.Clamp(u, 0, 1);
-        var (tip, hips) = FallPath(u, lying);
-        var fitted = pose with { Hips = FallHips };
-        // The boots are held to the ground from the yank until the body rolls back, sliding out ahead as the seat drops.
-        float planted = Mathf.SmoothStep(.1f, FallDrops + .04f, u) * (1 - Mathf.SmoothStep(FallSits - .05f, FallLies - .05f, u));
-        if (planted <= 0) return (fitted, tip, hips);
-        float t = Mathf.DegToRad(tip), slide = Mathf.SmoothStep(FallDrops, FallSits, u);
-        var left = OnGround(Mathf.Lerp(.42f, .62f, slide) - hips.X, hips.Y, t);
-        var right = OnGround(Mathf.Lerp(-.12f, .42f, slide) - hips.X, hips.Y, t);
-        return (fitted with {
-            SwingL = Mathf.Lerp(pose.SwingL, left.Swing, planted),
-            KneeL = Mathf.Lerp(pose.KneeL, left.Knee, planted),
-            FootL = Mathf.Lerp(pose.FootL, left.Foot, planted),
-            SwingR = Mathf.Lerp(pose.SwingR, right.Swing, planted),
-            KneeR = Mathf.Lerp(pose.KneeR, right.Knee, planted),
-            FootR = Mathf.Lerp(pose.FootR, right.Foot, planted),
-        }, tip, hips);
-    }
-
-    /// <summary>
-    /// How far a body falling backward has tipped back, in degrees, and where its hips are, ahead of where it stood and up,
-    /// a share <paramref name="u"/> through the fall; see <see cref="FallingBack"/>.
-    /// </summary>
-    public static (float Tip, Vector2 Hips) FallPath(float u, float lying) {
-        u = Math.Clamp(u, 0, 1);
-        float drop = Math.Clamp((u - FallDrops) / (FallSits - FallDrops), 0, 1), roll = Math.Clamp((u - FallSits) / (FallLies - FallSits), 0, 1);
-        float top = FallHips - .05f * Mathf.SmoothStep(0, FallDrops, u);
-        float bounce = u > FallSits && u < FallSits + .1f ? .025f * MathF.Sin(MathF.PI * (u - FallSits) / .1f) : 0;
-        float up = top - (top - LyingHips) * drop * drop + bounce, back = lying * Mathf.SmoothStep(FallDrops - .05f, FallSits, u);
-        return (SittingTip * drop * drop + (90 - SittingTip) * roll * roll, new Vector2(back, up));
-    }
-
-    /// <summary>The leg angles that stand a boot flat on the ground <paramref name="ahead"/> of hips <paramref name="up"/> above it, in a rig tipped back <paramref name="tip"/> radians.</summary>
-    private static LegAngles OnGround(float ahead, float up, float tip) {
-        // The ankle stands a sole's height above the ground; in the tipped rig, ahead tilts up and down tilts back.
-        float below = up - Sole;
-        var (swing, knee) = LegTo(ahead * MathF.Cos(tip) - below * MathF.Sin(tip), ahead * MathF.Sin(tip) + below * MathF.Cos(tip));
-        return new LegAngles(swing, knee, -Mathf.RadToDeg(tip) + swing - knee);
-    }
     // Knocked or yanked back off the feet: the trunk is jerked upright and back, the head snaps forward, the arms fling up
     // for the door and the front foot slips out ahead; the knees fold as the body drops onto its seat and back, the arms thrown
-    // wide at the landing, and then it lies fighting the wolf as Mauled has it. The rig tips back as WorldView.FallBack has it.
+    // wide at the landing, and then it lies fighting the wolf as Mauled has it. The rig tips back as FallBackView.FallBack has it.
     private static readonly (float At, Pose Pose)[] FallBackKeys = {
         (0, new Pose(Lean: 12, Head: -10, RaiseL: 80, OutL: 14, ElbowL: 30, RaiseR: 85, OutR: 12, ElbowR: 26, SwingL: 6, KneeL: 16, SwingR: 6, KneeR: 16, Splay: 3)),
         (.18f, new Pose(Lean: -8, Head: 26, RaiseL: 140, OutL: 20, ElbowL: 30, RaiseR: 128, OutR: 24, ElbowR: 40, SwingL: 38, KneeL: 8, FootL: -20, SwingR: 4, KneeR: 34, Splay: 5)),

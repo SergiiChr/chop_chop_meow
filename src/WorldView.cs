@@ -478,7 +478,7 @@ public partial class WorldView : Node3D {
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
         // A downed player is posed by the fall alone.
-        if (downedFor > 0) FallBack(playerRig, player, downedFor, torch, World.Dead ? null : HoldingOff(World.Me.Id));
+        if (downedFor > 0) FallBackView.FallBack(playerRig, player, downedFor, torch, World.Dead ? null : HoldingOff(World.Me.Id));
         else Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
@@ -589,7 +589,7 @@ public partial class WorldView : Node3D {
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
-            if (other.DownedFor > 0) FallBack(other.Rig, state, other.DownedFor, torch, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
+            if (other.DownedFor > 0) FallBackView.FallBack(other.Rig, state, other.DownedFor, torch, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
             else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
@@ -623,52 +623,6 @@ public partial class WorldView : Node3D {
         foreach (var t in World.Things) if ((t.Kind == ThingKind.Stone || t.IsDeposit) && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f) return "footsteps_rocks";
         return "footsteps_default";
     }
-
-    /// <summary>How far a knocked-down player's feet slide out ahead of where they stood, toward the wolf, as they go over onto their back.</summary>
-    public const float KnockDownSlide = .65f;
-
-    /// <summary>
-    /// Poses a player knocked or yanked off their feet backward as <see cref="ActorAnimation.FallingBack"/> has them, onto
-    /// their back, <see cref="KnockDownSlide"/> on from where they stood, where <see cref="Throat"/> finds their throat.
-    /// </summary>
-    private static void FallBack(ActorRig rig, ActorState state, float downedFor, bool torch, WolfModel? wolf) {
-        var (pose, tip, hips) = ActorAnimation.FallingBack(state.Pose, downedFor / ActorAnimation.FallBackSeconds, KnockDownSlide - ActorAnimation.FallHips);
-        state.HipHeight = pose.HipHeight; state.Lift = 0;
-        float t = Mathf.DegToRad(tip);
-        rig.Root.Position = FallRoot(state.Position, ActorAnimation.Forward(state.Yaw), t, hips);
-        rig.Root.Rotation = new Vector3(-t, state.Yaw, 0);
-        // The hands push the wolf's head off by the back of the jaw, while it is in their reach; with the head too close for the
-        // arm to stay out at the side, a hand takes the neck further back instead.
-        float rollL = 0, rollR = 0;
-        if (wolf != null) {
-            var place = wolf.Root.Transform;
-            var across = place.Basis.X.Normalized() * JawHold;
-            var (neckRoot, jaws) = wolf.NeckLine;
-            for (int arm = 0; arm < 2; arm++) {
-                bool left = arm == 0;
-                var shoulder = ArmReach.Shoulder(pose, rig.Root.Transform, left);
-                Vector3 hold = Vector3.Zero;
-                for (float share = WolfModel.JawShare; share >= 0; share -= .05f) {
-                    var on = place * neckRoot.Lerp(jaws, share);
-                    // Each hand takes the side of the neck nearer its own shoulder.
-                    hold = shoulder.DistanceTo(on + across) < shoulder.DistanceTo(on - across) ? on + across : on - across;
-                    if (shoulder.DistanceTo(hold) >= HoldFrom) break;
-                }
-                float grip = Mathf.SmoothStep(ArmLength + .08f, ArmLength - .04f, shoulder.DistanceTo(hold)) * Mathf.SmoothStep(HoldFrom - .08f, HoldFrom, shoulder.DistanceTo(hold));
-                if (grip <= 0) continue;
-                // The elbow stays out at its own side and down.
-                (pose, float roll) = ArmReach.Reaching(pose, hold, rig.Root.Transform, left, grip, new Vector3(left ? 1 : -1, -1, 0));
-                if (left) rollL = roll; else rollR = roll;
-            }
-        }
-        rig.Show(pose, null, false, false, torch);
-        if (rollL != 0) rig.RollArm(true, rollL);
-        if (rollR != 0) rig.RollArm(false, rollR);
-    }
-    /// <summary>How far to either side of the middle of a wolf's jaw a player's hands push at it, and how far a hand reaches from its shoulder.</summary>
-    private const float JawHold = .07f, ArmLength = ActorRig.UpperArm + ActorRig.Forearm;
-    /// <summary>How far from its shoulder a hand pushing a wolf off holds it at least, with the elbow out at the side rather than folded across the chest.</summary>
-    private const float HoldFrom = .3f;
 
     /// <summary>Poses an actor's rig; one at the steps of the cabin door at <paramref name="door"/> stands on them.</summary>
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null) {
@@ -1290,7 +1244,7 @@ public partial class WorldView : Node3D {
                 if (model.Pinned == 0) model.StepFrom = model.Root.Position;
                 model.Pinned += dt;
                 float fell = model.Pinned / ActorAnimation.FallBackSeconds;
-                var throat = Throat(fallen.Position, ActorAnimation.Forward(fallen.Yaw), float.MaxValue);
+                var throat = FallBackView.Throat(fallen.Position, ActorAnimation.Forward(fallen.Yaw), float.MaxValue);
                 var wait = (throat + To3(wolf.LungeFrom) * WaitAside) with { Y = 0 };
                 model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero;
                 model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(-wolf.LungeFrom, model.Yaw), Math.Min(1, dt * 8));
@@ -1396,7 +1350,7 @@ public partial class WorldView : Node3D {
     /// </summary>
     private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted, Vector3 path, float flight, Vector3? waist = null) {
         if (model.Pinned > ActorAnimation.FallBackSeconds) return model.Held;
-        var held = (waist ?? Throat(hunted, model.Toward, model.Pinned)) - model.Root.Basis * model.Bite;
+        var held = (waist ?? FallBackView.Throat(hunted, model.Toward, model.Pinned)) - model.Root.Basis * model.Bite;
         held.Y = Math.Max(0, held.Y);
         if (model.Pinned > 0) return model.Held = held;
         return path.Lerp(held, Ease(Math.Clamp(flight, 0, 1)));
@@ -1405,8 +1359,8 @@ public partial class WorldView : Node3D {
     /// <summary>Where a player lying on their back as <paramref name="fallen"/> is drawn has their feet, and the way from there to their throat.</summary>
     private static (Vector2 Feet, Vector2 Length) BodyLine(ActorState fallen) {
         var forward = ActorAnimation.Forward(fallen.Yaw);
-        var feet = fallen.Position + forward * KnockDownSlide;
-        var throat = Throat(fallen.Position, forward, float.MaxValue);
+        var feet = fallen.Position + forward * FallBackView.KnockDownSlide;
+        var throat = FallBackView.Throat(fallen.Position, forward, float.MaxValue);
         return (feet, new Vector2(throat.X, throat.Z) - feet);
     }
 
@@ -1524,25 +1478,6 @@ public partial class WorldView : Node3D {
     /// <summary>How many spots along a lying body, feet to throat, a feeding wolf chooses among, and how thick an arm is, in metres.</summary>
     private const int FeedSpots = 20;
     private const float ArmRadius = .06f;
-
-    /// <summary>The rig's throat: above the feet and a little in front, before a knockdown tips it back.</summary>
-    private const float ThroatHeight = 1.31f, ThroatAhead = .06f;
-
-    /// <summary>
-    /// Where the root of a player's rig is <paramref name="tip"/> radians into a fall backward with the hips at
-    /// <paramref name="hips"/>, ahead of where they stood at <paramref name="at"/> facing <paramref name="forward"/> and up: the rig
-    /// turns about its feet, so they go where the tipped hips need them.
-    /// </summary>
-    private static Vector3 FallRoot(Vector2 at, Vector2 forward, float tip, Vector2 hips) =>
-        To3(at) + To3(forward) * (hips.X + ActorAnimation.FallHips * MathF.Sin(tip)) + Vector3.Up * (hips.Y - ActorAnimation.FallHips * MathF.Cos(tip));
-
-    /// <summary>Where the throat of a player at <paramref name="at"/> facing <paramref name="toward"/> is, <paramref name="downedFor"/> seconds into being knocked down; it follows FallBack.</summary>
-    public static Vector3 Throat(Vector2 at, Vector2 toward, float downedFor) {
-        var (tip, hips) = ActorAnimation.FallPath(downedFor / ActorAnimation.FallBackSeconds, KnockDownSlide - ActorAnimation.FallHips);
-        float back = Mathf.DegToRad(tip);
-        var forward = toward.Normalized();
-        return FallRoot(at, forward, back, hips) + To3(forward) * (ThroatAhead * MathF.Cos(back) - ThroatHeight * MathF.Sin(back)) + Vector3.Up * (ThroatHeight * MathF.Cos(back) + ThroatAhead * MathF.Sin(back));
-    }
 
     /// <summary>Tufts of fur knocked loose by a hit, and embers off a burning torch.</summary>
     private void FurAndEmbers(Vector3 at) {
