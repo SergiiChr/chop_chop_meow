@@ -306,24 +306,24 @@ public partial class WorldView {
         (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) shown;
         if (now == Doorway.None) {
             float walked = Math.Clamp((time - start) / 1.6f, 0, 1);
-            var from = door - IntoCabin * 2;
-            shown = (from.Lerp(door, walked), door + IntoCabin, walked < 1 ? ActorAction.Jog : ActorAction.Idle, false);
+            var from = door - DoorwayView.IntoCabin * 2;
+            shown = (from.Lerp(door, walked), door + DoorwayView.IntoCabin, walked < 1 ? ActorAction.Jog : ActorAction.Idle, false);
         } else if (now == Doorway.Tugged) {
             // Half way into a run in, the player is tugged back out a metre, then runs in again from there.
             float run = time - start, tugged = run - Doorways.RushSeconds / 2;
             var tuggedTo = door + Doorways.OutOfDoor * DoorTug.TugDistance;
             var part = run < Doorways.RushSeconds / 2 ? Doorway.Entering : tugged < DoorTug.TugSeconds ? Doorway.Tugged : Doorway.Entering;
             if (part != reviewActor.Stage) { reviewActor.Stage = part; reviewActor.StageFrom = reviewActor.Position; }
-            shown = run < Doorways.RushSeconds / 2 ? DoorStep(Doorway.Entering, door, door, reviewActor.StageFrom, run, Doorways.RushSeconds, true, 0)
-                : tugged < DoorTug.TugSeconds ? DoorStep(Doorway.Tugged, door, door, reviewActor.StageFrom, tugged, DoorTug.TugSeconds, true, DoorTug.TugDistance)
-                : DoorStep(Doorway.Entering, door, tuggedTo, reviewActor.StageFrom, tugged - DoorTug.TugSeconds, Doorways.RushSeconds, true, 0);
+            shown = run < Doorways.RushSeconds / 2 ? DoorwayView.DoorStep(Doorway.Entering, door, door, reviewActor.StageFrom, run, Doorways.RushSeconds, true, 0)
+                : tugged < DoorTug.TugSeconds ? DoorwayView.DoorStep(Doorway.Tugged, door, door, reviewActor.StageFrom, tugged, DoorTug.TugSeconds, true, DoorTug.TugDistance)
+                : DoorwayView.DoorStep(Doorway.Entering, door, tuggedTo, reviewActor.StageFrom, tugged - DoorTug.TugSeconds, Doorways.RushSeconds, true, 0);
         } else {
             if (now != reviewActor.Stage) { reviewActor.Stage = now; reviewActor.StageFrom = reviewActor.Position; }
             float seconds = now switch { Doorway.Knocking => Doorways.KnockLead + Doorways.KnockSeconds, Doorway.Leaving => Doorways.LeaveSeconds, _ => Doorways.EnterSeconds };
-            shown = DoorStep(now, door, door, reviewActor.StageFrom, time - start, seconds, false, 0);
+            shown = DoorwayView.DoorStep(now, door, door, reviewActor.StageFrom, time - start, seconds, false, 0);
         }
         bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Tugged && shown.At.DistanceTo(door) < ReviewSeen;
-        SwingDoor(reviewCabin, open, dt / Doorways.ShutSeconds);
+        DoorwayView.SwingDoor(reviewCabin, open, dt / Doorways.ShutSeconds);
         reviewActor.Update(shown.At, shown.Action, shown.Facing, dt, shown.Backing);
         Pose(reviewRigs[0], reviewActor, null, door: new DoorShown(shown.At, shown.Facing, shown.Action, door, shown.Backing, 0, 0, 0));
         reviewRigs[0].Root.Visible = shown.At.DistanceTo(door) < ReviewSeen || now is Doorway.None or Doorway.Knocking;
