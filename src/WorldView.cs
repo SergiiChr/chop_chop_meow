@@ -60,9 +60,15 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<int, Avatar> others = new();
     /// <summary>Draws players at cabin doors.</summary>
     private readonly DoorwayView doorways;
+    /// <summary>Draws wolves tugging players out of cabin doorways.</summary>
+    private readonly TugView tugs;
+    /// <summary>Where wolves stand round a fallen player.</summary>
+    private readonly FeedingSpots feeding;
 
     public WorldView() {
         doorways = new DoorwayView(() => World, StateOf);
+        tugs = new TugView(() => World, StateOf);
+        feeding = new FeedingSpots(wolves);
     }
     // The host keeps the original teal; each guest keeps the first one free when it joined.
     private static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
@@ -599,9 +605,6 @@ public partial class WorldView : Node3D {
             if (!HasPlayer(id)) { other.Rig.Root.QueueFree(); others.Remove(id); }
     }
 
-    /// <summary>How far behind a player's hips a tugging wolf's jaws hold them.</summary>
-    private const float WaistBehind = .12f;
-
     private bool HasWorker(int id) {
         foreach (var w in World.Workers) if (w.Id == id) return true;
         return false;
@@ -1101,35 +1104,8 @@ public partial class WorldView : Node3D {
         foreach (var (wolf, model) in wolves) if (!World.Wolves.Contains(wolf) && model.Last.DistanceTo(at) < 2) return model;
         return null;
     }
-    /// <summary>The back of the waist of the player a wolf hunts as drawn, while they are out in the open in a cabin's doorway, or null.</summary>
-    private Vector3? InTheDoorway(Wolf wolf) =>
-        World.PlayerById(wolf.Target) is { Door: Doorway.Entering or Doorway.Following or Doorway.Knocking } p && !Doorways.Indoors(p) && StateOf(p.Id) is ActorState held ? Waist(held) : null;
-    /// <summary>The player a tugging wolf tugs as drawn, and how far through the tug they are, 0 to 1; null once they are not being tugged.</summary>
-    private (ActorState Held, float Progress)? TuggedBy(Wolf wolf) =>
-        World.PlayerById(wolf.Target) is { Door: Doorway.Tugged or Doorway.TuggedOff } p && StateOf(p.Id) is ActorState held ? (held, Math.Clamp(p.DoorTime / DoorTug.TugSeconds, 0, 1)) : null;
-    /// <summary>The back of a drawn player's waist, where a wolf takes hold of them.</summary>
-    private static Vector3 Waist(ActorState held) => To3(held.Position - ActorAnimation.Forward(held.Yaw) * WaistBehind) + Vector3.Up * (held.HipHeight + held.Lift);
-    /// <summary>
-    /// How far beside a fallen player's throat a wolf that tugged them out waits while they fall, and the shares of
-    /// <see cref="ActorAnimation.FallBackSeconds"/> over which it then lunges onto the throat.
-    /// </summary>
-    private const float WaitAside = 1.2f, LungeStart = .74f, LungeEnd = .92f;
     /// <summary>Whether a player is pinned by a wolf beside them, which tugged them back out of a doorway, so they fall back rather than turn to it.</summary>
     private bool FallsBack(int player) => PinningWolf(player) is { LungeFrom: var lungeFrom } && lungeFrom != Vector2.Zero;
-    /// <summary>
-    /// Which way a wolf tugging <paramref name="held"/> turns from another wolf tugging someone within <see cref="TuggersApart"/>
-    /// of them: 1 to the held player's left, -1 to their right, 0 with nobody there.
-    /// </summary>
-    private float ApartFrom(Wolf tugger, ActorState held) {
-        foreach (var other in World.Wolves)
-            if (other != tugger && other.Tugging && TuggedBy(other) is var (them, _) && them != held && them.Position.DistanceTo(held.Position) < TuggersApart)
-                return (held.Position - them.Position).Dot(ActorAnimation.Forward(held.Yaw).Orthogonal()) >= 0 ? -1 : 1;
-        return 0;
-    }
-    /// <summary>Seconds a wolf taking hold of a player to tug them takes to lunge in to their waist.</summary>
-    private const float TugLunge = .2f;
-    /// <summary>How near two tugged players are when their wolves angle apart, and by how many degrees.</summary>
-    private const float TuggersApart = 1.2f, SplayTugger = 35;
     private Wolf? PinningWolf(int player) {
         foreach (var w in World.Wolves) if (w.Pinning && w.Target == player) return w;
         return null;
@@ -1213,8 +1189,7 @@ public partial class WorldView : Node3D {
     }
 
     private void SyncWolves(float dt) {
-        liveWolves.Clear();
-        foreach (var wolf in World.Wolves) liveWolves.Add(wolf);
+        feeding.Remember(World.Wolves);
         foreach (var wolf in World.Wolves) {
             if (!wolves.TryGetValue(wolf, out var model)) {
                 model = new WolfModel { Last = wolf.Pos, Yaw = ActorAnimation.Yaw(Hunted(wolf) - wolf.Pos, 0) };
@@ -1223,49 +1198,8 @@ public partial class WorldView : Node3D {
             var hunted = Hunted(wolf);
             var moved = wolf.Pos - model.Last;
             model.Last = wolf.Pos;
-            if (wolf.Tugging && TuggedBy(wolf) is var (held, through)) {
-                // Its jaws hold the back of the player's hips as they are drawn, the wolf facing the way they face,
-                // or angled away from another wolf tugging someone beside them so the two bodies keep clear.
-                // Taking hold, it lunges in to the waist from where it stood rather than appearing there.
-                if (model.Motion != WolfMotion.Tug) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; }
-                float lunge = Ease(Math.Min(1, through * DoorTug.TugSeconds / TugLunge));
-                model.Yaw = Mathf.LerpAngle(model.FromYaw, held.Yaw + Mathf.DegToRad(SplayTugger) * ApartFrom(wolf, held), lunge);
-                model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
-                model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-                model.Root.Visible = World.Sees(wolf.Pos);
-                model.Tug(through, Elapsed, dt);
-                var grip = Waist(held) - model.Root.Basis * model.Bite;
-                model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);
-                model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
-                continue;
-            }
-            if (wolf.Pinning && wolf.LungeFrom != Vector2.Zero && StateOf(wolf.Target) is ActorState fallen) {
-                // Having tugged its player out, it lets go as they fall back toward it, steps round to their side and lunges onto the throat as they land.
-                if (model.Pinned == 0) model.StepFrom = model.Root.Position;
-                model.Pinned += dt;
-                float fell = model.Pinned / ActorAnimation.FallBackSeconds;
-                var throat = FallBackView.Throat(fallen.Position, ActorAnimation.Forward(fallen.Yaw), float.MaxValue);
-                var wait = (throat + To3(wolf.LungeFrom) * WaitAside) with { Y = 0 };
-                model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero;
-                model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(-wolf.LungeFrom, model.Yaw), Math.Min(1, dt * 8));
-                model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-                model.Root.Visible = World.Sees(wolf.Pos);
-                if (fell < LungeStart) {
-                    // It springs back off the yanked body at once, then slows as it comes round.
-                    float off = fell / LungeStart;
-                    var at = model.StepFrom.Lerp(wait, 1 - (1 - off) * (1 - off));
-                    // It backs off the falling body rather than walking forward while it goes back.
-                    model.Move((at - model.Root.Position).Dot(model.Root.Basis.Z), dt, false, false);
-                    model.Root.Position = at;
-                    continue;
-                }
-                model.Feed(Elapsed + wolf.Id % 7, dt, true, 1, lunged: true);
-                if (fell < LungeEnd) {
-                    var bite = (throat - model.Root.Basis * model.Bite) with { Y = 0 };
-                    model.Root.Position = model.Held = wait.Lerp(bite, Ease((fell - LungeStart) / (LungeEnd - LungeStart)));
-                } else model.Root.Position = model.Held;
-                continue;
-            }
+            if (wolf.Tugging && tugs.ShowTugging(wolf, model, Elapsed, dt)) continue;
+            if (wolf.Pinning && wolf.LungeFrom != Vector2.Zero && tugs.ShowLunging(wolf, model, Elapsed, dt)) continue;
             // A hit throws the wolf back at once in the world; the model holds its place and lunges into the swing, then is thrown back when it lands.
             if (wolf.Stagger > model.Stagger) {
                 model.KnockBack -= moved; moved = Vector2.Zero;
@@ -1309,34 +1243,23 @@ public partial class WorldView : Node3D {
                 float start = progress < 1 ? (gap - World.PinDistance * progress) / (1 - progress) : gap;
                 float contact = start <= WolfModel.ContactReach ? 0 : (start - WolfModel.ContactReach) / (start - World.PinDistance);
                 model.Pinned = gap <= WolfModel.ContactReach ? model.Pinned + dt : 0;
-                var chest = PawsOnChest(model, RigOf(wolf.Target));
+                var chest = FeedingSpots.PawsOnChest(model, RigOf(wolf.Target));
                 if (model.Pinned > 0) model.Feed(Elapsed, dt, true, model.Pinned / ActorAnimation.FallBackSeconds, chest: chest);
                 else { model.Leap(progress, contact, dt, chest); flight = contact > 0 ? progress / contact : 1; }
                 if (model.Pinned == 0) model.Toward = (wolf.Pos - hunted).Normalized();
             } else if (wolf.Feeding) {
                 if (wolf.Pinning) model.Pinned += dt;
-                model.Feed(Elapsed + wolf.Id % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? PawsOnChest(model, RigOf(wolf.Target)) : null);
+                model.Feed(Elapsed + wolf.Id % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? FeedingSpots.PawsOnChest(model, RigOf(wolf.Target)) : null);
             } else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (running) model.Move(backing ? -moved.Length() : moved.Length(), dt, wolf.Chase > 0 && !backing, wary);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
             var place = To3(wolf.Pos + model.KnockBack + model.Drift);
             if (wolf.Leap > 0 || wolf.Pinning) {
                 if (model.Toward == Vector2.Zero) model.Toward = (wolf.Pos - hunted).Normalized();
-                place = AtTheThroat(model, hunted, place, flight, InTheDoorway(wolf));
+                place = AtTheThroat(model, hunted, place, flight, tugs.InTheDoorway(wolf));
             } else model.Toward = Vector2.Zero;
-            if (wolf.Feeding && !wolf.Pinning && Fallen(wolf) is var (lying, lyingRig)) {
-                // A feeding wolf stands perpendicular to the lying body at the part of it nearest to it that leaves it touching neither
-                // another wolf nor the player's arms, keeping that spot while it stays free; it eases there from where it stood, and to
-                // any new spot it has to move to.
-                var spot = FreeSpot(wolf, model, lying, lyingRig);
-                if (model.Fed == 0 || spot.Along != model.FeedAlong || spot.Side != model.FeedSide) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; model.Fed = 0; }
-                (model.FeedAlong, model.FeedSide) = (spot.Along, spot.Side);
-                model.Fed += dt;
-                float ease = Ease(Math.Min(1, model.Fed / FeedEasing));
-                model.Yaw = Mathf.LerpAngle(model.FromYaw, spot.Yaw, ease);
-                model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-                place = model.StepFrom.Lerp(spot.At, ease);
-            } else { model.Fed = 0; model.FeedSide = 0; }
+            if (wolf.Feeding && !wolf.Pinning && Fallen(wolf) is var (lying, lyingRig)) place = feeding.Place(wolf, model, lying, lyingRig, dt);
+            else { model.Fed = 0; model.FeedSide = 0; }
             model.Root.Position = place;
         }
         foreach (var (wolf, model) in wolves)
@@ -1356,34 +1279,6 @@ public partial class WorldView : Node3D {
         return path.Lerp(held, Ease(Math.Clamp(flight, 0, 1)));
     }
 
-    /// <summary>Where a player lying on their back as <paramref name="fallen"/> is drawn has their feet, and the way from there to their throat.</summary>
-    private static (Vector2 Feet, Vector2 Length) BodyLine(ActorState fallen) {
-        var forward = ActorAnimation.Forward(fallen.Yaw);
-        var feet = fallen.Position + forward * FallBackView.KnockDownSlide;
-        var throat = FallBackView.Throat(fallen.Position, forward, float.MaxValue);
-        return (feet, new Vector2(throat.X, throat.Z) - feet);
-    }
-
-    /// <summary>
-    /// Where a feeding wolf stands, and which way it faces, to bite a lying player's <paramref name="body"/>
-    /// at <paramref name="along"/> of the way from their feet to their throat, from the side <paramref name="side"/>: 1 to
-    /// their left, -1 to their right, standing perpendicular to the body.
-    /// </summary>
-    private static (Vector3 At, float Yaw) OnTheBody((Vector2 Feet, Vector2 Length) body, float along, int side) {
-        var near = body.Feet + body.Length * along;
-        var outward = body.Length.Orthogonal().Normalized() * side;
-        // The legs are lower and narrower than the trunk.
-        bool legs = along < LegsEnd;
-        float yaw = ActorAnimation.Yaw(-outward, 0);
-        var at = To3(near + outward * (legs ? LegSide : BodySide), legs ? LegTop : BodyTop) - new Basis(Vector3.Up, yaw) * WolfModel.FeedingBite;
-        return (at with { Y = 0 }, yaw);
-    }
-    /// <summary>
-    /// How far out from the middle of a body lying on its back, and how high, the side of its trunk and of its legs are, where a
-    /// feeding wolf's jaws close; the share of the way from the feet to the throat where the legs end; and seconds a feeding wolf
-    /// takes to ease onto its spot.
-    /// </summary>
-    private const float BodySide = .17f, BodyTop = .2f, LegSide = .15f, LegTop = .1f, LegsEnd = .45f, FeedEasing = .4f;
     /// <summary>The wolf a downed player pushes at: the one knocking them down or pinning them, as drawn, or null.</summary>
     private WolfModel? HoldingOff(int player) {
         foreach (var w in World.Wolves)
@@ -1396,88 +1291,9 @@ public partial class WorldView : Node3D {
     /// <summary>How a player is drawn, or null for one not drawn yet.</summary>
     private ActorState? StateOf(int id) => id == World.Me.Id ? player : others.TryGetValue(id, out var other) ? other.State : null;
 
-    /// <summary>
-    /// Where a wolf's left and right forepaws stand on a player's chest, in the wolf's model as last placed: on the front of the
-    /// chest either side of the breastbone, a paw's thickness off it.
-    /// </summary>
-    private static (Vector3 Left, Vector3 Right)? PawsOnChest(WolfModel model, ActorRig? rig) {
-        if (rig == null) return null;
-        var chest = rig.Torso.GlobalTransform;
-        var toModel = model.Root.GlobalTransform.AffineInverse();
-        Vector3 a = toModel * (chest * ChestSpot), b = toModel * (chest * (ChestSpot with { X = -ChestSpot.X }));
-        // The wolf's left forepaw takes the side of the chest to its left.
-        return a.X >= b.X ? (a, b) : (b, a);
-    }
-    /// <summary>Where on the trunk, from the hips, a forepaw on the chest stands: beside the breastbone, inside the player's forearms pushing at the jaw, out from the shirt by a paw.</summary>
-    private static readonly Vector3 ChestSpot = new(.05f, .3f, .18f);
-
     /// <summary>The drawn player a wolf hunts once they lie fallen, or null.</summary>
     private (ActorState State, ActorRig Rig)? Fallen(Wolf wolf) =>
         StateOf(wolf.Target) is { Action: ActorAction.Mauled or ActorAction.Devoured } state && RigOf(wolf.Target) is ActorRig rig ? (state, rig) : null;
-
-    /// <summary>
-    /// The spot a feeding wolf takes at a lying player: perpendicular to the body at the part nearest to the wolf, on either
-    /// side, where it touches neither another wolf as drawn nor the player's arms; its last spot while that stays free.
-    /// With no free spot it keeps its last one.
-    /// </summary>
-    private (Vector3 At, float Yaw, int Along, int Side) FreeSpot(Wolf wolf, WolfModel model, ActorState lying, ActorRig rig) {
-        FillObstacles(wolf, rig);
-        var body = BodyLine(lying);
-        if (model.FeedSide != 0) {
-            var (at, yaw) = OnTheBody(body, model.FeedAlong / (float)FeedSpots, model.FeedSide);
-            if (Free(at, yaw)) return (at, yaw, model.FeedAlong, model.FeedSide);
-        }
-        Span<(float Away, int Along, int Side)> spots = stackalloc (float, int, int)[2 * (FeedSpots + 1)];
-        int count = 0;
-        for (int i = 0; i <= FeedSpots; i++)
-            for (int side = -1; side <= 1; side += 2) {
-                var (at, _) = OnTheBody(body, i / (float)FeedSpots, side);
-                spots[count++] = (new Vector2(at.X, at.Z).DistanceTo(wolf.Pos), i, side);
-            }
-        spots.Sort();
-        foreach (var (_, along, side) in spots) {
-            var (at, yaw) = OnTheBody(body, along / (float)FeedSpots, side);
-            if (Free(at, yaw)) return (at, yaw, along, side);
-        }
-        int lastSide = model.FeedSide == 0 ? 1 : model.FeedSide;
-        var (last, lastYaw) = OnTheBody(body, model.FeedAlong / (float)FeedSpots, lastSide);
-        return (last, lastYaw, model.FeedAlong, lastSide);
-    }
-
-    /// <summary>The wolves still in the world this frame; a dead one's model stays drawn a while after.</summary>
-    private readonly HashSet<Wolf> liveWolves = new();
-    /// <summary>What a feeding wolf must not touch, as spheres in the world: every other wolf as drawn and the lying player's arms.</summary>
-    private readonly List<(Vector3 At, float Radius)> obstacles = new();
-
-    /// <summary>Fills <see cref="obstacles"/> for <paramref name="feeder"/> at the player drawn by <paramref name="rig"/>, once for all the spots it weighs.</summary>
-    private void FillObstacles(Wolf feeder, ActorRig rig) {
-        obstacles.Clear();
-        Span<(Vector3 At, float Radius)> theirs = stackalloc (Vector3, float)[WolfModel.VolumeCount];
-        foreach (var (wolf, model) in wolves) {
-            if (wolf == feeder || !liveWolves.Contains(wolf)) continue;
-            model.Volumes(theirs);
-            var other = model.Root.Transform;
-            foreach (var (at, radius) in theirs) obstacles.Add((other * at, radius));
-        }
-        var body = rig.Root.Transform;
-        for (int arm = 0; arm < 2; arm++) {
-            Vector3 fist = body * rig.Fist(arm == 0), elbow = body * rig.Elbow(arm == 0);
-            obstacles.Add((fist, ArmRadius)); obstacles.Add((fist.Lerp(elbow, .5f), ArmRadius)); obstacles.Add((elbow, ArmRadius));
-        }
-    }
-
-    /// <summary>Whether a feeding wolf placed at <paramref name="at"/> facing <paramref name="yaw"/> touches none of the <see cref="obstacles"/>.</summary>
-    private bool Free(Vector3 at, float yaw) {
-        var place = new Transform3D(new Basis(Vector3.Up, yaw), at);
-        foreach (var mine in WolfModel.FeedingVolumes) {
-            var centre = place * mine.At;
-            foreach (var (them, radius) in obstacles) if (centre.DistanceSquaredTo(them) < (mine.Radius + radius) * (mine.Radius + radius)) return false;
-        }
-        return true;
-    }
-    /// <summary>How many spots along a lying body, feet to throat, a feeding wolf chooses among, and how thick an arm is, in metres.</summary>
-    private const int FeedSpots = 20;
-    private const float ArmRadius = .06f;
 
     /// <summary>Tufts of fur knocked loose by a hit, and embers off a burning torch.</summary>
     private void FurAndEmbers(Vector3 at) {

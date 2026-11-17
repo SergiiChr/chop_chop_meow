@@ -374,7 +374,7 @@ public partial class WorldView {
             case "wolf feed": {
                     // Tearing at the side of the fallen player's belly.
                     wolf.Feed(Elapsed, dt, false);
-                    (place, wolf.Yaw) = OnTheBody(BodyLine(reviewPerson), .4f, 1);
+                    (place, wolf.Yaw) = FeedingSpots.OnTheBody(FeedingSpots.BodyLine(reviewPerson), .4f, 1);
                     wolf.Root.Rotation = new Vector3(0, wolf.Yaw, 0);
                     person = ActorAction.Devoured; downed = 1;
                     break;
@@ -386,7 +386,7 @@ public partial class WorldView {
                     wolf.Toward = track;
                     if (c < .6f) { wolf.Pinned = 0; wolf.Stand(Elapsed, dt, true); } else {
                         wolf.Pinned = gap <= WolfModel.ContactReach ? wolf.Pinned + dt : 0;
-                        var chest = PawsOnChest(wolf, reviewRigs[0]);
+                        var chest = FeedingSpots.PawsOnChest(wolf, reviewRigs[0]);
                         if (wolf.Pinned > 0) wolf.Feed(Elapsed, dt, true, wolf.Pinned / ActorAnimation.FallBackSeconds, chest: chest);
                         else { wolf.Leap(progress, contact, dt, chest); flight = progress / contact; }
                     }
