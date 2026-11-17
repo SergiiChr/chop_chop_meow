@@ -891,24 +891,41 @@ public partial class WorldView : Node3D {
         var forward = new Vector3(MathF.Sin(state.Yaw), 0, MathF.Cos(state.Yaw));
         rig.Root.Position = To3(state.Position) + forward * (hips.X + pose.HipHeight * MathF.Sin(t)) + Vector3.Up * (hips.Y - pose.HipHeight * MathF.Cos(t));
         rig.Root.Rotation = new Vector3(-t, state.Yaw, 0);
-        // The hands push the wolf's head off by the back of the jaw, while it is in their reach.
+        // The hands push the wolf's head off by the back of the jaw, while it is in their reach; with the head too close for the
+        // arm to stay out at the side, a hand takes the neck further back instead.
+        float rollL = 0, rollR = 0;
         if (wolf != null) {
-            var neck = wolf.Root.Transform * wolf.JawBack;
-            var across = wolf.Root.Transform.Basis.X.Normalized() * JawHold;
+            var place = wolf.Root.Transform;
+            var across = place.Basis.X.Normalized() * JawHold;
             var trunk = Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway)));
             for (int arm = 0; arm < 2; arm++) {
                 bool left = arm == 0;
                 var shoulder = rig.Root.Transform * (Vector3.Up * pose.HipHeight + trunk * new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0));
-                // Each hand takes the side of the jaw nearer its own shoulder.
-                var hold = shoulder.DistanceTo(neck + across) < shoulder.DistanceTo(neck - across) ? neck + across : neck - across;
-                float grip = Mathf.SmoothStep(ArmReach + .08f, ArmReach - .04f, shoulder.DistanceTo(hold));
-                if (grip > 0) pose = Reaching(pose, hold, rig.Root.Transform, left, grip);
+                Vector3 hold = Vector3.Zero;
+                for (float share = WolfModel.JawShare; share >= 0; share -= .05f) {
+                    var on = place * wolf.AlongNeck(share);
+                    // Each hand takes the side of the neck nearer its own shoulder.
+                    hold = shoulder.DistanceTo(on + across) < shoulder.DistanceTo(on - across) ? on + across : on - across;
+                    if (shoulder.DistanceTo(hold) >= HoldFrom) break;
+                }
+                float grip = Mathf.SmoothStep(ArmReach + .08f, ArmReach - .04f, shoulder.DistanceTo(hold)) * Mathf.SmoothStep(HoldFrom - .08f, HoldFrom, shoulder.DistanceTo(hold));
+                if (grip <= 0) continue;
+                // The elbow stays out at its own side and down.
+                var inTrunk = trunk.Inverse() * (rig.Root.Transform.AffineInverse() * hold - Vector3.Up * pose.HipHeight);
+                var (raise, outward, elbow, roll) = ActorAnimation.ArmTo(inTrunk, left, new Vector3(left ? 1 : -1, -1, 0), ActorRig.Palm);
+                pose = left ? pose with { RaiseL = Mathf.Lerp(pose.RaiseL, raise, grip), OutL = Mathf.Lerp(pose.OutL, outward, grip), ElbowL = Mathf.Lerp(pose.ElbowL, elbow, grip) }
+                    : pose with { RaiseR = Mathf.Lerp(pose.RaiseR, raise, grip), OutR = Mathf.Lerp(pose.OutR, outward, grip), ElbowR = Mathf.Lerp(pose.ElbowR, elbow, grip) };
+                if (left) rollL = roll * grip; else rollR = roll * grip;
             }
         }
         rig.Show(pose, null, false, false, torch);
+        if (rollL != 0) rig.RollArm(true, rollL);
+        if (rollR != 0) rig.RollArm(false, rollR);
     }
     /// <summary>How far to either side of the middle of a wolf's jaw a player's hands push at it, and how far a hand reaches from its shoulder.</summary>
     private const float JawHold = .07f, ArmReach = ActorRig.UpperArm + ActorRig.Forearm;
+    /// <summary>How far from its shoulder a hand pushing a wolf off holds it at least, with the elbow out at the side rather than folded across the chest.</summary>
+    private const float HoldFrom = .3f;
 
     /// <summary>A pose with a fist, the right one unless <paramref name="left"/>, <paramref name="weight"/> of the way to <paramref name="aim"/> in the world, for a rig placed at <paramref name="root"/>.</summary>
     private static Pose Reaching(Pose pose, Vector3 aim, Transform3D root, bool left = false, float weight = 1) {
@@ -1746,8 +1763,8 @@ public partial class WorldView : Node3D {
         // The wolf's left forepaw takes the side of the chest to its left.
         return a.X >= b.X ? (a, b) : (b, a);
     }
-    /// <summary>Where on the trunk, from the hips, a forepaw on the chest stands: toward the shoulder, outside the player's forearms pushing at the jaw, out from the shirt by a paw.</summary>
-    private static readonly Vector3 ChestSpot = new(.13f, .3f, .18f);
+    /// <summary>Where on the trunk, from the hips, a forepaw on the chest stands: beside the breastbone, inside the player's forearms pushing at the jaw, out from the shirt by a paw.</summary>
+    private static readonly Vector3 ChestSpot = new(.05f, .3f, .18f);
 
     /// <summary>The drawn player a wolf hunts once they lie fallen, or null.</summary>
     private (ActorState State, ActorRig Rig)? Fallen(Wolf wolf) {

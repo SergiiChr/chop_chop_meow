@@ -28,6 +28,7 @@ public static class AnimationChecks {
         CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning();
         CheckDiggingKeepsBothFeetWhereTheyStand();
         CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem();
+        CheckAHandReachesItsPointWithTheElbowTheWayAsked();
         CheckWolfGaitsPlantEachPaw();
         CheckPosingAllocatesNothing();
     }
@@ -199,6 +200,28 @@ public static class AnimationChecks {
             Require(deepest > -.003f, $"{action} from {from} m to {to} m in from a cabin's door should never sink a boot into its steps: {deepest:0.000} m");
             Require(highest < .01f, $"{action} from {from} m to {to} m in from a cabin's door should keep a boot on the steps: the lowest rose {highest:0.000} m off them");
         }
+    }
+
+    /// <summary>Hands pushed at points in front of the chest and face reach them, the elbow on its own side and down, outside the trunk rather than across or in it.</summary>
+    private static void CheckAHandReachesItsPointWithTheElbowTheWayAsked() {
+        var rig = new ActorRig(ActorSkin.Player);
+        foreach (bool left in new[] { true, false })
+            foreach (var target in new[] { new Vector3(.05f, .5f, .3f), new Vector3(-.05f, .6f, .25f), new Vector3(.1f, .35f, .35f), new Vector3(0, .55f, .4f) }) {
+                float side = left ? 1 : -1;
+                var aim = target with { X = target.X * side };
+                var (raise, outward, elbow, roll) = ActorAnimation.ArmTo(aim, left, new Vector3(side, -1, 0), ActorRig.Palm);
+                var pose = left ? new Pose(RaiseL: raise, OutL: outward, ElbowL: elbow) : new Pose(RaiseR: raise, OutR: outward, ElbowR: elbow);
+                rig.Show(pose, null, false);
+                rig.RollArm(left, roll);
+                var hips = Vector3.Up * pose.HipHeight;
+                float miss = (rig.Fist(left) - hips).DistanceTo(aim);
+                var at = rig.Elbow(left) - hips;
+                Require(miss < .005f, $"a {(left ? "left" : "right")} hand should reach {aim}: it missed by {miss:0.000} m");
+                // Its own side of the body and below the shoulder, beside the trunk or in front of the chest, never in it.
+                bool outside = at.X * side > ActorRig.ShoulderOut || at.Z > .2f;
+                Require(at.X * side > .05f && at.Y < ActorRig.ShoulderUp && outside, $"a {(left ? "left" : "right")} elbow should stay out and down, reaching {aim}: it is at {at}");
+            }
+        rig.Root.Free();
     }
 
     private static void CheckActionsLoopAndWrapByTheirDuration() {

@@ -414,10 +414,10 @@ public sealed class WolfModel {
         return volumes;
     }
 
-    /// <summary>Where the back of the jaw is, in the model, under the pose shown, where a player pushing the wolf's head off takes hold.</summary>
-    public Vector3 JawBack => (Frame(shown, false) * Posed(WolfShape.Neck, Vector3.Zero, Turn(shown.Neck, shown.NeckTurn))).Origin.Lerp(BiteOf(shown), JawShare);
-    /// <summary>How far from the root of the neck to the jaws the back of the jaw is.</summary>
-    private const float JawShare = .75f;
+    /// <summary>A point along the neck, in the model, under the pose shown: <paramref name="share"/> of the way from its root to the jaws.</summary>
+    public Vector3 AlongNeck(float share) => (Frame(shown, false) * Posed(WolfShape.Neck, Vector3.Zero, Turn(shown.Neck, shown.NeckTurn))).Origin.Lerp(BiteOf(shown), share);
+    /// <summary>How far from the root of the neck to the jaws the back of the jaw is, where a player pushing the wolf's head off takes hold.</summary>
+    public const float JawShare = .75f;
 
     /// <summary>Where the jaws close, in the model, under the pose shown.</summary>
     public Vector3 Bite => BiteOf(shown);

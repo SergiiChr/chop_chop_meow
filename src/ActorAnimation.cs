@@ -343,6 +343,38 @@ public static class ActorAnimation {
         return (Mathf.PosMod(raise + 180, 360) - 180, Mathf.RadToDeg(outward), Mathf.RadToDeg(bend - MathF.Atan2(palm, ActorRig.Forearm)));
     }
 
+    /// <summary>
+    /// The arm raise, outward swing, elbow bend and roll of the arm about its own length, in degrees, that put a fist at
+    /// <paramref name="grip"/>, from the hips in the trunk's own frame, with the elbow as far toward <paramref name="elbowToward"/>
+    /// as the arm allows; <see cref="ActorRig.RollArm"/> applies the roll after the pose.
+    /// </summary>
+    public static (float Raise, float Out, float Elbow, float Roll) ArmTo(Vector3 grip, bool left, Vector3 elbowToward, float palm = 0) {
+        var shoulder = new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
+        const float upper = ActorRig.UpperArm;
+        float fore = MathF.Sqrt(ActorRig.Forearm * ActorRig.Forearm + palm * palm);
+        var reach = grip - shoulder;
+        float d = Math.Clamp(reach.Length(), Math.Abs(upper - fore) + 1e-3f, upper + fore - 1e-3f);
+        var along = reach.Normalized();
+        // The elbow lies on a circle round the line to the hand; it takes the point of it nearest the way asked.
+        float toCentre = (upper * upper - fore * fore + d * d) / (2 * d), radius = MathF.Sqrt(Math.Max(0, upper * upper - toCentre * toCentre));
+        var toward = elbowToward - along * elbowToward.Dot(along);
+        if (toward.LengthSquared() < 1e-8f) toward = Vector3.Down - along * Vector3.Down.Dot(along);
+        var elbowAt = shoulder + along * toCentre + toward.Normalized() * radius;
+        var hand = shoulder + along * d;
+        Vector3 down = (elbowAt - shoulder).Normalized(), forearm = (hand - elbowAt).Normalized();
+        // The forearm bends toward the shoulder's +Z; the fist sits a palm ahead of the forearm's line.
+        var bend = forearm - down * forearm.Dot(down);
+        if (bend.LengthSquared() < 1e-8f) bend = Vector3.Back - down * Vector3.Back.Dot(down);
+        var z = bend.Normalized();
+        var y = -down;
+        var basis = new Basis(y.Cross(z), y, z);
+        // The shoulder turns as Rx(-raise) Rz(out) and RollArm then turns it about its length.
+        var euler = basis.GetEuler(EulerOrder.Xzy);
+        float elbow = Mathf.RadToDeg(MathF.Acos(Math.Clamp(down.Dot(forearm), -1, 1)) - MathF.Atan2(palm, ActorRig.Forearm));
+        float outward = Mathf.RadToDeg(euler.Z);
+        return (-Mathf.RadToDeg(euler.X), left ? outward : -outward, elbow, Mathf.RadToDeg(euler.Y));
+    }
+
     /// <summary>How far past the right fist, along the handle it holds, the left fist grips in a two-handed swing, in metres.</summary>
     private const float SecondGrip = .06f;
     /// <summary>
