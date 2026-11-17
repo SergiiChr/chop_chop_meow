@@ -32,8 +32,6 @@ public partial class WorldView : Node3D {
     /// <summary>From the camera along its view: past the ground it looks at, by more than the tallest model, and still inside what it draws and casts shadows for.</summary>
     private const float WarmStageDepth = 85;
     public bool AnimationReview;
-    /// <summary>Seconds the clock moves each frame while the animation review is captured, so frames are evenly spaced whatever the frame rate; null follows real time.</summary>
-    public float? CaptureStep;
     /// <summary>A fixed daylight landscape view with the lake and sea waves held at one moment, for <c>--environment-review</c>; set before the view enters the tree.</summary>
     public bool EnvironmentReview;
     public bool EnvironmentReviewFog;
@@ -456,7 +454,7 @@ public partial class WorldView : Node3D {
     public override void _Process(double delta) {
         // The film moves everything by its own clock.
         if (World == null || filming) return;
-        float dt = Paused ? 0 : CaptureStep ?? Math.Min((float)delta, .1f);
+        float dt = Paused ? 0 : Math.Min((float)delta, .1f);
         Elapsed += dt;
         SyncCamera();
         ShowWarmStage();

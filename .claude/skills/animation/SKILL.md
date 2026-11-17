@@ -7,12 +7,12 @@ description: Make a character or creature animation look physically right, check
 
 ## Workflow
 
-1. Capture the clip as it is now, before changing it (see [Review](#review)).
+1. Record the clip as it is now, before changing it (see [Review](#review)).
 2. Find references for the motion and write down its key poses and timings: contact, mid-stance, push-off, mid-swing,
    how long a foot is down, how long the body is in the air.
 3. Work out the geometry first: leg reach, foot placement, hip height.
    A short script in the scratchpad that solves the poses is quicker to iterate than the game.
-4. Change the poses, capture again and compare from the side in slow motion, frame by frame, then from the front and the
+4. Change the poses, record again and compare from the side in slow motion, frame by frame, then from the front and the
    game camera.
 5. Add or extend a check in `tests/AnimationChecks.cs` for what can be measured: feet on the ground, no sliding, nothing
    below it, time in the air. `CheckWolfGaitsPlantEachPaw` and
@@ -123,7 +123,7 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 
 ## Review
 
-`tools/animation_review.py` captures one clip close up, moving over marked ground, from the side, the front, the game
+`tools/animation_review.py` records one clip close up, moving over marked ground, from the side, the front, the game
 camera and the game camera with the actor facing it (`facing`):
 
 ```sh
@@ -132,14 +132,29 @@ git fetch origin
 ./tools/animation_review.py "player run" --base origin/main --views side --slow 1  # add the same views from main
 ```
 
-- Frames land in `build/animation-review/<clip>/<current or ref>/<view>/`, 96 a view at 30 a second.
+- Movies land in `build/animation-review/<clip>/<current or ref>/<view>.avi`, 96 frames a view at 30 a second of
+  slowed game time. Recordings of the same sources match frame for frame, and so do a branch and its base.
 - The first frames show the start from standing: pick frames after it for a steady cycle.
-- `--base` captures a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
-  A ref without the close-up review (`--animation-clip`) cannot be captured.
+- `--base` records a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
+  A ref without the close-up review (`--animation-clip`) cannot be recorded.
 - `--base-clip` names the clip in `--base` when it was renamed since, such as `--base-clip "player walk"` for
   `"player jog"`; both land in the current clip's folder.
 - Wolves have close-ups too: `wolf idle`, `wolf walk`, `wolf trot`, `wolf gallop`, `wolf speeds` (stand to gallop and
   back, for blends), `wolf leap`, `wolf hit`, `wolf feed` and `wolf fall`. The last four play against a player, as
   `SyncWolves` sets them up. `./build.py play -- --animation-review` shows every clip on one screen.
-- A machine without a display, such as a cloud container, captures under `xvfb-run -a ./tools/animation_review.py ...`.
-- Turn the frames into a video or a numbered contact sheet with the `frame-compare` skill.
+- A machine without a display, such as a cloud container, records under `xvfb-run -a ./tools/animation_review.py ...`.
+- Turn the movies into a side-by-side video or a numbered contact sheet with the `frame-compare` skill, which takes
+  them as they are.
+
+Any scene records the same way, such as a showcase, with `./build.py record`:
+
+```sh
+./build.py record build/recordings/queue.avi -- --showcase --hide-ui --doorway queue --zoom 5 --frames 120
+./build.py record build/recordings/queue-slow.avi -- --showcase --hide-ui --doorway queue --slow 4 --frames 480
+```
+
+- Each frame moves the game on by exactly 1/30 of a second (`--fps` sets another rate), however long it takes to draw,
+  and `--slow` slows game time. The movie carries the game's sound too.
+- The first recording after a change exports the game; later ones reuse that export while the sources stay the same,
+  and take seconds. Doc and tool edits do not count as changes.
+- Record into `build/`, not a temporary folder: frames of many recordings fill a small `/tmp` fast.

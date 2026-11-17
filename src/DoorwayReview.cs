@@ -76,7 +76,7 @@ public sealed partial class DoorwayReview : Node {
 
     /// <summary>Runs the script up to this frame, then walks each player sent to the door a step toward it and steps them in on arrival, as a click on the cabin does.</summary>
     public override void _Process(double delta) {
-        float dt = View.CaptureStep ?? Math.Min((float)delta, .1f);
+        float dt = Math.Min((float)delta, .1f);
         time += dt;
         while (next < script.Length && script[next].At <= time) script[next++].Do();
         foreach (var p in walking.ToArray())

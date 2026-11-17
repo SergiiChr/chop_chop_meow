@@ -38,6 +38,7 @@ The project uses Godot's Forward+ renderer, which picks a discrete GPU over an i
 ./build.py test     # run only the tests
 ./build.py build    # check, export, and smoke-test build/ChopChopMeow.x86_64
 ./build.py icons    # re-render item and building icons from their models (opens a window)
+./build.py record build/recordings/out.avi -- --showcase --frames 120  # record the game to a movie at 30 frames a second
 ```
 
 ### Release bundle
@@ -68,13 +69,12 @@ Play accepts Godot arguments after `--`:
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
 | `--animation-review` | Show every actor action on rotating rigs |
-| `--animation-capture /absolute/directory` | Capture 96 frames of the animation review or a showcase scene for visual inspection, evenly spaced at 30 a second of game time |
-| `--animation-frames 240` | Capture this many frames instead of 96 |
+| `--frames 240` | Quit after this many frames, to end a recording (`./build.py record`) |
+| `--slow 4` | Slow game time this many times, for a recording in slow motion |
 | `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following; a felling clip such as `"player steel axe"` plays against a trunk |
 | `--animation-review --animation-clip "wolf leap"` | Show one wolf clip close up; the leap, hit and feed play against a player |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
-| `--animation-slow 4` | Slow a capture down this many times |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
 | `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
 | `--performance-run /absolute/directory` | Record a walking, day/night and staffed-settlement benchmark; summarise it with `python3 tools/performance_report.py /absolute/directory` |
@@ -85,10 +85,10 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 ```sh
 ./build.py play -- --showcase --screenshot /tmp/chop-chop-meow.png
-./build.py play -- --animation-review --animation-capture /tmp/chop-chop-meow-animation
+./build.py record build/recordings/review.avi -- --animation-review --frames 96  # a movie at 30 frames a second
 ./tools/environment_review.py             # landscape views, saved in build/environment-review/
 ./tools/environment_review.py --shoreline # coast, lake edge and mine views
-./tools/animation_review.py "player run"   # one clip from the side, front and game camera, in build/animation-review/
+./tools/animation_review.py "player run"   # one clip from the side, front and game camera, as movies in build/animation-review/
 ./tools/intro_film.py                     # the intro film's frames and sound cue sheet, in build/intro/frames/
 ./tools/intro_film.py --stills 1.5,9.2    # single frames of the film, in build/intro/stills/
 ```
