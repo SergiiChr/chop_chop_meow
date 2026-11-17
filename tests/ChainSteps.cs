@@ -2,6 +2,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static CabinSteps;
 using static PlayerSteps;
 using static SetupSteps;
 using static WorkerSteps;

@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ["*.md", "docs/*.md", "assets/*.md", ".claude/skills/*/SKILL.md"]
 # What the names are looked up in: the game and its checks, then the launcher, the tools and the skills' own scripts.
-CSHARP = ["src/**/*.cs", "tests/*.cs"]
+CSHARP = ["src/**/*.cs", "tests/**/*.cs"]
 OTHER_CODE = [
     "build.py",
     "tools/*.py",

@@ -178,8 +178,8 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/*Checks.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`) |
-| `tests/*Steps.cs` | Steps shared by the simulation checks |
+| `tests/*Checks.cs`, `tests/cabins/CabinChecks.cs`, `tests/actors/enemies/wolf/*Checks.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`), each feature's in the folder of its code |
+| `tests/*Steps.cs`, `tests/cabins/CabinSteps.cs` | Steps shared by the simulation checks |
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
 | `src/RecipeReadyChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |

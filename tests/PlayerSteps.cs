@@ -89,17 +89,6 @@ internal static class PlayerSteps {
         Require(world.Find(loose.Id) == null, $"picking up {loose.Kind} should take the whole piece at once");
     }
 
-    /// <summary>Puts a player, the acting one by default, at a cabin's door and steps them in at a run, ticking until they are inside.</summary>
-    public static void StepInside(World world, Thing hut, PlayerState? who = null) {
-        who ??= world.Me;
-        world.As(who, () => {
-            world.Player = Doorways.DoorPoint(hut);
-            Require(world.Doorways.Enter(hut, true), "a player at the cabin's door should start stepping in");
-        });
-        for (float time = 0; time < 2 && who.Sheltered != hut.Id; time += .05f) world.Tick(.05f);
-        Require(who.Sheltered == hut.Id, $"the player should be inside the cabin, not {who.Door}");
-    }
-
     public static Thing BuildAt(World world, ThingKind kind, Vector2 position) {
         world.Player = position + new Vector2(-1.5f, 0);
         var built = world.Build(kind, position);

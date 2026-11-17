@@ -216,23 +216,6 @@ internal static class WorldSteps {
         }
     }
 
-    /// <summary>
-    /// A spot on dry ground for a cabin whose door has open ground for <paramref name="open"/> metres straight out from it and
-    /// none just past that, such as the lake's water: with no open ground, the door itself is in it.
-    /// </summary>
-    public static Vector2 ShoreForACabin(World world, float open = 0) {
-        for (float x = 0; x < 200; x += .5f)
-            for (float y = 0; y < 200; y += .5f) {
-                var at = new Vector2(x, y);
-                var door = Doorways.DoorPoint(new Thing { Pos = at });
-                if (!world.CanStand(at) || Terrain.InLake(at, .8f) || world.CanStand(door + Doorways.OutOfDoor * open)) continue;
-                bool clear = true;
-                for (float ahead = 0; ahead < open - .05f && clear; ahead += .1f) clear = world.CanStand(door + Doorways.OutOfDoor * ahead);
-                if (clear) return at;
-            }
-        throw new InvalidOperationException($"the valley should have a dry spot whose cabin door has {open} m of open ground in front");
-    }
-
     /// <summary>Ticks a night with only the given wolves, so new arrivals do not interfere.</summary>
     public static void WolfTick(World world, float seconds, params Wolf[] keep) {
         for (float t = 0; t < seconds; t += .1f) {

@@ -687,7 +687,7 @@ def check_raw_save() -> None:
     """Fail when a check or step outside tests/SetupSteps.cs uses a world's raw save."""
     raw = re.compile(r"\b(?!Key\b)\w+\.S\b")
     files = [
-        *ROOT.glob("tests/*.cs"),
+        *ROOT.glob("tests/**/*.cs"),
         *ROOT.glob("src/*Checks.cs"),
         *ROOT.glob("src/*Steps.cs"),
     ]
