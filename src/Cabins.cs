@@ -96,7 +96,7 @@ public sealed partial class World {
         }
     }
     /// <summary>How far to the other side of a cabin's door point someone stepping out past a player standing aside keeps.</summary>
-    public const float MakeWay = .2f;
+    public const float MakeWay = .1f;
 
     /// <summary>Whether a player stepping out of a cabin is through its doorway, out in the open on the step.</summary>
     private static bool Through(PlayerState p) => p.DoorTime >= LeaveSeconds / 2;
