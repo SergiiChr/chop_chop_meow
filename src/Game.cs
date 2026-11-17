@@ -57,6 +57,7 @@ public partial class Game : Node, IGameFlow {
     private Saves saves = null!;
     private StartMenu startMenu = null!;
     private PauseMenu menu = null!;
+    private PaintFilter paintFilter = null!;
     /// <summary>Health as last shown, so a guest flashes the damage its updates bring.</summary>
     private float shownHealth;
     private float runTime;
@@ -79,6 +80,7 @@ public partial class Game : Node, IGameFlow {
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
             view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = Launch.Has("--environment-review") }; AddChild(view);
+            paintFilter = new PaintFilter { Visible = Settings.PaintFilter }; AddChild(paintFilter);
             kit = new UiKit(world, sounds, Notify, RefreshLive);
             net = new Net { Name = "Net", World = world, Key = Settings.MachineKey }; AddChild(net);
             saves = new Saves(kit, net, this);
@@ -209,6 +211,7 @@ public partial class Game : Node, IGameFlow {
     public void ApplyResolution(Vector2I size) { Settings.ApplyResolution(GetWindow(), size, fullscreen); FitInterface(); }
     public void ApplyFullscreen(bool on) { fullscreen = on; ApplyResolution(GetWindow().ContentScaleSize); }
     public void ShowFrameRate(bool on) => corner.FrameRate.Visible = on;
+    public void ApplyPaintFilter(bool on) => paintFilter.Visible = on;
 
     /// <summary>How large the interface is drawn against the size it is laid out for.</summary>
     public const float InterfaceScale = .8f;

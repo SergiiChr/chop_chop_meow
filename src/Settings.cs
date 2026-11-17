@@ -21,6 +21,7 @@ public static class Settings {
     public static int FrameLimit => Get("display", "frame_limit", 0);
     /// <summary>The stored anti-aliasing choice, or FSR Native before the player picks one or when the file holds something else.</summary>
     public static AntiAliasing AntiAliasing => Get("display", "anti_aliasing", (int)AntiAliasing.FsrNative) is var stored && System.Enum.IsDefined((AntiAliasing)stored) ? (AntiAliasing)stored : AntiAliasing.FsrNative;
+    public static bool PaintFilter => Get("display", "paint_filter", true);
     public static bool Fullscreen => Get("display", "fullscreen", false);
     public static bool FrameRate => Get("display", "fps", true);
 

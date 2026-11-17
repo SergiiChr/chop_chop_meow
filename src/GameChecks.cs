@@ -855,6 +855,22 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
+    /// <summary>The paint filter switch starts on, hides the filter at once when switched off and keeps its choice.</summary>
+    private async Task CheckPaintFilterSwitchDrawsTheFilter() {
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        var paint = (CheckButton)startMenu.Screen.FindChild("paint_filter", true, false);
+        Require(paint.ButtonPressed && paintFilter.Visible, "The paint filter must start on.");
+        await Click(paint);
+        Require(!paintFilter.Visible, "Switching the paint filter off must hide it at once.");
+        await KeyStroke(Key.Escape);
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        paint = (CheckButton)startMenu.Screen.FindChild("paint_filter", true, false);
+        Require(!paint.ButtonPressed, "Reopened options must show the paint filter off.");
+        await Click(paint);
+        Require(paintFilter.Visible, "Switching the paint filter on must draw it again.");
+        await KeyStroke(Key.Escape);
+    }
+
     /// <summary>At 4K the interface keeps its share of the screen, and its text is drawn at the size it shows rather than drawn small and stretched.</summary>
     private async Task CheckInterfaceTextIsDrawnAtTheSizeItShows() {
         await Click(FindButton(startMenu.Screen, "Options")!);
@@ -2018,6 +2034,7 @@ public partial class Game {
             await Test(CheckLaunchOpensTheStartMenuWithNoSaveToContinue);
             await Test(CheckOptionsApplyAndKeepTheirChoices);
             await Test(CheckAntiAliasingChoicesNameTheSizeTheWorldIsDrawnAt);
+            await Test(CheckPaintFilterSwitchDrawsTheFilter);
             await Test(CheckInterfaceTextIsDrawnAtTheSizeItShows);
             await Test(CheckNewGameStartsTheWelcomePage);
             await Test(CheckPauseMenuAsksBeforeNewGameAndQuit);
