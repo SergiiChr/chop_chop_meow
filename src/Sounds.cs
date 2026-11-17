@@ -44,7 +44,7 @@ public partial class Sounds : Node {
         ["close_chest"] = -13,
         ["hut_door_normal"] = -6.5f,
         ["hut_door_escaping"] = -8,
-        ["door_bang"] = -11,
+        ["door_knock"] = -11,
         ["open_steel_smelter"] = -9,
         ["meat_inventory"] = -6.5f,
         ["move_coins_inventory"] = -1,
@@ -65,7 +65,7 @@ public partial class Sounds : Node {
         ["wolf_howl_group"] = -11,
         ["wolf_growl_approaching"] = -3,
         ["wolf_bite"] = -3,
-        ["pulled_scream"] = -5,
+        ["tug_scream"] = -5,
         ["takedown_scream"] = -5,
         ["wolf_hit"] = -5.5f,
     };

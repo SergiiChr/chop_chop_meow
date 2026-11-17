@@ -127,7 +127,7 @@ public sealed partial class World {
         return (wolf.Pos - ahead * WolfTail, wolf.Pos + ahead * WolfNose);
     }
 
-    /// <summary>Whether a wolf holds its place at the player: dragging them, pinning them or in the air.</summary>
+    /// <summary>Whether a wolf holds its place at the player: tugging them, pinning them or in the air.</summary>
     private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Pinning || wolf.Leap > 0;
 
     /// <summary>The nearest points to each other on two line segments, from <paramref name="a0"/> to <paramref name="a1"/> and <paramref name="b0"/> to <paramref name="b1"/>.</summary>

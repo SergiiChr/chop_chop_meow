@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// Developer review fixture for <c>--doorway</c>: two players and, at dusk, wolves at a cabin's door, moved by a script
-/// and run by the game's own rules, for a look at how they queue, bang on the door and get dragged out.
+/// and run by the game's own rules, for a look at how they queue, knock on the door and get tugged out.
 /// </summary>
 public sealed partial class DoorwayReview : Node {
     /// <summary>The scenes <c>--doorway</c> takes.</summary>
@@ -23,8 +23,8 @@ public sealed partial class DoorwayReview : Node {
     private float time;
     /// <summary>Metres round the cabin cleared of everything else.</summary>
     private const float Clearing = 15;
-    /// <summary>Seconds into the neighbor's banging at which the host steps out in the occupied scene, and whether they have.</summary>
-    private const float LeaveAfterBangs = .4f;
+    /// <summary>Seconds into the neighbor's knocking at which the host steps out in the occupied scene, and whether they have.</summary>
+    private const float LeaveAfterKnocks = .4f;
     private bool hostLeft;
 
     public override void _Ready() {
@@ -52,9 +52,9 @@ public sealed partial class DoorwayReview : Node {
         View.CameraTurn = Launch.Number("--camera-turn", 0);
         if (Launch.Value("--camera-pitch") != null) View.CameraPitch = Launch.Number("--camera-pitch", 30);
         script = Scene switch {
-            // Both walk up; the host gets there first and steps in, the neighbor follows, finds the door shut and bangs on it.
+            // Both walk up; the host gets there first and steps in, the neighbor follows, finds the door shut and knocks on it.
             "queue" => new (float, Action)[] { (0, () => walking.Add(host)), (.4f, () => walking.Add(guest)) },
-            // The host is inside; the neighbor walks up and bangs, and while they bang the host steps out, the neighbor standing aside for them, and the neighbor goes in.
+            // The host is inside; the neighbor walks up and knocks, and while they knock the host steps out, the neighbor standing aside for them, and the neighbor goes in.
             "occupied" => new (float, Action)[] {
                 (0, () => { World.Player = door; World.S.Sheltered = Cabin.Id; }), (0, () => walking.Add(guest)),
             },
@@ -65,7 +65,7 @@ public sealed partial class DoorwayReview : Node {
                 (.15f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.6f, 1.2f), Target = host.Id })),
                 (.9f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(2.2f, 1.4f), Target = guest.Id })),
             },
-            // A badly hurt host is dragged out of the doorway and pinned.
+            // A badly hurt host is tugged out of the doorway and pinned.
             _ => new (float, Action)[] {
                 (0, () => { World.Player = door; World.S.Health = 45; World.As(guest, () => World.Player = door + new Vector2(2.5f, 2)); }),
                 (0, () => World.Enter(Cabin, false)),
@@ -80,11 +80,11 @@ public sealed partial class DoorwayReview : Node {
         float dt = Math.Min((float)delta, .1f);
         time += dt;
         while (next < script.Length && script[next].At <= time) script[next++].Do();
-        if (Scene == "occupied" && !hostLeft && guest.Door == Doorway.Knocking && guest.DoorTime >= World.KnockLead + LeaveAfterBangs) { World.Leave(); hostLeft = true; }
+        if (Scene == "occupied" && !hostLeft && guest.Door == Doorway.Knocking && guest.DoorTime >= World.KnockLead + LeaveAfterKnocks) { World.Leave(); hostLeft = true; }
         foreach (var p in walking.ToArray())
             World.As(p, () => {
                 var toward = World.TowardDoor(Cabin, World.Player);
-                if (toward != Vector2.Zero) World.MovePlayer(toward * Math.Min(dt * World.Data.MoveSpeed(false), World.Player.DistanceTo(World.DoorPoint(Cabin))));
+                if (toward != Vector2.Zero) World.MovePlayer(World.StepToDoor(Cabin, toward * dt * World.Data.MoveSpeed(false)));
                 else if (World.Enter(Cabin, false)) walking.Remove(p);
             });
     }

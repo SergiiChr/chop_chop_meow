@@ -33,7 +33,7 @@ public enum ActorAction {
     SteelAxeSwing,
     Knock,
     Brake,
-    /// <summary>Dragged back by the waist by a wolf, bent over and stepping back with each tug.</summary>
+    /// <summary>Tugged back by the waist by a wolf, bent over and stepping back with each tug.</summary>
     Tugged,
     /// <summary>Knocked or yanked off the feet backward by a wolf, falling onto the back.</summary>
     FallBack
@@ -90,7 +90,7 @@ public static class ActorAnimation {
         ActorAction.Attack => .875f,
         ActorAction.Knock => World.KnockSeconds / World.Knocks,
         ActorAction.Brake => Momentum.BrakeSeconds,
-        ActorAction.Tugged => 2 * World.PullSeconds / World.Tugs,
+        ActorAction.Tugged => 2 * World.TugSeconds / World.Tugs,
         ActorAction.FallBack => FallBackSeconds,
         ActorAction.Kindle => World.KindleSeconds,
         ActorAction.TorchSwing => .6f,
@@ -513,7 +513,7 @@ public static class ActorAnimation {
                 return new Pose(Lean: -14 + wave * 2, Head: 10 + MathF.Cos(p * Mathf.Tau) * 2, RaiseL: 55, OutL: 18, ElbowL: 45, RaiseR: 40, OutR: 22, ElbowR: 55,
                     SwingL: 42, KneeL: 6, FootL: -18, SwingR: -18, KneeR: 58, Splay: 4);
             case ActorAction.Tugged: {
-                    // Dragged back by the waist: bent over at the hips with the arms reaching for the doorway and the head up to keep it in sight.
+                    // Tugged back by the waist: bent over at the hips with the arms reaching for the doorway and the head up to keep it in sight.
                     // Each tug, half the loop, jerks the hips back and the trunk lower; the front foot steps back in the air while the other stays
                     // planted, the hips passing back over it until it is in front.
                     float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / World.Heave)), heave = World.HeavePulse(half);
@@ -683,23 +683,16 @@ public static class ActorAnimation {
     }
 
     /// <summary>
-    /// How high above the ground under it to stand a pose on steps: on the boot that bears the weight, easing onto the
-    /// other boot's tread as the first one lifts off.
+    /// A pose stood on steps, and how high above the ground under it the body stands: on the boot that bears the weight,
+    /// easing onto the other boot's tread as the first one lifts off.
+    /// A boot that would sink into a tread bends its knee to stand on it instead, keeping its angle to the ground.
     /// <paramref name="depth"/> is how far along the way up the hips are and <paramref name="up"/> that way in the body's
     /// own frame, X toward its left and Y ahead; the steps rise <paramref name="rise"/> at each of <paramref name="edges"/>.
     /// </summary>
-    public static float StepLift(Pose pose, float depth, Vector2 up, ReadOnlySpan<float> edges, float rise) {
+    public static (Pose Pose, float Lift) OnSteps(Pose pose, float depth, Vector2 up, ReadOnlySpan<float> edges, float rise) {
         var (left, right) = Boots(pose, depth, up, edges, rise);
         float lower = Math.Min(left.Clear, right.Clear);
-        return Math.Min(left.Rests + LiftEase * (left.Clear - lower), right.Rests + LiftEase * (right.Clear - lower));
-    }
-
-    /// <summary>
-    /// A pose's legs fitted to steps with the body <paramref name="lift"/> above the ground it is posed on, as <see cref="StepLift"/> gives:
-    /// a boot that would sink into a tread bends its knee to stand on it instead, keeping its angle to the ground.
-    /// </summary>
-    public static Pose OnSteps(Pose pose, float lift, float depth, Vector2 up, ReadOnlySpan<float> edges, float rise) {
-        var (left, right) = Boots(pose, depth, up, edges, rise);
+        float lift = Math.Min(left.Rests + LiftEase * (left.Clear - lower), right.Rests + LiftEase * (right.Clear - lower));
         var fitted = pose with { Hips = pose.HipHeight };
         if (left.Rests > lift) {
             var leg = Raised(new LegAngles(pose.SwingL, pose.KneeL, pose.FootL), left.Rests - lift);
@@ -709,7 +702,7 @@ public static class ActorAnimation {
             var leg = Raised(new LegAngles(pose.SwingR, pose.KneeR, pose.FootR), right.Rests - lift);
             fitted = fitted with { SwingR = leg.Swing, KneeR = leg.Knee, FootR = leg.Foot };
         }
-        return fitted;
+        return (fitted, lift);
     }
 
     /// <summary>A leg with its ankle drawn <paramref name="by"/> metres straight up toward the hip, the boot keeping its angle to the ground.</summary>

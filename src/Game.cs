@@ -74,6 +74,8 @@ public partial class Game : Node, IGameFlow {
             if (Launch.Has("--server")) { Server.Run(this, data); return; }
             // A check run that stopped half way leaves its settings and saves behind; they go before anything here reads them.
             if (Launch.Args.Any(a => a is "--ui-test" or "--net-check" or "--server-check")) RemoveCheckFiles();
+            // A driven playtest starts from every option at its default, in a window at the design size, whatever the last one changed.
+            if (Launch.Has("--drive")) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(Settings.Path));
             world = new World(data);
             if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             if (Launch.Value("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
@@ -363,7 +365,9 @@ public partial class Game : Node, IGameFlow {
         }
         view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection; view.Placing = player.Mode.Placing;
         view.Mouse = GetViewport().GetMousePosition();
-        var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
+        // A recording leaves the pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
+        bool recording = Engine.GetWriteMoviePath() != "";
+        var hover = recording ? null : view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = recording ? 0 : view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt;
         if (uiClock > .2f || net.AwaitingAnswer && net.ShownUpdate != refreshedUpdate) {
             uiClock = 0; refreshedUpdate = net.ShownUpdate; RefreshLive();

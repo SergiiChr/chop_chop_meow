@@ -147,7 +147,7 @@ public sealed class PlayerControl {
         world.Me.Braking = momentum.Braking;
         var move = step * dt * world.Data.MoveSpeed(world.Me.Sprinting);
         // Walking to a cabin's door, the last step stops on it rather than past it, however long the frame.
-        if (entering != null) move = move.LimitLength(world.Player.DistanceTo(World.DoorPoint(entering)));
+        if (entering != null) move = world.StepToDoor(entering, move);
         world.MovePlayer(move); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
         // A tool in hand that has left the backpack leaves the hand empty.

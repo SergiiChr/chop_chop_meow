@@ -200,8 +200,8 @@ public partial class WorldView {
     private const float ReviewBackSeconds = 1.2f;
     /// <summary>The back clips' movement, braking at each change of key as the player's does.</summary>
     private Momentum reviewMomentum;
-    /// <summary>The cabin clip's stages and when each starts, in seconds of its loop: up to the door, in at a walk, out, bang on the door, in at a run.</summary>
-    private static readonly (float At, Doorway Stage)[] ReviewDoorway = { (0, Doorway.None), (2, Doorway.Entering), (4, Doorway.Leaving), (6, Doorway.Knocking), (7.5f, Doorway.Pulled) };
+    /// <summary>The cabin clip's stages and when each starts, in seconds of its loop: up to the door, in at a walk, out, knock on the door, in at a run.</summary>
+    private static readonly (float At, Doorway Stage)[] ReviewDoorway = { (0, Doorway.None), (2, Doorway.Entering), (4, Doorway.Leaving), (6, Doorway.Knocking), (7.5f, Doorway.Tugged) };
     private const float ReviewDoorwayLoop = 10.5f;
     private HutProp? reviewCabin;
     /// <summary>The cabin the cabin clip plays at, at the middle of the ground.</summary>
@@ -293,7 +293,7 @@ public partial class WorldView {
 
     /// <summary>
     /// A player walks up to a cabin at the middle of the ground and through each doorway stage as the game shows them:
-    /// in at a walk, out, banging on the shut door, and in at a run after a moment of being dragged back.
+    /// in at a walk, out, knocking on the shut door, and in at a run after a moment of being tugged back.
     /// </summary>
     private void ReviewCabin(float dt) {
         if (reviewCabin == null) { reviewCabin = (HutProp)WorldModels.Build(ReviewHut); review!.AddChild(reviewCabin.Root); }
@@ -308,21 +308,21 @@ public partial class WorldView {
             float walked = Math.Clamp((time - start) / 1.6f, 0, 1);
             var from = door - IntoCabin * 2;
             shown = (from.Lerp(door, walked), door + IntoCabin, walked < 1 ? ActorAction.Jog : ActorAction.Idle, false);
-        } else if (now == Doorway.Pulled) {
-            // Half way into a run in, the player is dragged back out a metre, then runs in again from there.
-            float run = time - start, pulled = run - World.RushSeconds / 2;
-            var dragged = door + World.OutOfDoor * World.DragDistance;
-            var part = run < World.RushSeconds / 2 ? Doorway.Entering : pulled < World.PullSeconds ? Doorway.Pulled : Doorway.Entering;
+        } else if (now == Doorway.Tugged) {
+            // Half way into a run in, the player is tugged back out a metre, then runs in again from there.
+            float run = time - start, tugged = run - World.RushSeconds / 2;
+            var tuggedTo = door + World.OutOfDoor * World.TugDistance;
+            var part = run < World.RushSeconds / 2 ? Doorway.Entering : tugged < World.TugSeconds ? Doorway.Tugged : Doorway.Entering;
             if (part != reviewActor.Stage) { reviewActor.Stage = part; reviewActor.StageFrom = reviewActor.Position; }
             shown = run < World.RushSeconds / 2 ? DoorStep(Doorway.Entering, door, door, reviewActor.StageFrom, run, World.RushSeconds, true, 0)
-                : pulled < World.PullSeconds ? DoorStep(Doorway.Pulled, door, door, reviewActor.StageFrom, pulled, World.PullSeconds, true, World.DragDistance)
-                : DoorStep(Doorway.Entering, door, dragged, reviewActor.StageFrom, pulled - World.PullSeconds, World.RushSeconds, true, 0);
+                : tugged < World.TugSeconds ? DoorStep(Doorway.Tugged, door, door, reviewActor.StageFrom, tugged, World.TugSeconds, true, World.TugDistance)
+                : DoorStep(Doorway.Entering, door, tuggedTo, reviewActor.StageFrom, tugged - World.TugSeconds, World.RushSeconds, true, 0);
         } else {
             if (now != reviewActor.Stage) { reviewActor.Stage = now; reviewActor.StageFrom = reviewActor.Position; }
             float seconds = now switch { Doorway.Knocking => World.KnockLead + World.KnockSeconds, Doorway.Leaving => World.LeaveSeconds, _ => World.EnterSeconds };
             shown = DoorStep(now, door, door, reviewActor.StageFrom, time - start, seconds, false, 0);
         }
-        bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Pulled && shown.At.DistanceTo(door) < ReviewSeen;
+        bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Tugged && shown.At.DistanceTo(door) < ReviewSeen;
         SwingDoor(reviewCabin, open, dt / World.ShutSeconds);
         reviewActor.Update(shown.At, shown.Action, shown.Facing, dt, shown.Backing);
         Pose(reviewRigs[0], reviewActor, null, door: new DoorShown(shown.At, shown.Facing, shown.Action, door, shown.Backing, 0, 0, 0));

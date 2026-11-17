@@ -14,8 +14,11 @@ and sends them through `Input.ParseInputEvent`, like real input.
 1. A driven game keeps the player's files out of it: it reads and writes `playtest-*` saves and settings. They live in
    the checkout's own user data: `build/xdg-data/godot/app_userdata/Chop Chop Meow/` in a worktree,
    `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/` in the main checkout. Each `./build.py play` in a worktree
-   first copies the player's saves and settings there from the main checkout. To test with one of the player's saves,
-   copy it to a `playtest-` name first.
+   first copies the player's saves and settings there from the main checkout.
+   Every driven start deletes `playtest-settings.cfg`, so every playtest starts the same: each option at its default,
+   in a 1440x900 window. Don't copy the player's settings in.
+   To test with one of the player's saves, copy it to a `playtest-` name first; loading it, you play the player who
+   saved it.
 2. Start the game in the background with a folder in your scratchpad:
 
    ```sh
@@ -48,7 +51,7 @@ Wait for `ready` before writing the next `cmd.txt`.
 | `shot name` | Saves `<dir>/name.png` from the viewport |
 | `quit` | Closes the game |
 
-Coordinates are window pixels at the game's resolution; screenshots use the same pixels, so read positions off the last shot. A showcase runs at 1440x900 and a normal game at the saved resolution, so they differ.
+Coordinates are window pixels at the game's resolution, 1440x900 for a showcase and a driven game alike; screenshots use the same pixels, so read positions off the last shot.
 Look at every screenshot before deciding the next step.
 
 ## Pitfalls

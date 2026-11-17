@@ -184,6 +184,7 @@ Any scene records the same way, such as a showcase, with `./build.py record`:
 - That holds for scenes whose world runs inside the window: `--showcase`, its `--doorway` scenes and
   `--animation-review`. A normal game's world runs in its own server process on real time, so a recording of one
   neither repeats frame for frame nor slows down.
+- A recording leaves the mouse pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
 - The first recording after a change exports the game; later ones reuse that export while the sources stay the same,
   and take seconds. Doc and tool edits do not count as changes.
 - Record into `build/`, not a temporary folder: frames of many recordings fill a small `/tmp` fast.

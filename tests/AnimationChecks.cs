@@ -169,7 +169,7 @@ public static class AnimationChecks {
 
     /// <summary>
     /// A cabin's door has two treads 14 cm high and then the floor, 40, 62 and 80 cm in from where a player stands at it,
-    /// as the cabin model builds them; a player walks, runs and is dragged over them and bangs on the door from the lower one.
+    /// as the cabin model builds them; a player walks, runs and is tugged over them and knocks on the door from the lower one.
     /// </summary>
     private static void CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem() {
         ReadOnlySpan<float> edges = stackalloc float[] { .4f, .62f, .8f };
@@ -184,8 +184,7 @@ public static class AnimationChecks {
                 float depth = Mathf.Lerp(from, to, i / 300f), travelled = Math.Abs(to - from) * i / 300f;
                 time = seconds * i / 300f;
                 var pose = ActorAnimation.PoseAt(action, ActorAnimation.Stride(action) > 0 ? ActorAnimation.Advance(action, 0, travelled) : time, from != to);
-                float lift = ActorAnimation.StepLift(pose, depth, up, edges, rise);
-                pose = ActorAnimation.OnSteps(pose, lift, depth, up, edges, rise);
+                (pose, float lift) = ActorAnimation.OnSteps(pose, depth, up, edges, rise);
                 float lowest = float.MaxValue;
                 for (int side = 0; side < 2; side++) {
                     var (toe, heel) = side == 0 ? ActorAnimation.SoleOf(pose.SwingL, pose.KneeL, pose.FootL) : ActorAnimation.SoleOf(pose.SwingR, pose.KneeR, pose.FootR);

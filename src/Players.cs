@@ -46,7 +46,7 @@ public sealed class PlayerState {
     public float DoorTime { get; set; }
     /// <summary>The player sprinted to the door, so they step in at a run and slam it.</summary>
     public bool DoorRush { get; set; }
-    /// <summary>When the player came to the door, numbered by <see cref="SaveState.DoorArrivals"/>, which sets who of those dragged back out goes in first.</summary>
+    /// <summary>When the player came to the door, numbered by <see cref="SaveState.DoorArrivals"/>, which sets who of those tugged back out goes in first.</summary>
     public int DoorQueued { get; set; }
     /// <summary>The resource the player is working on, so other machines can show it.</summary>
     public int GatherTarget { get; set; }
@@ -408,7 +408,7 @@ public sealed partial class World {
 
     /// <summary>Host: puts a guest where their own machine walked them, as <see cref="MovePlayer"/> does for the host.</summary>
     public void MoveTo(Vector2 p) {
-        if (Downed || S.Sheltered != 0 || S.Actor.Door != Doorway.None || p == Player) return;
+        if (Occupied || p == Player) return;
         playerBusy = true; Player = p;
     }
 

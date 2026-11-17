@@ -53,19 +53,19 @@ public sealed class WolfModel {
     private readonly Skeleton3D skeleton;
     /// <summary>The view's bookkeeping: heading, last world position, last stagger seen and the gap the knockback slide closes.</summary>
     public float Yaw, Stagger;
-    public Vector2 Last, Knock;
+    public Vector2 Last, KnockBack;
     /// <summary>
     /// A blow: seconds until the swing lands and how long it took in all, where the wolf stood and who swung, then seconds left in the recoil and the knockback it started from.
     /// Pinned counts seconds since a leap's jaws reached the throat.
     /// </summary>
     public float HitIn, HitSeconds, Recoiling, Pinned;
-    public Vector2 HitFrom, Striker, KnockFrom;
+    public Vector2 HitFrom, Striker, KnockBackFrom;
     /// <summary>A leap's bearing from the player to the wolf, and where it holds the throat once the player is down.</summary>
     public Vector2 Toward;
     public Vector3 Held;
     /// <summary>Where the wolf was drawn as its latest move began, to ease from: lunging in to take hold, stepping round to pin, or onto a feeding spot.</summary>
     public Vector3 StepFrom;
-    /// <summary>How far the wolf is drawn from its place in the world after letting go of a player it dragged; it closes as the wolf walks.</summary>
+    /// <summary>How far the wolf is drawn from its place in the world after letting go of a player it tugged; it closes as the wolf walks.</summary>
     public Vector2 Drift;
     /// <summary>Which way the wolf faced as its latest move began, to turn from.</summary>
     public float FromYaw;
@@ -278,11 +278,11 @@ public sealed class WolfModel {
     public static readonly Vector3 FeedingBite = BiteOf(Tearing(0, 0, 0, 0));
 
     /// <summary>
-    /// Dragging a player back by the waist like a dog at tug of war, low on bent hind legs with the forelegs braced wide
+    /// Tugging a player back by the waist like a dog at tug of war, low on bent hind legs with the forelegs braced wide
     /// either side of the player's feet. Each tug it throws its weight back: the forelegs straighten and push against the ground, the chest
     /// rears and the head wrenches to one side, the next tug to the other, while its paws stay where they stand until the
     /// forepaws hop back at the end of the heave; between tugs the hind paws step back after it and it shakes its head.
-    /// <paramref name="progress"/> runs 0 to 1 over the drag, timed as <see cref="World.Dragged"/> moves the player and the
+    /// <paramref name="progress"/> runs 0 to 1 over the tug, timed as <see cref="World.TugProgress"/> moves the player and the
     /// view holds the jaws at their waist.
     /// </summary>
     public void Tug(float progress, float time, float dt) {
@@ -292,23 +292,23 @@ public sealed class WolfModel {
         float side = tug % 2 == 0 ? 1 : -1;
         var body = Tugging(heave, side, shake);
         // How far the player, and so the jaws, have come back in this tug: planted paws come that far forward against the body.
-        float pulled = World.DragDistance * (World.Dragged(progress) - (float)tug / World.Tugs);
+        float moved = World.TugDistance * (World.TugProgress(progress) - (float)tug / World.Tugs);
         // The jaws hold still at the waist, so a body that rears back carries its paws with it unless they make up the difference.
         var drift = BiteOf(body) - TuggingBite;
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
-            // The forepaws hop back to where they started once the heave has pulled the player most of the way; each hind paw steps back after it in turn.
+            // The forepaws hop back to where they started once the heave has moved the player most of the way; each hind paw steps back after it in turn.
             float leaves = hind ? leg == 2 ? .45f : .65f : HopFrom, lands = hind ? leaves + .2f : HopTo;
             float back = Mathf.SmoothStep(leaves, lands, u), lift = (hind ? .04f : .06f) * MathF.Sin(MathF.PI * Math.Clamp((u - leaves) / (lands - leaves), 0, 1));
             // The forepaws straddle the player's feet, which step back between them.
-            var at = new Vector3(WolfShape.Pivot(leg).X * (hind ? 1.3f : 3.2f), WolfShape.Sole + lift, Home(leg) + (hind ? -.08f : .05f) + pulled * (1 - back)) + (drift with { Y = 0 });
+            var at = new Vector3(WolfShape.Pivot(leg).X * (hind ? 1.3f : 3.2f), WolfShape.Sole + lift, Home(leg) + (hind ? -.08f : .05f) + moved * (1 - back)) + (drift with { Y = 0 });
             // Braced forelegs slant forward, straighter as they push.
             body = body.WithLeg(leg, Reach(body, leg, at, hind ? 6 : 24 - 10 * heave, hind ? 0 : -12));
         }
         Show(WolfMotion.Tug, body, dt);
     }
 
-    /// <summary>Shares of a tug between which a tugging wolf's forepaws hop back, once the heave has pulled the player about half way.</summary>
+    /// <summary>Shares of a tug between which a tugging wolf's forepaws hop back, once the heave has moved the player about half way.</summary>
     private const float HopFrom = .18f, HopTo = .34f;
 
     /// <summary>Where a tugging wolf's jaws close between heaves, in the model; which way the next heave wrenches makes no difference at rest.</summary>
