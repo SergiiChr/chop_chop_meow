@@ -52,7 +52,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         float lunge = WorldView.Ease(Math.Min(1, through * DoorTug.TugSeconds / TugLunge));
         model.Yaw = Mathf.LerpAngle(model.FromYaw, held.Yaw + Mathf.DegToRad(SplayTugger) * ApartFrom(wolf, held), lunge);
         model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
-        model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
         model.Root.Visible = world().Sees(wolf.Pos);
         model.Tug(through, elapsed, dt);
         var grip = Waist(held) - model.Root.Basis * model.Bite;
@@ -72,7 +72,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         var wait = (throat + WorldView.To3(wolf.LungeFrom) * WaitAside) with { Y = 0 };
         model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero;
         model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(-wolf.LungeFrom, model.Yaw), Math.Min(1, dt * 8));
-        model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
         model.Root.Visible = world().Sees(wolf.Pos);
         if (fell < LungeStart) {
             // It springs back off the yanked body at once, then slows as it comes round.

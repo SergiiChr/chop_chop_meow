@@ -4,8 +4,8 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// A player's turn: the head turns toward a new heading first and the body follows with weight, easing into and out of
-/// the turn and leaning into it.
+/// An actor's turn, a person's or a wolf's: the head turns toward a new heading first and the body follows with weight,
+/// easing into and out of the turn and leaning into it.
 /// </summary>
 public struct Turning {
     /// <summary>The head's turn from the body, and the body's roll about its forward line, in radians.</summary>
@@ -13,7 +13,7 @@ public struct Turning {
     // How fast the body and the head turn, in radians a second.
     private float speed, head, headSpeed;
     /// <summary>
-    /// How quickly a player's body and head turn to a new heading, as the rate of a critically damped spring a second:
+    /// How quickly a body and head turn to a new heading, as the rate of a critically damped spring a second:
     /// the body covers 90% of a turn in 0.3 s, and the head about 0.2 s before it, as people turning while walking or running do.
     /// </summary>
     public const float BodyRate = 13, HeadRate = 30;
@@ -46,5 +46,10 @@ public struct Turning {
         // Turning toward +X, the rig's left, tips it that way: a negative roll about its forward line.
         float most = running ? MaxBank : MaxJogBank, lean = Math.Clamp(-MathF.Atan(pace * speed / 9.8f), -most, most);
         Bank = Mathf.Lerp(Bank, lean, Math.Min(1, dt * 12));
+    }
+
+    /// <summary>Keeps the head with the body at <paramref name="yaw"/>, still and upright, while something else turns the body.</summary>
+    public void Hold(float yaw) {
+        head = yaw; speed = headSpeed = 0; Look = Bank = 0;
     }
 }

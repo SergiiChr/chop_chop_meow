@@ -371,6 +371,9 @@ Legs are placed by two-bone IK from where each paw should stand, with the front 
 A stance moves the paw back at exactly the body's speed, so paws stay where they land.
 `WolfModel.Move` picks a lateral-sequence walk, a diagonal trot or a rotary gallop from the wolf's smoothed speed; the gallop folds the spine at the gathered float and stretches it at the extended one.
 A change of motion blends from the last shown pose over a short smoothstep, so standing, walking, trotting, galloping, leaping and recoiling run into each other.
+A wolf turns as people do (`WolfModel.Turning`, `WolfModel.TurnToward`): its neck and head turn toward a new heading first and the body follows, leaning into the turn at a gallop; one struck turns straight to its hitter, and one tugging, lunging or feeding is turned by that motion.
+Reversing at speed, a wolf's body faces the way it came for a moment while it moves the other way; it brakes then (`WolfModel.Brake`), the forelegs braced out ahead and the paws sliding, instead of running backward.
+The path is the simulation's, unchanged: the brake is only drawn.
 
 `WorldView` times the wolf against the player:
 

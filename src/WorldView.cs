@@ -1230,9 +1230,14 @@ public partial class WorldView : Node3D {
             model.Drift = model.Drift.MoveToward(Vector2.Zero, moved.Length());
             // A struck wolf keeps facing whoever hit it; a running one turns into its path.
             var facing = struck ? model.Striker - wolf.Pos - model.KnockBack : running && !backing ? moved : hunted - wolf.Pos;
-            model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(facing, model.Yaw), Math.Min(1, dt * (struck ? 16 : 10)));
+            // A struck wolf snaps round to whoever hit it; otherwise the head turns first and the body follows, leaning in.
+            // Reversing, its body still faces the old way for a moment: it brakes rather than running backward.
+            bool braking = false;
+            if (struck) {
+                model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(facing, model.Yaw), Math.Min(1, dt * 16)); model.Turning.Hold(model.Yaw);
+                model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+            } else braking = model.TurnToward(facing, moved, dt, running, wolf.Chase > 0, backing);
             model.Root.Visible = World.Sees(wolf.Pos);
-            model.Root.Rotation = new Vector3(0, model.Yaw, 0);
             bool wary = wolf.Scared || HuntedTorchLit(wolf);
             float flight = 0;
             if (model.HitIn > 0) model.Move(-back, dt, false, true);
@@ -1251,6 +1256,7 @@ public partial class WorldView : Node3D {
                 if (wolf.Pinning) model.Pinned += dt;
                 model.Feed(Elapsed + wolf.Id % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? FeedingSpots.PawsOnChest(model, RigOf(wolf.Target)) : null);
             } else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
+            else if (braking) model.Brake(moved.Length(), dt);
             else if (running) model.Move(backing ? -moved.Length() : moved.Length(), dt, wolf.Chase > 0 && !backing, wary);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
             var place = To3(wolf.Pos + model.KnockBack + model.Drift);

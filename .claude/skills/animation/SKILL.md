@@ -168,8 +168,9 @@ git fetch origin
 - `--base-clip` names the clip in `--base` when it was renamed since, such as `--base-clip "player walk"` for
   `"player jog"`; both land in the current clip's folder.
 - Wolves have close-ups too: `wolf idle`, `wolf walk`, `wolf trot`, `wolf gallop`, `wolf speeds` (stand to gallop and
-  back, for blends), `wolf leap`, `wolf hit`, `wolf feed` and `wolf fall`. The last four play against a player, as
-  `SyncWolves` sets them up. `./build.py play -- --animation-review` shows every clip on one screen.
+  back, for blends), `wolf turn` (a gallop reversing every 2 s, for the head-first turn and the brake), `wolf leap`,
+  `wolf hit`, `wolf feed` and `wolf fall`. The last four play against a player, as `SyncWolves` sets them up.
+  `./build.py play -- --animation-review` shows every clip on one screen.
 - A machine without a display, such as a cloud container, records under `xvfb-run -a ./tools/animation_review.py ...`.
 - Turn the movies into a side-by-side video or a numbered contact sheet with the `frame-compare` skill, which takes
   them as they are.

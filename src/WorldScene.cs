@@ -220,7 +220,9 @@ public partial class WorldView {
     /// <summary>The clip <c>--animation-clip</c> names, shown alone and close up, moving across marked ground at its speed in the world; -1 shows every clip.</summary>
     private static readonly int ReviewClip = Array.FindIndex(ReviewClips, clip => clip.Name == Launch.Value("--animation-clip"));
     /// <summary>Wolf close-ups for <c>--animation-clip</c>; the leap, hit and feed play against a player the way SyncWolves sets them up.</summary>
-    private static readonly string[] WolfClips = { "wolf idle", "wolf howl", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf leap", "wolf hit", "wolf feed", "wolf fall" };
+    /// <summary>How fast, in metres a second, a wolf in the review gallops, and how many seconds the turn clip takes to go out and back.</summary>
+    private const float ReviewGallop = 6.3f, ReviewTurnLoop = 4;
+    private static readonly string[] WolfClips = { "wolf idle", "wolf howl", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf turn", "wolf leap", "wolf hit", "wolf feed", "wolf fall" };
     private static readonly int ReviewWolfClip = Array.IndexOf(WolfClips, Launch.Value("--animation-clip"));
     private string? ReviewCloseUpName => ReviewClip >= 0 ? ReviewClips[ReviewClip].Name : ReviewWolfClip >= 0 ? WolfClips[ReviewWolfClip] : null;
     /// <summary>The camera's pitch in degrees for <c>--animation-pitch</c>, low for a side view; the game's otherwise.</summary>
@@ -406,8 +408,19 @@ public partial class WorldView {
                     if (punch >= 0 && punch < ActorAnimation.Duration(ActorAction.Attack)) person = ActorAction.Attack;
                     break;
                 }
+            case "wolf turn": {
+                    // Galloping along the track, then running back the other way: the head turns first, the body follows
+                    // leaning in, and it brakes while its body still faces the way it came.
+                    float way = Elapsed % ReviewTurnLoop < ReviewTurnLoop / 2 ? 1 : -1;
+                    var moved = track * (way * ReviewGallop * dt);
+                    reviewGround += way * ReviewGallop * dt;
+                    if (wolf.TurnToward(moved, moved, dt, true, true, false)) wolf.Brake(moved.Length(), dt); else wolf.Move(moved.Length(), dt, true, false);
+                    wolf.Root.Rotation += new Vector3(0, Mathf.DegToRad(ReviewTurn), 0);
+                    place = To3(track * reviewGround);
+                    break;
+                }
             default: {
-                    float speed = clip switch { "wolf walk" => 1.5f, "wolf trot" => 3, "wolf gallop" => 6.3f, _ => ReviewSpeeds(Elapsed % 11) };
+                    float speed = clip switch { "wolf walk" => 1.5f, "wolf trot" => 3, "wolf gallop" => ReviewGallop, _ => ReviewSpeeds(Elapsed % 11) };
                     // The wolf crosses 40 tiles of track, then starts over.
                     reviewGround = Mathf.PosMod(reviewGround + speed * dt + 20, 40) - 20;
                     if (speed < .05f) wolf.Stand(Elapsed, dt, false); else wolf.Move(speed * dt, dt, speed > 4.5f, false);

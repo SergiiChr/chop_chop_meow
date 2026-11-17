@@ -30,6 +30,7 @@ public static class AnimationChecks {
         CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem();
         CheckAHandReachesItsPointWithTheElbowTheWayAsked();
         CheckWolfGaitsPlantEachPaw();
+        CheckAWolfReversingAtAGallopLooksRoundFirstAndBrakesUntilItsBodyComesRound();
         CheckPosingAllocatesNothing();
     }
 
@@ -59,6 +60,31 @@ public static class AnimationChecks {
             lowest = Math.Min(lowest, pose.Hips); highest = Math.Max(highest, pose.Hips);
         }
         Require(highest - lowest > .1f, $"the digger should bend down onto the shovel and straighten to throw: the hips moved {highest - lowest:0.00} m");
+    }
+
+    private static void CheckAWolfReversingAtAGallopLooksRoundFirstAndBrakesUntilItsBodyComesRound() {
+        var wolf = new WolfModel();
+        const float dt = 1f / 60, speed = 6.3f;
+        var ahead = new Vector2(0, 1);
+        for (int i = 0; i < 60; i++) {
+            var moved = ahead * speed * dt;
+            Require(!wolf.TurnToward(moved, moved, dt, true, true, false), "a wolf galloping on in a straight line should not brake");
+            wolf.Move(moved.Length(), dt, true, false);
+        }
+        bool braked = false, stillBraking = true;
+        float lookAhead = 0;
+        // The body takes 0.3 s to come most of the way round; half a second later it gallops on.
+        for (int i = 0; i < 48; i++) {
+            var moved = -ahead * speed * dt;
+            bool braking = wolf.TurnToward(moved, moved, dt, true, true, false);
+            if (braking) wolf.Brake(moved.Length(), dt); else wolf.Move(moved.Length(), dt, true, false);
+            if (i < 6) lookAhead = Math.Max(lookAhead, Math.Abs(wolf.Turning.Look));
+            braked |= braking; stillBraking = braking;
+        }
+        Require(lookAhead > Mathf.DegToRad(20), $"a wolf turning round should turn its head ahead of its body, not {Mathf.RadToDeg(lookAhead):0} degrees");
+        Require(braked, "a wolf reversing at a gallop should brake while its body still faces the way it came");
+        Require(!stillBraking && wolf.Motion == WolfMotion.Gallop, $"a wolf whose body has come round should gallop on, not {wolf.Motion}");
+        wolf.Root.Free();
     }
 
     /// <summary>At each gait's pace a paw on the ground holds its place while the body moves on over it, and no paw sinks into the ground.</summary>

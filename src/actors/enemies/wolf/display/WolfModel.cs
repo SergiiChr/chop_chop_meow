@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What a wolf model shows; a change blends from the pose it had into the new one.</summary>
-public enum WolfMotion { Stand, Walk, Trot, Gallop, Leap, Feed, Pin, Recoil, Fall, Howl, Tug }
+public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug }
 
 /// <summary>
 /// A leg's joint angles in degrees, each swinging the segment below forward from its parent's line; Splay swings the whole leg out from the body.
@@ -53,6 +53,8 @@ public sealed class WolfModel {
     private readonly Skeleton3D skeleton;
     /// <summary>The view's bookkeeping: heading, last world position, last stagger seen and the gap the knockback slide closes.</summary>
     public float Yaw, Stagger;
+    /// <summary>How the wolf turns: the head toward a new heading first and the body after it, leaning into the turn.</summary>
+    public Turning Turning;
     public Vector2 Last, KnockBack;
     /// <summary>
     /// A blow: seconds until the swing lands and how long it took in all, where the wolf stood and who swung, then seconds left in the recoil and the knockback it started from.
@@ -180,6 +182,31 @@ public sealed class WolfModel {
         }
         return body;
     }
+
+    /// <summary>
+    /// Braking while the body still faces away from where the wolf moves, over <paramref name="distance"/> tiles this frame:
+    /// the forelegs braced out ahead and the paws sliding, the hindquarters dropped under, the head up.
+    /// </summary>
+    public void Brake(float distance, float dt) {
+        if (dt > 0) speed = Mathf.Lerp(speed, Math.Abs(distance) / dt, 1 - MathF.Exp(-dt * 8));
+        var body = new WolfPose(Lift: -.06f, Pitch: -10, Flex: 6, Neck: -6, Head: -14, Ears: 20, Tail: -40, Curl: 4);
+        Show(WolfMotion.Brake, Planted(body, 1.6f, .06f, BrakeReach), dt);
+    }
+    /// <summary>
+    /// Turns the wolf toward <paramref name="facing"/>, the head first and the body after it, leaning into the turn when it
+    /// <paramref name="moved"/> that far this frame at a gallop or slower; returns whether it brakes, running but with its body
+    /// still facing away from where it goes, as just after it reverses. A wolf <paramref name="backing"/> off steps backward on purpose.
+    /// </summary>
+    public bool TurnToward(Vector2 facing, Vector2 moved, float dt, bool running, bool galloping, bool backing) {
+        Turning.Step(ref Yaw, ActorAnimation.Yaw(facing, Yaw), running && dt > 0 ? moved.Length() / dt : 0, dt, galloping);
+        Root.Rotation = new Vector3(0, Yaw, Turning.Bank);
+        return running && !backing && moved.Dot(ActorAnimation.Forward(Yaw)) < 0;
+    }
+
+    /// <summary>How far ahead of home, in metres, a braking wolf braces its forepaws.</summary>
+    private const float BrakeReach = .12f;
+    /// <summary>The share of the head's turn ahead of the body that the neck takes; the head takes the rest.</summary>
+    private const float NeckShare = .6f;
 
     // ---------- Standing, leaping and feeding ----------
 
@@ -435,6 +462,11 @@ public sealed class WolfModel {
     // ---------- Blending and posing ----------
 
     private void Show(WolfMotion next, WolfPose target, float dt) {
+        // The head turns ahead of the body, the neck taking most of the turn.
+        if (Turning.Look != 0) {
+            float look = Mathf.RadToDeg(Turning.Look);
+            target = target with { NeckTurn = target.NeckTurn + NeckShare * look, HeadTurn = target.HeadTurn + (1 - NeckShare) * look };
+        }
         if (next != motion) {
             from = shown; blend = 0;
             // A leap and a blow happen fast; changes of gait and settling down take longer.

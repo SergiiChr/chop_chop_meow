@@ -128,7 +128,7 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
         model.Fed += dt;
         float ease = WorldView.Ease(Math.Min(1, model.Fed / FeedEasing));
         model.Yaw = Mathf.LerpAngle(model.FromYaw, spot.Yaw, ease);
-        model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
         return model.StepFrom.Lerp(spot.At, ease);
     }
 
