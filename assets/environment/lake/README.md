@@ -8,7 +8,7 @@ stones in the pond, sand under the sea, also where the sea's waterline wanders i
 `BedMap`, baked while loading at one texel a world unit, tells it where the drawn water lies.
 
 `lake.gdshader` is a Godot 4 port of the [Realistic Water Shader](https://godotshaders.com/shader/realistic-water/) by
-UnionBytes (Achim Menzel), released under the MIT licence in `LICENSE`.
+UnionBytes (Achim Menzel), released under the MIT licence in `LICENSE`, with its contributors in `AUTHORS.md`.
 Its header lists what the port changes.
 Three Gerstner waves move the surface; two scrolling normal maps ripple it.
 The water reads the ground under it from Godot's depth and screen textures: it bends the view of the bed by the
@@ -17,7 +17,8 @@ animated caustics and foam over the shallows.
 Things standing in the water are not part of what it shows through, and the sand and stone bank strips are not either:
 Godot copies the screen for the water before it draws anything see-through.
 `waves.gdshaderinc` holds the waves, which `lily_pad.gdshader` shares so the pads rise and fall with the water.
-`LakeAppearance` sets the three waves and their speed, and spaces the surfaces' vertices by the shortest.
+`Waves` holds the three waves and their speed, and spaces the surfaces' vertices by the shortest; `LakeAppearance`
+gives them to the water and lily pad materials.
 The textures are the shader's demo project's (`water_*.png`), downloaded by `tools/water_textures.py`, which pins
 their commit and SHA-256; `water_caustics.png` imports as an array of its 16 frames, four by four.
 
@@ -38,7 +39,7 @@ The grass edge bites in and out by up to 1.2 units more on the coast.
 One read of the shore's height map shifts it along the view, so its ripples and stones look sunk in, as far as the
 model kit's scans do.
 The bank strips start under the water and follow the bed down.
-`ShorelineAppearance.ShoreLook` holds each shore's photoscan, tile size, wet shade and fade widths.
+`ShoreLook` holds each shore's photoscan, tile size, wet shade, grass fade and wander.
 Lake stones cluster in patches rather than an even ring.
 
 The `--environment-review` flag freezes the waves, the water's maps and the lily pads at 1.25 seconds for comparable

@@ -19,9 +19,6 @@ internal static class ShorelineAppearance {
         material.SetShaderParameter("shore_wander", look.Wander);
     }
 
-    /// <summary>Along the valley, the most inland the sea's drawn water reaches, where its waterline wanders furthest in.</summary>
-    internal static float SeaWaterEdge(float across) => Terrain.Waterline(across) - ShoreLook.Sand.Wander / 2;
-
     /// <summary>Distance from the drawn waterline, seaward, where a bank strip starts under the water.</summary>
     private static float BankStart(ShoreLook look) => -.35f - look.Wander / 2;
 

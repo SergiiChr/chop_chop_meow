@@ -40,6 +40,15 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
     /// <summary>The screenshot the window takes once the run has finished.</summary>
     public string Screenshot => Path.GetFullPath(Path.Combine(folder, "corner.png"));
 
+    /// <summary>A part's name in the run's results.</summary>
+    private static string Name(Part part) => part.ToString().ToLowerInvariant();
+
+    /// <summary>A share of a day starting at 06:00 as a clock time.</summary>
+    private static string Clock(float phase) {
+        int minutes = (int)MathF.Round(phase * GameData.MinutesPerDay + 6 * 60) % GameData.MinutesPerDay;
+        return $"{minutes / 60:00}:{minutes % 60:00}";
+    }
+
     /// <summary>Rendering pipelines compiled so far, summed over every compilation group.</summary>
     private static long PipelineCompilations() {
         double total = 0;
@@ -62,7 +71,7 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
         world.Player = PerformanceRoute.Start;
         lastPosition = world.Player;
         start = previous = Time.GetTicksUsec();
-        GD.Print($"PERFORMANCE START: {PerformanceStage.WarmupSeconds:0}s warmup on the beach, then sprints ocean -> camp -> pond -> top corner by day from 13:30 and at night from midnight with a lit torch; 2560x1440, uncapped, vsync off; GPU {RenderingServer.GetVideoAdapterName()}");
+        GD.Print($"PERFORMANCE START: {PerformanceStage.WarmupSeconds:0}s warmup on the beach, then sprints ocean -> camp -> pond -> top corner by day from {Clock(PerformanceStage.DayStart)} and at night from {Clock(PerformanceStage.NightStart)} with a lit torch; 2560x1440, uncapped, vsync off; GPU {RenderingServer.GetVideoAdapterName()}");
         return State.Running;
     }
 
@@ -102,7 +111,7 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
         var (along, across) = PerformanceRoute.Heading(world.Player, stops[stop]);
         if (along == 0 && across == 0) {
             if (++stop == stops.Length) {
-                events.Add(new { seconds, part = part.ToString(), reached = name, position = new[] { world.Player.X, world.Player.Y } });
+                events.Add(new { seconds, part = Name(part), reached = name, position = new[] { world.Player.X, world.Player.Y } });
                 if (leg == 0 && part == Part.Day) campReached = seconds;
                 leg++; stop = 0;
             }
@@ -139,12 +148,14 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
                 world.Player = PerformanceRoute.Start;
                 world.UseTorch(world.Player + Terrain.Sideways);
             }
+            // The server turns to night once it sees the player back on the beach, within the settle.
+            if (part == Part.Night && !world.Night) return Fail("The night sprint would start in daylight: the server never turned the clock to midnight.");
             lastPosition = world.Player;
-            events.Add(new { seconds, part = part.ToString(), position = new[] { world.Player.X, world.Player.Y }, phase = world.DayPhase });
+            events.Add(new { seconds, part = Name(part), position = new[] { world.Player.X, world.Player.Y }, phase = world.DayPhase });
         }
         if (part is (Part.Day or Part.Night) && Sprint(seconds) is string stuck) return Fail($"The player got stuck at {world.Player} on the {stuck} leg.");
         // The frame that finishes a sprint belongs to its last leg; the settle has none.
-        int sampledLeg = part == Part.Settle ? 0 : Math.Min(leg, PerformanceRoute.Legs.Length - 1);
+        int sampledLeg = part == Part.Settle ? -1 : Math.Min(leg, PerformanceRoute.Legs.Length - 1);
         walked += lastPosition.DistanceTo(world.Player); lastPosition = world.Player;
         RecordFirsts(seconds);
         int activeWorkers = 0, activeMachines = 0;
@@ -192,7 +203,7 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
             csv.WriteLine("seconds,frame_ms,process_ms,render_cpu_ms,gpu_ms,allocated_total,gen0_total,gen1_total,gen2_total,resident_bytes,video_bytes,draw_calls,primitives,workers_active,machines_active,part,leg,pipelines_total");
             for (int i = 0; i < count; i++) {
                 var s = samples[i];
-                csv.WriteLine(FormattableString.Invariant($"{s.Seconds:F6},{s.FrameMs:F4},{s.ProcessMs:F4},{s.RenderCpuMs:F4},{s.GpuMs:F4},{s.Allocated},{s.Gen0},{s.Gen1},{s.Gen2},{s.ResidentBytes},{s.VideoBytes},{s.DrawCalls},{s.Primitives},{s.WorkersActive},{s.MachinesActive},{s.Part.ToString().ToLowerInvariant()},{PerformanceRoute.Legs[s.Leg].Name},{s.Pipelines}"));
+                csv.WriteLine(FormattableString.Invariant($"{s.Seconds:F6},{s.FrameMs:F4},{s.ProcessMs:F4},{s.RenderCpuMs:F4},{s.GpuMs:F4},{s.Allocated},{s.Gen0},{s.Gen1},{s.Gen2},{s.ResidentBytes},{s.VideoBytes},{s.DrawCalls},{s.Primitives},{s.WorkersActive},{s.MachinesActive},{Name(s.Part)},{(s.Leg < 0 ? "" : PerformanceRoute.Legs[s.Leg].Name)},{s.Pipelines}"));
             }
         }
         var stations = world.Things.Where(t => machines.ContainsKey(t.Id)).Select(t => new {

@@ -9,9 +9,9 @@
     // The ground photoscans below lie flat in world x and z, with their height along world up.
     vec3 view = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xzy);
     // Ground under the drawn water is a bed, with the meadow's work skipped where the water covers it whole.
-    vec2 bed = texture(beds, (v_vertex.xz - woods_corner) / woods_span).rg;
-    float wet = max(bed.r, bed.g);
-    if (wet < 1.0) {
+    vec2 bed = texture(beds, (v_vertex.xz - map_corner) / map_span).rg;
+    float submerged = max(bed.r, bed.g);
+    if (submerged < 1.0) {
         // Terrain3D supplies height, clipmap LOD, terrain normals and the grass and rock photoscans blended by slope.
         // The project supplies the colours; the photoscans add only their grain, as brightness around their mean, and
         // their bump.
@@ -47,7 +47,7 @@
         }
         // The woods along the mountains take the forest floor photoscan as it is, its edge wandering in broad patches
         // and reaching further out at its litter.
-        float woods = texture(woods_distance, (v_vertex.xz - woods_corner) / woods_span).r * woods_reach;
+        float woods = texture(woods_distance, (v_vertex.xz - map_corner) / map_span).r * woods_reach;
         if (woods < woods_reach && bare < 1.0) {
             vec2 forest_uv = scan_parallax(forest_height, v_vertex.xz / forest_tile, view, scan_relief / forest_tile);
             float wander = sin(v_vertex.x * 0.31 + v_vertex.z * 0.17) * sin(v_vertex.z * 0.27 - v_vertex.x * 0.13);
@@ -74,7 +74,7 @@
     }
     // The bed takes the shore photoscan as it is, as dark as the shore at its wet waterline: mossy stones in the pond,
     // sand under the sea.
-    if (wet > 0.0) {
+    if (submerged > 0.0) {
         vec3 bed_normal, bed_albedo;
         if (bed.r > bed.g)
             bed_albedo = bed_scan(rocks_albedo, rocks_normal, rocks_height, rocks_tile, rocks_wet, v_vertex.xz, view,
@@ -82,8 +82,8 @@
         else
             bed_albedo = bed_scan(sand_albedo, sand_normal, sand_height, sand_tile, sand_wet, v_vertex.xz, view,
                 bed_normal);
-        ALBEDO = mix(ALBEDO, bed_albedo, wet);
-        NORMAL_MAP = mix(NORMAL_MAP, bed_normal, wet);
+        ALBEDO = mix(ALBEDO, bed_albedo, submerged);
+        NORMAL_MAP = mix(NORMAL_MAP, bed_normal, submerged);
     }
     // Matte ground: a low sun turns the photoscans' roughness into a sheen that washes out the meadow.
     ROUGHNESS = 1.0;

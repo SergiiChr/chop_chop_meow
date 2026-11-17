@@ -550,7 +550,6 @@ public partial class WorldView {
     // ---------- The valley ----------
 
     /// <summary>How far along the valley the coast lies where the hero's route down the valley reaches it.</summary>
-    private static float TrailCoast => Terrain.Coast(Terrain.Across(Terrain.Spawn));
 
     /// <summary>The middle of the hero's route from the clearing down the valley to the shore, at a distance along the valley.</summary>
     private static Vector2 Trail(float along) =>

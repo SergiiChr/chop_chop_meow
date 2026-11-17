@@ -17,7 +17,7 @@ internal static class PerformanceRoute {
     /// <summary>Where the sprint stops in the camp: between the two furnaces seaward of the fixture's middle.</summary>
     public static readonly Vector2 Camp = Terrain.Spawn + Terrain.Point(2, .35f);
     /// <summary>The valley's top corner, where the sprint ends.</summary>
-    public static readonly Vector2 Corner = Terrain.Point(22, 0);
+    private static readonly Vector2 Corner = Terrain.Point(22, 0);
     /// <summary>
     /// The sprint's legs, each through its stops: up into the camp, across to the pond's shore, then round the pond's
     /// left side, up past it and on to the valley's top corner.

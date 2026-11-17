@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 /// <summary>
 /// The server's half of a performance run: it keeps the player fed, holds the clock at the day sprint's start until the
 /// player sets off, puts things in front of them for the first time as they reach the camp and turns the clock to
-/// midnight once they reach the corner.
+/// midnight once the window moves them back to the beach for the night sprint.
 /// The player's own moves stay in the window, which sprints them along <see cref="PerformanceRoute"/> as a player would.
 /// </summary>
 internal partial class PerformanceStage(World world) : Node {
@@ -16,7 +16,7 @@ internal partial class PerformanceStage(World world) : Node {
     /// <summary>Seconds between the day sprint and the night one, while the player is moved back and lights a torch.</summary>
     public const double SettleSeconds = 3;
     /// <summary>Clock at the start of the day and night sprints, as shares of a day starting at 06:00: 13:30 and midnight.</summary>
-    private const float DayStart = 7.5f / 24, NightStart = 18f / 24;
+    internal const float DayStart = 7.5f / 24, NightStart = 18f / 24;
     /// <summary>Seconds after the player reaches the camp when something first appears in front of them, which should draw from models warmed while loading.</summary>
     public static readonly (double After, string Name)[] FirstTimes = { (0, "cart"), (.5, "buildings"), (1, "drops"), (1.5, "second cart") };
     /// <summary>Units within which the server counts the player as at a place; wider than a stop, as it sees them less often.</summary>
@@ -41,7 +41,7 @@ internal partial class PerformanceStage(World world) : Node {
         }
         if (campReached == 0 && at.DistanceTo(PerformanceRoute.Camp) < Arrived) campReached = Time.GetTicksMsec();
         if (campReached != 0 && firsts < FirstTimes.Length && Time.GetTicksMsec() - campReached >= FirstTimes[firsts].After * 1000) Show(FirstTimes[firsts++].Name);
-        if (!night && at.DistanceTo(PerformanceRoute.Corner) < Arrived) { night = true; s.Time = day + world.Data.DaySeconds * NightStart; }
+        if (!night && at.DistanceTo(PerformanceRoute.Start) < Arrived) { night = true; s.Time = day + world.Data.DaySeconds * NightStart; }
     }
 
     /// <summary>

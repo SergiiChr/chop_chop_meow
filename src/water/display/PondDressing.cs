@@ -36,12 +36,23 @@ internal static class PondDressing {
                 if (i % 3 == 0) Cylinder(parent, .035f, .035f, .16f, clump + offset + new Vector3(0, height - .05f, 0), Mat("6e4a2e"), null, 6);
             }
         }
-        var lilyPad = LakeAppearance.LilyPadMaterial(new Color("5b8a3e"), still);
-        // Built while loading, so the first look at the pond does not stall on it.
-        _ = lilyPad.GetRid();
+        var lilyPad = LakeAppearance.LilyPadMaterial(LilyPadColor, still);
         for (int i = 0; i < 24; i++) {
             float angle = (float)rng.NextDouble() * Mathf.Tau, r = Terrain.Shore(angle) - 1 - (float)rng.NextDouble() * 3;
-            Cylinder(parent, .28f, .28f, .01f, at + new Vector3(MathF.Cos(angle) * r, LakeAppearance.Level + .01f, MathF.Sin(angle) * r), lilyPad, null, 9);
+            LilyPad(parent, at + new Vector3(MathF.Cos(angle) * r, LakeAppearance.Level + .01f, MathF.Sin(angle) * r), lilyPad);
         }
     }
+
+    /// <summary>
+    /// Puts a patch of water and a lily pad on the stage drawn behind the ground while loading, so their shaders and
+    /// pipelines are built before the player first sees the pond or the sea.
+    /// </summary>
+    internal static void Warm(Node3D stage) {
+        stage.AddChild(new MeshInstance3D { Mesh = LakeAppearance.Grid([0, 1], [0, 1], (x, z) => new Vector3(x, 0, z)), MaterialOverride = LakeAppearance.CreateMaterial(false) });
+        LilyPad(stage, Vector3.Zero, LakeAppearance.LilyPadMaterial(LilyPadColor, false));
+    }
+
+    private static readonly Color LilyPadColor = new("5b8a3e");
+
+    private static void LilyPad(Node3D parent, Vector3 at, Material material) => Cylinder(parent, .28f, .28f, .01f, at, material, null, 9);
 }

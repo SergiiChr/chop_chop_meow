@@ -22,7 +22,7 @@ internal static class BedMap {
             for (int x = 0; x < span; x++) {
                 var p = corner + new Vector2(x + .5f, z + .5f);
                 beds[(z * span + x) * 2] = (byte)(Terrain.InLake(p, Margin) ? 255 : 0);
-                beds[(z * span + x) * 2 + 1] = (byte)(Terrain.Along(p) > ShorelineAppearance.SeaWaterEdge(Terrain.Across(p)) - Margin ? 255 : 0);
+                beds[(z * span + x) * 2 + 1] = (byte)(Terrain.Along(p) > ShoreLook.SeaWaterEdge(Terrain.Across(p)) - Margin ? 255 : 0);
             }
         });
         return ImageTexture.CreateFromImage(Image.CreateFromData(span, span, false, Image.Format.Rg8, beds));
