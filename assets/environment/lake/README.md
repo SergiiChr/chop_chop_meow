@@ -5,7 +5,7 @@ the ground people walk on stays flat.
 The pond is a bowl 2.5 units deep at its middle; the sea floor drops one unit for every four out, to 6 units deep.
 The terrain draws the ground under the drawn water with the shore photoscan, at the wet shade of the waterline: mossy
 stones in the pond, sand under the sea, also where the sea's waterline wanders inland of where walking stops.
-A beds map baked while loading, one texel a world unit, tells it where the drawn water lies.
+`BedMap`, baked while loading at one texel a world unit, tells it where the drawn water lies.
 
 `lake.gdshader` is a Godot 4 port of the [Realistic Water Shader](https://godotshaders.com/shader/realistic-water/) by
 UnionBytes (Achim Menzel), released under the MIT licence in `LICENSE`.

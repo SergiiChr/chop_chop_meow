@@ -7,7 +7,6 @@ namespace ChopChopMeow;
 /// <summary>Wind, worn footpaths and the sound listener.</summary>
 public partial class WorldView {
     private readonly AudioListener3D listener = new();
-    private static readonly StringName TerrainTraffic = "traffic";
 
     // Paths form where people walk: footfall wears a map at two texels a tile, which slowly grows back.
     private const int TrafficScale = 2, TrafficSize = Terrain.Size * TrafficScale;
@@ -25,8 +24,8 @@ public partial class WorldView {
         trafficImage = Image.CreateFromData(TrafficSize, TrafficSize, false, Image.Format.R8, traffic);
         trafficTexture = ImageTexture.CreateFromImage(trafficImage);
         dressingMaterial.SetShaderParameter("traffic", trafficTexture);
-        // Terrain3D's material is reached only by its RID; the terrain keeps a reference to the texture through the field.
-        RenderingServer.MaterialSetParam(terrainMaterialRid, TerrainTraffic, trafficTexture.GetRid());
+        // The terrain keeps a reference to the texture through the field.
+        terrainView.SetTraffic(trafficTexture);
         AddChild(listener);
         listener.MakeCurrent();
     }
@@ -61,7 +60,7 @@ public partial class WorldView {
     /// <summary>Per-frame look updates; none of them allocates.</summary>
     private void UpdateLook(float dt) {
         Wind.Update(dt, World.Player);
-        UpdateTerrainTarget();
+        terrainView.Follow(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
         SyncListener();
         if (dt > 0) UpdateTraffic(dt);
     }

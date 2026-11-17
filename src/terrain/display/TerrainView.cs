@@ -6,21 +6,18 @@ using Godot;
 
 namespace ChopChopMeow;
 
-public partial class WorldView {
-    private Rid terrainMaterialRid;
-    private Node3D? terrainTarget;
-    // RenderingServer uniforms take RIDs, so retain the texture resource for their lifetime.
-    private Texture2D? terrainGrass;
-    private readonly List<Texture2D> groundScanMaps = new();
+/// <summary>
+/// The ground through the Terrain3D plugin: the valley's heights with its mountains and the beds under the water, the
+/// meadow, photoscans, woods and beds drawn on it, and the point its finest detail follows.
+/// </summary>
+internal sealed class TerrainView {
+    private static readonly StringName Traffic = "traffic";
+    private readonly Rid materialRid;
+    private readonly Node3D target;
+    // RenderingServer uniforms take RIDs, so retain the texture resources for their lifetime.
+    private readonly List<Texture2D> maps = new();
     /// <summary>The ground photoscans drawn as they are, each with its colour, OpenGL normal and height maps beside the terrain, and the world units one tile spans, about its real size.</summary>
     private static readonly (string Name, float Tile)[] GroundScans = { ("path", 2), ("moss", 15), ("forest", 2) };
-    private ImageTexture? woodsDistance;
-    private ImageTexture? bedMap;
-    /// <summary>
-    /// World units past the drawn water's edge that the beds map still marks as bed, so filtering keeps the bed whole up
-    /// to the water's edge; the banks cover the ground there.
-    /// </summary>
-    private const float BedMargin = 1;
     /// <summary>World units out from the foot of the ranges that the woods' floor reaches, where <see cref="World"/> scatters trees at better than even odds.</summary>
     private const float WoodsBand = 10;
     /// <summary>World units out from the foot of the ranges that the woods map measures; the shader's frayed band ends within it.</summary>
@@ -30,8 +27,12 @@ public partial class WorldView {
     /// <summary>Soft noise over the whole map, about fifteen tiles a blob, for lusher and drier patches of meadow.</summary>
     private readonly NoiseTexture2D terrainPatches = new() { Width = 256, Height = 256, Noise = new FastNoiseLite { Seed = 913, Frequency = .05f, FractalOctaves = 3 } };
 
-    /// <summary>Native Terrain3D clipmaps render the existing valley, with its flat playable floor and mountain heights.</summary>
-    private void BuildTerrain3D(Node3D parent, Texture2D grass) {
+    /// <summary>
+    /// Adds Terrain3D's clipmaps for the valley under <paramref name="parent"/>, seen by <paramref name="camera"/> and lit
+    /// by <paramref name="sun"/>, with the meadow's <paramref name="grass"/> and the worn ground and shade maps, its finest
+    /// detail first under <paramref name="start"/>.
+    /// </summary>
+    public TerrainView(Node3D parent, Camera3D camera, DirectionalLight3D sun, Texture2D grass, Texture2D disturbance, Texture2D sceneryShade, Texture2D objectShade, Vector2 start) {
         const string extension = "res://addons/terrain_3d/terrain.gdextension";
         if (!FileAccess.FileExists(extension)) throw new InvalidOperationException("Terrain3D is missing. Launch with ./build.py setup to install the pinned runtime.");
         var loaded = GDExtensionManager.LoadExtension(extension);
@@ -39,9 +40,9 @@ public partial class WorldView {
             throw new InvalidOperationException($"Terrain3D extension could not load: {loaded}");
         var terrain = (Node3D)ClassDB.Instantiate("Terrain3D").AsGodotObject()!;
         terrain.Name = "Landscape";
-        terrainTarget = new Node3D { Name = "TerrainDetailTarget", Position = To3(World.Player) };
-        parent.AddChild(terrainTarget);
-        terrain.Set("clipmap_target", terrainTarget);
+        target = new Node3D { Name = "TerrainDetailTarget", Position = To3(start) };
+        parent.AddChild(target);
+        terrain.Set("clipmap_target", target);
         terrain.Set("free_editor_textures", false);
         terrain.Set("collision_mode", 0);
         terrain.Call("set_camera", camera);
@@ -106,27 +107,23 @@ public partial class WorldView {
         int end = code.LastIndexOf("\n}", StringComparison.Ordinal);
         if (end < fragment) throw new InvalidOperationException("Pinned Terrain3D shader fragment boundary changed.");
         shader.Code = code.Insert(end, GD.Load<ShaderInclude>("res://assets/environment/terrain3d/fragment.gdshaderinc").Code);
-        terrainMaterialRid = material.Call("get_material_rid").AsRid();
-        terrainGrass = grass;
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "grass", grass.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "patches", terrainPatches.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "disturbance", disturbanceTexture.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "shade", sceneryShadeTexture.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "contact", objectShadeTexture.GetRid());
+        materialRid = material.Call("get_material_rid").AsRid();
+        void Use(string name, Texture2D texture) { maps.Add(texture); RenderingServer.MaterialSetParam(materialRid, name, texture.GetRid()); }
+        Use("grass", grass);
+        Use("patches", terrainPatches);
+        Use("disturbance", disturbance);
+        Use("shade", sceneryShade);
+        Use("contact", objectShade);
         void Scan(string name, float tile, Func<string, Texture2D> load) {
-            RenderingServer.MaterialSetParam(terrainMaterialRid, $"{name}_tile", tile);
-            foreach (var map in new[] { "albedo", "normal", "height" }) {
-                var texture = load(map);
-                groundScanMaps.Add(texture);
-                RenderingServer.MaterialSetParam(terrainMaterialRid, $"{name}_{map}", texture.GetRid());
-            }
+            RenderingServer.MaterialSetParam(materialRid, $"{name}_tile", tile);
+            foreach (var map in new[] { "albedo", "normal", "height" }) Use($"{name}_{map}", load(map));
         }
         foreach (var (scan, tile) in GroundScans) Scan(scan, tile, map => GD.Load<Texture2D>($"res://assets/environment/terrain3d/{scan}_{map}.jpg"));
         foreach (var look in new[] { ShoreLook.Rocks, ShoreLook.Sand }) {
             Scan(look.Name, look.Tile, map => ShorelineAppearance.Map(look, map));
-            RenderingServer.MaterialSetParam(terrainMaterialRid, $"{look.Name}_wet", look.Wet);
+            RenderingServer.MaterialSetParam(materialRid, $"{look.Name}_wet", look.Wet);
         }
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "scan_relief", ModelKit.ScanRelief);
+        RenderingServer.MaterialSetParam(materialRid, "scan_relief", ModelKit.ScanRelief);
         // One texel a world unit over all nine regions: how far each texel's middle, where filtering reads it, lies from
         // the foot of the nearer range, which is where trees thicken into woods.
         const int span = 3 * regionSize;
@@ -137,23 +134,12 @@ public partial class WorldView {
                 woods[z * span + x] = (byte)Math.Round(Math.Clamp(from / WoodsReach, 0, 1) * 255);
             }
         });
-        woodsDistance = ImageTexture.CreateFromImage(Image.CreateFromData(span, span, false, Image.Format.R8, woods));
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_distance", woodsDistance.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_corner", new Vector2(-regionSize, -regionSize));
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_span", (float)span);
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_reach", WoodsReach);
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_band", WoodsBand);
-        // On the same texels, red under the pond's drawn water and green under the sea's, out to BedMargin past it.
-        var beds = new byte[span * span * 2];
-        Parallel.For(0, span, z => {
-            for (int x = 0; x < span; x++) {
-                var p = new Vector2(x - regionSize + .5f, z - regionSize + .5f);
-                beds[(z * span + x) * 2] = (byte)(Terrain.InLake(p, BedMargin) ? 255 : 0);
-                beds[(z * span + x) * 2 + 1] = (byte)(Terrain.Along(p) > ShorelineAppearance.SeaWaterEdge(Terrain.Across(p)) - BedMargin ? 255 : 0);
-            }
-        });
-        bedMap = ImageTexture.CreateFromImage(Image.CreateFromData(span, span, false, Image.Format.Rg8, beds));
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "beds", bedMap.GetRid());
+        Use("woods_distance", ImageTexture.CreateFromImage(Image.CreateFromData(span, span, false, Image.Format.R8, woods)));
+        RenderingServer.MaterialSetParam(materialRid, "woods_corner", new Vector2(-regionSize, -regionSize));
+        RenderingServer.MaterialSetParam(materialRid, "woods_span", (float)span);
+        RenderingServer.MaterialSetParam(materialRid, "woods_reach", WoodsReach);
+        RenderingServer.MaterialSetParam(materialRid, "woods_band", WoodsBand);
+        Use("beds", BedMap.Bake(new Vector2(-regionSize, -regionSize), span));
         // The shader's tunnel cut-outs hold exactly one entry per cliff.
         if (World.Cliffs.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {World.Cliffs.Length}.");
         var mines = new Vector4[World.Cliffs.Length];
@@ -161,15 +147,18 @@ public partial class WorldView {
             var cliff = World.Cliffs[i]; var at = World.MineSpot(cliff);
             mines[i] = new Vector4(at.X, at.Y, cliff.Face.X, cliff.Face.Y);
         }
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "mines", mines);
+        RenderingServer.MaterialSetParam(materialRid, "mines", mines);
         GD.Print($"TERRAIN3D: v1.1.0-rc1, 9 regions, {regionSize}² samples/region; playable floor {floor:0.000}");
     }
 
     /// <summary>The ground's height: the mountains, the flat valley floor between them, and the beds under the water.</summary>
     private static float GroundHeight(Vector2 p) => Math.Max(0, MountainShape.Height(p) - .03f) - Terrain.BedDepth(p);
 
-    /// <summary>Keeps Terrain3D's finest detail under the view.</summary>
-    private void UpdateTerrainTarget() {
-        if (terrainTarget != null) terrainTarget.Position = To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
-    }
+    /// <summary>Wears footpaths into the ground where <paramref name="traffic"/>, the map of how much the ground has been walked, says.</summary>
+    public void SetTraffic(Texture2D traffic) => RenderingServer.MaterialSetParam(materialRid, Traffic, traffic.GetRid());
+
+    /// <summary>Keeps Terrain3D's finest detail under <paramref name="at"/>.</summary>
+    public void Follow(Vector2 at) => target.Position = To3(at);
+
+    private static Vector3 To3(Vector2 p) => new(p.X, 0, p.Y);
 }

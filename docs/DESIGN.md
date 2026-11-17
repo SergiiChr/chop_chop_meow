@@ -75,7 +75,7 @@ Simulation and data:
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
 | `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the gather, craft, bellows and fire jobs |
 | `src/Hauling.cs` | The four haul rules, what each kind of place offers a hauler, and the carry in hand |
-| `src/Terrain.cs` | The fixed valley map |
+| `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the pond and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
 | `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
@@ -148,7 +148,8 @@ Rendering and sound:
 | --- | --- |
 | `src/WorldView.cs` | The 3D scene, orthographic camera, picking, lighting and world animation |
 | `src/WorldScene.cs` | Ground dressing, particles and the animation review |
-| `src/Terrain3DView.cs` | Mountain and valley terrain through the Terrain3D plugin |
+| `src/terrain/display/TerrainView.cs` | Mountain and valley terrain through the Terrain3D plugin |
+| `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
 | `src/water/display/LakeAppearance.cs` | The pond and sea surfaces, their tiles, and the water and lily pad materials |
@@ -983,7 +984,7 @@ The options screen sets the music volume, stored in the settings file.
 
 ## World map
 
-The world is a fixed 216-tile valley defined in `src/Terrain.cs`:
+The world is a fixed 216-tile valley defined in `src/terrain/Terrain.cs`:
 
 - sea past the coast;
 - mountain ranges beyond a valley half-width that narrows inland;

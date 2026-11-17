@@ -16,7 +16,7 @@ public partial class WorldView {
         var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
         var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
         var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
-        BuildTerrain3D(parent, grass);
+        terrainView = new TerrainView(parent, camera, sun, grass, disturbanceTexture, sceneryShadeTexture, objectShadeTexture, World.Player);
         // Sea and its feathered bank follow the coastline at the valley's mouth.
         ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
         PondDressing.Build(parent, EnvironmentReview);

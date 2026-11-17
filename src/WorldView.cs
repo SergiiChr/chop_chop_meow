@@ -46,6 +46,7 @@ public partial class WorldView : Node3D {
     private const float Pitch = 30, BaseSize = 14.5f;
     private Camera3D camera = null!;
     private DirectionalLight3D sun = null!;
+    private TerrainView terrainView = null!;
     private Godot.Environment environment = null!;
     /// <summary>Never drawn: its light from above and bounce from below is the ambient light, so a roof and a wall differ in shade.</summary>
     private ProceduralSkyMaterial skylight = null!;
