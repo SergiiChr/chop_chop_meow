@@ -125,8 +125,11 @@ UI and input:
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
 | `src/CabinPanel.cs` | A cabin: its door, sleep and the needs a night would leave |
-| `src/Cabins.cs` | Cabin doors: walking round to the door, stepping in and out, following, knocking and being tugged out |
-| `src/Momentum.cs` | How the player's movement answers the keys: braking, turning round and running back on a key for the other way |
+| `src/cabins/Doorways.cs` | Cabin doors: walking round to the door, stepping in and out, following, knocking and being tugged out |
+| `src/cabins/model/Doorway.cs` | `Doorway`, what a player is doing at a cabin's door |
+| `src/actors/Momentum.cs` | How the player's movement answers the keys: braking, turning round and running back on a key for the other way |
+| `src/actors/player/model/PlayerState.cs`, `src/actors/player/model/HeldStack.cs`, `src/actors/player/model/Command.cs` | One player's saved body and belongings, a held stack, and the commands a guest sends its host |
+| `src/actors/enemies/wolf/model/Wolf.cs` | `Wolf`, a wolf as the world saves it |
 | `src/CampfirePanel.cs` | A campfire |
 | `src/ResourcePanel.cs` | A resource in the world |
 | `src/PilePanel.cs` | A pile or compost heap |
@@ -157,7 +160,8 @@ Rendering and sound:
 | `src/PaintFilter.cs` | The paint filter over the drawn world ([assets/environment/paint_filter](../assets/environment/paint_filter/README.md)) |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
-| `src/WolfModel.cs` | Poses the wolf: its gaits, leap, howl, tug, recoil and fall |
+| `src/actors/enemies/wolf/display/WolfModel.cs`, `src/actors/enemies/wolf/display/WolfShape.cs` | Builds the wolf and poses it: its gaits, leap, howl, tug, recoil and fall |
+| `src/actors/display/Turning.cs` | How an actor's head, then body, turn toward where it heads, with inertia |
 | `src/IconRender.cs` | Renders item and building icons from the models (`./build.py icons`) |
 | `src/Sounds.cs` | Plays sound effects |
 
@@ -176,7 +180,7 @@ Checks and review tools:
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
-| `src/DoorwayReview.cs` | The `--doorway` scenes: two players and wolves at a cabin's door, moved by a script and run by the game's rules |
+| `src/cabins/DoorwayReview.cs` | The `--doorway` scenes: two players and wolves at a cabin's door, moved by a script and run by the game's rules |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
 | `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
 | `src/intro/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
@@ -494,7 +498,7 @@ Inside a cabin (`SaveState.Sheltered`) the player is hidden: their hunters give 
 
 #### Cabin doors
 
-`src/Cabins.cs` runs a cabin's door, which holds one player at a time.
+`src/cabins/Doorways.cs` runs a cabin's door, which holds one player at a time.
 A click on a cabin walks the player to `World.DoorPoint` along `World.TowardDoor`, round the walls when the cabin is in the way, and `World.Enter` starts there.
 What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they are occupied (`World.Occupied`), as when downed, and any action they try is refused with "You are busy." (`World.Busy`); inside a cabin they are not.
 Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin needs dry, open ground there; stepping out and waking in a cabin put the player on it, or, for a cabin from an older save with it blocked, on the first open ground round the cabin (`World.Doorstep`).

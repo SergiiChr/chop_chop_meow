@@ -134,9 +134,10 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 - To put a hand on a point, use `ActorAnimation.ArmTo`: it gives the shoulder and elbow angles for a fist, or for what
   the fist holds, at a point in the trunk's frame. Grinding places both arms with it. The intro film's `Reaching` in
   `src/intro/WorldIntro.cs` wraps it for a point in the rig's own space. Do not write another arm solver.
-- Wolves: `src/WolfShape.cs` builds one skinned mesh on a skeleton, and `WolfModel` in `src/WolfModel.cs` poses it from
-  a `WolfPose` of spine, neck, head, jaw, ears, tail and leg angles. Gait legs are solved by IK from where each paw stands
-  (`Reach`), and `WolfModel.Paw` and `WolfModel.Bite` give where a paw and the jaws are under the pose shown.
+- Wolves: `src/actors/enemies/wolf/display/WolfShape.cs` builds one skinned mesh on a skeleton, and `WolfModel` in
+  `src/actors/enemies/wolf/display/WolfModel.cs` poses it from a `WolfPose` of spine, neck, head, jaw, ears, tail and leg
+  angles. Gait legs are solved by IK from where each paw stands (`Reach`), and `WolfModel.Paw` and `WolfModel.Bite` give
+  where a paw and the jaws are under the pose shown.
   `SyncWolves` in `src/WorldView.cs` times the wolf against the player.
 - The pelvis is part of the torso model, so it cannot turn or drop on its own.
 - Only the walk, jog and sprint set the ankle. Other actions leave the boot square to the shin, so toes can dip into the
