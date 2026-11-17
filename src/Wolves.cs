@@ -118,7 +118,6 @@ public sealed partial class World {
     private static void GoHome(Wolf wolf) {
         Calm(wolf); wolf.Mode = WolfMode.Home;
     }
-    /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
     /// <summary>How far a wolf's body reaches ahead of where it stands to its nose and back to its tail's root, and half its width, in metres.</summary>
     public const float WolfNose = .76f, WolfTail = .5f, WolfHalfWidth = .18f;
 
@@ -141,6 +140,7 @@ public sealed partial class World {
         return (a0 + da * s, b0 + db * t);
     }
 
+    /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
     private static void Calm(Wolf wolf) {
         wolf.Target = 0; wolf.Howl = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
         wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.Beside = Vector2.Zero; wolf.Route.Clear();

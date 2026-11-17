@@ -145,7 +145,10 @@ public sealed class PlayerControl {
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
         var step = momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
         world.Me.Braking = momentum.Braking;
-        world.MovePlayer(step * dt * world.Data.MoveSpeed(world.Me.Sprinting)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
+        var move = step * dt * world.Data.MoveSpeed(world.Me.Sprinting);
+        // Walking to a cabin's door, the last step stops on it rather than past it, however long the frame.
+        if (entering != null) move = move.LimitLength(world.Player.DistanceTo(World.DoorPoint(entering)));
+        world.MovePlayer(move); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
         // A tool in hand that has left the backpack leaves the hand empty.
         if (world.InHand != "" && world.Backpack[world.InHand] == 0) world.SelectInHand("");

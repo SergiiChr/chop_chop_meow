@@ -411,8 +411,8 @@ public sealed partial class World {
         var p = S.Absent.Remove(key, out var back) ? back : S.Absent.Remove("", out var unclaimed) ? unclaimed : Newcomer();
         p.Key = key; p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(0, 4).First(i => S.Players.All(o => o.Shirt != i));
         // What only made sense while they played: a cabin may have gone and a building gone up where they stood, a wolf that had them pinned has moved on, and the other properties follow input they no longer give.
-        // A cabin holds one player, so one someone else went into meanwhile leaves the newcomer at its door.
-        if (Find(p.Sheltered)?.Kind != ThingKind.Hut || S.Players.Any(o => o.Sheltered == p.Sheltered)) p.Sheltered = 0;
+        // A cabin holds one player, so one someone else went into or is at the door of meanwhile leaves the newcomer at its door.
+        if (Find(p.Sheltered)?.Kind != ThingKind.Hut || Ahead(p.Sheltered, p) != Doorway.Entering) p.Sheltered = 0;
         p.Door = Doorway.None;
         if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
         Forget(p);

@@ -90,14 +90,22 @@ public sealed partial class World {
         if (Find(S.Sheltered) is not Thing cabin || S.Actor.Door != Doorway.None || Forwarded(Verb.Leave)) return;
         S.Sheltered = 0; Player = DoorPoint(cabin); S.Actor.Warp++;
         Stage(Doorway.Leaving, cabin.Id);
-        // Whoever waits at the door, banging on it or standing there, steps aside to let them out, keeping the order they came in,
+        // Whoever bangs on the door steps aside to let them out, keeping the order they came in,
         // and the one stepping out keeps to the other side of the door, to pass them as they squeeze in.
         foreach (var other in S.Players.Where(o => o != S.Actor && Waiting(o, cabin)).OrderBy(o => o.DoorQueued).ToList()) {
             other.Door = Doorway.Aside; other.DoorCabin = cabin.Id; other.DoorTime = 0; other.DoorRush = false; other.DoorQueued = ++S.DoorArrivals;
             other.Pos = AsideSpot(other); other.Warp++;
             Player = DoorPoint(cabin) - AsideWay * MakeWay;
         }
+        // Someone just standing at the door stays where they are, and the one stepping out ends beside them instead.
+        foreach (var other in S.Players)
+            if (other != S.Actor && other.Sheltered == 0 && other.Door == Doorway.None && other.Pos.DistanceTo(Player) < ClearOf) {
+                float side = (other.Pos - DoorPoint(cabin)).Dot(AsideWay) > 0 ? -1 : 1;
+                Player = other.Pos + AsideWay * (side * ClearOf);
+            }
     }
+    /// <summary>How far apart, in metres, someone stepping out of a cabin keeps from a player standing at its door.</summary>
+    public const float ClearOf = .6f;
     /// <summary>How far to the other side of a cabin's door point someone stepping out past a player standing aside keeps.</summary>
     public const float MakeWay = .1f;
 
@@ -111,10 +119,8 @@ public sealed partial class World {
         return false;
     }
 
-    /// <summary>Whether a player waits at a cabin's door: banging on it, or standing free within reach of it.</summary>
-    private static bool Waiting(PlayerState p, Thing cabin) =>
-        p.Sheltered == 0 && !p.Mauled && p.RespawnIn <= 0
-        && (p.Door == Doorway.Knocking && p.DoorCabin == cabin.Id || p.Door == Doorway.None && p.Pos.DistanceTo(DoorPoint(cabin)) <= DoorReach);
+    /// <summary>Whether a player waits at a cabin's door: banging on it.</summary>
+    private static bool Waiting(PlayerState p, Thing cabin) => p.Door == Doorway.Knocking && p.DoorCabin == cabin.Id;
 
     /// <summary>
     /// Where a player standing aside at a cabin's door stands: a step to the right of the door point, away from the door as it
@@ -163,12 +169,14 @@ public sealed partial class World {
     /// </summary>
     private Doorway Ahead(int cabin, PlayerState arriving) {
         var door = Doorway.Entering;
+        // A player not at any door, such as one waking or rejoining, comes after everyone already there.
+        int queued = arriving.Door == Doorway.None ? int.MaxValue : arriving.DoorQueued;
         foreach (var p in S.Players) {
             if (p == arriving) continue;
             // Someone still in the doorway on their way out keeps the door; once they are through it, the next one squeezes past them in.
             if (p.Sheltered == cabin || p.DoorCabin == cabin && p.Door == Doorway.Leaving && !Through(p)) return Doorway.Knocking;
             // Someone dragged back out, or standing aside for someone stepping out, stays ahead only if they came to the door first.
-            if (p.DoorCabin == cabin && (p.Door == Doorway.Entering || p.Door is Doorway.Pulled or Doorway.Aside && p.DoorQueued < arriving.DoorQueued)) door = Doorway.Following;
+            if (p.DoorCabin == cabin && (p.Door == Doorway.Entering || p.Door is Doorway.Pulled or Doorway.Aside && p.DoorQueued < queued)) door = Doorway.Following;
         }
         return door;
     }
@@ -236,8 +244,8 @@ public sealed partial class World {
                 var tugger = Tugger();
                 if (tugger != null) { tugger.Tugging = false; tugger.Attack = 1; tugger.Pos = Player + OutOfDoor * TugReach; }
                 // The wolf that dragged them steps aside, to their left, as they fall back toward it.
-                if (S.Health <= 50 && (tugger ?? NearestHunter()) is Wolf wolf) {
-                    Pin(wolf, Hunters.Skip(1).Any(), tugger != null ? -OutOfDoor.Orthogonal() : default);
+                if (S.Health <= 50 && tugger != null) {
+                    Pin(tugger, Hunters.Skip(1).Any(), -OutOfDoor.Orthogonal());
                     p.Door = Doorway.None;
                 } else if (p.Door == Doorway.Pulled) StepIn(p.DoorCabin, true);
                 else p.Door = Doorway.None;
@@ -265,22 +273,23 @@ public sealed partial class World {
 
     /// <summary>
     /// Holds a tugging wolf at the waist of the player it drags back, who is shown there; returns false once the drag has
-    /// ended some other way, such as the player dying, and lets go.
+    /// ended some other way, such as the player dying, and lets go. A wolf hit while it drags is knocked off: the player
+    /// stays as far out as it got them and steps in again at a run, or stops banging.
     /// </summary>
     private bool Tug(Wolf wolf) {
-        if (S.Actor.Door is not (Doorway.Pulled or Doorway.PulledOff)) { wolf.Tugging = false; return false; }
-        wolf.Pos = Player + OutOfDoor * (DragDistance * Dragged(S.Actor.DoorTime / PullSeconds) + TugReach);
+        var p = S.Actor;
+        if (p.Door is not (Doorway.Pulled or Doorway.PulledOff)) { wolf.Tugging = false; return false; }
+        if (wolf.Stagger > 0) {
+            wolf.Tugging = false;
+            Player = Hauled; p.Warp++;
+            if (p.Door == Doorway.Pulled) StepIn(p.DoorCabin, true); else p.Door = Doorway.None;
+            return false;
+        }
+        wolf.Pos = Player + OutOfDoor * (DragDistance * Dragged(p.DoorTime / PullSeconds) + TugReach);
         wolf.Attack = 1;
         return true;
     }
 
     /// <summary>Whether a wolf is dragging the acting player out of a doorway, when only it may take them down.</summary>
     private bool Tugged => S.Actor.Door is Doorway.Pulled or Doorway.PulledOff && Tugger() != null;
-
-    private Wolf? NearestHunter() {
-        Wolf? best = null;
-        foreach (var w in S.Wolves)
-            if (w.Target == S.Actor.Id && w.Flee <= 0 && (best == null || w.Pos.DistanceTo(Player) < best.Pos.DistanceTo(Player))) best = w;
-        return best;
-    }
 }

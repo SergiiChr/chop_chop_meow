@@ -101,7 +101,10 @@ public static class SimulationChecks {
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
         Test(CheckACabinHoldsOnePlayerAndTheNextBangsOnTheDoor, data);
         Test(CheckAPlayerBangingOnACabinDoorStepsAsideForOneComingOutThenGoesIn, data);
+        Test(CheckOnlyAPlayerBangingOnTheDoorGoesInWhenSomeoneStepsOut, data);
+        Test(CheckHittingAWolfThatDragsAPlayerOutKnocksItOff, data);
         Test(CheckAPlayerRespawnsInTheNearestFreeCabin, data);
+        Test(CheckAPlayerDoesNotRespawnInACabinSomeoneIsDraggedOutOfTheDoorOf, data);
         Test(CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
@@ -2967,6 +2970,36 @@ public static class SimulationChecks {
         Require(guest.Sheltered == hut.Id && world.Sheltered == 0, "the player who stood aside should end up inside, and the one who came out outside");
     }
 
+    private static void CheckOnlyAPlayerBangingOnTheDoorGoesInWhenSomeoneStepsOut(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        StepInside(world, hut);
+        // The guest stands at the door without ever clicking the cabin.
+        world.As(guest, () => world.Player = World.DoorPoint(hut));
+        world.Leave();
+        Require(guest.Door == Doorway.None && guest.Pos == World.DoorPoint(hut), $"a player standing at a cabin's door without banging on it should be left where they are, not {guest.Door}");
+        Require(world.Player.DistanceTo(guest.Pos) >= World.ClearOf, $"someone stepping out should end clear of a player standing at the door, not {world.Player.DistanceTo(guest.Pos):0.00} m from them");
+        world.Tick(World.LeaveSeconds + .05f);
+        Require(guest.Sheltered == 0, "a player who never clicked a cabin should not end up inside it");
+    }
+
+    private static void CheckHittingAWolfThatDragsAPlayerOutKnocksItOff(GameData data) {
+        var world = NightWorld(data);
+        var guest = world.Arrive("guest", 2);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = World.DoorPoint(hut);
+        SetNeeds(world, health: 45);
+        Require(world.Enter(hut, false), "a player at the door should step in");
+        var tugger = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2, 0) });
+        for (float time = 0; time < .6f && world.Door == Doorway.Entering; time += .05f) world.Tick(.05f);
+        Require(world.Door == Doorway.Pulled && tugger.Tugging, $"a wolf should drag the wounded player out of the doorway, not {world.Door}");
+        world.Tick(.4f);
+        Give(guest, "steel_axe", 1);
+        world.As(guest, () => { world.Player = tugger.Pos + new Vector2(1, 0); world.Attack(); });
+        world.Tick(.05f);
+        Require(!tugger.Tugging && world.Door == Doorway.Entering && !world.Mauled, $"a wolf hit while it drags a player out should let go, and the player should run back in, not {world.Door}");
+    }
+
     private static void CheckACabinHoldsOnePlayerAndTheNextBangsOnTheDoor(GameData data) {
         var (world, guest, _) = Hosted(data);
         var heard = Listen(world);
@@ -3005,6 +3038,25 @@ public static class SimulationChecks {
         SetNeeds(world, health: 0);
         SafeTick(world, data.RespawnSeconds + 1);
         Require(world.Sheltered == far.Id, "a player should respawn in the nearest cabin nobody is in");
+    }
+
+    private static void CheckAPlayerDoesNotRespawnInACabinSomeoneIsDraggedOutOfTheDoorOf(GameData data) {
+        var world = NightWorld(data);
+        var guest = world.Arrive("guest", 2);
+        var near = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -6));
+        var far = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -14));
+        world.Player = near.Pos + new Vector2(4, 0);
+        SetNeeds(world, health: 0);
+        world.Tick(.05f);
+        Require(world.Dead, "a player with no health left should fall");
+        for (int i = 0; i < 4000 && world.S.RespawnIn > .9f; i++) { world.Tick(.05f); NourishEveryone(world); }
+        // The guest, who came to a door after the fallen player last did, is dragged out of the near cabin's doorway as the fallen player wakes.
+        world.As(guest, () => { world.Player = World.DoorPoint(near); Require(world.Enter(near, false), "the guest at the door should step in"); });
+        PlaceWolf(world, new Wolf { Pos = guest.Pos + new Vector2(.8f, 0), Target = guest.Id });
+        for (int i = 0; i < 14 && guest.Door == Doorway.Entering; i++) { world.Tick(.05f); NourishEveryone(world); }
+        for (int i = 0; i < 20 && world.Dead; i++) { world.Tick(.05f); NourishEveryone(world); }
+        Require(!world.Dead && guest.Door == Doorway.Pulled, $"the fallen player should wake while the guest is dragged out, not with the guest {guest.Door}");
+        Require(world.Sheltered == far.Id, "a player should not respawn in a cabin someone is being dragged out of the door of");
     }
 
     private static void CheckCabinShelterAndChasingWolfGivesUpInLight(GameData data) {

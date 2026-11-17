@@ -2347,7 +2347,6 @@ public sealed partial class World {
             S.Health -= dt * (16 + 8 * feeding);
         }
     }
-    /// <summary>A wolf that has reached the player knocks them onto their back and holds them down.</summary>
     /// <summary>Pins the acting player under a wolf, standing over them, or to the side <paramref name="beside"/> of their throat once it has dragged them back out of a doorway.</summary>
     private void Pin(Wolf wolf, bool pack, Vector2 beside = default) {
         wolf.Leap = 0; wolf.Beside = beside; wolf.Feeding = wolf.Pinning = true; S.Mauled = true;

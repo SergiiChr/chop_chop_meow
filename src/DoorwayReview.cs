@@ -23,6 +23,9 @@ public sealed partial class DoorwayReview : Node {
     private float time;
     /// <summary>Metres round the cabin cleared of everything else.</summary>
     private const float Clearing = 15;
+    /// <summary>Seconds into the neighbor's banging at which the host steps out in the occupied scene, and whether they have.</summary>
+    private const float LeaveAfterBangs = .4f;
+    private bool hostLeft;
 
     public override void _Ready() {
         if (!Scenes.Contains(Scene)) throw new ArgumentException($"--doorway takes {string.Join(", ", Scenes)}, not {Scene}");
@@ -51,10 +54,9 @@ public sealed partial class DoorwayReview : Node {
         script = Scene switch {
             // Both walk up; the host gets there first and steps in, the neighbor follows, finds the door shut and bangs on it.
             "queue" => new (float, Action)[] { (0, () => Walk(host)), (.4f, () => Walk(guest)) },
-            // The host is inside; the neighbor walks up and bangs, then the host steps out, the neighbor standing aside for them, and the neighbor goes in.
+            // The host is inside; the neighbor walks up and bangs, and while they bang the host steps out, the neighbor standing aside for them, and the neighbor goes in.
             "occupied" => new (float, Action)[] {
                 (0, () => { World.Player = door; World.S.Sheltered = Cabin.Id; }), (0, () => Walk(guest)),
-                (3.2f, () => World.Leave()),
             },
             // The host steps in at a walk with a wolf close by and the neighbor at the door behind them; a second wolf comes for the neighbor while they wait.
             "wolf" => new (float, Action)[] {
@@ -79,6 +81,7 @@ public sealed partial class DoorwayReview : Node {
         float dt = Math.Min((float)delta, .1f);
         time += dt;
         while (next < script.Length && script[next].At <= time) script[next++].Do();
+        if (Scene == "occupied" && !hostLeft && guest.Door == Doorway.Knocking && guest.DoorTime >= World.KnockLead + LeaveAfterBangs) { World.Leave(); hostLeft = true; }
         foreach (var p in walking.ToArray())
             World.As(p, () => {
                 var toward = World.TowardDoor(Cabin, World.Player);
