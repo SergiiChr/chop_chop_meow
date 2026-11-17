@@ -513,6 +513,7 @@ Inside a cabin (`SaveState.Sheltered`) the player is hidden: their hunters give 
 `Doorways` (`src/cabins/Doorways.cs`) runs a cabin's door, which holds one player at a time, and `DoorTug` (`src/actors/enemies/wolf/DoorTug.cs`) a wolf tugging a player out of it; `World` holds one of each (`World.Doorways`, `World.DoorTug`) and ticks the doorway with the acting player.
 A click on a cabin walks the player to `Doorways.DoorPoint` along `Doorways.TowardDoor`, round the walls when the cabin is in the way, and `Doorways.Enter` starts there.
 What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they are occupied (`World.Occupied`), as when downed, and any action they try is refused with "You are busy." (`World.Busy`); inside a cabin they are not.
+Picking a hotbar slot, putting a held stack back, marking the ending seen and skipping to morning are not refused.
 Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin needs dry, open ground there; stepping out and waking in a cabin put the player on it, or, for a cabin from an older save with it blocked, on the first open ground round the cabin (`Doorways.Doorstep`).
 
 - `Entering` takes `Doorways.EnterSeconds`, or `Doorways.RushSeconds` for a player who sprinted there (`PlayerState.DoorRush`), then shelters them.
