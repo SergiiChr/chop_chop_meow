@@ -184,13 +184,13 @@ public static class AnimationChecks {
                 float depth = Mathf.Lerp(from, to, i / 300f), travelled = Math.Abs(to - from) * i / 300f;
                 time = seconds * i / 300f;
                 var pose = ActorAnimation.PoseAt(action, ActorAnimation.Stride(action) > 0 ? ActorAnimation.Advance(action, 0, travelled) : time, from != to);
-                (pose, float lift) = ActorAnimation.OnSteps(pose, depth, up, edges, rise);
+                (pose, float lift) = StairSteps.OnSteps(pose, depth, up, edges, rise);
                 float lowest = float.MaxValue;
                 for (int side = 0; side < 2; side++) {
                     var (toe, heel) = side == 0 ? ActorAnimation.SoleOf(pose.SwingL, pose.KneeL, pose.FootL) : ActorAnimation.SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
                     foreach (var point in new[] { toe, heel }) {
                         // Facing out, a point ahead of the hips is further out from the door.
-                        float clear = lift + pose.HipHeight - point.Y - ActorAnimation.StepGround(depth + up.Y * point.X, edges, rise);
+                        float clear = lift + pose.HipHeight - point.Y - StairSteps.StepGround(depth + up.Y * point.X, edges, rise);
                         deepest = Math.Min(deepest, clear); lowest = Math.Min(lowest, clear);
                     }
                 }
@@ -208,7 +208,7 @@ public static class AnimationChecks {
             foreach (var target in new[] { new Vector3(.05f, .5f, .3f), new Vector3(-.05f, .6f, .25f), new Vector3(.1f, .35f, .35f), new Vector3(0, .55f, .4f) }) {
                 float side = left ? 1 : -1;
                 var aim = target with { X = target.X * side };
-                var (raise, outward, elbow, roll) = ActorAnimation.ArmTo(aim, left, new Vector3(side, -1, 0), ActorRig.Palm);
+                var (raise, outward, elbow, roll) = ArmReach.ArmTo(aim, left, new Vector3(side, -1, 0), ActorRig.Palm);
                 var pose = left ? new Pose(RaiseL: raise, OutL: outward, ElbowL: elbow) : new Pose(RaiseR: raise, OutR: outward, ElbowR: elbow);
                 rig.Show(pose, null, false);
                 rig.RollArm(left, roll);

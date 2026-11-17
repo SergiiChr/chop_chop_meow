@@ -128,6 +128,8 @@ public static class ActorAnimation {
         return phase < 0 ? phase + 1 : phase;
     }
 
+    /// <summary>The ground direction a body facing <paramref name="yaw"/> faces.</summary>
+    public static Vector2 Forward(float yaw) => new(MathF.Sin(yaw), MathF.Cos(yaw));
     /// <summary>Turns world-plane movement into a rig yaw in radians; the rig faces +Z, which is world +Y.</summary>
     public static float Yaw(Vector2 movement, float previous) =>
         movement.LengthSquared() < 0.0001f ? previous : MathF.Atan2(movement.X, movement.Y);
@@ -320,58 +322,9 @@ public static class ActorAnimation {
         float tilt = Mathf.DegToRad(PestleLean);
         // Measured upright, then turned into the leaning trunk's frame.
         var toFist = new Vector3(aside.X - PestleGrip * MathF.Sin(tilt), BowlOverFist + CookShape.BowlFloor + lift + PestleGrip * MathF.Cos(tilt), aside.Y);
-        var bowl = ArmTo(BowlHand, left: true, ActorRig.Palm);
-        var pestle = ArmTo(BowlHand + toFist.Rotated(Vector3.Right, -Mathf.DegToRad(GrindLean)), left: false, ActorRig.Palm);
+        var bowl = ArmReach.ArmTo(BowlHand, left: true, ActorRig.Palm);
+        var pestle = ArmReach.ArmTo(BowlHand + toFist.Rotated(Vector3.Right, -Mathf.DegToRad(GrindLean)), left: false, ActorRig.Palm);
         return Stance with { Lean = GrindLean, RaiseL = bowl.Raise, OutL = bowl.Out, ElbowL = bowl.Elbow, RaiseR = pestle.Raise, OutR = pestle.Out, ElbowR = pestle.Elbow };
-    }
-
-    /// <summary>
-    /// The arm raise, outward swing and elbow bend, in degrees, that put a fist at <paramref name="grip"/>, measured from the hips in the trunk's own frame.
-    /// With <paramref name="palm"/> it is what the fist holds that goes there, that far ahead of the forearm's line.
-    /// </summary>
-    public static (float Raise, float Out, float Elbow) ArmTo(Vector3 grip, bool left, float palm = 0) {
-        var reach = grip - new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
-        // A held thing ahead of the forearm's line is reached by a slightly longer forearm bent a little further.
-        const float upper = ActorRig.UpperArm;
-        float fore = MathF.Sqrt(ActorRig.Forearm * ActorRig.Forearm + palm * palm);
-        // The elbow folds until the fist is that far from the shoulder, then the shoulder swings the bent arm onto the point.
-        float bend = MathF.Acos(Math.Clamp((reach.LengthSquared() - upper * upper - fore * fore) / (2 * upper * fore), -1, 1));
-        float along = upper + fore * MathF.Cos(bend), ahead = fore * MathF.Sin(bend);
-        float outward = MathF.Asin(Math.Clamp((left ? reach.X : -reach.X) / along, -1, 1));
-        float raise = Mathf.RadToDeg(MathF.Atan2(reach.Z, -reach.Y) - MathF.Atan2(ahead, along * MathF.Cos(outward)));
-        return (Mathf.PosMod(raise + 180, 360) - 180, Mathf.RadToDeg(outward), Mathf.RadToDeg(bend - MathF.Atan2(palm, ActorRig.Forearm)));
-    }
-
-    /// <summary>
-    /// The arm raise, outward swing, elbow bend and roll of the arm about its own length, in degrees, that put a fist at
-    /// <paramref name="grip"/>, from the hips in the trunk's own frame, with the elbow as far toward <paramref name="elbowToward"/>
-    /// as the arm allows; <see cref="ActorRig.RollArm"/> applies the roll after the pose.
-    /// </summary>
-    public static (float Raise, float Out, float Elbow, float Roll) ArmTo(Vector3 grip, bool left, Vector3 elbowToward, float palm = 0) {
-        var shoulder = new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
-        const float upper = ActorRig.UpperArm;
-        float fore = MathF.Sqrt(ActorRig.Forearm * ActorRig.Forearm + palm * palm);
-        var reach = grip - shoulder;
-        float d = Math.Clamp(reach.Length(), Math.Abs(upper - fore) + 1e-3f, upper + fore - 1e-3f);
-        var along = reach.Normalized();
-        // The elbow lies on a circle round the line to the hand; it takes the point of it nearest the way asked.
-        float toCentre = (upper * upper - fore * fore + d * d) / (2 * d), radius = MathF.Sqrt(Math.Max(0, upper * upper - toCentre * toCentre));
-        var toward = elbowToward - along * elbowToward.Dot(along);
-        if (toward.LengthSquared() < 1e-8f) toward = Vector3.Down - along * Vector3.Down.Dot(along);
-        var elbowAt = shoulder + along * toCentre + toward.Normalized() * radius;
-        var hand = shoulder + along * d;
-        Vector3 down = (elbowAt - shoulder).Normalized(), forearm = (hand - elbowAt).Normalized();
-        // The forearm bends toward the shoulder's +Z; the fist sits a palm ahead of the forearm's line.
-        var bend = forearm - down * forearm.Dot(down);
-        if (bend.LengthSquared() < 1e-8f) bend = Vector3.Back - down * Vector3.Back.Dot(down);
-        var z = bend.Normalized();
-        var y = -down;
-        var basis = new Basis(y.Cross(z), y, z);
-        // The shoulder turns as Rx(-raise) Rz(out) and RollArm then turns it about its length.
-        var euler = basis.GetEuler(EulerOrder.Xzy);
-        float elbow = Mathf.RadToDeg(MathF.Acos(Math.Clamp(down.Dot(forearm), -1, 1)) - MathF.Atan2(palm, ActorRig.Forearm));
-        float outward = Mathf.RadToDeg(euler.Z);
-        return (-Mathf.RadToDeg(euler.X), left ? outward : -outward, elbow, Mathf.RadToDeg(euler.Y));
     }
 
     /// <summary>How far past the right fist, along the handle it holds, the left fist grips in a two-handed swing, in metres.</summary>
@@ -384,7 +337,7 @@ public static class ActorAnimation {
         var shoulder = Basis.FromEuler(new Vector3(Mathf.DegToRad(-pose.RaiseR), 0, Mathf.DegToRad(-pose.OutR)));
         var arm = shoulder * new Basis(Vector3.Right, Mathf.DegToRad(-pose.ElbowR));
         var fist = new Vector3(-ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0) + shoulder * new Vector3(0, -ActorRig.UpperArm, 0) + arm * new Vector3(0, -ActorRig.Forearm, ActorRig.Palm);
-        var (raise, outward, elbow) = ArmTo(fist + arm * Vector3.Down * SecondGrip, left: true);
+        var (raise, outward, elbow) = ArmReach.ArmTo(fist + arm * Vector3.Down * SecondGrip, left: true);
         return pose with { RaiseL = raise, OutL = outward, ElbowL = elbow };
     }
 
@@ -437,8 +390,8 @@ public static class ActorAnimation {
         var hips = new Vector3(0, height, 0);
         // Measured from the ground under the hips, then turned into the leaning, twisted trunk's frame.
         Vector3 InTrunk(Vector3 point) => (point - hips).Rotated(Vector3.Up, -Mathf.DegToRad(twist)).Rotated(Vector3.Right, -Mathf.DegToRad(lean));
-        var right = ArmTo(InTrunk(top), left: false, ActorRig.Palm);
-        var left = ArmTo(InTrunk(top + along * ShovelGrip), left: true, ActorRig.Palm);
+        var right = ArmReach.ArmTo(InTrunk(top), left: false, ActorRig.Palm);
+        var left = ArmReach.ArmTo(InTrunk(top + along * ShovelGrip), left: true, ActorRig.Palm);
         return new Pose(Lean: lean, Twist: twist, Head: 14 + lean * .3f, Hips: height,
             RaiseL: left.Raise, OutL: left.Out, ElbowL: left.Elbow, RaiseR: right.Raise, OutR: right.Out, ElbowR: right.Elbow,
             SwingL: front.Swing, KneeL: front.Knee, FootL: front.Foot, SwingR: back.Swing, KneeR: back.Knee, FootR: back.Foot);
@@ -578,7 +531,7 @@ public static class ActorAnimation {
     public static float Reach(float swing, float knee) => Ankle(swing, knee).Y;
 
     /// <summary>Where a leg's ankle is, ahead of the hip and below it, for a thigh swung forward and a knee folded back by these angles.</summary>
-    private static Vector2 Ankle(float swing, float knee) {
+    internal static Vector2 Ankle(float swing, float knee) {
         float thigh = Mathf.DegToRad(swing), shin = Mathf.DegToRad(swing - knee);
         return new Vector2(Thigh * MathF.Sin(thigh) + Shin * MathF.Sin(shin), Thigh * MathF.Cos(thigh) + Shin * MathF.Cos(shin));
     }
@@ -595,7 +548,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>A leg's thigh swing, knee bend and foot tip in degrees, as in <see cref="Pose"/>.</summary>
-    private readonly record struct LegAngles(float Swing, float Knee, float Foot) {
+    internal readonly record struct LegAngles(float Swing, float Knee, float Foot) {
         public static LegAngles operator +(LegAngles a, LegAngles b) => new(a.Swing + b.Swing, a.Knee + b.Knee, a.Foot + b.Foot);
         public static LegAngles operator -(LegAngles a, LegAngles b) => new(a.Swing - b.Swing, a.Knee - b.Knee, a.Foot - b.Foot);
         public static LegAngles operator *(LegAngles a, float by) => new(a.Swing * by, a.Knee * by, a.Foot * by);
@@ -625,7 +578,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>The thigh swing and knee bend, in degrees, that put the ankle <paramref name="ahead"/> of the hip and <paramref name="below"/> it, knee forward.</summary>
-    private static (float Swing, float Knee) LegTo(float ahead, float below) {
+    internal static (float Swing, float Knee) LegTo(float ahead, float below) {
         float reach = Math.Min(MathF.Sqrt(ahead * ahead + below * below), Thigh + Shin - 1e-4f);
         float knee = MathF.Acos(Math.Clamp((Thigh * Thigh + Shin * Shin - reach * reach) / (2 * Thigh * Shin), -1, 1));
         float thigh = MathF.Acos(Math.Clamp((Thigh * Thigh + reach * reach - Shin * Shin) / (2 * Thigh * reach), -1, 1));
@@ -644,73 +597,8 @@ public static class ActorAnimation {
         return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
     }
 
-    // ---------- Steps ----------
-
     /// <summary>How far a leg hangs to the side of the hips' middle, toward the body's left for the left leg.</summary>
     public const float LegSide = .09f;
-    // A swinging boot rises onto a tread over this far ahead of its edge, so it clears the edge rather than snapping up at it.
-    private const float StepClearance = .12f;
-    // A boot this much higher than the other has left the ground: the body stands on the other one.
-    private const float OffTheGround = .03f;
-    // The body eases onto a lifting boot's tread this many metres per metre the boot rises, so the hips never jump.
-    private const float LiftEase = 3;
-
-    /// <summary>How high steps rising <paramref name="rise"/> at each of <paramref name="edges"/>, depths along the way up, are at <paramref name="depth"/>.</summary>
-    public static float StepGround(float depth, ReadOnlySpan<float> edges, float rise) => StepGround(depth, edges, rise, 0);
-
-    /// <summary>The steps' height at <paramref name="depth"/>, rising onto each tread over <paramref name="ahead"/> before its edge.</summary>
-    private static float StepGround(float depth, ReadOnlySpan<float> edges, float rise, float ahead) {
-        float ground = 0;
-        foreach (float edge in edges)
-            ground += depth >= edge ? rise : ahead > 0 && depth > edge - ahead ? rise * Mathf.SmoothStep(0, 1, (depth - edge + ahead) / ahead) : 0;
-        return ground;
-    }
-
-    /// <summary>
-    /// For each leg of a pose, how high its boot sole's lower end is above the ground the pose stands on, and how high that
-    /// ground would have to be for the boot to rest on the steps with neither end in them.
-    /// Once the boot is off the ground, each tread's rise is counted over <see cref="StepClearance"/> ahead of its edge.
-    /// </summary>
-    private static ((float Clear, float Rests) Left, (float Clear, float Rests) Right) Boots(Pose pose, float depth, Vector2 up, ReadOnlySpan<float> edges, float rise) {
-        float hips = pose.HipHeight;
-        var (toeL, heelL) = SoleOf(pose.SwingL, pose.KneeL, pose.FootL);
-        var (toeR, heelR) = SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
-        float clearL = hips - Math.Max(toeL.Y, heelL.Y), clearR = hips - Math.Max(toeR.Y, heelR.Y), lower = Math.Min(clearL, clearR);
-        float aheadL = StepClearance * Math.Clamp((clearL - lower) / OffTheGround, 0, 1), aheadR = StepClearance * Math.Clamp((clearR - lower) / OffTheGround, 0, 1);
-        float restsL = Math.Max(StepGround(depth + up.Y * toeL.X + up.X * LegSide, edges, rise, aheadL) - hips + toeL.Y, StepGround(depth + up.Y * heelL.X + up.X * LegSide, edges, rise, aheadL) - hips + heelL.Y);
-        float restsR = Math.Max(StepGround(depth + up.Y * toeR.X - up.X * LegSide, edges, rise, aheadR) - hips + toeR.Y, StepGround(depth + up.Y * heelR.X - up.X * LegSide, edges, rise, aheadR) - hips + heelR.Y);
-        return ((clearL, restsL), (clearR, restsR));
-    }
-
-    /// <summary>
-    /// A pose stood on steps, and how high above the ground under it the body stands: on the boot that bears the weight,
-    /// easing onto the other boot's tread as the first one lifts off.
-    /// A boot that would sink into a tread bends its knee to stand on it instead, keeping its angle to the ground.
-    /// <paramref name="depth"/> is how far along the way up the hips are and <paramref name="up"/> that way in the body's
-    /// own frame, X toward its left and Y ahead; the steps rise <paramref name="rise"/> at each of <paramref name="edges"/>.
-    /// </summary>
-    public static (Pose Pose, float Lift) OnSteps(Pose pose, float depth, Vector2 up, ReadOnlySpan<float> edges, float rise) {
-        var (left, right) = Boots(pose, depth, up, edges, rise);
-        float lower = Math.Min(left.Clear, right.Clear);
-        float lift = Math.Min(left.Rests + LiftEase * (left.Clear - lower), right.Rests + LiftEase * (right.Clear - lower));
-        var fitted = pose with { Hips = pose.HipHeight };
-        if (left.Rests > lift) {
-            var leg = Raised(new LegAngles(pose.SwingL, pose.KneeL, pose.FootL), left.Rests - lift);
-            fitted = fitted with { SwingL = leg.Swing, KneeL = leg.Knee, FootL = leg.Foot };
-        }
-        if (right.Rests > lift) {
-            var leg = Raised(new LegAngles(pose.SwingR, pose.KneeR, pose.FootR), right.Rests - lift);
-            fitted = fitted with { SwingR = leg.Swing, KneeR = leg.Knee, FootR = leg.Foot };
-        }
-        return (fitted, lift);
-    }
-
-    /// <summary>A leg with its ankle drawn <paramref name="by"/> metres straight up toward the hip, the boot keeping its angle to the ground.</summary>
-    private static LegAngles Raised(LegAngles leg, float by) {
-        var ankle = Ankle(leg.Swing, leg.Knee);
-        var (swing, knee) = LegTo(ankle.X, ankle.Y - by);
-        return new LegAngles(swing, knee, leg.Foot - leg.Swing + leg.Knee + swing - knee);
-    }
 
     // ---------- Walking ----------
 

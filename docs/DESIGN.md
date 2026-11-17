@@ -328,7 +328,7 @@ While it brakes, `PlayerState.Braking` is set and carried to other machines, and
 
 Digging (`ActorAction.Dig`) holds the shovel in both hands: the right on top of the handle and the left `ActorAnimation.ShovelGrip` down the shaft.
 `ActorAnimation.DigKeys` give where the blade's tip is and how the shaft leans at each moment: driven into the ground ahead, leant on, levered up and thrown aside to the left.
-Both arms are solved from there with `ActorAnimation.ArmTo`, and `ActorRig.Show` lays the shaft from the right fist through the left, so the blade goes where the keys take it.
+Both arms are solved from there with `ArmReach.ArmTo`, and `ActorRig.Show` lays the shaft from the right fist through the left, so the blade goes where the keys take it.
 The front boot stays flat and the back one on its toe at fixed spots, so neither slides as the hips go down and up.
 The handle is kept ahead of the right side of the chest and below the shoulders: at the middle of the chest the folded right arm would lie inside the torso, and higher it would be in front of the face.
 
@@ -343,7 +343,7 @@ The player working a station they stand near packs the same way.
 
 At a cooking table, which is only worked for the mortar's recipes and dough, the `Grind` action holds the mortar in hand (`ActorAnimation.StationAction`); kneading dough uses the `Pack` action, facing the table.
 The left fist holds the bowl out in front, and the right takes the pestle twice round the bowl's floor, then lifts it and pounds.
-Both arms are solved from where the hands have to be (`ActorAnimation.ArmTo`), so the pestle stays over the bowl.
+Both arms are solved from where the hands have to be (`ArmReach.ArmTo`), so the pestle stays over the bowl.
 `ActorRig` turns the bowl and pestle against their forearms in the resting pose (`ActorAnimation.GrindRest`), which keeps the bowl level and the pestle leaning toward its hand.
 While someone grinds, the table's own mortar is off the counter (`WorldView.grinding`).
 
@@ -516,12 +516,12 @@ Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin
   The wolf then lets go and bites no sooner than a second later; at half health or less it ends as the last tug lands (`DoorTug.Heave`) and it pins them, otherwise a tugged player steps in again at a run, and one tugged off the door stands free.
 - `Leaving` puts the player on the doorstep and takes `Doorways.LeaveSeconds`.
   Anyone knocking on that door goes `Aside` to `Doorways.AsideSpot`, a step along `Doorways.AsideWay`, and steps in once the leaver is through the doorway, in the order they came, while the leaver keeps `Doorways.MakeWay` to the other side; a player just standing at the door stays put, and the leaver ends `Doorways.ClearOf` beside them.
-  The view walks them in from there up the side of the step (`WorldView.Inward`), the two turning chest to chest with their arms hanging as they pass (`WorldView.SqueezePast`), the one going in with the right palm on the door frame (`WorldView.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
+  The view walks them in from there up the side of the step (`WorldView.Inward`), the two turning chest to chest with their arms hanging as they pass (`WorldView.SqueezePast`), the one going in with the right palm on the door frame (`ArmReach.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
 - A follower waits aside, out of the way, while the one ahead is tugged back out (`WorldView.Behind`).
 
 The view walks the player through the doorway over the stage (`WorldView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
-On the two treads of the step and the floor (`WorldView.StepEdges`) the body stands on the boot that bears its weight and the other knee bends to put its boot on its tread, a swinging boot rising ahead of each edge (`ActorAnimation.OnSteps`), so no boot sinks into the step.
-Every takedown falls the player backward onto their seat and back (`ActorAction.FallBack`, `WorldView.FallBack`, `ActorAnimation.FallPath`), facing the wolf after a leap; a leaping or pinning wolf puts its forepaws on the player's chest (`WorldView.PawsOnChest`), astride with its hind paws wide of the legs, while the player's hands push its head off by the jaw within reach, or by the neck when the jaw is too close, elbows out at the sides (`WolfModel.NeckLine`, `ActorAnimation.ArmTo` with an elbow direction and `ActorRig.RollArm`), and every other wolf feeding there stands perpendicular to the body at the part of it nearest to it where it touches neither another wolf nor the player's arms (`WorldView.FreeSpot`, `WolfModel.Volumes`), keeping that spot while it stays free.
+On the two treads of the step and the floor (`StairSteps.StepEdges`) the body stands on the boot that bears its weight and the other knee bends to put its boot on its tread, a swinging boot rising ahead of each edge (`StairSteps.OnSteps`), so no boot sinks into the step.
+Every takedown falls the player backward onto their seat and back (`ActorAction.FallBack`, `WorldView.FallBack`, `ActorAnimation.FallPath`), facing the wolf after a leap; a leaping or pinning wolf puts its forepaws on the player's chest (`WorldView.PawsOnChest`), astride with its hind paws wide of the legs, while the player's hands push its head off by the jaw within reach, or by the neck when the jaw is too close, elbows out at the sides (`WolfModel.NeckLine`, `ArmReach.ArmTo` with an elbow direction and `ActorRig.RollArm`), and every other wolf feeding there stands perpendicular to the body at the part of it nearest to it where it touches neither another wolf nor the player's arms (`WorldView.FreeSpot`, `WolfModel.Volumes`), keeping that spot while it stays free.
 A wounded player tugged out falls backward still facing the door, and the wolf lets go, steps round to their left (`Wolf.LungeFrom`) and lunges onto the throat from there as they land.
 A player knocking on the door stands on the lower tread, with the front boot on the upper one, and steps back down off it when done.
 The animation review's `player cabin` clip plays every stage at a cabin, `player jog back` and `player run back` a run braking and turning round, and `player jog turns` and `player run turns` the keys A, W, D and S pressed in quick turn.
