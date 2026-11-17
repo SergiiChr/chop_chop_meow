@@ -63,6 +63,7 @@ Play accepts Godot arguments after `--`:
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
+| `--no-paint-filter` | Turn the paint filter off for this run, whatever the stored choice |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -120,12 +121,15 @@ game, Load game, Join game, Options and Quit.
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
 
-Options holds a render resolution picker, a frame rate limit (off, 60 or 90 fps), an anti-aliasing picker, a fullscreen
-switch (off by default), a frame rate counter switch (on by default, shown under the clock) and a music volume slider.
+Options holds a render resolution picker, a frame rate limit (off, 60 or 90 fps), an anti-aliasing picker, a paint
+filter switch (on by default), a fullscreen switch (off by default), a frame rate counter switch (on by default, shown
+under the clock) and a music volume slider.
 Anti-aliasing is off, FSR Upscale, FSR Native (the default) or TAA; each FSR choice names the size it draws the world at.
 FSR Upscale renders the world at two thirds of the render size and upscales it with AMD FSR 2, which smooths edges too
 and costs less than full size; FSR Native smooths with FSR 2 at full size.
 The interface always draws at full size.
+The paint filter turns the drawn world into patches of paint, each pixel taking its colour from an area 9 render pixels
+across, while name tags and the interface stay sharp.
 The game renders at the picked size, 16:9 or 16:10 from 1280 × 720 to 3840 × 2400; the window opens at that size, or as
 large as the screen allows, and resizing it only stretches the image, with bars when the shapes differ.
 Fullscreen covers the whole screen with no window frame, still rendering at the picked size.
