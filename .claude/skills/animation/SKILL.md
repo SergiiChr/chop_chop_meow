@@ -33,12 +33,11 @@ A frame that fails sends the motion back for another pass, as many passes as it 
   bodies stand, and low from the side for heights.
   Two bodies that overlap in one view may still be apart; judge from a view where they would show apart.
 - Every frame must pass all of these:
-  - Nothing passes through anything: feet through steps or ground, bodies through walls or door frames, one character or
-    wolf through another, a limb through a body.
-  - Poses a body could hold: joints bend the way they bend and no further, no stiff limbs where a real one would give,
-    weight over what carries it.
-  - The right part makes contact: a palm on a door frame, not an elbow; jaws at the waist; a boot flat on its tread.
-  - Smooth motion: no jumps between frames; a reach starts early enough to arrive without a snap, and a release eases.
+  - Nothing clips through anything.
+  - Physiologically possible poses.
+  - The right part touches the target: feet touch the ground and steps, a palm touches the target described, a wolf's
+    jaws touch the bite target.
+  - Smooth motion: no jumps between frames; every animation is evenly filled with intermediate motion.
   - Each body acts on the other where that one is drawn: a leap lands on the player as shown, not on where the world
     keeps their place.
 - What can be measured, such as a sole's height over the tread under it or the gap between two bodies, is measured on
