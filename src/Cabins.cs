@@ -91,11 +91,12 @@ public sealed partial class World {
         // and the one stepping out keeps to the other side of the door, to pass them as they squeeze in.
         foreach (var other in S.Players.Where(o => o != S.Actor && Waiting(o, cabin)).OrderBy(o => o.DoorQueued).ToList()) {
             other.Door = Doorway.Aside; other.DoorCabin = cabin.Id; other.DoorTime = 0; other.DoorRush = false; other.DoorQueued = ++S.DoorArrivals;
+            other.Pos = AsideSpot(other); other.Warp++;
             Player = DoorPoint(cabin) - AsideWay * MakeWay;
         }
     }
     /// <summary>How far to the other side of a cabin's door point someone stepping out past a player standing aside keeps.</summary>
-    public const float MakeWay = .25f;
+    public const float MakeWay = .2f;
 
     /// <summary>Whether a player stepping out of a cabin is through its doorway, out in the open on the step.</summary>
     private static bool Through(PlayerState p) => p.DoorTime >= LeaveSeconds / 2;

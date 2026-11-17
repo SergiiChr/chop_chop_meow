@@ -119,6 +119,28 @@ public sealed partial class World {
         Calm(wolf); wolf.Mode = WolfMode.Home;
     }
     /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
+    /// <summary>How far a wolf's body reaches ahead of where it stands to its nose and back to its tail's root, and half its width, in metres.</summary>
+    public const float WolfNose = .76f, WolfTail = .5f, WolfHalfWidth = .18f;
+
+    /// <summary>Where a wolf's body runs from the root of its tail to its nose, facing <paramref name="facing"/>.</summary>
+    public static (Vector2 Tail, Vector2 Nose) Body(Wolf wolf, Vector2 facing) {
+        var ahead = facing == wolf.Pos ? Vector2.Right : (facing - wolf.Pos).Normalized();
+        return (wolf.Pos - ahead * WolfTail, wolf.Pos + ahead * WolfNose);
+    }
+
+    /// <summary>Whether a wolf holds its place at the player: dragging them, pinning them or in the air.</summary>
+    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Pinning || wolf.Leap > 0;
+
+    /// <summary>The nearest points to each other on two line segments, from <paramref name="a0"/> to <paramref name="a1"/> and <paramref name="b0"/> to <paramref name="b1"/>.</summary>
+    private static (Vector2 OnA, Vector2 OnB) Closest(Vector2 a0, Vector2 a1, Vector2 b0, Vector2 b1) {
+        Vector2 da = a1 - a0, db = b1 - b0, r = a0 - b0;
+        float aa = da.Dot(da), bb = db.Dot(db), ab = da.Dot(db), ar = da.Dot(r), br = db.Dot(r), denominator = aa * bb - ab * ab;
+        float s = denominator > 1e-8f ? Math.Clamp((ab * br - ar * bb) / denominator, 0, 1) : 0;
+        float t = Math.Clamp((ab * s + br) / bb, 0, 1);
+        s = Math.Clamp((ab * t - ar) / aa, 0, 1);
+        return (a0 + da * s, b0 + db * t);
+    }
+
     private static void Calm(Wolf wolf) {
         wolf.Target = 0; wolf.Howl = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
         wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.Beside = Vector2.Zero; wolf.Route.Clear();

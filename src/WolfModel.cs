@@ -65,6 +65,10 @@ public sealed class WolfModel {
     public Vector3 Held;
     /// <summary>Where a wolf that dragged its player out stood as it let go, to step round to their side from.</summary>
     public Vector3 StepFrom;
+    /// <summary>How far the wolf is drawn from its place in the world after letting go of a player it dragged; it closes as the wolf walks.</summary>
+    public Vector2 Drift;
+    /// <summary>Which way the wolf faced as it took hold of a player to drag them, to turn from as it lunges in.</summary>
+    public float FromYaw;
 
     /// <summary>How far ahead of its root a leaping wolf's jaws reach the throat of a standing player: the reach of the bite plus the throat's own depth.</summary>
     public const float ContactReach = .65f;

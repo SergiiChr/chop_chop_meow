@@ -80,6 +80,7 @@ public static class SimulationChecks {
         Test(CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth, data);
         Test(CheckAWolfClosingInStopsAtBitingDistanceRatherThanOnThePlayer, data);
         Test(CheckAWolfClosingInKeepsOffWhereAnotherDragsThePlayer, data);
+        Test(CheckTwoWolvesAtOnePlayerKeepTheirBodiesApart, data);
         Test(CheckWolfThatBitesAPlayerToDeathEatsTheirFood, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
         Test(CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst, data);
@@ -1318,6 +1319,19 @@ public static class SimulationChecks {
         Require(nearest > .8f, $"a wolf closing in should keep off where another wolf has dragged the player, not come {nearest:0.00} m from them");
     }
 
+    private static void CheckTwoWolvesAtOnePlayerKeepTheirBodiesApart(GameData data) {
+        var world = NightWorld(data);
+        // Both close in on the player's right side, nearly along the same line.
+        var first = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(3, 0), Attack = 5 });
+        var second = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(3.5f, .3f), Attack = 5 });
+        for (int i = 0; i < 60; i++) world.Tick(.05f);
+        var a = World.Body(first, world.Player); var b = World.Body(second, world.Player);
+        float gap = float.MaxValue;
+        // Sample points along each body, nose to tail.
+        for (int i = 0; i <= 20; i++) for (int j = 0; j <= 20; j++) gap = Math.Min(gap, a.Tail.Lerp(a.Nose, i / 20f).DistanceTo(b.Tail.Lerp(b.Nose, j / 20f)));
+        Require(gap >= 2 * World.WolfHalfWidth - .01f, $"two wolves at one player should keep their bodies apart, not come {gap:0.00} m from each other");
+    }
+
     private static void CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth(GameData data) {
         var maul = NightWorld(data);
         SetNeeds(maul, health: 49);
@@ -1679,8 +1693,8 @@ public static class SimulationChecks {
         var data = world.Data;
         var worker = world.Hire(sign, offer);
         Require(worker != null, "sale proceeds should fund a new worker");
-        // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning.
-        for (int i = 0; i < 4000 && !world.OnDuty(worker!); i++) { SafeTick(world, Step); SetNeeds(world, health: 100); }
+        // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning; the night's wolves are not what this checks.
+        for (int i = 0; i < 4000 && !world.OnDuty(worker!); i++) { SafeTick(world, Step); RemoveWolves(world, _ => true); }
         var chest = BuildAt(world, ThingKind.Chest, Site(37, 25));
         // A woodcutter takes an axe from a tool station, so the player racks theirs: a station is 8 planks and 4 stone.
         GatherUntil(world, tree, "wood", 2);
@@ -2942,6 +2956,7 @@ public static class SimulationChecks {
         world.Tick(.2f);
         world.Leave();
         Require(guest.Door == Doorway.Aside, $"a player banging on the door should step aside for someone stepping out, not {guest.Door}");
+        Require((guest.Pos - World.DoorPoint(hut)).Dot(World.AsideWay) > .5f, "a player stepping aside should stand to the side of the door");
         Require(world.Player.DistanceTo(World.DoorPoint(hut) - World.AsideWay * World.MakeWay) < .01f, "someone stepping out past a player standing aside should keep to the other side of the door");
         world.Tick(World.LeaveSeconds / 2 - .1f);
         Require(guest.Door == Doorway.Aside && world.Door == Doorway.Leaving, "a player standing aside should wait until the one stepping out is through the doorway");
