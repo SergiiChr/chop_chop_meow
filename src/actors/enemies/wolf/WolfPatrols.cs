@@ -4,29 +4,8 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Anything that walks the map on its own: it steps straight at where it is going, or follows a route around what blocks it.</summary>
-public interface IWalker {
-    Vector2 Pos { get; set; }
-    List<Vector2> Route { get; }
-    Vector2 RouteTarget { get; set; }
-    /// <summary>When a walker that found no way to its destination looks again.</summary>
-    float RouteRetry { get; set; }
-}
-
-/// <summary>A small cave at the foot of the mountains, <see cref="Face"/> pointing out into the valley; its wolves come out at dusk and go back in before dawn.</summary>
-public readonly record struct Den(Vector2 Mouth, Vector2 Face) {
-    /// <summary>The den is a mine outcrop at this size.</summary>
-    public const float Scale = .5f;
-    /// <summary>Open ground in front of the mouth, where the wolves come out and go back in.</summary>
-    public Vector2 Door => Mouth + Face * 1.5f;
-    /// <summary>Where a mine's cart would stand: a mine's tunnel opens 2.2 m in from it, so at half size the den's opens at <see cref="Mouth"/>.</summary>
-    public Vector2 Spot => Mouth + Face * 1.1f;
-    /// <summary>How far from the door nothing may be built, so the wolves always have a way out.</summary>
-    public const float Clearance = 4;
-}
-
-/// <summary>Wolves at night: they come out of the dens from dusk and patrol until one smells a player, howls and goes after them, and before dawn they all go home.</summary>
-public sealed partial class World {
+/// <summary>Wolves at night in <paramref name="world"/>: they come out of the dens from dusk and patrol until one smells a player, howls and goes after them, and before dawn they all go home.</summary>
+public sealed class WolfPatrols(World world) {
     /// <summary>The dens along the valley from its inland end, each dug into the range on one side.</summary>
     public static readonly Den[] Dens = { FootDen(17, 1), FootDen(56, -1), FootDen(92, 1), FootDen(166, -1), FootDen(211, 1) };
     private static Den FootDen(float along, int side) => new(Terrain.Point(along, side * (Terrain.HalfWidth(along, side) - 1)), Terrain.Sideways * -side);
@@ -35,13 +14,11 @@ public sealed partial class World {
         foreach (var den in Dens) if (den.Door.DistanceTo(p) < nearest.Door.DistanceTo(p)) nearest = den;
         return nearest;
     }
-    /// <summary>How far the player a wolf runs at may move before it looks for a new way around what blocks it.</summary>
-    private const float RouteSlack = 2;
     private readonly Random wolfRandom = new(1913);
     /// <summary>A wolf hunting nobody walks its patrol at this share of its trot.</summary>
     private const float PatrolPace = .5f;
     /// <summary>From an hour before dawn every wolf gives up and heads back to the nearest den.</summary>
-    public bool WolvesRetreat => DayPhase >= Data.WolfRetreatStarts;
+    public bool WolvesRetreat => world.DayPhase >= world.Data.WolfRetreatStarts;
 
     /// <summary>Seconds after dusk between one den opening and the next, so their wolves do not all appear on the same frame.</summary>
     public const float DenGapSeconds = 2;
@@ -54,44 +31,50 @@ public sealed partial class World {
     /// Lets each den's wolves out in turn at dusk once nobody can see its door, then one more from a den picked at random every hour,
     /// and moves every wolf that hunts nobody.
     /// </summary>
-    private void TickDens(float dt) {
-        float sinceDusk = (DayPhase - Data.DuskStarts) * Data.DaySeconds;
+    internal void TickDens(float dt) {
+        var (s, data) = (world.S, world.Data);
+        float sinceDusk = (world.DayPhase - data.DuskStarts) * data.DaySeconds;
         if (!WolvesRetreat) {
             for (int i = 0; i < Dens.Length; i++) {
-                if ((S.DensOut & 1 << i) != 0 || sinceDusk < i * DenGapSeconds || !Unseen(Dens[i].Door)) continue;
-                S.DensOut |= 1 << i;
+                if ((s.DensOut & 1 << i) != 0 || sinceDusk < i * DenGapSeconds || !Unseen(Dens[i].Door)) continue;
+                s.DensOut |= 1 << i;
                 // Each wolf of a den sets off its own way.
                 float heading = (float)wolfRandom.NextDouble() * MathF.Tau;
-                for (int n = 0; n < Data.WolvesPerDen; n++) LetOut(Dens[i], heading + n * MathF.Tau / Data.WolvesPerDen);
+                for (int n = 0; n < data.WolvesPerDen; n++) LetOut(Dens[i], heading + n * MathF.Tau / data.WolvesPerDen);
             }
-            int hours = (int)(sinceDusk / Data.HourSeconds);
-            if (S.DenHours < hours && RandomUnseenDen() is Den den) { S.DenHours = hours; LetOut(den, (float)wolfRandom.NextDouble() * MathF.Tau); }
+            int hours = (int)(sinceDusk / data.HourSeconds);
+            if (s.DenHours < hours && RandomUnseenDen() is Den den) { s.DenHours = hours; LetOut(den, (float)wolfRandom.NextDouble() * MathF.Tau); }
         }
-        for (int i = S.Wolves.Count - 1; i >= 0; i--) {
-            var wolf = S.Wolves[i];
+        for (int i = s.Wolves.Count - 1; i >= 0; i--) {
+            var wolf = s.Wolves[i];
             if (WolvesRetreat && wolf.Mode != WolfMode.Home) GoHome(wolf);
             if (wolf.Target != 0) continue;
-            if (wolf.Visit != WolfVisit.None) { DoorVisits.Tick(wolf, dt); continue; }
-            float step = dt * Data.WolfTrot;
+            if (wolf.Visit != WolfVisit.None) { world.DoorVisits.Tick(wolf, dt); continue; }
+            float step = dt * data.WolfTrot;
             switch (wolf.Mode) {
                 case WolfMode.Patrol:
                     Wander(wolf, step * PatrolPace);
-                    if (!Smell(wolf, Data.SmellRadius)) DoorVisits.Smell(wolf);
+                    if (!Smell(wolf, data.SmellRadius)) world.DoorVisits.Smell(wolf);
                     break;
                 case WolfMode.Called:
                     // A called wolf still noses the air on the way, so it does not run past a player or a cabin with someone inside.
-                    if (!Travel(wolf, wolf.Call, step, step) || wolf.Pos.DistanceTo(wolf.Call) < 2) Patrol(wolf, wolf.Heading);
-                    if (!Smell(wolf, Data.SmellRadius)) DoorVisits.Smell(wolf);
+                    if (!world.Travel(wolf, wolf.Call, step, step) || wolf.Pos.DistanceTo(wolf.Call) < 2) Patrol(wolf, wolf.Heading);
+                    if (!Smell(wolf, data.SmellRadius)) world.DoorVisits.Smell(wolf);
                     break;
                 case WolfMode.Home:
                     var door = NearestDen(wolf.Pos).Door;
-                    Travel(wolf, door, step, step);
-                    if (wolf.Pos.DistanceTo(door) < 1) S.Wolves.RemoveAt(i);
+                    world.Travel(wolf, door, step, step);
+                    if (wolf.Pos.DistanceTo(door) < 1) s.Wolves.RemoveAt(i);
                     break;
             }
         }
     }
-    private void LetOut(Den den, float heading) => S.Wolves.Add(new Wolf { Pos = den.Door, Health = Data.WolfHealth, Heading = heading });
+    private void LetOut(Den den, float heading) => world.S.Wolves.Add(new Wolf { Pos = den.Door, Health = world.Data.WolfHealth, Heading = heading });
+    /// <summary>Whether no player can see a spot.</summary>
+    private bool Unseen(Vector2 p) {
+        foreach (var player in world.S.Players) if (player.Pos.DistanceTo(p) <= world.Data.SightRadius) return false;
+        return true;
+    }
     /// <summary>One of the dens whose door no player sees, each as likely as the next, or null when every door is watched.</summary>
     private Den? RandomUnseenDen() {
         Den? pick = null; int unseen = 0;
@@ -103,7 +86,7 @@ public sealed partial class World {
     /// A wolf already in firelight, such as one let out of a den beside a camp, may walk on to get out of it.
     /// </summary>
     private void Wander(Wolf wolf, float step) {
-        bool lit = Protected(wolf.Pos);
+        bool lit = world.Protected(wolf.Pos);
         var ahead = wolf.Pos + Vector2.Right.Rotated(wolf.Heading) * step;
         for (int tries = 0; !Roams(ahead, lit) && tries < 12; tries++) {
             wolf.Heading = (float)wolfRandom.NextDouble() * MathF.Tau;
@@ -111,7 +94,7 @@ public sealed partial class World {
         }
         if (Roams(ahead, lit)) wolf.Pos = ahead;
     }
-    private bool Roams(Vector2 p, bool lit) => CanStand(p) && (lit || !Protected(p));
+    private bool Roams(Vector2 p, bool lit) => world.CanStand(p) && (lit || !world.Protected(p));
     /// <summary>Sends a wolf back to patrolling on a heading, hunting nobody.</summary>
     internal static void Patrol(Wolf wolf, float heading) {
         Calm(wolf); wolf.Mode = WolfMode.Patrol; wolf.Heading = heading;
@@ -132,20 +115,21 @@ public sealed partial class World {
     /// One that finds them out of its sight howls before it goes after them, which calls every patrolling wolf within <see cref="GameData.HowlRadius"/> to where it stands.
     /// </summary>
     internal bool Smell(Wolf wolf, float within) {
+        var (s, data) = (world.S, world.Data);
         PlayerState? prey = null;
-        foreach (var p in S.Players)
+        foreach (var p in s.Players)
             if (p.RespawnIn <= 0 && !Doorways.Indoors(p) && p.Pos.DistanceTo(wolf.Pos) <= within && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
         if (prey == null) return false;
         Patrol(wolf, wolf.Heading);
-        if (prey.Pos.DistanceTo(wolf.Pos) <= Data.WolfSightRange) { wolf.Target = prey.Id; return true; }
+        if (prey.Pos.DistanceTo(wolf.Pos) <= data.WolfSightRange) { wolf.Target = prey.Id; return true; }
         // The night's first howl is a lone wolf; every later one sounds like the pack answering.
         // The wolf holds its howl as long as the recording plays.
-        bool answer = S.Howled;
-        wolf.Target = prey.Id; wolf.Howl = wolf.HowlLength = answer ? Data.PackHowlSeconds : Data.LoneHowlSeconds;
-        Play(answer ? "wolf_howl_group" : "wolf_howl", wolf.Pos);
-        S.Howled = true;
-        foreach (var other in S.Wolves)
-            if (other.Target == 0 && other.Mode != WolfMode.Home && other.Pos.DistanceTo(wolf.Pos) <= Data.HowlRadius) { other.Mode = WolfMode.Called; other.Call = wolf.Pos; other.Route.Clear(); }
+        bool answer = s.Howled;
+        wolf.Target = prey.Id; wolf.Howl = wolf.HowlLength = answer ? data.PackHowlSeconds : data.LoneHowlSeconds;
+        world.Play(answer ? "wolf_howl_group" : "wolf_howl", wolf.Pos);
+        s.Howled = true;
+        foreach (var other in s.Wolves)
+            if (other.Target == 0 && other.Mode != WolfMode.Home && other.Pos.DistanceTo(wolf.Pos) <= data.HowlRadius) { other.Mode = WolfMode.Called; other.Call = wolf.Pos; other.Route.Clear(); }
         return true;
     }
 }

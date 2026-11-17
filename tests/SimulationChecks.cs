@@ -2584,10 +2584,10 @@ public static class SimulationChecks {
         SafeTick(world, .9f);
         Require(world.Wolves.Count == 0, "no wolf should come out before dusk");
         SafeTick(world, 1);
-        Require(world.Wolves.Count == 1 && world.Wolves.All(w => w.Pos.DistanceTo(World.Dens[0].Door) < 4),
+        Require(world.Wolves.Count == 1 && world.Wolves.All(w => w.Pos.DistanceTo(WolfPatrols.Dens[0].Door) < 4),
                 "the first den should let its one wolf out as soon as dusk starts, and the others in turn after it");
-        SafeTick(world, World.Dens.Length * World.DenGapSeconds);
-        Require(!world.Night && world.Wolves.Count == World.Dens.Length, "every den should have let its one wolf out well before night");
+        SafeTick(world, WolfPatrols.Dens.Length * WolfPatrols.DenGapSeconds);
+        Require(!world.Night && world.Wolves.Count == WolfPatrols.Dens.Length, "every den should have let its one wolf out well before night");
         Require(world.Wolves.All(w => w.Target == 0 && w.Mode == WolfMode.Patrol), "wolves out of their dens should patrol until they smell someone");
     }
 
@@ -2598,15 +2598,15 @@ public static class SimulationChecks {
         world.Doorways.TurnKey();
         RunUntilDusk(world);
         SafeTick(world, data.HourSeconds - 1);
-        Require(world.Wolves.Count == World.Dens.Length, "only the wolves of dusk should be out through the first hour");
+        Require(world.Wolves.Count == WolfPatrols.Dens.Length, "only the wolves of dusk should be out through the first hour");
         SafeTick(world, 2);
-        Require(world.Wolves.Count == World.Dens.Length + 1 && World.Dens.Any(den => world.Wolves[^1].Pos.DistanceTo(den.Door) < 4),
+        Require(world.Wolves.Count == WolfPatrols.Dens.Length + 1 && WolfPatrols.Dens.Any(den => world.Wolves[^1].Pos.DistanceTo(den.Door) < 4),
                 "one den should let one more wolf out an hour after dusk");
         SafeTick(world, data.HourSeconds);
-        Require(world.Wolves.Count == World.Dens.Length + 2, "a den should let one more wolf out after each further hour");
+        Require(world.Wolves.Count == WolfPatrols.Dens.Length + 2, "a den should let one more wolf out after each further hour");
         // From dusk at 20:24 to the retreat at 05:00 eight whole hours pass.
         SafeTick(world, data.WolfRetreatStarts * data.DaySeconds - world.Time - 1);
-        Require(world.Wolves.Count == World.Dens.Length + 8, $"a night should let out one wolf an hour until the retreat, not {world.Wolves.Count - World.Dens.Length}");
+        Require(world.Wolves.Count == WolfPatrols.Dens.Length + 8, $"a night should let out one wolf an hour until the retreat, not {world.Wolves.Count - WolfPatrols.Dens.Length}");
     }
 
     private static void CheckWolvesAreNoStrongerOnLaterNights(GameData data) {
@@ -2695,7 +2695,7 @@ public static class SimulationChecks {
 
     private static void CheckDensStayOpen(GameData data) {
         var world = new World(data);
-        foreach (var den in World.Dens) {
+        foreach (var den in WolfPatrols.Dens) {
             Require(world.CanStand(den.Door) && !world.CanStand(den.Mouth - den.Face * .5f), "a den's rock should be solid and the ground at its door open");
             world.Player = den.Door + den.Face * 3;
             Require(world.PlacementBlock(ThingKind.Hut, den.Door + den.Face * 2) != null, "nothing should be built over a den's mouth");

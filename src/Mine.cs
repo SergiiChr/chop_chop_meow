@@ -28,7 +28,7 @@ public sealed partial class World {
     private static bool InSpur(Vector2 p, float margin = 0) {
         foreach (var c in Cliffs) if (InOutcrop(p - MineSpot(c), c.Face, margin)) return true;
         // A den is the same outcrop at a smaller size.
-        foreach (var den in Dens) if (InOutcrop((p - den.Spot) / Den.Scale, den.Face, margin / Den.Scale)) return true;
+        foreach (var den in WolfPatrols.Dens) if (InOutcrop((p - den.Spot) / Den.Scale, den.Face, margin / Den.Scale)) return true;
         return false;
     }
     /// <summary>Whether a point <paramref name="offset"/> from a mine's spot lies within its outcrop, which faces <paramref name="face"/>.</summary>

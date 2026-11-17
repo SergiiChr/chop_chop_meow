@@ -100,7 +100,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 
 ### Buildings and stations
 
-- `src/CabinShape.cs` — the cabin's shared sloped wall shell with door and window openings, its continuous corrugated roof, and a simple interior. The interior has contrasting wall lining, a wooden floor and a sleeping platform, visible through the open doorway.
+- `src/cabins/display/CabinShape.cs` and `src/cabins/display/CabinModel.cs` — the cabin's shared sloped wall shell with door and window openings, its continuous corrugated roof, and a simple interior. The interior has contrasting wall lining, a wooden floor and a sleeping platform, visible through the open doorway.
 - `src/FurnaceShape.cs` — shared bevelled block faces, a recessed firebox, a shaped steel coping plate and a coal pile of irregular broken slabs with broad fracture faces. The furnace's outdoor `StockPile` shows its selected stocked fuel, a piece for each one up to a small heap, and disappears when that slot is empty.
 - `src/ForgeShape.cs` — the reinforced forge's continuous rounded tank shell, fitted steel bands, recessed refractory chamber and continuous teardrop bellows boards. Its shared meshes keep separate animated bellows pivots and heat glow.
 - `src/AnvilShape.cs` — the anvil's shared cast body with a curved waist, bevelled working face and swept horn.

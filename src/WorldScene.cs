@@ -21,7 +21,7 @@ public partial class WorldView {
         ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
         LakeDressing.Build(parent, EnvironmentReview);
         foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
-        foreach (var den in World.Dens) BuildDen(parent, den);
+        foreach (var den in WolfPatrols.Dens) BuildDen(parent, den);
         BuildPlacedEnvironment(parent);
     }
 

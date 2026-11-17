@@ -34,7 +34,7 @@ public partial class InsideSet : SubViewport {
 
     public InsideSet() {
         Size = new Vector2I(Height * 4 / 9, Height); OwnWorld3D = true; RenderTargetUpdateMode = UpdateMode.Once;
-        cabin = WorldModels.Cabin(); AddChild(cabin.Root);
+        cabin = CabinModel.Build(); AddChild(cabin.Root);
         // Bare ground outside the door, so the night out there is not a void.
         var ground = new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(60, 60) }, MaterialOverride = Mat("20251d", 1) }; AddChild(ground);
         AddChild(stage);

@@ -34,7 +34,7 @@ public sealed partial class DoorwayReview : Node {
         // Wolves come out at dusk, while there is still light to see them by.
         World.S.Time = World.Data.DaySeconds * (night ? World.Data.DuskStarts + .02f : .3f);
         // Only the scene's own wolf comes: every den stays shut tonight.
-        World.S.Wolves.Clear(); World.S.DensOut = (1 << World.Dens.Length) - 1; World.S.DenHours = 24;
+        World.S.Wolves.Clear(); World.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; World.S.DenHours = 24;
         // No crew walks through the scene.
         foreach (var w in World.Workers) World.Assign(w, null);
         World.S.Workers.Clear();

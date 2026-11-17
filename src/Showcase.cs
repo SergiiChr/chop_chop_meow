@@ -52,7 +52,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
                 "coast" => coastCenter - Terrain.Seaward * 3,
                 "mine" => World.MineSpot(reviewCliff) + reviewCliff.Face,
                 "terrain" => Terrain.Point(125, -18),
-                "den" => World.Dens[3].Door + World.Dens[3].Face * 2.5f,
+                "den" => WolfPatrols.Dens[3].Door + WolfPatrols.Dens[3].Face * 2.5f,
                 _ => Terrain.Spawn,
             };
             world.S.Time = world.Data.DaySeconds * .2f;

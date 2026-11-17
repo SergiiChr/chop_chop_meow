@@ -136,7 +136,7 @@ public sealed class DoorTug(World world) {
         var p = world.S.Actor;
         world.Player = TuggedTo; p.Warp++;
         if (takedown != null) {
-            world.Pin(takedown, world.Hunters.Skip(1).Any(), -Doorways.OutOfDoor.Orthogonal());
+            world.WolfHunt.Pin(takedown, world.Hunters.Skip(1).Any(), -Doorways.OutOfDoor.Orthogonal());
             p.Door = Doorway.None;
         } else if (p.Door == Doorway.Tugged) world.Doorways.StepIn(p.DoorCabin, true);
         else p.Door = Doorway.None;

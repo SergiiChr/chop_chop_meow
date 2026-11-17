@@ -79,7 +79,7 @@ public sealed class DoorVisits(World world) {
     }
 
     private static void Start(Wolf wolf, Thing cabin) {
-        World.Patrol(wolf, wolf.Heading);
+        WolfPatrols.Patrol(wolf, wolf.Heading);
         wolf.Visit = WolfVisit.Coming; wolf.VisitCabin = cabin.Id;
     }
 
@@ -114,7 +114,7 @@ public sealed class DoorVisits(World world) {
         if (world.Find(wolf.VisitCabin) is not { Kind: ThingKind.Hut } cabin || !Occupied(cabin.Id) || world.Protected(Doorways.DoorPoint(cabin)) || wolf.Stagger > 0) { End(wolf); return; }
         var door = Doorways.DoorPoint(cabin);
         // Until its snout is in the door, a wolf turns to a player out in the open within its sight.
-        if (wolf.Visit <= WolfVisit.Scratching && world.Smell(wolf, world.Data.WolfSightRange)) return;
+        if (wolf.Visit <= WolfVisit.Scratching && world.WolfPatrols.Smell(wolf, world.Data.WolfSightRange)) return;
         float before = wolf.VisitTime, step = dt * world.Data.WolfTrot;
         switch (wolf.Visit) {
             case WolfVisit.Coming:
@@ -140,14 +140,14 @@ public sealed class DoorVisits(World world) {
     }
 
     /// <summary>Ends a wolf's visit to a door: it goes back to patrolling, the way it was heading.</summary>
-    private static void End(Wolf wolf) => World.Patrol(wolf, wolf.Heading);
+    private static void End(Wolf wolf) => WolfPatrols.Patrol(wolf, wolf.Heading);
 
     /// <summary>Sends every wolf at a locked cabin's door away from it; each leaves that cabin alone until it has been out of smell range of it.</summary>
     private void GoAway(Thing cabin) {
         foreach (var w in world.S.Wolves) {
             if (w.Visit == WolfVisit.None || w.VisitCabin != cabin.Id) continue;
             var away = w.Pos - cabin.Pos;
-            World.Patrol(w, (away == Vector2.Zero ? Doorways.OutOfDoor : away).Angle());
+            WolfPatrols.Patrol(w, (away == Vector2.Zero ? Doorways.OutOfDoor : away).Angle());
             w.Tried = cabin.Id;
         }
     }
@@ -169,7 +169,7 @@ public sealed class DoorVisits(World world) {
         }
         foreach (var w in world.S.Wolves) {
             if (w.Visit == WolfVisit.None || w.VisitCabin != cabin.Id) continue;
-            World.Patrol(w, w.Heading);
+            WolfPatrols.Patrol(w, w.Heading);
             w.Target = victim.Id;
         }
         wolf.Visit = WolfVisit.TakingOut; wolf.VisitCabin = cabin.Id; wolf.Tugging = true; wolf.Attack = 1;
