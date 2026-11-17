@@ -19,6 +19,8 @@ public enum Doorway {
     PulledOff,
     /// <summary>Stepping out through the door, out in the open for the second half.</summary>
     Leaving,
+    /// <summary>Standing aside from the door for someone stepping out, to step in once they are out.</summary>
+    Aside,
 }
 
 /// <summary>
@@ -85,7 +87,43 @@ public sealed partial class World {
         if (Find(S.Sheltered) is not Thing cabin || S.Actor.Door != Doorway.None || Forwarded(Verb.Leave)) return;
         S.Sheltered = 0; Player = DoorPoint(cabin); S.Actor.Warp++;
         Stage(Doorway.Leaving, cabin.Id);
+        // Whoever waits at the door, banging on it or standing there, steps aside to let them out, keeping the order they came in,
+        // and the one stepping out keeps to the other side of the door, to pass them as they squeeze in.
+        foreach (var other in S.Players.Where(o => o != S.Actor && Waiting(o, cabin)).OrderBy(o => o.DoorQueued).ToList()) {
+            other.Door = Doorway.Aside; other.DoorCabin = cabin.Id; other.DoorTime = 0; other.DoorRush = false; other.DoorQueued = ++S.DoorArrivals;
+            Player = DoorPoint(cabin) - AsideWay * MakeWay;
+        }
     }
+    /// <summary>How far to the other side of a cabin's door point someone stepping out past a player standing aside keeps.</summary>
+    public const float MakeWay = .25f;
+
+    /// <summary>Whether a player stepping out of a cabin is through its doorway, out in the open on the step.</summary>
+    private static bool Through(PlayerState p) => p.DoorTime >= LeaveSeconds / 2;
+
+    /// <summary>Whether someone in the doorway on their way out of the cabin a player stands aside at, or standing aside there before them, still keeps them from stepping in.</summary>
+    private bool Blocked(PlayerState aside) {
+        foreach (var o in S.Players)
+            if (o.DoorCabin == aside.DoorCabin && (o.Door == Doorway.Leaving && !Through(o) || o.Door == Doorway.Aside && o.DoorQueued < aside.DoorQueued)) return true;
+        return false;
+    }
+
+    /// <summary>Whether a player waits at a cabin's door: banging on it, or standing free within reach of it.</summary>
+    private static bool Waiting(PlayerState p, Thing cabin) =>
+        p.Sheltered == 0 && !p.Mauled && p.RespawnIn <= 0
+        && (p.Door == Doorway.Knocking && p.DoorCabin == cabin.Id || p.Door == Doorway.None && p.Pos.DistanceTo(DoorPoint(cabin)) <= DoorReach);
+
+    /// <summary>
+    /// Where a player standing aside at a cabin's door stands: a step to the right of the door point, away from the door as it
+    /// swings open, a further step out for each player who stood aside before them.
+    /// </summary>
+    public Vector2 AsideSpot(PlayerState p) {
+        int before = S.Players.Count(o => o != p && o.Door == Doorway.Aside && o.DoorCabin == p.DoorCabin && o.DoorQueued < p.DoorQueued);
+        return DoorPoint(Find(p.DoorCabin) ?? new Thing()) + AsideWay * (AsideStep + AsideGap * before);
+    }
+    /// <summary>The way players at a cabin's door step aside: to their right as they face the door.</summary>
+    public static readonly Vector2 AsideWay = OutOfDoor.Orthogonal();
+    /// <summary>How far to the side of a cabin's door point the first player standing aside stands, and how far apart the next ones stand.</summary>
+    public const float AsideStep = .7f, AsideGap = .6f;
 
     /// <summary>
     /// The way to walk from <paramref name="from"/> to a cabin's door: straight there when the cabin is not in the way, else
@@ -123,9 +161,10 @@ public sealed partial class World {
         var door = Doorway.Entering;
         foreach (var p in S.Players) {
             if (p == arriving) continue;
-            if (p.Sheltered == cabin || p.DoorCabin == cabin && p.Door == Doorway.Leaving) return Doorway.Knocking;
-            // Someone dragged back out stays ahead only if they came to the door first.
-            if (p.DoorCabin == cabin && (p.Door == Doorway.Entering || p.Door == Doorway.Pulled && p.DoorQueued < arriving.DoorQueued)) door = Doorway.Following;
+            // Someone still in the doorway on their way out keeps the door; once they are through it, the next one squeezes past them in.
+            if (p.Sheltered == cabin || p.DoorCabin == cabin && p.Door == Doorway.Leaving && !Through(p)) return Doorway.Knocking;
+            // Someone dragged back out, or standing aside for someone stepping out, stays ahead only if they came to the door first.
+            if (p.DoorCabin == cabin && (p.Door == Doorway.Entering || p.Door is Doorway.Pulled or Doorway.Aside && p.DoorQueued < arriving.DoorQueued)) door = Doorway.Following;
         }
         return door;
     }
@@ -201,6 +240,10 @@ public sealed partial class World {
                 break;
             case Doorway.Leaving when done:
                 p.Door = Doorway.None;
+                break;
+            case Doorway.Aside:
+                // Once the one stepping out is through the doorway, whoever stood aside first squeezes past them in.
+                if (!Blocked(p)) StepIn(p.DoorCabin, false);
                 break;
         }
     }

@@ -504,11 +504,12 @@ What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed b
   The world moves the player there when the drag ends; meanwhile the wolf stands `World.TugReach` behind them and no other wolf leaps.
   The wolf then lets go and bites no sooner than a second later; at half health or less it pins them, otherwise a pulled player steps in again at a run, and one pulled off the door stands free.
 - `Leaving` puts the player on the doorstep and takes `World.LeaveSeconds`.
+  Anyone waiting at that door, banging on it or standing free within `World.DoorReach`, goes `Aside` to `World.AsideSpot`, a step along `World.AsideWay`, and steps in once the leaver is out, in the order they came; the view walks them in from there round the front of the step (`WorldView.Inward`).
 
 The view walks the player through the doorway over the stage (`WorldView.AtDoor`), hurrying from the second tread, and drags a pulled one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
 On the two treads of the step and the floor (`WorldView.StepEdges`) the body stands on the boot that bears its weight and the other knee bends to put its boot on its tread, a swinging boot rising ahead of each edge (`ActorAnimation.StepLift`, `ActorAnimation.OnSteps`), so no boot sinks into the step.
 A wounded player dragged out falls backward still facing the door (`ActorAction.FallBack`, `WorldView.FallBack`), and the wolf lets go, steps round to their left (`Wolf.Beside`) and lunges onto the throat from there as they land.
-A player banging on the door stands on the lower tread.
+A player banging on the door stands on the lower tread, with the front boot on the upper one, and steps back down off it when done.
 The animation review's `player cabin` clip plays every stage at a cabin, `player jog back` and `player run back` a run braking and turning round, and `player jog turns` and `player run turns` the keys A, W, D and S pressed in quick turn.
 The door opens while someone steps in or out: it swings with `hut_door_normal` after a walk, and slams shut with `hut_door_escaping` after a run.
 

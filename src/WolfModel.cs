@@ -254,8 +254,8 @@ public sealed class WolfModel {
     }
 
     /// <summary>
-    /// Dragging a player back by the waist like a dog at tug of war, low on bent hind legs with the forelegs braced wide and
-    /// far out ahead. Each tug it throws its weight back: the forelegs straighten and push against the ground, the chest
+    /// Dragging a player back by the waist like a dog at tug of war, low on bent hind legs with the forelegs braced wide
+    /// either side of the player's feet. Each tug it throws its weight back: the forelegs straighten and push against the ground, the chest
     /// rears and the head wrenches to one side, the next tug to the other, while its paws stay where they stand until the
     /// forepaws hop back at the end of the heave; between tugs the hind paws step back after it and it shakes its head.
     /// <paramref name="progress"/> runs 0 to 1 over the drag, timed as <see cref="World.Dragged"/> moves the player and the
@@ -276,7 +276,8 @@ public sealed class WolfModel {
             // The forepaws hop back to where they started once the heave has pulled the player most of the way; each hind paw steps back after it in turn.
             float leaves = hind ? leg == 2 ? .45f : .65f : HopFrom, lands = hind ? leaves + .2f : HopTo;
             float back = Mathf.SmoothStep(leaves, lands, u), lift = (hind ? .04f : .06f) * MathF.Sin(MathF.PI * Math.Clamp((u - leaves) / (lands - leaves), 0, 1));
-            var at = new Vector3(WolfShape.Pivot(leg).X * (hind ? 1.25f : 1.75f), WolfShape.Sole + lift, Home(leg) + (hind ? -.08f : .18f) + pulled * (1 - back)) + (drift with { Y = 0 });
+            // The forepaws straddle the player's feet, which step back between them.
+            var at = new Vector3(WolfShape.Pivot(leg).X * (hind ? 1.3f : 3.2f), WolfShape.Sole + lift, Home(leg) + (hind ? -.08f : .05f) + pulled * (1 - back)) + (drift with { Y = 0 });
             // Braced forelegs slant forward, straighter as they push.
             body = body.WithLeg(leg, Reach(body, leg, at, hind ? 6 : 24 - 10 * heave, hind ? 0 : -12));
         }
@@ -288,9 +289,9 @@ public sealed class WolfModel {
 
     /// <summary>A tugging wolf's body: <paramref name="heave"/> 0 to 1 through a tug, wrenching toward <paramref name="side"/>, and its head shaking.</summary>
     private static WolfPose Tugging(float heave, float side, float shake) =>
-        new(Lift: -.07f - .07f * heave, Pitch: -6 - 12 * heave, Roll: 5 * side * heave, Surge: -.06f * heave, Flex: 8 + 10 * heave, Bend: 10 * side * heave,
-            Neck: 8 - 16 * heave, Head: 6 + 6 * heave, HeadTurn: 16 * side * heave + 12 * shake, HeadTilt: 12 * side * heave + 10 * shake, Jaw: 10, Ears: -18 - 8 * heave,
-            Tail: -40 + 14 * heave, Wag: 6 * shake - 10 * side * heave, Curl: 4);
+        new(Lift: -.06f - .1f * heave, Pitch: -4 - 16 * heave, Roll: 7 * side * heave, Surge: -.1f * heave, Flex: 8 + 12 * heave, Bend: 14 * side * heave,
+            Neck: 8 - 18 * heave, Head: 6 + 8 * heave, HeadTurn: 22 * side * heave + 12 * shake, HeadTilt: 14 * side * heave + 10 * shake, Jaw: 10, Ears: -18 - 8 * heave,
+            Tail: -28 + 12 * heave, Wag: 6 * shake - 12 * side * heave, Curl: 6);
 
     /// <summary>
     /// Struck: the head snaps away from the blow and the wolf hops back off its forelegs, lands hind paws first and ducks low with its ears flat and tail tucked, then rises wary.

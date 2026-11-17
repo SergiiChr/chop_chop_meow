@@ -63,7 +63,7 @@ Play accepts Godot arguments after `--`:
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
-| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and bangs), `occupied` (one bangs while the other is inside, who then steps out), `wolf` (wolves drag each out of the doorway at dusk) or `wounded` (a badly hurt player dragged out and pinned); `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
+| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and bangs), `occupied` (one bangs while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves drag each out of the doorway at dusk) or `wounded` (a badly hurt player dragged out and pinned); `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -826,6 +826,7 @@ No other wolf takes you down while one drags you.
 
 Wolves cannot smell you inside: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
 Stepping out takes about 1.5 seconds, and wolves can reach you for its second half, once you are out of the doorway.
+Anyone banging on the door or standing at it steps aside to their right to let you out, then goes in once you are out, in the order they came.
 
 A cabin holds one player.
 Someone who walks up behind a player stepping in follows them; once that player is in, they wait for the door to swing shut, step up to it, bang on it three times and stand free.

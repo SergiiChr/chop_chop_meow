@@ -97,6 +97,7 @@ public static class SimulationChecks {
         Test(CheckWolvesCannotReachAPlayerHalfWayIn, data);
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
         Test(CheckACabinHoldsOnePlayerAndTheNextBangsOnTheDoor, data);
+        Test(CheckAPlayerBangingOnACabinDoorStepsAsideForOneComingOutThenGoesIn, data);
         Test(CheckAPlayerRespawnsInTheNearestFreeCabin, data);
         Test(CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl, data);
         Test(CheckSprintOutrunsWolf, data);
@@ -2902,6 +2903,23 @@ public static class SimulationChecks {
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         world.Tick(.3f);
         Require(world.Health < 100 && world.Door == Doorway.Leaving, "a wolf should bite a player in the second half of stepping out, who walks on out");
+    }
+
+    private static void CheckAPlayerBangingOnACabinDoorStepsAsideForOneComingOutThenGoesIn(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        StepInside(world, hut);
+        world.As(guest, () => { world.Player = World.DoorPoint(hut); Require(world.Enter(hut, false) && guest.Door == Doorway.Knocking, "a player at the door of a cabin someone is in should bang on it"); });
+        world.Tick(.2f);
+        world.Leave();
+        Require(guest.Door == Doorway.Aside, $"a player banging on the door should step aside for someone stepping out, not {guest.Door}");
+        Require(world.Player.DistanceTo(World.DoorPoint(hut) - World.AsideWay * World.MakeWay) < .01f, "someone stepping out past a player standing aside should keep to the other side of the door");
+        world.Tick(World.LeaveSeconds / 2 - .1f);
+        Require(guest.Door == Doorway.Aside && world.Door == Doorway.Leaving, "a player standing aside should wait until the one stepping out is through the doorway");
+        world.Tick(.2f);
+        Require(world.Door == Doorway.Leaving && guest.Door == Doorway.Entering, $"once the other is through the doorway, a player standing aside should squeeze past them in, not {guest.Door}");
+        world.Tick(World.EnterSeconds + .05f);
+        Require(guest.Sheltered == hut.Id && world.Sheltered == 0, "the player who stood aside should end up inside, and the one who came out outside");
     }
 
     private static void CheckACabinHoldsOnePlayerAndTheNextBangsOnTheDoor(GameData data) {

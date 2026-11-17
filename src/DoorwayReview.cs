@@ -31,7 +31,9 @@ public sealed partial class DoorwayReview : Node {
         World.S.Time = World.Data.DaySeconds * (night ? World.Data.DuskStarts + .02f : .3f);
         // Only the scene's own wolf comes: every den stays shut tonight.
         World.S.Wolves.Clear(); World.S.DensOut = (1 << World.Dens.Length) - 1; World.S.DenHours = 24;
+        // No crew walks through the scene.
         foreach (var w in World.Workers) World.Assign(w, null);
+        World.S.Workers.Clear();
         // Nothing else stands near the cabin, so a camera turned round or brought low sees the players and wolves clearly.
         World.S.Things.RemoveAll(t => t != Cabin && t.Pos.DistanceTo(Cabin.Pos) < Clearing);
         // The fixture's hand crafting would crouch the host the moment they are outside.
@@ -49,10 +51,10 @@ public sealed partial class DoorwayReview : Node {
         script = Scene switch {
             // Both walk up; the host gets there first and steps in, the neighbor follows, finds the door shut and bangs on it.
             "queue" => new (float, Action)[] { (0, () => Walk(host)), (.4f, () => Walk(guest)) },
-            // The host is inside; the neighbor walks up and bangs, then the host steps out and the neighbor goes in.
+            // The host is inside; the neighbor walks up and bangs, then the host steps out, the neighbor standing aside for them, and the neighbor goes in.
             "occupied" => new (float, Action)[] {
                 (0, () => { World.Player = door; World.S.Sheltered = Cabin.Id; }), (0, () => Walk(guest)),
-                (3.2f, () => World.Leave()), (5, () => Walk(guest)),
+                (3.2f, () => World.Leave()),
             },
             // The host steps in at a walk with a wolf close by and the neighbor at the door behind them; a second wolf comes for the neighbor while they wait.
             "wolf" => new (float, Action)[] {
