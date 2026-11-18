@@ -153,7 +153,7 @@ public partial class WorldView {
 
     private static readonly (string Name, ActorSkin Skin, ActorAction Action)[] ReviewClips =
     {
-        ("player jog", ActorSkin.Player, ActorAction.Jog), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop), ("player axe swing", ActorSkin.Player, ActorAction.SteelAxeSwing),
+        ("player jog", ActorSkin.Player, ActorAction.Jog), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop), ("player axe swing", ActorSkin.Player, ActorAction.SteelAxeSwing), ("player axe sweep", ActorSkin.Player, ActorAction.SteelAxeSweep),
         ("player pick", ActorSkin.Player, ActorAction.Mine), ("player steel pick", ActorSkin.Player, ActorAction.SteelMine), ("player gather", ActorSkin.Player, ActorAction.Gather),
         ("player hammer", ActorSkin.Player, ActorAction.Hammer), ("player pump", ActorSkin.Player, ActorAction.Pump), ("player punch", ActorSkin.Player, ActorAction.Attack),
         ("player idle", ActorSkin.Player, ActorAction.Idle), ("worker walk", ActorSkin.Worker, ActorAction.Walk), ("worker axe", ActorSkin.Worker, ActorAction.Chop),
@@ -188,10 +188,10 @@ public partial class WorldView {
     private static Vector3 ReviewSpot(int index) => ScreenRight * ((index % 7 - 3) * 2f) + ScreenDown * ((index / 7 - 2f) * 3.3f);
     /// <summary>The clip <c>--animation-clip</c> names, shown alone and close up, moving across marked ground at its speed in the world; -1 shows every clip.</summary>
     private static readonly int ReviewClip = Array.FindIndex(ReviewClips, clip => clip.Name == Launch.Value("--animation-clip"));
-    /// <summary>Wolf close-ups for <c>--animation-clip</c>; the leap, hit and feed play against a player the way SyncWolves sets them up.</summary>
+    /// <summary>Wolf close-ups for <c>--animation-clip</c>; the leap, hit, feed, snap and brace play against a player the way SyncWolves sets them up.</summary>
     /// <summary>How fast, in metres a second, a wolf in the review gallops, and how many seconds the turn clip takes to go out and back.</summary>
     private const float ReviewGallop = 6.3f, ReviewTurnLoop = 4;
-    private static readonly string[] WolfClips = { "wolf idle", "wolf howl", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf turn", "wolf leap", "wolf hit", "wolf feed", "wolf fall" };
+    private static readonly string[] WolfClips = { "wolf idle", "wolf howl", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf turn", "wolf leap", "wolf hit", "wolf feed", "wolf fall", "wolf snap", "wolf brace" };
     private static readonly int ReviewWolfClip = Array.IndexOf(WolfClips, Launch.Value("--animation-clip"));
     private string? ReviewCloseUpName => ReviewClip >= 0 ? ReviewClips[ReviewClip].Name : ReviewWolfClip >= 0 ? WolfClips[ReviewWolfClip] : null;
     /// <summary>The camera's pitch in degrees for <c>--animation-pitch</c>, low for a side view; the game's otherwise.</summary>
@@ -324,7 +324,7 @@ public partial class WorldView {
         if (review == null) {
             review = ReviewTrack();
             reviewWolf = new WolfModel(); review.AddChild(reviewWolf.Root);
-            if (clip is "wolf leap" or "wolf hit" or "wolf feed") { var rig = new ActorRig(ActorSkin.Player); review.AddChild(rig.Root); reviewRigs.Add(rig); }
+            if (clip is "wolf leap" or "wolf hit" or "wolf feed" or "wolf snap" or "wolf brace") { var rig = new ActorRig(ActorSkin.Player); review.AddChild(rig.Root); reviewRigs.Add(rig); }
             // The player starts facing the wolf, rather than turning to it on the spot, or on the ground in the feeding clip.
             reviewPerson.Yaw = ActorAnimation.Yaw(track, 0);
         }
@@ -368,15 +368,34 @@ public partial class WorldView {
                     break;
                 }
             case "wolf hit": {
-                    // A punch from 1.8 tiles: the wolf lunges into it, then hops KnockBackDistance clear once it lands.
-                    float c = Elapsed % 2.4f, punch = c - .4f, lands = ActorAnimation.Contact(ActorAction.Attack), near = 1.8f, far = near + World.KnockBackDistance, gap;
-                    if (punch < 0) { wolf.Stand(Elapsed, dt, true); gap = near; } else if (punch < lands) { gap = Mathf.Lerp(near, WolfModel.StrikeReach, Ease(punch / lands)); wolf.Move(reviewLunge - gap, dt, false, true); } else if (punch < lands + WolfModel.RecoilSeconds) {
+                    // A punch at a wolf at biting distance: when it lands the wolf hops KnockBackDistance clear.
+                    float c = Elapsed % 2.4f, punch = c - .4f, lands = ActorAnimation.Contact(ActorAction.Attack), near = WolfBodies.StandOff, far = near + World.KnockBackDistance, gap;
+                    if (punch < lands) { wolf.Stand(Elapsed, dt, true); gap = near; } else if (punch < lands + WolfModel.RecoilSeconds) {
                         float recoil = (punch - lands) / WolfModel.RecoilSeconds, hop = Math.Min(1, recoil / WolfModel.HopShare);
-                        gap = far - (far - WolfModel.StrikeReach) * (1 - hop) * (1 - hop);
+                        gap = far - (far - near) * (1 - hop) * (1 - hop);
                         wolf.Recoil(recoil, dt);
                     } else { wolf.Stand(Elapsed, dt, true); gap = far; }
-                    reviewLunge = gap; place = To3(track * gap);
+                    place = To3(track * gap);
                     if (punch >= 0 && punch < ActorAnimation.Duration(ActorAction.Attack)) person = ActorAction.Attack;
+                    break;
+                }
+            case "wolf snap": {
+                    // A snap at a player standing still: the wolf gathers itself at biting distance, leaps the last of the way and shuts its jaws on them, then steps back.
+                    float c = Elapsed % 2.4f, snap = c - .6f, landed = snap - WolfSnap.Windup - WolfSnap.Flight, near = WolfBodies.StandOff, close = WolfBodies.WolfNose + WolfSnap.JawsShort, gap;
+                    if (snap < 0) { wolf.Stand(Elapsed, dt, true); gap = near; } else if (landed < 0) {
+                        float drive = Math.Max(0, snap - WolfSnap.Windup) / WolfSnap.Flight;
+                        wolf.Snap(Math.Min(1, snap / WolfSnap.Windup), drive, 0, dt); gap = Mathf.Lerp(near, close, drive);
+                    } else if (landed < WolfModel.SnapHold) { wolf.Snap(1, 1, landed / WolfModel.SnapHold, dt); gap = close; } else {
+                        gap = Math.Min(near, reviewLunge + WolfBodies.BackOffSpeed * dt);
+                        if (gap < near) wolf.Move(reviewLunge - gap, dt, false, true); else wolf.Stand(Elapsed, dt, true);
+                    }
+                    reviewLunge = gap; place = To3(track * gap);
+                    break;
+                }
+            case "wolf brace": {
+                    // A following wolf the player has walked up to: wary for three seconds, then braced where it stands.
+                    if (Elapsed % 8 < 3) wolf.Stand(Elapsed, dt, true); else wolf.Brace(Elapsed, dt);
+                    place = To3(track * WolfFollow.StandOrRunAt);
                     break;
                 }
             case "wolf turn": {

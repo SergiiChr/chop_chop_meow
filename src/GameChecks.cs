@@ -2043,7 +2043,7 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    /// <summary>Space without an axe attacks unarmed, and one right click walks over and picks up a whole loose piece without the gather animation.</summary>
+    /// <summary>Space without an axe attacks unarmed the way the player last walked, and one right click walks over and picks up a whole loose piece without the gather animation.</summary>
     private async Task CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece() {
         await CloseWithEsc();
         // Space would pump the furnace clicked last.
@@ -2051,7 +2051,10 @@ public partial class Game {
         Drop(Hosted, "steel_axe");
         // By day wolves are calmed and sent home at once, which would clear the blow before the window shows it.
         float health = world.Health; RunUntilNight(Hosted);
-        var wolf = PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + Vector2.Right * 1.2f, Health = 5 });
+        // Space swings the way the player last walked: a step to the right on screen aims the punch at a wolf there.
+        await Holding(Key.D, () => Seconds(.1));
+        await Frames();
+        var wolf = PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + PlayerControl.KeyDirection(1, 0) * 1.2f, Health = 5 });
         await KeyStroke(Key.Space);
         Require(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
         Require(sounds.Last == "tool_air_swing", "A punch must whoosh before it lands.");
