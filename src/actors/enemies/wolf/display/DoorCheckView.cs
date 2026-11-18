@@ -313,7 +313,7 @@ public static class DoorCheckView {
 
     /// <summary>
     /// A wolf's pose this far into a door check, stood on the ground, the cabin's step and its floor, whatever each paw is on.
-    /// From when it stands in the doorway it looks at whoever watches from inside.
+    /// From when it stands in the doorway it looks at whoever watches from inside, its snout held below the line to them.
     /// </summary>
     private static WolfPose StoodAt(float clock, float time) {
         Span<float> ground = stackalloc float[4];
@@ -323,8 +323,11 @@ public static class DoorCheckView {
         if (stares <= 0) return pose;
         var stand = StandAt(clock);
         var watcher = stand.In(new Vector2(Watcher.X, Watcher.Z));
-        return WolfPose.Lerp(pose, WolfModel.LookingAt(pose, new Vector3(watcher.X, Watcher.Y, watcher.Y)), stares);
+        var looking = WolfModel.LookingAt(pose, new Vector3(watcher.X, Watcher.Y, watcher.Y));
+        return WolfPose.Lerp(pose, looking with { Head = looking.Head + SnoutBelow }, stares);
     }
+    /// <summary>How many degrees below the line to whoever it stares at a wolf holds its snout, so it looks at them from under its brow.</summary>
+    private const float SnoutBelow = 20;
 
     /// <summary>Poses a wolf model this far into a door check, standing on the cabin's step.</summary>
     public static void Pose(WolfModel model, float clock, float time, float dt) => model.Pose(WolfMotion.Door, StoodAt(clock, time), dt);
