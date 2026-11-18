@@ -663,9 +663,9 @@ A torch that lands on a wolf sets `Wolf.Flee`; it leaves alone one in the air or
   It heads along the line touching its circle where it stands, so going round never takes it nearer the player, where it would brace.
   The two ways walk in lanes a little outside and inside the circle, so wolves going opposite ways pass each other, and each wolf's place drifts ahead and back and its lane in and out at its own pace by its id; all of it stays within `WolfFollow.Wander` of the circle.
 - **Bracing.** One the player comes within `WolfFollow.BraceFrom` of stops and stands braced (`FollowStage.Braced`) until they are `WolfFollow.BraceUntil` off again.
-- **Alone.** At `WolfFollow.StandOrRunAt` a wolf following alone runs (`FollowStage.Routed`) at a gallop until it is out of the player's line of sight, or for `WolfFollow.RoutSeconds`, then patrols again (`WolfFollow.GiveUp`).
+- **Alone.** At `WolfFollow.StandOrRunAt` a wolf with no other follower in the player's line of sight runs (`FollowStage.Routed`) at a gallop until it is out of the player's line of sight, or for `WolfFollow.RoutSeconds`, then patrols again (`WolfFollow.GiveUp`).
   It leaves that player alone until it has been out of smell range of them (`Wolf.Shunned`), as a wolf does a cabin it gave up on (`Wolf.Tried`).
-- **Among others.** With more than one wolf following, the one walked at stands its ground: it growls every `WolfFollow.GrowlEvery` from `WolfFollow.GrowlFrom`, and at `WolfFollow.StandOrRunAt` every wolf hunting the player within their line of sight turns on them (`FollowStage.Bold`).
+- **Among others.** With more than one wolf following within the player's line of sight, the one walked at stands its ground: it growls every `WolfFollow.GrowlEvery` from `WolfFollow.GrowlFrom`, and at `WolfFollow.StandOrRunAt` every wolf hunting the player within their line of sight turns on them (`FollowStage.Bold`).
   Each attacks as a wolf does with no torch lit, leap for the throat included, and no torch wave scares it again; one out of sight keeps following.
 
 #### Mauling and wolf meat

@@ -9,7 +9,7 @@ namespace ChopChopMeow;
 /// the edge of the torchlight, each its own way round. One the player walks at stands braced where it is. From
 /// <see cref="StandOrRunAt"/> a wolf following alone runs out of the player's line of sight and goes back to patrolling,
 /// while one of several stands its ground: it growls from <see cref="GrowlFrom"/>, and then every wolf hunting the
-/// player within their line of sight turns on them, for good.
+/// player within their line of sight turns on them, for good. Only followers within that line of sight count as others.
 /// </summary>
 public sealed class WolfFollow(World world) {
     /// <summary>Metres from a following wolf at which a player walking at it makes it run, alone, or the pack turn on them, among others.</summary>
@@ -41,7 +41,6 @@ public sealed class WolfFollow(World world) {
 
     /// <summary>The wolves hunting the acting player this tick, and those of them that follow.</summary>
     private List<Wolf> pack = new();
-    private int Following => clockwise.Count + counter.Count;
     /// <summary>The followers going each way round the player, in order round them, and the bearing of each way's first place, in radians.</summary>
     private readonly List<Wolf> clockwise = new(), counter = new();
     private float firstClockwise, firstCounter;
@@ -101,12 +100,12 @@ public sealed class WolfFollow(World world) {
         float near = wolf.Pos.DistanceTo(world.Player);
         wolf.Chase = 0;
         if (near < StandOrRunAt) {
-            if (Following > 1) TurnOnPlayer(); else { wolf.Follow = FollowStage.Routed; wolf.GrowlIn = 0; wolf.Flee = RoutSeconds; }
+            if (FollowingInSight() > 1) TurnOnPlayer(); else { wolf.Follow = FollowStage.Routed; wolf.GrowlIn = 0; wolf.Flee = RoutSeconds; }
             return;
         }
         if (near < (braced ? BraceUntil : BraceFrom)) {
             wolf.Follow = FollowStage.Braced;
-            if (Following > 1 && near < GrowlFrom) Growl(wolf, dt); else wolf.GrowlIn = 0;
+            if (near < GrowlFrom && FollowingInSight() > 1) Growl(wolf, dt); else wolf.GrowlIn = 0;
             return;
         }
         wolf.GrowlIn = 0;
@@ -141,6 +140,14 @@ public sealed class WolfFollow(World world) {
     }
 
     private float Bearing(Wolf wolf) => (wolf.Pos - world.Player).Angle();
+
+    /// <summary>How many wolves follow the acting player within their line of sight: only these count as others to one they walk at.</summary>
+    private int FollowingInSight() {
+        int seen = 0;
+        foreach (var wolf in clockwise) if (world.Sees(wolf.Pos)) seen++;
+        foreach (var wolf in counter) if (world.Sees(wolf.Pos)) seen++;
+        return seen;
+    }
 
     /// <summary>A wolf standing its ground growls again and again, starting at once.</summary>
     private void Growl(Wolf wolf, float dt) {

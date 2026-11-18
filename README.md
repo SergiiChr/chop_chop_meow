@@ -851,8 +851,8 @@ Wolves in follow mode keep circling you at a walk at the edge of the light, abou
 Walk away and they come after you at that walk.
 Walk at one and it stops and stands braced where it is. Come within 2 metres and:
 
-- a wolf following alone runs until it is out of your line of sight, or for 8 seconds, goes back to patrolling and leaves you alone until it has been out of smell range of you;
-- with more than one following, the wolf you walked at stands its ground: it growls again and again from 3 metres, and at 2 metres every wolf in your line of sight turns on you.
+- a wolf with no other follower in your line of sight runs until it is out of your line of sight, or for 8 seconds, goes back to patrolling and leaves you alone until it has been out of smell range of you;
+- with more than one following in your line of sight, the wolf you walked at stands its ground: it growls again and again from 3 metres, and at 2 metres every wolf in your line of sight turns on you.
   They then attack as if you had no torch, and no wave of the torch scares them again.
 
 Once five are around you they attack together and swings no longer scare them.

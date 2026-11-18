@@ -17,6 +17,20 @@ public static class WolfFollowChecks {
         Test(CheckAWolfWalkedAtStandsBracedWhereItIs, data);
         Test(CheckAWolfFollowingAloneRunsOutOfSightAndLeavesThePlayerAlone, data);
         Test(CheckAmongOthersAWolfWalkedAtGrowlsThenThePackInSightTurnsOnThePlayerForGood, data);
+        Test(CheckAWolfWhoseFellowFollowersAreOutOfSightRunsAsOneAlone, data);
+    }
+
+    /// <summary>Only followers within the player's line of sight count as others: one left out of sight does not make a wolf stand its ground.</summary>
+    private static void CheckAWolfWhoseFellowFollowersAreOutOfSightRunsAsOneAlone(GameData data) {
+        var (world, wolf) = Followed(data, 1);
+        var far = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(0, data.SightRadius + 25), Follow = FollowStage.Circling });
+        var heard = Listen(world);
+        WalkTo(world, wolf, 2.6f);
+        WolfTick(world, 1, wolf, far);
+        Require(!heard.Contains("wolf_growl_approaching"), "a wolf whose fellow followers are out of sight should stand silent, as one alone does");
+        WalkTo(world, wolf, 1.9f);
+        WolfTick(world, .2f, wolf, far);
+        Require(wolf.Follow == FollowStage.Routed && far.Following, "a wolf whose fellow followers are out of sight should run when the player comes within 2 m");
     }
 
     /// <summary>
