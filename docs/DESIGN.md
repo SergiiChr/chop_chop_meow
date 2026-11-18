@@ -660,6 +660,7 @@ A torch that lands on a wolf sets `Wolf.Flee`; it leaves alone one in the air or
 
 - **Circling.** They walk round the player about `World.StalkDistance` off without biting or leaping, never faster than a walk (`WolfPatrols.PatrolPace` of the trot), each the way round it was given at random as it began to follow (`Wolf.Round`).
   Wolves going the same way spread evenly: `WolfFollow.Arrange` orders them by bearing and turns that way's places to fit them, and each heads a little ahead of its place, going round the player and never across them.
+  It heads along the line touching its circle where it stands, so going round never takes it nearer the player, where it would brace.
   The two ways walk in lanes a little outside and inside the circle, so wolves going opposite ways pass each other, and each wolf's place drifts ahead and back and its lane in and out at its own pace by its id; all of it stays within `WolfFollow.Wander` of the circle.
 - **Bracing.** One the player comes within `WolfFollow.BraceFrom` of stops and stands braced (`Wolf.Braced`) until they are `WolfFollow.BraceUntil` off again.
 - **Alone.** At `WolfFollow.StandOrRunAt` a wolf following alone runs (`Wolf.Routed`) at a gallop until it is out of the player's line of sight, or for `WolfFollow.RoutSeconds`, then patrols again (`WolfFollow.GiveUp`).

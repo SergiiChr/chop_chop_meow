@@ -1,3 +1,4 @@
+using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static SetupSteps;
@@ -41,4 +42,15 @@ internal static class WolfSteps {
         Checks.Require(wolf.Snap == 0 && wolf.Attack > 0, "the wolf should have snapped once within a second");
         return world.Health;
     }
+
+    /// <summary>A torch night with wolves in follow mode, settled on their circle; returns one of them.</summary>
+    public static (World World, Wolf Wolf) Followed(GameData data, int count) {
+        var world = TorchNight(data);
+        var wolves = Enumerable.Range(0, count).Select(i => PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(World.StalkDistance, 0).Rotated(i * Mathf.Tau / count), Scared = true })).ToArray();
+        WolfTick(world, 1, wolves);
+        return (world, wolves[0]);
+    }
+
+    /// <summary>Puts the player a given distance from a wolf, on the line between them, as if they had walked at it.</summary>
+    public static void WalkTo(World world, Wolf wolf, float distance) => world.Player = wolf.Pos + (world.Player - wolf.Pos).Normalized() * distance;
 }

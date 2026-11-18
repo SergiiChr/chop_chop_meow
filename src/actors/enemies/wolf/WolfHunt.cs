@@ -26,10 +26,7 @@ public sealed class WolfHunt(World world) {
         // A sheltered player is out of reach: the pack goes to the cabin's door, or gives up and patrols on away from a cabin it leaves alone.
         if (Doorways.Indoors(world.S.Actor)) {
             var cabin = world.Find(world.S.Sheltered != 0 ? world.S.Sheltered : world.S.Actor.DoorCabin);
-            foreach (var wolf in hunters) {
-                wolf.Snap = 0;
-                if (!world.DoorCheck.Follow(wolf, cabin)) WolfPatrols.Patrol(wolf, AwayFromPlayer(wolf).Angle());
-            }
+            foreach (var wolf in hunters) if (!world.DoorCheck.Follow(wolf, cabin)) WolfPatrols.Patrol(wolf, AwayFromPlayer(wolf).Angle());
             return;
         }
         bool lit = world.Protected(world.Player);
@@ -52,7 +49,7 @@ public sealed class WolfHunt(World world) {
             var from = wolf.Pos;
             wolf.Attack -= dt;
             Hunt(wolf, dt, hunters.Count > 1, lit, wary, speed, chase);
-            Face(wolf, from, dt);
+            Face(wolf, from, dt, wary && wolf.Scared);
         }
         world.WolfBodies.KeepApart(hunters, dt);
         if (world.S.Mauled && !world.Dead) {
@@ -136,12 +133,13 @@ public sealed class WolfHunt(World world) {
     /// <summary>
     /// Turns a wolf's body the way it went this tick when it ran, and to its player while it stands, creeps or backs off.
     /// One reeling from a blow keeps facing the way it did, and one snapping the way it leapt.
+    /// <paramref name="following"/> tells that it is in follow mode: scared, with a torch holding it back.
     /// </summary>
-    private void Face(Wolf wolf, Vector2 from, float dt) {
+    private void Face(Wolf wolf, Vector2 from, float dt, bool following) {
         if (wolf.Stagger > 0 || wolf.Snap > 0 && !WolfSnap.Winding(wolf)) return;
         var went = wolf.Pos - from;
         // A following wolf walks round its player, slower than that, and still faces its way.
-        float pace = wolf.Scared ? FollowsItsWayFrom : FacesItsWayFrom;
+        float pace = following ? FollowsItsWayFrom : FacesItsWayFrom;
         var toward = went.LengthSquared() > dt * dt * pace * pace ? went : world.Player - wolf.Pos;
         if (toward.LengthSquared() > 1e-8f) wolf.Heading = toward.Angle();
     }

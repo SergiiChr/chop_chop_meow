@@ -100,7 +100,9 @@ public sealed class WolfFollow(World world) {
         float place = (wolf.Round > 0 ? firstClockwise : firstCounter) + ring.IndexOf(wolf) * MathF.Tau / ring.Count
             + wolf.Round * Lead * (1 + .5f * MathF.Sin(time * .7f + own * 1.4f));
         float bearing = Bearing(wolf), radius = World.StalkDistance + wolf.Round * Lane + Drift * (.65f * MathF.Sin(time * .9f + own) + .35f * MathF.Sin(time * 2.3f + own * 1.7f));
-        var to = world.Player + Vector2.Right.Rotated(bearing + Math.Clamp(Mathf.AngleDifference(bearing, place), -Arc, Arc)) * radius - wolf.Pos;
+        // It heads along the line touching its circle where it stands, so going round never takes it nearer the player.
+        float round = Math.Clamp(Mathf.AngleDifference(bearing, place), -Arc, Arc);
+        var to = world.Player + Vector2.Right.Rotated(bearing + round) * (radius / MathF.Cos(round)) - wolf.Pos;
         wolf.Pos = world.Slide(wolf.Pos, to.LimitLength(dt * Math.Min(walk, to.Length() * Keenness)));
     }
 

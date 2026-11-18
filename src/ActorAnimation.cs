@@ -120,8 +120,7 @@ public static class ActorAnimation {
     public static float Contact(ActorAction action) => action switch {
         ActorAction.Attack => .32f * Duration(action),
         ActorAction.TorchSwing => .3f * Duration(action),
-        ActorAction.AxeSwing or ActorAction.SteelAxeSwing => .5f * Duration(action),
-        ActorAction.AxeSweep or ActorAction.SteelAxeSweep => .5f * Duration(action),
+        ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep => .5f * Duration(action),
         _ => 0
     };
 

@@ -1245,7 +1245,8 @@ public partial class WorldView : Node3D {
             float glance = glances ? Math.Clamp(Mathf.AngleDifference(model.Yaw, ActorAnimation.Yaw(hunted - wolf.Pos, model.Yaw)), -WolfModel.MaxGlance, WolfModel.MaxGlance) : 0;
             model.Glance = Mathf.MoveToward(model.Glance, glance, dt * WolfModel.GlanceRate);
             // A snap is shown through to the jaws shutting, a moment after the wolf lands.
-            model.SnapHeld = wolf.Snap > 0 ? WolfModel.SnapHold : Math.Max(0, model.SnapHeld - dt);
+            // One stopped while the wolf still gathered itself has nothing to show.
+            model.SnapHeld = wolf.Snap > 0 ? WolfSnap.Winding(wolf) ? 0 : WolfModel.SnapHold : Math.Max(0, model.SnapHeld - dt);
             bool struck = model.Struck || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;
             // Easing back from its player to biting distance, a wolf steps backward still facing them.
             bool backing = running && wolf.Flee <= 0 && !wolf.Scared && moved.Dot(hunted - wolf.Pos) < 0 && moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
