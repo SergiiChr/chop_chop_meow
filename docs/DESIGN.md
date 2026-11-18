@@ -1166,6 +1166,7 @@ Workers use grid detours around water and buildings.
 
 [AGENTS.md](../AGENTS.md#checks) lists the checks and [RELEASE.md](RELEASE.md) the development flow.
 The network check's guest joins through a relay in `build.py` that adds about 80 ms of delay and 5% packet loss each way.
+Through it the guest chops the wolf its swing is aimed at, misses one to the side, and is bitten by a wolf on the host.
 
 ### Platform
 
