@@ -1170,21 +1170,22 @@ public sealed partial class World {
     }
     private void SwingTorch(Vector2 aim) {
         if (attackClock > 0) return;
-        attackClock = Swings.Cooldown;
         torchSwings.RemoveAll(t => S.Time - t > WildWindow); torchSwings.Add(S.Time);
-        Vector2 direction = aim == Vector2.Zero ? Vector2.Down : aim.Normalized();
-        PlayerActed?.Invoke(ActorAction.TorchSwing, Player + direction); Play("tool_air_swing", Player);
+        Vector2 direction = StartSwing(ActorAction.TorchSwing, aim);
         if (torchSwings.Count >= WildSwings) { PutOutTorch(); Say("Torch went off due to wild swinging."); return; }
         TorchFlare = .5f;
-        Swings.Start(ActorAction.TorchSwing, direction, Swings.TorchDamage, Swings.TorchSpread);
-        // A wave of fire toward a wolf makes it keep its distance; a pack closing in, or a wolf that stood its ground, no longer cares.
-        if (PackAround >= PackSize) return;
-        foreach (var w in S.Wolves)
-            if (!w.Bold && !w.Routed && w.Pos.DistanceTo(Player) < ScareRange && (w.Pos - Player).Normalized().Dot(direction) > .7f) {
-                w.Scared = true;
-                // The fire stops a wolf still gathering itself to snap; one already in the air lands.
-                if (WolfSnap.Winding(w)) w.Snap = 0;
-            }
+        Swings.Start(ActorAction.TorchSwing, direction);
+        WolfFollow.Scare(direction);
+    }
+    /// <summary>
+    /// The acting player begins a swing along <paramref name="aim"/>, south when none is given: it shows and whooshes,
+    /// and the next has to wait. Returns the way it goes, a unit vector.
+    /// </summary>
+    private Vector2 StartSwing(ActorAction action, Vector2 aim) {
+        attackClock = Swings.Cooldown;
+        Vector2 direction = aim == Vector2.Zero ? Vector2.Down : aim.Normalized();
+        PlayerActed?.Invoke(action, Player + direction); Play("tool_air_swing", Player);
+        return direction;
     }
     public const float StaggerSeconds = .45f;
     /// <summary>How far a blow throws a wolf back: a short hop, which the view plays as the wolf jumping clear.</summary>
@@ -1204,7 +1205,7 @@ public sealed partial class World {
     private void PutOutTorch() {
         if (S.TorchLit) Play("torch_out", Player);
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
-        foreach (var w in Hunters) w.Scared = w.Braced = false;
+        WolfFollow.Stop();
     }
     /// <summary>
     /// Swings the best axe carried, or a fist without one, along <paramref name="aim"/>, south when none is given.
@@ -1212,15 +1213,17 @@ public sealed partial class World {
     /// </summary>
     public void Attack(Vector2 aim = default) {
         if (attackClock > 0 || S.Sheltered != 0 || Busy() || Forwarded(Verb.Attack, at: aim)) return;
-        attackClock = Swings.Cooldown;
         string? axe = BestTool("axe");
-        bool sweep = axe != null && S.Actor.SweepNext, steel = axe == "steel_axe";
+        bool sweep = axe != null && S.Actor.SweepNext;
         S.Actor.SweepNext = axe != null && !sweep;
-        ActorAction action = axe == null ? ActorAction.Attack : sweep ? steel ? ActorAction.SteelAxeSweep : ActorAction.AxeSweep : steel ? ActorAction.SteelAxeSwing : ActorAction.AxeSwing;
-        Vector2 direction = aim == Vector2.Zero ? Vector2.Down : aim.Normalized();
-        PlayerActed?.Invoke(action, Player + direction); Play("tool_air_swing", Player);
-        if (axe == null) Swings.Start(action, direction, Swings.PunchDamage, Swings.PunchSpread);
-        else Swings.Start(action, direction, Swings.AxeDamage * Speed(axe), Swings.AxeSpread);
+        ActorAction action = (axe, sweep) switch {
+            (null, _) => ActorAction.Attack,
+            ("steel_axe", true) => ActorAction.SteelAxeSweep,
+            (_, true) => ActorAction.AxeSweep,
+            ("steel_axe", false) => ActorAction.SteelAxeSwing,
+            _ => ActorAction.AxeSwing
+        };
+        Swings.Start(action, StartSwing(action, aim), axe == null ? 1 : Speed(axe));
     }
     public void Die() {
         Release();

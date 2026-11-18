@@ -41,7 +41,7 @@ public sealed class WolfFollow(World world) {
 
     /// <summary>The wolves hunting the acting player this tick, and those of them that follow.</summary>
     private List<Wolf> pack = new();
-    private int following;
+    private int Following => clockwise.Count + counter.Count;
     /// <summary>The followers going each way round the player, in order round them, and the bearing of each way's first place, in radians.</summary>
     private readonly List<Wolf> clockwise = new(), counter = new();
     private float firstClockwise, firstCounter;
@@ -49,15 +49,31 @@ public sealed class WolfFollow(World world) {
     private readonly Random ways = new(3571);
 
     /// <summary>
-    /// Counts the wolves following the acting player, gives each new one a way round them at random, and for each way
+    /// A torch waved along <paramref name="direction"/>, a unit vector, puts the wolves it is waved at in follow mode.
+    /// A pack closing in, a wolf that turned on its player and one running from them no longer care.
+    /// </summary>
+    internal void Scare(Vector2 direction) {
+        if (world.PackAround >= World.PackSize) return;
+        foreach (var wolf in world.S.Wolves)
+            if (!wolf.Bold && !wolf.Routed && wolf.Pos.DistanceTo(world.Player) < World.ScareRange && (wolf.Pos - world.Player).Normalized().Dot(direction) > .7f) {
+                wolf.Scared = true;
+                // The fire stops a wolf still gathering itself to snap; one already in the air lands.
+                if (WolfSnap.Winding(wolf)) wolf.Snap = 0;
+            }
+    }
+
+    /// <summary>The acting player's torch is out, so the wolves hunting them follow no longer.</summary>
+    internal void Stop() { foreach (var wolf in world.Hunters) wolf.Scared = wolf.Braced = false; }
+
+    /// <summary>
+    /// Finds the wolves following the acting player, gives each new one a way round them at random, and for each way
     /// orders its wolves by bearing and turns its evenly spread places to where they fit those wolves best.
     /// </summary>
     internal void Arrange(List<Wolf> hunters) {
-        pack = hunters; following = 0;
+        pack = hunters;
         clockwise.Clear(); counter.Clear();
         foreach (var wolf in hunters) {
             if (!wolf.Scared) continue;
-            following++;
             if (wolf.Round == 0) wolf.Round = ways.Next(2) == 0 ? 1 : -1;
             var ring = wolf.Round > 0 ? clockwise : counter;
             int at = ring.Count;
@@ -85,12 +101,12 @@ public sealed class WolfFollow(World world) {
         float near = wolf.Pos.DistanceTo(world.Player);
         wolf.Chase = 0;
         if (near < StandOrRunAt) {
-            if (following > 1) TurnOnPlayer(); else { wolf.Scared = false; wolf.GrowlIn = 0; wolf.Routed = true; wolf.Flee = RoutSeconds; }
+            if (Following > 1) TurnOnPlayer(); else { wolf.Scared = false; wolf.GrowlIn = 0; wolf.Routed = true; wolf.Flee = RoutSeconds; }
             return;
         }
         if (near < (braced ? BraceUntil : BraceFrom)) {
             wolf.Braced = true;
-            if (following > 1 && near < GrowlFrom) Growl(wolf, dt); else wolf.GrowlIn = 0;
+            if (Following > 1 && near < GrowlFrom) Growl(wolf, dt); else wolf.GrowlIn = 0;
             return;
         }
         wolf.GrowlIn = 0;
@@ -112,7 +128,7 @@ public sealed class WolfFollow(World world) {
     /// </summary>
     private void TurnOnPlayer() {
         foreach (var wolf in pack) {
-            if (wolf.Routed || wolf.Pos.DistanceTo(world.Player) > world.Data.SightRadius) continue;
+            if (wolf.Routed || !world.Sees(wolf.Pos)) continue;
             wolf.Scared = wolf.Braced = false; wolf.Bold = true; wolf.GrowlIn = 0;
         }
     }

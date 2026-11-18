@@ -382,7 +382,7 @@ public partial class WorldView {
                 }
             case "wolf snap": {
                     // A snap at a player standing still: the wolf gathers itself at biting distance, leaps the last of the way and shuts its jaws on them, then steps back.
-                    float c = Elapsed % 2.4f, snap = c - .6f, landed = snap - WolfSnap.Windup - WolfSnap.Flight, near = WolfBodies.StandOff, close = WolfBodies.WolfNose + WolfSnap.JawsShort, gap;
+                    float c = Elapsed % 2.4f, snap = c - .6f, landed = snap - WolfSnap.Windup - WolfSnap.Flight, near = WolfBodies.StandOff, close = WolfSnap.JawsAhead, gap;
                     if (snap < 0) { wolf.Stand(Elapsed, dt, true); gap = near; } else if (landed < 0) {
                         float drive = Math.Max(0, snap - WolfSnap.Windup) / WolfSnap.Flight;
                         wolf.Snap(Math.Min(1, snap / WolfSnap.Windup), drive, 0, dt); gap = Mathf.Lerp(near, close, drive);

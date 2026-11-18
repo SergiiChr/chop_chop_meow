@@ -134,10 +134,7 @@ public sealed class WolfPatrols(World world) {
         return true;
     }
     /// <summary>Whether the player with an id is still in the game and within smell range of a wolf.</summary>
-    private bool InSmell(Wolf wolf, int player) {
-        foreach (var p in world.S.Players) if (p.Id == player) return p.Pos.DistanceTo(wolf.Pos) <= world.Data.SmellRadius;
-        return false;
-    }
+    private bool InSmell(Wolf wolf, int player) => world.PlayerById(player) is { } p && p.Pos.DistanceTo(wolf.Pos) <= world.Data.SmellRadius;
     /// <summary>
     /// Seconds a wolf takes to turn half a turn where it stands, to face a player it smelled before it howls.
     /// A smaller turn takes the square root of its share of that: a wolf's body comes round fast at first and settles slowly.

@@ -1199,9 +1199,6 @@ public partial class WorldView : Node3D {
         return false;
     }
 
-    /// <summary>Seconds from one glance of a following wolf at its player to the next, how long it looks, and how far apart wolves with neighbouring ids glance.</summary>
-    private const float GlanceEvery = 4.6f, GlanceSeconds = 1.7f, GlanceApart = 1.3f;
-
     private void SyncWolves(float dt) {
         feeding.Remember(World.Wolves);
         foreach (var wolf in World.Wolves) {
@@ -1241,15 +1238,17 @@ public partial class WorldView : Node3D {
                 model.KnockBack = model.KnockBackFrom * (1 - hop * (2 - hop));
             } else model.KnockBack = Vector2.Zero;
             // A following wolf walking round its player turns its head to them now and then, each at its own moments.
-            bool glances = wolf.Scared && !wolf.Braced && wolf.Flee <= 0 && (Elapsed + wolf.Id * GlanceApart) % GlanceEvery < GlanceSeconds;
+            bool glances = wolf.Scared && !wolf.Braced && wolf.Flee <= 0 && (Elapsed + wolf.Id * WolfModel.GlanceApart) % WolfModel.GlanceEvery < WolfModel.GlanceSeconds;
             float glance = glances ? Math.Clamp(Mathf.AngleDifference(model.Yaw, ActorAnimation.Yaw(hunted - wolf.Pos, model.Yaw)), -WolfModel.MaxGlance, WolfModel.MaxGlance) : 0;
             model.Glance = Mathf.MoveToward(model.Glance, glance, dt * WolfModel.GlanceRate);
             // A snap is shown through to the jaws shutting, a moment after the wolf lands.
             // One stopped while the wolf still gathered itself has nothing to show.
-            model.SnapHeld = wolf.Snap > 0 ? WolfSnap.Winding(wolf) ? 0 : WolfModel.SnapHold : Math.Max(0, model.SnapHeld - dt);
+            model.SnapHeld = WolfSnap.InAir(wolf) ? WolfModel.SnapHold : wolf.Snap > 0 ? 0 : Math.Max(0, model.SnapHeld - dt);
             bool struck = model.Struck || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;
+            // No faster than a wolf backs off.
+            bool slow = moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
             // Easing back from its player to biting distance, a wolf steps backward still facing them.
-            bool backing = running && wolf.Flee <= 0 && !wolf.Scared && moved.Dot(hunted - wolf.Pos) < 0 && moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
+            bool backing = running && wolf.Flee <= 0 && !wolf.Scared && moved.Dot(hunted - wolf.Pos) < 0 && slow;
             // A scared or galloping wolf turns fast. At a walk or a trot, one that sets off far from the way it faces turns
             // round where it stands first, and only then goes after its place in the world.
             bool fast = wolf.Chase > 0 || wolf.Flee > 0;
@@ -1277,7 +1276,7 @@ public partial class WorldView : Node3D {
             bool wary = wolf.Scared || HuntedTorchLit(wolf);
             float flight = 0;
             // Gathering itself for a snap while it still runs with its player, it keeps running; standing, it sinks back first.
-            bool gathers = WolfSnap.Winding(wolf) && moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
+            bool gathers = WolfSnap.Winding(wolf) && slow;
             if (model.Struck) model.Stand(Elapsed + wolf.Id % 7, dt, true);
             else if (model.Recoiling > 0) model.Recoil(1 - model.Recoiling / WolfModel.RecoilSeconds, dt);
             else if (wolf.Leap > 0) {
@@ -1293,7 +1292,7 @@ public partial class WorldView : Node3D {
             } else if (wolf.Feeding) {
                 if (wolf.Pinning) model.Pinned += dt;
                 model.Feed(Elapsed + wolf.Id % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? FeedingSpots.PawsOnChest(model, RigOf(wolf.Target)) : null);
-            } else if (gathers || wolf.Snap > 0 && !WolfSnap.Winding(wolf) || model.SnapHeld > 0 && wolf.Snap == 0) {
+            } else if (gathers || model.SnapHeld > 0) {
                 float wind = gathers ? 1 - (wolf.Snap - WolfSnap.Flight) / WolfSnap.Windup : 1;
                 model.Snap(wind, gathers ? 0 : 1 - wolf.Snap / WolfSnap.Flight, wolf.Snap > 0 ? 0 : 1 - model.SnapHeld / WolfModel.SnapHold, dt);
             } else if (stepsRound) model.Move(Math.Abs(turned) * WolfModel.TurnStep, dt, false, wary);

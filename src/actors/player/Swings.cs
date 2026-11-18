@@ -44,16 +44,29 @@ public sealed class Swings(World world) {
         return false;
     }
 
-    /// <summary>The acting player starts a swing along <paramref name="aim"/>, a unit vector; it lands when its animation does.</summary>
-    internal void Start(ActorAction action, Vector2 aim, float damage, float spread) =>
-        world.S.Actor.Swing = new Swing(action, aim, damage, spread, ActorAnimation.Contact(action));
+    /// <summary>What a swing takes off a wolf's health, and how far either side of that a blow can land.</summary>
+    private static (float Damage, float Spread) Blow(ActorAction action) => action switch {
+        ActorAction.Attack => (PunchDamage, PunchSpread),
+        ActorAction.TorchSwing => (TorchDamage, TorchSpread),
+        _ => (AxeDamage, AxeSpread)
+    };
+
+    /// <summary>
+    /// The acting player starts a swing along <paramref name="aim"/>, a unit vector; it lands when its animation does.
+    /// <paramref name="strength"/> is the speed of the axe swung, which multiplies its damage.
+    /// </summary>
+    internal void Start(ActorAction action, Vector2 aim, float strength = 1) {
+        var (damage, spread) = Blow(action);
+        world.S.Actor.Swing = new Swing(action, aim, damage * strength, spread, ActorAnimation.Contact(action));
+    }
 
     /// <summary>Counts the acting player's swing down and lands it; one who went down or indoors meanwhile lands nothing.</summary>
     internal void Tick(float dt) {
         if (world.S.Actor.Swing is not Swing swing) return;
-        if (swing.In > dt && !world.Downed && world.S.Sheltered == 0) { world.S.Actor.Swing = swing with { In = swing.In - dt }; return; }
+        if (world.Downed || world.S.Sheltered != 0) { world.S.Actor.Swing = null; return; }
+        if (swing.In > dt) { world.S.Actor.Swing = swing with { In = swing.In - dt }; return; }
         world.S.Actor.Swing = null;
-        if (!world.Downed && world.S.Sheltered == 0) Land(swing);
+        Land(swing);
     }
 
     /// <summary>

@@ -53,13 +53,13 @@ public sealed partial class WolfReview : Node {
             "rout" => new (float, Action)[] {
                 (0, () => { Torch(open); Hunters(new Vector2(6, 0)); }),
                 (.8f, () => World.UseTorch(Vector2.Right)),
-                (5, () => WalkAt(0, 1.8f)),
+                (5, () => WalkAt(1.8f)),
             },
             // Two wolves follow a player with a torch; they walk up to one, which stands braced and growls, then on at it, and both turn on them.
             "stand" => new (float, Action)[] {
                 (0, () => { Torch(open); Hunters(new Vector2(6, .5f), new Vector2(6.5f, -1)); }),
                 (.8f, () => World.UseTorch(Vector2.Right)),
-                (6, () => WalkAt(0, 2.6f)), (11, () => WalkAt(0, 1.8f)),
+                (6, () => WalkAt(2.6f)), (11, () => WalkAt(1.8f)),
             },
             // A player with a steel axe and no torch meets two wolves: each gathers itself and snaps, and the player swings at
             // them, the overhead chop and the sideways sweep in turn; the sweep passes over them.
@@ -85,8 +85,8 @@ public sealed partial class WolfReview : Node {
     /// <summary>Stands the player at a spot with a lit torch in hand.</summary>
     private void Torch(Vector2 at) { World.Player = at; World.S.Backpack.Add("torch", 1); World.UseTorch(Vector2.Zero); World.Tick(World.KindleSeconds); }
 
-    /// <summary>Sends the player walking at one of the wolves until they are a distance from it.</summary>
-    private void WalkAt(int wolf, float until) { if (wolf < World.S.Wolves.Count) { walkAt = World.S.Wolves[wolf]; walkUntil = until; } }
+    /// <summary>Sends the player walking at the first wolf until they are a distance from it.</summary>
+    private void WalkAt(float until) { if (World.S.Wolves.Count > 0) { walkAt = World.S.Wolves[0]; walkUntil = until; } }
 
     /// <summary>The player swings the axe at the nearest wolf.</summary>
     private void Swing() {

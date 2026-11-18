@@ -36,18 +36,11 @@ public static class SwingsChecks {
     }
 
     private static void CheckASwingHitsOnlyWhereItIsAimedAndAsFarAsTheBladeReaches(GameData data) {
-        float Taken(Vector2 wolfAt, Vector2 aim) {
-            var world = AxeNight(data);
-            var wolf = StillWolf(world, wolfAt);
-            world.Attack(aim);
-            world.Tick(.5f);
-            return data.WolfHealth - wolf.Health;
-        }
-        Require(Taken(new Vector2(1.5f, 0), Vector2.Left) == 0, "a swing aimed away from a wolf should miss it");
-        Require(Taken(new Vector2(1.5f, 0), Vector2.Up) == 0, "an overhead swing aimed past a wolf's side should miss it");
+        Require(TakenByAnAxe(data, new Vector2(1.5f, 0), Vector2.Left) == 0, "a swing aimed away from a wolf should miss it");
+        Require(TakenByAnAxe(data, new Vector2(1.5f, 0), Vector2.Up) == 0, "an overhead swing aimed past a wolf's side should miss it");
         // A wolf facing the player reaches 0.76 m toward them with its nose, and the axe head comes down 1.35 m out.
-        Require(Taken(new Vector2(2, 0), Vector2.Right) > 0, "an axe should reach the nose of a wolf standing 2 m off");
-        Require(Taken(new Vector2(2.4f, 0), Vector2.Right) == 0, "an axe should fall short of a wolf standing 2.4 m off");
+        Require(TakenByAnAxe(data, new Vector2(2, 0), Vector2.Right) > 0, "an axe should reach the nose of a wolf standing 2 m off");
+        Require(TakenByAnAxe(data, new Vector2(2.4f, 0), Vector2.Right) == 0, "an axe should fall short of a wolf standing 2.4 m off");
     }
 
     /// <summary>
@@ -132,7 +125,6 @@ public static class SwingsChecks {
     /// Each swing's shape on the ground is where the player's model carries the axe head, the flame or the fist through its
     /// stroke, from the top of the wind-up to its end: every point of that path lies in the shape, and the shape reaches no
     /// further than the path does, nor lower. The overhead chop counts from where the axe head has come down to head height.
-    /// A wolf's own height in the world follows its model too: standing, reared up, and through a leap for the throat.
     /// </summary>
     private static void CheckSwingShapesFollowThePlayersModel(GameData data) {
         var rig = new ActorRig(ActorSkin.Player);
@@ -156,25 +148,5 @@ public static class SwingsChecks {
             Require(shape.Left - left < 8 && shape.Right - right < 8, $"{action} should sweep from {left:0} degrees left to {right:0} right as its model does, not {shape.Left} to {shape.Right}");
         }
         rig.Root.Free();
-        var model = new WolfModel();
-        Span<(Vector3 At, float Radius)> body = stackalloc (Vector3, float)[WolfModel.VolumeCount];
-        float Top(Span<(Vector3 At, float Radius)> body) {
-            model.Volumes(body);
-            float top = 0;
-            foreach (var (at, radius) in body) top = Math.Max(top, at.Y + radius);
-            return top;
-        }
-        model.Stand(0, 1, false);
-        Require(Math.Abs(Top(body) - WolfBodies.StandingTop) < .03f, $"a standing wolf's model is {Top(body):0.00} m tall, not {WolfBodies.StandingTop} m");
-        WolfModel.VolumesOf(WolfModel.Rearing(1.1f, 0), body);
-        float reared = 0;
-        foreach (var (at, radius) in body) reared = Math.Max(reared, at.Y + radius);
-        Require(Math.Abs(reared - WolfBodies.RearedTop) < .05f, $"a reared wolf's model is {reared:0.00} m tall, not {WolfBodies.RearedTop} m");
-        for (float progress = 0; progress <= 1; progress += .125f) {
-            model.Stand(0, 1, true); model.Leap(progress, 1, 1);
-            float world = WolfBodies.Top(new Wolf { Leap = World.LeapSeconds * (1 - progress) + 1e-4f });
-            Require(Math.Abs(Top(body) - world) < .12f, $"a wolf {progress:0.000} through its leap is {Top(body):0.00} m tall in its model and {world:0.00} m in the world");
-        }
-        model.Root.Free();
     }
 }

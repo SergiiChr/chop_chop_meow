@@ -22,8 +22,14 @@ public sealed class WolfSnap(World world) {
     /// <summary>How near the jaws have to end to where they were aimed on the player for the bite to land, in metres.</summary>
     public const float Reach = .5f;
 
+    /// <summary>How far ahead of where a wolf stands its jaws snap shut, in metres.</summary>
+    public const float JawsAhead = WolfBodies.WolfNose + JawsShort;
+
     /// <summary>Whether a wolf is gathering itself for a snap, before it leaves the ground.</summary>
     public static bool Winding(Wolf wolf) => wolf.Snap > Flight;
+
+    /// <summary>Whether a wolf has left the ground in a snap and not yet landed.</summary>
+    public static bool InAir(Wolf wolf) => wolf.Snap > 0 && !Winding(wolf);
 
     /// <summary>
     /// A wolf within reach of the acting player whose last snap is behind it starts another. While another wolf tugs them
@@ -56,13 +62,13 @@ public sealed class WolfSnap(World world) {
         var aim = world.Player + (world.Player - wolf.SnapSeen) / Windup * Flight;
         var toward = aim - wolf.Pos;
         if (toward.LengthSquared() > 1e-6f) wolf.Heading = toward.Angle();
-        wolf.SnapTo = wolf.Pos + Vector2.Right.Rotated(wolf.Heading) * Math.Clamp(toward.Length() - WolfBodies.WolfNose - JawsShort, 0, Range);
+        wolf.SnapTo = wolf.Pos + Vector2.Right.Rotated(wolf.Heading) * Math.Clamp(toward.Length() - JawsAhead, 0, Range);
     }
 
     /// <summary>The jaws snap: they bite a player still out in the open within reach of them, which is how every tug out of a doorway starts.</summary>
     private void Land(Wolf wolf) {
         wolf.Attack = Rest;
-        var jaws = wolf.Pos + Vector2.Right.Rotated(wolf.Heading) * (WolfBodies.WolfNose + JawsShort);
+        var jaws = wolf.Pos + Vector2.Right.Rotated(wolf.Heading) * JawsAhead;
         if (!world.Downed && !world.DoorTug.Tugged && jaws.DistanceTo(world.Player) <= Reach) Bite(wolf);
     }
 

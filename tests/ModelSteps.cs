@@ -15,6 +15,26 @@ internal static class ModelSteps {
         return meshes;
     }
 
+    /// <summary>How high off the ground the top of a wolf's body is as its model stands now.</summary>
+    public static float WolfTop(WolfModel model) {
+        Span<(Vector3 At, float Radius)> body = stackalloc (Vector3, float)[WolfModel.VolumeCount];
+        model.Volumes(body);
+        return Highest(body);
+    }
+
+    /// <summary>How high off the ground the top of a wolf's body is in a pose of its model.</summary>
+    public static float WolfTop(WolfPose pose) {
+        Span<(Vector3 At, float Radius)> body = stackalloc (Vector3, float)[WolfModel.VolumeCount];
+        WolfModel.VolumesOf(pose, body);
+        return Highest(body);
+    }
+
+    private static float Highest(ReadOnlySpan<(Vector3 At, float Radius)> body) {
+        float top = 0;
+        foreach (var (at, radius) in body) top = Math.Max(top, at.Y + radius);
+        return top;
+    }
+
     /// <summary>How many times wider than the stump model the stump left by a tree with this id is drawn.</summary>
     public static float StumpWidth(int tree) {
         var prop = WorldModels.Build(new Thing { Id = 1, Kind = ThingKind.Stump, OfTree = tree });

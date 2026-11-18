@@ -69,6 +69,8 @@ public sealed class WolfModel {
     public float Glance;
     /// <summary>The most a wolf's head turns from its body to glance at a player, and how fast it turns there and back, in radians and radians a second.</summary>
     public static readonly float MaxGlance = Mathf.DegToRad(105), GlanceRate = Mathf.DegToRad(260);
+    /// <summary>Seconds from one glance of a following wolf at its player to the next, how long it looks, and how far apart wolves with neighbouring ids glance.</summary>
+    public const float GlanceEvery = 4.6f, GlanceSeconds = 1.7f, GlanceApart = 1.3f;
     /// <summary>Seconds left of holding the end of a snap, jaws shut, after the wolf has landed.</summary>
     public float SnapHeld;
     /// <summary>A leap's bearing from the player to the wolf, and where it holds the throat once the player is down.</summary>
@@ -299,9 +301,9 @@ public sealed class WolfModel {
 
     /// <summary>
     /// How far forward of its place a snapping wolf throws its body, so its jaws close where the world aims them:
-    /// <see cref="WolfSnap.JawsShort"/> past its nose's standing reach.
+    /// <see cref="WolfSnap.JawsAhead"/> of its place.
     /// </summary>
-    public static readonly float SnapSurge = WolfBodies.WolfNose + WolfSnap.JawsShort - BiteOf(Snapping(1, 1, 1, 0)).Z;
+    public static readonly float SnapSurge = WolfSnap.JawsAhead - BiteOf(Snapping(1, 1, 1, 0)).Z;
 
     /// <summary>
     /// Howling: the wolf braces on all four paws, lifts its chest and throws its head back with the muzzle to the sky, the jaw opening as the note swells and closing as it fades.

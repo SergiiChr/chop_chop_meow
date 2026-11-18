@@ -20,6 +20,15 @@ internal static class WolfSteps {
     public static Wolf StillWolf(World world, Vector2 from) =>
         PlaceWolf(world, new Wolf { Pos = world.Player + from, Heading = (-from).Angle(), Howl = 5, HowlLength = 5 });
 
+    /// <summary>The health one swing of a steel axe along <paramref name="aim"/> takes off a wolf standing still <paramref name="wolfAt"/> from the player.</summary>
+    public static float TakenByAnAxe(GameData data, Vector2 wolfAt, Vector2 aim) {
+        var world = AxeNight(data);
+        var wolf = StillWolf(world, wolfAt);
+        world.Attack(aim);
+        world.Tick(.5f);
+        return data.WolfHealth - wolf.Health;
+    }
+
     /// <summary>Ticks a night in steps short enough to follow a snap, 0.08 seconds of which is in the air.</summary>
     public static void SnapTick(World world, float seconds) {
         for (float t = 0; t < seconds - 1e-4f; t += SnapStep) { Nourished(world); world.Tick(SnapStep); }
@@ -36,7 +45,7 @@ internal static class WolfSteps {
         var way = Vector2.Right;
         world.Me.Sprinting = sprinting;
         for (float t = 0; t < 1 && (t == 0 || wolf.Snap > 0); t += SnapStep) {
-            if (turns && wolf.Snap > 0 && !WolfSnap.Winding(wolf)) way = Vector2.Up;
+            if (turns && WolfSnap.InAir(wolf)) way = Vector2.Up;
             Nourished(world); world.MovePlayer(way * SnapStep * data.MoveSpeed(sprinting)); world.Tick(SnapStep);
         }
         Checks.Require(wolf.Snap == 0 && wolf.Attack > 0, "the wolf should have snapped once within a second");

@@ -220,7 +220,7 @@ public sealed class ActorRig {
     public Vector3 Elbow(bool left) => FromForearm(left, Vector3.Zero);
 
     /// <summary>Where the middle of the axe's head is from the rig's root, under the pose just shown.</summary>
-    public Vector3 AxeHead => FromForearm(false, wrist.Transform * new Vector3(0, AxeHeadAt, AxeHeadOut));
+    public Vector3 AxeHead => FromForearm(false, wrist.Transform * new Vector3(0, HeadAt, AxeHeadOut));
 
     /// <summary>Where the tip of the shovel's blade is from the rig's root, under the pose just shown.</summary>
     public Vector3 ShovelTip => FromForearm(false, shovel.Transform * new Vector3(0, -ActorAnimation.ShovelLength, 0));
@@ -256,7 +256,7 @@ public sealed class ActorRig {
     }
 
     /// <summary>How long an axe's or a pickaxe's handle is, how far along it from the grip its head sits, and how far toward its edge the middle of an axe's head is.</summary>
-    private const float ToolLength = .72f, AxeHeadAt = .06f - ToolLength, AxeHeadOut = -.1f;
+    private const float ToolLength = .72f, HeadAt = .06f - ToolLength, AxeHeadOut = -.1f;
 
     /// <summary>A held tool gripped at the origin, handle down along -Y and blade toward -Z; the icon renderer shows it on its own.</summary>
     public static Node3D Tool(string name) {
@@ -267,16 +267,15 @@ public sealed class ActorRig {
         string handle = steelTool ? "e87d1e" : "8a5a32", head = steelTool ? "c9d3d8" : "5b5f62";
         float metal = steelTool ? .85f : .45f;
         var tool = new Node3D();
-        const float length = ToolLength, end = AxeHeadAt;
-        Cylinder(tool, .022f, .022f, length, new Vector3(0, .08f - length / 2, 0), Wood(handle, .7f));
+        Cylinder(tool, .022f, .022f, ToolLength, new Vector3(0, .08f - ToolLength / 2, 0), Wood(handle, .7f));
         if (steelTool) Cylinder(tool, .027f, .027f, .16f, new Vector3(0, -.02f, 0), Mat("222222"));
         var steel = Metal(head, .35f, metal);
         if (name.EndsWith("axe")) {
-            Box(tool, new Vector3(.045f, .1f, .15f), new Vector3(0, end, -.05f), steel);
-            Box(tool, new Vector3(.03f, .17f, .05f), new Vector3(0, end, -.14f), Metal(steelTool ? "e9eef0" : "8d9294", .3f, metal));
+            Box(tool, new Vector3(.045f, .1f, .15f), new Vector3(0, HeadAt, -.05f), steel);
+            Box(tool, new Vector3(.03f, .17f, .05f), new Vector3(0, HeadAt, -.14f), Metal(steelTool ? "e9eef0" : "8d9294", .3f, metal));
         } else {
-            Cylinder(tool, .035f, 0, .3f, new Vector3(0, end, -.15f), steel, new Vector3(-90, 0, 0), 6);
-            Cylinder(tool, .035f, 0, .22f, new Vector3(0, end, .11f), steel, new Vector3(90, 0, 0), 6);
+            Cylinder(tool, .035f, 0, .3f, new Vector3(0, HeadAt, -.15f), steel, new Vector3(-90, 0, 0), 6);
+            Cylinder(tool, .035f, 0, .22f, new Vector3(0, HeadAt, .11f), steel, new Vector3(90, 0, 0), 6);
         }
         return tool;
     }

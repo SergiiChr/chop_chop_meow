@@ -363,7 +363,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>Swings that play out in full on the move: the arms and body keep swinging while the legs keep walking.</summary>
-    public static bool SwingsOnTheMove(ActorAction action) => action is ActorAction.TorchSwing or ActorAction.Attack or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep;
+    public static bool SwingsOnTheMove(ActorAction action) => Contact(action) > 0;
 
     public static Pose PoseAt(ActorAction action, float elapsed, bool moving) {
         if (moving && SwingsOnTheMove(action)) {

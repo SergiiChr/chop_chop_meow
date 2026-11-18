@@ -45,9 +45,8 @@ public static class WolfFollowChecks {
 
     /// <summary>A following wolf is given its way round the player at random, and goes round them that way at a walk, however far off they get.</summary>
     private static void CheckEachFollowingWolfWalksItsOwnWayRound(GameData data) {
-        var world = TorchNight(data);
-        var wolves = Enumerable.Range(0, 4).Select(i => PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(World.StalkDistance, 0).Rotated(i * Mathf.Tau / 4), Scared = true })).ToArray();
-        WolfTick(world, .2f, wolves);
+        var (world, _) = Followed(data, 4);
+        var wolves = world.Wolves.ToArray();
         Require(wolves.All(w => w.Round is 1 or -1), "each following wolf should be given a way round the player");
         Require(wolves.Any(w => w.Round == 1) && wolves.Any(w => w.Round == -1), "following wolves should not all be given the same way round");
         // Wolves going the same way first spread apart, which can take one of them back a little.
@@ -109,7 +108,7 @@ public static class WolfFollowChecks {
         Require(wolf.Braced && !heard.Contains("wolf_growl_approaching"), "a wolf standing its ground should not growl until the player is 3 m off");
         WalkTo(world, wolf, 2.6f);
         WolfTick(world, WolfFollow.GrowlEvery + .5f, all);
-        Require(heard.Count(sound => sound == "wolf_growl_approaching") == 2, $"a wolf standing its ground should growl again and again from 3 m, not {heard.Count(sound => sound == "wolf_growl_approaching")} times in 4 seconds");
+        Require(DoorCheckSteps.Heard(heard, "wolf_growl_approaching") == 2, $"a wolf standing its ground should growl again and again from 3 m, not {DoorCheckSteps.Heard(heard, "wolf_growl_approaching")} times in 4 seconds");
         Require(wolf.Scared && world.Health == 100, "a growling wolf should still hold back while the player keeps 2 m off");
         WalkTo(world, wolf, 1.9f);
         WolfTick(world, .2f, all);

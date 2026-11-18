@@ -18,8 +18,7 @@ public sealed class WolfBodies(World world) {
 
     /// <summary>Where a wolf's body runs from the root of its tail to its nose, facing <paramref name="facing"/>.</summary>
     public static (Vector2 Tail, Vector2 Nose) Body(Wolf wolf, Vector2 facing) {
-        var ahead = facing == wolf.Pos ? Vector2.Right : (facing - wolf.Pos).Normalized();
-        return (wolf.Pos - ahead * WolfTail, wolf.Pos + ahead * WolfNose);
+        return Along(wolf, facing == wolf.Pos ? Vector2.Right : (facing - wolf.Pos).Normalized());
     }
 
     /// <summary>
@@ -33,10 +32,9 @@ public sealed class WolfBodies(World world) {
         wolf.Leap > 0 ? StandingTop + LeapRise * Mathf.SmoothStep(.125f, .625f, 1 - wolf.Leap / World.LeapSeconds) : wolf.Side != 0 ? RearedTop : StandingTop;
 
     /// <summary>Where a wolf's body runs from the root of its tail to its nose, the way it faces (<see cref="Wolf.Heading"/>).</summary>
-    public static (Vector2 Tail, Vector2 Nose) Body(Wolf wolf) {
-        var ahead = Vector2.Right.Rotated(wolf.Heading);
-        return (wolf.Pos - ahead * WolfTail, wolf.Pos + ahead * WolfNose);
-    }
+    public static (Vector2 Tail, Vector2 Nose) Body(Wolf wolf) => Along(wolf, Vector2.Right.Rotated(wolf.Heading));
+
+    private static (Vector2 Tail, Vector2 Nose) Along(Wolf wolf, Vector2 ahead) => (wolf.Pos - ahead * WolfTail, wolf.Pos + ahead * WolfNose);
 
     /// <summary>
     /// How far a wolf closing in on the acting player goes straight at them this tick, up to <paramref name="step"/>: on to
