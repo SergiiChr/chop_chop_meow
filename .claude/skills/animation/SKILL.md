@@ -173,8 +173,8 @@ git fetch origin
   `"player jog"`; both land in the current clip's folder.
 - Wolves have close-ups too: `wolf idle`, `wolf walk`, `wolf trot`, `wolf gallop`, `wolf speeds` (stand to gallop and
   back, for blends), `wolf turn` (a gallop reversing every 2 s, for the head-first turn and the brake), `wolf leap`,
-  `wolf hit`, `wolf feed`, `wolf fall`, `wolf snap` (the bite) and `wolf brace` (standing its ground). All but
-  `wolf fall` of these play against a player, as `SyncWolves` sets them up.
+  `wolf hit`, `wolf feed`, `wolf fall`, `wolf snap` (the bite) and `wolf brace` (standing its ground).
+  `wolf leap`, `wolf hit`, `wolf feed`, `wolf snap` and `wolf brace` play against a player, as `SyncWolves` sets them up.
   `./build.py play -- --animation-review` shows every clip on one screen.
 - Wolves moved by the game's own rules play in `--showcase --wolf-scene patrol` (turns on a patrol), `howl` (turning to
   a player and howling), `feast` (a takedown and feeding), `follow`, `rout` and `stand` (follow mode behind a torch)

@@ -18,6 +18,8 @@ public static class SwingsChecks {
         Test(CheckAWolfStandsTwoBlowsOfASteelAxeAndFallsToTheThirdOrFourth, data);
         Test(CheckATorchBurnsOnlyAWolfItsFlameReaches, data);
         Test(CheckAPunchReachesAWolfAtBitingDistance, data);
+        Test(CheckABlowThrowsAWolfBackAndLeavesItReeling, data);
+        Test(CheckABurntWolfRunsFromThePlayerForAMoment, data);
         Test(CheckSwingShapesFollowThePlayersModel, data);
     }
 
@@ -105,6 +107,37 @@ public static class SwingsChecks {
         float taken = data.WolfHealth - close.Health;
         Require(taken is >= .8f and <= 1.2f, $"a torch crossing a wolf's muzzle should take 0.8 to 1.2 health, not {taken}");
         Require(close.Stagger > 0 && close.Flee > 0, "a burnt wolf should be knocked back and run for a moment");
+    }
+
+    /// <summary>A blow throws a wolf half a metre back from the player, and it stands reeling there for 0.45 seconds.</summary>
+    private static void CheckABlowThrowsAWolfBackAndLeavesItReeling(GameData data) {
+        var world = AxeNight(data);
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0) });
+        world.Attack(Vector2.Right);
+        // The wolf snaps first; the axe comes down 0.4 seconds in.
+        SnapTick(world, .38f);
+        float before = wolf.Pos.DistanceTo(world.Player);
+        SnapTick(world, .04f);
+        float thrown = wolf.Pos.DistanceTo(world.Player) - before;
+        Require(wolf.Health < data.WolfHealth && thrown is > .45f and < .55f, $"a blow should throw a wolf half a metre back, not {thrown:0.00} m");
+        var landed = wolf.Pos;
+        SnapTick(world, .3f);
+        Require(wolf.Pos == landed, "a wolf reeling from a blow should stand where it was thrown");
+        SnapTick(world, .5f);
+        Require(wolf.Pos != landed, "a wolf should move again once it has reeled for 0.45 seconds");
+    }
+
+    /// <summary>A wolf a torch burns runs from the player for a moment, even one that turned on them and that no wave scares.</summary>
+    private static void CheckABurntWolfRunsFromThePlayerForAMoment(GameData data) {
+        var world = TorchNight(data);
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0), Bold = true });
+        world.UseTorch(Vector2.Right);
+        SnapTick(world, .2f);
+        float burnt = wolf.Pos.DistanceTo(world.Player);
+        Require(wolf.Health < data.WolfHealth && !wolf.Scared, "a torch should burn a wolf that turned on the player without scaring it");
+        SnapTick(world, 1.5f);
+        Require(wolf.Pos.DistanceTo(world.Player) > burnt + 1, $"a burnt wolf should run from the player, not stay {wolf.Pos.DistanceTo(world.Player):0.0} m off");
+        Require(world.Health == 100, "a torch that burns a wolf as it gathers itself should stop its bite");
     }
 
     private static void CheckAPunchReachesAWolfAtBitingDistance(GameData data) {

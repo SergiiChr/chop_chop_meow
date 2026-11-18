@@ -825,7 +825,7 @@ A blow knocks a wolf back and leaves it reeling for a moment.
 A wolf at biting distance does not bite at once.
 It gathers itself for 0.3 seconds, then leaps and snaps at where you will be if you keep going the way you were.
 Standing or walking, you are bitten; sprinting, a turn aside as it leaps takes you out of its jaws.
-A blow that lands on it before it leaves the ground stops the bite, and after a snap it waits 0.6 seconds before the next.
+A blow that lands on it before its jaws shut stops the bite, and after a snap it waits 0.6 seconds before the next.
 In a cabin's doorway the same snap is how a wolf takes hold of you: only a bite that lands starts a tug.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
@@ -846,12 +846,12 @@ After that each click swings it, which briefly widens its light by a fifth.
 Swinging four times within 2 seconds, as fast as swings go, puts it out with a message.
 Relighting takes the same 2 seconds and keeps the burn time it had left.
 
-While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into follow mode.
+While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into follow mode, which also stops a bite it was gathering itself for.
 Wolves in follow mode keep circling you at a walk at the edge of the light, about 4.5 metres off, each the way round it took at random; those going the same way spread evenly, and each wanders a little in and out and ahead and back, and turns its head to you now and then.
 Walk away and they come after you at that walk.
 Walk at one and it stops and stands braced where it is. Come within 2 metres and:
 
-- a wolf following alone runs until it is out of your line of sight, goes back to patrolling and leaves you alone until it has been out of smell range of you;
+- a wolf following alone runs until it is out of your line of sight, or for 8 seconds, goes back to patrolling and leaves you alone until it has been out of smell range of you;
 - with more than one following, the wolf you walked at stands its ground: it growls again and again from 3 metres, and at 2 metres every wolf in your line of sight turns on you.
   They then attack as if you had no torch, and no wave of the torch scares them again.
 
