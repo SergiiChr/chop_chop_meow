@@ -58,9 +58,14 @@ public sealed class Wolf : IWalker {
     /// player at the edge of the torchlight while the torch burns.
     /// </summary>
     public bool Scared { get; set; }
+    /// <summary>
+    /// The way a following wolf circles its player: 1 for clockwise on the map, -1 for the other way, and 0 until it is
+    /// given one at random.
+    /// </summary>
+    public int Round { get; set; }
     /// <summary>A following wolf standing braced where it is, because its player has walked up to it.</summary>
     public bool Braced { get; set; }
-    /// <summary>The wolf stood its ground among others and turned on its player: no torch wave scares it again.</summary>
+    /// <summary>The wolf turned on its player when one of a pack following them stood its ground: no torch wave scares it again.</summary>
     public bool Bold { get; set; }
     /// <summary>The wolf, following alone, runs from its player until it is out of their line of sight, for <see cref="Flee"/> seconds at most.</summary>
     public bool Routed { get; set; }

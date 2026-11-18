@@ -14,7 +14,7 @@ public static class SwingsChecks {
     public static void Run(GameData data) {
         Test(CheckAnAxeLandsWhenItComesDownNotWhenItIsSwung, data);
         Test(CheckASwingHitsOnlyWhereItIsAimedAndAsFarAsTheBladeReaches, data);
-        Test(CheckAxeSwingsTakeTurnsAndTheSweepHitsEveryWolfItCrosses, data);
+        Test(CheckAxeSwingsTakeTurnsAndTheSweepCatchesOnlyAWolfInTheAir, data);
         Test(CheckAWolfStandsTwoBlowsOfASteelAxeAndFallsToTheThirdOrFourth, data);
         Test(CheckATorchBurnsOnlyAWolfItsFlameReaches, data);
         Test(CheckAPunchReachesAWolfAtBitingDistance, data);
@@ -50,24 +50,31 @@ public static class SwingsChecks {
         Require(Taken(new Vector2(2.4f, 0), Vector2.Right) == 0, "an axe should fall short of a wolf standing 2.4 m off");
     }
 
-    /// <summary>The overhead chop comes down on one line; every second swing sweeps round from the player's left to the front.</summary>
-    private static void CheckAxeSwingsTakeTurnsAndTheSweepHitsEveryWolfItCrosses(GameData data) {
+    /// <summary>
+    /// The overhead chop comes down on one line. Every second swing sweeps round from the player's left to the front at chest
+    /// height: it passes over a wolf on the ground and lands on one in the air.
+    /// </summary>
+    private static void CheckAxeSwingsTakeTurnsAndTheSweepCatchesOnlyAWolfInTheAir(GameData data) {
         var world = AxeNight(data);
         // Aiming east, the player's left is north, which is up the map.
         var ahead = StillWolf(world, new Vector2(1.5f, 0));
         var left = StillWolf(world, new Vector2(1.5f, 0).Rotated(Mathf.DegToRad(-60)));
-        var right = StillWolf(world, new Vector2(1.5f, 0).Rotated(Mathf.DegToRad(60)));
         var swung = new List<ActorAction>();
         world.PlayerActed += (action, _) => swung.Add(action);
         world.Attack(Vector2.Right);
         world.Tick(.7f);
-        Require(ahead.Health < data.WolfHealth && left.Health == data.WolfHealth && right.Health == data.WolfHealth, "the overhead chop should land only on the wolf straight ahead");
+        Require(ahead.Health < data.WolfHealth && left.Health == data.WolfHealth, "the overhead chop should land only on the wolf straight ahead");
         float after = ahead.Health;
         world.Attack(Vector2.Right);
-        world.Tick(.7f);
+        world.Tick(.2f);
+        // A wolf leaping from the left: half way through its leap as the sweep comes round, 0.42 seconds into the swing.
+        var leaper = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2.6f, 0).Rotated(Mathf.DegToRad(-60)), Leap = World.LeapSeconds });
+        var right = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2.6f, 0).Rotated(Mathf.DegToRad(60)), Leap = World.LeapSeconds });
+        SnapTick(world, .25f);
         Require(swung.SequenceEqual(new[] { ActorAction.SteelAxeSwing, ActorAction.SteelAxeSweep }), $"axe swings should take turns, overhead then sideways: {string.Join(", ", swung)}");
-        Require(ahead.Health < after && left.Health < data.WolfHealth, "the sideways sweep should land on the wolf to the left and the one ahead");
-        Require(right.Health == data.WolfHealth, "the sideways sweep, which comes round from the left, should miss a wolf to the right");
+        Require(ahead.Health == after && left.Health == data.WolfHealth, "the sideways sweep, at chest height, should pass over wolves on the ground");
+        Require(leaper.Health < data.WolfHealth, "the sideways sweep should catch a wolf leaping in from the left");
+        Require(right.Health == data.WolfHealth, "the sideways sweep, which comes round from the left, should miss a wolf leaping in from the right");
     }
 
     private static void CheckAWolfStandsTwoBlowsOfASteelAxeAndFallsToTheThirdOrFourth(GameData data) {
@@ -76,10 +83,13 @@ public static class SwingsChecks {
         for (int n = 0; n < 12; n++) {
             var wolf = StillWolf(world, new Vector2(1.2f, 0));
             int count = 0;
-            while (world.Wolves.Contains(wolf) && count < 6) {
+            for (int swings = 0; world.Wolves.Contains(wolf) && swings < 12; swings++) {
                 // A blow knocks the wolf back; each one is met from the same distance.
                 wolf.Pos = world.Player + new Vector2(1.2f, 0);
-                world.Attack(Vector2.Right); world.Tick(.7f); count++;
+                float health = wolf.Health;
+                world.Attack(Vector2.Right); world.Tick(.7f);
+                // Every second swing is the sweep, which passes over it.
+                if (!world.Wolves.Contains(wolf) || wolf.Health < health) count++;
             }
             blows.Add(count);
         }
@@ -121,14 +131,15 @@ public static class SwingsChecks {
     /// <summary>
     /// Each swing's shape on the ground is where the player's model carries the axe head, the flame or the fist through its
     /// stroke, from the top of the wind-up to its end: every point of that path lies in the shape, and the shape reaches no
-    /// further than the path does. The overhead chop counts from where the axe head has come down to head height.
+    /// further than the path does, nor lower. The overhead chop counts from where the axe head has come down to head height.
+    /// A wolf's own height in the world follows its model too: standing, reared up, and through a leap for the throat.
     /// </summary>
     private static void CheckSwingShapesFollowThePlayersModel(GameData data) {
         var rig = new ActorRig(ActorSkin.Player);
         foreach (var (action, windup, end, shape) in new[] {
             (ActorAction.SteelAxeSwing, .46f, .52f, Swings.Chop), (ActorAction.SteelAxeSweep, .38f, .52f, Swings.Sweep),
             (ActorAction.TorchSwing, .2f, .45f, Swings.Torch), (ActorAction.Attack, .14f, .32f, Swings.Punch) }) {
-            float lands = ActorAnimation.Contact(action) / ActorAnimation.Duration(action), far = 0, left = -180, right = -180;
+            float lands = ActorAnimation.Contact(action) / ActorAnimation.Duration(action), far = 0, left = -180, right = -180, low = float.MaxValue;
             Require(lands >= windup && lands <= end, $"{action} should land during its stroke, {windup} to {end} through, not {lands:0.00} through");
             for (float p = windup; p <= end + .001f; p += .01f) {
                 rig.Show(ActorAnimation.PoseAt(action, p * ActorAnimation.Duration(action), false), ActorAnimation.Tool(action), false, lit: action == ActorAction.TorchSwing);
@@ -137,11 +148,33 @@ public static class SwingsChecks {
                 float distance = new Vector2(at.X, at.Z).Length(), angle = Mathf.RadToDeg(MathF.Atan2(at.X, at.Z));
                 Require(distance <= shape.Far + .01f && angle <= shape.Left + 1 && angle >= -shape.Right - 1,
                     $"{action} carries its end to {distance:0.00} m at {angle:0} degrees left, {p:0.00} through, outside its shape {shape}");
-                far = Math.Max(far, distance); left = Math.Max(left, angle); right = Math.Max(right, -angle);
+                far = Math.Max(far, distance); left = Math.Max(left, angle); right = Math.Max(right, -angle); low = Math.Min(low, at.Y);
             }
+            // An axe head is 0.17 m tall, so its edge comes that much lower than its middle at most; a torch and a fist count at any height.
+            Require(shape.Low == 0 || shape.Low <= low && low - shape.Low < .17f, $"{action} should come no lower than its model does, {low:0.00} m at the middle of its head, not {shape.Low} m");
             Require(shape.Far - far < .25f, $"{action} should reach no more than a head's width past the {far:0.00} m its model does, not to {shape.Far} m");
             Require(shape.Left - left < 8 && shape.Right - right < 8, $"{action} should sweep from {left:0} degrees left to {right:0} right as its model does, not {shape.Left} to {shape.Right}");
         }
         rig.Root.Free();
+        var model = new WolfModel();
+        Span<(Vector3 At, float Radius)> body = stackalloc (Vector3, float)[WolfModel.VolumeCount];
+        float Top(Span<(Vector3 At, float Radius)> body) {
+            model.Volumes(body);
+            float top = 0;
+            foreach (var (at, radius) in body) top = Math.Max(top, at.Y + radius);
+            return top;
+        }
+        model.Stand(0, 1, false);
+        Require(Math.Abs(Top(body) - WolfBodies.StandingTop) < .03f, $"a standing wolf's model is {Top(body):0.00} m tall, not {WolfBodies.StandingTop} m");
+        WolfModel.VolumesOf(WolfModel.Rearing(1.1f, 0), body);
+        float reared = 0;
+        foreach (var (at, radius) in body) reared = Math.Max(reared, at.Y + radius);
+        Require(Math.Abs(reared - WolfBodies.RearedTop) < .05f, $"a reared wolf's model is {reared:0.00} m tall, not {WolfBodies.RearedTop} m");
+        for (float progress = 0; progress <= 1; progress += .125f) {
+            model.Stand(0, 1, true); model.Leap(progress, 1, 1);
+            float world = WolfBodies.Top(new Wolf { Leap = World.LeapSeconds * (1 - progress) + 1e-4f });
+            Require(Math.Abs(Top(body) - world) < .12f, $"a wolf {progress:0.000} through its leap is {Top(body):0.00} m tall in its model and {world:0.00} m in the world");
+        }
+        model.Root.Free();
     }
 }

@@ -65,7 +65,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door), `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm) or `takedown` (the same with a player hurt enough to go down, pinned and fed on; the scene keeps them alive); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
-| `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls and turns on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
+| `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -815,7 +815,8 @@ It lands when the blade comes down, 0.4 seconds in for a steel axe, on every wol
 Axe swings take turns:
 
 - the overhead chop comes down on a strip straight ahead, out to 1.35 metres;
-- the sideways sweep comes round from your left to the front, out to 1.3 metres, and lands on every wolf in that quarter.
+- the sideways sweep comes round from your left to the front at chest height, out to 1.3 metres.
+  It passes over a wolf on the ground, and lands on every wolf in that quarter that is in the air, leaping for your throat, or reared up on someone's arm.
 
 A steel axe takes 2.2 to 3.2 of a wolf's 8 health a blow, a torch 0.8 to 1.2 and a punch 0.4 to 0.6.
 A torch and a fist reach only a wolf at biting distance: the flame 0.75 metres, the fist 0.7 metres and a little to your right.
@@ -846,12 +847,13 @@ Swinging four times within 2 seconds, as fast as swings go, puts it out with a m
 Relighting takes the same 2 seconds and keeps the burn time it had left.
 
 While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into follow mode.
-Wolves in follow mode keep circling you at the edge of the light, about 4.5 metres off, spread evenly round you, each wandering a little in and out and ahead and back.
+Wolves in follow mode keep circling you at a walk at the edge of the light, about 4.5 metres off, each the way round it took at random; those going the same way spread evenly, and each wanders a little in and out and ahead and back.
+Walk away and they come after you at that walk.
 Walk at one and it stops and stands braced where it is. Come within 2 metres and:
 
 - a wolf following alone runs until it is out of your line of sight, goes back to patrolling and leaves you alone until it has been out of smell range of you;
-- with more than one following, the wolf you walked at stands its ground: it growls again and again from 3 metres, and at 2 metres turns on you.
-  It then attacks as if you had no torch, no wave of the torch scares it again, and the others keep following.
+- with more than one following, the wolf you walked at stands its ground: it growls again and again from 3 metres, and at 2 metres every wolf in your line of sight turns on you.
+  They then attack as if you had no torch, and no wave of the torch scares them again.
 
 Once five are around you they attack together and swings no longer scare them.
 A torch that lands on a wolf burns it and sends it running for a moment.

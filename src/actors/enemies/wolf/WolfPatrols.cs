@@ -16,7 +16,7 @@ public sealed class WolfPatrols(World world) {
     }
     private readonly Random wolfRandom = new(1913);
     /// <summary>A wolf hunting nobody walks its patrol at this share of its trot.</summary>
-    private const float PatrolPace = .5f;
+    internal const float PatrolPace = .5f;
     /// <summary>From an hour before dawn every wolf gives up and heads back to the nearest den.</summary>
     public bool WolvesRetreat => world.DayPhase >= world.Data.WolfRetreatStarts;
 
@@ -106,7 +106,7 @@ public sealed class WolfPatrols(World world) {
     }
     /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
     private static void Calm(Wolf wolf) {
-        wolf.Target = 0; wolf.Howl = wolf.HowlIn = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = wolf.Snap = 0;
+        wolf.Target = 0; wolf.Howl = wolf.HowlIn = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = wolf.Snap = 0; wolf.Round = 0;
         wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Braced = wolf.Bold = wolf.Routed = wolf.Growled = wolf.Sprinted = false; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();
         wolf.LetGoOfArm(); wolf.EndDoorCheck();
     }

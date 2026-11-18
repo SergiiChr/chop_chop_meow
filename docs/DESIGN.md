@@ -625,17 +625,18 @@ The door opens while someone steps in or out: it swings with `hut_door_normal` a
 `Swings` (`src/actors/player/Swings.cs`) runs a player's swings at wolves.
 `World.Attack` swings the best axe carried, or a fist without one, and `World.UseTorch` a lit torch, along the aim the player gives, with `Swings.Cooldown` between swings.
 The swing lands `ActorAnimation.Contact` into its animation (`PlayerState.Swing`, a `Swing` counting down), not when it starts, and a player who went down or indoors meanwhile lands nothing.
-It lands on every wolf whose body touches the ground it passes over then, a `SwingShape` seen from above:
+It lands on every wolf whose body touches the ground it passes over then, a `SwingShape` seen from above, and that stands as tall as the swing comes low (`SwingShape.Low`):
 
-| Swing | Shape | Passes over | Damage |
-| --- | --- | --- | --- |
-| Overhead chop | `Swings.Chop` | 0.5 to 1.35 m ahead, 10° left to 8° right of the aim | 2.2 to 3.2 with a steel axe |
-| Sideways sweep | `Swings.Sweep` | 0.5 to 1.3 m out, from 95° left of the aim round to it | 2.2 to 3.2 with a steel axe |
-| Torch | `Swings.Torch` | within 0.75 m, 76° left to 40° right | 0.8 to 1.2 |
-| Punch | `Swings.Punch` | within 0.7 m, 10° to 35° right | 0.4 to 0.6 |
+| Swing | Shape | Passes over | Comes down to | Damage |
+| --- | --- | --- | --- | --- |
+| Overhead chop | `Swings.Chop` | 0.5 to 1.35 m ahead, 10° left to 8° right of the aim | 0.7 m | 2.2 to 3.2 with a steel axe |
+| Sideways sweep | `Swings.Sweep` | 0.5 to 1.3 m out, from 95° left of the aim round to it | 1.05 m | 2.2 to 3.2 with a steel axe |
+| Torch | `Swings.Torch` | within 0.75 m, 76° left to 40° right | any height | 0.8 to 1.2 |
+| Punch | `Swings.Punch` | within 0.7 m, 10° to 35° right | any height | 0.4 to 0.6 |
 
 The shapes are where the player's model carries the axe head (`ActorRig.AxeHead`), the flame and the fist through each stroke, which `CheckSwingShapesFollowThePlayersModel` holds them to.
-A wolf's body is `Swings.Touches`' line of round sections from the root of its tail to its nose, the way it faces (`WolfBodies.Body`).
+A wolf's body is `Swings.Touches`' line of round sections from the root of its tail to its nose, the way it faces (`WolfBodies.Body`), as tall as `WolfBodies.Top`: `WolfBodies.StandingTop` on the ground, up to `WolfBodies.LeapRise` more through a leap for the throat, and `WolfBodies.RearedTop` reared up with an arm in its jaws, as its model stands.
+So the sweep passes over a wolf on the ground and catches one in the air or reared up.
 Each wolf touched takes its own roll of the damage, the swing's own give or take its spread (`Swings.AxeDamage` times the axe's speed, `AxeSpread`), and is knocked back and left reeling (`World.Strike`).
 
 #### Torch
@@ -655,14 +656,14 @@ A torch that lands on a wolf sets `Wolf.Flee`; it leaves alone one in the air or
 
 **Follow mode** (`WolfFollow`) is what wolves a torch scared off do while it burns:
 
-- **Circling.** They walk round the player about `World.StalkDistance` off without biting or leaping, spread evenly: `WolfFollow.Arrange` orders them by bearing and turns the circle's places to fit them, and each heads a little ahead of its place, going round the player and never across them.
-  Each wolf's place drifts ahead and back and its circle swells and shrinks by `WolfFollow.Wander`, at its own pace by its id, so the pack does not walk one plain ring.
-  A wolf far from its place gallops to catch up.
+- **Circling.** They walk round the player about `World.StalkDistance` off without biting or leaping, never faster than a walk (`WolfPatrols.PatrolPace` of the trot), each the way round it was given at random as it began to follow (`Wolf.Round`).
+  Wolves going the same way spread evenly: `WolfFollow.Arrange` orders them by bearing and turns that way's places to fit them, and each heads a little ahead of its place, going round the player and never across them.
+  The two ways walk in lanes a little outside and inside the circle, so wolves going opposite ways pass each other, and each wolf's place drifts ahead and back and its lane in and out at its own pace by its id; all of it stays within `WolfFollow.Wander` of the circle.
 - **Bracing.** One the player comes within `WolfFollow.BraceFrom` of stops and stands braced (`Wolf.Braced`) until they are `WolfFollow.BraceUntil` off again.
 - **Alone.** At `WolfFollow.StandOrRunAt` a wolf following alone runs (`Wolf.Routed`) at a gallop until it is out of the player's line of sight, or for `WolfFollow.RoutSeconds`, then patrols again (`WolfFollow.GiveUp`).
   It leaves that player alone until it has been out of smell range of them (`Wolf.Shunned`), as a wolf does a cabin it gave up on (`Wolf.Tried`).
-- **Among others.** With more than one wolf following, the one walked at stands its ground: it growls every `WolfFollow.GrowlEvery` from `WolfFollow.GrowlFrom`, and at `WolfFollow.StandOrRunAt` turns on the player (`Wolf.Bold`).
-  It attacks as a wolf does with no torch lit, leap for the throat included, and no torch wave scares it again; the others keep following.
+- **Among others.** With more than one wolf following, the one walked at stands its ground: it growls every `WolfFollow.GrowlEvery` from `WolfFollow.GrowlFrom`, and at `WolfFollow.StandOrRunAt` every wolf hunting the player within their line of sight turns on them (`Wolf.Bold`).
+  Each attacks as a wolf does with no torch lit, leap for the throat included, and no torch wave scares it again; one out of sight keeps following.
 
 #### Mauling and wolf meat
 

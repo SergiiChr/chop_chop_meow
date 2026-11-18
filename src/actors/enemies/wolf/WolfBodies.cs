@@ -22,6 +22,16 @@ public sealed class WolfBodies(World world) {
         return (wolf.Pos - ahead * WolfTail, wolf.Pos + ahead * WolfNose);
     }
 
+    /// <summary>
+    /// How tall a wolf's body stands on the ground, how much higher a leap for the throat carries it, and how tall it
+    /// stands reared up with a player's arm in its jaws, in metres.
+    /// </summary>
+    public const float StandingTop = .87f, LeapRise = .55f, RearedTop = 1.16f;
+
+    /// <summary>How high off the ground the top of a wolf's body is: it rises through the first part of a leap for the throat, and stands taller reared up.</summary>
+    public static float Top(Wolf wolf) =>
+        wolf.Leap > 0 ? StandingTop + LeapRise * Mathf.SmoothStep(.125f, .625f, 1 - wolf.Leap / World.LeapSeconds) : wolf.Side != 0 ? RearedTop : StandingTop;
+
     /// <summary>Where a wolf's body runs from the root of its tail to its nose, the way it faces (<see cref="Wolf.Heading"/>).</summary>
     public static (Vector2 Tail, Vector2 Nose) Body(Wolf wolf) {
         var ahead = Vector2.Right.Rotated(wolf.Heading);
@@ -45,7 +55,7 @@ public sealed class WolfBodies(World world) {
             bool holdsA = Holds(a), holdsB = Holds(b);
             // Bodies this far apart cannot touch.
             if (holdsA && holdsB || a.Pos.DistanceSquaredTo(b.Pos) > (2 * (WolfNose + WolfHalfWidth)) * (2 * (WolfNose + WolfHalfWidth))) continue;
-            var (aTail, aNose) = Body(a, at); var (bTail, bNose) = Body(b, at);
+            var (aTail, aNose) = Near(a, at); var (bTail, bNose) = Near(b, at);
             var (onA, onB) = Closest(aTail, aNose, bTail, bNose);
             float overlap = 2 * WolfHalfWidth - onA.DistanceTo(onB);
             if (overlap <= 0) continue;
@@ -55,6 +65,12 @@ public sealed class WolfBodies(World world) {
             if (!holdsB) b.Pos = world.Slide(b.Pos, holdsA ? -push * 2 : -push);
         }
     }
+
+    /// <summary>
+    /// Where the body of a wolf at a player runs: toward them for one closing in, and along its own way for one that
+    /// follows them round, so two going opposite ways pass side by side.
+    /// </summary>
+    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Scared ? Body(wolf) : Body(wolf, player);
 
     /// <summary>Whether a wolf holds its place at the player: tugging them, pinning them or in the air.</summary>
     private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Leap > 0;

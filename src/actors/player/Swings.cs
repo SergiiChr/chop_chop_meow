@@ -10,10 +10,11 @@ namespace ChopChopMeow;
 public sealed class Swings(World world) {
     /// <summary>
     /// What each swing passes over as it lands, measured on the player's model: the overhead chop comes down on a strip
-    /// straight ahead, the sideways sweep crosses from the left round to the front, the torch arm sweeps across in front
-    /// at arm's length, and the right fist reaches out a little to the right.
+    /// straight ahead to the height of a wolf's back, the sideways sweep crosses from the left round to the front at chest
+    /// height, over a wolf on the ground, the torch arm sweeps across in front at arm's length, and the right fist reaches
+    /// out a little to the right. A torch and a fist count at any height.
     /// </summary>
-    public static readonly SwingShape Chop = new(.5f, 1.35f, 10, 8), Sweep = new(.5f, 1.3f, 95, 0), Torch = new(0, .75f, 76, 40), Punch = new(0, .7f, -10, 35);
+    public static readonly SwingShape Chop = new(.5f, 1.35f, 10, 8, .7f), Sweep = new(.5f, 1.3f, 95, 0, 1.05f), Torch = new(0, .75f, 76, 40), Punch = new(0, .7f, -10, 35);
     /// <summary>What a punch and a torch take off a wolf's health, and an axe for each unit of its speed.</summary>
     public const float PunchDamage = .5f, TorchDamage = 1, AxeDamage = 1.5f;
     /// <summary>How far either side of its damage a blow can land: each one is weaker or stronger by up to this much.</summary>
@@ -37,8 +38,9 @@ public sealed class Swings(World world) {
     /// <summary>Whether a swing from <paramref name="from"/> along <paramref name="aim"/>, a unit vector, touches a wolf's body.</summary>
     public static bool Touches(SwingShape shape, Vector2 from, Vector2 aim, Wolf wolf) {
         var (tail, nose) = WolfBodies.Body(wolf);
+        float top = WolfBodies.Top(wolf);
         for (int i = 0; i < BodySections; i++)
-            if (shape.Touches(from, aim, tail.Lerp(nose, i / (BodySections - 1f)), WolfBodies.WolfHalfWidth)) return true;
+            if (shape.Touches(from, aim, tail.Lerp(nose, i / (BodySections - 1f)), WolfBodies.WolfHalfWidth, top)) return true;
         return false;
     }
 

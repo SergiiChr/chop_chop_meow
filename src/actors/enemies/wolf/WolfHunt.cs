@@ -11,8 +11,11 @@ public sealed class WolfHunt(World world) {
     private const float FeastSpeed = 5.5f, ChaseSeconds = 3;
     /// <summary>The share of its trot a wolf creeps in at behind torchlight.</summary>
     private const float CreepPace = .35f;
-    /// <summary>Metres a second above which a wolf's body faces the way it goes; slower, as when it backs off, it faces its player.</summary>
-    private const float FacesItsWayFrom = 1.5f;
+    /// <summary>
+    /// Metres a second above which a wolf's body faces the way it goes, closing in and following; slower, as when it backs
+    /// off, it faces its player.
+    /// </summary>
+    private const float FacesItsWayFrom = 1.5f, FollowsItsWayFrom = .3f;
     /// <summary>How far from a downed player's tile each feeding wolf stands.</summary>
     private const float FeastSeat = 1.1f;
 
@@ -100,7 +103,7 @@ public sealed class WolfHunt(World world) {
             wolf.Pos = world.Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * (wolf.Routed ? chase : speed));
             if (wolf.Routed && (wolf.Flee <= 0 || wolf.Pos.DistanceTo(world.Player) > world.Data.SightRadius)) world.WolfFollow.GiveUp(wolf);
         } else if (wary && wolf.Scared) {
-            world.WolfFollow.Follow(wolf, braced, dt, speed, chase);
+            world.WolfFollow.Follow(wolf, braced, dt, speed * WolfPatrols.PatrolPace);
             Growl(wolf);
         } else if (wary) {
             wolf.Chase = 0;
@@ -137,7 +140,9 @@ public sealed class WolfHunt(World world) {
     private void Face(Wolf wolf, Vector2 from, float dt) {
         if (wolf.Stagger > 0 || wolf.Snap > 0 && !WolfSnap.Winding(wolf)) return;
         var went = wolf.Pos - from;
-        var toward = went.LengthSquared() > dt * dt * FacesItsWayFrom * FacesItsWayFrom ? went : world.Player - wolf.Pos;
+        // A following wolf walks round its player, slower than that, and still faces its way.
+        float pace = wolf.Scared ? FollowsItsWayFrom : FacesItsWayFrom;
+        var toward = went.LengthSquared() > dt * dt * pace * pace ? went : world.Player - wolf.Pos;
         if (toward.LengthSquared() > 1e-8f) wolf.Heading = toward.Angle();
     }
 

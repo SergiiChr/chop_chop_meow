@@ -55,14 +55,14 @@ public sealed partial class WolfReview : Node {
                 (.8f, () => World.UseTorch(Vector2.Right)),
                 (5, () => WalkAt(0, 1.8f)),
             },
-            // Two wolves follow a player with a torch; they walk up to one, which stands braced and growls, then on at it, and it turns on them.
+            // Two wolves follow a player with a torch; they walk up to one, which stands braced and growls, then on at it, and both turn on them.
             "stand" => new (float, Action)[] {
                 (0, () => { Torch(open); Hunters(new Vector2(6, .5f), new Vector2(6.5f, -1)); }),
                 (.8f, () => World.UseTorch(Vector2.Right)),
                 (6, () => WalkAt(0, 2.6f)), (11, () => WalkAt(0, 1.8f)),
             },
             // A player with a steel axe and no torch meets two wolves: each gathers itself and snaps, and the player swings at
-            // them, the overhead chop and the sideways sweep in turn.
+            // them, the overhead chop and the sideways sweep in turn; the sweep passes over them.
             _ => new (float, Action)[] {
                 (0, () => { World.Player = open; World.S.Backpack.Add("steel_axe", 1); Hunters(new Vector2(5, .5f), new Vector2(5.5f, -1.5f)); }),
                 (.75f, Swing), (1.45f, Swing), (2.15f, Swing), (2.85f, Swing), (3.55f, Swing), (4.25f, Swing), (4.95f, Swing), (5.65f, Swing), (6.35f, Swing), (7.05f, Swing),
