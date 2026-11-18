@@ -56,6 +56,7 @@ Icons and models are committed; playing does not call an image-generation servic
   For motion, record a movie at a fixed frame rate with `./build.py record` (`animation` skill), which reuses the last export while the sources are unchanged.
 - To play the real window with keyboard and mouse, use the `playtest` skill (`.claude/skills/playtest`).
 - After a scripted rename, run `python3 tools/compare_strings.py <base>`: checks do not read most text, and a rename can reach into it.
+  It does not see names in code: also search the diff for the old and the new word (`git diff <base> | grep -nw -e Old -e New`) and read each hit, since a rename by word also renames unrelated things that share it, such as a test helper.
 - `python3 tools/doc_names.py` lists the files, types, members, checks and flags the docs name in backticks that the code no longer has.
 - Report limitations candidly; do not claim a full playthrough from a fixture that injects finished goods.
 

@@ -49,7 +49,7 @@ public sealed partial class WolfReview : Node {
     private void StayIn() { World.Player = Doorways.DoorPoint(Cabin); World.S.Sheltered = Cabin.Id; Cabin.Locked = true; }
 
     /// <summary>Sets a wolf patrolling from a spot on a heading in degrees, east at 0 and south at 90, leaving the cabin alone.</summary>
-    private void Patrol(Vector2 from, float degrees) => World.S.Wolves.Add(new Wolf { Pos = from, Heading = Mathf.DegToRad(degrees), Tried = Cabin.Id });
+    private void Patrol(Vector2 from, float degrees) => World.S.Wolves.Add(new Wolf { Pos = from, Heading = Mathf.DegToRad(degrees), Tried = { Cabin.Id } });
 
     /// <summary>Turns every patrolling wolf onto a heading in degrees.</summary>
     private void Head(float degrees) { foreach (var wolf in World.S.Wolves) wolf.Heading = Mathf.DegToRad(degrees); }

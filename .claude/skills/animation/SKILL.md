@@ -126,6 +126,10 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 - Check proportions against a side-on reference photo: render the model side-on and orthographic at the photo's scale and
   put the two side by side.
 - Look at anything that glows, such as eyes, in a dark scene as well.
+- When a body comes at another from a side, check which side and which limb it takes: look from straight above
+  (`--camera-pitch 89`), where a body on the wrong side crossing over to the far limb shows at once, and print how
+  far out to that side it is drawn. Take every left and right of a body from `BodySide`
+  (`src/actors/model/BodySide.cs`), never from a sign worked out on the spot.
 
 ## This game's rigs
 
@@ -171,6 +175,9 @@ git fetch origin
   back, for blends), `wolf turn` (a gallop reversing every 2 s, for the head-first turn and the brake), `wolf leap`,
   `wolf hit`, `wolf feed` and `wolf fall`. The last four play against a player, as `SyncWolves` sets them up.
   `./build.py play -- --animation-review` shows every clip on one screen.
+- Wolves moved by the game's own rules play in `--showcase --wolf-scene patrol` (turns on a patrol), `howl` (turning to
+  a player and howling) and `feast` (a takedown and feeding), and at a cabin's door in the `--doorway` scenes
+  (README, command-line flags). Record them with `./build.py record` as below.
 - A machine without a display, such as a cloud container, records under `xvfb-run -a ./tools/animation_review.py ...`.
 - Turn the movies into a side-by-side video or a numbered contact sheet with the `frame-compare` skill, which takes
   them as they are.

@@ -72,14 +72,15 @@ public sealed class DoorCheck(World world) {
 
     /// <summary>
     /// A wolf hunting nobody that comes within smell of a cabin with someone inside goes to its door, without a howl; returns
-    /// whether it did. It leaves alone the cabin whose locked door it last left, until it has been out of smell range of it.
+    /// whether it did. It leaves alone each cabin whose door it gave up on, until it has been out of smell range of that one.
     /// </summary>
     public bool Smell(Wolf wolf) {
         float radius = world.Data.SmellRadius;
-        if (wolf.Tried != 0 && (world.Find(wolf.Tried) is not Thing left || left.Pos.DistanceTo(wolf.Pos) > radius)) wolf.Tried = 0;
+        for (int i = wolf.Tried.Count - 1; i >= 0; i--)
+            if (world.Find(wolf.Tried[i]) is not Thing left || left.Pos.DistanceTo(wolf.Pos) > radius) wolf.Tried.RemoveAt(i);
         Thing? nearest = null;
         foreach (var t in world.S.Things.Of(ThingKind.Hut))
-            if (t.Id != wolf.Tried && t.Pos.DistanceTo(wolf.Pos) <= radius && Draws(t) && (nearest == null || t.Pos.DistanceSquaredTo(wolf.Pos) < nearest.Pos.DistanceSquaredTo(wolf.Pos))) nearest = t;
+            if (!wolf.Tried.Contains(t.Id) && t.Pos.DistanceTo(wolf.Pos) <= radius && Draws(t) && (nearest == null || t.Pos.DistanceSquaredTo(wolf.Pos) < nearest.Pos.DistanceSquaredTo(wolf.Pos))) nearest = t;
         if (nearest == null) return false;
         Start(wolf, nearest);
         return true;
@@ -87,7 +88,7 @@ public sealed class DoorCheck(World world) {
 
     /// <summary>Sends a wolf whose player got inside a cabin to its door; false for a cabin it leaves alone or one a campfire lights.</summary>
     public bool Follow(Wolf wolf, Thing? cabin) {
-        if (cabin == null || cabin.Kind != ThingKind.Hut || cabin.Id == wolf.Tried || world.Protected(Doorways.DoorPoint(cabin))) return false;
+        if (cabin == null || cabin.Kind != ThingKind.Hut || wolf.Tried.Contains(cabin.Id) || world.Protected(Doorways.DoorPoint(cabin))) return false;
         Start(wolf, cabin);
         return true;
     }
@@ -137,10 +138,11 @@ public sealed class DoorCheck(World world) {
                     // It comes round to face the door, then walks straight up to it, so it gets there facing it and at a walk.
                     var scratch = door + Doorways.AsideWay * ScratchAside;
                     float aside = (wolf.Pos - scratch).Dot(Doorways.AsideWay), outFrom = (wolf.Pos - scratch).Dot(Doorways.OutOfDoor);
+                    // With no way to the door it gives up on the cabin.
                     if (Math.Abs(aside) < ApproachLane && outFrom > 0 && outFrom < ApproachFrom + ApproachLane) {
-                        world.Travel(wolf, scratch, step * ApproachPace, step * ApproachPace);
-                        if (wolf.Pos.DistanceTo(scratch) < AtDoorSpot) Stage(wolf, DoorCheckStage.Scratching);
-                    } else world.Travel(wolf, scratch + Doorways.OutOfDoor * ApproachFrom, step, step);
+                        if (!world.Travel(wolf, scratch, step * ApproachPace, step * ApproachPace)) GiveUp(wolf, cabin);
+                        else if (wolf.Pos.DistanceTo(scratch) < AtDoorSpot) Stage(wolf, DoorCheckStage.Scratching);
+                    } else if (!world.Travel(wolf, scratch + Doorways.OutOfDoor * ApproachFrom, step, step)) GiveUp(wolf, cabin);
                 } else if (lead != null && WaitSpot(wolf, lead, door) is var spot && wolf.Pos.DistanceTo(spot) >= AtSpot && world.CanStand(spot)) world.Travel(wolf, spot, step, step);
                 break;
             case DoorCheckStage.Scratching:
@@ -174,14 +176,17 @@ public sealed class DoorCheck(World world) {
     /// <summary>Ends a wolf's door check: it goes back to patrolling, the way it was heading.</summary>
     private static void End(Wolf wolf) => WolfPatrols.Patrol(wolf, wolf.Heading);
 
-    /// <summary>Sends every wolf at a locked cabin's door away from it; each leaves that cabin alone until it has been out of smell range of it.</summary>
+    /// <summary>Sends every wolf at a locked cabin's door away from it.</summary>
     private void GoAway(Thing cabin) {
-        foreach (var w in world.S.Wolves) {
-            if (w.DoorCheck == DoorCheckStage.None || w.DoorCheckCabin != cabin.Id) continue;
-            var away = w.Pos - cabin.Pos;
-            WolfPatrols.Patrol(w, (away == Vector2.Zero ? Doorways.OutOfDoor : away).Angle());
-            w.Tried = cabin.Id;
-        }
+        foreach (var w in world.S.Wolves)
+            if (w.DoorCheck != DoorCheckStage.None && w.DoorCheckCabin == cabin.Id) GiveUp(w, cabin);
+    }
+
+    /// <summary>A wolf gives up on a cabin's door and walks on away from it; it leaves that cabin alone until it has been out of smell range of it.</summary>
+    private static void GiveUp(Wolf wolf, Thing cabin) {
+        var away = wolf.Pos - cabin.Pos;
+        WolfPatrols.Patrol(wolf, (away == Vector2.Zero ? Doorways.OutOfDoor : away).Angle());
+        if (!wolf.Tried.Contains(cabin.Id)) wolf.Tried.Add(cabin.Id);
     }
 
     /// <summary>

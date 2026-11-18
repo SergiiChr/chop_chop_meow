@@ -31,8 +31,10 @@ public sealed class Wolf : IWalker {
     public DoorCheckStage DoorCheck { get; set; }
     public int DoorCheckCabin { get; set; }
     public float DoorCheckTime { get; set; }
-    /// <summary>The cabin whose locked door this wolf last left; it leaves that cabin alone until it is out of smell range of it.</summary>
-    public int Tried { get; set; }
+    /// <summary>The cabins whose doors this wolf gave up on, locked or out of its reach; it leaves each alone until it is out of smell range of it.</summary>
+    public List<int> Tried { get; set; } = new(TriedRoom);
+    /// <summary>How many cabins a wolf has room to remember from the start, so giving up on one mid-game makes no new list.</summary>
+    private const int TriedRoom = 4;
     /// <summary>The way from a player's throat to where a wolf that tugged them out lunges onto it from, or zero for one that pins them standing over them.</summary>
     public Vector2 LungeFrom { get; set; }
     /// <summary>The wolf has growled at the player while closing in; it growls only once.</summary>

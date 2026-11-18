@@ -868,7 +868,7 @@ A wolf that was hunting you when you got inside comes to the cabin's door, and s
 A campfire lighting the door keeps them off it.
 The wolf scratches at the door for 3.6 seconds, which you hear from inside.
 
-- From a locked door it goes away, and leaves that cabin alone until it has been out of smell of it and comes back.
+- From a locked door it goes away, and so does a wolf with no way to a door; it leaves every cabin it gave up on alone until it has been out of smell of that one and comes back.
 - You can still turn the key while it scratches.
 - At an unlocked door it turns to the door's free edge, hooks its snout behind it and levers the door out in three pries over 1.5 seconds, the door rattling at each; the key no longer turns.
   It squeezes in between the door and its frame over 2.5 seconds, stands in the doorway growling at you with its fangs bared for 2 seconds and launches itself at you.

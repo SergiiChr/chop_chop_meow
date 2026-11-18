@@ -579,7 +579,7 @@ A wolf whose player got inside goes there (`DoorCheck.Follow`), and so does a pa
 
 - `Coming`: the wolf nearest the door comes round to face it and walks straight up, at a walk, to `DoorCheck.ScratchAside` toward the free edge from `Doorways.DoorPoint`; the others wait `DoorCheck.WaitBehind` out from it, `DoorCheck.WaitApart` apart.
 - `Scratching` lasts `DoorCheck.ScratchSeconds` with `door_scratch`.
-  From a locked door every wolf there goes away (`Wolf.Tried`), leaving that cabin alone until it has been out of smell range of it.
+  From a locked door every wolf there goes away, and a wolf with no way to a door gives up on it (`DoorCheck.GiveUp`); it leaves alone every cabin it gave up on (`Wolf.Tried`) until it has been out of smell range of that one.
   Until its snout is in the door a wolf turns to a player out in the open within `WolfSightRange`.
 - `Prying`, `Opening`, `Staring` (with a growl) and `Launching` last `PrySeconds`, `OpenSeconds`, `StareSeconds` and `LaunchSeconds`.
   From `Prying` on the key does not turn, nobody steps in past the wolf, and nobody steps out from the first scratch on (`DoorCheck.Forcing`, `DoorCheck.AtDoor`).

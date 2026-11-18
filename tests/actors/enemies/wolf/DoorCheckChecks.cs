@@ -29,6 +29,8 @@ public static class DoorCheckChecks {
         Test(CheckSleepBehindALockedDoorLastsUntilDawn, data);
         Test(CheckNobodySleepsWhileAWolfForcesTheDoor, data);
         Test(CheckAHitKnocksAWolfOffTheDoorItForces, data);
+        Test(CheckAWolfLeavesAloneEveryLockedCabinItTriedWhileItSmellsThem, data);
+        Test(CheckAWolfGivesUpOnACabinWhoseDoorItCannotReach, data);
     }
 
     private static void CheckAWolfScratchesAtALockedDoorAndGoesAway(GameData data) {
@@ -227,6 +229,36 @@ public static class DoorCheckChecks {
         Require(world.Day == day + 1 && !world.Night, "sleep behind a locked door should last until dawn");
         Require(world.Sheltered == hut.Id && world.Health == 100 && hut.Locked, "the sleeper should wake inside, unhurt, behind the locked door");
         Require(!heard.Contains("door_scratch") && world.Wolves.Count == 0, $"a slept night should be silent and end with the wolves gone: heard {string.Join(", ", heard)}");
+    }
+
+    /// <summary>A wolf walks at 1.5 m a second, so 12 seconds after its second scratch it is still within the 30 m it smells both cabins from.</summary>
+    private static void CheckAWolfLeavesAloneEveryLockedCabinItTriedWhileItSmellsThem(GameData data) {
+        var (world, hut, heard) = ShelteredNight(data, locked: true);
+        var guest = world.Arrive("guest", 2);
+        var second = world.Add(ThingKind.Hut, hut.Pos + new Vector2(8, 0));
+        StepInside(world, second, guest);
+        world.As(guest, world.Doorways.TurnKey);
+        Require(second.Locked, "the guest inside the second cabin should lock its door");
+        var wolf = ScratchingWolf(world, hut);
+        for (float time = 0; time < 25 && Heard(heard, "door_scratch") < 2; time += .05f) DoorCheckTick(world, .05f);
+        Require(Heard(heard, "door_scratch") == 2 && wolf.DoorCheckCabin == second.Id, $"a wolf sent away from one locked cabin should try the other one beside it: heard {string.Join(", ", heard)}");
+        DoorCheckTick(world, 12);
+        Require(wolf.Pos.DistanceTo(hut.Pos) < data.SmellRadius && wolf.Pos.DistanceTo(second.Pos) < data.SmellRadius, "the wolf should still be within smell of both cabins");
+        Require(Heard(heard, "door_scratch") == 2 && wolf.DoorCheck == DoorCheckStage.None, $"a wolf should leave alone both locked cabins it tried, not scratch {Heard(heard, "door_scratch")} times and be {wolf.DoorCheck}");
+    }
+
+    private static void CheckAWolfGivesUpOnACabinWhoseDoorItCannotReach(GameData data) {
+        var world = NightWorld(data);
+        // A cabin from an older save, with its door in the lake.
+        var hut = world.Add(ThingKind.Hut, ShoreForACabin(world));
+        SetSheltered(world, hut);
+        var from = new[] { new Vector2(0, -5), new Vector2(-5, 0), new Vector2(5, 0), new Vector2(-4, -4), new Vector2(4, -4) }.Select(way => hut.Pos + way).First(world.CanStand);
+        var wolf = PatrolWolf(world, new Wolf { Pos = from });
+        DoorCheckTick(world, 4);
+        Require(wolf.DoorCheck == DoorCheckStage.None && wolf.Mode == WolfMode.Patrol, $"a wolf with no way to a cabin's door should give up on it, not stay {wolf.DoorCheck}");
+        var at = wolf.Pos;
+        DoorCheckTick(world, 3);
+        Require(wolf.DoorCheck == DoorCheckStage.None && wolf.Pos.DistanceTo(at) > 2, $"a wolf that gave up on a cabin should walk on and leave it alone, not be {wolf.DoorCheck} {wolf.Pos.DistanceTo(at):0.0} m on");
     }
 
     private static void CheckAHitKnocksAWolfOffTheDoorItForces(GameData data) {
