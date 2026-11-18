@@ -153,7 +153,7 @@ public partial class WorldView {
 
     private static readonly (string Name, ActorSkin Skin, ActorAction Action)[] ReviewClips =
     {
-        ("player jog", ActorSkin.Player, ActorAction.Jog), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop), ("player axe swing", ActorSkin.Player, ActorAction.SteelAxeSwing), ("player axe sweep", ActorSkin.Player, ActorAction.SteelAxeSweep),
+        ("player jog", ActorSkin.Player, ActorAction.Jog), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop), ("player axe swing", ActorSkin.Player, ActorAction.SteelAxeSwing), ("player axe sweep", ActorSkin.Player, ActorAction.SteelAxeSweep), ("player torch swing", ActorSkin.Player, ActorAction.TorchSwing),
         ("player pick", ActorSkin.Player, ActorAction.Mine), ("player steel pick", ActorSkin.Player, ActorAction.SteelMine), ("player gather", ActorSkin.Player, ActorAction.Gather),
         ("player hammer", ActorSkin.Player, ActorAction.Hammer), ("player pump", ActorSkin.Player, ActorAction.Pump), ("player punch", ActorSkin.Player, ActorAction.Attack),
         ("player idle", ActorSkin.Player, ActorAction.Idle), ("worker walk", ActorSkin.Worker, ActorAction.Walk), ("worker axe", ActorSkin.Worker, ActorAction.Chop),
@@ -260,7 +260,8 @@ public partial class WorldView {
         float along = Mathf.PosMod(Elapsed * ReviewSpeed(action) + 20, 40) - 20;
         if (reviewActor.Position.Dot(track) > along + 1) reviewActor.Position -= track * 40;
         reviewActor.Update(track * along, action, track * (along + 1), dt);
-        Pose(reviewRigs[0], reviewActor, ActorAnimation.Tool(action));
+        Pose(reviewRigs[0], reviewActor, ActorAnimation.Tool(action), torch: action == ActorAction.TorchSwing);
+        reviewRigs[0].Flame.Visible = action == ActorAction.TorchSwing;
         reviewRigs[0].Root.Rotation += new Vector3(0, Mathf.DegToRad(ReviewTurn), 0);
     }
 
