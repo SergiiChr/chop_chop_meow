@@ -57,9 +57,12 @@ public sealed class Wolf : IWalker {
     public FollowStage Follow { get; set; }
     /// <summary>
     /// A torch swing toward this wolf made it keep its distance, in follow mode (<see cref="WolfFollow"/>): it circles its
-    /// player at the edge of the torchlight while the torch burns, or stands braced when they walk up to it.
+    /// player at the edge of the torchlight while the torch burns, walks back out to that circle first, or stands braced
+    /// when they walk up to it.
     /// </summary>
-    [JsonIgnore] public bool Following => Follow is FollowStage.Circling or FollowStage.Braced;
+    [JsonIgnore] public bool Following => Follow is FollowStage.BackingOff or FollowStage.Circling or FollowStage.Braced;
+    /// <summary>Where its player stood when a wolf backing off last looked, which tells it whether they come after it.</summary>
+    public Vector2 Watched { get; set; }
     /// <summary>
     /// The way a following wolf circles its player: 1 for clockwise on the map, -1 for the other way, and 0 until it is
     /// given one at random.

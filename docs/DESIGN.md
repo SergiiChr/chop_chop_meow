@@ -651,13 +651,15 @@ They put the torch out after `World.WildSwings` within `World.WildWindow` second
 While the torch burns and fewer than `World.PackSize` wolves are near:
 
 - an unscared wolf creeps in at a third of its speed and can bite;
-- a swing aimed within about 45° of a wolf in `World.ScareRange` puts it in follow mode (`Wolf.Follow`, a `FollowStage`; `Wolf.Following` while it circles or stands braced).
+- a swing aimed within about 45° of a wolf in `World.ScareRange` puts it in follow mode (`Wolf.Follow`, a `FollowStage`; `Wolf.Following` while it backs off, circles or stands braced).
 
 Once the pack is complete, swings no longer scare and the wolves attack.
 A torch that lands on a wolf sets `Wolf.Flee`; it leaves alone one in the air or feeding.
 
 **Follow mode** (`WolfFollow`) is what wolves a torch scared off do while it burns:
 
+- **Backing off.** Every wave that reaches a wolf, a first one or one at a wolf already following, sends it walking back out to its circle (`FollowStage.BackingOff`), however near the player it was.
+  Until it is `WolfFollow.BraceFrom` off, the rules below wait, unless the player comes after it: any step of theirs toward it (`Wolf.Watched`) makes a wolf with no other follower in their line of sight run as in **Alone**, and makes one among others stand its ground at once, as in **Among others**.
 - **Circling.** They walk round the player about `World.StalkDistance` off without biting or leaping, never faster than a walk (`WolfPatrols.PatrolPace` of the trot), each the way round it was given at random as it began to follow (`Wolf.Round`).
   Wolves going the same way spread evenly: `WolfFollow.Arrange` orders them by bearing and turns that way's places to fit them, and each heads a little ahead of its place, going round the player and never across them.
   It heads along the line touching its circle where it stands, so going round never takes it nearer the player, where it would brace.

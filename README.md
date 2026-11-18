@@ -847,6 +847,8 @@ Swinging four times within 2 seconds, as fast as swings go, puts it out with a m
 Relighting takes the same 2 seconds and keeps the burn time it had left.
 
 While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into follow mode, which also stops a bite it was gathering itself for.
+Every wave sends the wolves it reaches walking back out to their circle, however near they were, a second wave as much as a first.
+Take any step toward one that is still backing off and it stops backing off: alone it runs, and among others it stands its ground, both as below.
 Wolves in follow mode keep circling you at a walk at the edge of the light, about 4.5 metres off, each the way round it took at random; those going the same way spread evenly, and each wanders a little in and out and ahead and back, and turns its head to you now and then.
 Walk away and they come after you at that walk.
 Walk at one and it stops and stands braced where it is. Come within 2 metres and:

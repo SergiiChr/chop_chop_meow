@@ -60,6 +60,17 @@ internal static class WolfSteps {
         return (world, wolves[0]);
     }
 
+    /// <summary>
+    /// A torch night with wolves <paramref name="off"/> metres east of the player, a few degrees apart, that the player has
+    /// just waved the torch at.
+    /// </summary>
+    public static (World World, Wolf[] Wolves) WavedAtUpClose(GameData data, int count, float off) {
+        var world = TorchNight(data);
+        var wolves = Enumerable.Range(0, count).Select(i => PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(off, 0).Rotated(Mathf.DegToRad(30 * i - 15 * (count - 1))) })).ToArray();
+        world.UseTorch(Vector2.Right);
+        return (world, wolves);
+    }
+
     /// <summary>Puts the player a given distance from a wolf, on the line between them, as if they had walked at it.</summary>
     public static void WalkTo(World world, Wolf wolf, float distance) => world.Player = wolf.Pos + (world.Player - wolf.Pos).Normalized() * distance;
 }

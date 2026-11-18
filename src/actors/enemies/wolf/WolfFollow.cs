@@ -5,8 +5,10 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// Follow mode in <paramref name="world"/>: wolves a torch wave scared off keep circling the acting player at a walk, at
-/// the edge of the torchlight, each its own way round. One the player walks at stands braced where it is. From
+/// Follow mode in <paramref name="world"/>: wolves a torch wave scared off walk back out to a circle round the acting
+/// player and keep circling them at a walk, at the edge of the torchlight, each its own way round. One still backing
+/// off that the player comes after runs, alone, or stands its ground, among others.
+/// One on its circle that the player walks at stands braced where it is. From
 /// <see cref="StandOrRunAt"/> a wolf following alone runs out of the player's line of sight and goes back to patrolling,
 /// while one of several stands its ground: it growls from <see cref="GrowlFrom"/>, and then every wolf hunting the
 /// player within their line of sight turns on them, for good. Only followers within that line of sight count as others.
@@ -38,6 +40,8 @@ public sealed class WolfFollow(World world) {
     private const float Arc = .6f;
     /// <summary>Metres a second a wolf moves for each metre it is from where it heads, up to its walk.</summary>
     private const float Keenness = 1.2f;
+    /// <summary>Metres toward a wolf backing off that a player has to move in a tick to count as coming after it: any step, past rounding.</summary>
+    private const float ChaseStep = 1e-4f;
 
     /// <summary>The wolves hunting the acting player this tick, and those of them that follow.</summary>
     private List<Wolf> pack = new();
@@ -55,7 +59,8 @@ public sealed class WolfFollow(World world) {
         if (world.PackAround >= World.PackSize) return;
         foreach (var wolf in world.S.Wolves)
             if (wolf.Follow is not (FollowStage.Bold or FollowStage.Routed) && wolf.Pos.DistanceTo(world.Player) < World.ScareRange && (wolf.Pos - world.Player).Normalized().Dot(direction) > .7f) {
-                if (wolf.Follow == FollowStage.None) wolf.Follow = FollowStage.Circling;
+                // Every wave sends it back out to its circle, one already following too.
+                wolf.Follow = FollowStage.BackingOff; wolf.Watched = world.Player;
                 // The fire stops a wolf still gathering itself to snap; one already in the air lands.
                 if (WolfSnap.Winding(wolf)) wolf.Snap = 0;
             }
@@ -93,14 +98,26 @@ public sealed class WolfFollow(World world) {
 
     /// <summary>
     /// Moves a following wolf: round the circle toward its place at a walk, or not at all while the player is close, when
-    /// it braces, growls, and from <see cref="StandOrRunAt"/> runs or sets the pack on them. <paramref name="braced"/>
+    /// it braces, growls, and from <see cref="StandOrRunAt"/> runs or sets the pack on them. One a wave has just reached
+    /// walks out to its circle first, whatever the distance, unless the player comes after it. <paramref name="braced"/>
     /// tells that it stood braced last tick, and <paramref name="walk"/> is a wolf's walking pace.
     /// </summary>
     internal void Follow(Wolf wolf, bool braced, float dt, float walk) {
         float near = wolf.Pos.DistanceTo(world.Player);
         wolf.Chase = 0;
+        if (wolf.Follow == FollowStage.BackingOff) {
+            // Any step of the player's toward the wolf is a chase.
+            bool chased = (world.Player - wolf.Watched).Dot((wolf.Pos - wolf.Watched).Normalized()) > ChaseStep;
+            wolf.Watched = world.Player;
+            if (near < BraceFrom) {
+                if (!chased) { wolf.GrowlIn = 0; GoRound(wolf, dt, walk); return; }
+                // Chased, a wolf alone runs; among others it stands its ground from here on.
+                if (FollowingInSight() <= 1) { Rout(wolf); return; }
+            }
+            wolf.Follow = FollowStage.Circling;
+        }
         if (near < StandOrRunAt) {
-            if (FollowingInSight() > 1) TurnOnPlayer(); else { wolf.Follow = FollowStage.Routed; wolf.GrowlIn = 0; wolf.Flee = RoutSeconds; }
+            if (FollowingInSight() > 1) TurnOnPlayer(); else Rout(wolf);
             return;
         }
         if (near < (braced ? BraceUntil : BraceFrom)) {
@@ -109,6 +126,14 @@ public sealed class WolfFollow(World world) {
             return;
         }
         wolf.GrowlIn = 0;
+        GoRound(wolf, dt, walk);
+    }
+
+    /// <summary>A wolf following alone runs from the acting player.</summary>
+    private static void Rout(Wolf wolf) { wolf.Follow = FollowStage.Routed; wolf.GrowlIn = 0; wolf.Flee = RoutSeconds; }
+
+    /// <summary>Walks a following wolf toward its place on its circle: out to it from nearer the player, and round it once there.</summary>
+    private void GoRound(Wolf wolf, float dt, float walk) {
         var ring = wolf.Round > 0 ? clockwise : counter;
         // Each wolf's place drifts ahead and back and its circle in and out at its own pace, by its saved id, so it replays the same.
         float time = world.S.Time, own = wolf.Id * 1.7f;

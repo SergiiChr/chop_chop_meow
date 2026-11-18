@@ -4,6 +4,8 @@ namespace ChopChopMeow;
 public enum FollowStage {
     /// <summary>No torch wave has reached it: it hunts as the light lets it.</summary>
     None,
+    /// <summary>In follow mode, walking back out to its circle after a torch wave reached it nearer its player.</summary>
+    BackingOff,
     /// <summary>In follow mode, circling its player at the edge of the torchlight.</summary>
     Circling,
     /// <summary>In follow mode, standing braced where it is because its player has walked up to it.</summary>
