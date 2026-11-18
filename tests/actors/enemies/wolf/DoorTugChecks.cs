@@ -216,8 +216,8 @@ public static class DoorTugChecks {
         Require(world.Door == Doorway.Tugged && tugger.Tugging, $"a wolf should tug the wounded player out of the doorway, not {world.Door}");
         world.Tick(.4f);
         Give(guest, "steel_axe", 1);
-        world.As(guest, () => { world.Player = tugger.Pos + new Vector2(1, 0); world.Attack(); });
-        world.Tick(.05f);
+        world.As(guest, () => { world.Player = tugger.Pos + new Vector2(1, 0); world.Attack(Vector2.Left); });
+        world.Tick(.45f);
         Require(!tugger.Tugging && world.Door == Doorway.Entering && !world.Mauled, $"a wolf hit while it tugs a player out should let go, and the player should run back in, not {world.Door}");
     }
     private static void CheckAWolfTugsAPlayerStandingAsideAtACabinDoorOffIt(GameData data) {

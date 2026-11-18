@@ -22,6 +22,12 @@ public sealed class WolfBodies(World world) {
         return (wolf.Pos - ahead * WolfTail, wolf.Pos + ahead * WolfNose);
     }
 
+    /// <summary>Where a wolf's body runs from the root of its tail to its nose, the way it faces (<see cref="Wolf.Heading"/>).</summary>
+    public static (Vector2 Tail, Vector2 Nose) Body(Wolf wolf) {
+        var ahead = Vector2.Right.Rotated(wolf.Heading);
+        return (wolf.Pos - ahead * WolfTail, wolf.Pos + ahead * WolfNose);
+    }
+
     /// <summary>
     /// How far a wolf closing in on the acting player goes straight at them this tick, up to <paramref name="step"/>: on to
     /// <see cref="StandOff"/>, where its jaws reach them, or back to it at a walk when they come closer.

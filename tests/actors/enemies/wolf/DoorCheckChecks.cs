@@ -270,8 +270,8 @@ public static class DoorCheckChecks {
         DoorCheckTick(world, 3.9f);
         Require(wolf.DoorCheck == DoorCheckStage.Prying, $"a wolf should pry at an unlocked door after scratching, not {wolf.DoorCheck}");
         Give(guest, "steel_axe", 1);
-        world.As(guest, () => { world.Player = wolf.Pos + new Vector2(1, 0); world.Attack(); });
-        world.Tick(.05f);
+        world.As(guest, () => { world.Player = wolf.Pos + new Vector2(1, 0); world.Attack(Vector2.Left); });
+        world.Tick(.45f);
         Require(wolf.DoorCheck == DoorCheckStage.None, $"a wolf hit while it forces a door should be knocked off it, not go on {wolf.DoorCheck}");
         DoorCheckTick(world, 8);
         Require(world.Sheltered == hut.Id && world.Health == 100, "the player inside should be left alone by a wolf knocked off the door");

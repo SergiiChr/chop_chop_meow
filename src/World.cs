@@ -318,7 +318,7 @@ public sealed partial class World {
     public World(GameData data, bool generate = true) {
         Data = data;
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
-        WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this);
+        WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
     }
@@ -338,6 +338,12 @@ public sealed partial class World {
     public WolfPatrols WolfPatrols { get; }
     /// <summary>Wolves hunting a player: howling, closing in, leaping, biting and pinning.</summary>
     public WolfHunt WolfHunt { get; }
+    /// <summary>A wolf's bite: gathering itself, leaping and snapping at where the player is heading.</summary>
+    public WolfSnap WolfSnap { get; }
+    /// <summary>Follow mode: wolves scared by a torch circling a player, bracing, running or standing their ground.</summary>
+    public WolfFollow WolfFollow { get; }
+    /// <summary>Players' swings at wolves: when each lands and which wolves it touches.</summary>
+    public Swings Swings { get; }
     /// <summary>At this much health or less, a wolf's attack takes a player down rather than biting.</summary>
     public const float TakedownHealth = 50;
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
@@ -1128,7 +1134,7 @@ public sealed partial class World {
         foreach (var t in S.Things.Of(ThingKind.Campfire)) if (t.Burn > 0 && t.Pos.DistanceTo(p) < FireReach) return true;
         return false;
     }
-    /// <summary>Wolves scared by a torch circle the player at this distance until enough gather to attack together.</summary>
+    /// <summary>Wolves scared by a torch circle the player about this far off, in follow mode, until enough gather to attack together.</summary>
     public const float StalkDistance = 4.5f;
     public const int PackSize = 5;
     public const float KindleSeconds = 2, ScareRange = 9, FleeSeconds = 2.5f;
@@ -1164,30 +1170,32 @@ public sealed partial class World {
     }
     private void SwingTorch(Vector2 aim) {
         if (attackClock > 0) return;
-        attackClock = .6f;
+        attackClock = Swings.Cooldown;
         torchSwings.RemoveAll(t => S.Time - t > WildWindow); torchSwings.Add(S.Time);
         Vector2 direction = aim == Vector2.Zero ? Vector2.Down : aim.Normalized();
         PlayerActed?.Invoke(ActorAction.TorchSwing, Player + direction); Play("tool_air_swing", Player);
         if (torchSwings.Count >= WildSwings) { PutOutTorch(); Say("Torch went off due to wild swinging."); return; }
         TorchFlare = .5f;
-        bool pack = PackAround >= PackSize;
-        var wolf = S.Wolves.Where(w => w.Leap <= 0 && !w.Feeding).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
-        if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
-            wolf.Flee = FleeSeconds; Strike(wolf, 1);
-        }
-        // A wave of fire toward a wolf on its own makes it keep its distance; a pack closing in no longer cares.
-        if (!pack)
-            foreach (var w in S.Wolves.Where(w => w.Pos.DistanceTo(Player) < ScareRange && (w.Pos - Player).Normalized().Dot(direction) > .7f)) w.Scared = true;
+        Swings.Start(ActorAction.TorchSwing, direction, Swings.TorchDamage, Swings.TorchSpread);
+        // A wave of fire toward a wolf makes it keep its distance; a pack closing in, or a wolf that stood its ground, no longer cares.
+        if (PackAround >= PackSize) return;
+        foreach (var w in S.Wolves)
+            if (!w.Bold && !w.Routed && w.Pos.DistanceTo(Player) < ScareRange && (w.Pos - Player).Normalized().Dot(direction) > .7f) {
+                w.Scared = true;
+                // The fire stops a wolf still gathering itself to snap; one already in the air lands.
+                if (WolfSnap.Winding(w)) w.Snap = 0;
+            }
     }
     public const float StaggerSeconds = .45f;
     /// <summary>How far a blow throws a wolf back: a short hop, which the view plays as the wolf jumping clear.</summary>
     public const float KnockBackDistance = .5f;
     /// <summary>A blow landing on a wolf: it takes the damage and is thrown back, and falls once its health is gone.</summary>
-    private void Strike(Wolf wolf, float damage) {
+    internal void Strike(Wolf wolf, float damage) {
         wolf.Health -= damage; KnockBack(wolf);
         if (wolf.Health <= 0) KillWolf(wolf);
     }
-    private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, WolfHunt.AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; }
+    /// <summary>Throws a wolf back from the acting player and leaves it reeling, which stops a snap it had begun.</summary>
+    private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, WolfHunt.AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; wolf.Snap = 0; }
     /// <summary>Leaves a carcass where a struck wolf fell.</summary>
     private void KillWolf(Wolf wolf) {
         S.Wolves.Remove(wolf); Add(ThingKind.WolfCorpse, wolf.Pos, WolfMeat);
@@ -1196,19 +1204,23 @@ public sealed partial class World {
     private void PutOutTorch() {
         if (S.TorchLit) Play("torch_out", Player);
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
-        foreach (var w in Hunters) w.Scared = false;
+        foreach (var w in Hunters) w.Scared = w.Braced = false;
     }
-    public void Attack() {
-        if (attackClock > 0 || S.Sheltered != 0 || Busy() || Forwarded(Verb.Attack)) return;
-        attackClock = .6f;
-        var wolf = S.Wolves.OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
+    /// <summary>
+    /// Swings the best axe carried, or a fist without one, along <paramref name="aim"/>, south when none is given.
+    /// Axe swings take turns: the overhead chop, then the sideways sweep.
+    /// </summary>
+    public void Attack(Vector2 aim = default) {
+        if (attackClock > 0 || S.Sheltered != 0 || Busy() || Forwarded(Verb.Attack, at: aim)) return;
+        attackClock = Swings.Cooldown;
         string? axe = BestTool("axe");
-        ActorAction action = axe == "steel_axe" ? ActorAction.SteelAxeSwing : axe != null ? ActorAction.AxeSwing : ActorAction.Attack;
-        Vector2 target = wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f ? wolf.Pos : Player;
-        PlayerActed?.Invoke(action, target); Play("tool_air_swing", Player);
-        if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
-            Strike(wolf, axe == null ? .5f : 1.5f * Speed(axe));
-        }
+        bool sweep = axe != null && S.Actor.SweepNext, steel = axe == "steel_axe";
+        S.Actor.SweepNext = axe != null && !sweep;
+        ActorAction action = axe == null ? ActorAction.Attack : sweep ? steel ? ActorAction.SteelAxeSweep : ActorAction.AxeSweep : steel ? ActorAction.SteelAxeSwing : ActorAction.AxeSwing;
+        Vector2 direction = aim == Vector2.Zero ? Vector2.Down : aim.Normalized();
+        PlayerActed?.Invoke(action, Player + direction); Play("tool_air_swing", Player);
+        if (axe == null) Swings.Start(action, direction, Swings.PunchDamage, Swings.PunchSpread);
+        else Swings.Start(action, direction, Swings.AxeDamage * Speed(axe), Swings.AxeSpread);
     }
     public void Die() {
         Release();
@@ -2204,6 +2216,7 @@ public sealed partial class World {
     /// </summary>
     private void NeedsTick(float dt, bool sleeping) {
         attackClock = Math.Max(0, attackClock - dt);
+        Swings.Tick(dt);
         if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
             float drain = S.Actor.Sprinting ? Data.SprintDrain : 1, fed = S.Hunger;

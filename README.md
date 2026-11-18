@@ -400,6 +400,7 @@ In multiplayer, every player must be downed before skipping.
 Fog of war covers the map.
 Ground you have never seen is black.
 You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
+This circle is your line of sight: it ends where the grey fog starts.
 
 Ground you have seen before is greyed out and shows things as you last saw them: a tree felled out of sight still stands there until you look again.
 What changed while you were away shows as it now is when you come back, without playing the change: such a tree is already a stump, and a chest that was filled keeps its lid shut.

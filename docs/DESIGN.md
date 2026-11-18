@@ -489,6 +489,9 @@ Recovery boxes are never automation storage and disappear once empty.
 
 ### Sight and fog of war
 
+A player's **line of sight** is the circle of `SightRadius` (20 metres) around them, which ends where the grey fog starts.
+"In sight" and "out of sight" mean inside and outside it; what a wolf sees is its own `WolfSightRange`.
+
 Fog of war is simulation state.
 `World.Look` runs every tick: it marks tiles within `SightRadius` of the player in `SaveState.Explored` and replaces `SaveState.Remembered` entries in sight with snapshots of the live things there.
 

@@ -157,8 +157,8 @@ public sealed partial class GameData {
     public float WolfChase { get; } = 1.5f;
     /// <summary>Wolves that come out of each den at dusk; after them one den lets one more out every hour until the wolves head home.</summary>
     public int WolvesPerDen { get; } = 1;
-    /// <summary>A wolf's health: an axe blow takes more than half of it.</summary>
-    public float WolfHealth { get; } = 4;
+    /// <summary>A wolf's health: it stands two blows of a steel axe and falls to the third or the fourth, as each lands weaker or stronger.</summary>
+    public float WolfHealth { get; } = 8;
     /// <summary>Health one bite takes: the fourth bite, not the third, brings a healthy player to half.</summary>
     public float WolfBite { get; } = 15;
     /// <summary>Metres a second a wolf stalks and backs off at; it patrols at half of it.</summary>

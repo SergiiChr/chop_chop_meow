@@ -36,7 +36,10 @@ public enum ActorAction {
     /// <summary>Tugged back by the waist by a wolf, bent over and stepping back with each tug.</summary>
     Tugged,
     /// <summary>Knocked or yanked off the feet backward by a wolf, falling onto the back.</summary>
-    FallBack
+    FallBack,
+    /// <summary>An axe swung sideways in the air, round from the left to the front, as in felling; it takes turns with the overhead swing.</summary>
+    AxeSweep,
+    SteelAxeSweep
 }
 
 /// <summary>
@@ -84,7 +87,7 @@ public static class ActorAnimation {
         ActorAction.Walk or ActorAction.Carry => WalkCycle,
         ActorAction.Jog => Jogging.Cycle,
         ActorAction.Run => Sprinting.Cycle,
-        ActorAction.SteelChop or ActorAction.SteelMine or ActorAction.SteelAxeSwing => .8f,
+        ActorAction.SteelChop or ActorAction.SteelMine or ActorAction.SteelAxeSwing or ActorAction.SteelAxeSweep => .8f,
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
@@ -110,11 +113,15 @@ public static class ActorAnimation {
     public static float Advance(ActorAction action, float seconds, float metres) =>
         Stride(action) > 0 ? metres / Stride(action) * Duration(action) : seconds;
 
-    /// <summary>Seconds into a swing at which it lands: the punch at full stretch, the torch crossing in front, or the axe at the bottom of its overhead stroke; zero for anything else.</summary>
+    /// <summary>
+    /// Seconds into a swing at which it lands: the punch at full stretch, the torch crossing in front, the axe at the bottom of
+    /// its overhead stroke or at the end of its sweep round to the front; zero for anything else.
+    /// </summary>
     public static float Contact(ActorAction action) => action switch {
         ActorAction.Attack => .32f * Duration(action),
         ActorAction.TorchSwing => .3f * Duration(action),
         ActorAction.AxeSwing or ActorAction.SteelAxeSwing => .5f * Duration(action),
+        ActorAction.AxeSweep or ActorAction.SteelAxeSweep => .52f * Duration(action),
         _ => 0
     };
 
@@ -136,7 +143,7 @@ public static class ActorAnimation {
 
     /// <summary>The tool an action shows in hand, or null for empty hands; the mortar is its pestle in the right hand and its bowl in the left.</summary>
     public static string? Tool(ActorAction action) => action switch {
-        ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing => "steel_axe",
+        ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep => "steel_axe",
         ActorAction.Mine or ActorAction.SteelMine => "steel_pick",
         ActorAction.Hammer => "hammer",
         ActorAction.Protest => "protest_sign",
@@ -346,7 +353,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>Swings that play out in full on the move: the arms and body keep swinging while the legs keep walking.</summary>
-    public static bool SwingsOnTheMove(ActorAction action) => action is ActorAction.TorchSwing or ActorAction.Attack or ActorAction.AxeSwing or ActorAction.SteelAxeSwing;
+    public static bool SwingsOnTheMove(ActorAction action) => action is ActorAction.TorchSwing or ActorAction.Attack or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep;
 
     public static Pose PoseAt(ActorAction action, float elapsed, bool moving) {
         if (moving && SwingsOnTheMove(action)) {
@@ -373,7 +380,7 @@ public static class ActorAnimation {
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
                 return moving ? Walk(p) with { Lean = carry.Lean, Head = -carry.Lean / 2, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
-            case ActorAction.Chop or ActorAction.SteelChop:
+            case ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSweep or ActorAction.SteelAxeSweep:
                 return Keys(p, ChopKeys);
             case ActorAction.AxeSwing or ActorAction.SteelAxeSwing:
                 return Keys(p, AxeSwingKeys);
