@@ -234,7 +234,7 @@ public sealed class WolfModel {
     /// <summary>How far ahead of home, in metres, a braking wolf braces its forepaws.</summary>
     private const float BrakeReach = .12f;
     /// <summary>The share of the head's turn ahead of the body that the neck takes; the head takes the rest.</summary>
-    private const float NeckShare = .6f;
+    internal const float NeckShare = .6f;
 
     // ---------- Standing, leaping and feeding ----------
 
@@ -531,6 +531,15 @@ public sealed class WolfModel {
     public void Pose(WolfMotion motion, WolfPose pose, float dt) {
         Steps = null;
         Show(motion, pose, dt);
+    }
+
+    /// <summary>
+    /// Stands the model upright the way it faces, with no knock-back or lean of its own, for something else to place:
+    /// a tug, a hold on an arm, a lunge or a door check. <paramref name="stagger"/> is its wolf's, so a later hit shows.
+    /// </summary>
+    public void StandPlaced(float stagger) {
+        KnockBack = Vector2.Zero; Stagger = stagger; Toward = Vector2.Zero;
+        Turning.Hold(Yaw); Root.Rotation = new Vector3(0, Yaw, 0);
     }
 
     /// <summary>Where a wolf's head is, in the model, under a pose, and the way its muzzle points, which is the way it looks.</summary>

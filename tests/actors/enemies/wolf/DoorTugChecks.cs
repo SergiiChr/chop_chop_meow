@@ -42,11 +42,8 @@ public static class DoorTugChecks {
 
     /// <summary>Each bite takes 15 health: the tugging wolf's and the one a second wolf gives as it takes the player's arm leave 70 of 100.</summary>
     private static void CheckASecondWolfTakesATuggedPlayersSideBitesOnceAndHoldsUntilTheTugEnds(GameData data) {
-        var world = NightWorld(data);
+        var (world, _) = SteppingInAtNight(data);
         var heard = Listen(world);
-        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
-        world.Player = Doorways.DoorPoint(hut);
-        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
         var tugger = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         var second = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-2.5f, 1) });
         world.Tick(.05f);
@@ -63,10 +60,7 @@ public static class DoorTugChecks {
 
     /// <summary>Each bite takes 15 health. The second wolf bit .6 s before it takes the arm, and bites again a second after that bite.</summary>
     private static void CheckAWolfWhoseLastBiteIsFreshTakesATuggedPlayersArmAtOnceAndBitesWhenItCan(GameData data) {
-        var world = NightWorld(data);
-        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
-        world.Player = Doorways.DoorPoint(hut);
-        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+        var (world, _) = SteppingInAtNight(data);
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         var second = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-1, .2f), Attack = .4f });
         world.Tick(.05f);
@@ -82,10 +76,7 @@ public static class DoorTugChecks {
 
     /// <summary>Each bite takes 15 health: the tugging wolf's and one at each arm leave 55 of 100, and the waiting wolf's bite 40.</summary>
     private static void CheckAWolfWithNoArmToTakeWaitsBesideATuggedPlayerAndBitesOnceTheyAreLetGo(GameData data) {
-        var world = NightWorld(data);
-        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
-        world.Player = Doorways.DoorPoint(hut);
-        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+        var (world, _) = SteppingInAtNight(data);
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         foreach (int side in new[] { -1, 1 }) PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(side, .2f) });
         var waiting = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.3f, 2.2f) });
@@ -97,10 +88,7 @@ public static class DoorTugChecks {
     }
 
     private static void CheckOnlyOneWolfTakesEachSideOfATuggedPlayer(GameData data) {
-        var world = NightWorld(data);
-        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
-        world.Player = Doorways.DoorPoint(hut);
-        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+        var (world, _) = SteppingInAtNight(data);
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         var others = new[] { new Vector2(-2.5f, 1), new Vector2(2.5f, 1), new Vector2(0, 3) }.Select(from => PlaceWolf(world, new Wolf { Pos = world.Player + from })).ToArray();
         world.Tick(.05f);

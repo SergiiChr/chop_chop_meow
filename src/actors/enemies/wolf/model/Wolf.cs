@@ -68,4 +68,10 @@ public sealed class Wolf : IWalker {
     /// <summary>Tells wolves apart for other machines; zero until <see cref="World.NumberWolvesAndOrders"/>.</summary>
     public int Id { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
+
+    /// <summary>Lets go of the arm it holds.</summary>
+    public void LetGoOfArm() { Side = 0; SideBitten = false; }
+
+    /// <summary>Ends its door check, whatever stage it is at.</summary>
+    public void EndDoorCheck() { DoorCheck = DoorCheckStage.None; DoorCheckCabin = 0; DoorCheckTime = 0; }
 }

@@ -121,6 +121,7 @@ public partial class InsideDoorPOV : TextureRect {
     /// <summary>Draws the picture when it was asked for, and stops drawing it when not.</summary>
     public void Finish() {
         for (int i = 0; i < Wolves; i++) wolves[i].Root.Visible = i < shown;
+        // A picture still on the one drawing it starts with is left to finish it.
         var mode = Showing ? SubViewport.UpdateMode.Always : SubViewport.UpdateMode.Disabled;
         if (picture.RenderTargetUpdateMode != mode && (Showing || picture.RenderTargetUpdateMode == SubViewport.UpdateMode.Always)) picture.RenderTargetUpdateMode = mode;
     }

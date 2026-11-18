@@ -2,9 +2,19 @@ using System;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static WorldSteps;
 
-/// <summary>Steps the cabin checks share: a player stepped inside a cabin, and a shore to build a cabin on.</summary>
+/// <summary>Steps the cabin checks share: a player stepped inside a cabin or stepping in, and a shore to build a cabin on.</summary>
 public static class CabinSteps {
+    /// <summary>A night with the player starting to step, at a walk, into a cabin four metres up from where they stood.</summary>
+    public static (World World, Thing Hut) SteppingInAtNight(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = Doorways.DoorPoint(hut);
+        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+        return (world, hut);
+    }
+
     /// <summary>Puts a player, the acting one by default, at a cabin's door and steps them in at a run, ticking until they are inside.</summary>
     public static void StepInside(World world, Thing hut, PlayerState? who = null) {
         who ??= world.Me;

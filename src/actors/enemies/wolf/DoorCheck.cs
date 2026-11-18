@@ -159,8 +159,17 @@ public sealed class DoorCheck(World world) {
         }
     }
 
+    /// <summary>Which pry a wolf is in this many seconds into its prying, from 0, and how far through it, 0 to 1.</summary>
+    public static (int Pry, float Through) PryPhase(float prying) {
+        float pries = Math.Clamp(prying / PrySeconds, 0, 1) * Pries, pry = MathF.Min(MathF.Floor(pries), Pries - 1);
+        return ((int)pry, pries - pry);
+    }
+
     /// <summary>How many times the door has rattled this many seconds into a wolf's prying: once in each pry.</summary>
-    private static int Rattled(float prying) => prying < RattleFrom ? 0 : Math.Min(Pries, (int)((prying - RattleFrom) / (PrySeconds / Pries)) + 1);
+    private static int Rattled(float prying) {
+        var (pry, through) = PryPhase(prying);
+        return pry + (through * PrySeconds / Pries >= RattleFrom ? 1 : 0);
+    }
 
     /// <summary>Ends a wolf's door check: it goes back to patrolling, the way it was heading.</summary>
     private static void End(Wolf wolf) => WolfPatrols.Patrol(wolf, wolf.Heading);
@@ -183,17 +192,18 @@ public sealed class DoorCheck(World world) {
         PlayerState? victim = null;
         foreach (var p in world.S.Players) if (p.Sheltered == cabin.Id && (victim == null || p.DoorQueued > victim.DoorQueued)) victim = p;
         if (victim == null) { End(wolf); return; }
-        using (world.ActAs(victim)) {
-            victim.Sheltered = 0; world.Player = Doorways.DoorPoint(cabin); victim.Warp++;
-            Doorways.Stage(victim, Doorway.Tugged, cabin.Id);
-            victim.Health -= world.Data.WolfBite;
-            world.Play("wolf_bite", world.Player); world.Play("tug_scream", world.Player);
-        }
+        // Every wolf at the door drops its door check for the hunt; the one that takes the player out goes on to its last stage.
         foreach (var w in world.S.Wolves) {
             if (w.DoorCheck == DoorCheckStage.None || w.DoorCheckCabin != cabin.Id) continue;
             WolfPatrols.Patrol(w, w.Heading);
             w.Target = victim.Id;
         }
-        wolf.DoorCheck = DoorCheckStage.TakingOut; wolf.DoorCheckCabin = cabin.Id; wolf.Tugging = true; wolf.Attack = 1;
+        using (world.ActAs(victim)) {
+            victim.Sheltered = 0; world.Player = Doorways.DoorPoint(cabin); victim.Warp++;
+            victim.Health -= world.Data.WolfBite;
+            world.Play("wolf_bite", world.Player);
+            world.DoorTug.Begin(wolf, Doorway.Tugged, cabin.Id);
+        }
+        wolf.DoorCheck = DoorCheckStage.TakingOut; wolf.DoorCheckCabin = cabin.Id; wolf.Attack = 1;
     }
 }

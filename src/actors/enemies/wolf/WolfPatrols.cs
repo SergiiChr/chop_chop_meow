@@ -107,8 +107,8 @@ public sealed class WolfPatrols(World world) {
     /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
     private static void Calm(Wolf wolf) {
         wolf.Target = 0; wolf.Howl = wolf.HowlIn = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
-        wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.Side = 0; wolf.SideBitten = false; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();
-        wolf.DoorCheck = DoorCheckStage.None; wolf.DoorCheckCabin = 0; wolf.DoorCheckTime = 0;
+        wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();
+        wolf.LetGoOfArm(); wolf.EndDoorCheck();
     }
     /// <summary>
     /// A wolf that smells a player out in the open <paramref name="within"/> metres takes them as its prey, dropping whatever it did at a

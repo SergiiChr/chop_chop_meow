@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 /// Cabin doors in <paramref name="world"/>: players step in through the door one at a time until the cabin is full, anyone
 /// at the door of a full or locked cabin knocks on it, and players standing aside let someone step out.
 /// What a wolf does to a player in the doorway is <see cref="DoorTug"/>'s, and what it does at the door of a cabin with
-/// someone inside is <see cref="DoorCheck"/>'.
+/// someone inside is <see cref="DoorCheck"/>'s.
 /// </summary>
 public sealed class Doorways(World world) {
     /// <summary>How many players a cabin holds.</summary>
@@ -199,6 +199,7 @@ public sealed class Doorways(World world) {
         // A player not at any door, such as one waking or rejoining, comes after everyone already there.
         int queued = arriving.Door == Doorway.None ? int.MaxValue : arriving.DoorQueued;
         int inside = 0;
+        // A wolf with its snout in the door is in the way of anyone stepping in.
         bool leaving = false, ahead = world.DoorCheck.Forcing(cabin);
         foreach (var p in world.S.Players) {
             if (p == arriving) continue;
@@ -210,7 +211,6 @@ public sealed class Doorways(World world) {
             if (p.Door == Doorway.Entering || p.Door is Doorway.Tugged or Doorway.Aside && p.DoorQueued < queued) ahead = true;
         }
         if (leaving || inside >= Places) return Doorway.Knocking;
-        // A wolf with its snout in the door is in the way too.
         if (ahead) return Doorway.Following;
         return inside > 0 && world.Find(cabin) is { Locked: true } ? Doorway.Knocking : Doorway.Entering;
     }

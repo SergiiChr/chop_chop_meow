@@ -222,10 +222,7 @@ public static class DoorCheckView {
     private const float PryShare = .55f;
 
     /// <summary>Which pry a prying wolf is in this far into a door check, from 0, and how far through it, 0 to 1.</summary>
-    private static (int Pry, float Through) PryPhase(float clock) {
-        float pries = Math.Clamp((clock - PryAt) / DoorCheck.PrySeconds, 0, 1) * DoorCheck.Pries, pry = MathF.Min(MathF.Floor(pries), DoorCheck.Pries - 1);
-        return ((int)pry, pries - pry);
-    }
+    private static (int Pry, float Through) PryPhase(float clock) => DoorCheck.PryPhase(clock - PryAt);
 
     /// <summary>How far a wolf has levered the door this far into a door check, 0 to 1: a third further with each pry.</summary>
     private static float Pried(float clock) {
@@ -258,7 +255,7 @@ public static class DoorCheckView {
         for (int pass = 0; pass < 4; pass++) {
             var bite = WolfModel.BiteOf(pose);
             float turn = Mathf.RadToDeg((spot.X - bite.X) / NeckLength);
-            pose = pose with { NeckTurn = pose.NeckTurn + turn * .6f, HeadTurn = pose.HeadTurn + turn * .4f, Surge = Math.Clamp(pose.Surge + spot.Y - bite.Z, -MostLean, MostLean) };
+            pose = pose with { NeckTurn = pose.NeckTurn + turn * WolfModel.NeckShare, HeadTurn = pose.HeadTurn + turn * (1 - WolfModel.NeckShare), Surge = Math.Clamp(pose.Surge + spot.Y - bite.Z, -MostLean, MostLean) };
         }
         return pose;
     }
@@ -343,8 +340,8 @@ public static class DoorCheckView {
         var (at, yaw) = Placement(door, clock);
         float settle = WorldView.Ease(model.Settled);
         model.Yaw = Mathf.LerpAngle(model.FromYaw, yaw, settle);
-        model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
-        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.Pinned = 0;
+        model.StandPlaced(wolf.Stagger);
         model.Root.Position = model.StepFrom.Lerp(at, settle);
         model.Root.Visible = visible;
         Pose(model, clock, time, dt);

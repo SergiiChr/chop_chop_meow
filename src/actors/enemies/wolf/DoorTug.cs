@@ -64,9 +64,17 @@ public sealed class DoorTug(World world) {
     /// short where open ground ends, leaving room on it for the wolf behind them where there is any.
     /// </summary>
     public float TugDistanceFrom(Vector2 from) {
-        float both = OpenOut(from, TugDistance + TugReach) - TugReach;
-        return both >= 0 ? both : OpenOut(from, TugDistance);
+        if (from != measured.From || Math.Abs(world.Time - measured.At) > TugSeconds) {
+            float both = OpenOut(from, TugDistance + TugReach) - TugReach;
+            measured = (from, world.Time, both >= 0 ? both : OpenOut(from, TugDistance));
+        }
+        return measured.Distance;
     }
+    /// <summary>
+    /// The distance last measured, from where and when: every wolf at a tug reads it several times a tick, and open
+    /// ground does not change in the second and a half a tug lasts.
+    /// </summary>
+    private (Vector2 From, float At, float Distance) measured = (new Vector2(float.NaN, float.NaN), 0, 0);
 
     /// <summary>How far open ground runs from <paramref name="from"/> straight out of a doorway, up to <paramref name="most"/> metres.</summary>
     private float OpenOut(Vector2 from, float most) {
@@ -95,11 +103,15 @@ public sealed class DoorTug(World world) {
     public bool TugOut(Wolf wolf) {
         var p = world.S.Actor;
         if (p.Door is not (Doorway.Entering or Doorway.Following or Doorway.Knocking or Doorway.Aside) || Doorways.Indoors(p)) return false;
-        Doorways.Stage(p, p.Door is Doorway.Knocking or Doorway.Aside ? Doorway.TuggedOff : Doorway.Tugged, p.DoorCabin);
-        wolf.Tugging = true; wolf.Leap = 0;
-        // The player screams through the whole tug.
-        world.Play("tug_scream", world.Player);
+        Begin(wolf, p.Door is Doorway.Knocking or Doorway.Aside ? Doorway.TuggedOff : Doorway.Tugged, p.DoorCabin);
         return true;
+    }
+
+    /// <summary>A wolf takes the acting player by the waist on a tugged doorway stage at a cabin, and they scream through the whole tug.</summary>
+    internal void Begin(Wolf wolf, Doorway stage, int cabin) {
+        Doorways.Stage(world.S.Actor, stage, cabin);
+        wolf.Tugging = true; wolf.Leap = 0;
+        world.Play("tug_scream", world.Player);
     }
 
     /// <summary>
@@ -164,7 +176,7 @@ public sealed class DoorTug(World world) {
     /// </summary>
     public bool Hold(Wolf wolf) {
         if (wolf.Side == 0) return false;
-        if (!Tugged || wolf.Stagger > 0) { wolf.Side = 0; wolf.SideBitten = false; wolf.Attack = 1; return false; }
+        if (!Tugged || wolf.Stagger > 0) { wolf.LetGoOfArm(); wolf.Attack = 1; return false; }
         if (world.CanStand(SideSpot(wolf.Side))) wolf.Pos = SideSpot(wolf.Side);
         BiteArm(wolf);
         // Once it has bitten it only holds on.
@@ -173,7 +185,7 @@ public sealed class DoorTug(World world) {
     }
 
     /// <summary>A wolf lets go of the player it tugged, which also ends the door check at a cabin that took them out of it.</summary>
-    private static void Release(Wolf wolf) { wolf.Tugging = false; wolf.DoorCheck = DoorCheckStage.None; wolf.DoorCheckCabin = 0; wolf.DoorCheckTime = 0; }
+    private static void Release(Wolf wolf) { wolf.Tugging = false; wolf.EndDoorCheck(); }
 
     /// <summary>
     /// Ends a tug that has run its time: the player is let go, a badly hurt one knocked down, anyone else stepping in again
@@ -193,7 +205,7 @@ public sealed class DoorTug(World world) {
     private void LetGo(Wolf? takedown) {
         var p = world.S.Actor;
         // The wolves at the player's sides let go with the one that tugged, and bite again no sooner than after any other bite.
-        foreach (var w in world.S.Wolves) if (w.Side != 0 && w.Target == p.Id) { w.Side = 0; w.SideBitten = false; w.Attack = 1; }
+        foreach (var w in world.S.Wolves) if (w.Side != 0 && w.Target == p.Id) { w.LetGoOfArm(); w.Attack = 1; }
         world.Player = TuggedTo; p.Warp++;
         if (takedown != null) {
             world.WolfHunt.Pin(takedown, world.Hunters.Skip(1).Any(), BodySide.Out(Facing, BodySide.Of(TuggedTo, Facing, takedown.Pos)));

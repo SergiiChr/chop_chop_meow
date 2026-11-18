@@ -51,8 +51,8 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         if (model.Motion != WolfMotion.Tug) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; }
         float lunge = WorldView.Ease(Math.Min(1, through * DoorTug.TugSeconds / TugLunge));
         model.Yaw = Mathf.LerpAngle(model.FromYaw, held.Yaw + Mathf.DegToRad(SplayTugger) * ApartFrom(wolf, held), lunge);
-        model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
-        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.Pinned = 0;
+        model.StandPlaced(wolf.Stagger);
         model.Root.Visible = world().Sees(wolf.Pos);
         // A wolf taking a player out of their cabin starts in its doorway, with its paws on the step and the floor.
         model.Steps = wolf.DoorCheck == DoorCheckStage.TakingOut && world().Find(wolf.DoorCheckCabin) is Thing cabin ? Doorways.DoorPoint(cabin) : null;
@@ -85,8 +85,8 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         var from = held.Position + BodySide.Out(ActorAnimation.Forward(held.Yaw), wolf.Side) * DoorTug.SideReach;
         var toward = new Vector2(arm.X, arm.Z) - from;
         model.Yaw = Mathf.LerpAngle(model.FromYaw, ActorAnimation.Yaw(toward, model.Yaw), lunge);
-        model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
-        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.Pinned = 0;
+        model.StandPlaced(wolf.Stagger);
         model.Root.Visible = world().Sees(wolf.Pos);
         model.Steps = world().PlayerById(wolf.Target) is { DoorCabin: not 0 } p && world().Find(p.DoorCabin) is Thing cabin ? Doorways.DoorPoint(cabin) : null;
         var body = WolfModel.Rearing(arm.Y, elapsed + wolf.Id % 7);
@@ -109,9 +109,8 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         float fell = model.Pinned / ActorAnimation.FallBackSeconds;
         var throat = FallBackView.Throat(fallen.Position, ActorAnimation.Forward(fallen.Yaw), float.MaxValue);
         var wait = (throat + WorldView.To3(wolf.LungeFrom) * WaitAside) with { Y = 0 };
-        model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero;
         model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(-wolf.LungeFrom, model.Yaw), Math.Min(1, dt * 8));
-        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.StandPlaced(wolf.Stagger);
         model.Root.Visible = world().Sees(wolf.Pos);
         if (fell < LungeStart) {
             // It springs back off the yanked body at once, then slows as it comes round.
