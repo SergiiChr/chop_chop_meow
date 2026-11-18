@@ -5,11 +5,11 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// Developer review fixture for <c>--wolves</c>: wolves by a cabin at dusk, moved by a script and run by the game's own
+/// Developer review fixture for <c>--wolf-scene</c>: wolves by a cabin at dusk, moved by a script and run by the game's own
 /// rules, for a look at how they turn on a patrol, turn to a player they smell and howl, and feed on one they brought down.
 /// </summary>
 public sealed partial class WolfReview : Node {
-    /// <summary>The scenes <c>--wolves</c> takes.</summary>
+    /// <summary>The scenes <c>--wolf-scene</c> takes.</summary>
     public static readonly string[] Scenes = { "patrol", "howl", "feast" };
     public World World = null!;
     public WorldView View = null!;
@@ -20,7 +20,7 @@ public sealed partial class WolfReview : Node {
     private float time;
 
     public override void _Ready() {
-        if (!Scenes.Contains(Scene)) throw new ArgumentException($"--wolves takes {string.Join(", ", Scenes)}, not {Scene}");
+        if (!Scenes.Contains(Scene)) throw new ArgumentException($"--wolf-scene takes {string.Join(", ", Scenes)}, not {Scene}");
         DoorwayReview.Stage(World, View, Cabin, true);
         var door = Doorways.DoorPoint(Cabin);
         script = Scene switch {

@@ -28,6 +28,7 @@ public static class DoorCheckChecks {
         Test(CheckSleepBehindAnUnlockedDoorStopsWhenAWolfScratches, data);
         Test(CheckSleepBehindALockedDoorLastsUntilDawn, data);
         Test(CheckNobodySleepsWhileAWolfForcesTheDoor, data);
+        Test(CheckAHitKnocksAWolfOffTheDoorItForces, data);
     }
 
     private static void CheckAWolfScratchesAtALockedDoorAndGoesAway(GameData data) {
@@ -226,6 +227,22 @@ public static class DoorCheckChecks {
         Require(world.Day == day + 1 && !world.Night, "sleep behind a locked door should last until dawn");
         Require(world.Sheltered == hut.Id && world.Health == 100 && hut.Locked, "the sleeper should wake inside, unhurt, behind the locked door");
         Require(!heard.Contains("door_scratch") && world.Wolves.Count == 0, $"a slept night should be silent and end with the wolves gone: heard {string.Join(", ", heard)}");
+    }
+
+    private static void CheckAHitKnocksAWolfOffTheDoorItForces(GameData data) {
+        var (world, hut, _) = ShelteredNight(data, locked: false);
+        // The guest waits out of the wolf's smell until it has its snout in the door.
+        var guest = world.Arrive("guest", 2);
+        world.As(guest, () => world.Player = Doorways.DoorPoint(hut) + new Vector2(60, 0));
+        var wolf = ScratchingWolf(world, hut);
+        DoorCheckTick(world, 3.9f);
+        Require(wolf.DoorCheck == DoorCheckStage.Prying, $"a wolf should pry at an unlocked door after scratching, not {wolf.DoorCheck}");
+        Give(guest, "steel_axe", 1);
+        world.As(guest, () => { world.Player = wolf.Pos + new Vector2(1, 0); world.Attack(); });
+        world.Tick(.05f);
+        Require(wolf.DoorCheck == DoorCheckStage.None, $"a wolf hit while it forces a door should be knocked off it, not go on {wolf.DoorCheck}");
+        DoorCheckTick(world, 8);
+        Require(world.Sheltered == hut.Id && world.Health == 100, "the player inside should be left alone by a wolf knocked off the door");
     }
 
     private static void CheckNobodySleepsWhileAWolfForcesTheDoor(GameData data) {

@@ -206,7 +206,7 @@ Checks and review tools:
 | `src/performance/PerformanceRoute.cs` | The run's sprint from the beach past the camp and the lake to the valley's top corner |
 | `src/performance/ResidentMemory.cs`, `src/performance/model/PerformanceSample.cs` | Reading resident memory without allocating, and one sampled frame |
 | `src/cabins/DoorwayReview.cs` | The `--doorway` scenes: two players and wolves at a cabin's door, outside it or inside behind it, moved by a script and run by the game's rules |
-| `src/actors/enemies/wolf/WolfReview.cs` | The `--wolves` scenes: wolves turning on a patrol, turning to a player they smell and howling, and feeding on one they brought down |
+| `src/actors/enemies/wolf/WolfReview.cs` | The `--wolf-scene` scenes: wolves turning on a patrol, turning to a player they smell and howling, and feeding on one they brought down |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
 | `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
 | `src/intro/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
@@ -559,7 +559,7 @@ Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin
   The wolf then lets go and bites no sooner than a second later; at half health or less it ends as the last tug lands (`DoorTug.Heave`) and it pins them, otherwise a tugged player steps in again at a run, and one tugged off the door stands free.
 - While one wolf tugs, another that comes within `DoorTug.SideWithin` of the player takes the side it is on, or the other when that one is taken or has no open ground (`DoorTug.TakeSide`, `Wolf.Side`, a `BodySide`), one wolf a side.
   It bites once as it takes hold, or as soon after as its last bite is a second behind it (`DoorTug.BiteArm`, `Wolf.SideBitten`), stands `DoorTug.SideReach` to that side and bites no more (`DoorTug.Hold`) until the tug ends or it is hit.
-  A wolf with no side to take waits at biting distance and bites again once the tug has ended (`WolfHunt.Bite`).
+  A wolf with no side to take, with both held, without open ground or not out of the door yet, waits at biting distance and bites again once the tug has ended (`WolfHunt.Bite`).
   A player a wolf takes out of a cabin has no sides to take until `DoorTug.OutOfDoorBy` into the tug, when they are out of its door.
   `TugView.ShowHolding` draws it reared up (`WolfModel.Rearing`, `WolfModel.Rear`) as steeply as puts its jaws on the player's forearm as their rig draws it, its forepaws on their flank and its hind paws on the ground.
 - `Leaving` puts the player on the doorstep and takes `Doorways.LeaveSeconds`.
@@ -570,7 +570,7 @@ Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin
 The view walks the player through the doorway over the stage (`DoorwayView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
 On the two treads of the step and the floor (`StairSteps.StepEdges`) the body stands on the boot that bears its weight and the other knee bends to put its boot on its tread, a swinging boot rising ahead of each edge (`StairSteps.OnSteps`), so no boot sinks into the step.
 Every takedown falls the player backward onto their seat and back (`ActorAction.FallBack`, `FallBackView.FallBack`, `FallBackView.FallPath`), facing the wolf after a leap; a leaping or pinning wolf puts its forepaws on the player's chest (`FeedingSpots.PawsOnChest`), astride with its hind paws wide of the legs, while the player's hands push its head off by the jaw within reach, or by the neck when the jaw is too close, elbows out at the sides (`WolfModel.NeckLine`, `ArmReach.ArmTo` with an elbow direction and `ActorRig.RollArm`), and every other wolf feeding there stands perpendicular to the body at the part of it nearest to it where it touches neither another wolf nor the player's arms (`FeedingSpots.FreeSpot`, `WolfModel.Volumes`), keeping that spot while it stays free.
-A wounded player tugged out falls backward still facing the door, and the wolf lets go, steps round to their left (`Wolf.LungeFrom`) and lunges onto the throat from there as they land.
+A wounded player tugged out falls backward still facing the door, and the wolf lets go, steps round to the side of them it stands on, their left for one straight behind them (`Wolf.LungeFrom`), and lunges onto the throat from there as they land.
 A player knocking on the door stands on the lower tread, with the front boot on the upper one, and steps back down off it when done.
 #### Wolves at a cabin's door
 

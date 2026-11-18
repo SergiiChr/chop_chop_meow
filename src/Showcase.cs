@@ -38,7 +38,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // With --panel the cabin's page shows beside the scene, for a look at its key.
             if (Launch.Has("--panel")) panel.Select(cabin);
         }
-        if (Launch.Value("--wolves") is string wolves) view.AddChild(new WolfReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = wolves });
+        if (Launch.Value("--wolf-scene") is string wolves) view.AddChild(new WolfReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = wolves });
     }
 
     private void Place() {

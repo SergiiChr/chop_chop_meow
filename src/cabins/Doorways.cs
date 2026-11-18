@@ -242,6 +242,8 @@ public sealed class Doorways(World world) {
         bool done = p.DoorTime >= DoorSeconds(p);
         switch (p.Door) {
             case Doorway.Entering when done:
+                // A door left locked with nobody behind it, as in a save loaded without whoever locked it, is unlocked by the first one in.
+                UnlockEmpty(p.DoorCabin);
                 p.Sheltered = p.DoorCabin; p.Door = Doorway.None;
                 break;
             case Doorway.Following:

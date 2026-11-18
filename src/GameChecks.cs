@@ -7,6 +7,7 @@ using Godot;
 using static Checks;
 using static ModelSteps;
 using static PlayerSteps;
+using static CabinSteps;
 using static SetupSteps;
 using static WorldSteps;
 using static WorkerSteps;
@@ -2017,6 +2018,31 @@ public partial class Game {
         await CloseWithEsc();
     }
 
+    /// <summary>The window onto the door from inside stays shut while a wolf scratches, opens as it pries, and shuts once the wolf is gone.</summary>
+    private async Task CheckTheInsideWindowOpensWhenAWolfPriesAtTheDoor() {
+        await CloseWithEsc();
+        float health = world.Health; RunUntilNight(Hosted);
+        // Only this check's wolf comes to the door.
+        RemoveWolves(Hosted, _ => true); ShutDens(Hosted);
+        var at = Terrain.Spawn - new Vector2(30, 30);
+        RemoveThings(Hosted, t => t.Pos.DistanceTo(at) < 12);
+        var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(0, -4));
+        StepInside(Hosted, hut);
+        await Until(() => world.Sheltered == hut.Id, "the player being inside the cabin", 3);
+        var wolf = PatrolWolf(Hosted, new Wolf { Pos = Doorways.DoorPoint(hut) + Doorways.OutOfDoor * 3 });
+        await Until(() => world.Wolves.Any(w => w.DoorCheck == DoorCheckStage.Scratching), "a wolf passing the cabin coming to scratch at its door", 6);
+        await Frames();
+        Require(!view.InsideDoorPOV.Showing && !view.InsideDoorPOV.Visible, "The window onto the door from inside must stay shut while a wolf only scratches.");
+        await Until(() => world.Wolves.Any(w => w.DoorCheck == DoorCheckStage.Prying), "the wolf prying at the unlocked door", 6);
+        await Until(() => view.InsideDoorPOV.Showing && view.InsideDoorPOV.Visible, "the window onto the door from inside opening as the wolf pries", 2);
+        RemoveWolves(Hosted, w => w == wolf);
+        await Until(() => !view.InsideDoorPOV.Showing && !view.InsideDoorPOV.Visible, "the window onto the door from inside shutting once the wolf is gone", 2);
+        Hosted.Doorways.Leave();
+        await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "the player stepping out of the cabin again", 4);
+        RemoveThings(Hosted, t => t == hut); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
+        await CloseWithEsc();
+    }
+
     /// <summary>Space without an axe attacks unarmed, and one right click walks over and picks up a whole loose piece without the gather animation.</summary>
     private async Task CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece() {
         await CloseWithEsc();
@@ -2151,6 +2177,7 @@ public partial class Game {
             Test(CheckForegroundCanopyFadesOnlyOverBuildings);
             await Test(CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece);
             await Test(CheckAWolfAtATuggedPlayersArmIsDrawnOnTheSideItHolds);
+            await Test(CheckTheInsideWindowOpensWhenAWolfPriesAtTheDoor);
             await Test(CheckBerryBushHidesOnlyItsFruitWhenPicked);
             await Test(CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings);
             await Test(CheckStackLargerThanCrateFillsItAndRestStaysHeld);

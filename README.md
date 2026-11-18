@@ -65,7 +65,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door), `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm) or `takedown` (the same with a player hurt enough to go down, pinned and fed on; the scene keeps them alive); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
-| `--showcase --wolves patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl) or `feast` (four bring a hurt player down and feed; the scene keeps them alive); takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
+| `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl) or `feast` (four bring a hurt player down and feed; the scene keeps them alive); takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -805,7 +805,7 @@ A wolf that smells you within 30 metres while you are out in the open, but too f
 After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
 A wolf that finds you already within sight goes for you without a howl.
 A sprinting wolf gallops faster than you walk, but sprinting outruns it.
-A wolf that reaches you stops at biting distance, about a metre off, and waits there without biting while other wolves tug you and hold both your arms.
+A wolf that reaches you stops at biting distance, about a metre off, and waits there without biting while another wolf tugs you and it has no arm of yours to take.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
 

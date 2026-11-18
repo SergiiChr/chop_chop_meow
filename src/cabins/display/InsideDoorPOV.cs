@@ -31,9 +31,8 @@ public partial class InsideDoorPOV : TextureRect {
     /// <summary>Holds the copies where the world has their originals, moved so that the cabin they are at stands in the middle of the picture's world.</summary>
     private readonly Node3D stage = new();
     private readonly WolfModel[] wolves = new WolfModel[Wolves];
-    private ActorRig rig;
-    /// <summary>The shirt the rig wears: the first player's until a player in another one is taken out.</summary>
-    private string shirt = WorldView.Shirts[0];
+    /// <summary>A player in each shirt one may wear, of which only the one a wolf takes out is shown.</summary>
+    private readonly ActorRig[] rigs = new ActorRig[WorldView.Shirts.Length];
     private int shown;
     /// <summary>Frames left of the window's first ones, in which it is drawn faintly to build its shader's pipeline.</summary>
     private int warmFrames = 4;
@@ -51,7 +50,7 @@ public partial class InsideDoorPOV : TextureRect {
         picture.AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(60, 60) }, MaterialOverride = Mat("20251d", 1) });
         picture.AddChild(stage);
         for (int i = 0; i < Wolves; i++) { wolves[i] = new WolfModel(); stage.AddChild(wolves[i].Root); }
-        rig = new ActorRig(ActorSkin.Player); stage.AddChild(rig.Root);
+        for (int i = 0; i < rigs.Length; i++) { rigs[i] = new ActorRig(ActorSkin.Player, WorldView.Shirts[i]); stage.AddChild(rigs[i].Root); }
         picture.AddChild(new Camera3D { Current = true, Fov = FieldOfView, Near = .05f, Far = 80, Position = Eye, Basis = Basis.LookingAt(Aim - Eye, Vector3.Up) });
         // Moonlight from outside and above falls in only through the open door; nothing lights the inside.
         picture.AddChild(new DirectionalLight3D { LightColor = new Color("9fb4d8"), LightEnergy = .55f, ShadowEnabled = true, DirectionalShadowMaxDistance = 12, Basis = Basis.LookingAt(new Vector3(.35f, -.5f, -1).Normalized(), Vector3.Up) });
@@ -93,7 +92,7 @@ public partial class InsideDoorPOV : TextureRect {
     /// <summary>Starts a frame of the picture with no copies in it.</summary>
     public void Clear() {
         Showing = false; shown = 0;
-        rig.Root.Visible = false;
+        foreach (var rig in rigs) rig.Root.Visible = false;
     }
 
     /// <summary>Asks for the picture this frame, of the cabin at <paramref name="at"/> with its door <paramref name="door"/> as the world draws it.</summary>
@@ -110,12 +109,7 @@ public partial class InsideDoorPOV : TextureRect {
 
     /// <summary>Adds a copy of a player as the world draws them, in a shirt of <paramref name="colour"/>.</summary>
     public void Add(ActorRig player, string colour) {
-        // A player in another shirt needs a rig of their own, made as the wolf comes for them.
-        if (colour != shirt) {
-            shirt = colour; rig.Root.QueueFree();
-            rig = new ActorRig(ActorSkin.Player, colour); stage.AddChild(rig.Root);
-        }
-        CopyPose(player.Root, rig.Root);
+        CopyPose(player.Root, rigs[Math.Max(0, Array.IndexOf(WorldView.Shirts, colour))].Root);
     }
 
     /// <summary>Draws the picture when it was asked for, and stops drawing it when not.</summary>

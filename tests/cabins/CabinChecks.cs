@@ -32,6 +32,7 @@ public static class CabinChecks {
         Test(CheckACabinCannotBeBuiltWithItsDoorOnGroundNobodyCanStandOn, data);
         Test(CheckNothingCanBeBuiltOnACabinsDoorSpot, data);
         Test(CheckSteppingOutOfACabinWhoseDoorIsBlockedLandsOnOpenGround, data);
+        Test(CheckACabinNobodyIsLeftInsideIsUnlocked, data);
     }
 
     private static void CheckPlayerBehindACabinWalksRoundItToTheDoor(GameData data) {
@@ -120,6 +121,19 @@ public static class CabinChecks {
         Require(third.Door == Doorway.None && third.Sheltered == 0 && heard.Count(name => name == "door_knock") == 3, $"the third player should knock 3 times over a second and stand free: heard {string.Join(", ", heard)}");
         world.As(third, () => Require(world.Doorways.Enter(hut, false), "a player at the door of a full cabin should knock on it"));
         Require(third.Door == Doorway.Knocking, "a player at the door of a full cabin should knock on it");
+    }
+    private static void CheckACabinNobodyIsLeftInsideIsUnlocked(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        StepInside(world, hut, guest);
+        world.As(guest, world.Doorways.TurnKey);
+        Require(hut.Locked, "the guest inside should lock the door");
+        world.Depart(guest.Id);
+        Require(!hut.Locked, "a cabin whose only player left the game should be unlocked");
+        // A save loaded without whoever locked a cabin has it locked with nobody inside.
+        hut.Locked = true;
+        StepInside(world, hut);
+        Require(world.Sheltered == hut.Id && !hut.Locked, "a player stepping into a cabin locked with nobody inside should find its door unlocked");
     }
     private static void CheckAPlayerAtALockedDoorKnocksUntilSomeoneInsideTurnsTheKey(GameData data) {
         var (world, guest, _) = Hosted(data);

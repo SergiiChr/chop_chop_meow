@@ -28,6 +28,7 @@ public static class DoorTugChecks {
         Test(CheckAWolfWhoseLastBiteIsFreshTakesATuggedPlayersArmAtOnceAndBitesWhenItCan, data);
         Test(CheckAWolfWithNoArmToTakeWaitsBesideATuggedPlayerAndBitesOnceTheyAreLetGo, data);
         Test(CheckABodysLeftAndRightFollowFromTheWayItFaces);
+        Test(CheckAWolfWithNoRoomBehindAPlayerItTuggedOutPinsThemFromTheSideItStandsOn, data);
     }
 
     /// <summary>On the map, north is -Y and east is +X: facing north, a body's left hand is to the west.</summary>
@@ -38,6 +39,24 @@ public static class DoorTugChecks {
         Require(BodySide.Of(at, north, at + new Vector2(-2, 5)) == BodySide.Left && BodySide.Of(at, north, at + new Vector2(.1f, -3)) == BodySide.Right, "a spot to the west of a body facing north should be on its left and one to the east on its right, however far ahead or behind");
         Require(BodySide.Free(at, north, at + east, leftTaken: false, rightTaken: true) == BodySide.Left, "something on a body's right should take its left when the right is taken");
         Require(BodySide.Free(at, north, at + east, leftTaken: true, rightTaken: true) == 0, "nothing should take a side of a body with both taken");
+    }
+
+    /// <summary>
+    /// With water half a metre in front of the door, the wolf has no ground behind the player and stays at the side it
+    /// came from. The player faces the door, up the map, so east is to their right and west to their left.
+    /// </summary>
+    private static void CheckAWolfWithNoRoomBehindAPlayerItTuggedOutPinsThemFromTheSideItStandsOn(GameData data) {
+        foreach (int east in new[] { 1, -1 }) {
+            var world = NightWorld(data);
+            var hut = world.Add(ThingKind.Hut, ShoreForACabin(world, .5f));
+            world.Player = Doorways.DoorPoint(hut);
+            SetNeeds(world, health: 45);
+            Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+            var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(east * .8f, 0) });
+            for (float time = 0; time < DoorTug.TugSeconds + .2f && !world.Mauled; time += .05f) world.Tick(.05f);
+            Require(world.Mauled && wolf.Pinning, "a wounded player tugged out should be pinned by the wolf that tugged them");
+            Require(wolf.LungeFrom.X * east > .9f, $"a wolf standing to the {(east > 0 ? "east" : "west")} of the player it tugged should pin them from that side, not from {wolf.LungeFrom}");
+        }
     }
 
     /// <summary>Each bite takes 15 health: the tugging wolf's and the one a second wolf gives as it takes the player's arm leave 70 of 100.</summary>

@@ -206,9 +206,10 @@ public sealed class DoorTug(World world) {
         var p = world.S.Actor;
         // The wolves at the player's sides let go with the one that tugged, and bite again no sooner than after any other bite.
         foreach (var w in world.S.Wolves) if (w.Side != 0 && w.Target == p.Id) { w.LetGoOfArm(); w.Attack = 1; }
-        world.Player = TuggedTo; p.Warp++;
+        var at = TuggedTo;
+        world.Player = at; p.Warp++;
         if (takedown != null) {
-            world.WolfHunt.Pin(takedown, world.Hunters.Skip(1).Any(), BodySide.Out(Facing, BodySide.Of(TuggedTo, Facing, takedown.Pos)));
+            world.WolfHunt.Pin(takedown, world.Hunters.Skip(1).Any(), BodySide.Out(Facing, BodySide.Of(at, Facing, takedown.Pos)));
             p.Door = Doorway.None;
         } else if (p.Door == Doorway.Tugged) world.Doorways.StepIn(p.DoorCabin, true);
         else p.Door = Doorway.None;
