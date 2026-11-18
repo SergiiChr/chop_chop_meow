@@ -64,7 +64,7 @@ Play accepts Godot arguments after `--`:
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
-| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) or `pack` (three wolves, two waiting behind the one at the door); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
+| `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door) or `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -804,7 +804,7 @@ A wolf that smells you within 30 metres while you are out in the open, but too f
 After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
 A wolf that finds you already within sight goes for you without a howl.
 A sprinting wolf gallops faster than you walk, but sprinting outruns it.
-A wolf that reaches you stops at biting distance, about a metre off, and keeps that distance while another wolf tugs you.
+A wolf that reaches you stops at biting distance, about a metre off, and keeps that distance while other wolves tug you and hold both your arms.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
 
@@ -838,6 +838,8 @@ It then lets go and you run in again at once.
 At half health or less, its third tug takes you straight over onto your back about 1.2 seconds in.
 Hit the wolf while it tugs someone and it lets go of them.
 No other wolf takes you down while one tugs you.
+While it tugs, one more wolf can take each of your sides: it rears up, sets its forepaws on you and takes your forearm in its jaws, biting once as it takes hold, and holds on until the tug ends.
+A player a wolf takes out of a cabin has to be out of its door first, about 0.6 seconds into the tug.
 
 You stay in until you press Step outside in its panel.
 Stepping out takes about 1.5 seconds, and wolves can reach you for its second half, once you are out of the doorway.
@@ -853,8 +855,8 @@ Players a wolf tugs back out go in again in the order they came to the door.
 
 #### The door's key
 
-Once you are inside, the cabin's page shows the door's keyhole with its key under the Step outside button.
-Click the key to lock the door: it turns half a turn with the sound of the lock, and a click turns it back.
+Once you are inside, the cabin's page shows the door's round lock with its key in it under the Step outside button.
+Click the key to lock the door: it turns half a turn to the right with the sound of the lock, and a click turns it back.
 Either player inside can turn it.
 A locked door keeps out other players, who knock, and wolves.
 Step outside unlocks the door first and leaves it unlocked.
@@ -867,10 +869,11 @@ The wolf scratches at the door for 3.6 seconds, which you hear from inside.
 
 - From a locked door it goes away, and leaves that cabin alone until it has been out of smell of it and comes back.
 - You can still turn the key while it scratches.
-- At an unlocked door it works its snout into the door's edge for 1.5 seconds, when the key no longer turns, pushes in round the door over 2.5 seconds, stands in the doorway growling for 2 seconds and launches itself at you.
+- At an unlocked door it turns to the door's free edge, hooks its snout behind it and levers the door out in three heaves over 1.5 seconds, the door rattling at each; the key no longer turns.
+  It squeezes in between the door and its frame over 2.5 seconds, stands in the doorway growling with its fangs bared for 2 seconds and launches itself at you.
 - It bites and takes you out by the waist, as a wolf tugging you out of the doorway does: at more than half health you run back in, and it comes to the door again.
 - With two players inside it takes the one who came in last.
-- Other wolves that come to the same door wait a few metres behind it and go for you once you are out.
+- Other wolves that come to the same door wait a few metres behind it and go for you once you are out, one taking each of your arms while the first tugs.
 - While a wolf is at the door, Step outside says "A wolf is at the door."
 - A wolf at the door turns to a player out in the open within its sight until its snout is in the door, and a hit knocks it off the door.
 
@@ -985,7 +988,7 @@ The world reacts too:
 - furnaces smoke (the reinforced furnace darker and thicker), and anvils spark;
 - storage lids open on transfers, and the cabin door opens for someone stepping in or out and shuts behind them, or as far as a wolf forcing it has pushed it;
 - the market mailbox flag rises while a cart is out;
-- wolves trot, leap, feed and fall dead, scratch at a cabin's door and push in round it, and a pinned player struggles on their back;
+- wolves trot, leap, feed and fall dead, bare their fangs when they growl or attack, scratch at a cabin's door, lever it open and squeeze in, and rear up onto the arm of a player another wolf tugs; a pinned player struggles on their back;
 - couriers pull the trade cart.
 
 Animations pause with gameplay.

@@ -63,6 +63,51 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         return true;
     }
 
+    /// <summary>How far along a forearm, from the elbow to the fist, a wolf at a tugged player's side closes its jaws.</summary>
+    private const float ArmHold = .35f;
+    /// <summary>Where on the trunk, from the hips, the forepaws of a wolf at a player's left stand: on their side, one above and behind the other.</summary>
+    private static readonly Vector3 LowPaw = new(.19f, .1f, .07f), HighPaw = new(.19f, .24f, -.07f);
+
+    /// <summary>
+    /// Shows a wolf holding the arm of a player another wolf tugs: reared up at their side with its forepaws on their flank
+    /// and its jaws on their forearm as <paramref name="rig"/> draws it; returns false while the player is not drawn as tugged.
+    /// </summary>
+    public bool ShowHolding(Wolf wolf, WolfModel model, ActorRig? rig, float elapsed, float dt) {
+        if (rig == null || TuggedBy(wolf) is not var (held, _)) return false;
+        // Taking hold, it lunges in to the arm from where it stood rather than appearing there.
+        if (model.Motion != WolfMotion.Rear) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; model.Settled = 0; }
+        model.Settled = Math.Min(1, model.Settled + dt / TugLunge);
+        float lunge = WorldView.Ease(model.Settled);
+        bool left = wolf.Side > 0;
+        var root = rig.Root.GlobalTransform;
+        var arm = root * rig.Elbow(left).Lerp(rig.Fist(left), ArmHold);
+        // It faces across the player, from the side it holds.
+        var across = ActorAnimation.Forward(held.Yaw).Orthogonal() * (left ? 1 : -1);
+        model.Yaw = Mathf.LerpAngle(model.FromYaw, ActorAnimation.Yaw(FacesAcross(root, arm, across), model.Yaw), lunge);
+        model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
+        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.Root.Visible = world().Sees(wolf.Pos);
+        model.Steps = world().PlayerById(wolf.Target) is { DoorCabin: not 0 } p && world().Find(p.DoorCabin) is Thing cabin ? Doorways.DoorPoint(cabin) : null;
+        var body = WolfModel.Rearing(arm.Y, elapsed + wolf.Id % 7);
+        var grip = arm - model.Root.Basis * WolfModel.BiteOf(body);
+        model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);
+        var toModel = model.Root.Transform.AffineInverse();
+        var torso = rig.Torso.GlobalTransform;
+        float side = left ? 1 : -1;
+        Vector3 low = toModel * (torso * (LowPaw with { X = LowPaw.X * side })), high = toModel * (torso * (HighPaw with { X = HighPaw.X * side }));
+        // Each forepaw takes the spot on its own side, so the forelegs do not cross.
+        model.Rear(body, low.X >= high.X ? (low, high) : (high, low), dt);
+        model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
+        return true;
+    }
+
+    /// <summary>The way a wolf holding a player's arm faces: from out at their side, where its body has room, toward the arm.</summary>
+    private static Vector2 FacesAcross(Transform3D player, Vector3 arm, Vector2 across) {
+        var from = new Vector2(player.Origin.X, player.Origin.Z) - across * DoorTug.SideReach;
+        var toward = new Vector2(arm.X, arm.Z) - from;
+        return toward.LengthSquared() > 1e-4f ? toward : across;
+    }
+
     /// <summary>Shows a wolf that tugged its player out lunging onto them as they fall; returns false while the player is not drawn.</summary>
     public bool ShowLunging(Wolf wolf, WolfModel model, float elapsed, float dt) {
         if (stateOf(wolf.Target) is not ActorState fallen) return false;

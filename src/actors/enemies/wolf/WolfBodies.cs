@@ -51,7 +51,7 @@ public sealed class WolfBodies(World world) {
     }
 
     /// <summary>Whether a wolf holds its place at the player: tugging them, pinning them or in the air.</summary>
-    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Pinning || wolf.Leap > 0;
+    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Leap > 0;
 
     /// <summary>The nearest points to each other on two line segments, from <paramref name="a0"/> to <paramref name="a1"/> and <paramref name="b0"/> to <paramref name="b1"/>.</summary>
     private static (Vector2 OnA, Vector2 OnB) Closest(Vector2 a0, Vector2 a1, Vector2 b0, Vector2 b1) {

@@ -15,8 +15,8 @@ public partial class InsideSet : SubViewport {
     public const int Height = 648;
     /// <summary>How many wolves at the door the picture shows.</summary>
     public const int Wolves = 4;
-    /// <summary>Where the camera stands in the cabin, at the back wall beside the bed, and the spot on the door it looks at.</summary>
-    private static readonly Vector3 Eye = new(.12f, 1.08f, -.92f), Aim = new(-.34f, 1.02f, 1.05f);
+    /// <summary>Where the camera stands in the cabin, at the back wall beside the bed, and the spot it looks at, on the half of the door that opens.</summary>
+    private static readonly Vector3 Eye = new(.12f, 1.08f, -.92f), Aim = new(-.14f, 1.02f, 1.05f);
     /// <summary>The camera's field of view, in degrees, and the one it closes in to as a wolf launches itself at it.</summary>
     private const float FieldOfView = 50, CloseUp = 30;
     /// <summary>Degrees a second the camera opens out again after a launch.</summary>

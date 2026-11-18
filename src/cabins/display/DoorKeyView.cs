@@ -5,8 +5,8 @@ using static ChopChopMeow.ModelKit;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The keyhole of a cabin's door with its key in it, drawn from the game's angle into a picture the cabin's page shows.
-/// The key's grip stands up while the door is unlocked and turns half a turn, down, as it locks, in time with the lock's sound.
+/// The round lock of a cabin's door with its flat key in it, drawn from above and from the left into a picture the cabin's page shows.
+/// The key's teeth point up while the door is unlocked; it turns half a turn to the right, teeth down, as it locks, in time with the lock's sound.
 /// It is made once and kept, so showing it mid-game builds nothing.
 /// </summary>
 public partial class DoorKeyView : SubViewport {
@@ -23,10 +23,10 @@ public partial class DoorKeyView : SubViewport {
 
     public DoorKeyView() {
         Size = new Vector2I(Side, Side); TransparentBg = true; OwnWorld3D = true; Msaa3D = Msaa.Msaa4X; RenderTargetUpdateMode = UpdateMode.Once;
-        // Seen as the game sees the world: from above and from the right.
-        float pitch = Mathf.DegToRad(30), yaw = Mathf.DegToRad(38);
+        // Seen from above and from the left, so the key points down to the right.
+        float pitch = Mathf.DegToRad(30), yaw = Mathf.DegToRad(-38);
         var back = new Vector3(MathF.Cos(pitch) * MathF.Sin(yaw), MathF.Sin(pitch), MathF.Cos(pitch) * MathF.Cos(yaw));
-        AddChild(new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = 1.42f, Near = .1f, Far = 20, Current = true, Position = new Vector3(.04f, .02f, .16f) + back * 6, Basis = Basis.LookingAt(-back, Vector3.Up) });
+        AddChild(new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = .97f, Near = .1f, Far = 20, Current = true, Position = new Vector3(.033f, -.039f, .055f) + back * 6, Basis = Basis.LookingAt(-back, Vector3.Up) });
         AddChild(new DirectionalLight3D { LightEnergy = 1.7f, LightColor = new Color("fff1dc"), Basis = Basis.LookingAt(new Vector3(.55f, -.8f, -.75f).Normalized(), Vector3.Up) });
         var environment = new Godot.Environment {
             BackgroundMode = Godot.Environment.BGMode.ClearColor,
@@ -35,23 +35,23 @@ public partial class DoorKeyView : SubViewport {
             AmbientLightEnergy = .9f,
         };
         AddChild(new WorldEnvironment { Environment = environment });
-        var plate = new Node3D(); AddChild(plate);
-        // A brass plate with rounded ends, held by two screws, around a dark keyhole.
-        var brass = Metal("c9a257", .45f, .35f); var dark = Mat("1d1a17", .9f); var iron = Metal("aeb4b8", .45f, .4f);
-        Box(plate, new Vector3(.52f, .78f, .05f), Vector3.Zero, brass);
-        foreach (float y in new[] { .39f, -.39f }) {
-            Cylinder(plate, .26f, .26f, .05f, new Vector3(0, y, 0), brass, new Vector3(90, 0, 0), 24);
-            Cylinder(plate, .04f, .04f, .02f, new Vector3(0, y * 1.28f, .03f), iron, new Vector3(90, 0, 0), 12);
-        }
-        Cylinder(plate, .1f, .1f, .012f, new Vector3(0, .08f, .026f), dark, new Vector3(90, 0, 0), 20);
-        Box(plate, new Vector3(.075f, .26f, .012f), new Vector3(0, -.07f, .026f), dark);
-        // The key turns about its shaft, which goes into the round of the keyhole; its grip is a flat tab to one side of the shaft.
-        key = Pivot(plate, new Vector3(0, .08f, .03f));
-        Cylinder(key, .035f, .035f, .34f, new Vector3(0, 0, .17f), iron, new Vector3(90, 0, 0), 12);
-        Cylinder(key, .055f, .055f, .04f, new Vector3(0, 0, .32f), iron, new Vector3(90, 0, 0), 12);
-        Box(key, new Vector3(.045f, .24f, .15f), new Vector3(0, .1f, .4f), iron);
-        Cylinder(key, .15f, .15f, .045f, new Vector3(0, .27f, .4f), iron, new Vector3(0, 0, 90), 20);
-        Cylinder(key, .06f, .06f, .05f, new Vector3(0, .29f, .4f), dark, new Vector3(0, 0, 90), 14);
+        var body = new Node3D(); AddChild(body);
+        // A round lock: a dark collar that narrows away from the door, around a bright steel face with a maker's tag stamped over the plug the key goes into.
+        var collar = Metal("403d39", .6f, .4f); var steel = Metal("d3d1c9", .4f, .45f); var stamped = Metal("b4b2aa", .45f, .45f); var dark = Mat("1d1a17", .9f); var nickel = Metal("85847e", .45f, .4f);
+        var outward = new Vector3(90, 0, 0);
+        Cylinder(body, .43f, .37f, .12f, new Vector3(0, 0, .06f), collar, outward, 32);
+        Cylinder(body, .3f, .3f, .02f, new Vector3(0, 0, .125f), steel, outward, 32);
+        Box(body, new Vector3(.22f, .075f, .012f), new Vector3(0, .13f, .137f), stamped);
+        // The plug turns with the flat key in it. The key's teeth run along one edge of its blade, and its grip is a flat ring.
+        key = Pivot(body, new Vector3(0, -.09f, .135f));
+        Cylinder(key, .105f, .105f, .02f, new Vector3(0, 0, .005f), dark, outward, 20);
+        Box(key, new Vector3(.024f, .075f, .2f), new Vector3(0, -.012f, .1f), nickel);
+        foreach (var (along, height) in new[] { (.035f, .014f), (.07f, .03f), (.105f, .02f), (.14f, .034f) })
+            Box(key, new Vector3(.024f, height, .028f), new Vector3(0, .0255f + height / 2, along), nickel);
+        Box(key, new Vector3(.024f, .16f, .034f), new Vector3(0, 0, .2f), nickel);
+        Box(key, new Vector3(.028f, .12f, .07f), new Vector3(0, 0, .24f), nickel);
+        var grip = Torus(key, .05f, .19f, new Vector3(0, 0, .43f), nickel);
+        grip.RotationDegrees = new Vector3(0, 0, 90); grip.Scale = new Vector3(1, .2f, 1);
         Pose();
     }
 
@@ -80,7 +80,8 @@ public partial class DoorKeyView : SubViewport {
     private void Pose() {
         float turned = Mathf.SmoothStep(TurnFrom, TurnTo, since), jog = since < JogTo ? MathF.Sin(MathF.PI * Mathf.SmoothStep(JogFrom, JogTo, since)) : 0;
         float degrees = (locked ? turned : 1 - turned) * 180 + (locked ? 1 : -1) * jog * JogDegrees;
-        key.RotationDegrees = new Vector3(0, 0, degrees);
+        // Seen from the front, a turn to the right goes against the angle's own direction.
+        key.RotationDegrees = new Vector3(0, 0, -degrees);
         RenderTargetUpdateMode = UpdateMode.Once;
     }
 }

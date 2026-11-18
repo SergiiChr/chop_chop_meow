@@ -174,6 +174,10 @@ git fetch origin
 - A machine without a display, such as a cloud container, records under `xvfb-run -a ./tools/animation_review.py ...`.
 - Turn the movies into a side-by-side video or a numbered contact sheet with the `frame-compare` skill, which takes
   them as they are.
+- For a face or a paw, record the clip yourself with `--animation-zoom`, which brings the camera that many times
+  closer; idle wolves face the middle, so `--animation-turn 90` shows one from the front:
+  `./build.py record build/recordings/face.avi -- --animation-review --animation-clip "wolf idle" --animation-pitch 3 --animation-turn 90 --animation-zoom 2.6 --frames 200`.
+  The wary half of `wolf idle` shows the snarl.
 
 Any scene records the same way, such as a showcase, with `./build.py record`:
 

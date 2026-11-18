@@ -165,7 +165,8 @@ public static class DoorVisitsChecks {
         VisitTick(world, .1f);
         Require(wolf.Target == 0 && wolf.Visit == WolfVisit.Coming && wolf.VisitCabin == hut.Id, $"a wolf hunting a player who got inside should go to the cabin's door, not {wolf.Visit}");
         for (int i = 0; i < 100 && wolf.Visit == WolfVisit.Coming; i++) VisitTick(world, .05f);
-        Require(wolf.Visit == WolfVisit.Scratching && wolf.Pos.DistanceTo(Doorways.DoorPoint(hut)) < .2f, $"the wolf should scratch at the door once it is there, not {wolf.Visit} at {wolf.Pos - Doorways.DoorPoint(hut)}");
+        // It scratches at the half of the door that opens, 0.2 m to the right of the door point.
+        Require(wolf.Visit == WolfVisit.Scratching && wolf.Pos.DistanceTo(Doorways.DoorPoint(hut) + new Vector2(.2f, 0)) < .1f, $"the wolf should scratch at the door once it is there, not {wolf.Visit} at {wolf.Pos - Doorways.DoorPoint(hut)}");
     }
 
     private static void CheckOtherWolvesWaitBehindTheOneAtTheDoorAndJoinIn(GameData data) {
@@ -182,6 +183,10 @@ public static class DoorVisitsChecks {
         VisitTick(world, 7.5f);
         Require(world.Door == Doorway.Tugged && first.Tugging, $"the wolf at the door should take the player out, not leave them {world.Door}");
         Require(second.Target == world.Me.Id && third.Target == world.Me.Id && second.Visit == WolfVisit.None, "the wolves that waited should go for the player once they are out");
+        // The player is out of the door 0.6 s into the tug; until then nobody can get to their sides.
+        Require(second.Side == 0 && third.Side == 0, $"no wolf should take the side of a player still in the cabin's door: sides {second.Side} and {third.Side}");
+        VisitTick(world, .7f);
+        Require(second.Side != 0 && third.Side == -second.Side, $"the two wolves that waited should each take a side of the player once they are out of the door: sides {second.Side} and {third.Side}");
     }
 
     private static void CheckAWolfAtADoorTurnsToAPlayerOutInTheOpen(GameData data) {

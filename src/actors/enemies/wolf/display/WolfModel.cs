@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What a wolf model shows; a change blends from the pose it had into the new one.</summary>
-public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Door }
+public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Rear, Door }
 
 /// <summary>
 /// A leg's joint angles in degrees, each swinging the segment below forward from its parent's line; Splay swings the whole leg out from the body.
@@ -20,11 +20,12 @@ public readonly record struct WolfLeg(float Upper, float Middle, float Lower, fl
 /// Lift, Shift and Surge move the body up, sideways and forward from standing; Pitch tips it nose down and Roll onto its right side.
 /// Flex rounds the back, tucking chest and pelvis toward each other, and negative stretches it out; Bend curls it to its left.
 /// Neck and Head lower the head, NeckTurn and HeadTurn look to its left, and HeadTilt rolls the head.
-/// Jaw opens the mouth and Ears lays the ears back. Tail lifts the tail from straight back, Wag swings it to the left and Curl bends it on up.
+/// Jaw opens the mouth and Ears lays the ears back. Snarl, 0 to 1, lifts the lips off the upper teeth and lowers the brows.
+/// Tail lifts the tail from straight back, Wag swings it to the left and Curl bends it on up.
 /// </summary>
 public readonly record struct WolfPose(
     float Lift = 0, float Pitch = 0, float Roll = 0, float Shift = 0, float Surge = 0, float Flex = 0, float Bend = 0,
-    float Neck = 0, float NeckTurn = 0, float Head = 0, float HeadTurn = 0, float HeadTilt = 0, float Jaw = 0, float Ears = 0,
+    float Neck = 0, float NeckTurn = 0, float Head = 0, float HeadTurn = 0, float HeadTilt = 0, float Jaw = 0, float Ears = 0, float Snarl = 0,
     float Tail = -65, float Wag = 0, float Curl = 0,
     WolfLeg FrontLeft = default, WolfLeg FrontRight = default, WolfLeg HindLeft = default, WolfLeg HindRight = default) {
     public WolfLeg Leg(int i) => i switch { 0 => FrontLeft, 1 => FrontRight, 2 => HindLeft, _ => HindRight };
@@ -39,7 +40,7 @@ public readonly record struct WolfPose(
     public static WolfPose Lerp(WolfPose a, WolfPose b, float t) => new(
         Mathf.Lerp(a.Lift, b.Lift, t), Mathf.Lerp(a.Pitch, b.Pitch, t), Mathf.Lerp(a.Roll, b.Roll, t), Mathf.Lerp(a.Shift, b.Shift, t), Mathf.Lerp(a.Surge, b.Surge, t),
         Mathf.Lerp(a.Flex, b.Flex, t), Mathf.Lerp(a.Bend, b.Bend, t), Mathf.Lerp(a.Neck, b.Neck, t), Mathf.Lerp(a.NeckTurn, b.NeckTurn, t),
-        Mathf.Lerp(a.Head, b.Head, t), Mathf.Lerp(a.HeadTurn, b.HeadTurn, t), Mathf.Lerp(a.HeadTilt, b.HeadTilt, t), Mathf.Lerp(a.Jaw, b.Jaw, t), Mathf.Lerp(a.Ears, b.Ears, t),
+        Mathf.Lerp(a.Head, b.Head, t), Mathf.Lerp(a.HeadTurn, b.HeadTurn, t), Mathf.Lerp(a.HeadTilt, b.HeadTilt, t), Mathf.Lerp(a.Jaw, b.Jaw, t), Mathf.Lerp(a.Ears, b.Ears, t), Mathf.Lerp(a.Snarl, b.Snarl, t),
         Mathf.Lerp(a.Tail, b.Tail, t), Mathf.Lerp(a.Wag, b.Wag, t), Mathf.Lerp(a.Curl, b.Curl, t),
         WolfLeg.Lerp(a.FrontLeft, b.FrontLeft, t), WolfLeg.Lerp(a.FrontRight, b.FrontRight, t), WolfLeg.Lerp(a.HindLeft, b.HindLeft, t), WolfLeg.Lerp(a.HindRight, b.HindRight, t));
 }
@@ -141,7 +142,7 @@ public sealed class WolfModel {
     private WolfPose Walk(float p, bool wary) {
         float step = MathF.Cos(p * Mathf.Tau * 2), side = MathF.Sin(p * Mathf.Tau);
         var body = new WolfPose(Lift: -.008f + .006f * step - (wary ? .07f : 0), Pitch: .8f * step + (wary ? 3 : 0), Roll: 1.2f * side, Bend: 2 * side,
-            Neck: (wary ? 30 : 12) + 3 * step, Head: wary ? -24 : -6, HeadTurn: -2 * side, Ears: wary ? -8 : 0,
+            Neck: (wary ? 30 : 12) + 3 * step, Head: wary ? -24 : -6, HeadTurn: -2 * side, Jaw: wary ? 8 : 0, Ears: wary ? -8 : 0, Snarl: wary ? 1 : 0,
             Tail: wary ? -78 : -64, Wag: 7 * side, Curl: 8);
         return Stride(body, WalkGait, p);
     }
@@ -150,7 +151,7 @@ public sealed class WolfModel {
         // Lowest as each diagonal pair takes the weight, highest in the float between them.
         float bob = MathF.Cos((p - .2f) * Mathf.Tau * 2), side = MathF.Sin(p * Mathf.Tau);
         var body = new WolfPose(Lift: .006f - .013f * bob - (wary ? .06f : 0), Pitch: .6f * bob, Roll: 1.5f * side, Bend: 1.5f * side,
-            Neck: (wary ? 30 : 20) + 2 * bob, Head: wary ? -24 : -12, Ears: wary ? -6 : 6, Jaw: 3,
+            Neck: (wary ? 30 : 20) + 2 * bob, Head: wary ? -24 : -12, Ears: wary ? -6 : 6, Jaw: wary ? 8 : 3, Snarl: wary ? 1 : 0,
             Tail: wary ? -72 : -48, Wag: 9 * side, Curl: 10);
         return Stride(body, TrotGait, p);
     }
@@ -159,7 +160,7 @@ public sealed class WolfModel {
         // The spine folds under at the gathered float and stretches out in the extended one; the head stays level over the rocking body.
         float flex = MathF.Cos((p - .45f) * Mathf.Tau), pitch = 6 * MathF.Cos((p - .25f) * Mathf.Tau);
         var body = new WolfPose(Lift: .045f + .05f * MathF.Cos((p - .44f) * Mathf.Tau * 2), Pitch: pitch, Flex: 15 * flex, Roll: 1.5f * MathF.Sin(p * Mathf.Tau),
-            Neck: 12 - pitch - 4 * flex, Head: -10, Jaw: 8, Ears: 28, Tail: -18 + 9 * flex, Curl: 6 - 6 * flex);
+            Neck: 12 - pitch - 4 * flex, Head: -10, Jaw: 10, Ears: 28, Snarl: 1, Tail: -18 + 9 * flex, Curl: 6 - 6 * flex);
         return Stride(body, GallopGait, p);
     }
 
@@ -222,7 +223,7 @@ public sealed class WolfModel {
     private static WolfPose Standing(float time, bool wary) {
         float breath = MathF.Sin(time * 2.4f), look = MathF.Sin(time * .37f), settle = MathF.Sin(time * .23f);
         var body = wary
-            ? new WolfPose(Lift: -.08f + .004f * breath, Pitch: 4, Neck: 30 + breath, Head: -26, NeckTurn: look * 4, Jaw: 9 + 2 * breath, Ears: -10, Tail: -82, Wag: MathF.Sin(time * .9f) * 3)
+            ? new WolfPose(Lift: -.08f + .004f * breath, Pitch: 4, Neck: 30 + breath, Head: -26, NeckTurn: look * 4, Jaw: 9 + 2 * breath, Ears: -10, Snarl: 1, Tail: -82, Wag: MathF.Sin(time * .9f) * 3)
             : new WolfPose(Lift: .004f * breath, Shift: .008f * settle, Roll: -1.2f * settle, Neck: 6 + 4 * MathF.Sin(time * .55f), NeckTurn: look * 16 + MathF.Sin(time * 1.3f) * 4,
                 Head: -6 + breath, HeadTurn: look * 10, HeadTilt: look * 4, Jaw: 2 + 2 * Math.Max(0, MathF.Sin(time * 7)), Ears: 4 + 6 * Math.Max(0, MathF.Sin(time * .9f + 1)),
                 Tail: -66 + 3 * MathF.Sin(time * .8f), Wag: 8 * MathF.Sin(time * 1.1f), Curl: 8 + 4 * MathF.Sin(time * 1.1f + .8f));
@@ -266,7 +267,7 @@ public sealed class WolfModel {
         float push = Mathf.SmoothStep(0, .3f, t), air = Mathf.SmoothStep(.15f, 1, t), reach = Mathf.SmoothStep(.4f, 1, t);
         // The body arcs up and comes down onto the throat, which sits lower than the top of the leap.
         var body = new WolfPose(Lift: Mathf.Lerp(-.06f, .14f, air) + .22f * MathF.Sin(MathF.PI * air) + .06f * push * (1 - air), Pitch: -12 * push - 22 * air, Flex: Mathf.Lerp(8, -12, air),
-            Neck: Mathf.Lerp(10, 16, air), Head: Mathf.Lerp(-8, 8, reach), Jaw: 34 * reach, Ears: Mathf.Lerp(0, 22, air), Tail: Mathf.Lerp(-50, -10, air), Curl: -8);
+            Neck: Mathf.Lerp(10, 16, air), Head: Mathf.Lerp(-8, 8, reach), Jaw: 8 + 26 * reach, Ears: Mathf.Lerp(0, 22, air), Snarl: 1, Tail: Mathf.Lerp(-50, -10, air), Curl: -8);
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
             float x = WolfShape.Pivot(leg).X;
@@ -293,7 +294,7 @@ public sealed class WolfModel {
             // Riding the player down: high and nose up while they still stand, then low over them with the jaws at the throat.
             float up = 1 - Mathf.SmoothStep(0, 1, down);
             body = new WolfPose(Lift: -.05f + .3f * up - .02f * pull, Pitch: 14 - 34 * up - 4 * pull, Surge: -.03f * pull, Flex: 4,
-                Neck: 52 - 60 * up - 12 * pull, Head: 14 + 4 * shake, HeadTurn: 12 * shake, HeadTilt: 6 * shake, Jaw: 10 + 6 * bite, Ears: 26, Tail: -70 + 6 * MathF.Sin(time * 1.7f), Wag: 8 * MathF.Sin(time * 2.1f));
+                Neck: 52 - 60 * up - 12 * pull, Head: 14 + 4 * shake, HeadTurn: 12 * shake, HeadTilt: 6 * shake, Jaw: 10 + 6 * bite, Ears: 26, Snarl: 1, Tail: -70 + 6 * MathF.Sin(time * 1.7f), Wag: 8 * MathF.Sin(time * 2.1f));
             // Beside the player it keeps its forepaws on the ground by their shoulder.
             body = lunged ? Planted(body, 1.4f, 0, .05f) : Planted(body, 2.4f, 0, .05f, ChestTop + .5f * up, 3.2f);
             // Astride, its forepaws stay on the player's chest as they go down under it and once they lie.
@@ -308,7 +309,7 @@ public sealed class WolfModel {
     /// <summary>A feeding wolf's pose: head down, pulling back by <paramref name="pull"/>, shaking and biting, with all four paws planted.</summary>
     private static WolfPose Tearing(float time, float pull, float shake, float bite) =>
         Planted(new WolfPose(Lift: -.07f, Pitch: 12 - 4 * pull, Surge: -.05f * pull, Flex: 6, Neck: 46 - 14 * pull + 6 * MathF.Sin(time * 9), Head: 18,
-            HeadTurn: 18 * shake, HeadTilt: 6 * shake, Jaw: 6 + 18 * bite, Ears: 22, Tail: -74 + 5 * MathF.Sin(time * 1.7f), Wag: 12 * MathF.Sin(time * 2.1f)), 1.25f, 0, .1f);
+            HeadTurn: 18 * shake, HeadTilt: 6 * shake, Jaw: 6 + 18 * bite, Ears: 22, Snarl: 1, Tail: -74 + 5 * MathF.Sin(time * 1.7f), Wag: 12 * MathF.Sin(time * 2.1f)), 1.25f, 0, .1f);
 
     /// <summary>Where a feeding wolf's jaws close, in the model, between its pulls.</summary>
     public static readonly Vector3 FeedingBite = BiteOf(Tearing(0, 0, 0, 0));
@@ -353,8 +354,37 @@ public sealed class WolfModel {
     /// <summary>A tugging wolf's body: <paramref name="heave"/> 0 to 1 through a tug, wrenching toward <paramref name="side"/>, and its head shaking.</summary>
     private static WolfPose Tugging(float heave, float side, float shake) =>
         new(Lift: -.06f - .1f * heave, Pitch: -4 - 16 * heave, Roll: 7 * side * heave, Surge: -.1f * heave, Flex: 8 + 12 * heave, Bend: 14 * side * heave,
-            Neck: 8 - 18 * heave, Head: 6 + 8 * heave, HeadTurn: 22 * side * heave + 12 * shake, HeadTilt: 14 * side * heave + 10 * shake, Jaw: 10, Ears: -18 - 8 * heave,
+            Neck: 8 - 18 * heave, Head: 6 + 8 * heave, HeadTurn: 22 * side * heave + 12 * shake, HeadTilt: 14 * side * heave + 10 * shake, Jaw: 10, Ears: -18 - 8 * heave, Snarl: 1,
             Tail: -28 + 12 * heave, Wag: 6 * shake - 12 * side * heave, Curl: 6);
+
+    /// <summary>
+    /// The body of a wolf reared up on its hind legs with its jaws closed on something <paramref name="jaws"/> metres off the
+    /// ground, such as the arm of a player another wolf tugs: the higher that is, the steeper it rears. It worries what it
+    /// holds, its head shaking and wrenching back as <paramref name="time"/> runs on.
+    /// </summary>
+    internal static WolfPose Rearing(float jaws, float time) {
+        float shake = MathF.Sin(time * 14), wrench = MathF.Pow(Math.Max(0, MathF.Sin(time * 5.2f)), 2);
+        var body = new WolfPose(Lift: -.03f, Pitch: -45, Flex: -4 + 4 * wrench, Surge: -.02f * wrench, Neck: 8 - 8 * wrench, Head: 24, HeadTurn: 9 * shake, HeadTilt: 10 * shake,
+            Jaw: 13, Ears: -22, Snarl: 1, Tail: -34 + 8 * wrench, Wag: 10 * MathF.Sin(time * 6), Curl: 8);
+        for (int pass = 0; pass < 4; pass++) body = body with { Pitch = Math.Clamp(body.Pitch - (jaws - BiteOf(body).Y) / RiseADegree, SteepestRear, ShallowestRear) };
+        return body;
+    }
+    /// <summary>About how far a degree more of rearing lifts a wolf's jaws, in metres, and the pitches it rears between.</summary>
+    private const float RiseADegree = .011f, SteepestRear = -68, ShallowestRear = -12;
+
+    /// <summary>
+    /// Shows a wolf reared up as <paramref name="body"/> has it, from <see cref="Rearing"/>: standing on its hind paws with
+    /// its forepaws on what it holds, at <paramref name="paws"/> in the model.
+    /// </summary>
+    public void Rear(WolfPose body, (Vector3 Left, Vector3 Right) paws, float dt) {
+        for (int leg = 0; leg < 4; leg++) {
+            bool hind = leg >= 2;
+            // The hind paws stand apart under the hips, a little behind where they stand on all fours; the forelegs reach up and forward.
+            var at = hind ? new Vector3(WolfShape.Pivot(leg).X * 1.5f, WolfShape.Sole, Home(leg) - .06f) : leg == 0 ? paws.Left : paws.Right;
+            body = body.WithLeg(leg, hind ? ReachTo(body, leg, at, -8, 0) : Reach(body, leg, at, 55, 30));
+        }
+        Show(WolfMotion.Rear, body, dt);
+    }
 
     /// <summary>
     /// Struck: the head snaps away from the blow and the wolf hops back off its forelegs, lands hind paws first and ducks low with its ears flat and tail tucked, then rises wary.
@@ -367,7 +397,7 @@ public sealed class WolfModel {
         float duck = Mathf.SmoothStep(HopShare - .12f, HopShare + .08f, t) * (1 - .45f * Mathf.SmoothStep(.7f, 1, t)), cower = Math.Max(snap, duck);
         var body = new WolfPose(Lift: .1f * air - .15f * duck, Pitch: -6 * air + 6 * duck, Roll: 6 * snap, Bend: -12 * snap, Flex: 10 * air + 4 * duck,
             Neck: -16 * snap + 40 * duck, Head: -10 * snap - 30 * duck, HeadTurn: -36 * snap, HeadTilt: -14 * snap, Jaw: 24 * snap + 12 * duck,
-            Ears: 45 * cower, Tail: -62 - 36 * cower, Curl: -30 * cower);
+            Ears: 45 * cower, Snarl: cower, Tail: -62 - 36 * cower, Curl: -30 * cower);
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
             // In the air the hind paws reach back for the landing and the forepaws trail where they pushed off; landed, the legs spread to brace the crouch.
@@ -539,7 +569,7 @@ public sealed class WolfModel {
         if (next != motion) {
             from = shown; blend = 0;
             // A leap and a blow happen fast, and a wolf at a door stands still before its first scratch; changes of gait and settling down take longer.
-            blendSeconds = next is WolfMotion.Leap or WolfMotion.Recoil ? .08f : next is WolfMotion.Pin or WolfMotion.Door ? .12f : motion == WolfMotion.Recoil ? .3f : .25f;
+            blendSeconds = next is WolfMotion.Leap or WolfMotion.Recoil ? .08f : next is WolfMotion.Pin or WolfMotion.Door or WolfMotion.Rear ? .12f : motion == WolfMotion.Recoil ? .3f : .25f;
             motion = next;
         }
         blend = Math.Min(1, blend + dt / blendSeconds);
@@ -615,6 +645,9 @@ public sealed class WolfModel {
         return new WolfLeg(Mathf.RadToDeg(a1), Mathf.RadToDeg(a2 - a1), Mathf.RadToDeg(a3 - a2), Mathf.RadToDeg(pawAt - a3), Mathf.RadToDeg(splay));
     }
 
+    /// <summary>How far a full snarl lifts the lips, in metres, how many degrees it curls them up at the front, and how many it lowers the brows.</summary>
+    private const float LipLift = .028f, LipCurl = 6, BrowDrop = 10;
+
     private void Apply(WolfPose p) {
         for (int bone = WolfShape.Loin; bone <= WolfShape.Pelvis; bone++) {
             var (at, turn) = Spine(p, bone);
@@ -626,6 +659,11 @@ public sealed class WolfModel {
         skeleton.SetBonePoseRotation(WolfShape.Jaw, Turn(p.Jaw));
         skeleton.SetBonePoseRotation(WolfShape.EarL, Turn(-p.Ears, 0, -p.Ears * .3f));
         skeleton.SetBonePoseRotation(WolfShape.EarR, Turn(-p.Ears, 0, p.Ears * .3f));
+        // A snarl lifts the lips, most at the front, and lowers the inner end of each brow over its eye.
+        skeleton.SetBonePosePosition(WolfShape.Lip, Rest(WolfShape.Lip).Origin + new Vector3(0, LipLift * p.Snarl, 0));
+        skeleton.SetBonePoseRotation(WolfShape.Lip, Turn(-LipCurl * p.Snarl));
+        skeleton.SetBonePoseRotation(WolfShape.BrowL, Turn(0, 0, BrowDrop * p.Snarl));
+        skeleton.SetBonePoseRotation(WolfShape.BrowR, Turn(0, 0, -BrowDrop * p.Snarl));
         // The tail rests pointing straight back; most of the lift is at the root and the curl and wag carry on along it.
         skeleton.SetBonePoseRotation(WolfShape.Tail, Turn(p.Tail, p.Wag));
         skeleton.SetBonePoseRotation(WolfShape.Tail + 1, Turn(p.Curl * .5f, p.Wag * .6f));

@@ -17,6 +17,14 @@ public sealed class DoorVisits(World world) {
     public const float WaitBehind = 2.4f, WaitApart = .9f;
     /// <summary>How near its spot at a door, in metres, a wolf has arrived.</summary>
     private const float AtSpot = .15f;
+    /// <summary>How far toward the free edge of a cabin's door from its door point a wolf stands to scratch at it, and how near that spot it stops.</summary>
+    public const float ScratchAside = .2f;
+    private const float AtDoorSpot = .05f;
+    /// <summary>
+    /// How far out from where it scratches a wolf comes round to before it walks straight up to the door, how far to a side
+    /// of that line it may be to walk straight in, and the share of its trot it walks up at.
+    /// </summary>
+    private const float ApproachFrom = .9f, ApproachLane = .3f, ApproachPace = .45f;
 
     /// <summary>Seconds a stage of a wolf's visit to a door lasts; a wolf comes for as long as the way takes.</summary>
     public static float Seconds(WolfVisit stage) => stage switch {
@@ -120,8 +128,13 @@ public sealed class DoorVisits(World world) {
             case WolfVisit.Coming:
                 var lead = Lead(cabin.Id, door);
                 if (lead == wolf) {
-                    world.Travel(wolf, door, step, step);
-                    if (wolf.Pos.DistanceTo(door) < AtSpot) Stage(wolf, WolfVisit.Scratching);
+                    // It comes round to face the door, then walks straight up to it, so it gets there facing it and at a walk.
+                    var scratch = door + Doorways.AsideWay * ScratchAside;
+                    float aside = (wolf.Pos - scratch).Dot(Doorways.AsideWay), outFrom = (wolf.Pos - scratch).Dot(Doorways.OutOfDoor);
+                    if (Math.Abs(aside) < ApproachLane && outFrom > 0 && outFrom < ApproachFrom + ApproachLane) {
+                        world.Travel(wolf, scratch, step * ApproachPace, step * ApproachPace);
+                        if (wolf.Pos.DistanceTo(scratch) < AtDoorSpot) Stage(wolf, WolfVisit.Scratching);
+                    } else world.Travel(wolf, scratch + Doorways.OutOfDoor * ApproachFrom, step, step);
                 } else if (lead != null && WaitSpot(wolf, lead, door) is var spot && wolf.Pos.DistanceTo(spot) >= AtSpot && world.CanStand(spot)) world.Travel(wolf, spot, step, step);
                 break;
             case WolfVisit.Scratching:

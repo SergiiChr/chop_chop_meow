@@ -21,6 +21,10 @@ public sealed class Wolf : IWalker {
     public bool Pinning { get; set; }
     /// <summary>The wolf tugging its player out of a cabin's doorway by the waist.</summary>
     public bool Tugging { get; set; }
+    /// <summary>
+    /// The side of the player another wolf tugs that this wolf holds by the arm: 1 for their left, -1 for their right, 0 for neither.
+    /// </summary>
+    public int Side { get; set; }
     /// <summary>What the wolf is doing at the door of the cabin <see cref="VisitCabin"/>, and for how many seconds.</summary>
     public WolfVisit Visit { get; set; }
     public int VisitCabin { get; set; }

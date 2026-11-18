@@ -38,7 +38,7 @@ public sealed class WolfHunt(World world) {
         float speed = world.Data.WolfTrot, chase = world.Data.WalkSpeed * world.Data.WolfChase;
         foreach (var wolf in hunters) {
             wolf.Attack -= dt;
-            if (wolf.Tugging && world.DoorTug.Tug(wolf)) continue;
+            if (wolf.Tugging && world.DoorTug.Tug(wolf) || world.DoorTug.Hold(wolf)) continue;
             if (wolf.Howl > 0) { wolf.Howl = Math.Max(0, wolf.Howl - dt); continue; }
             if (wolf.Leap > 0) {
                 // Closing the remaining gap evenly makes every leap last LeapSeconds.
@@ -95,9 +95,12 @@ public sealed class WolfHunt(World world) {
         wolf.Pos = lungeFrom == Vector2.Zero ? world.Player + AwayFromPlayer(wolf) * World.PinDistance : world.Player + Doorways.OutOfDoor * DoorTug.FallenThroat + lungeFrom * DoorTug.AsideReach;
         world.Say(pack ? "You are pinned. The pack closes in." : "You are pinned."); world.Play("wolf_bite", world.Player); world.Play("takedown_scream", world.Player);
     }
-    /// <summary>A wolf within reach of the acting player whose last bite is behind it bites them, and tugs them out of a doorway they are in.</summary>
+    /// <summary>
+    /// A wolf within reach of the acting player whose last bite is behind it bites them, and tugs them out of a doorway
+    /// they are in, or takes them by an arm while another wolf tugs them.
+    /// </summary>
     private void Bite(Wolf wolf) {
-        if (wolf.Pos.DistanceTo(world.Player) >= 1.1f || wolf.Attack > 0) return;
+        if (wolf.Attack > 0 || world.DoorTug.TakeSide(wolf) || wolf.Pos.DistanceTo(world.Player) >= 1.1f) return;
         wolf.Attack = 1; world.S.Health -= world.Data.WolfBite; world.Play("wolf_bite", world.Player); world.DoorTug.TugOut(wolf);
     }
 

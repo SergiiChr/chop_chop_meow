@@ -23,6 +23,42 @@ public static class DoorTugChecks {
         Test(CheckHittingAWolfThatTugsAPlayerOutKnocksItBack, data);
         Test(CheckAWolfTugsAPlayerStandingAsideAtACabinDoorOffIt, data);
         Test(CheckAWolfTugsAPlayerOutOnlyAsFarAsOpenGroundGoes, data);
+        Test(CheckASecondWolfTakesATuggedPlayersSideBitesOnceAndHoldsUntilTheTugEnds, data);
+        Test(CheckOnlyOneWolfTakesEachSideOfATuggedPlayer, data);
+    }
+
+    /// <summary>Each bite takes 15 health: the tugging wolf's and the one a second wolf gives as it takes the player's arm leave 70 of 100.</summary>
+    private static void CheckASecondWolfTakesATuggedPlayersSideBitesOnceAndHoldsUntilTheTugEnds(GameData data) {
+        var world = NightWorld(data);
+        var heard = Listen(world);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = Doorways.DoorPoint(hut);
+        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+        var tugger = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        var second = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-2.5f, 1) });
+        world.Tick(.05f);
+        Require(world.Door == Doorway.Tugged && tugger.Tugging && world.Health == 85, $"the nearer wolf should bite the player and tug them out, not leave them {world.Door} at {world.Health} health");
+        for (float time = 0; time < .8f && second.Side == 0; time += .05f) world.Tick(.05f);
+        Require(second.Side == 1 && world.Health == 70, $"a second wolf reaching a tugged player from their left should take that side with one bite, not side {second.Side} at {world.Health} health");
+        Require(heard.Count(name => name == "wolf_bite") == 2, $"each wolf taking hold should be heard biting once: heard {string.Join(", ", heard)}");
+        while (world.Me.DoorTime < DoorTug.TugSeconds - .1f) world.Tick(.05f);
+        Require(world.Door == Doorway.Tugged && second.Side == 1 && world.Health == 70, $"a wolf at a tugged player's side should hold on without biting again, not side {second.Side} at {world.Health} health");
+        Require(second.Pos.DistanceTo(world.DoorTug.TuggedTo) is > .6f and < 1, $"a wolf holding a tugged player's arm should stand at their side, not {second.Pos.DistanceTo(world.DoorTug.TuggedTo):0.00} m from them");
+        world.Tick(.15f);
+        Require(second.Side == 0 && !tugger.Tugging && world.Door == Doorway.Entering, $"the wolves should let go as the tug ends, not side {second.Side} with the player {world.Door}");
+    }
+
+    private static void CheckOnlyOneWolfTakesEachSideOfATuggedPlayer(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = Doorways.DoorPoint(hut);
+        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        var others = new[] { new Vector2(-2.5f, 1), new Vector2(2.5f, 1), new Vector2(0, 3) }.Select(from => PlaceWolf(world, new Wolf { Pos = world.Player + from })).ToArray();
+        world.Tick(.05f);
+        for (float time = 0; time < 1; time += .05f) world.Tick(.05f);
+        Require(world.Door == Doorway.Tugged, $"the player should still be tugged a second in, not {world.Door}");
+        Require(others.Count(w => w.Side == 1) == 1 && others.Count(w => w.Side == -1) == 1, $"one wolf should hold each side of a tugged player: sides {string.Join(", ", others.Select(w => w.Side))}");
     }
 
     /// <summary>A wolf bite takes 15 health, which leaves a healthy player above half.</summary>

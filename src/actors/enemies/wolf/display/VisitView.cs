@@ -4,10 +4,11 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// Draws a wolf at the door of a cabin with someone inside: scratching at it, stepping over to its free edge and working
-/// its snout in, pushing in round the door, standing in the doorway and launching itself in.
+/// Draws a wolf at the door of a cabin with someone inside: scratching at it, shuffling round to face its free edge,
+/// hooking its snout behind the edge and levering the door out a heave at a time, squeezing in between the door and its
+/// frame, standing in the doorway and launching itself in.
 /// Everything follows from the stage of the visit and the seconds into it, so every view of one visit shows the same
-/// thing, and the door stands as far open as the wolf's body has pushed it.
+/// thing, and the door, which opens outward, stands as far open as the wolf has levered and pushed it.
 /// Spots are measured from the cabin's door point: X across the door toward its free edge, Y out from it.
 /// </summary>
 public static class VisitView {
@@ -24,10 +25,11 @@ public static class VisitView {
     }
 
     /// <summary>
-    /// The wolf's stands: in front of the door to scratch at it, at the door's free edge to work its snout in, in the
-    /// doorway with its forepaws on the step, and inside, where its launch ends.
+    /// The wolf's stands: in front of the door's free half to scratch at it, turned to face the gap the door's free edge
+    /// opens, further in along that line with its forepaws on the step and its shoulders between the door and the frame,
+    /// and inside, where its launch ends.
     /// </summary>
-    private static readonly Stand Front = new(new(0, -.01f), 0), Edge = new(new(.58f, -.02f), 16), Doorway = new(new(0, -.4f), 0), Inside = new(new(0, -.95f), 0);
+    private static readonly Stand Front = new(new(DoorVisits.ScratchAside, -.01f), 0), Edge = new(new(.434f, .025f), 15), Doorway = new(new(.32f, -.4f), 15), Inside = new(new(.2f, -.95f), 0);
 
     /// <summary>Seconds into a visit, counted from the first scratch, at which each stage starts.</summary>
     private const float PryAt = DoorVisits.ScratchSeconds, OpenAt = PryAt + DoorVisits.PrySeconds, StareAt = OpenAt + DoorVisits.OpenSeconds,
@@ -78,7 +80,7 @@ public static class VisitView {
         float come = WorldView.Ease(along) * Strides, stride = MathF.Min(MathF.Floor(come), Strides - 1);
         return (Stand.Lerp(from, to, stride / Strides), Stand.Lerp(from, to, (stride + 1) / Strides), come - stride);
     }
-    private const int Strides = 3;
+    private const int Strides = 2;
 
     /// <summary>Where a wolf stands this far into a visit.</summary>
     private static Stand StandAt(float clock) {
@@ -134,7 +136,7 @@ public static class VisitView {
         // The cabin's floor is three treads up from the ground the wolf stood on.
         float floor = 3 * StairSteps.StepRise;
         var body = new WolfPose(Lift: Mathf.Lerp(-.14f, floor - .08f, air) + .07f * MathF.Sin(MathF.PI * air), Pitch: -10 * drive + 6 * reach, Flex: Mathf.Lerp(10, -12, air),
-            Neck: Mathf.Lerp(26, 6, air), Head: Mathf.Lerp(-24, -2, reach), Jaw: 12 + 26 * reach, Ears: -22, Tail: Mathf.Lerp(-82, -16, air), Curl: -6);
+            Neck: Mathf.Lerp(26, 6, air), Head: Mathf.Lerp(-24, -2, reach), Jaw: 12 + 26 * reach, Ears: -22, Snarl: 1, Tail: Mathf.Lerp(-82, -16, air), Curl: -6);
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
             float x = WolfShape.Pivot(leg).X * Spread;
@@ -183,24 +185,81 @@ public static class VisitView {
         float breath = MathF.Sin(time * 2.4f);
         // Scratching, it leans on its left foreleg and watches its paw.
         var scratching = new WolfPose(Lift: .01f + .004f * breath, Pitch: -3, Roll: -2, Shift: .02f, Neck: 16, NeckTurn: -8, Head: 2, Jaw: 3, Ears: 10, Tail: -58, Wag: 10 * MathF.Sin(time * 3.1f), Curl: 10);
-        // At the door's edge it lowers its nose to the gap and sniffs.
-        float sniff = MathF.Sin(time * 11);
-        var sniffing = new WolfPose(Lift: -.03f, Pitch: 5, Surge: .03f + .008f * sniff, Neck: 34, NeckTurn: 4, Head: -6 + 2 * sniff, HeadTurn: 6, Jaw: 2, Ears: 14, Tail: -66, Wag: 5 * MathF.Sin(time * 2.2f), Curl: 8);
-        // Prying, it drives its snout in behind the door's edge, twisting its head from side to side.
-        float pry = Mathf.SmoothStep(0, 1, (clock - PryAt) / DoorVisits.PrySeconds), twist = MathF.Sin((clock - PryAt) * 8.5f);
-        var prying = new WolfPose(Lift: -.05f, Pitch: 7, Surge: .05f + .1f * pry + .012f * twist, Neck: 36, NeckTurn: 2 + 3 * twist, Head: -4, HeadTurn: 4 + 5 * twist, HeadTilt: 14 * twist, Jaw: 4, Ears: -6, Tail: -72, Wag: 6 * twist, Curl: 4);
-        // Pushing in round the door, it keeps its head low and its ears back.
-        var pushing = new WolfPose(Lift: -.06f, Pitch: 5, Surge: .05f, Neck: 30, Head: -10, Jaw: 5, Ears: -10, Tail: -76, Curl: 2);
-        // In the doorway it crouches, looks up from under its brow and snarls.
+        // Turned to the door's free edge, it puts its nose to the seam and sniffs along it.
+        float sniff = MathF.Sin(clock * 11);
+        var sniffing = new WolfPose(Lift: -.02f, Pitch: 3, Neck: 24, Head: -2 + 2 * sniff, Jaw: 2, Ears: 14, Tail: -66, Wag: 5 * MathF.Sin(time * 2.2f), Curl: 8);
+        // Prying, it hooks its snout behind the edge and levers the door out toward itself a heave at a time, its head
+        // coming up and back and twisting one way, then the other.
+        float pried = Pried(clock), heave = Heave(clock);
+        var prying = new WolfPose(Lift: -.03f - .02f * Math.Abs(heave), Pitch: 4 - 5 * pried, Roll: 3 * heave, Neck: 26 - 14 * pried - 4 * Math.Abs(heave), Head: -2, HeadTilt: 14 * heave, Jaw: 4, Ears: -8,
+            Tail: -70 + 6 * Math.Abs(heave), Wag: 8 * heave, Curl: 4);
+        // Squeezing in between the door and its frame, it keeps its head low and its ears back.
+        var pushing = new WolfPose(Lift: -.06f, Pitch: 5, Surge: .04f, Neck: 30, Head: -10, Jaw: 7, Ears: -10, Snarl: .5f, Tail: -76, Curl: 2);
+        // In the doorway it crouches, turns its head to whoever is inside, looks up from under its brow and snarls.
         float stare = Mathf.SmoothStep(0, 1, (clock - StareAt) / DoorVisits.StareSeconds), snarl = MathF.Sin(time * 23);
-        var staring = new WolfPose(Lift: -.08f - .02f * stare + .003f * breath, Pitch: 4, Surge: .03f + .05f * stare, Neck: 30 + breath, Head: -28, HeadTilt: 2 * MathF.Sin(time * 1.3f), Jaw: 10 + 4 * stare + 1.5f * snarl,
-            Ears: -14, Tail: -84, Wag: 2 * MathF.Sin(time * .9f));
-        return clock < ToEdgeFrom ? scratching
+        var staring = new WolfPose(Lift: -.08f - .02f * stare + .003f * breath, Pitch: 4, Surge: .03f + .05f * stare, Neck: 30 + breath, NeckTurn: -StareTurn * .6f, Head: -28, HeadTurn: -StareTurn * .4f,
+            HeadTilt: 2 * MathF.Sin(time * 1.3f), Jaw: 10 + 4 * stare + 1.5f * snarl, Ears: -14, Snarl: 1, Tail: -84, Wag: 2 * MathF.Sin(time * .9f));
+        var pose = clock < ToEdgeFrom ? scratching
             : clock < PryAt ? WolfPose.Lerp(scratching, sniffing, Mathf.SmoothStep(ToEdgeFrom, ToEdgeBy, clock))
-            : clock < OpenAt ? WolfPose.Lerp(sniffing, prying, Mathf.SmoothStep(PryAt, PryAt + .3f, clock))
-            : clock < StareAt ? WolfPose.Lerp(prying, pushing, Mathf.SmoothStep(OpenAt, OpenAt + .5f, clock))
+            : clock < OpenAt ? WolfPose.Lerp(sniffing, prying, Mathf.SmoothStep(PryAt, PryAt + .2f, clock))
+            : clock < StareAt - .2f ? WolfPose.Lerp(prying, pushing, Mathf.SmoothStep(OpenAt, OpenAt + NoseOff, clock))
             : WolfPose.Lerp(pushing, staring, Mathf.SmoothStep(StareAt - .2f, StareAt + .3f, clock));
+        // From the turn to the edge until it starts to squeeze in, its nose is where the door's edge is.
+        float nosing = Mathf.SmoothStep(ToEdgeFrom, ToEdgeBy, clock) * (1 - Mathf.SmoothStep(OpenAt, OpenAt + NoseOff, clock));
+        return nosing > 0 ? WolfPose.Lerp(pose, NoseTo(pose, StandAt(clock).In(Nose(clock))), nosing) : pose;
     }
+    /// <summary>How many degrees to its right a wolf in the doorway turns its head, to whoever is inside.</summary>
+    private const float StareTurn = 16;
+    /// <summary>Seconds over which a wolf that has levered the door open takes its nose off the door's edge and starts to squeeze in.</summary>
+    private const float NoseOff = .5f;
+
+    /// <summary>How many heaves a wolf levers a door open in, and the share of each spent heaving; it holds for the rest.</summary>
+    private const int Pries = 3;
+    private const float HeaveShare = .55f;
+
+    /// <summary>Which heave a prying wolf is in this far into a visit, from 0, and how far through it, 0 to 1.</summary>
+    private static (int Pry, float Through) PryPhase(float clock) {
+        float pries = Math.Clamp((clock - PryAt) / DoorVisits.PrySeconds, 0, 1) * Pries, pry = MathF.Min(MathF.Floor(pries), Pries - 1);
+        return ((int)pry, pries - pry);
+    }
+
+    /// <summary>How far a wolf has levered the door this far into a visit, 0 to 1: a third further with each heave.</summary>
+    private static float Pried(float clock) {
+        var (pry, through) = PryPhase(clock);
+        return (pry + Mathf.SmoothStep(0, HeaveShare, through)) / Pries;
+    }
+
+    /// <summary>How hard a prying wolf heaves this far into a visit, rising and falling over each heave, one way and then the other: -1 to 1.</summary>
+    private static float Heave(float clock) {
+        var (pry, through) = PryPhase(clock);
+        return clock < PryAt || through >= HeaveShare ? 0 : MathF.Sin(MathF.PI * through / HeaveShare) * (pry % 2 == 0 ? 1 : -1);
+    }
+
+    /// <summary>
+    /// Where a wolf's nose is this far into a visit, measured from the door point, while it is at the door's edge: at the
+    /// seam beside the free edge until it pries, then behind the edge, following it out as the door swings.
+    /// </summary>
+    private static Vector2 Nose(float clock) {
+        float pried = Pried(clock), angle = Mathf.DegToRad(Mathf.Lerp(SeamAngle, LeveredAngle, pried));
+        return Hinge + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * Mathf.Lerp(SeamReach, LeveredReach, pried);
+    }
+    /// <summary>
+    /// How far from the door's hinge, and how many degrees out from the shut door, a wolf's nose is at the seam, just past
+    /// the door's free edge, and once it has levered the door out.
+    /// </summary>
+    private const float SeamReach = .895f, SeamAngle = 3.6f, LeveredReach = .78f, LeveredAngle = 27;
+
+    /// <summary>A pose with its neck and head turned and its body leant so that its jaws are over a spot in its model, X to its left and Y ahead.</summary>
+    private static WolfPose NoseTo(WolfPose pose, Vector2 spot) {
+        for (int pass = 0; pass < 4; pass++) {
+            var bite = WolfModel.BiteOf(pose);
+            float turn = Mathf.RadToDeg((spot.X - bite.X) / NeckLength);
+            pose = pose with { NeckTurn = pose.NeckTurn + turn * .6f, HeadTurn = pose.HeadTurn + turn * .4f, Surge = Math.Clamp(pose.Surge + spot.Y - bite.Z, -MostLean, MostLean) };
+        }
+        return pose;
+    }
+    /// <summary>About how far a wolf's jaws are from the root of its neck, and how far it leans its body to put its nose somewhere.</summary>
+    private const float NeckLength = .37f, MostLean = .2f;
 
     /// <summary>
     /// A scratching wolf's right forepaw this far into a visit: up off the ground to the door, then down it once for each
@@ -277,38 +336,78 @@ public static class VisitView {
     /// <summary>How far through its launch into the cabin a wolf is this far into a visit, 0 to 1.</summary>
     public static float Launched(float clock) => Math.Clamp((clock - LaunchAt) / DoorVisits.LaunchSeconds, 0, 1);
 
-    /// <summary>How many degrees open a wolf has pushed a cabin's door this far into its visit.</summary>
-    public static float DoorDegrees(float clock) => clock <= PryAt ? 0 : pushed[Math.Min(pushed.Length - 1, (int)((clock - PryAt) * PushedRate))];
+    /// <summary>
+    /// How many degrees open a cabin's door stands this far into a wolf's visit: as far as the wolf has levered and pushed
+    /// it, and rattling off its snout at each heave.
+    /// </summary>
+    public static float DoorDegrees(float clock) {
+        if (clock <= PryAt) return 0;
+        float at = Math.Min((clock - PryAt) * PushedRate, pushed.Length - 1);
+        int before = Math.Min((int)at, pushed.Length - 2);
+        return Mathf.Lerp(pushed[before], pushed[before + 1], at - before) + Rattle(clock);
+    }
 
-    /// <summary>The door's opening at each sixtieth of a second from the wolf's first push: it only ever opens further.</summary>
+    /// <summary>
+    /// How many degrees the door jumps out off a prying wolf's snout this far into a visit: quick knocks that start as each
+    /// heave is at its hardest and die away. The door only ever jumps away from the snout.
+    /// </summary>
+    private static float Rattle(float clock) {
+        var (pry, through) = PryPhase(clock);
+        // The last heave's knocks die away after the prying is over.
+        float since = (pry == Pries - 1 ? clock - PryAt - DoorVisits.PrySeconds * pry / Pries : through * DoorVisits.PrySeconds / Pries) - RattleFrom;
+        return since <= 0 ? 0 : RattleDegrees * MathF.Exp(-since / RattleFade) * (.5f - .5f * MathF.Cos(since * Mathf.Tau * RattleRate));
+    }
+    /// <summary>How far the door rattles, in degrees, how many times a second, from how many seconds into a heave, and the seconds over which it dies away.</summary>
+    private const float RattleDegrees = 2.6f, RattleRate = 13, RattleFrom = .1f, RattleFade = .11f;
+
+    /// <summary>The door's opening at each sixtieth of a second from the wolf's first heave, without its rattle: it only ever opens further.</summary>
     private static readonly float[] pushed = Pushed();
     private const int PushedRate = 60;
+    /// <summary>How high the door's lower edge is: the paws and shins of a wolf below it are under the door, not in its way.</summary>
+    private const float DoorBottom = 3 * StairSteps.StepRise;
+    /// <summary>The most degrees a second the door swings while the wolf levers it and squeezes in, and while it launches itself in.</summary>
+    private const float SwingRate = 55, FlungRate = 400;
+    /// <summary>Which of a wolf's <see cref="WolfModel.VolumesOf"/> spheres is its snout.</summary>
+    private const int Snout = 7;
 
     private static float[] Pushed() {
         var table = new float[(int)((End - PryAt) * PushedRate) + 1];
         Span<(Vector3 At, float Radius)> volumes = stackalloc (Vector3, float)[WolfModel.VolumeCount];
+        Span<float> ground = stackalloc float[4];
         float open = 0;
         for (int i = 0; i < table.Length; i++) {
             float clock = PryAt + (float)i / PushedRate;
             var stand = StandAt(clock);
-            WolfModel.VolumesOf(PoseAt(clock, clock), volumes);
-            foreach (var (centre, radius) in volumes) open = Math.Max(open, Cleared(stand.Out(new Vector2(centre.X, centre.Z)), radius, open));
+            GroundAt(clock, ground);
+            WolfModel.VolumesOf(WolfModel.Stood(PoseAt(clock, clock), ground), volumes);
+            for (int part = 0; part < volumes.Length; part++) {
+                var (centre, radius) = volumes[part];
+                if (centre.Y + radius < DoorBottom) continue;
+                // The snout it levers with is hooked behind the door's edge, whichever side of the door's line it is on.
+                open = Math.Max(open, Cleared(stand.Out(new Vector2(centre.X, centre.Z)), radius, open, part == Snout && clock < OpenAt + NoseOff));
+            }
             table[i] = open;
         }
+        // The door starts to swing a moment before a part of the wolf that needs it further open gets there, so it never jumps.
+        for (int i = table.Length - 2; i >= 0; i--) table[i] = Math.Max(table[i], table[i + 1] - (PryAt + (float)i / PushedRate < LaunchAt ? SwingRate : FlungRate) / PushedRate);
+        // The door is shut until the snout wedges in beside its edge, and gives way to it no faster than it swings.
+        table[0] = 0;
+        for (int i = 1; i < table.Length && table[i] > table[i - 1] + SwingRate / PushedRate; i++) table[i] = table[i - 1] + SwingRate / PushedRate;
         return table;
     }
 
     /// <summary>
     /// How many degrees open the door has to stand to clear a round part of the wolf at <paramref name="centre"/> that is
-    /// behind the door, or touching it, as it stands <paramref name="open"/> degrees open; zero for a part out in front of the door.
+    /// behind the door, or touching it, as it stands <paramref name="open"/> degrees open; zero for a part out in front of the
+    /// door, unless it is <paramref name="hooked"/> behind the door's edge.
     /// </summary>
-    private static float Cleared(Vector2 centre, float radius, float open) {
+    private static float Cleared(Vector2 centre, float radius, float open, bool hooked = false) {
         var from = centre - Hinge;
         float far = from.Length(), turn = Mathf.DegToRad(open);
         var along = new Vector2(MathF.Cos(turn), MathF.Sin(turn));
         // How far the part is out in front of the door, and how far along the door from its hinge.
         float ahead = along.X * from.Y - along.Y * from.X, reach = along.Dot(from);
-        if (ahead >= radius || reach <= 0 || reach >= Leaf + radius || far <= radius) return 0;
+        if (ahead >= radius && !hooked || reach <= 0 || reach >= Leaf + radius || far <= radius) return 0;
         // Past the door's free edge only that edge has to clear the part; nearer the hinge the whole face does.
         float half = far > Leaf ? MathF.Acos(Math.Clamp((Leaf * Leaf + far * far - radius * radius) / (2 * Leaf * far), -1, 1)) : MathF.Asin(radius / far);
         return Mathf.RadToDeg(MathF.Atan2(from.Y, from.X) + half) + Clear;

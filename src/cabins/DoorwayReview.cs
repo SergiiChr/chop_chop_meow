@@ -12,7 +12,7 @@ namespace ChopChopMeow;
 /// </summary>
 public sealed partial class DoorwayReview : Node {
     /// <summary>The scenes <c>--doorway</c> takes.</summary>
-    public static readonly string[] Scenes = { "queue", "occupied", "wolf", "wounded", "locked", "forced", "pair", "pack" };
+    public static readonly string[] Scenes = { "queue", "occupied", "wolf", "wounded", "locked", "forced", "pair", "pack", "sides" };
     public World World = null!;
     public WorldView View = null!;
     public Thing Cabin = null!;
@@ -88,6 +88,14 @@ public sealed partial class DoorwayReview : Node {
                 (.2f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.5f, 4) })),
                 (.6f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(3, 6) })),
                 (1, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-4, 7) })),
+            },
+            // The host steps in at a walk with three wolves after them: one tugs them out and one more takes each of their arms.
+            "sides" => new (float, Action)[] {
+                (0, () => { World.Player = door; World.As(guest, () => World.Player = door + new Vector2(60, 0)); }),
+                (0, () => World.Doorways.Enter(Cabin, false)),
+                (.15f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-.5f, 1.6f), Target = host.Id })),
+                (.15f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-3, 2), Target = host.Id })),
+                (.15f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(3, 2.5f), Target = host.Id })),
             },
             // A badly hurt host is tugged out of the doorway and pinned.
             _ => new (float, Action)[] {

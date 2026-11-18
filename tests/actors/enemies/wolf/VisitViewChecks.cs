@@ -7,7 +7,7 @@ using static Checks;
 public static class VisitViewChecks {
     public static void Run() {
         Test(CheckAWolfAtADoorKeepsItsPawsOnTheGroundAndTheStep);
-        Test(CheckTheDoorOpensOnlyAsFarAsTheWolfPushesItAndNeverThroughIt);
+        Test(CheckTheDoorOpensGraduallyRattlesAtEachHeaveAndNeverStandsInTheWolf);
     }
 
     /// <summary>The door point the checks' cabin has, and the seconds of a visit before the wolf launches itself in: 3.6 + 1.5 + 2.5 + 2.</summary>
@@ -49,31 +49,39 @@ public static class VisitViewChecks {
     }
 
     /// <summary>
-    /// The cabin's door is hinged 0.41 m to the left of its door point, 0.925 m in from it, and is 0.82 m long.
-    /// It stays shut until the wolf pries, never swings back, and no part of the wolf is ever on both sides of it.
+    /// The cabin's door is hinged 0.41 m to the left of its door point, 0.925 m in from it, is 0.82 m long and has its
+    /// lower edge 0.42 m up. It stays shut until the wolf pries, opens a little at a time, swings back a little in each of the
+    /// three heaves of the 1.5 s of prying, and no part of the wolf is ever on both sides of it.
     /// </summary>
-    private static void CheckTheDoorOpensOnlyAsFarAsTheWolfPushesItAndNeverThroughIt() {
+    private static void CheckTheDoorOpensGraduallyRattlesAtEachHeaveAndNeverStandsInTheWolf() {
         var wolf = new WolfModel();
         var hinge = Door + new Vector2(-.41f, -.925f);
         Span<(Vector3 At, float Radius)> volumes = stackalloc (Vector3, float)[WolfModel.VolumeCount];
-        float before = 0, deepest = 0;
+        Span<bool> rattled = stackalloc bool[3];
+        float before = 0, widest = 0, deepest = 0, fastest = 0, fastestAt = 0, deepestAt = 0;
         for (float clock = 0; clock < LaunchAt; clock += Frame) {
             Show(wolf, clock);
             float open = VisitView.DoorDegrees(clock);
             Require(clock > PryAt || open == 0, $"the door should stay shut until the wolf pries at it: {open:0.0} degrees open {clock:0.00} s in");
-            Require(open >= before && open <= 100, $"the door should only open further, up to its full swing: {before:0.0} then {open:0.0} degrees {clock:0.00} s in");
-            before = open;
+            Require(open > widest - 3 && open <= 100, $"the door should swing back only a little as it rattles, and open no further than its full swing: {open:0.0} degrees after {widest:0.0}, {clock:0.00} s in");
+            if (Math.Abs(open - before) > fastest) (fastest, fastestAt) = (Math.Abs(open - before), clock);
+            int heave = (int)((clock - PryAt) / .5f);
+            if (clock > PryAt && heave < 3 && open < before - .2f) rattled[heave] = true;
+            (before, widest) = (open, Math.Max(widest, open));
             var edge = hinge + new Vector2(.82f, 0).Rotated(Mathf.DegToRad(open));
             wolf.Volumes(volumes);
             foreach (var (centre, radius) in volumes) {
                 var at = wolf.Root.Transform * centre;
+                if (at.Y + radius < .42f) continue;
                 var spot = new Vector2(at.X, at.Z);
                 var nearest = hinge + (edge - hinge) * Math.Clamp((spot - hinge).Dot(edge - hinge) / (edge - hinge).LengthSquared(), 0, 1);
-                deepest = Math.Min(deepest, spot.DistanceTo(nearest) - radius);
+                if (spot.DistanceTo(nearest) - radius < deepest) (deepest, deepestAt) = (spot.DistanceTo(nearest) - radius, clock);
             }
         }
         wolf.Root.Free();
-        Require(deepest > -.03f, $"the door should never stand in the wolf's body: {-deepest:0.000} m into it");
-        Require(before is > 55 and < 90, $"a wolf standing in the doorway should hold the door most of the way open against its flank: {before:0.0} degrees");
+        Require(fastest < 3, $"the door should open a little at a time: it swings {fastest:0.0} degrees in a sixtieth of a second, {fastestAt:0.00} s in");
+        for (int heave = 0; heave < 3; heave++) Require(rattled[heave], $"the door should rattle at each heave of the wolf's prying: it does not swing back in heave {heave + 1}");
+        Require(deepest > -.03f, $"the door should never stand in the wolf's body: {-deepest:0.000} m into it, {deepestAt:0.00} s in");
+        Require(widest is > 35 and < 70, $"a wolf standing in the doorway should hold the door part of the way open against its flank: {widest:0.0} degrees");
     }
 }

@@ -7,6 +7,8 @@ namespace ChopChopMeow;
 /// <summary>
 /// A wolf in <paramref name="world"/> that reaches a player out in the open in a cabin's doorway takes them by the waist
 /// and tugs them back out of it, then lets go: a badly hurt player falls back and is pinned, anyone else steps in again.
+/// While it tugs, one more wolf on each side of the player can take them by the arm, biting once as it does, and hold on
+/// until the tug ends.
 /// </summary>
 public sealed class DoorTug(World world) {
     /// <summary>Seconds a wolf takes to tug a player back out of a doorway.</summary>
@@ -23,6 +25,10 @@ public sealed class DoorTug(World world) {
     /// to the side of it the wolf that pins them stands.
     /// </summary>
     public const float FallenThroat = .66f, AsideReach = .7f;
+    /// <summary>How far to a side of a tugged player a wolf that holds their arm stands, and how near them it has to come to take it.</summary>
+    public const float SideReach = .8f, SideWithin = 1.3f;
+    /// <summary>Seconds into a tug out of a cabin by which the player is far enough out of its door for wolves to take their sides.</summary>
+    public const float OutOfDoorBy = .6f;
 
     /// <summary>Seconds a tug out of a doorway lasts: a wounded player is taken down as the last tug lands, with no hold after it.</summary>
     public static float Seconds(PlayerState p) => p.Health <= World.TakedownHealth ? TugSeconds * (Tugs - 1 + Heave) / Tugs : TugSeconds;
@@ -114,6 +120,46 @@ public sealed class DoorTug(World world) {
         return true;
     }
 
+    /// <summary>Where a wolf holding the acting player's arm on a side stands: 1 for their left, -1 for their right, as they face into the cabin.</summary>
+    private Vector2 SideSpot(int side) => TuggedTo - Doorways.AsideWay * (side * SideReach);
+
+    /// <summary>
+    /// A wolf that reaches the acting player while another wolf tugs them takes them by the arm on the nearer side that is
+    /// free and has open ground, biting as it takes hold; returns whether it did. A player a wolf takes out of a cabin has
+    /// to be out of its door first.
+    /// </summary>
+    public bool TakeSide(Wolf wolf) {
+        var p = world.S.Actor;
+        if (Tugger() is not Wolf tugger || tugger == wolf || p.Door is not (Doorway.Tugged or Doorway.TuggedOff) || wolf.Pos.DistanceTo(TuggedTo) >= SideWithin) return false;
+        if (tugger.Visit == WolfVisit.TakingOut && p.DoorTime < OutOfDoorBy) return false;
+        int nearer = wolf.Pos.DistanceSquaredTo(SideSpot(1)) <= wolf.Pos.DistanceSquaredTo(SideSpot(-1)) ? 1 : -1;
+        foreach (int side in (ReadOnlySpan<int>)[nearer, -nearer]) {
+            if (!world.CanStand(SideSpot(side)) || Holder(side) != null) continue;
+            wolf.Side = side; wolf.Pos = SideSpot(side); wolf.Attack = 1; wolf.Leap = 0;
+            p.Health -= world.Data.WolfBite; world.Play("wolf_bite", world.Player);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>The wolf holding the acting player's arm on a side, or null.</summary>
+    private Wolf? Holder(int side) {
+        foreach (var w in world.S.Wolves) if (w.Side == side && w.Target == world.S.Actor.Id) return w;
+        return null;
+    }
+
+    /// <summary>
+    /// Keeps a wolf that holds the acting player's arm at their side while they are tugged; returns false, letting go,
+    /// once the tug is over or the wolf has been hit.
+    /// </summary>
+    public bool Hold(Wolf wolf) {
+        if (wolf.Side == 0) return false;
+        if (!Tugged || wolf.Stagger > 0) { wolf.Side = 0; return false; }
+        if (world.CanStand(SideSpot(wolf.Side))) wolf.Pos = SideSpot(wolf.Side);
+        wolf.Attack = 1;
+        return true;
+    }
+
     /// <summary>A wolf lets go of the player it tugged, which also ends the visit to a cabin's door that took them out of it.</summary>
     private static void Release(Wolf wolf) { wolf.Tugging = false; wolf.Visit = WolfVisit.None; wolf.VisitCabin = 0; wolf.VisitTime = 0; }
 
@@ -134,6 +180,8 @@ public sealed class DoorTug(World world) {
     /// </summary>
     private void LetGo(Wolf? takedown) {
         var p = world.S.Actor;
+        // The wolves at the player's sides let go with the one that tugged, and bite again no sooner than after any other bite.
+        foreach (var w in world.S.Wolves) if (w.Side != 0 && w.Target == p.Id) { w.Side = 0; w.Attack = 1; }
         world.Player = TuggedTo; p.Warp++;
         if (takedown != null) {
             world.WolfHunt.Pin(takedown, world.Hunters.Skip(1).Any(), -Doorways.OutOfDoor.Orthogonal());

@@ -196,6 +196,8 @@ public partial class WorldView {
     private string? ReviewCloseUpName => ReviewClip >= 0 ? ReviewClips[ReviewClip].Name : ReviewWolfClip >= 0 ? WolfClips[ReviewWolfClip] : null;
     /// <summary>The camera's pitch in degrees for <c>--animation-pitch</c>, low for a side view; the game's otherwise.</summary>
     private static readonly float ReviewPitch = Launch.Number("--animation-pitch", Pitch);
+    /// <summary>How many times closer <c>--animation-zoom</c> brings the review's camera, for a look at a face or a paw.</summary>
+    private static readonly float ReviewZoom = Launch.Number("--animation-zoom", 1);
     /// <summary>Degrees <c>--animation-turn</c> turns the close-up clip's rig from where it moves, to see it from the front or behind.</summary>
     private static readonly float ReviewTurn = Launch.Number("--animation-turn", 0);
     /// <summary>How far ahead of someone felling a tree the middle of its trunk stands, and the trunk's radius, for the close-up's trunk.</summary>

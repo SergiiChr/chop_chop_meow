@@ -272,7 +272,7 @@ public partial class WorldView : Node3D {
     /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
     private void SyncCamera() {
         var size = GetViewport().GetVisibleRect().Size;
-        camera.Size = (AnimationReview ? ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : 11 : BaseSize) / Zoom;
+        camera.Size = (AnimationReview ? (ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : 11) / ReviewZoom : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(AnimationReview ? ReviewPitch : CameraPitch ?? Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         var back = new Vector3(across, MathF.Sin(pitch), across).Rotated(Vector3.Up, Mathf.DegToRad(CameraTurn));
         var target = AnimationReview ? ReviewCenter + To3(reviewActor.Position) : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
@@ -1213,6 +1213,7 @@ public partial class WorldView : Node3D {
                 continue;
             }
             if (wolf.Tugging && tugs.ShowTugging(wolf, model, Elapsed, dt)) continue;
+            if (wolf.Side != 0 && tugs.ShowHolding(wolf, model, RigOf(wolf.Target), Elapsed, dt)) continue;
             model.Steps = null;
             if (wolf.Pinning && wolf.LungeFrom != Vector2.Zero && tugs.ShowLunging(wolf, model, Elapsed, dt)) continue;
             // A hit throws the wolf back at once in the world; the model holds its place and lunges into the swing, then is thrown back when it lands.
