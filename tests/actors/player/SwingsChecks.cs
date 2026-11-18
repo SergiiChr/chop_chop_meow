@@ -51,8 +51,8 @@ public static class SwingsChecks {
     }
 
     /// <summary>
-    /// The overhead chop comes down on one line. Every second swing sweeps round from the player's left to the front at chest
-    /// height: it passes over a wolf on the ground and lands on one in the air.
+    /// The overhead chop comes down on one line. Every second swing sweeps from behind the player's left shoulder round the
+    /// front to their right at chest height: it passes over a wolf on the ground and lands on one in the air.
     /// </summary>
     private static void CheckAxeSwingsTakeTurnsAndTheSweepCatchesOnlyAWolfInTheAir(GameData data) {
         var world = AxeNight(data);
@@ -67,14 +67,14 @@ public static class SwingsChecks {
         float after = ahead.Health;
         world.Attack(Vector2.Right);
         world.Tick(.2f);
-        // A wolf leaping from the left: half way through its leap as the sweep comes round, 0.42 seconds into the swing.
+        // A wolf leaping from the left: half way through its leap as the sweep crosses the front, 0.4 seconds into the swing.
         var leaper = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2.6f, 0).Rotated(Mathf.DegToRad(-60)), Leap = World.LeapSeconds });
-        var right = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2.6f, 0).Rotated(Mathf.DegToRad(60)), Leap = World.LeapSeconds });
+        var behind = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2.6f, 0).Rotated(Mathf.DegToRad(120)), Leap = World.LeapSeconds });
         SnapTick(world, .25f);
         Require(swung.SequenceEqual(new[] { ActorAction.SteelAxeSwing, ActorAction.SteelAxeSweep }), $"axe swings should take turns, overhead then sideways: {string.Join(", ", swung)}");
         Require(ahead.Health == after && left.Health == data.WolfHealth, "the sideways sweep, at chest height, should pass over wolves on the ground");
         Require(leaper.Health < data.WolfHealth, "the sideways sweep should catch a wolf leaping in from the left");
-        Require(right.Health == data.WolfHealth, "the sideways sweep, which comes round from the left, should miss a wolf leaping in from the right");
+        Require(behind.Health == data.WolfHealth, "the sideways sweep, which ends to the player's right, should miss a wolf leaping in from behind that");
     }
 
     private static void CheckAWolfStandsTwoBlowsOfASteelAxeAndFallsToTheThirdOrFourth(GameData data) {
@@ -96,7 +96,7 @@ public static class SwingsChecks {
         Require(blows.All(count => count is 3 or 4), $"a wolf should stand two blows of a steel axe and fall to the third or the fourth, not to blow {string.Join(" or ", blows)}");
     }
 
-    /// <summary>A torch is held close: its flame reaches 0.75 m, so it burns a wolf at biting distance and only scares one further off.</summary>
+    /// <summary>A torch is swung bent over, low enough for a wolf: its flame reaches 1 m, so it burns a wolf at biting distance and only scares one further off.</summary>
     private static void CheckATorchBurnsOnlyAWolfItsFlameReaches(GameData data) {
         var far = TorchNight(data);
         var off = StillWolf(far, new Vector2(2, 0));
@@ -137,7 +137,7 @@ public static class SwingsChecks {
     private static void CheckSwingShapesFollowThePlayersModel(GameData data) {
         var rig = new ActorRig(ActorSkin.Player);
         foreach (var (action, windup, end, shape) in new[] {
-            (ActorAction.SteelAxeSwing, .46f, .52f, Swings.Chop), (ActorAction.SteelAxeSweep, .38f, .52f, Swings.Sweep),
+            (ActorAction.SteelAxeSwing, .46f, .52f, Swings.Chop), (ActorAction.SteelAxeSweep, .34f, .6f, Swings.Sweep),
             (ActorAction.TorchSwing, .2f, .45f, Swings.Torch), (ActorAction.Attack, .14f, .32f, Swings.Punch) }) {
             float lands = ActorAnimation.Contact(action) / ActorAnimation.Duration(action), far = 0, left = -180, right = -180, low = float.MaxValue;
             Require(lands >= windup && lands <= end, $"{action} should land during its stroke, {windup} to {end} through, not {lands:0.00} through");
@@ -150,7 +150,7 @@ public static class SwingsChecks {
                     $"{action} carries its end to {distance:0.00} m at {angle:0} degrees left, {p:0.00} through, outside its shape {shape}");
                 far = Math.Max(far, distance); left = Math.Max(left, angle); right = Math.Max(right, -angle); low = Math.Min(low, at.Y);
             }
-            // An axe head is 0.17 m tall, so its edge comes that much lower than its middle at most; a torch and a fist count at any height.
+            // An axe head is 0.17 m tall, so its edge comes that much lower than its middle at most, and a flame's foot is below its middle; a fist counts at any height.
             Require(shape.Low == 0 || shape.Low <= low && low - shape.Low < .17f, $"{action} should come no lower than its model does, {low:0.00} m at the middle of its head, not {shape.Low} m");
             Require(shape.Far - far < .25f, $"{action} should reach no more than a head's width past the {far:0.00} m its model does, not to {shape.Far} m");
             Require(shape.Left - left < 8 && shape.Right - right < 8, $"{action} should sweep from {left:0} degrees left to {right:0} right as its model does, not {shape.Left} to {shape.Right}");

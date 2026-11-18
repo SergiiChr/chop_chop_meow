@@ -99,13 +99,10 @@ public sealed class DoorTug(World world) {
     /// <summary>Whether a wolf is tugging the acting player out of a doorway, when only it may take them down.</summary>
     public bool Tugged => world.S.Actor.Door is Doorway.Tugged or Doorway.TuggedOff && Tugger() != null;
 
-    /// <summary>Whether the acting player is in the open part of a doorway, where a wolf that reaches them tugs them back out of it.</summary>
-    public bool InOpenDoorway => world.S.Actor.Door is Doorway.Entering or Doorway.Following or Doorway.Knocking or Doorway.Aside && !Doorways.Indoors(world.S.Actor);
-
-    /// <summary>A wolf reaching a player in the open part of a doorway takes them by the waist to tug them back out of it; returns whether it did.</summary>
+    /// <summary>A wolf whose bite or leap lands on a player in the open part of a doorway takes them by the waist to tug them back out of it; returns whether it did.</summary>
     public bool TugOut(Wolf wolf) {
         var p = world.S.Actor;
-        if (!InOpenDoorway) return false;
+        if (p.Door is not (Doorway.Entering or Doorway.Following or Doorway.Knocking or Doorway.Aside) || Doorways.Indoors(p)) return false;
         Begin(wolf, p.Door is Doorway.Knocking or Doorway.Aside ? Doorway.TuggedOff : Doorway.Tugged, p.DoorCabin);
         return true;
     }

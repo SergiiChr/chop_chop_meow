@@ -1199,6 +1199,9 @@ public partial class WorldView : Node3D {
         return false;
     }
 
+    /// <summary>Seconds from one glance of a following wolf at its player to the next, how long it looks, and how far apart wolves with neighbouring ids glance.</summary>
+    private const float GlanceEvery = 4.6f, GlanceSeconds = 1.7f, GlanceApart = 1.3f;
+
     private void SyncWolves(float dt) {
         feeding.Remember(World.Wolves);
         foreach (var wolf in World.Wolves) {
@@ -1237,6 +1240,10 @@ public partial class WorldView : Node3D {
                 float hop = Math.Min(1, (1 - model.Recoiling / WolfModel.RecoilSeconds) / WolfModel.HopShare);
                 model.KnockBack = model.KnockBackFrom * (1 - hop * (2 - hop));
             } else model.KnockBack = Vector2.Zero;
+            // A following wolf walking round its player turns its head to them now and then, each at its own moments.
+            bool glances = wolf.Scared && !wolf.Braced && wolf.Flee <= 0 && (Elapsed + wolf.Id * GlanceApart) % GlanceEvery < GlanceSeconds;
+            float glance = glances ? Math.Clamp(Mathf.AngleDifference(model.Yaw, ActorAnimation.Yaw(hunted - wolf.Pos, model.Yaw)), -WolfModel.MaxGlance, WolfModel.MaxGlance) : 0;
+            model.Glance = Mathf.MoveToward(model.Glance, glance, dt * WolfModel.GlanceRate);
             // A snap is shown through to the jaws shutting, a moment after the wolf lands.
             model.SnapHeld = wolf.Snap > 0 ? WolfModel.SnapHold : Math.Max(0, model.SnapHeld - dt);
             bool struck = model.Struck || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;

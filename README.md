@@ -815,18 +815,18 @@ It lands when the blade comes down, 0.4 seconds in for a steel axe, on every wol
 Axe swings take turns:
 
 - the overhead chop comes down on a strip straight ahead, out to 1.35 metres;
-- the sideways sweep comes round from your left to the front at chest height, out to 1.3 metres.
-  It passes over a wolf on the ground, and lands on every wolf in that quarter that is in the air, leaping for your throat, or reared up on someone's arm.
+- the sideways sweep goes from behind your left shoulder all the way round the front to your right at chest height, out to 1.3 metres.
+  It passes over a wolf on the ground, and lands on every wolf in its way that is in the air, leaping for your throat, or reared up on someone's arm.
 
 A steel axe takes 2.2 to 3.2 of a wolf's 8 health a blow, a torch 0.8 to 1.2 and a punch 0.4 to 0.6.
-A torch and a fist reach only a wolf at biting distance: the flame 0.75 metres, the fist 0.7 metres and a little to your right.
+A torch and a fist reach only a wolf at biting distance: the flame 1 metre, swung low with you bent over, and the fist 0.7 metres and a little to your right.
 A blow knocks a wolf back and leaves it reeling for a moment.
 
 A wolf at biting distance does not bite at once.
 It gathers itself for 0.3 seconds, then leaps and snaps at where you will be if you keep going the way you were.
 Standing or walking, you are bitten; sprinting, a turn aside as it leaps takes you out of its jaws.
 A blow that lands on it before it leaves the ground stops the bite, and after a snap it waits 0.6 seconds before the next.
-In a cabin's doorway a wolf that reaches you bites and takes hold at once.
+In a cabin's doorway the same snap is how a wolf takes hold of you: only a bite that lands starts a tug.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
 
@@ -847,7 +847,7 @@ Swinging four times within 2 seconds, as fast as swings go, puts it out with a m
 Relighting takes the same 2 seconds and keeps the burn time it had left.
 
 While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into follow mode.
-Wolves in follow mode keep circling you at a walk at the edge of the light, about 4.5 metres off, each the way round it took at random; those going the same way spread evenly, and each wanders a little in and out and ahead and back.
+Wolves in follow mode keep circling you at a walk at the edge of the light, about 4.5 metres off, each the way round it took at random; those going the same way spread evenly, and each wanders a little in and out and ahead and back, and turns its head to you now and then.
 Walk away and they come after you at that walk.
 Walk at one and it stops and stands braced where it is. Come within 2 metres and:
 

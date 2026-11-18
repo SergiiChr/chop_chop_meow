@@ -37,7 +37,7 @@ public enum ActorAction {
     Tugged,
     /// <summary>Knocked or yanked off the feet backward by a wolf, falling onto the back.</summary>
     FallBack,
-    /// <summary>An axe swung sideways in the air, round from the left to the front, as in felling; it takes turns with the overhead swing.</summary>
+    /// <summary>An axe swept sideways in the air, from behind the left shoulder round the front to the right at chest height; it takes turns with the overhead swing.</summary>
     AxeSweep,
     SteelAxeSweep
 }
@@ -115,13 +115,13 @@ public static class ActorAnimation {
 
     /// <summary>
     /// Seconds into a swing at which it lands: the punch at full stretch, the torch crossing in front, the axe at the bottom of
-    /// its overhead stroke or at the end of its sweep round to the front; zero for anything else.
+    /// its overhead stroke or as its sweep crosses the front; zero for anything else.
     /// </summary>
     public static float Contact(ActorAction action) => action switch {
         ActorAction.Attack => .32f * Duration(action),
         ActorAction.TorchSwing => .3f * Duration(action),
         ActorAction.AxeSwing or ActorAction.SteelAxeSwing => .5f * Duration(action),
-        ActorAction.AxeSweep or ActorAction.SteelAxeSweep => .52f * Duration(action),
+        ActorAction.AxeSweep or ActorAction.SteelAxeSweep => .5f * Duration(action),
         _ => 0
     };
 
@@ -172,6 +172,15 @@ public static class ActorAnimation {
         (.38f, TwoHanded(Stance with { Twist = 48, Sway = -4, RaiseR = 66, OutR = -62, ElbowR = 30, Grip = 75 })),
         (.52f, TwoHanded(Stance with { Lean = 19, Twist = -14, Sway = 2, RaiseR = 77, OutR = -39, ElbowR = 28, Grip = 90, KneeL = 24, KneeR = 16 })),
         (.66f, TwoHanded(Stance with { Lean = 20, Twist = -16, Sway = 2, RaiseR = 74, OutR = -40, ElbowR = 30, Grip = 90, KneeL = 24, KneeR = 16 })),
+    };
+    // An axe swept sideways in the air: wound far round behind the left shoulder with the arms out level, then swung wide
+    // across the front at chest height and on round to the right in one stroke, the shoulders turning all the way with it.
+    private static readonly Pose SweepReady = TwoHanded(Stance with { Lean = 4, Twist = 20, RaiseR = 60, OutR = -35, ElbowR = 35, Grip = 60 });
+    private static readonly (float At, Pose Pose)[] SweepKeys = {
+        (0, SweepReady),
+        (.34f, TwoHanded(Stance with { Lean = -2, Twist = 75, Sway = -5, RaiseR = 74, OutR = -72, ElbowR = 18, Grip = 85 })),
+        (.6f, TwoHanded(Stance with { Lean = 4, Twist = -60, Sway = 4, RaiseR = 82, OutR = -15, ElbowR = 10, Grip = 90, KneeL = 22, KneeR = 16 })),
+        (.74f, TwoHanded(Stance with { Lean = 4, Twist = -55, Sway = 3, RaiseR = 80, OutR = -18, ElbowR = 16, Grip = 90, KneeL = 20, KneeR = 14 })),
     };
     private static readonly Pose MineGuard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
     /// <summary>Seconds a player knocked or yanked off their feet backward takes to land on their back and lie there under the wolf.</summary>
@@ -239,13 +248,15 @@ public static class ActorAnimation {
         (.32f, Fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
         (.5f, Fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }),
     };
-    // A wide forehand sweep of the torch arm across the body.
+    // A wide forehand sweep of the torch arm across the body, bent over at the waist with the knees giving, so the flame
+    // passes low enough to reach a wolf.
     private static readonly Pose TorchUp = Stance with { RaiseL = 30, OutL = 4, ElbowL = 60, RaiseR = 20, OutR = 10, ElbowR = 30 };
+    private static readonly Pose TorchLow = TorchUp with { KneeL = 46, SwingL = 34, KneeR = 34, SwingR = -4, Head = -20 };
     private static readonly (float At, Pose Pose)[] TorchSwingKeys = {
         (0, TorchUp),
-        (.2f, TorchUp with { Twist = 22, Lean = -4, RaiseL = 70, OutL = 50, ElbowL = 30 }),
-        (.45f, TorchUp with { Twist = -24, Lean = 10, RaiseL = 95, OutL = -40, ElbowL = 8 }),
-        (.65f, TorchUp with { Twist = -16, Lean = 6, RaiseL = 80, OutL = -30, ElbowL = 20 }),
+        (.2f, TorchLow with { Twist = 22, Lean = 34, RaiseL = 46, OutL = 50, ElbowL = 24 }),
+        (.45f, TorchLow with { Twist = -24, Lean = 50, RaiseL = 58, OutL = -34, ElbowL = 8 }),
+        (.65f, TorchLow with { Twist = -16, Lean = 40, RaiseL = 52, OutL = -26, ElbowL = 18 }),
     };
     // Cross-legged on the ground with hands on the knees, or on a rock with knees up and forearms on them.
     // Now and then a bite goes up to the mouth.
@@ -380,8 +391,10 @@ public static class ActorAnimation {
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
                 return moving ? Walk(p) with { Lean = carry.Lean, Head = -carry.Lean / 2, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
-            case ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSweep or ActorAction.SteelAxeSweep:
+            case ActorAction.Chop or ActorAction.SteelChop:
                 return Keys(p, ChopKeys);
+            case ActorAction.AxeSweep or ActorAction.SteelAxeSweep:
+                return Keys(p, SweepKeys);
             case ActorAction.AxeSwing or ActorAction.SteelAxeSwing:
                 return Keys(p, AxeSwingKeys);
             case ActorAction.Mine or ActorAction.SteelMine:

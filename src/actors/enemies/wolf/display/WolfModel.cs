@@ -65,6 +65,10 @@ public sealed class WolfModel {
     public bool Struck;
     public float HitIn, Recoiling, Pinned;
     public Vector2 Striker, KnockBackFrom;
+    /// <summary>How far the wolf's head is turned from its body toward a player it glances at as it walks round them, in radians to its left.</summary>
+    public float Glance;
+    /// <summary>The most a wolf's head turns from its body to glance at a player, and how fast it turns there and back, in radians and radians a second.</summary>
+    public static readonly float MaxGlance = Mathf.DegToRad(105), GlanceRate = Mathf.DegToRad(260);
     /// <summary>Seconds left of holding the end of a snap, jaws shut, after the wolf has landed.</summary>
     public float SnapHeld;
     /// <summary>A leap's bearing from the player to the wolf, and where it holds the throat once the player is down.</summary>
@@ -658,6 +662,11 @@ public sealed class WolfModel {
         if (Turning.Look != 0) {
             float look = Mathf.RadToDeg(Turning.Look);
             target = target with { NeckTurn = target.NeckTurn + NeckShare * look, HeadTurn = target.HeadTurn + (1 - NeckShare) * look, Bend = target.Bend + CurlShare * look, Wag = target.Wag + TailShare * look };
+        }
+        // A glance turns only the neck and head.
+        if (Glance != 0) {
+            float glance = Mathf.RadToDeg(Glance);
+            target = target with { NeckTurn = target.NeckTurn + NeckShare * glance, HeadTurn = target.HeadTurn + (1 - NeckShare) * glance };
         }
         if (next != motion) {
             from = shown; blend = 0;
