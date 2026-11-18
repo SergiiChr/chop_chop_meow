@@ -136,7 +136,7 @@ public sealed class DoorTug(World world) {
         var p = world.S.Actor;
         if (Tugger() is not Wolf tugger || tugger == wolf || p.Door is not (Doorway.Tugged or Doorway.TuggedOff) || wolf.Pos.DistanceTo(TuggedTo) >= SideWithin) return false;
         if (tugger.DoorCheck == DoorCheckStage.TakingOut && p.DoorTime < OutOfDoorBy) return false;
-        int side = BodySide.Free(TuggedTo, Facing, wolf.Pos, Taken);
+        int side = BodySide.Free(TuggedTo, Facing, wolf.Pos, Taken(BodySide.Left), Taken(BodySide.Right));
         if (side == 0) return false;
         wolf.Side = side; wolf.SideBitten = false; wolf.Pos = SideSpot(side); wolf.Leap = 0;
         BiteArm(wolf);

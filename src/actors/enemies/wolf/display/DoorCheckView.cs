@@ -380,6 +380,8 @@ public static class DoorCheckView {
 
     /// <summary>The door's opening at each sixtieth of a second from the wolf's first pry, without its rattle: it only ever opens further.</summary>
     private static readonly float[] pushed = Pushed();
+    /// <summary>Works out the door's opening for a whole door check while loading, rather than as the first wolf comes to a door mid-game.</summary>
+    public static void Warm() => _ = pushed.Length;
     private const int PushedRate = 60;
     /// <summary>How high the door's lower edge is: the paws and shins of a wolf below it are under the door, not in its way.</summary>
     private const float DoorBottom = 3 * StairSteps.StepRise;

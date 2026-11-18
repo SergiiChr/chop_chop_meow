@@ -76,7 +76,7 @@ public partial class WorldView : Node3D {
         feeding = new FeedingSpots(wolves);
     }
     // The host keeps the original teal; each guest keeps the first one free when it joined.
-    private static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
+    internal static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
     private readonly Dictionary<int, (ActorRig Rig, ActorState State, (MeshInstance3D Mesh, Material Material)[] Parts)> crew = new();
     private readonly Dictionary<Wolf, WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
@@ -201,6 +201,7 @@ public partial class WorldView : Node3D {
         BuildLook();
         BuildEffects(scene);
         PileShape.Warm(World.Data);
+        DoorCheckView.Warm();
         warmStage = new Node3D(); WorldModels.Warm(warmStage); PileShape.Stage(warmStage, World.Data); LakeDressing.Warm(warmStage); scene.AddChild(warmStage);
         BuildGhosts();
         for (int i = 0; i < World.Carts; i++) idleCarts.Push(NewCart());
@@ -1065,15 +1066,14 @@ public partial class WorldView : Node3D {
             case HutProp hut:
                 // The door stands open while someone steps in or out, and shuts behind them: swung shut after a walk, slammed after a run.
                 // A wolf forcing the door holds it as far open as its body has pushed it.
-                if (live && World.DoorCheck.AtDoor(t.Id) is { DoorCheck: <= DoorCheckStage.Launching } caller) {
-                    DoorwayView.PushDoor(hut, DoorCheckView.DoorDegrees(DoorCheckClock(caller)));
-                    break;
+                if (live && World.DoorCheck.AtDoor(t.Id) is { DoorCheck: <= DoorCheckStage.Launching } caller) DoorwayView.PushDoor(hut, DoorCheckView.DoorDegrees(DoorCheckClock(caller)));
+                else {
+                    var through = live ? doorways.Passing(t.Id) : null;
+                    if (through != null) hut.Slam = through.DoorRush;
+                    if (dt > 0 && through != null && hut.Open == 0 && !through.DoorRush) Sounds?.Play("hut_door_normal", t.Pos);
+                    if (dt > 0 && through == null && hut.Open == 1 && hut.Slam) Sounds?.Play("hut_door_escaping", t.Pos);
+                    DoorwayView.SwingDoor(hut, through != null, Math.Max(dt, .016f) * (through == null && hut.Slam ? 8 : 1 / Doorways.ShutSeconds));
                 }
-                var through = live ? doorways.Passing(t.Id) : null;
-                if (through != null) hut.Slam = through.DoorRush;
-                if (dt > 0 && through != null && hut.Open == 0 && !through.DoorRush) Sounds?.Play("hut_door_normal", t.Pos);
-                if (dt > 0 && through == null && hut.Open == 1 && hut.Slam) Sounds?.Play("hut_door_escaping", t.Pos);
-                DoorwayView.SwingDoor(hut, through != null, Math.Max(dt, .016f) * (through == null && hut.Slam ? 8 : 1 / Doorways.ShutSeconds));
                 bool lit = Dark;
                 if (lit != hut.Lit) {
                     hut.Lit = lit;

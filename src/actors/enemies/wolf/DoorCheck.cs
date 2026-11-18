@@ -49,11 +49,14 @@ public sealed class DoorCheck(World world) {
     /// <summary>Whether a wolf has its snout in a cabin's door or is further in, when the key no longer turns and nobody steps in past it.</summary>
     public bool Forcing(int cabin) => AtDoor(cabin) is { DoorCheck: >= DoorCheckStage.Prying };
 
-    /// <summary>Whether a wolf scratches at an unlocked door, which wakes whoever sleeps behind it.</summary>
+    /// <summary>
+    /// Whether a wolf is at an unlocked door, from its first scratch until it has gone or let go of whom it took out.
+    /// The first scratch wakes whoever sleeps, and nobody sleeps while the wolf is there.
+    /// </summary>
     public bool Waking {
         get {
             foreach (var w in world.S.Wolves)
-                if (w.DoorCheck == DoorCheckStage.Scratching && world.Find(w.DoorCheckCabin) is { Locked: false }) return true;
+                if (w.DoorCheck >= DoorCheckStage.Scratching && world.Find(w.DoorCheckCabin) is { Locked: false }) return true;
             return false;
         }
     }

@@ -27,6 +27,7 @@ public static class DoorCheckChecks {
         Test(CheckAWolfAtADoorTurnsToAPlayerOutInTheOpen, data);
         Test(CheckSleepBehindAnUnlockedDoorStopsWhenAWolfScratches, data);
         Test(CheckSleepBehindALockedDoorLastsUntilDawn, data);
+        Test(CheckNobodySleepsWhileAWolfForcesTheDoor, data);
     }
 
     private static void CheckAWolfScratchesAtALockedDoorAndGoesAway(GameData data) {
@@ -225,5 +226,19 @@ public static class DoorCheckChecks {
         Require(world.Day == day + 1 && !world.Night, "sleep behind a locked door should last until dawn");
         Require(world.Sheltered == hut.Id && world.Health == 100 && hut.Locked, "the sleeper should wake inside, unhurt, behind the locked door");
         Require(!heard.Contains("door_scratch") && world.Wolves.Count == 0, $"a slept night should be silent and end with the wolves gone: heard {string.Join(", ", heard)}");
+    }
+
+    private static void CheckNobodySleepsWhileAWolfForcesTheDoor(GameData data) {
+        var (world, hut, _) = ShelteredNight(data, locked: false);
+        var told = new List<string>();
+        world.Notify += told.Add;
+        var wolf = ScratchingWolf(world, hut);
+        DoorCheckTick(world, 3.9f);
+        Require(wolf.DoorCheck == DoorCheckStage.Prying, $"a wolf should pry at an unlocked door after scratching, not {wolf.DoorCheck}");
+        float time = world.Time;
+        Nourished(world);
+        world.Sleep(hut);
+        Require(world.Time == time && wolf.DoorCheck == DoorCheckStage.Prying, $"no time should pass in sleep while a wolf forces the door, not {world.Time - time:0} s with the wolf {wolf.DoorCheck}");
+        Require(world.Sheltered == hut.Id && world.Health == 100 && told.Contains("You are awakened by the noise outside."), $"the player should stay inside, unhurt, and be told why: {string.Join(" | ", told)}");
     }
 }

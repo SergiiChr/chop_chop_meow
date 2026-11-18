@@ -32,7 +32,8 @@ public partial class InsideDoorPOV : TextureRect {
     private readonly Node3D stage = new();
     private readonly WolfModel[] wolves = new WolfModel[Wolves];
     private ActorRig rig;
-    private string shirt = "";
+    /// <summary>The shirt the rig wears: the first player's until a player in another one is taken out.</summary>
+    private string shirt = WorldView.Shirts[0];
     private int shown;
     /// <summary>Whether the picture was asked for this frame.</summary>
     public bool Showing { get; private set; }

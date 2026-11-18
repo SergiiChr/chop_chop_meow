@@ -1107,7 +1107,8 @@ public sealed partial class World {
     }
     /// <summary>
     /// Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.
-    /// A wolf that starts scratching at an unlocked cabin door stops the night there and wakes everyone.
+    /// A wolf that starts scratching at an unlocked cabin door stops the night there and wakes everyone, and no night
+    /// starts while a wolf is at such a door.
     /// </summary>
     private void PassNight() {
         float seconds = SecondsToDawn;

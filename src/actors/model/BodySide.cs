@@ -21,11 +21,12 @@ public static class BodySide {
     public static int Of(Vector2 at, Vector2 facing, Vector2 spot) => (spot - at).Dot(Out(facing, Left)) >= 0 ? Left : Right;
 
     /// <summary>
-    /// The side of a body that something at <paramref name="spot"/> takes when one or both may be <paramref name="taken"/>:
+    /// The side of a body that something at <paramref name="spot"/> takes when its left or its right may be taken:
     /// the side it is on while that is free, else the other, else 0.
     /// </summary>
-    public static int Free(Vector2 at, Vector2 facing, Vector2 spot, System.Func<int, bool> taken) {
+    public static int Free(Vector2 at, Vector2 facing, Vector2 spot, bool leftTaken, bool rightTaken) {
         int near = Of(at, facing, spot);
-        return !taken(near) ? near : !taken(-near) ? -near : 0;
+        bool nearTaken = near == Left ? leftTaken : rightTaken, farTaken = near == Left ? rightTaken : leftTaken;
+        return !nearTaken ? near : !farTaken ? -near : 0;
     }
 }

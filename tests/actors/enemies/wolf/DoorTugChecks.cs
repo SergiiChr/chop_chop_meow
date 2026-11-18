@@ -36,8 +36,8 @@ public static class DoorTugChecks {
         Require(BodySide.Out(north, BodySide.Left).IsEqualApprox(new Vector2(-1, 0)) && BodySide.Out(north, BodySide.Right).IsEqualApprox(east), $"a body facing north should have west on its left and east on its right, not {BodySide.Out(north, BodySide.Left)}");
         Require(BodySide.Out(east, BodySide.Left).IsEqualApprox(north), $"a body facing east should have north on its left, not {BodySide.Out(east, BodySide.Left)}");
         Require(BodySide.Of(at, north, at + new Vector2(-2, 5)) == BodySide.Left && BodySide.Of(at, north, at + new Vector2(.1f, -3)) == BodySide.Right, "a spot to the west of a body facing north should be on its left and one to the east on its right, however far ahead or behind");
-        Require(BodySide.Free(at, north, at + east, side => side == BodySide.Right) == BodySide.Left, "something on a body's right should take its left when the right is taken");
-        Require(BodySide.Free(at, north, at + east, _ => true) == 0, "nothing should take a side of a body with both taken");
+        Require(BodySide.Free(at, north, at + east, leftTaken: false, rightTaken: true) == BodySide.Left, "something on a body's right should take its left when the right is taken");
+        Require(BodySide.Free(at, north, at + east, leftTaken: true, rightTaken: true) == 0, "nothing should take a side of a body with both taken");
     }
 
     /// <summary>Each bite takes 15 health: the tugging wolf's and the one a second wolf gives as it takes the player's arm leave 70 of 100.</summary>

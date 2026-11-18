@@ -924,6 +924,7 @@ A guest that loses the connection tries to get back in on its own for up to 120 
 Everyone shares the world, the market and the workers.
 Sleep needs every other player inside a cabin, and everyone with enough food and water.
 Wolves patrol on through a slept night: one that comes to an unlocked door with someone inside stops the night as it starts scratching, with "You are awakened by the noise outside.", and everyone is awake to deal with it.
+While the wolf is at that door, until it has gone or let go of the player it took out, Sleep answers with the same message.
 Behind locked doors the night passes to dawn.
 Night wolves hunt each player separately.
 

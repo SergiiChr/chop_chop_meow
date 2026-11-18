@@ -473,7 +473,7 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
 Sleeping in a cabin advances time toward dawn.
 It is allowed from `World.SleepHour` (22:00), a little before night falls.
 It is refused if hunger or thirst would run out first.
-Wolves patrol on through a slept night, and one that starts scratching at an unlocked door with someone inside stops the night there (`DoorCheck.Waking`); a tick that only skips ahead (`World.Tick` with `sleeping`) leaves wolves where they are.
+Wolves patrol on through a slept night, and one that starts scratching at an unlocked door with someone inside stops the night there, and no night starts while it is at that door (`DoorCheck.Waking`); a tick that only skips ahead (`World.Tick` with `sleeping`) leaves wolves where they are.
 
 #### Sprinting
 

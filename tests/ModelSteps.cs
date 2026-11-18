@@ -87,13 +87,13 @@ internal static class ModelSteps {
 
     public static List<MeshInstance3D> Core(ActorRig rig) {
         var result = new List<MeshInstance3D>();
-        DoorCheck(rig.Root, result);
+        Visit(rig.Root, result);
         return result;
     }
 
-    private static void DoorCheck(Node node, List<MeshInstance3D> result) {
+    private static void Visit(Node node, List<MeshInstance3D> result) {
         if (node is MeshInstance3D mesh && mesh.Name.ToString().StartsWith("Human", StringComparison.Ordinal)) result.Add(mesh);
-        for (int i = 0; i < node.GetChildCount(); i++) DoorCheck(node.GetChild(i), result);
+        for (int i = 0; i < node.GetChildCount(); i++) Visit(node.GetChild(i), result);
     }
 
     public static (Vector3 Min, Vector3 Max) BoundsInTorso(MeshInstance3D mesh) {

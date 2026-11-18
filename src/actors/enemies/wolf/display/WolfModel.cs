@@ -267,7 +267,7 @@ public sealed class WolfModel {
     /// All four paws flat on the ground at home, spread by <paramref name="spread"/>, the hind ones by <paramref name="hindSpread"/>
     /// when given; <paramref name="shift"/> moves the hind paws forward.
     /// </summary>
-    internal static WolfPose Planted(WolfPose body, float spread, float shift = 0, float frontAhead = 0, float frontUp = 0, float hindSpread = 0) {
+    private static WolfPose Planted(WolfPose body, float spread, float shift = 0, float frontAhead = 0, float frontUp = 0, float hindSpread = 0) {
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
             var at = new Vector3(WolfShape.Pivot(leg).X * (hind && hindSpread > 0 ? hindSpread : spread), WolfShape.Sole + (hind ? 0 : frontUp), Home(leg) + (hind ? shift * (leg == 2 ? 1 : -1) : frontAhead));
@@ -283,7 +283,7 @@ public sealed class WolfModel {
     public void Leap(float progress, float contact, float dt, (Vector3 Left, Vector3 Right)? chest = null) => Show(WolfMotion.Leap, Leaping(progress, contact, chest), dt);
 
     /// <summary>A leaping wolf's pose, <paramref name="progress"/> of the way through the leap, with its jaws reaching their mark at <paramref name="contact"/>.</summary>
-    internal static WolfPose Leaping(float progress, float contact, (Vector3 Left, Vector3 Right)? chest = null) {
+    private static WolfPose Leaping(float progress, float contact, (Vector3 Left, Vector3 Right)? chest = null) {
         float t = Math.Clamp(progress / Math.Max(contact, .05f), 0, 1);
         float push = Mathf.SmoothStep(0, .3f, t), air = Mathf.SmoothStep(.15f, 1, t), reach = Mathf.SmoothStep(.4f, 1, t);
         // The body arcs up and comes down onto the throat, which sits lower than the top of the leap.
@@ -464,7 +464,7 @@ public sealed class WolfModel {
     /// <summary>Where a paw bone is, in the model, under the pose shown; it stands WolfShape.Sole above the ground when the paw is planted.</summary>
     public Vector3 Paw(int leg) => PawOf(shown, leg);
 
-    internal static Vector3 PawOf(WolfPose pose, int leg) {
+    private static Vector3 PawOf(WolfPose pose, int leg) {
         var l = pose.Leg(leg);
         int bone = WolfShape.Leg(leg);
         var at = Frame(pose, leg >= 2) * Posed(bone, Vector3.Zero, Turn(-l.Upper, 0, l.Splay)) * Posed(bone + 1, Vector3.Zero, Turn(-l.Middle))
@@ -534,7 +534,7 @@ public sealed class WolfModel {
     }
 
     /// <summary>Where a wolf's head is, in the model, under a pose, and the way its muzzle points, which is the way it looks.</summary>
-    internal static (Vector3 From, Vector3 Along) Gaze(WolfPose pose) {
+    private static (Vector3 From, Vector3 Along) Gaze(WolfPose pose) {
         var neck = Frame(pose, false) * Posed(WolfShape.Neck, Vector3.Zero, Turn(pose.Neck, pose.NeckTurn));
         var head = neck * Posed(WolfShape.Head, Vector3.Zero, Turn(pose.Head, pose.HeadTurn, pose.HeadTilt));
         return (head.Origin, head.Basis * (WolfShape.Bite - WolfShape.Bones[WolfShape.Head].At).Normalized());
@@ -549,12 +549,6 @@ public sealed class WolfModel {
             pose = pose with { NeckTurn = pose.NeckTurn + NeckShare * turn, HeadTurn = pose.HeadTurn + (1 - NeckShare) * turn, Head = pose.Head + lower };
         }
         return pose;
-    }
-
-    /// <summary>Shows the pose another wolf model shows, as it is.</summary>
-    public void CopyPose(WolfModel other) {
-        shown = other.shown; motion = other.motion; blend = 1;
-        Apply(shown);
     }
 
     /// <summary>A pose stood on the step of the cabin whose door point is <paramref name="door"/>, each paw on the tread or floor under it.</summary>
