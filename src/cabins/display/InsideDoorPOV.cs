@@ -35,11 +35,15 @@ public partial class InsideDoorPOV : TextureRect {
     /// <summary>The shirt the rig wears: the first player's until a player in another one is taken out.</summary>
     private string shirt = WorldView.Shirts[0];
     private int shown;
+    /// <summary>Frames left of the window's first ones, in which it is drawn faintly to build its shader's pipeline.</summary>
+    private int warmFrames = 4;
+    /// <summary>How faintly the window is drawn in those frames: the least the renderer still draws.</summary>
+    private static readonly Color Faint = new(1, 1, 1, .01f);
     /// <summary>Whether the picture was asked for this frame.</summary>
     public bool Showing { get; private set; }
 
     public InsideDoorPOV() {
-        Name = "inside"; Visible = false; MouseFilter = MouseFilterEnum.Ignore;
+        Name = "inside"; Visible = false; Modulate = Faint; MouseFilter = MouseFilterEnum.Ignore;
         AnchorLeft = Middle - Width / 2; AnchorRight = Middle + Width / 2; AnchorTop = (1 - Tall) / 2; AnchorBottom = (1 + Tall) / 2;
         AddChild(picture);
         cabin = CabinModel.Build(); picture.AddChild(cabin.Root);
@@ -72,9 +76,15 @@ public partial class InsideDoorPOV : TextureRect {
         Material = tape;
     }
 
-    /// <summary>Shows the window while the picture is drawn, and keeps the picture to the window's shape.</summary>
+    /// <summary>
+    /// Shows the window while the picture is drawn, and keeps the picture to the window's shape.
+    /// For its first frames it is drawn all but see-through, which builds the tape shader's pipeline while loading
+    /// rather than as the first wolf forces a door.
+    /// </summary>
     public override void _Process(double delta) {
-        if (Visible != Showing) Visible = Showing;
+        if (warmFrames > 0 && --warmFrames == 0) Modulate = Colors.White;
+        bool show = Showing || warmFrames > 0;
+        if (Visible != show) Visible = show;
         if (!Visible || Size.Y <= 0) return;
         var size = new Vector2I(Math.Max(16, Mathf.RoundToInt(Height * Size.X / Size.Y)), Height);
         if (picture.Size != size) picture.Size = size;
