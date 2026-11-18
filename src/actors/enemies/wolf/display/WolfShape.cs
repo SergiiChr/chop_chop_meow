@@ -220,7 +220,7 @@ internal static class WolfShape {
         // A broad black nose on the tip of the muzzle.
         Tube(s, ref start, new[] { new Ring(new Vector3(0, .853f, .8f), .018f, .014f, Head), new Ring(new Vector3(0, .854f, .822f), .028f, .022f, Head), new Ring(new Vector3(0, .85f, .842f), .012f, .01f, Head) },
             Vector3.Right, Vector3.Up, 8, (_, _, _) => Black);
-        Tufts(s, ref start);
+        FurSpikes(s, ref start);
         for (int leg = 0; leg < 4; leg++) LegTube(s, ref start, leg);
         // A full brush tail, dark on top and at the tip.
         (float Z, float Y, float W, float H)[] brush = { (-.44f, .675f, .04f, .045f), (-.5f, .665f, .052f, .058f), (-.58f, .66f, .066f, .072f), (-.68f, .655f, .074f, .08f), (-.78f, .655f, .072f, .075f), (-.88f, .655f, .055f, .058f), (-.95f, .655f, .03f, .032f), (-.98f, .655f, .006f, .006f) };
@@ -287,8 +287,8 @@ internal static class WolfShape {
             Vector3.Back, Vector3.Up, 6, (_, _, up) => up < -.45f ? Black : Pale.Lerp(Tan, .15f));
     }
 
-    /// <summary>A tuft of fur: a spike from its root in the coat to its tip, <paramref name="width"/> across at the root, shading from one colour to another.</summary>
-    private static void Tuft(SurfaceTool s, ref int start, Vector3 root, Vector3 tip, float width, int bone, Color from, Color to) {
+    /// <summary>A fur spike: a cone from its root in the coat to its tip, <paramref name="width"/> across at the root, shading from one colour to another.</summary>
+    private static void FurSpike(SurfaceTool s, ref int start, Vector3 root, Vector3 tip, float width, int bone, Color from, Color to) {
         var along = (tip - root).Normalized();
         var across = along.Cross(Vector3.Up).LengthSquared() < .01f ? Vector3.Right : along.Cross(Vector3.Up).Normalized();
         Tube(s, ref start, new[] { new Ring(root - along * width * .5f, width, width * .7f, bone), new Ring(root.Lerp(tip, .45f), width * .62f, width * .42f, bone), new Ring(tip, .002f, .002f, bone) },
@@ -296,34 +296,34 @@ internal static class WolfShape {
     }
 
     /// <summary>
-    /// The spiky fur that stands out from the coat: a ruff down each cheek, tufts on the crown, a mane round the neck and
-    /// over the shoulders, a tuft under the throat and hackles along the back.
+    /// The spiky fur that stands out from the coat: a ruff down each cheek, spikes on the crown, a mane round the neck and
+    /// over the shoulders, a spike under the throat and hackles along the back.
     /// </summary>
-    private static void Tufts(SurfaceTool s, ref int start) {
+    private static void FurSpikes(SurfaceTool s, ref int start) {
         var white = Pale.Lightened(.15f);
         foreach (int side in new[] { 1, -1 }) {
             // Cheek ruff, fanning out and back from under the ear down to the jaw.
-            Tuft(s, ref start, new Vector3(side * .108f, .905f, .535f), new Vector3(side * .19f, .915f, .46f), .03f, Head, Grey, Dark);
-            Tuft(s, ref start, new Vector3(side * .116f, .875f, .54f), new Vector3(side * .21f, .86f, .47f), .034f, Head, Pale, Grey);
-            Tuft(s, ref start, new Vector3(side * .11f, .845f, .54f), new Vector3(side * .195f, .8f, .485f), .034f, Head, white, Grey.Lerp(Pale, .4f));
-            Tuft(s, ref start, new Vector3(side * .09f, .82f, .54f), new Vector3(side * .15f, .755f, .5f), .03f, Head, white, Pale);
-            Tuft(s, ref start, new Vector3(side * .032f, .972f, .5f), new Vector3(side * .05f, 1f, .42f), .026f, Head, Grey, Dark);
+            FurSpike(s, ref start, new Vector3(side * .108f, .905f, .535f), new Vector3(side * .19f, .915f, .46f), .03f, Head, Grey, Dark);
+            FurSpike(s, ref start, new Vector3(side * .116f, .875f, .54f), new Vector3(side * .21f, .86f, .47f), .034f, Head, Pale, Grey);
+            FurSpike(s, ref start, new Vector3(side * .11f, .845f, .54f), new Vector3(side * .195f, .8f, .485f), .034f, Head, white, Grey.Lerp(Pale, .4f));
+            FurSpike(s, ref start, new Vector3(side * .09f, .82f, .54f), new Vector3(side * .15f, .755f, .5f), .03f, Head, white, Pale);
+            FurSpike(s, ref start, new Vector3(side * .032f, .972f, .5f), new Vector3(side * .05f, 1f, .42f), .026f, Head, Grey, Dark);
             // The mane round the neck, and a second, shorter row over the shoulders.
-            Tuft(s, ref start, new Vector3(side * .078f, .885f, .47f), new Vector3(side * .125f, .935f, .37f), .04f, Neck, Grey, Dark);
-            Tuft(s, ref start, new Vector3(side * .13f, .8f, .47f), new Vector3(side * .215f, .815f, .37f), .044f, Neck, Grey.Lerp(Tan, .4f), Grey);
-            Tuft(s, ref start, new Vector3(side * .122f, .7f, .47f), new Vector3(side * .195f, .66f, .39f), .042f, Neck, Tan.Lerp(Pale, .5f), Grey.Lerp(Tan, .5f));
-            Tuft(s, ref start, new Vector3(side * .068f, .632f, .46f), new Vector3(side * .105f, .575f, .415f), .036f, Neck, white, Pale);
-            Tuft(s, ref start, new Vector3(side * .1f, .805f, .3f), new Vector3(side * .15f, .84f, .2f), .038f, Chest, Grey, Dark);
-            Tuft(s, ref start, new Vector3(side * .165f, .69f, .3f), new Vector3(side * .225f, .68f, .21f), .038f, Chest, Grey.Lerp(Tan, .5f), Grey);
+            FurSpike(s, ref start, new Vector3(side * .078f, .885f, .47f), new Vector3(side * .125f, .935f, .37f), .04f, Neck, Grey, Dark);
+            FurSpike(s, ref start, new Vector3(side * .13f, .8f, .47f), new Vector3(side * .215f, .815f, .37f), .044f, Neck, Grey.Lerp(Tan, .4f), Grey);
+            FurSpike(s, ref start, new Vector3(side * .122f, .7f, .47f), new Vector3(side * .195f, .66f, .39f), .042f, Neck, Tan.Lerp(Pale, .5f), Grey.Lerp(Tan, .5f));
+            FurSpike(s, ref start, new Vector3(side * .068f, .632f, .46f), new Vector3(side * .105f, .575f, .415f), .036f, Neck, white, Pale);
+            FurSpike(s, ref start, new Vector3(side * .1f, .805f, .3f), new Vector3(side * .15f, .84f, .2f), .038f, Chest, Grey, Dark);
+            FurSpike(s, ref start, new Vector3(side * .165f, .69f, .3f), new Vector3(side * .225f, .68f, .21f), .038f, Chest, Grey.Lerp(Tan, .5f), Grey);
         }
-        Tuft(s, ref start, new Vector3(0, .978f, .51f), new Vector3(0, 1.012f, .43f), .028f, Head, Grey, Dark);
-        Tuft(s, ref start, new Vector3(0, .912f, .47f), new Vector3(0, .965f, .36f), .042f, Neck, Dark.Lerp(Grey, .4f), Dark);
-        Tuft(s, ref start, new Vector3(0, .605f, .44f), new Vector3(0, .53f, .43f), .04f, Chest, white, Pale);
+        FurSpike(s, ref start, new Vector3(0, .978f, .51f), new Vector3(0, 1.012f, .43f), .028f, Head, Grey, Dark);
+        FurSpike(s, ref start, new Vector3(0, .912f, .47f), new Vector3(0, .965f, .36f), .042f, Neck, Dark.Lerp(Grey, .4f), Dark);
+        FurSpike(s, ref start, new Vector3(0, .605f, .44f), new Vector3(0, .53f, .43f), .04f, Chest, white, Pale);
         // Hackles along the back, from the withers to the loin.
-        Tuft(s, ref start, new Vector3(0, .832f, .3f), new Vector3(0, .88f, .19f), .04f, Chest, Dark.Lerp(Grey, .3f), Dark);
-        Tuft(s, ref start, new Vector3(0, .822f, .17f), new Vector3(0, .862f, .07f), .034f, Chest, Dark.Lerp(Grey, .3f), Dark);
-        Tuft(s, ref start, new Vector3(0, .802f, .02f), new Vector3(0, .836f, -.07f), .03f, Loin, Dark.Lerp(Grey, .3f), Dark);
-        Tuft(s, ref start, new Vector3(0, .79f, -.14f), new Vector3(0, .818f, -.22f), .028f, Loin, Dark.Lerp(Grey, .3f), Dark);
+        FurSpike(s, ref start, new Vector3(0, .832f, .3f), new Vector3(0, .88f, .19f), .04f, Chest, Dark.Lerp(Grey, .3f), Dark);
+        FurSpike(s, ref start, new Vector3(0, .822f, .17f), new Vector3(0, .862f, .07f), .034f, Chest, Dark.Lerp(Grey, .3f), Dark);
+        FurSpike(s, ref start, new Vector3(0, .802f, .02f), new Vector3(0, .836f, -.07f), .03f, Loin, Dark.Lerp(Grey, .3f), Dark);
+        FurSpike(s, ref start, new Vector3(0, .79f, -.14f), new Vector3(0, .818f, -.22f), .028f, Loin, Dark.Lerp(Grey, .3f), Dark);
     }
 
     /// <summary>

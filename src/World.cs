@@ -317,7 +317,7 @@ public sealed partial class World {
     private bool playerBusy { get => S.Actor.Busy; set => S.Actor.Busy = value; }
     public World(GameData data, bool generate = true) {
         Data = data;
-        Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorVisits = new DoorVisits(this); WolfBodies = new WolfBodies(this);
+        Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
@@ -331,7 +331,7 @@ public sealed partial class World {
     /// <summary>Wolves tugging players back out of cabin doorways.</summary>
     public DoorTug DoorTug { get; }
     /// <summary>Wolves at the doors of cabins with someone inside: scratching, forcing an unlocked door and taking a player out.</summary>
-    public DoorVisits DoorVisits { get; }
+    public DoorCheck DoorCheck { get; }
     /// <summary>How wolves at a player keep their distance from them and from each other.</summary>
     public WolfBodies WolfBodies { get; }
     /// <summary>Wolves coming out of their dens at dusk, patrolling, smelling players and going home before dawn.</summary>
@@ -1113,11 +1113,11 @@ public sealed partial class World {
         float seconds = SecondsToDawn;
         asleep = true;
         try {
-            while (seconds > 0 && !DoorVisits.Waking) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
+            while (seconds > 0 && !DoorCheck.Waking) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
         } finally {
             asleep = false;
         }
-        if (DoorVisits.Waking) { SayToAll("Scratching at a cabin door wakes you."); return; }
+        if (DoorCheck.Waking) { SayToAll("You are awakened by the noise outside."); return; }
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
     /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>

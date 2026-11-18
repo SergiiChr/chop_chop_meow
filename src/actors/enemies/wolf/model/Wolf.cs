@@ -25,10 +25,12 @@ public sealed class Wolf : IWalker {
     /// The side of the player another wolf tugs that this wolf holds by the arm: 1 for their left, -1 for their right, 0 for neither.
     /// </summary>
     public int Side { get; set; }
-    /// <summary>What the wolf is doing at the door of the cabin <see cref="VisitCabin"/>, and for how many seconds.</summary>
-    public WolfVisit Visit { get; set; }
-    public int VisitCabin { get; set; }
-    public float VisitTime { get; set; }
+    /// <summary>The wolf holding an arm has bitten it: it bites once as it takes hold, or as soon after as its last bite is a second behind it.</summary>
+    public bool SideBitten { get; set; }
+    /// <summary>What the wolf is doing at the door of the cabin <see cref="DoorCheckCabin"/>, and for how many seconds.</summary>
+    public DoorCheckStage DoorCheck { get; set; }
+    public int DoorCheckCabin { get; set; }
+    public float DoorCheckTime { get; set; }
     /// <summary>The cabin whose locked door this wolf last left; it leaves that cabin alone until it is out of smell range of it.</summary>
     public int Tried { get; set; }
     /// <summary>The way from a player's throat to where a wolf that tugged them out lunges onto it from, or zero for one that pins them standing over them.</summary>
@@ -54,6 +56,8 @@ public sealed class Wolf : IWalker {
     public float CallX { get; set; }
     public float CallY { get; set; }
     [JsonIgnore] public Vector2 Call { get => new(CallX, CallY); set { CallX = value.X; CallY = value.Y; } }
+    /// <summary>Seconds left turning where it stands to a player it smelled, before it howls at them.</summary>
+    public float HowlIn { get; set; }
     /// <summary>Seconds left howling at a player it smelled; it stands still until it is done.</summary>
     public float Howl { get; set; }
     /// <summary>Seconds the current howl lasts in all, the length of its recording.</summary>

@@ -25,6 +25,8 @@ public static class DoorTugChecks {
         Test(CheckAWolfTugsAPlayerOutOnlyAsFarAsOpenGroundGoes, data);
         Test(CheckASecondWolfTakesATuggedPlayersSideBitesOnceAndHoldsUntilTheTugEnds, data);
         Test(CheckOnlyOneWolfTakesEachSideOfATuggedPlayer, data);
+        Test(CheckAWolfWhoseLastBiteIsFreshTakesATuggedPlayersArmAtOnceAndBitesWhenItCan, data);
+        Test(CheckAWolfWithNoArmToTakeWaitsBesideATuggedPlayerAndBitesOnceTheyAreLetGo, data);
         Test(CheckABodysLeftAndRightFollowFromTheWayItFaces);
     }
 
@@ -57,6 +59,41 @@ public static class DoorTugChecks {
         Require(second.Pos.DistanceTo(world.DoorTug.TuggedTo) is > .6f and < 1, $"a wolf holding a tugged player's arm should stand at their side, not {second.Pos.DistanceTo(world.DoorTug.TuggedTo):0.00} m from them");
         world.Tick(.15f);
         Require(second.Side == 0 && !tugger.Tugging && world.Door == Doorway.Entering, $"the wolves should let go as the tug ends, not side {second.Side} with the player {world.Door}");
+    }
+
+    /// <summary>Each bite takes 15 health. The second wolf bit .6 s before it takes the arm, and bites again a second after that bite.</summary>
+    private static void CheckAWolfWhoseLastBiteIsFreshTakesATuggedPlayersArmAtOnceAndBitesWhenItCan(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = Doorways.DoorPoint(hut);
+        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        var second = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-1, .2f), Attack = .4f });
+        world.Tick(.05f);
+        world.Tick(.05f);
+        Require(world.Door == Doorway.Tugged && second.Side == 1 && world.Health == 85, $"a wolf whose last bite is fresh should take a tugged player's arm at once without biting, not side {second.Side} at {world.Health} health");
+        for (float time = 0; time < .2f; time += .05f) world.Tick(.05f);
+        Require(second.Side == 1 && world.Health == 85, $"a wolf holding an arm should not bite before a second has passed since its last bite, not leave {world.Health} health");
+        for (float time = 0; time < .25f; time += .05f) world.Tick(.05f);
+        Require(second.Side == 1 && world.Health == 70, $"a wolf holding an arm should bite as soon as a second has passed since its last bite, not leave {world.Health} health");
+        while (world.Me.DoorTime < DoorTug.TugSeconds - .1f) world.Tick(.05f);
+        Require(second.Side == 1 && world.Health == 70, $"a wolf holding an arm should bite only once, not leave {world.Health} health");
+    }
+
+    /// <summary>Each bite takes 15 health: the tugging wolf's and one at each arm leave 55 of 100, and the waiting wolf's bite 40.</summary>
+    private static void CheckAWolfWithNoArmToTakeWaitsBesideATuggedPlayerAndBitesOnceTheyAreLetGo(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = Doorways.DoorPoint(hut);
+        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        foreach (int side in new[] { -1, 1 }) PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(side, .2f) });
+        var waiting = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.3f, 2.2f) });
+        while (world.Me.DoorTime < DoorTug.TugSeconds - .1f) world.Tick(.05f);
+        Require(world.Door == Doorway.Tugged && waiting.Side == 0 && world.Health == 55, $"a wolf with no arm to take should not bite a tugged player, who should have 55 health, not {world.Health}");
+        Require(waiting.Pos.DistanceTo(world.DoorTug.TuggedTo) < 2, $"a wolf with no arm to take should wait beside the tugged player, not {waiting.Pos.DistanceTo(world.DoorTug.TuggedTo):0.00} m off");
+        for (float time = 0; time < .5f && world.Health == 55; time += .05f) world.Tick(.05f);
+        Require(world.Health == 40, $"the waiting wolf should bite once the player is let go, leaving 40 health, not {world.Health}");
     }
 
     private static void CheckOnlyOneWolfTakesEachSideOfATuggedPlayer(GameData data) {

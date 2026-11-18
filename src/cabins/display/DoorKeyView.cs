@@ -12,10 +12,8 @@ namespace ChopChopMeow;
 public partial class DoorKeyView : SubViewport {
     /// <summary>Pixels along each side of the picture.</summary>
     public const int Side = 192;
-    /// <summary>The seconds into the lock's sound over which the key turns: from the bolt's rattle to its landing.</summary>
-    public const float TurnFrom = 1.3f, TurnTo = 1.68f;
-    /// <summary>The seconds into the lock's sound over which a hand takes the key and jogs it, and by how many degrees.</summary>
-    private const float JogFrom = .02f, JogTo = .3f, JogDegrees = 9;
+    /// <summary>The seconds into the lock's sound over which the key turns: from its first click to the clack of the bolt landing.</summary>
+    public const float TurnFrom = .08f, TurnTo = .43f;
     /// <summary>How many degrees to the right of upright the key lies while the door is locked.</summary>
     private const float LockedTurn = 90;
     private readonly Node3D key;
@@ -80,8 +78,7 @@ public partial class DoorKeyView : SubViewport {
 
     /// <summary>Puts the key where it is this long after it was last turned, and draws the picture again.</summary>
     private void Pose() {
-        float turned = Mathf.SmoothStep(TurnFrom, TurnTo, since), jog = since < JogTo ? MathF.Sin(MathF.PI * Mathf.SmoothStep(JogFrom, JogTo, since)) : 0;
-        float degrees = (locked ? turned : 1 - turned) * LockedTurn + (locked ? 1 : -1) * jog * JogDegrees;
+        float turned = Mathf.SmoothStep(TurnFrom, TurnTo, since), degrees = (locked ? turned : 1 - turned) * LockedTurn;
         // Seen from the front, a turn to the right goes against the angle's own direction.
         key.RotationDegrees = new Vector3(0, 0, -degrees);
         RenderTargetUpdateMode = UpdateMode.Once;

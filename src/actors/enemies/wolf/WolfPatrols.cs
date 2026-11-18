@@ -49,17 +49,18 @@ public sealed class WolfPatrols(World world) {
             var wolf = s.Wolves[i];
             if (WolvesRetreat && wolf.Mode != WolfMode.Home) GoHome(wolf);
             if (wolf.Target != 0) continue;
-            if (wolf.Visit != WolfVisit.None) { world.DoorVisits.Tick(wolf, dt); continue; }
+            if (wolf.DoorCheck != DoorCheckStage.None) { world.DoorCheck.Tick(wolf, dt); continue; }
             float step = dt * data.WolfTrot;
+            var from = wolf.Pos;
             switch (wolf.Mode) {
                 case WolfMode.Patrol:
                     Wander(wolf, step * PatrolPace);
-                    if (!Smell(wolf, data.SmellRadius)) world.DoorVisits.Smell(wolf);
+                    if (!Smell(wolf, data.SmellRadius, wolf.Pos - from)) world.DoorCheck.Smell(wolf);
                     break;
                 case WolfMode.Called:
                     // A called wolf still noses the air on the way, so it does not run past a player or a cabin with someone inside.
                     if (!world.Travel(wolf, wolf.Call, step, step) || wolf.Pos.DistanceTo(wolf.Call) < 2) Patrol(wolf, wolf.Heading);
-                    if (!Smell(wolf, data.SmellRadius)) world.DoorVisits.Smell(wolf);
+                    if (!Smell(wolf, data.SmellRadius, wolf.Pos - from)) world.DoorCheck.Smell(wolf);
                     break;
                 case WolfMode.Home:
                     var door = NearestDen(wolf.Pos).Door;
@@ -105,31 +106,48 @@ public sealed class WolfPatrols(World world) {
     }
     /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
     private static void Calm(Wolf wolf) {
-        wolf.Target = 0; wolf.Howl = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
-        wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.Side = 0; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();
-        wolf.Visit = WolfVisit.None; wolf.VisitCabin = 0; wolf.VisitTime = 0;
+        wolf.Target = 0; wolf.Howl = wolf.HowlIn = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
+        wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.Side = 0; wolf.SideBitten = false; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();
+        wolf.DoorCheck = DoorCheckStage.None; wolf.DoorCheckCabin = 0; wolf.DoorCheckTime = 0;
     }
     /// <summary>
     /// A wolf that smells a player out in the open <paramref name="within"/> metres takes them as its prey, dropping whatever it did at a
     /// cabin's door; returns whether it did.
-    /// One that finds them out of its sight howls before it goes after them, which calls every patrolling wolf within <see cref="GameData.HowlRadius"/> to where it stands.
+    /// One that finds them out of its sight first turns to them from the way it <paramref name="went"/>, then howls before it goes after them.
     /// </summary>
-    internal bool Smell(Wolf wolf, float within) {
+    internal bool Smell(Wolf wolf, float within, Vector2 went = default) {
         var (s, data) = (world.S, world.Data);
         PlayerState? prey = null;
         foreach (var p in s.Players)
             if (p.RespawnIn <= 0 && !Doorways.Indoors(p) && p.Pos.DistanceTo(wolf.Pos) <= within && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
         if (prey == null) return false;
         Patrol(wolf, wolf.Heading);
-        if (prey.Pos.DistanceTo(wolf.Pos) <= data.WolfSightRange) { wolf.Target = prey.Id; return true; }
-        // The night's first howl is a lone wolf; every later one sounds like the pack answering.
-        // The wolf holds its howl as long as the recording plays.
+        wolf.Target = prey.Id;
+        if (prey.Pos.DistanceTo(wolf.Pos) <= data.WolfSightRange) return true;
+        // A wolf that stood still turns as far as one facing away.
+        float turn = went == Vector2.Zero ? MathF.PI : Math.Abs(went.AngleTo(prey.Pos - wolf.Pos));
+        wolf.HowlIn = HowlTurnSeconds * MathF.Sqrt(turn / MathF.PI);
+        if (wolf.HowlIn == 0) Howl(wolf);
+        return true;
+    }
+    /// <summary>
+    /// Seconds a wolf takes to turn half a turn where it stands, to face a player it smelled before it howls.
+    /// A smaller turn takes the square root of its share of that: a wolf's body comes round fast at first and settles slowly.
+    /// </summary>
+    public const float HowlTurnSeconds = 1.3f;
+
+    /// <summary>
+    /// A wolf that has turned to the player it smelled howls, which calls every patrolling wolf within <see cref="GameData.HowlRadius"/> to where it stands.
+    /// The night's first howl is a lone wolf; every later one sounds like the pack answering.
+    /// The wolf holds its howl as long as the recording plays.
+    /// </summary>
+    internal void Howl(Wolf wolf) {
+        var (s, data) = (world.S, world.Data);
         bool answer = s.Howled;
-        wolf.Target = prey.Id; wolf.Howl = wolf.HowlLength = answer ? data.PackHowlSeconds : data.LoneHowlSeconds;
+        wolf.HowlIn = 0; wolf.Howl = wolf.HowlLength = answer ? data.PackHowlSeconds : data.LoneHowlSeconds;
         world.Play(answer ? "wolf_howl_group" : "wolf_howl", wolf.Pos);
         s.Howled = true;
         foreach (var other in s.Wolves)
             if (other.Target == 0 && other.Mode != WolfMode.Home && other.Pos.DistanceTo(wolf.Pos) <= data.HowlRadius) { other.Mode = WolfMode.Called; other.Call = wolf.Pos; other.Route.Clear(); }
-        return true;
     }
 }

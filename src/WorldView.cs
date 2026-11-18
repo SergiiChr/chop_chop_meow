@@ -44,6 +44,8 @@ public partial class WorldView : Node3D {
     private const float Pitch = 30, BaseSize = 14.5f;
     /// <summary>Degrees the camera is turned round the player from where the game puts it, and its pitch in place of the game's, for a review from another side.</summary>
     public float CameraTurn;
+    /// <summary>A spot the camera keeps on in place of the player, for a review scene whose subject is away from them.</summary>
+    public Vector2? CameraOn;
     public float? CameraPitch;
     private Camera3D camera = null!;
     private DirectionalLight3D sun = null!;
@@ -61,8 +63,8 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<int, Avatar> others = new();
     /// <summary>Draws players at cabin doors.</summary>
     private readonly DoorwayView doorways;
-    /// <summary>What a player inside a cabin sees of a wolf forcing its door, drawn into a picture of its own.</summary>
-    public InsideSet Inside { get; } = new();
+    /// <summary>What a player inside a cabin sees of a wolf forcing its door, in a window of the interface.</summary>
+    public InsideDoorPOV InsideDoorPOV { get; } = new();
     /// <summary>Draws wolves tugging players out of cabin doorways.</summary>
     private readonly TugView tugs;
     /// <summary>Where wolves stand round a fallen player.</summary>
@@ -183,7 +185,6 @@ public partial class WorldView : Node3D {
         sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = DaySun, SkyMode = DirectionalLight3D.SkyModeEnum.LightOnly };
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
-        AddChild(Inside);
         explored = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.L8, World.S.Explored);
         exploredTexture = ImageTexture.CreateFromImage(explored);
         fog.SetShaderParameter("explored", exploredTexture);
@@ -275,7 +276,7 @@ public partial class WorldView : Node3D {
         camera.Size = (AnimationReview ? (ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : 11) / ReviewZoom : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(AnimationReview ? ReviewPitch : CameraPitch ?? Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         var back = new Vector3(across, MathF.Sin(pitch), across).Rotated(Vector3.Up, Mathf.DegToRad(CameraTurn));
-        var target = AnimationReview ? ReviewCenter + To3(reviewActor.Position) : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
+        var target = AnimationReview ? ReviewCenter + To3(reviewActor.Position) : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : CameraOn ?? World.Player);
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
         camera.Position = target + back * (EnvironmentReview ? EnvironmentCameraDistance : 60);
         if (EnvironmentReview && EnvironmentCameraDistance > 60) sun.DirectionalShadowMaxDistance = EnvironmentCameraDistance + 40;
@@ -434,7 +435,7 @@ public partial class WorldView : Node3D {
         if (moved || EnvironmentReview) UpdateActors(dt);
         SyncThings(dt);
         if (moved) { SyncWolves(dt); SyncCarts(dt); }
-        SyncInside(dt);
+        SyncInsideDoorPOV();
         worldReplaced = false;
         UpdateEffects(dt);
         UpdateMarkers();
@@ -1064,8 +1065,8 @@ public partial class WorldView : Node3D {
             case HutProp hut:
                 // The door stands open while someone steps in or out, and shuts behind them: swung shut after a walk, slammed after a run.
                 // A wolf forcing the door holds it as far open as its body has pushed it.
-                if (live && World.DoorVisits.AtDoor(t.Id) is { Visit: <= WolfVisit.Launching } caller) {
-                    DoorwayView.PushDoor(hut, VisitView.DoorDegrees(VisitClock(caller)));
+                if (live && World.DoorCheck.AtDoor(t.Id) is { DoorCheck: <= DoorCheckStage.Launching } caller) {
+                    DoorwayView.PushDoor(hut, DoorCheckView.DoorDegrees(DoorCheckClock(caller)));
                     break;
                 }
                 var through = live ? doorways.Passing(t.Id) : null;
@@ -1208,8 +1209,8 @@ public partial class WorldView : Node3D {
             var hunted = Hunted(wolf);
             var moved = wolf.Pos - model.Last;
             model.Last = wolf.Pos;
-            if (wolf.Visit is >= WolfVisit.Scratching and <= WolfVisit.Launching && World.Find(wolf.VisitCabin) is Thing visited) {
-                VisitView.Show(wolf, model, visited, Elapsed + wolf.Id % 7, dt, World.Sees(wolf.Pos));
+            if (wolf.DoorCheck is >= DoorCheckStage.Scratching and <= DoorCheckStage.Launching && World.Find(wolf.DoorCheckCabin) is Thing checkedCabin) {
+                DoorCheckView.Show(wolf, model, checkedCabin, Elapsed + wolf.Id % 7, dt, World.Sees(wolf.Pos));
                 continue;
             }
             if (wolf.Tugging && tugs.ShowTugging(wolf, model, Elapsed, dt)) continue;
@@ -1262,7 +1263,8 @@ public partial class WorldView : Node3D {
             } else braking = model.TurnToward(facing, moved, dt, running, fast, backing);
             // Turning where it stands, it comes round about its hips, its forepaws stepping round them.
             float turned = Mathf.AngleDifference(faced, model.Yaw);
-            bool stepsRound = !struck && !fast && (turnsRound || !running) && dt > 0 && Math.Abs(turned) > WolfModel.StepsRoundFrom * dt;
+            // A howling wolf has turned already and keeps its paws planted.
+            bool stepsRound = !struck && !fast && wolf.Howl <= 0 && (turnsRound || !running) && dt > 0 && Math.Abs(turned) > WolfModel.StepsRoundFrom * dt;
             if (stepsRound) model.Drift += (ActorAnimation.Forward(model.Yaw) - ActorAnimation.Forward(faced)) * WolfModel.HipsBehind;
             model.Root.Visible = World.Sees(wolf.Pos);
             bool wary = wolf.Scared || HuntedTorchLit(wolf);
@@ -1300,8 +1302,8 @@ public partial class WorldView : Node3D {
             if (!World.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
     }
 
-    /// <summary>Seconds into its visit to a cabin's door a wolf is drawn at, or as the world has it for one not drawn at the door yet.</summary>
-    private float VisitClock(Wolf wolf) => wolves.TryGetValue(wolf, out var model) && model.Motion == WolfMotion.Door ? model.VisitClock : VisitView.Clock(wolf.Visit, wolf.VisitTime);
+    /// <summary>Seconds into its door check at a cabin a wolf is drawn at, or as the world has it for one not drawn at the door yet.</summary>
+    private float DoorCheckClock(Wolf wolf) => wolves.TryGetValue(wolf, out var model) && model.Motion == WolfMotion.Door ? model.DoorCheckClock : DoorCheckView.Clock(wolf.DoorCheck, wolf.DoorCheckTime);
 
     /// <summary>Seconds a player left inside a cabin goes on seeing the one a wolf takes out of it.</summary>
     private const float TakenOutSeconds = .9f;
@@ -1310,19 +1312,19 @@ public partial class WorldView : Node3D {
     /// Shows the player inside a cabin what a wolf forcing its door looks like from in there: the wolves at the door, and
     /// for a moment the player the wolf takes out.
     /// </summary>
-    private void SyncInside(float dt) {
-        Inside.Clear();
-        if (World.Sheltered != 0 && World.DoorVisits.AtDoor(World.Sheltered) is { Visit: >= WolfVisit.Prying } caller && props.TryGetValue(World.Sheltered, out var prop) && prop is HutProp hut) {
-            var taken = caller.Visit == WolfVisit.TakingOut ? World.PlayerById(caller.Target) : null;
-            if (caller.Visit != WolfVisit.TakingOut || taken is { Door: Doorway.Tugged, DoorTime: < TakenOutSeconds }) {
-                Inside.Show(hut.Look.Pos, hut.Door, caller.Visit == WolfVisit.Launching ? VisitView.Launched(VisitClock(caller)) : 0, dt);
-                if (wolves.TryGetValue(caller, out var lead)) Inside.Add(lead);
+    private void SyncInsideDoorPOV() {
+        InsideDoorPOV.Clear();
+        if (World.Sheltered != 0 && World.DoorCheck.AtDoor(World.Sheltered) is { DoorCheck: >= DoorCheckStage.Prying } caller && props.TryGetValue(World.Sheltered, out var prop) && prop is HutProp hut) {
+            var taken = caller.DoorCheck == DoorCheckStage.TakingOut ? World.PlayerById(caller.Target) : null;
+            if (caller.DoorCheck != DoorCheckStage.TakingOut || taken is { Door: Doorway.Tugged, DoorTime: < TakenOutSeconds }) {
+                InsideDoorPOV.Show(hut.Look.Pos, hut.Door);
+                if (wolves.TryGetValue(caller, out var lead)) InsideDoorPOV.Add(lead);
                 foreach (var wolf in World.Wolves)
-                    if (wolf != caller && (wolf.VisitCabin == World.Sheltered || taken != null && wolf.Target == taken.Id) && wolves.TryGetValue(wolf, out var model)) Inside.Add(model);
-                if (taken != null && RigOf(taken.Id) is ActorRig rig) Inside.Add(rig, ShirtOf(taken));
+                    if (wolf != caller && (wolf.DoorCheckCabin == World.Sheltered || taken != null && wolf.Target == taken.Id) && wolves.TryGetValue(wolf, out var model)) InsideDoorPOV.Add(model);
+                if (taken != null && RigOf(taken.Id) is ActorRig rig) InsideDoorPOV.Add(rig, ShirtOf(taken));
             }
         }
-        Inside.Finish();
+        InsideDoorPOV.Finish();
     }
 
     /// <summary>
@@ -1345,8 +1347,10 @@ public partial class WorldView : Node3D {
         return null;
     }
 
+    /// <summary>The model a wolf is drawn with, or null for one not drawn yet.</summary>
+    internal WolfModel? ModelOf(Wolf wolf) => wolves.GetValueOrDefault(wolf);
     /// <summary>The rig of a player as drawn, or null.</summary>
-    private ActorRig? RigOf(int id) => id == World.Me.Id ? playerRig : others.TryGetValue(id, out var other) ? other.Rig : null;
+    internal ActorRig? RigOf(int id) => id == World.Me.Id ? playerRig : others.TryGetValue(id, out var other) ? other.Rig : null;
     /// <summary>How a player is drawn, or null for one not drawn yet.</summary>
     private ActorState? StateOf(int id) => id == World.Me.Id ? player : others.TryGetValue(id, out var other) ? other.State : null;
 

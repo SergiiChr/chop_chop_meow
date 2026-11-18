@@ -91,8 +91,8 @@ public static class SimulationChecks {
         CabinChecks.Run(data);
         Test(CheckPressingTheOppositeWayBrakesBeforeRunningBack, data);
         DoorTugChecks.Run(data);
-        DoorVisitsChecks.Run(data);
-        VisitViewChecks.Run();
+        DoorCheckChecks.Run(data);
+        DoorCheckViewChecks.Run();
         Test(CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
@@ -101,6 +101,7 @@ public static class SimulationChecks {
         Test(CheckPatrollingWolfWalksAtHalfItsTrot, data);
         Test(CheckWolvesKeepToGroundAPlayerCanWalk, data);
         Test(CheckSmelledPlayerDrawsAHowlAndThePack, data);
+        Test(CheckAWolfTurnsToAPlayerItSmellsBeforeItHowls, data);
         Test(CheckWolvesGoHomeBeforeDawn, data);
         Test(CheckDensStayOpen, data);
         Test(CheckWolvesLetGoCleanly, data);
@@ -2727,10 +2728,29 @@ public static class SimulationChecks {
         Require(!dawn.Mauled, "a pinned player should go free once the wolves head home");
     }
 
+    /// <summary>A wolf walking straight away from a player it smells has half a turn to make, which takes it 1.3 seconds.</summary>
+    private static void CheckAWolfTurnsToAPlayerItSmellsBeforeItHowls(GameData data) {
+        var world = NightWorld(data);
+        world.Player = Terrain.Point(120, 0);
+        var smeller = PatrolWolf(world, new Wolf { Pos = world.Player + Terrain.Seaward * (data.SmellRadius - 5), Heading = Terrain.Seaward.Angle() });
+        var called = PatrolWolf(world, new Wolf { Pos = smeller.Pos + Terrain.Seaward * 20, Heading = Terrain.Seaward.Angle() });
+        var heard = Listen(world);
+        SafeTick(world, .1f);
+        var at = smeller.Pos;
+        Require(smeller.Target == world.Me.Id, "a wolf within smell of the player should take them as its prey");
+        SafeTick(world, 1);
+        Require(smeller.Howl == 0 && !heard.Contains("wolf_howl") && called.Mode == WolfMode.Patrol, $"a wolf facing away from the player it smells should turn to them in silence before it howls: heard {string.Join(", ", heard)}");
+        Require(smeller.Pos == at, "a wolf turning to the player it smells should stand where it is");
+        SafeTick(world, .4f);
+        Require(smeller.Howl > 0 && heard.Contains("wolf_howl") && called.Mode == WolfMode.Called, "a wolf that has turned to the player it smells should howl, calling the wolves around");
+        Require(smeller.Howl > smeller.HowlLength - .35f, $"the howl should start once the half turn is made, 1.3 s in, not {smeller.HowlLength - smeller.Howl:0.00} s before now");
+    }
+
     private static void CheckSmelledPlayerDrawsAHowlAndThePack(GameData data) {
         var world = NightWorld(data);
         world.Player = Terrain.Point(120, 0);
-        var smeller = new Wolf { Pos = world.Player + Terrain.Seaward * (data.SmellRadius - 5) };
+        // The smelling wolf walks straight at the player, so it has no turn to make before it howls.
+        var smeller = new Wolf { Pos = world.Player + Terrain.Seaward * (data.SmellRadius - 5), Heading = (-Terrain.Seaward).Angle() };
         var called = new Wolf { Pos = smeller.Pos + Terrain.Seaward * (data.HowlRadius - 10) };
         var deaf = new Wolf { Pos = smeller.Pos - Terrain.Seaward * (data.HowlRadius + 10) };
         var heard = Listen(world);
@@ -2822,7 +2842,7 @@ public static class SimulationChecks {
         var caught = new Wolf { Pos = world.Player, Target = world.Me.Id };
         PlaceWolf(world, caught);
         SafeTick(world, 10);
-        Require(caught.Target == 0 && wolf.Target == 0 && caught.Mode == WolfMode.Patrol && caught.Visit == WolfVisit.None && wolf.Visit == WolfVisit.None, "wolves should give up on the player and patrol on once they have been inside behind a locked door long enough");
+        Require(caught.Target == 0 && wolf.Target == 0 && caught.Mode == WolfMode.Patrol && caught.DoorCheck == DoorCheckStage.None && wolf.DoorCheck == DoorCheckStage.None, "wolves should give up on the player and patrol on once they have been inside behind a locked door long enough");
         Require(world.Health >= 40, "a wolf must not hurt a player behind a locked door");
         world.Doorways.Leave();
         Require(world.Sheltered == 0, "stepping outside should leave the cabin");

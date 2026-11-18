@@ -74,8 +74,8 @@ public sealed class WolfModel {
     public float FromYaw;
     /// <summary>How far a wolf at a cabin's door has settled into its stand there from where it arrived, 0 to 1.</summary>
     public float Settled;
-    /// <summary>Seconds into its visit to a cabin's door the wolf is drawn at, which runs on between the world's updates.</summary>
-    public float VisitClock;
+    /// <summary>Seconds into its door check at a cabin the wolf is drawn at, which runs on between the world's updates.</summary>
+    public float DoorCheckClock;
     /// <summary>The door point of the cabin whose step the wolf stands at, when it does: its paws are set on the treads and the floor past the door, and its body lifted and tipped to stand on them.</summary>
     public Vector2? Steps;
     /// <summary>Seconds a wolf has fed at its spot at a fallen player, easing it there from where it stood.</summary>
@@ -160,7 +160,7 @@ public sealed class WolfModel {
         // The spine folds under at the gathered float and stretches out in the extended one; the head stays level over the rocking body.
         float flex = MathF.Cos((p - .45f) * Mathf.Tau), pitch = 6 * MathF.Cos((p - .25f) * Mathf.Tau);
         var body = new WolfPose(Lift: .045f + .05f * MathF.Cos((p - .44f) * Mathf.Tau * 2), Pitch: pitch, Flex: 15 * flex, Roll: 1.5f * MathF.Sin(p * Mathf.Tau),
-            Neck: 12 - pitch - 4 * flex, Head: -10, Jaw: 10, Ears: 28, Snarl: 1, Tail: -18 + 9 * flex, Curl: 6 - 6 * flex);
+            Neck: 12 - pitch - 4 * flex, Head: -10, Jaw: 10, Ears: 28, Tail: -18 + 9 * flex, Curl: 6 - 6 * flex);
         return Stride(body, GallopGait, p);
     }
 

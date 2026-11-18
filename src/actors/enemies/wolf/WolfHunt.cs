@@ -19,7 +19,7 @@ public sealed class WolfHunt(World world) {
         // A sheltered player is out of reach: the pack goes to the cabin's door, or gives up and patrols on away from a cabin it leaves alone.
         if (Doorways.Indoors(world.S.Actor)) {
             var cabin = world.Find(world.S.Sheltered != 0 ? world.S.Sheltered : world.S.Actor.DoorCabin);
-            foreach (var wolf in hunters) if (!world.DoorVisits.Follow(wolf, cabin)) WolfPatrols.Patrol(wolf, AwayFromPlayer(wolf).Angle());
+            foreach (var wolf in hunters) if (!world.DoorCheck.Follow(wolf, cabin)) WolfPatrols.Patrol(wolf, AwayFromPlayer(wolf).Angle());
             return;
         }
         bool lit = world.Protected(world.Player);
@@ -31,7 +31,7 @@ public sealed class WolfHunt(World world) {
         if (!world.Downed && world.S.Health <= World.TakedownHealth && !lit && !wary && !world.DoorTug.Tugged && !AnyLeaping(hunters)) {
             Wolf? hunter = null;
             foreach (var w in hunters)
-                if (!world.Protected(w.Pos) && w.Howl <= 0 && w.Flee <= 0 && w.Stagger <= 0 && w.Pos.DistanceTo(world.Player) < World.LeapRange && (hunter == null || w.Pos.DistanceTo(world.Player) < hunter.Pos.DistanceTo(world.Player))) hunter = w;
+                if (!world.Protected(w.Pos) && w.Howl <= 0 && w.HowlIn <= 0 && w.Flee <= 0 && w.Stagger <= 0 && w.Pos.DistanceTo(world.Player) < World.LeapRange && (hunter == null || w.Pos.DistanceTo(world.Player) < hunter.Pos.DistanceTo(world.Player))) hunter = w;
             if (hunter != null) { hunter.Leap = World.LeapSeconds; world.Say("A wolf leaps for your throat!"); }
         }
         // A chase always outpaces a walk but not a sprint.
@@ -39,6 +39,11 @@ public sealed class WolfHunt(World world) {
         foreach (var wolf in hunters) {
             wolf.Attack -= dt;
             if (wolf.Tugging && world.DoorTug.Tug(wolf) || world.DoorTug.Hold(wolf)) continue;
+            if (wolf.HowlIn > 0) {
+                wolf.HowlIn = Math.Max(0, wolf.HowlIn - dt);
+                if (wolf.HowlIn == 0) world.WolfPatrols.Howl(wolf);
+                continue;
+            }
             if (wolf.Howl > 0) { wolf.Howl = Math.Max(0, wolf.Howl - dt); continue; }
             if (wolf.Leap > 0) {
                 // Closing the remaining gap evenly makes every leap last LeapSeconds.
@@ -97,10 +102,10 @@ public sealed class WolfHunt(World world) {
     }
     /// <summary>
     /// A wolf within reach of the acting player whose last bite is behind it bites them, and tugs them out of a doorway
-    /// they are in, or takes them by an arm while another wolf tugs them.
+    /// they are in. While another wolf tugs them it takes them by an arm, or waits beside them with both arms taken.
     /// </summary>
     private void Bite(Wolf wolf) {
-        if (wolf.Attack > 0 || world.DoorTug.TakeSide(wolf) || wolf.Pos.DistanceTo(world.Player) >= 1.1f) return;
+        if (world.DoorTug.TakeSide(wolf) || world.DoorTug.Tugged || wolf.Attack > 0 || wolf.Pos.DistanceTo(world.Player) >= 1.1f) return;
         wolf.Attack = 1; world.S.Health -= world.Data.WolfBite; world.Play("wolf_bite", world.Player); world.DoorTug.TugOut(wolf);
     }
 

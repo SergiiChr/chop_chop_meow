@@ -1,7 +1,7 @@
 namespace ChopChopMeow;
 
 /// <summary>What a wolf is doing at the door of a cabin with someone inside, in the order it does it.</summary>
-public enum WolfVisit {
+public enum DoorCheckStage {
     None,
     /// <summary>On its way to the door, or waiting behind a wolf already at it.</summary>
     Coming,

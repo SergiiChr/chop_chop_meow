@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 /// Cabin doors in <paramref name="world"/>: players step in through the door one at a time until the cabin is full, anyone
 /// at the door of a full or locked cabin knocks on it, and players standing aside let someone step out.
 /// What a wolf does to a player in the doorway is <see cref="DoorTug"/>'s, and what it does at the door of a cabin with
-/// someone inside is <see cref="DoorVisits"/>'.
+/// someone inside is <see cref="DoorCheck"/>'.
 /// </summary>
 public sealed class Doorways(World world) {
     /// <summary>How many players a cabin holds.</summary>
@@ -85,7 +85,7 @@ public sealed class Doorways(World world) {
     public void TurnKey() {
         var s = world.S;
         if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None) return;
-        if (world.DoorVisits.Forcing(cabin.Id)) { world.Say("A wolf is forcing the door."); return; }
+        if (world.DoorCheck.Forcing(cabin.Id)) return;
         if (world.Forwarded(Verb.TurnKey)) return;
         cabin.Locked = !cabin.Locked; world.Play("door_lock", DoorPoint(cabin));
     }
@@ -108,7 +108,7 @@ public sealed class Doorways(World world) {
     public void Leave() {
         var s = world.S;
         if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None) return;
-        if (world.DoorVisits.AtDoor(cabin.Id) != null) { world.Say("A wolf is at the door."); return; }
+        if (world.DoorCheck.AtDoor(cabin.Id) != null) return;
         if (world.Forwarded(Verb.Leave)) return;
         if (cabin.Locked) { cabin.Locked = false; world.Play("door_lock", DoorPoint(cabin)); }
         s.Sheltered = 0; world.Player = Doorstep(cabin); s.Actor.Warp++;
@@ -199,7 +199,7 @@ public sealed class Doorways(World world) {
         // A player not at any door, such as one waking or rejoining, comes after everyone already there.
         int queued = arriving.Door == Doorway.None ? int.MaxValue : arriving.DoorQueued;
         int inside = 0;
-        bool leaving = false, ahead = world.DoorVisits.Forcing(cabin);
+        bool leaving = false, ahead = world.DoorCheck.Forcing(cabin);
         foreach (var p in world.S.Players) {
             if (p == arriving) continue;
             if (p.Sheltered == cabin) inside++;
