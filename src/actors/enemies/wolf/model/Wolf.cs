@@ -53,22 +53,18 @@ public sealed class Wolf : IWalker {
     [JsonIgnore] public bool Sprinted { get; set; }
     /// <summary>Seconds a chasing wolf keeps following the player into firelight before it gives up; above zero the wolf gallops.</summary>
     public float Chase { get; set; }
+    /// <summary>What a torch has made of this wolf while it hunts a player: in follow mode, turned on them, or running from them.</summary>
+    public FollowStage Follow { get; set; }
     /// <summary>
     /// A torch swing toward this wolf made it keep its distance, in follow mode (<see cref="WolfFollow"/>): it circles its
-    /// player at the edge of the torchlight while the torch burns.
+    /// player at the edge of the torchlight while the torch burns, or stands braced when they walk up to it.
     /// </summary>
-    public bool Scared { get; set; }
+    [JsonIgnore] public bool Following => Follow is FollowStage.Circling or FollowStage.Braced;
     /// <summary>
     /// The way a following wolf circles its player: 1 for clockwise on the map, -1 for the other way, and 0 until it is
     /// given one at random.
     /// </summary>
     public int Round { get; set; }
-    /// <summary>A following wolf standing braced where it is, because its player has walked up to it.</summary>
-    public bool Braced { get; set; }
-    /// <summary>The wolf turned on its player when one of a pack following them stood its ground: no torch wave scares it again.</summary>
-    public bool Bold { get; set; }
-    /// <summary>The wolf, following alone, runs from its player until it is out of their line of sight, for <see cref="Flee"/> seconds at most.</summary>
-    public bool Routed { get; set; }
     /// <summary>The players this wolf ran from; it leaves each alone until it has been out of smell range of them.</summary>
     public List<int> Shunned { get; set; } = new();
     /// <summary>Seconds until a wolf standing its ground growls again.</summary>

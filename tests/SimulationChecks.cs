@@ -1853,7 +1853,7 @@ public static class SimulationChecks {
         var behind = new Wolf { Pos = scared.Player + new Vector2(-6, 0), Health = 4 };
         PlaceWolf(scared, wolf); PlaceWolf(scared, behind);
         scared.UseTorch(Vector2.Right);
-        Require(wolf.Scared && !behind.Scared, "a swing should scare only the wolves it is aimed at");
+        Require(wolf.Following && !behind.Following, "a swing should scare only the wolves it is aimed at");
         RemoveWolves(scared, w => w == behind);
         WolfTick(scared, 8, wolf);
         Require(scared.Health == 100 && Math.Abs(wolf.Pos.DistanceTo(scared.Player) - World.StalkDistance) <= WolfFollow.Wander + .1f, "a scared wolf should follow at the edge of the light without biting");
@@ -1864,7 +1864,7 @@ public static class SimulationChecks {
         var wolves = Enumerable.Range(0, World.PackSize).Select(i => new Wolf { Pos = pack.Player + Vector2.Right.Rotated(i * Mathf.Tau / World.PackSize) * World.StalkDistance, Health = 4 }).ToArray();
         foreach (var w in wolves) PlaceWolf(pack, w);
         pack.UseTorch(Vector2.Right);
-        Require(wolves.All(w => !w.Scared), "a complete pack should ignore a swing");
+        Require(wolves.All(w => !w.Following), "a complete pack should ignore a swing");
         WolfTick(pack, 4, wolves);
         Require(pack.Health < 100, $"{World.PackSize} wolves around a torch should attack together");
     }

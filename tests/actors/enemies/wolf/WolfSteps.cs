@@ -55,7 +55,7 @@ internal static class WolfSteps {
     /// <summary>A torch night with wolves in follow mode, settled on their circle; returns one of them.</summary>
     public static (World World, Wolf Wolf) Followed(GameData data, int count) {
         var world = TorchNight(data);
-        var wolves = Enumerable.Range(0, count).Select(i => PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(World.StalkDistance, 0).Rotated(i * Mathf.Tau / count), Scared = true })).ToArray();
+        var wolves = Enumerable.Range(0, count).Select(i => PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(World.StalkDistance, 0).Rotated(i * Mathf.Tau / count), Follow = FollowStage.Circling })).ToArray();
         WolfTick(world, 1, wolves);
         return (world, wolves[0]);
     }

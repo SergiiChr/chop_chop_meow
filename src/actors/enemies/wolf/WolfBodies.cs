@@ -68,7 +68,7 @@ public sealed class WolfBodies(World world) {
     /// Where the body of a wolf at a player runs: toward them for one closing in, and along its own way for one that
     /// follows them round, so two going opposite ways pass side by side.
     /// </summary>
-    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Scared ? Body(wolf) : Body(wolf, player);
+    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Following ? Body(wolf) : Body(wolf, player);
 
     /// <summary>Whether a wolf holds its place at the player: tugging them, pinning them or in the air.</summary>
     private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Leap > 0;

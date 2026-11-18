@@ -97,7 +97,7 @@ public static class SwingsChecks {
         var off = StillWolf(far, new Vector2(2, 0));
         far.UseTorch(Vector2.Right);
         far.Tick(.4f);
-        Require(off.Health == data.WolfHealth && off.Scared, "a torch swung at a wolf 2 m off should scare it without burning it");
+        Require(off.Health == data.WolfHealth && off.Following, "a torch swung at a wolf 2 m off should scare it without burning it");
 
         var near = TorchNight(data);
         var close = StillWolf(near, new Vector2(1.05f, 0));
@@ -130,11 +130,11 @@ public static class SwingsChecks {
     /// <summary>A wolf a torch burns runs from the player for a moment, even one that turned on them and that no wave scares.</summary>
     private static void CheckABurntWolfRunsFromThePlayerForAMoment(GameData data) {
         var world = TorchNight(data);
-        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0), Bold = true });
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0), Follow = FollowStage.Bold });
         world.UseTorch(Vector2.Right);
         SnapTick(world, .2f);
         float burnt = wolf.Pos.DistanceTo(world.Player);
-        Require(wolf.Health < data.WolfHealth && !wolf.Scared, "a torch should burn a wolf that turned on the player without scaring it");
+        Require(wolf.Health < data.WolfHealth && wolf.Follow == FollowStage.Bold, "a torch should burn a wolf that turned on the player without scaring it");
         SnapTick(world, 1.5f);
         Require(wolf.Pos.DistanceTo(world.Player) > burnt + 1, $"a burnt wolf should run from the player, not stay {wolf.Pos.DistanceTo(world.Player):0.0} m off");
         Require(world.Health == 100, "a torch that burns a wolf as it gathers itself should stop its bite");

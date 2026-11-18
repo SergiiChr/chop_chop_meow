@@ -134,7 +134,7 @@ UI and input:
 | `src/actors/enemies/wolf/WolfPatrols.cs` | Wolf dens, the wolves they let out, patrols, smell, howls and the way home |
 | `src/actors/enemies/wolf/WolfHunt.cs` | The pack hunting a player: howling, closing in, leaping, pinning and backing off from firelight |
 | `src/actors/enemies/wolf/WolfSnap.cs` | A wolf's bite: gathering itself, leaping to where its player is heading and snapping |
-| `src/actors/enemies/wolf/WolfFollow.cs` | Follow mode: wolves a torch scared off circling a player, bracing when walked at, running or standing their ground |
+| `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: wolves a torch scared off circling a player, bracing when walked at, running or standing their ground |
 | `src/actors/player/Swings.cs`, `src/actors/player/model/Swing.cs`, `src/actors/player/model/SwingShape.cs` | Players' swings at wolves: when a swing lands, the ground its blade, flame or fist passes over, and the wolves it touches |
 | `src/actors/enemies/wolf/model/Wolf.cs` | `Wolf`, a wolf as the world saves it |
 | `src/actors/enemies/wolf/model/Den.cs` | `Den`, a wolf den's mouth, door and clearance |
@@ -414,7 +414,7 @@ The path is the simulation's, unchanged: the brake is only drawn.
 - a leap arcs up and comes down jaws first on the throat (`FallBackView.Throat`); contact at `WolfModel.ContactReach` knocks the player onto their back facing the wolf, and the jaws stay on the throat as they go over, so the wolf ends standing over them;
 - a wolf a swing lands on (`Wolf.Stagger` rising) hops back `World.KnockBackDistance`, moving only while in the air, and ducks low before rising wary; where the blow reaches a machine a moment before the swing it shows comes down (`ActorAnimation.Contact`), the wolf stands until it does (`WolfModel.Struck`);
 - a snapping wolf (`Wolf.Snap`) that stands sinks back onto its haunches while it gathers itself, and one still running with its player keeps running; then it throws chest, neck and wide jaws out ahead (`WolfModel.Snap`, `WolfModel.SnapSurge`) and shuts them a moment after it lands (`WolfModel.SnapHold`);
-- a following wolf its player has walked up to (`Wolf.Braced`) stands braced, low over forepaws set wide, ears flat and lips drawn back (`WolfModel.Brace`);
+- a following wolf its player has walked up to (`FollowStage.Braced`) stands braced, low over forepaws set wide, ears flat and lips drawn back (`WolfModel.Brace`);
 - a following wolf walking round its player turns its head to them for `GlanceSeconds` in every `GlanceEvery`, each wolf at its own moments by its id (`WolfModel.Glance`, up to `WolfModel.MaxGlance` from its body);
 - a killing blow throws the wolf off its feet onto its side, covering the knockback in the air, and it lands with a bounce and lies limp.
 - a howling wolf (`Wolf.Howl`) braces, lifts its chest and throws its head back, muzzle to the sky, its jaw opening as the note swells (`WolfModel.Howl`).
@@ -651,7 +651,7 @@ They put the torch out after `World.WildSwings` within `World.WildWindow` second
 While the torch burns and fewer than `World.PackSize` wolves are near:
 
 - an unscared wolf creeps in at a third of its speed and can bite;
-- a swing aimed within about 45° of a wolf in `World.ScareRange` sets `Wolf.Scared`, which puts it in follow mode.
+- a swing aimed within about 45° of a wolf in `World.ScareRange` puts it in follow mode (`Wolf.Follow`, a `FollowStage`; `Wolf.Following` while it circles or stands braced).
 
 Once the pack is complete, swings no longer scare and the wolves attack.
 A torch that lands on a wolf sets `Wolf.Flee`; it leaves alone one in the air or feeding.
@@ -662,10 +662,10 @@ A torch that lands on a wolf sets `Wolf.Flee`; it leaves alone one in the air or
   Wolves going the same way spread evenly: `WolfFollow.Arrange` orders them by bearing and turns that way's places to fit them, and each heads a little ahead of its place, going round the player and never across them.
   It heads along the line touching its circle where it stands, so going round never takes it nearer the player, where it would brace.
   The two ways walk in lanes a little outside and inside the circle, so wolves going opposite ways pass each other, and each wolf's place drifts ahead and back and its lane in and out at its own pace by its id; all of it stays within `WolfFollow.Wander` of the circle.
-- **Bracing.** One the player comes within `WolfFollow.BraceFrom` of stops and stands braced (`Wolf.Braced`) until they are `WolfFollow.BraceUntil` off again.
-- **Alone.** At `WolfFollow.StandOrRunAt` a wolf following alone runs (`Wolf.Routed`) at a gallop until it is out of the player's line of sight, or for `WolfFollow.RoutSeconds`, then patrols again (`WolfFollow.GiveUp`).
+- **Bracing.** One the player comes within `WolfFollow.BraceFrom` of stops and stands braced (`FollowStage.Braced`) until they are `WolfFollow.BraceUntil` off again.
+- **Alone.** At `WolfFollow.StandOrRunAt` a wolf following alone runs (`FollowStage.Routed`) at a gallop until it is out of the player's line of sight, or for `WolfFollow.RoutSeconds`, then patrols again (`WolfFollow.GiveUp`).
   It leaves that player alone until it has been out of smell range of them (`Wolf.Shunned`), as a wolf does a cabin it gave up on (`Wolf.Tried`).
-- **Among others.** With more than one wolf following, the one walked at stands its ground: it growls every `WolfFollow.GrowlEvery` from `WolfFollow.GrowlFrom`, and at `WolfFollow.StandOrRunAt` every wolf hunting the player within their line of sight turns on them (`Wolf.Bold`).
+- **Among others.** With more than one wolf following, the one walked at stands its ground: it growls every `WolfFollow.GrowlEvery` from `WolfFollow.GrowlFrom`, and at `WolfFollow.StandOrRunAt` every wolf hunting the player within their line of sight turns on them (`FollowStage.Bold`).
   Each attacks as a wolf does with no torch lit, leap for the throat included, and no torch wave scares it again; one out of sight keeps following.
 
 #### Mauling and wolf meat

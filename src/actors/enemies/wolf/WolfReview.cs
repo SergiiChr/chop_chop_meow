@@ -109,7 +109,7 @@ public sealed partial class WolfReview : Node {
         // all but the feast keep them above half health too, where no wolf leaps for the throat.
         World.S.Health = Math.Max(World.S.Health, Scene == "feast" ? DoorwayReview.KeptAlive : World.TakedownHealth + 10);
         // The player stops once the wolf they walk at has run or turned on them.
-        if (walkAt == null || walkAt.Routed || walkAt.Bold || !World.S.Wolves.Contains(walkAt)) return;
+        if (walkAt == null || walkAt.Follow is FollowStage.Routed or FollowStage.Bold || !World.S.Wolves.Contains(walkAt)) return;
         var to = walkAt.Pos - World.Player;
         if (to.Length() > walkUntil) World.MovePlayer(to.Normalized() * Math.Min(to.Length() - walkUntil, dt * World.Data.MoveSpeed(false)));
     }
