@@ -25,6 +25,17 @@ public static class DoorTugChecks {
         Test(CheckAWolfTugsAPlayerOutOnlyAsFarAsOpenGroundGoes, data);
         Test(CheckASecondWolfTakesATuggedPlayersSideBitesOnceAndHoldsUntilTheTugEnds, data);
         Test(CheckOnlyOneWolfTakesEachSideOfATuggedPlayer, data);
+        Test(CheckABodysLeftAndRightFollowFromTheWayItFaces);
+    }
+
+    /// <summary>On the map, north is -Y and east is +X: facing north, a body's left hand is to the west.</summary>
+    private static void CheckABodysLeftAndRightFollowFromTheWayItFaces() {
+        Vector2 north = new(0, -1), east = new(1, 0), at = new(10, 10);
+        Require(BodySide.Out(north, BodySide.Left).IsEqualApprox(new Vector2(-1, 0)) && BodySide.Out(north, BodySide.Right).IsEqualApprox(east), $"a body facing north should have west on its left and east on its right, not {BodySide.Out(north, BodySide.Left)}");
+        Require(BodySide.Out(east, BodySide.Left).IsEqualApprox(north), $"a body facing east should have north on its left, not {BodySide.Out(east, BodySide.Left)}");
+        Require(BodySide.Of(at, north, at + new Vector2(-2, 5)) == BodySide.Left && BodySide.Of(at, north, at + new Vector2(.1f, -3)) == BodySide.Right, "a spot to the west of a body facing north should be on its left and one to the east on its right, however far ahead or behind");
+        Require(BodySide.Free(at, north, at + east, side => side == BodySide.Right) == BodySide.Left, "something on a body's right should take its left when the right is taken");
+        Require(BodySide.Free(at, north, at + east, _ => true) == 0, "nothing should take a side of a body with both taken");
     }
 
     /// <summary>Each bite takes 15 health: the tugging wolf's and the one a second wolf gives as it takes the player's arm leave 70 of 100.</summary>
@@ -59,6 +70,9 @@ public static class DoorTugChecks {
         for (float time = 0; time < 1; time += .05f) world.Tick(.05f);
         Require(world.Door == Doorway.Tugged, $"the player should still be tugged a second in, not {world.Door}");
         Require(others.Count(w => w.Side == 1) == 1 && others.Count(w => w.Side == -1) == 1, $"one wolf should hold each side of a tugged player: sides {string.Join(", ", others.Select(w => w.Side))}");
+        // The player faces the door, up the map, so their left is toward -X: each wolf holds the side it came from and stands on it.
+        Require(others[0].Side == 1 && others[0].Pos.X < world.DoorTug.TuggedTo.X - .5f, $"the wolf that came from the player's left should hold their left side and stand there, not side {others[0].Side} at {others[0].Pos - world.DoorTug.TuggedTo}");
+        Require(others[1].Side == -1 && others[1].Pos.X > world.DoorTug.TuggedTo.X + .5f, $"the wolf that came from the player's right should hold their right side and stand there, not side {others[1].Side} at {others[1].Pos - world.DoorTug.TuggedTo}");
     }
 
     /// <summary>A wolf bite takes 15 health, which leaves a healthy player above half.</summary>

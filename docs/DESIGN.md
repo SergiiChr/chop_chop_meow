@@ -170,6 +170,7 @@ Rendering and sound:
 | `src/PaintFilter.cs` | The paint filter over the drawn world ([assets/environment/paint_filter](../assets/environment/paint_filter/README.md)) |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
+| `src/actors/model/BodySide.cs` | Which side of a body is its left and which its right, and which side a spot is on |
 | `src/actors/enemies/wolf/display/WolfModel.cs`, `src/actors/enemies/wolf/display/WolfShape.cs` | Builds the wolf and poses it: its gaits, leap, howl, tug, recoil and fall |
 | `src/actors/display/Turning.cs` | How an actor's head, then body, turn toward where it heads, with inertia |
 | `src/actors/display/ActorState.cs` | How a player or worker is drawn: where, facing which way, doing what, and at which doorway stage |
@@ -381,6 +382,14 @@ Pausing freezes animation and effects.
 
 ### Wolf animation
 
+`BodySide` (`src/actors/model/BodySide.cs`) is the one place that says which side of a body is which: 1 its left, -1 its right, from the way it faces, standing or fallen onto its back.
+A wolf that comes at a body from a side takes the side it is on (`BodySide.Of`, `BodySide.Free`) and stands out from it that way (`BodySide.Out`): taking an arm in a tug (`DoorTug.TakeSide`, `TugView.ShowHolding`), angling away from another tugging wolf (`TugView.ApartFrom`), pinning a tugged player from beside them (`DoorTug.LetGo`), waiting behind a door (`DoorVisits.WaitSpot`) and choosing a spot to feed at (`FeedingSpots.FreeSpot`, which counts a spot across the body a metre further off).
+A wolf's own forepaws take the spots on their own sides (`WolfModel.Uncrossed`).
+
+At a gallop, or scared off, a wolf turns fast; reversing at a gallop it brakes.
+At a walk or a trot its head turns first and its body comes round over about a second (`WolfModel.SlowTurn`), the spine curling into the turn by `WolfModel.CurlShare` of the head's lead and the tail swinging in after it, as a dog walking a circle bends.
+Setting off more than 75 degrees from the way it faces (`WolfModel.SetsOffWithin`), it turns round where it stands first, about its hips with its forepaws stepping round (`WolfModel.HipsBehind`, `WolfModel.TurnStep`), then catches up with its place in the world at `WolfModel.CatchUp` more than its pace (`WolfModel.Drift`).
+
 `WolfShape` builds one skinned wolf mesh on a skeleton of spine, neck, head, jaw, ears, upper lips, brows, a three-bone tail and four legs of three segments and a paw; `WolfModel` poses it.
 The head has a broad skull with a ruff of fur tufts down each cheek, a mane of them round the neck and hackles along the back (`WolfShape.Tufts`), and fangs, front teeth and cheek teeth in both jaws.
 The upper lips hang over the upper teeth on a bone of their own: `WolfPose.Snarl`, 0 to 1, lifts them and lowers the inner end of each brow.
@@ -546,7 +555,7 @@ Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin
   The world moves the player there when the tug ends; meanwhile the wolf stands `DoorTug.TugReach` behind them, or where it stood with no open ground there, and no other wolf leaps.
   A hit knocks the wolf back (`Wolf.Stagger`): the player stays as far out as it got them and steps in again at a run.
   The wolf then lets go and bites no sooner than a second later; at half health or less it ends as the last tug lands (`DoorTug.Heave`) and it pins them, otherwise a tugged player steps in again at a run, and one tugged off the door stands free.
-- While one wolf tugs, another that comes within `DoorTug.SideWithin` of the player takes the nearer free side with open ground (`DoorTug.TakeSide`, `Wolf.Side`: 1 their left, -1 their right), one wolf a side, with one bite as it takes hold.
+- While one wolf tugs, another that comes within `DoorTug.SideWithin` of the player takes the side it is on, or the other when that one is taken or has no open ground (`DoorTug.TakeSide`, `Wolf.Side`, a `BodySide`), one wolf a side, with one bite as it takes hold.
   It stands `DoorTug.SideReach` to that side and bites no more (`DoorTug.Hold`) until the tug ends or it is hit.
   A player a wolf takes out of a cabin has no sides to take until `DoorTug.OutOfDoorBy` into the tug, when they are out of its door.
   `TugView.ShowHolding` draws it reared up (`WolfModel.Rearing`, `WolfModel.Rear`) as steeply as puts its jaws on the player's forearm as their rig draws it, its forepaws on their flank and its hind paws on the ground.
@@ -577,16 +586,16 @@ A wolf whose player got inside goes there (`DoorVisits.Follow`), and so does a p
 `VisitView` (`src/actors/enemies/wolf/display/VisitView.cs`) draws the visit from the stage and its seconds alone (`VisitView.Clock`), so the world and the inside view agree.
 The cabin's door opens outward, so the wolf cannot push it in.
 It stands in front of the door's free half to scratch, its right forepaw raking the boards once for each scratch of the recording, then shuffles round to face the gap the free edge opens and puts its nose to the seam.
-Prying, it hooks its snout behind the edge and levers the door out toward itself in three heaves, its nose following the edge (`VisitView.Nose`, `VisitView.NoseTo`); then it walks straight on along that line, in between the door and its frame, stands with its shoulders in the doorway and its head turned to whoever is inside, and springs in (`VisitView.PoseAt`, `VisitView.Placement`).
+Prying, it hooks its snout behind the edge and levers the door out toward itself in three heaves, its nose following the edge (`VisitView.Nose`, `VisitView.NoseTo`); then it walks straight on along that line, in between the door and its frame, stands with its shoulders in the doorway looking at where whoever is inside watches from, the inside view's camera (`VisitView.Watcher`, `WolfModel.LookingAt`), and springs in (`VisitView.PoseAt`, `VisitView.Placement`).
 Its paws stay where they stand while the body moves over them and step one at a time, timed by how far the body has come, each paw's height running from what it left to what it lands on (`StairSteps.HeightAt`, `WolfModel.Stood`, `WolfModel.ReachTo`).
 The door stands as far open as the wolf has levered and pushed it (`VisitView.DoorDegrees`, `DoorwayView.PushDoor`): a table made once of the least opening that clears the hooked snout and every part of the wolf behind the door that is as high as the door's lower edge, which only grows and swings no faster than `VisitView.SwingRate` until the launch.
 On top of it the door rattles: at each heave it jumps a few degrees out off the snout in quick knocks that die away (`VisitView.Rattle`).
 A player the wolf takes out is drawn from where they stood inside (`DoorwayView.IntoCabin`).
 
-A player inside the cabin sees the door from in there in `InsideWindow`, a fifth of the screen wide and four fifths tall in its left third, from `Prying` until the wolf has them; one left inside sees the other taken out for `WorldView.TakenOutSeconds` more.
+A player inside the cabin sees the door from in there in `InsideWindow`, three tenths of the screen wide and 72% of it tall in its left third, from `Prying` until the wolf has them; one left inside sees the other taken out for `WorldView.TakenOutSeconds` more.
 `InsideSet` is a cabin of its own in a viewport with its own world, lit only by dim moonlight through the door, where `WorldView.SyncInside` copies the poses of the wolves at the door and of the player taken out as the world draws them (`ModelKit.CopyPose`); its camera closes in as the wolf launches.
 The window draws that picture through the VHS shader.
-`DoorKeyView` draws the round lock and the flat key in it that the cabin's page shows, seen from above and from the left, the key turning to the right as the lock's sound plays.
+`DoorKeyView` draws the round lock and the flat key in it that the cabin's page shows, seen from above and from the left, the key turning a quarter turn to the right as the lock's sound plays and lying across the lock while the door is locked.
 
 The animation review's `player cabin` clip plays every stage at a cabin, `player jog back` and `player run back` a run braking and turning round, and `player jog turns` and `player run turns` the keys A, W, D and S pressed in quick turn.
 The door opens while someone steps in or out: it swings with `hut_door_normal` after a walk, and slams shut with `hut_door_escaping` after a run.

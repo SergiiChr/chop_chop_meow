@@ -5,15 +5,15 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The window that shows a player inside a cabin the picture of a wolf forcing its door, <see cref="InsideSet"/>, as an old
-/// tape would: in the left third of the screen, a fifth of its width and four fifths of its height.
+/// tape would: in the left third of the screen, three tenths of its width and 72% of its height.
 /// It shows only while the picture is drawn.
 /// </summary>
 public partial class InsideWindow : TextureRect {
     private const string ShaderPath = "res://assets/environment/vhs/vhs.gdshader";
     /// <summary>The window's share of the screen's width and height, and where across the screen its middle is.</summary>
-    private const float Width = .2f, Tall = .8f, Middle = 1f / 6;
+    private const float Width = .3f, Tall = .72f, Middle = 1f / 6;
     /// <summary>How coarse the tape is: its smears and jitters are this many to the picture's width and height.</summary>
-    private static readonly Vector2 TapeLines = new(180, 405);
+    private static readonly Vector2 TapeLines = new(270, 365);
     private readonly InsideSet set;
 
     public InsideWindow(InsideSet set) {

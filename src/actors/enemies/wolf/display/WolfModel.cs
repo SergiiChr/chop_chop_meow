@@ -201,14 +201,35 @@ public sealed class WolfModel {
     }
     /// <summary>
     /// Turns the wolf toward <paramref name="facing"/>, the head first and the body after it, leaning into the turn when it
-    /// <paramref name="moved"/> that far this frame at a gallop or slower; returns whether it brakes, running but with its body
-    /// still facing away from where it goes, as just after it reverses. A wolf <paramref name="backing"/> off steps backward on purpose.
+    /// <paramref name="moved"/> that far this frame. <paramref name="galloping"/>, it turns fast; returns whether it then brakes,
+    /// running but with its body still facing away from where it goes, as just after it reverses. Slower, the body takes about
+    /// a second to come round after the head, curled into the turn. A wolf <paramref name="backing"/> off steps backward on purpose.
     /// </summary>
     public bool TurnToward(Vector2 facing, Vector2 moved, float dt, bool running, bool galloping, bool backing) {
-        Turning.Step(ref Yaw, ActorAnimation.Yaw(facing, Yaw), running && dt > 0 ? moved.Length() / dt : 0, dt, galloping);
+        Turning.Step(ref Yaw, ActorAnimation.Yaw(facing, Yaw), running && dt > 0 ? moved.Length() / dt : 0, dt, galloping, galloping ? Turning.BodyRate : SlowTurn);
         Root.Rotation = new Vector3(0, Yaw, Turning.Bank);
-        return running && !backing && moved.Dot(ActorAnimation.Forward(Yaw)) < 0;
+        return galloping && running && !backing && moved.Dot(ActorAnimation.Forward(Yaw)) < 0;
     }
+
+    /// <summary>How quickly a wolf's body turns at a walk or a trot, as a spring's rate a second: nine tenths of a turn in about a second.</summary>
+    private const float SlowTurn = 4;
+    /// <summary>
+    /// How far short of the way it has to go a wolf at a walk or a trot may face and still set off: facing further away, it
+    /// turns round where it stands first. The cosine of 75 degrees.
+    /// </summary>
+    public const float SetsOffWithin = .26f;
+    /// <summary>
+    /// How far behind its middle a wolf's hips are, which it turns about on the spot; the metres its forepaws step for each
+    /// radian of such a turn; and how fast, in radians a second, it has to turn to step round rather than stand.
+    /// </summary>
+    public const float HipsBehind = .3f, TurnStep = .45f, StepsRoundFrom = .5f;
+    /// <summary>The share of its pace a wolf adds to catch up with its place in the world after turning round or letting go.</summary>
+    public const float CatchUp = .6f;
+    /// <summary>
+    /// The share of the head's turn ahead of the body that the spine curls into the turn by, and that the tail swings into
+    /// it by: a turning wolf bends along its length, nose toward tail, as a dog walking a circle does.
+    /// </summary>
+    private const float CurlShare = .7f, TailShare = .5f;
 
     /// <summary>How far ahead of home, in metres, a braking wolf braces its forepaws.</summary>
     private const float BrakeReach = .12f;
@@ -281,6 +302,12 @@ public sealed class WolfModel {
         }
         return body;
     }
+
+    /// <summary>
+    /// Two spots in the model for a wolf's forepaws, as its left and its right: each paw takes the one on its own side, so
+    /// the forelegs never cross.
+    /// </summary>
+    public static (Vector3 Left, Vector3 Right) Uncrossed(Vector3 a, Vector3 b) => a.X >= b.X ? (a, b) : (b, a);
 
     /// <summary>
     /// Feeding at a downed player: braced over the body, tearing with sharp pulls back.
@@ -500,13 +527,28 @@ public sealed class WolfModel {
 
     // ---------- Blending and posing ----------
 
-    /// <summary>
-    /// Shows a pose worked out elsewhere, with each paw standing <paramref name="ground"/> metres higher than the ground under
-    /// the model, as on a step, blending into it from the pose shown when the motion changes.
-    /// </summary>
-    public void Pose(WolfMotion motion, WolfPose pose, ReadOnlySpan<float> ground, float dt) {
+    /// <summary>Shows a pose worked out elsewhere, already stood on what its paws stand on, blending into it from the pose shown when the motion changes.</summary>
+    public void Pose(WolfMotion motion, WolfPose pose, float dt) {
         Steps = null;
-        Show(motion, Stood(pose, ground), dt);
+        Show(motion, pose, dt);
+    }
+
+    /// <summary>Where a wolf's head is, in the model, under a pose, and the way its muzzle points, which is the way it looks.</summary>
+    internal static (Vector3 From, Vector3 Along) Gaze(WolfPose pose) {
+        var neck = Frame(pose, false) * Posed(WolfShape.Neck, Vector3.Zero, Turn(pose.Neck, pose.NeckTurn));
+        var head = neck * Posed(WolfShape.Head, Vector3.Zero, Turn(pose.Head, pose.HeadTurn, pose.HeadTilt));
+        return (head.Origin, head.Basis * (WolfShape.Bite - WolfShape.Bones[WolfShape.Head].At).Normalized());
+    }
+
+    /// <summary>A pose with its neck and head turned and its head raised or lowered so that it looks at a spot in the model.</summary>
+    internal static WolfPose LookingAt(WolfPose pose, Vector3 spot) {
+        for (int pass = 0; pass < 5; pass++) {
+            var (from, along) = Gaze(pose);
+            var want = (spot - from).Normalized();
+            float turn = Mathf.RadToDeg(Mathf.AngleDifference(MathF.Atan2(along.X, along.Z), MathF.Atan2(want.X, want.Z))), lower = Mathf.RadToDeg(MathF.Asin(along.Y) - MathF.Asin(want.Y));
+            pose = pose with { NeckTurn = pose.NeckTurn + NeckShare * turn, HeadTurn = pose.HeadTurn + (1 - NeckShare) * turn, Head = pose.Head + lower };
+        }
+        return pose;
     }
 
     /// <summary>Shows the pose another wolf model shows, as it is.</summary>
@@ -561,10 +603,10 @@ public sealed class WolfModel {
 
     private void Show(WolfMotion next, WolfPose target, float dt) {
         if (Steps is Vector2 door) target = OnSteps(target, door);
-        // The head turns ahead of the body, the neck taking most of the turn.
+        // The head turns ahead of the body, the neck taking most of the turn, and the spine and tail curl after it.
         if (Turning.Look != 0) {
             float look = Mathf.RadToDeg(Turning.Look);
-            target = target with { NeckTurn = target.NeckTurn + NeckShare * look, HeadTurn = target.HeadTurn + (1 - NeckShare) * look };
+            target = target with { NeckTurn = target.NeckTurn + NeckShare * look, HeadTurn = target.HeadTurn + (1 - NeckShare) * look, Bend = target.Bend + CurlShare * look, Wag = target.Wag + TailShare * look };
         }
         if (next != motion) {
             from = shown; blend = 0;

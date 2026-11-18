@@ -38,10 +38,11 @@ public struct Turning {
     /// Eases a body's <paramref name="yaw"/> toward <paramref name="heading"/>, both in radians, with the head ahead of it on a faster spring,
     /// and leans the body into the turn by the angle that balances turning at <paramref name="pace"/> metres a second against gravity,
     /// up to <see cref="MaxBank"/> when <paramref name="running"/> and <see cref="MaxJogBank"/> otherwise.
+    /// The body turns at <paramref name="rate"/>, a spring's rate a second, which a body that turns slowly lowers.
     /// </summary>
-    public void Step(ref float yaw, float heading, float pace, float dt, bool running) {
+    public void Step(ref float yaw, float heading, float pace, float dt, bool running, float rate = BodyRate) {
         head = Spring(head, heading, HeadRate, dt, ref headSpeed, speed);
-        yaw = Spring(yaw, heading, BodyRate, dt, ref speed, Look);
+        yaw = Spring(yaw, heading, rate, dt, ref speed, Look);
         Look = Math.Clamp(Mathf.AngleDifference(yaw, head), -MaxLook, MaxLook);
         // Turning toward +X, the rig's left, tips it that way: a negative roll about its forward line.
         float most = running ? MaxBank : MaxJogBank, lean = Math.Clamp(-MathF.Atan(pace * speed / 9.8f), -most, most);

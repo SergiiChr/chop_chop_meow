@@ -27,7 +27,7 @@ public sealed class Doorways(World world) {
     /// <summary>How far, in metres, from <see cref="DoorPoint"/> a player can start stepping in.</summary>
     public const float DoorReach = .5f;
     /// <summary>Where a player stands at a cabin's door, from the cabin's middle: in front of the doorway in the model's front wall, past its step and clear of the door as it swings open.</summary>
-    private static readonly Vector2 DoorOffset = new(-.34f, 2f);
+    internal static readonly Vector2 DoorOffset = new(-.34f, 2f);
 
     /// <summary>The spot just outside a cabin's door where a player steps in and out.</summary>
     public static Vector2 DoorPoint(Thing cabin) => cabin.Pos + DoorOffset;

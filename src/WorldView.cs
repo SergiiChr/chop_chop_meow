@@ -1242,8 +1242,15 @@ public partial class WorldView : Node3D {
             bool struck = model.HitIn > 0 || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;
             // Easing back from its player to biting distance, a wolf steps backward still facing them.
             bool backing = running && wolf.Flee <= 0 && !wolf.Scared && moved.Dot(hunted - wolf.Pos) < 0 && moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
-            // Where it was drawn when it let go of a player it tugged closes up only as it walks, so it never slides.
-            model.Drift = model.Drift.MoveToward(Vector2.Zero, moved.Length());
+            // A scared or galloping wolf turns fast. At a walk or a trot, one that sets off far from the way it faces turns
+            // round where it stands first, and only then goes after its place in the world.
+            bool fast = wolf.Chase > 0 || wolf.Flee > 0;
+            bool turnsRound = running && !backing && !fast && moved.Normalized().Dot(ActorAnimation.Forward(model.Yaw)) < WolfModel.SetsOffWithin;
+            // Where it is drawn away from its place in the world, after turning round or letting go of a player it tugged,
+            // closes up only as it walks, so it never slides.
+            var drifted = model.Drift;
+            model.Drift = turnsRound ? model.Drift - moved : model.Drift.MoveToward(Vector2.Zero, moved.Length() * WolfModel.CatchUp);
+            float walked = (moved + model.Drift - drifted).Length(), faced = model.Yaw;
             // A struck wolf keeps facing whoever hit it; a running one turns into its path.
             var facing = struck ? model.Striker - wolf.Pos - model.KnockBack : running && !backing ? moved : hunted - wolf.Pos;
             // A struck wolf snaps round to whoever hit it; otherwise the head turns first and the body follows, leaning in.
@@ -1252,7 +1259,11 @@ public partial class WorldView : Node3D {
             if (struck) {
                 model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(facing, model.Yaw), Math.Min(1, dt * 16)); model.Turning.Hold(model.Yaw);
                 model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-            } else braking = model.TurnToward(facing, moved, dt, running, wolf.Chase > 0, backing);
+            } else braking = model.TurnToward(facing, moved, dt, running, fast, backing);
+            // Turning where it stands, it comes round about its hips, its forepaws stepping round them.
+            float turned = Mathf.AngleDifference(faced, model.Yaw);
+            bool stepsRound = !struck && !fast && (turnsRound || !running) && dt > 0 && Math.Abs(turned) > WolfModel.StepsRoundFrom * dt;
+            if (stepsRound) model.Drift += (ActorAnimation.Forward(model.Yaw) - ActorAnimation.Forward(faced)) * WolfModel.HipsBehind;
             model.Root.Visible = World.Sees(wolf.Pos);
             bool wary = wolf.Scared || HuntedTorchLit(wolf);
             float flight = 0;
@@ -1271,9 +1282,10 @@ public partial class WorldView : Node3D {
             } else if (wolf.Feeding) {
                 if (wolf.Pinning) model.Pinned += dt;
                 model.Feed(Elapsed + wolf.Id % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? FeedingSpots.PawsOnChest(model, RigOf(wolf.Target)) : null);
-            } else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
+            } else if (stepsRound) model.Move(Math.Abs(turned) * WolfModel.TurnStep, dt, false, wary);
+            else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (braking) model.Brake(moved.Length(), dt);
-            else if (running) model.Move(backing ? -moved.Length() : moved.Length(), dt, wolf.Chase > 0 && !backing, wary);
+            else if (running) model.Move(backing ? -walked : walked, dt, wolf.Chase > 0 && !backing, wary);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
             var place = To3(wolf.Pos + model.KnockBack + model.Drift);
             if (wolf.Leap > 0 || wolf.Pinning) {

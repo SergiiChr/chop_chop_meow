@@ -27,13 +27,13 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
     /// </summary>
     private const float WaitAside = 1.2f, LungeStart = .74f, LungeEnd = .92f;
     /// <summary>
-    /// Which way a wolf tugging <paramref name="held"/> turns from another wolf tugging someone within <see cref="TuggersApart"/>
-    /// of them: 1 to the held player's left, -1 to their right, 0 with nobody there.
+    /// The <see cref="BodySide"/> of <paramref name="held"/> on which another wolf tugs someone within <see cref="TuggersApart"/>
+    /// of them, or 0 with nobody there. Their own wolf turns its head to that side, which swings its body away from the other wolf.
     /// </summary>
     private float ApartFrom(Wolf tugger, ActorState held) {
         foreach (var other in world().Wolves)
             if (other != tugger && other.Tugging && TuggedBy(other) is var (them, _) && them != held && them.Position.DistanceTo(held.Position) < TuggersApart)
-                return (held.Position - them.Position).Dot(ActorAnimation.Forward(held.Yaw).Orthogonal()) >= 0 ? -1 : 1;
+                return BodySide.Of(held.Position, ActorAnimation.Forward(held.Yaw), them.Position);
         return 0;
     }
 
@@ -78,12 +78,13 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         if (model.Motion != WolfMotion.Rear) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; model.Settled = 0; }
         model.Settled = Math.Min(1, model.Settled + dt / TugLunge);
         float lunge = WorldView.Ease(model.Settled);
-        bool left = wolf.Side > 0;
+        bool left = wolf.Side == BodySide.Left;
         var root = rig.Root.GlobalTransform;
         var arm = root * rig.Elbow(left).Lerp(rig.Fist(left), ArmHold);
-        // It faces across the player, from the side it holds.
-        var across = ActorAnimation.Forward(held.Yaw).Orthogonal() * (left ? 1 : -1);
-        model.Yaw = Mathf.LerpAngle(model.FromYaw, ActorAnimation.Yaw(FacesAcross(root, arm, across), model.Yaw), lunge);
+        // It stands out at the side it holds and faces in from there to the arm on that side.
+        var from = held.Position + BodySide.Out(ActorAnimation.Forward(held.Yaw), wolf.Side) * DoorTug.SideReach;
+        var toward = new Vector2(arm.X, arm.Z) - from;
+        model.Yaw = Mathf.LerpAngle(model.FromYaw, ActorAnimation.Yaw(toward, model.Yaw), lunge);
         model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
         model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
         model.Root.Visible = world().Sees(wolf.Pos);
@@ -93,19 +94,10 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);
         var toModel = model.Root.Transform.AffineInverse();
         var torso = rig.Torso.GlobalTransform;
-        float side = left ? 1 : -1;
-        Vector3 low = toModel * (torso * (LowPaw with { X = LowPaw.X * side })), high = toModel * (torso * (HighPaw with { X = HighPaw.X * side }));
-        // Each forepaw takes the spot on its own side, so the forelegs do not cross.
-        model.Rear(body, low.X >= high.X ? (low, high) : (high, low), dt);
+        Vector3 low = toModel * (torso * (LowPaw with { X = LowPaw.X * wolf.Side })), high = toModel * (torso * (HighPaw with { X = HighPaw.X * wolf.Side }));
+        model.Rear(body, WolfModel.Uncrossed(low, high), dt);
         model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
         return true;
-    }
-
-    /// <summary>The way a wolf holding a player's arm faces: from out at their side, where its body has room, toward the arm.</summary>
-    private static Vector2 FacesAcross(Transform3D player, Vector3 arm, Vector2 across) {
-        var from = new Vector2(player.Origin.X, player.Origin.Z) - across * DoorTug.SideReach;
-        var toward = new Vector2(arm.X, arm.Z) - from;
-        return toward.LengthSquared() > 1e-4f ? toward : across;
     }
 
     /// <summary>Shows a wolf that tugged its player out lunging onto them as they fall; returns false while the player is not drawn.</summary>

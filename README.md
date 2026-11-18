@@ -838,7 +838,7 @@ It then lets go and you run in again at once.
 At half health or less, its third tug takes you straight over onto your back about 1.2 seconds in.
 Hit the wolf while it tugs someone and it lets go of them.
 No other wolf takes you down while one tugs you.
-While it tugs, one more wolf can take each of your sides: it rears up, sets its forepaws on you and takes your forearm in its jaws, biting once as it takes hold, and holds on until the tug ends.
+While it tugs, one more wolf can take each of your sides, the side it comes from: it rears up, sets its forepaws on you and takes your forearm in its jaws, biting once as it takes hold, and holds on until the tug ends.
 A player a wolf takes out of a cabin has to be out of its door first, about 0.6 seconds into the tug.
 
 You stay in until you press Step outside in its panel.
@@ -856,7 +856,7 @@ Players a wolf tugs back out go in again in the order they came to the door.
 #### The door's key
 
 Once you are inside, the cabin's page shows the door's round lock with its key in it under the Step outside button.
-Click the key to lock the door: it turns half a turn to the right with the sound of the lock, and a click turns it back.
+Click the key to lock the door: it turns a quarter turn to the right with the sound of the lock and lies across the lock while the door is locked, and a click turns it back upright.
 Either player inside can turn it.
 A locked door keeps out other players, who knock, and wolves.
 Step outside unlocks the door first and leaves it unlocked.
@@ -870,14 +870,14 @@ The wolf scratches at the door for 3.6 seconds, which you hear from inside.
 - From a locked door it goes away, and leaves that cabin alone until it has been out of smell of it and comes back.
 - You can still turn the key while it scratches.
 - At an unlocked door it turns to the door's free edge, hooks its snout behind it and levers the door out in three heaves over 1.5 seconds, the door rattling at each; the key no longer turns.
-  It squeezes in between the door and its frame over 2.5 seconds, stands in the doorway growling with its fangs bared for 2 seconds and launches itself at you.
+  It squeezes in between the door and its frame over 2.5 seconds, stands in the doorway growling at you with its fangs bared for 2 seconds and launches itself at you.
 - It bites and takes you out by the waist, as a wolf tugging you out of the doorway does: at more than half health you run back in, and it comes to the door again.
 - With two players inside it takes the one who came in last.
 - Other wolves that come to the same door wait a few metres behind it and go for you once you are out, one taking each of your arms while the first tugs.
 - While a wolf is at the door, Step outside says "A wolf is at the door."
 - A wolf at the door turns to a player out in the open within its sight until its snout is in the door, and a hit knocks it off the door.
 
-From the moment the wolf pries until it has you, a window in the left third of the screen shows the door from inside the cabin, in the dark and as an old tape would: the door creeping open, the wolf's eyes, and its launch at you.
+From the moment the wolf pries until it has you, a window in the left third of the screen, three tenths of its width and 72% of its height, shows the door from inside the cabin, in the dark and as an old tape would: the door creeping open, the wolf's eyes, and its launch at you.
 A player left inside goes on seeing the other one dragged out for a moment before the window closes.
 
 ### Wolf kills

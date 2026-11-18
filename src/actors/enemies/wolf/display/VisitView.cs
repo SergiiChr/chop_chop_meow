@@ -187,7 +187,9 @@ public static class VisitView {
         var scratching = new WolfPose(Lift: .01f + .004f * breath, Pitch: -3, Roll: -2, Shift: .02f, Neck: 16, NeckTurn: -8, Head: 2, Jaw: 3, Ears: 10, Tail: -58, Wag: 10 * MathF.Sin(time * 3.1f), Curl: 10);
         // Turned to the door's free edge, it puts its nose to the seam and sniffs along it.
         float sniff = MathF.Sin(clock * 11);
-        var sniffing = new WolfPose(Lift: -.02f, Pitch: 3, Neck: 24, Head: -2 + 2 * sniff, Jaw: 2, Ears: 14, Tail: -66, Wag: 5 * MathF.Sin(time * 2.2f), Curl: 8);
+        // Shuffling round to its left, it curls that way along its length, nose first.
+        float curl = MathF.Sin(MathF.PI * Math.Clamp((clock - ToEdgeFrom) / (ToEdgeBy - ToEdgeFrom), 0, 1));
+        var sniffing = new WolfPose(Lift: -.02f, Pitch: 3, Bend: 16 * curl, Neck: 24, Head: -2 + 2 * sniff, Jaw: 2, Ears: 14, Tail: -66, Wag: 5 * MathF.Sin(time * 2.2f) + 10 * curl, Curl: 8);
         // Prying, it hooks its snout behind the edge and levers the door out toward itself a heave at a time, its head
         // coming up and back and twisting one way, then the other.
         float pried = Pried(clock), heave = Heave(clock);
@@ -195,9 +197,9 @@ public static class VisitView {
             Tail: -70 + 6 * Math.Abs(heave), Wag: 8 * heave, Curl: 4);
         // Squeezing in between the door and its frame, it keeps its head low and its ears back.
         var pushing = new WolfPose(Lift: -.06f, Pitch: 5, Surge: .04f, Neck: 30, Head: -10, Jaw: 7, Ears: -10, Snarl: .5f, Tail: -76, Curl: 2);
-        // In the doorway it crouches, turns its head to whoever is inside, looks up from under its brow and snarls.
+        // In the doorway it crouches and snarls; where it looks is set once it stands on the step (StoodAt).
         float stare = Mathf.SmoothStep(0, 1, (clock - StareAt) / DoorVisits.StareSeconds), snarl = MathF.Sin(time * 23);
-        var staring = new WolfPose(Lift: -.08f - .02f * stare + .003f * breath, Pitch: 4, Surge: .03f + .05f * stare, Neck: 30 + breath, NeckTurn: -StareTurn * .6f, Head: -28, HeadTurn: -StareTurn * .4f,
+        var staring = new WolfPose(Lift: -.08f - .02f * stare + .003f * breath, Pitch: 4, Surge: .03f + .05f * stare, Neck: 30 + breath, Head: -28,
             HeadTilt: 2 * MathF.Sin(time * 1.3f), Jaw: 10 + 4 * stare + 1.5f * snarl, Ears: -14, Snarl: 1, Tail: -84, Wag: 2 * MathF.Sin(time * .9f));
         var pose = clock < ToEdgeFrom ? scratching
             : clock < PryAt ? WolfPose.Lerp(scratching, sniffing, Mathf.SmoothStep(ToEdgeFrom, ToEdgeBy, clock))
@@ -208,8 +210,11 @@ public static class VisitView {
         float nosing = Mathf.SmoothStep(ToEdgeFrom, ToEdgeBy, clock) * (1 - Mathf.SmoothStep(OpenAt, OpenAt + NoseOff, clock));
         return nosing > 0 ? WolfPose.Lerp(pose, NoseTo(pose, StandAt(clock).In(Nose(clock))), nosing) : pose;
     }
-    /// <summary>How many degrees to its right a wolf in the doorway turns its head, to whoever is inside.</summary>
-    private const float StareTurn = 16;
+    /// <summary>
+    /// Where whoever is inside the cabin watches the door from, measured from the door point and up from the ground: where
+    /// the inside view's camera stands. A wolf in the doorway looks there.
+    /// </summary>
+    private static readonly Vector3 Watcher = InsideSet.Eye - new Vector3(Doorways.DoorOffset.X, 0, Doorways.DoorOffset.Y);
     /// <summary>Seconds over which a wolf that has levered the door open takes its nose off the door's edge and starts to squeeze in.</summary>
     private const float NoseOff = .5f;
 
@@ -307,12 +312,23 @@ public static class VisitView {
         return (WorldView.To3(door + stand.At), MathF.Atan2(stand.Ahead.X, stand.Ahead.Y));
     }
 
-    /// <summary>Poses a wolf model this far into a visit, standing on the cabin's step.</summary>
-    public static void Pose(WolfModel model, float clock, float time, float dt) {
+    /// <summary>
+    /// A wolf's pose this far into a visit, stood on the ground, the cabin's step and its floor, whatever each paw is on.
+    /// From when it stands in the doorway it looks at whoever watches from inside.
+    /// </summary>
+    private static WolfPose StoodAt(float clock, float time) {
         Span<float> ground = stackalloc float[4];
         GroundAt(clock, ground);
-        model.Pose(WolfMotion.Door, PoseAt(clock, time), ground, dt);
+        var pose = WolfModel.Stood(PoseAt(clock, time), ground);
+        float stares = Mathf.SmoothStep(StareAt - .2f, StareAt + .3f, clock);
+        if (stares <= 0) return pose;
+        var stand = StandAt(clock);
+        var watcher = stand.In(new Vector2(Watcher.X, Watcher.Z));
+        return WolfPose.Lerp(pose, WolfModel.LookingAt(pose, new Vector3(watcher.X, Watcher.Y, watcher.Y)), stares);
     }
+
+    /// <summary>Poses a wolf model this far into a visit, standing on the cabin's step.</summary>
+    public static void Pose(WolfModel model, float clock, float time, float dt) => model.Pose(WolfMotion.Door, StoodAt(clock, time), dt);
 
     /// <summary>Shows a wolf at a cabin's door as its visit has it, settling into its stand from where it arrived.</summary>
     public static void Show(Wolf wolf, WolfModel model, Thing cabin, float time, float dt, bool visible) {
@@ -373,13 +389,11 @@ public static class VisitView {
     private static float[] Pushed() {
         var table = new float[(int)((End - PryAt) * PushedRate) + 1];
         Span<(Vector3 At, float Radius)> volumes = stackalloc (Vector3, float)[WolfModel.VolumeCount];
-        Span<float> ground = stackalloc float[4];
         float open = 0;
         for (int i = 0; i < table.Length; i++) {
             float clock = PryAt + (float)i / PushedRate;
             var stand = StandAt(clock);
-            GroundAt(clock, ground);
-            WolfModel.VolumesOf(WolfModel.Stood(PoseAt(clock, clock), ground), volumes);
+            WolfModel.VolumesOf(StoodAt(clock, clock), volumes);
             for (int part = 0; part < volumes.Length; part++) {
                 var (centre, radius) = volumes[part];
                 if (centre.Y + radius < DoorBottom) continue;

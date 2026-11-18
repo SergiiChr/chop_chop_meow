@@ -19,16 +19,17 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
 
     /// <summary>
     /// Where a feeding wolf stands, and which way it faces, to bite a lying player's <paramref name="body"/>
-    /// at <paramref name="along"/> of the way from their feet to their throat, from the side <paramref name="side"/>: 1 to
-    /// their left, -1 to their right, standing perpendicular to the body.
+    /// at <paramref name="along"/> of the way from their feet to their throat, from their <see cref="BodySide"/>
+    /// <paramref name="side"/>, standing perpendicular to the body.
     /// </summary>
     public static (Vector3 At, float Yaw) OnTheBody((Vector2 Feet, Vector2 Length) body, float along, int side) {
         var near = body.Feet + body.Length * along;
-        var outward = body.Length.Orthogonal().Normalized() * side;
+        // A player on their back fell from facing the way their feet now point.
+        var outward = BodySide.Out(-body.Length, side);
         // The legs are lower and narrower than the trunk.
         bool legs = along < LegsEnd;
         float yaw = ActorAnimation.Yaw(-outward, 0);
-        var at = WorldView.To3(near + outward * (legs ? LegSide : BodySide), legs ? LegTop : BodyTop) - new Basis(Vector3.Up, yaw) * WolfModel.FeedingBite;
+        var at = WorldView.To3(near + outward * (legs ? LegSide : TrunkSide), legs ? LegTop : TrunkTop) - new Basis(Vector3.Up, yaw) * WolfModel.FeedingBite;
         return (at with { Y = 0 }, yaw);
     }
 
@@ -37,7 +38,7 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
     /// feeding wolf's jaws close; the share of the way from the feet to the throat where the legs end; and seconds a feeding wolf
     /// takes to ease onto its spot.
     /// </summary>
-    private const float BodySide = .17f, BodyTop = .2f, LegSide = .15f, LegTop = .1f, LegsEnd = .45f, FeedEasing = .4f;
+    private const float TrunkSide = .17f, TrunkTop = .2f, LegSide = .15f, LegTop = .1f, LegsEnd = .45f, FeedEasing = .4f;
     /// <summary>
     /// Where a wolf's left and right forepaws stand on a player's chest, in the wolf's model as last placed: on the front of the
     /// chest either side of the breastbone, a paw's thickness off it.
@@ -46,16 +47,15 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
         if (rig == null) return null;
         var chest = rig.Torso.GlobalTransform;
         var toModel = model.Root.GlobalTransform.AffineInverse();
-        Vector3 a = toModel * (chest * ChestSpot), b = toModel * (chest * (ChestSpot with { X = -ChestSpot.X }));
-        // The wolf's left forepaw takes the side of the chest to its left.
-        return a.X >= b.X ? (a, b) : (b, a);
+        return WolfModel.Uncrossed(toModel * (chest * ChestSpot), toModel * (chest * (ChestSpot with { X = -ChestSpot.X })));
     }
 
     /// <summary>Where on the trunk, from the hips, a forepaw on the chest stands: beside the breastbone, inside the player's forearms pushing at the jaw, out from the shirt by a paw.</summary>
     private static readonly Vector3 ChestSpot = new(.05f, .3f, .18f);
     /// <summary>
-    /// The spot a feeding wolf takes at a lying player: perpendicular to the body at the part nearest to the wolf, on either
-    /// side, where it touches neither another wolf as drawn nor the player's arms; its last spot while that stays free.
+    /// The spot a feeding wolf takes at a lying player: perpendicular to the body at the part nearest to where the wolf is
+    /// drawn, on the side it is on before the other, where it touches neither another wolf as drawn nor the player's arms;
+    /// its last spot while that stays free.
     /// With no free spot it keeps its last one.
     /// </summary>
     private (Vector3 At, float Yaw, int Along, int Side) FreeSpot(Wolf wolf, WolfModel model, ActorState lying, ActorRig rig) {
@@ -66,11 +66,13 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
             if (Free(at, yaw)) return (at, yaw, model.FeedAlong, model.FeedSide);
         }
         Span<(float Away, int Along, int Side)> spots = stackalloc (float, int, int)[2 * (FeedSpots + 1)];
-        int count = 0;
+        var drawn = new Vector2(model.Root.Position.X, model.Root.Position.Z);
+        int near = BodySide.Of(body.Feet, -body.Length, drawn), count = 0;
         for (int i = 0; i <= FeedSpots; i++)
-            for (int side = -1; side <= 1; side += 2) {
+            foreach (int side in (ReadOnlySpan<int>)[near, -near]) {
                 var (at, _) = OnTheBody(body, i / (float)FeedSpots, side);
-                spots[count++] = (new Vector2(at.X, at.Z).DistanceTo(wolf.Pos), i, side);
+                // A spot across the body counts as that much further off, so a wolf goes round only when its own side is full.
+                spots[count++] = (new Vector2(at.X, at.Z).DistanceTo(drawn) + (side == near ? 0 : AcrossTheBody), i, side);
             }
         spots.Sort();
         foreach (var (_, along, side) in spots) {
@@ -116,6 +118,8 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
     /// <summary>How many spots along a lying body, feet to throat, a feeding wolf chooses among, and how thick an arm is, in metres.</summary>
     private const int FeedSpots = 20;
     private const float ArmRadius = .06f;
+    /// <summary>How many metres further off a feeding spot on the far side of the body counts than one on the wolf's own side.</summary>
+    private const float AcrossTheBody = 1;
 
     /// <summary>Where a feeding wolf stands at a lying player, easing there from where it stood.</summary>
     public Vector3 Place(Wolf wolf, WolfModel model, ActorState lying, ActorRig lyingRig, float dt) {

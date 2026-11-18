@@ -112,9 +112,9 @@ public sealed class DoorVisits(World world) {
             if (w == wolf) break;
             if (w != lead && w.Visit == WolfVisit.Coming && w.VisitCabin == wolf.VisitCabin) before++;
         }
-        // The first waits to the left, the next to the right, the next further left, and so on.
-        float aside = ((before + 1) / 2 + .5f) * WaitApart * (before % 2 == 0 ? -1 : 1);
-        return door + Doorways.OutOfDoor * WaitBehind + Doorways.AsideWay * aside;
+        // Seen facing the door, the first waits to the left, the next to the right, the next further left, and so on.
+        float aside = ((before + 1) / 2 + .5f) * WaitApart;
+        return door + Doorways.OutOfDoor * WaitBehind + BodySide.Out(-Doorways.OutOfDoor, before % 2 == 0 ? BodySide.Left : BodySide.Right) * aside;
     }
 
     /// <summary>Moves a wolf's visit to a cabin's door on by <paramref name="dt"/> seconds.</summary>

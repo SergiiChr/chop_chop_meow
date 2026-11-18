@@ -120,27 +120,30 @@ public sealed class DoorTug(World world) {
         return true;
     }
 
-    /// <summary>Where a wolf holding the acting player's arm on a side stands: 1 for their left, -1 for their right, as they face into the cabin.</summary>
-    private Vector2 SideSpot(int side) => TuggedTo - Doorways.AsideWay * (side * SideReach);
+    /// <summary>The way a tugged player faces: into the cabin they are tugged out of.</summary>
+    private static readonly Vector2 Facing = -Doorways.OutOfDoor;
+
+    /// <summary>Where a wolf holding the acting player's arm on a <see cref="BodySide"/> stands.</summary>
+    private Vector2 SideSpot(int side) => TuggedTo + BodySide.Out(Facing, side) * SideReach;
 
     /// <summary>
-    /// A wolf that reaches the acting player while another wolf tugs them takes them by the arm on the nearer side that is
-    /// free and has open ground, biting as it takes hold; returns whether it did. A player a wolf takes out of a cabin has
+    /// A wolf that reaches the acting player while another wolf tugs them takes them by the arm on the side it is on, or on
+    /// the other when that one is taken or has no open ground, biting as it takes hold; returns whether it did. A player a wolf takes out of a cabin has
     /// to be out of its door first.
     /// </summary>
     public bool TakeSide(Wolf wolf) {
         var p = world.S.Actor;
         if (Tugger() is not Wolf tugger || tugger == wolf || p.Door is not (Doorway.Tugged or Doorway.TuggedOff) || wolf.Pos.DistanceTo(TuggedTo) >= SideWithin) return false;
         if (tugger.Visit == WolfVisit.TakingOut && p.DoorTime < OutOfDoorBy) return false;
-        int nearer = wolf.Pos.DistanceSquaredTo(SideSpot(1)) <= wolf.Pos.DistanceSquaredTo(SideSpot(-1)) ? 1 : -1;
-        foreach (int side in (ReadOnlySpan<int>)[nearer, -nearer]) {
-            if (!world.CanStand(SideSpot(side)) || Holder(side) != null) continue;
-            wolf.Side = side; wolf.Pos = SideSpot(side); wolf.Attack = 1; wolf.Leap = 0;
-            p.Health -= world.Data.WolfBite; world.Play("wolf_bite", world.Player);
-            return true;
-        }
-        return false;
+        int side = BodySide.Free(TuggedTo, Facing, wolf.Pos, Taken);
+        if (side == 0) return false;
+        wolf.Side = side; wolf.Pos = SideSpot(side); wolf.Attack = 1; wolf.Leap = 0;
+        p.Health -= world.Data.WolfBite; world.Play("wolf_bite", world.Player);
+        return true;
     }
+
+    /// <summary>Whether no wolf can take a side of the acting player: another holds it, or it has no open ground.</summary>
+    private bool Taken(int side) => Holder(side) != null || !world.CanStand(SideSpot(side));
 
     /// <summary>The wolf holding the acting player's arm on a side, or null.</summary>
     private Wolf? Holder(int side) {
@@ -175,16 +178,18 @@ public sealed class DoorTug(World world) {
 
     /// <summary>
     /// Ends the acting player's tug out of a doorway where it has got them: <paramref name="takedown"/>, the wolf that tugged
-    /// them, pins them from their left as they fall back toward it; otherwise a tugged player steps in again at a run, and
+    /// them, pins them from the side it is on as they fall back toward it; otherwise a tugged player steps in again at a run, and
     /// one tugged off the door stands free.
     /// </summary>
     private void LetGo(Wolf? takedown) {
         var p = world.S.Actor;
+        // The wolf that tugged pins from the side it is on, or from the other when only that one has no wolf at it.
+        int pinFrom = takedown == null ? 0 : BodySide.Free(TuggedTo, Facing, takedown.Pos, side => Holder(side) != null);
         // The wolves at the player's sides let go with the one that tugged, and bite again no sooner than after any other bite.
         foreach (var w in world.S.Wolves) if (w.Side != 0 && w.Target == p.Id) { w.Side = 0; w.Attack = 1; }
         world.Player = TuggedTo; p.Warp++;
         if (takedown != null) {
-            world.WolfHunt.Pin(takedown, world.Hunters.Skip(1).Any(), -Doorways.OutOfDoor.Orthogonal());
+            world.WolfHunt.Pin(takedown, world.Hunters.Skip(1).Any(), BodySide.Out(Facing, pinFrom == 0 ? BodySide.Of(TuggedTo, Facing, takedown.Pos) : pinFrom));
             p.Door = Doorway.None;
         } else if (p.Door == Doorway.Tugged) world.Doorways.StepIn(p.DoorCabin, true);
         else p.Door = Doorway.None;

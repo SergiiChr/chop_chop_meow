@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The round lock of a cabin's door with its flat key in it, drawn from above and from the left into a picture the cabin's page shows.
-/// The key's teeth point up while the door is unlocked; it turns half a turn to the right, teeth down, as it locks, in time with the lock's sound.
+/// The key stands upright while the door is unlocked; it turns a quarter turn to the right and lies across the lock as it locks, in time with the lock's sound.
 /// It is made once and kept, so showing it mid-game builds nothing.
 /// </summary>
 public partial class DoorKeyView : SubViewport {
@@ -16,6 +16,8 @@ public partial class DoorKeyView : SubViewport {
     public const float TurnFrom = 1.3f, TurnTo = 1.68f;
     /// <summary>The seconds into the lock's sound over which a hand takes the key and jogs it, and by how many degrees.</summary>
     private const float JogFrom = .02f, JogTo = .3f, JogDegrees = 9;
+    /// <summary>How many degrees to the right of upright the key lies while the door is locked.</summary>
+    private const float LockedTurn = 90;
     private readonly Node3D key;
     private bool locked;
     /// <summary>Seconds since the key was last turned; from <see cref="TurnTo"/> on it rests.</summary>
@@ -79,7 +81,7 @@ public partial class DoorKeyView : SubViewport {
     /// <summary>Puts the key where it is this long after it was last turned, and draws the picture again.</summary>
     private void Pose() {
         float turned = Mathf.SmoothStep(TurnFrom, TurnTo, since), jog = since < JogTo ? MathF.Sin(MathF.PI * Mathf.SmoothStep(JogFrom, JogTo, since)) : 0;
-        float degrees = (locked ? turned : 1 - turned) * 180 + (locked ? 1 : -1) * jog * JogDegrees;
+        float degrees = (locked ? turned : 1 - turned) * LockedTurn + (locked ? 1 : -1) * jog * JogDegrees;
         // Seen from the front, a turn to the right goes against the angle's own direction.
         key.RotationDegrees = new Vector3(0, 0, -degrees);
         RenderTargetUpdateMode = UpdateMode.Once;
