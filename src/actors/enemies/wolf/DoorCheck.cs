@@ -13,6 +13,9 @@ namespace ChopChopMeow;
 public sealed class DoorCheck(World world) {
     /// <summary>Seconds a wolf scratches at a door, pries its edge, pushes it open, stares in and takes to launch itself at a player inside.</summary>
     public const float ScratchSeconds = 3.6f, PrySeconds = 1.5f, OpenSeconds = 2.5f, StareSeconds = 2, LaunchSeconds = .4f;
+    /// <summary>How many pries a wolf levers a door open in, and the seconds into each at which the door rattles off its snout.</summary>
+    public const int Pries = 3;
+    public const float RattleFrom = .1f;
     /// <summary>How far out from a cabin's door point wolves wait behind the one at the door, and how far apart.</summary>
     public const float WaitBehind = 2.4f, WaitApart = .9f;
     /// <summary>How near its spot at a door, in metres, a wolf has arrived.</summary>
@@ -146,11 +149,15 @@ public sealed class DoorCheck(World world) {
             case DoorCheckStage.Prying or DoorCheckStage.Opening or DoorCheckStage.Staring or DoorCheckStage.Launching:
                 if (wolf.DoorCheck == DoorCheckStage.Staring && before == 0) world.Play("wolf_growl_approaching", door);
                 wolf.DoorCheckTime += dt;
+                if (wolf.DoorCheck == DoorCheckStage.Prying && Rattled(wolf.DoorCheckTime) > Rattled(before)) world.Play("door_rattle", door);
                 if (wolf.DoorCheckTime < Seconds(wolf.DoorCheck)) break;
                 if (wolf.DoorCheck == DoorCheckStage.Launching) TakeOut(wolf, cabin); else Stage(wolf, wolf.DoorCheck + 1);
                 break;
         }
     }
+
+    /// <summary>How many times the door has rattled this many seconds into a wolf's prying: once in each pry.</summary>
+    private static int Rattled(float prying) => prying < RattleFrom ? 0 : Math.Min(Pries, (int)((prying - RattleFrom) / (PrySeconds / Pries)) + 1);
 
     /// <summary>Ends a wolf's door check: it goes back to patrolling, the way it was heading.</summary>
     private static void End(Wolf wolf) => WolfPatrols.Patrol(wolf, wolf.Heading);

@@ -1009,7 +1009,7 @@ Sound effects follow the same actions:
 - buying jingles coins, and hiring signs the worker on;
 - your stomach growls when food runs low;
 - wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, bite, and thud when struck;
-- a key turns in a cabin's lock, and a wolf's claws scratch at its door;
+- a key turns in a cabin's lock, a wolf's claws scratch at its door, and the door rattles at each pry;
 - you scream as a wolf tugs you out of a cabin's doorway, and when a wolf takes you down.
 
 Repeated sounds rotate between variants.

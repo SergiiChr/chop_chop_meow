@@ -218,20 +218,19 @@ public static class DoorCheckView {
     /// <summary>Seconds over which a wolf that has levered the door open takes its nose off the door's edge and starts to squeeze in.</summary>
     private const float NoseOff = .5f;
 
-    /// <summary>How many pries a wolf levers a door open in, and the share of each spent levering; it holds for the rest.</summary>
-    private const int Pries = 3;
+    /// <summary>The share of each pry a wolf spends levering the door; it holds for the rest.</summary>
     private const float PryShare = .55f;
 
     /// <summary>Which pry a prying wolf is in this far into a door check, from 0, and how far through it, 0 to 1.</summary>
     private static (int Pry, float Through) PryPhase(float clock) {
-        float pries = Math.Clamp((clock - PryAt) / DoorCheck.PrySeconds, 0, 1) * Pries, pry = MathF.Min(MathF.Floor(pries), Pries - 1);
+        float pries = Math.Clamp((clock - PryAt) / DoorCheck.PrySeconds, 0, 1) * DoorCheck.Pries, pry = MathF.Min(MathF.Floor(pries), DoorCheck.Pries - 1);
         return ((int)pry, pries - pry);
     }
 
     /// <summary>How far a wolf has levered the door this far into a door check, 0 to 1: a third further with each pry.</summary>
     private static float Pried(float clock) {
         var (pry, through) = PryPhase(clock);
-        return (pry + Mathf.SmoothStep(0, PryShare, through)) / Pries;
+        return (pry + Mathf.SmoothStep(0, PryShare, through)) / DoorCheck.Pries;
     }
 
     /// <summary>How hard a prying wolf pries this far into a door check, rising and falling over each pry, one way and then the other: -1 to 1.</summary>
@@ -370,11 +369,11 @@ public static class DoorCheckView {
     private static float Rattle(float clock) {
         var (pry, through) = PryPhase(clock);
         // The last pry's knocks die away after the prying is over.
-        float since = (pry == Pries - 1 ? clock - PryAt - DoorCheck.PrySeconds * pry / Pries : through * DoorCheck.PrySeconds / Pries) - RattleFrom;
+        float since = (pry == DoorCheck.Pries - 1 ? clock - PryAt - DoorCheck.PrySeconds * pry / DoorCheck.Pries : through * DoorCheck.PrySeconds / DoorCheck.Pries) - DoorCheck.RattleFrom;
         return since <= 0 ? 0 : RattleDegrees * MathF.Exp(-since / RattleFade) * (.5f - .5f * MathF.Cos(since * Mathf.Tau * RattleRate));
     }
-    /// <summary>How far the door rattles, in degrees, how many times a second, from how many seconds into a pry, and the seconds over which it dies away.</summary>
-    private const float RattleDegrees = 2.6f, RattleRate = 13, RattleFrom = .1f, RattleFade = .11f;
+    /// <summary>How far the door rattles, in degrees, how many times a second, and the seconds over which it dies away.</summary>
+    private const float RattleDegrees = 2.6f, RattleRate = 13, RattleFade = .11f;
 
     /// <summary>The door's opening at each sixtieth of a second from the wolf's first pry, without its rattle: it only ever opens further.</summary>
     private static readonly float[] pushed = Pushed();

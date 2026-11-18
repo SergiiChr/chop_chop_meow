@@ -66,10 +66,12 @@ public static class DoorCheckChecks {
         Require(wolf.DoorCheck == DoorCheckStage.Scratching, $"3.5 s in, a wolf should still scratch, not {wolf.DoorCheck}");
         DoorCheckTick(world, .3f);
         Require(wolf.DoorCheck == DoorCheckStage.Prying, $"3.8 s in, a wolf at an unlocked door should pry at its edge, not {wolf.DoorCheck}");
+        Require(Heard(heard, "door_rattle") == 1, $"the door should rattle once in the wolf's first pry: heard {string.Join(", ", heard)}");
         DoorCheckTick(world, 1.1f);
         Require(wolf.DoorCheck == DoorCheckStage.Prying, $"4.9 s in, a wolf should still pry, not {wolf.DoorCheck}");
         DoorCheckTick(world, .5f);
         Require(wolf.DoorCheck == DoorCheckStage.Opening, $"5.4 s in, a wolf should push the door open, not {wolf.DoorCheck}");
+        Require(Heard(heard, "door_rattle") == 3, $"the door should rattle once in each of the wolf's three pries: heard {string.Join(", ", heard)}");
         DoorCheckTick(world, 2.1f);
         Require(wolf.DoorCheck == DoorCheckStage.Opening && !heard.Contains("wolf_growl_approaching"), $"7.5 s in, a wolf should still push the door open without a growl, not {wolf.DoorCheck}");
         DoorCheckTick(world, .5f);
