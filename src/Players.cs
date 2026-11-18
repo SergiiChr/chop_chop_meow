@@ -143,6 +143,7 @@ public sealed partial class World {
             case Verb.Torch: UseTorch(c.At); break;
             case Verb.Attack: Attack(); break;
             case Verb.Leave: Doorways.Leave(); break;
+            case Verb.TurnKey: Doorways.TurnKey(); break;
             case Verb.Craft: Craft(c.Item, c.Count); break;
             case Verb.CancelCraft: CancelCraft(c.Item, c.Count); break;
             case Verb.Transfer:
@@ -342,8 +343,8 @@ public sealed partial class World {
         var p = S.Absent.Remove(key, out var back) ? back : S.Absent.Remove("", out var unclaimed) ? unclaimed : Newcomer();
         p.Key = key; p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(0, 4).First(i => S.Players.All(o => o.Shirt != i));
         // What only made sense while they played: a cabin may have gone and a building gone up where they stood, a wolf that had them pinned has moved on, and the other properties follow input they no longer give.
-        // A cabin holds one player, so one someone else went into or is at the door of meanwhile leaves the newcomer at its door.
-        if (Find(p.Sheltered)?.Kind != ThingKind.Hut || Doorways.Ahead(p.Sheltered, p) != Doorway.Entering) p.Sheltered = 0;
+        // A cabin that others filled meanwhile leaves the newcomer at its door.
+        if (Find(p.Sheltered)?.Kind != ThingKind.Hut || !Doorways.HasPlace(p.Sheltered, p)) p.Sheltered = 0;
         p.Door = Doorway.None;
         if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
         Forget(p);
@@ -367,6 +368,7 @@ public sealed partial class World {
         if (PlayerById(id) is not PlayerState p) return;
         ReleaseFor(p);
         S.Players.Remove(p); S.Absent[p.Key] = p;
+        Doorways.UnlockEmpty(p.Sheltered);
         if (S.Actor == p) S.Actor = S.Players.FirstOrDefault() ?? new PlayerState();
         SayToAll("A neighbor left the settlement.");
     }

@@ -12,6 +12,8 @@ internal static class WolfShape {
     /// <summary>The tail has three bones, from the root out.</summary>
     public const int TailBones = 3;
     private const int LegBones = Tail + TailBones;
+    /// <summary>The upper lips, which lift off the teeth in a snarl, and the brow over each eye, which lowers at its inner end.</summary>
+    public const int Lip = LegBones + 16, BrowL = Lip + 1, BrowR = Lip + 2;
 
     /// <summary>A leg's first bone; it is followed by the middle, lower and paw bones. Legs run front left, front right, hind left, hind right.</summary>
     public static int Leg(int leg) => LegBones + leg * 4;
@@ -32,15 +34,18 @@ internal static class WolfShape {
     public static readonly (int Parent, Vector3 At)[] Bones = BuildBones();
 
     private static (int, Vector3)[] BuildBones() {
-        var bones = new (int, Vector3)[LegBones + 16];
+        var bones = new (int, Vector3)[BrowR + 1];
         bones[Loin] = (-1, new Vector3(0, .66f, -.04f));
         bones[Chest] = (Loin, new Vector3(0, .69f, .22f));
         bones[Pelvis] = (Loin, new Vector3(0, .66f, -.3f));
         bones[Neck] = (Chest, new Vector3(0, .74f, .4f));
         bones[Head] = (Neck, new Vector3(0, .86f, .56f));
         bones[Jaw] = (Head, new Vector3(0, .818f, .6f));
-        bones[EarL] = (Head, new Vector3(.052f, .925f, .55f));
-        bones[EarR] = (Head, new Vector3(-.052f, .925f, .55f));
+        bones[EarL] = (Head, new Vector3(.062f, .925f, .54f));
+        bones[EarR] = (Head, new Vector3(-.062f, .925f, .54f));
+        bones[Lip] = (Head, new Vector3(0, .83f, .7f));
+        bones[BrowL] = (Head, new Vector3(.1f, .92f, .606f));
+        bones[BrowR] = (Head, new Vector3(-.1f, .92f, .606f));
         for (int i = 0; i < TailBones; i++) bones[Tail + i] = (i == 0 ? Pelvis : Tail + i - 1, new Vector3(0, .665f, -.46f - .17f * i));
         for (int leg = 0; leg < 4; leg++) {
             var at = Pivot(leg); var lengths = Lengths(leg);
@@ -53,7 +58,7 @@ internal static class WolfShape {
     }
 
     private static readonly Color Dark = new("4a4e46"), Grey = new("7b7d71"), Tan = new("8b7f64"), Pale = new("cbc5b0"),
-        Black = new("1e1f1c"), Mouth = new("6b2e2b"), InnerEar = new("b7a596");
+        Black = new("1e1f1c"), Mouth = new("6b2e2b"), InnerEar = new("b7a596"), Gum = new("8f4a4c"), Tongue = new("b8585c"), Tooth = new("efe9d9");
     public static readonly StandardMaterial3D Fur = ModelKit.Vertex(Surface.Flat, .95f);
     private static readonly StandardMaterial3D EyeShine = new() { AlbedoColor = new Color("d9a046"), Roughness = .35f, EmissionEnabled = true, Emission = new Color("d9a046"), EmissionEnergyMultiplier = 1.2f };
     private static ArrayMesh? fur, eyes;
@@ -175,32 +180,47 @@ internal static class WolfShape {
         }
         neck.CopyTo(rings, body.Length);
         Tube(s, ref start, rings, Vector3.Right, Vector3.Up, 16, (r, _, up) => Coat(up, r >= body.Length || rings[r].Center.Z is > .05f or < -.3f ? 1 : .5f));
-        // Skull and muzzle, with the pale cheeks and darker bridge of a grey wolf's face.
-        (float Z, float Y, float W, float H)[] skull = {
-            (.47f, .865f, .08f, .08f), (.52f, .88f, .115f, .1f), (.585f, .88f, .108f, .09f), (.645f, .862f, .078f, .066f),
-            (.7f, .848f, .056f, .047f), (.755f, .842f, .043f, .037f), (.795f, .842f, .031f, .028f), (.81f, .842f, .014f, .013f) };
-        var head = new Ring[skull.Length];
-        for (int i = 0; i < skull.Length; i++) head[i] = new Ring(new Vector3(0, skull[i].Y, skull[i].Z), skull[i].W, skull[i].H, Head);
-        Tube(s, ref start, head, Vector3.Right, Vector3.Up, 14, (r, across, up) =>
-            r >= 6 ? Black : r >= 4 ? (up > .45f ? Tan.Lerp(Grey, .4f) : Pale) : r == 0 ? Coat(up, 1) : up > .5f ? Grey.Lerp(Dark, (up - .5f) * 1.6f) : up < .3f ? Pale : Grey.Lerp(Pale, .5f));
-        // The lower jaw hangs from its own bone and shows a dark mouth on top when it opens.
+        // A broad skull with a dark crown, a tan mask round the eyes and white cheeks, narrowing to a deep muzzle with a darker bridge.
+        var head = new Ring[Skull.Length];
+        for (int i = 0; i < Skull.Length; i++) head[i] = new Ring(new Vector3(0, Skull[i].Y, Skull[i].Z), Skull[i].W, Skull[i].H, Head);
+        Tube(s, ref start, head, Vector3.Right, Vector3.Up, 16, (r, across, up) =>
+            r == 0 ? Coat(up, 1)
+            : r >= Muzzle ? (up > .55f ? Tan.Lerp(Dark, .45f) : up > -.55f ? Pale.Lerp(Tan, .2f * Math.Max(0, up)) : Mouth)
+            : up > .6f ? Grey.Lerp(Dark, Math.Min(1, (up - .6f) * 2.2f + .25f)) : up > .05f ? (Math.Abs(across) > .25f ? Tan.Lerp(Pale, .35f) : Grey.Lerp(Tan, .5f)) : Pale);
+        // The lower jaw hangs from its own bone: black lips round a dark mouth, with the tongue lying in it.
         var jaw = new[] {
-            new Ring(new Vector3(0, .815f, .6f), .055f, .024f, Jaw), new Ring(new Vector3(0, .806f, .68f), .04f, .02f, Jaw),
-            new Ring(new Vector3(0, .808f, .76f), .029f, .014f, Jaw), new Ring(new Vector3(0, .81f, .785f), .013f, .008f, Jaw) };
-        Tube(s, ref start, jaw, Vector3.Right, Vector3.Up, 10, (_, _, up) => up > .5f ? Mouth : Pale);
+            new Ring(new Vector3(0, .815f, .6f), .058f, .024f, Jaw), new Ring(new Vector3(0, .807f, .68f), .046f, .02f, Jaw),
+            new Ring(new Vector3(0, .808f, .76f), .036f, .015f, Jaw), new Ring(new Vector3(0, .811f, .797f), .02f, .01f, Jaw) };
+        Tube(s, ref start, jaw, Vector3.Right, Vector3.Up, 12, (_, _, up) => up > .55f ? Mouth : up > .2f ? Black : Pale);
+        var tongue = new[] {
+            new Ring(new Vector3(0, .836f, .63f), .024f, .006f, Jaw), new Ring(new Vector3(0, .829f, .7f), .023f, .006f, Jaw),
+            new Ring(new Vector3(0, .827f, .76f), .019f, .005f, Jaw), new Ring(new Vector3(0, .824f, .787f), .01f, .004f, Jaw) };
+        Tube(s, ref start, tongue, Vector3.Right, Vector3.Up, 8, (_, _, _) => Tongue);
         Teeth(s, ref start);
+        Lips(s, ref start);
         foreach (int side in new[] { 1, -1 }) {
             int ear = side > 0 ? EarL : EarR;
             var at = Bones[ear].At;
-            // Upright triangular ears, cupped forward: pale inside, grey outside.
+            // Upright triangular ears, cupped forward: pale inside, dark outside and along the rim.
             var ears = new[] {
-                new Ring(at + new Vector3(side * .004f, -.015f, 0), .048f, .04f, ear), new Ring(at + new Vector3(side * .012f, .055f, -.005f), .034f, .026f, ear),
-                new Ring(at + new Vector3(side * .02f, .105f, -.01f), .014f, .008f, ear), new Ring(at + new Vector3(side * .022f, .125f, -.012f), .002f, .002f, ear) };
-            Tube(s, ref start, ears, new Vector3(1, 0, side * .35f).Normalized(), new Vector3(-side * .35f, 0, 1).Normalized(), 8, (_, _, up) => up > .2f ? InnerEar : Dark.Lerp(Grey, .4f));
+                new Ring(at + new Vector3(side * .004f, -.02f, 0), .052f, .042f, ear), new Ring(at + new Vector3(side * .014f, .055f, -.005f), .037f, .027f, ear),
+                new Ring(at + new Vector3(side * .024f, .108f, -.01f), .015f, .009f, ear), new Ring(at + new Vector3(side * .027f, .13f, -.012f), .002f, .002f, ear) };
+            Tube(s, ref start, ears, new Vector3(1, 0, side * .35f).Normalized(), new Vector3(-side * .35f, 0, 1).Normalized(), 8, (_, across, up) => up > .2f && Math.Abs(across) < .8f ? InnerEar : Dark.Lerp(Grey, .25f));
+            // A dark rim round each eye and a slit pupil on it, and over it a heavy brow that a snarl lowers at its inner end.
+            Vector3 eye = Eye(side), faces = EyeFaces(side), level = Vector3.Up.Cross(faces).Normalized();
+            Tube(s, ref start, new[] { new Ring(eye - faces * .016f, .012f, .01f, Head), new Ring(eye - faces * .009f, .021f, .015f, Head), new Ring(eye - faces * .004f, .017f, .012f, Head) },
+                level, Vector3.Up, 8, (_, _, _) => Black);
+            Tube(s, ref start, new[] { new Ring(eye + faces * .003f, .003f, .006f, Head), new Ring(eye + faces * .0075f, .004f, .0075f, Head), new Ring(eye + faces * .009f, .001f, .002f, Head) },
+                level, Vector3.Up, 6, (_, _, _) => Black);
+            int brow = side > 0 ? BrowL : BrowR;
+            Vector3 outer = Bones[brow].At, inner = new(side * .03f, .914f, .652f), along = (inner - outer).Normalized();
+            Tube(s, ref start, new[] { new Ring(outer - along * .012f, .006f, .006f, brow), new Ring(outer.Lerp(inner, .3f), .012f, .013f, brow), new Ring(outer.Lerp(inner, .75f), .013f, .015f, brow), new Ring(inner + along * .006f, .006f, .007f, brow) },
+                Vector3.Up, along.Cross(Vector3.Up).Normalized(), 6, (_, _, _) => Dark.Lerp(Grey, .2f));
         }
-        // A black nose on the tip of the muzzle.
-        Tube(s, ref start, new[] { new Ring(new Vector3(0, .85f, .79f), .012f, .01f, Head), new Ring(new Vector3(0, .852f, .805f), .021f, .017f, Head), new Ring(new Vector3(0, .848f, .822f), .006f, .006f, Head) },
+        // A broad black nose on the tip of the muzzle.
+        Tube(s, ref start, new[] { new Ring(new Vector3(0, .853f, .8f), .018f, .014f, Head), new Ring(new Vector3(0, .854f, .822f), .028f, .022f, Head), new Ring(new Vector3(0, .85f, .842f), .012f, .01f, Head) },
             Vector3.Right, Vector3.Up, 8, (_, _, _) => Black);
+        FurSpikes(s, ref start);
         for (int leg = 0; leg < 4; leg++) LegTube(s, ref start, leg);
         // A full brush tail, dark on top and at the tip.
         (float Z, float Y, float W, float H)[] brush = { (-.44f, .675f, .04f, .045f), (-.5f, .665f, .052f, .058f), (-.58f, .66f, .066f, .072f), (-.68f, .655f, .074f, .08f), (-.78f, .655f, .072f, .075f), (-.88f, .655f, .055f, .058f), (-.95f, .655f, .03f, .032f), (-.98f, .655f, .006f, .006f) };
@@ -214,10 +234,96 @@ internal static class WolfShape {
         return s.Commit();
     }
 
-    /// <summary>Two small white fangs on each side of the upper jaw, out of sight until the mouth opens.</summary>
+    /// <summary>The skull's sections from the back of the head to the tip of the muzzle: how far forward, how high, and half its width and height.</summary>
+    private static readonly (float Z, float Y, float W, float H)[] Skull = {
+        (.46f, .865f, .085f, .085f), (.5f, .882f, .118f, .102f), (.545f, .886f, .126f, .102f), (.59f, .882f, .112f, .092f), (.635f, .868f, .08f, .07f),
+        (.675f, .857f, .062f, .052f), (.72f, .851f, .054f, .044f), (.765f, .848f, .048f, .039f), (.8f, .847f, .04f, .032f), (.818f, .846f, .02f, .017f) };
+    /// <summary>The first of the skull's sections that is muzzle.</summary>
+    private const int Muzzle = 5;
+
+    /// <summary>A tooth: a white cone from its root in the gum to its point.</summary>
+    private static void Fang(SurfaceTool s, ref int start, Vector3 root, Vector3 point, float width, int bone) =>
+        Tube(s, ref start, new[] { new Ring(root, width, width, bone), new Ring(root.Lerp(point, .5f), width * .7f, width * .7f, bone), new Ring(point, .0008f, .0008f, bone) }, Vector3.Right, Vector3.Back, 5, (_, _, _) => Tooth);
+
+    /// <summary>
+    /// The teeth and the gums they stand in: long fangs, small front teeth between them and a row of cheek teeth behind, in
+    /// the upper jaw and the lower. The lips and the closed jaw hide them; a snarl lifts the lips off the upper ones.
+    /// </summary>
     private static void Teeth(SurfaceTool s, ref int start) {
-        foreach (var at in new[] { new Vector3(.024f, .812f, .762f), new Vector3(-.024f, .812f, .762f) })
-            Tube(s, ref start, new[] { new Ring(at + new Vector3(0, .012f, 0), .006f, .006f, Head), new Ring(at - new Vector3(0, .014f, 0), .001f, .001f, Head) }, Vector3.Right, Vector3.Back, 5, (_, _, _) => new Color("eee8d8"));
+        foreach (int side in new[] { 1, -1 }) {
+            // Upper jaw: the gum along the edge of the muzzle, the fang, two front teeth and three cheek teeth.
+            Tube(s, ref start, new[] { new Ring(new Vector3(side * .05f, .818f, .65f), .006f, .007f, Head), new Ring(new Vector3(side * .042f, .816f, .73f), .006f, .007f, Head), new Ring(new Vector3(side * .027f, .817f, .798f), .006f, .006f, Head), new Ring(new Vector3(0, .818f, .808f), .006f, .006f, Head) },
+                Vector3.Right, Vector3.Up, 6, (_, _, _) => Gum);
+            Fang(s, ref start, new Vector3(side * .027f, .816f, .77f), new Vector3(side * .028f, .786f, .774f), .0075f, Head);
+            Fang(s, ref start, new Vector3(side * .007f, .815f, .806f), new Vector3(side * .007f, .8f, .808f), .0042f, Head);
+            Fang(s, ref start, new Vector3(side * .019f, .815f, .802f), new Vector3(side * .019f, .799f, .804f), .0045f, Head);
+            foreach (var (z, x, deep) in new[] { (.735f, .041f, .014f), (.705f, .044f, .016f), (.672f, .047f, .014f) })
+                Fang(s, ref start, new Vector3(side * x, .816f, z), new Vector3(side * x, .816f - deep, z), .0062f, Head);
+            // Lower jaw: the fang stands ahead of the upper one, with two front teeth and three cheek teeth.
+            Fang(s, ref start, new Vector3(side * .024f, .819f, .752f), new Vector3(side * .025f, .846f, .755f), .0068f, Jaw);
+            Fang(s, ref start, new Vector3(side * .006f, .818f, .786f), new Vector3(side * .006f, .83f, .788f), .0038f, Jaw);
+            Fang(s, ref start, new Vector3(side * .016f, .818f, .781f), new Vector3(side * .016f, .831f, .783f), .004f, Jaw);
+            foreach (var (z, x, tall) in new[] { (.72f, .032f, .011f), (.692f, .036f, .013f), (.662f, .04f, .011f) })
+                Fang(s, ref start, new Vector3(side * x, .824f, z), new Vector3(side * x, .824f + tall, z), .0055f, Jaw);
+        }
+    }
+
+    /// <summary>
+    /// The upper lips: a flap of pale fur with a black edge down each side of the muzzle and across its front, hanging
+    /// over the upper teeth. They follow their own bone, which a snarl lifts.
+    /// </summary>
+    private static void Lips(SurfaceTool s, ref int start) {
+        foreach (int side in new[] { 1, -1 }) {
+            var flap = new Ring[Skull.Length - Muzzle + 1];
+            for (int i = 0; i < flap.Length; i++) {
+                // The flap starts where the muzzle leaves the cheek and runs to its tip, lying on the muzzle's lower flank.
+                var (z, y, w, h) = Skull[Muzzle - 1 + i];
+                bool tip = i == flap.Length - 1;
+                flap[i] = new Ring(new Vector3(side * (w - (tip ? .012f : .003f)), y - h * .6f - .008f, z + (i == 0 ? .012f : 0)), tip ? .004f : .008f, tip ? .014f : .025f, Lip);
+            }
+            Tube(s, ref start, flap, Vector3.Right, Vector3.Up, 8, (_, _, up) => up < -.45f ? Black : Pale.Lerp(Tan, .15f));
+        }
+        Tube(s, ref start, new[] { new Ring(new Vector3(-.028f, .819f, .806f), .006f, .016f, Lip), new Ring(new Vector3(0, .82f, .814f), .007f, .017f, Lip), new Ring(new Vector3(.028f, .819f, .806f), .006f, .016f, Lip) },
+            Vector3.Back, Vector3.Up, 6, (_, _, up) => up < -.45f ? Black : Pale.Lerp(Tan, .15f));
+    }
+
+    /// <summary>A fur spike: a cone from its root in the coat to its tip, <paramref name="width"/> across at the root, shading from one colour to another.</summary>
+    private static void FurSpike(SurfaceTool s, ref int start, Vector3 root, Vector3 tip, float width, int bone, Color from, Color to) {
+        var along = (tip - root).Normalized();
+        var across = along.Cross(Vector3.Up).LengthSquared() < .01f ? Vector3.Right : along.Cross(Vector3.Up).Normalized();
+        Tube(s, ref start, new[] { new Ring(root - along * width * .5f, width, width * .7f, bone), new Ring(root.Lerp(tip, .45f), width * .62f, width * .42f, bone), new Ring(tip, .002f, .002f, bone) },
+            across, across.Cross(along), 5, (r, _, _) => r == 0 ? from : r == 1 ? from.Lerp(to, .6f) : to);
+    }
+
+    /// <summary>
+    /// The spiky fur that stands out from the coat: a ruff down each cheek, spikes on the crown, a mane round the neck and
+    /// over the shoulders, a spike under the throat and hackles along the back.
+    /// </summary>
+    private static void FurSpikes(SurfaceTool s, ref int start) {
+        var white = Pale.Lightened(.15f);
+        foreach (int side in new[] { 1, -1 }) {
+            // Cheek ruff, fanning out and back from under the ear down to the jaw.
+            FurSpike(s, ref start, new Vector3(side * .108f, .905f, .535f), new Vector3(side * .19f, .915f, .46f), .03f, Head, Grey, Dark);
+            FurSpike(s, ref start, new Vector3(side * .116f, .875f, .54f), new Vector3(side * .21f, .86f, .47f), .034f, Head, Pale, Grey);
+            FurSpike(s, ref start, new Vector3(side * .11f, .845f, .54f), new Vector3(side * .195f, .8f, .485f), .034f, Head, white, Grey.Lerp(Pale, .4f));
+            FurSpike(s, ref start, new Vector3(side * .09f, .82f, .54f), new Vector3(side * .15f, .755f, .5f), .03f, Head, white, Pale);
+            FurSpike(s, ref start, new Vector3(side * .032f, .972f, .5f), new Vector3(side * .05f, 1f, .42f), .026f, Head, Grey, Dark);
+            // The mane round the neck, and a second, shorter row over the shoulders.
+            FurSpike(s, ref start, new Vector3(side * .078f, .885f, .47f), new Vector3(side * .125f, .935f, .37f), .04f, Neck, Grey, Dark);
+            FurSpike(s, ref start, new Vector3(side * .13f, .8f, .47f), new Vector3(side * .215f, .815f, .37f), .044f, Neck, Grey.Lerp(Tan, .4f), Grey);
+            FurSpike(s, ref start, new Vector3(side * .122f, .7f, .47f), new Vector3(side * .195f, .66f, .39f), .042f, Neck, Tan.Lerp(Pale, .5f), Grey.Lerp(Tan, .5f));
+            FurSpike(s, ref start, new Vector3(side * .068f, .632f, .46f), new Vector3(side * .105f, .575f, .415f), .036f, Neck, white, Pale);
+            FurSpike(s, ref start, new Vector3(side * .1f, .805f, .3f), new Vector3(side * .15f, .84f, .2f), .038f, Chest, Grey, Dark);
+            FurSpike(s, ref start, new Vector3(side * .165f, .69f, .3f), new Vector3(side * .225f, .68f, .21f), .038f, Chest, Grey.Lerp(Tan, .5f), Grey);
+        }
+        FurSpike(s, ref start, new Vector3(0, .978f, .51f), new Vector3(0, 1.012f, .43f), .028f, Head, Grey, Dark);
+        FurSpike(s, ref start, new Vector3(0, .912f, .47f), new Vector3(0, .965f, .36f), .042f, Neck, Dark.Lerp(Grey, .4f), Dark);
+        FurSpike(s, ref start, new Vector3(0, .605f, .44f), new Vector3(0, .53f, .43f), .04f, Chest, white, Pale);
+        // Hackles along the back, from the withers to the loin.
+        FurSpike(s, ref start, new Vector3(0, .832f, .3f), new Vector3(0, .88f, .19f), .04f, Chest, Dark.Lerp(Grey, .3f), Dark);
+        FurSpike(s, ref start, new Vector3(0, .822f, .17f), new Vector3(0, .862f, .07f), .034f, Chest, Dark.Lerp(Grey, .3f), Dark);
+        FurSpike(s, ref start, new Vector3(0, .802f, .02f), new Vector3(0, .836f, -.07f), .03f, Loin, Dark.Lerp(Grey, .3f), Dark);
+        FurSpike(s, ref start, new Vector3(0, .79f, -.14f), new Vector3(0, .818f, -.22f), .028f, Loin, Dark.Lerp(Grey, .3f), Dark);
     }
 
     /// <summary>
@@ -269,14 +375,17 @@ internal static class WolfShape {
         return (first + joints.Length, -1, 0);
     }
 
+    /// <summary>Where each eye sits on the skull, and the way it faces: forward and a little outward.</summary>
+    private static Vector3 Eye(int side) => new(side * .074f, .898f, .634f);
+    private static Vector3 EyeFaces(int side) => new Vector3(side * .8f, .15f, 1).Normalized();
+
     private static ArrayMesh BuildEyes() {
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         int start = 0;
         foreach (int side in new[] { 1, -1 }) {
-            var at = new Vector3(side * .08f, .886f, .628f);
-            var across = new Vector3(side, 0, .55f).Normalized();
-            Tube(s, ref start, new[] { new Ring(at - across * .006f, .006f, .006f, Head), new Ring(at, .014f, .01f, Head), new Ring(at + across * .006f, .006f, .005f, Head) },
-                Vector3.Up.Cross(across).Normalized(), Vector3.Up, 8, (_, _, _) => Colors.White);
+            var at = Eye(side); var faces = EyeFaces(side);
+            Tube(s, ref start, new[] { new Ring(at - faces * .006f, .006f, .006f, Head), new Ring(at, .015f, .01f, Head), new Ring(at + faces * .006f, .006f, .005f, Head) },
+                Vector3.Up.Cross(faces).Normalized(), Vector3.Up, 8, (_, _, _) => Colors.White);
         }
         return s.Commit();
     }

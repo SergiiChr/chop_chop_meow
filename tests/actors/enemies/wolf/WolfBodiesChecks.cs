@@ -36,8 +36,9 @@ public static class WolfBodiesChecks {
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         world.Tick(.05f);
         Require(world.Door == Doorway.Tugged, "a wolf should tug the player out of the doorway");
-        // A second wolf waits just past where the tug ends, its last bite still fresh.
-        var other = PlaceWolf(world, new Wolf { Pos = Doorways.DoorPoint(hut) + Doorways.OutOfDoor * 2, Attack = 5 });
+        // With a wolf at each arm, one more waits just past where the tug ends.
+        foreach (int side in new[] { -1, 1 }) PlaceWolf(world, new Wolf { Pos = Doorways.DoorPoint(hut) + new Vector2(side, .2f) });
+        var other = PlaceWolf(world, new Wolf { Pos = Doorways.DoorPoint(hut) + Doorways.OutOfDoor * 2 });
         float nearest = float.MaxValue;
         for (float time = 0; time < DoorTug.TugSeconds - .1f; time += .05f) {
             world.Tick(.05f);

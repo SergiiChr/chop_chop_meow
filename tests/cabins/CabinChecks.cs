@@ -19,16 +19,20 @@ public static class CabinChecks {
         Test(CheckSteppingInTakesLongerAtAWalkThanAtASprint, data);
         Test(CheckWolvesCannotReachAPlayerHalfWayIn, data);
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
-        Test(CheckACabinHoldsOnePlayerAndTheNextKnocksOnTheDoor, data);
+        Test(CheckACabinHoldsTwoPlayersAndTheThirdKnocksOnTheDoor, data);
+        Test(CheckAPlayerAtALockedDoorKnocksUntilSomeoneInsideTurnsTheKey, data);
+        Test(CheckSteppingOutOfALockedCabinUnlocksIt, data);
+        Test(CheckOnlyAPlayerInsideTurnsTheKey, data);
         Test(CheckAPlayerKnockingOnACabinDoorStepsAsideForOneComingOutThenGoesIn, data);
         Test(CheckAPlayerAtACabinDoorIsBusyAndCanDoNothingElse, data);
         Test(CheckAPlayerInsideACabinCanStillEat, data);
         Test(CheckOnlyAPlayerKnockingOnTheDoorGoesInWhenSomeoneStepsOut, data);
-        Test(CheckAPlayerRespawnsInTheNearestFreeCabin, data);
+        Test(CheckAPlayerRespawnsInTheNearestCabinWithAPlaceLeft, data);
         Test(CheckAPlayerDoesNotRespawnInACabinSomeoneIsTuggedOutOfTheDoorOf, data);
         Test(CheckACabinCannotBeBuiltWithItsDoorOnGroundNobodyCanStandOn, data);
         Test(CheckNothingCanBeBuiltOnACabinsDoorSpot, data);
         Test(CheckSteppingOutOfACabinWhoseDoorIsBlockedLandsOnOpenGround, data);
+        Test(CheckACabinNobodyIsLeftInsideIsUnlocked, data);
     }
 
     private static void CheckPlayerBehindACabinWalksRoundItToTheDoor(GameData data) {
@@ -91,8 +95,9 @@ public static class CabinChecks {
         world.Tick(.3f);
         Require(world.Health < 100 && world.Door == Doorway.Leaving, "a wolf should bite a player in the second half of stepping out, who walks on out");
     }
-    private static void CheckACabinHoldsOnePlayerAndTheNextKnocksOnTheDoor(GameData data) {
+    private static void CheckACabinHoldsTwoPlayersAndTheThirdKnocksOnTheDoor(GameData data) {
         var (world, guest, _) = Hosted(data);
+        var third = world.Arrive("third", 3);
         var heard = Listen(world);
         var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
         world.Player = Doorways.DoorPoint(hut);
@@ -102,20 +107,87 @@ public static class CabinChecks {
         Require(guest.Door == Doorway.Following, $"a player at the door behind someone stepping in should follow them, not {guest.Door}");
         world.As(guest, () => world.MoveTo(guest.Pos + Vector2.Right));
         Require(guest.Pos == Doorways.DoorPoint(hut) + new Vector2(.3f, 0), "a player following someone in should not walk away");
+        world.Tick(.2f);
+        world.As(third, () => { world.Player = Doorways.DoorPoint(hut) + new Vector2(-.3f, 0); Require(world.Doorways.Enter(hut, false), "the third player at the door should start after the guest"); });
+        Require(third.Door == Doorway.Following, $"a third player at the door should follow the two ahead, not {third.Door}");
         world.Tick(Doorways.EnterSeconds);
-        Require(world.Sheltered == hut.Id && guest.Door == Doorway.Knocking && guest.Sheltered == 0, $"the door should shut on the follower, who knocks on it, not {guest.Door}");
+        Require(world.Sheltered == hut.Id && guest.Door == Doorway.Entering && third.Door == Doorway.Following, $"the second player should step in once the first is inside, not {guest.Door}, with the third still behind, not {third.Door}");
+        world.Tick(Doorways.EnterSeconds + .05f);
+        Require(guest.Sheltered == hut.Id, "a cabin should hold a second player");
+        Require(third.Door == Doorway.Knocking && third.Sheltered == 0, $"the door of a full cabin should shut on the third player, who knocks on it, not {third.Door}");
         world.Tick(.4f);
-        Require(!heard.Contains("door_knock"), "a follower should knock only once the door has swung shut");
+        Require(!heard.Contains("door_knock"), "a player left outside should knock only once the door has swung shut");
         world.Tick(1.1f);
-        Require(guest.Door == Doorway.None && guest.Sheltered == 0 && heard.Count(name => name == "door_knock") == 3, $"the follower should knock 3 times over a second and stand free: heard {string.Join(", ", heard)}");
-        world.As(guest, () => Require(world.Doorways.Enter(hut, false), "a player at the door of a cabin someone is in should knock on it"));
-        Require(guest.Door == Doorway.Knocking, "a player at the door of a cabin someone is in should knock on it");
+        Require(third.Door == Doorway.None && third.Sheltered == 0 && heard.Count(name => name == "door_knock") == 3, $"the third player should knock 3 times over a second and stand free: heard {string.Join(", ", heard)}");
+        world.As(third, () => Require(world.Doorways.Enter(hut, false), "a player at the door of a full cabin should knock on it"));
+        Require(third.Door == Doorway.Knocking, "a player at the door of a full cabin should knock on it");
+    }
+    private static void CheckACabinNobodyIsLeftInsideIsUnlocked(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        StepInside(world, hut, guest);
+        world.As(guest, world.Doorways.TurnKey);
+        Require(hut.Locked, "the guest inside should lock the door");
+        world.Depart(guest.Id);
+        Require(!hut.Locked, "a cabin whose only player left the game should be unlocked");
+        // A save loaded without whoever locked a cabin has it locked with nobody inside.
+        hut.Locked = true;
+        StepInside(world, hut);
+        Require(world.Sheltered == hut.Id && !hut.Locked, "a player stepping into a cabin locked with nobody inside should find its door unlocked");
+    }
+    private static void CheckAPlayerAtALockedDoorKnocksUntilSomeoneInsideTurnsTheKey(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var heard = Listen(world);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        StepInside(world, hut);
+        world.Doorways.TurnKey();
+        Require(hut.Locked && heard.Count(name => name == "door_lock") == 1, $"turning the key from inside should lock the door with one lock sound: heard {string.Join(", ", heard)}");
+        world.As(guest, () => { world.Player = Doorways.DoorPoint(hut); Require(world.Doorways.Enter(hut, false), "a player at a locked door should knock on it"); });
+        Require(guest.Door == Doorway.Knocking, $"a player at the locked door of a cabin with a place left should knock on it, not {guest.Door}");
+        world.Tick(Doorways.KnockLead + Doorways.KnockSeconds + .05f);
+        Require(guest.Door == Doorway.None && guest.Sheltered == 0, "a player who knocked on a locked door should stand free outside");
+        world.Doorways.TurnKey();
+        Require(!hut.Locked && heard.Count(name => name == "door_lock") == 2, $"turning the key again should unlock the door with the same sound: heard {string.Join(", ", heard)}");
+        world.As(guest, () => Require(world.Doorways.Enter(hut, false), "a player at an unlocked door should step in"));
+        Require(guest.Door == Doorway.Entering, $"a player at the unlocked door of a cabin with a place left should step in, not {guest.Door}");
+        world.Tick(Doorways.EnterSeconds + .05f);
+        Require(guest.Sheltered == hut.Id && world.Sheltered == hut.Id, "both players should be inside the cabin");
+    }
+    private static void CheckSteppingOutOfALockedCabinUnlocksIt(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var heard = Listen(world);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        StepInside(world, hut);
+        StepInside(world, hut, guest);
+        world.As(guest, () => world.Doorways.TurnKey());
+        Require(hut.Locked, "either player inside should be able to lock the door");
+        world.Doorways.Leave();
+        Require(world.Door == Doorway.Leaving && !hut.Locked, "stepping out of a locked cabin should unlock its door and step out");
+        Require(heard.Count(name => name == "door_lock") == 2, $"the key should be heard turning back: heard {string.Join(", ", heard)}");
+        world.Tick(Doorways.LeaveSeconds + .05f);
+        Require(!hut.Locked && guest.Sheltered == hut.Id, "the door should stay unlocked behind the one who stepped out, with the other still inside");
+    }
+    private static void CheckOnlyAPlayerInsideTurnsTheKey(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
+        world.Player = Doorways.DoorPoint(hut);
+        world.Doorways.TurnKey();
+        Require(!hut.Locked, "a player outside a cabin should not lock its door");
+        StepInside(world, hut);
+        world.As(guest, () => { world.Player = Doorways.DoorPoint(hut); world.Doorways.TurnKey(); });
+        Require(!hut.Locked, "a player at the door of a cabin someone else is in should not lock it");
+        world.Doorways.TurnKey();
+        Require(hut.Locked, "the player inside should lock the door");
+        SetNeeds(world, health: 0);
+        world.Tick(.05f);
+        Require(world.Dead && !hut.Locked, "a cabin whose only player has fallen should be unlocked");
     }
     private static void CheckAPlayerKnockingOnACabinDoorStepsAsideForOneComingOutThenGoesIn(GameData data) {
         var (world, guest, _) = Hosted(data);
         var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
         StepInside(world, hut);
-        world.As(guest, () => { world.Player = Doorways.DoorPoint(hut); Require(world.Doorways.Enter(hut, false) && guest.Door == Doorway.Knocking, "a player at the door of a cabin someone is in should knock on it"); });
+        world.Doorways.TurnKey();
+        world.As(guest, () => { world.Player = Doorways.DoorPoint(hut); Require(world.Doorways.Enter(hut, false) && guest.Door == Doorway.Knocking, "a player at the locked door of a cabin someone is in should knock on it"); });
         world.Tick(.2f);
         world.Doorways.Leave();
         Require(guest.Door == Doorway.Aside, $"a player knocking on the door should step aside for someone stepping out, not {guest.Door}");
@@ -134,9 +206,10 @@ public static class CabinChecks {
         world.Relay += (_, message) => told.Add(message);
         var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
         StepInside(world, hut);
+        world.Doorways.TurnKey();
         world.As(guest, () => {
             world.Player = Doorways.DoorPoint(hut);
-            Require(world.Doorways.Enter(hut, false) && guest.Door == Doorway.Knocking, "a player at the door of a cabin someone is in should knock on it");
+            Require(world.Doorways.Enter(hut, false) && guest.Door == Doorway.Knocking, "a player at the locked door of a cabin someone is in should knock on it");
             var stone = world.Add(ThingKind.LooseStone, world.Player + new Vector2(.5f, 0), 1);
             int stones = world.Backpack["stone"];
             for (int i = 0; i < 4; i++) world.Gather(stone, .25f);
@@ -169,21 +242,34 @@ public static class CabinChecks {
         world.Tick(Doorways.LeaveSeconds + .05f);
         Require(guest.Sheltered == 0, "a player who never clicked a cabin should not end up inside it");
     }
-    private static void CheckAPlayerRespawnsInTheNearestFreeCabin(GameData data) {
+    private static void CheckAPlayerRespawnsInTheNearestCabinWithAPlaceLeft(GameData data) {
         var (world, guest, _) = Hosted(data);
-        var near = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -6));
-        var far = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -14));
-        StepInside(world, near, guest);
-        world.Player = near.Pos + new Vector2(4, 0);
+        var third = world.Arrive("third", 3);
+        var full = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -6));
+        var locked = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -14));
+        world.Add(ThingKind.Hut, world.Player + new Vector2(0, -22));
+        StepInside(world, full, guest);
+        StepInside(world, locked, third);
+        world.As(third, () => world.Doorways.TurnKey());
+        world.Player = full.Pos + new Vector2(4, 0);
         SetNeeds(world, health: 0);
         SafeTick(world, data.RespawnSeconds + 1);
-        Require(world.Sheltered == far.Id, "a player should respawn in the nearest cabin nobody is in");
+        Require(world.Sheltered == full.Id, "a player should respawn in the nearest cabin, which has a place left beside the one inside");
+        world.Doorways.Leave();
+        world.Tick(Doorways.LeaveSeconds + .05f);
+        StepInside(world, full, world.Arrive("fourth", 4));
+        world.Player = full.Pos + new Vector2(4, 0);
+        SetNeeds(world, health: 0);
+        SafeTick(world, data.RespawnSeconds + 1);
+        Require(world.Sheltered == locked.Id && locked.Locked, "with the nearest cabin full, a player should respawn in the next one with a place left, which stays locked");
     }
     private static void CheckAPlayerDoesNotRespawnInACabinSomeoneIsTuggedOutOfTheDoorOf(GameData data) {
         var world = NightWorld(data);
         var guest = world.Arrive("guest", 2);
         var near = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -6));
         var far = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -14));
+        // Someone inside leaves the near cabin one place, which the guest at its door takes.
+        StepInside(world, near, world.Arrive("third", 3));
         world.Player = near.Pos + new Vector2(4, 0);
         SetNeeds(world, health: 0);
         world.Tick(.05f);

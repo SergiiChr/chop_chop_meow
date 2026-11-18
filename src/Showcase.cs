@@ -32,7 +32,13 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     public void Run() {
         Place();
         view.Zoom = Launch.Number("--zoom", view.Zoom);
-        if (Launch.Value("--doorway") is string scene) view.AddChild(new DoorwayReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = scene });
+        if (Launch.Value("--doorway") is string scene) {
+            var cabin = world.Things.First(t => t.Kind == ThingKind.Hut);
+            view.AddChild(new DoorwayReview { World = world, View = view, Cabin = cabin, Scene = scene });
+            // With --panel the cabin's page shows beside the scene, for a look at its key.
+            if (Launch.Has("--panel")) panel.Select(cabin);
+        }
+        if (Launch.Value("--wolf-scene") is string wolves) view.AddChild(new WolfReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = wolves });
     }
 
     private void Place() {
@@ -47,7 +53,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
                 "coast" => coastCenter - Terrain.Seaward * 3,
                 "mine" => World.MineSpot(reviewCliff) + reviewCliff.Face,
                 "terrain" => Terrain.Point(125, -18),
-                "den" => World.Dens[3].Door + World.Dens[3].Face * 2.5f,
+                "den" => WolfPatrols.Dens[3].Door + WolfPatrols.Dens[3].Face * 2.5f,
                 _ => Terrain.Spawn,
             };
             world.S.Time = world.Data.DaySeconds * .2f;

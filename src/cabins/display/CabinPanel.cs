@@ -3,10 +3,10 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A cabin: inside or outside, and what a night's sleep would leave of each need.</summary>
+/// <summary>A cabin: inside or outside, the key of its door for a player inside, and what a night's sleep would leave of each need.</summary>
 public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        var tag = Style.Pill("", Style.TagPill, Style.Rim, 13); tag.MouseFilter = Control.MouseFilterEnum.Pass; tag.TooltipText = "Wolves back off while you are inside";
+        var tag = Style.Pill("", Style.TagPill, Style.Rim, 13);
         panel.AddToHeader(tag);
         // What a night's sleep would leave of each need at dawn; the corner plate shows them now.
         var well = Well(new VBoxContainer()); well.AddThemeConstantOverride("separation", 12);
@@ -20,13 +20,23 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         foreach (var need in dawn) vials.AddChild(need);
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
         var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == thing.Id) world.Doorways.Leave(); else panel.Player.WalkInto(thing); });
-        var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(thing)); sleep.Name = "sleep";
-        buttons.AddChild(door); buttons.AddChild(sleep);
+        var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(thing)); sleep.Name = "sleep"; sleep.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+        // The door's key sits under its button, for a player inside to turn.
+        var doorSide = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; doorSide.AddThemeConstantOverride("separation", 8);
+        var key = kit.Button("", () => world.Doorways.TurnKey()); key.Name = "key"; key.Flat = true; key.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        key.CustomMinimumSize = new Vector2(KeySide, KeySide);
+        var keyhole = new TextureRect { Texture = panel.DoorKey.GetTexture(), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, MouseFilter = Control.MouseFilterEnum.Ignore };
+        keyhole.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); key.AddChild(keyhole);
+        doorSide.AddChild(door); doorSide.AddChild(key);
+        buttons.AddChild(doorSide); buttons.AddChild(sleep);
+        panel.DoorKey.Rest(thing.Locked);
+        live.Watch(() => thing.Locked, locked => { panel.DoorKey.Turn(locked); key.TooltipText = locked ? "Unlock the door" : "Lock the door · keeps wolves out"; });
         live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), world.Data.GameMinutes(world.SecondsToDawn)), now => {
             var (inside, blocked, _) = now;
             tag.Text = inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);
             door.Text = inside ? "Step outside" : "Enter";
+            key.Visible = inside;
             sleep.TooltipText = blocked ?? "Sleep until dawn. Production, hunger, trade and wages advance.";
             sleep.Modulate = blocked == null ? Colors.White : Style.Unready;
             block.Visible = blocked != null; block.Text = blocked == null ? "" : ShortBlock(blocked);
@@ -42,6 +52,8 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
             vial.QueueRedraw();
         }
     }
+    /// <summary>Pixels along each side of the door's key.</summary>
+    private const float KeySide = 120;
     /// <summary>A sleep refusal cut to a tag: what stops it, in a word or two.</summary>
     private static string ShortBlock(string reason) => reason.Contains("thirsty") && reason.Contains("hungry") ? "too hungry and thirsty" : reason.Contains("thirsty") ? "too thirsty" : reason.Contains("hungry") ? "too hungry" : reason.Contains("night") ? "only at night" : "not yet";
 }

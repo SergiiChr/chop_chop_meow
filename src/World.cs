@@ -49,6 +49,8 @@ public sealed class Thing {
     public Inventory? Burner { get; set; }
     /// <summary>A crafting bench's chisel and hammer slots; automation never touches them.</summary>
     public Inventory? Tools { get; set; }
+    /// <summary>A cabin's door locked from inside with its key, which keeps out players and wolves; only a cabin with someone inside is locked.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Locked { get; set; }
     /// <summary>How far a mine is built.</summary>
     public MineStage MineStage { get; set; }
     /// <summary>Where a farm plot is in its growing cycle.</summary>
@@ -217,7 +219,7 @@ public sealed class SaveState {
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
     public List<Wolf> Wolves { get; set; } = new();
-    /// <summary>One bit for each of <see cref="World.Dens"/> whose wolves are out tonight.</summary>
+    /// <summary>One bit for each of <see cref="WolfPatrols.Dens"/> whose wolves are out tonight.</summary>
     public int DensOut { get; set; }
     /// <summary>Whole hours since dusk that have had their one more wolf tonight.</summary>
     public int DenHours { get; set; }
@@ -295,10 +297,7 @@ public sealed partial class World {
     /// Landing short, rather than across the tile, keeps the leap on one bearing from start to finish.
     /// </summary>
     public const float PinDistance = .1f;
-    private bool packAttack { get => S.Actor.PackAttack; set => S.Actor.PackAttack = value; }
-    private const float LeapRange = 3.5f, FeastSpeed = 5.5f, ChaseSeconds = 3;
-    /// <summary>How far from a downed player's tile each feeding wolf stands.</summary>
-    public const float FeastSeat = 1.1f;
+    internal const float LeapRange = 3.5f;
     /// <summary>Minimum reinforced furnace heat: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
     /// <summary>Heat as degrees Celsius for display: the steel line sits where steel forms, 1450 °C.</summary>
@@ -318,7 +317,8 @@ public sealed partial class World {
     private bool playerBusy { get => S.Actor.Busy; set => S.Actor.Busy = value; }
     public World(GameData data, bool generate = true) {
         Data = data;
-        Doorways = new Doorways(this); DoorTug = new DoorTug(this); WolfBodies = new WolfBodies(this);
+        Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
+        WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
     }
@@ -330,8 +330,14 @@ public sealed partial class World {
     public Doorways Doorways { get; }
     /// <summary>Wolves tugging players back out of cabin doorways.</summary>
     public DoorTug DoorTug { get; }
+    /// <summary>Wolves at the doors of cabins with someone inside: scratching, forcing an unlocked door and taking a player out.</summary>
+    public DoorCheck DoorCheck { get; }
     /// <summary>How wolves at a player keep their distance from them and from each other.</summary>
     public WolfBodies WolfBodies { get; }
+    /// <summary>Wolves coming out of their dens at dusk, patrolling, smelling players and going home before dawn.</summary>
+    public WolfPatrols WolfPatrols { get; }
+    /// <summary>Wolves hunting a player: howling, closing in, leaping, biting and pinning.</summary>
+    public WolfHunt WolfHunt { get; }
     /// <summary>At this much health or less, a wolf's attack takes a player down rather than biting.</summary>
     public const float TakedownHealth = 50;
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
@@ -527,7 +533,7 @@ public sealed partial class World {
         }
         for (int placed = 0, tried = 0; placed < count && tried < tries; tried++) {
             var p = new Vector2(rng.Next(3, Terrain.Size - 3), rng.Next(3, Terrain.Size - 3));
-            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InSpur(p, 2.5f) || NearDen(p, 5)) continue;
+            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InSpur(p, 2.5f) || WolfPatrols.NearDen(p, 5)) continue;
             if (rng.NextDouble() > chance(p) || Crowded(p)) continue;
             var t = Add(kind, p, remaining); placed++;
             if (!near.TryGetValue(Cell(p), out var cellList)) near[Cell(p)] = cellList = new();
@@ -720,7 +726,7 @@ public sealed partial class World {
         if (!crate && !Data.Buildings.ContainsKey(kind)) return "Unknown building.";
         if (Occupied) return "You are busy.";
         if (S.Sheltered != 0) return "Leave the cabin first.";
-        if (NearDen(p, Den.Clearance)) return "Leave the wolf den's mouth clear.";
+        if (WolfPatrols.NearDen(p, Den.Clearance)) return "Leave the wolf den's mouth clear.";
         if (kind == ThingKind.Mine) return MineBlock(p);
         if (IsZone(kind)) return ZoneBlock(kind, p);
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
@@ -1099,15 +1105,20 @@ public sealed partial class World {
         if (Forwarded(Verb.Sleep, hut.Id)) return;
         PassNight();
     }
-    /// <summary>Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.</summary>
+    /// <summary>
+    /// Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.
+    /// A wolf that starts scratching at an unlocked cabin door stops the night there and wakes everyone, and no night
+    /// starts while a wolf is at such a door.
+    /// </summary>
     private void PassNight() {
         float seconds = SecondsToDawn;
         asleep = true;
         try {
-            while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
+            while (seconds > 0 && !DoorCheck.Waking) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
         } finally {
             asleep = false;
         }
+        if (DoorCheck.Waking) { SayToAll("You are awakened by the noise outside."); return; }
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
     /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
@@ -1139,7 +1150,7 @@ public sealed partial class World {
         }
     }
     /// <summary>A burning torch in hand, with the player out in the open, sets how wolves behave.</summary>
-    private bool Torchlit => S.TorchLit && !Downed && S.Sheltered == 0 && !Protected(Player);
+    internal bool Torchlit => S.TorchLit && !Downed && S.Sheltered == 0 && !Protected(Player);
     /// <summary>
     /// Lights a torch from the backpack, which stays there while it burns, or swings it once it burns.
     /// A torch put out before, by wild swinging, lights again with the burn time it had left.
@@ -1176,7 +1187,7 @@ public sealed partial class World {
         wolf.Health -= damage; KnockBack(wolf);
         if (wolf.Health <= 0) KillWolf(wolf);
     }
-    private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; }
+    private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, WolfHunt.AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; }
     /// <summary>Leaves a carcass where a struck wolf fell.</summary>
     private void KillWolf(Wolf wolf) {
         S.Wolves.Remove(wolf); Add(ThingKind.WolfCorpse, wolf.Pos, WolfMeat);
@@ -1205,7 +1216,9 @@ public sealed partial class World {
         // The player falls backwards facing the wolf that leapt, so the feet point back the way it came.
         var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
         var box = Add(ThingKind.Grave, killer == null ? Player : Player + (killer.Pos - Player).Normalized() * 1.5f); box.Inventory = S.Backpack;
+        int cabin = S.Sheltered;
         S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
+        Doorways.UnlockEmpty(cabin);
         // A wolf that pinned the player, or bit them down without a leap, eats every scrap of food.
         bool wolfKill = S.Mauled || Hunters.Any(w => w.Pos.DistanceTo(Player) < LeapRange);
         if (wolfKill) foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
@@ -1216,8 +1229,9 @@ public sealed partial class World {
         Say(wolfKill ? ate : $"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
     }
     private void Respawn() {
-        // The player wakes inside the free cabin nearest to where they fell, or in the clearing without one.
+        // The player wakes inside the cabin with a place left nearest to where they fell, the last one in, or in the clearing without one.
         var cabin = Doorways.NearestFreeCabin(Player);
+        if (cabin != null) S.Actor.DoorQueued = ++S.DoorArrivals;
         S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Terrain.Spawn : Doorways.Doorstep(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
         Say(cabin == null ? "You wake in the clearing. Recover your belongings from the box." : "You wake in the cabin. Recover your belongings from the box.");
     }
@@ -1786,7 +1800,7 @@ public sealed partial class World {
     /// otherwise <paramref name="step"/> along a route around what blocks it, found again once the destination has moved more than <paramref name="repath"/>.
     /// False when no way leads there.
     /// </summary>
-    private bool Travel(IWalker walker, Vector2 destination, float direct, float step, float repath = .2f) {
+    internal bool Travel(IWalker walker, Vector2 destination, float direct, float step, float repath = .2f) {
         if (walker.RouteTarget.DistanceTo(destination) > repath) { walker.Route.Clear(); walker.RouteTarget = destination; walker.RouteRetry = 0; }
         var next = walker.Pos.MoveToward(destination, direct);
         if (walker.Route.Count == 0 && CanStand(next)) { walker.Pos = next; return true; }
@@ -2049,7 +2063,7 @@ public sealed partial class World {
         S.Time += dt;
         if (!sleeping) S.PlaySeconds += dt;
         // A wolf whose player left the game goes back to patrolling.
-        foreach (var wolf in S.Wolves) if (wolf.Target != 0 && PlayerById(wolf.Target) == null) Patrol(wolf, wolf.Heading);
+        foreach (var wolf in S.Wolves) if (wolf.Target != 0 && PlayerById(wolf.Target) == null) WolfPatrols.Patrol(wolf, wolf.Heading);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) NeedsTick(dt, sleeping);
         KeepHolds();
@@ -2113,17 +2127,20 @@ public sealed partial class World {
                 if (CanStand(b.Pos - push)) b.Pos -= push;
             }
         }
-        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.DenHours = 0; S.Howled = false; } else if (!sleeping) TickDens(dt);
+        // Wolves patrol on through a slept night, so one can come to a sleeper's door; a tick that only skips ahead
+        // leaves them where they are.
+        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.DenHours = 0; S.Howled = false; } else if (!sleeping || asleep) WolfPatrols.TickDens(dt);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
             using (ActAs(p)) {
                 if (!sleeping) Doorways.Tick(dt);
                 if (!Dusk) {
                     if (!Dead) S.Mauled = false;
-                } else if (!sleeping) {
+                } else if (!sleeping || asleep && Doorways.Indoors(p)) {
+                    // Through a slept night, wolves that hunted a sleeper go to their cabin's door; one sleeping out in the open is left alone.
                     hunting.Clear();
                     foreach (var w in S.Wolves) if (w.Target == p.Id) hunting.Add(w);
-                    TickWolves(dt, hunting);
+                    WolfHunt.TickWolves(dt, hunting);
                 }
                 if (!Dead && S.Health <= 0) Die();
                 p.Still = playerBusy ? 0 : p.Still + dt;
@@ -2236,109 +2253,6 @@ public sealed partial class World {
         }
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size && S.Explored[(int)p.Y * Terrain.Size + (int)p.X] != 0;
-    /// <summary>Moves the pack hunting the acting player.</summary>
-    private void TickWolves(float dt, List<Wolf> hunters) {
-        // A wolf that let go, such as one heading home before dawn, frees the player it pinned.
-        if (S.Mauled && !Dead && !AnyPinning(hunters)) S.Mauled = false;
-        // A sheltered player is out of reach and out of smell: the pack gives up at once and patrols on away from the cabin.
-        if (Doorways.Indoors(S.Actor)) {
-            foreach (var wolf in hunters) Patrol(wolf, AwayFromPlayer(wolf).Angle());
-            return;
-        }
-        bool lit = Protected(Player);
-        // Behind a torch a lone wolf creeps in until a swing scares it off; once the pack is complete they attack together.
-        bool torch = Torchlit, pack = torch && PackAround >= PackSize, wary = torch && !pack;
-        if (pack && !packAttack) Say("The pack has you surrounded. They attack!");
-        packAttack = pack;
-        // A wounded player away from fire and shelter invites a leap for the throat, unless a wolf already tugs them out of a doorway.
-        if (!Downed && S.Health <= TakedownHealth && !lit && !wary && !DoorTug.Tugged && !AnyLeaping(hunters)) {
-            Wolf? hunter = null;
-            foreach (var w in hunters)
-                if (!Protected(w.Pos) && w.Howl <= 0 && w.Flee <= 0 && w.Stagger <= 0 && w.Pos.DistanceTo(Player) < LeapRange && (hunter == null || w.Pos.DistanceTo(Player) < hunter.Pos.DistanceTo(Player))) hunter = w;
-            if (hunter != null) { hunter.Leap = LeapSeconds; Say("A wolf leaps for your throat!"); }
-        }
-        // A chase always outpaces a walk but not a sprint.
-        float speed = Data.WolfTrot, chase = Data.WalkSpeed * Data.WolfChase;
-        foreach (var wolf in hunters) {
-            wolf.Attack -= dt;
-            if (wolf.Tugging && DoorTug.Tug(wolf)) continue;
-            if (wolf.Howl > 0) { wolf.Howl = Math.Max(0, wolf.Howl - dt); continue; }
-            if (wolf.Leap > 0) {
-                // Closing the remaining gap evenly makes every leap last LeapSeconds.
-                var landing = Player + (wolf.Pos - Player).Normalized() * PinDistance;
-                wolf.Pos = wolf.Pos.MoveToward(landing, wolf.Pos.DistanceTo(landing) * Math.Min(1, dt / wolf.Leap));
-                wolf.Leap = Math.Max(0, wolf.Leap - dt);
-                // A player in a doorway is tugged back out of it first, and pinned once out.
-                if (wolf.Leap == 0 && !DoorTug.TugOut(wolf)) Pin(wolf, hunters.Count > 1);
-            } else if (S.Mauled) {
-                if (wolf.Feeding) continue;
-                var seat = Player + (wolf.Pos - Player).Normalized() * FeastSeat;
-                wolf.Pos = wolf.Pos.MoveToward(seat, dt * FeastSpeed);
-                wolf.Feeding = wolf.Pos.DistanceTo(seat) < .05f;
-            } else if (wolf.Stagger > 0) {
-                wolf.Stagger = Math.Max(0, wolf.Stagger - dt); wolf.Chase = 0;
-            } else if (wolf.Flee > 0) {
-                wolf.Flee -= dt; wolf.Chase = 0;
-                wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * speed);
-            } else if (wary && wolf.Scared) {
-                // Each scared wolf keeps its bearing at the edge of the torchlight, so a growing pack surrounds the player.
-                wolf.Chase = 0;
-                var away = AwayFromPlayer(wolf);
-                wolf.Pos = Slide(wolf.Pos, (Player + away * StalkDistance - wolf.Pos).LimitLength(dt * speed * .6f));
-                if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-            } else if (wary) {
-                wolf.Chase = 0;
-                Travel(wolf, DoorTug.TuggedTo, WolfBodies.Closing(wolf, dt * speed * .35f, dt), dt * speed * .35f, RouteSlack);
-                if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                Bite(wolf);
-            } else if ((lit || Protected(wolf.Pos)) is var safe && safe && wolf.Chase <= 0) {
-                // Firelight turns a wolf back, unless it is already on the player's heels: then it follows in briefly.
-                wolf.Chase = 0; wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * 3);
-            } else if (wolf.Chase <= 0 && wolf.Pos.DistanceTo(Player) > Data.WolfSightRange) {
-                // Out of the light a wolf closes in unseen, then sprints once it is near enough to see the player.
-                Travel(wolf, Player, dt * speed, dt * speed, RouteSlack);
-            } else {
-                if (!wolf.Sprinted && !safe) { wolf.Sprinted = true; Play("wolf_growl_distance", wolf.Pos); }
-                wolf.Chase = safe ? wolf.Chase - dt : ChaseSeconds;
-                Travel(wolf, DoorTug.TuggedTo, WolfBodies.Closing(wolf, dt * chase, dt), dt * chase, RouteSlack);
-                if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                Bite(wolf);
-            }
-        }
-        WolfBodies.KeepApart(hunters, dt);
-        if (S.Mauled && !Dead) {
-            int feeding = 0;
-            foreach (var w in hunters) if (w.Feeding) feeding++;
-            S.Health -= dt * (16 + 8 * feeding);
-        }
-    }
-    /// <summary>Pins the acting player under a wolf, standing over them, or lunging onto their throat from <paramref name="lungeFrom"/> of it once it has tugged them back out of a doorway.</summary>
-    internal void Pin(Wolf wolf, bool pack, Vector2 lungeFrom = default) {
-        wolf.Leap = 0; wolf.LungeFrom = lungeFrom; wolf.Feeding = wolf.Pinning = true; S.Mauled = true;
-        wolf.Pos = lungeFrom == Vector2.Zero ? Player + AwayFromPlayer(wolf) * PinDistance : Player + Doorways.OutOfDoor * DoorTug.FallenThroat + lungeFrom * DoorTug.AsideReach;
-        Say(pack ? "You are pinned. The pack closes in." : "You are pinned."); Play("wolf_bite", Player); Play("takedown_scream", Player);
-    }
-    /// <summary>A wolf within reach of the acting player whose last bite is behind it bites them, and tugs them out of a doorway they are in.</summary>
-    private void Bite(Wolf wolf) {
-        if (wolf.Pos.DistanceTo(Player) >= 1.1f || wolf.Attack > 0) return;
-        wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); DoorTug.TugOut(wolf);
-    }
-
-    /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>
-    private Vector2 AwayFromPlayer(Wolf wolf) => wolf.Pos == Player ? Vector2.Right : (wolf.Pos - Player).Normalized();
-    /// <summary>Whether no player can see a spot.</summary>
-    private bool Unseen(Vector2 p) {
-        foreach (var player in S.Players) if (player.Pos.DistanceTo(p) <= Data.SightRadius) return false;
-        return true;
-    }
-    private static bool AnyLeaping(List<Wolf> wolves) {
-        foreach (var w in wolves) if (w.Leap > 0) return true;
-        return false;
-    }
-    private static bool AnyPinning(List<Wolf> wolves) {
-        foreach (var w in wolves) if (w.Pinning) return true;
-        return false;
-    }
     private static readonly string[] Milestones = {
         "water", "hut", "campfire", "gather", "bench", "crate", "sold", "pick",
         "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned"

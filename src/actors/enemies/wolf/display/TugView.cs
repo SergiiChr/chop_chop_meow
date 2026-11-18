@@ -27,13 +27,13 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
     /// </summary>
     private const float WaitAside = 1.2f, LungeStart = .74f, LungeEnd = .92f;
     /// <summary>
-    /// Which way a wolf tugging <paramref name="held"/> turns from another wolf tugging someone within <see cref="TuggersApart"/>
-    /// of them: 1 to the held player's left, -1 to their right, 0 with nobody there.
+    /// The <see cref="BodySide"/> of <paramref name="held"/> on which another wolf tugs someone within <see cref="TuggersApart"/>
+    /// of them, or 0 with nobody there. Their own wolf turns its head to that side, which swings its body away from the other wolf.
     /// </summary>
     private float ApartFrom(Wolf tugger, ActorState held) {
         foreach (var other in world().Wolves)
             if (other != tugger && other.Tugging && TuggedBy(other) is var (them, _) && them != held && them.Position.DistanceTo(held.Position) < TuggersApart)
-                return (held.Position - them.Position).Dot(ActorAnimation.Forward(held.Yaw).Orthogonal()) >= 0 ? -1 : 1;
+                return BodySide.Of(held.Position, ActorAnimation.Forward(held.Yaw), them.Position);
         return 0;
     }
 
@@ -51,12 +51,51 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         if (model.Motion != WolfMotion.Tug) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; }
         float lunge = WorldView.Ease(Math.Min(1, through * DoorTug.TugSeconds / TugLunge));
         model.Yaw = Mathf.LerpAngle(model.FromYaw, held.Yaw + Mathf.DegToRad(SplayTugger) * ApartFrom(wolf, held), lunge);
-        model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero; model.Pinned = 0;
-        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.Pinned = 0;
+        model.StandPlaced(wolf.Stagger);
         model.Root.Visible = world().Sees(wolf.Pos);
+        // A wolf taking a player out of their cabin starts in its doorway, with its paws on the step and the floor.
+        model.Steps = wolf.DoorCheck == DoorCheckStage.TakingOut && world().Find(wolf.DoorCheckCabin) is Thing cabin ? Doorways.DoorPoint(cabin) : null;
         model.Tug(through, elapsed, dt);
         var grip = Waist(held) - model.Root.Basis * model.Bite;
         model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);
+        model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
+        return true;
+    }
+
+    /// <summary>How far along a forearm, from the elbow to the fist, a wolf at a tugged player's side closes its jaws.</summary>
+    private const float ArmHold = .35f;
+    /// <summary>Where on the trunk, from the hips, the forepaws of a wolf at a player's left stand: on their side, one above and behind the other.</summary>
+    private static readonly Vector3 LowPaw = new(.19f, .1f, .07f), HighPaw = new(.19f, .24f, -.07f);
+
+    /// <summary>
+    /// Shows a wolf holding the arm of a player another wolf tugs: reared up at their side with its forepaws on their flank
+    /// and its jaws on their forearm as <paramref name="rig"/> draws it; returns false while the player is not drawn as tugged.
+    /// </summary>
+    public bool ShowHolding(Wolf wolf, WolfModel model, ActorRig? rig, float elapsed, float dt) {
+        if (rig == null || TuggedBy(wolf) is not var (held, _)) return false;
+        // Taking hold, it lunges in to the arm from where it stood rather than appearing there.
+        if (model.Motion != WolfMotion.Rear) { model.StepFrom = model.Root.Position; model.FromYaw = model.Yaw; model.Settled = 0; }
+        model.Settled = Math.Min(1, model.Settled + dt / TugLunge);
+        float lunge = WorldView.Ease(model.Settled);
+        bool left = wolf.Side == BodySide.Left;
+        var root = rig.Root.GlobalTransform;
+        var arm = root * rig.Elbow(left).Lerp(rig.Fist(left), ArmHold);
+        // It stands out at the side it holds and faces in from there to the arm on that side.
+        var from = held.Position + BodySide.Out(ActorAnimation.Forward(held.Yaw), wolf.Side) * DoorTug.SideReach;
+        var toward = new Vector2(arm.X, arm.Z) - from;
+        model.Yaw = Mathf.LerpAngle(model.FromYaw, ActorAnimation.Yaw(toward, model.Yaw), lunge);
+        model.Pinned = 0;
+        model.StandPlaced(wolf.Stagger);
+        model.Root.Visible = world().Sees(wolf.Pos);
+        model.Steps = world().PlayerById(wolf.Target) is { DoorCabin: not 0 } p && world().Find(p.DoorCabin) is Thing cabin ? Doorways.DoorPoint(cabin) : null;
+        var body = WolfModel.Rearing(arm.Y, elapsed + wolf.Id % 7);
+        var grip = arm - model.Root.Basis * WolfModel.BiteOf(body);
+        model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);
+        var toModel = model.Root.Transform.AffineInverse();
+        var torso = rig.Torso.GlobalTransform;
+        Vector3 low = toModel * (torso * (LowPaw with { X = LowPaw.X * wolf.Side })), high = toModel * (torso * (HighPaw with { X = HighPaw.X * wolf.Side }));
+        model.Rear(body, WolfModel.Uncrossed(low, high), dt);
         model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
         return true;
     }
@@ -70,9 +109,8 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         float fell = model.Pinned / ActorAnimation.FallBackSeconds;
         var throat = FallBackView.Throat(fallen.Position, ActorAnimation.Forward(fallen.Yaw), float.MaxValue);
         var wait = (throat + WorldView.To3(wolf.LungeFrom) * WaitAside) with { Y = 0 };
-        model.KnockBack = Vector2.Zero; model.Stagger = wolf.Stagger; model.Toward = Vector2.Zero;
         model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(-wolf.LungeFrom, model.Yaw), Math.Min(1, dt * 8));
-        model.Turning.Hold(model.Yaw); model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+        model.StandPlaced(wolf.Stagger);
         model.Root.Visible = world().Sees(wolf.Pos);
         if (fell < LungeStart) {
             // It springs back off the yanked body at once, then slows as it comes round.

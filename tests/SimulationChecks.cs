@@ -80,6 +80,7 @@ public static class SimulationChecks {
         Test(CheckWolvesLeaveHealthyOrFirelitPlayersAlone, data);
         Test(CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth, data);
         WolfBodiesChecks.Run(data);
+        WolfPatrolsChecks.Run(data);
         Test(CheckWolfThatBitesAPlayerToDeathEatsTheirFood, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
         Test(CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst, data);
@@ -91,6 +92,8 @@ public static class SimulationChecks {
         CabinChecks.Run(data);
         Test(CheckPressingTheOppositeWayBrakesBeforeRunningBack, data);
         DoorTugChecks.Run(data);
+        DoorCheckChecks.Run(data);
+        DoorCheckViewChecks.Run();
         Test(CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
@@ -2582,28 +2585,29 @@ public static class SimulationChecks {
         SafeTick(world, .9f);
         Require(world.Wolves.Count == 0, "no wolf should come out before dusk");
         SafeTick(world, 1);
-        Require(world.Wolves.Count == 1 && world.Wolves.All(w => w.Pos.DistanceTo(World.Dens[0].Door) < 4),
+        Require(world.Wolves.Count == 1 && world.Wolves.All(w => w.Pos.DistanceTo(WolfPatrols.Dens[0].Door) < 4),
                 "the first den should let its one wolf out as soon as dusk starts, and the others in turn after it");
-        SafeTick(world, World.Dens.Length * World.DenGapSeconds);
-        Require(!world.Night && world.Wolves.Count == World.Dens.Length, "every den should have let its one wolf out well before night");
+        SafeTick(world, WolfPatrols.Dens.Length * WolfPatrols.DenGapSeconds);
+        Require(!world.Night && world.Wolves.Count == WolfPatrols.Dens.Length, "every den should have let its one wolf out well before night");
         Require(world.Wolves.All(w => w.Target == 0 && w.Mode == WolfMode.Patrol), "wolves out of their dens should patrol until they smell someone");
     }
 
     private static void CheckARandomDenLetsOneMoreWolfOutEveryHour(GameData data) {
-        // Inside a cabin the player is never smelled, so every wolf let out stays out until the retreat.
+        // Behind a locked cabin door the player is never reached, so every wolf let out stays out until the retreat.
         var world = EmptyWorld(data);
         StepInside(world, world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0)));
+        world.Doorways.TurnKey();
         RunUntilDusk(world);
         SafeTick(world, data.HourSeconds - 1);
-        Require(world.Wolves.Count == World.Dens.Length, "only the wolves of dusk should be out through the first hour");
+        Require(world.Wolves.Count == WolfPatrols.Dens.Length, "only the wolves of dusk should be out through the first hour");
         SafeTick(world, 2);
-        Require(world.Wolves.Count == World.Dens.Length + 1 && World.Dens.Any(den => world.Wolves[^1].Pos.DistanceTo(den.Door) < 4),
+        Require(world.Wolves.Count == WolfPatrols.Dens.Length + 1 && WolfPatrols.Dens.Any(den => world.Wolves[^1].Pos.DistanceTo(den.Door) < 4),
                 "one den should let one more wolf out an hour after dusk");
         SafeTick(world, data.HourSeconds);
-        Require(world.Wolves.Count == World.Dens.Length + 2, "a den should let one more wolf out after each further hour");
+        Require(world.Wolves.Count == WolfPatrols.Dens.Length + 2, "a den should let one more wolf out after each further hour");
         // From dusk at 20:24 to the retreat at 05:00 eight whole hours pass.
         SafeTick(world, data.WolfRetreatStarts * data.DaySeconds - world.Time - 1);
-        Require(world.Wolves.Count == World.Dens.Length + 8, $"a night should let out one wolf an hour until the retreat, not {world.Wolves.Count - World.Dens.Length}");
+        Require(world.Wolves.Count == WolfPatrols.Dens.Length + 8, $"a night should let out one wolf an hour until the retreat, not {world.Wolves.Count - WolfPatrols.Dens.Length}");
     }
 
     private static void CheckWolvesAreNoStrongerOnLaterNights(GameData data) {
@@ -2692,7 +2696,7 @@ public static class SimulationChecks {
 
     private static void CheckDensStayOpen(GameData data) {
         var world = new World(data);
-        foreach (var den in World.Dens) {
+        foreach (var den in WolfPatrols.Dens) {
             Require(world.CanStand(den.Door) && !world.CanStand(den.Mouth - den.Face * .5f), "a den's rock should be solid and the ground at its door open");
             world.Player = den.Door + den.Face * 3;
             Require(world.PlacementBlock(ThingKind.Hut, den.Door + den.Face * 2) != null, "nothing should be built over a den's mouth");
@@ -2727,7 +2731,8 @@ public static class SimulationChecks {
     private static void CheckSmelledPlayerDrawsAHowlAndThePack(GameData data) {
         var world = NightWorld(data);
         world.Player = Terrain.Point(120, 0);
-        var smeller = new Wolf { Pos = world.Player + Terrain.Seaward * (data.SmellRadius - 5) };
+        // The smelling wolf walks straight at the player, so it has no turn to make before it howls.
+        var smeller = new Wolf { Pos = world.Player + Terrain.Seaward * (data.SmellRadius - 5), Heading = (-Terrain.Seaward).Angle() };
         var called = new Wolf { Pos = smeller.Pos + Terrain.Seaward * (data.HowlRadius - 10) };
         var deaf = new Wolf { Pos = smeller.Pos - Terrain.Seaward * (data.HowlRadius + 10) };
         var heard = Listen(world);
@@ -2806,21 +2811,21 @@ public static class SimulationChecks {
         PlaceWolf(world, wolf);
         SafeTick(world, .5f);
         StepInside(world, hut);
-        float before = wolf.Pos.DistanceTo(world.Player);
+        world.Doorways.TurnKey();
         SetNeeds(world, health: 40);
         SafeTick(world, 1);
-        Require(wolf.Pos.DistanceTo(world.Player) > before,
-            "a wolf must back off at once when the player is inside a cabin");
+        Require(wolf.Target == 0, "a wolf must stop hunting a player who is inside a cabin");
         Require(wolf.Leap <= 0, "a wolf must stop its leap when the player is inside a cabin");
         Require(world.Health >= 40, "a wolf must not hurt a player inside a cabin");
         var inside = world.Player;
         world.MovePlayer(new Vector2(0, .1f));
         Require(world.Sheltered == hut.Id && world.Player == inside, "moving should not take the player back outside");
-        // A chaser that caught up stands right on the player; it must still back off and give up.
+        // A chaser that caught up stands right on the player; it must still give up once it has scratched at the locked door.
         var caught = new Wolf { Pos = world.Player, Target = world.Me.Id };
         PlaceWolf(world, caught);
         SafeTick(world, 10);
-        Require(caught.Target == 0 && wolf.Target == 0 && caught.Mode == WolfMode.Patrol, "wolves should give up on the player and patrol on once they have been inside long enough");
+        Require(caught.Target == 0 && wolf.Target == 0 && caught.Mode == WolfMode.Patrol && caught.DoorCheck == DoorCheckStage.None && wolf.DoorCheck == DoorCheckStage.None, "wolves should give up on the player and patrol on once they have been inside behind a locked door long enough");
+        Require(world.Health >= 40, "a wolf must not hurt a player behind a locked door");
         world.Doorways.Leave();
         Require(world.Sheltered == 0, "stepping outside should leave the cabin");
         world.Player = hut.Pos + new Vector2(12, 0);

@@ -25,6 +25,8 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
         }
         if (p.Door == Doorway.None && state.SteppingDown <= 0 || world().Find(p.DoorCabin) is not Thing cabin) return null;
         var door = Doorways.DoorPoint(cabin);
+        // A player a wolf takes out of the cabin they were in starts from where they stood inside it.
+        if (p.Door == Doorway.Tugged && state.StageBefore == Doorway.None) state.StageFrom = door + IntoCabin;
         if (p.Door == Doorway.None && state.SteppingDown > 0) {
             // Done knocking, the player steps back down off the step to where they stand, still facing the door.
             state.SteppingDown = Math.Max(0, state.SteppingDown - dt);
@@ -208,10 +210,24 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
         return null;
     }
 
+    /// <summary>Stands a cabin's door <paramref name="degrees"/> open, as a wolf pushing it holds it, for the door to swing on from there.</summary>
+    public static void PushDoor(HutProp hut, float degrees) {
+        // The door's swing eases in and out, so the share of the swing that stands it this far open is found by halving.
+        float low = 0, high = 1;
+        for (int i = 0; i < 12; i++) {
+            float middle = (low + high) / 2;
+            if (FullSwing * WorldView.Ease(middle) < degrees) low = middle; else high = middle;
+        }
+        hut.Open = (low + high) / 2;
+        hut.Door.RotationDegrees = new Vector3(0, -degrees, 0);
+    }
+    /// <summary>How many degrees a cabin's door swings open.</summary>
+    private const float FullSwing = 100;
+
     /// <summary>Swings a cabin's door <paramref name="step"/> of the way further open, or shut.</summary>
     public static void SwingDoor(HutProp hut, bool open, float step) {
         hut.Open = Mathf.MoveToward(hut.Open, open ? 1 : 0, step);
-        hut.Door.RotationDegrees = new Vector3(0, -100 * WorldView.Ease(hut.Open), 0);
+        hut.Door.RotationDegrees = new Vector3(0, -FullSwing * WorldView.Ease(hut.Open), 0);
     }
 
     /// <summary>

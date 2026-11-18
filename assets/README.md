@@ -100,7 +100,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 
 ### Buildings and stations
 
-- `src/CabinShape.cs` — the cabin's shared sloped wall shell with door and window openings, its continuous corrugated roof, and a simple interior. The interior has contrasting wall lining, a wooden floor and a sleeping platform, visible through the open doorway.
+- `src/cabins/display/CabinShape.cs` and `src/cabins/display/CabinModel.cs` — the cabin's shared sloped wall shell with door and window openings, its continuous corrugated roof, and a simple interior. The interior has contrasting wall lining, a wooden floor and a sleeping platform, visible through the open doorway.
 - `src/FurnaceShape.cs` — shared bevelled block faces, a recessed firebox, a shaped steel coping plate and a coal pile of irregular broken slabs with broad fracture faces. The furnace's outdoor `StockPile` shows its selected stocked fuel, a piece for each one up to a small heap, and disappears when that slot is empty.
 - `src/ForgeShape.cs` — the reinforced forge's continuous rounded tank shell, fitted steel bands, recessed refractory chamber and continuous teardrop bellows boards. Its shared meshes keep separate animated bellows pivots and heat glow.
 - `src/AnvilShape.cs` — the anvil's shared cast body with a curved waist, bevelled working face and swept horn.
@@ -217,6 +217,10 @@ Each cut is faded at both ends, and the cuts of one sound are brought to one mea
 `wolf_howl` (a lone wolf, the night's first howl), `wolf_howl_group` (the pack answering) and `hire_sign` (a pen signing paper, cleaned of rumble and room noise) were supplied for this project.
 
 `door_knock` is "Door bang 1.wav" by freesound_community (Pixabay 14449), a recording supplied for this project: its three knocks on a door, each cut into its own variant, faded at both ends and brought to one mean level.
+
+`door_rattle` is "Rattling door" by alegemaate ([freesound 364682](https://freesound.org/people/alegemaate/sounds/364682/)), released under CC0 1.0: the two rattles of freesound's preview of it, each cut into its own variant, faded at both ends and brought to one mean level.
+
+`door_lock` (a key turning in a lock, with the silence cut from both ends) and `door_scratch` (four scratches on a door) were recorded for this project by its author, faded at the ends and peak-normalised.
 
 `tug_scream` is the first second and a half of "Male horror scream" (Pixabay 123080), and `takedown_scream` is "Man pain scream 02" (Pixabay 567205) with the silence cut from both ends: recordings supplied for this project, faded at the ends and brought to one mean level.
 
