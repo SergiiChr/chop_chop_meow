@@ -97,15 +97,17 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 ### Intro film
 
-The game opens with a 42-second film, `assets/intro.ogv`, played over the start menu; Esc skips it.
-It shows the hero bored at his office desk, his boss yelling at him, the bat he takes to his computer, packing at home,
-the train, the walk through the forest, the shore where he squats to touch the sea, and a cold first night by a fire
-with wolves howling.
+The game opens with a 50-second film, `assets/intro.ogv`, played over the start menu; Esc skips it.
+It shows the hero bored at his office desk, his hand on the mouse, the catgirls dancing on his screen, his boss yelling
+at him, his blank stare, the bat he takes to his computer, packing at home, the train, the walk through the forest, the
+shore where he squats to touch the sea, and a cold first night by a fire with wolves howling.
 It is made to look like a movie on a 1990s console: small frames, 15 a second, lightly blocky from compression.
 
 The game draws the film itself, so a change to a model or a shot means making the movie again:
 
 1. `./tools/intro_film.py` draws the frames, 30 a second, and writes the cue sheet of the film's sounds beside them.
+   The paint filter is drawn over them 21 pixels wide, not the game's 8, so its strokes are still there after step 2
+   shrinks them.
 2. A movie tool turns the frames and cue sheet into `assets/intro.ogv`: keep every second frame, shrink it to 480×270,
    pack each as a JPEG so its blocks just show, mix the cue sheet's sounds from `assets/sounds` and `assets`, and write
    Ogg Theora, which the game plays and blows up to the window.

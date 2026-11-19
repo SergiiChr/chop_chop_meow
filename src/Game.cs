@@ -116,6 +116,7 @@ public partial class Game : Node, IGameFlow {
                 // --intro-stills saves only the frames at those seconds, such as 1.5,9.2, for a look at single moments.
                 var stills = Launch.Value("--intro-stills")?.Split(',').Select(at => float.Parse(at, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
                 panel.Close(); ui.Visible = false; AudioServer.SetBusMute(0, true);
+                paintFilter.Width = WorldView.IntroPaintWidth;
                 view.RenderIntro(introFolder, stills);
             }
             if (Launch.Has("--animation-review")) { panel.Close(); ui.Visible = false; view.AnimationReview = true; }

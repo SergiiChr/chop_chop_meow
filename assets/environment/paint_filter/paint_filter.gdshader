@@ -6,7 +6,7 @@ shader_type canvas_item;
 
 uniform sampler2D screen : hint_screen_texture, filter_nearest, repeat_disable;
 // Each pixel reads kernel_size / 2 render pixels to each side: larger gives bigger patches of paint and costs more.
-uniform int kernel_size : hint_range(2, 20, 1) = 8;
+uniform int kernel_size : hint_range(2, 24, 1) = 8;
 // How strongly a wedge with an even colour wins over the others.
 uniform float hardness : hint_range(1.0, 100.0) = 8.0;
 uniform float sharpness : hint_range(1.0, 18.0) = 8.0;

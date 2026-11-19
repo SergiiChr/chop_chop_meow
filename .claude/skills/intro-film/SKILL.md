@@ -59,15 +59,18 @@ Times are from the film's start; a change to a shot's length moves every later s
 | Starts | Shot | Method |
 | --- | --- | --- |
 | 0 | Bored at the desk | `DeskShot` |
-| 5 | Boss yelling | `BossShot` |
-| 9 | Bat and run | `SmashShot` |
-| 12 | Packing at home | `PackingShot` |
-| 17 | Train | `TrainShot` |
-| 20 | Forest trail | `ForestShot` |
-| 23 | Arrival at the shore | `ArrivalShot` |
-| 27.4 | Touching the sea, fade | `ShoreShot` |
-| 31 | Black | |
-| 33 | Night by the fire, fade | `NightShot` |
+| 5 | Hand on the mouse | `MouseShot` |
+| 7.5 | Catgirls dancing on his screen | `ScreenShot` |
+| 11 | Boss yelling | `BossShot` |
+| 15 | Blank stare | `StareShot` |
+| 17 | Bat and run | `SmashShot` |
+| 20 | Packing at home | `PackingShot` |
+| 25 | Train | `TrainShot` |
+| 28 | Forest trail | `ForestShot` |
+| 31 | Arrival at the shore | `ArrivalShot` |
+| 35.4 | Touching the sea, fade | `ShoreShot` |
+| 39 | Black | |
+| 41 | Night by the fire, fade | `NightShot` |
 
 ## What goes wrong
 
@@ -83,5 +86,9 @@ Times are from the film's start; a change to a shot's length moves every later s
   per shot; say that it was measured, not heard, and what to check by ear.
 - **The film is drawn by its own clock.** Anything that moves by real time, such as a shader's `TIME`, runs at the wrong
   speed in the frames; give it the film's time, as the sea's waves get.
+- **A hand or a desk lies in a dark band.** The office's strip lights cast shadows on the desks under them. A close-up
+  can pass its own light direction to `OfficeLight`, as the mouse shot does, to move the band off its subject.
+- **The page on his screen comes out pale.** `CatgirlPage` has its own light; a lit colour over 1 is cut off to white,
+  so keep its key and fill light together near 1.
 - **A new model in the film.** The film's own sets belong in `IntroSets`; anything the game already has is taken from
   the game's builders, so it stays the same model.

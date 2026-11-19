@@ -3,7 +3,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The intro film's own poses, for what nobody does in the game: sitting at a desk, yelling, swinging a bat, riding a train and shivering.</summary>
+/// <summary>The intro film's own poses, for what nobody does in the game: sitting at a desk, dancing, yelling, swinging a bat, riding a train and shivering.</summary>
 internal static class IntroPoses {
     /// <summary>A value eased through keys sorted by time, held before the first and after the last; <paramref name="blend"/> mixes two of them.</summary>
     public static T Keyed<T>(float time, Func<T, T, float, T> blend, ReadOnlySpan<(float At, T Value)> keys) {
@@ -40,6 +40,32 @@ internal static class IntroPoses {
             OutL = -8,
             ElbowL = 50 + tap * 9
         };
+    }
+
+    /// <summary>At the desk with the left hand on the keyboard and the eyes on the screen; the film puts the right hand on the mouse.</summary>
+    public static readonly Pose Browsing = Seated with { Lean = 12, Head = 6, RaiseL = 46, OutL = -6, ElbowL = 56 };
+
+    /// <summary>Sitting bolt upright with the hands in the lap, facing straight ahead.</summary>
+    public static readonly Pose Staring = Seated with { Lean = 2, Head = 0 };
+
+    /// <summary>Seconds a beat of the catgirls' dance lasts.</summary>
+    public const float DanceBeat = .5f;
+
+    /// <summary>How far a dancer leans to her left at this moment, from -1 to 1: one sway a beat.</summary>
+    public static float DanceSway(float time) => MathF.Sin(time / DanceBeat * MathF.PI);
+
+    /// <summary>
+    /// A dance of eight beats: bouncing on the knees with the hips swaying, the fists up by the chin like paws, pawing in turn.
+    /// Over its second half both arms wave overhead.
+    /// </summary>
+    public static Pose Dancing(float time) {
+        float beat = time / DanceBeat, sway = DanceSway(time), knee = 10 + 26 * MathF.Abs(sway);
+        var paws = new Pose(Lean: 6, Sway: 9 * sway, Twist: 10 * sway, Head: -4,
+            RaiseL: 62 + 22 * sway, OutL: 24, ElbowL: 128, RaiseR: 62 - 22 * sway, OutR: 24, ElbowR: 128,
+            SwingL: knee / 2, KneeL: knee, SwingR: knee / 2, KneeR: knee);
+        var waving = paws with { RaiseL = 158, OutL = 14 + 18 * sway, ElbowL = 24, RaiseR = 158, OutR = 14 - 18 * sway, ElbowR = 24 };
+        float bar = Mathf.PosMod(beat, 8);
+        return Pose.Lerp(paws, waving, Mathf.SmoothStep(3.6f, 4, bar) - Mathf.SmoothStep(7.6f, 8, bar));
     }
 
     /// <summary>Shrinking in the chair from someone standing over the left shoulder.</summary>

@@ -234,6 +234,7 @@ Checks and review tools:
 | `src/actors/enemies/wolf/WolfReview.cs` | The `--wolf-scene` scenes: wolves turning on a patrol, turning to a player they smell and howling, feeding on one they brought down, following one with a torch, and fighting one with an axe |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
 | `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
+| `src/intro/CatgirlPage.cs` | The web page on the hero's screen in the film: three catgirls dancing inside a browser window |
 | `src/intro/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
 | `tools/intro_film.py` | Draws the film's frames and writes its sound cue sheet |
 
@@ -1165,7 +1166,13 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 - It reuses the game's own models: the player's rig, the pack, flask, axe and torch, the trees, the valley with its
   shore and sea, and the fire pit. Walking and running go through the game's gaits.
 - New for the film: the office, the rented room and the train car (`IntroSets`), a baseball bat, the boss
-  (`ActorSkin.Boss`), and the poses in `IntroPoses`.
+  (`ActorSkin.Boss`), the catgirls (`ActorSkin.Catgirl`) and the poses in `IntroPoses`.
+- The hero's screen shows a web page of three catgirls dancing (`CatgirlPage`). The page is a small world of its own,
+  drawn to a picture that a sheet over his screen wears; it is drawn again each frame only while the office is shown.
+  The catgirls are the game's person model with long hair, cat ears, a skirt and a tail of four joints
+  (`ActorRig.SwingTail`), dancing `IntroPoses.Dancing` in step.
+- The paint filter is drawn over the frames wider than in the game (`WorldView.IntroPaintWidth`), since the movie tool
+  shrinks them.
 - The camera is the game's own, switched to perspective and placed per shot at eye level. A dome around it draws the
   sky,
   since the game's sky is one flat colour that only a view from above hides.
@@ -1176,7 +1183,8 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   level,
   then settings. A game sound goes by its name in `assets/sounds`, and music or one of the film's own recordings by its
   folder and name under `assets`, such as `intro/boss`. A cue's `from` and `length` take a part of a file, `far=1` makes
-  it distant, `rate` plays it faster or slower, and a `stop` cue fades out the music track that is playing.
+  it distant, `muffled=1` leaves only its low part as if heard through a wall, `rate` plays it faster or slower, and a
+  `stop` cue fades out the music track that is playing.
 - A hand goes to a thing through `Reaching`, which bends an arm of a pose so its fist lands on a point: packing at home
   and touching the sea use it over the game's crafting squat.
 - A pose's elbow folds only forward. `Folding` also turns the upper arm about its own length (`ActorRig.RollArm`), so a

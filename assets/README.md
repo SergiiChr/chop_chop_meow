@@ -46,9 +46,10 @@ Detail past these does not show at the game's camera distance and costs frame ti
 Models are assembled from code-built Godot meshes, with baked meshes for trees, berry bushes and four foods.
 
 - `src/WorldModels.cs` — world objects, wolf carcass and trade cart.
-- `src/ActorRig.cs` — player, worker, courier and the intro film's boss, and the tools they hold: the steel shovel is
+- `src/ActorRig.cs` — player, worker, courier and the intro film's boss and catgirls, and the tools they hold: the steel shovel is
   a spade with a bar across the top of its handle and a pointed blade, laid through both fists while digging.
 - `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
+- `src/intro/CatgirlPage.cs` — the web page of dancing catgirls on the hero's screen in the intro film.
 - `src/ModelKit.cs` — shared primitive, material and fade helpers.
   A material is flat colour or one of the surfaces wood, metal, stone, cloth and earth: the colour stays the model's
   own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
@@ -266,6 +267,8 @@ them out of the game.
 - `office.mp3` — thirteen seconds of "IT office 3" by thellywellyn (Pixabay 535970).
 - `office_room.mp3` — thirteen seconds of "Office ambience 01 (owi)" by freesound_community (Pixabay 57193), laid over
   it.
+- `mouse_click.ogg` and `mouse_release.ogg` — the first mouse click and mouse release of Kenney's
+  [UI Audio](https://kenney.nl/assets/ui-audio) pack, CC0 1.0, downloaded from Patch's asset library (patch.gg).
 
 The train and office recordings were downloaded from Pixabay; their titles and authors are as the downloads' file names
 give them.

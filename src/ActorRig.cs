@@ -5,7 +5,7 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-public enum ActorSkin { Player, Worker, Courier, Boss }
+public enum ActorSkin { Player, Worker, Courier, Boss, Catgirl }
 
 /// <summary>
 /// A jointed low-poly person about 1.65 units tall, posed every frame from <see cref="ActorAnimation.PoseAt"/>.
@@ -36,29 +36,38 @@ public sealed class ActorRig {
     public Node3D Head => head;
     /// <summary>The player's backpack and its straps, which a film hides before the journey starts; null on other skins.</summary>
     public Node3D? Pack { get; private set; }
+    /// <summary>A catgirl's tail, joint by joint from its root to its tip; empty on other skins.</summary>
+    private readonly List<Node3D> tail = new();
+    /// <summary>How far each joint of the tail bends at rest, in degrees: back and down from the spine, then curling up.</summary>
+    private static readonly float[] TailCurl = { -115, 30, 35, 35 };
 
     /// <param name="shirtColor">Tells players apart; each skin has its own otherwise.</param>
-    public ActorRig(ActorSkin skin, string? shirtColor = null) {
+    /// <param name="hairColor">Tells catgirls apart; each skin has its own otherwise.</param>
+    public ActorRig(ActorSkin skin, string? shirtColor = null, string? hairColor = null) {
         var (skinTone, hair, shirt, legs, boots) = skin switch {
             ActorSkin.Worker => ("c48d66", "2e2420", "e9dfc6", "3c5e94", "5c3a22"),
             ActorSkin.Courier => ("b98060", "3a2c22", "6d7378", "3b3f45", "2d2a28"),
             ActorSkin.Boss => ("dba083", "8c8a86", "ece8dc", "2c2f36", "1d1c1c"),
+            ActorSkin.Catgirl => ("f0c9ae", "f29ab8", "fbf6f8", "f6f1f4", "3a2d3a"),
             _ => ("d9a27c", "5a3b25", "2f7f86", "34465e", "6b4428"),
         };
-        shirt = shirtColor ?? shirt;
+        shirt = shirtColor ?? shirt; hair = hairColor ?? hair;
+        bool catgirl = skin == ActorSkin.Catgirl;
         hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
         (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, legs, boots);
         (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, legs, boots);
         torso = Pivot(hips, Vector3.Zero);
-        HumanShape.Torso(torso, shirt, legs);
+        // A catgirl's dress runs down over the hips; her stockings start under it.
+        HumanShape.Torso(torso, shirt, catgirl ? shirt : legs);
         Cylinder(torso, .055f, .05f, .08f, new Vector3(0, .54f, 0), Mat(skinTone));
         head = Pivot(torso, new Vector3(0, .56f, 0));
         Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(skinTone), new Vector3(.95f, 1.05f, 1), 16);
         Sphere(head, .023f, new Vector3(0, .12f, .115f), Mat(skinTone), new Vector3(.7f, 1, 1), 8);
         shoulderL = Pivot(torso, new Vector3(ShoulderOut, ShoulderUp, 0));
         shoulderR = Pivot(torso, new Vector3(-ShoulderOut, ShoulderUp, 0));
-        elbowL = Arm(shoulderL, shirt, skinTone, skin == ActorSkin.Player);
-        elbowR = Arm(shoulderR, shirt, skinTone, skin == ActorSkin.Player);
+        bool shortSleeves = skin == ActorSkin.Player || catgirl;
+        elbowL = Arm(shoulderL, shirt, skinTone, shortSleeves);
+        elbowR = Arm(shoulderR, shirt, skinTone, shortSleeves);
         switch (skin) {
             case ActorSkin.Player:
                 Pack = BuildPlayerDetails(skinTone, hair);
@@ -74,6 +83,9 @@ public sealed class ActorRig {
                 break;
             case ActorSkin.Boss:
                 BuildBossDetails(skinTone, hair, shirt);
+                break;
+            case ActorSkin.Catgirl:
+                BuildCatgirlDetails(hair, shirt);
                 break;
         }
         crate = Pivot(torso, new Vector3(0, .37f, .33f));
@@ -131,6 +143,46 @@ public sealed class ActorRig {
         Box(head, new Vector3(.075f, .016f, .014f), new Vector3(0, .088f, .112f), Mat(hair));
         Sphere(torso, .15f, new Vector3(0, .23f, .045f), Cloth(shirt), new Vector3(1.05f, 1, .85f), 12);
         Tie(torso, "8e2a2a").Position += new Vector3(0, 0, .045f);
+    }
+
+    /// <summary>
+    /// A catgirl on a web page: long hair with a fringe, cat ears, large eyes, a collar with a bell, a skirt and a tail.
+    /// </summary>
+    private void BuildCatgirlDetails(string hair, string dress) {
+        var locks = Mat(hair);
+        // A cap of hair, a fringe over the brow, a fall down the back and a lock in front of each shoulder.
+        Sphere(head, .13f, new Vector3(0, .185f, -.022f), locks, new Vector3(1.04f, .76f, 1.06f), 16);
+        Box(head, new Vector3(.19f, .04f, .03f), new Vector3(0, .207f, .098f), locks, new Vector3(-12, 0, 0));
+        Sphere(head, .12f, new Vector3(0, .05f, -.075f), locks, new Vector3(1.1f, 1.5f, .6f), 12);
+        foreach (float side in new[] { -1f, 1f }) {
+            Limb(head, .028f, .2f, new Vector3(side * .115f, .17f, .035f), locks);
+            // An ear: a flattened pyramid of hair with a pink one set into its front.
+            var ear = Pivot(head, new Vector3(side * .075f, .265f, -.01f), new Vector3(0, 0, -side * 16));
+            Cylinder(ear, .05f, 0, .1f, new Vector3(0, .04f, 0), locks, sides: 4).Scale = new Vector3(1, 1, .55f);
+            Cylinder(ear, .03f, 0, .065f, new Vector3(0, .03f, .014f), Mat("f7b3c4"), sides: 4).Scale = new Vector3(1, 1, .4f);
+            // An eye with a glint in it, and a blush on the cheek under it.
+            Box(head, new Vector3(.032f, .04f, .012f), new Vector3(side * .048f, .14f, .108f), Mat("2c2530"));
+            Box(head, new Vector3(.011f, .013f, .013f), new Vector3(side * .048f + .007f, .151f, .109f), Mat("ffffff"));
+            Box(head, new Vector3(.03f, .013f, .008f), new Vector3(side * .08f, .105f, .087f), Mat("f4a3ae"), new Vector3(0, side * 40, 0));
+        }
+        Box(head, new Vector3(.024f, .008f, .012f), new Vector3(0, .082f, .113f), Mat("b5475a"));
+        Cylinder(torso, .058f, .058f, .022f, new Vector3(0, .535f, 0), Cloth("b5324a"));
+        Sphere(torso, .02f, new Vector3(0, .52f, .062f), Metal("e8c14a", .3f, .8f));
+        Cylinder(torso, .27f, .13f, .27f, new Vector3(0, -.01f, 0), Cloth(dress), sides: 14);
+        // The tail: capsules end to end, each on a joint at the end of the one before.
+        const float segment = .11f, thick = .022f;
+        var joint = Pivot(torso, new Vector3(0, .06f, -.1f));
+        for (int i = 0; i < TailCurl.Length; i++) {
+            if (i > 0) joint = Pivot(joint, new Vector3(0, segment, 0));
+            Limb(joint, thick, segment + thick * 2, new Vector3(0, segment, 0), locks);
+            tail.Add(joint);
+        }
+        SwingTail(0, 0);
+    }
+
+    /// <summary>Bends a catgirl's tail sideways, from <paramref name="root"/> degrees at its first joint to <paramref name="tip"/> at its last.</summary>
+    public void SwingTail(float root, float tip) {
+        for (int i = 0; i < tail.Count; i++) tail[i].RotationDegrees = new Vector3(TailCurl[i], 0, Mathf.Lerp(root, tip, i / (tail.Count - 1f)));
     }
 
     /// <summary>A knotted tie down the front of a shirt; returned so it can be loosened or taken off.</summary>
