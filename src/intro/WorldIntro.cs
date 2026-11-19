@@ -13,7 +13,7 @@ namespace ChopChopMeow;
 /// The intro film: the hero's last day at the office, the trip out, his arrival at the shore and his first night by a fire.
 /// <c>--render-intro DIR</c> plays it in place of a game, under a film camera at eye level rather than the game's view from above.
 /// Each frame is saved to DIR with a cue sheet of its sounds; a movie tool outside this project turns them into <c>assets/intro.ogv</c>.
-/// With <c>--intro-dance</c> it draws only the solo of the catgirl on the hero's screen, filling the picture, once through.
+/// With <c>--intro-dance</c> it draws only the solo of the catgirl on the hero's screen, as tall as the picture, once through.
 /// </summary>
 public partial class WorldView {
     public const int IntroFps = 30;
@@ -351,6 +351,7 @@ public partial class WorldView {
     /// <param name="rays">The way the strip lights' light travels, down onto the desks at a slant unless given.</param>
     private void OfficeLight(Vector3? rays = null) {
         Stage(office.Root);
+        office.Monitor.Visible = true;
         Light(rays ?? new Vector3(.25f, -1, .2f), "eef2ff", .9f, "c4c3c0", .9f, 14);
         PaintSky("9fb4c8", "dfe6e2");
         hero.Pack!.Visible = false;
@@ -401,7 +402,7 @@ public partial class WorldView {
     private void MouseShot(float t, float dt) {
         const float pressSeconds = .09f;
         // The light falls steeper here, which moves a strip light's shadow off his hand.
-        if (cut) { OfficeLight(new Vector3(.02f, -1, -.05f)); office.Monitor.Visible = true; boss.Root.Visible = false; mouseFingers.Visible = true; }
+        if (cut) { OfficeLight(new Vector3(.02f, -1, -.05f)); boss.Root.Visible = false; mouseFingers.Visible = true; }
         OfficeAround();
         // Round the pad, to a stop for the double click, then a short slide to the last click.
         office.Mouse.Position = IntroSets.MouseSpot + Path(t, (0, new Vector3(.03f, 0, -.02f)), (.35f, new Vector3(-.04f, 0, .03f)), (.7f, new Vector3(.05f, 0, .04f)),
@@ -430,29 +431,37 @@ public partial class WorldView {
         Frame(screen + new Vector3(0, .01f, -.56f + .08f * Mathf.SmoothStep(0, ScreenSeconds, t)), screen, 34);
     }
 
-    /// <summary>The soloist's dance alone, the page filling the picture over everything else and under no paint filter.</summary>
+    /// <summary>The soloist's dance alone: the page as tall as the picture, on black, over everything else and under no paint filter.</summary>
     private void DanceShot(float t, float dt) {
         if (cut) {
             OfficeLight();
             office.Page.Rehearse();
+            // The page is narrower than the picture, so black covers the office at its sides.
+            var backdrop = new ColorRect { Color = Colors.Black };
             var page = new TextureRect { Texture = office.Page.Picture.AlbedoTexture, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };
-            page.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-            filmLayer.AddChild(page); filmLayer.MoveChild(page, 0);
+            backdrop.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); page.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+            backdrop.AddChild(page);
+            filmLayer.AddChild(backdrop); filmLayer.MoveChild(backdrop, 0);
         }
         office.Page.Play(t);
     }
 
+    /// <summary>The boss bent over the hero's left shoulder, <paramref name="yelling"/> seconds into his rant, his mouth as wide open as he shouts.</summary>
+    private void YellingBoss(float yelling, float shout) {
+        Place(boss, BossSpot, -100, IntroPoses.Yelling(yelling));
+        bossMouth.Scale = new Vector3(1 + shout * .2f, .25f + shout, 1);
+    }
+
     /// <summary>The boss leans over him, yelling and jabbing a finger; he shrinks into the chair.</summary>
     private void BossShot(float t, float dt) {
-        if (cut) { OfficeLight(); office.Monitor.Visible = true; }
+        if (cut) OfficeLight();
         OfficeAround();
         // His mouth opens as wide as the recording is loud at this moment.
         float shout = Shout(BossVoiceStarts + BossHeardBefore + t);
         Place(hero, Vector3.Zero, 0, IntroPoses.Cowering(t));
         TurnHead(hero, 0, 38, 0);
         heroLids.Scale = new Vector3(1, .01f, 1);
-        Place(boss, BossSpot, -100, IntroPoses.Yelling(t));
-        bossMouth.Scale = new Vector3(1 + shout * .2f, .25f + shout, 1);
+        YellingBoss(t, shout);
         // From the desk top, looking up past his face at the boss, with a tremor on every shout.
         var tremor = new Vector3(MathF.Sin(t * 47), MathF.Sin(t * 61 + 1), 0) * .006f * shout;
         Frame(new Vector3(-.6f, .84f, .34f).Lerp(new Vector3(-.52f, .86f, .3f), Mathf.SmoothStep(0, BossSeconds, t)) + tremor, new Vector3(.5f, 1.26f, .05f), 54);
@@ -469,9 +478,7 @@ public partial class WorldView {
         OfficeAround();
         Place(hero, Vector3.Zero, 0, IntroPoses.Staring);
         heroLids.Scale = new Vector3(1, .01f, 1);
-        float shout = Shout(BossVoiceAgain + t);
-        Place(boss, BossSpot, -100, IntroPoses.Yelling(BossSeconds + t));
-        bossMouth.Scale = new Vector3(1 + shout * .2f, .25f + shout, 1);
+        YellingBoss(BossSeconds + t, Shout(BossVoiceAgain + t));
         Frame(new Vector3(0, 1.14f, .82f).Lerp(new Vector3(0, 1.14f, .7f), Mathf.SmoothStep(0, StareSeconds, t)), new Vector3(0, 1.13f, .1f), 28);
     }
 
@@ -481,7 +488,7 @@ public partial class WorldView {
     private void SmashShot(float t, float dt) {
         const float drop = 1.9f, bolt = 2.02f;
         if (cut) {
-            OfficeLight(); office.LeaningBat.Visible = false; office.Monitor.Visible = true;
+            OfficeLight(); office.LeaningBat.Visible = false;
             office.Chair.Position += new Vector3(-.35f, .2f, -1.25f); office.Chair.RotationDegrees = new Vector3(0, 40, 84);
         }
         OfficeAround();

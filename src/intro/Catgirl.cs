@@ -29,9 +29,9 @@ internal sealed class Catgirl {
     public Catgirl(CatgirlOutfit outfit, Vector3 at) {
         this.outfit = outfit;
         var (hair, eyes, clothes) = outfit switch {
-            CatgirlOutfit.Maid => ("f29ab8", "3f8fd6", new CatgirlClothes("25222c", "25222c", "f6f1f4", "1d1b20", Sleeves.Short, false)),
-            CatgirlOutfit.Shorts => ("e8c56a", "d98a2b", new CatgirlClothes("f6f4f0", "1c1b20", ActorRig.CatgirlSkin, "c8372f", Sleeves.None, true)),
-            _ => ("e9e6f2", "8a5fd0", new CatgirlClothes("f0b63f", "f0b63f", ActorRig.CatgirlSkin, "f4f4f4", Sleeves.Long, true)),
+            CatgirlOutfit.Maid => ("f29ab8", "3f8fd6", new CatgirlClothes("25222c", "25222c", "f6f1f4", "1d1b20", Sleeves.Short)),
+            CatgirlOutfit.Shorts => ("e8c56a", "d98a2b", new CatgirlClothes("f6f4f0", "1c1b20", null, "c8372f", Sleeves.None)),
+            _ => ("e9e6f2", "8a5fd0", new CatgirlClothes("f0b63f", "f0b63f", null, "f4f4f4", Sleeves.Long)),
         };
         Rig = new ActorRig(ActorSkin.Catgirl, clothes: clothes);
         home = at;
@@ -42,7 +42,7 @@ internal sealed class Catgirl {
         BuildFace(hair, eyes);
         BuildHair();
         BuildTail();
-        BuildOutfit();
+        BuildOutfit(clothes);
         left = new Hand(Rig, true, skin); right = new Hand(Rig, false, skin);
     }
 
@@ -121,11 +121,11 @@ internal sealed class Catgirl {
     }
 
     /// <summary>What she wears over the body's own colours: what is above the waist rides on the chest, the rest on the torso under it.</summary>
-    private void BuildOutfit() {
+    private void BuildOutfit(CatgirlClothes clothes) {
         StandardMaterial3D white = Cloth("f4f2ee");
         switch (outfit) {
             case CatgirlOutfit.Maid: {
-                    var black = Cloth("25222c");
+                    var black = Cloth(clothes.Top);
                     // A flared skirt over a petticoat, an apron with a bib, a waistband tied in a bow at the back, puffed sleeves and a collar.
                     Cylinder(torso, .3f, .1f, .3f, new Vector3(0, -.03f, 0), black, sides: 16);
                     Cylinder(torso, .31f, .29f, .03f, new Vector3(0, -.185f, 0), white, sides: 16);
@@ -146,7 +146,7 @@ internal sealed class Catgirl {
                     break;
                 }
             case CatgirlOutfit.Shorts: {
-                    StandardMaterial3D black = Cloth("1c1b20"), red = Cloth("c8372f");
+                    StandardMaterial3D black = Cloth(clothes.Hips), red = Cloth("c8372f");
                     // A sleeveless shirt: a cap over each shoulder where a sleeve would start, a small collar and three buttons.
                     foreach (float side in new[] { -1f, 1f }) {
                         Sphere(chest, .05f, new Vector3(side * .14f, .455f, 0), white, new Vector3(.8f, .8f, 1.1f), 10);
@@ -165,7 +165,7 @@ internal sealed class Catgirl {
                     break;
                 }
             default: {
-                    StandardMaterial3D hoodie = Cloth("f0b63f"), trim = Cloth("d99f2b");
+                    StandardMaterial3D hoodie = Cloth(clothes.Top), trim = Cloth("d99f2b");
                     // A hoodie several sizes too large, down to the thighs: its body in two lengths that overlap at the waist, a hem
                     // band, a hood, a pouch pocket and two cords.
                     Cylinder(torso, .2f, .174f, .33f, new Vector3(0, .095f, 0), hoodie, sides: 14).Scale = new Vector3(1, 1, .78f);

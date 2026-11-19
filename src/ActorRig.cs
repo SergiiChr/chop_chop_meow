@@ -11,10 +11,10 @@ public enum ActorSkin { Player, Worker, Courier, Boss, Catgirl }
 public enum Sleeves { None, Short, Long }
 
 /// <summary>
-/// What a catgirl of the intro film wears on her body: the colours of her top, hips, legs and shoes, her sleeves, and
-/// whether her legs are bare, in which case their colour is her skin's.
+/// What a catgirl of the intro film wears on her body: the colours of her top, hips, legs and shoes, and her sleeves.
+/// Legs without a colour are bare.
 /// </summary>
-public readonly record struct CatgirlClothes(string Top, string Hips, string Legs, string Shoes, Sleeves Sleeves, bool BareLegs);
+public readonly record struct CatgirlClothes(string Top, string Hips, string? Legs, string Shoes, Sleeves Sleeves);
 
 /// <summary>
 /// A jointed low-poly person about 1.65 units tall, posed every frame from <see cref="ActorAnimation.PoseAt"/>.
@@ -64,7 +64,7 @@ public sealed class ActorRig {
             ActorSkin.Worker => ("c48d66", "2e2420", "e9dfc6", "3c5e94", "5c3a22"),
             ActorSkin.Courier => ("b98060", "3a2c22", "6d7378", "3b3f45", "2d2a28"),
             ActorSkin.Boss => ("dba083", "8c8a86", "ece8dc", "2c2f36", "1d1c1c"),
-            ActorSkin.Catgirl when clothes is { } worn => (CatgirlSkin, "", worn.Top, worn.Legs, worn.Shoes),
+            ActorSkin.Catgirl when clothes is { } worn => (CatgirlSkin, "", worn.Top, worn.Legs ?? CatgirlSkin, worn.Shoes),
             _ => ("d9a27c", "5a3b25", "2f7f86", "34465e", "6b4428"),
         };
         shirt = shirtColor ?? shirt;
@@ -73,7 +73,7 @@ public sealed class ActorRig {
         shoulderOut = slim ? CatgirlShoulderOut : ShoulderOut;
         float neck = slim ? .78f : 1;
         hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
-        bool bareLegs = clothes?.BareLegs ?? false;
+        bool bareLegs = clothes is { Legs: null };
         (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, legs, boots, slim, bareLegs);
         (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, legs, boots, slim, bareLegs);
         torso = Pivot(hips, Vector3.Zero);
@@ -85,9 +85,9 @@ public sealed class ActorRig {
         Sphere(head, slim ? .011f : .023f, new Vector3(0, .12f, .115f), Mat(skinTone), new Vector3(.7f, 1, 1), 8);
         shoulderL = Pivot(chest, new Vector3(shoulderOut, ShoulderUp, 0));
         shoulderR = Pivot(chest, new Vector3(-shoulderOut, ShoulderUp, 0));
-        bool shortSleeves = skin == ActorSkin.Player || clothes is { Sleeves: not Sleeves.Long }, bareArms = clothes is { Sleeves: Sleeves.None };
-        elbowL = Arm(shoulderL, shirt, skinTone, shortSleeves, slim, bareArms);
-        elbowR = Arm(shoulderR, shirt, skinTone, shortSleeves, slim, bareArms);
+        var sleeves = clothes?.Sleeves ?? (skin == ActorSkin.Player ? Sleeves.Short : Sleeves.Long);
+        elbowL = Arm(shoulderL, shirt, skinTone, sleeves, slim);
+        elbowR = Arm(shoulderR, shirt, skinTone, sleeves, slim);
         switch (skin) {
             case ActorSkin.Player:
                 Pack = BuildPlayerDetails(skinTone, hair);
@@ -222,9 +222,9 @@ public sealed class ActorRig {
     }
 
     /// <summary>Every role shares the continuous arm and its skin weights; the palette selects sleeve length.</summary>
-    private Node3D Arm(Node3D shoulder, string sleeve, string skinTone, bool shortSleeve, bool slim, bool bare) {
+    private Node3D Arm(Node3D shoulder, string shirt, string skinTone, Sleeves sleeves, bool slim) {
         var elbow = Pivot(shoulder, new Vector3(0, -UpperArm, 0));
-        limbs.Add((HumanShape.Arm(shoulder, UpperArm, shoulder.Position.X > 0, sleeve, skinTone, shortSleeve, slim, bare), elbow));
+        limbs.Add((HumanShape.Arm(shoulder, UpperArm, shoulder.Position.X > 0, shirt, skinTone, sleeves, slim), elbow));
         return elbow;
     }
 
@@ -276,7 +276,8 @@ public sealed class ActorRig {
 
     /// <summary>
     /// Turns a catgirl's chest on her belly at the waist: a lean forward, a twist toward her left and a tip toward her
-    /// right shoulder, in degrees. It stays until set again.
+    /// right shoulder, in degrees.
+    /// It stays until set again.
     /// </summary>
     public void BendChest(float lean, float twist, float tip) {
         var turn = Basis.FromEuler(new Vector3(Mathf.DegToRad(lean), Mathf.DegToRad(twist), Mathf.DegToRad(tip)));
@@ -285,15 +286,19 @@ public sealed class ActorRig {
 
     /// <summary>
     /// Turns the hips with the legs and all above them: a tuck forward, a turn toward the left and a tilt that lifts the
-    /// left hip, in degrees. It stays until set again.
+    /// left hip, in degrees.
+    /// It stays until set again.
     /// </summary>
     public void TurnHips(float tuck, float turn, float tilt) => hips.RotationDegrees = new Vector3(tuck, turn, tilt);
 
-    /// <summary>Moves a shoulder from its place on the chest, up for a shrug and forward for a hunch, in metres. It stays until set again.</summary>
+    /// <summary>
+    /// Moves a shoulder from its place on the chest, up for a shrug and forward for a hunch, in metres.
+    /// It stays until set again.
+    /// </summary>
     public void MoveShoulder(bool left, float up, float forward) =>
         (left ? shoulderL : shoulderR).Position = new Vector3(left ? shoulderOut : -shoulderOut, ShoulderUp + up, forward);
 
-    /// <summary>Tips a foot sideways at the ankle, its outer edge down, on top of the pose just shown.</summary>
+    /// <summary>Tips a foot sideways at the ankle, its outer edge up, on top of the pose just shown.</summary>
     public void RollFoot(bool left, float degrees) {
         var foot = left ? footL : footR;
         foot.SetBonePoseRotation(2, foot.GetBonePoseRotation(2) * new Quaternion(Vector3.Back, Mathf.DegToRad(left ? degrees : -degrees)));

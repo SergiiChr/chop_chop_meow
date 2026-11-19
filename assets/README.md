@@ -46,8 +46,9 @@ Detail past these does not show at the game's camera distance and costs frame ti
 Models are assembled from code-built Godot meshes, with baked meshes for trees, berry bushes and four foods.
 
 - `src/WorldModels.cs` — world objects, wolf carcass and trade cart.
-- `src/ActorRig.cs` — player, worker, courier and the intro film's boss and catgirls, and the tools they hold: the steel shovel is
-  a spade with a bar across the top of its handle and a pointed blade, laid through both fists while digging.
+- `src/ActorRig.cs` — player, worker, courier and the intro film's boss and catgirls, and the tools they hold: the
+  steel shovel is a spade with a bar across the top of its handle and a pointed blade, laid through both fists while
+  digging.
 - `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
 - `src/intro/CatgirlPage.cs` — the web page of dancing catgirls on the hero's screen in the intro film.
 - `src/intro/Catgirl.cs` — a catgirl of that page: the person model's slim build with a face, hair, cat ears, a tail,

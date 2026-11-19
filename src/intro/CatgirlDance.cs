@@ -79,7 +79,10 @@ internal static class CatgirlDance {
                 Mix(Facing, to.Facing), Mix(Lift, to.Lift), Mix(Bounce, to.Bounce));
         }
 
-        /// <summary>The same step the other way round: what her left side did, her right side does.</summary>
+        /// <summary>
+        /// The same step the other way round: what her left side did, her right side does.
+        /// A kick stays her right foot's.
+        /// </summary>
         public Step Mirrored(float at) => new(at, Mirror(HandR), Mirror(ElbowR), ShapeR, Mirror(HandL), Mirror(ElbowL), ShapeL,
             -Hip, -HipTurn, -Tip, -Twist, SplayR, SplayL, KneeR, KneeL, Kick, Lean, Nod, -Turn, -Tilt, Toes, WristR, WristL, ShrugR, ShrugL, -Facing, Lift, Bounce);
     }
@@ -184,11 +187,9 @@ internal static class CatgirlDance {
             new Vector3(step.WristL, 0, 0), new Vector3(step.WristR, 0, 0), new Vector2(step.ShrugL, 0), new Vector2(step.ShrugR, 0), step.Facing, step.Lift);
     }
 
+    private static readonly (float At, Step Step)[] SoloKeys = Array.ConvertAll(SoloSteps, step => (step.At, step));
+
     /// <summary>The blend of the two steps the solo is between at a moment of its loop.</summary>
-    private static Step SoloStep(float time) {
-        float at = Mathf.PosMod(time, SoloSeconds);
-        int next = Array.FindIndex(SoloSteps, key => key.At > at);
-        Step from = SoloSteps[next - 1], to = SoloSteps[next];
-        return from.Toward(to, Mathf.SmoothStep(from.At, to.At, at));
-    }
+    private static Step SoloStep(float time) =>
+        IntroPoses.Keyed<Step>(Mathf.PosMod(time, SoloSeconds), static (from, to, blend) => from.Toward(to, blend), SoloKeys);
 }
