@@ -4,11 +4,14 @@ using static ChopChopMeow.ActorShape;
 
 namespace ChopChopMeow;
 
-/// <summary>One neutral human core: outfits use palette textures while geometry and skin weights are shared.</summary>
+/// <summary>
+/// One neutral human core: outfits use palette textures while geometry and skin weights are shared.
+/// A slim build of it, for the intro film's catgirls, has a waist, a bust, thinner limbs and wrists that end without a fist.
+/// </summary>
 internal static class HumanShape {
     private const float Cloth = 1f / 6, Middle = .5f, End = 5f / 6;
     private static readonly Color Neutral = Colors.White;
-    private static readonly Dictionary<(string, string, string, bool), StandardMaterial3D> palettes = new();
+    private static readonly Dictionary<(string, string, string, bool, bool), StandardMaterial3D> palettes = new();
     private static readonly Ring[] hips = {
         new(.13f,.13f,.085f,Neutral),new(.08f,.155f,.1f,Neutral),
         new(.02f,.165f,.09f,Neutral),new(-.015f,.165f,.088f,Neutral)
@@ -40,30 +43,53 @@ internal static class HumanShape {
         new(-.6f,.001f,.001f,Neutral,.015f,Tone:End)
     };
 
-    public static void Torso(Node3D parent, string shirt, string trousers) {
-        ActorShape.Add(parent, hips, material: ModelKit.Cloth(trousers)).Name = "HumanHips";
-        ActorShape.Add(parent, torso, material: ModelKit.Cloth(shirt)).Name = "HumanTorso";
+    private static readonly Ring[] slimHips = {
+        new(.13f,.115f,.08f,Neutral),new(.08f,.145f,.096f,Neutral),
+        new(.02f,.152f,.094f,Neutral),new(-.015f,.148f,.088f,Neutral)
+    };
+    private static readonly Ring[] slimTorso = {
+        new(.54f,.042f,.04f,Neutral),new(.5f,.09f,.06f,Neutral),
+        new(.44f,.142f,.078f,Neutral),new(.37f,.132f,.098f,Neutral,.014f),
+        new(.31f,.112f,.08f,Neutral),new(.21f,.094f,.068f,Neutral),new(.13f,.112f,.078f,Neutral),new(.105f,.118f,.08f,Neutral)
+    };
+    private static readonly Ring[] slimLeg = Thinned(leg, .8f), slimLeftArm = Wrist(Thinned(leftArm, .7f)), slimRightArm = Wrist(Thinned(rightArm, .7f));
+
+    private static Ring[] Thinned(Ring[] rings, float by) => System.Array.ConvertAll(rings, ring => ring with { Width = ring.Width * by, Depth = ring.Depth * by });
+
+    /// <summary>An arm without its fist: it closes just past the wrist, where a hand with fingers is put on.</summary>
+    private static Ring[] Wrist(Ring[] arm) {
+        var rings = new List<Ring>(System.Array.FindAll(arm, ring => ring.Tone != End));
+        rings.Add(rings[^1] with { Y = rings[^1].Y - .012f, Width = .001f, Depth = .001f });
+        return rings.ToArray();
     }
-    public static Skeleton3D Leg(Node3D parent, float joint, float ankle, string trousers, string boots) {
-        var skeleton = ActorShape.Limb(parent, leg, joint, Palette(trousers, boots, "302d29", false), ankle);
+
+    public static void Torso(Node3D parent, string shirt, string trousers, bool slim = false) {
+        ActorShape.Add(parent, slim ? slimHips : hips, material: ModelKit.Cloth(trousers)).Name = "HumanHips";
+        ActorShape.Add(parent, slim ? slimTorso : torso, material: ModelKit.Cloth(shirt)).Name = "HumanTorso";
+    }
+    /// <param name="bare">Whether the leg is bare skin of the colour given as trousers, which takes no weave.</param>
+    public static Skeleton3D Leg(Node3D parent, float joint, float ankle, string trousers, string boots, bool slim = false, bool bare = false) {
+        var skeleton = ActorShape.Limb(parent, slim ? slimLeg : leg, joint, Palette(trousers, boots, "302d29", false, !bare), ankle);
         skeleton.GetChild<MeshInstance3D>(0).Name = "HumanLeg";
         return skeleton;
     }
-    public static Skeleton3D Arm(Node3D parent, float joint, bool left, string shirt, string skin, bool shortSleeve) {
-        var skeleton = ActorShape.Limb(parent, left ? leftArm : rightArm, joint, Palette(shirt, shortSleeve ? skin : shirt, skin, !shortSleeve));
+    public static Skeleton3D Arm(Node3D parent, float joint, bool left, string shirt, string skin, bool shortSleeve, bool slim = false) {
+        var rings = slim ? left ? slimLeftArm : slimRightArm : left ? leftArm : rightArm;
+        var skeleton = ActorShape.Limb(parent, rings, joint, Palette(shirt, shortSleeve ? skin : shirt, skin, !shortSleeve));
         skeleton.GetChild<MeshInstance3D>(0).Name = left ? "HumanArmLeft" : "HumanArmRight";
         return skeleton;
     }
     /// <param name="middleCloth">Whether the middle tone is cloth too; the weave covers the cloth tones and leaves skin and boots smooth.</param>
-    private static StandardMaterial3D Palette(string cloth, string middle, string end, bool middleCloth) {
-        var key = (cloth, middle, end, middleCloth);
+    /// <param name="firstCloth">Whether the first tone is cloth; a bare leg's is skin.</param>
+    private static StandardMaterial3D Palette(string cloth, string middle, string end, bool middleCloth, bool firstCloth = true) {
+        var key = (cloth, middle, end, middleCloth, firstCloth);
         if (palettes.TryGetValue(key, out var material)) return material;
         // Texel centres map the same neutral limb to clothing, exposed skin, boots and soles, blended between them along the limb.
         // A StandardMaterial3D, so fades treat a limb like any other mesh.
         var image = Image.CreateFromData(3, 1, false, Image.Format.Rgba8, new byte[12]);
         var weave = Image.CreateFromData(3, 1, false, Image.Format.Rgba8, new byte[12]);
         Color[] tones = { new(cloth), new(middle), new(end) };
-        for (int i = 0; i < tones.Length; i++) { image.SetPixel(i, 0, tones[i]); weave.SetPixel(i, 0, i == 0 || i == 1 && middleCloth ? Colors.White : Colors.Black); }
+        for (int i = 0; i < tones.Length; i++) { image.SetPixel(i, 0, tones[i]); weave.SetPixel(i, 0, i == 0 && firstCloth || i == 1 && middleCloth ? Colors.White : Colors.Black); }
         material = new StandardMaterial3D { AlbedoTexture = ImageTexture.CreateFromImage(image), DetailMask = ImageTexture.CreateFromImage(weave), Roughness = .85f };
         ModelKit.Dress(material, Surface.Cloth);
         // A limb is a few centimetres wide: plain filtering, since an anisotropic footprint would reach past the end texels and wrap.

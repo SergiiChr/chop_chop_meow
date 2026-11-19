@@ -8,6 +8,12 @@ namespace ChopChopMeow;
 public enum ActorSkin { Player, Worker, Courier, Boss, Catgirl }
 
 /// <summary>
+/// What a catgirl of the intro film wears on her body: the colours of her top, hips, legs and shoes, whether her sleeves
+/// reach the wrists, and whether her legs are bare, in which case their colour is her skin's.
+/// </summary>
+public readonly record struct CatgirlClothes(string Top, string Hips, string Legs, string Shoes, bool LongSleeves, bool BareLegs);
+
+/// <summary>
 /// A jointed low-poly person about 1.65 units tall, posed every frame from <see cref="ActorAnimation.PoseAt"/>.
 /// The rig faces +Z; the hips are lifted so the lower foot always stays on the ground.
 /// </summary>
@@ -36,38 +42,39 @@ public sealed class ActorRig {
     public Node3D Head => head;
     /// <summary>The player's backpack and its straps, which a film hides before the journey starts; null on other skins.</summary>
     public Node3D? Pack { get; private set; }
-    /// <summary>A catgirl's tail, joint by joint from its root to its tip; empty on other skins.</summary>
-    private readonly List<Node3D> tail = new();
-    /// <summary>How far each joint of the tail bends at rest, in degrees: back and down from the spine, then curling up.</summary>
-    private static readonly float[] TailCurl = { -115, 30, 35, 35 };
+    /// <summary>A catgirl's skin, and how far out from her spine her narrower shoulders sit.</summary>
+    public const string CatgirlSkin = "f0c9ae";
+    public const float CatgirlShoulderOut = .145f;
 
     /// <param name="shirtColor">Tells players apart; each skin has its own otherwise.</param>
-    /// <param name="hairColor">Tells catgirls apart; each skin has its own otherwise.</param>
-    public ActorRig(ActorSkin skin, string? shirtColor = null, string? hairColor = null) {
+    /// <param name="clothes">What a catgirl wears; her hair, face, hands and the rest of her outfit are put on by <see cref="Catgirl"/>.</param>
+    public ActorRig(ActorSkin skin, string? shirtColor = null, CatgirlClothes? clothes = null) {
         var (skinTone, hair, shirt, legs, boots) = skin switch {
             ActorSkin.Worker => ("c48d66", "2e2420", "e9dfc6", "3c5e94", "5c3a22"),
             ActorSkin.Courier => ("b98060", "3a2c22", "6d7378", "3b3f45", "2d2a28"),
             ActorSkin.Boss => ("dba083", "8c8a86", "ece8dc", "2c2f36", "1d1c1c"),
-            ActorSkin.Catgirl => ("f0c9ae", "f29ab8", "fbf6f8", "f6f1f4", "3a2d3a"),
+            ActorSkin.Catgirl when clothes is { } worn => (CatgirlSkin, "", worn.Top, worn.Legs, worn.Shoes),
             _ => ("d9a27c", "5a3b25", "2f7f86", "34465e", "6b4428"),
         };
-        shirt = shirtColor ?? shirt; hair = hairColor ?? hair;
-        bool catgirl = skin == ActorSkin.Catgirl;
+        shirt = shirtColor ?? shirt;
+        // A catgirl has the slim build: a waist, thinner limbs, narrower shoulders, a thinner neck and a small nose.
+        bool slim = skin == ActorSkin.Catgirl;
+        float shoulderOut = slim ? CatgirlShoulderOut : ShoulderOut, neck = slim ? .78f : 1;
         hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
-        (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, legs, boots);
-        (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, legs, boots);
+        bool bareLegs = clothes?.BareLegs ?? false;
+        (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, legs, boots, slim, bareLegs);
+        (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, legs, boots, slim, bareLegs);
         torso = Pivot(hips, Vector3.Zero);
-        // A catgirl's dress runs down over the hips; her stockings start under it.
-        HumanShape.Torso(torso, shirt, catgirl ? shirt : legs);
-        Cylinder(torso, .055f, .05f, .08f, new Vector3(0, .54f, 0), Mat(skinTone));
+        HumanShape.Torso(torso, shirt, clothes?.Hips ?? legs, slim);
+        Cylinder(torso, .055f * neck, .05f * neck, .08f, new Vector3(0, .54f, 0), Mat(skinTone));
         head = Pivot(torso, new Vector3(0, .56f, 0));
         Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(skinTone), new Vector3(.95f, 1.05f, 1), 16);
-        Sphere(head, .023f, new Vector3(0, .12f, .115f), Mat(skinTone), new Vector3(.7f, 1, 1), 8);
-        shoulderL = Pivot(torso, new Vector3(ShoulderOut, ShoulderUp, 0));
-        shoulderR = Pivot(torso, new Vector3(-ShoulderOut, ShoulderUp, 0));
-        bool shortSleeves = skin == ActorSkin.Player || catgirl;
-        elbowL = Arm(shoulderL, shirt, skinTone, shortSleeves);
-        elbowR = Arm(shoulderR, shirt, skinTone, shortSleeves);
+        Sphere(head, slim ? .011f : .023f, new Vector3(0, .12f, .115f), Mat(skinTone), new Vector3(.7f, 1, 1), 8);
+        shoulderL = Pivot(torso, new Vector3(shoulderOut, ShoulderUp, 0));
+        shoulderR = Pivot(torso, new Vector3(-shoulderOut, ShoulderUp, 0));
+        bool shortSleeves = skin == ActorSkin.Player || clothes is { LongSleeves: false };
+        elbowL = Arm(shoulderL, shirt, skinTone, shortSleeves, slim);
+        elbowR = Arm(shoulderR, shirt, skinTone, shortSleeves, slim);
         switch (skin) {
             case ActorSkin.Player:
                 Pack = BuildPlayerDetails(skinTone, hair);
@@ -83,9 +90,6 @@ public sealed class ActorRig {
                 break;
             case ActorSkin.Boss:
                 BuildBossDetails(skinTone, hair, shirt);
-                break;
-            case ActorSkin.Catgirl:
-                BuildCatgirlDetails(hair, shirt);
                 break;
         }
         crate = Pivot(torso, new Vector3(0, .37f, .33f));
@@ -145,46 +149,6 @@ public sealed class ActorRig {
         Tie(torso, "8e2a2a").Position += new Vector3(0, 0, .045f);
     }
 
-    /// <summary>
-    /// A catgirl on a web page: long hair with a fringe, cat ears, large eyes, a collar with a bell, a skirt and a tail.
-    /// </summary>
-    private void BuildCatgirlDetails(string hair, string dress) {
-        var locks = Mat(hair);
-        // A cap of hair, a fringe over the brow, a fall down the back and a lock in front of each shoulder.
-        Sphere(head, .13f, new Vector3(0, .185f, -.022f), locks, new Vector3(1.04f, .76f, 1.06f), 16);
-        Box(head, new Vector3(.19f, .04f, .03f), new Vector3(0, .207f, .098f), locks, new Vector3(-12, 0, 0));
-        Sphere(head, .12f, new Vector3(0, .05f, -.075f), locks, new Vector3(1.1f, 1.5f, .6f), 12);
-        foreach (float side in new[] { -1f, 1f }) {
-            Limb(head, .028f, .2f, new Vector3(side * .115f, .17f, .035f), locks);
-            // An ear: a flattened pyramid of hair with a pink one set into its front.
-            var ear = Pivot(head, new Vector3(side * .075f, .265f, -.01f), new Vector3(0, 0, -side * 16));
-            Cylinder(ear, .05f, 0, .1f, new Vector3(0, .04f, 0), locks, sides: 4).Scale = new Vector3(1, 1, .55f);
-            Cylinder(ear, .03f, 0, .065f, new Vector3(0, .03f, .014f), Mat("f7b3c4"), sides: 4).Scale = new Vector3(1, 1, .4f);
-            // An eye with a glint in it, and a blush on the cheek under it.
-            Box(head, new Vector3(.032f, .04f, .012f), new Vector3(side * .048f, .14f, .108f), Mat("2c2530"));
-            Box(head, new Vector3(.011f, .013f, .013f), new Vector3(side * .048f + .007f, .151f, .109f), Mat("ffffff"));
-            Box(head, new Vector3(.03f, .013f, .008f), new Vector3(side * .08f, .105f, .087f), Mat("f4a3ae"), new Vector3(0, side * 40, 0));
-        }
-        Box(head, new Vector3(.024f, .008f, .012f), new Vector3(0, .082f, .113f), Mat("b5475a"));
-        Cylinder(torso, .058f, .058f, .022f, new Vector3(0, .535f, 0), Cloth("b5324a"));
-        Sphere(torso, .02f, new Vector3(0, .52f, .062f), Metal("e8c14a", .3f, .8f));
-        Cylinder(torso, .27f, .13f, .27f, new Vector3(0, -.01f, 0), Cloth(dress), sides: 14);
-        // The tail: capsules end to end, each on a joint at the end of the one before.
-        const float segment = .11f, thick = .022f;
-        var joint = Pivot(torso, new Vector3(0, .06f, -.1f));
-        for (int i = 0; i < TailCurl.Length; i++) {
-            if (i > 0) joint = Pivot(joint, new Vector3(0, segment, 0));
-            Limb(joint, thick, segment + thick * 2, new Vector3(0, segment, 0), locks);
-            tail.Add(joint);
-        }
-        SwingTail(0, 0);
-    }
-
-    /// <summary>Bends a catgirl's tail sideways, from <paramref name="root"/> degrees at its first joint to <paramref name="tip"/> at its last.</summary>
-    public void SwingTail(float root, float tip) {
-        for (int i = 0; i < tail.Count; i++) tail[i].RotationDegrees = new Vector3(TailCurl[i], 0, Mathf.Lerp(root, tip, i / (tail.Count - 1f)));
-    }
-
     /// <summary>A knotted tie down the front of a shirt; returned so it can be loosened or taken off.</summary>
     public static Node3D Tie(Node3D torso, string color) {
         var tie = Pivot(torso, Vector3.Zero);
@@ -236,18 +200,18 @@ public sealed class ActorRig {
         return (holder, flame, light);
     }
 
-    private (Node3D Hip, Node3D Knee, Skeleton3D Skin) Leg(float x, string trousers, string boots) {
+    private (Node3D Hip, Node3D Knee, Skeleton3D Skin) Leg(float x, string trousers, string boots, bool slim, bool bare) {
         var hip = Pivot(hips, new Vector3(x, -.02f, 0));
         var knee = Pivot(hip, new Vector3(0, -ActorAnimation.Thigh, 0));
-        var skin = HumanShape.Leg(hip, ActorAnimation.Thigh, ActorAnimation.Thigh + ActorAnimation.Shin, trousers, boots);
+        var skin = HumanShape.Leg(hip, ActorAnimation.Thigh, ActorAnimation.Thigh + ActorAnimation.Shin, trousers, boots, slim, bare);
         limbs.Add((skin, knee));
         return (hip, knee, skin);
     }
 
     /// <summary>Every role shares the continuous arm and its skin weights; the palette selects sleeve length.</summary>
-    private Node3D Arm(Node3D shoulder, string sleeve, string skinTone, bool shortSleeve) {
+    private Node3D Arm(Node3D shoulder, string sleeve, string skinTone, bool shortSleeve, bool slim) {
         var elbow = Pivot(shoulder, new Vector3(0, -UpperArm, 0));
-        limbs.Add((HumanShape.Arm(shoulder, UpperArm, shoulder.Position.X > 0, sleeve, skinTone, shortSleeve), elbow));
+        limbs.Add((HumanShape.Arm(shoulder, UpperArm, shoulder.Position.X > 0, sleeve, skinTone, shortSleeve, slim), elbow));
         return elbow;
     }
 

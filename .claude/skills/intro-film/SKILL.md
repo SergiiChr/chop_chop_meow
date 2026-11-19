@@ -61,16 +61,16 @@ Times are from the film's start; a change to a shot's length moves every later s
 | 0 | Bored at the desk | `DeskShot` |
 | 5 | Hand on the mouse | `MouseShot` |
 | 7.5 | Catgirls dancing on his screen | `ScreenShot` |
-| 11 | Boss yelling | `BossShot` |
-| 15 | Blank stare | `StareShot` |
-| 17 | Bat and run | `SmashShot` |
-| 20 | Packing at home | `PackingShot` |
-| 25 | Train | `TrainShot` |
-| 28 | Forest trail | `ForestShot` |
-| 31 | Arrival at the shore | `ArrivalShot` |
-| 35.4 | Touching the sea, fade | `ShoreShot` |
-| 39 | Black | |
-| 41 | Night by the fire, fade | `NightShot` |
+| 11.5 | Boss yelling | `BossShot` |
+| 15.5 | Blank stare | `StareShot` |
+| 17.5 | Bat and run | `SmashShot` |
+| 20.5 | Packing at home | `PackingShot` |
+| 25.5 | Train | `TrainShot` |
+| 28.5 | Forest trail | `ForestShot` |
+| 31.5 | Arrival at the shore | `ArrivalShot` |
+| 35.9 | Touching the sea, fade | `ShoreShot` |
+| 39.5 | Black | |
+| 41.5 | Night by the fire, fade | `NightShot` |
 
 ## What goes wrong
 

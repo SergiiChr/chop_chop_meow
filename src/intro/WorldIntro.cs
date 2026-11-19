@@ -279,29 +279,6 @@ public partial class WorldView {
         return left ? pose with { RaiseL = raise, OutL = outward, ElbowL = elbow } : pose with { RaiseR = raise, OutR = outward, ElbowR = elbow };
     }
 
-    /// <summary>
-    /// Bends one arm of a pose so its fist lies on a point of his own torso, given in the torso's space, with the elbow
-    /// swung toward <paramref name="elbowToward"/>.
-    /// That takes a turn of the upper arm about its own length, which a pose cannot hold: <paramref name="roll"/> is that
-    /// turn in degrees, for <see cref="ActorRig.RollArm"/> once the pose is shown.
-    /// </summary>
-    private static RigPose Folding(RigPose pose, bool left, Vector3 target, Vector3 elbowToward, out float roll) {
-        const float upper = ActorRig.UpperArm, fore = ActorRig.Forearm;
-        var to = target - new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
-        float reach = Math.Clamp(to.Length(), .1f, upper + fore - .005f);
-        var line = to.Normalized();
-        // The elbow can sit anywhere on a circle around the line from shoulder to fist; it takes the point nearest the hint.
-        float along = (upper * upper - fore * fore + reach * reach) / (2 * reach), off = MathF.Sqrt(Math.Max(0, upper * upper - along * along));
-        var elbow = line * along + (elbowToward - line * elbowToward.Dot(line)).Normalized() * off;
-        Vector3 arm = elbow / upper, forearm = (line * reach - elbow) / fore;
-        float bend = MathF.Acos(Math.Clamp(arm.Dot(forearm), -1, 1)), outward = MathF.Asin(Math.Clamp(arm.X, -1, 1)), raise = MathF.Atan2(arm.Z, -arm.Y);
-        // The way the bent forearm points, seen from the shoulder as the pose alone turns it, gives the turn still missing.
-        var folds = Basis.FromEuler(new Vector3(-raise, 0, outward)).Inverse() * ((forearm - arm * MathF.Cos(bend)) / MathF.Sin(bend));
-        roll = Mathf.RadToDeg(MathF.Atan2(folds.X, folds.Z));
-        return left ? pose with { RaiseL = Mathf.RadToDeg(raise), OutL = Mathf.RadToDeg(outward), ElbowL = Mathf.RadToDeg(bend) }
-            : pose with { RaiseR = Mathf.RadToDeg(raise), OutR = -Mathf.RadToDeg(outward), ElbowR = Mathf.RadToDeg(bend) };
-    }
-
     private static float Span(float from, float to, float time) => Math.Clamp((time - from) / (to - from), 0, 1);
 
     // ---------- Flying wreckage ----------
@@ -355,7 +332,7 @@ public partial class WorldView {
 
     private static readonly Vector3 BossSpot = new(.86f, 0, .12f);
     /// <summary>How long each shot in the office runs, in seconds.</summary>
-    private const float DeskSeconds = 5, MouseSeconds = 2.5f, ScreenSeconds = 3.5f, BossSeconds = 4, StareSeconds = 2, SmashSeconds = 3;
+    private const float DeskSeconds = 5, MouseSeconds = 2.5f, ScreenSeconds = 4, BossSeconds = 4, StareSeconds = 2, SmashSeconds = 3;
     private const float OfficeSeconds = DeskSeconds + MouseSeconds + ScreenSeconds + BossSeconds + StareSeconds + SmashSeconds;
     /// <summary>
     /// The boss is first heard this many seconds before the cut to him, from <see cref="BossVoiceStarts"/> seconds into his recording.
@@ -379,7 +356,8 @@ public partial class WorldView {
     /// <summary>What goes on in the office by itself: colleagues typing, the catgirls dancing on his screen and its glow.</summary>
     private void OfficeAround() {
         for (int i = 0; i < office.Staff.Count; i++) office.Staff[i].Show(IntroPoses.Typing(filmTime + i * 1.37f), null, false);
-        office.Page.Play(filmTime);
+        // The page's clock starts with the close-up of it.
+        office.Page.Play(filmTime - DeskSeconds - MouseSeconds);
         // The tube's glow wavers a little on his face.
         office.Glow.LightEnergy = .12f + .012f * MathF.Sin(filmTime * 31) + .008f * MathF.Sin(filmTime * 7.3f);
     }
@@ -741,8 +719,8 @@ public partial class WorldView {
         float scared = Mathf.SmoothStep(howl + .3f, howl + .6f, t);
         // Arms crossed over the chest, each palm on the other shoulder, the right arm outside, rubbing a little for warmth.
         float rub = .012f * MathF.Sin(t * 5.2f) * (1 - scared);
-        var huddled = Folding(IntroPoses.Shivering(t, scared), true, new Vector3(-.15f, .44f + rub, .1f), new Vector3(.5f, -1, .3f), out float leftRoll);
-        huddled = Folding(huddled, false, new Vector3(.15f, .44f - rub, .15f), new Vector3(-.5f, -1, .45f), out float rightRoll);
+        var huddled = IntroPoses.Folding(IntroPoses.Shivering(t, scared), true, new Vector3(-.15f, .44f + rub, .1f), new Vector3(.5f, -1, .3f), out float leftRoll);
+        huddled = IntroPoses.Folding(huddled, false, new Vector3(.15f, .44f - rub, .15f), new Vector3(-.5f, -1, .45f), out float rightRoll);
         Place(hero, To3(seat), Mathf.RadToDeg(ActorAnimation.Yaw(toward, 0)), huddled);
         hero.RollArm(true, leftRoll); hero.RollArm(false, rightRoll);
         float look = Track(t, (howl + .3f, 0), (howl + .55f, 55), (pack + .2f, 50), (pack + .5f, -62), (pack + 1.9f, -55), (pack + 2.4f, -20));

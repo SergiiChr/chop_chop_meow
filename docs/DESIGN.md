@@ -235,6 +235,8 @@ Checks and review tools:
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
 | `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
 | `src/intro/CatgirlPage.cs` | The web page on the hero's screen in the film: three catgirls dancing inside a browser window |
+| `src/intro/Catgirl.cs` | A catgirl of that page: face, hair, ears, tail, hands with fingers and one of three outfits on the person model's slim build |
+| `src/intro/CatgirlDance.cs` | The catgirls' dances: one the two at the sides do in step, and the solo of the one in the middle |
 | `src/intro/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
 | `tools/intro_film.py` | Draws the film's frames and writes its sound cue sheet |
 
@@ -1169,8 +1171,12 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   (`ActorSkin.Boss`), the catgirls (`ActorSkin.Catgirl`) and the poses in `IntroPoses`.
 - The hero's screen shows a web page of three catgirls dancing (`CatgirlPage`). The page is a small world of its own,
   drawn to a picture that a sheet over his screen wears; it is drawn again each frame only while the office is shown.
-  The catgirls are the game's person model with long hair, cat ears, a skirt and a tail of four joints
-  (`ActorRig.SwingTail`), dancing `IntroPoses.Dancing` in step.
+  A catgirl (`Catgirl`) is the game's person model in a slim build (`ActorSkin.Catgirl`: a waist, thinner limbs,
+  narrower shoulders, wrists that end without a fist), with a smaller head, a face that blinks, hair, cat ears, a tail
+  of five joints, hands with fingers and one of three outfits: a maid's dress, a sailor uniform or a long hoodie.
+  The two at the sides dance `CatgirlDance.Chorus` in step. The one in the middle dances `CatgirlDance.Solo`: a list
+  of steps, each a place for either hand with a way for its elbow to point, blended and solved by `IntroPoses.Folding`
+  every frame. The page's clock starts with the close-up of it.
 - The paint filter is drawn over the frames wider than in the game (`WorldView.IntroPaintWidth`), since the movie tool
   shrinks them.
 - The camera is the game's own, switched to perspective and placed per shot at eye level. A dome around it draws the

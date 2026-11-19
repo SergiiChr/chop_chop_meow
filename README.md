@@ -97,7 +97,7 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 ### Intro film
 
-The game opens with a 50-second film, `assets/intro.ogv`, played over the start menu; Esc skips it.
+The game opens with a film of about 50 seconds, `assets/intro.ogv`, played over the start menu; Esc skips it.
 It shows the hero bored at his office desk, his hand on the mouse, the catgirls dancing on his screen, his boss yelling
 at him, his blank stare, the bat he takes to his computer, packing at home, the train, the walk through the forest, the
 shore where he squats to touch the sea, and a cold first night by a fire with wolves howling.

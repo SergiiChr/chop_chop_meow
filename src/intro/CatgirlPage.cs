@@ -6,7 +6,7 @@ using static ChopChopMeow.ModelKit;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The web page on the hero's screen in the intro film: three catgirls dancing in step on a stage, inside a browser window.
+/// The web page on the hero's screen in the intro film: three catgirls dancing on a stage, the one in the middle a solo, inside a browser window.
 /// The page is drawn in a world of its own, and <see cref="Picture"/> shows it on whatever wears that material.
 /// </summary>
 internal sealed class CatgirlPage {
@@ -15,12 +15,13 @@ internal sealed class CatgirlPage {
     /// <summary>How tall the browser's bars above and below the stage are, in pixels.</summary>
     private const int TitleBar = 30, AddressBar = 34, Banner = 40, StatusBar = 24;
     /// <summary>How far apart the dancers stand, in metres.</summary>
-    private const float Spacing = .72f;
-    /// <summary>Each dancer's hair and dress.</summary>
-    private static readonly (string Hair, string Dress)[] Looks = { ("8fd3f0", "3b3f6b"), ("f29ab8", "6a3f9c"), ("f6d77a", "d8453c") };
+    private const float Spacing = .82f;
+    /// <summary>The dancers from the viewer's left to right; the one in the middle dances the solo.</summary>
+    private static readonly CatgirlOutfit[] Outfits = { CatgirlOutfit.Maid, CatgirlOutfit.Sailor, CatgirlOutfit.Hoodie };
+    private const int Soloist = 1;
 
     private readonly SubViewport view = new() { Size = Size, OwnWorld3D = true, Msaa3D = Viewport.Msaa.Msaa4X, RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled };
-    private readonly List<ActorRig> dancers = new();
+    private readonly List<Catgirl> dancers = new();
     private readonly List<Node3D> stars = new();
     private readonly Control live;
 
@@ -44,9 +45,9 @@ internal sealed class CatgirlPage {
         stage.AddChild(new WorldEnvironment { Environment = air });
         stage.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-42, 24, 0), LightEnergy = .55f, ShadowEnabled = true });
         // The stage sits in the part of the page the browser's bars leave free, so the camera aims above the dancers' middle.
-        var camera = new Camera3D { Position = new Vector3(0, 1.02f, 4.3f), Fov = 30 };
+        var camera = new Camera3D { Position = new Vector3(0, 1.02f, 4.5f), Fov = 30 };
         stage.AddChild(camera);
-        camera.Basis = Basis.LookingAt(new Vector3(0, .08f, -4.3f), Vector3.Up);
+        camera.Basis = Basis.LookingAt(new Vector3(0, .08f, -4.5f), Vector3.Up);
         // A pink floor, a darker wall with a lighter disc on it, and stars around the disc.
         Cylinder(stage, 2.6f, 2.6f, .05f, new Vector3(0, -.025f, 0), Mat("f3b4d2", .9f), sides: 32);
         const GeometryInstance3D.ShadowCastingSetting unshadowed = GeometryInstance3D.ShadowCastingSetting.Off;
@@ -60,10 +61,9 @@ internal sealed class CatgirlPage {
             Box(star, new Vector3(.13f, .13f, .02f), Vector3.Zero, gold).CastShadow = unshadowed;
             stars.Add(star);
         }
-        for (int i = 0; i < Looks.Length; i++) {
-            var dancer = new ActorRig(ActorSkin.Catgirl, Looks[i].Dress, Looks[i].Hair);
-            dancer.Root.Position = new Vector3((i - (Looks.Length - 1) / 2f) * Spacing, 0, 0);
-            stage.AddChild(dancer.Root); dancers.Add(dancer);
+        for (int i = 0; i < Outfits.Length; i++) {
+            var dancer = new Catgirl(Outfits[i], new Vector3((i - (Outfits.Length - 1) / 2f) * Spacing, 0, 0));
+            stage.AddChild(dancer.Rig.Root); dancers.Add(dancer);
         }
         live = BuildBrowser();
     }
@@ -93,15 +93,10 @@ internal sealed class CatgirlPage {
         return tag;
     }
 
-    /// <summary>Poses the page for a moment of the film: the dance, the tails, the stars and the "LIVE" tag.</summary>
+    /// <summary>Poses the page for a moment of the film, in seconds since the solo began: the dances, the stars and the "LIVE" tag.</summary>
     public void Play(float time) {
-        float sway = IntroPoses.DanceSway(time);
-        foreach (var dancer in dancers) {
-            dancer.Show(IntroPoses.Dancing(time), null, false);
-            // The head tips with the hips, and the tail's tip trails behind its root.
-            dancer.Head.RotationDegrees += new Vector3(0, 0, 9 * sway);
-            dancer.SwingTail(16 * sway, 40 * IntroPoses.DanceSway(time - IntroPoses.DanceBeat * .3f));
-        }
+        // Each blinks by a clock of her own, so they do not blink together.
+        for (int i = 0; i < dancers.Count; i++) dancers[i].Show(i == Soloist ? CatgirlDance.Solo(time) : CatgirlDance.Chorus(time), time + i * 1.1f);
         for (int i = 0; i < stars.Count; i++) stars[i].Scale = Vector3.One * (.75f + .35f * MathF.Sin(time * 5 + i * 1.9f));
         live.Visible = Mathf.PosMod(time, .8f) < .5f;
     }
