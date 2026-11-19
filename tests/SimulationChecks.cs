@@ -1996,20 +1996,12 @@ public static class SimulationChecks {
     private static void CheckTinCansNeedASteelHammer(GameData data) {
         var world = EmptyWorld(data);
         Give(world, "tin_bar", 2);
-        var bench = world.Add(ThingKind.Bench, Site(0, 4));
-        world.Player = bench.Pos + new Vector2(1.2f, 0);
-        Give(world, "wood_hammer", 1);
-        world.SetRecipe(bench, "tin_can");
-        Require(world.SlotTool(bench, "wood_hammer"), "a wooden mallet should fit the hammer slot");
-        world.LoadBatch(bench);
-        SafeTick(world, 20);
+        var bench = BenchLeftWithAMallet(world, "tin_can");
         Require(!bench.Processing, "tin cans should wait while only a wooden mallet is slotted");
         Require(bench.Inventory["tin_can"] == 0, "tin cans should not be made with a wooden mallet");
         Require(world.BenchTool(bench, "hammer", 2) == null,
             "a wooden mallet should not count as a hammer for tin cans");
-        world.UnslotTool(bench, "wood_hammer");
-        Give(world, "steel_hammer", 1);
-        world.SlotTool(bench, "steel_hammer");
+        SwapMalletForSteelHammer(world, bench);
         SafeTick(world, data.Recipes["tin_can"].Seconds / data.BenchSpeed / data.Items["steel_hammer"].Speed + 1);
         Require(bench.Inventory["tin_can"] == 4, "a steel hammer should turn one tin bar into four cans");
     }

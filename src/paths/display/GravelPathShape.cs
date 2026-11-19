@@ -14,9 +14,6 @@ internal static class GravelPathShape {
     private const int Sides = 24;
     private static ArrayMesh? tile;
 
-    /// <summary>The gravel photoscan as the ground draws it.</summary>
-    public static StandardMaterial3D Material => ModelKit.Scanned(Scan.Gravel, 1);
-
     /// <summary>A tile on its own: a round pad as wide as a path.</summary>
     public static Mesh Tile => tile ??= BuildTile();
 

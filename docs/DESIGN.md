@@ -24,9 +24,9 @@ These came from the user; change them only after asking.
   strip between two tiles corner to corner, a turn through the tile between them, and a square of four filled. A tile
   goes under buildings and buildings over tiles, but not on a standing tree, boulder, deposit, berry bush or leaf patch.
   A tile cannot be clicked in normal play.
-- **Taking down:** the red cross in the build menu gives the remove selector: a building or path tile in reach turns red
-  under the mouse and one click takes it down, with no question; it stays on until Esc or a right click. Building pages
-  have no take-down button.
+- **Taking down:** the red cross in the building plans gives the remove selector: a building or path tile in reach
+  turns red under the mouse and one click takes it down, with no question; it stays on until Esc or a right click.
+  Building pages have no take-down button.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
 - **Wolves:** the same every night, never stronger or faster with the days; three or four bites bring a healthy player to half health. After the five let out at dusk, one den picked at random lets one more out every hour.
@@ -73,7 +73,7 @@ Simulation and data:
 | `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView` |
 | `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
-| `src/buildings/Construction.cs` | Putting buildings, yards and crates up and taking buildings down: where a plan snaps to, why it cannot go somewhere, what it costs and what comes back |
+| `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
 | `src/buildings/model/Removal.cs` | `Removal`, what the remove selector points at: a building or a gravel path tile |
 | `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
 | `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
@@ -179,7 +179,8 @@ Rendering and sound:
 | `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/paths/display/GravelPathView.cs` | Laid gravel paths as the ground draws them: the map of how far each spot is from the gravel's edge |
-| `src/paths/display/GravelPathShape.cs` | One gravel path tile as a model, for the plan's icon and its ghost while placing |
+| `src/paths/display/GravelPathShape.cs` | One gravel path tile as a model, for the plan's icon, its ghost while placing and the remove selector's red pad |
+| `src/buildings/display/RemovalMark.cs` | The red mark on the building or gravel path tile the remove selector points at |
 | `src/WorldLook.cs`, `src/Wind.cs` | The sound listener and the wind |
 | `src/terrain/display/FootpathWear.cs` | Footpaths worn where the player and workers walk, and their growing back |
 | `src/actors/display/Footsteps.cs` | Which footstep sound the ground gives at a spot |
@@ -830,11 +831,11 @@ Once an active crew has the forge hot, it never falls below the bar while they a
 `Construction.Dismantle` removes a building in reach and puts its cost, a supplied mine's materials and everything its boxes hold into the backpack, and the rest into a recovery box where it stood.
 `Construction.DismantleBlock` keeps up a cabin someone shelters in and a trading post with a cart out.
 
-The build menu's last cell (`PlansPanel`, named `remove`) sets `ClickMode.Remove`, the remove selector.
+The building plans' last cell (`PlansPanel`, named `remove`) sets `ClickMode.Remove`, the remove selector.
 `Construction.RemovalAt` says what it points at, a `Removal`: the building picked under the mouse, else the gravel path
 tile whose gravel the mouse is on (`GravelPaths.TileUnder`).
 While that is in reach (`Construction.InReach`, the reach `Dismantle` and `GravelPaths.TakeUp` ask for),
-`WorldView.MarkRemoval` lays a red material over the building's model, or a red pad on the tile.
+`RemovalMark.Update` lays a red material over the building's model, or a red pad on the tile.
 A click runs `Construction.Remove` at once and the selector stays; Esc or a right click sets `ClickMode.Normal`.
 
 ### Gravel paths
@@ -850,9 +851,9 @@ a new game, a load, or a guest's update of the shared state.
 `GravelPaths.Revision` moves only when the tiles change.
 
 - `GravelPaths.Block` refuses a tile only on water or cliffs, on a tile already laid, on a tile where a resource stands,
-  with or without anything left on it (not a loose piece, a stump or a plain bush), out of the 5 tiles a building may be placed in,
-  and without the gravel. Buildings and yards do not count either way, and `Construction.PlacementBlock` never looks at
-  tiles.
+  with or without anything left on it (not a loose piece, a stump or a plain bush), out of the 5 tiles a building may
+  be placed in, and without the gravel.
+  Buildings and yards do not count either way, and `Construction.PlacementBlock` never looks at tiles.
 - `GravelPaths.Lay` clears a stump or plain bush off the tile (`World.ClearTile`).
 - `GravelPaths.TakeUp` (`Verb.TakeUpPath`) gives the cost back through `Construction.GiveBack`, which `Dismantle` also
   uses: into the backpack, the rest into a recovery box.

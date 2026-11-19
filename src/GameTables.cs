@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace ChopChopMeow;
@@ -93,7 +94,7 @@ public sealed partial class GameData {
         [ThingKind.Cooktable] = new() { Name = "Cooking table", Cost = new() { ["steel_bar"] = 2, ["stone"] = 6, ["planks"] = 8 }, Description = "A steel grill over a firebox, with a mortar slot. Crushing berries and grinding wheat need the mortar and someone working it, and so does kneading dough, with no fire; jam and stew cook on their own over wood, coal or charcoal." },
         [ThingKind.Cannery] = new() { Name = "Canning station", Cost = new() { ["steel_bar"] = 2, ["planks"] = 8 }, Description = "Seals meat stew or jam into tin cans over a wood, coal or charcoal fire. Canned goods keep and sell for the most." },
         [ThingKind.Packer] = new() { Name = "Packing station", Cost = new() { ["planks"] = 8, ["wood"] = 4 }, Description = "Packs one chosen good into crates, one item at a time while someone works it. A full crate waits to be carried out." },
-        [ThingKind.GravelPath] = new() { Name = "Gravel path", Cost = new() { ["gravel"] = 4 }, Description = "One metre of path. Tiles join into paths and turns, and lie under buildings as well as beside them. You and your workers move 1.2 times faster on gravel." },
+        [ThingKind.GravelPath] = new() { Name = "Gravel path", Cost = new() { ["gravel"] = 4 }, Description = FormattableString.Invariant($"One metre of path. Tiles join into paths and turns, and lie under buildings as well as beside them. You and your workers move {GravelSpeed} times faster on gravel.") },
         [ThingKind.Signpost] = new() { Name = "Trading post", Cost = new() { ["wood"] = 10, ["stone"] = 4 }, Description = "Trade by cart. Hire and manage neighboring villagers." },
     };
     public Dictionary<string, SourceDef> Sources { get; } = new() {

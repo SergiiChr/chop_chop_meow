@@ -200,13 +200,13 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // Gravel paths in each shape tiles join into: one tile, two and three in a row, two corner to corner, a turn and a
             // square of four; then a path that runs under a chest, past a pile and off at a slant.
             // --top looks straight down with the tiles square on screen, as on squared paper.
-            var at = GravelPaths.TileAt(Terrain.Spawn) + new Vector2I(-4, 12);
+            var at = Terrain.TileAt(Terrain.Spawn) + new Vector2I(-4, 12);
             world.S.Things.RemoveAll(t => t.Pos.X > at.X - 6 && t.Pos.X < at.X + 20 && t.Pos.Y > at.Y - 6 && t.Pos.Y < at.Y + 16);
             (int X, int Y)[] tiles = {
                 (0, 0), (0, 2), (1, 2), (6, -1), (6, 0), (6, 1), (3, 4), (4, 3), (3, 7), (4, 7), (4, 6), (3, 9), (4, 9), (3, 10), (4, 10),
                 (9, 0), (10, 0), (11, 0), (12, 0), (12, 1), (12, 2), (12, 3), (13, 4), (14, 5), (15, 6), (15, 7), (14, 8), (13, 9), (12, 9), (11, 9), (10, 9),
             };
-            foreach (var (x, y) in tiles) world.S.GravelPaths.Add((at.Y + y) * Terrain.Size + at.X + x);
+            foreach (var (x, y) in tiles) world.GravelPaths.Lay(at + new Vector2I(x, y));
             world.Add(ThingKind.Chest, at + new Vector2(12, 2));
             var pile = world.Add(ThingKind.Pile, at + new Vector2(9.5f, 5)); pile.Inventory.Add("gravel", 5 * pile.Inventory.StackSize);
             world.Player = at + new Vector2(7, 5); world.Tick(0); view.Zoom = .9f; panel.Close();

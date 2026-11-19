@@ -26,6 +26,12 @@ public static class Terrain {
     public static float Across(Vector2 p) => p.Dot(Sideways);
     public static Vector2 Point(float along, float across) => Seaward * along + Sideways * across;
 
+    /// <summary>The map tile a point lies on: tiles are centred on whole coordinates, where buildings stand.</summary>
+    public static Vector2I TileAt(Vector2 p) => new((int)MathF.Round(p.X), (int)MathF.Round(p.Y));
+    public static bool OnMap(Vector2I tile) => (uint)tile.X < Size && (uint)tile.Y < Size;
+    /// <summary>A tile's place in the map's rows, which maps of a value a tile and saves list it by.</summary>
+    public static int TileIndex(Vector2I tile) => tile.Y * Size + tile.X;
+
     /// <summary>Half the valley's width at a point along it, on one side; the valley narrows inland.</summary>
     public static float HalfWidth(float along, float side) =>
         10 + .2f * along + 5 * MathF.Sin(along * .06f + side * 2) + 2.5f * MathF.Sin(along * .17f + side);

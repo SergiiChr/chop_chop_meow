@@ -7,6 +7,7 @@ using static SetupSteps;
 using static WorldSteps;
 using static WorkerSteps;
 using static GravelPathSteps;
+using static PlayerSteps;
 
 /// <summary>Checks of gravel and gravel paths: crushing rocks, laying and taking up tiles, where gravel lies and how fast walkers are on it.</summary>
 public static class GravelPathChecks {
@@ -23,6 +24,7 @@ public static class GravelPathChecks {
         Test(CheckATurnKeepsItsInsideCornerBare, data);
         Test(CheckFourTilesInASquareAreGravelAllOver, data);
         Test(CheckWorkersWalkAFifthFasterOnGravel, data);
+        Test(CheckThePlayerWalksAndSprintsAFifthFasterOnGravel, data);
         Test(CheckTakingUpATileGivesItsGravelBack, data);
         Test(CheckATileOutOfReachStaysDown, data);
         Test(CheckGravelThatDoesNotFitTheBackpackWaitsInABox, data);
@@ -31,17 +33,10 @@ public static class GravelPathChecks {
 
     private static void CheckASteelHammerAtTheBenchCrushesAStoneIntoGravel(GameData data) {
         var world = EmptyWorld(data);
-        Give(world, "stone", 1); Give(world, "wood_hammer", 1);
-        var bench = world.Add(ThingKind.Bench, Site(0, 4));
-        world.Player = bench.Pos + new Vector2(1.2f, 0);
-        world.SetRecipe(bench, "gravel");
-        world.SlotTool(bench, "wood_hammer");
-        world.LoadBatch(bench);
-        SafeTick(world, 20);
+        Give(world, "stone", 1);
+        var bench = BenchLeftWithAMallet(world, "gravel");
         Require(bench.Inventory["gravel"] == 0, "a wooden mallet should not crush rocks");
-        world.UnslotTool(bench, "wood_hammer");
-        Give(world, "steel_hammer", 1);
-        world.SlotTool(bench, "steel_hammer");
+        SwapMalletForSteelHammer(world, bench);
         // Ten base seconds, at twice the speed at a bench and 1.8 times with a steel hammer.
         SafeTick(world, 10 / 2f / 1.8f + 1);
         Require(bench.Inventory["gravel"] == 1 && bench.Inventory["stone"] == 0, "a steel hammer at the bench should crush one stone into one gravel");
@@ -95,14 +90,14 @@ public static class GravelPathChecks {
         world.Player = new Vector2(81, 81);
         foreach (var resource in new[] { tree, boulder }) {
             world.Construction.Build(ThingKind.GravelPath, resource.Pos);
-            Require(!world.GravelPaths.Laid(GravelPaths.TileAt(resource.Pos)), $"a path tile should not be laid on a {resource.Kind}");
+            Require(!world.GravelPaths.Laid(Terrain.TileAt(resource.Pos)), $"a path tile should not be laid on a {resource.Kind}");
         }
         Require(said.Contains("A resource is in the way."), "the player should be told a resource is in the way");
         var bush = world.Add(ThingKind.Berries, new Vector2(80, 82), 0);
         var patch = world.Add(ThingKind.Leaves, new Vector2(82, 82), 0);
         foreach (var empty in new[] { bush, patch }) {
             world.Construction.Build(ThingKind.GravelPath, empty.Pos);
-            Require(!world.GravelPaths.Laid(GravelPaths.TileAt(empty.Pos)), $"a path tile should not be laid on {empty.Kind} with nothing left to gather");
+            Require(!world.GravelPaths.Laid(Terrain.TileAt(empty.Pos)), $"a path tile should not be laid on {empty.Kind} with nothing left to gather");
         }
         world.Construction.Build(ThingKind.GravelPath, new Vector2(81, 80));
         Require(world.GravelPaths.Laid(81, 80), "a path tile should go between two resources");
@@ -111,7 +106,7 @@ public static class GravelPathChecks {
 
         world.Player = Terrain.Lake + new Vector2(Terrain.LakeRadius + 3, 0);
         world.Construction.Build(ThingKind.GravelPath, Terrain.Lake);
-        Require(!world.GravelPaths.Laid(GravelPaths.TileAt(Terrain.Lake)) && world.Backpack["gravel"] == 36, "a path tile should not be laid on the lake");
+        Require(!world.GravelPaths.Laid(Terrain.TileAt(Terrain.Lake)) && world.Backpack["gravel"] == 36, "a path tile should not be laid on the lake");
     }
 
     private static void CheckAPathTileClearsAStumpAway(GameData data) {
@@ -179,23 +174,25 @@ public static class GravelPathChecks {
     }
 
     private static void CheckWorkersWalkAFifthFasterOnGravel(GameData data) {
-        float Walked(bool gravel) {
-            var world = WorkDay(data);
-            var from = new Vector2I(80, 80);
-            if (gravel) LayRow(world, from, 16);
-            var bench = Bench(world, from + new Vector2(30, 0), "planks", "stone_chisel");
-            bench.Inventory.Add("wood", 4);
-            var worker = AddWorker(world, from);
-            worker.Wage = 18;
-            world.SetDuty(worker, bench, JobKind.Craft, true);
-            world.Player = from + new Vector2(0, 20);
-            SafeTick(world, 4);
-            return worker.Pos.X - from.X;
-        }
-        float grass = Walked(false), onGravel = Walked(true);
+        var from = new Vector2I(80, 80);
+        var (onGrass, grassWalker) = WorkerSentAlongARow(data, from, 0, 30);
+        var (paved, gravelWalker) = WorkerSentAlongARow(data, from, 16, 30);
+        SafeTick(onGrass, 4); SafeTick(paved, 4);
+        float grass = grassWalker.Pos.X - from.X, onGravel = gravelWalker.Pos.X - from.X;
         // A worker walks 2.25 tiles a second: 9 tiles in four seconds on grass and 10.8 on gravel.
         Require(grass > 8.4f && grass <= 9.01f, $"a worker should walk about 9 tiles of grass in four seconds, not {grass}");
         Require(onGravel / grass > 1.19f && onGravel / grass < 1.21f, $"a worker should walk 1.2 times as far on gravel, not {onGravel / grass}");
+    }
+
+    private static void CheckThePlayerWalksAndSprintsAFifthFasterOnGravel(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(80, 80);
+        Require(world.PlayerSpeed is > 4.19f and < 4.21f, $"a player should walk 4.2 tiles a second on grass, not {world.PlayerSpeed}");
+        LayPath(world, new Vector2I(80, 80));
+        world.Player = new Vector2(80, 80);
+        Require(world.PlayerSpeed is > 5.03f and < 5.05f, $"a player should walk 5.04 tiles a second on gravel, not {world.PlayerSpeed}");
+        world.Me.Sprinting = true;
+        Require(world.PlayerSpeed is > 8.05f and < 8.08f, $"a player should sprint 8.064 tiles a second on gravel, not {world.PlayerSpeed}");
     }
 
     private static void CheckTakingUpATileGivesItsGravelBack(GameData data) {

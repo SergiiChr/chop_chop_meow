@@ -650,7 +650,7 @@ public partial class Game {
         await CloseWithEsc(); await KeyStroke(Key.Tab);
         await PickUp(Cell(0, c => c.TooltipText.StartsWith("Wood crate ·")));
         for (int placed = 1; placed <= 2; placed++) {
-            var spot = Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()))
+            var spot = SpotsNearby()
                 .First(p => world.Construction.PlacementBlock(ThingKind.Crate, p, "crate") == null && Uncovered(view.Screen(p)));
             await Click(view.Screen(spot));
             await Until(() => world.Backpack["crate"] == 2 - placed && (world.Held?.Count ?? 0) == 2 - placed, "a click on open ground placing one held crate", 2);
@@ -1070,7 +1070,7 @@ public partial class Game {
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == farm);
     }
-    /// <summary>The red cross in the build menu hands over the remove selector, which turns a building in reach red and takes it down on one click, then stays for the next; a building's page has no take-down button.</summary>
+    /// <summary>The red cross in the building plans hands over the remove selector, which turns a building in reach red and takes it down on one click, then stays for the next; a building's page has no take-down button.</summary>
     private async Task CheckRemoveSelectorTakesBuildingsDownAtOnce() {
         var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("coal", 5);
         var other = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(-2, 2));
@@ -1080,9 +1080,9 @@ public partial class Game {
         await CloseWithEsc();
         await KeyStroke(Key.B);
         await Click(Named("remove")!);
-        Require(player.Mode is ClickMode.Remove && !panel.Visible, "A click on the red cross must close the build menu and hand over the remove selector.");
+        Require(player.Mode is ClickMode.Remove && !panel.Visible, "A click on the red cross must close the building plans and hand over the remove selector.");
         await Hover(view.Screen(chest.Pos, .3f));
-        Require(view.RemovalShown.Thing == chest.Id, "A building in reach under the remove selector must turn red.");
+        Require(view.RemovalShown.Building == chest.Id, "A building in reach under the remove selector must turn red.");
         await ClickOn(chest);
         await Until(() => world.Find(chest.Id) == null, "one click with the remove selector taking the chest down", 2);
         Require(world.Backpack["wood"] == wood + 8 && world.Backpack["coal"] == coal + 5, "Taking the chest down must give back its 8 wood and the coal in it.");
@@ -1111,9 +1111,10 @@ public partial class Game {
     /// <summary>A gravel path tile cannot be clicked in normal play; the remove selector turns it red and takes it up, giving its gravel back, and Esc puts the selector away.</summary>
     private async Task CheckRemoveSelectorTakesUpAGravelPathTile() {
         await CloseWithEsc();
-        var tile = Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => GravelPaths.TileAt(world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r)))
-            .First(t => Hosted.GravelPaths.Block(t) is null or "Missing materials in your backpack." && view.Pick(view.Screen(t)) == null && view.PickWorker(view.Screen(t)) == null && Uncovered(view.Screen(t)));
-        GravelPathSteps.LayPath(Hosted, tile); await Frames();
+        Give(Hosted, "gravel", 4);
+        var tile = SpotsNearby().Select(Terrain.TileAt)
+            .First(t => Hosted.GravelPaths.Block(t) == null && view.Pick(view.Screen(t)) == null && view.PickWorker(view.Screen(t)) == null && Uncovered(view.Screen(t)));
+        Hosted.Construction.Build(ThingKind.GravelPath, tile); await Frames();
         Require(world.GravelPaths.Laid(tile), "The window must see a path tile laid on the server.");
         int gravel = world.Backpack["gravel"];
         await Click(view.Screen(tile));
@@ -1133,26 +1134,13 @@ public partial class Game {
     private async Task CheckGravelIsFasterUnderfootAndCrunches() {
         await CloseWithEsc();
         // The D key walks toward higher x and lower y, so the path is a chain of tiles corner to corner that way.
-        var start = GravelPaths.TileAt(world.Player); var way = new Vector2I(1, -1);
-        async Task<float> Speed() {
-            Warp(world, start); await Frames();
-            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
-            await Until(() => world.Player.DistanceTo(start) > 1, "the player getting up to speed", 2);
-            // By the game's own clock, which moves the player: a frame that stalls counts for a tenth of a second there, and for all of it on a real clock.
-            var from = world.Player; float began = runTime;
-            await Until(() => world.Player.DistanceTo(start) > 4, "the player walking four tiles", 3);
-            float speed = world.Player.DistanceTo(from) / (runTime - began);
-            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
-            await Frames();
-            return speed;
-        }
-        float grass = await Speed();
+        var start = Terrain.TileAt(world.Player); var way = new Vector2I(1, -1);
+        float grass = await WalkingSpeed(start);
         for (int i = 0; i <= 4; i++) GravelPathSteps.LayPath(Hosted, start + way * i);
         Warp(world, start); await Frames();
         Require(world.GravelPaths.Covers(start + new Vector2(2.5f, -2.5f)), "The window must see the path laid on the server, joined corner to corner.");
-        float gravel = await Speed();
+        float gravel = await WalkingSpeed(start);
         Require(sounds.Last == "footsteps_gravel", $"Steps on a gravel path must crunch, not play {sounds.Last}.");
-        // The player walks 4.2 tiles a second, and 5.04 on gravel.
         Require(Math.Abs(grass - 4.2f) < .3f && Math.Abs(gravel - 5.04f) < .3f, $"The player must walk 4.2 tiles a second on grass and 5.04 on gravel, not {grass} and {gravel}.");
         for (int i = 0; i <= 4; i++) Hosted.GravelPaths.TakeUp(start + way * i);
         Drop(Hosted, "gravel", 20); await Frames();
@@ -1326,7 +1314,7 @@ public partial class Game {
         await PickUp(Named("build_chest")!);
         Require(cursor.Plan == "chest", "A click on a plan must pick it up.");
         int chests = world.Things.Count(t => t.Kind == ThingKind.Chest);
-        var spot = Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()))
+        var spot = SpotsNearby()
             .First(p => world.Construction.PlacementBlock(ThingKind.Chest, world.Construction.Snap(ThingKind.Chest, p)) == null && Uncovered(view.Screen(p)));
         await Click(view.Screen(spot));
         await Until(() => world.Things.Count(t => t.Kind == ThingKind.Chest) == chests + 1, "a click on open ground placing the held plan", 2);
@@ -1440,7 +1428,7 @@ public partial class Game {
     }
     /// <summary>A stump a gravel path tile is laid on just goes, as one under a building does.</summary>
     private async Task CheckStumpAPathTileIsLaidOnGoesWithoutBeingThrownUp() {
-        var tile = GravelPaths.TileAt(Hosted.Player + new Vector2(2, 2));
+        var tile = Terrain.TileAt(Hosted.Player + new Vector2(2, 2));
         var stump = Hosted.Add(ThingKind.Stump, tile, World.StumpWood); stump.Progress = GatherRules.DigSeconds * .8f;
         await Frames(2);
         Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "A stump in sight must be drawn.");

@@ -628,6 +628,8 @@ public sealed partial class World {
     public float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
     /// <summary>How many times faster than a recipe's own seconds work goes: a bench's speed, or 1 elsewhere and by hand, times the tool's.</summary>
     public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
+    /// <summary>Tiles a second the acting player moves where they stand: walking or sprinting, and faster on gravel.</summary>
+    public float PlayerSpeed => Data.MoveSpeed(Me.Sprinting) * GravelPaths.SpeedAt(Player);
     public void MovePlayer(Vector2 delta) {
         // Inside a cabin the player stays put until they step outside on purpose.
         if (Occupied || S.Sheltered != 0) return;
@@ -1659,8 +1661,6 @@ public sealed partial class World {
         foreach (var t in routeBlockers) if (Blocks(t, p)) return false;
         return true;
     }
-    private static int RouteIndex(Vector2I p) => p.Y * Terrain.Size + p.X;
-    private static bool OnMap(Vector2I p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size;
     /// <summary>Appends the tiles from <paramref name="from"/> to within reach of <paramref name="destination"/> to <paramref name="route"/>, or nothing when there is no way.</summary>
     private const float RouteRetrySeconds = 1;
     private static readonly float[] Swerves = { 0, MathF.PI / 4, -MathF.PI / 4, MathF.PI / 2, -MathF.PI / 2 };
@@ -1682,27 +1682,27 @@ public sealed partial class World {
         // Collected once, since a search on the large map can visit thousands of tiles.
         routeBlockers.Clear();
         foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) routeBlockers.Add(t);
-        var start = new Vector2I((int)MathF.Round(from.X), (int)MathF.Round(from.Y));
-        if (!OnMap(start)) return;
+        var start = Terrain.TileAt(from);
+        if (!Terrain.OnMap(start)) return;
         routeQueue.Clear(); routeQueue.Enqueue(start);
-        routeSeen[RouteIndex(start)] = search;
+        routeSeen[Terrain.TileIndex(start)] = search;
         int end = -1;
         // A walker beside a building, with the building between them and where they go, may stand on a square near enough to it while they are not:
         // that square then never ends the search, and they step round. One already as near as a walk's usual reach finds no route and counts as there.
         bool near = from.DistanceTo(destination) < WalkReach;
         while (routeQueue.Count > 0) {
             var current = routeQueue.Dequeue();
-            if ((near || current != start) && ((Vector2)current).DistanceTo(destination) <= 1.15f) { end = RouteIndex(current); break; }
+            if ((near || current != start) && ((Vector2)current).DistanceTo(destination) <= 1.15f) { end = Terrain.TileIndex(current); break; }
             foreach (var step in RouteSteps) {
                 var next = current + step;
-                if (!OnMap(next) || routeSeen[RouteIndex(next)] == search || !RouteOpen(next)) continue;
+                if (!Terrain.OnMap(next) || routeSeen[Terrain.TileIndex(next)] == search || !RouteOpen(next)) continue;
                 if (step.X != 0 && step.Y != 0 && (!RouteOpen(current + new Vector2I(step.X, 0)) || !RouteOpen(current + new Vector2I(0, step.Y)))) continue;
-                routeSeen[RouteIndex(next)] = search; routeFrom[RouteIndex(next)] = RouteIndex(current); routeQueue.Enqueue(next);
+                routeSeen[Terrain.TileIndex(next)] = search; routeFrom[Terrain.TileIndex(next)] = Terrain.TileIndex(current); routeQueue.Enqueue(next);
             }
         }
         if (end < 0) return;
         int first = route.Count;
-        for (int node = end; node != RouteIndex(start); node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
+        for (int node = end; node != Terrain.TileIndex(start); node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
         route.Reverse(first, route.Count - first);
     }
     /// <summary>How near a worker counts as at a place: the reach of a walk, and how near a closer spot they cannot get to counts as there.</summary>

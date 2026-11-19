@@ -69,17 +69,16 @@ public static class ModelKit {
     /// </summary>
     public static StandardMaterial3D Scanned(Scan scan, float roughness) {
         if (scans.TryGetValue((scan, roughness), out var cached)) return cached;
-        Texture2D Map(string map) => ScanMap(scan, map);
         return scans[(scan, roughness)] = new StandardMaterial3D {
-            AlbedoTexture = Map("albedo"),
+            AlbedoTexture = ScanMap(scan, "albedo"),
             VertexColorUseAsAlbedo = true,
             VertexColorIsSrgb = true,
             Roughness = roughness,
             NormalEnabled = true,
-            NormalTexture = Map("bump"),
+            NormalTexture = ScanMap(scan, "bump"),
             Uv1Scale = Vector3.One / ScanTile,
             HeightmapEnabled = true,
-            HeightmapTexture = Map("height"),
+            HeightmapTexture = ScanMap(scan, "height"),
             HeightmapDeepParallax = true,
             // The engine reads its height map scale in hundredths of a tile.
             HeightmapScale = ScanRelief / ScanTile * 100,
@@ -278,14 +277,17 @@ public static class ModelKit {
         for (int i = 0; i < count; i++) BuildShaders(node.GetChild(i));
     }
 
-    /// <summary>
-    /// Lays a material over every mesh under a node, or takes it off with null.
-    /// Unless <paramref name="shadows"/> is set, a mesh it is laid over stops casting a shadow, as a placement ghost should.
-    /// </summary>
-    public static void SetOverride(Node node, Material? material, bool shadows = false) {
+    /// <summary>Lays a material over every mesh under a node, or takes it off with null.</summary>
+    public static void SetOverride(Node node, Material? material) {
         if (node is GeometryInstance3D geometry) geometry.MaterialOverlay = material;
-        if (!shadows && node is MeshInstance3D mesh && material != null) mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         int count = node.GetChildCount();
-        for (int i = 0; i < count; i++) SetOverride(node.GetChild(i), material, shadows);
+        for (int i = 0; i < count; i++) SetOverride(node.GetChild(i), material);
+    }
+
+    /// <summary>Stops every mesh under a node casting a shadow.</summary>
+    public static void NoShadows(Node node) {
+        if (node is MeshInstance3D mesh) mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        int count = node.GetChildCount();
+        for (int i = 0; i < count; i++) NoShadows(node.GetChild(i));
     }
 }

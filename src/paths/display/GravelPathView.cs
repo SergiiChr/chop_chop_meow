@@ -34,18 +34,22 @@ internal sealed class GravelPathView {
     public void Update(GravelPaths paths) {
         if (paths.Revision == revision) return;
         revision = paths.Revision;
+        bool changed = false;
         for (int y = 0; y < Terrain.Size; y++)
             for (int x = 0; x < Terrain.Size; x++) {
+                int tile = Terrain.TileIndex(new Vector2I(x, y));
                 bool laid = paths.Laid(x, y);
-                if (laid == shown[y * Terrain.Size + x]) continue;
-                shown[y * Terrain.Size + x] = laid;
+                if (laid == shown[tile]) continue;
+                shown[tile] = laid; changed = true;
                 for (int sy = Math.Max(0, y - Spread); sy <= Math.Min(Terrain.Size - 1, y + Spread); sy++)
-                    for (int sx = Math.Max(0, x - Spread); sx <= Math.Min(Terrain.Size - 1, x + Spread); sx++) stale[sy * Terrain.Size + sx] = true;
+                    for (int sx = Math.Max(0, x - Spread); sx <= Math.Min(Terrain.Size - 1, x + Spread); sx++) stale[Terrain.TileIndex(new Vector2I(sx, sy))] = true;
             }
+        if (!changed) return;
         for (int y = 0; y < Terrain.Size; y++)
             for (int x = 0; x < Terrain.Size; x++) {
-                if (!stale[y * Terrain.Size + x]) continue;
-                stale[y * Terrain.Size + x] = false;
+                int tile = Terrain.TileIndex(new Vector2I(x, y));
+                if (!stale[tile]) continue;
+                stale[tile] = false;
                 Draw(paths, x, y);
             }
         image.SetData(Size, Size, false, Image.Format.R8, field);

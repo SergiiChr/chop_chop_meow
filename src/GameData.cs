@@ -184,7 +184,7 @@ public sealed partial class GameData {
     /// <summary>Tiles a second the player moves, walking or sprinting.</summary>
     public float MoveSpeed(bool sprinting) => WalkSpeed * (sprinting ? SprintSpeed : 1);
     /// <summary>How many times faster players and workers move on a gravel path: below <see cref="WolfChase"/>, so walking on gravel never outpaces a wolf.</summary>
-    public float GravelSpeed { get; } = 1.2f;
+    public const float GravelSpeed = 1.2f;
     /// <summary>How many times faster food and drink drain while sprinting.</summary>
     public float SprintDrain { get; } = 1.7f;
     /// <summary>Food or drink percentage below which the player is too weak to sprint and the screen edges warn.</summary>

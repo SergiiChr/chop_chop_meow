@@ -153,7 +153,7 @@ public sealed class PlayerControl {
         var step = momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
         if (step != Vector2.Zero) walked = step.Normalized();
         world.Me.Braking = momentum.Braking;
-        var move = step * dt * world.Data.MoveSpeed(world.Me.Sprinting) * world.GravelPaths.SpeedAt(world.Player);
+        var move = step * dt * world.PlayerSpeed;
         // Walking to a cabin's door, the last step stops on it rather than past it, however long the frame.
         if (entering != null) move = world.Doorways.StepToDoor(entering, move);
         world.MovePlayer(move); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);

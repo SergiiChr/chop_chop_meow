@@ -57,7 +57,7 @@ public partial class World {
     }
     /// <summary>Clears away a stump or bush standing on a tile a gravel path is laid on.</summary>
     internal void ClearTile(Vector2I tile) {
-        foreach (var kind in ClearedKinds) S.Things.RemoveAll(kind, t => GravelPaths.TileAt(t.Pos) == tile);
+        foreach (var kind in ClearedKinds) S.Things.RemoveAll(kind, t => Terrain.TileAt(t.Pos) == tile);
     }
     private static readonly ThingKind[] ClearedKinds = Array.FindAll(Kinds.All, BuiltOver);
 }

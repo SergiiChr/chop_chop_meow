@@ -287,7 +287,7 @@ public static class WorldModels {
             case ThingKind.Signpost: prop = Signpost(); break;
             case ThingKind.Campfire: prop = FirePit(); break;
             case ThingKind.Mine: prop = Mine(World.CliffAt(t.Pos).Ore); break;
-            case ThingKind.GravelPath: prop = new Prop(); Add(prop.Body, GravelPathShape.Tile, GravelPathShape.Material, Vector3.Zero); break;
+            case ThingKind.GravelPath: prop = new Prop(); Add(prop.Body, GravelPathShape.Tile, Scanned(Scan.Gravel, 1), Vector3.Zero); break;
             default: throw new ArgumentOutOfRangeException(nameof(t), t.Kind, "No model for this kind.");
         }
         prop.Kind = t.Kind; prop.Hits = Hits(t);

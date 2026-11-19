@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static SetupSteps;
 
 namespace ChopChopMeow;
 
@@ -207,6 +209,28 @@ public partial class Game {
         await Frames(1);
         await Until(() => !panel.SubjectGone, "the page of something that is gone closing", 3);
         for (int i = 0; i < 3 && (player.Mode.Placing != null || panel.Visible || bag.Visible); i++) await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>Whole spots round the player, two to four tiles out and the nearest ring first: where a check puts something the player can reach.</summary>
+    private IEnumerable<Vector2> SpotsNearby() =>
+        Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()));
+
+    /// <summary>
+    /// Tiles a second the player walks with D held, from a standing start at <paramref name="start"/>: measured over
+    /// three tiles once they are up to speed.
+    /// </summary>
+    private async Task<float> WalkingSpeed(Vector2 start) {
+        Warp(world, start); await Frames();
+        float speed = 0;
+        await Holding(Key.D, async () => {
+            await Until(() => world.Player.DistanceTo(start) > 1, "the player getting up to speed", 2);
+            // By the game's own clock, which moves the player: a frame that stalls counts for a tenth of a second there, and for all of it on a real clock.
+            var from = world.Player; float began = runTime;
+            await Until(() => world.Player.DistanceTo(start) > 4, "the player walking four tiles", 3);
+            speed = world.Player.DistanceTo(from) / (runTime - began);
+        });
+        await Frames();
+        return speed;
     }
 
     /// <summary>Holds D until the player moves, so it shows the world is not held.</summary>

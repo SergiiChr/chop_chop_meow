@@ -25,7 +25,7 @@ public partial class Game {
     }
 
     /// <summary>The path tile the host lays before the guest joins, and the tile corner to corner with it that the guest lays.</summary>
-    private static readonly Vector2I NetPath = GravelPaths.TileAt(Terrain.Spawn + new Vector2(3, -2)), NetLaid = NetPath + new Vector2I(1, -1);
+    private static readonly Vector2I NetPath = Terrain.TileAt(Terrain.Spawn + new Vector2(3, -2)), NetLaid = NetPath + new Vector2I(1, -1);
 
     private async Task HostNetCheck() {
         await Frames(4);

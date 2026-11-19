@@ -21,7 +21,7 @@ public static class GravelOutline {
     /// It allocates nothing.
     /// </summary>
     public static float Distance(GravelPaths paths, Vector2 p) {
-        var tile = GravelPaths.TileAt(p);
+        var tile = Terrain.TileAt(p);
         // Only the nine tiles round the point have middle lines within reach of it.
         float nearest = HalfWidth + Reach;
         for (int y = tile.Y - 1; y <= tile.Y + 1; y++)

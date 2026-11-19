@@ -122,4 +122,26 @@ internal static class PlayerSteps {
         for (int limit = 400; (world.Crafting.Count > 0 || world.Making != "") && limit > 0; limit--) SafeTick(world, Step);
         Require(world.Crafting.Count == 0 && world.Making == "", $"hand crafting {recipe} should finish: rate={world.CraftRate}, progress={world.CraftTime}, slots={world.Backpack.UsedSlots}, items={string.Join(",", world.Backpack.Items.Select(p => p.Key + "=" + p.Value))}, room={world.Backpack.Room(world.Data.Recipes[recipe].Output)}");
     }
+
+    /// <summary>
+    /// A bench beside the player set to <paramref name="recipe"/>, with a wooden mallet slotted and a batch loaded from
+    /// the backpack, left twenty seconds to make it.
+    /// </summary>
+    public static Thing BenchLeftWithAMallet(World world, string recipe) {
+        var bench = world.Add(ThingKind.Bench, Site(0, 4));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        Give(world, "wood_hammer", 1);
+        world.SetRecipe(bench, recipe);
+        Require(world.SlotTool(bench, "wood_hammer"), "a wooden mallet should fit the hammer slot");
+        world.LoadBatch(bench);
+        SafeTick(world, 20);
+        return bench;
+    }
+
+    /// <summary>Swaps the mallet in a bench's hammer slot for a steel hammer.</summary>
+    public static void SwapMalletForSteelHammer(World world, Thing bench) {
+        world.UnslotTool(bench, "wood_hammer");
+        Give(world, "steel_hammer", 1);
+        world.SlotTool(bench, "steel_hammer");
+    }
 }
