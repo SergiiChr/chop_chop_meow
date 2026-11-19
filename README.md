@@ -357,6 +357,7 @@ The crew button opens an overview with each worker's daily pay and the total abo
 ### Taking buildings down
 
 The building plans (B) end with a red cross: click it for the remove selector.
+A plan held on the cursor is let go of by that click.
 With it, the building under the mouse turns red when it is within reach, 15 metres, and a click takes it down at once,
 without asking.
 A gravel path tile turns red and comes up the same way, when the mouse is on gravel with no building over it.
@@ -681,8 +682,8 @@ Tiles join into paths three quarters of a metre wide with round ends:
 
 A tile goes on any dry open ground within 5 tiles of you, also under your feet and under buildings and yards already
 there; a building or yard goes up over tiles and leaves them under it.
-It does not go on a tile where a tree, boulder, ore deposit, berry bush or leaf patch stands, and it clears a stump or
-plain bush away.
+It does not go on a tile where a tree, boulder, ore deposit, berry bush or leaf patch stands, picked clean or not, and it
+clears a stump or plain bush away.
 Nothing grows through gravel.
 A click on a path does what a click on open ground does.
 Take tiles up with the remove selector, which gives the 4 gravel back ([Taking buildings down](#taking-buildings-down)).

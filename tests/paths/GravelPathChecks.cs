@@ -98,6 +98,12 @@ public static class GravelPathChecks {
             Require(!world.GravelPaths.Laid(GravelPaths.TileAt(resource.Pos)), $"a path tile should not be laid on a {resource.Kind}");
         }
         Require(said.Contains("A resource is in the way."), "the player should be told a resource is in the way");
+        var bush = world.Add(ThingKind.Berries, new Vector2(80, 82), 0);
+        var patch = world.Add(ThingKind.Leaves, new Vector2(82, 82), 0);
+        foreach (var empty in new[] { bush, patch }) {
+            world.Construction.Build(ThingKind.GravelPath, empty.Pos);
+            Require(!world.GravelPaths.Laid(GravelPaths.TileAt(empty.Pos)), $"a path tile should not be laid on {empty.Kind} with nothing left to gather");
+        }
         world.Construction.Build(ThingKind.GravelPath, new Vector2(81, 80));
         Require(world.GravelPaths.Laid(81, 80), "a path tile should go between two resources");
         world.Construction.Build(ThingKind.GravelPath, new Vector2(81, 80));

@@ -25,7 +25,9 @@ public partial class PlansPanel(PageTools tools) : PagePanel(tools) {
         }
         var (remove, _) = ItemSlot.Create("remove"); remove.Icon = Icons.Of("line_close"); remove.TooltipText = "Remove\nLMB: pick buildings to take down";
         remove.AddThemeColorOverride(ItemSlot.IconNormal, Style.Brick); remove.AddThemeColorOverride("icon_hover_color", Style.Brick); remove.AddThemeColorOverride("icon_pressed_color", Style.Brick);
-        remove.Controls = new SlotInput(cursor) { Click = () => { panel.Player.Mode = new ClickMode.Remove(); panel.Close(); kit.Refresh(); } };
+        // A plan held on the cursor is let go of first.
+        void StartRemoving() { panel.Player.Mode = new ClickMode.Remove(); panel.Close(); kit.Refresh(); }
+        remove.Controls = new SlotInput(cursor) { Click = StartRemoving, Takes = held => held.Plan != null, Put = (held, _) => { held.Release(); StartRemoving(); } };
         remove.MouseEntered += () => details.Text = "Remove\nClick a building or a gravel path tile within reach to take it down at once. Its cost and everything it holds come back to your backpack.";
         grid.AddChild(remove);
         AddChild(details);

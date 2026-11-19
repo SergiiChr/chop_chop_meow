@@ -1091,7 +1091,22 @@ public partial class Game {
         await Until(() => world.Find(other.Id) == null, "the next click taking the next chest down", 2);
         await RightClick(world.Player + new Vector2(3, 0));
         Require(player.Mode is ClickMode.Normal, "A right click must put the remove selector away.");
+        await KeyStroke(Key.B);
+        await PickUp(Named("build_chest")!);
+        await Click(Named("remove")!);
+        Require(player.Mode is ClickMode.Remove && cursor.Empty && !panel.Visible, "A click on the red cross with a plan held must let go of the plan and hand over the remove selector.");
+        await KeyStroke(Key.Escape);
         Drop(Hosted, "wood", 16); Drop(Hosted, "coal", 5); await Frames();
+    }
+    /// <summary>Gravel taken out of a chest by hand rattles like stone.</summary>
+    private async Task CheckGravelMovedByHandRattlesLikeStone() {
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("gravel", 3);
+        // The chest is open first, so its lid is not the last sound heard.
+        await ClickOn(chest);
+        await PickUp(await Showing(0, c => c.TooltipText.StartsWith("Gravel", StringComparison.Ordinal)));
+        await Click(BagCell(c => c.Visible && c.Icon == null));
+        await Until(() => cursor.Empty && world.Backpack["gravel"] == 3 && sounds.Last == "wood_rocks_inventory", "the chest's gravel landing in the backpack with the sound stone makes", 2);
+        Drop(Hosted, "gravel", 3); RemoveThings(Hosted, t => t == chest); await CloseWithEsc();
     }
     /// <summary>A gravel path tile cannot be clicked in normal play; the remove selector turns it red and takes it up, giving its gravel back, and Esc puts the selector away.</summary>
     private async Task CheckRemoveSelectorTakesUpAGravelPathTile() {
@@ -2201,6 +2216,7 @@ public partial class Game {
             await Test(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
             await Test(CheckRemoveSelectorTakesBuildingsDownAtOnce);
             await Test(CheckRemoveSelectorTakesUpAGravelPathTile);
+            await Test(CheckGravelMovedByHandRattlesLikeStone);
             await Test(CheckGravelIsFasterUnderfootAndCrunches);
             await Test(CheckPageClosesWhenWhatItShowsIsGone);
             await Test(CheckPackedCrateOpensFromTheBackpack);

@@ -849,8 +849,8 @@ A tile is a map tile, centred on whole coordinates like a building, saved as its
 a new game, a load, or a guest's update of the shared state.
 `GravelPaths.Revision` moves only when the tiles change.
 
-- `GravelPaths.Block` refuses a tile only on water or cliffs, on a tile already laid, on a tile where a resource with
-  something left stands (not a loose piece, a stump or a plain bush), out of the 5 tiles a building may be placed in,
+- `GravelPaths.Block` refuses a tile only on water or cliffs, on a tile already laid, on a tile where a resource stands,
+  with or without anything left on it (not a loose piece, a stump or a plain bush), out of the 5 tiles a building may be placed in,
   and without the gravel. Buildings and yards do not count either way, and `Construction.PlacementBlock` never looks at
   tiles.
 - `GravelPaths.Lay` clears a stump or plain bush off the tile (`World.ClearTile`).
