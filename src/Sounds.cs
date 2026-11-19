@@ -83,6 +83,16 @@ public partial class Sounds : Node {
     /// <summary>Counts every sound started, so a caller can tell whether an action already made one.</summary>
     public int Played { get; private set; }
     public string Last { get; private set; } = "";
+    // The names of the last sounds started, the newest over the oldest.
+    private readonly string[] recent = new string[32];
+    /// <summary>
+    /// Whether a sound of this name was started after <see cref="Played"/> read <paramref name="since"/>, whatever has
+    /// played after it; it remembers the last 32 sounds.
+    /// </summary>
+    public bool Heard(string name, int since) {
+        for (int i = Math.Max(since, Played - recent.Length); i < Played; i++) if (recent[i % recent.Length] == name) return true;
+        return false;
+    }
     public static IEnumerable<string> Names => Levels.Keys;
     /// <summary>A sound's place in the mix, in decibels.</summary>
     public static float Level(string name) => Levels.GetValueOrDefault(name);
@@ -182,6 +192,7 @@ public partial class Sounds : Node {
             player.Stream = streams[pick]; player.PitchScale = pitch; player.VolumeDb = volume;
             player.Play();
         }
+        recent[Played % recent.Length] = name;
         Played++; Last = name; LastFade = fade; LastPlaced = placed;
     }
 

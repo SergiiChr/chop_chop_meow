@@ -476,8 +476,9 @@ public partial class Game {
         Require(Named("packed_crate") != null, "The station must show the crate being packed.");
         await Holding(Key.Shift, () => Click(Slots().First(c => c.TooltipText.StartsWith("Berries ·"))));
         await Until(() => packer.Inventory["berries"] > 0, "Shift on berries in the backpack loading them into the packing station", 2);
+        int soundsBefore = sounds.Played;
         packer.Inventory.Add("crate", 1);
-        await Until(() => view.PlayerAnimation == ActorAction.Pack && sounds.Last == "rustle", "the idle player packing at the station beside it, rustling through the goods", 4);
+        await Until(() => view.PlayerAnimation == ActorAction.Pack && sounds.Heard("rustle", soundsBefore), "the idle player packing at the station beside it, rustling through the goods", 4);
         RemoveThings(Hosted, t => t == packer); Drop(Hosted, "berries"); await CloseWithEsc();
     }
     /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
@@ -510,6 +511,7 @@ public partial class Game {
     }
 
     private async Task CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings() {
+        var home = Hosted.Player;
         await CloseWithEsc(); Drop(Hosted, "stone_chisel"); Give(Hosted, "stone", 2); Give(Hosted, "wood", 3);
         await KeyStroke(Key.C);
         Require(ShownPage() == "Crafting", "C must open the crafting menu.");
@@ -545,10 +547,12 @@ public partial class Game {
         bool swungWalking = view.PlayerAnimation == ActorAction.TorchSwing && world.Player.DistanceTo(from) > .3f;
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         Require(swungWalking, "A torch swing made while walking must keep playing as the player walks on.");
+        Warp(Hosted, home); await Frames(4);
     }
 
     /// <summary>A stack bigger than a crate's room fills it, and the rest stays on the cursor while the player walks to the next crate and opens it with E.</summary>
     private async Task CheckStackLargerThanCrateFillsItAndRestStaysHeld() {
+        var home = Hosted.Player;
         Drop(Hosted, "wood", world.Backpack["wood"]);
         Require(Give(Hosted, "wood", 64) == 64, "The backpack must have room for a stack of wood.");
         var crates = new[] { Hosted.Add(ThingKind.Crate, world.Player + new Vector2(-1, 0)), Hosted.Add(ThingKind.Crate, world.Player + new Vector2(5, -5)) };
@@ -572,6 +576,7 @@ public partial class Game {
         Require(world.Backpack["wood"] == 64 - 2 * cap, "Letting go must leave the rest in the backpack.");
         foreach (var crate in crates) RemoveThings(Hosted, t => t == crate);
         await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
     }
 
     /// <summary>A held stack shows its count by the cursor: the whole stack by left click, half of one by right click.</summary>
@@ -697,6 +702,7 @@ public partial class Game {
     }
 
     private async Task CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable() {
+        var home = Hosted.Player;
         await CloseWithEsc();
         var hut = Hosted.Add(ThingKind.Hut, world.Player + new Vector2(0, 4));
         // The click lands while the player is still walking, as when running from a wolf.
@@ -750,6 +756,7 @@ public partial class Game {
         RemoveThings(Hosted, t => t == hidden); await Frames();
         Require(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
         Require(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
+        Warp(Hosted, home); await Frames(4);
     }
     /// <summary>What changed while the player was away shows as it now is when they come back, without playing the change in front of them.</summary>
     private async Task CheckChangesOutOfSightDoNotReplayWhenSeenAgain() {
@@ -941,9 +948,11 @@ public partial class Game {
     }
     /// <summary>WASD jogs and Shift while moving sprints, unless the player is too thirsty.</summary>
     private async Task CheckWasdJogsAndShiftSprintsUnlessTooThirsty() {
+        var home = Hosted.Player;
         var start = world.Player;
+        int soundsBefore = sounds.Played;
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
-        await Until(() => view.PlayerAnimation == ActorAction.Jog && world.Player.DistanceTo(start) > .25f && sounds.Last == "footsteps_default",
+        await Until(() => view.PlayerAnimation == ActorAction.Jog && world.Player.DistanceTo(start) > .25f && sounds.Heard("footsteps_default", soundsBefore),
             "WASD moving the player through Godot input with the full jogging cycle and grass footsteps", 2);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
@@ -960,6 +969,7 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
         SetNeeds(Hosted, thirst: drink);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = false });
+        Warp(Hosted, home); await Frames(4);
     }
     /// <summary>Food under 15% keeps the screen edges glowing.</summary>
     private async Task CheckLowFoodGlowsScreenEdges() {
@@ -1038,13 +1048,15 @@ public partial class Game {
     }
     /// <summary>Holding the right mouse button on a tree or a ripe farm plot walks over and works it.</summary>
     private async Task CheckRightClickGathersTreeAndHarvestsFarm() {
+        var home = Hosted.Player;
         var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
         int wood = world.Backpack["wood"];
         var point = view.Screen(tree.Pos) - new Vector2(0, 70);
         Require(view.Pick(point)?.Id == tree.Id, "Illustrated tree hit area must select the visible resource.");
         var windowPoint = GetViewport().GetFinalTransform() * point;
+        int soundsBefore = sounds.Played;
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-        await Until(() => view.PlayerAnimation == ActorAction.SteelChop && sounds.Last == "chop_tree" && world.Backpack["wood"] > wood,
+        await Until(() => view.PlayerAnimation == ActorAction.SteelChop && sounds.Heard("chop_tree", soundsBefore) && world.Backpack["wood"] > wood,
             "holding RMB approaching and gathering a tree with the starting axe's steel stroke and chop sound", 8);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
         await Frames();
@@ -1057,6 +1069,7 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = farmPoint, Pressed = false });
         await Frames(); Require(farm.Progress > 0 && farm.FarmStage == FarmStage.Ripe, "holding RMB on a ripe farm plot must walk over and harvest by hand.");
         RemoveThings(Hosted, t => t == farm);
+        Warp(Hosted, home); await Frames(4);
     }
     /// <summary>A growing plot's page says how long until the wheat is ripe without a word of harvesting, which it offers once ripe.</summary>
     private async Task CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest() {
@@ -1101,11 +1114,11 @@ public partial class Game {
     /// <summary>Gravel taken out of a chest by hand rattles like stone.</summary>
     private async Task CheckGravelMovedByHandRattlesLikeStone() {
         var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("gravel", 3);
-        // The chest is open first, so its lid is not the last sound heard.
         await ClickOn(chest);
+        int soundsBefore = sounds.Played;
         await PickUp(await Showing(0, c => c.TooltipText.StartsWith("Gravel", StringComparison.Ordinal)));
         await Click(BagCell(c => c.Visible && c.Icon == null));
-        await Until(() => cursor.Empty && world.Backpack["gravel"] == 3 && sounds.Last == "wood_rocks_inventory", "the chest's gravel landing in the backpack with the sound stone makes", 2);
+        await Until(() => cursor.Empty && world.Backpack["gravel"] == 3 && sounds.Heard("wood_rocks_inventory", soundsBefore), "the chest's gravel landing in the backpack with the sound stone makes", 2);
         Drop(Hosted, "gravel", 3); RemoveThings(Hosted, t => t == chest); await CloseWithEsc();
     }
     /// <summary>A gravel path tile cannot be clicked in normal play; the remove selector turns it red and takes it up, giving its gravel back, and Esc puts the selector away.</summary>
@@ -1142,8 +1155,9 @@ public partial class Game {
         for (int i = 0; i <= 4; i++) GravelPathSteps.LayPath(Hosted, start + way * i);
         await Frames();
         Require(world.GravelPaths.Covers(start + new Vector2(2.5f, -2.5f)), "The window must see the path laid on the server, joined corner to corner.");
+        int soundsBefore = sounds.Played;
         float gravel = await WalkingSpeed(start);
-        Require(sounds.Last == "footsteps_gravel", $"Steps on a gravel path must crunch, not play {sounds.Last}.");
+        Require(sounds.Heard("footsteps_gravel", soundsBefore), "Steps on a gravel path must crunch.");
         Require(Math.Abs(grass - 4.2f) < .3f && Math.Abs(gravel - 5.04f) < .3f, $"The player must walk 4.2 tiles a second on grass and 5.04 on gravel, not {grass} and {gravel}.");
         for (int i = 0; i <= 4; i++) Hosted.GravelPaths.TakeUp(start + way * i);
         Drop(Hosted, "gravel", 20); Warp(Hosted, home); await Frames(4);
@@ -1357,24 +1371,27 @@ public partial class Game {
     /// <summary>A player standing idle beside a bench that is making a crate hammers it with the bench's own knock.</summary>
     private async Task CheckIdlePlayerBesideABenchKnocksWithItsHammer() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
+        int soundsBefore = sounds.Played;
         var bench = Hosted.Add(ThingKind.Bench, Hosted.Player + new Vector2(1.2f, 0));
         bench.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 6);
-        await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Last == "bench_work", "the idle player hammering at the bench beside it with its knock", 4);
+        await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Heard("bench_work", soundsBefore), "the idle player hammering at the bench beside it with its knock", 4);
         RemoveThings(Hosted, t => t == bench);
     }
     /// <summary>A bench crushing rocks rings like a pickaxe on stone under each hammer blow, in place of its wooden knock.</summary>
     private async Task CheckABenchCrushingRocksSoundsLikeMiningStone() {
+        int soundsBefore = sounds.Played;
         var bench = Hosted.Add(ThingKind.Bench, Hosted.Player + new Vector2(1.2f, 0));
         bench.Tools!.Add("steel_hammer", 1); Hosted.SetRecipe(bench, "gravel"); bench.Inventory.Add("stone", 6);
-        await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Last == "mine_ore", "the idle player crushing rocks at the bench beside it with the sound of mining stone", 4);
+        await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Heard("mine_ore", soundsBefore), "the idle player crushing rocks at the bench beside it with the sound of mining stone", 4);
         RemoveThings(Hosted, t => t == bench);
     }
     /// <summary>A player standing idle beside a cooking table that is crushing berries grinds with its mortar, which leaves the counter for their hands.</summary>
     private async Task CheckIdlePlayerBesideACookingTableGrindsWithItsMortar() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
+        int soundsBefore = sounds.Played;
         var table = Hosted.Add(ThingKind.Cooktable, Hosted.Player + new Vector2(1.2f, 0));
         table.Tools!.Add("mortar", 1); Hosted.SetRecipe(table, "crushed_berries"); table.Inventory.Add("berries", 8);
-        await Until(() => table.Processing && view.PlayerAnimation == ActorAction.Grind && sounds.Last == "grind_mortar", "the idle player grinding at the cooking table beside it, with the pestle heard", 4);
+        await Until(() => table.Processing && view.PlayerAnimation == ActorAction.Grind && sounds.Heard("grind_mortar", soundsBefore), "the idle player grinding at the cooking table beside it, with the pestle heard", 4);
         Require(view.PropOf(table.Id) is StoveProp { Mortar.Visible: false }, "The mortar must be off the counter while the player grinds with it.");
         RemoveThings(Hosted, t => t == table);
     }
@@ -1407,8 +1424,9 @@ public partial class Game {
         var stump = world.Things.Single(t => t.Kind == ThingKind.Stump && t.Pos == tree.Pos);
         Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "The stump must stand under the toppling tree.");
         await Until(() => view.Departing == 0, "the felled tree fading away over its stump", 4);
+        int soundsBefore = sounds.Played;
         point = RightPress(stump.Pos);
-        await Until(() => stump.Progress > 0 && view.PlayerAnimation == ActorAction.Dig && sounds.Last is "dig_earth" or "dig_toss", "holding RMB on a stump digging at it with the shovel, heard in the soil", 6);
+        await Until(() => stump.Progress > 0 && view.PlayerAnimation == ActorAction.Dig && (sounds.Heard("dig_earth", soundsBefore) || sounds.Heard("dig_toss", soundsBefore)), "holding RMB on a stump digging at it with the shovel, heard in the soil", 6);
         await Until(() => world.Find(stump.Id) == null && view.Departing == 1, "the stump coming out of the ground, thrown up as it goes", 8);
         // The tree held 4 wood and its stump 3.
         await Until(() => world.Backpack["wood"] == wood + 7 && view.Departing == 0 && view.PlayerAnimation != ActorAction.Dig, "the stump's wood in the backpack, its model gone and the digging done", 3);
@@ -1477,6 +1495,7 @@ public partial class Game {
         RemoveThings(Hosted, t => t == anvil);
     }
     private async Task CheckRightClickGathersAndLeavesASelectedWorkerMarked() {
+        var home = Hosted.Player;
         var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
         var worker = AddWorker(Hosted, world.Player + new Vector2(-2, 2));
         await Frames(); await Click(view.Screen(worker.Pos, 1));
@@ -1491,6 +1510,7 @@ public partial class Game {
         Require(view.Selection.Worker == worker.Id, "A right click on a tree must leave a selected worker marked.");
         Require(panel.HeadingTitle.Text == worker.Name, "A right click on a tree must leave the worker's page open.");
         Hosted.Fire(worker); await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
     }
     /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item selected on it.</summary>
     private async Task CheckHudAndHotbarEatAndDrinkSelected() {
@@ -1656,6 +1676,7 @@ public partial class Game {
         await KeyStroke(Key.F9); await Frames();
         Require(player.Mode is ClickMode.Normal, "A load must end placement.");
         Require(view.Selection == default, "A load must clear the selection.");
+        await CloseWithEsc();
     }
     /// <summary>A load ends a crate lift under way, since finishing it on the crate from before the load would copy the crate into the backpack.</summary>
     private async Task CheckLoadEndsCrateLiftUnderWay() {
@@ -1675,9 +1696,11 @@ public partial class Game {
         await Frames();
         Require(world.Backpack["crate"] == carried && world.Find(crate.Id) != null, "Loading while a crate is held under the right button must leave it on the ground, and not in the backpack too.");
         RemoveThings(Hosted, t => t.Id == crate.Id);
+        await CloseWithEsc();
     }
     /// <summary>Carried items show as backpack cells, and the HUD heart, stomach and droplet track health, hunger and thirst.</summary>
     private async Task CheckBackpackCellsAndHudIconsTrackStats() {
+        await KeyStroke(Key.Tab);
         Give(Hosted, Inventory.Coins, 1200);
         await Until(() => Slots().Count(c => c.TooltipText.StartsWith("Coins")) == 2, "carried coins showing as backpack cells stacking to 1000", 2);
         Drop(Hosted, Inventory.Coins, 1200);
@@ -1702,9 +1725,11 @@ public partial class Game {
         await DoubleClick(Slots().First(c => c.TooltipText.StartsWith("Berries")));
         await Until(() => world.Backpack["berries"] == berriesBeforeClick - 1, "a double click on a berry cell eating one berry", 2);
         Require(cursor.Empty, "A double click on a berry cell must not pick the berries up.");
+        await CloseWithEsc();
     }
     /// <summary>A mauled player cannot move; death shows the respawn countdown and respawning clears it.</summary>
     private async Task CheckPinnedPlayerStaysDownAndDeathCountsDown() {
+        var home = Hosted.Player;
         RunUntilNight(Hosted); SetMauled(Hosted, true);
         // The pin lasts only while a wolf holds it.
         PlaceWolf(Hosted, new Wolf { Pos = world.Player + Vector2.Right * .8f, Feeding = true, Pinning = true }); await Frames();
@@ -1722,6 +1747,9 @@ public partial class Game {
         RunUntilMorning(Hosted); SetNeeds(Hosted, health: 100);
         Hosted.Die(); await Until(() => world.Dead && deathLabel.Text.StartsWith("You collapsed\nRespawning in"), "a collapse showing its cause over the respawn countdown", 2);
         Hosted.Tick(world.RespawnIn); await Until(() => !world.Dead && deathLabel.Text == "", "the countdown clearing once the player respawns again", 2);
+        // Dying left what the player carried in a box where they fell.
+        RemoveThings(Hosted, t => t.Kind == ThingKind.Grave); await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
     }
     /// <summary>The starter goals alone do not end the game; mines and the profit goal show the ending, and keep playing closes it for good.</summary>
     private async Task CheckEndGoalsShowEndingOnceAndKeepPlaying() {
@@ -1739,6 +1767,7 @@ public partial class Game {
         Require(world.EndingShown, "Keep playing must remember that the ending was shown.");
         await Frames(3);
         Require(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
+        RemoveThings(Hosted, t => t.Kind == ThingKind.Mine);
     }
     /// <summary>A recipe group closes on a click on its heading and opens on the next, on the crafting menu and on a station alike.</summary>
     private async Task CheckRecipeGroupsCloseAndOpenOnAClick() {
@@ -2058,6 +2087,7 @@ public partial class Game {
         Require(!view.Paused, "Escape must resume after animation pause check.");
         await Frames();
         Require(view.PlayerAnimation != ActorAction.Pump, "Actions rejected during pause must not play delayed pulses after resume.");
+        RemoveThings(Hosted, t => t == furnace);
     }
     /// <summary>A canopy in front of a building fades; one behind it or far away does not.</summary>
     private void CheckForegroundCanopyFadesOnlyOverBuildings() {
@@ -2075,6 +2105,7 @@ public partial class Game {
     /// one holding their right arm to the east.
     /// </summary>
     private async Task CheckAWolfAtATuggedPlayersArmIsDrawnOnTheSideItHolds() {
+        var home = Hosted.Player;
         await CloseWithEsc();
         float health = world.Health; RunUntilNight(Hosted);
         var at = Terrain.Spawn - new Vector2(30, 30);
@@ -2100,16 +2131,19 @@ public partial class Game {
         await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "a player nobody tugs any more standing free outside the cabin", 4);
         RemoveThings(Hosted, t => t == hut); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
         await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
     }
 
     /// <summary>The window onto the door from inside stays shut while a wolf scratches, opens as it pries, and shuts once the wolf is gone.</summary>
     private async Task CheckTheInsideWindowOpensWhenAWolfPriesAtTheDoor() {
+        var home = Hosted.Player;
         await CloseWithEsc();
         float health = world.Health; RunUntilNight(Hosted);
         // Only this check's wolf comes to the door.
         RemoveWolves(Hosted, _ => true); ShutDens(Hosted);
         var at = Terrain.Spawn - new Vector2(30, 30);
         RemoveThings(Hosted, t => t.Pos.DistanceTo(at) < 12);
+        Warp(Hosted, at); await Frames(4);
         var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(0, -4));
         StepInside(Hosted, hut);
         await Until(() => world.Sheltered == hut.Id, "the player being inside the cabin", 3);
@@ -2125,13 +2159,13 @@ public partial class Game {
         await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "the player stepping out of the cabin again", 4);
         RemoveThings(Hosted, t => t == hut); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
         await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
     }
 
     /// <summary>Space without an axe attacks unarmed the way the player last walked, and one right click walks over and picks up a whole loose piece without the gather animation.</summary>
     private async Task CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece() {
+        var home = Hosted.Player;
         await CloseWithEsc();
-        // Space would pump the furnace clicked last.
-        RemoveThings(Hosted, t => t.Kind == ThingKind.Reinforced);
         Drop(Hosted, "steel_axe");
         // By day wolves are calmed and sent home at once, which would clear the blow before the window shows it.
         float health = world.Health; RunUntilNight(Hosted);
@@ -2139,10 +2173,11 @@ public partial class Game {
         await Holding(Key.D, () => Seconds(.1));
         await Frames();
         var wolf = PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + PlayerControl.KeyDirection(1, 0) * 1.2f, Health = 5 });
+        int soundsBefore = sounds.Played;
         await KeyStroke(Key.Space);
         Require(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
-        Require(sounds.Last == "tool_air_swing", "A punch must whoosh before it lands.");
-        await Until(() => sounds.Last == "wolf_hit", "the punch thudding as it lands on the wolf", 2);
+        Require(sounds.Heard("tool_air_swing", soundsBefore) && !sounds.Heard("wolf_hit", soundsBefore), "A punch must whoosh before it lands.");
+        await Until(() => sounds.Heard("wolf_hit", soundsBefore), "the punch thudding as it lands on the wolf", 2);
         RemoveWolves(Hosted, w => w == wolf); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
         await Until(() => view.PlayerAnimation != ActorAction.Attack, "the unarmed attack finishing", 3);
         var gatheringPosition = Terrain.Spawn - new Vector2(30, 30);
@@ -2163,6 +2198,7 @@ public partial class Game {
         for (int i = 0; i < 120 && world.Find(looseOre.Id) != null; i++) { await Frames(); harvestAnimation |= view.PlayerAnimation == ActorAction.Gather; }
         Require(world.Find(looseOre.Id) == null && world.Backpack["coal"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
         Require(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
+        Warp(Hosted, home); await Frames(4);
     }
     /// <summary>Picking a bush clean hides only its fruit, which shows again once it is replenished.</summary>
     private async Task CheckBerryBushHidesOnlyItsFruitWhenPicked() {
@@ -2175,8 +2211,9 @@ public partial class Game {
         var point = view.Screen(berryBush.Pos, .35f);
         Require(view.Pick(point)?.Id == berryBush.Id, "The bush foliage must select its berry resource.");
         var windowPoint = GetViewport().GetFinalTransform() * point;
+        int soundsBefore = sounds.Played;
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-        await Until(() => sounds.Last == "rustle", "picking a berry bush by hand rustling its leaves", 3);
+        await Until(() => sounds.Heard("rustle", soundsBefore), "picking a berry bush by hand rustling its leaves", 3);
         await Until(() => berryBush.Remaining == 0, "holding RMB on a berry bush picking it clean", world.Data.GatherSeconds + 3);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
         await Frames(2);
@@ -2190,108 +2227,108 @@ public partial class Game {
     }
     private async void RunUIChecks() {
         try {
-            await Test(CheckLaunchOpensTheStartMenuWithNoSaveToContinue);
-            await Test(CheckOptionsApplyAndKeepTheirChoices);
-            await Test(CheckAntiAliasingChoicesNameTheSizeTheWorldIsDrawnAt);
-            await Test(CheckPaintFilterSwitchDrawsTheFilter);
-            await Test(CheckInterfaceTextIsDrawnAtTheSizeItShows);
-            await Test(CheckNewGameStartsTheWelcomePage);
-            await Test(CheckPauseMenuAsksBeforeNewGameAndQuit);
-            await Test(CheckWasdJogsAndShiftSprintsUnlessTooThirsty);
-            await Test(CheckMessagesStackFadeAndKeepClearOfHud);
-            await Test(CheckPanelPagesRefreshWithoutAllocating);
-            await Test(CheckLowFoodGlowsScreenEdges);
-            await Test(CheckSoundsRotateAndMusicCrossfades);
-            await Test(CheckSoundsFadeWithDistanceFromThePlayerAtAnyZoom);
-            await Test(CheckRightClickGathersTreeAndHarvestsFarm);
-            await Test(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
-            await Test(CheckRemoveSelectorTakesBuildingsDownAtOnce);
-            await Test(CheckRemoveSelectorTakesUpAGravelPathTile);
-            await Test(CheckGravelMovedByHandRattlesLikeStone);
-            await Test(CheckGravelIsFasterUnderfootAndCrunches);
-            await Test(CheckPageClosesWhenWhatItShowsIsGone);
-            await Test(CheckPackedCrateOpensFromTheBackpack);
-            await Test(CheckDriverPlaysItsCommandFileAsRealInput);
-            await Test(CheckEmptiedCrateGivesWayToTheBackpack);
-            await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
-            await Test(CheckHotbarDoubleClickUsesAndRightClickEmpties);
-            await Test(CheckDoubleClickTakesAToolOffTheHotbarInHand);
-            await Test(CheckABoundStackIsRimmedAndStaysBehindOnCtrl);
-            await Test(CheckAPressLetGoOverAnotherSlotDoesNothing);
-            await Test(CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround);
-            await Test(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
-            await Test(CheckHeldPlanPlacesOnOpenGround);
-            await Test(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
-            await Test(CheckHarvestingBesideAStationStopsHammering);
-            await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
-            await Test(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
-            await Test(CheckABenchCrushingRocksSoundsLikeMiningStone);
-            await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
-            await Test(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
-            await Test(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
-            await Test(CheckStumpAPathTileIsLaidOnGoesWithoutBeingThrownUp);
-            await Test(CheckMinePageFollowsTheMineThroughItsStages);
-            await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
-            await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
-            await Test(CheckHudAndHotbarEatAndDrinkSelected);
+            await TestClean(CheckLaunchOpensTheStartMenuWithNoSaveToContinue);
+            await TestClean(CheckOptionsApplyAndKeepTheirChoices);
+            await TestClean(CheckAntiAliasingChoicesNameTheSizeTheWorldIsDrawnAt);
+            await TestClean(CheckPaintFilterSwitchDrawsTheFilter);
+            await TestClean(CheckInterfaceTextIsDrawnAtTheSizeItShows);
+            await TestClean(CheckNewGameStartsTheWelcomePage);
+            await TestClean(CheckPauseMenuAsksBeforeNewGameAndQuit);
+            await TestClean(CheckWasdJogsAndShiftSprintsUnlessTooThirsty);
+            await TestClean(CheckMessagesStackFadeAndKeepClearOfHud);
+            await TestClean(CheckPanelPagesRefreshWithoutAllocating);
+            await TestClean(CheckLowFoodGlowsScreenEdges);
+            await TestClean(CheckSoundsRotateAndMusicCrossfades);
+            await TestClean(CheckSoundsFadeWithDistanceFromThePlayerAtAnyZoom);
+            await TestClean(CheckRightClickGathersTreeAndHarvestsFarm);
+            await TestClean(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
+            await TestClean(CheckRemoveSelectorTakesBuildingsDownAtOnce);
+            await TestClean(CheckRemoveSelectorTakesUpAGravelPathTile);
+            await TestClean(CheckGravelMovedByHandRattlesLikeStone);
+            await TestClean(CheckGravelIsFasterUnderfootAndCrunches);
+            await TestClean(CheckPageClosesWhenWhatItShowsIsGone);
+            await TestClean(CheckPackedCrateOpensFromTheBackpack);
+            await TestClean(CheckDriverPlaysItsCommandFileAsRealInput);
+            await TestClean(CheckEmptiedCrateGivesWayToTheBackpack);
+            await TestClean(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
+            await TestClean(CheckHotbarDoubleClickUsesAndRightClickEmpties);
+            await TestClean(CheckDoubleClickTakesAToolOffTheHotbarInHand);
+            await TestClean(CheckABoundStackIsRimmedAndStaysBehindOnCtrl);
+            await TestClean(CheckAPressLetGoOverAnotherSlotDoesNothing);
+            await TestClean(CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround);
+            await TestClean(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
+            await TestClean(CheckHeldPlanPlacesOnOpenGround);
+            await TestClean(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
+            await TestClean(CheckHarvestingBesideAStationStopsHammering);
+            await TestClean(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
+            await TestClean(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
+            await TestClean(CheckABenchCrushingRocksSoundsLikeMiningStone);
+            await TestClean(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
+            await TestClean(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
+            await TestClean(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
+            await TestClean(CheckStumpAPathTileIsLaidOnGoesWithoutBeingThrownUp);
+            await TestClean(CheckMinePageFollowsTheMineThroughItsStages);
+            await TestClean(CheckStrikerBesideAStationLeavesThePlayerHammering);
+            await TestClean(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
+            await TestClean(CheckHudAndHotbarEatAndDrinkSelected);
             var chest = await Test(CheckBuildPlanPlacesChest);
             await Test(() => CheckChestMovesSplitsAndFiltersStacks(chest));
             await Test(() => CheckQuickSaveAndLoadRestorePlayerAndChest(chest));
-            await Test(CheckLoadEndsClickModeAndSelection);
-            await Test(CheckLoadEndsCrateLiftUnderWay);
-            await Test(CheckBackpackCellsAndHudIconsTrackStats);
-            await Test(CheckPinnedPlayerStaysDownAndDeathCountsDown);
-            await Test(CheckMouseWheelOverPanelDoesNotZoom);
-            await Test(CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable);
-            await Test(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
-            await Test(CheckFelledTreeBreaksThenCrashesAsItLands);
-            await Test(CheckTradingPostSendsOnlyCratesOffOnACart);
-            await Test(CheckPileFilterNamesOneResource);
-            await Test(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
-            await Test(CheckPackingStationListsGoodsAndTakesBackpackClicks);
-            await Test(CheckEndGoalsShowEndingOnceAndKeepPlaying);
-            await Test(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
-            await Test(CheckRecipeBoardsMarkAndQueueWithModifiers);
-            await Test(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);
-            await Test(CheckStationSlotsShakeWhenTheBackpackHasNoRoomForThem);
-            await Test(CheckUnmarkedStationStaysOnItsRecipe);
-            await Test(CheckRefusedDoubleClickKeepsTheWorkerMark);
+            await TestClean(CheckLoadEndsClickModeAndSelection);
+            await TestClean(CheckLoadEndsCrateLiftUnderWay);
+            await TestClean(CheckBackpackCellsAndHudIconsTrackStats);
+            await TestClean(CheckPinnedPlayerStaysDownAndDeathCountsDown);
+            await TestClean(CheckMouseWheelOverPanelDoesNotZoom);
+            await TestClean(CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable);
+            await TestClean(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
+            await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
+            await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
+            await TestClean(CheckPileFilterNamesOneResource);
+            await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
+            await TestClean(CheckPackingStationListsGoodsAndTakesBackpackClicks);
+            await TestClean(CheckEndGoalsShowEndingOnceAndKeepPlaying);
+            await TestClean(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
+            await TestClean(CheckRecipeBoardsMarkAndQueueWithModifiers);
+            await TestClean(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);
+            await TestClean(CheckStationSlotsShakeWhenTheBackpackHasNoRoomForThem);
+            await TestClean(CheckUnmarkedStationStaysOnItsRecipe);
+            await TestClean(CheckRefusedDoubleClickKeepsTheWorkerMark);
             await RunRecipeReadyChecks();
-            await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
-            await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
-            await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
-            await Test(CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce);
-            await Test(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
-            await Test(CheckGameGoesOnUnderTheOpenRecipeMap);
-            await Test(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
+            await TestClean(CheckRecipeGroupsCloseAndOpenOnAClick);
+            await TestClean(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
+            await TestClean(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
+            await TestClean(CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce);
+            await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
+            await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
+            await TestClean(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
             var furnace = await Test(CheckSteelFurnaceSlotsLoadHeldStacksThenPump);
             await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));
             Test(CheckForegroundCanopyFadesOnlyOverBuildings);
-            await Test(CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece);
-            await Test(CheckAWolfAtATuggedPlayersArmIsDrawnOnTheSideItHolds);
-            await Test(CheckTheInsideWindowOpensWhenAWolfPriesAtTheDoor);
-            await Test(CheckBerryBushHidesOnlyItsFruitWhenPicked);
-            await Test(CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings);
-            await Test(CheckStackLargerThanCrateFillsItAndRestStaysHeld);
-            await Test(CheckCarriedStackShowsItsCount);
-            await Test(CheckWindowsMoveByDragAndOpenInTheirUsualSpots);
-            await Test(CheckFilterWindowOpensOnScreenBesideAMovedPanel);
-            await Test(CheckSurvivalActionsWorkThroughTheInventoryUI);
-            await Test(CheckAutosaveTellsTheOwner);
+            await TestClean(CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece);
+            await TestClean(CheckAWolfAtATuggedPlayersArmIsDrawnOnTheSideItHolds);
+            await TestClean(CheckTheInsideWindowOpensWhenAWolfPriesAtTheDoor);
+            await TestClean(CheckBerryBushHidesOnlyItsFruitWhenPicked);
+            await TestClean(CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings);
+            await TestClean(CheckStackLargerThanCrateFillsItAndRestStaysHeld);
+            await TestClean(CheckCarriedStackShowsItsCount);
+            await TestClean(CheckWindowsMoveByDragAndOpenInTheirUsualSpots);
+            await TestClean(CheckFilterWindowOpensOnScreenBesideAMovedPanel);
+            await TestClean(CheckSurvivalActionsWorkThroughTheInventoryUI);
+            await TestClean(CheckAutosaveTellsTheOwner);
             Test(CheckFailedSaveKeepsTheSaveBefore);
-            await Test(CheckOthersGlideAndStopWhereTheServerPutThem);
-            await Test(CheckTickBoxesFollowTheServer);
-            await Test(CheckLoadRemembersWhatIsOutOfSight);
-            await Test(CheckWorkerPageFollowsItsJobs);
-            await Test(CheckWorkerPageShowsWhatEachPlaceIsSetToMake);
-            await Test(CheckDraggingAJobBelowAnotherMakesItComeAfter);
-            await Test(CheckAHaulDragsIntoAHaulGroupAndStaysWhenItIsTakenApart);
-            await Test(CheckAJobBelowAHaulGroupDragsIntoIt);
-            await Test(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
-            await Test(CheckCratePutIntoCrateStopsAtWarning);
+            await TestClean(CheckOthersGlideAndStopWhereTheServerPutThem);
+            await TestClean(CheckTickBoxesFollowTheServer);
+            await TestClean(CheckLoadRemembersWhatIsOutOfSight);
+            await TestClean(CheckWorkerPageFollowsItsJobs);
+            await TestClean(CheckWorkerPageShowsWhatEachPlaceIsSetToMake);
+            await TestClean(CheckDraggingAJobBelowAnotherMakesItComeAfter);
+            await TestClean(CheckAHaulDragsIntoAHaulGroupAndStaysWhenItIsTakenApart);
+            await TestClean(CheckAJobBelowAHaulGroupDragsIntoIt);
+            await TestClean(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
+            await TestClean(CheckCratePutIntoCrateStopsAtWarning);
             RemoveCheckFiles();
-            await Test(CheckRestartBuildsFreshModelsForReusedIds);
-            await Test(CheckIntroFilmCoversTheStartMenuUntilEsc);
+            await TestClean(CheckRestartBuildsFreshModelsForReusedIds);
+            await TestClean(CheckIntroFilmCoversTheStartMenuUntilEsc);
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
