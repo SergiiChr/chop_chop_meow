@@ -63,7 +63,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
-| `--showcase --paths` | Show gravel paths in every shape their tiles join into, one under a chest and a pile of gravel; `--top` looks straight down with the tiles square on screen |
+| `--showcase --paths` | Show gravel paths in every shape their tiles join into, two staircases, a path under a chest and a pile of gravel; `--top` looks straight down with the tiles square on screen |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door), `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm) or `takedown` (the same with a player hurt enough to go down, pinned and fed on; the scene keeps them alive); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
 | `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
@@ -676,8 +676,9 @@ Tiles join into paths three quarters of a metre wide with round ends:
 
 - a tile alone is a round pad;
 - tiles side by side join into one strip;
-- two tiles corner to corner are joined by a slanted strip;
-- with a tile between those two, the path turns through that tile instead, round on the outside of the turn;
+- two tiles corner to corner are joined by a slanted strip, whatever lies between them;
+- so a turn is cut on the slant on its inside and round on its outside, and a staircase of tiles has straight slanted
+  edges;
 - four tiles in a square are gravel all over.
 
 A tile goes on any dry open ground within 5 tiles of you, also under your feet and under buildings and yards already

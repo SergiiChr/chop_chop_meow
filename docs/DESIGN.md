@@ -20,9 +20,11 @@ These came from the user; change them only after asking.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
 - **Gravel paths:** a steel hammer at the bench crushes 1 stone into 1 gravel in 10 base seconds, and a path tile, one
   metre square, costs 4 gravel. Players, walking or sprinting, and workers move 1.2 times as fast where gravel is drawn,
-  and workers keep their routes. Tiles join as the user's sketch shows: round ends, strips between neighbours, a slanted
-  strip between two tiles corner to corner, a turn through the tile between them, and a square of four filled. A tile
-  goes under buildings and buildings over tiles, but not on a standing tree, boulder, deposit, berry bush or leaf patch.
+  and workers keep their routes.
+  Tiles join with round ends, strips between neighbours and a slanted strip between any two tiles corner to corner, so
+  every corner is cut on the slant; a square of four is filled.
+  A tile goes under buildings and buildings over tiles, but not on a tree, boulder, deposit, berry bush, leaf patch or
+  wolf carcass.
   A tile cannot be clicked in normal play.
 - **Taking down:** the red cross in the building plans gives the remove selector: a building or path tile in reach
   turns red under the mouse and one click takes it down, with no question; it stays on until Esc or a right click.
@@ -863,7 +865,8 @@ them.
 `GravelOutline.Distance` is the one definition of where gravel lies: within `GravelOutline.HalfWidth` (0.375 m) of the
 paths' middle lines.
 Those are each laid tile's middle, a line between the middles of tiles side by side, and a line between two tiles corner
-to corner when neither tile between them is laid; four tiles in a square count whole.
+to corner, whatever lies on the tiles between them; four tiles in a square count whole.
+So a turn's inside corner is cut on the slant and a staircase of tiles has straight slanted edges.
 `GravelPaths.Covers` reads it for the simulation and `GravelPathView` for the picture, so walkers are faster exactly
 where gravel is drawn.
 Workers step `GameData.GravelSpeed` (1.2) times as far in `World.Walk` when they stand on gravel, and

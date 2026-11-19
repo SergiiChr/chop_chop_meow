@@ -14,8 +14,8 @@ internal sealed class GravelPathView {
     /// </summary>
     private const int Scale = 8, Size = Terrain.Size * Scale;
     /// <summary>
-    /// Tiles round a changed one whose texels may change with it: a strip between two of its neighbours comes or goes
-    /// with it, and the map reaches half a metre past the gravel.
+    /// Tiles round a changed one whose texels may change with it: its strips reach the tiles next to it, and the map
+    /// reaches half a metre past the gravel.
     /// </summary>
     private const int Spread = 2;
     private readonly byte[] field = new byte[Size * Size];

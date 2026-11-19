@@ -24,7 +24,8 @@ public static class GravelPathChecks {
         Test(CheckATileAloneIsARoundPad, data);
         Test(CheckTilesSideBySideJoinIntoOneStrip, data);
         Test(CheckTilesCornerToCornerAreJoinedByASlantedStrip, data);
-        Test(CheckATurnKeepsItsInsideCornerBare, data);
+        Test(CheckATurnIsCutOnTheSlantInside, data);
+        Test(CheckAStaircaseOfTilesHasStraightSlantedEdges, data);
         Test(CheckFourTilesInASquareAreGravelAllOver, data);
         Test(CheckWorkersWalkAFifthFasterOnGravel, data);
         Test(CheckThePlayerWalksAndSprintsAFifthFasterOnGravel, data);
@@ -160,26 +161,36 @@ public static class GravelPathChecks {
         Require(!paths.Covers(new Vector2(80.9f, 80.1f)), "the slanted strip should be as wide as any other, not fill the tiles beside it");
     }
 
-    private static void CheckATurnKeepsItsInsideCornerBare(GameData data) {
+    private static void CheckATurnIsCutOnTheSlantInside(GameData data) {
         var world = EmptyWorld(data);
-        LayPath(world, new Vector2I(80, 80), new Vector2I(81, 81));
+        LayPath(world, new Vector2I(80, 80), new Vector2I(81, 80), new Vector2I(81, 81));
         var paths = world.GravelPaths;
-        // Half way between the two tiles' middles, and 0.14 from it toward the tile inside the turn.
-        Vector2 shared = new(80.5f, 80.5f), inside = new(80.4f, 80.6f);
-        Require(paths.Covers(shared) && paths.Covers(inside), "two tiles corner to corner should be joined by a slanted strip");
-        LayPath(world, new Vector2I(81, 80));
-        Require(!paths.Covers(shared) && !paths.Covers(inside), "with the tile between them laid, the path should turn through that tile and leave the slanted strip out");
+        // Half way between the two end tiles' middles, and 0.14 and 0.3 from it toward the bare tile inside the turn.
+        Require(paths.Covers(new Vector2(80.5f, 80.5f)) && paths.Covers(new Vector2(80.4f, 80.6f)) && paths.Covers(new Vector2(80.29f, 80.71f)), "a turn's inside corner should be filled up to a slanted edge, as between two tiles corner to corner");
+        // 0.45 from that slanted line, and the middle of the bare tile.
+        Require(!paths.Covers(new Vector2(80.18f, 80.82f)) && !paths.Covers(new Vector2(80, 81)), "the slanted edge inside a turn should be as far from the line between its end tiles as any path's edge");
         // The turn's outside corner is round: 0.42 and 0.35 from the corner tile's middle.
         Require(!paths.Covers(new Vector2(81.3f, 79.7f)) && paths.Covers(new Vector2(81.25f, 79.75f)), "a turn's outside corner should be round");
-        Require(paths.Covers(new Vector2(80.5f, 80.3f)) && paths.Covers(new Vector2(80.7f, 80.5f)), "both arms of a turn should be whole up to its inside corner");
+    }
+
+    private static void CheckAStaircaseOfTilesHasStraightSlantedEdges(GameData data) {
+        var world = EmptyWorld(data);
+        LayPath(world, new Vector2I(80, 80), new Vector2I(81, 80), new Vector2I(81, 81), new Vector2I(82, 81), new Vector2I(82, 82));
+        var paths = world.GravelPaths;
+        // Each side's edge runs 0.375 outside the line through that side's corner tiles: points 0.3 and 0.45 out from it, at two steps.
+        Require(paths.Covers(new Vector2(80.29f, 80.71f)) && paths.Covers(new Vector2(81.29f, 81.71f)), "a staircase's notches on one side should be filled up to one slanted edge");
+        Require(!paths.Covers(new Vector2(80.18f, 80.82f)) && !paths.Covers(new Vector2(81.18f, 81.82f)), "that slanted edge should run straight, three eighths of a tile out");
+        Require(paths.Covers(new Vector2(81.71f, 80.29f)) && !paths.Covers(new Vector2(81.82f, 80.18f)), "a staircase's notch on the other side should be filled up to a slanted edge too");
     }
 
     private static void CheckFourTilesInASquareAreGravelAllOver(GameData data) {
         var world = EmptyWorld(data);
         LayPath(world, new Vector2I(80, 80), new Vector2I(81, 80), new Vector2I(81, 81));
-        Require(!world.GravelPaths.Covers(new Vector2(80.5f, 80.5f)), "three tiles of a square should leave its middle bare");
+        // In the fourth tile, 0.42 from the line between the tiles at the turn's ends and 0.28 from its own middle.
+        var inFourth = new Vector2(80.2f, 80.8f);
+        Require(!world.GravelPaths.Covers(inFourth), "three tiles of a square should leave the fourth's place bare past their slanted edge");
         LayPath(world, new Vector2I(80, 81));
-        Require(world.GravelPaths.Covers(new Vector2(80.5f, 80.5f)), "four tiles in a square should be gravel all over, with no hole in the middle");
+        Require(world.GravelPaths.Covers(inFourth) && world.GravelPaths.Covers(new Vector2(80.5f, 80.5f)), "four tiles in a square should be gravel all over");
         // 0.42 from the corner tile's middle.
         Require(!world.GravelPaths.Covers(new Vector2(79.7f, 79.7f)), "a square of four tiles should have round corners");
     }
