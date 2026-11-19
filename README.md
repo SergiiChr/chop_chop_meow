@@ -866,7 +866,7 @@ Click a cabin, or press Enter in its panel, and you walk round it to its door an
 Once you set off you cannot walk away, and the keys do nothing until you are in.
 Stepping in takes about 1.3 seconds at a walk, hurrying up the second tread, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
 For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and tugs you a metre back out in three tugs over 1.5 seconds, less where water or a building is in the way, you bent over, reaching for the door and screaming.
-It then lets go and you run in again at once.
+It then lets go and leaves you standing there, free to move: click the cabin to go for its door again.
 At half health or less, its third tug takes you straight over onto your back about 1.2 seconds in.
 Hit the wolf while it tugs someone and it lets go of them.
 No other wolf takes you down while one tugs you.
@@ -883,7 +883,6 @@ A cabin holds two players.
 While you are at its door, knocking, following or stepping in, anything you try in the world says "You are busy."; you can still pick a hotbar slot.
 Someone who walks up behind a player stepping in follows them in once that player is inside.
 At the door of a cabin that is full, or locked with someone inside, you wait for the door to swing shut, step up to it, knock on it three times and stand free.
-Players a wolf tugs back out go in again in the order they came to the door.
 
 #### The door's key
 
@@ -903,7 +902,7 @@ The wolf scratches at the door for 3.6 seconds, which you hear from inside.
 - You can still turn the key while it scratches.
 - At an unlocked door it turns to the door's free edge, hooks its snout behind it and levers the door out in three pries over 1.5 seconds, the door rattling at each; the key no longer turns.
   It squeezes in between the door and its frame over 2.5 seconds, stands in the doorway growling at you with its fangs bared for 2 seconds and launches itself at you.
-- It bites and takes you out by the waist, as a wolf tugging you out of the doorway does: at more than half health you run back in, and it comes to the door again.
+- It bites and takes you out by the waist, as a wolf tugging you out of the doorway does: at more than half health it lets go and leaves you standing outside.
 - With two players inside it takes the one who came in last.
 - Other wolves that come to the same door wait a few metres behind it and go for you once you are out, one taking each of your arms while the first tugs.
 - While a wolf is at the door, Step outside does nothing.

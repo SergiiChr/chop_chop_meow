@@ -1237,7 +1237,7 @@ public sealed partial class World {
         // A wolf that pinned the player, or bit them down without a leap, eats every scrap of food.
         bool wolfKill = S.Mauled || Hunters.Any(w => w.Pos.DistanceTo(Player) < LeapRange);
         if (wolfKill) foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
-        string ate = $"{(Hunters.Count() > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.";
+        const string ate = "Wolves ate food in your backpack.";
         // A pack that pinned the player stays to feed until they respawn.
         if (S.Mauled) { Say(ate); return; }
         S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);

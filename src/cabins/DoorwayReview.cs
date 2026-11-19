@@ -59,7 +59,7 @@ public sealed partial class DoorwayReview : Node {
                 (0, () => { HostInside(); Cabin.Locked = true; GuestAway(); }),
                 (.2f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.5f, 4) })),
             },
-            // The host is inside with the door unlocked; a wolf scratches, forces the door and takes them out, and they run back in.
+            // The host is inside with the door unlocked; a wolf scratches, forces the door and takes them out and lets them go outside.
             "forced" => new (float, Action)[] {
                 (0, () => { HostInside(); GuestAway(); }),
                 (.2f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.5f, 4) })),

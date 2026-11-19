@@ -1633,9 +1633,11 @@ public partial class Game {
         await Seconds(ActorAnimation.FallBackSeconds);
         Require(view.PlayerAnimation == ActorAction.Mauled, "A pinned player must show the mauled struggle once down.");
         Require(deathLabel.Text == "", "A pinned player must leave the message to the pinned notice.");
-        SetMauled(Hosted, false); RunUntilMorning(Hosted); SetNeeds(Hosted, health: 100);
-        Hosted.Die(); await Until(() => world.Dead && deathLabel.Text.Contains("Respawning in"), "death showing the respawn countdown", 2);
+        Hosted.Die(); await Until(() => world.Dead && deathLabel.Text.StartsWith("Respawning in"), "a wolf kill showing only the respawn countdown", 2);
         Hosted.Tick(world.RespawnIn); await Until(() => !world.Dead && deathLabel.Text == "", "the countdown clearing once the player respawns", 2);
+        RunUntilMorning(Hosted); SetNeeds(Hosted, health: 100);
+        Hosted.Die(); await Until(() => world.Dead && deathLabel.Text.StartsWith("You collapsed\nRespawning in"), "a collapse showing its cause over the respawn countdown", 2);
+        Hosted.Tick(world.RespawnIn); await Until(() => !world.Dead && deathLabel.Text == "", "the countdown clearing once the player respawns again", 2);
     }
     /// <summary>The starter goals alone do not end the game; mines and the profit goal show the ending, and keep playing closes it for good.</summary>
     private async Task CheckEndGoalsShowEndingOnceAndKeepPlaying() {
@@ -2011,9 +2013,7 @@ public partial class Game {
             Require(held < .15f && held < other, $"A wolf holding a player's {(left ? "left" : "right")} arm must be drawn with its jaws on that forearm, not {held:0.00} m from it and {other:0.00} m from the other.");
         }
         RemoveWolves(Hosted, pack.Contains);
-        await Until(() => world.Sheltered == hut.Id, "a player nobody tugs any more stepping into the cabin", 4);
-        Hosted.Doorways.Leave();
-        await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "the player stepping out of the cabin again", 4);
+        await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "a player nobody tugs any more standing free outside the cabin", 4);
         RemoveThings(Hosted, t => t == hut); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
         await CloseWithEsc();
     }

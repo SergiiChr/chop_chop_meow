@@ -49,7 +49,7 @@ public sealed class WolfHunt(World world) {
             var from = wolf.Pos;
             wolf.Attack -= dt;
             bool held = Held(wolf, wary);
-            Hunt(wolf, dt, hunters.Count > 1, lit, held, speed, chase);
+            Hunt(wolf, dt, lit, held, speed, chase);
             Face(wolf, from, dt, held && wolf.Following);
         }
         world.WolfBodies.KeepApart(hunters, dt);
@@ -63,7 +63,7 @@ public sealed class WolfHunt(World world) {
     /// Moves one wolf hunting the acting player through this tick: at a doorway, howling, in the air, feeding, reeling,
     /// snapping, running off, or closing in as the light and the torch let it.
     /// </summary>
-    private void Hunt(Wolf wolf, float dt, bool pack, bool lit, bool held, float speed, float chase) {
+    private void Hunt(Wolf wolf, float dt, bool lit, bool held, float speed, float chase) {
         // A wolf stands braced only for as long as follow mode keeps finding its player close.
         bool braced = wolf.Follow == FollowStage.Braced;
         if (braced) wolf.Follow = FollowStage.Circling;
@@ -82,7 +82,7 @@ public sealed class WolfHunt(World world) {
             wolf.Pos = wolf.Pos.MoveToward(landing, wolf.Pos.DistanceTo(landing) * Math.Min(1, dt / wolf.Leap));
             wolf.Leap = Math.Max(0, wolf.Leap - dt);
             // A player in a doorway is tugged back out of it first, and pinned once out.
-            if (wolf.Leap == 0 && !world.DoorTug.TugOut(wolf)) Pin(wolf, pack);
+            if (wolf.Leap == 0 && !world.DoorTug.TugOut(wolf)) Pin(wolf);
         } else if (world.S.Mauled) {
             if (wolf.Feeding) return;
             var seat = world.Player + (wolf.Pos - world.Player).Normalized() * FeastSeat;
@@ -148,10 +148,10 @@ public sealed class WolfHunt(World world) {
     }
 
     /// <summary>Pins the acting player under a wolf, standing over them, or lunging onto their throat from <paramref name="lungeFrom"/> of it once it has tugged them back out of a doorway.</summary>
-    internal void Pin(Wolf wolf, bool pack, Vector2 lungeFrom = default) {
+    internal void Pin(Wolf wolf, Vector2 lungeFrom = default) {
         wolf.Leap = 0; wolf.LungeFrom = lungeFrom; wolf.Feeding = wolf.Pinning = true; world.S.Mauled = true;
         wolf.Pos = lungeFrom == Vector2.Zero ? world.Player + AwayFromPlayer(wolf) * World.PinDistance : world.Player + Doorways.OutOfDoor * DoorTug.FallenThroat + lungeFrom * DoorTug.AsideReach;
-        world.Say(pack ? "You are pinned. The pack closes in." : "You are pinned."); world.Play("wolf_bite", world.Player); world.Play("takedown_scream", world.Player);
+        world.Say("You are pinned and can't move."); world.Play("wolf_bite", world.Player); world.Play("takedown_scream", world.Player);
     }
     /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>
     internal Vector2 AwayFromPlayer(Wolf wolf) => wolf.Pos == world.Player ? Vector2.Right : (wolf.Pos - world.Player).Normalized();

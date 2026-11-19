@@ -1298,10 +1298,13 @@ public static class SimulationChecks {
         var packmate = new Wolf { Pos = maul.Player + new Vector2(-9, 4), Attack = 5 };
         PlaceWolf(maul, leaper); PlaceWolf(maul, packmate);
         var heard = Listen(maul);
+        var said = new List<string>();
+        maul.Notify += said.Add;
         maul.Tick(.1f);
         Require(leaper.Leap > 0 && !maul.Mauled, "a nearby wolf should leap at a player on half health");
         maul.Tick(World.LeapSeconds);
         Require(maul.Mauled, "the leap should pin the player");
+        Require(said.Contains("You are pinned and can't move."), $"a pinned player should be told they cannot move: told {string.Join(" | ", said)}");
         Require(heard.Count(name => name == "takedown_scream") == 1, $"a player pinned by a leap should scream once: heard {string.Join(", ", heard)}");
         Require(leaper.Feeding, "the leap should make the wolf feed");
         Require(leaper.Pinning && leaper.LungeFrom == Vector2.Zero, "the leap should make the wolf pin, over the player");
@@ -1313,6 +1316,7 @@ public static class SimulationChecks {
         Require(maul.Player == pinned && leaper.Health == data.WolfHealth, "a pinned player can neither move nor fight back");
         for (int i = 0; i < 40 && !maul.Dead; i++) maul.Tick(.1f);
         Require(maul.Dead, "a pinned player should be killed within seconds");
+        Require(said.Contains("Wolves ate food in your backpack."), $"a player wolves killed should be told only that they ate the food: told {string.Join(" | ", said)}");
         for (int i = 0; i < 20; i++) maul.Tick(.1f);
         Require(packmate.Feeding, "the rest of the pack should stay to feed");
         Require(packmate.Pos.DistanceTo(pinned) < 1.6f, "the rest of the pack should run in to the pinned player");

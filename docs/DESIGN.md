@@ -547,7 +547,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   As it leaves the ground it aims its jaws at where the player will be when it lands if they keep going the way they went while it gathered itself (`Wolf.SnapSeen`), `WolfSnap.JawsShort` short of their middle, and from there it does not follow them (`Wolf.SnapTo`); a leap carries it `WolfSnap.Range` at most.
   It bites only a player within `WolfSnap.Reach` of its jaws as it lands, so a walking player is bitten whatever they do and a sprinting one who turns aside as it leaps is missed.
   A blow that lands on it first, or a torch waved at it while it gathers itself, stops the snap.
-  A bite that lands on a player in the open part of a doorway is how every tug out of it starts (`DoorTug.TugOut`); a player let go above half health runs back in, in the open for less time than a snap takes.
+  A bite that lands on a player in the open part of a doorway is how every tug out of it starts (`DoorTug.TugOut`); a player let go above half health is left standing free outside.
   A wolf leaping at a player in a cabin's doorway lands at their waist (`TugView.InTheDoorway`), and one taking hold of a player lunges in to the waist rather than appearing there.
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
   A player a wolf had pinned goes free as it leaves.
@@ -570,12 +570,12 @@ Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin
   At the door of a cabin that is full (`Doorways.Inside`), locked with someone inside (`Thing.Locked`) or being stepped out of, they are `Knocking`: the door swings shut over `Doorways.ShutSeconds`, they step up to it, and from `Doorways.KnockLead` knock `Doorways.Knocks` times over `Doorways.KnockSeconds`, then stand free.
 - `Doorways.TurnKey` locks or unlocks the door of the cabin the acting player is in, with `door_lock`; `Doorways.Leave` unlocks it first, and a cabin nobody is left inside is unlocked (`Doorways.UnlockEmpty`).
   A player wakes after death in the nearest cabin with a place left (`Doorways.HasPlace`), locked or not.
-  Each arrival at a door is numbered (`SaveState.DoorArrivals`, `PlayerState.DoorQueued`), so players tugged back out go in again in the order they came.
+  Each arrival at a door is numbered (`SaveState.DoorArrivals`, `PlayerState.DoorQueued`), so whoever came to it first goes in first, and a wolf takes out whoever came in last.
 - `Doorways.Indoors` is what wolves go by: inside, through the second half of `Entering` and the first half of `Leaving`.
 - A bite or a leap landing on a player out in the open at a door (`DoorTug.TugOut`) has that wolf take them by the waist (`Wolf.Tugging`) and tug them back out along `Doorways.OutOfDoor`, `DoorTug.TugDistance` or as far as open ground runs with room for the wolf behind them (`DoorTug.TugDistanceFrom`), in `DoorTug.Tugs` tugs over `DoorTug.TugSeconds` (`Tugged`, or `TuggedOff` while knocking), the way `DoorTug.TugProgress` paces it, with one `tug_scream` through the tug.
   The world moves the player there when the tug ends; meanwhile the wolf stands `DoorTug.TugReach` behind them, or where it stood with no open ground there, and no other wolf leaps.
-  A hit knocks the wolf back (`Wolf.Stagger`): the player stays as far out as it got them and steps in again at a run.
-  The wolf then lets go and bites no sooner than a second later; at half health or less it ends as the last tug lands (`DoorTug.Heave`) and it pins them, otherwise a tugged player steps in again at a run, and one tugged off the door stands free.
+  A hit knocks the wolf back (`Wolf.Stagger`): the player stands free as far out as it got them.
+  The wolf then lets go and bites no sooner than a second later; at half health or less it ends as the last tug lands (`DoorTug.Heave`) and it pins them, otherwise the player stands free where the tug left them, and goes in again only when they go for the cabin.
 - While one wolf tugs, another that comes within `DoorTug.SideWithin` of the player takes the side it is on, or the other when that one is taken or has no open ground (`DoorTug.TakeSide`, `Wolf.Side`, a `BodySide`), one wolf a side.
   It bites once as it takes hold, or as soon after as its last bite is a second behind it (`DoorTug.BiteArm`, `Wolf.SideBitten`), stands `DoorTug.SideReach` to that side and bites no more (`DoorTug.Hold`) until the tug ends or it is hit.
   A wolf with no side to take, with both held, without open ground or not out of the door yet, waits at biting distance and snaps again once the tug has ended (`WolfSnap.Start`).

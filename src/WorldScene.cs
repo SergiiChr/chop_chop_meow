@@ -283,7 +283,7 @@ public partial class WorldView {
             var from = door - DoorwayView.IntoCabin * 2;
             shown = (from.Lerp(door, walked), door + DoorwayView.IntoCabin, walked < 1 ? ActorAction.Jog : ActorAction.Idle, false);
         } else if (now == Doorway.Tugged) {
-            // Half way into a run in, the player is tugged back out a metre, then runs in again from there.
+            // Half way into a run in, the player is tugged back out a metre, then runs in from there as one who goes for the cabin again.
             float run = time - start, tugged = run - Doorways.RushSeconds / 2;
             var tuggedTo = door + Doorways.OutOfDoor * DoorTug.TugDistance;
             var part = run < Doorways.RushSeconds / 2 ? Doorway.Entering : tugged < DoorTug.TugSeconds ? Doorway.Tugged : Doorway.Entering;

@@ -9,7 +9,7 @@ public enum Doorway {
     Following,
     /// <summary>Knocking on the shut door of a cabin someone is in.</summary>
     Knocking,
-    /// <summary>Tugged back out of the doorway by a wolf holding them by the waist, to step in again at a run.</summary>
+    /// <summary>Tugged back out of the doorway by a wolf holding them by the waist.</summary>
     Tugged,
     /// <summary>Tugged off the door they knocked on, or stood aside at, by a wolf, to stand free.</summary>
     TuggedOff,
