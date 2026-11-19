@@ -64,6 +64,27 @@ internal static class WorldSteps {
         return (world, guest, heard);
     }
 
+    /// <summary>
+    /// Packs <paramref name="count"/> crates of berries as a player does and stores them in new chests along a row from
+    /// <paramref name="from"/>, five to a chest, then puts the player back where they stood.
+    /// </summary>
+    public static void StoreCrates(World world, Vector2 from, int count) {
+        var stood = world.Player;
+        Thing? chest = null;
+        for (int i = 0; i < count; i++) {
+            if (i % 5 == 0) {
+                var at = from + new Vector2(i / 5 * 2, 0);
+                chest = world.Add(ThingKind.Chest, at);
+                Warp(world, at + new Vector2(0, 1));
+            }
+            Give(world, "crate"); Give(world, "berries", world.Data.CrateCapacity);
+            world.MoveInCrate(0, "berries", world.Data.CrateCapacity, true);
+            string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+            Require(world.Transfer(world.Backpack, chest!.Inventory, packed, 1) == 1, $"a packed crate should go into the chest at {chest.Pos}");
+        }
+        Warp(world, stood);
+    }
+
     /// <summary>A daytime camp in the generated valley: woodcutters, a bellows crew at a hot forge, a furnace, a campfire and storage.</summary>
     public static World Settlement(GameData data) {
         var world = new World(data);

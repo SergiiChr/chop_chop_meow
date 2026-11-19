@@ -11,9 +11,9 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace ChopChopMeow;
 
-/// <summary>Names one entry of a world update: a thing, worker, wolf, trade order or player by its id, or one of the three shared entries.</summary>
+/// <summary>Names one entry of a world update: a thing, worker, wolf, trade order or player by its id, or one of the four shared entries.</summary>
 public readonly record struct EntryKey(byte Prefix, int Id) {
-    public const byte Thing = (byte)'t', Worker = (byte)'w', Wolf = (byte)'f', Order = (byte)'o', Player = (byte)'p', State = (byte)'s', Work = (byte)'k', Paths = (byte)'g';
+    public const byte Thing = (byte)'t', Worker = (byte)'w', Wolf = (byte)'f', Order = (byte)'o', Player = (byte)'p', State = (byte)'s', Work = (byte)'k', Paths = (byte)'g', Crates = (byte)'c';
     /// <summary>A changed entry that carries only its changed fields is named with this in front.</summary>
     public const byte Patched = (byte)'~';
     /// <summary>Longest name: a patch mark, a prefix, a colon and an int.</summary>
@@ -50,9 +50,9 @@ public sealed class Snapshot : Dictionary<EntryKey, byte[]> {
 /// </summary>
 public sealed class WorldUpdates {
     private static readonly JsonSerializerOptions Compact = new(GameData.Json) { WriteIndented = false };
-    // Lists merged by identity, the fog each machine keeps itself, every player of the save and whose it is, and the gravel path tiles, which have an entry of their own.
-    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered), nameof(SaveState.Party), nameof(SaveState.Owner), nameof(SaveState.GravelPaths) }.ToHashSet();
-    // The world's own fields, without the lists, players and path tiles that have entries of their own, or the fog, which each machine works out from where everyone stands.
+    // Lists merged by identity, the fog each machine keeps itself, every player of the save and whose it is, and the gravel path tiles and packed crates, which have entries of their own.
+    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered), nameof(SaveState.Party), nameof(SaveState.Owner), nameof(SaveState.GravelPaths), nameof(SaveState.Crates) }.ToHashSet();
+    // The world's own fields, without the lists, players, path tiles and crates that have entries of their own, or the fog, which each machine works out from where everyone stands.
     private static readonly JsonSerializerOptions Rest = new(Compact) {
         TypeInfoResolver = new DefaultJsonTypeInfoResolver {
             Modifiers = {
@@ -91,7 +91,7 @@ public sealed class WorldUpdates {
 
     public Snapshot Empty() => spare.Count > 0 ? spare.Pop() : new Snapshot();
 
-    /// <summary>The world as entries: each thing, worker, wolf, trade order and player under its id, the rest of the world, what each worker is doing, and the gravel path tiles.</summary>
+    /// <summary>The world as entries: each thing, worker, wolf, trade order and player under its id, the rest of the world, what each worker is doing, the gravel path tiles and the packed crates' contents.</summary>
     public Snapshot Capture(World world) {
         var s = world.S;
         world.NumberWolvesAndOrders();
@@ -107,12 +107,13 @@ public sealed class WorldUpdates {
         }
         entryWriter.WriteEndObject();
         Keep(snapshot, new EntryKey(EntryKey.Work, 0));
-        // The state entry is written again on every update, as time moves: the tiles, which seldom change, stay out of it.
+        // The state entry is written again on every update, as time moves: the tiles and crates, which seldom change, stay out of it.
         entry.ResetWrittenCount(); entryWriter.Reset(entry);
         entryWriter.WriteStartArray();
         foreach (int tile in s.GravelPaths) entryWriter.WriteNumberValue(tile);
         entryWriter.WriteEndArray();
         Keep(snapshot, new EntryKey(EntryKey.Paths, 0));
+        Write(snapshot, new EntryKey(EntryKey.Crates, 0), s.Crates, UpdateJson.Default.DictionaryInt32Inventory);
         foreach (var t in s.Things) Write(snapshot, new EntryKey(EntryKey.Thing, t.Id), t, UpdateJson.Default.Thing);
         foreach (var w in s.Workers) Write(snapshot, new EntryKey(EntryKey.Worker, w.Id), w, UpdateJson.Default.Worker);
         foreach (var w in s.Wolves) Write(snapshot, new EntryKey(EntryKey.Wolf, w.Id), w, UpdateJson.Default.Wolf);

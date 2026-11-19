@@ -38,8 +38,9 @@ public sealed class Inventory {
     /// <summary>
     /// The totals as saved under the name "Items", for loading and network copies.
     /// Assigning copies the totals in; the stacks then need <see cref="RebuildStacks"/> unless <see cref="Layout"/> is set from the same source.
+    /// It is the dictionary itself, not a read-only interface over it, so the JSON writer walks it without allocating, as updates do for every filled inventory thirty times a second.
     /// </summary>
-    [JsonPropertyName("Items")] public IReadOnlyDictionary<string, int> SavedItems { get => items; set { if (!ReferenceEquals(value, items)) { items.Clear(); foreach (var pair in value) items[pair.Key] = pair.Value; } } }
+    [JsonInclude, JsonPropertyName("Items")] internal Dictionary<string, int> SavedItems { get => items; set { if (!ReferenceEquals(value, items)) { items.Clear(); foreach (var pair in value) items[pair.Key] = pair.Value; } } }
     /// <summary>Physical stack positions; <see cref="Items"/> holds each item's total across them.</summary>
     public List<Slot> Layout { get; set; } = new();
     public HashSet<string> InputFilter { get; set; } = new();
