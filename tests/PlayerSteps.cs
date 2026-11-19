@@ -48,6 +48,23 @@ internal static class PlayerSteps {
         return world.Backpack.Items.Keys.Single(id => !before.Contains(id));
     }
 
+    /// <summary>
+    /// Packs <paramref name="count"/> crates of berries as a player does and stores them in new chests along a row from
+    /// <paramref name="from"/>, five to a chest, then puts the player back where they stood.
+    /// </summary>
+    public static void StoreCrates(World world, Vector2 from, int count) {
+        var stood = world.Player;
+        for (var at = from; count > 0; at += new Vector2(2, 0)) {
+            var chest = world.Add(ThingKind.Chest, at);
+            Warp(world, at + new Vector2(0, 1));
+            for (int i = 0; i < 5 && count > 0; i++, count--) {
+                string packed = PackCrate(world, ("berries", world.Data.CrateCapacity));
+                Require(world.Transfer(world.Backpack, chest.Inventory, packed, 1) == 1, $"a packed crate should go into the chest at {chest.Pos}");
+            }
+        }
+        Warp(world, stood);
+    }
+
     /// <summary>A compost pile on open ground with a farm plot built beside it, the player standing by with one sowing's seeds and fertilizer.</summary>
     public static (World World, Thing Compost, Thing Farm) FarmBesideCompost(GameData data) {
         var world = EmptyWorld(data);

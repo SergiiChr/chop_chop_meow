@@ -50,7 +50,7 @@ public static class AllocationChecks {
         // Two hundred path tiles lie off to one side: they ride in an entry of their own, which an update that lays none does not write again.
         GravelPathSteps.LayWhereFree(hosting, new Vector2I(60, 80), 200);
         // A hundred packed crates lie in chests off to the other side, with an entry of their own too.
-        StoreCrates(hosting, new Vector2(60, 110), 100);
+        PlayerSteps.StoreCrates(hosting, new Vector2(60, 110), 100);
         var host = new WorldUpdates(); var guest = new WorldUpdates();
         var sent = new Queue<(Snapshot Host, Snapshot Guest)>();
         Check("update: working settlement", () => {
