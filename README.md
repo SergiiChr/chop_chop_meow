@@ -1062,6 +1062,7 @@ Sound effects follow the same actions:
 
 - footsteps change on grass, rock, the lake shore and gravel paths;
 - axes, pickaxes, anvils, benches and swings have impacts, and fitting a mine's frame clinks on its rails;
+- a bench crushing rocks rings like a pickaxe on stone in place of its knock;
 - a felled tree cracks as it breaks, a tall one tearing at length, and crashes as it reaches the ground;
 - a shovel crunches into the soil and throws it aside, and a stump or bush comes out with a heave of earth;
 - picking plants by hand and packing crates rustle, butchering tears, and a mortar grinds;

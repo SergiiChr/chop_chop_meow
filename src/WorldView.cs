@@ -708,10 +708,12 @@ public partial class WorldView : Node3D {
         // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips.
         bool inSight = World.Sees(subject.Pos);
         if (inSight) prop.Shake = 1;
+        // A recipe with a sound of its own is heard in place of its station's.
         // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.
         string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
             : action == ActorAction.Dig ? "dig_earth"
             : action == ActorAction.Pump ? "bellows_pump"
+            : World.Data.Recipes.GetValueOrDefault(subject.Making)?.Sound is { Length: > 0 } made ? made
             : subject.Kind == ThingKind.Anvil ? "anvil_work"
             : subject.Kind is ThingKind.Bench or ThingKind.Mine ? "bench_work"
             : subject.Kind == ThingKind.Tree && action != ActorAction.Gather ? "chop_tree"

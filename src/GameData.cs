@@ -50,6 +50,8 @@ public sealed class RecipeDef {
     /// <summary>The fuels a batch can burn, one unit per batch from the station's fuel slot, in the order workers look for them; empty for a recipe that burns none.</summary>
     public List<string> Fuels { get; set; } = new();
     public bool Burns => Fuels.Count > 0;
+    /// <summary>The sound of each blow struck while a batch is made, or empty for the station's own.</summary>
+    public string Sound { get; set; } = "";
 }
 /// <summary>
 /// A refillable vessel and the liquid it carries, in liters.

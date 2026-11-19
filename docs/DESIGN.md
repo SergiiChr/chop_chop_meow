@@ -840,6 +840,7 @@ A click runs `Construction.Remove` at once and the selector stays; Esc or a righ
 ### Gravel paths
 
 A bench recipe (`gravel`, a hammer of tier 2, not by hand) crushes 1 stone into 1 gravel.
+Each hammer blow on it plays `mine_ore`, the recipe's own sound (`RecipeDef.Sound`), in place of the bench's knock.
 The gravel path is a building plan (`ThingKind.GravelPath`, 4 gravel) but never a thing: `Construction.Build` hands it
 to `World.GravelPaths` (`src/paths/GravelPaths.cs`), which keeps the laid tiles.
 A tile is a map tile, centred on whole coordinates like a building, saved as its place in the map's rows in

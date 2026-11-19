@@ -1355,6 +1355,13 @@ public partial class Game {
         await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Last == "bench_work", "the idle player hammering at the bench beside it with its knock", 4);
         RemoveThings(Hosted, t => t == bench);
     }
+    /// <summary>A bench crushing rocks rings like a pickaxe on stone under each hammer blow, in place of its wooden knock.</summary>
+    private async Task CheckABenchCrushingRocksSoundsLikeMiningStone() {
+        var bench = Hosted.Add(ThingKind.Bench, Hosted.Player + new Vector2(1.2f, 0));
+        bench.Tools!.Add("steel_hammer", 1); Hosted.SetRecipe(bench, "gravel"); bench.Inventory.Add("stone", 6);
+        await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Last == "mine_ore", "the idle player crushing rocks at the bench beside it with the sound of mining stone", 4);
+        RemoveThings(Hosted, t => t == bench);
+    }
     /// <summary>A player standing idle beside a cooking table that is crushing berries grinds with its mortar, which leaves the counter for their hands.</summary>
     private async Task CheckIdlePlayerBesideACookingTableGrindsWithItsMortar() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
@@ -2198,6 +2205,7 @@ public partial class Game {
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await Test(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
+            await Test(CheckABenchCrushingRocksSoundsLikeMiningStone);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
             await Test(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
