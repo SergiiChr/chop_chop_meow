@@ -45,10 +45,12 @@ public static class AllocationChecks {
         Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 7, warmup: 1200);
 
         // The host sends an update thirty times a second, against one the guest confirmed a few updates back, as over a long connection, and the guest merges it.
-        // Only entries that changed are new arrays, on the host and again in the guest's merge: about seven worker and station entries an update in a working settlement (measured 10.6 KB an update).
+        // Only entries that changed are new arrays, on the host and again in the guest's merge: about seven worker and station entries an update in a working settlement (measured 10.5 KB an update).
         var hosting = Settlement(data);
         // Two hundred path tiles lie off to one side: they ride in an entry of their own, which an update that lays none does not write again.
         GravelPathSteps.LayWhereFree(hosting, new Vector2I(60, 80), 200);
+        // A hundred packed crates lie in chests off to the other side, with an entry of their own too.
+        PlayerSteps.StoreCrates(hosting, new Vector2(60, 110), 100);
         var host = new WorldUpdates(); var guest = new WorldUpdates();
         var sent = new Queue<(Snapshot Host, Snapshot Guest)>();
         Check("update: working settlement", () => {

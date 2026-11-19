@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -16,6 +17,7 @@ namespace ChopChopMeow;
 [JsonSerializable(typeof(Wolf))]
 [JsonSerializable(typeof(TradeOrder))]
 [JsonSerializable(typeof(PlayerState))]
+[JsonSerializable(typeof(Dictionary<int, Inventory>))]
 internal partial class UpdateJson : JsonSerializerContext;
 
 /// <summary>Every inventory that is not fresh, written as <see cref="UpdateJson"/> writes the rest.</summary>
