@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
@@ -138,20 +139,46 @@ public partial class Game {
         await Frames(4);
         // The model outlives its tree while it falls, so it is taken before the tree leaves the world.
         var falling = (TreeProp)view.PropOf(tree.Id)!;
+        int soundsBefore = sounds.Played;
         var stump = SetupSteps.Fell(Hosted, tree);
-        await Until(() => sounds.Last == (tall ? "tree_bend" : "tree_crack"), tall ? "a tall tree tearing at length as it breaks" : "a short tree cracking as it breaks", 2);
+        await Until(() => sounds.Heard(tall ? "tree_bend" : "tree_crack", soundsBefore), tall ? "a tall tree tearing at length as it breaks" : "a short tree cracking as it breaks", 2);
         // The fall is timed on the view's own clock, which a slow frame does not stretch the way it stretches real time.
         float brokeAt = view.Elapsed, leanAtBreak = falling.Sway.RotationDegrees.X;
-        await Until(() => sounds.Last == "tree_crash", "a felled tree crashing", 4);
+        await Until(() => sounds.Heard("tree_crash", soundsBefore), "a felled tree crashing", 4);
         var fall = (view.Elapsed - brokeAt, leanAtBreak, falling.Sway.RotationDegrees.X);
         SetupSteps.RemoveThings(Hosted, t => t == stump); await Frames(2);
         return fall;
     }
 
+    /// <summary>
+    /// Runs one UI check, then fails it when it leaves the game other than it found it: the player somewhere else, a
+    /// building, crate or box more or fewer on the ground, something held, a page or menu open, or a click mode on.
+    /// So the next check starts where this one did, and a check that leaves a mess fails under its own name.
+    /// </summary>
+    private async Task TestClean(Func<Task> check, [CallerArgumentExpression(nameof(check))] string name = "") {
+        bool playing = hosted?.World != null;
+        var stood = playing ? Hosted.Player : default;
+        int built = playing ? Built() : 0;
+        await Test(check, name: name);
+        if (!playing || hosted?.World == null) return;
+        Require(Hosted.Player.DistanceTo(stood) <= .5f, $"{name} must leave the player where it found them, not {Hosted.Player.DistanceTo(stood):0.0} tiles away.");
+        Require(Built() == built, $"{name} must leave as many buildings, crates and boxes on the ground as it found, not {Built() - built} more.");
+        Require(cursor.Empty, $"{name} must leave nothing held on the cursor.");
+        Require(!panel.Visible && !bag.Visible && !menu.Visible, $"{name} must leave every page and menu closed.");
+        Require(player.Mode is ClickMode.Normal, $"{name} must leave no click mode on.");
+    }
+
+    /// <summary>How many buildings, crates and boxes stand in the server's world.</summary>
+    private int Built() {
+        int count = 0;
+        foreach (var t in Hosted.Things) if (t.Kind is ThingKind.Crate or ThingKind.Grave || Hosted.Data.Buildings.ContainsKey(t.Kind)) count++;
+        return count;
+    }
+
     /// <summary>The closest place a building can go.</summary>
     private Vector2 FreeSpotNearby(ThingKind kind) {
         var spots = from x in Enumerable.Range(-3, 7) from y in Enumerable.Range(-3, 7) select world.Player.Round() + new Vector2(x, y);
-        return spots.Where(spot => world.PlacementBlock(kind, spot) == null).MinBy(spot => spot.DistanceTo(world.Player));
+        return spots.Where(spot => world.Construction.PlacementBlock(kind, spot) == null).MinBy(spot => spot.DistanceTo(world.Player));
     }
 
     /// <summary>Starts a game on this computer that someone else owns, which has not been opened to anyone, and returns its server's process and port.</summary>

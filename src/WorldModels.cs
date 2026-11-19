@@ -240,6 +240,7 @@ public static class WorldModels {
         ThingKind.Toolstation => new[] { new Hit(.55f, 0, 1.5f) },
         ThingKind.Pile => new[] { new Hit(1.5f, 0, .5f) },
         ThingKind.Farm => new[] { new Hit(1.5f, 0, .5f) },
+        ThingKind.GravelPath => Array.Empty<Hit>(),
         ThingKind.Leaves => new[] { new Hit(.6f, 0, .15f) },
         ThingKind.Grave => new[] { new Hit(.65f, 0, 1.5f) },
         ThingKind.Anvil => new[] { new Hit(.45f, 0, .85f) },
@@ -286,6 +287,7 @@ public static class WorldModels {
             case ThingKind.Signpost: prop = Signpost(); break;
             case ThingKind.Campfire: prop = FirePit(); break;
             case ThingKind.Mine: prop = Mine(World.CliffAt(t.Pos).Ore); break;
+            case ThingKind.GravelPath: prop = new Prop(); Add(prop.Body, GravelPathShape.Tile, Scanned(Scan.Gravel, 1), Vector3.Zero); break;
             default: throw new ArgumentOutOfRangeException(nameof(t), t.Kind, "No model for this kind.");
         }
         prop.Kind = t.Kind; prop.Hits = Hits(t);

@@ -20,6 +20,7 @@ public partial class Sounds : Node {
     // Variants share a loudness, and these levels set each sound's place in the mix: quiet steps, then impacts and handling, then alerts.
     private static readonly Dictionary<string, float> Levels = new() {
         ["footsteps_default"] = -18,
+        ["footsteps_gravel"] = -18,
         ["footsteps_rocks"] = -17,
         ["footsteps_water"] = -15,
         ["chop_tree"] = -7.5f,
@@ -82,6 +83,16 @@ public partial class Sounds : Node {
     /// <summary>Counts every sound started, so a caller can tell whether an action already made one.</summary>
     public int Played { get; private set; }
     public string Last { get; private set; } = "";
+    // The names of the last sounds started, the newest over the oldest.
+    private readonly string[] recent = new string[32];
+    /// <summary>
+    /// Whether a sound of this name was started after <see cref="Played"/> read <paramref name="since"/>, whatever has
+    /// played after it; it remembers the last 32 sounds.
+    /// </summary>
+    public bool Heard(string name, int since) {
+        for (int i = Math.Max(since, Played - recent.Length); i < Played; i++) if (recent[i % recent.Length] == name) return true;
+        return false;
+    }
     public static IEnumerable<string> Names => Levels.Keys;
     /// <summary>A sound's place in the mix, in decibels.</summary>
     public static float Level(string name) => Levels.GetValueOrDefault(name);
@@ -132,7 +143,7 @@ public partial class Sounds : Node {
     public static string ForItem(string item) => item switch {
         Inventory.Coins => "move_coins_inventory",
         "raw_meat" or "burnt_steak" or "meat_stew" => "meat_inventory",
-        "wood" or "stone" or "iron_ore" or "coal" or "charcoal" or "tin_ore" or "leaves" or "planks" or "wood_parts" or "wood_hammer" or "stone_chisel" or "torch" => "wood_rocks_inventory",
+        "wood" or "stone" or "gravel" or "iron_ore" or "coal" or "charcoal" or "tin_ore" or "leaves" or "planks" or "wood_parts" or "wood_hammer" or "stone_chisel" or "torch" => "wood_rocks_inventory",
         _ when World.IsCrate(item) => "wood_rocks_inventory",
         _ when item.StartsWith("iron_") || item.StartsWith("steel_") || item.StartsWith("tin_") || item.StartsWith("canned_") || item == "rake" => "pickup_gold",
         _ => "moving_leather_in_inventory"
@@ -181,6 +192,7 @@ public partial class Sounds : Node {
             player.Stream = streams[pick]; player.PitchScale = pitch; player.VolumeDb = volume;
             player.Play();
         }
+        recent[Played % recent.Length] = name;
         Played++; Last = name; LastFade = fade; LastPlaced = placed;
     }
 

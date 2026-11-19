@@ -28,7 +28,7 @@ public static class MineChecks {
         foreach (var cliff in World.Cliffs) {
             Require(World.CliffAt(World.MineSpot(cliff)) == cliff, "each aligned site must belong to its own cliff");
             var marking = FundedWorld(data); marking.Player = World.MineSpot(cliff) + cliff.Face * 3;
-            Require(marking.Build(ThingKind.Mine, World.MineSpot(cliff) + cliff.Along + cliff.Face)?.Pos == World.MineSpot(cliff), "every aligned site must remain markable and snap correctly");
+            Require(marking.Construction.Build(ThingKind.Mine, World.MineSpot(cliff) + cliff.Along + cliff.Face)?.Pos == World.MineSpot(cliff), "every aligned site must remain markable and snap correctly");
             var outward = cliff.Face;
             var basis = Basis.FromEuler(WorldModels.MineYaw(World.MineSpot(cliff)));
             var renderedOut = basis * Vector3.Back;
@@ -45,13 +45,13 @@ public static class MineChecks {
         var world = FundedWorld(data);
         var cliff = World.CliffOf(ThingKind.Iron);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
-        Require(world.PlacementBlock(ThingKind.Mine, world.Player + cliff.Face * 15) != null, "a mine must be marked at a cliff, not out in the valley");
+        Require(world.Construction.PlacementBlock(ThingKind.Mine, world.Player + cliff.Face * 15) != null, "a mine must be marked at a cliff, not out in the valley");
         int carried = world.Backpack.Count;
         var mine = MarkMine(world);
         Require(mine.Pos == World.MineSpot(cliff), "marking must snap to the cliff's mine spot");
         Require(mine.MineStage == MineStage.Marked, "marking must leave the mine in the marked stage");
         Require(world.Backpack.Count == carried, "marking must be free");
-        Require(world.Build(ThingKind.Mine, World.MineSpot(cliff) - cliff.Along * 2) == null && world.Things.Count(t => t.Kind == ThingKind.Mine) == 1, "a cliff must take only one mine");
+        Require(world.Construction.Build(ThingKind.Mine, World.MineSpot(cliff) - cliff.Along * 2) == null && world.Things.Count(t => t.Kind == ThingKind.Mine) == 1, "a cliff must take only one mine");
         Require(World.Cliffs.All(c => world.CanStand(World.MineSpot(c)) && world.CanStand(World.MineDoor(new Thing { Kind = ThingKind.Mine, Pos = World.MineSpot(c) }))), "every cliff's mine spot and entrance must be open ground");
         Require(!world.CanStand(World.MineDoor(mine) - cliff.Face * 2), "the rock spur the tunnel runs into must block walking");
         var coal = MarkMine(world, ThingKind.Coal);

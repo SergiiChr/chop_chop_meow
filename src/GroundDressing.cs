@@ -20,7 +20,7 @@ public partial class WorldView {
     private bool sceneryShadeBaked;
 
     /// <summary>
-    /// Plants shrink away on worn ground; wear is read at each plant's origin so the whole plant scales evenly.
+    /// Plants shrink away on worn ground and on gravel paths; wear is read at each plant's origin so the whole plant scales evenly.
     /// Plants sway in the wind and part around the player.
     /// </summary>
     private static readonly string DressingCode = $$"""
@@ -29,11 +29,15 @@ public partial class WorldView {
         uniform sampler2D disturbance : filter_linear, repeat_disable;
         // Footpaths worn by walking.
         uniform sampler2D traffic : filter_linear, repeat_disable;
+        // Gravel paths: above a half inside the gravel's edge (GravelPathView).
+        uniform sampler2D gravel : filter_linear, repeat_disable;
         varying vec3 tint;
         {{Wind.ShaderCode}}
         void vertex() {
             vec2 uv = MODEL_MATRIX[3].xz / {{Terrain.Size}}.0;
             float wear = max(texture(disturbance, uv).r, texture(traffic, uv).r);
+            // Nothing grows through gravel: the tiles' own corners lie half a tile before the map tile's.
+            wear = max(wear, smoothstep(0.4, 0.5, texture(gravel, (MODEL_MATRIX[3].xz + 0.5) / {{Terrain.Size}}.0).r));
             VERTEX *= 1.0 - smoothstep(0.12, 0.65, wear);
             vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
             float bend = clamp(VERTEX.y / 0.3, 0.0, 1.0);
@@ -94,7 +98,7 @@ public partial class WorldView {
             case ThingKind.Water or ThingKind.Leaves or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine: break;
             default:
                 if (t.IsLoose) ShadeObject(t.Pos, .3f, .6f);
-                else if (!World.IsZone(t.Kind)) ShadeObject(t.Pos, World.Footprint(t.Kind) + .25f, .5f);
+                else if (!Construction.IsZone(t.Kind)) ShadeObject(t.Pos, World.Footprint(t.Kind) + .25f, .5f);
                 break;
         }
     }

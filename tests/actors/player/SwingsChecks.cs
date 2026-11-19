@@ -21,6 +21,7 @@ public static class SwingsChecks {
         Test(CheckABlowThrowsAWolfBackAndLeavesItReeling, data);
         Test(CheckABurntWolfRunsFromThePlayerForAMoment, data);
         Test(CheckSwingShapesFollowThePlayersModel, data);
+        Test(CheckTorchSwingScaresOnlyWolvesItIsAimedAt, data);
     }
 
     /// <summary>The blow counts when the animation brings the axe down, half way through the swing, so a press alone hurts nothing.</summary>
@@ -181,5 +182,23 @@ public static class SwingsChecks {
             Require(shape.Left - left < 8 && shape.Right - right < 8, $"{action} should sweep from {left:0} degrees left to {right:0} right as its model does, not {shape.Left} to {shape.Right}");
         }
         rig.Root.Free();
+    }
+
+    private static void CheckTorchSwingScaresOnlyWolvesItIsAimedAt(GameData data) {
+        var creeping = TorchNight(data);
+        var lone = new Wolf { Pos = creeping.Player + new Vector2(8, 0), Health = 4 };
+        PlaceWolf(creeping, lone);
+        WolfTick(creeping, 3, lone);
+        Require(lone.Pos.DistanceTo(creeping.Player) < 6.5f && lone.Pos.DistanceTo(creeping.Player) > 3.5f, "a lone wolf should creep in slowly even with a torch");
+
+        var scared = TorchNight(data);
+        var wolf = new Wolf { Pos = scared.Player + new Vector2(6, 0), Health = 4 };
+        var behind = new Wolf { Pos = scared.Player + new Vector2(-6, 0), Health = 4 };
+        PlaceWolf(scared, wolf); PlaceWolf(scared, behind);
+        scared.UseTorch(Vector2.Right);
+        Require(wolf.Following && !behind.Following, "a swing should scare only the wolves it is aimed at");
+        RemoveWolves(scared, w => w == behind);
+        WolfTick(scared, 8, wolf);
+        Require(scared.Health == 100 && Math.Abs(wolf.Pos.DistanceTo(scared.Player) - World.StalkDistance) <= WolfFollow.Wander + .1f, "a scared wolf should follow at the edge of the light without biting");
     }
 }

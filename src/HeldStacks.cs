@@ -67,7 +67,7 @@ public sealed partial class World {
     private Inventory? heldSource;
     private int heldCount;
     /// <summary>The inventory the command being sent or run takes from when it is marked "from held stack", or null.</summary>
-    private Inventory? MarkedSource => heldSource ?? (fromHeld ? HeldBox : null);
+    internal Inventory? MarkedSource => heldSource ?? (fromHeld ? HeldBox : null);
 
     /// <summary>
     /// Runs a slot's own command, such as <see cref="Transfer"/>, <see cref="LoadFuel"/> or <see cref="MoveInCrate"/>, with the mark "from held stack".
@@ -134,7 +134,7 @@ public sealed partial class World {
     /// Before a building and what it holds go, such as a crate lifted or a station taken down: whether another player holds a stack in it, which they are told stops it.
     /// The acting player's own held stack there is let go of.
     /// </summary>
-    private bool HeldByOthers(Thing t) {
+    internal bool HeldByOthers(Thing t) {
         foreach (var p in S.Players) {
             if (p.HeldBox is not Inventory box || BoxIndex(t, box) < 0) continue;
             if (p != S.Actor) { Say(HeldByAnother); return true; }

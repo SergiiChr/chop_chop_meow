@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack the pinned CC0 photoscans of the model kit's surfaces and of the rock, coal and soil it draws as they are."""
+"""Pack the pinned CC0 photoscans of the model kit's surfaces and of the rock, coal, gravel and soil it draws as they are."""
 
 from __future__ import annotations
 
@@ -34,6 +34,10 @@ SETS = {
         "Rock035",
         "e745b558d754962ac44162ccee8805d7dba84ecdc428a543c3e552bcb28f8b85",
     ),
+    "gravel": (
+        "Gravel004",
+        "3093e97dfdfad219a548d2f63051937a6ceb8323f9c0693aec75089ab000d5f9",
+    ),
     "cloth": (
         "Fabric061",
         "fdab47618c56a6ecdffc3ed9131ecba8d21e3a35bcd3932f1c5625cc37514be4",
@@ -59,11 +63,12 @@ POLYHAVEN = {
 }
 MAPS = ("Color", "NormalGL", "Displacement")
 # Cloth scans are nearly even at the game's distance, so the weave keeps all of its contrast to show at all.
-# Rock, coal and soil are drawn as the photoscans are, with parallax.
+# Rock, coal, gravel and soil are drawn as the photoscans are, with parallax.
 DETAIL: dict[str, float | Literal["scan"]] = {
     "cloth": 1.0,
     "rock": "scan",
     "coal": "scan",
+    "gravel": "scan",
     "soil": "scan",
 }
 # A quarter of the source size: a tile spans a model or two and a model is well under a hundred screen pixels.

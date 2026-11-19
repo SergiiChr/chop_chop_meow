@@ -18,6 +18,17 @@ These came from the user; change them only after asking.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
 - **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, shovel for stumps and bushes, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they go to another spot of the job that they can work, loose pieces last, or wait and say so once.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
+- **Gravel paths:** a steel hammer at the bench crushes 1 stone into 1 gravel in 10 base seconds, and a path tile, one
+  metre square, costs 4 gravel. Players, walking or sprinting, and workers move 1.2 times as fast where gravel is drawn,
+  and workers keep their routes.
+  Tiles join with round ends, strips between neighbours and a slanted strip between any two tiles corner to corner, so
+  every corner is cut on the slant; a square of four is filled.
+  A tile goes under buildings and buildings over tiles, but not on a tree, boulder, deposit, berry bush, leaf patch or
+  wolf carcass.
+  A tile cannot be clicked in normal play.
+- **Taking down:** the red cross in the building plans gives the remove selector: a building or path tile in reach
+  turns red under the mouse and one click takes it down, with no question; it stays on until Esc or a right click.
+  Building pages have no take-down button.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
 - **Wolves:** the same every night, never stronger or faster with the days; three or four bites bring a healthy player to half health. After the five let out at dusk, one den picked at random lets one more out every hour.
@@ -64,6 +75,10 @@ Simulation and data:
 | `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView` |
 | `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
+| `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
+| `src/buildings/model/Removal.cs` | `Removal`, what the remove selector points at: a building or a gravel path tile |
+| `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
+| `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
@@ -153,7 +168,7 @@ UI and input:
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
-| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, clicking things, E and Space, and `ClickMode`, what the next click does |
+| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things, E and Space, and `ClickMode`, what the next click does |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
@@ -165,7 +180,12 @@ Rendering and sound:
 | `src/terrain/display/TerrainView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
-| `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
+| `src/paths/display/GravelPathView.cs` | Laid gravel paths as the ground draws them: the map of how far each spot is from the gravel's edge |
+| `src/paths/display/GravelPathShape.cs` | One gravel path tile as a model, for the plan's icon, its ghost while placing and the remove selector's red pad |
+| `src/buildings/display/RemovalMark.cs` | The red mark on the building or gravel path tile the remove selector points at |
+| `src/WorldLook.cs`, `src/Wind.cs` | The sound listener and the wind |
+| `src/terrain/display/FootpathWear.cs` | Footpaths worn where the player and workers walk, and their growing back |
+| `src/actors/display/Footsteps.cs` | Which footstep sound the ground gives at a spot |
 | `src/water/display/LakeAppearance.cs` | The lake and sea surfaces, their tiles, and the water and lily pad materials |
 | `src/water/display/ShorelineAppearance.cs` | The sand and stony bank strips along the lake and the coast, and the coast's water |
 | `src/water/display/LakeDressing.cs` | The lake's bank, water, stones, reeds and lily pads |
@@ -194,13 +214,15 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/*Checks.cs`, `tests/cabins/CabinChecks.cs`, `tests/actors/enemies/wolf/*Checks.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`), each feature's in the folder of its code |
-| `tests/*Steps.cs`, `tests/cabins/CabinSteps.cs` | Steps shared by the simulation checks |
-| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
+| `tests/<feature>/` | Every check of a feature whose code has a folder, beside its steps: `*Checks.cs` its rules through `World`, `*UIChecks.cs` what the player does and sees, `*NetChecks.cs` its scene in the network session. So far `tests/paths/`, `tests/cabins/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/*Checks.cs` | Simulation checks of the features whose code is still flat, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
+| `tests/*Steps.cs` | Steps several features' simulation checks share |
+| `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
+| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events for the features whose code is still flat, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
 | `src/RecipeReadyChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
-| `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
+| `src/NetChecks.cs` | The host and guest network session (`NET-HOST PASS`, `NET-GUEST PASS`): joining, leaving and reconnecting, with each feature's `NetScene` played in between (`Game.NetScenes`) |
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
-| `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
+| `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps several features' UI and network checks share, and `Game.TestClean`, which fails a UI check that leaves a mess |
 | `src/RecipeSteps.cs` | Steps that open a fresh station for a recipe, give and load its items and fuel, and expect a batch to start or be refused |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
@@ -273,7 +295,7 @@ Shared rules:
 #### Network updates
 
 An update holds only what changed since the last one the guest confirmed.
-The host keeps the world of each recent update as one JSON entry per thing, worker, wolf, trade cart and player, plus two shared entries, and sends changed fields of changed entries.
+The host keeps the world of each recent update as one JSON entry per thing, worker, wolf, trade cart and player, plus three shared entries, and sends changed fields of changed entries.
 Entries leave out fields at their type's default and write a fresh inventory as `{}` (`UpdateJson`).
 A field whose new object starts elsewhere is marked to be always written, which `MultiplayerChecks` enforces.
 A changed entry whose set of fields changed is sent whole.
@@ -487,6 +509,7 @@ Wolves patrol on through a slept night, and one that starts scratching at an unl
 #### Sprinting
 
 Holding Shift while moving sprints at `SprintSpeed` times the walking speed (`PlayerState.Sprinting`, sent by guests with their walk).
+On a gravel path either is `GravelSpeed` times as fast ([Gravel paths](#gravel-paths)).
 Hunger and thirst drain `SprintDrain` times as fast meanwhile.
 Under 15% food or drink (`GameData.LowNeed`) the player cannot sprint and the screen edges pulse red.
 As food falls under 20% (`GameData.GrowlBelow`), and with every further 5% gone (`GameData.GrowlEvery`), `stomach_growl` plays at the player.
@@ -512,7 +535,7 @@ Only what is in sight is drawn every frame (`WorldView.SyncThings`).
 A thing out of sight is drawn once as its snapshot, moved on far enough to finish whatever it was doing, and left alone until its snapshot changes, night falls or lifts, or it is seen again.
 A change that did not happen in front of the player is not played when they see it (`WorldView.Watched`): a tree felled out of sight is a stump, a chest filled out of sight keeps its lid shut, and a chip or a building that appeared out of sight neither flies nor lands in dust.
 A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
-A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one a building now stands over (`World.Clears`) just goes.
+A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one a building now stands over (`World.Clears`), or a gravel path tile lies on (`GravelPaths.Laid`), just goes.
 While it is dug at, a stump or bush leans further over with `Thing.Progress` (`DugProp`).
 Work out of sight shakes nothing and throws no chips.
 It is silent too, since `SightRadius` (20 metres) lies beyond the 16 metres a sound carries ([Sound effects](#sound-effects)).
@@ -563,7 +586,7 @@ Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters
 A click on a cabin walks the player to `Doorways.DoorPoint` along `Doorways.TowardDoor`, round the walls when the cabin is in the way, and `Doorways.Enter` starts there.
 What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they are occupied (`World.Occupied`), as when downed, and any action they try is refused with "You are busy." (`World.Busy`); inside a cabin they are not.
 Picking a hotbar slot, putting a held stack back, marking the ending seen and skipping to morning are not refused.
-Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin needs dry, open ground there; stepping out and waking in a cabin put the player on it, or, for a cabin from an older save with it blocked, on the first open ground round the cabin (`Doorways.Doorstep`).
+Building keeps `Construction.DoorRoom` clear round every cabin's door spot, and a cabin needs dry, open ground there; stepping out and waking in a cabin put the player on it, or, for a cabin from an older save with it blocked, on the first open ground round the cabin (`Doorways.Doorstep`).
 
 - `Entering` takes `Doorways.EnterSeconds`, or `Doorways.RushSeconds` for a player who sprinted there (`PlayerState.DoorRush`), then shelters them.
 - A player who arrives while someone else steps in is `Following` until that one is inside, then steps in themselves (`Doorways.Ahead`).
@@ -705,7 +728,7 @@ Tier 1 is unused, since there are no iron tools.
 
 `World.BestTool` picks the fastest carried tool at or above a tier.
 Recipes name the tool they need, the lowest `Tier` that will do, and whether they can be made by hand (`Hand`).
-So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
+So a steel chisel does everything a stone chisel does, faster, while tin cans and gravel need a steel hammer and the mortar a steel chisel.
 
 `GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for boulders and deposits, a shovel for stumps and bushes), one that only speeds gathering up (a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
 A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf patches.
@@ -809,9 +832,56 @@ Once an active crew has the forge hot, it never falls below the bar while they a
 
 ### Taking buildings down
 
-`World.Dismantle` removes a building in reach and puts its cost, a supplied mine's materials and everything its boxes hold into the backpack, and the rest into a recovery box where it stood.
-`World.DismantleBlock` keeps up a cabin someone shelters in and a trading post with a cart out.
-The red trash can on `ThingPage`'s header turns into "Remove?" on the first click and dismantles on the second.
+`Construction.Dismantle` removes a building in reach and puts its cost, a supplied mine's materials and everything its boxes hold into the backpack, and the rest into a recovery box where it stood.
+`Construction.DismantleBlock` keeps up a cabin someone shelters in and a trading post with a cart out.
+
+The building plans' last cell (`PlansPanel`, named `remove`) sets `ClickMode.Remove`, the remove selector.
+`Construction.RemovalAt` says what it points at, a `Removal`: the building picked under the mouse, else the gravel path
+tile whose gravel the mouse is on (`GravelPaths.TileUnder`).
+While that is in reach (`Construction.InReach`, the reach `Dismantle` and `GravelPaths.TakeUp` ask for),
+`RemovalMark.Update` lays a red material over the building's model, or a red pad on the tile.
+A click runs `Construction.Remove` at once and the selector stays; Esc or a right click sets `ClickMode.Normal`.
+
+### Gravel paths
+
+A bench recipe (`gravel`, a hammer of tier 2, not by hand) crushes 1 stone into 1 gravel.
+Each hammer blow on it plays `mine_ore`, the recipe's own sound (`RecipeDef.Sound`), in place of the bench's knock.
+The gravel path is a building plan (`ThingKind.GravelPath`, 4 gravel) but never a thing: `Construction.Build` hands it
+to `World.GravelPaths` (`src/paths/GravelPaths.cs`), which keeps the laid tiles.
+A tile is a map tile, centred on whole coordinates like a building, saved as its place in the map's rows in
+`SaveState.GravelPaths`.
+`GravelPaths` keeps one flag a tile beside that list and brings the flags in step whenever another list takes its place:
+a new game, a load, or a guest's update that brings other tiles.
+The tiles have an update entry of their own (`EntryKey.Paths`), so only an update that lays or takes up a tile carries
+them.
+`GravelPaths.Revision` moves only when the tiles change.
+
+- `GravelPaths.Block` refuses a tile only on water or cliffs, on a tile already laid, on a tile where a resource stands,
+  with or without anything left on it (not a loose piece, a stump or a plain bush), out of the 5 tiles a building may
+  be placed in, and without the gravel.
+  Buildings and yards do not count either way, and `Construction.PlacementBlock` never looks at tiles.
+- `GravelPaths.Lay` clears a stump or plain bush off the tile (`World.ClearTile`).
+- `GravelPaths.TakeUp` (`Verb.TakeUpPath`) gives the cost back through `Construction.GiveBack`, which `Dismantle` also
+  uses: into the backpack, the rest into a recovery box.
+
+`GravelOutline.Distance` is the one definition of where gravel lies: within `GravelOutline.HalfWidth` (0.375 m) of the
+paths' middle lines.
+Those are each laid tile's middle, a line between the middles of tiles side by side, and a line between two tiles corner
+to corner, whatever lies on the tiles between them; four tiles in a square count whole.
+So a turn's inside corner is cut on the slant and a staircase of tiles has straight slanted edges.
+`GravelPaths.Covers` reads it for the simulation and `GravelPathView` for the picture, so walkers are faster exactly
+where gravel is drawn.
+Workers step `GameData.GravelSpeed` (1.2) times as far in `World.Walk` when they stand on gravel, and
+`PlayerControl.Walk` moves the player the same way; routes are found as before.
+Data validation keeps `GravelSpeed` below `WolfChase`, so a walk on gravel never outpaces a chasing wolf.
+
+`GravelPathView` (`src/paths/display/GravelPathView.cs`) keeps a map of 8 texels a tile holding how far inside the
+gravel's edge each spot is, a half at the edge.
+It redraws only the tiles within two of one laid or taken up, when `Revision` moves.
+The terrain shader draws the gravel photoscan where the map passes a half, with stones that stand higher reaching a
+little further, and the plants' shader shrinks plants there to nothing.
+The scan is the models' `Scan.Gravel` at the same size, so the gravel heap, the plan's ghost (`GravelPathShape`) and the
+ground match.
 
 ### Storage, filters and automation
 
@@ -868,8 +938,8 @@ Manual transfers ignore those filters.
 
 #### Piles
 
-Piles (`pile`) are 3×3 yards (`World.IsZone`, `ZoneSize`) that do not block walking.
-`World.Snap` puts a new yard on the grid of the nearest yard within reach, and `ZoneBlock` lets yards touch but not overlap.
+Piles (`pile`) are 3×3 yards (`Construction.IsZone`, `ZoneSize`) that do not block walking.
+`Construction.Snap` puts a new yard on the grid of the nearest yard within reach, and `ZoneBlock` lets yards touch but not overlap.
 
 A pile takes part in automation like a chest.
 Its input and output filters name the same one `World.PileEntry`: an item, a kind of crate (`World.MixedCrate` for crates of mixed goods), or a vessel's liquid for every fill of that vessel holding some, apart from the empty vessel.
@@ -1133,7 +1203,7 @@ A sound within a metre of the player plays with no place too, so a long one such
 Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
-- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
+- The view plays sounds tied to animation timing: footsteps by ground type (`Footsteps.Sound`: gravel paths, water, rock, grass), axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
 A tree felled in sight takes 1 second to reach the ground when it is among the shortest and 2.1 when among the tallest (`WorldView.FallSeconds`).

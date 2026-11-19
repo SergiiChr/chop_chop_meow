@@ -11,7 +11,7 @@ namespace ChopChopMeow;
 /// meadow, photoscans, woods and beds drawn on it, and the point its finest detail follows.
 /// </summary>
 internal sealed class TerrainView {
-    private static readonly StringName Traffic = "traffic";
+    private static readonly StringName Traffic = "traffic", Gravel = "gravel";
     private readonly Rid materialRid;
     private readonly Node3D target;
     // RenderingServer uniforms take RIDs, so retain the texture resources for their lifetime.
@@ -119,6 +119,8 @@ internal sealed class TerrainView {
             foreach (var map in new[] { "albedo", "normal", "height" }) Use($"{name}_{map}", load(map));
         }
         foreach (var (scan, tile) in GroundScans) Scan(scan, tile, map => GD.Load<Texture2D>($"res://assets/environment/terrain3d/{scan}_{map}.jpg"));
+        // Gravel paths take the scan the models' gravel is drawn with, at the same size.
+        Scan("gravel_scan", ModelKit.ScanTile, map => ModelKit.ScanMap(ChopChopMeow.Scan.Gravel, map == "normal" ? "bump" : map));
         foreach (var look in new[] { ShoreLook.Rocks, ShoreLook.Sand }) {
             Scan(look.Name, look.Tile, map => ShorelineAppearance.Map(look, map));
             RenderingServer.MaterialSetParam(materialRid, $"{look.Name}_wet", look.Wet);
@@ -156,6 +158,9 @@ internal sealed class TerrainView {
 
     /// <summary>Wears footpaths into the ground where <paramref name="traffic"/>, the map of how much the ground has been walked, says.</summary>
     public void SetTraffic(Texture2D traffic) => RenderingServer.MaterialSetParam(materialRid, Traffic, traffic.GetRid());
+
+    /// <summary>Draws gravel where <paramref name="gravel"/>, the map of how far each spot is inside the gravel paths' edge, says.</summary>
+    public void SetGravel(Texture2D gravel) => RenderingServer.MaterialSetParam(materialRid, Gravel, gravel.GetRid());
 
     /// <summary>Keeps Terrain3D's finest detail under <paramref name="at"/>.</summary>
     public void Follow(Vector2 at) => target.Position = To3(at);

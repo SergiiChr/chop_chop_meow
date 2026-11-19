@@ -28,7 +28,7 @@ Icons and models are committed; playing does not call an image-generation servic
   `IntroPoses.cs` draw its frames (`intro-film` skill).
 - `src/Server.cs`: the headless server every game runs on.
 - `src/Net.cs`: the connection between a server and its players.
-- `tests/`: simulation checks; `src/GameChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`: UI, network and real server checks.
+- `tests/<feature>/`: every check of a feature whose code has a folder. `tests/*.cs`: simulation checks of the rest; `src/GameChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`: their UI, network and real server checks.
 - `build.py` and `tools/`: launcher, checks and asset tools.
 
 [docs/DESIGN.md](docs/DESIGN.md#source-files) maps every source file.
@@ -57,6 +57,9 @@ Icons and models are committed; playing does not call an image-generation servic
 - To play the real window with keyboard and mouse, use the `playtest` skill (`.claude/skills/playtest`).
 - After a scripted rename, run `python3 tools/compare_strings.py <base>`: checks do not read most text, and a rename can reach into it.
   It does not see names in code: also search the diff for the old and the new word (`git diff <base> | grep -nw -e Old -e New`) and read each hit, since a rename by word also renames unrelated things that share it, such as a test helper.
+- `./build.py icons` renders every icon again, each with slightly different bytes.
+  After adding or changing one, stage the icons you meant to change (`git add assets/icons/<name>.png`), then put the
+  rest back with `git checkout -- assets/icons`.
 - `python3 tools/doc_names.py` lists the files, types, members, checks and flags the docs name in backticks that the code no longer has.
 - Report limitations candidly; do not claim a full playthrough from a fixture that injects finished goods.
 

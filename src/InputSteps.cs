@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static SetupSteps;
 
 namespace ChopChopMeow;
 
@@ -54,6 +56,13 @@ public partial class Game {
     /// <summary>Moves the mouse onto a control.</summary>
     private async Task Hover(Control control) {
         var at = await At(control);
+        Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
+        await Frames();
+    }
+
+    /// <summary>Moves the mouse onto a point of the world on screen.</summary>
+    private async Task Hover(Vector2 point) {
+        var at = GetViewport().GetFinalTransform() * point;
         Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
         await Frames();
     }
@@ -201,6 +210,10 @@ public partial class Game {
         await Until(() => !panel.SubjectGone, "the page of something that is gone closing", 3);
         for (int i = 0; i < 3 && (player.Mode.Placing != null || panel.Visible || bag.Visible); i++) await KeyStroke(Key.Escape);
     }
+
+    /// <summary>Whole spots round the player, two to four tiles out and the nearest ring first: where a check puts something the player can reach.</summary>
+    private IEnumerable<Vector2> SpotsNearby() =>
+        Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()));
 
     /// <summary>Holds D until the player moves, so it shows the world is not held.</summary>
     private async Task<bool> PlayerWalks() {

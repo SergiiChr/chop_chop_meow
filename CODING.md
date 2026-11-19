@@ -27,6 +27,7 @@ Project rules on top of the global coding and testing guides.
 - **Illegal states:** use enums such as `ActorAction` rather than combinations of flags or strings.
 - **Validation at the boundary:** `GameData` checks its tables fit together when the game starts, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
 - **Saves:** a change that would make a save written before it load wrong raises `SaveState.Version`, and `World.Deserialize` refuses every other version. Write no code that converts an old save or repairs a broken one, and no check for either: a save the game cannot take as it is, is refused with the reason. The user's own save is fixed by hand when they ask.
+- **Network messages:** a change to what a host and a guest send each other raises `Net.Protocol`, so builds that differ refuse each other: a command added to or renamed in `Verb`, which travels as its number, a building or other kind added to `ThingKind`, or a field added to or taken out of an update entry.
 
 ## Architecture
 
@@ -42,7 +43,10 @@ Project rules on top of the global coding and testing guides.
   - `Input.ParseInputEvent` and what the player sees catch broken controls and panels, and miss how the game looks.
   - `Net`'s messages between a host and a guest process catch sync breaks and miss a real network.
 - Use representative end-to-end checks plus focused edge cases.
-- UI checks live in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`; a change to a shared check helper covers all four.
+- Checks are filed by feature, not by the kind of check. A feature whose code has a folder under `src/` has one under `tests/` with every check of it, named as in `tests/paths/`: `GravelPathChecks.cs` for its rules through `World`, `GravelPathUIChecks.cs` for what the player does and sees, `GravelPathNetChecks.cs` for its scene in the network session, and its steps beside them. Gravel paths, cabins, wolves and a player's swings are filed this way.
+- The checks of features whose code is still flat are in `tests/*Checks.cs` (rules) and in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs` (UI, network and server). They move to a feature's folder when its code does, and a check that covers two features is split first.
+- UI and network check files are parts of `Game` wherever they are, so a change to a shared step covers them all. Each feature's UI file has a runner, such as `RunGravelPathUIChecks`, that `Game.RunUIChecks` calls; its rule checks' `Run` is called from `SimulationChecks.Run`.
+- The network session plays `Game.NetScenes` in order between the guest joining and leaving. A feature adds a `NetScene` in its folder: what the host puts down before the guest joins, the host's half and the guest's half. Both sides finish a scene before either starts the next, so a scene never waits on another's signals.
 - Input tests go through `Input.ParseInputEvent`, not direct calls to input handlers.
 - UI checks play on a server inside the window: they set up through `Hosted`, its world, then use real input and read what the screen shows or the window's `world`. A direct call into private `Game` code says in a comment why no input reaches it.
 - `Frames` passes everything on the line to that server and back at once, so a window's copy is up to date after any step that waits. Setup followed at once by a read of `world` needs a `Frames` between them. A window keeps its own player's position and hotbar, so those are set with `Warp` and `SetHotbarSlot(world, …)`.
@@ -58,11 +62,13 @@ Project rules on top of the global coding and testing guides.
 - Simulation setup may construct fixtures, but tests claiming resource-to-steel progression must gather raw materials and use the actual recipes and trade delays.
 - A fixture built by editing text, such as a save edited by hand, fails when the text it edits is missing.
 - A UI check picks a backpack cell with the `BagCell` step, by what the cell holds, never by its place among a page's grids: a page that gains or loses a grid shifts those numbers.
+- The UI runner calls each check through `TestClean`, which fails a check that leaves the game other than it found it: the player somewhere else, a building, crate or box more or fewer on the ground, something held, a page or menu open, or a click mode on. So every check starts where the one before it did, and a check that leaves a mess fails under its own name. A check that moves the player ends with `Warp(Hosted, home)`. Checks that hand what they build to the next ones (the chest, the furnace) run through `Test`, and the last of them removes it.
+- A check waits for a sound with `sounds.Heard(name, since)`, reading `sounds.Played` before the action that makes it: another sound may follow at once, such as a chest's lid after the item put into it. `sounds.Last` is for saying that nothing else played.
 - UI checks wait for a condition with a time limit, not for a fixed time; a fixed wait is only for holding input, letting something play for a set time or pausing between retries.
 - An open page refreshes at once after the player's own action, but only every 0.2 seconds otherwise, and a page that has to draw itself again does so a frame later.
   A check that reads the page after `Hosted.Tick` or other setup waits on something that refresh draws, such as a slot's count; after `Frames` alone it reads the page as it was.
 - A check that a load restores something changes that thing between saving and loading.
-- Check files hold only checks and their runners. Steps live in feature files: `tests/WorldSteps.cs`, `PlayerSteps.cs`, `WorkerSteps.cs`, `EconomySteps.cs`, `ModelSteps.cs`, `ChainSteps.cs` and `SetupSteps.cs` for simulation checks, and `src/InputSteps.cs`, `PanelSteps.cs` and `SessionSteps.cs` for UI and network checks.
+- Check files hold only checks and their runners. Steps only one feature uses live in its folder, as `GravelPathSteps.cs` does, or `GravelPathUISteps.cs` for its UI and network checks. Steps several features use live in the shared step files: `tests/*Steps.cs` for rule checks and `src/*Steps.cs` for UI and network checks. A step moves to the shared files when a second feature starts to use it.
 - Checks fail through the shared `Checks.Require` in `tests/Checks.cs`.
 - A runner calls each check through `Checks.Test`, which logs its time and stops the process when it runs past 20 seconds. A check that needs longer, such as a whole network session, is tagged `slow: true` for 180 seconds, since the lossy relay makes reconnects vary from 20 to over 130 seconds. `./build.py` also gives all test stages together 300 seconds.
 - A check over 50 lines is long: split it into one check per behaviour, or move its setup into steps. A longer one stays only when it is a single scenario that loses its point when split, and says so in its summary.
@@ -99,6 +105,7 @@ Allocation budgets:
 - `CheckPanelPagesRefreshWithoutAllocating` holds every panel page to 0 bytes a refresh while what it shows stays the same. Live panel updates go through `LiveUpdates`: `Watch` draws only when a value changes, and `Bind` rebuilds text in a reused buffer and hands Godot a new string only when it changes.
 - Real frames are measured only while walking, so per-frame code for gathering, a mauling or a settlement in view has no allocation check yet; review those paths by hand.
 - The server's network updates, thirty a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
+- A list that grows with play gets an update entry of its own, as gravel path tiles have (`EntryKey.Paths`), and stays out of the world's state entry, which is written again on every update because time moves. `SaveState.Crates` still rides in the state entry.
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
 `./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a sprint from the sea past a staffed camp and the lake to the valley's top corner, by day and at night with a lit torch, split by leg.

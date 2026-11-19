@@ -13,6 +13,8 @@ public partial class WorldView : Node3D {
     public World World = null!;
     public Selection Selection;
     public int Hover;
+    /// <summary>What the remove selector points at, which shows red when it is in reach.</summary>
+    public Removal Removal;
     public int HoverWorker;
     /// <summary>The building being placed, or a packed crate, or null when not placing.</summary>
     public ThingKind? Placing;
@@ -89,6 +91,8 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<ThingKind, Prop> ghosts = new(), mineGhosts = new();
     private Prop? ghost;
     private MeshInstance3D selectRing = null!, hoverRing = null!, workerRing = null!, playerRing = null!, placeTile = null!;
+    /// <summary>The red on what the remove selector points at.</summary>
+    private RemovalMark removalMark = null!;
     private float pulseRemaining;
     private ActorAction pulseAction;
     private Vector2 pulseTarget;
@@ -152,7 +156,7 @@ public partial class WorldView : Node3D {
     internal static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
 
     public override void _Ready() {
-        World.Replaced += () => { worldReplaced = true; ClearPaths(); };
+        World.Replaced += () => { worldReplaced = true; Footpaths.Clear(); };
         camera = new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = BaseSize, Near = 1, Far = 200, Current = true };
         AddChild(camera);
         // Half energy puts the sky's light at DayAmbientEnergy.
@@ -212,6 +216,8 @@ public partial class WorldView : Node3D {
         playerRing = Ring(new Color(.95f, .88f, .57f, .6f));
         placeTile = Add(scene, new PlaneMesh { Size = new Vector2(1.4f, 1.4f) }, GhostValid, Vector3.Zero);
         placeTile.Visible = false;
+        removalMark = new RemovalMark(scene, id => props.GetValueOrDefault(id)?.Root);
+        RemovalMark.Warm(warmStage);
         player.Position = World.Player;
         overlay = new Overlay { Paint = PaintOverlay }; AddChild(overlay);
         World.PlayerActed += PlayerActed;
@@ -486,7 +492,7 @@ public partial class WorldView : Node3D {
         if (door is DoorShown shown) { at = shown.At; target = shown.Facing; action = shown.Action; subject = null; }
         player.Update(at, action, target, dt, door?.Backing ?? false);
         // A foot lands at each extreme of the stride.
-        if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
+        if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
@@ -600,7 +606,7 @@ public partial class WorldView : Node3D {
             if (door is DoorShown shown) { at = shown.At; facing = shown.Facing; action = shown.Action; subject = null; }
             state.Update(at, action, facing, dt, door?.Backing ?? false);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
-            if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
+            if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             if (other.DownedFor > 0) FallBackView.FallBack(other.Rig, state, other.DownedFor, torch, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
             else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door);
@@ -625,13 +631,6 @@ public partial class WorldView : Node3D {
     private Thing? ThingAt(Vector2 at) {
         foreach (var t in World.Things) if (t.Pos == at) return t;
         return null;
-    }
-
-    private string FootstepSound(Vector2 p) {
-        if (Terrain.InLake(p, 1)) return "footsteps_water";
-        foreach (var c in World.Cliffs) if (c.DistanceTo(p) < Cliff.Depth + 3) return "footsteps_rocks";
-        foreach (var t in World.Things) if ((t.Kind == ThingKind.Stone || t.IsDeposit) && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f) return "footsteps_rocks";
-        return "footsteps_default";
     }
 
     /// <summary>Poses an actor's rig; one at the steps of the cabin door at <paramref name="door"/> stands on them.</summary>
@@ -705,10 +704,12 @@ public partial class WorldView : Node3D {
         // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips.
         bool inSight = World.Sees(subject.Pos);
         if (inSight) prop.Shake = 1;
+        // A recipe with a sound of its own is heard in place of its station's.
         // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.
         string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
             : action == ActorAction.Dig ? "dig_earth"
             : action == ActorAction.Pump ? "bellows_pump"
+            : World.Data.Recipes.GetValueOrDefault(subject.Making)?.Sound is { Length: > 0 } made ? made
             : subject.Kind == ThingKind.Anvil ? "anvil_work"
             : subject.Kind is ThingKind.Bench or ThingKind.Mine ? "bench_work"
             : subject.Kind == ThingKind.Tree && action != ActorAction.Gather ? "chop_tree"
@@ -867,8 +868,9 @@ public partial class WorldView : Node3D {
     /// <summary>Whether a model whose thing has left the world plays its way out: a felled tree, and a stump or bush that was dug out rather than built over.</summary>
     private bool Departs(Prop prop) => prop is TreeProp || prop is DugProp && !BuiltOver(prop.Look.Pos);
 
-    /// <summary>Whether a building, yard or crate now stands over a spot, having cleared away the stump or bush that was there.</summary>
+    /// <summary>Whether a building, yard, crate or gravel path tile now lies over a spot, having cleared away the stump or bush that was there.</summary>
     private bool BuiltOver(Vector2 at) {
+        if (World.GravelPaths.Laid(Terrain.TileAt(at))) return true;
         foreach (var kind in World.Structures)
             foreach (var t in World.ThingsOf(kind)) if (World.Clears(t, at)) return true;
         return false;
@@ -1453,9 +1455,10 @@ public partial class WorldView : Node3D {
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
+        removalMark.Update(World, Removal);
         placeTile.Visible = Placing != null;
         var kind = Placing.GetValueOrDefault();
-        var at = Placing == null ? Vector2.Zero : World.Snap(kind, ToWorld(Mouse).Round());
+        var at = Placing == null ? Vector2.Zero : World.Construction.Snap(kind, ToWorld(Mouse).Round());
         var shown = Placing == null ? null : kind == ThingKind.Mine ? mineGhosts[World.CliffAt(at).Ore] : ghosts[kind];
         if (shown != ghost) {
             if (ghost != null) ghost.Root.Visible = false;
@@ -1463,7 +1466,7 @@ public partial class WorldView : Node3D {
             ghost = shown;
         }
         if (shown == null) return;
-        bool valid = World.PlacementBlock(kind, at) == null;
+        bool valid = World.Construction.PlacementBlock(kind, at) == null;
         if (shown.Tint != valid) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid; }
         shown.Root.Position = To3(at);
         if (kind == ThingKind.Mine) shown.Body.Rotation = WorldModels.MineYaw(at);
@@ -1476,6 +1479,7 @@ public partial class WorldView : Node3D {
         Prop Ghost(ThingKind kind, Vector2 at) {
             var built = WorldModels.Build(new Thing { Kind = kind, Pos = at });
             SetFade(built.Root, .35f);
+            NoShadows(built.Root);
             built.Root.Visible = false;
             scene.AddChild(built.Root);
             return built;
@@ -1484,6 +1488,9 @@ public partial class WorldView : Node3D {
         ghosts[ThingKind.Crate] = Ghost(ThingKind.Crate, Vector2.Zero);
         foreach (var ore in World.MineOres) mineGhosts[ore] = Ghost(ThingKind.Mine, World.MineSpot(World.CliffOf(ore)));
     }
+
+    /// <summary>What the remove selector has turned red: the building or gravel path tile it points at, while that is in reach.</summary>
+    public Removal RemovalShown => removalMark.Shown;
 
     private void Mark(MeshInstance3D ring, Thing? t, float lift) {
         ring.Visible = t != null;

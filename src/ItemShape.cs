@@ -90,8 +90,9 @@ internal static class ItemShape {
         [Water.Empty] = Bottle(Water.Empty),
         // Berries heap one by one.
         ["berries"] = new(Berry, Glossy, .16f, Lay.Loose, .7f),
-        // Leaves and compost are each one mound, which swells with what is in it.
+        // Leaves, gravel and compost are each one mound, which swells with what is in it.
         ["leaves"] = new(Leaves, Plain, Lay: Lay.Mound),
+        ["gravel"] = new(Gravel, Plain, Lay: Lay.Mound, Scan: ModelKit.Scanned(Scan.Gravel, 1)),
         [Compost] = new(Mulch, Plain, Lay: Lay.Mound, Scan: ModelKit.Scanned(Scan.Soil, 1)),
     };
 
@@ -555,6 +556,18 @@ internal static class ItemShape {
     private static void Leaves(List<Face> faces) {
         var top = Mound(faces, .95f, .42f, 11, new Color[] { new("c08a3a"), new("a8652c"), new("d0a347"), new("8e5a2a"), new("b8753a") });
         Litter(faces, top, .95f, 16);
+    }
+
+    /// <summary>A heap of gravel: a mound with the path's gravel photoscan draped over it, and loose stones that have rolled to its foot.</summary>
+    private static void Gravel(List<Face> faces) {
+        const float radius = 1;
+        Mound(faces, radius, .5f, 37, null);
+        Color[] stones = { new("9a9f9b"), new("7f8581"), new("b3b6b0"), new("8d8a80") };
+        for (int i = 0; i < 18; i++) {
+            float angle = i * 2.399963f + .7f, reach = radius * (.92f + .12f * MathF.Sin(i * 1.9f)), size = .07f + .03f * MathF.Sin(i * 2.7f);
+            var at = new Transform3D(new Basis(new Vector3(1, 2, .5f).Normalized(), i * 1.3f), new Vector3(MathF.Cos(angle) * reach, size * .4f, MathF.Sin(angle) * reach));
+            Box(faces, at, new Vector3(size, size * .7f, size * 1.2f), stones[i % stones.Length]);
+        }
     }
 
     /// <summary>A compost heap: a mound of dark soil with leaves on it and stalks and scraps poking out of it.</summary>

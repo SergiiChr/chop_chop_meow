@@ -46,14 +46,18 @@ public partial class World {
 
     /// <summary>Whether a spot is on the ground a building, yard or crate keeps clear of other resources, where it leaves no stump or bush.</summary>
     public static bool Clears(Thing built, Vector2 p) {
-        if (!IsZone(built.Kind)) return p.DistanceTo(built.Pos) < Footprint(built.Kind) + ResourceRoom;
-        float room = ZoneSize / 2 + YardResourceRoom;
+        if (!Construction.IsZone(built.Kind)) return p.DistanceTo(built.Pos) < Footprint(built.Kind) + Construction.ResourceRoom;
+        float room = Construction.ZoneSize / 2 + Construction.YardResourceRoom;
         return Math.Abs(p.X - built.Pos.X) < room && Math.Abs(p.Y - built.Pos.Y) < room;
     }
 
     /// <summary>Clears away the stumps and bushes under a new building, yard or crate.</summary>
-    private void ClearGround(Thing built) {
+    internal void ClearGround(Thing built) {
         foreach (var kind in ClearedKinds) S.Things.RemoveAll(kind, t => Clears(built, t.Pos));
+    }
+    /// <summary>Clears away a stump or bush standing on a tile a gravel path is laid on.</summary>
+    internal void ClearTile(Vector2I tile) {
+        foreach (var kind in ClearedKinds) S.Things.RemoveAll(kind, t => Terrain.TileAt(t.Pos) == tile);
     }
     private static readonly ThingKind[] ClearedKinds = Array.FindAll(Kinds.All, BuiltOver);
 }

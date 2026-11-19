@@ -63,6 +63,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
+| `--showcase --paths` | Show gravel paths in every shape their tiles join into, two staircases, a path under a chest and a pile of gravel; `--top` looks straight down with the tiles square on screen |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door), `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm) or `takedown` (the same with a player hurt enough to go down, pinned and fed on; the scene keeps them alive); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
 | `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
@@ -159,11 +160,12 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | --- | --- |
 | WASD or arrow keys | Move in screen directions; pressing about the opposite way while running brakes to a stop in a lunge, turns round and runs back |
 | Shift while moving | Sprint 1.6× as fast; food and drink drain 1.7× as fast; not under 15% food or drink |
+| Walk or sprint on a gravel path | Move 1.2× as fast |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
 | Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you round to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
-| B | Open building plans |
+| B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
 | C | Open the crafting menu |
 | H | Open the crew overview |
@@ -354,9 +356,13 @@ The crew button opens an overview with each worker's daily pay and the total abo
 
 ### Taking buildings down
 
-A building's page has a red trash can at the left of its header.
-Click it, then click "Remove?" to take the building down.
-Its cost and everything in it go to your backpack, and what does not fit waits in a recovery box where it stood; a mine also gives back the timber, iron and stone delivered to it.
+The building plans (B) end with a red cross: click it for the remove selector.
+A plan held on the cursor is let go of by that click.
+With it, the building under the mouse turns red when it is within reach, 15 metres, and a click takes it down at once,
+without asking.
+A gravel path tile turns red and comes up the same way, when the mouse is on gravel with no building over it.
+The selector stays for the next one until Esc or a right click.
+A building's cost and everything in it go to your backpack, and what does not fit waits in a recovery box where it stood; a mine also gives back the timber, iron and stone delivered to it.
 A cabin someone is in, or a trading post with a cart out, stays up until they come out or the cart is back.
 
 ## Survival
@@ -439,6 +445,7 @@ A cabin needs dry, open ground in front of its door, and no other building goes 
 | Campfire | 6 wood, 4 stone |
 | Cabin | 20 wood, 8 stone |
 | Pile, farm plot | 8 wood |
+| Gravel path, one tile | 4 gravel |
 | Trading post | 10 wood, 4 stone |
 | Crafting bench | 10 planks |
 | Tool station | 8 planks, 4 stone |
@@ -502,6 +509,7 @@ It makes what the menu's chisel makes (planks, wood parts, the mallet, torches a
 Some recipes need a better tool:
 
 - Tin cans (1 tin bar → 4) need a steel hammer.
+- Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
 - A tin water bottle (1 tin bar + 1 wood part) needs a steel hammer.
 
@@ -655,6 +663,31 @@ A worker on the station's Stock job brings tools from other storage to the rack.
 
 Oaks drop a patch of leaves beside the trunk.
 Gather them by hand, or three times as fast with a rake, and they fall again every day.
+
+## Gravel paths
+
+Crush rocks at a bench with a steel hammer: each stone gives one gravel.
+A gravel path is a building of one tile, a metre square, for 4 gravel.
+You and your workers move 1.2 times as fast on gravel, walking or sprinting, and your steps crunch; a wolf at your heels
+still outruns a walk.
+Workers keep their usual routes, so lay paths along the lines they already walk.
+
+Tiles join into paths three quarters of a metre wide with round ends:
+
+- a tile alone is a round pad;
+- tiles side by side join into one strip;
+- two tiles corner to corner are joined by a slanted strip, whatever lies between them;
+- so a turn is cut on the slant on its inside and round on its outside, and a staircase of tiles has straight slanted
+  edges;
+- four tiles in a square are gravel all over.
+
+A tile goes on any dry open ground within 5 tiles of you, also under your feet and under buildings and yards already
+there; a building or yard goes up over tiles and leaves them under it.
+It does not go on a tile where a tree, boulder, ore deposit, berry bush or leaf patch stands, picked clean or not.
+It clears a stump or plain bush away.
+Nothing grows through gravel.
+A click on a path does what a click on open ground does.
+Take tiles up with the remove selector, which gives the 4 gravel back ([Taking buildings down](#taking-buildings-down)).
 
 ## Farming
 
@@ -1029,8 +1062,9 @@ Animations pause with gameplay.
 
 Sound effects follow the same actions:
 
-- footsteps change on grass, rock and the lake shore;
+- footsteps change on grass, rock, the lake shore and gravel paths;
 - axes, pickaxes, anvils, benches and swings have impacts, and fitting a mine's frame clinks on its rails;
+- a bench crushing rocks rings like a pickaxe on stone in place of its knock;
 - a felled tree cracks as it breaks, a tall one tearing at length, and crashes as it reaches the ground;
 - a shovel crunches into the soil and throws it aside, and a stump or bush comes out with a heave of earth;
 - picking plants by hand and packing crates rustle, butchering tears, and a mortar grinds;
@@ -1064,7 +1098,7 @@ Sound credits:
 - Kenney ([www.kenney.nl](https://www.kenney.nl))
 - Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com))
 - kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the grass
-  footsteps, the digging, the stomach growl and the intro film's train and office recordings
+  and gravel footsteps, the digging, the stomach growl and the intro film's train and office recordings
   ([assets/README.md](assets/README.md#intro-film))
 
 Music credits:

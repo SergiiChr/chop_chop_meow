@@ -16,6 +16,13 @@ uniform sampler2D path_normal : hint_normal, filter_linear_mipmap_anisotropic, r
 uniform sampler2D path_height : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 // World units one footpath tile spans.
 uniform float path_tile;
+// Gravel paths: how far each spot is inside the gravel's edge, a half at the edge and one unit a metre, with its first
+// texel's corner half a unit before the map's (GravelPathView), and the gravel photoscan drawn there in its own colours.
+uniform sampler2D gravel : filter_linear, repeat_disable;
+uniform sampler2D gravel_scan_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D gravel_scan_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D gravel_scan_height : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float gravel_scan_tile;
 // How far in world units the ground photoscans' lowest points shift from their highest, seen edge on
 // (ModelKit.ScanRelief).
 uniform float scan_relief;

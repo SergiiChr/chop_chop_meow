@@ -268,6 +268,8 @@ public sealed class SaveState {
     public byte[] Explored { get; set; }
     /// <summary>Things as last seen, kept so the fog shows them unchanged until the player looks again.</summary>
     public Dictionary<int, Thing> Remembered { get; set; } = new();
+    /// <summary>Every tile with a gravel path laid on it, as its place in the map's rows, <c>y * Terrain.Size + x</c>.</summary>
+    public List<int> GravelPaths { get; set; } = new();
 }
 
 /// <summary>Authoritative simulation, independent of rendering and UI; the host runs it for every player.</summary>
@@ -319,6 +321,7 @@ public sealed partial class World {
         Data = data;
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
+        Construction = new Construction(this); GravelPaths = new GravelPaths(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
     }
@@ -326,6 +329,10 @@ public sealed partial class World {
     private readonly ThingKind[] stationKinds;
     public ReadOnlySpan<ThingKind> StationKinds => stationKinds;
     public Vector2 Player { get => new(S.PlayerX, S.PlayerY); set { S.PlayerX = value.X; S.PlayerY = value.Y; } }
+    /// <summary>Putting buildings, yards and crates up and taking buildings down.</summary>
+    public Construction Construction { get; }
+    /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
+    public GravelPaths GravelPaths { get; }
     /// <summary>Cabin doors: stepping in and out, the queue at the door and knocking.</summary>
     public Doorways Doorways { get; }
     /// <summary>Wolves tugging players back out of cabin doorways.</summary>
@@ -389,7 +396,9 @@ public sealed partial class World {
     /// <summary>Whether the player can move items to or from a thing.</summary>
     public bool Reaches(Thing t) => Near(t, ItemReach);
     /// <summary>Whether the player can take from a worker's hands or put something in them: the worker is in sight and within the reach of a building's slots.</summary>
-    public bool Reaches(Worker w) => !Downed && S.Sheltered == 0 && Sees(w) && w.Away <= 0 && w.Commute == 0 && Player.DistanceTo(w.Pos) <= ItemReach;
+    public bool Reaches(Worker w) => Sees(w) && w.Away <= 0 && w.Commute == 0 && Reaches(w.Pos);
+    /// <summary>Whether a spot on the ground is within the player's reach, which nothing is while they are down or in a cabin.</summary>
+    public bool Reaches(Vector2 spot) => !Downed && S.Sheltered == 0 && Player.DistanceTo(spot) <= ItemReach;
     public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(GatherAt(t, Player)) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
     /// <summary>What every worker's wage comes to each dawn.</summary>
@@ -561,7 +570,7 @@ public sealed partial class World {
         return true;
     }
     /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their spurs.</summary>
-    private static bool Open(Vector2 p) {
+    internal static bool Open(Vector2 p) {
         if (!Terrain.Open(p)) return false;
         foreach (var c in Cliffs) if (c.DistanceTo(p) < Cliff.Depth) return false;
         return !InSpur(p);
@@ -569,22 +578,12 @@ public sealed partial class World {
     /// <summary>The kinds that are not resources: buildings, yards and what is left on the ground, such as graves.</summary>
     public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null);
     /// <summary>The kinds that stand in the way; resources, yards, campfires, graves, signposts and mines are walked past.</summary>
-    private static readonly ThingKind[] Blockers = Array.FindAll(Structures, kind => !IsZone(kind) && kind is not (ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine));
+    private static readonly ThingKind[] Blockers = Array.FindAll(Structures, kind => !Construction.IsZone(kind) && kind is not (ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine));
     /// <summary>Whether a thing of one of the <see cref="Blockers"/> kinds stands on a spot.</summary>
     private static bool Blocks(Thing t, Vector2 p) => t.Pos.DistanceTo(p) < Footprint(t.Kind);
-    /// <summary>Square 3×3 yards laid out on the ground, walkable and snapping edge to edge into grids.</summary>
-    public static bool IsZone(ThingKind kind) => kind is ThingKind.Pile or ThingKind.Farm;
-    private static readonly ThingKind[] Zones = { ThingKind.Pile, ThingKind.Farm };
-    public const float ZoneSize = 3;
     public const int PileStacks = 14;
     /// <summary>A third of a pile, rounded to the nearest stack.</summary>
     public const int ChestStacks = (PileStacks + 1) / 3;
-    /// <summary>Snaps a mine to its cliff and a yard to the grid of the nearest yard close enough to touch it.</summary>
-    public Vector2 Snap(ThingKind kind, Vector2 p) {
-        if (kind == ThingKind.Mine) return SnapMine(p);
-        if (!IsZone(kind) || Nearest(Zones, p) is not Thing near || near.Pos.DistanceTo(p) > ZoneSize * 1.6f) return p;
-        return near.Pos + ((p - near.Pos) / ZoneSize).Round() * ZoneSize;
-    }
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
     /// <summary>Where a packer stands: behind the packing table, facing the camera, between the open crate and the heap of goods.</summary>
@@ -629,6 +628,8 @@ public sealed partial class World {
     public float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
     /// <summary>How many times faster than a recipe's own seconds work goes: a bench's speed, or 1 elsewhere and by hand, times the tool's.</summary>
     public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
+    /// <summary>Tiles a second the acting player moves where they stand: walking or sprinting, and faster on gravel.</summary>
+    public float PlayerSpeed => Data.MoveSpeed(S.Actor.Sprinting) * GravelPaths.SpeedAt(Player);
     public void MovePlayer(Vector2 delta) {
         // Inside a cabin the player stays put until they step outside on purpose.
         if (Occupied || S.Sheltered != 0) return;
@@ -723,95 +724,6 @@ public sealed partial class World {
     public bool CrewHammers(Thing anvil) {
         foreach (var w in S.Workers) if (w.Assignment == anvil.Id && w.WageDebt <= 0 && w.WorkState == WorkerWorkState.Hammering && HasDuty(w, anvil.Id, JobKind.Craft)) return true;
         return false;
-    }
-    /// <summary>The room a building keeps from a resource's middle beyond its own footprint, and a yard beyond its own edge.</summary>
-    private const float ResourceRoom = .65f, YardResourceRoom = .3f;
-    /// <summary>Why a building, or a crate from the backpack when <paramref name="item"/> names one, cannot go here.</summary>
-    public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null) {
-        bool crate = kind == ThingKind.Crate;
-        if (!crate && !Data.Buildings.ContainsKey(kind)) return "Unknown building.";
-        if (Occupied) return "You are busy.";
-        if (S.Sheltered != 0) return "Leave the cabin first.";
-        if (WolfPatrols.NearDen(p, Den.Clearance)) return "Leave the wolf den's mouth clear.";
-        if (kind == ThingKind.Mine) return MineBlock(p);
-        if (IsZone(kind)) return ZoneBlock(kind, p);
-        if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
-        if (Player.DistanceTo(p) < 1.2f || Terrain.Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
-        if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
-        foreach (var t in S.Things)
-            if (!BuiltOver(t.Kind) && t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + ResourceRoom : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
-        if (kind == ThingKind.Hut) {
-            var door = Doorways.DoorPoint(new Thing { Pos = p });
-            if (!CanStand(door) || Terrain.InLake(door, .8f) || S.Things.Any(t => !BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < Footprint(t.Kind) + DoorRoom))
-                return "Leave open ground in front of the door.";
-        }
-        foreach (var hut in S.Things.Of(ThingKind.Hut)) if (Doorways.DoorPoint(hut).DistanceTo(p) < Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
-        if (crate ? item != null && (MarkedSource ?? S.Backpack)[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
-        return null;
-    }
-    /// <summary>How far past their own footprint buildings keep from a cabin's door spot, where players step in and out.</summary>
-    private const float DoorRoom = .45f;
-    private string? ZoneBlock(ThingKind kind, Vector2 p) {
-        if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
-        // Every tile the yard covers.
-        for (int x = -1; x <= 1; x++)
-            for (int y = -1; y <= 1; y++) {
-                var q = p + new Vector2(x, y);
-                if (!CanStand(q) || Terrain.InLake(q, .8f) || Terrain.Spawn.DistanceTo(q) < 1) return "Choose dry, open ground.";
-            }
-        float half = ZoneSize / 2;
-        // Yards may touch edge to edge; anything else keeps its usual room from the square.
-        foreach (var t in S.Things) {
-            if (!IsZone(t.Kind) && t.IsResource && t.Remaining <= 0 || BuiltOver(t.Kind)) continue;
-            float margin = IsZone(t.Kind) ? half - .05f : t.IsResource ? YardResourceRoom : Footprint(t.Kind) + .2f;
-            if (Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin) return "Leave room around resources and buildings.";
-        }
-        return S.Backpack.Has(Data.Buildings[kind].Cost) ? null : "Missing materials in your backpack.";
-    }
-    public Thing? Build(ThingKind kind, Vector2 p) {
-        p = Snap(kind, p);
-        var blocked = PlacementBlock(kind, p);
-        if (blocked != null) { Say(blocked); return null; }
-        if (Busy() || Forwarded(Verb.Build, item: kind.Id(), at: p)) return null;
-        S.Backpack.Spend(Data.Buildings[kind].Cost);
-        var t = Add(kind, p); ClearGround(t); Play("place_building", p);
-        if (kind == ThingKind.Campfire) { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
-        S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); Made?.Invoke(S.Actor.Id, t.Id); }
-        return t;
-    }
-    /// <summary>Why a building cannot come down now, or null: someone shelters in it, or a cart is out from it.</summary>
-    private string? DismantleBlock(Thing t) {
-        foreach (var p in S.Players) if (p.Sheltered == t.Id || p.Door != Doorway.None && p.DoorCabin == t.Id) return "Someone is inside. It can come down once they step out.";
-        foreach (var order in S.Orders) if (order.Signpost == t.Id) return "A cart is out from this trading post. Wait for it to come back.";
-        return null;
-    }
-    /// <summary>
-    /// Takes a building down: its cost, anything delivered to build it and everything it holds go to the backpack,
-    /// and what does not fit waits in a recovery box where it stood.
-    /// </summary>
-    public bool Dismantle(Thing t) {
-        if (!Data.Buildings.TryGetValue(t.Kind, out var def)) return false;
-        if (!Reaches(t)) { Say("Walk closer first."); return false; }
-        if (DismantleBlock(t) is string refused) { Say(refused); return false; }
-        if (Busy() || Forwarded(Verb.Dismantle, t.Id)) return true;
-        if (HeldByOthers(t)) return false;
-        // Liquid fills the backpack's vessels, and the rest is spilled.
-        string spilled = "";
-        foreach (var box in Boxes(t)) if (box != null) spilled += PourOut(box);
-        var back = new Dictionary<string, int>(def.Cost);
-        if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
-        foreach (var box in Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
-        S.Things.Remove(t); Play("take_down_building", t.Pos);
-        if (t.Kind == ThingKind.Toolstation) toolsChanged = true;
-        Inventory? rest = null;
-        foreach (var (item, amount) in back) {
-            int left = amount - S.Backpack.Add(item, amount);
-            if (left <= 0) continue;
-            if (rest == null) { rest = Add(ThingKind.Grave, t.Pos).Inventory; rest.Slots = 0; }
-            rest.Slots += (left + rest.StackOf(item) - 1) / rest.StackOf(item); rest.Add(item, left);
-        }
-        Say((rest == null ? $"The {Lower(def.Name)} is down. Everything is back in your backpack." : $"The {Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
-        return true;
     }
     public void Consume(string item) {
         if (!Data.Items.TryGetValue(item, out var def) || Busy() || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
@@ -1451,7 +1363,7 @@ public sealed partial class World {
     /// <summary>Puts a crate from the backpack, or the held crate, down, still holding whatever it was packed with.</summary>
     public Thing? PlaceCrate(string item, Vector2 p) {
         if (!IsCrate(item)) return null;
-        if (PlacementBlock(ThingKind.Crate, p, item) is string blocked) { Say(blocked); return null; }
+        if (Construction.PlacementBlock(ThingKind.Crate, p, item) is string blocked) { Say(blocked); return null; }
         if (Busy() || Forwarded(Verb.PlaceCrate, item: item, count: S.Backpack.PreferredSlot, at: p)) return null;
         // A crate put down from the held stack comes from wherever it is held, such as a chest; any other from the backpack.
         (MarkedSource ?? S.Backpack).Remove(item, 1);
@@ -1729,7 +1641,7 @@ public sealed partial class World {
     /// <summary>The nearest thing of a kind, or null.</summary>
     public Thing? Nearest(ThingKind kind, Vector2 origin) => Nearest(new ReadOnlySpan<ThingKind>(in kind), origin);
     /// <summary>The nearest thing of any of these kinds, or null.</summary>
-    private Thing? Nearest(ReadOnlySpan<ThingKind> kinds, Vector2 origin) {
+    internal Thing? Nearest(ReadOnlySpan<ThingKind> kinds, Vector2 origin) {
         Thing? best = null; float bestDistance = 0;
         foreach (var kind in kinds)
             foreach (var t in S.Things.Of(kind)) {
@@ -1749,8 +1661,6 @@ public sealed partial class World {
         foreach (var t in routeBlockers) if (Blocks(t, p)) return false;
         return true;
     }
-    private static int RouteIndex(Vector2I p) => p.Y * Terrain.Size + p.X;
-    private static bool OnMap(Vector2I p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size;
     /// <summary>Appends the tiles from <paramref name="from"/> to within reach of <paramref name="destination"/> to <paramref name="route"/>, or nothing when there is no way.</summary>
     private const float RouteRetrySeconds = 1;
     private static readonly float[] Swerves = { 0, MathF.PI / 4, -MathF.PI / 4, MathF.PI / 2, -MathF.PI / 2 };
@@ -1772,27 +1682,27 @@ public sealed partial class World {
         // Collected once, since a search on the large map can visit thousands of tiles.
         routeBlockers.Clear();
         foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) routeBlockers.Add(t);
-        var start = new Vector2I((int)MathF.Round(from.X), (int)MathF.Round(from.Y));
-        if (!OnMap(start)) return;
+        var start = Terrain.TileAt(from);
+        if (!Terrain.OnMap(start)) return;
         routeQueue.Clear(); routeQueue.Enqueue(start);
-        routeSeen[RouteIndex(start)] = search;
+        routeSeen[Terrain.TileIndex(start)] = search;
         int end = -1;
         // A walker beside a building, with the building between them and where they go, may stand on a square near enough to it while they are not:
         // that square then never ends the search, and they step round. One already as near as a walk's usual reach finds no route and counts as there.
         bool near = from.DistanceTo(destination) < WalkReach;
         while (routeQueue.Count > 0) {
             var current = routeQueue.Dequeue();
-            if ((near || current != start) && ((Vector2)current).DistanceTo(destination) <= 1.15f) { end = RouteIndex(current); break; }
+            if ((near || current != start) && ((Vector2)current).DistanceTo(destination) <= 1.15f) { end = Terrain.TileIndex(current); break; }
             foreach (var step in RouteSteps) {
                 var next = current + step;
-                if (!OnMap(next) || routeSeen[RouteIndex(next)] == search || !RouteOpen(next)) continue;
+                if (!Terrain.OnMap(next) || routeSeen[Terrain.TileIndex(next)] == search || !RouteOpen(next)) continue;
                 if (step.X != 0 && step.Y != 0 && (!RouteOpen(current + new Vector2I(step.X, 0)) || !RouteOpen(current + new Vector2I(0, step.Y)))) continue;
-                routeSeen[RouteIndex(next)] = search; routeFrom[RouteIndex(next)] = RouteIndex(current); routeQueue.Enqueue(next);
+                routeSeen[Terrain.TileIndex(next)] = search; routeFrom[Terrain.TileIndex(next)] = Terrain.TileIndex(current); routeQueue.Enqueue(next);
             }
         }
         if (end < 0) return;
         int first = route.Count;
-        for (int node = end; node != RouteIndex(start); node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
+        for (int node = end; node != Terrain.TileIndex(start); node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
         route.Reverse(first, route.Count - first);
     }
     /// <summary>How near a worker counts as at a place: the reach of a walk, and how near a closer spot they cannot get to counts as there.</summary>
@@ -1805,7 +1715,8 @@ public sealed partial class World {
         float distance = w.Pos.DistanceTo(destination);
         if (distance < reach) return true;
         // Stop at arrival range rather than overshooting into the target's footprint, where the step would be refused.
-        if (Travel(w, destination, Math.Min(dt * WorkerSpeed, distance - reach + .05f), dt * WorkerSpeed)) return false;
+        float step = dt * WorkerSpeed * GravelPaths.SpeedAt(w.Pos);
+        if (Travel(w, destination, Math.Min(step, distance - reach + .05f), step)) return false;
         if (distance < WalkReach) return true;
         w.Status = "Path blocked · clear a route"; w.WorkState = WorkerWorkState.Blocked;
         return false;
@@ -1969,7 +1880,7 @@ public sealed partial class World {
     // The tool kinds tool stations give out; a tool station's contents or filters changing marks it out of date, and it is worked out again when next asked.
     private readonly HashSet<string> stationTools = new();
     private bool toolsChanged = true;
-    private void ToolsChanged() => toolsChanged = true;
+    internal void ToolsChanged() => toolsChanged = true;
     /// <summary>Has a tool station's contents and filters report to the tool kinds stations give out.</summary>
     private void WatchTools(Thing station) { station.Inventory.Changed = ToolsChanged; toolsChanged = true; }
     /// <summary>The tool of a kind a tool station gives out: its best, when its filter lets that one out; otherwise null.</summary>
@@ -2404,7 +2315,7 @@ public sealed partial class World {
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
         if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Obtained == null || loaded.Prices == null
-            || loaded.Remembered == null || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
+            || loaded.Remembered == null || loaded.GravelPaths == null || loaded.GravelPaths.Exists(tile => (uint)tile >= Terrain.Size * Terrain.Size) || loaded.GravelPaths.Distinct().Count() != loaded.GravelPaths.Count || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
             throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Players = new();
         // Until its machines join, the save's world runs as the player no machine has claimed, else the first.

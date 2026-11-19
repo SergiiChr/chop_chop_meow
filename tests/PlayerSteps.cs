@@ -54,10 +54,10 @@ internal static class PlayerSteps {
         var origin = new Vector2(20, 20);
         world.Player = origin + new Vector2(1.5f, 2.5f);
         Give(world, "wood", 16); Give(world, "wheat_seeds", 1); Give(world, "fertilizer", 1);
-        var compost = world.Build(ThingKind.Pile, origin);
+        var compost = world.Construction.Build(ThingKind.Pile, origin);
         Require(compost != null, "a pile should build on open ground");
         world.SetCompost(compost!, true);
-        var farm = world.Build(ThingKind.Farm, origin + new Vector2(3.4f, .3f));
+        var farm = world.Construction.Build(ThingKind.Farm, origin + new Vector2(3.4f, .3f));
         Require(farm != null, "a farm plot should build beside a pile");
         return (world, compost!, farm!);
     }
@@ -91,7 +91,7 @@ internal static class PlayerSteps {
 
     public static Thing BuildAt(World world, ThingKind kind, Vector2 position) {
         world.Player = position + new Vector2(-1.5f, 0);
-        var built = world.Build(kind, position);
+        var built = world.Construction.Build(kind, position);
         Require(built != null, $"build {kind} at a clear nearby location");
         return built!;
     }
@@ -121,5 +121,27 @@ internal static class PlayerSteps {
         for (int i = 0; i < times; i++) Require(world.Craft(recipe), $"{recipe} should be craftable by hand: {world.CraftBlock(recipe)}");
         for (int limit = 400; (world.Crafting.Count > 0 || world.Making != "") && limit > 0; limit--) SafeTick(world, Step);
         Require(world.Crafting.Count == 0 && world.Making == "", $"hand crafting {recipe} should finish: rate={world.CraftRate}, progress={world.CraftTime}, slots={world.Backpack.UsedSlots}, items={string.Join(",", world.Backpack.Items.Select(p => p.Key + "=" + p.Value))}, room={world.Backpack.Room(world.Data.Recipes[recipe].Output)}");
+    }
+
+    /// <summary>
+    /// A bench beside the player set to <paramref name="recipe"/>, with a wooden mallet slotted and a batch loaded from
+    /// the backpack, left twenty seconds to make it.
+    /// </summary>
+    public static Thing BenchLeftWithAMallet(World world, string recipe) {
+        var bench = world.Add(ThingKind.Bench, Site(0, 4));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        Give(world, "wood_hammer", 1);
+        world.SetRecipe(bench, recipe);
+        Require(world.SlotTool(bench, "wood_hammer"), "a wooden mallet should fit the hammer slot");
+        world.LoadBatch(bench);
+        SafeTick(world, 20);
+        return bench;
+    }
+
+    /// <summary>Swaps the mallet in a bench's hammer slot for a steel hammer.</summary>
+    public static void SwapMalletForSteelHammer(World world, Thing bench) {
+        world.UnslotTool(bench, "wood_hammer");
+        Give(world, "steel_hammer", 1);
+        world.SlotTool(bench, "steel_hammer");
     }
 }

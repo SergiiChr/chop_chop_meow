@@ -33,6 +33,12 @@ public static class CabinChecks {
         Test(CheckNothingCanBeBuiltOnACabinsDoorSpot, data);
         Test(CheckSteppingOutOfACabinWhoseDoorIsBlockedLandsOnOpenGround, data);
         Test(CheckACabinNobodyIsLeftInsideIsUnlocked, data);
+        Test(CheckSleepingPassesTheNightForTheWorld, data);
+        Test(CheckSleepNeedsFoodAndWater, data);
+        Test(CheckSleepHealsOnlyWhileFed, data);
+        Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
+        Test(CheckSleepWaitsForEveryone, data);
+        Test(CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem);
     }
 
     private static void CheckPlayerBehindACabinWalksRoundItToTheDoor(GameData data) {
@@ -218,7 +224,7 @@ public static class CabinChecks {
             world.Consume("berries");
             Require(world.Backpack["berries"] == 3, "a player knocking on a cabin door should not eat");
             Give(world, data.Buildings[ThingKind.Chest].Cost);
-            Require(world.Build(ThingKind.Chest, world.Player + new Vector2(-3, 2)) == null, "a player knocking on a cabin door should not build");
+            Require(world.Construction.Build(ThingKind.Chest, world.Player + new Vector2(-3, 2)) == null, "a player knocking on a cabin door should not build");
         });
         Require(told.Count > 0 && told.All(message => message == "You are busy."), $"a player at a cabin door should be told they are busy, not {string.Join(" | ", told)}");
     }
@@ -288,7 +294,7 @@ public static class CabinChecks {
         var shore = ShoreForACabin(world);
         world.Player = shore + new Vector2(-2.5f, -1.5f);
         Give(world, data.Buildings[ThingKind.Hut].Cost);
-        Require(world.PlacementBlock(ThingKind.Hut, shore) != null && world.Build(ThingKind.Hut, shore) == null, "a cabin should not go up with its door where nobody can stand");
+        Require(world.Construction.PlacementBlock(ThingKind.Hut, shore) != null && world.Construction.Build(ThingKind.Hut, shore) == null, "a cabin should not go up with its door where nobody can stand");
     }
     private static void CheckNothingCanBeBuiltOnACabinsDoorSpot(GameData data) {
         var world = EmptyWorld(data);
@@ -297,8 +303,8 @@ public static class CabinChecks {
         var spot = Doorways.DoorPoint(hut) + Doorways.OutOfDoor * .6f;
         world.Player = spot + new Vector2(2.5f, 0);
         Give(world, data.Buildings[ThingKind.Bench].Cost);
-        Require(world.PlacementBlock(ThingKind.Bench, spot + Doorways.OutOfDoor * 2) == null, "a bench well clear of the cabin's door should go up");
-        Require(world.PlacementBlock(ThingKind.Bench, spot) != null && world.Build(ThingKind.Bench, spot) == null, "a bench should not go up on a cabin's door spot");
+        Require(world.Construction.PlacementBlock(ThingKind.Bench, spot + Doorways.OutOfDoor * 2) == null, "a bench well clear of the cabin's door should go up");
+        Require(world.Construction.PlacementBlock(ThingKind.Bench, spot) != null && world.Construction.Build(ThingKind.Bench, spot) == null, "a bench should not go up on a cabin's door spot");
     }
     private static void CheckSteppingOutOfACabinWhoseDoorIsBlockedLandsOnOpenGround(GameData data) {
         var world = EmptyWorld(data);
@@ -308,5 +314,183 @@ public static class CabinChecks {
         world.Doorways.Leave();
         world.Tick(Doorways.LeaveSeconds + .05f);
         Require(world.Sheltered == 0 && world.CanStand(world.Player), $"a player stepping out of a cabin whose door is blocked should land on open ground, not at {world.Player}");
+    }
+
+    private static void CheckSleepingPassesTheNightForTheWorld(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = Terrain.Spawn;
+        RunUntilPhase(world, data.NightStarts + .01f);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
+        var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(1, 2));
+        var furnace = world.Add(ThingKind.Furnace, world.Player + new Vector2(-2, 1));
+        furnace.Processing = true;
+        var order = new TradeOrder { Goods = new() { ["wood"] = 1 }, Buying = false, Value = 12, Signpost = sign.Id };
+        PlaceOrder(world, order);
+        var worker = AddWorker(world, sign.Pos);
+        SetCoins(world, (int)worker.Wage + 3);
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(8, 0) });
+        float priorTime = world.Time;
+        float priorHunger = world.Hunger;
+        world.Sleep(hut);
+        Require(world.Time > priorTime && world.Day > 1,
+                "sleep should advance the world clock through dawn");
+        Require(world.Orders.Count == 0, "trade settlement should finish the order");
+        Require(sign.Wages![Inventory.Coins] == 12 - worker.Wage,
+            "the daily wage should come out of the wage slot during sleep");
+        Require(world.Coins == worker.Wage + 3, "the worker's wage should reach the player");
+        Require(worker.WageDebt == 0,
+                "a funded worker should receive the normal daily wage during sleep");
+        Require(!furnace.Processing && furnace.Inventory["iron_bar"] > 0,
+                "furnace production should continue while the player sleeps");
+        Require(world.Wolves.Count == 0 && world.Hunger < priorHunger,
+                "nighttime sleep should advance survival needs and clear wolves at dawn");
+    }
+
+    private static void CheckSleepNeedsFoodAndWater(GameData data) {
+        Require(Math.Abs(100 / data.HungerPerSecond - data.DaySeconds) < .01f && Math.Abs(100 / data.ThirstPerSecond - data.DaySeconds) < .01f,
+                "a full stomach should last one in-game day and a full water droplet one day");
+        foreach (var (hunger, thirst, reason) in new[] { (10f, 100f, "hungry"), (100f, 10f, "thirsty") }) {
+            var world = NightWorld(data);
+            var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
+            SetNeeds(world, hunger, thirst);
+            float time = world.Time;
+            world.Sleep(hut);
+            Require(world.Time == time && world.SleepBlock()?.Contains(reason) == true,
+                    $"sleep must be refused when the player is too {reason} to last until morning");
+        }
+        var early = EmptyWorld(data);
+        early.Add(ThingKind.Hut, early.Player + new Vector2(2, 0));
+        RunUntilPhase(early, (World.SleepHour - 6 - .2f) / 24);
+        Require(early.SleepBlock()?.Contains("10 pm") == true, "sleep must be refused before 10 pm");
+        RunUntilPhase(early, (World.SleepHour - 6 + .2f) / 24);
+        Require(!early.Night && early.SleepBlock() == null, "sleep must be allowed from 10 pm, before night falls");
+    }
+
+    /// <summary>Health comes back only in sleep, while hunger and thirst both stay above 45%, and the cabin foretells what a night leaves.</summary>
+    private static void CheckSleepHealsOnlyWhileFed(GameData data) {
+        var awake = EmptyWorld(data);
+        SetNeeds(awake, 100, 100, 50);
+        SafeTick(awake, 60);
+        Require(awake.Health == 50, "a fed player should not heal while awake");
+
+        var rested = NightWorld(data);
+        var hut = rested.Add(ThingKind.Hut, rested.Player + new Vector2(2, 0));
+        SetNeeds(rested, 100, 100, 50);
+        float foretold = rested.HealthAtDawn();
+        rested.Sleep(hut);
+        // At most eight hours of sleep, 280 seconds, heal .12 a second: a fed night brings back up to 34.
+        Require(rested.Health > 60 && rested.Health < 84, $"a fed night's sleep should heal a good part of the way: {rested.Health:0.0}");
+        Require(Math.Abs(rested.Health - foretold) < .2f, $"the cabin's dawn health {foretold:0.0} should be what sleep leaves, {rested.Health:0.0}");
+
+        var hungry = NightWorld(data);
+        hut = hungry.Add(ThingKind.Hut, hungry.Player + new Vector2(2, 0));
+        SetNeeds(hungry, 50, 100, 50);
+        hungry.Sleep(hut);
+        // Hunger falls from 50 to 45 in 5% of a day, 42 seconds, which heal 5.
+        Require(Math.Abs(hungry.Health - 55) < .3f, $"sleep should heal only while hunger stays above 45%: {hungry.Health:0.0}");
+    }
+
+    private static void CheckCabinShelterAndChasingWolfGivesUpInLight(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
+        var wolf = new Wolf { Pos = world.Player + new Vector2(-4, 0) };
+        PlaceWolf(world, wolf);
+        SafeTick(world, .5f);
+        StepInside(world, hut);
+        world.Doorways.TurnKey();
+        SetNeeds(world, health: 40);
+        SafeTick(world, 1);
+        Require(wolf.Target == 0, "a wolf must stop hunting a player who is inside a cabin");
+        Require(wolf.Leap <= 0, "a wolf must stop its leap when the player is inside a cabin");
+        Require(world.Health >= 40, "a wolf must not hurt a player inside a cabin");
+        var inside = world.Player;
+        world.MovePlayer(new Vector2(0, .1f));
+        Require(world.Sheltered == hut.Id && world.Player == inside, "moving should not take the player back outside");
+        // A chaser that caught up stands right on the player; it must still give up once it has scratched at the locked door.
+        var caught = new Wolf { Pos = world.Player, Target = world.Me.Id };
+        PlaceWolf(world, caught);
+        SafeTick(world, 10);
+        Require(caught.Target == 0 && wolf.Target == 0 && caught.Mode == WolfMode.Patrol && caught.DoorCheck == DoorCheckStage.None && wolf.DoorCheck == DoorCheckStage.None, "wolves should give up on the player and patrol on once they have been inside behind a locked door long enough");
+        Require(world.Health >= 40, "a wolf must not hurt a player behind a locked door");
+        world.Doorways.Leave();
+        Require(world.Sheltered == 0, "stepping outside should leave the cabin");
+        world.Player = hut.Pos + new Vector2(12, 0);
+        SetNeeds(world, health: -1);
+        for (int i = 0; i < 200 && world.Sheltered == 0; i++) { world.Tick(.25f); SetNeeds(world, health: Math.Max(world.Health, 1)); }
+        Require(world.Sheltered == hut.Id, "a fallen player should wake inside the nearest cabin");
+        Require(world.Player.DistanceTo(hut.Pos) < 3, "a fallen player should wake beside that cabin");
+        Require(world.CanStand(world.Player), "a fallen player should wake on standable ground");
+
+        var lit = NightWorld(data);
+        var chaser = new Wolf { Pos = lit.Player + new Vector2(-5, 0) };
+        PlaceWolf(lit, chaser);
+        SafeTick(lit, .5f);
+        lit.Add(ThingKind.Campfire, lit.Player + new Vector2(2, 0)).Burn = 300;
+        float gap = chaser.Pos.DistanceTo(lit.Player);
+        SafeTick(lit, .5f);
+        Require(chaser.Pos.DistanceTo(lit.Player) < gap, "a wolf already chasing should follow the player briefly into firelight");
+        SafeTick(lit, 4);
+        gap = chaser.Pos.DistanceTo(lit.Player);
+        SafeTick(lit, .5f);
+        Require(chaser.Pos.DistanceTo(lit.Player) > gap, "a chasing wolf should give up and back away after a few seconds in the light");
+    }
+
+    private static void CheckSleepWaitsForEveryone(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        RunUntilNight(world);
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(3, 0));
+        StepInside(world, hut);
+        Require(world.SleepBlock() == "Everyone has to be inside a cabin to sleep.", $"sleeping should wait for a guest still outside: {world.SleepBlock()}");
+        // The guest sleeps in a cabin of their own, and both lock their doors against the night's wolves.
+        var guestHut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(3, 6));
+        StepInside(world, guestHut, guest);
+        world.Doorways.TurnKey();
+        world.Run(guest, new Command(Verb.TurnKey, 0, 0, "", 0, default));
+        Require(hut.Locked && guestHut.Locked, "each player should lock the door of the cabin they are in");
+        SetNeeds(guest, hunger: 1);
+        Require(world.SleepBlock() == "Someone is too hungry or thirsty to sleep.", "sleeping should wait for a hungry guest");
+        SetNeeds(guest, hunger: 100);
+        AddWorker(world, Terrain.Spawn).Wage = 10;
+        Give(world, Inventory.Coins, 50); Give(guest, Inventory.Coins, 50);
+        int day = world.Day;
+        world.Run(guest, new Command(Verb.Sleep, guestHut.Id, 0, "", 0, default));
+        Require(world.Day == day + 1, "with everyone inside, a guest's sleep should move to the next day");
+        Require(!world.Night, "with everyone inside, a guest's sleep should end the night");
+        Require(guest.Hunger < 100, "with everyone inside, a guest's sleep should use up the guest's hunger");
+        Require(world.Backpack[Inventory.Coins] == 40 && guest.Backpack[Inventory.Coins] == 50, "the host's backpack should pay the wages even when a guest sleeps");
+    }
+
+    /// <summary>
+    /// A cabin's door has two treads 14 cm high and then the floor, 40, 62 and 80 cm in from where a player stands at it,
+    /// as the cabin model builds them; a player walks, runs and is tugged over them and knocks on the door from the lower one.
+    /// </summary>
+    private static void CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem() {
+        ReadOnlySpan<float> edges = stackalloc float[] { .4f, .62f, .8f };
+        const float rise = .14f;
+        // How far in from the door point the hips go, facing in or out, over how many seconds, and whether the lowest boot must stay on the ground.
+        foreach (var (action, from, to, facingIn, seconds, grounded) in new[] {
+            (ActorAction.Walk, 0f, 1.8f, true, 1.5f, true), (ActorAction.Walk, 1.8f, 0f, false, 1.5f, true), (ActorAction.Jog, 0f, 1.8f, true, .7f, false),
+            (ActorAction.Walk, .1f, .5f, true, .3f, true), (ActorAction.Knock, .5f, .5f, true, 1f, true), (ActorAction.Tugged, .7f, -.3f, true, 1.5f, true) }) {
+            var up = new Vector2(0, facingIn ? 1 : -1);
+            float time = 0, deepest = 0, highest = 0;
+            for (int i = 0; i <= 300; i++) {
+                float depth = Mathf.Lerp(from, to, i / 300f), travelled = Math.Abs(to - from) * i / 300f;
+                time = seconds * i / 300f;
+                var pose = ActorAnimation.PoseAt(action, ActorAnimation.Stride(action) > 0 ? ActorAnimation.Advance(action, 0, travelled) : time, from != to);
+                (pose, float lift) = StairSteps.OnSteps(pose, depth, up, edges, rise);
+                float lowest = float.MaxValue;
+                for (int side = 0; side < 2; side++) {
+                    var (toe, heel) = side == 0 ? ActorAnimation.SoleOf(pose.SwingL, pose.KneeL, pose.FootL) : ActorAnimation.SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
+                    foreach (var point in new[] { toe, heel }) {
+                        // Facing out, a point ahead of the hips is further out from the door.
+                        float clear = lift + pose.HipHeight - point.Y - StairSteps.StepGround(depth + up.Y * point.X, edges, rise);
+                        deepest = Math.Min(deepest, clear); lowest = Math.Min(lowest, clear);
+                    }
+                }
+                if (grounded) highest = Math.Max(highest, lowest);
+            }
+            Require(deepest > -.003f, $"{action} from {from} m to {to} m in from a cabin's door should never sink a boot into its steps: {deepest:0.000} m");
+            Require(highest < .01f, $"{action} from {from} m to {to} m in from a cabin's door should keep a boot on the steps: the lowest rose {highest:0.000} m off them");
+        }
     }
 }

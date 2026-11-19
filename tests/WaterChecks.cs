@@ -218,7 +218,7 @@ public static class WaterChecks {
         world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 2);
         EmptyBackpack(world); Give(world, Water.Empty, 1);
         string message = ""; world.Notify = text => message = text;
-        Require(world.Dismantle(table), "the table should come down");
+        Require(world.Construction.Dismantle(table), "the table should come down");
         Require(world.Backpack[Water.TwoLiters] == 1 && world.Backpack[Water.Liquid] == 0 && world.Things.All(t => t.Inventory[Water.Liquid] == 0),
             "a dismantled station's water must fill the bottles carried");
         var spill = new World(data, false);
@@ -226,7 +226,7 @@ public static class WaterChecks {
         spill.SetRecipe(full, "dough"); full.Inventory.Add(Water.Liquid, 5);
         EmptyBackpack(spill); Give(spill, Water.Empty, 1);
         string said = ""; spill.Notify = text => said = text;
-        spill.Dismantle(full);
+        spill.Construction.Dismantle(full);
         Require(spill.Backpack[Water.Full] == 1 && said == "The cooking table is down. Everything is back in your backpack. 2L of water spilled.",
             $"water beyond the bottles carried must spill, and say so: \"{said}\"");
     }

@@ -53,10 +53,11 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   A material is flat colour or one of the surfaces wood, metal, stone, cloth and earth: the colour stays the model's
   own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
   layer, so the marks stay put as it moves and a model's own albedo texture stays free.
-  `Scanned` draws one of the scans rock, coal and soil as it is instead, with its bumps and the engine's parallax, on a
-  mesh that carries its place on the scan in world units: the stone and coal rocks, loose stones and coal, the farm
-  field and the compost mound. Heap pieces are those meshes shrunk to a heap's size with their place on the scan kept,
-  so a heaped stone or lump shows the scan finer than in the world.
+  `Scanned` draws one of the scans rock, coal, soil and gravel as it is instead, with its bumps and the engine's
+  parallax, on a mesh that carries its place on the scan in world units: the stone and coal rocks, loose stones and
+  coal, the farm field, the compost mound, the gravel heap and the gravel path tile.
+  Heap pieces are those meshes shrunk to a heap's size with their place on the scan kept, so a heaped stone or lump
+  shows the scan finer than in the world.
   A rounded shape has the scan draped over it from the top down (`NatureShape.Draped`), so only its hidden underside
   bunches, and is shaded smooth; each replaced rock stays under 500 triangles.
   `Mat` makes a flat material and `Wood`, `Metal`, `Stone` and `Cloth` a surfaced one for primitives; `Vertex` dresses
@@ -71,7 +72,9 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   - Built in code: wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a six-sided collar, none with a handle), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a ribbon, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
   - Baked from Kenney's Food Kit and recoloured to the game's palette: bread (the round loaf), raw meat (the ham on the bone), burnt steak (the cooked steak, charred) and the bowls of meat stew and crushed berries (the bowl of soup). `tools/food_models.py` bakes them into `models/food/`; see [food/README.md](models/food/README.md).
   - Light copies of models the world already shows, for heaps alone, since their icons come from those models: the hand tools and the torch with their cylinders redrawn on six sides, the rake, the mortar turned on fewer sides, the cargo crate, the bottle lying on its back, a single berry, a log, a board, one boulder of the world's stones, one lump of its loose ore and coal, one charcoal briquette, and six cast bars stacked three across three.
-  - Each good says how its heap is laid (`Lay`): neat grids for boxes, sacks, jars and six-packs; rows for logs, boards, tools and bottles, which lie the same way; loose and turned any way for stone, ore, coal, charcoal, berries, bread, meat and parts; and one mound that swells for leaves and compost.
+  - Each good says how its heap is laid (`Lay`): neat grids for boxes, sacks, jars and six-packs; rows for logs, boards, tools and bottles, which lie the same way; loose and turned any way for stone, ore, coal, charcoal, berries, bread, meat and parts; and one mound that swells for leaves, gravel and compost.
+  - Gravel is a mound with the gravel path's photoscan draped over it and loose stones at its foot, in its icon and on a
+    pile alike.
   - Cans heap as six-packs and bars as six-packs stacked three across three; a compost pile is a mound of soil with leaves on it and scraps poking out, whatever it holds.
   - Cans and jars in a heap are plainer than in their icons: no rim, rib, lid, bare tin, mark or ribbon, which do not show at the game's distance.
   - A heap shows as many pieces as its triangles allow, so a full pile and a fully stocked packing station stay under their ceilings whatever the good.
@@ -115,6 +118,9 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   - Fully stocked it stays under its ceiling of 2,500 triangles, whichever good it heaps.
 - `RackShape` — caches the tool station's fitted concrete feet, bevelled planks and cap, and shaped axe, pickaxe, shovel, rake, hammer and chisel. Each of the four pegs has a pivot per tool shape in `RackProp.Pegs`, and shows the one its slot holds.
 - `PileShape` — the pile's dirt pad with fitted log edging, and how every good heaps: the piece from `ItemShape` and its places on a pad. `WorldModels.SyncPile` fills the pile's `StockPile` from its inventory, the fuller the pile the more pieces, while `WorldView` keeps its sight guard, so a remembered heap shows in fog. A compost pile shows one mound for all it holds. The farm yard uses `PileShape.Yard`.
+- `GravelPathShape` (`src/paths/display/GravelPathShape.cs`) — one gravel path tile on its own, a flat round pad as wide
+  as a path in the gravel photoscan, for the plan's icon and its ghost while placing. Laid tiles are drawn by the
+  ground, joined to their neighbours ([DESIGN](../docs/DESIGN.md#gravel-paths)).
 - `FarmShape` — caches the farm's shaped soil rows and three seeded variants of sprouts, green plants and ripe wheat. Leaves are tapered and two-sided, stems are triangular and grain heads are shaped. One crop mesh is shown per growth stage under the `Crops` handles.
 - `MineShape` — caches the mine's plan outline, inward-facing tunnel shell, spoil pad, fitted portal and sloped board hood, inner supports and rail runs. The cart has a continuous flared tub, inner lining and rim, and axles and wheels seated on the rail tops. Its load reuses loose-ore geometry. Construction pivots, cart/load visibility, lantern fire/light and tunnel glow are independent. Each cave site rotates with its own cliff face, projecting from the mountain foot with a matching blocked rock footprint. Grass is cleared only inside the cave/rail approaches.
 - `MineRockShape` — a continuous single-mesh outcrop at the cave mouth. Its rear is embedded beneath the mountain triangles sampled by `MountainShape`. The middle cliff columns are removed, and the mountain triangles are clipped around the tunnel to leave its interior clear.
@@ -166,7 +172,7 @@ How they are framed:
 
 `ui/` holds hand-written SVG icons:
 
-- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, guide, close, filter, stash, trash and so on), tinted in code.
+- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, guide, close, filter, stash and so on), tinted in code.
 - `fresh_water.svg`, the water a full bottle pours into a station: a blue droplet in the shape of the corner's thirst icon, used as the item icon since only stations hold it and it has no model.
 
 ## Fonts
@@ -227,6 +233,12 @@ Each cut is faded at both ends, and the cuts of one sound are brought to one mea
 `footsteps_default` is cut with ffmpeg from "Footsteps_Grass_1" by freesound_community (Pixabay 6810, artist SilentStrikeZ on Freesound), a recording supplied for this project: six single steps, each 0.34 seconds from just before the foot lands, faded in over 15 ms and out over its last 120 ms.
 Each step's loudest 400 ms of heard loudness, counting the silence after it, is brought to -23.3 LUFS, the mean of the steps it replaced.
 
+`footsteps_gravel` is cut the same way from "Going on a forest road gravel and grass" by freesound_community (Pixabay
+6404, artist straget on Freesound), a recording supplied for this project: six single steps on gravel, each 0.34 seconds
+from just before the foot lands, with the same fades.
+Each is brought to the grass steps' -23.3 LUFS by the same measure, and plays at the same level in the mix, so a step on
+gravel is no louder than one on grass.
+
 `stomach_growl` is "yet more stomach sounds" by freesound_community (Pixabay 97719, artist Darsycho on Freesound), a recording supplied for this project, with the silence cut from both ends: four seconds of three rumbles.
 
 The tree sounds are cut and mixed with ffmpeg from three recordings supplied for this project, a tree bending and two trees falling:
@@ -268,8 +280,8 @@ Moss002, packed at 256 px by `tools/surface_textures.py` with the same script: a
 brightness around the photoscan's mean as a multiplier, at the ground's detail strength, and the normal PNG. The cloth
 weave keeps all of its contrast and is drawn coarse, since a fabric scan is nearly even at the game's distance.
 The scans come through the same script at their full 1K size, so their marks stay sharp at full zoom: rock from
-ambientCG's Rock026 and coal from its Rock035, and soil from the Poly Haven photoscan Red Laterite Soil Stones by Amal
-Kumar, released under CC0 1.0.
+ambientCG's Rock026, coal from its Rock035 and gravel from its Gravel004, which the ground also draws on gravel paths,
+and soil from the Poly Haven photoscan Red Laterite Soil Stones by Amal Kumar, released under CC0 1.0.
 The shores in `environment/lake/` are two [Poly Haven](https://polyhaven.com) photoscans by Rob Tuytel, released under
 CC0 1.0 and drawn with their own colours and parallax, both at 2K and one tile 15 world units: Aerial Beach 01 for the
 sea coast's sand, and Coast Sand Rocks 02 for the mossy, stony ground around the lake.

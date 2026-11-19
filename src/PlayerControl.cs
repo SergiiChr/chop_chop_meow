@@ -14,12 +14,14 @@ public abstract record ClickMode {
     public sealed record Crate(string Item) : ClickMode;
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
+    /// <summary>The remove selector: a click takes down the building or gravel path tile under it, and the next click the next one.</summary>
+    public sealed record Remove : ClickMode;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
     public ThingKind? Placing => this switch { Build build => build.Kind, Crate => ThingKind.Crate, _ => null };
 }
 
-/// <summary>The player in the world: walking, gathering, lifting crates, placing buildings and clicking things.</summary>
+/// <summary>The player in the world: walking, gathering, lifting crates, placing buildings, taking them down and clicking things.</summary>
 public sealed class PlayerControl {
     private const float LiftSeconds = .6f;
     private readonly UiKit kit;
@@ -151,7 +153,7 @@ public sealed class PlayerControl {
         var step = momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
         if (step != Vector2.Zero) walked = step.Normalized();
         world.Me.Braking = momentum.Braking;
-        var move = step * dt * world.Data.MoveSpeed(world.Me.Sprinting);
+        var move = step * dt * world.PlayerSpeed;
         // Walking to a cabin's door, the last step stops on it rather than past it, however long the frame.
         if (entering != null) move = world.Doorways.StepToDoor(entering, move);
         world.MovePlayer(move); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
@@ -183,6 +185,8 @@ public sealed class PlayerControl {
     }
 
     private void RightPress(Vector2 at) {
+        // A right click puts the remove selector away.
+        if (Mode is ClickMode.Remove) { Mode = new ClickMode.Normal(); return; }
         // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         var t = view.Pick(at);
@@ -201,6 +205,7 @@ public sealed class PlayerControl {
             return;
         }
         if (Mode.Placing != null) { Place(view.ToWorld(at).Round()); return; }
+        if (Mode is ClickMode.Remove) { world.Construction.Remove(RemovalAt(t, at)); return; }
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
         var w = view.PickWorker(at);
         if (w != null) panel.Select(w);
@@ -208,6 +213,9 @@ public sealed class PlayerControl {
         else if (hotbar.ActiveItem() is string selected && hotbar.HasUse(selected)) hotbar.UseSelected(view.ToWorld(at));
         else panel.Close();
     }
+
+    /// <summary>What the remove selector points at with <paramref name="picked"/> under the mouse at a screen point, or nothing while the selector is away.</summary>
+    public Removal RemovalAt(Thing? picked, Vector2 at) => Mode is ClickMode.Remove ? world.Construction.RemovalAt(picked, view.ToWorld(at)) : Removal.None;
 
     private void AssignGather(ClickMode.Assign assign, Thing? t) {
         var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);
@@ -228,7 +236,7 @@ public sealed class PlayerControl {
     /// </summary>
     private void Place(Vector2 at) {
         bool sent = Sent(at);
-        if (Mode is not ClickMode.Crate crate) world.Build(Mode.Placing!.Value, at);
+        if (Mode is not ClickMode.Crate crate) world.Construction.Build(Mode.Placing!.Value, at);
         // A held crate goes down from the held stack, wherever it lies.
         else if (placingHeld && cursor.Stack?.Item == crate.Item) world.FromHeldStack(() => world.PlaceCrate(crate.Item, at));
         // One from the hotbar goes down from the stack bound to the selected slot.
@@ -241,7 +249,7 @@ public sealed class PlayerControl {
     }
 
     /// <summary>Whether a placement at <paramref name="at"/> goes to the server, which it does when nothing here blocks it.</summary>
-    private bool Sent(Vector2 at) => (Mode is ClickMode.Crate crate ? world.PlacementBlock(ThingKind.Crate, at, crate.Item) : world.PlacementBlock(Mode.Placing!.Value, world.Snap(Mode.Placing.Value, at))) == null;
+    private bool Sent(Vector2 at) => (Mode is ClickMode.Crate crate ? world.Construction.PlacementBlock(ThingKind.Crate, at, crate.Item) : world.Construction.PlacementBlock(Mode.Placing!.Value, world.Construction.Snap(Mode.Placing.Value, at))) == null;
 
     /// <summary>Whether another can be paid for, on top of the one just sent.</summary>
     private bool CanPlaceAgain() => Mode switch {
