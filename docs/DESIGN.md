@@ -959,8 +959,7 @@ It keeps the player's filters rather than setting its own, and `Thing.SkipFood` 
 
 A wood crate holds `CrateCapacity` (12) units.
 A picked-up crate becomes an item `crate_<n>` whose contents live in `SaveState.Crates`; an empty one is the stackable item `crate`.
-Those contents have an update entry of their own (`EntryKey.Crates`), so only an update that changes a packed crate carries
-them.
+Those contents have an update entry of their own (`EntryKey.Crates`), sent only when a packed crate changes.
 `World.MoveInCrate` moves items between a packed crate in the backpack and the backpack, and renames the crate after what it then holds under the same number; emptied, it becomes a plain `crate`.
 A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
 `World.PackedKind` gives `World.MixedCrate` for a crate of mixed goods, which only a pile's filter can name.

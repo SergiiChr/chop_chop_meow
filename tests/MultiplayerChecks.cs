@@ -77,12 +77,16 @@ public static class MultiplayerChecks {
         var world = Settlement(data);
         for (int i = 0; i < 600; i++) world.Tick(1 / 60f);
         var wolf = PlaceWolf(world, new Wolf { Health = 0, Target = 2 });
+        StoreCrates(world, new Vector2(60, 110), 5);
         var entries = new WorldUpdates().Capture(world);
         foreach (var t in world.Things) RequireReadsBackAs(entries, new EntryKey(EntryKey.Thing, t.Id), t);
         foreach (var w in world.Workers) RequireReadsBackAs(entries, new EntryKey(EntryKey.Worker, w.Id), w);
         foreach (var o in world.Orders) RequireReadsBackAs(entries, new EntryKey(EntryKey.Order, o.Id), o);
         foreach (var p in world.Players) RequireReadsBackAs(entries, new EntryKey(EntryKey.Player, p.Id), p);
         RequireReadsBackAs(entries, new EntryKey(EntryKey.Wolf, wolf.Id), wolf);
+        var packed = world.Things.SelectMany(t => t.Inventory.Items.Keys).Where(item => World.PackedId(item) != 0).OrderBy(World.PackedId).ToDictionary(World.PackedId, item => world.Packed(item)!);
+        Require(packed.Count == 5, $"the five stored crates should be packed in the chests, not {packed.Count}");
+        RequireReadsBackAs(entries, new EntryKey(EntryKey.Crates, 0), packed);
     }
 
     /// <summary>An inventory counted as fresh is written as {}, so every field it saves must end that, including one added later: a field type this check does not know fails it.</summary>

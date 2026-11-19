@@ -33,12 +33,12 @@ public sealed class Inventory {
     /// <summary>A coin stack no game comes near, for a box with no coin limit; small enough that adding stacks up never overflows.</summary>
     public const int UnlimitedCoins = int.MaxValue / 4;
     private int slots = NewSlots, stackSize = NewStackSize;
-    /// <summary>Read-only view of each item's total across all stacks; the inventory's methods are the only way to change it.</summary>
+    /// <summary>Read-only view of each item's total across all stacks; play changes it only through the inventory's methods, and a load or update through <see cref="SavedItems"/>.</summary>
     [JsonIgnore] public ItemTotals Items { get; }
     /// <summary>
     /// The totals as saved under the name "Items", for loading and network copies.
     /// Assigning copies the totals in; the stacks then need <see cref="RebuildStacks"/> unless <see cref="Layout"/> is set from the same source.
-    /// It is the dictionary itself, not a read-only interface over it, so the JSON writer walks it without allocating, as updates do for every filled inventory thirty times a second.
+    /// Typed as the dictionary itself, which the JSON writer walks without allocating, as updates do for every filled inventory thirty times a second.
     /// </summary>
     [JsonInclude, JsonPropertyName("Items")] internal Dictionary<string, int> SavedItems { get => items; set { if (!ReferenceEquals(value, items)) { items.Clear(); foreach (var pair in value) items[pair.Key] = pair.Value; } } }
     /// <summary>Physical stack positions; <see cref="Items"/> holds each item's total across them.</summary>
