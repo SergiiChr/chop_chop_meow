@@ -387,6 +387,7 @@ public partial class Game : Node, IGameFlow {
         // A recording leaves the pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
         bool recording = Engine.GetWriteMoviePath() != "";
         var hover = recording ? null : view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = recording ? 0 : view.PickWorker(view.Mouse)?.Id ?? 0;
+        view.Removal = GetViewport().GuiGetHoveredControl() == null ? player.RemovalAt(hover, view.Mouse) : Removal.None;
         uiClock += dt;
         if (uiClock > .2f || net.AwaitingAnswer && net.ShownUpdate != refreshedUpdate) {
             uiClock = 0; refreshedUpdate = net.ShownUpdate; RefreshLive();

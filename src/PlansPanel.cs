@@ -2,7 +2,10 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Every building plan as a cell: hovering shows what it needs, a click picks it up for placing or for a hotbar slot, and a double click starts placing it.</summary>
+/// <summary>
+/// Every building plan as a cell: hovering shows what it needs, a click picks it up for placing or for a hotbar slot, and a double click starts placing it.
+/// After them a red cross, which hands the player the remove selector.
+/// </summary>
 public partial class PlansPanel(PageTools tools) : PagePanel(tools) {
     protected override void Build() {
         var grid = NewGrid(); AddChild(grid);
@@ -20,6 +23,11 @@ public partial class PlansPanel(PageTools tools) : PagePanel(tools) {
             live.Watch(() => world.Backpack.Has(def.Cost), ready => cell.Modulate = ready ? Colors.White : Style.Unready);
             grid.AddChild(cell);
         }
+        var (remove, _) = ItemSlot.Create("remove"); remove.Icon = Icons.Of("line_close"); remove.TooltipText = "Remove\nLMB: pick buildings to take down";
+        remove.AddThemeColorOverride(ItemSlot.IconNormal, Style.Brick); remove.AddThemeColorOverride("icon_hover_color", Style.Brick); remove.AddThemeColorOverride("icon_pressed_color", Style.Brick);
+        remove.Controls = new SlotInput(cursor) { Click = () => { panel.Player.Mode = new ClickMode.Remove(); panel.Close(); kit.Refresh(); } };
+        remove.MouseEntered += () => details.Text = "Remove\nClick a building or a gravel path tile within reach to take it down at once. Its cost and everything it holds come back to your backpack.";
+        grid.AddChild(remove);
         AddChild(details);
     }
 }

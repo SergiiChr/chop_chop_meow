@@ -20,6 +20,7 @@ public partial class Sounds : Node {
     // Variants share a loudness, and these levels set each sound's place in the mix: quiet steps, then impacts and handling, then alerts.
     private static readonly Dictionary<string, float> Levels = new() {
         ["footsteps_default"] = -18,
+        ["footsteps_gravel"] = -18,
         ["footsteps_rocks"] = -17,
         ["footsteps_water"] = -15,
         ["chop_tree"] = -7.5f,

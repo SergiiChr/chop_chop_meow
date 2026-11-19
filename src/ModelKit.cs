@@ -11,7 +11,7 @@ namespace ChopChopMeow;
 public enum Surface { Flat, Wood, Metal, Stone, Cloth, Earth, Foliage }
 
 /// <summary>A photoscan drawn as it is, in its own colours, with bumps and parallax.</summary>
-public enum Scan { Rock, Coal, Soil }
+public enum Scan { Rock, Coal, Soil, Gravel }
 
 /// <summary>
 /// Low-poly primitive helpers shared by every code-built model.
@@ -55,7 +55,7 @@ public static class ModelKit {
     public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, _ => 1 };
 
     /// <summary>World units one tile of a scan spans, about its real size.</summary>
-    private const float ScanTile = 2;
+    public const float ScanTile = 2;
     /// <summary>
     /// How far in world units every photoscan's lowest point shifts from its highest, seen edge on: the models' scans here,
     /// the shores and the ground photoscans alike.
@@ -69,7 +69,7 @@ public static class ModelKit {
     /// </summary>
     public static StandardMaterial3D Scanned(Scan scan, float roughness) {
         if (scans.TryGetValue((scan, roughness), out var cached)) return cached;
-        Texture2D Map(string map) => GD.Load<Texture2D>($"res://assets/models/surfaces/{scan.ToString().ToLowerInvariant()}_{map}.png");
+        Texture2D Map(string map) => ScanMap(scan, map);
         return scans[(scan, roughness)] = new StandardMaterial3D {
             AlbedoTexture = Map("albedo"),
             VertexColorUseAsAlbedo = true,
@@ -88,6 +88,9 @@ public static class ModelKit {
             TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
         };
     }
+
+    /// <summary>One of a scan's maps: its "albedo", its "bump", an OpenGL normal map, or its "height".</summary>
+    public static Texture2D ScanMap(Scan scan, string map) => GD.Load<Texture2D>($"res://assets/models/surfaces/{scan.ToString().ToLowerInvariant()}_{map}.png");
 
     /// <summary>A surface's grain, a multiplier around one; the engine hands out one copy per file.</summary>
     public static Texture2D Grain(Surface surface) => GD.Load<Texture2D>($"res://assets/models/surfaces/{surface.ToString().ToLowerInvariant()}_grain.exr");
@@ -275,10 +278,14 @@ public static class ModelKit {
         for (int i = 0; i < count; i++) BuildShaders(node.GetChild(i));
     }
 
-    public static void SetOverride(Node node, Material? material) {
+    /// <summary>
+    /// Lays a material over every mesh under a node, or takes it off with null.
+    /// Unless <paramref name="shadows"/> is set, a mesh it is laid over stops casting a shadow, as a placement ghost should.
+    /// </summary>
+    public static void SetOverride(Node node, Material? material, bool shadows = false) {
         if (node is GeometryInstance3D geometry) geometry.MaterialOverlay = material;
-        if (node is MeshInstance3D mesh && material != null) mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        if (!shadows && node is MeshInstance3D mesh && material != null) mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         int count = node.GetChildCount();
-        for (int i = 0; i < count; i++) SetOverride(node.GetChild(i), material);
+        for (int i = 0; i < count; i++) SetOverride(node.GetChild(i), material, shadows);
     }
 }

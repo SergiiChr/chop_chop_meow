@@ -34,6 +34,7 @@ public sealed partial class GameData {
         ["planks"] = new() { Name = "Wood planks", Color = "d2a26a" },
         ["wood_parts"] = new() { Name = "Wood parts", Color = "b98552" },
         ["stone"] = new() { Name = "Stone", Color = "aab2af" },
+        ["gravel"] = new() { Name = "Gravel", Color = "8f948f" },
         ["torch"] = new() { Name = "Torch", Color = "e8913a" },
         ["stone_chisel"] = new() { Name = "Stone chisel", Color = "9aa29f", Tool = "chisel" },
         ["iron_ore"] = new() { Name = "Iron ore", Color = "cc8a60" },
@@ -92,6 +93,7 @@ public sealed partial class GameData {
         [ThingKind.Cooktable] = new() { Name = "Cooking table", Cost = new() { ["steel_bar"] = 2, ["stone"] = 6, ["planks"] = 8 }, Description = "A steel grill over a firebox, with a mortar slot. Crushing berries and grinding wheat need the mortar and someone working it, and so does kneading dough, with no fire; jam and stew cook on their own over wood, coal or charcoal." },
         [ThingKind.Cannery] = new() { Name = "Canning station", Cost = new() { ["steel_bar"] = 2, ["planks"] = 8 }, Description = "Seals meat stew or jam into tin cans over a wood, coal or charcoal fire. Canned goods keep and sell for the most." },
         [ThingKind.Packer] = new() { Name = "Packing station", Cost = new() { ["planks"] = 8, ["wood"] = 4 }, Description = "Packs one chosen good into crates, one item at a time while someone works it. A full crate waits to be carried out." },
+        [ThingKind.GravelPath] = new() { Name = "Gravel path", Cost = new() { ["gravel"] = 4 }, Description = "One metre of path. Tiles join into paths and turns, and lie under buildings as well as beside them. You and your workers move 1.2 times faster on gravel." },
         [ThingKind.Signpost] = new() { Name = "Trading post", Cost = new() { ["wood"] = 10, ["stone"] = 4 }, Description = "Trade by cart. Hire and manage neighboring villagers." },
     };
     public Dictionary<string, SourceDef> Sources { get; } = new() {
@@ -140,6 +142,7 @@ public sealed partial class GameData {
         ["steel_shovel"] = new() { Name = "Steel shovel", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 2, ["wood_parts"] = 1 }, Output = "steel_shovel", Amount = 1, Seconds = 10 },
         ["steel_hammer"] = new() { Name = "Steel hammer", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 1, ["wood_parts"] = 1 }, Output = "steel_hammer", Amount = 1, Seconds = 10 },
         ["tin_can"] = new() { Name = "Tin cans", Group = RecipeGroup.Containers, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Tier = 2, Inputs = new() { ["tin_bar"] = 1 }, Output = "tin_can", Amount = 4, Seconds = 10 },
+        ["gravel"] = new() { Name = "Crush rocks", Group = RecipeGroup.Materials, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Tier = 2, Inputs = new() { ["stone"] = 1 }, Output = "gravel", Amount = 1, Seconds = 10 },
         ["steel_chisel"] = new() { Name = "Steel chisel", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 1, ["wood_parts"] = 1 }, Output = "steel_chisel", Amount = 1, Seconds = 10 },
         ["rake"] = new() { Name = "Rake", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 1, ["wood_parts"] = 2 }, Output = "rake", Amount = 1, Seconds = 10 },
         ["mortar"] = new() { Name = "Mortar and pestle", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = true, Tool = "chisel", Tier = 2, Inputs = new() { ["stone"] = 3 }, Output = "mortar", Amount = 1, Seconds = 10 },

@@ -66,6 +66,19 @@
             ALBEDO = mix(ALBEDO, texture(path_albedo, path_uv).rgb, worn);
             NORMAL_MAP = mix(NORMAL_MAP, texture(path_normal, path_uv).rgb, worn);
         }
+        // Gravel paths lie over all of that. Stones that stand higher reach a little past the edge and lower ones stop
+        // short of it, so the edge is made of stones.
+        float graveled = texture(gravel, (v_vertex.xz + 0.5) / 216.0).r;
+        if (graveled > 0.4) {
+            vec2 gravel_uv = scan_parallax(gravel_scan_height, v_vertex.xz / gravel_scan_tile, view,
+                scan_relief / gravel_scan_tile);
+            float edge = graveled + (texture(gravel_scan_height, gravel_uv).r - 0.5) * 0.06;
+            float soft = max(fwidth(graveled), 0.01);
+            float laid = smoothstep(0.5 - soft, 0.5 + soft, edge);
+            ALBEDO = mix(ALBEDO, texture(gravel_scan_albedo, gravel_uv).rgb, laid);
+            NORMAL_MAP = mix(NORMAL_MAP, texture(gravel_scan_normal, gravel_uv).rgb, laid);
+            wear = max(wear, laid);
+        }
         // Scenery shrinks away on worn ground, and its shade with it.
         float scenery = texture(shade, v_vertex.xz / 216.0).r;
         vec2 objectShade = texture(contact, v_vertex.xz / 216.0).rg;

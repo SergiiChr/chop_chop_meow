@@ -268,6 +268,8 @@ public sealed class SaveState {
     public byte[] Explored { get; set; }
     /// <summary>Things as last seen, kept so the fog shows them unchanged until the player looks again.</summary>
     public Dictionary<int, Thing> Remembered { get; set; } = new();
+    /// <summary>Every tile with a gravel path laid on it, as its place in the map's rows, <c>y * Terrain.Size + x</c>.</summary>
+    public List<int> GravelPaths { get; set; } = new();
 }
 
 /// <summary>Authoritative simulation, independent of rendering and UI; the host runs it for every player.</summary>
@@ -318,7 +320,7 @@ public sealed partial class World {
     public World(GameData data, bool generate = true) {
         Data = data;
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
-        WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); Construction = new Construction(this);
+        WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); Construction = new Construction(this); GravelPaths = new GravelPaths(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
     }
@@ -328,6 +330,8 @@ public sealed partial class World {
     public Vector2 Player { get => new(S.PlayerX, S.PlayerY); set { S.PlayerX = value.X; S.PlayerY = value.Y; } }
     /// <summary>Putting buildings, yards and crates up and taking buildings down.</summary>
     public Construction Construction { get; }
+    /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
+    public GravelPaths GravelPaths { get; }
     /// <summary>Cabin doors: stepping in and out, the queue at the door and knocking.</summary>
     public Doorways Doorways { get; }
     /// <summary>Wolves tugging players back out of cabin doorways.</summary>
@@ -557,7 +561,7 @@ public sealed partial class World {
         return true;
     }
     /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their spurs.</summary>
-    private static bool Open(Vector2 p) {
+    internal static bool Open(Vector2 p) {
         if (!Terrain.Open(p)) return false;
         foreach (var c in Cliffs) if (c.DistanceTo(p) < Cliff.Depth) return false;
         return !InSpur(p);
@@ -1693,7 +1697,8 @@ public sealed partial class World {
         float distance = w.Pos.DistanceTo(destination);
         if (distance < reach) return true;
         // Stop at arrival range rather than overshooting into the target's footprint, where the step would be refused.
-        if (Travel(w, destination, Math.Min(dt * WorkerSpeed, distance - reach + .05f), dt * WorkerSpeed)) return false;
+        float step = dt * WorkerSpeed * GravelPaths.SpeedAt(w.Pos);
+        if (Travel(w, destination, Math.Min(step, distance - reach + .05f), step)) return false;
         if (distance < WalkReach) return true;
         w.Status = "Path blocked · clear a route"; w.WorkState = WorkerWorkState.Blocked;
         return false;
@@ -2291,7 +2296,7 @@ public sealed partial class World {
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
         if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Obtained == null || loaded.Prices == null
-            || loaded.Remembered == null || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
+            || loaded.Remembered == null || loaded.GravelPaths == null || loaded.GravelPaths.Exists(tile => (uint)tile >= Terrain.Size * Terrain.Size) || loaded.GravelPaths.Distinct().Count() != loaded.GravelPaths.Count || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
             throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Players = new();
         // Until its machines join, the save's world runs as the player no machine has claimed, else the first.

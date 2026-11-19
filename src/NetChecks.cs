@@ -21,6 +21,9 @@ public partial class Game {
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 
+    /// <summary>The path tile the host lays before the guest joins, and the tile corner to corner with it that the guest lays.</summary>
+    private static readonly Vector2I NetPath = GravelPaths.TileAt(Terrain.Spawn + new Vector2(3, -2)), NetLaid = NetPath + new Vector2I(1, -1);
+
     private async Task HostNetCheck() {
         await Frames(4);
         await Click(FindButton(startMenu.Screen, "New game")!);
@@ -31,6 +34,7 @@ public partial class Game {
         Hosted.Add(ThingKind.LooseCoal, NetOre, 2); Hosted.Add(ThingKind.LooseCoal, NetCoal, 2);
         var chest = Hosted.Add(ThingKind.Chest, NetChest); var hut = Hosted.Add(ThingKind.Hut, NetHut);
         Hosted.Add(ThingKind.Anvil, NetAnvil).Inventory.Add("steel_bar", 20);
+        GravelPathSteps.LayPath(Hosted, NetPath);
         await KeyStroke(Key.Escape);
         await Seconds(.3f);
         float before = Hosted.Time;
@@ -60,6 +64,9 @@ public partial class Game {
         await Until(() => view.ShowsPlayer(Guest().Id), "the guest's figure appearing");
         await Until(() => view.OtherAnimation(Guest().Id) == ActorAction.Hammer, "the host seeing the guest hammer at the anvil beside it");
         Signal("saw-hammering");
+        await Until(() => !Hosted.GravelPaths.Laid(NetPath) && Hosted.GravelPaths.Laid(NetLaid), "the guest taking up the host's path tile and laying it beside where it was", 90);
+        await Until(() => world.GravelPaths.Laid(NetLaid) && !world.GravelPaths.Laid(NetPath), "the host's window showing the tile the guest laid");
+        Require(world.Backpack["gravel"] == 0, "Gravel from a tile the guest takes up must not reach the host's backpack.");
         await Until(() => chest.Inventory["coal"] == 2 && Guest().Backpack["coal"] == 2, "the guest storing the first loose coal and gathering the second", 90);
         Require(world.Backpack["coal"] == 0, "What the guest gathers must not reach the host's backpack.");
         await Until(() => Guest().Sheltered == hut.Id, "the guest walking into the cabin with one click");
@@ -140,6 +147,17 @@ public partial class Game {
         await Until(() => view.ShowsPlayer(hostId), "the host's figure appearing");
         await Until(() => view.OtherAnimation(hostId) == ActorAction.Hammer, "the guest seeing the host hammer at the anvil beside it");
         await Signaled("saw-hammering");
+
+        // The host's gravel path comes up for the guest's remove selector, and goes down again where the guest lays it.
+        Require(world.GravelPaths.Laid(NetPath), "Joining must bring the host's gravel path into the guest's world.");
+        await KeyStroke(Key.B); await Click(Named("remove")!);
+        await Click(view.Screen(NetPath));
+        await Until(() => !world.GravelPaths.Laid(NetPath) && world.Backpack["gravel"] == 4, "the host taking up the path tile the guest clicked with the remove selector");
+        await KeyStroke(Key.Escape);
+        await KeyStroke(Key.B); await PickUp(Named("build_gravel_path")!);
+        await Click(view.Screen(NetLaid));
+        await Until(() => world.GravelPaths.Laid(NetLaid) && world.Backpack["gravel"] == 0, "the host laying the path tile the guest placed");
+        await CloseWithEsc();
 
         await RightClick(NetOre);
         await Until(() => world.Backpack["coal"] == 2 && world.Things.All(t => t.Pos != NetOre), "the host handing over the loose coal the guest walked to");

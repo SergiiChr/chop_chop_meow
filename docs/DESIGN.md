@@ -18,6 +18,15 @@ These came from the user; change them only after asking.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
 - **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, shovel for stumps and bushes, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they go to another spot of the job that they can work, loose pieces last, or wait and say so once.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
+- **Gravel paths:** a steel hammer at the bench crushes 1 stone into 1 gravel in 10 base seconds, and a path tile, one
+  metre square, costs 4 gravel. Players, walking or sprinting, and workers move 1.2 times as fast where gravel is drawn,
+  and workers keep their routes. Tiles join as the user's sketch shows: round ends, strips between neighbours, a slanted
+  strip between two tiles corner to corner, a turn through the tile between them, and a square of four filled. A tile
+  goes under buildings and buildings over tiles, but not on a standing tree, boulder, deposit, berry bush or leaf patch.
+  A tile cannot be clicked in normal play.
+- **Taking down:** the red cross in the build menu gives the remove selector: a building or path tile in reach turns red
+  under the mouse and one click takes it down, with no question; it stays on until Esc or a right click. Building pages
+  have no take-down button.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
 - **Wolves:** the same every night, never stronger or faster with the days; three or four bites bring a healthy player to half health. After the five let out at dusk, one den picked at random lets one more out every hour.
@@ -65,6 +74,9 @@ Simulation and data:
 | `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings, yards and crates up and taking buildings down: where a plan snaps to, why it cannot go somewhere, what it costs and what comes back |
+| `src/buildings/model/Removal.cs` | `Removal`, what the remove selector points at: a building or a gravel path tile |
+| `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
+| `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
@@ -151,7 +163,7 @@ UI and input:
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
-| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, clicking things, E and Space, and `ClickMode`, what the next click does |
+| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things, E and Space, and `ClickMode`, what the next click does |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
@@ -163,6 +175,8 @@ Rendering and sound:
 | `src/terrain/display/TerrainView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
+| `src/paths/display/GravelPathView.cs` | Laid gravel paths as the ground draws them: the map of how far each spot is from the gravel's edge |
+| `src/paths/display/GravelPathShape.cs` | One gravel path tile as a model, for the plan's icon and its ghost while placing |
 | `src/WorldLook.cs`, `src/Wind.cs` | The sound listener and the wind |
 | `src/terrain/display/FootpathWear.cs` | Footpaths worn where the player and workers walk, and their growing back |
 | `src/actors/display/Footsteps.cs` | Which footstep sound the ground gives at a spot |
@@ -481,6 +495,7 @@ Wolves patrol on through a slept night, and one that starts scratching at an unl
 #### Sprinting
 
 Holding Shift while moving sprints at `SprintSpeed` times the walking speed (`PlayerState.Sprinting`, sent by guests with their walk).
+On a gravel path either is `GravelSpeed` times as fast ([Gravel paths](#gravel-paths)).
 Hunger and thirst drain `SprintDrain` times as fast meanwhile.
 Under 15% food or drink (`GameData.LowNeed`) the player cannot sprint and the screen edges pulse red.
 As food falls under 20% (`GameData.GrowlBelow`), and with every further 5% gone (`GameData.GrowlEvery`), `stomach_growl` plays at the player.
@@ -657,7 +672,7 @@ Tier 1 is unused, since there are no iron tools.
 
 `World.BestTool` picks the fastest carried tool at or above a tier.
 Recipes name the tool they need, the lowest `Tier` that will do, and whether they can be made by hand (`Hand`).
-So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
+So a steel chisel does everything a stone chisel does, faster, while tin cans and gravel need a steel hammer and the mortar a steel chisel.
 
 `GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for boulders and deposits, a shovel for stumps and bushes), one that only speeds gathering up (a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
 A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf patches.
@@ -763,7 +778,50 @@ Once an active crew has the forge hot, it never falls below the bar while they a
 
 `Construction.Dismantle` removes a building in reach and puts its cost, a supplied mine's materials and everything its boxes hold into the backpack, and the rest into a recovery box where it stood.
 `Construction.DismantleBlock` keeps up a cabin someone shelters in and a trading post with a cart out.
-The red trash can on `ThingPage`'s header turns into "Remove?" on the first click and dismantles on the second.
+
+The build menu's last cell (`PlansPanel`, named `remove`) sets `ClickMode.Remove`, the remove selector.
+`Construction.RemovalAt` says what it points at, a `Removal`: the building picked under the mouse, else the gravel path
+tile whose gravel the mouse is on (`GravelPaths.TileUnder`).
+While that is in reach (`Construction.InReach`, the reach `Dismantle` and `GravelPaths.TakeUp` ask for),
+`WorldView.MarkRemoval` lays a red material over the building's model, or a red pad on the tile.
+A click runs `Construction.Remove` at once and the selector stays; Esc or a right click sets `ClickMode.Normal`.
+
+### Gravel paths
+
+A bench recipe (`gravel`, a hammer of tier 2, not by hand) crushes 1 stone into 1 gravel.
+The gravel path is a building plan (`ThingKind.GravelPath`, 4 gravel) but never a thing: `Construction.Build` hands it
+to `World.GravelPaths` (`src/paths/GravelPaths.cs`), which keeps the laid tiles.
+A tile is a map tile, centred on whole coordinates like a building, saved as its place in the map's rows in
+`SaveState.GravelPaths`.
+`GravelPaths` keeps one flag a tile beside that list and brings the flags in step whenever another list takes its place:
+a new game, a load, or a guest's update of the shared state.
+`GravelPaths.Revision` moves only when the tiles change.
+
+- `GravelPaths.Block` refuses a tile only on water or cliffs, on a tile already laid, on a tile where a resource with
+  something left stands (not a loose piece, a stump or a plain bush), out of the 5 tiles a building may be placed in,
+  and without the gravel. Buildings and yards do not count either way, and `Construction.PlacementBlock` never looks at
+  tiles.
+- `GravelPaths.Lay` clears a stump or plain bush off the tile (`World.ClearTile`).
+- `GravelPaths.TakeUp` (`Verb.TakeUpPath`) gives the cost back through `Construction.GiveBack`, which `Dismantle` also
+  uses: into the backpack, the rest into a recovery box.
+
+`GravelOutline.Distance` is the one definition of where gravel lies: within `GravelOutline.HalfWidth` (0.375 m) of the
+paths' middle lines.
+Those are each laid tile's middle, a line between the middles of tiles side by side, and a line between two tiles corner
+to corner when neither tile between them is laid; four tiles in a square count whole.
+`GravelPaths.Covers` reads it for the simulation and `GravelPathView` for the picture, so walkers are faster exactly
+where gravel is drawn.
+Workers step `GameData.GravelSpeed` (1.2) times as far in `World.Walk` when they stand on gravel, and
+`PlayerControl.Walk` moves the player the same way; routes are found as before.
+Data validation keeps `GravelSpeed` below `WolfChase`, so a walk on gravel never outpaces a chasing wolf.
+
+`GravelPathView` (`src/paths/display/GravelPathView.cs`) keeps a map of 8 texels a tile holding how far inside the
+gravel's edge each spot is, a half at the edge.
+It redraws only the tiles within two of one laid or taken up, when `Revision` moves.
+The terrain shader draws the gravel photoscan where the map passes a half, with stones that stand higher reaching a
+little further, and the plants' shader shrinks plants there to nothing.
+The scan is the models' `Scan.Gravel` at the same size, so the gravel heap, the plan's ghost (`GravelPathShape`) and the
+ground match.
 
 ### Storage, filters and automation
 
@@ -1085,7 +1143,7 @@ A sound within a metre of the player plays with no place too, so a long one such
 Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
-- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
+- The view plays sounds tied to animation timing: footsteps by ground type (`Footsteps.Sound`: gravel paths, water, rock, grass), axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
 A tree felled in sight takes 1 second to reach the ground when it is among the shortest and 2.1 when among the tallest (`WorldView.FallSeconds`).

@@ -14,6 +14,8 @@ public abstract record ClickMode {
     public sealed record Crate(string Item) : ClickMode;
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
+    /// <summary>The remove selector: a click takes down the building or gravel path tile under it, and the next click the next one.</summary>
+    public sealed record Remove : ClickMode;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
     public ThingKind? Placing => this switch { Build build => build.Kind, Crate => ThingKind.Crate, _ => null };
@@ -148,7 +150,7 @@ public sealed class PlayerControl {
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
         var step = momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
         world.Me.Braking = momentum.Braking;
-        var move = step * dt * world.Data.MoveSpeed(world.Me.Sprinting);
+        var move = step * dt * world.Data.MoveSpeed(world.Me.Sprinting) * world.GravelPaths.SpeedAt(world.Player);
         // Walking to a cabin's door, the last step stops on it rather than past it, however long the frame.
         if (entering != null) move = world.Doorways.StepToDoor(entering, move);
         world.MovePlayer(move); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
@@ -180,6 +182,8 @@ public sealed class PlayerControl {
     }
 
     private void RightPress(Vector2 at) {
+        // A right click puts the remove selector away.
+        if (Mode is ClickMode.Remove) { Mode = new ClickMode.Normal(); return; }
         // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         var t = view.Pick(at);
@@ -198,6 +202,7 @@ public sealed class PlayerControl {
             return;
         }
         if (Mode.Placing != null) { Place(view.ToWorld(at).Round()); return; }
+        if (Mode is ClickMode.Remove) { world.Construction.Remove(RemovalAt(t, at)); return; }
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
         var w = view.PickWorker(at);
         if (w != null) panel.Select(w);
@@ -205,6 +210,9 @@ public sealed class PlayerControl {
         else if (hotbar.ActiveItem() is string selected && hotbar.HasUse(selected)) hotbar.UseSelected(view.ToWorld(at));
         else panel.Close();
     }
+
+    /// <summary>What the remove selector points at with <paramref name="picked"/> under the mouse at a screen point, or nothing while the selector is away.</summary>
+    public Removal RemovalAt(Thing? picked, Vector2 at) => Mode is ClickMode.Remove ? world.Construction.RemovalAt(picked, view.ToWorld(at)) : Removal.None;
 
     private void AssignGather(ClickMode.Assign assign, Thing? t) {
         var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);

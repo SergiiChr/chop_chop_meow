@@ -90,6 +90,7 @@ public static class SimulationChecks {
         Test(CheckSprintBurnsFood, data);
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
         CabinChecks.Run(data);
+        GravelPathChecks.Run(data);
         Test(CheckPressingTheOppositeWayBrakesBeforeRunningBack, data);
         DoorTugChecks.Run(data);
         DoorCheckChecks.Run(data);

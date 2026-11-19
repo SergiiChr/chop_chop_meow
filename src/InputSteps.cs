@@ -58,6 +58,13 @@ public partial class Game {
         await Frames();
     }
 
+    /// <summary>Moves the mouse onto a point of the world on screen.</summary>
+    private async Task Hover(Vector2 point) {
+        var at = GetViewport().GetFinalTransform() * point;
+        Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
+        await Frames();
+    }
+
     /// <summary>Opens an option button with a click and picks an item with the arrow keys and Enter.</summary>
     private async Task Choose(OptionButton picker, int index) {
         await Click(picker);

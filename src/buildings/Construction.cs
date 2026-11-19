@@ -14,9 +14,10 @@ public sealed class Construction(World world) {
     public static bool IsZone(ThingKind kind) => kind is ThingKind.Pile or ThingKind.Farm;
     private static readonly ThingKind[] Zones = { ThingKind.Pile, ThingKind.Farm };
     public const float ZoneSize = 3;
-    /// <summary>Snaps a mine to its cliff and a yard to the grid of the nearest yard close enough to touch it.</summary>
+    /// <summary>Snaps a mine to its cliff, a yard to the grid of the nearest yard close enough to touch it and a gravel path to the middle of its tile.</summary>
     public Vector2 Snap(ThingKind kind, Vector2 p) {
         if (kind == ThingKind.Mine) return World.SnapMine(p);
+        if (kind == ThingKind.GravelPath) return GravelPaths.TileAt(p);
         if (!IsZone(kind) || world.Nearest(Zones, p) is not Thing near || near.Pos.DistanceTo(p) > ZoneSize * 1.6f) return p;
         return near.Pos + ((p - near.Pos) / ZoneSize).Round() * ZoneSize;
     }
@@ -30,6 +31,7 @@ public sealed class Construction(World world) {
         if (world.S.Sheltered != 0) return "Leave the cabin first.";
         if (WolfPatrols.NearDen(p, Den.Clearance)) return "Leave the wolf den's mouth clear.";
         if (kind == ThingKind.Mine) return world.MineBlock(p);
+        if (kind == ThingKind.GravelPath) return world.GravelPaths.Block(p);
         if (IsZone(kind)) return ZoneBlock(kind, p);
         if (world.Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
         if (world.Player.DistanceTo(p) < 1.2f || Terrain.Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
@@ -64,15 +66,18 @@ public sealed class Construction(World world) {
         }
         return world.S.Backpack.Has(world.Data.Buildings[kind].Cost) ? null : "Missing materials in your backpack.";
     }
+    /// <summary>Builds what <see cref="PlacementBlock"/> allows and returns it; a gravel path tile is laid and is no thing, so it returns null as a refusal does.</summary>
     public Thing? Build(ThingKind kind, Vector2 p) {
         p = Snap(kind, p);
         var blocked = PlacementBlock(kind, p);
         if (blocked != null) { world.Say(blocked); return null; }
         if (world.Busy() || world.Forwarded(Verb.Build, item: kind.Id(), at: p)) return null;
         world.S.Backpack.Spend(world.Data.Buildings[kind].Cost);
+        world.S.Milestones.Add(kind.Id());
+        if (kind == ThingKind.GravelPath) { world.GravelPaths.Lay(GravelPaths.TileAt(p)); world.Play("place_building", p); return null; }
         var t = world.Add(kind, p); world.ClearGround(t); world.Play("place_building", p);
         if (kind == ThingKind.Campfire) { t.Burn = world.Data.CampfireSeconds; world.Play("start_fire", p); }
-        world.S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { world.Say($"Marked the {World.MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); world.Made?.Invoke(world.S.Actor.Id, t.Id); }
+        if (kind == ThingKind.Mine) { world.Say($"Marked the {World.MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); world.Made?.Invoke(world.S.Actor.Id, t.Id); }
         return t;
     }
     /// <summary>Why a building cannot come down now, or null: someone shelters in it, or a cart is out from it.</summary>
@@ -99,14 +104,32 @@ public sealed class Construction(World world) {
         foreach (var box in World.Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
         world.S.Things.Remove(t); world.Play("take_down_building", t.Pos);
         if (t.Kind == ThingKind.Toolstation) world.ToolsChanged();
+        world.Say((GiveBack(back, t.Pos) ? $"The {world.Lower(def.Name)} is down. Everything is back in your backpack." : $"The {world.Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
+        return true;
+    }
+    /// <summary>
+    /// What the remove selector points at on the ground at <paramref name="at"/> with <paramref name="picked"/> under the
+    /// pointer: that thing when it is a building, else the gravel path tile whose gravel the point is on.
+    /// </summary>
+    public Removal RemovalAt(Thing? picked, Vector2 at) {
+        if (picked != null && world.Find(picked.Id) is Thing building && world.Data.Buildings.ContainsKey(building.Kind)) return new Removal(building.Id, null);
+        return world.GravelPaths.TileUnder(at) is Vector2I tile ? new Removal(0, tile) : Removal.None;
+    }
+    /// <summary>Whether what the remove selector points at is within the acting player's reach.</summary>
+    public bool InReach(Removal removal) =>
+        world.Find(removal.Thing) is Thing building ? world.Reaches(building) : removal.Tile is Vector2I tile && world.GravelPaths.TakeUpBlock(tile) == null;
+    /// <summary>Takes down what the remove selector points at, at once: a building as <see cref="Dismantle"/> does, a gravel path tile as <see cref="GravelPaths.TakeUp"/>.</summary>
+    public bool Remove(Removal removal) =>
+        world.Find(removal.Thing) is Thing building ? Dismantle(building) : removal.Tile is Vector2I tile && world.GravelPaths.TakeUp(tile);
+    /// <summary>Puts items into the acting player's backpack and what does not fit into a recovery box at <paramref name="at"/>; true when all of it fitted.</summary>
+    internal bool GiveBack(Dictionary<string, int> items, Vector2 at) {
         Inventory? rest = null;
-        foreach (var (item, amount) in back) {
+        foreach (var (item, amount) in items) {
             int left = amount - world.S.Backpack.Add(item, amount);
             if (left <= 0) continue;
-            if (rest == null) { rest = world.Add(ThingKind.Grave, t.Pos).Inventory; rest.Slots = 0; }
+            if (rest == null) { rest = world.Add(ThingKind.Grave, at).Inventory; rest.Slots = 0; }
             rest.Slots += (left + rest.StackOf(item) - 1) / rest.StackOf(item); rest.Add(item, left);
         }
-        world.Say((rest == null ? $"The {world.Lower(def.Name)} is down. Everything is back in your backpack." : $"The {world.Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
-        return true;
+        return rest == null;
     }
 }

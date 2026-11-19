@@ -13,6 +13,8 @@ public partial class WorldView : Node3D {
     public World World = null!;
     public Selection Selection;
     public int Hover;
+    /// <summary>What the remove selector points at, which shows red when it is in reach.</summary>
+    public Removal Removal;
     public int HoverWorker;
     /// <summary>The building being placed, or a packed crate, or null when not placing.</summary>
     public ThingKind? Placing;
@@ -88,7 +90,9 @@ public partial class WorldView : Node3D {
     /// <summary>Build-mode ghosts by building kind, made hidden while loading; mines have one per cliff ore instead.</summary>
     private readonly Dictionary<ThingKind, Prop> ghosts = new(), mineGhosts = new();
     private Prop? ghost;
-    private MeshInstance3D selectRing = null!, hoverRing = null!, workerRing = null!, playerRing = null!, placeTile = null!;
+    private MeshInstance3D selectRing = null!, hoverRing = null!, workerRing = null!, playerRing = null!, placeTile = null!, removeTile = null!;
+    /// <summary>The building the remove selector has turned red.</summary>
+    private int removeShown;
     private float pulseRemaining;
     private ActorAction pulseAction;
     private Vector2 pulseTarget;
@@ -98,6 +102,8 @@ public partial class WorldView : Node3D {
     private readonly Font font = ThemeDB.FallbackFont;
     private static readonly StandardMaterial3D GhostValid = Flat(new Color(.55f, .95f, .45f, .45f));
     private static readonly StandardMaterial3D GhostBlocked = Flat(new Color(1, .35f, .3f, .5f));
+    /// <summary>The red laid over what the remove selector is about to take down.</summary>
+    private static readonly StandardMaterial3D RemoveTint = Flat(new Color(1, .12f, .08f, .55f));
     private static readonly StandardMaterial3D NightGlass = Mat("ffd58a", .3f, 0, 1.6f);
     private static readonly StandardMaterial3D Sparks = Flat(new Color("ffd27a"));
     private static readonly StandardMaterial3D GatherDust = Flat(new Color(.8f, .78f, .7f, .45f));
@@ -212,6 +218,10 @@ public partial class WorldView : Node3D {
         playerRing = Ring(new Color(.95f, .88f, .57f, .6f));
         placeTile = Add(scene, new PlaneMesh { Size = new Vector2(1.4f, 1.4f) }, GhostValid, Vector3.Zero);
         placeTile.Visible = false;
+        removeTile = Add(scene, GravelPathShape.Tile, RemoveTint, Vector3.Zero);
+        removeTile.Visible = false;
+        // Drawn once over every model with the rest of the warm stage, so the first building to turn red builds nothing.
+        SetOverride(warmStage, RemoveTint, shadows: true);
         player.Position = World.Player;
         overlay = new Overlay { Paint = PaintOverlay }; AddChild(overlay);
         World.PlayerActed += PlayerActed;
@@ -1434,6 +1444,7 @@ public partial class WorldView : Node3D {
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
+        MarkRemoval();
         placeTile.Visible = Placing != null;
         var kind = Placing.GetValueOrDefault();
         var at = Placing == null ? Vector2.Zero : World.Construction.Snap(kind, ToWorld(Mouse).Round());
@@ -1464,6 +1475,22 @@ public partial class WorldView : Node3D {
         foreach (var kind in World.Data.Buildings.Keys) if (kind != ThingKind.Mine) ghosts[kind] = Ghost(kind, Vector2.Zero);
         ghosts[ThingKind.Crate] = Ghost(ThingKind.Crate, Vector2.Zero);
         foreach (var ore in World.MineOres) mineGhosts[ore] = Ghost(ThingKind.Mine, World.MineSpot(World.CliffOf(ore)));
+    }
+
+    /// <summary>What the remove selector has turned red: the building or gravel path tile it points at, while that is in reach.</summary>
+    public Removal RemovalShown => new(removeShown, removeTile.Visible ? Removal.Tile : null);
+
+    /// <summary>Turns the building or gravel path tile the remove selector points at red, while it is in reach.</summary>
+    private void MarkRemoval() {
+        bool reached = World.Construction.InReach(Removal);
+        int building = reached ? Removal.Thing : 0;
+        if (building != removeShown) {
+            if (props.TryGetValue(removeShown, out var was)) SetOverride(was.Root, null, shadows: true);
+            if (props.TryGetValue(building, out var now)) SetOverride(now.Root, RemoveTint, shadows: true);
+            removeShown = building;
+        }
+        removeTile.Visible = reached && Removal.Tile != null;
+        if (removeTile.Visible) removeTile.Position = To3(Removal.Tile!.Value, .01f);
     }
 
     private void Mark(MeshInstance3D ring, Thing? t, float lift) {
