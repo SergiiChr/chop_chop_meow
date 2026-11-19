@@ -17,7 +17,7 @@ internal enum HandShape { Open, Fist, Point, Ring }
 internal sealed class Catgirl {
     public readonly ActorRig Rig;
     private readonly CatgirlOutfit outfit;
-    private readonly Node3D head, torso;
+    private readonly Node3D head, torso, chest;
     private readonly StandardMaterial3D skin = Mat(ActorRig.CatgirlSkin), locks;
     private readonly List<Node3D> tail = new(), lids = new(), tresses = new();
     private readonly Hand left, right;
@@ -35,7 +35,7 @@ internal sealed class Catgirl {
         };
         Rig = new ActorRig(ActorSkin.Catgirl, clothes: clothes);
         home = at;
-        head = Rig.Head; torso = Rig.Torso;
+        head = Rig.Head; torso = Rig.Torso; chest = Rig.Chest;
         locks = Mat(hair);
         // A smaller head on the same body makes her taller for her head, as a grown girl in a cartoon is.
         head.Scale = Vector3.One * .92f;
@@ -120,7 +120,7 @@ internal sealed class Catgirl {
         Sphere(joint, .027f, new Vector3(0, segment, 0), Mat("ffffff"), null, 8);
     }
 
-    /// <summary>What she wears over the body's own colours, hung on the torso.</summary>
+    /// <summary>What she wears over the body's own colours: what is above the waist rides on the chest, the rest on the torso under it.</summary>
     private void BuildOutfit() {
         StandardMaterial3D white = Cloth("f4f2ee");
         switch (outfit) {
@@ -130,14 +130,14 @@ internal sealed class Catgirl {
                     Cylinder(torso, .3f, .1f, .3f, new Vector3(0, -.03f, 0), black, sides: 16);
                     Cylinder(torso, .31f, .29f, .03f, new Vector3(0, -.185f, 0), white, sides: 16);
                     Box(torso, new Vector3(.2f, .25f, .012f), new Vector3(0, -.03f, .207f), white, new Vector3(-33.7f, 0, 0));
-                    Box(torso, new Vector3(.12f, .13f, .012f), new Vector3(0, .31f, .112f), white);
+                    Box(chest, new Vector3(.12f, .13f, .012f), new Vector3(0, .31f, .112f), white);
                     Cylinder(torso, .102f, .102f, .03f, new Vector3(0, .13f, 0), white, sides: 14);
                     foreach (float side in new[] { -1f, 1f }) {
                         Box(torso, new Vector3(.1f, .06f, .02f), new Vector3(side * .05f, .14f, -.1f), white, new Vector3(0, 0, side * 20));
-                        Sphere(torso, .06f, new Vector3(side * .155f, .44f, 0), black, null, 10);
-                        Box(torso, new Vector3(.03f, .022f, .012f), new Vector3(side * .02f, .5f, .07f), Cloth("c8372f"), new Vector3(0, 0, side * 18));
+                        Sphere(chest, .06f, new Vector3(side * .155f, .44f, 0), black, null, 10);
+                        Box(chest, new Vector3(.03f, .022f, .012f), new Vector3(side * .02f, .5f, .07f), Cloth("c8372f"), new Vector3(0, 0, side * 18));
                     }
-                    Cylinder(torso, .05f, .05f, .02f, new Vector3(0, .535f, 0), white);
+                    Cylinder(chest, .05f, .05f, .02f, new Vector3(0, .535f, 0), white);
                     // A frilled band over the crown, from ear to ear.
                     for (int frill = -2; frill <= 2; frill++) {
                         float angle = Mathf.DegToRad(frill * 25);
@@ -151,23 +151,25 @@ internal sealed class Catgirl {
                     Cylinder(torso, .27f, .1f, .25f, new Vector3(0, -.005f, 0), navy, sides: 18);
                     Cylinder(torso, .254f, .246f, .014f, new Vector3(0, -.1f, 0), white, sides: 18);
                     Cylinder(torso, .106f, .1f, .04f, new Vector3(0, .14f, 0), white, sides: 14);
-                    Box(torso, new Vector3(.2f, .12f, .012f), new Vector3(0, .44f, -.084f), navy);
+                    Box(chest, new Vector3(.2f, .12f, .012f), new Vector3(0, .44f, -.084f), navy);
                     foreach (float side in new[] { -1f, 1f }) {
-                        Box(torso, new Vector3(.075f, .016f, .15f), new Vector3(side * .09f, .503f, 0), navy, new Vector3(0, 0, -side * 22));
-                        Box(torso, new Vector3(.036f, .13f, .012f), new Vector3(side * .045f, .435f, .088f), navy, new Vector3(0, 0, side * 22));
-                        Box(torso, new Vector3(.022f, .07f, .012f), new Vector3(side * .016f, .315f, .116f), red, new Vector3(0, 0, side * 12));
+                        Box(chest, new Vector3(.075f, .016f, .15f), new Vector3(side * .09f, .503f, 0), navy, new Vector3(0, 0, -side * 22));
+                        Box(chest, new Vector3(.036f, .13f, .012f), new Vector3(side * .045f, .435f, .088f), navy, new Vector3(0, 0, side * 22));
+                        Box(chest, new Vector3(.022f, .07f, .012f), new Vector3(side * .016f, .315f, .116f), red, new Vector3(0, 0, side * 12));
                     }
-                    Box(torso, new Vector3(.04f, .04f, .02f), new Vector3(0, .37f, .118f), red);
+                    Box(chest, new Vector3(.04f, .04f, .02f), new Vector3(0, .37f, .118f), red);
                     break;
                 }
             default: {
                     StandardMaterial3D hoodie = Cloth("f0b63f"), trim = Cloth("d99f2b");
-                    // A hoodie several sizes too large, down to the thighs: its body, hem band, hood, pouch pocket and two cords.
-                    Cylinder(torso, .2f, .155f, .56f, new Vector3(0, .21f, 0), hoodie, sides: 14).Scale = new Vector3(1, 1, .78f);
+                    // A hoodie several sizes too large, down to the thighs: its body in two lengths that overlap at the waist, a hem
+                    // band, a hood, a pouch pocket and two cords.
+                    Cylinder(torso, .2f, .174f, .33f, new Vector3(0, .095f, 0), hoodie, sides: 14).Scale = new Vector3(1, 1, .78f);
+                    Cylinder(chest, .18f, .155f, .3f, new Vector3(0, .34f, 0), hoodie, sides: 14).Scale = new Vector3(1, 1, .78f);
                     Cylinder(torso, .205f, .2f, .05f, new Vector3(0, -.08f, 0), trim, sides: 14).Scale = new Vector3(1, 1, .78f);
-                    Sphere(torso, .1f, new Vector3(0, .5f, -.09f), hoodie, new Vector3(1.3f, .7f, .8f), 10);
+                    Sphere(chest, .1f, new Vector3(0, .5f, -.09f), hoodie, new Vector3(1.3f, .7f, .8f), 10);
                     Box(torso, new Vector3(.2f, .09f, .02f), new Vector3(0, .08f, .152f), trim);
-                    foreach (float side in new[] { -1f, 1f }) Limb(torso, .006f, .12f, new Vector3(side * .03f, .48f, .125f), white);
+                    foreach (float side in new[] { -1f, 1f }) Limb(chest, .006f, .12f, new Vector3(side * .03f, .48f, .125f), white);
                     break;
                 }
         }
@@ -177,10 +179,14 @@ internal sealed class Catgirl {
     public void Show(in DanceFrame frame, float time) {
         Rig.Show(frame.Pose, null, false);
         Rig.RollArm(true, frame.RollL); Rig.RollArm(false, frame.RollR);
+        Rig.BendChest(frame.Chest.X, frame.Chest.Y, frame.Chest.Z);
+        Rig.TiltHips(frame.HipTilt);
+        Rig.SplayLeg(true, frame.SplayL); Rig.SplayLeg(false, frame.SplayR);
         Rig.Root.Position = home + new Vector3(frame.Shift, 0, 0);
+        head.RotationDegrees += frame.Head;
         left.Shape = frame.HandL; right.Shape = frame.HandR;
-        // The head tips with the hips; the tail's tip and her tied hair trail behind the sway.
-        head.RotationDegrees += new Vector3(0, 0, 8 * frame.Swing);
+        left.Bend = frame.WristL; right.Bend = frame.WristR;
+        // The tail's tip and her tied hair trail behind the sway.
         for (int i = 0; i < tail.Count; i++) tail[i].RotationDegrees = new Vector3(TailCurl[i], 0, Mathf.Lerp(14 * frame.Swing, 38 * frame.Trail, i / (tail.Count - 1f)));
         foreach (var tress in tresses) tress.RotationDegrees = new Vector3(0, 0, -12 * frame.Trail);
         // A quick blink every few seconds.
@@ -191,14 +197,17 @@ internal sealed class Catgirl {
     /// <summary>A hand on the end of a forearm: a palm, four fingers of two joints each and a thumb.</summary>
     private sealed class Hand {
         private readonly Node3D[] fingers = new Node3D[4], tips = new Node3D[4];
-        private readonly Node3D thumb;
+        private readonly Node3D thumb, wrist;
         /// <summary>Which way the fingers curl: toward the body, which is -X for the left hand.</summary>
         private readonly float inward;
         private HandShape shape = HandShape.Open;
 
         public Hand(ActorRig rig, bool isLeft, Material skin) {
             inward = isLeft ? -1 : 1;
-            var root = new Node3D(); rig.Hold(root, right: !isLeft);
+            // The wrist is where the forearm ends, a little above where a fist would be.
+            wrist = new Node3D(); rig.Hold(wrist, right: !isLeft);
+            wrist.Position += new Vector3(0, .05f, 0);
+            var root = Pivot(wrist, new Vector3(0, -.05f, 0));
             // The palm runs from the wrist down past where a fist would be; the index finger is the one next to the thumb, ahead.
             Box(root, new Vector3(.018f, .07f, .05f), new Vector3(0, .015f, 0), skin);
             for (int i = 0; i < fingers.Length; i++) {
@@ -211,6 +220,9 @@ internal sealed class Catgirl {
             Box(thumb, new Vector3(.013f, .036f, .013f), new Vector3(0, -.014f, .008f), skin, new Vector3(-38, 0, 0));
             Curl();
         }
+
+        /// <summary>Degrees the hand bends toward its palm at the wrist; negative bends it back.</summary>
+        public float Bend { set => wrist.RotationDegrees = new Vector3(0, 0, value * inward); }
 
         public HandShape Shape {
             set {

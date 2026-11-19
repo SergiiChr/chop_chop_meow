@@ -47,10 +47,14 @@ internal static class HumanShape {
         new(.13f,.115f,.08f,Neutral),new(.08f,.145f,.096f,Neutral),
         new(.02f,.152f,.094f,Neutral),new(-.015f,.148f,.088f,Neutral)
     };
-    private static readonly Ring[] slimTorso = {
+    // The slim torso is two pieces that overlap at the waist, so the chest can turn on the belly.
+    private static readonly Ring[] slimChest = {
         new(.54f,.042f,.04f,Neutral),new(.5f,.09f,.06f,Neutral),
         new(.44f,.142f,.078f,Neutral),new(.37f,.132f,.098f,Neutral,.014f),
-        new(.31f,.112f,.08f,Neutral),new(.21f,.094f,.068f,Neutral),new(.13f,.112f,.078f,Neutral),new(.105f,.118f,.08f,Neutral)
+        new(.31f,.112f,.08f,Neutral),new(.21f,.092f,.066f,Neutral),new(.16f,.088f,.064f,Neutral)
+    };
+    private static readonly Ring[] slimBelly = {
+        new(.27f,.1f,.072f,Neutral),new(.21f,.096f,.07f,Neutral),new(.13f,.112f,.078f,Neutral),new(.105f,.118f,.08f,Neutral)
     };
     private static readonly Ring[] slimLeg = Thinned(leg, .8f), slimLeftArm = Wrist(Thinned(leftArm, .7f)), slimRightArm = Wrist(Thinned(rightArm, .7f));
 
@@ -63,9 +67,11 @@ internal static class HumanShape {
         return rings.ToArray();
     }
 
-    public static void Torso(Node3D parent, string shirt, string trousers, bool slim = false) {
+    /// <param name="chest">Where the chest goes: the torso itself, or in the slim build the part of it that turns at the waist.</param>
+    public static void Torso(Node3D parent, Node3D chest, string shirt, string trousers, bool slim = false) {
         ActorShape.Add(parent, slim ? slimHips : hips, material: ModelKit.Cloth(trousers)).Name = "HumanHips";
-        ActorShape.Add(parent, slim ? slimTorso : torso, material: ModelKit.Cloth(shirt)).Name = "HumanTorso";
+        if (slim) ActorShape.Add(parent, slimBelly, material: ModelKit.Cloth(shirt)).Name = "HumanBelly";
+        ActorShape.Add(chest, slim ? slimChest : torso, material: ModelKit.Cloth(shirt)).Name = "HumanTorso";
     }
     /// <param name="bare">Whether the leg is bare skin of the colour given as trousers, which takes no weave.</param>
     public static Skeleton3D Leg(Node3D parent, float joint, float ankle, string trousers, string boots, bool slim = false, bool bare = false) {

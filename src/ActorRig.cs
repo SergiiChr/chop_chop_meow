@@ -23,7 +23,7 @@ public sealed class ActorRig {
     public const float ShoulderOut = .17f, ShoulderUp = .45f, UpperArm = .28f, Forearm = .27f;
     /// <summary>How far ahead of the forearm's line a held thing sits in the fist, in metres.</summary>
     public const float Palm = .01f;
-    private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
+    private readonly Node3D hips, torso, chest, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     /// <summary>The right fist's grip, which turns a held tool about its own length (<see cref="Pose.Grip"/>).</summary>
     private readonly Node3D wrist;
     private float grip;
@@ -39,6 +39,13 @@ public sealed class ActorRig {
     public readonly OmniLight3D TorchLight;
     /// <summary>The torso and head, for a film to dress and turn beyond what a <see cref="Pose"/> holds.</summary>
     public Node3D Torso => torso;
+    /// <summary>
+    /// What carries the head and arms: the torso itself, or on a catgirl the part of it above the waist, which
+    /// <see cref="BendChest"/> turns on the belly.
+    /// </summary>
+    public Node3D Chest => chest;
+    /// <summary>Where a catgirl's chest turns on her belly, from the hips.</summary>
+    private static readonly Vector3 Waist = new(0, .21f, 0);
     public Node3D Head => head;
     /// <summary>The player's backpack and its straps, which a film hides before the journey starts; null on other skins.</summary>
     public Node3D? Pack { get; private set; }
@@ -65,13 +72,14 @@ public sealed class ActorRig {
         (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, legs, boots, slim, bareLegs);
         (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, legs, boots, slim, bareLegs);
         torso = Pivot(hips, Vector3.Zero);
-        HumanShape.Torso(torso, shirt, clothes?.Hips ?? legs, slim);
-        Cylinder(torso, .055f * neck, .05f * neck, .08f, new Vector3(0, .54f, 0), Mat(skinTone));
-        head = Pivot(torso, new Vector3(0, .56f, 0));
+        chest = slim ? Pivot(torso, Vector3.Zero) : torso;
+        HumanShape.Torso(torso, chest, shirt, clothes?.Hips ?? legs, slim);
+        Cylinder(chest, .055f * neck, .05f * neck, .08f, new Vector3(0, .54f, 0), Mat(skinTone));
+        head = Pivot(chest, new Vector3(0, .56f, 0));
         Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(skinTone), new Vector3(.95f, 1.05f, 1), 16);
         Sphere(head, slim ? .011f : .023f, new Vector3(0, .12f, .115f), Mat(skinTone), new Vector3(.7f, 1, 1), 8);
-        shoulderL = Pivot(torso, new Vector3(shoulderOut, ShoulderUp, 0));
-        shoulderR = Pivot(torso, new Vector3(-shoulderOut, ShoulderUp, 0));
+        shoulderL = Pivot(chest, new Vector3(shoulderOut, ShoulderUp, 0));
+        shoulderR = Pivot(chest, new Vector3(-shoulderOut, ShoulderUp, 0));
         bool shortSleeves = skin == ActorSkin.Player || clothes is { LongSleeves: false };
         elbowL = Arm(shoulderL, shirt, skinTone, shortSleeves, slim);
         elbowR = Arm(shoulderR, shirt, skinTone, shortSleeves, slim);
@@ -227,7 +235,10 @@ public sealed class ActorRig {
     }
 
     /// <summary>Where a point on a forearm is from the rig's root, under the pose just shown.</summary>
-    private Vector3 FromForearm(bool left, Vector3 point) => hips.Transform * (torso.Transform * ((left ? shoulderL : shoulderR).Transform * ((left ? elbowL : elbowR).Transform * point)));
+    private Vector3 FromForearm(bool left, Vector3 point) {
+        var fromChest = (left ? shoulderL : shoulderR).Transform * ((left ? elbowL : elbowR).Transform * point);
+        return hips.Transform * (torso.Transform * (chest == torso ? fromChest : chest.Transform * fromChest));
+    }
 
     /// <summary>Where a fist is from the rig's root, under the pose just shown.</summary>
     public Vector3 Fist(bool left) => FromForearm(left, new Vector3(0, -Forearm, Palm));
@@ -257,6 +268,24 @@ public sealed class ActorRig {
     /// A <see cref="Pose"/> has no such turn, so an elbow folds only forward; with it a forearm can lie across the chest.
     /// </summary>
     public void RollArm(bool left, float degrees) => (left ? shoulderL : shoulderR).RotateObjectLocal(Vector3.Up, Mathf.DegToRad(degrees));
+
+    /// <summary>
+    /// Turns a catgirl's chest on her belly at the waist: a lean forward, a twist toward her left and a tip toward her
+    /// right shoulder, in degrees. It stays until set again.
+    /// </summary>
+    public void BendChest(float lean, float twist, float tip) {
+        var turn = Basis.FromEuler(new Vector3(Mathf.DegToRad(lean), Mathf.DegToRad(twist), Mathf.DegToRad(tip)));
+        chest.Transform = new Transform3D(turn, Waist - turn * Waist);
+    }
+
+    /// <summary>Tilts the hips with the legs and all above them, lifting the left hip by <paramref name="degrees"/>. It stays until set again.</summary>
+    public void TiltHips(float degrees) => hips.RotationDegrees = new Vector3(0, 0, degrees);
+
+    /// <summary>Tips one thigh out sideways from the body, on top of the pose just shown.</summary>
+    public void SplayLeg(bool left, float degrees) {
+        var leg = left ? legL : legR;
+        leg.Basis = new Basis(Vector3.Back, Mathf.DegToRad(left ? degrees : -degrees)) * leg.Basis;
+    }
 
     /// <summary>Puts something gripped at its origin into the right fist, or the left one.</summary>
     public void Hold(Node3D item, bool right = true) {

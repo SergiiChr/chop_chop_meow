@@ -1177,6 +1177,10 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   The two at the sides dance `CatgirlDance.Chorus` in step. The one in the middle dances `CatgirlDance.Solo`: a list
   of steps, each a place for either hand with a way for its elbow to point, blended and solved by `IntroPoses.Folding`
   every frame. The page's clock starts with the close-up of it.
+  The slim build has joints the game's people lack, each set on top of a shown pose: the chest turns on the belly at
+  the waist (`ActorRig.BendChest`), the hips tilt (`TiltHips`) and each thigh tips out on its own (`SplayLeg`).
+  `Catgirl` adds wrists that bend and a head that nods, turns and tilts. A step of the solo sets all of them, so her
+  weight goes onto one leg with the far hip lifted and the chest tipped back over it.
 - The paint filter is drawn over the frames wider than in the game (`WorldView.IntroPaintWidth`), since the movie tool
   shrinks them.
 - The camera is the game's own, switched to perspective and placed per shot at eye level. A dome around it draws the
