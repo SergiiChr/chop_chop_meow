@@ -70,17 +70,15 @@ internal static class WorldSteps {
     /// </summary>
     public static void StoreCrates(World world, Vector2 from, int count) {
         var stood = world.Player;
-        Thing? chest = null;
-        for (int i = 0; i < count; i++) {
-            if (i % 5 == 0) {
-                var at = from + new Vector2(i / 5 * 2, 0);
-                chest = world.Add(ThingKind.Chest, at);
-                Warp(world, at + new Vector2(0, 1));
+        for (var at = from; count > 0; at += new Vector2(2, 0)) {
+            var chest = world.Add(ThingKind.Chest, at);
+            Warp(world, at + new Vector2(0, 1));
+            for (int i = 0; i < 5 && count > 0; i++, count--) {
+                Give(world, "crate"); Give(world, "berries", world.Data.CrateCapacity);
+                world.MoveInCrate(0, "berries", world.Data.CrateCapacity, true);
+                string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+                Require(world.Transfer(world.Backpack, chest.Inventory, packed, 1) == 1, $"a packed crate should go into the chest at {chest.Pos}");
             }
-            Give(world, "crate"); Give(world, "berries", world.Data.CrateCapacity);
-            world.MoveInCrate(0, "berries", world.Data.CrateCapacity, true);
-            string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
-            Require(world.Transfer(world.Backpack, chest!.Inventory, packed, 1) == 1, $"a packed crate should go into the chest at {chest.Pos}");
         }
         Warp(world, stood);
     }
