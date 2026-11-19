@@ -535,6 +535,15 @@ public static class ActorAnimation {
         return curve;
     }
 
+    /// <summary>
+    /// The share of a cycle since a foot landed, from 0 up to but never 1.
+    /// A moment a hair before the landing rounds to a whole cycle after it, which is the landing itself.
+    /// </summary>
+    private static float SinceLanding(float cycles) {
+        float q = Mathf.PosMod(cycles, 1);
+        return q < 1 ? q : 0;
+    }
+
     /// <summary>A swinging leg a share <paramref name="q"/> of the cycle after its foot landed, on a smooth curve through its keys.</summary>
     private static LegAngles Swinging((float At, LegAngles Leg, LegAngles Rate)[] curve, float q) {
         int k = 0;
@@ -604,7 +613,7 @@ public static class ActorAnimation {
 
     /// <summary>A walking leg's angles a share <paramref name="sinceLanding"/> of the cycle after its heel lands.</summary>
     private static LegAngles WalkLeg(float sinceLanding) {
-        float q = Mathf.PosMod(sinceLanding, 1);
+        float q = SinceLanding(sinceLanding);
         return q < WalkStance ? WalkPlanted(q) : Swinging(WalkSwing, q);
     }
 
@@ -712,7 +721,7 @@ public static class ActorAnimation {
 
     /// <summary>A running leg's angles a share <paramref name="sinceLanding"/> of the cycle after its foot lands.</summary>
     private static LegAngles RunLeg(RunGait gait, float sinceLanding) {
-        float q = Mathf.PosMod(sinceLanding, 1);
+        float q = SinceLanding(sinceLanding);
         return q < gait.Stance ? Planted(gait, q) : Swinging(gait.Swing, q);
     }
 

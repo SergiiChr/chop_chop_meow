@@ -26,6 +26,7 @@ public static class AnimationChecks {
         CheckCraftingSquatsOnlyWhileStandingStill();
         CheckChangingActionBlendsBetweenPoses();
         CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning();
+        CheckEveryMomentOfAStrideHasAPose();
         CheckDiggingKeepsBothFeetWhereTheyStand();
         CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem();
         CheckAHandReachesItsPointWithTheElbowTheWayAsked();
@@ -461,5 +462,20 @@ public static class AnimationChecks {
         Require(ActorAnimation.Tool(ActorAction.Grind) == "mortar", "grinding should show the mortar in hand");
         Require(ActorAnimation.Tool(ActorAction.Dig) == "steel_shovel", "digging should show the shovel");
         Require(ActorAnimation.Tool(ActorAction.Gather) == null, "hand gathering should show no tool");
+    }
+
+    /// <summary>
+    /// A walk, a jog and a run have a pose at every moment, also the ones a hair either side of a foot landing, a quarter
+    /// and three quarters into the stride, where rounding puts a leg a whole stride after its own landing.
+    /// </summary>
+    private static void CheckEveryMomentOfAStrideHasAPose() {
+        foreach (var gait in new[] { ActorAction.Walk, ActorAction.Jog, ActorAction.Run })
+            foreach (float landing in new[] { .25f, .75f }) {
+                float early = landing * ActorAnimation.Duration(gait), late = early;
+                for (int i = 0; i < 4000; i++) {
+                    early = MathF.BitDecrement(early); late = MathF.BitIncrement(late);
+                    ActorAnimation.PoseAt(gait, early, true); ActorAnimation.PoseAt(gait, late, true);
+                }
+            }
     }
 }
