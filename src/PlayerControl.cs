@@ -225,7 +225,7 @@ public sealed class PlayerControl {
     /// </summary>
     private void Place(Vector2 at) {
         bool sent = Sent(at);
-        if (Mode is not ClickMode.Crate crate) world.Build(Mode.Placing!.Value, at);
+        if (Mode is not ClickMode.Crate crate) world.Construction.Build(Mode.Placing!.Value, at);
         // A held crate goes down from the held stack, wherever it lies.
         else if (placingHeld && cursor.Stack?.Item == crate.Item) world.FromHeldStack(() => world.PlaceCrate(crate.Item, at));
         // One from the hotbar goes down from the stack bound to the selected slot.
@@ -238,7 +238,7 @@ public sealed class PlayerControl {
     }
 
     /// <summary>Whether a placement at <paramref name="at"/> goes to the server, which it does when nothing here blocks it.</summary>
-    private bool Sent(Vector2 at) => (Mode is ClickMode.Crate crate ? world.PlacementBlock(ThingKind.Crate, at, crate.Item) : world.PlacementBlock(Mode.Placing!.Value, world.Snap(Mode.Placing.Value, at))) == null;
+    private bool Sent(Vector2 at) => (Mode is ClickMode.Crate crate ? world.Construction.PlacementBlock(ThingKind.Crate, at, crate.Item) : world.Construction.PlacementBlock(Mode.Placing!.Value, world.Construction.Snap(Mode.Placing.Value, at))) == null;
 
     /// <summary>Whether another can be paid for, on top of the one just sent.</summary>
     private bool CanPlaceAgain() => Mode switch {

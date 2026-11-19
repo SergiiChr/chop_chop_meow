@@ -218,7 +218,7 @@ public static class CabinChecks {
             world.Consume("berries");
             Require(world.Backpack["berries"] == 3, "a player knocking on a cabin door should not eat");
             Give(world, data.Buildings[ThingKind.Chest].Cost);
-            Require(world.Build(ThingKind.Chest, world.Player + new Vector2(-3, 2)) == null, "a player knocking on a cabin door should not build");
+            Require(world.Construction.Build(ThingKind.Chest, world.Player + new Vector2(-3, 2)) == null, "a player knocking on a cabin door should not build");
         });
         Require(told.Count > 0 && told.All(message => message == "You are busy."), $"a player at a cabin door should be told they are busy, not {string.Join(" | ", told)}");
     }
@@ -288,7 +288,7 @@ public static class CabinChecks {
         var shore = ShoreForACabin(world);
         world.Player = shore + new Vector2(-2.5f, -1.5f);
         Give(world, data.Buildings[ThingKind.Hut].Cost);
-        Require(world.PlacementBlock(ThingKind.Hut, shore) != null && world.Build(ThingKind.Hut, shore) == null, "a cabin should not go up with its door where nobody can stand");
+        Require(world.Construction.PlacementBlock(ThingKind.Hut, shore) != null && world.Construction.Build(ThingKind.Hut, shore) == null, "a cabin should not go up with its door where nobody can stand");
     }
     private static void CheckNothingCanBeBuiltOnACabinsDoorSpot(GameData data) {
         var world = EmptyWorld(data);
@@ -297,8 +297,8 @@ public static class CabinChecks {
         var spot = Doorways.DoorPoint(hut) + Doorways.OutOfDoor * .6f;
         world.Player = spot + new Vector2(2.5f, 0);
         Give(world, data.Buildings[ThingKind.Bench].Cost);
-        Require(world.PlacementBlock(ThingKind.Bench, spot + Doorways.OutOfDoor * 2) == null, "a bench well clear of the cabin's door should go up");
-        Require(world.PlacementBlock(ThingKind.Bench, spot) != null && world.Build(ThingKind.Bench, spot) == null, "a bench should not go up on a cabin's door spot");
+        Require(world.Construction.PlacementBlock(ThingKind.Bench, spot + Doorways.OutOfDoor * 2) == null, "a bench well clear of the cabin's door should go up");
+        Require(world.Construction.PlacementBlock(ThingKind.Bench, spot) != null && world.Construction.Build(ThingKind.Bench, spot) == null, "a bench should not go up on a cabin's door spot");
     }
     private static void CheckSteppingOutOfACabinWhoseDoorIsBlockedLandsOnOpenGround(GameData data) {
         var world = EmptyWorld(data);

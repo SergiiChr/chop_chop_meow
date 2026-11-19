@@ -82,7 +82,7 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         Button? button = null;
         bool armed = false;
         button = HeaderAction("trash", "Take this building down · everything comes back", () => {
-            if (armed) { if (kit.Run(() => world.Dismantle(thing))) panel.Close(); return; }
+            if (armed) { if (kit.Run(() => world.Construction.Dismantle(thing))) panel.Close(); return; }
             armed = true;
             button!.Icon = null; button.Text = "Remove?"; button.TooltipText = "Click again to take it down";
             Style.SkinPill(button, Style.Brick);

@@ -101,7 +101,7 @@ public sealed partial class World {
     }
 
     /// <summary>Fills the backpack's vessels from every liquid a box holds; what finds no room is spilled, and said, such as " 2L of water spilled."</summary>
-    private string PourOut(Inventory box) {
+    internal string PourOut(Inventory box) {
         string spilled = "";
         foreach (var v in Data.Vessels) {
             if (box[v.Liquid] == 0) continue;

@@ -54,10 +54,10 @@ internal static class PlayerSteps {
         var origin = new Vector2(20, 20);
         world.Player = origin + new Vector2(1.5f, 2.5f);
         Give(world, "wood", 16); Give(world, "wheat_seeds", 1); Give(world, "fertilizer", 1);
-        var compost = world.Build(ThingKind.Pile, origin);
+        var compost = world.Construction.Build(ThingKind.Pile, origin);
         Require(compost != null, "a pile should build on open ground");
         world.SetCompost(compost!, true);
-        var farm = world.Build(ThingKind.Farm, origin + new Vector2(3.4f, .3f));
+        var farm = world.Construction.Build(ThingKind.Farm, origin + new Vector2(3.4f, .3f));
         Require(farm != null, "a farm plot should build beside a pile");
         return (world, compost!, farm!);
     }
@@ -91,7 +91,7 @@ internal static class PlayerSteps {
 
     public static Thing BuildAt(World world, ThingKind kind, Vector2 position) {
         world.Player = position + new Vector2(-1.5f, 0);
-        var built = world.Build(kind, position);
+        var built = world.Construction.Build(kind, position);
         Require(built != null, $"build {kind} at a clear nearby location");
         return built!;
     }

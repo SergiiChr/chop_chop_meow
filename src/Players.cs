@@ -53,7 +53,7 @@ public sealed partial class World {
     /// On the server, a marked action (<see cref="FromHeldStack"/>, <see cref="FromSpares"/>) goes through the same checks a guest's does first, then comes back here to run.
     /// </summary>
     /// <summary>Whether the acting player is occupied, telling them so: anything they try then does nothing.</summary>
-    private bool Busy() {
+    internal bool Busy() {
         if (!Occupied) return false;
         Say("You are busy.");
         return true;
@@ -136,7 +136,7 @@ public sealed partial class World {
         var t = Find(c.Target);
         var w = S.Workers.Find(w => w.Id == c.Other);
         switch (c.Verb) {
-            case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Build(kind, c.At); break;
+            case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Construction.Build(kind, c.At); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At)); break;
             case Verb.MoveInCrate: MoveInCrate(c.Target, c.Item, c.Count, c.Other != 0); break;
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
@@ -192,7 +192,7 @@ public sealed partial class World {
             case Verb.SetPacking: SetPacking(t, c.Item); break;
             case Verb.Buy: Buy(t, c.Item, Math.Min(c.Count, 5)); break;
             case Verb.PickUpCrate: PickUpCrate(t); break;
-            case Verb.Dismantle: Dismantle(t); break;
+            case Verb.Dismantle: Construction.Dismantle(t); break;
             case Verb.SlotTool: SlotTool(t, c.Item); break;
             case Verb.UnslotTool: UnslotTool(t, c.Item); break;
             case Verb.FetchPrices: FetchPrices(t); break;
@@ -214,7 +214,7 @@ public sealed partial class World {
     public const int BoxCodes = 6;
     /// <summary>What <see cref="Locate"/> takes the number of a packed crate in the backpack from, to name its contents.</summary>
     private const int CrateCode = -2;
-    private static Inventory?[] Boxes(Thing t) => [t.Inventory, t.Output, t.Tools, t.Wages, t.Burner];
+    internal static Inventory?[] Boxes(Thing t) => [t.Inventory, t.Output, t.Tools, t.Wages, t.Burner];
     /// <summary>One of a thing's boxes in the order of <see cref="Boxes"/>, looked up without building the array, as ticks do.</summary>
     private static Inventory? Box(Thing t, int index) => index switch { 0 => t.Inventory, 1 => t.Output, 2 => t.Tools, 3 => t.Wages, 4 => t.Burner, _ => null };
     /// <summary>Which of a thing's boxes an inventory is, or -1.</summary>

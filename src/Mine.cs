@@ -48,7 +48,7 @@ public sealed partial class World {
     public static Vector2 MineDoor(Thing mine) => mine.Pos - CliffAt(mine.Pos).Face * 1.4f;
     /// <summary>Where a plan placed at <paramref name="p"/> goes: a mine near a cliff snaps to that cliff's spot.</summary>
     private static bool NearMineSite(Cliff cliff, Vector2 p) => cliff.DistanceTo(p) <= MineReach || p.DistanceTo(MineSpot(cliff)) <= 2.5f;
-    private static Vector2 SnapMine(Vector2 p) => CliffAt(p) is var c && NearMineSite(c, p) ? MineSpot(c) : p;
+    internal static Vector2 SnapMine(Vector2 p) => CliffAt(p) is var c && NearMineSite(c, p) ? MineSpot(c) : p;
     public static string MineOre(Thing mine) => ResourceItem(CliffAt(mine.Pos).Ore);
     public static string MineName(Thing mine) => CliffAt(mine.Pos).Ore switch { ThingKind.Iron => "iron mine", ThingKind.Coal => "coal mine", ThingKind.Tin => "tin mine", var ore => $"{ore.Id()} mine" };
     public float MineStageSeconds => Data.Mine.StageWorkdays * Data.WorkdaySeconds;
@@ -68,7 +68,7 @@ public sealed partial class World {
 
     /// <summary>Mining stops as soon as either the ore or the rock slot holds a full stack.</summary>
     public bool MineFull(Thing mine) => mine.Output is Inventory output && (output[MineOre(mine)] >= output.StackSize || output["stone"] >= output.StackSize);
-    private string? MineBlock(Vector2 p) {
+    internal string? MineBlock(Vector2 p) {
         var cliff = CliffAt(p);
         if (!NearMineSite(cliff, p)) return "Mark a mine at the foot of an ore cliff.";
         var spot = MineSpot(cliff);

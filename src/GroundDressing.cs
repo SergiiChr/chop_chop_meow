@@ -94,7 +94,7 @@ public partial class WorldView {
             case ThingKind.Water or ThingKind.Leaves or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine: break;
             default:
                 if (t.IsLoose) ShadeObject(t.Pos, .3f, .6f);
-                else if (!World.IsZone(t.Kind)) ShadeObject(t.Pos, World.Footprint(t.Kind) + .25f, .5f);
+                else if (!Construction.IsZone(t.Kind)) ShadeObject(t.Pos, World.Footprint(t.Kind) + .25f, .5f);
                 break;
         }
     }

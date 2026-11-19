@@ -152,7 +152,7 @@ public partial class WorldView : Node3D {
     internal static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
 
     public override void _Ready() {
-        World.Replaced += () => { worldReplaced = true; ClearPaths(); };
+        World.Replaced += () => { worldReplaced = true; Footpaths.Clear(); };
         camera = new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = BaseSize, Near = 1, Far = 200, Current = true };
         AddChild(camera);
         // Half energy puts the sky's light at DayAmbientEnergy.
@@ -486,7 +486,7 @@ public partial class WorldView : Node3D {
         if (door is DoorShown shown) { at = shown.At; target = shown.Facing; action = shown.Action; subject = null; }
         player.Update(at, action, target, dt, door?.Backing ?? false);
         // A foot lands at each extreme of the stride.
-        if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
+        if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
@@ -600,7 +600,7 @@ public partial class WorldView : Node3D {
             if (door is DoorShown shown) { at = shown.At; facing = shown.Facing; action = shown.Action; subject = null; }
             state.Update(at, action, facing, dt, door?.Backing ?? false);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
-            if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
+            if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             if (other.DownedFor > 0) FallBackView.FallBack(other.Rig, state, other.DownedFor, torch, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
             else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door);
@@ -625,13 +625,6 @@ public partial class WorldView : Node3D {
     private Thing? ThingAt(Vector2 at) {
         foreach (var t in World.Things) if (t.Pos == at) return t;
         return null;
-    }
-
-    private string FootstepSound(Vector2 p) {
-        if (Terrain.InLake(p, 1)) return "footsteps_water";
-        foreach (var c in World.Cliffs) if (c.DistanceTo(p) < Cliff.Depth + 3) return "footsteps_rocks";
-        foreach (var t in World.Things) if ((t.Kind == ThingKind.Stone || t.IsDeposit) && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f) return "footsteps_rocks";
-        return "footsteps_default";
     }
 
     /// <summary>Poses an actor's rig; one at the steps of the cabin door at <paramref name="door"/> stands on them.</summary>
@@ -1443,7 +1436,7 @@ public partial class WorldView : Node3D {
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
         placeTile.Visible = Placing != null;
         var kind = Placing.GetValueOrDefault();
-        var at = Placing == null ? Vector2.Zero : World.Snap(kind, ToWorld(Mouse).Round());
+        var at = Placing == null ? Vector2.Zero : World.Construction.Snap(kind, ToWorld(Mouse).Round());
         var shown = Placing == null ? null : kind == ThingKind.Mine ? mineGhosts[World.CliffAt(at).Ore] : ghosts[kind];
         if (shown != ghost) {
             if (ghost != null) ghost.Root.Visible = false;
@@ -1451,7 +1444,7 @@ public partial class WorldView : Node3D {
             ghost = shown;
         }
         if (shown == null) return;
-        bool valid = World.PlacementBlock(kind, at) == null;
+        bool valid = World.Construction.PlacementBlock(kind, at) == null;
         if (shown.Tint != valid) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid; }
         shown.Root.Position = To3(at);
         if (kind == ThingKind.Mine) shown.Body.Rotation = WorldModels.MineYaw(at);

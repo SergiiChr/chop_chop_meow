@@ -272,18 +272,18 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         world.Player = new Vector2(20, 20);
         Give(world, "wood", 8); Give(world, "stone", 30);
-        var chest = world.Build(ThingKind.Chest, world.Player + new Vector2(2, 0))!;
+        var chest = world.Construction.Build(ThingKind.Chest, world.Player + new Vector2(2, 0))!;
         world.Transfer(world.Backpack, chest.Inventory, "stone", 30);
         Require(world.Backpack["wood"] == 0 && world.Backpack["stone"] == 0, "building the chest and filling it should empty the backpack");
-        Require(world.Dismantle(chest), "the player should dismantle a chest in reach");
+        Require(world.Construction.Dismantle(chest), "the player should dismantle a chest in reach");
         Require(world.Find(chest.Id) == null, "a dismantled chest should be gone");
         Require(world.Backpack["wood"] == 8 && world.Backpack["stone"] == 30, "dismantling a chest should return its 8 wood and the 30 stone in it");
         Require(!world.Things.Any(t => t.Kind == ThingKind.Grave), "with room in the backpack nothing should go into a box");
 
         Give(world, "wood", 12); Give(world, "stone", 8);
-        var cabin = world.Build(ThingKind.Hut, world.Player + new Vector2(-4, 0))!;
+        var cabin = world.Construction.Build(ThingKind.Hut, world.Player + new Vector2(-4, 0))!;
         StepInside(world, cabin);
-        Require(!world.Dismantle(cabin) && world.Find(cabin.Id) != null, "a cabin someone shelters in should not come down");
+        Require(!world.Construction.Dismantle(cabin) && world.Find(cabin.Id) != null, "a cabin someone shelters in should not come down");
     }
 
     private static void CheckBuildingsKnockIntoPlaceAndClatterDown(GameData data) {
@@ -296,7 +296,7 @@ public static class SimulationChecks {
         heard.Clear(); BuildAt(world, ThingKind.Campfire, new Vector2(17, 23));
         Require(heard.SequenceEqual(new[] { "place_building", "start_fire" }), "a campfire should knock into place and catch fire");
         world.Player = new Vector2(20, 20);
-        heard.Clear(); world.Dismantle(chest);
+        heard.Clear(); world.Construction.Dismantle(chest);
         Require(heard.SequenceEqual(new[] { "take_down_building" }), "a building taken down should clatter apart");
     }
 
@@ -331,10 +331,10 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         world.Player = new Vector2(20, 20);
         Give(world, "planks", 10);
-        var bench = world.Build(ThingKind.Bench, world.Player + new Vector2(2, 0))!;
+        var bench = world.Construction.Build(ThingKind.Bench, world.Player + new Vector2(2, 0))!;
         Give(world, "stone", 24 * 64);
         Require(world.Backpack.Room("planks") == 0, "the fixture should fill the backpack");
-        Require(world.Dismantle(bench), "the player should dismantle a bench in reach");
+        Require(world.Construction.Dismantle(bench), "the player should dismantle a bench in reach");
         var box = world.Things.Single(t => t.Kind == ThingKind.Grave);
         Require(box.Inventory["planks"] == 10 && box.Pos == bench.Pos, "the planks that do not fit should wait in a recovery box where the bench stood");
     }
@@ -1127,9 +1127,9 @@ public static class SimulationChecks {
         world.Player = at;
 
         Give(world, "wood", 8);
-        Require(world.Build(ThingKind.Chest, Terrain.Spawn) == null,
+        Require(world.Construction.Build(ThingKind.Chest, Terrain.Spawn) == null,
                 "building placement must reject the player arrival tile");
-        var chest = world.Build(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 0));
+        var chest = world.Construction.Build(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 0));
         Require(chest != null, "building placement should accept a nearby clear tile");
         Require(chest.Kind == ThingKind.Chest, "building placement should build the chosen kind");
         Require(world.Backpack["wood"] == 0, "building placement should spend its cost");
@@ -1675,8 +1675,8 @@ public static class SimulationChecks {
         world.Player = Terrain.WaterPoint(Terrain.Spawn);
         world.Gather(lake, data.GatherSeconds);
         world.Player = Site(3, 3);
-        Require(world.Build(ThingKind.Hut, Site(5, 3)) != null, "gathered materials should build the opening shelter");
-        Require(world.Build(ThingKind.Campfire, Site(3, 6)) != null, "gathered materials should build the opening fire");
+        Require(world.Construction.Build(ThingKind.Hut, Site(5, 3)) != null, "gathered materials should build the opening shelter");
+        Require(world.Construction.Build(ThingKind.Campfire, Site(3, 6)) != null, "gathered materials should build the opening fire");
     }
 
     private static void CheckPlayerMovesItemsInAndOutOfACarriedCrate(GameData data) {
@@ -2195,16 +2195,16 @@ public static class SimulationChecks {
         var origin = new Vector2(20, 20);
         world.Player = origin + new Vector2(0, 2);
         Give(world, "wood", 40);
-        var pile = world.Build(ThingKind.Pile, origin);
+        var pile = world.Construction.Build(ThingKind.Pile, origin);
         Require(pile != null, "a pile should be built");
         Require(world.Backpack["wood"] == 32, "a pile should cost 8 wood");
         Require(pile!.Inventory.Slots == World.PileStacks, "a pile should hold 14 stacks");
         Require(world.Add(ThingKind.Chest, origin + new Vector2(0, 8)).Inventory.Slots == 5, "a chest should hold a third of a pile, 5 stacks");
-        Require(world.Snap(ThingKind.Pile, origin + new Vector2(3.4f, .4f)) == origin + new Vector2(3, 0) && world.Snap(ThingKind.Pile, origin + new Vector2(9, 0)) == origin + new Vector2(9, 0),
+        Require(world.Construction.Snap(ThingKind.Pile, origin + new Vector2(3.4f, .4f)) == origin + new Vector2(3, 0) && world.Construction.Snap(ThingKind.Pile, origin + new Vector2(9, 0)) == origin + new Vector2(9, 0),
                 "a pile placed beside another should snap edge to edge, and one far away should not");
-        var east = world.Build(ThingKind.Pile, origin + new Vector2(3.3f, 0));
+        var east = world.Construction.Build(ThingKind.Pile, origin + new Vector2(3.3f, 0));
         Require(east != null, "a pile beside another should build");
-        Require(world.PlacementBlock(ThingKind.Pile, origin + new Vector2(2, 0)) != null && east.Pos == origin + new Vector2(3, 0), "piles must not overlap but may touch");
+        Require(world.Construction.PlacementBlock(ThingKind.Pile, origin + new Vector2(2, 0)) != null && east.Pos == origin + new Vector2(3, 0), "piles must not overlap but may touch");
         Require(world.CanStand(origin), "a pile should be walkable");
 
         world.Player = origin;
@@ -2699,7 +2699,7 @@ public static class SimulationChecks {
         foreach (var den in WolfPatrols.Dens) {
             Require(world.CanStand(den.Door) && !world.CanStand(den.Mouth - den.Face * .5f), "a den's rock should be solid and the ground at its door open");
             world.Player = den.Door + den.Face * 3;
-            Require(world.PlacementBlock(ThingKind.Hut, den.Door + den.Face * 2) != null, "nothing should be built over a den's mouth");
+            Require(world.Construction.PlacementBlock(ThingKind.Hut, den.Door + den.Face * 2) != null, "nothing should be built over a den's mouth");
         }
     }
 

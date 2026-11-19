@@ -11,7 +11,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var stage = int.TryParse(Launch.Value("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
         var cliff = World.CliffOf(Kinds.Parse(Launch.Value("--mine-ore")) ?? ThingKind.Iron);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
-        var mine = world.Build(ThingKind.Mine, World.MineSpot(cliff))!;
+        var mine = world.Construction.Build(ThingKind.Mine, World.MineSpot(cliff))!;
         mine.MineStage = stage; mine.Progress = stage is MineStage.Marked or MineStage.Supplied ? world.MineStageSeconds / 2 : 0;
         if (stage == MineStage.Dug) mine.Inventory.Add("wood", 20);
         world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 + cliff.Along * 2);
@@ -62,7 +62,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             view.EnvironmentReviewFog = Launch.Has("--review-fog");
             view.EnvironmentCenter = location switch { "lake" => Terrain.Lake + Terrain.Seaward * 3, "terrain" => Terrain.Point(125, -18), "coast" => coastCenter, "mine" => mineCenter, _ => null };
             if (location == "mine") {
-                var mine = world.Build(ThingKind.Mine, World.MineSpot(reviewCliff))!;
+                var mine = world.Construction.Build(ThingKind.Mine, World.MineSpot(reviewCliff))!;
                 mine.MineStage = MineStage.Open;
                 mine.Output!.Add(World.MineOre(mine), 12);
             }
@@ -200,11 +200,11 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
             var at = Terrain.Spawn + new Vector2(-6, 9);
             for (int i = 0; i < 5; i++) {
-                var plot = world.Add(ThingKind.Farm, at + new Vector2(i * World.ZoneSize, 0));
+                var plot = world.Add(ThingKind.Farm, at + new Vector2(i * Construction.ZoneSize, 0));
                 plot.FarmStage = i switch { 0 => FarmStage.Fallow, 4 => FarmStage.Ripe, _ => FarmStage.Growing };
                 plot.Progress = i == 4 ? world.HarvestSeconds / 2 : (i - 1) * world.GrowSeconds / 3 + 1;
             }
-            var wheat = world.Add(ThingKind.Pile, at + new Vector2(0, World.ZoneSize)); wheat.Inventory.Add("wheat", 300);
+            var wheat = world.Add(ThingKind.Pile, at + new Vector2(0, Construction.ZoneSize)); wheat.Inventory.Add("wheat", 300);
             world.Player = at + new Vector2(6, 2.5f); world.Tick(0); view.Zoom = 1.2f;
             if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Farm)); else panel.Close();
         }

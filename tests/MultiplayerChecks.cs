@@ -293,8 +293,8 @@ public static class MultiplayerChecks {
         var chest = copy.Things.Single(t => t.Kind == ThingKind.Chest);
 
         copy.Consume("berries");
-        Require(copy.Build(ThingKind.Campfire, Terrain.Spawn + new Vector2(30, 0)) == null && sent.Count == 1, "the copy should refuse a building out of reach itself");
-        copy.Build(ThingKind.Campfire, Terrain.Spawn + new Vector2(-2, 2));
+        Require(copy.Construction.Build(ThingKind.Campfire, Terrain.Spawn + new Vector2(30, 0)) == null && sent.Count == 1, "the copy should refuse a building out of reach itself");
+        copy.Construction.Build(ThingKind.Campfire, Terrain.Spawn + new Vector2(-2, 2));
         copy.Transfer(copy.Backpack, chest.Inventory, "wood", 5);
         copy.SetFilter(chest, "wood", false, true);
         Require(copy.Backpack["berries"] == 3, "a guest's copy should keep its own backpack berries");

@@ -651,7 +651,7 @@ public partial class Game {
         await PickUp(Cell(0, c => c.TooltipText.StartsWith("Wood crate ·")));
         for (int placed = 1; placed <= 2; placed++) {
             var spot = Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()))
-                .First(p => world.PlacementBlock(ThingKind.Crate, p, "crate") == null && Uncovered(view.Screen(p)));
+                .First(p => world.Construction.PlacementBlock(ThingKind.Crate, p, "crate") == null && Uncovered(view.Screen(p)));
             await Click(view.Screen(spot));
             await Until(() => world.Backpack["crate"] == 2 - placed && (world.Held?.Count ?? 0) == 2 - placed, "a click on open ground placing one held crate", 2);
             Require(panel.Page == Page.Backpack, "Placing a crate must not open it.");
@@ -1253,10 +1253,10 @@ public partial class Game {
         Require(cursor.Plan == "chest", "A click on a plan must pick it up.");
         int chests = world.Things.Count(t => t.Kind == ThingKind.Chest);
         var spot = Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()))
-            .First(p => world.PlacementBlock(ThingKind.Chest, world.Snap(ThingKind.Chest, p)) == null && Uncovered(view.Screen(p)));
+            .First(p => world.Construction.PlacementBlock(ThingKind.Chest, world.Construction.Snap(ThingKind.Chest, p)) == null && Uncovered(view.Screen(p)));
         await Click(view.Screen(spot));
         await Until(() => world.Things.Count(t => t.Kind == ThingKind.Chest) == chests + 1, "a click on open ground placing the held plan", 2);
-        RemoveThings(Hosted, t => t.Kind == ThingKind.Chest && t.Pos == world.Snap(ThingKind.Chest, spot)); await CloseWithEsc();
+        RemoveThings(Hosted, t => t.Kind == ThingKind.Chest && t.Pos == world.Construction.Snap(ThingKind.Chest, spot)); await CloseWithEsc();
     }
     /// <summary>At a trading post a click on the bank picks up all its coins, and coins put on it pay in.</summary>
     private async Task CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown() {
@@ -1311,7 +1311,7 @@ public partial class Game {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
         var start = Hosted.Player;
         var cliff = await StandAtIronCliff();
-        var mine = Hosted.Build(ThingKind.Mine, World.MineSpot(cliff))!;
+        var mine = Hosted.Construction.Build(ThingKind.Mine, World.MineSpot(cliff))!;
         Give(Hosted, "steel_pick", 1);
         await Frames(2);
         var point = RightPress(mine.Pos);
@@ -1351,7 +1351,7 @@ public partial class Game {
         await Frames(2);
         Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "A stump in sight must be drawn.");
         Give(Hosted, world.Data.Buildings[ThingKind.Chest].Cost);
-        var chest = Hosted.Build(ThingKind.Chest, at);
+        var chest = Hosted.Construction.Build(ThingKind.Chest, at);
         await Frames(2);
         Require(chest != null && world.Find(stump.Id) == null, "A chest must go up over a stump and clear it away.");
         Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump built over must just go, not be thrown up through the building.");
@@ -1361,7 +1361,7 @@ public partial class Game {
     private async Task CheckMinePageFollowsTheMineThroughItsStages() {
         var start = Hosted.Player;
         var cliff = await StandAtIronCliff();
-        var mine = Hosted.Build(ThingKind.Mine, World.MineSpot(cliff))!;
+        var mine = Hosted.Construction.Build(ThingKind.Mine, World.MineSpot(cliff))!;
         await ClickOn(mine);
         await Until(() => HasLabel(panel, "Stage 1 · Dig the entrance"), "the mine's page opening on its first stage", 3);
         mine.MineStage = MineStage.Dug;
@@ -1455,7 +1455,7 @@ public partial class Game {
         Vector2 place = Vector2.Zero;
         for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) {
             var candidate = world.Player.Round() + new Vector2(x, y);
-            if (world.Player.DistanceTo(candidate) <= 3 && world.PlacementBlock(ThingKind.Chest, candidate) == null) place = candidate;
+            if (world.Player.DistanceTo(candidate) <= 3 && world.Construction.PlacementBlock(ThingKind.Chest, candidate) == null) place = candidate;
         }
         Require(place != Vector2.Zero, "A fresh clearing must offer space for construction.");
         var point = view.Screen(place);
@@ -1544,13 +1544,13 @@ public partial class Game {
         await Seconds(.25);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames(); Require(world.Player.DistanceTo(savedPosition) > .1f, "The player should move after saving.");
-        Require(view.WornGround > 0, "Walking about must have worn the ground.");
+        Require(view.Footpaths.WornGround > 0, "Walking about must have worn the ground.");
         await KeyStroke(Key.F9);
         // Half a second of play passes before the first footfall wears the loaded world's ground.
-        Require(view.WornGround == 0, "A loaded game must start on unworn ground, not on the footpaths of the game before.");
+        Require(view.Footpaths.WornGround == 0, "A loaded game must start on unworn ground, not on the footpaths of the game before.");
         // Two footfalls' time spent standing still.
         await Seconds(1.2);
-        Require(view.WornAt(world.Player) == 0, "Standing still must not wear the ground underfoot.");
+        Require(view.Footpaths.WornAt(world.Player) == 0, "Standing still must not wear the ground underfoot.");
         Require(world.Player.DistanceTo(savedPosition) < .01f && world.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] == savedWood), "F9 must restore position and stored items from disk.");
         Require(Enumerable.Range(0, 9).Select(world.HotbarItem).SequenceEqual(savedSlots) && world.ActiveHotbar == savedActiveSlot, "F5 and F9 must preserve hotbar references and selection.");
         Warp(Hosted, world.Player + Vector2.One); await CloseWithEsc();

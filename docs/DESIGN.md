@@ -64,6 +64,7 @@ Simulation and data:
 | `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView` |
 | `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
+| `src/buildings/Construction.cs` | Putting buildings, yards and crates up and taking buildings down: where a plan snaps to, why it cannot go somewhere, what it costs and what comes back |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
@@ -162,7 +163,9 @@ Rendering and sound:
 | `src/terrain/display/TerrainView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
-| `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
+| `src/WorldLook.cs`, `src/Wind.cs` | The sound listener and the wind |
+| `src/terrain/display/FootpathWear.cs` | Footpaths worn where the player and workers walk, and their growing back |
+| `src/actors/display/Footsteps.cs` | Which footstep sound the ground gives at a spot |
 | `src/water/display/LakeAppearance.cs` | The lake and sea surfaces, their tiles, and the water and lily pad materials |
 | `src/water/display/ShorelineAppearance.cs` | The sand and stony bank strips along the lake and the coast, and the coast's water |
 | `src/water/display/LakeDressing.cs` | The lake's bank, water, stones, reeds and lily pads |
@@ -544,7 +547,7 @@ Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters
 A click on a cabin walks the player to `Doorways.DoorPoint` along `Doorways.TowardDoor`, round the walls when the cabin is in the way, and `Doorways.Enter` starts there.
 What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they are occupied (`World.Occupied`), as when downed, and any action they try is refused with "You are busy." (`World.Busy`); inside a cabin they are not.
 Picking a hotbar slot, putting a held stack back, marking the ending seen and skipping to morning are not refused.
-Building keeps `World.DoorRoom` clear round every cabin's door spot, and a cabin needs dry, open ground there; stepping out and waking in a cabin put the player on it, or, for a cabin from an older save with it blocked, on the first open ground round the cabin (`Doorways.Doorstep`).
+Building keeps `Construction.DoorRoom` clear round every cabin's door spot, and a cabin needs dry, open ground there; stepping out and waking in a cabin put the player on it, or, for a cabin from an older save with it blocked, on the first open ground round the cabin (`Doorways.Doorstep`).
 
 - `Entering` takes `Doorways.EnterSeconds`, or `Doorways.RushSeconds` for a player who sprinted there (`PlayerState.DoorRush`), then shelters them.
 - A player who arrives while someone else steps in is `Following` until that one is inside, then steps in themselves (`Doorways.Ahead`).
@@ -758,8 +761,8 @@ Once an active crew has the forge hot, it never falls below the bar while they a
 
 ### Taking buildings down
 
-`World.Dismantle` removes a building in reach and puts its cost, a supplied mine's materials and everything its boxes hold into the backpack, and the rest into a recovery box where it stood.
-`World.DismantleBlock` keeps up a cabin someone shelters in and a trading post with a cart out.
+`Construction.Dismantle` removes a building in reach and puts its cost, a supplied mine's materials and everything its boxes hold into the backpack, and the rest into a recovery box where it stood.
+`Construction.DismantleBlock` keeps up a cabin someone shelters in and a trading post with a cart out.
 The red trash can on `ThingPage`'s header turns into "Remove?" on the first click and dismantles on the second.
 
 ### Storage, filters and automation
@@ -817,8 +820,8 @@ Manual transfers ignore those filters.
 
 #### Piles
 
-Piles (`pile`) are 3×3 yards (`World.IsZone`, `ZoneSize`) that do not block walking.
-`World.Snap` puts a new yard on the grid of the nearest yard within reach, and `ZoneBlock` lets yards touch but not overlap.
+Piles (`pile`) are 3×3 yards (`Construction.IsZone`, `ZoneSize`) that do not block walking.
+`Construction.Snap` puts a new yard on the grid of the nearest yard within reach, and `ZoneBlock` lets yards touch but not overlap.
 
 A pile takes part in automation like a chest.
 Its input and output filters name the same one `World.PileEntry`: an item, a kind of crate (`World.MixedCrate` for crates of mixed goods), or a vessel's liquid for every fill of that vessel holding some, apart from the empty vessel.

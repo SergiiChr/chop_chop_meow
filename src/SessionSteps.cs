@@ -151,7 +151,7 @@ public partial class Game {
     /// <summary>The closest place a building can go.</summary>
     private Vector2 FreeSpotNearby(ThingKind kind) {
         var spots = from x in Enumerable.Range(-3, 7) from y in Enumerable.Range(-3, 7) select world.Player.Round() + new Vector2(x, y);
-        return spots.Where(spot => world.PlacementBlock(kind, spot) == null).MinBy(spot => spot.DistanceTo(world.Player));
+        return spots.Where(spot => world.Construction.PlacementBlock(kind, spot) == null).MinBy(spot => spot.DistanceTo(world.Player));
     }
 
     /// <summary>Starts a game on this computer that someone else owns, which has not been opened to anyone, and returns its server's process and port.</summary>
