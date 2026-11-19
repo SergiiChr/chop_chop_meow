@@ -65,7 +65,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door), `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm) or `takedown` (the same with a player hurt enough to go down, pinned and fed on; the scene keeps them alive); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
-| `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl) or `feast` (four bring a hurt player down and feed; the scene keeps them alive); takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
+| `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -73,7 +73,7 @@ Play accepts Godot arguments after `--`:
 | `--frames 240` | Quit after this many frames, to end a recording (`./build.py record`) |
 | `--slow 4` | Slow game time this many times, for a recording in slow motion |
 | `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following; a felling clip such as `"player steel axe"` plays against a trunk |
-| `--animation-review --animation-clip "wolf leap"` | Show one wolf clip close up; the leap, hit and feed play against a player |
+| `--animation-review --animation-clip "wolf leap"` | Show one wolf clip close up; the leap, hit, feed, snap and brace play against a player |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
@@ -161,7 +161,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Shift while moving | Sprint 1.6× as fast; food and drink drain 1.7× as fast; not under 15% food or drink |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
-| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you round to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
+| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you round to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans |
 | Tab | Open or close the backpack |
@@ -169,7 +169,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | H | Open the crew overview |
 | I | Open or close the field guide |
 | 1–9 or click a hotbar slot | Select that slot, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
-| Space | Swing axe overhead, or pump the selected nearby reinforced furnace |
+| Space | Swing an axe, or a fist without one, the way you last walked, or pump the selected nearby reinforced furnace |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
@@ -400,6 +400,7 @@ In multiplayer, every player must be downed before skipping.
 Fog of war covers the map.
 Ground you have never seen is black.
 You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
+This circle is your line of sight: it ends where the grey fog starts.
 
 Ground you have seen before is greyed out and shows things as you last saw them: a tree felled out of sight still stands there until you look again.
 What changed while you were away shows as it now is when you come back, without playing the change: such a tree is already a stump, and a chest that was filled keeps its lid shut.
@@ -799,13 +800,33 @@ With none, a message says the mine is full with no output available.
 Five wolf dens, small caves at the foot of the mountains, each let one wolf out at dusk (20:24), so the hour or two before bed is risky too.
 After that one den, picked at random, lets one more wolf out every hour until the wolves head home, so a night sees about thirteen.
 They patrol the valley at a walk, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
-Wolves are the same every night: two blows of a steel axe fell one, and its fourth bite brings a healthy player down to half health.
+Wolves are the same every night: one stands two blows of a steel axe and falls to the third or the fourth, and its fourth bite brings a healthy player down to half health.
 
 A wolf that smells you within 30 metres while you are out in the open, but too far off to see you, turns to you where it stands, up to 1.3 seconds for a wolf walking away from you, then howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
 After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
 A wolf that finds you already within sight goes for you without a howl.
 A sprinting wolf gallops faster than you walk, but sprinting outruns it.
 A wolf that reaches you stops at biting distance, about a metre off, and waits there without biting while another wolf tugs you and it has no arm of yours to take.
+
+### Fighting
+
+A swing goes the way you aim it: toward the pointer for a click with an axe, pickaxe, hammer or torch selected, and the way you last walked for Space.
+It lands when the blade comes down, 0.4 seconds in for a steel axe, on every wolf it touches there, and misses one that has moved out of its way.
+Axe swings take turns:
+
+- the overhead chop comes down on a strip straight ahead, out to 1.35 metres;
+- the sideways sweep goes from behind your left shoulder all the way round the front to your right at chest height, out to 1.3 metres.
+  It passes over a wolf on the ground, and lands on every wolf in its way that is in the air, leaping for your throat, or reared up on someone's arm.
+
+A steel axe takes 2.2 to 3.2 of a wolf's 8 health a blow, a torch 0.8 to 1.2 and a punch 0.4 to 0.6.
+A torch and a fist reach only a wolf at biting distance: the flame 1 metre, swung low with you bent over, and the fist 0.7 metres and a little to your right.
+A blow knocks a wolf back and leaves it reeling for a moment.
+
+A wolf at biting distance does not bite at once.
+It gathers itself for 0.3 seconds, then leaps and snaps at where you will be if you keep going the way you were.
+Standing or walking, you are bitten; sprinting, a turn aside as it leaps takes you out of its jaws.
+A blow that lands on it before its jaws shut stops the bite, and after a snap it waits 0.6 seconds before the next.
+In a cabin's doorway the same snap is how a wolf takes hold of you: only a bite that lands starts a tug.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
 
@@ -825,9 +846,19 @@ After that each click swings it, which briefly widens its light by a fifth.
 Swinging four times within 2 seconds, as fast as swings go, puts it out with a message.
 Relighting takes the same 2 seconds and keeps the burn time it had left.
 
-While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into following you at the edge of the light.
+While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into follow mode, which also stops a bite it was gathering itself for.
+Every wave sends the wolves it reaches walking back out to their circle, however near they were, a second wave as much as a first.
+Take any step toward one that is still backing off and it stops backing off: alone it runs, and among others it stands its ground, both as below.
+Wolves in follow mode keep circling you at a walk at the edge of the light, about 4.5 metres off, each the way round it took at random; those going the same way spread evenly, and each wanders a little in and out and ahead and back, and turns its head to you now and then.
+Walk away and they come after you at that walk.
+Walk at one and it stops and stands braced where it is. Come within 2 metres and:
+
+- a wolf with no other follower in your line of sight runs until it is out of your line of sight, or for 8 seconds, goes back to patrolling and leaves you alone until it has been out of smell range of you;
+- with more than one following in your line of sight, the wolf you walked at stands its ground: it growls again and again from 3 metres, and at 2 metres every wolf in your line of sight turns on you.
+  They then attack as if you had no torch, and no wave of the torch scares them again.
+
 Once five are around you they attack together and swings no longer scare them.
-A direct hit with the torch hurts a wolf and sends it running for a moment.
+A torch that lands on a wolf burns it and sends it running for a moment.
 
 ### Cabins
 
@@ -835,7 +866,7 @@ Click a cabin, or press Enter in its panel, and you walk round it to its door an
 Once you set off you cannot walk away, and the keys do nothing until you are in.
 Stepping in takes about 1.3 seconds at a walk, hurrying up the second tread, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
 For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and tugs you a metre back out in three tugs over 1.5 seconds, less where water or a building is in the way, you bent over, reaching for the door and screaming.
-It then lets go and you run in again at once.
+It then lets go and leaves you standing there, free to move: click the cabin to go for its door again.
 At half health or less, its third tug takes you straight over onto your back about 1.2 seconds in.
 Hit the wolf while it tugs someone and it lets go of them.
 No other wolf takes you down while one tugs you.
@@ -852,7 +883,6 @@ A cabin holds two players.
 While you are at its door, knocking, following or stepping in, anything you try in the world says "You are busy."; you can still pick a hotbar slot.
 Someone who walks up behind a player stepping in follows them in once that player is inside.
 At the door of a cabin that is full, or locked with someone inside, you wait for the door to swing shut, step up to it, knock on it three times and stand free.
-Players a wolf tugs back out go in again in the order they came to the door.
 
 #### The door's key
 
@@ -872,7 +902,7 @@ The wolf scratches at the door for 3.6 seconds, which you hear from inside.
 - You can still turn the key while it scratches.
 - At an unlocked door it turns to the door's free edge, hooks its snout behind it and levers the door out in three pries over 1.5 seconds, the door rattling at each; the key no longer turns.
   It squeezes in between the door and its frame over 2.5 seconds, stands in the doorway growling at you with its fangs bared for 2 seconds and launches itself at you.
-- It bites and takes you out by the waist, as a wolf tugging you out of the doorway does: at more than half health you run back in, and it comes to the door again.
+- It bites and takes you out by the waist, as a wolf tugging you out of the doorway does: at more than half health it lets go and leaves you standing outside.
 - With two players inside it takes the one who came in last.
 - Other wolves that come to the same door wait a few metres behind it and go for you once you are out, one taking each of your arms while the first tugs.
 - While a wolf is at the door, Step outside does nothing.

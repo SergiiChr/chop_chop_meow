@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Godot;
 using static Checks;
 using static SetupSteps;
+using static WorldSteps;
 
 namespace ChopChopMeow;
 
@@ -13,6 +14,8 @@ namespace ChopChopMeow;
 /// </summary>
 public partial class Game {
     private static readonly Vector2 NetOre = Terrain.Spawn + new Vector2(2.5f, 2), NetCoal = Terrain.Spawn + new Vector2(-1.5f, 3.5f), NetChest = Terrain.Spawn + new Vector2(.5f, 3), NetHut = Terrain.Spawn + new Vector2(-3.5f, -3), NetAnvil = Terrain.Spawn + new Vector2(1.2f, -.6f);
+    /// <summary>The way the guest steps before it swings: left on screen, away from the anvil.</summary>
+    private static readonly Vector2 NetSwingAim = PlayerControl.KeyDirection(-1, 0);
 
     private async void RunNetCheck(bool hosting) {
         try {
@@ -60,6 +63,7 @@ public partial class Game {
         await Until(() => view.ShowsPlayer(Guest().Id), "the guest's figure appearing");
         await Until(() => view.OtherAnimation(Guest().Id) == ActorAction.Hammer, "the host seeing the guest hammer at the anvil beside it");
         Signal("saw-hammering");
+        await CheckAGuestsFightIsDecidedOnTheHost(Guest());
         await Until(() => chest.Inventory["coal"] == 2 && Guest().Backpack["coal"] == 2, "the guest storing the first loose coal and gathering the second", 90);
         Require(world.Backpack["coal"] == 0, "What the guest gathers must not reach the host's backpack.");
         await Until(() => Guest().Sheltered == hut.Id, "the guest walking into the cabin with one click");
@@ -81,6 +85,25 @@ public partial class Game {
         await LoadAndHost(1);
         await Until(() => Hosted.Players.Count == 2, "the guest joining by hand after it stopped trying", 90);
         await Signaled("joined");
+    }
+
+    /// <summary>The host's half of the fight: two wolves on the guest, one where the guest's chop is aimed and one to its side.</summary>
+    private async Task CheckAGuestsFightIsDecidedOnTheHost(PlayerState guest) {
+        var stood = GD.StrToVar(await Signaled("fight")).AsVector2();
+        await Until(() => guest.Pos.DistanceTo(stood) < .05f, "the host hearing where the guest stopped");
+        // By day wolves are calmed and sent home at once.
+        RunUntilNight(Hosted); ShutDens(Hosted); SetNeeds(guest, 100, 100, 100);
+        var ahead = PlaceWolf(Hosted, new Wolf { Pos = guest.Pos + NetSwingAim * 1.2f, Target = guest.Id });
+        var beside = PlaceWolf(Hosted, new Wolf { Pos = guest.Pos + PlayerControl.KeyDirection(0, 1) * 1.2f, Target = guest.Id });
+        await Until(() => view.OtherAnimation(guest.Id) == ActorAction.SteelAxeSwing, "the host seeing the guest chop", 10);
+        await Until(() => ahead.Health < Hosted.Data.WolfHealth, "the guest's chop landing on the wolf it was aimed at", 5);
+        // A steel axe takes 2.2 to 3.2 off a wolf's 8.
+        Require(ahead.Health is > 4.7f and < 5.9f, $"One chop of a steel axe must take 2.2 to 3.2 off the wolf ahead, which has {ahead.Health} left.");
+        Require(beside.Health == 8, "A chop must miss a wolf standing to the side of it.");
+        await Until(() => guest.Health <= 85, "a wolf's snap taking 15 health off a guest who stands still", 10);
+        await Signaled("fought");
+        RemoveWolves(Hosted, wolf => true); SetNeeds(guest, health: 100); RunUntilMorning(Hosted); NourishEveryone(Hosted);
+        Signal("fight-over");
     }
 
     /// <summary>A window sends its player's actions and hears the result later, so what follows one must not need it at once.</summary>
@@ -140,6 +163,7 @@ public partial class Game {
         await Until(() => view.ShowsPlayer(hostId), "the host's figure appearing");
         await Until(() => view.OtherAnimation(hostId) == ActorAction.Hammer, "the guest seeing the host hammer at the anvil beside it");
         await Signaled("saw-hammering");
+        await CheckAGuestFightsWolvesThroughTheHost();
 
         await RightClick(NetOre);
         await Until(() => world.Backpack["coal"] == 2 && world.Things.All(t => t.Pos != NetOre), "the host handing over the loose coal the guest walked to");
@@ -161,6 +185,25 @@ public partial class Game {
         // The host checks reach from where the guest stood when it clicked, not from where its glide has got to.
         await CloseWithEsc(); await Click(view.Screen(NetHut, .8f));
         await Until(() => world.Sheltered == world.Things.Single(t => t.Kind == ThingKind.Hut).Id, "the host letting the guest into the cabin it walked to");
+    }
+
+    /// <summary>
+    /// The guest's half of the fight: Space swings the way the guest last walked, the host decides what the chop touches,
+    /// and the guest's window shows the wolf it hurt and the bite it took.
+    /// </summary>
+    private async Task CheckAGuestFightsWolvesThroughTheHost() {
+        // Space swings the way the guest last walked: a step to the left on screen aims the chop at a wolf there.
+        await Holding(Key.A, () => Frames(8));
+        await Frames();
+        Signal("fight", GD.VarToStr(world.Player));
+        await Until(() => world.Wolves.Count == 2, "the host's two wolves showing up beside the guest", 30);
+        await KeyStroke(Key.Space);
+        await Until(() => world.Wolves.Any(wolf => wolf.Health is > 4.7f and < 5.9f), "the guest's window showing the wolf its chop hurt", 10);
+        await Until(() => sounds.LastVariant("wolf_hit") >= 0, "the guest hearing its chop land", 5);
+        await Until(() => world.Health <= 85, "the guest's window showing the bite it took", 10);
+        Signal("fought");
+        await Signaled("fight-over");
+        await Until(() => world.Wolves.Count == 0 && world.Health == 100, "the guest's window showing the wolves gone and its health back");
     }
 
     private async Task CheckGuestComesBackFromLeavingAndDropping() {

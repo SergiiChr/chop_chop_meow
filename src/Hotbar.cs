@@ -186,7 +186,7 @@ public partial class Hotbar : PanelContainer {
         if (ActiveItem() is not string id || !HasUse(id)) return;
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) FromStack(ActiveStack(), () => world.Consume(id));
         else if (id == "torch") world.UseTorch(at - world.Player);
-        else world.Attack();
+        else world.Attack(at - world.Player);
     }
 
     private void SetHotbar(int slot, string id) {

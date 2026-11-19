@@ -6,7 +6,8 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// A wolf in <paramref name="world"/> that reaches a player out in the open in a cabin's doorway takes them by the waist
-/// and tugs them back out of it, then lets go: a badly hurt player falls back and is pinned, anyone else steps in again.
+/// and tugs them back out of it, then lets go: a badly hurt player falls back and is pinned, anyone else is left standing
+/// there, free to go for the cabin again.
 /// While it tugs, one more wolf on each side of the player can take them by the arm, bite once and hold on until the tug
 /// ends; any other wolf waits beside them.
 /// </summary>
@@ -99,7 +100,7 @@ public sealed class DoorTug(World world) {
     /// <summary>Whether a wolf is tugging the acting player out of a doorway, when only it may take them down.</summary>
     public bool Tugged => world.S.Actor.Door is Doorway.Tugged or Doorway.TuggedOff && Tugger() != null;
 
-    /// <summary>A wolf reaching a player in the open part of a doorway takes them by the waist to tug them back out of it; returns whether it did.</summary>
+    /// <summary>A wolf whose bite or leap lands on a player in the open part of a doorway takes them by the waist to tug them back out of it; returns whether it did.</summary>
     public bool TugOut(Wolf wolf) {
         var p = world.S.Actor;
         if (p.Door is not (Doorway.Entering or Doorway.Following or Doorway.Knocking or Doorway.Aside) || Doorways.Indoors(p)) return false;
@@ -117,7 +118,7 @@ public sealed class DoorTug(World world) {
     /// <summary>
     /// Holds a tugging wolf at the waist of the player it tugs back, who is shown there; returns false once the tug has
     /// ended some other way, such as the player dying, and lets go. A wolf hit while it tugs is knocked back: the player
-    /// stays as far out as it got them and steps in again at a run, or stops knocking.
+    /// stands free as far out as it got them.
     /// </summary>
     public bool Tug(Wolf wolf) {
         var p = world.S.Actor;
@@ -188,8 +189,8 @@ public sealed class DoorTug(World world) {
     private static void Release(Wolf wolf) { wolf.Tugging = false; wolf.EndDoorCheck(); }
 
     /// <summary>
-    /// Ends a tug that has run its time: the player is let go, a badly hurt one knocked down, anyone else stepping in again
-    /// at a run, or stopping knocking. The wolf bites again no sooner than after any other bite.
+    /// Ends a tug that has run its time: the player is let go, a badly hurt one knocked down, anyone else left standing free.
+    /// The wolf bites again no sooner than after any other bite.
     /// </summary>
     public void End() {
         var tugger = Tugger();
@@ -199,8 +200,7 @@ public sealed class DoorTug(World world) {
 
     /// <summary>
     /// Ends the acting player's tug out of a doorway where it has got them: <paramref name="takedown"/>, the wolf that tugged
-    /// them, pins them from the side of them it stands on as they fall back toward it; otherwise a tugged player steps in
-    /// again at a run, and one tugged off the door stands free.
+    /// them, pins them from the side of them it stands on as they fall back toward it; otherwise they stand free there.
     /// </summary>
     private void LetGo(Wolf? takedown) {
         var p = world.S.Actor;
@@ -208,10 +208,7 @@ public sealed class DoorTug(World world) {
         foreach (var w in world.S.Wolves) if (w.Side != 0 && w.Target == p.Id) { w.LetGoOfArm(); w.Attack = 1; }
         var at = TuggedTo;
         world.Player = at; p.Warp++;
-        if (takedown != null) {
-            world.WolfHunt.Pin(takedown, world.Hunters.Skip(1).Any(), BodySide.Out(Facing, BodySide.Of(at, Facing, takedown.Pos)));
-            p.Door = Doorway.None;
-        } else if (p.Door == Doorway.Tugged) world.Doorways.StepIn(p.DoorCabin, true);
-        else p.Door = Doorway.None;
+        if (takedown != null) world.WolfHunt.Pin(takedown, BodySide.Out(Facing, BodySide.Of(at, Facing, takedown.Pos)));
+        p.Door = Doorway.None;
     }
 }

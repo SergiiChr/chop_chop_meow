@@ -87,11 +87,11 @@ public static class DoorCheckChecks {
         DoorCheckTick(world, .45f);
         Require(world.Sheltered == 0 && world.Door == Doorway.Tugged && wolf.Tugging && wolf.Target == world.Me.Id, $"10.5 s in, the wolf should have the player out of the cabin by the waist, not {world.Door}");
         Require(world.Health == 85 && Heard(heard, "tug_scream") == 1 && Heard(heard, "wolf_bite") == 1, $"a wolf taking a player out should bite them once, and they scream: {world.Health} health, heard {string.Join(", ", heard)}");
-        for (int i = 0; i < 60 && world.Sheltered == 0; i++) DoorCheckTick(world, .05f);
-        Require(world.Sheltered == hut.Id && !wolf.Tugging, "a healthy player tugged out of their cabin should be let go and run back in");
+        for (int i = 0; i < 60 && world.Door == Doorway.Tugged; i++) DoorCheckTick(world, .05f);
+        Require(world.Sheltered == 0 && world.Door == Doorway.None && !wolf.Tugging, $"a healthy player tugged out of their cabin should be let go and left standing outside, not {world.Door}");
         Require(world.Player.DistanceTo(Doorways.DoorPoint(hut) + new Vector2(0, 1)) < .01f, $"a wolf should tug a player a metre out from the door, not to {world.Player - Doorways.DoorPoint(hut)}");
-        DoorCheckTick(world, 1);
-        Require(wolf.DoorCheck is DoorCheckStage.Coming or DoorCheckStage.Scratching, $"the wolf should come to the door again after the player who ran back in, not {wolf.DoorCheck}");
+        DoorCheckTick(world, .5f);
+        Require(world.Sheltered == 0 && wolf.DoorCheck == DoorCheckStage.None && wolf.Target == world.Me.Id, $"the wolf should go on hunting the player it let go, who stays outside, not {wolf.DoorCheck}");
     }
 
     private static void CheckTheKeyTurnsWhileAWolfScratchesButNotOnceItPries(GameData data) {
@@ -270,8 +270,8 @@ public static class DoorCheckChecks {
         DoorCheckTick(world, 3.9f);
         Require(wolf.DoorCheck == DoorCheckStage.Prying, $"a wolf should pry at an unlocked door after scratching, not {wolf.DoorCheck}");
         Give(guest, "steel_axe", 1);
-        world.As(guest, () => { world.Player = wolf.Pos + new Vector2(1, 0); world.Attack(); });
-        world.Tick(.05f);
+        world.As(guest, () => { world.Player = wolf.Pos + new Vector2(1, 0); world.Attack(Vector2.Left); });
+        world.Tick(.45f);
         Require(wolf.DoorCheck == DoorCheckStage.None, $"a wolf hit while it forces a door should be knocked off it, not go on {wolf.DoorCheck}");
         DoorCheckTick(world, 8);
         Require(world.Sheltered == hut.Id && world.Health == 100, "the player inside should be left alone by a wolf knocked off the door");

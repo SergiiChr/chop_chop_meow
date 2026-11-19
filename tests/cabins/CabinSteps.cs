@@ -15,6 +15,15 @@ public static class CabinSteps {
         return (world, hut);
     }
 
+    /// <summary>
+    /// Ticks until a wolf has a player, the acting one by default, by the waist at a cabin's door, for 0.7 seconds at most:
+    /// a wolf at biting distance gathers itself and leaps before its jaws take hold.
+    /// </summary>
+    public static void UntilTugged(World world, PlayerState? who = null) {
+        who ??= world.Me;
+        for (float time = 0; time < .7f && who.Door is not (Doorway.Tugged or Doorway.TuggedOff); time += .05f) world.Tick(.05f);
+    }
+
     /// <summary>Puts a player, the acting one by default, at a cabin's door and steps them in at a run, ticking until they are inside.</summary>
     public static void StepInside(World world, Thing hut, PlayerState? who = null) {
         who ??= world.Me;

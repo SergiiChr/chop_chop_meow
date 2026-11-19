@@ -80,6 +80,9 @@ public static class SimulationChecks {
         Test(CheckWolvesLeaveHealthyOrFirelitPlayersAlone, data);
         Test(CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth, data);
         WolfBodiesChecks.Run(data);
+        SwingsChecks.Run(data);
+        WolfSnapChecks.Run(data);
+        WolfFollowChecks.Run(data);
         WolfPatrolsChecks.Run(data);
         Test(CheckWolfThatBitesAPlayerToDeathEatsTheirFood, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
@@ -155,7 +158,6 @@ public static class SimulationChecks {
         Test(CheckTorchLightsAndBurnsOut, data);
         Test(CheckALitTorchMovedOutOfTheBackpackGoesOut, data);
         Test(CheckTorchSwingScaresOnlyWolvesItIsAimedAt, data);
-        Test(CheckDirectTorchHitKnocksAWolfBack, data);
         Test(CheckFullPackIgnoresASwing, data);
         Test(CheckEachToolTakesItsOwnSlot, data);
         Test(MineChecks.Run, data);
@@ -1172,7 +1174,7 @@ public static class SimulationChecks {
         RunUntilNight(dark);
         SetNeeds(dark, health: 100);
         PlaceWolf(dark, new Wolf { Pos = dark.Player + new Vector2(.8f, 0) });
-        SafeTick(dark, .2f);
+        WolfSteps.SnapTick(dark, .5f);
         Require(dark.Health < 100, "an unprotected player near a wolf should take damage at night");
 
         var lit = EmptyWorld(data);
@@ -1224,7 +1226,8 @@ public static class SimulationChecks {
         PlaceWolf(hunt, prey);
         ActorAction swung = ActorAction.Idle;
         hunt.PlayerActed += (action, _) => swung = action;
-        hunt.Attack();
+        hunt.Attack(Vector2.Right);
+        hunt.Tick(.45f);
         Require(swung == ActorAction.SteelAxeSwing, "a swing with a steel axe carried should be the overhead axe swing, not the felling stroke");
         var carcass = hunt.Things.SingleOrDefault(t => t.Kind == ThingKind.WolfCorpse);
         Require(!hunt.Wolves.Contains(prey), "a killed wolf should not stay among the wolves");
@@ -1295,20 +1298,25 @@ public static class SimulationChecks {
         var packmate = new Wolf { Pos = maul.Player + new Vector2(-9, 4), Attack = 5 };
         PlaceWolf(maul, leaper); PlaceWolf(maul, packmate);
         var heard = Listen(maul);
+        var said = new List<string>();
+        maul.Notify += said.Add;
         maul.Tick(.1f);
         Require(leaper.Leap > 0 && !maul.Mauled, "a nearby wolf should leap at a player on half health");
         maul.Tick(World.LeapSeconds);
         Require(maul.Mauled, "the leap should pin the player");
+        Require(said.Contains("You are pinned and can't move."), $"a pinned player should be told they cannot move: told {string.Join(" | ", said)}");
         Require(heard.Count(name => name == "takedown_scream") == 1, $"a player pinned by a leap should scream once: heard {string.Join(", ", heard)}");
         Require(leaper.Feeding, "the leap should make the wolf feed");
         Require(leaper.Pinning && leaper.LungeFrom == Vector2.Zero, "the leap should make the wolf pin, over the player");
         Require(leaper.Pos.DistanceTo(maul.Player) < 1.6f, "the leap should land at the throat");
         var pinned = maul.Player;
         maul.MovePlayer(Vector2.Right);
-        maul.Attack();
-        Require(maul.Player == pinned && leaper.Health == 4, "a pinned player can neither move nor fight back");
+        maul.Attack(Vector2.Right);
+        maul.Tick(.5f);
+        Require(maul.Player == pinned && leaper.Health == data.WolfHealth, "a pinned player can neither move nor fight back");
         for (int i = 0; i < 40 && !maul.Dead; i++) maul.Tick(.1f);
         Require(maul.Dead, "a pinned player should be killed within seconds");
+        Require(said.Contains("Wolves ate food in your backpack."), $"a player wolves killed should be told only that they ate the food: told {string.Join(" | ", said)}");
         for (int i = 0; i < 20; i++) maul.Tick(.1f);
         Require(packmate.Feeding, "the rest of the pack should stay to feed");
         Require(packmate.Pos.DistanceTo(pinned) < 1.6f, "the rest of the pack should run in to the pinned player");
@@ -1849,25 +1857,10 @@ public static class SimulationChecks {
         var behind = new Wolf { Pos = scared.Player + new Vector2(-6, 0), Health = 4 };
         PlaceWolf(scared, wolf); PlaceWolf(scared, behind);
         scared.UseTorch(Vector2.Right);
-        Require(wolf.Scared && !behind.Scared, "a swing should scare only the wolves it is aimed at");
+        Require(wolf.Following && !behind.Following, "a swing should scare only the wolves it is aimed at");
         RemoveWolves(scared, w => w == behind);
         WolfTick(scared, 8, wolf);
-        Require(scared.Health == 100 && Math.Abs(wolf.Pos.DistanceTo(scared.Player) - World.StalkDistance) < .3f, "a scared wolf should follow at the edge of the light without biting");
-    }
-
-    private static void CheckDirectTorchHitKnocksAWolfBack(GameData data) {
-        var hit = TorchNight(data);
-        var close = new Wolf { Pos = hit.Player + new Vector2(2, 0), Health = 4 };
-        PlaceWolf(hit, close);
-        hit.UseTorch(Vector2.Right);
-        float struck = close.Pos.DistanceTo(hit.Player);
-        Require(close.Stagger == World.StaggerSeconds && struck >= 2 + World.KnockBackDistance - .01f, "a direct torch hit should knock the wolf back and stagger it");
-        WolfTick(hit, World.StaggerSeconds / 2, close);
-        Require(close.Pos.DistanceTo(hit.Player) == struck, "a staggering wolf should hold still");
-        WolfTick(hit, 1, close);
-        Require(close.Health == 3, "a direct torch hit should hurt the wolf");
-        Require(close.Flee > 0, "a direct torch hit should send the wolf running");
-        Require(close.Pos.DistanceTo(hit.Player) > struck + 1, "a direct torch hit should push the wolf back");
+        Require(scared.Health == 100 && Math.Abs(wolf.Pos.DistanceTo(scared.Player) - World.StalkDistance) <= WolfFollow.Wander + .1f, "a scared wolf should follow at the edge of the light without biting");
     }
 
     private static void CheckFullPackIgnoresASwing(GameData data) {
@@ -1875,7 +1868,7 @@ public static class SimulationChecks {
         var wolves = Enumerable.Range(0, World.PackSize).Select(i => new Wolf { Pos = pack.Player + Vector2.Right.Rotated(i * Mathf.Tau / World.PackSize) * World.StalkDistance, Health = 4 }).ToArray();
         foreach (var w in wolves) PlaceWolf(pack, w);
         pack.UseTorch(Vector2.Right);
-        Require(wolves.All(w => !w.Scared), "a complete pack should ignore a swing");
+        Require(wolves.All(w => !w.Following), "a complete pack should ignore a swing");
         WolfTick(pack, 4, wolves);
         Require(pack.Health < 100, $"{World.PackSize} wolves around a torch should attack together");
     }
@@ -2623,7 +2616,7 @@ public static class SimulationChecks {
             float pace = wolf.Pos.DistanceTo(from);
             SetNeeds(world, health: 100);
             PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
-            SafeTick(world, .2f);
+            WolfSteps.SnapTick(world, .5f);
             return (wolf.Health, pace, 100 - world.Health);
         }
         var (first, later) = (Wolf(1), Wolf(30));

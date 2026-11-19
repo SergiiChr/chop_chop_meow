@@ -18,6 +18,23 @@ public static class WolfBodiesChecks {
         Test(CheckAWolfClosingInStopsAtBitingDistanceRatherThanOnThePlayer, data);
         Test(CheckAWolfClosingInKeepsOffWhereAnotherTugsThePlayer, data);
         Test(CheckTwoWolvesAtOnePlayerKeepTheirBodiesApart, data);
+        Test(CheckAWolfsHeightInTheWorldFollowsItsModel, data);
+    }
+
+    /// <summary>A wolf is as tall in the world, where swings are tried against it, as its model stands: on the ground, reared up, and through a leap for the throat.</summary>
+    private static void CheckAWolfsHeightInTheWorldFollowsItsModel(GameData data) {
+        var model = new WolfModel();
+        model.Stand(0, 1, false);
+        float standing = ModelSteps.WolfTop(model);
+        Require(Math.Abs(standing - WolfBodies.StandingTop) < .03f, $"a standing wolf's model is {standing:0.00} m tall, not {WolfBodies.StandingTop} m");
+        float reared = ModelSteps.WolfTop(WolfModel.Rearing(1.1f, 0));
+        Require(Math.Abs(reared - WolfBodies.RearedTop) < .05f, $"a reared wolf's model is {reared:0.00} m tall, not {WolfBodies.RearedTop} m");
+        for (float progress = 0; progress <= 1; progress += .125f) {
+            model.Stand(0, 1, true); model.Leap(progress, 1, 1);
+            float leaping = ModelSteps.WolfTop(model), world = WolfBodies.Top(new Wolf { Leap = World.LeapSeconds * (1 - progress) + 1e-4f });
+            Require(Math.Abs(leaping - world) < .12f, $"a wolf {progress:0.000} through its leap is {leaping:0.00} m tall in its model and {world:0.00} m in the world");
+        }
+        model.Root.Free();
     }
 
     private static void CheckAWolfClosingInStopsAtBitingDistanceRatherThanOnThePlayer(GameData data) {
@@ -34,7 +51,7 @@ public static class WolfBodiesChecks {
         world.Player = Doorways.DoorPoint(hut);
         Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
-        world.Tick(.05f);
+        CabinSteps.UntilTugged(world);
         Require(world.Door == Doorway.Tugged, "a wolf should tug the player out of the doorway");
         // With a wolf at each arm, one more waits just past where the tug ends.
         foreach (int side in new[] { -1, 1 }) PlaceWolf(world, new Wolf { Pos = Doorways.DoorPoint(hut) + new Vector2(side, .2f) });

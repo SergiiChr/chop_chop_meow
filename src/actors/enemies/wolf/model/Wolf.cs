@@ -11,8 +11,18 @@ public enum WolfMode { Patrol, Called, Home }
 public sealed class Wolf : IWalker {
     public float X { get; set; }
     public float Y { get; set; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Health { get; set; } = 4;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Health { get; set; } = 8;
+    /// <summary>Seconds until the wolf may start its next snap at a player.</summary>
     public float Attack { get; set; }
+    /// <summary>
+    /// Seconds left in a snap at a player (<see cref="WolfSnap"/>): the wolf gathers itself, then leaps and bites as it
+    /// lands; zero while it is not snapping.
+    /// </summary>
+    public float Snap { get; set; }
+    /// <summary>Where the player stood as the snap began, which tells the wolf how they move.</summary>
+    public Vector2 SnapSeen { get; set; }
+    /// <summary>Where a snapping wolf's leap lands, set as it leaves the ground.</summary>
+    public Vector2 SnapTo { get; set; }
     /// <summary>Seconds left in a throat leap; zero while the wolf runs on the ground.</summary>
     public float Leap { get; set; }
     /// <summary>True once the wolf has reached the downed player and is feeding.</summary>
@@ -43,16 +53,36 @@ public sealed class Wolf : IWalker {
     [JsonIgnore] public bool Sprinted { get; set; }
     /// <summary>Seconds a chasing wolf keeps following the player into firelight before it gives up; above zero the wolf gallops.</summary>
     public float Chase { get; set; }
-    /// <summary>A torch swing toward this wolf made it keep its distance; it lasts while the torch burns.</summary>
-    public bool Scared { get; set; }
-    /// <summary>Seconds left running away after a direct torch hit.</summary>
+    /// <summary>What a torch has made of this wolf while it hunts a player: in follow mode, turned on them, or running from them.</summary>
+    public FollowStage Follow { get; set; }
+    /// <summary>
+    /// A torch swing toward this wolf made it keep its distance, in follow mode (<see cref="WolfFollow"/>): it circles its
+    /// player at the edge of the torchlight while the torch burns, walks back out to that circle first, or stands braced
+    /// when they walk up to it.
+    /// </summary>
+    [JsonIgnore] public bool Following => Follow is FollowStage.BackingOff or FollowStage.Circling or FollowStage.Braced;
+    /// <summary>Where its player stood when a wolf backing off last looked, which tells it whether they come after it.</summary>
+    public Vector2 Watched { get; set; }
+    /// <summary>
+    /// The way a following wolf circles its player: 1 for clockwise on the map, -1 for the other way, and 0 until it is
+    /// given one at random.
+    /// </summary>
+    public int Round { get; set; }
+    /// <summary>The players this wolf ran from; it leaves each alone until it has been out of smell range of them.</summary>
+    public List<int> Shunned { get; set; } = new();
+    /// <summary>Seconds until a wolf standing its ground growls again.</summary>
+    [JsonIgnore] public float GrowlIn { get; set; }
+    /// <summary>Seconds left running away, after a torch burnt it or from a player who walked at it.</summary>
     public float Flee { get; set; }
     /// <summary>Seconds left reeling from a hit, knocked back and holding still before it runs or attacks again.</summary>
     public float Stagger { get; set; }
     /// <summary>Id of the player this wolf hunts, or zero while it patrols, answers a howl or heads home.</summary>
     public int Target { get; set; }
     public WolfMode Mode { get; set; }
-    /// <summary>The way a patrolling wolf walks, in radians; it keeps it until the ground ahead is impassable.</summary>
+    /// <summary>
+    /// The way the wolf's body faces, in radians: the way a patrolling wolf walks, which it keeps until the ground ahead is
+    /// impassable, and for one hunting a player the way it runs, or the way to them while it stands, creeps or backs off.
+    /// </summary>
     public float Heading { get; set; }
     /// <summary>Where the howl that called this wolf came from.</summary>
     public float CallX { get; set; }

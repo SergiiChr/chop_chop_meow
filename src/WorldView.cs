@@ -1217,32 +1217,38 @@ public partial class WorldView : Node3D {
             if (wolf.Side != 0 && tugs.ShowHolding(wolf, model, RigOf(wolf.Target), Elapsed, dt)) continue;
             model.Steps = null;
             if (wolf.Pinning && wolf.LungeFrom != Vector2.Zero && tugs.ShowLunging(wolf, model, Elapsed, dt)) continue;
-            // A hit throws the wolf back at once in the world; the model holds its place and lunges into the swing, then is thrown back when it lands.
+            // A blow lands in the world as the swing comes down and throws the wolf back there at once; the model hops back from where it stood.
+            // The blow can reach this machine a moment before the swing it shows comes down: the model stands until it does.
             if (wolf.Stagger > model.Stagger) {
                 model.KnockBack -= moved; moved = Vector2.Zero;
                 (model.HitIn, model.Striker) = SwingLands(wolf.Pos + model.KnockBack);
-                model.HitSeconds = model.HitIn; model.HitFrom = wolf.Pos + model.KnockBack; model.Recoiling = 0;
+                model.Struck = true; model.Recoiling = 0; model.SnapHeld = 0;
             }
             model.Stagger = wolf.Stagger;
-            float back = 0;
-            if (model.HitIn > 0) {
+            if (model.Struck) {
                 model.HitIn = Math.Max(0, model.HitIn - dt);
-                // The lunge closes to striking distance of the swing; a wolf already that close stays put.
-                var toward = model.HitFrom - model.Striker;
-                var strike = model.Striker + toward.Normalized() * Math.Min(toward.Length(), WolfModel.StrikeReach);
-                var at = model.HitFrom.Lerp(strike, Ease(1 - model.HitIn / Math.Max(model.HitSeconds, .001f)));
-                back = -(at - wolf.Pos - model.KnockBack).Length();
-                model.KnockBack = at - wolf.Pos;
-                if (model.HitIn == 0) { model.Recoiling = WolfModel.RecoilSeconds; model.KnockBackFrom = model.KnockBack; FurAndEmbers(To3(at, .6f)); Sounds?.Play("wolf_hit", at); }
+                if (model.HitIn == 0) {
+                    var at = wolf.Pos + model.KnockBack;
+                    model.Struck = false; model.Recoiling = WolfModel.RecoilSeconds; model.KnockBackFrom = model.KnockBack; FurAndEmbers(To3(at, .6f)); Sounds?.Play("wolf_hit", at);
+                }
             } else if (model.Recoiling > 0) {
                 // The wolf goes back only while it is in the air, so its paws never slide.
                 model.Recoiling = Math.Max(0, model.Recoiling - dt);
                 float hop = Math.Min(1, (1 - model.Recoiling / WolfModel.RecoilSeconds) / WolfModel.HopShare);
                 model.KnockBack = model.KnockBackFrom * (1 - hop * (2 - hop));
             } else model.KnockBack = Vector2.Zero;
-            bool struck = model.HitIn > 0 || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;
+            // A following wolf walking round its player turns its head to them now and then, each at its own moments.
+            bool glances = wolf.Follow == FollowStage.Circling && wolf.Flee <= 0 && (Elapsed + wolf.Id * WolfModel.GlanceApart) % WolfModel.GlanceEvery < WolfModel.GlanceSeconds;
+            float glance = glances ? Math.Clamp(Mathf.AngleDifference(model.Yaw, ActorAnimation.Yaw(hunted - wolf.Pos, model.Yaw)), -WolfModel.MaxGlance, WolfModel.MaxGlance) : 0;
+            model.Glance = Mathf.MoveToward(model.Glance, glance, dt * WolfModel.GlanceRate);
+            // A snap is shown through to the jaws shutting, a moment after the wolf lands.
+            // One stopped while the wolf still gathered itself has nothing to show.
+            model.SnapHeld = WolfSnap.InAir(wolf) ? WolfModel.SnapHold : wolf.Snap > 0 ? 0 : Math.Max(0, model.SnapHeld - dt);
+            bool struck = model.Struck || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;
+            // No faster than a wolf backs off.
+            bool slow = moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
             // Easing back from its player to biting distance, a wolf steps backward still facing them.
-            bool backing = running && wolf.Flee <= 0 && !wolf.Scared && moved.Dot(hunted - wolf.Pos) < 0 && moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
+            bool backing = running && wolf.Flee <= 0 && !wolf.Following && moved.Dot(hunted - wolf.Pos) < 0 && slow;
             // A scared or galloping wolf turns fast. At a walk or a trot, one that sets off far from the way it faces turns
             // round where it stands first, and only then goes after its place in the world.
             bool fast = wolf.Chase > 0 || wolf.Flee > 0;
@@ -1267,9 +1273,11 @@ public partial class WorldView : Node3D {
             bool stepsRound = !struck && !fast && wolf.Howl <= 0 && (turnsRound || !running) && dt > 0 && Math.Abs(turned) > WolfModel.StepsRoundFrom * dt;
             if (stepsRound) model.Drift += (ActorAnimation.Forward(model.Yaw) - ActorAnimation.Forward(faced)) * WolfModel.HipsBehind;
             model.Root.Visible = World.Sees(wolf.Pos);
-            bool wary = wolf.Scared || HuntedTorchLit(wolf);
+            bool wary = wolf.Following || HuntedTorchLit(wolf);
             float flight = 0;
-            if (model.HitIn > 0) model.Move(-back, dt, false, true);
+            // Gathering itself for a snap while it still runs with its player, it keeps running; standing, it sinks back first.
+            bool gathers = WolfSnap.Winding(wolf) && slow;
+            if (model.Struck) model.Stand(Elapsed + wolf.Id % 7, dt, true);
             else if (model.Recoiling > 0) model.Recoil(1 - model.Recoiling / WolfModel.RecoilSeconds, dt);
             else if (wolf.Leap > 0) {
                 // The world closes the leap's gap evenly, so the start, and the point where the jaws reach the throat, follow from how far it has come.
@@ -1284,10 +1292,14 @@ public partial class WorldView : Node3D {
             } else if (wolf.Feeding) {
                 if (wolf.Pinning) model.Pinned += dt;
                 model.Feed(Elapsed + wolf.Id % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? FeedingSpots.PawsOnChest(model, RigOf(wolf.Target)) : null);
+            } else if (gathers || model.SnapHeld > 0) {
+                float wind = gathers ? 1 - (wolf.Snap - WolfSnap.Flight) / WolfSnap.Windup : 1;
+                model.Snap(wind, gathers ? 0 : 1 - wolf.Snap / WolfSnap.Flight, wolf.Snap > 0 ? 0 : 1 - model.SnapHeld / WolfModel.SnapHold, dt);
             } else if (stepsRound) model.Move(Math.Abs(turned) * WolfModel.TurnStep, dt, false, wary);
             else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (braking) model.Brake(moved.Length(), dt);
-            else if (running) model.Move(backing ? -walked : walked, dt, wolf.Chase > 0 && !backing, wary);
+            else if (running) model.Move(backing ? -walked : walked, dt, (wolf.Chase > 0 || wolf.Follow == FollowStage.Routed) && !backing, wary);
+            else if (wolf.Follow == FollowStage.Braced) model.Brace(Elapsed + wolf.Id % 7, dt);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
             var place = To3(wolf.Pos + model.KnockBack + model.Drift);
             if (wolf.Leap > 0 || wolf.Pinning) {
