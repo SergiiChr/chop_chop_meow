@@ -67,6 +67,10 @@ public sealed class PlayerState {
     /// <summary>Seconds since the player last moved or gathered; hand crafting only goes on while they stand still.</summary>
     internal float Still;
     internal bool Busy, PackAttack;
+    /// <summary>The swing this player has started that has yet to land.</summary>
+    internal Swing? Swing;
+    /// <summary>The next axe swing is the sideways sweep: it takes turns with the overhead chop.</summary>
+    internal bool SweepNext;
     internal readonly List<float> TorchSwings = new();
     /// <summary>Server: the inventory and slot the held stack lies in; the slot keeps its identity when a swap or a sort moves it.</summary>
     internal Inventory? HeldBox;

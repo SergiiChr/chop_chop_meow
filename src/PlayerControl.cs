@@ -37,6 +37,8 @@ public sealed class PlayerControl {
     /// <summary>A cabin the player is walking to after clicking it; they step inside on arrival.</summary>
     private Thing? entering;
     private Momentum momentum;
+    /// <summary>The way the player last walked, which is the way Space swings.</summary>
+    private Vector2 walked;
     /// <summary>A crate held under the right mouse button; it is lifted once held for <see cref="LiftSeconds"/>.</summary>
     private Thing? lifting;
     private float liftClock;
@@ -149,6 +151,7 @@ public sealed class PlayerControl {
         // Under 15% food or drink the player is too weak to sprint.
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
         var step = momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
+        if (step != Vector2.Zero) walked = step.Normalized();
         world.Me.Braking = momentum.Braking;
         var move = step * dt * world.Data.MoveSpeed(world.Me.Sprinting) * world.GravelPaths.SpeedAt(world.Player);
         // Walking to a cabin's door, the last step stops on it rather than past it, however long the frame.
@@ -167,10 +170,10 @@ public sealed class PlayerControl {
         if (t != null) panel.Select(t);
     }
 
-    /// <summary>Space: pumps a selected reinforced furnace in reach, else swings what is selected on the hotbar.</summary>
+    /// <summary>Space: pumps a selected reinforced furnace in reach, else swings an axe or a fist the way the player last walked.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
-        if (station != null && station.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station); else world.Attack();
+        if (station != null && station.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station); else world.Attack(walked);
     }
 
     /// <summary>A mouse button over the world; <paramref name="overPanel"/> tells that the pointer is on a panel, which passes the wheel on when it has nothing to scroll, but must not zoom the world behind.</summary>

@@ -90,6 +90,9 @@ public static class AllocationChecks {
         // A pack that has smelled the player closes in; the player is kept on their feet so the hunt never ends.
         for (int i = 0; i < 3; i++) PlaceWolf(night, new Wolf { Pos = night.Slide(night.Player, Vector2.Right.Rotated(i * 2.1f) * 15) });
         Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }, warmup: 600);
+        // Wolves a torch scared off circle the player in follow mode, each given its way round on the first tick.
+        var (torchlit, _) = WolfSteps.Followed(data, 3);
+        Check("tick: night, wolves following a torch", () => { torchlit.Tick(1 / 60f); Fed(torchlit); }, warmup: 600);
         // Wolves come to the locked door of the cabin the player is in: one scratches at it while the other waits, then both patrol away.
         var (indoors, hut, _) = DoorCheckSteps.ShelteredNight(data, locked: true);
         for (int i = 0; i < 2; i++) PatrolWolf(indoors, new Wolf { Pos = Doorways.DoorPoint(hut) + new Vector2(2 * i - 1, 7) });

@@ -16,7 +16,7 @@ public sealed class WolfPatrols(World world) {
     }
     private readonly Random wolfRandom = new(1913);
     /// <summary>A wolf hunting nobody walks its patrol at this share of its trot.</summary>
-    private const float PatrolPace = .5f;
+    internal const float PatrolPace = .5f;
     /// <summary>From an hour before dawn every wolf gives up and heads back to the nearest den.</summary>
     public bool WolvesRetreat => world.DayPhase >= world.Data.WolfRetreatStarts;
 
@@ -106,20 +106,23 @@ public sealed class WolfPatrols(World world) {
     }
     /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
     private static void Calm(Wolf wolf) {
-        wolf.Target = 0; wolf.Howl = wolf.HowlIn = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
-        wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();
+        wolf.Target = 0; wolf.Howl = wolf.HowlIn = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = wolf.Snap = 0; wolf.Round = 0; wolf.Follow = FollowStage.None;
+        wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Growled = wolf.Sprinted = false; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();
         wolf.LetGoOfArm(); wolf.EndDoorCheck();
     }
     /// <summary>
     /// A wolf that smells a player out in the open <paramref name="within"/> metres takes them as its prey, dropping whatever it did at a
     /// cabin's door; returns whether it did.
     /// One that finds them out of its sight first turns to them from the way it <paramref name="went"/>, then howls before it goes after them.
+    /// It leaves alone each player it ran from, until it has been out of smell range of that one.
     /// </summary>
     internal bool Smell(Wolf wolf, float within, Vector2 went = default) {
         var (s, data) = (world.S, world.Data);
+        for (int i = wolf.Shunned.Count - 1; i >= 0; i--)
+            if (!InSmell(wolf, wolf.Shunned[i])) wolf.Shunned.RemoveAt(i);
         PlayerState? prey = null;
         foreach (var p in s.Players)
-            if (p.RespawnIn <= 0 && !Doorways.Indoors(p) && p.Pos.DistanceTo(wolf.Pos) <= within && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
+            if (p.RespawnIn <= 0 && !Doorways.Indoors(p) && !wolf.Shunned.Contains(p.Id) && p.Pos.DistanceTo(wolf.Pos) <= within && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
         if (prey == null) return false;
         Patrol(wolf, wolf.Heading);
         wolf.Target = prey.Id;
@@ -130,6 +133,8 @@ public sealed class WolfPatrols(World world) {
         if (wolf.HowlIn == 0) Howl(wolf);
         return true;
     }
+    /// <summary>Whether the player with an id is still in the game and within smell range of a wolf.</summary>
+    private bool InSmell(Wolf wolf, int player) => world.PlayerById(player) is { } p && p.Pos.DistanceTo(wolf.Pos) <= world.Data.SmellRadius;
     /// <summary>
     /// Seconds a wolf takes to turn half a turn where it stands, to face a player it smelled before it howls.
     /// A smaller turn takes the square root of its share of that: a wolf's body comes round fast at first and settles slowly.

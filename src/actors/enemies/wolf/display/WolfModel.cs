@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What a wolf model shows; a change blends from the pose it had into the new one.</summary>
-public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Rear, Door }
+public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Rear, Door, Brace, Snap }
 
 /// <summary>
 /// A leg's joint angles in degrees, each swinging the segment below forward from its parent's line; Splay swings the whole leg out from the body.
@@ -58,11 +58,21 @@ public sealed class WolfModel {
     public Turning Turning;
     public Vector2 Last, KnockBack;
     /// <summary>
-    /// A blow: seconds until the swing lands and how long it took in all, where the wolf stood and who swung, then seconds left in the recoil and the knockback it started from.
+    /// A blow: whether one has reached the wolf that the swing shown has yet to land, the seconds until it does and who swung,
+    /// then seconds left in the recoil and the knockback it started from.
     /// Pinned counts seconds since a leap's jaws reached the throat.
     /// </summary>
-    public float HitIn, HitSeconds, Recoiling, Pinned;
-    public Vector2 HitFrom, Striker, KnockBackFrom;
+    public bool Struck;
+    public float HitIn, Recoiling, Pinned;
+    public Vector2 Striker, KnockBackFrom;
+    /// <summary>How far the wolf's head is turned from its body toward a player it glances at as it walks round them, in radians to its left.</summary>
+    public float Glance;
+    /// <summary>The most a wolf's head turns from its body to glance at a player, and how fast it turns there and back, in radians and radians a second.</summary>
+    public static readonly float MaxGlance = Mathf.DegToRad(105), GlanceRate = Mathf.DegToRad(260);
+    /// <summary>Seconds from one glance of a following wolf at its player to the next, how long it looks, and how far apart wolves with neighbouring ids glance.</summary>
+    public const float GlanceEvery = 4.6f, GlanceSeconds = 1.7f, GlanceApart = 1.3f;
+    /// <summary>Seconds left of holding the end of a snap, jaws shut, after the wolf has landed.</summary>
+    public float SnapHeld;
     /// <summary>A leap's bearing from the player to the wolf, and where it holds the throat once the player is down.</summary>
     public Vector2 Toward;
     public Vector3 Held;
@@ -85,8 +95,8 @@ public sealed class WolfModel {
 
     /// <summary>How far ahead of its root a leaping wolf's jaws reach the throat of a standing player: the reach of the bite plus the throat's own depth.</summary>
     public const float ContactReach = .65f;
-    /// <summary>How close to the swinger a struck wolf lunges before the blow lands: about the reach of an arm and a muzzle.</summary>
-    public const float StrikeReach = 1.35f;
+    /// <summary>Seconds a wolf holds the end of a snap, stretched out with its jaws shut, before it gathers its legs under it again.</summary>
+    public const float SnapHold = .14f;
     /// <summary>How long the recoil from a blow plays, from the moment it lands, and the share of it spent hopping back.</summary>
     public const float RecoilSeconds = .6f, HopShare = .4f;
     /// <summary>How long a killed wolf takes to go down, and the share of that it is thrown through the air before it hits the ground.</summary>
@@ -250,6 +260,50 @@ public sealed class WolfModel {
                 Tail: -66 + 3 * MathF.Sin(time * .8f), Wag: 8 * MathF.Sin(time * 1.1f), Curl: 8 + 4 * MathF.Sin(time * 1.1f + .8f));
         return Planted(body, wary ? 1.15f : 1, settle * .015f);
     }
+
+    /// <summary>
+    /// Braced, standing its ground square to whoever walks at it: sunk low over forepaws set wide and a little ahead, its
+    /// weight back on bent hind legs, the neck down and the head level, ears flat, lips drawn back off the teeth, the tail
+    /// held stiff. Its sides heave and the jaw trembles.
+    /// </summary>
+    public void Brace(float time, float dt) => Show(WolfMotion.Brace, Bracing(time), dt);
+
+    private static WolfPose Bracing(float time) {
+        float breath = MathF.Sin(time * 3.4f), tremble = MathF.Sin(time * 19);
+        var body = new WolfPose(Lift: -.11f + .005f * breath, Surge: -.05f, Pitch: 5, Flex: 5, Neck: 36 + breath, Head: -32, Jaw: 12 + 2 * breath + tremble,
+            Ears: 34, Snarl: 1, Tail: -46, Wag: tremble, Curl: -6);
+        return Planted(body, 1.35f, 0, frontAhead: .1f, hindSpread: 1.15f);
+    }
+
+    /// <summary>
+    /// A snap at a player. Gathering itself, as <paramref name="wind"/> runs 0 to 1, the wolf sinks back onto its haunches,
+    /// back rounded, head low and lips drawn. As <paramref name="drive"/> runs 0 to 1 it drives off its hind legs and throws
+    /// chest, neck and wide jaws out ahead, the forepaws reaching for the ground under them; the jaws close as
+    /// <paramref name="shut"/> runs 0 to 1 once it has landed.
+    /// </summary>
+    public void Snap(float wind, float drive, float shut, float dt) => Show(WolfMotion.Snap, Snapping(wind, drive, shut, SnapSurge), dt);
+
+    private static WolfPose Snapping(float wind, float drive, float shut, float surge) {
+        float g = Mathf.SmoothStep(0, 1, wind), d = Mathf.SmoothStep(0, 1, drive), air = MathF.Sin(MathF.PI * Math.Clamp(drive, 0, 1));
+        // From the wary stand it stalks in, to gathered, to stretched out at the end of the leap.
+        float Through(float wary, float gathered, float struck) => Mathf.Lerp(Mathf.Lerp(wary, gathered, g), struck, d);
+        var body = new WolfPose(Lift: Through(-.08f, -.15f, -.05f) + .03f * air, Surge: Through(0, -.1f, surge), Pitch: Through(4, -2, 3), Flex: Through(0, 12, -10),
+            Neck: Through(30, 26, 14), Head: Through(-26, -18, -12), Jaw: Through(9, 14, 34 - 30 * Mathf.SmoothStep(0, 1, shut)), Ears: Through(-10, 34, 34), Snarl: 1,
+            Tail: Through(-82, -74, -40), Curl: -4);
+        for (int leg = 0; leg < 4; leg++) {
+            bool hind = leg >= 2;
+            // The hind paws stay where they pushed off; the forepaws lift and come down under the chest where it lands.
+            var at = new Vector3(WolfShape.Pivot(leg).X * Through(1.15f, 1.3f, 1), WolfShape.Sole + (hind ? 0 : .1f * air), Home(leg) + (hind ? 0 : surge * d));
+            body = body.WithLeg(leg, Reach(body, leg, at, hind ? 2 - 20 * d : 10 - 40 * air, hind ? -24 * d : -20 * air));
+        }
+        return body;
+    }
+
+    /// <summary>
+    /// How far forward of its place a snapping wolf throws its body, so its jaws close where the world aims them:
+    /// <see cref="WolfSnap.JawsAhead"/> of its place.
+    /// </summary>
+    public static readonly float SnapSurge = WolfSnap.JawsAhead - BiteOf(Snapping(1, 1, 1, 0)).Z;
 
     /// <summary>
     /// Howling: the wolf braces on all four paws, lifts its chest and throws its head back with the muzzle to the sky, the jaw opening as the note swells and closing as it fades.
@@ -611,10 +665,15 @@ public sealed class WolfModel {
             float look = Mathf.RadToDeg(Turning.Look);
             target = target with { NeckTurn = target.NeckTurn + NeckShare * look, HeadTurn = target.HeadTurn + (1 - NeckShare) * look, Bend = target.Bend + CurlShare * look, Wag = target.Wag + TailShare * look };
         }
+        // A glance turns only the neck and head.
+        if (Glance != 0) {
+            float glance = Mathf.RadToDeg(Glance);
+            target = target with { NeckTurn = target.NeckTurn + NeckShare * glance, HeadTurn = target.HeadTurn + (1 - NeckShare) * glance };
+        }
         if (next != motion) {
             from = shown; blend = 0;
             // A leap and a blow happen fast, and a wolf at a door stands still before its first scratch; changes of gait and settling down take longer.
-            blendSeconds = next is WolfMotion.Leap or WolfMotion.Recoil ? .08f : next is WolfMotion.Pin or WolfMotion.Door or WolfMotion.Rear ? .12f : motion == WolfMotion.Recoil ? .3f : .25f;
+            blendSeconds = next is WolfMotion.Leap or WolfMotion.Recoil or WolfMotion.Snap ? .08f : next is WolfMotion.Pin or WolfMotion.Door or WolfMotion.Rear ? .12f : motion == WolfMotion.Recoil ? .3f : .25f;
             motion = next;
         }
         blend = Math.Min(1, blend + dt / blendSeconds);
