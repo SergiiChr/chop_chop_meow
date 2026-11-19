@@ -51,7 +51,7 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
 - `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
 - `src/intro/CatgirlPage.cs` — the web page of dancing catgirls on the hero's screen in the intro film.
 - `src/intro/Catgirl.cs` — a catgirl of that page: the person model's slim build with a face, hair, cat ears, a tail,
-  hands with fingers and a maid's dress, a sailor uniform or a long hoodie.
+  hands with fingers and a maid's dress, a sleeveless shirt with shorts and knee socks, or a long hoodie.
 - `src/ModelKit.cs` — shared primitive, material and fade helpers.
   A material is flat colour or one of the surfaces wood, metal, stone, cloth and earth: the colour stays the model's
   own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail

@@ -79,9 +79,11 @@ internal static class HumanShape {
         skeleton.GetChild<MeshInstance3D>(0).Name = "HumanLeg";
         return skeleton;
     }
-    public static Skeleton3D Arm(Node3D parent, float joint, bool left, string shirt, string skin, bool shortSleeve, bool slim = false) {
+    /// <param name="bare">Whether the arm is bare to the shoulder, which leaves it all skin and no weave.</param>
+    public static Skeleton3D Arm(Node3D parent, float joint, bool left, string shirt, string skin, bool shortSleeve, bool slim = false, bool bare = false) {
         var rings = slim ? left ? slimLeftArm : slimRightArm : left ? leftArm : rightArm;
-        var skeleton = ActorShape.Limb(parent, rings, joint, Palette(shirt, shortSleeve ? skin : shirt, skin, !shortSleeve));
+        var palette = bare ? Palette(skin, skin, skin, false, false) : Palette(shirt, shortSleeve ? skin : shirt, skin, !shortSleeve);
+        var skeleton = ActorShape.Limb(parent, rings, joint, palette);
         skeleton.GetChild<MeshInstance3D>(0).Name = left ? "HumanArmLeft" : "HumanArmRight";
         return skeleton;
     }

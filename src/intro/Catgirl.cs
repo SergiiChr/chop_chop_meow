@@ -5,14 +5,14 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-internal enum CatgirlOutfit { Maid, Sailor, Hoodie }
+internal enum CatgirlOutfit { Maid, Shorts, Hoodie }
 
 /// <summary>What a catgirl's hand does: spread open, shut, one finger pointing, or finger and thumb closed in a ring.</summary>
 internal enum HandShape { Open, Fist, Point, Ring }
 
 /// <summary>
 /// A catgirl dancing on the web page in the intro film: the game's person model in its slim build, with a face, hair,
-/// cat ears, a tail, hands with fingers and an outfit of her own.
+/// cat ears, a tail, hands with fingers and an outfit of her own: a maid's dress, a sleeveless shirt with shorts and knee socks, or a long hoodie.
 /// </summary>
 internal sealed class Catgirl {
     public readonly ActorRig Rig;
@@ -29,9 +29,9 @@ internal sealed class Catgirl {
     public Catgirl(CatgirlOutfit outfit, Vector3 at) {
         this.outfit = outfit;
         var (hair, eyes, clothes) = outfit switch {
-            CatgirlOutfit.Maid => ("f29ab8", "3f8fd6", new CatgirlClothes("25222c", "25222c", "f6f1f4", "1d1b20", false, false)),
-            CatgirlOutfit.Sailor => ("e8c56a", "d98a2b", new CatgirlClothes("f4f2ee", "2b3a67", ActorRig.CatgirlSkin, "6b4428", false, true)),
-            _ => ("e9e6f2", "8a5fd0", new CatgirlClothes("f0b63f", "f0b63f", ActorRig.CatgirlSkin, "f4f4f4", true, true)),
+            CatgirlOutfit.Maid => ("f29ab8", "3f8fd6", new CatgirlClothes("25222c", "25222c", "f6f1f4", "1d1b20", Sleeves.Short, false)),
+            CatgirlOutfit.Shorts => ("e8c56a", "d98a2b", new CatgirlClothes("f6f4f0", "1c1b20", ActorRig.CatgirlSkin, "c8372f", Sleeves.None, true)),
+            _ => ("e9e6f2", "8a5fd0", new CatgirlClothes("f0b63f", "f0b63f", ActorRig.CatgirlSkin, "f4f4f4", Sleeves.Long, true)),
         };
         Rig = new ActorRig(ActorSkin.Catgirl, clothes: clothes);
         home = at;
@@ -93,7 +93,7 @@ internal sealed class Catgirl {
             }
         }
         // A ponytail tied at the crown.
-        if (outfit != CatgirlOutfit.Sailor) return;
+        if (outfit != CatgirlOutfit.Shorts) return;
         Sphere(head, .034f, new Vector3(0, .26f, -.1f), Mat("c8372f"), null, 8);
         Tress(new Vector3(0, .26f, -.11f), new Vector3(-28, 0, 0), .045f, .034f, .23f);
     }
@@ -145,19 +145,23 @@ internal sealed class Catgirl {
                     }
                     break;
                 }
-            case CatgirlOutfit.Sailor: {
-                    StandardMaterial3D navy = Cloth("2b3a67"), red = Cloth("c8372f");
-                    // A pleated skirt with a white stripe, the blouse's hem over it, a sailor collar and a knotted scarf.
-                    Cylinder(torso, .27f, .1f, .25f, new Vector3(0, -.005f, 0), navy, sides: 18);
-                    Cylinder(torso, .254f, .246f, .014f, new Vector3(0, -.1f, 0), white, sides: 18);
-                    Cylinder(torso, .106f, .1f, .04f, new Vector3(0, .14f, 0), white, sides: 14);
-                    Box(chest, new Vector3(.2f, .12f, .012f), new Vector3(0, .44f, -.084f), navy);
+            case CatgirlOutfit.Shorts: {
+                    StandardMaterial3D black = Cloth("1c1b20"), red = Cloth("c8372f");
+                    // A sleeveless shirt: a cap over each shoulder where a sleeve would start, a small collar and three buttons.
                     foreach (float side in new[] { -1f, 1f }) {
-                        Box(chest, new Vector3(.075f, .016f, .15f), new Vector3(side * .09f, .503f, 0), navy, new Vector3(0, 0, -side * 22));
-                        Box(chest, new Vector3(.036f, .13f, .012f), new Vector3(side * .045f, .435f, .088f), navy, new Vector3(0, 0, side * 22));
-                        Box(chest, new Vector3(.022f, .07f, .012f), new Vector3(side * .016f, .315f, .116f), red, new Vector3(0, 0, side * 12));
+                        Sphere(chest, .05f, new Vector3(side * .14f, .455f, 0), white, new Vector3(.8f, .8f, 1.1f), 10);
+                        Box(chest, new Vector3(.05f, .03f, .012f), new Vector3(side * .032f, .515f, .062f), white, new Vector3(-20, 0, side * 28));
                     }
-                    Box(chest, new Vector3(.04f, .04f, .02f), new Vector3(0, .37f, .118f), red);
+                    for (int button = 0; button < 3; button++) Box(chest, new Vector3(.012f, .012f, .008f), new Vector3(0, .44f - button * .075f, .11f - button * .012f), Mat("9aa0a8"));
+                    // High shorts with a red belt, a wide cuff round each thigh, and socks to just under the knee.
+                    Cylinder(torso, .118f, .108f, .06f, new Vector3(0, .15f, 0), black, sides: 14).Scale = new Vector3(1, 1, .7f);
+                    Cylinder(torso, .113f, .113f, .022f, new Vector3(0, .185f, 0), red, sides: 14).Scale = new Vector3(1, 1, .7f);
+                    Box(torso, new Vector3(.03f, .026f, .01f), new Vector3(0, .185f, .08f), Metal("e8c14a", .3f, .8f));
+                    foreach (bool isLeft in new[] { true, false }) {
+                        Cylinder(Rig.Thigh(isLeft), .094f, .086f, .18f, new Vector3(0, -.07f, 0), black, sides: 12);
+                        Cylinder(Rig.Shin(isLeft), .051f, .062f, .3f, new Vector3(0, -.195f, .004f), black, sides: 10);
+                        Cylinder(Rig.Shin(isLeft), .065f, .065f, .022f, new Vector3(0, -.05f, .004f), black, sides: 10);
+                    }
                     break;
                 }
             default: {
@@ -180,12 +184,16 @@ internal sealed class Catgirl {
         Rig.Show(frame.Pose, null, false);
         Rig.RollArm(true, frame.RollL); Rig.RollArm(false, frame.RollR);
         Rig.BendChest(frame.Chest.X, frame.Chest.Y, frame.Chest.Z);
-        Rig.TiltHips(frame.HipTilt);
+        Rig.TurnHips(frame.Hips.X, frame.Hips.Y, frame.Hips.Z);
         Rig.SplayLeg(true, frame.SplayL); Rig.SplayLeg(false, frame.SplayR);
-        Rig.Root.Position = home + new Vector3(frame.Shift, 0, 0);
+        // Each foot tips back by as much as its leg leans out, so its sole lies flat on the floor.
+        Rig.RollFoot(true, -frame.SplayL - frame.Hips.Z); Rig.RollFoot(false, -frame.SplayR + frame.Hips.Z);
+        Rig.MoveShoulder(true, frame.ShoulderL.X, frame.ShoulderL.Y); Rig.MoveShoulder(false, frame.ShoulderR.X, frame.ShoulderR.Y);
+        Rig.Root.Position = home + new Vector3(frame.Shift, frame.Lift, 0);
+        Rig.Root.RotationDegrees = new Vector3(0, frame.Facing, 0);
         head.RotationDegrees += frame.Head;
         left.Shape = frame.HandL; right.Shape = frame.HandR;
-        left.Bend = frame.WristL; right.Bend = frame.WristR;
+        left.Turn(frame.WristL); right.Turn(frame.WristR);
         // The tail's tip and her tied hair trail behind the sway.
         for (int i = 0; i < tail.Count; i++) tail[i].RotationDegrees = new Vector3(TailCurl[i], 0, Mathf.Lerp(14 * frame.Swing, 38 * frame.Trail, i / (tail.Count - 1f)));
         foreach (var tress in tresses) tress.RotationDegrees = new Vector3(0, 0, -12 * frame.Trail);
@@ -221,8 +229,11 @@ internal sealed class Catgirl {
             Curl();
         }
 
-        /// <summary>Degrees the hand bends toward its palm at the wrist; negative bends it back.</summary>
-        public float Bend { set => wrist.RotationDegrees = new Vector3(0, 0, value * inward); }
+        /// <summary>
+        /// Turns the hand at the wrist: a bend toward its palm, a twist of the forearm that brings the thumb in toward
+        /// the body, and a tip toward the thumb's side, in degrees.
+        /// </summary>
+        public void Turn(Vector3 wristTurn) => wrist.RotationDegrees = new Vector3(wristTurn.Z, wristTurn.Y * inward, wristTurn.X * inward);
 
         public HandShape Shape {
             set {

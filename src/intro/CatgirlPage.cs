@@ -17,7 +17,7 @@ internal sealed class CatgirlPage {
     /// <summary>How far apart the dancers stand, in metres.</summary>
     private const float Spacing = .82f;
     /// <summary>The dancers from the viewer's left to right; the one in the middle dances the solo.</summary>
-    private static readonly CatgirlOutfit[] Outfits = { CatgirlOutfit.Maid, CatgirlOutfit.Sailor, CatgirlOutfit.Hoodie };
+    private static readonly CatgirlOutfit[] Outfits = { CatgirlOutfit.Maid, CatgirlOutfit.Shorts, CatgirlOutfit.Hoodie };
     private const int Soloist = 1;
 
     private readonly SubViewport view = new() { Size = Size, OwnWorld3D = true, Msaa3D = Viewport.Msaa.Msaa4X, RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled };

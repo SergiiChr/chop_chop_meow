@@ -1173,14 +1173,18 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   drawn to a picture that a sheet over his screen wears; it is drawn again each frame only while the office is shown.
   A catgirl (`Catgirl`) is the game's person model in a slim build (`ActorSkin.Catgirl`: a waist, thinner limbs,
   narrower shoulders, wrists that end without a fist), with a smaller head, a face that blinks, hair, cat ears, a tail
-  of five joints, hands with fingers and one of three outfits: a maid's dress, a sailor uniform or a long hoodie.
+  of five joints, hands with fingers and one of three outfits: a maid's dress, a sleeveless shirt with shorts and knee
+  socks, or a long hoodie.
   The two at the sides dance `CatgirlDance.Chorus` in step. The one in the middle dances `CatgirlDance.Solo`: a list
   of steps, each a place for either hand with a way for its elbow to point, blended and solved by `IntroPoses.Folding`
   every frame. The page's clock starts with the close-up of it.
   The slim build has joints the game's people lack, each set on top of a shown pose: the chest turns on the belly at
-  the waist (`ActorRig.BendChest`), the hips tilt (`TiltHips`) and each thigh tips out on its own (`SplayLeg`).
-  `Catgirl` adds wrists that bend and a head that nods, turns and tilts. A step of the solo sets all of them, so her
-  weight goes onto one leg with the far hip lifted and the chest tipped back over it.
+  the waist (`ActorRig.BendChest`), the hips tuck, turn and tilt (`TurnHips`), each thigh tips out on its own
+  (`SplayLeg`), each foot tips at the ankle to lie flat (`RollFoot`) and each shoulder shrugs or hunches
+  (`MoveShoulder`).
+  `Catgirl` adds wrists that bend, twist and tip, a head that nods, turns and tilts, a turn of the whole body and a lift
+  off the floor. A `DanceFrame` holds all of them; a step of the solo sets most, so her weight goes onto one leg with
+  the far hip lifted and the chest tipped back over it.
 - The paint filter is drawn over the frames wider than in the game (`WorldView.IntroPaintWidth`), since the movie tool
   shrinks them.
 - The camera is the game's own, switched to perspective and placed per shot at eye level. A dome around it draws the
