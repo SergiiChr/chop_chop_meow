@@ -27,6 +27,7 @@ Project rules on top of the global coding and testing guides.
 - **Illegal states:** use enums such as `ActorAction` rather than combinations of flags or strings.
 - **Validation at the boundary:** `GameData` checks its tables fit together when the game starts, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
 - **Saves:** a change that would make a save written before it load wrong raises `SaveState.Version`, and `World.Deserialize` refuses every other version. Write no code that converts an old save or repairs a broken one, and no check for either: a save the game cannot take as it is, is refused with the reason. The user's own save is fixed by hand when they ask.
+- **Network messages:** a change to what a host and a guest send each other raises `Net.Protocol`, so builds that differ refuse each other: a command added to or renamed in `Verb`, which travels as its number, a building or other kind added to `ThingKind`, or a field added to or taken out of an update entry.
 
 ## Architecture
 
@@ -99,6 +100,7 @@ Allocation budgets:
 - `CheckPanelPagesRefreshWithoutAllocating` holds every panel page to 0 bytes a refresh while what it shows stays the same. Live panel updates go through `LiveUpdates`: `Watch` draws only when a value changes, and `Bind` rebuilds text in a reused buffer and hands Godot a new string only when it changes.
 - Real frames are measured only while walking, so per-frame code for gathering, a mauling or a settlement in view has no allocation check yet; review those paths by hand.
 - The server's network updates, thirty a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
+- A list that grows with play gets an update entry of its own, as gravel path tiles have (`EntryKey.Paths`), and stays out of the world's state entry, which is written again on every update because time moves. `SaveState.Crates` still rides in the state entry.
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
 `./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a sprint from the sea past a staffed camp and the lake to the valley's top corner, by day and at night with a lit torch, split by leg.
