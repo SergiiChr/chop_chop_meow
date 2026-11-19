@@ -31,6 +31,9 @@ public sealed class GravelPaths(World world) {
 
     public bool Laid(Vector2I tile) => Laid(tile.X, tile.Y);
 
+    /// <summary>A tile's place in the map's rows, which the save lists it by.</summary>
+    private static int Index(Vector2I tile) => tile.Y * Terrain.Size + tile.X;
+
     /// <summary>Whether a point is on drawn gravel, which is where walkers are faster and footsteps crunch.</summary>
     public bool Covers(Vector2 p) => GravelOutline.Distance(this, p) <= 0;
 
@@ -52,10 +55,14 @@ public sealed class GravelPaths(World world) {
     /// <summary>How many times faster a walker at a point moves: <see cref="GameData.GravelSpeed"/> on gravel, 1 off it.</summary>
     public float SpeedAt(Vector2 p) => Covers(p) ? world.Data.GravelSpeed : 1;
 
-    /// <summary>Why a path tile cannot be laid at a point, or null: only water, cliffs, a standing resource and a tile already laid refuse it.</summary>
+    /// <summary>
+    /// Why the acting player cannot lay a path tile at a point, or null: it is out of their reach, on water or cliffs,
+    /// laid already, under a standing resource, or they lack the gravel.
+    /// Buildings and yards refuse nothing.
+    /// </summary>
     public string? Block(Vector2 p) {
         var tile = TileAt(p);
-        if (world.Player.DistanceTo(tile) > 5.5f) return "Build within 5 tiles of yourself.";
+        if (world.Construction.TooFar(tile) is string far) return far;
         if (!World.Open(tile) || Terrain.InLake(tile, .8f)) return "Choose dry, open ground.";
         if (Laid(tile)) return "Gravel is already laid here.";
         foreach (var t in world.S.Things)
@@ -67,15 +74,15 @@ public sealed class GravelPaths(World world) {
     internal void Lay(Vector2I tile) {
         Sync();
         world.ClearTile(tile);
-        world.S.GravelPaths.Add(tile.Y * Terrain.Size + tile.X);
-        laid[tile.Y * Terrain.Size + tile.X] = true;
+        world.S.GravelPaths.Add(Index(tile));
+        laid[Index(tile)] = true;
         Changed();
     }
 
     /// <summary>Why the acting player cannot take up a tile, or null: none is laid there, or it is out of reach.</summary>
     public string? TakeUpBlock(Vector2I tile) {
         if (!Laid(tile)) return "No gravel path here.";
-        return world.Downed || world.S.Sheltered != 0 || world.Player.DistanceTo(tile) > World.ItemReach ? "Walk closer first." : null;
+        return world.Reaches(tile) ? null : "Walk closer first.";
     }
 
     /// <summary>
@@ -84,8 +91,8 @@ public sealed class GravelPaths(World world) {
     public bool TakeUp(Vector2I tile) {
         if (TakeUpBlock(tile) is string refused) { world.Say(refused); return false; }
         if (world.Busy() || world.Forwarded(Verb.TakeUpPath, at: tile)) return true;
-        world.S.GravelPaths.Remove(tile.Y * Terrain.Size + tile.X);
-        laid[tile.Y * Terrain.Size + tile.X] = false;
+        world.S.GravelPaths.Remove(Index(tile));
+        laid[Index(tile)] = false;
         Changed();
         world.Play("take_down_building", tile);
         if (!world.Construction.GiveBack(world.Data.Buildings[ThingKind.GravelPath].Cost, tile)) world.Say("The gravel did not fit in your backpack. It is in a box where the path lay.");

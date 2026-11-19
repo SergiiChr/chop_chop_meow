@@ -32,6 +32,17 @@ public static class AllocationChecks {
         Check("tick: fresh valley, stack held from a chest", () => { holding.Tick(1 / 60f); Fed(holding); });
         Require(holding.Held != null, "the held stack should stay held through the ticks");
 
+        // A worker walking to a bench asks on every tick whether the ground underfoot is gravel; the path outlasts the check's eleven seconds.
+        var paved = WorkDay(data);
+        var pathStart = new Vector2I(80, 80);
+        GravelPathSteps.LayRow(paved, pathStart, 36);
+        var farBench = WorkerSteps.Bench(paved, pathStart + new Vector2(40, 0), "planks", "stone_chisel"); farBench.Inventory.Add("wood", 4);
+        var walker = AddWorker(paved, pathStart); walker.Wage = 18;
+        paved.SetDuty(walker, farBench, JobKind.Craft, true);
+        paved.Player = pathStart + new Vector2(0, 20);
+        Check("tick: worker walking a gravel path", () => { paved.Tick(1 / 60f); Fed(paved); });
+        Require(walker.Pos.X > pathStart.X + 25 && paved.GravelPaths.Covers(walker.Pos), "the worker should have walked the path through the ticks and still be on it");
+
         var settlement = Settlement(data);
         // Twenty seconds first, so every worker has been through its trips once and the status and cost caches hold what they will show.
         // A store taking an item it has not held before grows its table once (measured 0.2 to 0.5 bytes a tick).

@@ -872,8 +872,9 @@ public partial class WorldView : Node3D {
     /// <summary>Whether a model whose thing has left the world plays its way out: a felled tree, and a stump or bush that was dug out rather than built over.</summary>
     private bool Departs(Prop prop) => prop is TreeProp || prop is DugProp && !BuiltOver(prop.Look.Pos);
 
-    /// <summary>Whether a building, yard or crate now stands over a spot, having cleared away the stump or bush that was there.</summary>
+    /// <summary>Whether a building, yard, crate or gravel path tile now lies over a spot, having cleared away the stump or bush that was there.</summary>
     private bool BuiltOver(Vector2 at) {
+        if (World.GravelPaths.Laid(GravelPaths.TileAt(at))) return true;
         foreach (var kind in World.Structures)
             foreach (var t in World.ThingsOf(kind)) if (World.Clears(t, at)) return true;
         return false;

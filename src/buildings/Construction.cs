@@ -33,7 +33,7 @@ public sealed class Construction(World world) {
         if (kind == ThingKind.Mine) return world.MineBlock(p);
         if (kind == ThingKind.GravelPath) return world.GravelPaths.Block(p);
         if (IsZone(kind)) return ZoneBlock(kind, p);
-        if (world.Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
+        if (TooFar(p) is string far) return far;
         if (world.Player.DistanceTo(p) < 1.2f || Terrain.Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
         if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         foreach (var t in world.S.Things)
@@ -47,10 +47,12 @@ public sealed class Construction(World world) {
         if (crate ? item != null && (world.MarkedSource ?? world.S.Backpack)[item] == 0 : !world.S.Backpack.Has(world.Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
         return null;
     }
+    /// <summary>What refuses a plan further from the acting player than they can place one, or null within that.</summary>
+    internal string? TooFar(Vector2 p) => world.Player.DistanceTo(p) > 5.5f ? "Build within 5 tiles of yourself." : null;
     /// <summary>How far past their own footprint buildings keep from a cabin's door spot, where players step in and out.</summary>
     private const float DoorRoom = .45f;
     private string? ZoneBlock(ThingKind kind, Vector2 p) {
-        if (world.Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
+        if (TooFar(p) is string far) return far;
         // Every tile the yard covers.
         for (int x = -1; x <= 1; x++)
             for (int y = -1; y <= 1; y++) {

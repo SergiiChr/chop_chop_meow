@@ -370,7 +370,8 @@ public partial class Game : Node, IGameFlow {
         // A recording ends on its last frame, with no sound left playing to hold its stream at exit.
         if (framesLeft > 0 && --framesLeft == 0) { LeaveServer(); sounds.StopAll(); GetTree().Quit(); }
         float dt = Math.Min((float)delta, .1f); runTime += dt;
-        player.Update(dt, GetViewport().GuiGetHoveredControl() != null); panel.ShowAwaited();
+        bool overInterface = GetViewport().GuiGetHoveredControl() != null;
+        player.Update(dt, overInterface); panel.ShowAwaited();
         if (session is Session.Launching launching) AwaitServer(launching);
         // The server holds the world still while every player has a menu open, which in a game alone is whenever this one does.
         if (kit.Paused != holding) { holding = kit.Paused; net.Hold(holding); }
@@ -387,7 +388,7 @@ public partial class Game : Node, IGameFlow {
         // A recording leaves the pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
         bool recording = Engine.GetWriteMoviePath() != "";
         var hover = recording ? null : view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = recording ? 0 : view.PickWorker(view.Mouse)?.Id ?? 0;
-        view.Removal = GetViewport().GuiGetHoveredControl() == null ? player.RemovalAt(hover, view.Mouse) : Removal.None;
+        view.Removal = overInterface ? Removal.None : player.RemovalAt(hover, view.Mouse);
         uiClock += dt;
         if (uiClock > .2f || net.AwaitingAnswer && net.ShownUpdate != refreshedUpdate) {
             uiClock = 0; refreshedUpdate = net.ShownUpdate; RefreshLive();

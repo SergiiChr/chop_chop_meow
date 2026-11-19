@@ -1123,9 +1123,10 @@ public partial class Game {
             Warp(world, start); await Frames();
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
             await Until(() => world.Player.DistanceTo(start) > 1, "the player getting up to speed", 2);
-            var from = world.Player; ulong began = Time.GetTicksUsec();
+            // By the game's own clock, which moves the player: a frame that stalls counts for a tenth of a second there, and for all of it on a real clock.
+            var from = world.Player; float began = runTime;
             await Until(() => world.Player.DistanceTo(start) > 4, "the player walking four tiles", 3);
-            float speed = world.Player.DistanceTo(from) / ((Time.GetTicksUsec() - began) / 1e6f);
+            float speed = world.Player.DistanceTo(from) / (runTime - began);
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
             await Frames();
             return speed;
@@ -1421,6 +1422,18 @@ public partial class Game {
         Require(chest != null && world.Find(stump.Id) == null, "A chest must go up over a stump and clear it away.");
         Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump built over must just go, not be thrown up through the building.");
         RemoveThings(Hosted, t => t == chest); await Frames(2);
+    }
+    /// <summary>A stump a gravel path tile is laid on just goes, as one under a building does.</summary>
+    private async Task CheckStumpAPathTileIsLaidOnGoesWithoutBeingThrownUp() {
+        var tile = GravelPaths.TileAt(Hosted.Player + new Vector2(2, 2));
+        var stump = Hosted.Add(ThingKind.Stump, tile, World.StumpWood); stump.Progress = GatherRules.DigSeconds * .8f;
+        await Frames(2);
+        Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "A stump in sight must be drawn.");
+        GravelPathSteps.LayPath(Hosted, tile);
+        await Frames(2);
+        Require(world.GravelPaths.Laid(tile) && world.Find(stump.Id) == null, "A path tile must go down on a stump and clear it away.");
+        Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump a path tile is laid on must just go, not be thrown up through the gravel.");
+        Hosted.GravelPaths.TakeUp(tile); Drop(Hosted, "gravel", 4); await Frames(2);
     }
     /// <summary>A mine's page left open follows the mine from stage to stage and on to the open mine.</summary>
     private async Task CheckMinePageFollowsTheMineThroughItsStages() {
@@ -2209,6 +2222,7 @@ public partial class Game {
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
             await Test(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
+            await Test(CheckStumpAPathTileIsLaidOnGoesWithoutBeingThrownUp);
             await Test(CheckMinePageFollowsTheMineThroughItsStages);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);

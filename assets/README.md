@@ -54,11 +54,10 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
   layer, so the marks stay put as it moves and a model's own albedo texture stays free.
   `Scanned` draws one of the scans rock, coal, soil and gravel as it is instead, with its bumps and the engine's
-  parallax,
-  on a mesh that carries its place on the scan in world units: the stone and coal rocks, loose stones and coal, the farm
-  field, the compost mound, the gravel heap and the gravel path tile. Heap pieces are those meshes shrunk to a heap's
-  size with their place on the scan kept,
-  so a heaped stone or lump shows the scan finer than in the world.
+  parallax, on a mesh that carries its place on the scan in world units: the stone and coal rocks, loose stones and
+  coal, the farm field, the compost mound, the gravel heap and the gravel path tile.
+  Heap pieces are those meshes shrunk to a heap's size with their place on the scan kept, so a heaped stone or lump
+  shows the scan finer than in the world.
   A rounded shape has the scan draped over it from the top down (`NatureShape.Draped`), so only its hidden underside
   bunches, and is shaded smooth; each replaced rock stays under 500 triangles.
   `Mat` makes a flat material and `Wood`, `Metal`, `Stone` and `Cloth` a surfaced one for primitives; `Vertex` dresses
@@ -282,8 +281,7 @@ brightness around the photoscan's mean as a multiplier, at the ground's detail s
 weave keeps all of its contrast and is drawn coarse, since a fabric scan is nearly even at the game's distance.
 The scans come through the same script at their full 1K size, so their marks stay sharp at full zoom: rock from
 ambientCG's Rock026, coal from its Rock035 and gravel from its Gravel004, which the ground also draws on gravel paths,
-and soil from the Poly Haven photoscan Red Laterite Soil Stones by Amal
-Kumar, released under CC0 1.0.
+and soil from the Poly Haven photoscan Red Laterite Soil Stones by Amal Kumar, released under CC0 1.0.
 The shores in `environment/lake/` are two [Poly Haven](https://polyhaven.com) photoscans by Rob Tuytel, released under
 CC0 1.0 and drawn with their own colours and parallax, both at 2K and one tile 15 world units: Aerial Beach 01 for the
 sea coast's sand, and Coast Sand Rocks 02 for the mossy, stony ground around the lake.
