@@ -100,29 +100,29 @@ internal static class CatgirlDance {
     // The steps the solo is made of, each for the left side; the other side is its mirror.
     /// <summary>Fists flexed by the head over a wide stance with the toes out, the chest twisted one way and the hips turned the other, shoulders up.</summary>
     private static Step Shimmy(float at, float twist) =>
-        new(at, Flexed, Out, Fist, Mirror(Flexed), Mirror(Out), Fist, Hip: -twist * .25f, HipTurn: -twist * .5f, Twist: twist, SplayL: 13, SplayR: 13, KneeL: 8, KneeR: 8,
-            Tilt: twist * .35f, Toes: 10, WristL: 25, WristR: 25, ShrugL: .012f + twist * .0008f, ShrugR: .012f - twist * .0008f);
+        new(at, Flexed, Out, Fist, Mirror(Flexed), Mirror(Out), Fist, Hip: -twist * .25f, HipTurn: -twist * .5f, Twist: twist, SplayL: 13, SplayR: 13, KneeL: 12, KneeR: 12,
+            Tilt: twist * .45f, Toes: 10, WristL: 25, WristR: 25, ShrugL: .012f + twist * .0008f, ShrugR: .012f - twist * .0008f);
 
     /// <summary>The hips pop out to her right as the left arm arcs over her head and the right arm drops, its hand cocked back.</summary>
-    private static readonly Step Pop = new(0, Overhead, High, Open, Mirror(Low), Mirror(Down), Open, Hip: -7, HipTurn: 6, Tip: 11, SplayL: 23, SplayR: 3,
-        Tilt: -6, Toes: 8, WristL: 30, WristR: -45, ShrugL: .02f);
+    private static readonly Step Pop = new(0, Overhead, High, Open, Mirror(Low), Mirror(Down), Open, Hip: -11, HipTurn: 6, Tip: 17, SplayL: 26, SplayR: 3, KneeR: 6,
+        Tilt: -10, Toes: 8, WristL: 30, WristR: -45, ShrugL: .02f);
     /// <summary>The left hand rings her left eye: weight on the right leg, hips turned toward the hand, chest tipped back over them, head leaning into it.</summary>
-    private static readonly Step Framed = new(0, AtEye, High, Ring, Mirror(Low), Mirror(Down), Open, Hip: -9, HipTurn: 10, Tip: 15, Twist: -8, SplayL: 27, SplayR: 1,
-        Turn: 8, Tilt: -11, Toes: 8, WristR: -45, ShrugL: .02f);
+    private static readonly Step Framed = new(0, AtEye, High, Ring, Mirror(Low), Mirror(Down), Open, Hip: -13, HipTurn: 10, Tip: 21, Twist: -8, SplayL: 30, SplayR: 1, KneeR: 5,
+        Turn: 12, Tilt: -16, Toes: 8, WristR: -45, ShrugL: .02f);
     /// <summary>Both hands flick down to her sides, cocked back, as the knees dip and the head nods.</summary>
-    private static readonly Step Flick = new(0, Low, Down, Open, Mirror(Low), Mirror(Down), Open, SplayL: 8, SplayR: 8, KneeL: 22, KneeR: 22, Lean: 4, Nod: 8,
+    private static readonly Step Flick = new(0, Low, Down, Open, Mirror(Low), Mirror(Down), Open, SplayL: 8, SplayR: 8, KneeL: 28, KneeR: 28, Lean: 6, Nod: 10,
         WristL: -55, WristR: -55, Toes: 6, Bounce: 0);
     /// <summary>Both fists gathered at her chest, knees bent and feet together, before a burst.</summary>
-    private static readonly Step Gathered = new(0, AtChest, Tucked, Fist, Mirror(AtChest), Mirror(Tucked), Fist, KneeL: 22, KneeR: 22, Lean: 6, Nod: 8,
+    private static readonly Step Gathered = new(0, AtChest, Tucked, Fist, Mirror(AtChest), Mirror(Tucked), Fist, KneeL: 28, KneeR: 28, Lean: 8, Nod: 10,
         ShrugL: .015f, ShrugR: .015f, Bounce: 0);
     /// <summary>A finger at the sky from a straight left arm, weight on the right leg and the left knee loose, head thrown up toward the hand.</summary>
-    private static readonly Step Reached = new(0, Sky, Out, Point, Mirror(Low), Mirror(Down), Open, Hip: -6, Tip: 7, SplayL: 8, KneeL: 14, Nod: -12, Turn: 8,
+    private static readonly Step Reached = new(0, Sky, Out, Point, Mirror(Low), Mirror(Down), Open, Hip: -10, Tip: 12, SplayL: 10, KneeL: 18, Nod: -16, Turn: 10,
         WristR: -45, ShrugL: .03f, Bounce: 2);
     /// <summary>Turned a quarter toward her left with the near hand on her hip and the far one by her cheek, hips pushed back.</summary>
-    private static readonly Step Posed = new(0, OnHip, Back, Fist, Mirror(ByCheek), Mirror(Tucked), Open, Hip: -6, Tip: 9, Twist: -10, SplayL: 4, SplayR: 6, KneeL: 16,
+    private static readonly Step Posed = new(0, OnHip, Back, Fist, Mirror(ByCheek), Mirror(Tucked), Open, Hip: -10, Tip: 14, Twist: -12, SplayL: 4, SplayR: 6, KneeL: 20,
         Turn: -24, Tilt: -8, WristR: 20, Facing: 38);
     /// <summary>On her left leg with the right foot kicked up behind, a fist at her mouth and the other arm out low.</summary>
-    private static readonly Step Kicked = new(0, AtMouth, Tucked, Fist, Mirror(Low), Mirror(Down), Open, Hip: 7, Tip: -10, Kick: 1, Tilt: -7, WristR: -45, ShrugL: .015f, Bounce: 3);
+    private static readonly Step Kicked = new(0, AtMouth, Tucked, Fist, Mirror(Low), Mirror(Down), Open, Hip: 11, Tip: -15, Kick: 1, Tilt: -11, WristR: -45, ShrugL: .015f, Bounce: 3);
     /// <summary>The left hand up beside her head, open, waving at the wrist; the right on her hip.</summary>
     private static Step Waving(float at, float wrist) =>
         new(at, Raised, Out, Open, Mirror(OnHip), Mirror(Back), Fist, Hip: wrist * .15f, Tip: -wrist * .2f, SplayL: 6, SplayR: 6, Tilt: -wrist * .2f, WristL: wrist);
