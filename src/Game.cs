@@ -114,10 +114,11 @@ public partial class Game : Node, IGameFlow {
             if (Launch.Has("--server-check")) RunServerCheck();
             if (introFolder != null) {
                 // --intro-stills saves only the frames at those seconds, such as 1.5,9.2, for a look at single moments.
+                // --intro-dance draws only the solo of the catgirl on the hero's screen, for working on that dance.
                 var stills = Launch.Value("--intro-stills")?.Split(',').Select(at => float.Parse(at, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
                 panel.Close(); ui.Visible = false; AudioServer.SetBusMute(0, true);
                 paintFilter.Width = WorldView.IntroPaintWidth;
-                view.RenderIntro(introFolder, stills);
+                view.RenderIntro(introFolder, stills, Launch.Has("--intro-dance"));
             }
             if (Launch.Has("--animation-review")) { panel.Close(); ui.Visible = false; view.AnimationReview = true; }
             // A recording slows game time for a closer look, and ends after so many frames.

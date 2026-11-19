@@ -88,6 +88,9 @@ internal static class CatgirlDance {
         new(7.3f, Flexed, Out, Fist, Mirror(Flexed), Mirror(Out), Fist, 5, 13, 8),
     };
 
+    /// <summary>Seconds the solo runs before it comes round again.</summary>
+    public static float SoloSeconds => SoloSteps[^1].At;
+
     /// <summary>The solo of the catgirl in the middle at a moment of its loop.</summary>
     public static DanceFrame Solo(float time) {
         var (pose, shift, sway) = SoloBody(time, out var step);

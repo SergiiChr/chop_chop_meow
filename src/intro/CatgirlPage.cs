@@ -23,7 +23,8 @@ internal sealed class CatgirlPage {
     private readonly SubViewport view = new() { Size = Size, OwnWorld3D = true, Msaa3D = Viewport.Msaa.Msaa4X, RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled };
     private readonly List<Catgirl> dancers = new();
     private readonly List<Node3D> stars = new();
-    private readonly Control live;
+    private readonly Control live, browser;
+    private readonly Camera3D camera;
 
     /// <summary>The page's own viewport, which draws only inside the scene tree.</summary>
     public Node Root => view;
@@ -45,7 +46,7 @@ internal sealed class CatgirlPage {
         stage.AddChild(new WorldEnvironment { Environment = air });
         stage.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-42, 24, 0), LightEnergy = .55f, ShadowEnabled = true });
         // The stage sits in the part of the page the browser's bars leave free, so the camera aims above the dancers' middle.
-        var camera = new Camera3D { Position = new Vector3(0, 1.02f, 4.5f), Fov = 30 };
+        camera = new Camera3D { Position = new Vector3(0, 1.02f, 4.5f), Fov = 30 };
         stage.AddChild(camera);
         camera.Basis = Basis.LookingAt(new Vector3(0, .08f, -4.5f), Vector3.Up);
         // A pink floor, a darker wall with a lighter disc on it, and stars around the disc.
@@ -65,11 +66,11 @@ internal sealed class CatgirlPage {
             var dancer = new Catgirl(Outfits[i], new Vector3((i - (Outfits.Length - 1) / 2f) * Spacing, 0, 0));
             stage.AddChild(dancer.Rig.Root); dancers.Add(dancer);
         }
-        live = BuildBrowser();
+        (browser, live) = BuildBrowser();
     }
 
-    /// <summary>Draws the browser's window around the stage and returns its blinking "LIVE" tag.</summary>
-    private Control BuildBrowser() {
+    /// <summary>Draws the browser's window around the stage and returns it with its blinking "LIVE" tag.</summary>
+    private (Control Window, Control Live) BuildBrowser() {
         var window = new Control { MouseFilter = Control.MouseFilterEnum.Ignore };
         window.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); view.AddChild(window);
         Control Bar(int top, int height, string color, int left = 0, int width = 0) {
@@ -90,7 +91,16 @@ internal sealed class CatgirlPage {
         var tag = Bar(TitleBar + AddressBar + 8, Banner - 16, "e0241f", Size.X - 96, 80);
         Write(tag, "LIVE", 15, "ffffff", Style.Head, HorizontalAlignment.Center);
         Write(Bar(Size.Y - StatusBar, StatusBar, "c8c4bc"), "You are visitor no. 0000001", 13, "2a2a2a");
-        return tag;
+        return (window, tag);
+    }
+
+    /// <summary>
+    /// Shows the soloist alone, without the browser's window and with the camera level on her, for working on her dance.
+    /// </summary>
+    public void Rehearse() {
+        browser.Visible = false;
+        for (int i = 0; i < dancers.Count; i++) dancers[i].Rig.Root.Visible = i == Soloist;
+        camera.Position = new Vector3(0, 1, 4.4f); camera.Basis = Basis.Identity;
     }
 
     /// <summary>Poses the page for a moment of the film, in seconds since the solo began: the dances, the stars and the "LIVE" tag.</summary>

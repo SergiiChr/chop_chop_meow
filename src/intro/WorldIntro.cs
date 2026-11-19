@@ -13,6 +13,7 @@ namespace ChopChopMeow;
 /// The intro film: the hero's last day at the office, the trip out, his arrival at the shore and his first night by a fire.
 /// <c>--render-intro DIR</c> plays it in place of a game, under a film camera at eye level rather than the game's view from above.
 /// Each frame is saved to DIR with a cue sheet of its sounds; a movie tool outside this project turns them into <c>assets/intro.ogv</c>.
+/// With <c>--intro-dance</c> it draws only the solo of the catgirl on the hero's screen, filling the picture, once through.
 /// </summary>
 public partial class WorldView {
     public const int IntroFps = 30;
@@ -43,6 +44,7 @@ public partial class WorldView {
     private MeshInstance3D skyDome = null!, moon = null!;
     private ShaderMaterial skyColors = null!;
     private ColorRect black = null!;
+    private CanvasLayer filmLayer = null!;
     private Thing campfire = null!;
     private readonly List<ShaderMaterial> waters = new();
     private static readonly StringName SkyTop = "top", SkyHorizon = "horizon", SkyStars = "stars";
@@ -78,14 +80,15 @@ public partial class WorldView {
     /// Plays the film and saves every frame to <paramref name="folder"/>, or only the frames at <paramref name="stills"/> seconds when given.
     /// The film's clock moves one frame at a time, so the frames are evenly spaced however long each takes to draw and save.
     /// Each frame is drawn without waiting for the screen to refresh and saved in the background while the next one is drawn.
+    /// With <paramref name="danceOnly"/> the film is the catgirl's solo alone.
     /// </summary>
-    public async void RenderIntro(string folder, float[]? stills) {
+    public async void RenderIntro(string folder, float[]? stills, bool danceOnly) {
         try {
             DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
             var saves = new List<Task>();
             DirAccess.MakeDirRecursiveAbsolute(folder);
             BuildFilm();
-            var shots = IntroShots;
+            var shots = danceOnly ? new (float Seconds, Action<float, float> Play)[] { (CatgirlDance.SoloSeconds, DanceShot) } : IntroShots;
             // Shots start on whole frames, so their lengths never drift by rounding.
             var starts = new int[shots.Length + 1];
             for (int i = 0; i < shots.Length; i++) starts[i + 1] = starts[i] + Mathf.RoundToInt(shots[i].Seconds * IntroFps);
@@ -150,9 +153,9 @@ public partial class WorldView {
         skyDome.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         moon = Sphere(film, 1, Vector3.Zero, new StandardMaterial3D { AlbedoColor = new Color("e9edf2"), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, DisableFog = true }, Vector3.One * 16, 16);
         moon.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-        var layer = new CanvasLayer { Layer = 50 }; AddChild(layer);
+        filmLayer = new CanvasLayer { Layer = 50 }; AddChild(filmLayer);
         black = new ColorRect { Color = Colors.Black, MouseFilter = Control.MouseFilterEnum.Ignore };
-        black.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(black);
+        black.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); filmLayer.AddChild(black);
 
         hero = new ActorRig(ActorSkin.Player); film.AddChild(hero.Root);
         // Half-shut eyelids for the office, a loosened tie, and the bat.
@@ -425,6 +428,18 @@ public partial class WorldView {
         // Through his eyes, square on to the screen, drifting closer.
         var screen = office.Monitor.Position + IntroSets.ScreenMiddle;
         Frame(screen + new Vector3(0, .01f, -.56f + .08f * Mathf.SmoothStep(0, ScreenSeconds, t)), screen, 34);
+    }
+
+    /// <summary>The soloist's dance alone, the page filling the picture over everything else and under no paint filter.</summary>
+    private void DanceShot(float t, float dt) {
+        if (cut) {
+            OfficeLight();
+            office.Page.Rehearse();
+            var page = new TextureRect { Texture = office.Page.Picture.AlbedoTexture, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };
+            page.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+            filmLayer.AddChild(page); filmLayer.MoveChild(page, 0);
+        }
+        office.Page.Play(t);
     }
 
     /// <summary>The boss leans over him, yelling and jabbing a finger; he shrinks into the chair.</summary>

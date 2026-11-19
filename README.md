@@ -79,6 +79,7 @@ Play accepts Godot arguments after `--`:
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
 | `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
+| `--render-intro /absolute/directory --intro-dance` | Save only the solo dance of the catgirl on the hero's screen, filling the picture |
 | `--performance-run /absolute/directory` | Record a benchmark: sprinting from the sea past a staffed camp and the lake to the valley's top corner, by day and again at night with a lit torch; summarise it with `python3 tools/performance_report.py /absolute/directory` |
 | `--drive /absolute/directory` | Play the window from command files written to that directory, as keys and mouse, and save screenshots there; it keeps `playtest-` saves and settings of its own (`playtest` skill) |
 
@@ -93,6 +94,7 @@ These options are developer review tools; they do not represent a normal fresh-s
 ./tools/animation_review.py "player run"   # one clip from the side, front and game camera, as movies in build/animation-review/
 ./tools/intro_film.py                     # the intro film's frames and sound cue sheet, in build/intro/frames/
 ./tools/intro_film.py --stills 1.5,9.2    # single frames of the film, in build/intro/stills/
+./tools/intro_film.py --dance             # only the catgirl's solo dance, in build/intro/dance/
 ```
 
 ### Intro film
