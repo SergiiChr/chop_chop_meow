@@ -220,7 +220,7 @@ public partial class Game {
     /// three tiles once they are up to speed.
     /// </summary>
     private async Task<float> WalkingSpeed(Vector2 start) {
-        Warp(world, start); await Frames();
+        Warp(Hosted, start); await Frames(4);
         float speed = 0;
         await Holding(Key.D, async () => {
             await Until(() => world.Player.DistanceTo(start) > 1, "the player getting up to speed", 2);

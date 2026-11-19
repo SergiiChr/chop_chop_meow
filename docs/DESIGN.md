@@ -212,8 +212,8 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/*Checks.cs`, `tests/cabins/CabinChecks.cs`, `tests/actors/enemies/wolf/*Checks.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`), each feature's in the folder of its code |
-| `tests/*Steps.cs`, `tests/cabins/CabinSteps.cs` | Steps shared by the simulation checks |
+| `tests/*Checks.cs`, `tests/cabins/CabinChecks.cs`, `tests/paths/GravelPathChecks.cs`, `tests/actors/enemies/wolf/*Checks.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`), each feature's in the folder of its code |
+| `tests/*Steps.cs`, `tests/cabins/CabinSteps.cs`, `tests/paths/GravelPathSteps.cs` | Steps shared by the simulation checks |
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
 | `src/RecipeReadyChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
@@ -291,7 +291,7 @@ Shared rules:
 #### Network updates
 
 An update holds only what changed since the last one the guest confirmed.
-The host keeps the world of each recent update as one JSON entry per thing, worker, wolf, trade cart and player, plus two shared entries, and sends changed fields of changed entries.
+The host keeps the world of each recent update as one JSON entry per thing, worker, wolf, trade cart and player, plus three shared entries, and sends changed fields of changed entries.
 Entries leave out fields at their type's default and write a fresh inventory as `{}` (`UpdateJson`).
 A field whose new object starts elsewhere is marked to be always written, which `MultiplayerChecks` enforces.
 A changed entry whose set of fields changed is sent whole.
@@ -847,7 +847,9 @@ to `World.GravelPaths` (`src/paths/GravelPaths.cs`), which keeps the laid tiles.
 A tile is a map tile, centred on whole coordinates like a building, saved as its place in the map's rows in
 `SaveState.GravelPaths`.
 `GravelPaths` keeps one flag a tile beside that list and brings the flags in step whenever another list takes its place:
-a new game, a load, or a guest's update of the shared state.
+a new game, a load, or a guest's update that brings other tiles.
+The tiles have an update entry of their own (`EntryKey.Paths`), so only an update that lays or takes up a tile carries
+them.
 `GravelPaths.Revision` moves only when the tiles change.
 
 - `GravelPaths.Block` refuses a tile only on water or cliffs, on a tile already laid, on a tile where a resource stands,

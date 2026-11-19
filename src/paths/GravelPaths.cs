@@ -10,7 +10,9 @@ namespace ChopChopMeow;
 /// A tile is no thing: buildings and yards go over tiles and tiles under them, neither minding the other.
 /// </summary>
 public sealed class GravelPaths(World world) {
-    /// <summary>One flag a map tile, set where a path tile is laid; rebuilt from the save's list whenever that changes.</summary>
+    /// <summary>
+    /// One flag a map tile, set where a path tile is laid; rebuilt from the save's list whenever that changes.
+    /// </summary>
     private readonly bool[] laid = new bool[Terrain.Size * Terrain.Size];
     /// <summary>The save's list the flags were last built from.</summary>
     private List<int>? seen;
@@ -45,7 +47,9 @@ public sealed class GravelPaths(World world) {
         return nearest;
     }
 
-    /// <summary>How many times faster a walker at a point moves: <see cref="GameData.GravelSpeed"/> on gravel, 1 off it.</summary>
+    /// <summary>
+    /// How many times faster a walker at a point moves: <see cref="GameData.GravelSpeed"/> on gravel, 1 off it.
+    /// </summary>
     public float SpeedAt(Vector2 p) => Covers(p) ? GameData.GravelSpeed : 1;
 
     /// <summary>
@@ -62,7 +66,10 @@ public sealed class GravelPaths(World world) {
         return world.Construction.Unaffordable(ThingKind.GravelPath);
     }
 
-    /// <summary>Lays a tile that <see cref="Block"/> allows, clearing a stump or plain bush off it; <see cref="Construction.Build"/> takes its cost.</summary>
+    /// <summary>
+    /// Lays a tile that <see cref="Block"/> allows, clearing a stump or plain bush off it; <see
+    /// cref="Construction.Build"/> takes its cost.
+    /// </summary>
     internal void Lay(Vector2I tile) {
         Sync();
         world.ClearTile(tile);
@@ -71,14 +78,17 @@ public sealed class GravelPaths(World world) {
         revision++;
     }
 
-    /// <summary>Why the acting player cannot take up a tile, or null: none is laid there, or it is out of reach.</summary>
+    /// <summary>
+    /// Why the acting player cannot take up a tile, or null: none is laid there, or it is out of reach.
+    /// </summary>
     public string? TakeUpBlock(Vector2I tile) {
         if (!Laid(tile)) return "No gravel path here.";
         return world.Reaches(tile) ? null : "Walk closer first.";
     }
 
     /// <summary>
-    /// Takes up a laid tile in reach: its gravel goes to the backpack, and what does not fit waits in a recovery box on it.
+    /// Takes up a laid tile in reach: its gravel goes to the backpack, and what does not fit waits in a recovery box on
+    /// it.
     /// </summary>
     public bool TakeUp(Vector2I tile) {
         if (TakeUpBlock(tile) is string refused) { world.Say(refused); return false; }
@@ -92,7 +102,8 @@ public sealed class GravelPaths(World world) {
     }
 
     /// <summary>
-    /// Brings the flags in step with the save's list when another list has taken its place: a new game, a load or a guest's update.
+    /// Brings the flags in step with the save's list when another list has taken its place: a new game, a load or a
+    /// guest's update.
     /// It allocates nothing, and the revision moves only when the tiles differ.
     /// </summary>
     private void Sync() {

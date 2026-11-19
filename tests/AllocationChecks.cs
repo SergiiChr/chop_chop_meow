@@ -47,6 +47,8 @@ public static class AllocationChecks {
         // The host sends an update thirty times a second, against one the guest confirmed a few updates back, as over a long connection, and the guest merges it.
         // Only entries that changed are new arrays, on the host and again in the guest's merge: about seven worker and station entries an update in a working settlement (measured 10.6 KB an update).
         var hosting = Settlement(data);
+        // Two hundred path tiles lie off to one side: they ride in an entry of their own, which an update that lays none does not write again.
+        GravelPathSteps.LayWhereFree(hosting, new Vector2I(60, 80), 200);
         var host = new WorldUpdates(); var guest = new WorldUpdates();
         var sent = new Queue<(Snapshot Host, Snapshot Guest)>();
         Check("update: working settlement", () => {

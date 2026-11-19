@@ -4,7 +4,8 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// One gravel path tile as a flat model, for the plan's icon and its ghost while placing.
+/// One gravel path tile as a flat model, for the plan's icon, its ghost while placing and the remove selector's red
+/// pad.
 /// Laid tiles are drawn by the ground itself (<see cref="GravelPathView"/>), joined to their neighbours.
 /// </summary>
 internal static class GravelPathShape {

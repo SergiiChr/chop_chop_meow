@@ -9,9 +9,14 @@ namespace ChopChopMeow;
 /// The map is redrawn only round tiles laid or taken up.
 /// </summary>
 internal sealed class GravelPathView {
-    /// <summary>Texels a tile each way: the distance between them reads smoothly, so round ends and slanted edges stay clean.</summary>
+    /// <summary>
+    /// Texels a tile each way: the distance between them reads smoothly, so round ends and slanted edges stay clean.
+    /// </summary>
     private const int Scale = 8, Size = Terrain.Size * Scale;
-    /// <summary>Tiles round a changed one whose texels may change with it: a strip between two of its neighbours comes or goes with it, and the map reaches half a metre past the gravel.</summary>
+    /// <summary>
+    /// Tiles round a changed one whose texels may change with it: a strip between two of its neighbours comes or goes
+    /// with it, and the map reaches half a metre past the gravel.
+    /// </summary>
     private const int Spread = 2;
     private readonly byte[] field = new byte[Size * Size];
     /// <summary>The tiles the map was last drawn from, and those to draw again.</summary>
@@ -20,7 +25,8 @@ internal sealed class GravelPathView {
     private int revision = -1;
 
     /// <summary>
-    /// The map: half at the gravel's edge, rising to one half a metre inside it and falling to zero half a metre outside.
+    /// The map: half at the gravel's edge, rising to one half a metre inside it and falling to zero half a metre
+    /// outside.
     /// The texel at the map's corner is centred a sixteenth of a tile inside the first tile's corner, at -0.5 + 1/16.
     /// </summary>
     public ImageTexture Texture { get; }
@@ -30,7 +36,10 @@ internal sealed class GravelPathView {
         Texture = ImageTexture.CreateFromImage(image);
     }
 
-    /// <summary>Redraws the map round every tile laid or taken up since the last call; with nothing changed it does nothing and allocates nothing.</summary>
+    /// <summary>
+    /// Redraws the map round every tile laid or taken up since the last call; with nothing changed it does nothing and
+    /// allocates nothing.
+    /// </summary>
     public void Update(GravelPaths paths) {
         if (paths.Revision == revision) return;
         revision = paths.Revision;

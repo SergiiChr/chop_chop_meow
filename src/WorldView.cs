@@ -91,7 +91,7 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<ThingKind, Prop> ghosts = new(), mineGhosts = new();
     private Prop? ghost;
     private MeshInstance3D selectRing = null!, hoverRing = null!, workerRing = null!, playerRing = null!, placeTile = null!;
-    /// <summary>The building the remove selector has turned red.</summary>
+    /// <summary>The red on what the remove selector points at.</summary>
     private RemovalMark removalMark = null!;
     private float pulseRemaining;
     private ActorAction pulseAction;
@@ -102,7 +102,6 @@ public partial class WorldView : Node3D {
     private readonly Font font = ThemeDB.FallbackFont;
     private static readonly StandardMaterial3D GhostValid = Flat(new Color(.55f, .95f, .45f, .45f));
     private static readonly StandardMaterial3D GhostBlocked = Flat(new Color(1, .35f, .3f, .5f));
-    /// <summary>The red laid over what the remove selector is about to take down.</summary>
     private static readonly StandardMaterial3D NightGlass = Mat("ffd58a", .3f, 0, 1.6f);
     private static readonly StandardMaterial3D Sparks = Flat(new Color("ffd27a"));
     private static readonly StandardMaterial3D GatherDust = Flat(new Color(.8f, .78f, .7f, .45f));

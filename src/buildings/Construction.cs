@@ -14,16 +14,23 @@ public sealed class Construction(World world) {
     public static bool IsZone(ThingKind kind) => kind is ThingKind.Pile or ThingKind.Farm;
     private static readonly ThingKind[] Zones = { ThingKind.Pile, ThingKind.Farm };
     public const float ZoneSize = 3;
-    /// <summary>Snaps a mine to its cliff, a yard to the grid of the nearest yard close enough to touch it and a gravel path to the middle of its tile.</summary>
+    /// <summary>
+    /// Snaps a mine to its cliff, a yard to the grid of the nearest yard close enough to touch it and a gravel path to
+    /// the middle of its tile.
+    /// </summary>
     public Vector2 Snap(ThingKind kind, Vector2 p) {
         if (kind == ThingKind.Mine) return World.SnapMine(p);
         if (kind == ThingKind.GravelPath) return Terrain.TileAt(p);
         if (!IsZone(kind) || world.Nearest(Zones, p) is not Thing near || near.Pos.DistanceTo(p) > ZoneSize * 1.6f) return p;
         return near.Pos + ((p - near.Pos) / ZoneSize).Round() * ZoneSize;
     }
-    /// <summary>The room a building keeps from a resource's middle beyond its own footprint, and a yard beyond its own edge.</summary>
+    /// <summary>
+    /// The room a building keeps from a resource's middle beyond its own footprint, and a yard beyond its own edge.
+    /// </summary>
     internal const float ResourceRoom = .65f, YardResourceRoom = .3f;
-    /// <summary>Why a building, or a crate from the backpack when <paramref name="item"/> names one, cannot go here.</summary>
+    /// <summary>
+    /// Why a building, or a crate from the backpack when <paramref name="item"/> names one, cannot go here.
+    /// </summary>
     public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null) {
         bool crate = kind == ThingKind.Crate;
         if (!crate && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
@@ -47,11 +54,17 @@ public sealed class Construction(World world) {
         if (!crate) return Unaffordable(kind);
         return item != null && (world.MarkedSource ?? world.S.Backpack)[item] == 0 ? "That crate is no longer in your backpack." : null;
     }
-    /// <summary>What refuses a building the acting player's backpack does not hold the cost of, or null when it does.</summary>
+    /// <summary>
+    /// What refuses a building the acting player's backpack does not hold the cost of, or null when it does.
+    /// </summary>
     internal string? Unaffordable(ThingKind kind) => world.S.Backpack.Has(world.Data.Buildings[kind].Cost) ? null : "Missing materials in your backpack.";
-    /// <summary>What refuses a plan further from the acting player than they can place one, or null within that.</summary>
+    /// <summary>
+    /// What refuses a plan further from the acting player than they can place one, or null within that.
+    /// </summary>
     internal string? TooFar(Vector2 p) => world.Player.DistanceTo(p) > 5.5f ? "Build within 5 tiles of yourself." : null;
-    /// <summary>How far past their own footprint buildings keep from a cabin's door spot, where players step in and out.</summary>
+    /// <summary>
+    /// How far past their own footprint buildings keep from a cabin's door spot, where players step in and out.
+    /// </summary>
     private const float DoorRoom = .45f;
     private string? ZoneBlock(ThingKind kind, Vector2 p) {
         if (TooFar(p) is string far) return far;
@@ -70,7 +83,10 @@ public sealed class Construction(World world) {
         }
         return Unaffordable(kind);
     }
-    /// <summary>Builds what <see cref="PlacementBlock"/> allows and returns it; a gravel path tile is laid and is no thing, so it returns null as a refusal does.</summary>
+    /// <summary>
+    /// Builds what <see cref="PlacementBlock"/> allows and returns it; a gravel path tile is laid and is no thing, so
+    /// it returns null as a refusal does.
+    /// </summary>
     public Thing? Build(ThingKind kind, Vector2 p) {
         p = Snap(kind, p);
         var blocked = PlacementBlock(kind, p);
@@ -84,7 +100,9 @@ public sealed class Construction(World world) {
         if (kind == ThingKind.Mine) { world.Say($"Marked the {World.MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); world.Made?.Invoke(world.S.Actor.Id, t.Id); }
         return t;
     }
-    /// <summary>Why a building cannot come down now, or null: someone shelters in it, or a cart is out from it.</summary>
+    /// <summary>
+    /// Why a building cannot come down now, or null: someone shelters in it, or a cart is out from it.
+    /// </summary>
     private string? DismantleBlock(Thing t) {
         foreach (var p in world.S.Players) if (p.Sheltered == t.Id || p.Door != Doorway.None && p.DoorCabin == t.Id) return "Someone is inside. It can come down once they step out.";
         foreach (var order in world.S.Orders) if (order.Signpost == t.Id) return "A cart is out from this trading post. Wait for it to come back.";
@@ -112,7 +130,8 @@ public sealed class Construction(World world) {
         return true;
     }
     /// <summary>
-    /// What the remove selector points at on the ground at <paramref name="at"/> with <paramref name="picked"/> under the
+    /// What the remove selector points at on the ground at <paramref name="at"/> with <paramref name="picked"/> under
+    /// the
     /// pointer: that thing when it is a building, else the gravel path tile whose gravel the point is on.
     /// </summary>
     public Removal RemovalAt(Thing? picked, Vector2 at) {
@@ -122,10 +141,16 @@ public sealed class Construction(World world) {
     /// <summary>Whether what the remove selector points at is within the acting player's reach.</summary>
     public bool InReach(Removal removal) =>
         world.Find(removal.Building) is Thing building ? world.Reaches(building) : removal.Tile is Vector2I tile && world.GravelPaths.TakeUpBlock(tile) == null;
-    /// <summary>Takes down what the remove selector points at, at once: a building as <see cref="Dismantle"/> does, a gravel path tile as <see cref="GravelPaths.TakeUp"/>.</summary>
+    /// <summary>
+    /// Takes down what the remove selector points at, at once: a building as <see cref="Dismantle"/> does, a gravel
+    /// path tile as <see cref="GravelPaths.TakeUp"/>.
+    /// </summary>
     public bool Remove(Removal removal) =>
         world.Find(removal.Building) is Thing building ? Dismantle(building) : removal.Tile is Vector2I tile && world.GravelPaths.TakeUp(tile);
-    /// <summary>Puts items into the acting player's backpack and what does not fit into a recovery box at <paramref name="at"/>; true when all of it fitted.</summary>
+    /// <summary>
+    /// Puts items into the acting player's backpack and what does not fit into a recovery box at <paramref name="at"/>;
+    /// true when all of it fitted.
+    /// </summary>
     internal bool GiveBack(Dictionary<string, int> items, Vector2 at) {
         Inventory? rest = null;
         foreach (var (item, amount) in items) {

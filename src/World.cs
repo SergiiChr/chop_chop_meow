@@ -629,7 +629,7 @@ public sealed partial class World {
     /// <summary>How many times faster than a recipe's own seconds work goes: a bench's speed, or 1 elsewhere and by hand, times the tool's.</summary>
     public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
     /// <summary>Tiles a second the acting player moves where they stand: walking or sprinting, and faster on gravel.</summary>
-    public float PlayerSpeed => Data.MoveSpeed(Me.Sprinting) * GravelPaths.SpeedAt(Player);
+    public float PlayerSpeed => Data.MoveSpeed(S.Actor.Sprinting) * GravelPaths.SpeedAt(Player);
     public void MovePlayer(Vector2 delta) {
         // Inside a cabin the player stays put until they step outside on purpose.
         if (Occupied || S.Sheltered != 0) return;

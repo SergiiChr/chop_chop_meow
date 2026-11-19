@@ -1134,16 +1134,19 @@ public partial class Game {
     private async Task CheckGravelIsFasterUnderfootAndCrunches() {
         await CloseWithEsc();
         // The D key walks toward higher x and lower y, so the path is a chain of tiles corner to corner that way.
-        var start = Terrain.TileAt(world.Player); var way = new Vector2I(1, -1);
+        var home = world.Player;
+        var start = Terrain.TileAt(home); var way = new Vector2I(1, -1);
         float grass = await WalkingSpeed(start);
+        // From the middle of the path to be, every tile is within reach.
+        Warp(Hosted, start + way * 2); await Frames(4);
         for (int i = 0; i <= 4; i++) GravelPathSteps.LayPath(Hosted, start + way * i);
-        Warp(world, start); await Frames();
+        await Frames();
         Require(world.GravelPaths.Covers(start + new Vector2(2.5f, -2.5f)), "The window must see the path laid on the server, joined corner to corner.");
         float gravel = await WalkingSpeed(start);
         Require(sounds.Last == "footsteps_gravel", $"Steps on a gravel path must crunch, not play {sounds.Last}.");
         Require(Math.Abs(grass - 4.2f) < .3f && Math.Abs(gravel - 5.04f) < .3f, $"The player must walk 4.2 tiles a second on grass and 5.04 on gravel, not {grass} and {gravel}.");
         for (int i = 0; i <= 4; i++) Hosted.GravelPaths.TakeUp(start + way * i);
-        Drop(Hosted, "gravel", 20); await Frames();
+        Drop(Hosted, "gravel", 20); Warp(Hosted, home); await Frames(4);
     }
     /// <summary>A double click on a packed crate in the backpack opens it, and its contents move to the backpack and back by Shift-click.</summary>
     private async Task CheckPackedCrateOpensFromTheBackpack() {

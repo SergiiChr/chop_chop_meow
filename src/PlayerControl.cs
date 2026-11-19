@@ -21,7 +21,7 @@ public abstract record ClickMode {
     public ThingKind? Placing => this switch { Build build => build.Kind, Crate => ThingKind.Crate, _ => null };
 }
 
-/// <summary>The player in the world: walking, gathering, lifting crates, placing buildings and clicking things.</summary>
+/// <summary>The player in the world: walking, gathering, lifting crates, placing buildings, taking them down and clicking things.</summary>
 public sealed class PlayerControl {
     private const float LiftSeconds = .6f;
     private readonly UiKit kit;

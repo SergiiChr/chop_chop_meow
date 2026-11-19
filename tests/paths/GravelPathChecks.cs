@@ -9,7 +9,10 @@ using static WorkerSteps;
 using static GravelPathSteps;
 using static PlayerSteps;
 
-/// <summary>Checks of gravel and gravel paths: crushing rocks, laying and taking up tiles, where gravel lies and how fast walkers are on it.</summary>
+/// <summary>
+/// Checks of gravel and gravel paths: crushing rocks, laying and taking up tiles, where gravel lies and how fast
+/// walkers are on it.
+/// </summary>
 public static class GravelPathChecks {
     public static void Run(GameData data) {
         Test(CheckASteelHammerAtTheBenchCrushesAStoneIntoGravel, data);
@@ -104,9 +107,17 @@ public static class GravelPathChecks {
         world.Construction.Build(ThingKind.GravelPath, new Vector2(81, 80));
         Require(world.Backpack["gravel"] == 36 && said.Contains("Gravel is already laid here."), "a tile already laid should not be laid again");
 
-        world.Player = Terrain.Lake + new Vector2(Terrain.LakeRadius + 3, 0);
-        world.Construction.Build(ThingKind.GravelPath, Terrain.Lake);
-        Require(!world.GravelPaths.Laid(Terrain.TileAt(Terrain.Lake)) && world.Backpack["gravel"] == 36, "a path tile should not be laid on the lake");
+        // Each is refused within reach of the player, so by its ground and not by its distance: water four tiles out
+        // from the lake's shore, and a mountain side.
+        var water = Terrain.Lake + new Vector2(Terrain.LakeRadius - 2, 0);
+        var cliff = new Vector2(200, 20);
+        foreach (var (ground, name) in new[] { (water, "the lake"), (cliff, "a cliff") }) {
+            said.Clear();
+            world.Player = ground + new Vector2(4, 0);
+            world.Construction.Build(ThingKind.GravelPath, ground);
+            Require(!world.GravelPaths.Laid(Terrain.TileAt(ground)) && world.Backpack["gravel"] == 36, $"a path tile should not be laid on {name}");
+            Require(said.Contains("Choose dry, open ground."), $"the player should be told {name} is no ground for a path, not {string.Join(" ", said)}");
+        }
     }
 
     private static void CheckAPathTileClearsAStumpAway(GameData data) {

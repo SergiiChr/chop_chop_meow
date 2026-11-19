@@ -14,7 +14,10 @@ internal sealed class FootpathWear {
     private readonly Image image;
     private float clock, regrowClock;
     private bool changed;
-    /// <summary>Where the player, under id -1, and each worker last set foot; they wear the ground only once they move on from there.</summary>
+    /// <summary>
+    /// Where the player, under id -1, and each worker last set foot; they wear the ground only once they move on from
+    /// there.
+    /// </summary>
     private readonly Dictionary<int, Vector2> footfalls = new();
     /// <summary>How far a walker moves between two footfalls before the second wears the ground.</summary>
     private const float FootfallSpacing = .25f;
@@ -54,7 +57,10 @@ internal sealed class FootpathWear {
     /// <summary>How worn the ground is at a point, from none at zero to bare at 255.</summary>
     public byte WornAt(Vector2 at) => traffic[(int)(at.Y * Scale) * Size + (int)(at.X * Scale)];
 
-    /// <summary>Wears the ground under <paramref name="world"/>'s walkers twice a second and lets it grow back; it allocates nothing.</summary>
+    /// <summary>
+    /// Wears the ground under <paramref name="world"/>'s walkers twice a second and lets it grow back; it allocates
+    /// nothing.
+    /// </summary>
     public void Update(World world, float dt) {
         clock += dt; regrowClock += dt;
         if (clock < .5f) return;
@@ -71,7 +77,8 @@ internal sealed class FootpathWear {
     }
 
     /// <summary>
-    /// One step's wear, strongest under the foot and fading over about a tile, once the walker has moved on from its last
+    /// One step's wear, strongest under the foot and fading over about a tile, once the walker has moved on from its
+    /// last
     /// footfall; standing still, or first seen, it wears nothing.
     /// </summary>
     private void Tread(int walker, Vector2 at) {
