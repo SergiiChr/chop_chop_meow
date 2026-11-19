@@ -24,8 +24,6 @@ public static class MultiplayerChecks {
         CheckGuestActsThroughCommands(data);
         CheckGuestCopyForwardsActions(data);
         CheckGuestGathersAndHammers(data);
-        CheckEachPlayerHasTheirOwnPack(data);
-        CheckSleepWaitsForEveryone(data);
         CheckGuestComesBackFromSaveWithTheirPackAndSpot(data);
         CheckEveryPlayerSurvivesLoadingAndSavingAgain(data);
         CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole();
@@ -333,57 +331,6 @@ public static class MultiplayerChecks {
         world.As(guest, () => world.MoveTo(anvil.Pos + new Vector2(1, 0)));
         FedPlayersTick(world, data.Recipes["steel_parts"].Seconds + 1);
         Require(anvil.Inventory["steel_parts"] == 1, "a guest standing at an anvil should hammer it");
-    }
-
-    private static void CheckEachPlayerHasTheirOwnPack(GameData data) {
-        var (world, guest, _) = Hosted(data);
-        world.Player = Terrain.Spawn;
-        var far = Enumerable.Range(0, 63).Select(i => Terrain.Spawn + Vector2.Right.Rotated(i * .1f) * 35).First(world.CanStand);
-        world.As(guest, () => world.MoveTo(far));
-        RunUntilNight(world);
-        ShutDens(world);
-        // A patrolling wolf near each player smells the nearer one.
-        Vector2 Near(Vector2 at, Vector2 other) => Enumerable.Range(0, 63).Select(i => at + Vector2.Right.Rotated(i * .1f) * 10).First(p => world.CanStand(p) && p.DistanceTo(other) > 30);
-        var hostWolf = new Wolf { Pos = Near(world.Player, guest.Pos) }; var guestWolf = new Wolf { Pos = Near(guest.Pos, world.Player) };
-        PatrolWolf(world, hostWolf); PatrolWolf(world, guestWolf);
-        for (int i = 0; i < 3; i++) { world.Tick(.25f); SetNeeds(world, health: 100); SetNeeds(guest, health: 100); }
-        Require(hostWolf.Target == world.Me.Id && guestWolf.Target == GuestId, "each player out at night should draw the wolves that smell them");
-
-        Give(guest, "stone", 2); SetNeeds(guest, health: -1);
-        world.Tick(.25f);
-        Require(guest.RespawnIn > 0 && world.RespawnIn == 0, "only the guest should die");
-        Require(world.Wolves.All(w => w.Target != GuestId) && world.Wolves.Any(w => w.Target == world.Me.Id), "a guest's collapse should send off only their own pack");
-        Require(world.Things.Any(t => t.Kind == ThingKind.Grave && t.Inventory["stone"] == 2 && t.Pos.DistanceTo(far) < 2) && guest.Backpack.Count == 0, "a guest's belongings should stay where they fell");
-        int warp = guest.Warp;
-        for (float t = 0; t <= data.RespawnSeconds + .5f; t += .25f) { world.Tick(.25f); SetNeeds(world, health: 100); }
-        Require(guest.RespawnIn == 0, "a guest should finish respawning");
-        Require(guest.Pos == Terrain.Spawn, "a guest should respawn at the clearing");
-        Require(guest.Warp == warp + 1, "the respawn move should tell the guest's machine");
-    }
-
-    private static void CheckSleepWaitsForEveryone(GameData data) {
-        var (world, guest, _) = Hosted(data);
-        RunUntilNight(world);
-        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(3, 0));
-        StepInside(world, hut);
-        Require(world.SleepBlock() == "Everyone has to be inside a cabin to sleep.", $"sleeping should wait for a guest still outside: {world.SleepBlock()}");
-        // The guest sleeps in a cabin of their own, and both lock their doors against the night's wolves.
-        var guestHut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(3, 6));
-        StepInside(world, guestHut, guest);
-        world.Doorways.TurnKey();
-        world.Run(guest, new Command(Verb.TurnKey, 0, 0, "", 0, default));
-        Require(hut.Locked && guestHut.Locked, "each player should lock the door of the cabin they are in");
-        SetNeeds(guest, hunger: 1);
-        Require(world.SleepBlock() == "Someone is too hungry or thirsty to sleep.", "sleeping should wait for a hungry guest");
-        SetNeeds(guest, hunger: 100);
-        AddWorker(world, Terrain.Spawn).Wage = 10;
-        Give(world, Inventory.Coins, 50); Give(guest, Inventory.Coins, 50);
-        int day = world.Day;
-        world.Run(guest, new Command(Verb.Sleep, guestHut.Id, 0, "", 0, default));
-        Require(world.Day == day + 1, "with everyone inside, a guest's sleep should move to the next day");
-        Require(!world.Night, "with everyone inside, a guest's sleep should end the night");
-        Require(guest.Hunger < 100, "with everyone inside, a guest's sleep should use up the guest's hunger");
-        Require(world.Backpack[Inventory.Coins] == 40 && guest.Backpack[Inventory.Coins] == 50, "the host's backpack should pay the wages even when a guest sleeps");
     }
 
     private static void CheckGuestComesBackFromSaveWithTheirPackAndSpot(GameData data) {

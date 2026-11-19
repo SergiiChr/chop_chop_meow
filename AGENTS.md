@@ -28,7 +28,7 @@ Icons and models are committed; playing does not call an image-generation servic
   `IntroPoses.cs` draw its frames (`intro-film` skill).
 - `src/Server.cs`: the headless server every game runs on.
 - `src/Net.cs`: the connection between a server and its players.
-- `tests/`: simulation checks; `src/GameChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`: UI, network and real server checks.
+- `tests/<feature>/`: every check of a feature whose code has a folder. `tests/*.cs`: simulation checks of the rest; `src/GameChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`: their UI, network and real server checks.
 - `build.py` and `tools/`: launcher, checks and asset tools.
 
 [docs/DESIGN.md](docs/DESIGN.md#source-files) maps every source file.

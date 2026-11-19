@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static WolfSteps;
 using static SetupSteps;
 using static WorldSteps;
 using static EconomySteps;
@@ -51,7 +52,7 @@ public static class WolfBodiesChecks {
         world.Player = Doorways.DoorPoint(hut);
         Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
-        CabinSteps.UntilTugged(world);
+        WolfSteps.UntilTugged(world);
         Require(world.Door == Doorway.Tugged, "a wolf should tug the player out of the doorway");
         // With a wolf at each arm, one more waits just past where the tug ends.
         foreach (int side in new[] { -1, 1 }) PlaceWolf(world, new Wolf { Pos = Doorways.DoorPoint(hut) + new Vector2(side, .2f) });

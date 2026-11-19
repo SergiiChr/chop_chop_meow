@@ -1,6 +1,7 @@
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 using static SetupSteps;
 using static WorldSteps;
 
@@ -73,4 +74,22 @@ internal static class WolfSteps {
 
     /// <summary>Puts the player a given distance from a wolf, on the line between them, as if they had walked at it.</summary>
     public static void WalkTo(World world, Wolf wolf, float distance) => world.Player = wolf.Pos + (world.Player - wolf.Pos).Normalized() * distance;
+
+    /// <summary>A night with the player starting to step, at a walk, into a cabin four metres up from where they stood.</summary>
+    public static (World World, Thing Hut) SteppingInAtNight(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = Doorways.DoorPoint(hut);
+        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
+        return (world, hut);
+    }
+
+    /// <summary>
+    /// Ticks until a wolf has a player, the acting one by default, by the waist at a cabin's door, for 0.7 seconds at most:
+    /// a wolf at biting distance gathers itself and leaps before its jaws take hold.
+    /// </summary>
+    public static void UntilTugged(World world, PlayerState? who = null) {
+        who ??= world.Me;
+        for (float time = 0; time < .7f && who.Door is not (Doorway.Tugged or Doorway.TuggedOff); time += .05f) world.Tick(.05f);
+    }
 }

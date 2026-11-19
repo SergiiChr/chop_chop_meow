@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static WolfSteps;
 using static SetupSteps;
 using static WorldSteps;
 using static EconomySteps;

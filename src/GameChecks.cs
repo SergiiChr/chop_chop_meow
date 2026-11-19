@@ -701,53 +701,8 @@ public partial class Game {
         await Wheel(GetViewport().GetVisibleRect().GetCenter(), MouseButton.WheelUp);
     }
 
-    private async Task CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable() {
-        var home = Hosted.Player;
-        await CloseWithEsc();
-        var hut = Hosted.Add(ThingKind.Hut, world.Player + new Vector2(0, 4));
-        // The click lands while the player is still walking, as when running from a wolf.
-        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
-        await Seconds(.1);
-        await Click(view.Screen(hut.Pos, 1.5f));
-        await Until(() => world.Sheltered == hut.Id && Shows(hut), "a cabin clicked while walking taking the player inside and opening", 4);
-        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
-        await Frames();
-        await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind the player once they are inside", 3);
-        // The door's key shows under the door's button for a player inside; a click turns it, which locks the door.
-        await Until(() => Named("key") is { Visible: true }, "the cabin page showing the door's key to a player inside", 2);
-        await Click(Named("key")!);
-        await Until(() => world.Find(hut.Id) is { Locked: true }, "a click on the key locking the cabin's door", 2);
-        RunUntilNight(Hosted); SetNeeds(Hosted, hunger: 5);
-        await Until(() => Named("sleep")?.TooltipText.Contains("too hungry") == true, "the sleep button explaining that the player is too hungry to sleep", 2);
-        // Under "Stats after sleep" the page shows only what a night would leave, each capsule over its icon as in the corner; a fed night heals.
-        SetNeeds(Hosted, 100, 100, 40);
-        await Until(() => (panel.FindChild("health", true, false) as Control)?.TooltipText == $"Health at dawn {Hosted.HealthAtDawn():0}%" && Hosted.HealthAtDawn() > 40,
-            "the cabin page showing the health a fed night's sleep would leave", 2);
-        Require(HasLabel(panel, "Stats after sleep") && panel.FindChildren("*", "", true, false).OfType<NeedGauge>().Count() == 3,
-            "The cabin page must title its needs \"Stats after sleep\" and show a heart, a stomach and a droplet under them.");
-        SetNeeds(Hosted, hunger: 5);
-        RunUntilMorning(Hosted);
-        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true });
-        await Seconds(.2);
-        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = false });
-        await Frames();
-        Require(world.Sheltered == hut.Id, "Moving must not step the player out of the cabin.");
-        await Click(FindButton(panel, "Step outside")!);
-        Require(world.Sheltered == 0, "Step outside must leave the cabin.");
-        await Until(() => world.Find(hut.Id) is { Locked: false } && Named("key") is { Visible: false }, "stepping out unlocking the door and hiding its key", 2);
-        // With no key held the player stops where they stepped in, right by the door.
-        await Click(view.Screen(hut.Pos, 1.5f));
-        await Until(() => world.Sheltered == hut.Id, "a click on the cabin taking a standing player inside", 4);
-        await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind a player who stepped in from beside it", 3);
-        // A click on the cabin from inside opens its page again, and stepping out then keeps the player out.
-        await CloseWithEsc();
-        await Click(view.Screen(hut.Pos, 1.5f));
-        await Click(FindButton(panel, "Step outside")!);
-        await Seconds(Doorways.LeaveSeconds + 1);
-        Require(world.Sheltered == 0 && world.Door == Doorway.None, "A player who clicked the cabin they were in and stepped out must stay outside.");
-        RemoveThings(Hosted, t => t == hut); await CloseWithEsc();
-
-        // A loose piece far enough behind a tree sits under its crown on screen; it must still be the one picked.
+    /// <summary>A loose piece far enough behind a tree sits under its crown on screen and is still the one picked; a crown alone picks nothing, and the foot of the trunk picks the tree.</summary>
+    private async Task CheckATreeCrownKeepsALoosePieceBehindItClickable() {
         var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
         var hidden = Hosted.Add(ThingKind.LooseCoal, tree.Pos - new Vector2(3.3f, 3.3f), 2);
         await Frames();
@@ -756,7 +711,6 @@ public partial class Game {
         RemoveThings(Hosted, t => t == hidden); await Frames();
         Require(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
         Require(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
-        Warp(Hosted, home); await Frames(4);
     }
     /// <summary>What changed while the player was away shows as it now is when they come back, without playing the change in front of them.</summary>
     private async Task CheckChangesOutOfSightDoNotReplayWhenSeenAgain() {
@@ -1111,57 +1065,6 @@ public partial class Game {
         await KeyStroke(Key.Escape);
         Drop(Hosted, "wood", 16); Drop(Hosted, "coal", 5); await Frames();
     }
-    /// <summary>Gravel taken out of a chest by hand rattles like stone.</summary>
-    private async Task CheckGravelMovedByHandRattlesLikeStone() {
-        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("gravel", 3);
-        await ClickOn(chest);
-        int soundsBefore = sounds.Played;
-        await PickUp(await Showing(0, c => c.TooltipText.StartsWith("Gravel", StringComparison.Ordinal)));
-        await Click(BagCell(c => c.Visible && c.Icon == null));
-        await Until(() => cursor.Empty && world.Backpack["gravel"] == 3 && sounds.Heard("wood_rocks_inventory", soundsBefore), "the chest's gravel landing in the backpack with the sound stone makes", 2);
-        Drop(Hosted, "gravel", 3); RemoveThings(Hosted, t => t == chest); await CloseWithEsc();
-    }
-    /// <summary>A gravel path tile cannot be clicked in normal play; the remove selector turns it red and takes it up, giving its gravel back, and Esc puts the selector away.</summary>
-    private async Task CheckRemoveSelectorTakesUpAGravelPathTile() {
-        await CloseWithEsc();
-        Give(Hosted, "gravel", 4);
-        var tile = SpotsNearby().Select(Terrain.TileAt)
-            .First(t => Hosted.GravelPaths.Block(t) == null && view.Pick(view.Screen(t)) == null && view.PickWorker(view.Screen(t)) == null && Uncovered(view.Screen(t)));
-        Hosted.Construction.Build(ThingKind.GravelPath, tile); await Frames();
-        Require(world.GravelPaths.Laid(tile), "The window must see a path tile laid on the server.");
-        int gravel = world.Backpack["gravel"];
-        await Click(view.Screen(tile));
-        Require(!panel.Visible, $"A click on a gravel path tile must open no page, not {panel.Page} for thing {panel.Selection.Thing}.");
-        await KeyStroke(Key.B);
-        await Click(Named("remove")!);
-        await Hover(view.Screen(tile));
-        Require(view.RemovalShown.Tile == tile, "A path tile in reach under the remove selector must turn red.");
-        await Click(view.Screen(tile));
-        await Until(() => !world.GravelPaths.Laid(tile), "a click with the remove selector taking the path tile up", 2);
-        Require(world.Backpack["gravel"] == gravel + 4, "Taking a path tile up must give its 4 gravel back.");
-        await KeyStroke(Key.Escape);
-        Require(player.Mode is ClickMode.Normal, "Esc must put the remove selector away.");
-        Drop(Hosted, "gravel", 4); await Frames();
-    }
-    /// <summary>On a gravel path the player moves 1.2 times as fast as on grass and their steps crunch.</summary>
-    private async Task CheckGravelIsFasterUnderfootAndCrunches() {
-        await CloseWithEsc();
-        // The D key walks toward higher x and lower y, so the path is a chain of tiles corner to corner that way.
-        var home = world.Player;
-        var start = Terrain.TileAt(home); var way = new Vector2I(1, -1);
-        float grass = await WalkingSpeed(start);
-        // From the middle of the path to be, every tile is within reach.
-        Warp(Hosted, start + way * 2); await Frames(4);
-        for (int i = 0; i <= 4; i++) GravelPathSteps.LayPath(Hosted, start + way * i);
-        await Frames();
-        Require(world.GravelPaths.Covers(start + new Vector2(2.5f, -2.5f)), "The window must see the path laid on the server, joined corner to corner.");
-        int soundsBefore = sounds.Played;
-        float gravel = await WalkingSpeed(start);
-        Require(sounds.Heard("footsteps_gravel", soundsBefore), "Steps on a gravel path must crunch.");
-        Require(Math.Abs(grass - 4.2f) < .3f && Math.Abs(gravel - 5.04f) < .3f, $"The player must walk 4.2 tiles a second on grass and 5.04 on gravel, not {grass} and {gravel}.");
-        for (int i = 0; i <= 4; i++) Hosted.GravelPaths.TakeUp(start + way * i);
-        Drop(Hosted, "gravel", 20); Warp(Hosted, home); await Frames(4);
-    }
     /// <summary>A double click on a packed crate in the backpack opens it, and its contents move to the backpack and back by Shift-click.</summary>
     private async Task CheckPackedCrateOpensFromTheBackpack() {
         // Berries already carried would join the five taken out in one stack, which Shift would move back whole.
@@ -1377,14 +1280,6 @@ public partial class Game {
         await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Heard("bench_work", soundsBefore), "the idle player hammering at the bench beside it with its knock", 4);
         RemoveThings(Hosted, t => t == bench);
     }
-    /// <summary>A bench crushing rocks rings like a pickaxe on stone under each hammer blow, in place of its wooden knock.</summary>
-    private async Task CheckABenchCrushingRocksSoundsLikeMiningStone() {
-        int soundsBefore = sounds.Played;
-        var bench = Hosted.Add(ThingKind.Bench, Hosted.Player + new Vector2(1.2f, 0));
-        bench.Tools!.Add("steel_hammer", 1); Hosted.SetRecipe(bench, "gravel"); bench.Inventory.Add("stone", 6);
-        await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Heard("mine_ore", soundsBefore), "the idle player crushing rocks at the bench beside it with the sound of mining stone", 4);
-        RemoveThings(Hosted, t => t == bench);
-    }
     /// <summary>A player standing idle beside a cooking table that is crushing berries grinds with its mortar, which leaves the counter for their hands.</summary>
     private async Task CheckIdlePlayerBesideACookingTableGrindsWithItsMortar() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
@@ -1446,18 +1341,6 @@ public partial class Game {
         Require(chest != null && world.Find(stump.Id) == null, "A chest must go up over a stump and clear it away.");
         Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump built over must just go, not be thrown up through the building.");
         RemoveThings(Hosted, t => t == chest); await Frames(2);
-    }
-    /// <summary>A stump a gravel path tile is laid on just goes, as one under a building does.</summary>
-    private async Task CheckStumpAPathTileIsLaidOnGoesWithoutBeingThrownUp() {
-        var tile = Terrain.TileAt(Hosted.Player + new Vector2(2, 2));
-        var stump = Hosted.Add(ThingKind.Stump, tile, World.StumpWood); stump.Progress = GatherRules.DigSeconds * .8f;
-        await Frames(2);
-        Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "A stump in sight must be drawn.");
-        GravelPathSteps.LayPath(Hosted, tile);
-        await Frames(2);
-        Require(world.GravelPaths.Laid(tile) && world.Find(stump.Id) == null, "A path tile must go down on a stump and clear it away.");
-        Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump a path tile is laid on must just go, not be thrown up through the gravel.");
-        Hosted.GravelPaths.TakeUp(tile); Drop(Hosted, "gravel", 4); await Frames(2);
     }
     /// <summary>A mine's page left open follows the mine from stage to stage and on to the open mine.</summary>
     private async Task CheckMinePageFollowsTheMineThroughItsStages() {
@@ -2099,87 +1982,9 @@ public partial class Game {
         foregroundTree.Pos = world.Player + new Vector2(8, -8);
         Require(!view.TreeCanopyCoversThing(foregroundTree, occluded), "A distant tree must not fade for a building.");
     }
-    /// <summary>
-    /// A cabin's door faces down the map, so a player stepping in faces up it with their left arm to the west.
-    /// A wolf holding that arm while another tugs them is drawn to the west of them with its jaws on that forearm, and the
-    /// one holding their right arm to the east.
-    /// </summary>
-    private async Task CheckAWolfAtATuggedPlayersArmIsDrawnOnTheSideItHolds() {
+    /// <summary>One right click walks over to a loose piece and picks it up whole, without the gather animation.</summary>
+    private async Task CheckOneRightClickWalksOverAndPicksUpAWholeLoosePiece() {
         var home = Hosted.Player;
-        await CloseWithEsc();
-        float health = world.Health; RunUntilNight(Hosted);
-        var at = Terrain.Spawn - new Vector2(30, 30);
-        RemoveThings(Hosted, t => t.Pos.DistanceTo(at) < 12);
-        var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(0, -4));
-        Warp(Hosted, Doorways.DoorPoint(hut));
-        await Frames();
-        Require(Hosted.Doorways.Enter(hut, false), "A player at a cabin's door must step in.");
-        var pack = new[] { new Vector2(.8f, 0), new Vector2(-1, .2f), new Vector2(1, .2f) }.Select(from => PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + from })).ToList();
-        await Until(() => world.Door == Doorway.Tugged && world.Wolves.Count(w => w.Side != 0 && view.ModelOf(w) is { Motion: WolfMotion.Rear, Settled: >= 1 }) == 2,
-            "a wolf taking each arm of a player another wolf tugs out of a doorway", 3);
-        var rig = view.RigOf(world.Me.Id)!;
-        foreach (var wolf in world.Wolves.Where(w => w.Side != 0)) {
-            var model = view.ModelOf(wolf)!;
-            bool left = wolf.Side == BodySide.Left;
-            float east = model.Root.GlobalPosition.X - rig.Root.GlobalPosition.X;
-            Require(left ? east < -.3f : east > .3f, $"A wolf holding a player's {(left ? "left" : "right")} arm must be drawn on that side of them, not {east:0.00} m to their east.");
-            Vector3 jaws = model.Root.GlobalTransform * model.Bite;
-            float held = jaws.DistanceTo(rig.Root.GlobalTransform * rig.Elbow(left).Lerp(rig.Fist(left), .5f)), other = jaws.DistanceTo(rig.Root.GlobalTransform * rig.Elbow(!left).Lerp(rig.Fist(!left), .5f));
-            Require(held < .15f && held < other, $"A wolf holding a player's {(left ? "left" : "right")} arm must be drawn with its jaws on that forearm, not {held:0.00} m from it and {other:0.00} m from the other.");
-        }
-        RemoveWolves(Hosted, pack.Contains);
-        await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "a player nobody tugs any more standing free outside the cabin", 4);
-        RemoveThings(Hosted, t => t == hut); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
-        await CloseWithEsc();
-        Warp(Hosted, home); await Frames(4);
-    }
-
-    /// <summary>The window onto the door from inside stays shut while a wolf scratches, opens as it pries, and shuts once the wolf is gone.</summary>
-    private async Task CheckTheInsideWindowOpensWhenAWolfPriesAtTheDoor() {
-        var home = Hosted.Player;
-        await CloseWithEsc();
-        float health = world.Health; RunUntilNight(Hosted);
-        // Only this check's wolf comes to the door.
-        RemoveWolves(Hosted, _ => true); ShutDens(Hosted);
-        var at = Terrain.Spawn - new Vector2(30, 30);
-        RemoveThings(Hosted, t => t.Pos.DistanceTo(at) < 12);
-        Warp(Hosted, at); await Frames(4);
-        var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(0, -4));
-        StepInside(Hosted, hut);
-        await Until(() => world.Sheltered == hut.Id, "the player being inside the cabin", 3);
-        var wolf = PatrolWolf(Hosted, new Wolf { Pos = Doorways.DoorPoint(hut) + Doorways.OutOfDoor * 3 });
-        await Until(() => world.Wolves.Any(w => w.DoorCheck == DoorCheckStage.Scratching), "a wolf passing the cabin coming to scratch at its door", 6);
-        await Frames();
-        Require(!view.InsideDoorPOV.Showing && !view.InsideDoorPOV.Visible, "The window onto the door from inside must stay shut while a wolf only scratches.");
-        await Until(() => world.Wolves.Any(w => w.DoorCheck == DoorCheckStage.Prying), "the wolf prying at the unlocked door", 6);
-        await Until(() => view.InsideDoorPOV.Showing && view.InsideDoorPOV.Visible, "the window onto the door from inside opening as the wolf pries", 2);
-        RemoveWolves(Hosted, w => w == wolf);
-        await Until(() => !view.InsideDoorPOV.Showing && !view.InsideDoorPOV.Visible, "the window onto the door from inside shutting once the wolf is gone", 2);
-        Hosted.Doorways.Leave();
-        await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "the player stepping out of the cabin again", 4);
-        RemoveThings(Hosted, t => t == hut); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
-        await CloseWithEsc();
-        Warp(Hosted, home); await Frames(4);
-    }
-
-    /// <summary>Space without an axe attacks unarmed the way the player last walked, and one right click walks over and picks up a whole loose piece without the gather animation.</summary>
-    private async Task CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece() {
-        var home = Hosted.Player;
-        await CloseWithEsc();
-        Drop(Hosted, "steel_axe");
-        // By day wolves are calmed and sent home at once, which would clear the blow before the window shows it.
-        float health = world.Health; RunUntilNight(Hosted);
-        // Space swings the way the player last walked: a step to the right on screen aims the punch at a wolf there.
-        await Holding(Key.D, () => Seconds(.1));
-        await Frames();
-        var wolf = PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + PlayerControl.KeyDirection(1, 0) * 1.2f, Health = 5 });
-        int soundsBefore = sounds.Played;
-        await KeyStroke(Key.Space);
-        Require(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
-        Require(sounds.Heard("tool_air_swing", soundsBefore) && !sounds.Heard("wolf_hit", soundsBefore), "A punch must whoosh before it lands.");
-        await Until(() => sounds.Heard("wolf_hit", soundsBefore), "the punch thudding as it lands on the wolf", 2);
-        RemoveWolves(Hosted, w => w == wolf); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
-        await Until(() => view.PlayerAnimation != ActorAction.Attack, "the unarmed attack finishing", 3);
         var gatheringPosition = Terrain.Spawn - new Vector2(30, 30);
         // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
         RemoveThings(Hosted, t => t.Pos.DistanceTo(gatheringPosition) < 12);
@@ -2243,9 +2048,7 @@ public partial class Game {
             await TestClean(CheckRightClickGathersTreeAndHarvestsFarm);
             await TestClean(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
             await TestClean(CheckRemoveSelectorTakesBuildingsDownAtOnce);
-            await TestClean(CheckRemoveSelectorTakesUpAGravelPathTile);
-            await TestClean(CheckGravelMovedByHandRattlesLikeStone);
-            await TestClean(CheckGravelIsFasterUnderfootAndCrunches);
+            await RunGravelPathUIChecks();
             await TestClean(CheckPageClosesWhenWhatItShowsIsGone);
             await TestClean(CheckPackedCrateOpensFromTheBackpack);
             await TestClean(CheckDriverPlaysItsCommandFileAsRealInput);
@@ -2262,11 +2065,9 @@ public partial class Game {
             await TestClean(CheckHarvestingBesideAStationStopsHammering);
             await TestClean(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await TestClean(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
-            await TestClean(CheckABenchCrushingRocksSoundsLikeMiningStone);
             await TestClean(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await TestClean(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
             await TestClean(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
-            await TestClean(CheckStumpAPathTileIsLaidOnGoesWithoutBeingThrownUp);
             await TestClean(CheckMinePageFollowsTheMineThroughItsStages);
             await TestClean(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await TestClean(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
@@ -2279,7 +2080,8 @@ public partial class Game {
             await TestClean(CheckBackpackCellsAndHudIconsTrackStats);
             await TestClean(CheckPinnedPlayerStaysDownAndDeathCountsDown);
             await TestClean(CheckMouseWheelOverPanelDoesNotZoom);
-            await TestClean(CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable);
+            await RunCabinUIChecks();
+            await TestClean(CheckATreeCrownKeepsALoosePieceBehindItClickable);
             await TestClean(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
             await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
             await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
@@ -2304,9 +2106,9 @@ public partial class Game {
             var furnace = await Test(CheckSteelFurnaceSlotsLoadHeldStacksThenPump);
             await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));
             Test(CheckForegroundCanopyFadesOnlyOverBuildings);
-            await TestClean(CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece);
-            await TestClean(CheckAWolfAtATuggedPlayersArmIsDrawnOnTheSideItHolds);
-            await TestClean(CheckTheInsideWindowOpensWhenAWolfPriesAtTheDoor);
+            await RunSwingsUIChecks();
+            await TestClean(CheckOneRightClickWalksOverAndPicksUpAWholeLoosePiece);
+            await RunWolfUIChecks();
             await TestClean(CheckBerryBushHidesOnlyItsFruitWhenPicked);
             await TestClean(CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings);
             await TestClean(CheckStackLargerThanCrateFillsItAndRestStaysHeld);

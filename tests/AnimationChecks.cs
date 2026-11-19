@@ -28,10 +28,7 @@ public static class AnimationChecks {
         CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning();
         CheckEveryMomentOfAStrideHasAPose();
         CheckDiggingKeepsBothFeetWhereTheyStand();
-        CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem();
         CheckAHandReachesItsPointWithTheElbowTheWayAsked();
-        CheckWolfGaitsPlantEachPaw();
-        CheckAWolfReversingAtAGallopLooksRoundFirstAndBrakesUntilItsBodyComesRound();
         CheckPosingAllocatesNothing();
     }
 
@@ -61,58 +58,6 @@ public static class AnimationChecks {
             lowest = Math.Min(lowest, pose.Hips); highest = Math.Max(highest, pose.Hips);
         }
         Require(highest - lowest > .1f, $"the digger should bend down onto the shovel and straighten to throw: the hips moved {highest - lowest:0.00} m");
-    }
-
-    private static void CheckAWolfReversingAtAGallopLooksRoundFirstAndBrakesUntilItsBodyComesRound() {
-        var wolf = new WolfModel();
-        const float dt = 1f / 60, speed = 6.3f;
-        var ahead = new Vector2(0, 1);
-        for (int i = 0; i < 60; i++) {
-            var moved = ahead * speed * dt;
-            Require(!wolf.TurnToward(moved, moved, dt, true, true, false), "a wolf galloping on in a straight line should not brake");
-            wolf.Move(moved.Length(), dt, true, false);
-        }
-        bool braked = false, stillBraking = true;
-        float lookAhead = 0;
-        // The body takes 0.3 s to come most of the way round; half a second later it gallops on.
-        for (int i = 0; i < 48; i++) {
-            var moved = -ahead * speed * dt;
-            bool braking = wolf.TurnToward(moved, moved, dt, true, true, false);
-            if (braking) wolf.Brake(moved.Length(), dt); else wolf.Move(moved.Length(), dt, true, false);
-            if (i < 6) lookAhead = Math.Max(lookAhead, Math.Abs(wolf.Turning.Look));
-            braked |= braking; stillBraking = braking;
-        }
-        Require(lookAhead > Mathf.DegToRad(20), $"a wolf turning round should turn its head ahead of its body, not {Mathf.RadToDeg(lookAhead):0} degrees");
-        Require(braked, "a wolf reversing at a gallop should brake while its body still faces the way it came");
-        Require(!stillBraking && wolf.Motion == WolfMotion.Gallop, $"a wolf whose body has come round should gallop on, not {wolf.Motion}");
-        wolf.Root.Free();
-    }
-
-    /// <summary>At each gait's pace a paw on the ground holds its place while the body moves on over it, and no paw sinks into the ground.</summary>
-    private static void CheckWolfGaitsPlantEachPaw() {
-        var wolf = new WolfModel();
-        foreach (var (gait, speed, chasing) in new[] { ("walk", 1.1f, false), ("patrol walk", 1.5f, false), ("trot", 3f, false), ("gallop", 6.3f, true) }) {
-            const float dt = 1f / 240;
-            // A second at the pace lets the speed settle and the blend from the last gait finish.
-            for (int i = 0; i < 240; i++) wolf.Move(speed * dt, dt, chasing, false);
-            float travelled = 0, slide = 0, deepest = 0;
-            var landed = new float?[4];
-            for (int i = 0; i < 480; i++) {
-                wolf.Move(speed * dt, dt, chasing, false); travelled += speed * dt;
-                for (int leg = 0; leg < 4; leg++) {
-                    var paw = wolf.Paw(leg);
-                    deepest = Math.Min(deepest, paw.Y - WolfShape.Sole);
-                    // The model faces +Z, so a paw's place on the ground is its offset plus the distance travelled.
-                    if (paw.Y < WolfShape.Sole + .004f) {
-                        landed[leg] ??= paw.Z + travelled;
-                        slide = Math.Max(slide, Math.Abs(paw.Z + travelled - landed[leg]!.Value));
-                    } else landed[leg] = null;
-                }
-            }
-            Require(slide < .02f, $"a planted paw should not slide in the {gait}: {slide:0.000} tiles");
-            Require(deepest > -.005f, $"no paw should sink into the ground in the {gait}: {deepest:0.000} tiles");
-        }
-        wolf.Root.Free();
     }
 
     private static void CheckCraftingSquatsOnlyWhileStandingStill() {
@@ -191,40 +136,6 @@ public static class AnimationChecks {
             float cycle = ActorAnimation.Stride(gait) / speed;
             Require(Math.Abs(cycle - ActorAnimation.Duration(gait)) < .02f,
                 $"{gait}'s stride should take as long at its speed as its timing assumes: {cycle:0.000} s against {ActorAnimation.Duration(gait):0.000} s");
-        }
-    }
-
-    /// <summary>
-    /// A cabin's door has two treads 14 cm high and then the floor, 40, 62 and 80 cm in from where a player stands at it,
-    /// as the cabin model builds them; a player walks, runs and is tugged over them and knocks on the door from the lower one.
-    /// </summary>
-    private static void CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem() {
-        ReadOnlySpan<float> edges = stackalloc float[] { .4f, .62f, .8f };
-        const float rise = .14f;
-        // How far in from the door point the hips go, facing in or out, over how many seconds, and whether the lowest boot must stay on the ground.
-        foreach (var (action, from, to, facingIn, seconds, grounded) in new[] {
-            (ActorAction.Walk, 0f, 1.8f, true, 1.5f, true), (ActorAction.Walk, 1.8f, 0f, false, 1.5f, true), (ActorAction.Jog, 0f, 1.8f, true, .7f, false),
-            (ActorAction.Walk, .1f, .5f, true, .3f, true), (ActorAction.Knock, .5f, .5f, true, 1f, true), (ActorAction.Tugged, .7f, -.3f, true, 1.5f, true) }) {
-            var up = new Vector2(0, facingIn ? 1 : -1);
-            float time = 0, deepest = 0, highest = 0;
-            for (int i = 0; i <= 300; i++) {
-                float depth = Mathf.Lerp(from, to, i / 300f), travelled = Math.Abs(to - from) * i / 300f;
-                time = seconds * i / 300f;
-                var pose = ActorAnimation.PoseAt(action, ActorAnimation.Stride(action) > 0 ? ActorAnimation.Advance(action, 0, travelled) : time, from != to);
-                (pose, float lift) = StairSteps.OnSteps(pose, depth, up, edges, rise);
-                float lowest = float.MaxValue;
-                for (int side = 0; side < 2; side++) {
-                    var (toe, heel) = side == 0 ? ActorAnimation.SoleOf(pose.SwingL, pose.KneeL, pose.FootL) : ActorAnimation.SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
-                    foreach (var point in new[] { toe, heel }) {
-                        // Facing out, a point ahead of the hips is further out from the door.
-                        float clear = lift + pose.HipHeight - point.Y - StairSteps.StepGround(depth + up.Y * point.X, edges, rise);
-                        deepest = Math.Min(deepest, clear); lowest = Math.Min(lowest, clear);
-                    }
-                }
-                if (grounded) highest = Math.Max(highest, lowest);
-            }
-            Require(deepest > -.003f, $"{action} from {from} m to {to} m in from a cabin's door should never sink a boot into its steps: {deepest:0.000} m");
-            Require(highest < .01f, $"{action} from {from} m to {to} m in from a cabin's door should keep a boot on the steps: the lowest rose {highest:0.000} m off them");
         }
     }
 

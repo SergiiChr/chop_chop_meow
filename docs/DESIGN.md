@@ -214,13 +214,15 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/*Checks.cs`, `tests/cabins/CabinChecks.cs`, `tests/paths/GravelPathChecks.cs`, `tests/actors/enemies/wolf/*Checks.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`), each feature's in the folder of its code |
-| `tests/*Steps.cs`, `tests/cabins/CabinSteps.cs`, `tests/paths/GravelPathSteps.cs` | Steps shared by the simulation checks |
-| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
+| `tests/<feature>/` | Every check of a feature whose code has a folder, beside its steps: `*Checks.cs` its rules through `World`, `*UIChecks.cs` what the player does and sees, `*NetChecks.cs` its scene in the network session. So far `tests/paths/`, `tests/cabins/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/*Checks.cs` | Simulation checks of the features whose code is still flat, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
+| `tests/*Steps.cs` | Steps several features' simulation checks share |
+| `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
+| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events for the features whose code is still flat, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
 | `src/RecipeReadyChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
-| `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
+| `src/NetChecks.cs` | The host and guest network session (`NET-HOST PASS`, `NET-GUEST PASS`): joining, leaving and reconnecting, with each feature's `NetScene` played in between (`Game.NetScenes`) |
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
-| `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
+| `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps several features' UI and network checks share, and `Game.TestClean`, which fails a UI check that leaves a mess |
 | `src/RecipeSteps.cs` | Steps that open a fresh station for a recipe, give and load its items and fuel, and expect a batch to start or be refused |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
