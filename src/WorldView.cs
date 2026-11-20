@@ -939,7 +939,7 @@ public partial class WorldView : Node3D {
                 }
                 dug.Out = Math.Min(DugOutSeconds, dug.Out + dt);
                 // Thrown up from the lean digging left it at, it rises and falls under gravity, tumbling steadily over about its middle.
-                prop.Body.Transform = Thrown.Tumble(dug.Launch, dug.Middle, Thrown.Rise(dug.Out, DugOutSeconds), DugTumble * dug.Out / DugOutSeconds, 1 - Mathf.SmoothStep(.45f, 1, dug.Out / DugOutSeconds));
+                prop.Body.Transform = Thrown.Tumble(dug.Launch, dug.Middle, Movement.Rise(dug.Out, DugOutSeconds), DugTumble * dug.Out / DugOutSeconds, 1 - Mathf.SmoothStep(.45f, 1, dug.Out / DugOutSeconds));
                 return dug.Out < DugOutSeconds;
             default: return false;
         }
@@ -1107,7 +1107,7 @@ public partial class WorldView : Node3D {
                 if (t.Kind == ThingKind.Crate) {
                     float lifted = t.Id == Lifting ? Ease(LiftProgress) * CrateLift : 0;
                     if (lifted >= box.Raised) (box.Raised, box.Dropping) = (lifted, 0);
-                    else { box.Dropping += Thrown.Gravity * dt; box.Raised = Math.Max(lifted, box.Raised - box.Dropping * dt); }
+                    else { box.Dropping += Movement.Gravity * dt; box.Raised = Math.Max(lifted, box.Raised - box.Dropping * dt); }
                     float rocking = box.Raised / CrateLift;
                     prop.Body.Position = new Vector3(0, box.Raised, 0);
                     prop.Body.RotationDegrees = new Vector3(rocking * 9 * MathF.Sin(Elapsed * 18), 0, rocking * 6 * MathF.Cos(Elapsed * 15));

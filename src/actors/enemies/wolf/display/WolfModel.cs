@@ -180,22 +180,21 @@ public sealed class WolfModel {
             var (from, to) = flights[i];
             float into = Mathf.PosMod(p - from, 1), air = Mathf.PosMod(to - from, 1);
             if (into < air) {
-                float t = into * seconds, v = Gravity * air * seconds / 2;
-                return v * t - Gravity * t * t / 2;
+                float t = into * seconds, v = Movement.Gravity * air * seconds / 2;
+                return v * t - Movement.Gravity * t * t / 2;
             }
             // On the ground between this flight and the next.
             var (next, _) = flights[(i + 1) % flights.Length];
             float ground = Mathf.PosMod(next - to, 1), on = Mathf.PosMod(p - to, 1);
             if (on <= ground) {
-                float stance = ground * seconds, t = on * stance / ground, landed = Gravity * air * seconds / 2;
-                float push = MathF.PI * (2 * landed + Gravity * stance) / (2 * stance);
-                return -landed * t + push * stance / MathF.PI * (t - stance / MathF.PI * MathF.Sin(MathF.PI * t / stance)) - Gravity * t * t / 2;
+                float stance = ground * seconds, t = on * stance / ground, landed = Movement.Gravity * air * seconds / 2;
+                float push = MathF.PI * (2 * landed + Movement.Gravity * stance) / (2 * stance);
+                return -landed * t + push * stance / MathF.PI * (t - stance / MathF.PI * MathF.Sin(MathF.PI * t / stance)) - Movement.Gravity * t * t / 2;
             }
         }
         return 0;
     }
     /// <summary>Metres a second squared.</summary>
-    private const float Gravity = 9.81f;
 
     /// <summary>Where each paw stands at rest under its shoulder or hip.</summary>
     internal static float Home(int leg) => leg < 2 ? .33f : -.34f;
@@ -379,7 +378,7 @@ public sealed class WolfModel {
     private static WolfPose Snapping(float wind, float drive, float shut, float surge) {
         float g = Mathf.SmoothStep(0, 1, wind), d = Mathf.SmoothStep(0, 1, drive), flown = Math.Clamp(drive, 0, 1), air = MathF.Sin(MathF.PI * flown);
         // Off the ground the body rises and falls under gravity.
-        float hop = Gravity * WolfSnap.Flight * WolfSnap.Flight / 2 * flown * (1 - flown);
+        float hop = Movement.Gravity * WolfSnap.Flight * WolfSnap.Flight / 2 * flown * (1 - flown);
         // From the wary stand it stalks in, to gathered, to stretched out at the end of the leap.
         float Through(float wary, float gathered, float struck) => Mathf.Lerp(Mathf.Lerp(wary, gathered, g), struck, d);
         var body = new WolfPose(Lift: Through(-.08f, -.15f, -.05f) + hop, Surge: Through(0, -.1f, surge), Pitch: Through(4, -2, 3), Flex: Through(0, 12, -10),
@@ -486,8 +485,8 @@ public sealed class WolfModel {
         float pushing = PushShare * seconds, air = (1 - PushShare) * seconds;
         if (pushing + air <= 0) return to;
         // It leaves the ground as fast upward as the flight needs to come down on the mark, gathering that speed over the push.
-        float rise = (to.Y - from.Y + Gravity * air * air / 2) / (pushing / 2 + air), t = f * seconds;
-        float up = t < pushing ? rise * t * t / (2 * pushing) : rise * pushing / 2 + rise * (t - pushing) - Gravity * (t - pushing) * (t - pushing) / 2;
+        float rise = (to.Y - from.Y + Movement.Gravity * air * air / 2) / (pushing / 2 + air), t = f * seconds;
+        float up = t < pushing ? rise * t * t / (2 * pushing) : rise * pushing / 2 + rise * (t - pushing) - Movement.Gravity * (t - pushing) * (t - pushing) / 2;
         return at with { Y = from.Y + up };
     }
 
@@ -624,7 +623,7 @@ public sealed class WolfModel {
     /// </summary>
     public void Recoil(float progress, float dt) {
         // In the air it rises and falls under gravity: a hop of HopSeconds rises a gravity's HopSeconds squared over eight.
-        float t = Math.Clamp(progress, 0, 1), hop = t / HopShare, air = t < HopShare ? 4 * hop * (1 - hop) : 0, rise = Gravity * HopSeconds * HopSeconds / 8;
+        float t = Math.Clamp(progress, 0, 1), hop = t / HopShare, air = t < HopShare ? 4 * hop * (1 - hop) : 0, rise = Movement.Gravity * HopSeconds * HopSeconds / 8;
         float snap = Mathf.SmoothStep(0, .08f, t) * (1 - Mathf.SmoothStep(.15f, .55f, t));
         // The duck eases into the wary stand the wolf goes on to, rather than out of it.
         // It ducks once it has landed.
@@ -649,7 +648,7 @@ public sealed class WolfModel {
     /// </summary>
     public void Fall(float progress) {
         float p = Math.Clamp(progress, 0, 1), fly = Math.Min(1, p / ThrowShare), down = Mathf.SmoothStep(0, 1, fly), air = MathF.Sin(MathF.PI * fly);
-        float thrown = ThrowShare * FallSeconds, drop = -LyingDrop * fly + Gravity * thrown * thrown / 2 * fly * (1 - fly);
+        float thrown = ThrowShare * FallSeconds, drop = -LyingDrop * fly + Movement.Gravity * thrown * thrown / 2 * fly * (1 - fly);
         float after = Math.Max(0, (p - ThrowShare) / (1 - ThrowShare)), bounce = after < .3f ? MathF.Sin(MathF.PI * after / .3f) : 0;
         // The head lags the body and hits the ground a moment after it.
         float slam = p < ThrowShare ? 0 : Mathf.SmoothStep(0, .25f, after), kick = after is > .55f and < .8f ? MathF.Sin(MathF.PI * (after - .55f) / .25f) : 0;

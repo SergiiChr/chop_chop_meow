@@ -18,8 +18,8 @@ public static class StairSteps {
     // The body heads onto the other boot's tread this many metres per metre a boot lifting off behind rises, easing out
     // over this far either side of the hips as the boot swings past them.
     private const float LiftEase = 3, Passing = .1f;
-    // How quickly, per second, the body's height over the steps follows where it heads, up and down: it is most of the way
-    // there in 1.5 / rate seconds. It comes down quicker, since a boot it holds up over a lower tread would show in the air.
+    // How quickly the body's height over the steps follows where it heads, up and down, as the rate of a critically damped
+    // spring a second (Movement.Spring). It comes down quicker, since a boot it holds up over a lower tread would show in the air.
     private const float RiseRate = 20, DropRate = 40;
     // A boot reaching down toe first to a tread lifts its heel this many degrees at most.
     private const float MostPointed = 35;
@@ -77,19 +77,22 @@ public static class StairSteps {
         public float Bears => 1 - Math.Clamp(Clear / Bearing, 0, 1);
     }
 
-    private static (Boot Left, Boot Right) Boots(Pose pose, float depth, Vector2 up, bool backing, ReadOnlySpan<float> edges, float rise) {
+    /// <summary>
+    /// A leg of <paramref name="pose"/> over the steps, the left one or the right, with the hips <paramref name="depth"/> along
+    /// the way up, which is <paramref name="up"/> in the body's frame, and the boot travelling ahead or, <paramref name="backing"/>,
+    /// behind.
+    /// </summary>
+    private static Boot BootOf(Pose pose, bool left, float depth, Vector2 up, bool backing, ReadOnlySpan<float> edges, float rise) {
         float hips = pose.HipHeight;
-        var (toeL, heelL) = ActorAnimation.SoleOf(pose.SwingL, pose.KneeL, pose.FootL);
-        var (toeR, heelR) = ActorAnimation.SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
-        float clearL = hips - Math.Max(toeL.Y, heelL.Y), clearR = hips - Math.Max(toeR.Y, heelR.Y), lower = Math.Min(clearL, clearR);
-        float aheadL = StepClearance * Math.Clamp(clearL / OffTheGround, 0, 1), aheadR = StepClearance * Math.Clamp(clearR / OffTheGround, 0, 1);
-        float restsL = Math.Max(StepGround(depth + up.Y * toeL.X + up.X * ActorAnimation.LegSide, edges, rise, aheadL) - hips + toeL.Y, StepGround(depth + up.Y * heelL.X + up.X * ActorAnimation.LegSide, edges, rise, aheadL) - hips + heelL.Y);
-        float restsR = Math.Max(StepGround(depth + up.Y * toeR.X - up.X * ActorAnimation.LegSide, edges, rise, aheadR) - hips + toeR.Y, StepGround(depth + up.Y * heelR.X - up.X * ActorAnimation.LegSide, edges, rise, aheadR) - hips + heelR.Y);
+        var leg = pose.Leg(left);
+        var (toe, heel) = ActorAnimation.SoleOf(leg.Swing, leg.Knee, leg.Foot);
+        float clear = hips - Math.Max(toe.Y, heel.Y), ahead = StepClearance * Math.Clamp(clear / OffTheGround, 0, 1);
+        // Where the toe and heel are along the way up, the leg hanging to its own side of the hips.
+        float aside = (left ? up.X : -up.X) * ActorAnimation.LegSide, toeAt = depth + up.Y * toe.X + aside, heelAt = depth + up.Y * heel.X + aside;
+        float rests = Math.Max(StepGround(toeAt, edges, rise, ahead) - hips + toe.Y, StepGround(heelAt, edges, rise, ahead) - hips + heel.Y);
         // A boot swings the way the body moves: ahead, or behind it backing away.
         float travel = (backing ? -up.Y : up.Y) * LookAhead;
-        float aheadOfL = StepGround(depth + up.Y * toeL.X + up.X * ActorAnimation.LegSide + travel, edges, rise);
-        float aheadOfR = StepGround(depth + up.Y * toeR.X - up.X * ActorAnimation.LegSide + travel, edges, rise);
-        return (new(new(pose.SwingL, pose.KneeL, pose.FootL), toeL, clearL, restsL, aheadOfL), new(new(pose.SwingR, pose.KneeR, pose.FootR), toeR, clearR, restsR, aheadOfR));
+        return new(leg, toe, clear, rests, StepGround(toeAt + travel, edges, rise));
     }
 
     /// <summary>
@@ -97,33 +100,27 @@ public static class StairSteps {
     /// changes in <paramref name="speed"/> from one frame to the next, <paramref name="dt"/> seconds apart.
     /// The body heads for the tread of the boot that bears the weight, rising onto the other boot's tread as the first one
     /// lifts off behind, and lowering ahead of a boot in the air that is about to step down, moving the way the body does, or
-    /// behind it <paramref name="backing"/>, as far as a leg bearing weight bends. It gets there smoothly rather than in the frame a boot passes a tread's edge.
+    /// behind it <paramref name="backing"/>, as far as a leg bearing weight bends.
+    /// It gets there smoothly rather than in the frame a boot passes a tread's edge.
     /// It never stands higher than a boot on the ground can reach down to its tread, unless it would have to drop faster
-    /// than it falls, and a boot it holds over a lower tread reaches down toe first, as a foot stepping down a stair does. A boot that would sink into a tread bends its knee to stand
-    /// on it instead, keeping its angle to the ground.
+    /// than it falls, and a boot it holds over a lower tread reaches down toe first, as a foot stepping down a stair does.
+    /// A boot that would sink into a tread bends its knee to stand on it instead, keeping its angle to the ground.
     /// <paramref name="depth"/> is how far along the way up the hips are and <paramref name="up"/> that way in the body's
     /// own frame, X toward its left and Y ahead; the steps rise <paramref name="rise"/> at each of <paramref name="edges"/>.
     /// </summary>
     public static Pose OnSteps(Pose pose, float depth, Vector2 up, bool backing, ReadOnlySpan<float> edges, float rise, ref float lift, ref float speed, float dt) {
-        var (left, right) = Boots(pose, depth, up, backing, edges, rise);
+        Boot left = BootOf(pose, true, depth, up, backing, edges, rise), right = BootOf(pose, false, depth, up, backing, edges, rise);
         float lower = Math.Min(left.Clear, right.Clear), hips = pose.HipHeight;
         float aim = Math.Min(left.Heads + Easing(left, backing, rise) * (left.Clear - lower), right.Heads + Easing(right, backing, rise) * (right.Clear - lower));
         aim = Math.Max(aim, Math.Max(Lowest(left, right), Lowest(right, left)));
-        float before = lift, falls = before + Math.Min(speed, 0) * dt - ActorAnimation.Gravity * dt * dt / 2;
-        // A spring with no overshoot carries the body toward its aim.
-        float rate = aim > lift ? RiseRate : DropRate, e = MathF.Exp(-rate * dt), off = lift - aim, pull = speed + rate * off;
-        lift = aim + (off + pull * dt) * e;
-        speed = (speed - rate * dt * pull) * e;
+        float before = lift, falls = before + Math.Min(speed, 0) * dt - Movement.Gravity * dt * dt / 2;
+        Movement.Spring(ref lift, ref speed, aim, aim > lift ? RiseRate : DropRate, dt);
         // No higher than the boots on the ground reach down, but no faster down than falling: a boot that cannot reach its
         // tread in time stays in the air a moment longer.
         float held = Math.Max(Math.Min(lift, Math.Min(Highest(left), Highest(right))), falls);
         if (held != lift && dt > 0) speed = (held - before) / dt;
         lift = held;
-        var fitted = pose with { Hips = hips };
-        var leg = Fitted(left, lift);
-        fitted = fitted with { SwingL = leg.Swing, KneeL = leg.Knee, FootL = leg.Foot };
-        leg = Fitted(right, lift);
-        return fitted with { SwingR = leg.Swing, KneeR = leg.Knee, FootR = leg.Foot };
+        return (pose with { Hips = hips }).WithLegs(Fitted(left, lift), Fitted(right, lift));
     }
 
     /// <summary>
@@ -151,7 +148,7 @@ public static class StairSteps {
     /// </summary>
     private static float Highest(Boot boot) {
         if (boot.Bears <= 0) return float.MaxValue;
-        float tilt = Mathf.DegToRad(Math.Max(0, boot.Leg.Foot - boot.Leg.Swing + boot.Leg.Knee));
+        float tilt = Mathf.DegToRad(Math.Max(0, boot.Leg.Tilt));
         float reach = Math.Max(ActorAnimation.ToeReach(boot.Toe.X, tilt, ActorAnimation.StoodKnee), ActorAnimation.ToeReach(boot.Toe.X, Mathf.DegToRad(MostPointed), ActorAnimation.StoodKnee));
         return boot.Stands + Math.Max(0, reach - boot.Toe.Y) + (1 - boot.Bears) * Unborne;
     }
@@ -168,7 +165,7 @@ public static class StairSteps {
         // The toe goes straight down and the heel lifts about it as far as the leg, keeping its knee, needs to reach; the
         // leg straightens for the rest, as far as it goes.
         float ground = boot.Toe.Y + down;
-        float tilt = Mathf.DegToRad(boot.Leg.Foot - boot.Leg.Swing + boot.Leg.Knee);
+        float tilt = Mathf.DegToRad(boot.Leg.Tilt);
         tilt = Math.Clamp(ActorAnimation.HeelLift(boot.Toe.X, ground, boot.Leg.Knee), tilt, Math.Max(tilt, Mathf.DegToRad(MostPointed)));
         return ActorAnimation.OnToe(boot.Toe.X, Math.Min(ground, ActorAnimation.ToeReach(boot.Toe.X, tilt, ActorAnimation.StoodKnee)), tilt);
     }
@@ -177,6 +174,6 @@ public static class StairSteps {
     private static ActorAnimation.LegAngles Raised(ActorAnimation.LegAngles leg, float by) {
         var ankle = ActorAnimation.Ankle(leg.Swing, leg.Knee);
         var (swing, knee) = ActorAnimation.LegTo(ankle.X, ankle.Y - by);
-        return new ActorAnimation.LegAngles(swing, knee, leg.Foot - leg.Swing + leg.Knee + swing - knee);
+        return new ActorAnimation.LegAngles(swing, knee, leg.Tilt + swing - knee);
     }
 }

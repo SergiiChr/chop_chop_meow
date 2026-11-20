@@ -40,7 +40,7 @@ public static class LakeAppearance {
     /// <summary>How far round its turn a wave of <paramref name="length"/> metres is: its crests run at the speed deep water gives that length, slowed to the water's speed.</summary>
     private static float Phase(float length) {
         double k = Math.Tau / length;
-        return (float)(Math.Sqrt(9.8 * k) * WaterBody.Speed * clock % Math.Tau);
+        return (float)(Math.Sqrt(Movement.Gravity * k) * WaterBody.Speed * clock % Math.Tau);
     }
 
     /// <summary>Adds the lake's water surface, which ends at the shore that bounds walking.</summary>

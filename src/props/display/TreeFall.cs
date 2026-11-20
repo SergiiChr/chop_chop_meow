@@ -13,7 +13,6 @@ namespace ChopChopMeow;
 /// Angles are from upright, in radians, and points are in the tree's model sized as drawn, from its spot.
 /// </summary>
 public sealed class TreeFall {
-    public const float Gravity = 9.81f;
     /// <summary>
     /// The lean the fall is timed from: the tree starts upright at the speed it would have from falling from rest at this
     /// lean, which takes it down in the time a pole released there takes.
@@ -51,7 +50,7 @@ public sealed class TreeFall {
             if (ahead > 0 && at.Y > 0) lands = Math.Min(lands, MathF.Atan2(at.Y, ahead));
         }
         (Length, Lands) = (top * scale, lands);
-        Speed = MathF.Sqrt(3 * Gravity / Length * (1 - MathF.Cos(StartLean)));
+        Speed = MathF.Sqrt(3 * Movement.Gravity / Length * (1 - MathF.Cos(StartLean)));
     }
 
     /// <summary>The tree turned by the fall, about its hinge, before anything else turns it: a point of the model as drawn goes to <c>Turn * point</c>.</summary>
@@ -62,7 +61,7 @@ public sealed class TreeFall {
         if (Landed) return false;
         for (float left = dt; left > 0; left -= Step) {
             float h = Math.Min(Step, left);
-            Speed += 1.5f * Gravity / Length * MathF.Sin(Angle) * h;
+            Speed += 1.5f * Movement.Gravity / Length * MathF.Sin(Angle) * h;
             Angle += Speed * h;
             if (Angle < Lands) continue;
             (Angle, Speed) = (Lands, 0);

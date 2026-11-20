@@ -75,6 +75,16 @@ public readonly record struct Pose(
     /// <summary>The hip height above the ground: Hips when set, otherwise standing on the lower foot.</summary>
     public float HipHeight => Hips > 0 ? Hips : Standing;
 
+    /// <summary>The left leg's angles, or the right's.</summary>
+    internal ActorAnimation.LegAngles Leg(bool left) => left ? new(SwingL, KneeL, FootL) : new(SwingR, KneeR, FootR);
+
+    /// <summary>The pose with the left leg, or the right, at <paramref name="leg"/>'s angles.</summary>
+    internal Pose WithLeg(bool left, ActorAnimation.LegAngles leg) =>
+        left ? this with { SwingL = leg.Swing, KneeL = leg.Knee, FootL = leg.Foot } : this with { SwingR = leg.Swing, KneeR = leg.Knee, FootR = leg.Foot };
+
+    /// <summary>The pose with both legs at the given angles.</summary>
+    internal Pose WithLegs(ActorAnimation.LegAngles left, ActorAnimation.LegAngles right) => WithLeg(true, left).WithLeg(false, right);
+
     /// <summary>The hip height that puts the lower foot on the ground.</summary>
     private float Standing => Math.Max(ActorAnimation.Reach(SwingL, KneeL), ActorAnimation.Reach(SwingR, KneeR)) + ActorAnimation.Sole;
 }
@@ -566,7 +576,6 @@ public static class ActorAnimation {
     // The legs hang from this far below the hips, so the ankle is the rest of Sole above the bottom of the boot.
     // The boot's sole reaches this far ahead of the ankle to the toe and behind it to the heel, as HumanShape builds it.
     private const float LegDrop = .02f, Toe = .155f, Heel = .065f, AboveSole = Sole - LegDrop;
-    internal const float Gravity = 9.8f;
     /// <summary>How far below the hip a leg's ankle is, for a thigh swung forward and a knee folded back by these angles.</summary>
     public static float Reach(float swing, float knee) => Ankle(swing, knee).Y;
 
@@ -589,6 +598,8 @@ public static class ActorAnimation {
 
     /// <summary>A leg's thigh swing, knee bend and foot tip in degrees, as in <see cref="Pose"/>.</summary>
     internal readonly record struct LegAngles(float Swing, float Knee, float Foot) {
+        /// <summary>How far, in degrees, the boot's toes tip down from level ground.</summary>
+        public float Tilt => Foot - Swing + Knee;
         public static LegAngles operator +(LegAngles a, LegAngles b) => new(a.Swing + b.Swing, a.Knee + b.Knee, a.Foot + b.Foot);
         public static LegAngles operator -(LegAngles a, LegAngles b) => new(a.Swing - b.Swing, a.Knee - b.Knee, a.Foot - b.Foot);
         public static LegAngles operator *(LegAngles a, float by) => new(a.Swing * by, a.Knee * by, a.Foot * by);
@@ -801,7 +812,7 @@ public static class ActorAnimation {
         public RunGait(float speed, float cycle, float stance, float landing, float hipHeight, float pushOffTilt, float lean, float splay, float armGain, float armPivot, (float At, LegAngles Leg)[] swing) {
             (Stride, Cycle, Stance, Landing, HipHeight, PushOffTilt) = (speed * cycle, cycle, stance, landing, hipHeight, pushOffTilt);
             (Lean, Splay, ArmGain, ArmPivot) = (lean, splay, armGain, armPivot);
-            LandingSpeed = Gravity * (.5f - stance) * cycle / 2;
+            LandingSpeed = Movement.Gravity * (.5f - stance) * cycle / 2;
             Swing = SwingCurve(stance, q => Planted(this, q), swing);
         }
     }
@@ -858,7 +869,7 @@ public static class ActorAnimation {
         float q = Mathf.PosMod(sinceLanding, .5f);
         if (q < gait.Stance) return gait.HipHeight - gait.LandingSpeed * gait.Stance * gait.Cycle / MathF.PI * MathF.Sin(MathF.PI * q / gait.Stance);
         float t = (q - gait.Stance) * gait.Cycle;
-        return gait.HipHeight + gait.LandingSpeed * t - Gravity * t * t / 2;
+        return gait.HipHeight + gait.LandingSpeed * t - Movement.Gravity * t * t / 2;
     }
 
     /// <summary>A running leg's angles a share <paramref name="sinceLanding"/> of the cycle after its foot lands.</summary>
