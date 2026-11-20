@@ -190,8 +190,10 @@ Rendering and sound:
 | `src/water/display/ShorelineAppearance.cs` | The sand and stony bank strips along the lake and the coast, and the coast's water |
 | `src/water/display/LakeDressing.cs` | The lake's bank, water, stones, reeds and lily pads |
 | `src/water/model/ShoreLook.cs`, `src/water/model/WaterBody.cs` | The shore photoscans' looks, and the sea's and the lake's waves and colours |
-| `src/PaintFilter.cs` | The paint filter over the drawn world ([assets/environment/paint_filter](../assets/environment/paint_filter/README.md)) |
-| `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
+| `src/paint_filter/display/PaintFilter.cs` | The paint filter over the drawn world ([assets/environment/paint_filter](../assets/environment/paint_filter/README.md)) |
+| `src/WorldModels.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
+| `src/actors/display/ActorRig.cs`, `src/actors/display/HumanShape.cs` | The person model, its joints and the shapes of its body (see [assets/README.md](../assets/README.md)) |
+| `src/actors/display/Outfit.cs`, `src/actors/display/BodyBuild.cs` | The colours a person is drawn in, and the game's and the slim build of a body |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
 | `src/actors/model/BodySide.cs` | Which side of a body is its left and which its right, and which side a spot is on |
 | `src/actors/enemies/wolf/display/WolfModel.cs`, `src/actors/enemies/wolf/display/WolfShape.cs` | Builds the wolf and poses it: its gaits, leap, howl, tug, recoil and fall |
@@ -234,6 +236,9 @@ Checks and review tools:
 | `src/actors/enemies/wolf/WolfReview.cs` | The `--wolf-scene` scenes: wolves turning on a patrol, turning to a player they smell and howling, feeding on one they brought down, following one with a torch, and fighting one with an axe |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
 | `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
+| `src/intro/display/CatgirlPage.cs` | The web page on the hero's screen in the film: three catgirls dancing inside a browser window |
+| `src/intro/display/Catgirl.cs` | A catgirl of that page: face, hair, ears, tail, hands with fingers and one of three outfits on the person model's slim build |
+| `src/intro/display/CatgirlDance.cs`, `src/intro/display/DanceFrame.cs` | The catgirls' dances: one the two at the sides do in step, and the solo of the one in the middle; and a moment of a dance |
 | `src/intro/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
 | `tools/intro_film.py` | Draws the film's frames and writes its sound cue sheet |
 
@@ -1166,7 +1171,25 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 - It reuses the game's own models: the player's rig, the pack, flask, axe and torch, the trees, the valley with its
   shore and sea, and the fire pit. Walking and running go through the game's gaits.
 - New for the film: the office, the rented room and the train car (`IntroSets`), a baseball bat, the boss
-  (`ActorSkin.Boss`), and the poses in `IntroPoses`.
+  (`ActorSkin.Boss`), the catgirls (`Catgirl`) and the poses in `IntroPoses`.
+- The hero's screen shows a web page of three catgirls dancing (`CatgirlPage`). The page is a small world of its own,
+  drawn to a picture that a sheet over his screen wears; it is drawn again each frame only while his screen is seen.
+  A catgirl (`Catgirl`) is the game's person model in the slim build (`HumanShape.Slim`: a waist, thinner limbs,
+  narrower shoulders, wrists that end without a fist), in an `Outfit` of her own colours, with a smaller head, a face
+  that blinks, hair, cat ears, a tail of five joints, hands with fingers and one of three outfits: a maid's dress, a
+  sleeveless shirt with shorts and knee socks, or a long hoodie.
+  The two at the sides dance `CatgirlDance.Chorus` in step. The one in the middle dances `CatgirlDance.Solo`: a list
+  of steps, each a place for either hand with a way for its elbow to point, blended and solved by
+  `ArmReach.WithHandAt` every frame from where each shoulder is. The page's clock starts with the close-up of it.
+  The person model has joints the game's own poses leave at rest, which any rig has: the chest turns on the belly at
+  the waist (`ActorRig.BendChest`), the hips tuck, turn and tilt (`TurnHips`) and each shoulder shrugs or hunches
+  (`MoveShoulder`), all kept until set again; and each foot tips at the ankle (`RollFoot`), on top of the pose shown.
+  Each thigh tips out on its own through `Pose.SplayL` and `Pose.SplayR`.
+  `Catgirl` adds wrists that bend, twist and tip, a head that nods, turns and tilts, a turn of the whole body and a lift
+  off the floor. A `DanceFrame` holds all of them; a step of the solo sets most, so her weight goes onto one leg with
+  the far hip lifted and the chest tipped back over it.
+- The paint filter is drawn over the frames wider than in the game (`WorldView.IntroPaintWidth`), since the movie tool
+  shrinks them.
 - The camera is the game's own, switched to perspective and placed per shot at eye level. A dome around it draws the
   sky,
   since the game's sky is one flat colour that only a view from above hides.
@@ -1177,11 +1200,13 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   level,
   then settings. A game sound goes by its name in `assets/sounds`, and music or one of the film's own recordings by its
   folder and name under `assets`, such as `intro/boss`. A cue's `from` and `length` take a part of a file, `far=1` makes
-  it distant, `rate` plays it faster or slower, and a `stop` cue fades out the music track that is playing.
+  it distant, `muffled=1` leaves only its low part as if heard through a wall, `rate` plays it faster or slower, and a
+  `stop` cue fades out the music track that is playing.
 - A hand goes to a thing through `Reaching`, which bends an arm of a pose so its fist lands on a point: packing at home
   and touching the sea use it over the game's crafting squat.
-- A pose's elbow folds only forward. `Folding` also turns the upper arm about its own length (`ActorRig.RollArm`), so a
-  forearm can lie across the chest: by the fire his arms are crossed, each palm on the other shoulder.
+- A pose's elbow folds only forward. `ArmReach.WithHandAt` also turns the upper arm about its own length
+  (`ActorRig.RollArm`), so a forearm can lie across the chest: by the fire his arms are crossed, each palm on the other
+  shoulder.
 
 ## Sound and music
 
