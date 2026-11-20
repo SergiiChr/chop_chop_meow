@@ -113,7 +113,7 @@ The game draws the film itself, so a change to a model or a shot means making th
 2. A movie tool turns the frames and cue sheet into `assets/intro.ogv`: keep every second frame, shrink it to 480×270,
    pack each as a JPEG so its blocks just show, mix the cue sheet's sounds from `assets/sounds` and `assets`, and write
    Ogg Theora, which the game plays and blows up to the window.
-   The movie tool is not part of this project; the `intro-film` skill (`.claude/skills/intro-film`) has the commands.
+   The movie tool is not part of this project; the `intro-film` skill (`.agents/skills/intro-film`) has the commands.
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures

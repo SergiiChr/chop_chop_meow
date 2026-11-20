@@ -14,20 +14,20 @@ from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DOCS = ["*.md", "docs/*.md", "assets/*.md", ".claude/skills/*/SKILL.md"]
+DOCS = ["*.md", "docs/*.md", "assets/*.md", ".agents/skills/*/SKILL.md"]
 # What the names are looked up in: the game and its checks, then the launcher, the tools and the skills' own scripts.
 CSHARP = ["src/**/*.cs", "tests/**/*.cs"]
 OTHER_CODE = [
     "build.py",
     "tools/*.py",
     "tools/*.gd",
-    ".claude/skills/*/*.py",
-    ".claude/skills/*/*.sh",
-    ".claude/skills/*/*.txt",
+    ".agents/skills/*/*.py",
+    ".agents/skills/*/*.sh",
+    ".agents/skills/*/*.txt",
     ".github/workflows/*.yml",
 ]
 # A skill's commands, in its fenced blocks, may add a flag of their own to the game, such as the playtest driver's.
-SKILLS = ".claude/skills/*/SKILL.md"
+SKILLS = ".agents/skills/*/SKILL.md"
 
 SPAN = re.compile(r"`([^`\n]+)`")
 TYPE = re.compile(
@@ -49,6 +49,7 @@ FOLDERS = (
     "assets/",
     "scenes/",
     "addons/",
+    ".agents/",
     ".claude/",
     ".github/",
 )

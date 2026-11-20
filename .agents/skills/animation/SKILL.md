@@ -11,7 +11,8 @@ description: Make a character or creature animation look physically right, check
 2. Find references for the motion and write down its key poses and timings: contact, mid-stance, push-off, mid-swing,
    how long a foot is down, how long the body is in the air.
 3. Work out the geometry first: leg reach, foot placement, hip height.
-   A short script in the scratchpad that solves the poses is quicker to iterate than the game.
+   A short script in the scratch folder (the scratchpad the harness defines for the session, otherwise
+   `/tmp/scratch`) that solves the poses is quicker to iterate than the game.
 4. Change the poses, record again and go through it as [Frame by frame](#frame-by-frame) says, until every frame passes.
 5. Add or extend a check in `tests/AnimationChecks.cs` for what can be measured: feet on the ground, no sliding, nothing
    below it, time in the air. `CheckWolfGaitsPlantEachPaw` and
