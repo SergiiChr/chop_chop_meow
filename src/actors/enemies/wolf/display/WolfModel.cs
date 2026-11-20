@@ -98,7 +98,7 @@ public sealed class WolfModel {
     /// <summary>Seconds a wolf holds the end of a snap, stretched out with its jaws shut, before it gathers its legs under it again.</summary>
     public const float SnapHold = .14f;
     /// <summary>How long the recoil from a blow plays, from the moment it lands, and the share of it spent hopping back.</summary>
-    public const float RecoilSeconds = .6f, HopShare = .4f;
+    public const float RecoilSeconds = .6f, HopShare = .4f, HopSeconds = RecoilSeconds * HopShare;
     /// <summary>How long a killed wolf takes to go down, and the share of that it is thrown through the air before it hits the ground.</summary>
     public const float FallSeconds = .7f, ThrowShare = .35f;
     /// <summary>How high off the ground the chest of a player lying on their back is, where a pinning wolf's forepaws stand.</summary>
@@ -117,22 +117,85 @@ public sealed class WolfModel {
     }
 
     public WolfMotion Motion => motion;
+    /// <summary>The pose shown, with every paw set on the ground as <see cref="Plant"/> left it.</summary>
+    public WolfPose Shown => shown;
 
     // ---------- Gaits ----------
 
     /// <summary>
-    /// A gait: stride length in tiles, the share of the stride each paw is on the ground, each leg's place in the stride and how high front and hind paws lift.
-    /// Reach carries a swinging paw on past its landing spot before it comes back to land.
+    /// A gait: stride length in tiles, the share of the stride each paw is on the ground, each leg's place in the stride, how high
+    /// front and hind paws lift, how many degrees the wrist folds the forepaw up behind it in the swing, and how far apart, as a
+    /// share of the legs' own width, the fore and the hind paws are set.
     /// </summary>
-    private readonly record struct Gait(float Length, float Duty, float FrontLeft, float FrontRight, float HindLeft, float HindRight, float FrontLift, float HindLift, float Reach, float Width) {
+    private readonly record struct Gait(float Length, float Duty, float FrontLeft, float FrontRight, float HindLeft, float HindRight, float FrontLift, float HindLift, float Fold, float FrontWidth, float HindWidth) {
         public float Offset(int leg) => leg switch { 0 => FrontLeft, 1 => FrontRight, 2 => HindLeft, _ => HindRight };
+        public float Width(int leg) => leg < 2 ? FrontWidth : HindWidth;
     }
 
     // A walk sets the feet down one at a time, hind then fore on each side; a trot moves diagonal pairs together with a short float between them;
     // the rotary gallop lands both forefeet then both hind feet, folding the spine under between them and stretching it out after.
-    private static readonly Gait WalkGait = new(.9f, .68f, .23f, .73f, 0, .5f, .07f, .06f, 0, .9f);
-    private static readonly Gait TrotGait = new(1.26f, .42f, 0, .5f, .52f, .02f, .12f, .1f, .04f, .72f);
-    private static readonly Gait GallopGait = new(2.42f, .25f, 0, .1f, .6f, .5f, .2f, .16f, .14f, .85f);
+    // Galloping, the hind paws pass outside the fore, which land close to one line.
+    private static readonly Gait WalkGait = new(.9f, .68f, .23f, .73f, 0, .5f, .07f, .06f, 70, .9f, .9f);
+    private static readonly Gait TrotGait = new(1.26f, .42f, 0, .5f, .52f, .02f, .12f, .1f, 100, .72f, .72f);
+    private static readonly Gait GallopGait = new(0, .25f, 0, .1f, .6f, .5f, .2f, .16f, 110, .6f, 1.45f);
+
+    /// <summary>
+    /// The gallop's stride at a pace, in tiles: about two and a half strides a second, a few more the faster it goes, so a faster
+    /// gallop mostly reaches further, as in running dogs (Heglund, Taylor and McMahon 1974).
+    /// </summary>
+    private static float GallopStride(float speed) => Math.Max(speed, MinGallop) / GallopRate(speed);
+    private static float GallopRate(float speed) => 2.2f + .07f * Math.Max(speed, MinGallop);
+    /// <summary>The slowest pace, in tiles a second, the gallop's stride is timed for.</summary>
+    private const float MinGallop = .5f;
+
+    /// <summary>The shares of the gallop's stride from which every paw is off the ground until one lands, worked out once from its footfalls.</summary>
+    private static readonly (float From, float To)[] GallopFlights = Flights(GallopGait);
+
+    private static (float From, float To)[] Flights(Gait g) {
+        const int samples = 1000;
+        bool Down(float p) {
+            for (int leg = 0; leg < 4; leg++) if (Mathf.PosMod(p - g.Offset(leg), 1) < g.Duty) return true;
+            return false;
+        }
+        var flights = new System.Collections.Generic.List<(float, float)>();
+        int first = 0;
+        while (!Down(first / (float)samples)) first++;
+        for (int i = 0; i < samples; i++) {
+            float p = (first + i) / (float)samples;
+            if (Down(p) || !Down(p - 1f / samples)) continue;
+            int end = i;
+            while (!Down((first + end) / (float)samples)) end++;
+            flights.Add((Mathf.PosMod(p, 1), Mathf.PosMod((first + end) / (float)samples, 1)));
+        }
+        return flights.ToArray();
+    }
+
+    /// <summary>
+    /// How far the body is above where it left the ground, at <paramref name="p"/> through a stride of <paramref name="seconds"/>
+    /// with every paw off the ground over <paramref name="flights"/>: in the air it rises and falls under gravity, and on the
+    /// ground the legs take its weight like springs, lowest between the flights, so it leaves the ground as fast as it landed.
+    /// </summary>
+    private static float Bounce(ReadOnlySpan<(float From, float To)> flights, float p, float seconds) {
+        for (int i = 0; i < flights.Length; i++) {
+            var (from, to) = flights[i];
+            float into = Mathf.PosMod(p - from, 1), air = Mathf.PosMod(to - from, 1);
+            if (into < air) {
+                float t = into * seconds, v = Gravity * air * seconds / 2;
+                return v * t - Gravity * t * t / 2;
+            }
+            // On the ground between this flight and the next.
+            var (next, _) = flights[(i + 1) % flights.Length];
+            float ground = Mathf.PosMod(next - to, 1), on = Mathf.PosMod(p - to, 1);
+            if (on <= ground) {
+                float stance = ground * seconds, t = on * stance / ground, landed = Gravity * air * seconds / 2;
+                float push = MathF.PI * (2 * landed + Gravity * stance) / (2 * stance);
+                return -landed * t + push * stance / MathF.PI * (t - stance / MathF.PI * MathF.Sin(MathF.PI * t / stance)) - Gravity * t * t / 2;
+            }
+        }
+        return 0;
+    }
+    /// <summary>Metres a second squared.</summary>
+    private const float Gravity = 9.81f;
 
     /// <summary>Where each paw stands at rest under its shoulder or hip.</summary>
     internal static float Home(int leg) => leg < 2 ? .33f : -.34f;
@@ -145,8 +208,9 @@ public sealed class WolfModel {
         if (dt > 0) speed = Mathf.Lerp(speed, Math.Abs(distance) / dt, 1 - MathF.Exp(-dt * 8));
         var gait = chasing ? WolfMotion.Gallop : speed > (motion == WolfMotion.Trot ? 1.6f : 2.1f) ? WolfMotion.Trot : WolfMotion.Walk;
         var table = gait switch { WolfMotion.Gallop => GallopGait, WolfMotion.Trot => TrotGait, _ => WalkGait };
-        cycle = Mathf.PosMod(cycle + distance / table.Length, 1);
-        Show(gait, gait switch { WolfMotion.Gallop => Gallop(cycle), WolfMotion.Trot => Trot(cycle, wary), _ => Walk(cycle, wary) }, dt);
+        float length = gait == WolfMotion.Gallop ? GallopStride(speed) : table.Length;
+        cycle = Mathf.PosMod(cycle + distance / length, 1);
+        Show(gait, gait switch { WolfMotion.Gallop => Gallop(cycle, speed), WolfMotion.Trot => Trot(cycle, wary), _ => Walk(cycle, wary) }, dt, wary ? 1 : 0);
     }
 
     private WolfPose Walk(float p, bool wary) {
@@ -154,7 +218,7 @@ public sealed class WolfModel {
         var body = new WolfPose(Lift: -.008f + .006f * step - (wary ? .07f : 0), Pitch: .8f * step + (wary ? 3 : 0), Roll: 1.2f * side, Bend: 2 * side,
             Neck: (wary ? 30 : 12) + 3 * step, Head: wary ? -24 : -6, HeadTurn: -2 * side, Jaw: wary ? 8 : 0, Ears: wary ? -8 : 0, Snarl: wary ? 1 : 0,
             Tail: wary ? -78 : -64, Wag: 7 * side, Curl: 8);
-        return Stride(body, WalkGait, p);
+        return Stride(body, WalkGait, p, WalkGait.Length);
     }
 
     private WolfPose Trot(float p, bool wary) {
@@ -163,42 +227,60 @@ public sealed class WolfModel {
         var body = new WolfPose(Lift: .006f - .013f * bob - (wary ? .06f : 0), Pitch: .6f * bob, Roll: 1.5f * side, Bend: 1.5f * side,
             Neck: (wary ? 30 : 20) + 2 * bob, Head: wary ? -24 : -12, Ears: wary ? -6 : 6, Jaw: wary ? 8 : 3, Snarl: wary ? 1 : 0,
             Tail: wary ? -72 : -48, Wag: 9 * side, Curl: 10);
-        return Stride(body, TrotGait, p);
+        return Stride(body, TrotGait, p, TrotGait.Length);
     }
 
-    private WolfPose Gallop(float p) {
+    private static WolfPose Gallop(float p, float speed) {
         // The spine folds under at the gathered float and stretches out in the extended one; the head stays level over the rocking body.
+        // The body runs low enough for the forelegs to reach the ground ahead, and flies only as gravity lets it in its floats.
         float flex = MathF.Cos((p - .45f) * Mathf.Tau), pitch = 6 * MathF.Cos((p - .25f) * Mathf.Tau);
-        var body = new WolfPose(Lift: .045f + .05f * MathF.Cos((p - .44f) * Mathf.Tau * 2), Pitch: pitch, Flex: 15 * flex, Roll: 1.5f * MathF.Sin(p * Mathf.Tau),
+        var body = new WolfPose(Lift: GallopLow + Bounce(GallopFlights, p, 1 / GallopRate(speed)), Pitch: pitch, Flex: 15 * flex, Roll: 1.5f * MathF.Sin(p * Mathf.Tau),
             Neck: 12 - pitch - 4 * flex, Head: -10, Jaw: 10, Ears: 28, Tail: -18 + 9 * flex, Curl: 6 - 6 * flex);
-        return Stride(body, GallopGait, p);
+        return Stride(body, GallopGait, p, GallopStride(speed));
     }
+    /// <summary>How far below standing, in metres, a galloping wolf's body is as it leaves the ground and lands.</summary>
+    private const float GallopLow = -.03f;
 
-    /// <summary>The legs of a gait on <paramref name="body"/>: each paw sweeps back flat on the ground through its stance, then lifts, folds and reaches forward to land.</summary>
-    private static WolfPose Stride(WolfPose body, Gait g, float p) {
-        float sweep = g.Length * g.Duty / 2;
+    /// <summary>
+    /// The legs of a gait on <paramref name="body"/>, with strides <paramref name="length"/> tiles long: each paw lands flat and
+    /// stays where it landed as the body passes over it, rolls onto its toes to push off, then lifts, folds and reaches forward,
+    /// coming back to the ground moving as fast as the ground goes under it, so it neither slides as it lands nor as it leaves.
+    /// </summary>
+    private static WolfPose Stride(WolfPose body, Gait g, float p, float length) {
+        float sweep = length * g.Duty / 2;
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
-            float q = Mathf.PosMod(p - g.Offset(leg), 1), z, y = WolfShape.Sole, lower, paw = 0;
+            float q = Mathf.PosMod(p - g.Offset(leg), 1), x = WolfShape.Pivot(leg).X * g.Width(leg), lands = Home(leg) + sweep;
+            // The toe pads on the ground as the paw leaves it, rolled onto them, and the paw bone as it lands.
+            var left = Rolled(new Vector3(x, 0, Home(leg) - sweep + ToePad), -PushOff);
+            Vector3 at; float lower, paw;
             if (q < g.Duty) {
-                // A stance moves the paw back at exactly the body's speed, so it stays where it landed; the heel rises to push off.
-                float u = q / g.Duty, push = Mathf.SmoothStep(.7f, 1, u);
-                z = Home(leg) + sweep - 2 * sweep * u;
+                // A stance moves the paw back at exactly the body's speed, so it stays where it landed; the heel rises about the toes to push off.
+                float u = q / g.Duty, roll = -PushOff * Mathf.SmoothStep(.7f, 1, u);
+                at = Rolled(new Vector3(x, 0, lands + ToePad - 2 * sweep * u), roll);
                 lower = hind ? Mathf.Lerp(6, -28, u) : Mathf.Lerp(16, -14, u);
-                paw = -30 * push; y += .02f * push;
+                paw = roll;
             } else {
-                float s = (q - g.Duty) / (1 - g.Duty), fold = MathF.Sin(MathF.PI * MathF.Pow(s, .7f));
-                z = Home(leg) - sweep + 2 * sweep * Mathf.SmoothStep(0, 1, s) + g.Reach * MathF.Sin(MathF.PI * s) * s;
-                y += (hind ? g.HindLift : g.FrontLift) * fold;
+                // The paw folds and lifts from rest as it leaves the ground and comes to rest as it lands, highest a little before half way.
+                float s = (q - g.Duty) / (1 - g.Duty), rise = MathF.Sin(MathF.PI * MathF.Pow(s, .85f)), fold = rise * rise;
+                // Moving with the ground as it leaves and as it lands: in the model, back at the body's pace.
+                float span = lands - left.Z, slope = -length * (1 - g.Duty) / span;
+                float along = -2 * s * s * s + 3 * s * s + slope * (2 * s * s * s - 3 * s * s + s);
+                at = new Vector3(x, Mathf.Lerp(left.Y, WolfShape.Sole, Mathf.SmoothStep(0, 1, s)) + (hind ? g.HindLift : g.FrontLift) * fold, left.Z + span * along);
                 // The wrist flips the forepaw up behind as it leaves the ground; the hock lifts the hind paw back and up.
-                lower = hind ? Mathf.Lerp(-28, 6, s) - 40 * fold : Mathf.Lerp(-14, 16, s) - 100 * fold;
-                paw = (hind ? -25 : -45) * fold;
+                lower = hind ? Mathf.Lerp(-28, 6, s) - 40 * fold : Mathf.Lerp(-14, 16, s) - g.Fold * fold;
+                // The toes come level again before the paw lands, so they clear the ground.
+                paw = Mathf.Lerp(-PushOff, 0, Mathf.SmoothStep(0, .6f, s)) + (hind ? -25 : -45) * fold;
             }
-            float x = WolfShape.Pivot(leg).X * g.Width;
-            body = body.WithLeg(leg, Reach(body, leg, new Vector3(x, y, z), lower, lower + paw));
+            body = body.WithLeg(leg, ReachTo(body, leg, at, lower, paw));
         }
         return body;
     }
+    /// <summary>How far, in degrees, a paw rolls forward onto its toes as it pushes off.</summary>
+    private const float PushOff = 30;
+
+    /// <summary>Where the paw bone is with the toe pads at <paramref name="toes"/> and the paw rolled <paramref name="pitch"/> degrees forward of flat.</summary>
+    private static Vector3 Rolled(Vector3 toes, float pitch) => toes - new Basis(Vector3.Right, -Mathf.DegToRad(pitch)) * new Vector3(0, -WolfShape.Sole, ToePad);
 
     /// <summary>
     /// Braking while the body still faces away from where the wolf moves, over <paramref name="distance"/> tiles this frame:
@@ -236,6 +318,15 @@ public sealed class WolfModel {
     /// <summary>The share of its pace a wolf adds to catch up with its place in the world after turning round or letting go.</summary>
     public const float CatchUp = .6f;
     /// <summary>
+    /// How far a wolf that <paramref name="moved"/> that far in the world this frame closes the gap to its place there: by
+    /// <see cref="CatchUp"/> of its pace, but a wolf walking in the world catches up no faster than it can still walk, so it
+    /// never breaks into a trot to do it.
+    /// </summary>
+    public static float CatchingUp(float moved, float dt) =>
+        moved >= dt * WalkTop ? moved * CatchUp : Math.Min(moved * CatchUp, dt * WalkTop - moved);
+    /// <summary>The fastest a wolf walks, in tiles a second, a little under where it breaks into a trot.</summary>
+    private const float WalkTop = 2;
+    /// <summary>
     /// The share of the head's turn ahead of the body that the spine curls into the turn by, and that the tail swings into
     /// it by: a turning wolf bends along its length, nose toward tail, as a dog walking a circle does.
     /// </summary>
@@ -249,7 +340,7 @@ public sealed class WolfModel {
     // ---------- Standing, leaping and feeding ----------
 
     /// <summary>Standing: slow breaths, weight shifting between the hind legs, the head looking about; wary crouches low with the head down and the lips drawn back.</summary>
-    public void Stand(float time, float dt, bool wary) => Show(WolfMotion.Stand, Standing(time, wary), dt);
+    public void Stand(float time, float dt, bool wary) => Show(WolfMotion.Stand, Standing(time, wary), dt, wary ? 1 : 0);
 
     private static WolfPose Standing(float time, bool wary) {
         float breath = MathF.Sin(time * 2.4f), look = MathF.Sin(time * .37f), settle = MathF.Sin(time * .23f);
@@ -279,31 +370,48 @@ public sealed class WolfModel {
     /// A snap at a player. Gathering itself, as <paramref name="wind"/> runs 0 to 1, the wolf sinks back onto its haunches,
     /// back rounded, head low and lips drawn. As <paramref name="drive"/> runs 0 to 1 it drives off its hind legs and throws
     /// chest, neck and wide jaws out ahead, the forepaws reaching for the ground under them; the jaws close as
-    /// <paramref name="shut"/> runs 0 to 1 once it has landed.
+    /// <paramref name="shut"/> runs 0 to 1 once it has landed. Its jaws close <paramref name="jawsAhead"/> ahead of its place, which
+    /// <see cref="SnapReach"/> gives for a player.
     /// </summary>
-    public void Snap(float wind, float drive, float shut, float dt) => Show(WolfMotion.Snap, Snapping(wind, drive, shut, SnapSurge), dt);
+    public void Snap(float wind, float drive, float shut, float dt, float jawsAhead) =>
+        Show(WolfMotion.Snap, Snapping(wind, drive, shut, Math.Clamp(jawsAhead - SnapBite, -.1f, MostSurge)), dt);
 
     private static WolfPose Snapping(float wind, float drive, float shut, float surge) {
-        float g = Mathf.SmoothStep(0, 1, wind), d = Mathf.SmoothStep(0, 1, drive), air = MathF.Sin(MathF.PI * Math.Clamp(drive, 0, 1));
+        float g = Mathf.SmoothStep(0, 1, wind), d = Mathf.SmoothStep(0, 1, drive), flown = Math.Clamp(drive, 0, 1), air = MathF.Sin(MathF.PI * flown);
+        // Off the ground the body rises and falls under gravity.
+        float hop = Gravity * WolfSnap.Flight * WolfSnap.Flight / 2 * flown * (1 - flown);
         // From the wary stand it stalks in, to gathered, to stretched out at the end of the leap.
         float Through(float wary, float gathered, float struck) => Mathf.Lerp(Mathf.Lerp(wary, gathered, g), struck, d);
-        var body = new WolfPose(Lift: Through(-.08f, -.15f, -.05f) + .03f * air, Surge: Through(0, -.1f, surge), Pitch: Through(4, -2, 3), Flex: Through(0, 12, -10),
+        var body = new WolfPose(Lift: Through(-.08f, -.15f, -.05f) + hop, Surge: Through(0, -.1f, surge), Pitch: Through(4, -2, 3), Flex: Through(0, 12, -10),
             Neck: Through(30, 26, 14), Head: Through(-26, -18, -12), Jaw: Through(9, 14, 34 - 30 * Mathf.SmoothStep(0, 1, shut)), Ears: Through(-10, 34, 34), Snarl: 1,
             Tail: Through(-82, -74, -40), Curl: -4);
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
-            // The hind paws stay where they pushed off; the forepaws lift and come down under the chest where it lands.
+            // The hind paws push off where they stand; the forepaws lift and come down under the chest where it lands.
             var at = new Vector3(WolfShape.Pivot(leg).X * Through(1.15f, 1.3f, 1), WolfShape.Sole + (hind ? 0 : .1f * air), Home(leg) + (hind ? 0 : surge * d));
             body = body.WithLeg(leg, Reach(body, leg, at, hind ? 2 - 20 * d : 10 - 40 * air, hind ? -24 * d : -20 * air));
         }
         return body;
     }
 
+    /// <summary>How far ahead of its place a snapping wolf's jaws close at the end of the snap with its body not thrown forward, and how far forward it throws its body at most.</summary>
+    private static readonly float SnapBite = BiteOf(Snapping(1, 1, 1, 0)).Z;
+    private const float MostSurge = .3f;
+
     /// <summary>
-    /// How far forward of its place a snapping wolf throws its body, so its jaws close where the world aims them:
-    /// <see cref="WolfSnap.JawsAhead"/> of its place.
+    /// How far ahead of a snapping wolf placed at <paramref name="wolf"/> its jaws close on a player standing at
+    /// <paramref name="player"/> facing <paramref name="yaw"/>: on the near side of their body, round their hips and thighs.
     /// </summary>
-    public static readonly float SnapSurge = WolfSnap.JawsAhead - BiteOf(Snapping(1, 1, 1, 0)).Z;
+    public static float SnapReach(Vector2 wolf, Vector2 player, float yaw) {
+        var toWolf = wolf - player;
+        float apart = toWolf.Length();
+        if (apart < 1e-4f) return 0;
+        var forward = ActorAnimation.Forward(yaw);
+        float ahead = toWolf.Dot(forward) / apart / PlayerDepth, aside = toWolf.Dot(new Vector2(forward.Y, -forward.X)) / apart / PlayerWidth;
+        return apart - 1 / MathF.Sqrt(ahead * ahead + aside * aside);
+    }
+    /// <summary>How far out from a standing player's middle, at a wolf's bite height, their thighs and hips reach to the front and back, and to the sides.</summary>
+    private const float PlayerDepth = .09f, PlayerWidth = .17f;
 
     /// <summary>
     /// Howling: the wolf braces on all four paws, lifts its chest and throws its head back with the muzzle to the sky, the jaw opening as the note swells and closing as it fades.
@@ -325,7 +433,7 @@ public sealed class WolfModel {
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
             var at = new Vector3(WolfShape.Pivot(leg).X * (hind && hindSpread > 0 ? hindSpread : spread), WolfShape.Sole + (hind ? 0 : frontUp), Home(leg) + (hind ? shift * (leg == 2 ? 1 : -1) : frontAhead));
-            body = body.WithLeg(leg, Reach(body, leg, at, hind ? 2 : 10, 0));
+            body = body.WithLeg(leg, ReachTo(body, leg, at, hind ? 2 : 10, 0));
         }
         return body;
     }
@@ -333,28 +441,54 @@ public sealed class WolfModel {
     /// <summary>
     /// The leap at a standing player's throat, from the push off at <paramref name="progress"/> 0 to the moment the jaws reach it at <paramref name="contact"/>.
     /// The hind legs drive while the forelegs fold up, then reach out for the chest, landing at <paramref name="chest"/> in the model when given, with the jaws wide.
+    /// Reaching, it rears up so its jaws come to <paramref name="jawsUp"/> metres off the ground when given, where the throat is.
     /// </summary>
-    public void Leap(float progress, float contact, float dt, (Vector3 Left, Vector3 Right)? chest = null) => Show(WolfMotion.Leap, Leaping(progress, contact, chest), dt);
+    public void Leap(float progress, float contact, float dt, (Vector3 Left, Vector3 Right)? chest = null, float? jawsUp = null) => Show(WolfMotion.Leap, Leaping(progress, contact, chest, jawsUp), dt);
 
     /// <summary>A leaping wolf's pose, <paramref name="progress"/> of the way through the leap, with its jaws reaching their mark at <paramref name="contact"/>.</summary>
-    private static WolfPose Leaping(float progress, float contact, (Vector3 Left, Vector3 Right)? chest = null) {
+    private static WolfPose Leaping(float progress, float contact, (Vector3 Left, Vector3 Right)? chest = null, float? jawsUp = null) {
         float t = Math.Clamp(progress / Math.Max(contact, .05f), 0, 1);
-        float push = Mathf.SmoothStep(0, .3f, t), air = Mathf.SmoothStep(.15f, 1, t), reach = Mathf.SmoothStep(.4f, 1, t);
-        // The body arcs up and comes down onto the throat, which sits lower than the top of the leap.
-        var body = new WolfPose(Lift: Mathf.Lerp(-.06f, .14f, air) + .22f * MathF.Sin(MathF.PI * air) + .06f * push * (1 - air), Pitch: -12 * push - 22 * air, Flex: Mathf.Lerp(8, -12, air),
+        // It rises out of its crouch onto straightening hind legs as it pushes off, faster as it goes, and leaves the ground at full stretch.
+        float drive = Math.Min(1, t / PushShare), push = Mathf.SmoothStep(0, 1, drive), air = Mathf.SmoothStep(PushShare, 1, t), reach = Mathf.SmoothStep(.4f, 1, t);
+        var body = new WolfPose(Lift: -.06f + LeapRise * push, Pitch: -12 * Mathf.SmoothStep(0, 1, drive) - 22 * air, Flex: Mathf.Lerp(8, -12, air),
             Neck: Mathf.Lerp(10, 16, air), Head: Mathf.Lerp(-8, 8, reach), Jaw: 8 + 26 * reach, Ears: Mathf.Lerp(0, 22, air), Snarl: 1, Tail: Mathf.Lerp(-50, -10, air), Curl: -8);
+        if (jawsUp is float high) {
+            var reared = body;
+            for (int pass = 0; pass < 4; pass++) reared = reared with { Pitch = Math.Clamp(reared.Pitch - (high - BiteOf(reared).Y) / RiseADegree, SteepestRear, 30) };
+            body = body with { Pitch = Mathf.Lerp(body.Pitch, reared.Pitch, reach) };
+        }
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
             float x = WolfShape.Pivot(leg).X;
-            // Hind paws stay planted until they straighten, then trail out behind; forepaws tuck under the chest and then reach up and forward.
-            var at = hind ? new Vector3(x, WolfShape.Sole + Mathf.Lerp(0, .3f, air), Mathf.Lerp(-.3f, -.78f, air))
-                : new Vector3(x, Mathf.Lerp(WolfShape.Sole, .45f, push) + .55f * reach, Mathf.Lerp(.36f, .3f, push) + .45f * reach);
-            float lower = hind ? Mathf.Lerp(-10, -70, air) : Mathf.Lerp(10, -90, push * (1 - reach)) + 60 * reach;
+            // Hind paws stay where they push off until they leave the ground, then trail out behind; forepaws tuck under the chest and then reach up and forward.
+            var at = hind ? new Vector3(x, WolfShape.Sole + .3f * air, Mathf.Lerp(-.3f, -.78f, air))
+                : new Vector3(x, Mathf.Lerp(WolfShape.Sole, .45f, Mathf.SmoothStep(0, 1, drive)) + .55f * reach, Mathf.Lerp(.36f, .3f, Mathf.SmoothStep(0, 1, drive)) + .45f * reach);
+            float lower = hind ? Mathf.Lerp(-10, -70, air) : Mathf.Lerp(10, -90, Mathf.SmoothStep(0, 1, drive) * (1 - reach)) + 60 * reach;
             // Reaching out, the forepaws come down onto the player's chest as the jaws reach the throat.
             if (!hind && chest is var (left, right)) at = at.Lerp(leg == 0 ? left : right, reach);
-            body = body.WithLeg(leg, Reach(body, leg, at, lower, hind ? lower - 30 * air : lower - 20));
+            body = body.WithLeg(leg, ReachTo(body, leg, at, lower, hind ? lower - 30 * air : lower - 20));
         }
         return body;
+    }
+    /// <summary>The share of a leap up to the moment the jaws reach their mark that the wolf spends pushing off, and how far, in metres, it rises out of its crouch as it does.</summary>
+    private const float PushShare = .3f, LeapRise = .08f;
+
+    /// <summary>
+    /// Where a leaping wolf's model stands <paramref name="flight"/> of the way from where it set off, <paramref name="from"/>, to
+    /// where its jaws reach their mark, <paramref name="to"/>, <paramref name="seconds"/> after it set off: it speeds up from a
+    /// stand as it pushes off along the ground, rising as its legs straighten, then flies at an even pace, rising and falling
+    /// under gravity onto the mark.
+    /// </summary>
+    public static Vector3 LeapPath(Vector3 from, Vector3 to, float flight, float seconds) {
+        float f = Math.Clamp(flight, 0, 1), pace = 1 / (1 - PushShare / 2);
+        float along = f < PushShare ? pace * f * f / (2 * PushShare) : pace * (f - PushShare / 2);
+        var at = from.Lerp(to, along);
+        float pushing = PushShare * seconds, air = (1 - PushShare) * seconds;
+        if (pushing + air <= 0) return to;
+        // It leaves the ground as fast upward as the flight needs to come down on the mark, gathering that speed over the push.
+        float rise = (to.Y - from.Y + Gravity * air * air / 2) / (pushing / 2 + air), t = f * seconds;
+        float up = t < pushing ? rise * t * t / (2 * pushing) : rise * pushing / 2 + rise * (t - pushing) - Gravity * (t - pushing) * (t - pushing) / 2;
+        return at with { Y = from.Y + up };
     }
 
     /// <summary>
@@ -368,24 +502,37 @@ public sealed class WolfModel {
     /// A pinning wolf stands astride the player with its forepaws on the chest, at <paramref name="chest"/> in the model when given, and its hind paws wide of their legs, or, having <paramref name="lunged"/> onto the throat from beside them, with its forepaws by their shoulder;
     /// <paramref name="down"/> runs 0 to 1 as the player goes down under it.
     /// </summary>
-    public void Feed(float time, float dt, bool pinning, float down = 1, bool lunged = false, (Vector3 Left, Vector3 Right)? chest = null) {
+    /// <paramref name="jawsUp"/>, when given, is how high off the ground a pinning wolf's jaws hold the throat, which it rears up on
+    /// its hind legs to reach as the player goes down; <paramref name="jaws"/>, where in the model they hold it once the player lies.
+    public void Feed(float time, float dt, bool pinning, float down = 1, bool lunged = false, (Vector3 Left, Vector3 Right)? chest = null, float? jawsUp = null, Vector3? jaws = null) {
         float pull = MathF.Pow(Math.Max(0, MathF.Sin(time * 2.6f)), 3), shake = MathF.Sin(time * 13) * (1 - pull * .6f), bite = Math.Max(0, MathF.Sin(time * 4.5f));
         WolfPose body;
         if (pinning) {
             // Riding the player down: high and nose up while they still stand, then low over them with the jaws at the throat.
             float up = 1 - Mathf.SmoothStep(0, 1, down);
-            body = new WolfPose(Lift: -.05f + .3f * up - .02f * pull, Pitch: 14 - 34 * up - 4 * pull, Surge: -.03f * pull, Flex: 4,
+            body = new WolfPose(Lift: -.05f - .02f * pull, Pitch: 14 - 34 * up - 4 * pull, Surge: -.03f * pull, Flex: 4,
                 Neck: 52 - 60 * up - 12 * pull, Head: 14 + 4 * shake, HeadTurn: 12 * shake, HeadTilt: 6 * shake, Jaw: 10 + 6 * bite, Ears: 26, Snarl: 1, Tail: -70 + 6 * MathF.Sin(time * 1.7f), Wag: 8 * MathF.Sin(time * 2.1f));
+            // It rears up on its hind legs to hold the throat of a player still on their feet, and leans its body to keep its jaws on it once they lie.
+            if (jawsUp is float high)
+                for (int pass = 0; pass < 4; pass++) body = body with { Pitch = Math.Clamp(body.Pitch - (high - BiteOf(body).Y) / RiseADegree, SteepestRear, 30) };
+            if (jaws is Vector3 hold)
+                for (int pass = 0; pass < 3; pass++) {
+                    var off = hold - BiteOf(body);
+                    body = body with { Shift = Math.Clamp(body.Shift + off.X, -MostLean, MostLean), Lift = body.Lift + off.Y, Surge = Math.Clamp(body.Surge + off.Z, -MostLean, MostLean) };
+                }
             // Beside the player it keeps its forepaws on the ground by their shoulder.
-            body = lunged ? Planted(body, 1.4f, 0, .05f) : Planted(body, 2.4f, 0, .05f, ChestTop + .5f * up, 3.2f);
+            body = lunged ? Planted(body, 1.4f, 0, .05f) : Planted(body, 2.4f, 0, .05f, ChestTop + .5f * up, PinStance);
             // Astride, its forepaws stay on the player's chest as they go down under it and once they lie.
             if (!lunged && chest is var (left, right)) {
                 float lower = Mathf.Lerp(10, 50, up);
-                body = body.WithLeg(0, Reach(body, 0, left, lower, lower - 20)).WithLeg(1, Reach(body, 1, right, lower, lower - 20));
+                body = body.WithLeg(0, ReachTo(body, 0, left, lower, lower - 20)).WithLeg(1, ReachTo(body, 1, right, lower, lower - 20));
             }
         } else body = Tearing(time, pull, shake, bite);
         Show(pinning ? WolfMotion.Pin : WolfMotion.Feed, body, dt);
     }
+
+    /// <summary>How far apart a pinning wolf's hind paws stand, as a share of its legs' own width, wide of the legs of the player under it, and how far it leans its body to keep its jaws on the throat.</summary>
+    private const float PinStance = 2.5f, MostLean = .15f;
 
     /// <summary>A feeding wolf's pose: head down, pulling back by <paramref name="pull"/>, shaking and biting, with all four paws planted.</summary>
     private static WolfPose Tearing(float time, float pull, float shake, float bite) =>
@@ -401,14 +548,15 @@ public sealed class WolfModel {
     /// rears and the head wrenches to one side, the next tug to the other, while its paws stay where they stand until the
     /// forepaws hop back at the end of the heave; between tugs the hind paws step back after it and it shakes its head.
     /// <paramref name="progress"/> runs 0 to 1 over the tug, timed as <see cref="DoorTug.TugProgress"/> moves the player and the
-    /// view holds the jaws at their waist.
+    /// view holds the jaws at their waist, <paramref name="jawsUp"/> metres off the ground, which the wolf lifts or lowers its neck to reach.
     /// </summary>
-    public void Tug(float progress, float time, float dt) {
+    public void Tug(float progress, float time, float dt, float jawsUp) {
         var (tug, u) = DoorTug.TugPhase(progress);
         float heave = DoorTug.HeavePulse(u), shake = u < DoorTug.Heave ? 0 : MathF.Sin(time * 15) * Mathf.SmoothStep(DoorTug.Heave, DoorTug.Heave + .15f, u);
         // Each tug wrenches the other way.
         float side = tug % 2 == 0 ? 1 : -1;
         var body = Tugging(heave, side, shake);
+        for (int pass = 0; pass < 3; pass++) body = body with { Neck = body.Neck - (jawsUp - BiteOf(body).Y) / NeckRise };
         // How far the player, and so the jaws, have come back in this tug: planted paws come that far forward against the body.
         float moved = DoorTug.TugDistance * (DoorTug.TugProgress(progress) - (float)tug / DoorTug.Tugs);
         // The jaws hold still at the waist, so a body that rears back carries its paws with it unless they make up the difference.
@@ -425,6 +573,9 @@ public sealed class WolfModel {
         }
         Show(WolfMotion.Tug, body, dt);
     }
+
+    /// <summary>About how far a degree less of neck bend lifts a wolf's jaws, in metres.</summary>
+    private const float NeckRise = .006f;
 
     /// <summary>Shares of a tug between which a tugging wolf's forepaws hop back, once the heave has moved the player about half way.</summary>
     private const float HopFrom = .18f, HopTo = .34f;
@@ -472,17 +623,19 @@ public sealed class WolfModel {
     /// <paramref name="progress"/> runs 0 to 1 over the recoil; the view moves the wolf back only while it is in the air, the first HopShare of it.
     /// </summary>
     public void Recoil(float progress, float dt) {
-        float t = Math.Clamp(progress, 0, 1), air = t < HopShare ? MathF.Sin(MathF.PI * t / HopShare) : 0;
+        // In the air it rises and falls under gravity: a hop of HopSeconds rises a gravity's HopSeconds squared over eight.
+        float t = Math.Clamp(progress, 0, 1), hop = t / HopShare, air = t < HopShare ? 4 * hop * (1 - hop) : 0, rise = Gravity * HopSeconds * HopSeconds / 8;
         float snap = Mathf.SmoothStep(0, .08f, t) * (1 - Mathf.SmoothStep(.15f, .55f, t));
         // The duck eases into the wary stand the wolf goes on to, rather than out of it.
-        float duck = Mathf.SmoothStep(HopShare - .12f, HopShare + .08f, t) * (1 - .45f * Mathf.SmoothStep(.7f, 1, t)), cower = Math.Max(snap, duck);
-        var body = new WolfPose(Lift: .1f * air - .15f * duck, Pitch: -6 * air + 6 * duck, Roll: 6 * snap, Bend: -12 * snap, Flex: 10 * air + 4 * duck,
+        // It ducks once it has landed.
+        float duck = Mathf.SmoothStep(HopShare, HopShare + .2f, t) * (1 - .45f * Mathf.SmoothStep(.7f, 1, t)), cower = Math.Max(snap, duck);
+        var body = new WolfPose(Lift: rise * air - .15f * duck, Pitch: -6 * air + 6 * duck, Roll: 6 * snap, Bend: -12 * snap, Flex: 10 * air + 4 * duck,
             Neck: -16 * snap + 40 * duck, Head: -10 * snap - 30 * duck, HeadTurn: -36 * snap, HeadTilt: -14 * snap, Jaw: 24 * snap + 12 * duck,
             Ears: 45 * cower, Snarl: cower, Tail: -62 - 36 * cower, Curl: -30 * cower);
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
             // In the air the hind paws reach back for the landing and the forepaws trail where they pushed off; landed, the legs spread to brace the crouch.
-            var at = new Vector3(WolfShape.Pivot(leg).X * (1 + .2f * duck), WolfShape.Sole + .15f * air, Home(leg) + (hind ? -.1f : .07f) * air + (hind ? 0 : .05f * duck));
+            var at = new Vector3(WolfShape.Pivot(leg).X * (1 + .2f * duck), WolfShape.Sole + rise * air + .05f * MathF.Sin(MathF.PI * Math.Min(1, hop)), Home(leg) + (hind ? -.1f : .07f) * air + (hind ? 0 : .05f * duck));
             body = body.WithLeg(leg, Reach(body, leg, at, hind ? 2 - 24 * air : 10 - 50 * air, hind ? 0 : -30 * air));
         }
         Show(WolfMotion.Recoil, body, dt);
@@ -491,39 +644,82 @@ public sealed class WolfModel {
     /// <summary>
     /// A killed wolf is thrown off its feet, twisting onto its right side in the air, and slams down with a bounce that whips the head and legs.
     /// It then lies limp, legs stretched out and the upper ones resting on the lower, as a dog lies on its side.
-    /// <paramref name="progress"/> runs 0 to 1 over FallSeconds; it starts from a stand, so a carcass never blends.
+    /// <paramref name="progress"/> runs 0 to 1 over FallSeconds; it starts from the pose <see cref="FallFrom"/> hands it, or a stand.
+    /// Thrown, it drops under gravity from where it stood to lying on its side.
     /// </summary>
     public void Fall(float progress) {
         float p = Math.Clamp(progress, 0, 1), fly = Math.Min(1, p / ThrowShare), down = Mathf.SmoothStep(0, 1, fly), air = MathF.Sin(MathF.PI * fly);
+        float thrown = ThrowShare * FallSeconds, drop = -LyingDrop * fly + Gravity * thrown * thrown / 2 * fly * (1 - fly);
         float after = Math.Max(0, (p - ThrowShare) / (1 - ThrowShare)), bounce = after < .3f ? MathF.Sin(MathF.PI * after / .3f) : 0;
         // The head lags the body and hits the ground a moment after it.
         float slam = p < ThrowShare ? 0 : Mathf.SmoothStep(0, .25f, after), kick = after is > .55f and < .8f ? MathF.Sin(MathF.PI * (after - .55f) / .25f) : 0;
         // Rolled onto its side the body sinks until its flank lies on the ground.
-        var body = new WolfPose(Lift: -.5f * down + .12f * air + .07f * bounce, Pitch: -14 * air, Roll: 90 * down + 6 * bounce, Shift: -.05f * down,
+        var body = new WolfPose(Lift: drop + .07f * bounce, Pitch: -14 * air, Roll: 90 * down + 6 * bounce, Shift: -.05f * down,
             Flex: -12 * air - 4 * down, Bend: 6 * down, Neck: -34 * air + 10 * bounce - 8 * slam, NeckTurn: -12 * slam, Head: 12 * air, HeadTilt: -10 * slam,
             Jaw: 26 * air + 14 * down, Ears: 30 * down, Tail: Mathf.Lerp(-65, -6, down) + 30 * air, Curl: -10 * down);
-        var standing = Planted(new WolfPose(), 1);
+        var standing = fallFrom ?? Planted(new WolfPose(), 1);
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2, upper = leg % 2 == 0;
             // Knocked off its feet the legs buckle and fold under; on the ground the forelegs stretch forward and the hind legs back, the upper pair drooping onto the lower.
             var flung = hind ? new WolfLeg(45, -100, 70, 20) : new WolfLeg(-35, 30, -90, -20);
-            var limp = hind ? new WolfLeg(-30 - 14 * kick, -12, 16 + 10 * kick, 25, upper ? -12 : 4) : new WolfLeg(32, 14, -10, -25, upper ? -12 : 4);
+            var limp = hind ? new WolfLeg(-30 - 14 * kick, -20, 18 + 10 * kick, 25, upper ? -12 : 4) : new WolfLeg(32, 16, -10, -25, upper ? -12 : 4);
             var at = WolfLeg.Lerp(WolfLeg.Lerp(standing.Leg(leg), limp, down), flung, .8f * air);
             body = body.WithLeg(leg, at with { Upper = at.Upper + (hind ? -14 : 14) * bounce });
         }
+        // The body comes out of the pose it was killed in over the first part of the throw.
+        if (fallFrom is WolfPose was) body = WolfPose.Lerp(was, body, Mathf.SmoothStep(0, .5f, fly)) with { FrontLeft = body.FrontLeft, FrontRight = body.FrontRight, HindLeft = body.HindLeft, HindRight = body.HindRight };
+        // No paw goes into the ground, and in the air they all clear it.
+        float lowest = float.MaxValue;
+        for (int leg = 0; leg < 4; leg++) lowest = Math.Min(lowest, LowestOf(body, leg).Y);
+        float clear = p < ThrowShare ? ThrownClear * air : 0;
+        if (lowest < clear) body = body with { Lift = body.Lift + clear - lowest };
         motion = WolfMotion.Fall; blend = 1; shown = body;
         Apply(body);
     }
 
+    /// <summary>The pose a killed wolf's model showed, which its carcass's fall starts from.</summary>
+    private WolfPose? fallFrom;
+    /// <summary>Starts this carcass's fall from the pose <paramref name="dying"/>, the wolf's model as it was killed, shows.</summary>
+    public void FallFrom(WolfModel dying) => fallFrom = dying.shown;
+    /// <summary>How far a killed wolf's body drops from standing to lying on its side, and how far its paws clear the ground while it is thrown.</summary>
+    private const float LyingDrop = .5f, ThrownClear = .03f;
+
     /// <summary>Where a paw bone is, in the model, under the pose shown; it stands WolfShape.Sole above the ground when the paw is planted.</summary>
     public Vector3 Paw(int leg) => PawOf(shown, leg);
 
-    private static Vector3 PawOf(WolfPose pose, int leg) {
+    private static Vector3 PawOf(WolfPose pose, int leg) => PawFrame(pose, leg).Origin;
+
+    /// <summary>Where a paw bone is, in the model, under a pose, and how it is turned.</summary>
+    private static Transform3D PawFrame(WolfPose pose, int leg) {
         var l = pose.Leg(leg);
         int bone = WolfShape.Leg(leg);
-        var at = Frame(pose, leg >= 2) * Posed(bone, Vector3.Zero, Turn(-l.Upper, 0, l.Splay)) * Posed(bone + 1, Vector3.Zero, Turn(-l.Middle))
+        return Frame(pose, leg >= 2) * Posed(bone, Vector3.Zero, Turn(-l.Upper, 0, l.Splay)) * Posed(bone + 1, Vector3.Zero, Turn(-l.Middle))
             * Posed(bone + 2, Vector3.Zero, Turn(-l.Lower)) * Posed(bone + 3, Vector3.Zero, Turn(-l.Paw));
-        return at.Origin;
+    }
+
+    /// <summary>
+    /// The outline of the underside of a paw from the paw bone, back to front: the heel, the sole from the back pad to the
+    /// toe pads, which is flat on the ground when the paw is, and the tip of the toes.
+    /// </summary>
+    private static readonly Vector3[] SoleOutline = {
+        new(0, .005f, -.034f), new(0, -.015f, -.03f), new(0, -WolfShape.Sole, -.005f), new(0, -WolfShape.Sole, .03f), new(0, -WolfShape.Sole, ToePad), new(0, -.031f, .07f), new(0, -.023f, .074f) };
+    /// <summary>How many points <see cref="SolePoint"/> gives along a paw's underside.</summary>
+    public const int SolePoints = 7;
+    /// <summary>How far ahead of the paw bone the toe pads are, which a paw rolls onto as its heel lifts.</summary>
+    private const float ToePad = .058f;
+
+    /// <summary>A point on the underside of a paw, in the model, under the pose shown: 0 at the heel to <see cref="SolePoints"/> - 1 at the tip of the toes.</summary>
+    public Vector3 SolePoint(int leg, int point) => PawFrame(shown, leg) * SoleOutline[point];
+
+    /// <summary>The lowest point of a paw's underside, in the model, under a pose.</summary>
+    private static Vector3 LowestOf(WolfPose pose, int leg) {
+        var frame = PawFrame(pose, leg);
+        var lowest = frame * SoleOutline[0];
+        foreach (var point in SoleOutline) {
+            var at = frame * point;
+            if (at.Y < lowest.Y) lowest = at;
+        }
+        return lowest;
     }
 
     /// <summary>How many spheres <see cref="Volumes(Span{ValueTuple{Vector3, float}})"/> gives.</summary>
@@ -658,34 +854,183 @@ public sealed class WolfModel {
     /// <summary>How high off the ground, in metres, a paw starts to count as held up rather than stepping, and counts as held up.</summary>
     private const float HeldFrom = .12f, HeldBy = .3f;
 
-    private void Show(WolfMotion next, WolfPose target, float dt) {
+    /// <summary>
+    /// Shows <paramref name="target"/> for <paramref name="next"/>, blending into it from the pose shown when the motion or its
+    /// <paramref name="variant"/>, such as wary rather than calm, changes.
+    /// </summary>
+    private void Show(WolfMotion next, WolfPose target, float dt, int variant = 0) {
         if (Steps is Vector2 door) target = OnSteps(target, door);
         // The head turns ahead of the body, the neck taking most of the turn, and the spine and tail curl after it.
         if (Turning.Look != 0) {
             float look = Mathf.RadToDeg(Turning.Look);
             target = target with { NeckTurn = target.NeckTurn + NeckShare * look, HeadTurn = target.HeadTurn + (1 - NeckShare) * look, Bend = target.Bend + CurlShare * look, Wag = target.Wag + TailShare * look };
         }
-        // A glance turns only the neck and head.
+        // A glance turns only the neck and head, and with the turn no further from the body than a head turns.
         if (Glance != 0) {
-            float glance = Mathf.RadToDeg(Glance);
+            float most = Mathf.RadToDeg(MaxGlance), turned = Mathf.RadToDeg(Turning.Look);
+            float glance = Math.Clamp(turned + Mathf.RadToDeg(Glance), -most, most) - Math.Clamp(turned, -most, most);
             target = target with { NeckTurn = target.NeckTurn + NeckShare * glance, HeadTurn = target.HeadTurn + (1 - NeckShare) * glance };
         }
-        if (next != motion) {
+        if (next != motion || variant != shownVariant) {
             from = shown; blend = 0;
             // A leap and a blow happen fast, and a wolf at a door stands still before its first scratch; changes of gait and settling down take longer.
             blendSeconds = next is WolfMotion.Leap or WolfMotion.Recoil or WolfMotion.Snap ? .08f : next is WolfMotion.Pin or WolfMotion.Door or WolfMotion.Rear ? .12f : motion == WolfMotion.Recoil ? .3f : .25f;
-            motion = next;
+            motion = next; shownVariant = variant;
         }
         blend = Math.Min(1, blend + dt / blendSeconds);
-        shown = blend >= 1 ? target : WolfPose.Lerp(from, target, Mathf.SmoothStep(0, 1, blend));
+        shown = blend >= 1 ? target : Blended(from, target, Mathf.SmoothStep(0, 1, blend));
+        shownDt = dt;
+        // A motion whose paws are set elsewhere, such as at a door or in a tug, leaves nothing for Plant to hold on to after it.
+        if (FeetSetElsewhere) placedAt = null;
         Apply(shown);
     }
 
-    private static Quaternion Turn(float pitch, float yaw = 0, float roll = 0) =>
-        Basis.FromEuler(new Vector3(Mathf.DegToRad(pitch), Mathf.DegToRad(yaw), Mathf.DegToRad(roll))).GetRotationQuaternion();
+    /// <summary>
+    /// A pose <paramref name="t"/> of the way from <paramref name="a"/> to <paramref name="b"/>: the body's angles in between, and
+    /// each paw on the way from where it is in one to where it is in the other, so a paw on the ground in both stays on it.
+    /// </summary>
+    private static WolfPose Blended(WolfPose a, WolfPose b, float t) {
+        var body = WolfPose.Lerp(a, b, t);
+        for (int leg = 0; leg < 4; leg++) {
+            var (lowerA, pawA) = Slant(a, leg);
+            var (lowerB, pawB) = Slant(b, leg);
+            body = body.WithLeg(leg, ReachTo(body, leg, PawOf(a, leg).Lerp(PawOf(b, leg), t), Mathf.Lerp(lowerA, lowerB, t), Mathf.Lerp(pawA, pawB, t)));
+        }
+        return body;
+    }
+
+    /// <summary>The angles, in degrees forward of straight down in the model, of a leg's lowest segment and of its paw under a pose.</summary>
+    private static (float Lower, float Paw) Slant(WolfPose pose, int leg) {
+        var l = pose.Leg(leg);
+        var down = Frame(pose, leg >= 2).Basis * Vector3.Down;
+        float lower = l.Upper + l.Middle + l.Lower + Mathf.RadToDeg(MathF.Atan2(down.Z, -down.Y));
+        return (lower, lower + l.Paw);
+    }
+
+    // ---------- Paws on the ground ----------
+
+    /// <summary>How a paw meets the ground: following its pose, held where it stands, or stepping to where its pose has it.</summary>
+    private enum Footing : byte { Free, Down, Stepping }
+    private readonly Footing[] footing = new Footing[4];
+    /// <summary>Where each paw that is down has its toe pads on the ground, in the space the model is placed in.</summary>
+    private readonly Vector3[] anchor = new Vector3[4];
+    /// <summary>How far, in the model, each paw that has left the ground was from where its pose has it, and how far it has come since, 0 to 1.</summary>
+    private readonly Vector3[] parted = new Vector3[4];
+    private readonly float[] since = new float[4];
+    /// <summary>Seconds the last pose shown moved on by, and where the model was placed when its paws were last set on the ground.</summary>
+    private float shownDt;
+    private Vector3? placedAt;
+    private int shownVariant;
+
+    /// <summary>
+    /// Sets the paws on the ground once the model is placed for the frame: a paw that comes down stays where it landed, in the
+    /// world, while the body moves and turns over it, until its pose lifts it, and a lifted paw goes on from where it left the
+    /// ground to where its pose has it. Standing, a paw left too far from where its pose has it steps there, one paw at a time.
+    /// No paw goes into the ground.
+    /// </summary>
+    public void Plant() {
+        var root = Root.Transform;
+        bool jumped = placedAt is not Vector3 last || last.DistanceTo(root.Origin) > Jump;
+        placedAt = root.Origin;
+        bool holds = !FeetSetElsewhere;
+        bool standing = motion is WolfMotion.Stand or WolfMotion.Brace or WolfMotion.Feed or WolfMotion.Howl or WolfMotion.Pin or WolfMotion.Recoil or WolfMotion.Rear;
+        if (jumped || !holds) {
+            for (int leg = 0; leg < 4; leg++) { footing[leg] = Footing.Free; parted[leg] = Vector3.Zero; since[leg] = 1; }
+            if (!holds) return;
+        }
+        var toModel = root.AffineInverse();
+        bool stepping = false;
+        for (int leg = 0; leg < 4; leg++) stepping |= footing[leg] == Footing.Stepping;
+        var pose = shown;
+        for (int leg = 0; leg < 4; leg++) {
+            var frame = PawFrame(pose, leg);
+            float lowest = Lowest(root, frame);
+            var toes = root * (frame * SoleOutline[ToePoint]);
+            bool down = lowest < DownBy;
+            // Where the paw bone goes, moved from where the pose has it.
+            Vector3 shift;
+            switch (footing[leg]) {
+                case Footing.Down when lowest > UpBy:
+                    footing[leg] = Footing.Free; parted[leg] = toModel.Basis * HeldShift(leg, toes, lowest); since[leg] = 0;
+                    shift = parted[leg];
+                    break;
+                case Footing.Down when standing && !stepping && new Vector2(anchor[leg].X - toes.X, anchor[leg].Z - toes.Z).Length() > StepAfter:
+                    footing[leg] = Footing.Stepping; parted[leg] = toModel.Basis * HeldShift(leg, toes, lowest); since[leg] = 0; stepping = true;
+                    shift = parted[leg];
+                    break;
+                case Footing.Down:
+                    shift = toModel.Basis * HeldShift(leg, toes, lowest);
+                    break;
+                default: {
+                        bool steps = footing[leg] == Footing.Stepping;
+                        since[leg] = Math.Min(1, since[leg] + shownDt / (steps ? StepSeconds : PartSeconds));
+                        float left = 1 - Mathf.SmoothStep(0, 1, since[leg]);
+                        // It lifts clear of the ground on its way, as high as it has to go, rather than dragging along it.
+                        shift = parted[leg] * left + Vector3.Up * (steps ? StepLift : Math.Min(StepLift, parted[leg].Length())) * MathF.Sin(MathF.PI * since[leg]);
+                        // A paw on its way down lands where it has come to, once it is there.
+                        if (down && (!steps || since[leg] >= 1) && Lowest(root, frame with { Origin = frame.Origin + shift }) < DownBy) {
+                            footing[leg] = Footing.Down; anchor[leg] = (toes + root.Basis * shift) with { Y = 0 };
+                            if (steps) stepping = false;
+                            shift = toModel.Basis * HeldShift(leg, toes, lowest);
+                        }
+                        break;
+                    }
+            }
+            // Nothing goes into the ground.
+            float under = Lowest(root, frame with { Origin = frame.Origin + shift });
+            if (under < 0) shift += toModel.Basis * Vector3.Up * -under;
+            if (shift.LengthSquared() < Hair * Hair) continue;
+            var (lower, paw) = Slant(pose, leg);
+            var target = frame.Origin + shift;
+            var solved = ReachTo(pose, leg, target, lower, paw);
+            shown = shown.WithLeg(leg, solved);
+            ApplyLeg(leg, solved);
+            // A paw its leg cannot keep where it stands leaves it, from where the leg holds it.
+            var reached = PawOf(shown, leg);
+            if (footing[leg] == Footing.Down && reached.DistanceTo(target) > LetGo) {
+                footing[leg] = standing ? Footing.Stepping : Footing.Free; parted[leg] = reached - frame.Origin; since[leg] = 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether the motion shown sets its paws itself: on a cabin's step, in a tug, thrown dead, or braking with the forepaws
+    /// sliding, so <see cref="Plant"/> leaves them where it has them.
+    /// </summary>
+    private bool FeetSetElsewhere => Steps != null || motion is WolfMotion.Fall or WolfMotion.Door or WolfMotion.Tug or WolfMotion.Brake;
+
+    /// <summary>How far, in the space the model is placed in, a held paw moves from where its pose has it: its toe pads onto where they stand and its sole onto the ground.</summary>
+    private Vector3 HeldShift(int leg, Vector3 toes, float lowest) => new(anchor[leg].X - toes.X, -lowest, anchor[leg].Z - toes.Z);
+
+    /// <summary>How high above the ground, in the space the model is placed in, the lowest point of a paw's underside is.</summary>
+    private static float Lowest(Transform3D root, Transform3D paw) {
+        float lowest = float.MaxValue;
+        foreach (var point in SoleOutline) lowest = Math.Min(lowest, (root * (paw * point)).Y);
+        return lowest;
+    }
+
+    /// <summary>Which point of <see cref="SoleOutline"/> is the toe pads.</summary>
+    private const int ToePoint = 4;
+    /// <summary>
+    /// How near the ground, in metres, a paw's pose brings it to set it down, and how far up to lift it again; how far a paw
+    /// that is down may be from where a standing pose has it before it steps there, and how far from where its leg can reach
+    /// before it lets go.
+    /// </summary>
+    private const float DownBy = .01f, UpBy = .02f, StepAfter = .04f, LetGo = .01f;
+    /// <summary>Seconds a lifted paw takes to come from where it left the ground onto its pose's path, and a standing step takes, and how high a step lifts it.</summary>
+    private const float PartSeconds = .12f, StepSeconds = .22f, StepLift = .05f;
+    /// <summary>How far, in metres, the model may move in a frame and still be the same body walking on; further, it was put down somewhere new.</summary>
+    private const float Jump = .5f;
+    /// <summary>How near, in metres, a paw has to be to where its pose has it to be left there as it is.</summary>
+    private const float Hair = .001f;
+
+    /// <summary>A turn by these degrees, as the posing maths uses it.</summary>
+    private static Basis Turn(float pitch, float yaw = 0, float roll = 0) => Basis.FromEuler(new Vector3(Mathf.DegToRad(pitch), Mathf.DegToRad(yaw), Mathf.DegToRad(roll)));
+    /// <summary>A turn by these degrees, as the skeleton takes it.</summary>
+    private static Quaternion Rotation(float pitch, float yaw = 0, float roll = 0) => Turn(pitch, yaw, roll).GetRotationQuaternion();
 
     /// <summary>The loin's offset and turn, and each half of the spine's turn and slide against it, shared by posing and the leg solver.</summary>
-    private static (Vector3 At, Quaternion Turn) Spine(WolfPose p, int bone) => bone switch {
+    private static (Vector3 At, Basis Turn) Spine(WolfPose p, int bone) => bone switch {
         WolfShape.Loin => (new Vector3(p.Shift, p.Lift, p.Surge), Turn(p.Pitch, 0, p.Roll)),
         WolfShape.Chest => (new Vector3(0, 0, -.0012f * p.Flex), Turn(p.Flex / 2, p.Bend / 2)),
         _ => (new Vector3(0, 0, .0012f * p.Flex), Turn(-p.Flex / 2, -p.Bend / 2))
@@ -697,7 +1042,7 @@ public sealed class WolfModel {
     }
 
     /// <summary>A bone's pose relative to its parent: its rest offset moved by <paramref name="by"/> and turned.</summary>
-    private static Transform3D Posed(int bone, Vector3 by, Quaternion turn) => new(new Basis(turn), Rest(bone).Origin + by);
+    private static Transform3D Posed(int bone, Vector3 by, Basis turn) => new(turn, Rest(bone).Origin + by);
 
     /// <summary>Where the chest or pelvis sits in the model under <paramref name="p"/>.</summary>
     private static Transform3D Frame(WolfPose p, bool hind) {
@@ -715,15 +1060,21 @@ public sealed class WolfModel {
         var aim = paw;
         var solved = Reach(body, leg, aim, lowerAngle, pawAngle);
         for (int pass = 0; pass < 3; pass++) {
-            aim += paw - PawOf(body.WithLeg(leg, solved), leg);
+            var miss = paw - PawOf(body.WithLeg(leg, solved), leg);
+            if (miss.LengthSquared() < Close * Close) break;
+            aim += miss;
             solved = Reach(body, leg, aim, lowerAngle, pawAngle);
         }
         return solved;
     }
+    /// <summary>How near, in metres, a solved paw has to come to where it was asked to be.</summary>
+    private const float Close = .002f;
 
     /// <summary>
     /// Solves a leg so its paw bone reaches <paramref name="paw"/> in the model, with the lowest segment and the paw at the given angles forward of straight down.
-    /// The foreleg's elbow bends back and the hind stifle forward, as a dog's do; a paw out of reach is reached for as far as the leg goes.
+    /// The foreleg's elbow bends back and the hind stifle forward, as a dog's do, and no joint bends past a dog's range: where the
+    /// lowest segment's angle would take the wrist or hock past it, the segment takes the nearest angle that does not, and a paw out
+    /// of reach is reached for as far as the leg goes.
     /// </summary>
     internal static WolfLeg Reach(WolfPose body, int leg, Vector3 paw, float lowerAngle, float pawAngle) {
         bool hind = leg >= 2;
@@ -733,21 +1084,86 @@ public sealed class WolfModel {
         var down = frame.Basis * Vector3.Down;
         float lean = MathF.Atan2(down.Z, -down.Y);
         var lengths = WolfShape.Lengths(leg);
-        float a3 = Mathf.DegToRad(lowerAngle) - lean;
-        // The joint above the lowest segment, then the two upper segments meet it by the law of cosines.
-        float jz = local.Z - lengths.Z * MathF.Sin(a3), jy = local.Y + lengths.Z * MathF.Cos(a3);
-        float dz = jz - pivot.Z, dy = jy - pivot.Y, reach = MathF.Sqrt(dz * dz + dy * dy);
-        float d = Math.Clamp(reach, Math.Abs(lengths.X - lengths.Y) + .01f, lengths.X + lengths.Y - .001f);
-        float toward = MathF.Atan2(dz, -dy), spread = MathF.Acos(Math.Clamp((lengths.X * lengths.X + d * d - lengths.Y * lengths.Y) / (2 * lengths.X * d), -1, 1));
-        float a1 = hind ? toward + spread : toward - spread;
-        float ez = pivot.Z + lengths.X * MathF.Sin(a1), ey = pivot.Y - lengths.X * MathF.Cos(a1);
-        float a2 = MathF.Atan2(jz - ez, -(jy - ey));
-        // A paw beyond reach takes the straightened leg's own line instead of a joint it cannot get to.
-        if (reach > d) a3 = a2 + Math.Clamp(a3 - a2, -.3f, .3f);
+        float tz = local.Z - pivot.Z, ty = local.Y - pivot.Y, a3 = Mathf.DegToRad(lowerAngle) - lean;
+        if (Bent(a3, tz, ty, lengths, hind, out float a1, out float a2) > 0) {
+            a3 = NearestBend(a3, tz, ty, lengths, hind);
+            Bent(a3, tz, ty, lengths, hind, out a1, out a2);
+        }
         float pawAt = Mathf.DegToRad(pawAngle) - lean;
         float splay = MathF.Atan2(paw.X - WolfShape.Pivot(leg).X, Math.Max(.2f, WolfShape.Pivot(leg).Y - paw.Y));
-        return new WolfLeg(Mathf.RadToDeg(a1), Mathf.RadToDeg(a2 - a1), Mathf.RadToDeg(a3 - a2), Mathf.RadToDeg(pawAt - a3), Mathf.RadToDeg(splay));
+        return new WolfLeg(Mathf.RadToDeg(a1), Mathf.RadToDeg(Mathf.AngleDifference(a1, a2)), Mathf.RadToDeg(Mathf.AngleDifference(a2, a3)), Mathf.RadToDeg(Mathf.AngleDifference(a3, pawAt)), Mathf.RadToDeg(splay));
     }
+
+    /// <summary>
+    /// How far, in degrees forward of straight, each joint of a leg opens and folds at most, from the range of motion of a dog's
+    /// joints (Jaegger, Marcellin-Little and Levine 2002): the elbow stops 15 degrees short of straight and the stifle 18, the
+    /// wrist opens 16 past straight and folds 148 back, and the hock stops 16 short of straight and folds 141.
+    /// </summary>
+    private const float ElbowOpen = 15, ElbowFolded = 144, StifleOpen = -18, StifleFolded = -138, WristOpen = 16, WristFolded = -148, HockOpen = 16, HockFolded = 141;
+
+    /// <summary>
+    /// Solves the two upper segments of a leg in its shoulder's or hip's frame for the lowest segment at <paramref name="a3"/>
+    /// radians from straight down, with the paw bone <paramref name="tz"/> ahead of the shoulder or hip and <paramref name="ty"/>
+    /// above it; returns how many radians that bends the wrist or hock past its range, 0 when it does not.
+    /// </summary>
+    private static float Bent(float a3, float tz, float ty, Vector3 lengths, bool hind, out float a1, out float a2) {
+        float jz = tz - lengths.Z * MathF.Sin(a3), jy = ty + lengths.Z * MathF.Cos(a3), d = MathF.Sqrt(jz * jz + jy * jy);
+        float reach = Math.Clamp(d, Span(lengths, hind ? -StifleFolded : ElbowFolded), Span(lengths, hind ? -StifleOpen : ElbowOpen));
+        float toward = MathF.Atan2(jz, -jy), spread = MathF.Acos(Math.Clamp((lengths.X * lengths.X + reach * reach - lengths.Y * lengths.Y) / (2 * lengths.X * reach), -1, 1));
+        a1 = hind ? toward + spread : toward - spread;
+        float ez = lengths.X * MathF.Sin(a1), ey = -lengths.X * MathF.Cos(a1);
+        a2 = MathF.Atan2(reach * MathF.Sin(toward) - ez, reach * MathF.Cos(toward) + ey);
+        float lower = Mathf.RadToDeg(Mathf.AngleDifference(a2, a3)), open = hind ? HockOpen : WristFolded, folded = hind ? HockFolded : WristOpen;
+        return Mathf.DegToRad(Math.Max(0, Math.Max(open - lower, lower - folded)));
+    }
+
+    /// <summary>How far apart a leg's shoulder or hip and the joint above its lowest segment are with the joint between them bent this many degrees from straight.</summary>
+    private static float Span(Vector3 lengths, float bend) => MathF.Sqrt(lengths.X * lengths.X + lengths.Y * lengths.Y + 2 * lengths.X * lengths.Y * MathF.Cos(Mathf.DegToRad(bend)));
+
+    /// <summary>
+    /// The angle of a leg's lowest segment nearest <paramref name="want"/> at which the wrist or hock stays within its range; with
+    /// none, the one that comes nearest.
+    /// </summary>
+    private static float NearestBend(float want, float tz, float ty, Vector3 lengths, bool hind) {
+        // The wrist's or hock's bend moves nearly one for one with the lowest segment's angle, so a few steps along it find the edge of the range.
+        float near = want, open = Mathf.DegToRad(hind ? HockOpen : WristFolded), folded = Mathf.DegToRad(hind ? HockFolded : WristOpen);
+        for (int pass = 0; pass < 6; pass++) {
+            Bent(near, tz, ty, lengths, hind, out _, out float a2);
+            float bend = Mathf.AngleDifference(a2, near), edge = Math.Clamp(bend, open, folded);
+            if (Math.Abs(edge - bend) < 1e-4f) return near;
+            near += edge - bend;
+        }
+        if (Bent(near, tz, ty, lengths, hind, out _, out _) == 0) return near;
+        float best = want, least = float.MaxValue;
+        for (int k = 1; k <= BendSteps; k++) {
+            float found = float.NaN;
+            for (int side = -1; side <= 1; side += 2) {
+                float at = want + side * k * BendStep, miss = Bent(at, tz, ty, lengths, hind, out _, out _);
+                if (miss > 0) {
+                    if (miss < least) (least, best) = (miss, at);
+                    continue;
+                }
+                // The edge of the range lies between this angle and the one before it.
+                float inside = at, outside = want + side * (k - 1) * BendStep;
+                for (int pass = 0; pass < 12; pass++) {
+                    float mid = (inside + outside) / 2;
+                    if (Bent(mid, tz, ty, lengths, hind, out _, out _) > 0) outside = mid; else inside = mid;
+                }
+                if (float.IsNaN(found) || Math.Abs(inside - want) < Math.Abs(found - want)) found = inside;
+            }
+            if (!float.IsNaN(found)) return found;
+        }
+        // Past the range at every angle: the nearest it comes.
+        float lo = best - BendStep, hi = best + BendStep;
+        for (int pass = 0; pass < 12; pass++) {
+            float a = lo + (hi - lo) / 3, b = hi - (hi - lo) / 3;
+            if (Bent(a, tz, ty, lengths, hind, out _, out _) < Bent(b, tz, ty, lengths, hind, out _, out _)) hi = b; else lo = a;
+        }
+        return (lo + hi) / 2;
+    }
+    /// <summary>The radians between the angles of a lowest segment the search for one a leg can take tries, and how many it tries each way.</summary>
+    private const float BendStep = .05f;
+    private const int BendSteps = 64;
 
     /// <summary>How far a full snarl lifts the lips, in metres, how many degrees it curls them up at the front, and how many it lowers the brows.</summary>
     private const float LipLift = .028f, LipCurl = 6, BrowDrop = 10;
@@ -756,30 +1172,31 @@ public sealed class WolfModel {
         for (int bone = WolfShape.Loin; bone <= WolfShape.Pelvis; bone++) {
             var (at, turn) = Spine(p, bone);
             skeleton.SetBonePosePosition(bone, Rest(bone).Origin + at);
-            skeleton.SetBonePoseRotation(bone, turn);
+            skeleton.SetBonePoseRotation(bone, turn.GetRotationQuaternion());
         }
-        skeleton.SetBonePoseRotation(WolfShape.Neck, Turn(p.Neck, p.NeckTurn));
-        skeleton.SetBonePoseRotation(WolfShape.Head, Turn(p.Head, p.HeadTurn, p.HeadTilt));
-        skeleton.SetBonePoseRotation(WolfShape.Jaw, Turn(p.Jaw));
-        skeleton.SetBonePoseRotation(WolfShape.EarL, Turn(-p.Ears, 0, -p.Ears * .3f));
-        skeleton.SetBonePoseRotation(WolfShape.EarR, Turn(-p.Ears, 0, p.Ears * .3f));
+        skeleton.SetBonePoseRotation(WolfShape.Neck, Rotation(p.Neck, p.NeckTurn));
+        skeleton.SetBonePoseRotation(WolfShape.Head, Rotation(p.Head, p.HeadTurn, p.HeadTilt));
+        skeleton.SetBonePoseRotation(WolfShape.Jaw, Rotation(p.Jaw));
+        skeleton.SetBonePoseRotation(WolfShape.EarL, Rotation(-p.Ears, 0, -p.Ears * .3f));
+        skeleton.SetBonePoseRotation(WolfShape.EarR, Rotation(-p.Ears, 0, p.Ears * .3f));
         // A snarl lifts the lips, most at the front, and lowers the inner end of each brow over its eye.
         skeleton.SetBonePosePosition(WolfShape.Lip, Rest(WolfShape.Lip).Origin + new Vector3(0, LipLift * p.Snarl, 0));
-        skeleton.SetBonePoseRotation(WolfShape.Lip, Turn(-LipCurl * p.Snarl));
-        skeleton.SetBonePoseRotation(WolfShape.BrowL, Turn(0, 0, BrowDrop * p.Snarl));
-        skeleton.SetBonePoseRotation(WolfShape.BrowR, Turn(0, 0, -BrowDrop * p.Snarl));
+        skeleton.SetBonePoseRotation(WolfShape.Lip, Rotation(-LipCurl * p.Snarl));
+        skeleton.SetBonePoseRotation(WolfShape.BrowL, Rotation(0, 0, BrowDrop * p.Snarl));
+        skeleton.SetBonePoseRotation(WolfShape.BrowR, Rotation(0, 0, -BrowDrop * p.Snarl));
         // The tail rests pointing straight back; most of the lift is at the root and the curl and wag carry on along it.
-        skeleton.SetBonePoseRotation(WolfShape.Tail, Turn(p.Tail, p.Wag));
-        skeleton.SetBonePoseRotation(WolfShape.Tail + 1, Turn(p.Curl * .5f, p.Wag * .6f));
-        skeleton.SetBonePoseRotation(WolfShape.Tail + 2, Turn(p.Curl, p.Wag * .4f));
-        for (int leg = 0; leg < 4; leg++) {
-            var l = p.Leg(leg);
-            int bone = WolfShape.Leg(leg);
-            // The pose's angles swing forward; a positive turn about +X swings a hanging bone back.
-            skeleton.SetBonePoseRotation(bone, Turn(-l.Upper, 0, l.Splay));
-            skeleton.SetBonePoseRotation(bone + 1, Turn(-l.Middle));
-            skeleton.SetBonePoseRotation(bone + 2, Turn(-l.Lower));
-            skeleton.SetBonePoseRotation(bone + 3, Turn(-l.Paw));
-        }
+        skeleton.SetBonePoseRotation(WolfShape.Tail, Rotation(p.Tail, p.Wag));
+        skeleton.SetBonePoseRotation(WolfShape.Tail + 1, Rotation(p.Curl * .5f, p.Wag * .6f));
+        skeleton.SetBonePoseRotation(WolfShape.Tail + 2, Rotation(p.Curl, p.Wag * .4f));
+        for (int leg = 0; leg < 4; leg++) ApplyLeg(leg, p.Leg(leg));
+    }
+
+    private void ApplyLeg(int leg, WolfLeg l) {
+        int bone = WolfShape.Leg(leg);
+        // The pose's angles swing forward; a positive turn about +X swings a hanging bone back.
+        skeleton.SetBonePoseRotation(bone, Rotation(-l.Upper, 0, l.Splay));
+        skeleton.SetBonePoseRotation(bone + 1, Rotation(-l.Middle));
+        skeleton.SetBonePoseRotation(bone + 2, Rotation(-l.Lower));
+        skeleton.SetBonePoseRotation(bone + 3, Rotation(-l.Paw));
     }
 }

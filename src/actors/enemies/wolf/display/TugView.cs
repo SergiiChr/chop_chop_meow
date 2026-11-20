@@ -56,8 +56,9 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         model.Root.Visible = world().Sees(wolf.Pos);
         // A wolf taking a player out of their cabin starts in its doorway, with its paws on the step and the floor.
         model.Steps = wolf.DoorCheck == DoorCheckStage.TakingOut && world().Find(wolf.DoorCheckCabin) is Thing cabin ? Doorways.DoorPoint(cabin) : null;
-        model.Tug(through, elapsed, dt);
-        var grip = Waist(held) - model.Root.Basis * model.Bite;
+        var waist = Waist(held);
+        model.Tug(through, elapsed, dt, waist.Y);
+        var grip = waist - model.Root.Basis * model.Bite;
         model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);
         model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
         return true;
@@ -96,6 +97,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         var torso = rig.Torso.GlobalTransform;
         Vector3 low = toModel * (torso * (LowPaw with { X = LowPaw.X * wolf.Side })), high = toModel * (torso * (HighPaw with { X = HighPaw.X * wolf.Side }));
         model.Rear(body, WolfModel.Uncrossed(low, high), dt);
+        model.Plant();
         model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
         return true;
     }
@@ -119,6 +121,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
             // It backs off the falling body rather than walking forward while it goes back.
             model.Move((at - model.Root.Position).Dot(model.Root.Basis.Z), dt, false, false);
             model.Root.Position = at;
+            model.Plant();
             return true;
         }
         model.Feed(elapsed + wolf.Id % 7, dt, true, 1, lunged: true);
@@ -126,6 +129,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
             var bite = (throat - model.Root.Basis * model.Bite) with { Y = 0 };
             model.Root.Position = model.Held = wait.Lerp(bite, WorldView.Ease((fell - LungeStart) / (LungeEnd - LungeStart)));
         } else model.Root.Position = model.Held;
+        model.Plant();
         return true;
     }
 }

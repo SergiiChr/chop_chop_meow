@@ -22,31 +22,26 @@ public static class DoorCheckViewChecks {
         DoorCheckView.Pose(wolf, clock, clock, Frame);
     }
 
-    /// <summary>Until it launches itself in, no paw is under the ground, a tread or the floor, and a paw that is down stays where it landed.</summary>
+    /// <summary>
+    /// Until it launches itself in, no part of a sole is under the ground, a tread or the floor, and a part of a sole that is down
+    /// stays where it landed.
+    /// </summary>
     private static void CheckAWolfAtADoorKeepsItsPawsOnTheGroundAndTheStep() {
         var wolf = new WolfModel();
-        // The first frame at the door takes the stand, so the measured ones have the wolf where the frame before left it.
-        Show(wolf, 0);
-        float deepest = 0, slide = 0, deepestAt = 0, slideAt = 0;
-        int deepestLeg = 0, slideLeg = 0;
-        var landed = new Vector2?[4];
-        for (float clock = 0; clock < LaunchAt; clock += Frame) {
+        var paws = new PawWatch(spot => StairSteps.HeightAt(spot - Door));
+        // The first frames at the door blend into the stand from where the wolf arrived, so the measured ones have it at the door.
+        for (float clock = 0; clock < SettleSeconds; clock += Frame) Show(wolf, clock);
+        for (float clock = SettleSeconds; clock < LaunchAt; clock += Frame) {
             Show(wolf, clock);
-            for (int leg = 0; leg < 4; leg++) {
-                var paw = wolf.Root.Transform * wolf.Paw(leg);
-                var spot = new Vector2(paw.X, paw.Z);
-                float over = paw.Y - WolfShape.Sole - StairSteps.HeightAt(spot - Door);
-                if (over < deepest) (deepest, deepestAt, deepestLeg) = (over, clock, leg);
-                if (Math.Abs(over) < .004f) {
-                    landed[leg] ??= spot;
-                    if (spot.DistanceTo(landed[leg]!.Value) > slide) (slide, slideAt, slideLeg) = (spot.DistanceTo(landed[leg]!.Value), clock, leg);
-                } else landed[leg] = null;
-            }
+            paws.See(wolf, clock);
         }
         wolf.Root.Free();
-        Require(deepest > -.02f, $"no paw of a wolf at a door should sink into the ground or the step: paw {deepestLeg} is {-deepest:0.000} m in, {deepestAt:0.00} s into the door check");
-        Require(slide < .03f, $"a paw of a wolf at a door that is down should stay where it landed: paw {slideLeg} has slid {slide:0.000} m, {slideAt:0.00} s into the door check");
+        Require(paws.Deepest > -.01f, $"no paw of a wolf at a door should sink into the ground or the step: paw {paws.DeepestLeg} is {-paws.Deepest:0.000} m in, {paws.DeepestAt:0.00} s into the door check");
+        Require(paws.Slide < .03f, $"a paw of a wolf at a door that is down should stay where it landed: paw {paws.SlideLeg} has slid {paws.Slide:0.000} m, {paws.SlideAt:0.00} s into the door check");
+        Require(paws.PastRange < .6f, $"no joint of a wolf at a door should bend past a dog's range: the {paws.PastJoint} by {paws.PastRange:0.0} degrees");
     }
+    /// <summary>Seconds a wolf at a door takes to blend into its stand from where it arrived.</summary>
+    private const float SettleSeconds = .15f;
 
     /// <summary>
     /// The cabin's door is hinged 0.41 m to the left of its door point, 0.925 m in from it, is 0.82 m long and has its
