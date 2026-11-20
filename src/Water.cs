@@ -38,7 +38,7 @@ public static class Water {
             return WaterCollectResult.RefilledBottle;
         }
         if (FillBucket(backpack)) return WaterCollectResult.RefilledBottle;
-        if (bottle == Full || backpack[Bucket.AtFill(Bucket.Capacity)] > 0) return WaterCollectResult.NoChange;
+        if (bottle == Full) return WaterCollectResult.NoChange;
         world.S.Thirst = System.Math.Min(100, world.Thirst + LiterThirst);
         return WaterCollectResult.SourceLiter;
     }

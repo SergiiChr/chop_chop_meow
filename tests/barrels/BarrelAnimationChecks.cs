@@ -7,6 +7,7 @@ using static Checks;
 internal static class BarrelAnimationChecks {
     public static void Run() {
         CheckActorsHugTheBarrelThroughAFullStride();
+        CheckBarrelCarryKeepsTheTorchVisible();
         CheckWorkerKeepsTheirHandOnTheLadderUntilTheNextReach();
         CheckBothVesselsPourIntoTheRoofOpening();
     }
@@ -30,6 +31,17 @@ internal static class BarrelAnimationChecks {
             }
             rig.Root.Free();
         }
+    }
+
+    private static void CheckBarrelCarryKeepsTheTorchVisible() {
+        var rig = new ActorRig(ActorSkin.Player);
+        var torch = rig.Flame.GetParent<Node3D>();
+        var held = torch.Transform;
+        rig.HugBarrel(new Pose(), lit: true);
+        Require(torch.Visible && torch.Transform != held, "both hands hold the barrel while the torch stays visible beside the left grip");
+        rig.Show(new Pose(), null, false, lit: true);
+        Require(torch.Visible && torch.Transform.IsEqualApprox(held), "putting down the barrel restores the normal torch grip");
+        rig.Root.Free();
     }
 
     private static void CheckWorkerKeepsTheirHandOnTheLadderUntilTheNextReach() {

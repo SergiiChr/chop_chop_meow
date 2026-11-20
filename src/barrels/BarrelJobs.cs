@@ -27,7 +27,8 @@ public sealed partial class World {
 
         if (!BarrelJobs.Vessel(w.Tool)) {
             if (!StationsHold(Bucket.Item)) { w.Status = "Needs a bucket or bottle in the tool slot"; return false; }
-            if (Equip(w, Bucket.Item, target, dt) != Kit.Ready) return true;
+            var kit = Equip(w, Bucket.Item, target, dt);
+            if (kit != Kit.Ready) return kit == Kit.Busy;
         }
         if (w.ToolSlot.Free(w.Tool) == 0) { w.Status = "Waiting for the player to let go"; return true; }
 
@@ -47,10 +48,11 @@ public sealed partial class World {
         Find(duty.Thing) is { Kind: ThingKind.Barrel or ThingKind.Hut } place && Barrels.Room(place) > 0 ? place : null;
 
     private bool FetchWater(Worker w, Thing target, float dt) {
-        Thing? source = NearestWaterFor(w, target);
-        if (source == null) { w.Status = "Needs a lake or full barrel"; return false; }
+        if (NearestWaterFor(w, target) is not (Thing source, Vector2 at)) {
+            w.Status = "Needs an accessible lake shore or full barrel";
+            return false;
+        }
         w.Status = "Fetching water";
-        var at = source.Kind == ThingKind.Water ? Terrain.WaterPoint(w.Pos) : source.Pos + BarrelJobs.SpoutApproach;
         if (ReachWaterPoint(w, at, dt)) StartWater(w, WorkerWaterAction.Fill, source);
         return true;
     }
@@ -63,15 +65,36 @@ public sealed partial class World {
         return false;
     }
 
-    private Thing? NearestWaterFor(Worker w, Thing target) {
-        var nearest = Nearest(ThingKind.Water, w.Pos);
-        float distance = nearest == null ? float.MaxValue : Terrain.WaterPoint(w.Pos).DistanceSquaredTo(w.Pos);
+    private (Thing Source, Vector2 At)? NearestWaterFor(Worker w, Thing target) {
+        Thing? source = Nearest(ThingKind.Water, w.Pos);
+        Vector2? shore = source == null ? null : OpenShorePoint(w.Pos);
+        Vector2 at = shore.GetValueOrDefault();
+        float distance = shore == null ? float.MaxValue : at.DistanceSquaredTo(w.Pos);
+        if (shore == null) source = null;
         foreach (var t in S.Things.Of(ThingKind.Barrel)) {
             if (t == target || t.Inventory.Free(Water.Liquid) != Barrel.Capacity || !t.Inventory.AllowsWithdrawal(Water.Liquid)) continue;
+            var spout = t.Pos + BarrelJobs.SpoutApproach;
             float d = t.Pos.DistanceSquaredTo(w.Pos);
-            if (d < distance) { nearest = t; distance = d; }
+            if (d < distance && CanStand(spout)) { source = t; at = spout; distance = d; }
         }
-        return nearest;
+        return source == null ? null : (source, at);
+    }
+
+    /// <summary>Finds dry ground at the water's edge on either side of a blocked approach.</summary>
+    private Vector2? OpenShorePoint(Vector2 from) {
+        var shore = Terrain.WaterPoint(from);
+        if (CanStand(shore)) return shore;
+        var radial = shore - Terrain.Lake;
+        // Samples about one meter apart along the shore, starting with the closest pair.
+        const float step = 1f / Terrain.LakeRadius;
+        for (float angle = step; angle <= Mathf.Pi; angle += step) {
+            var left = Terrain.WaterPoint(Terrain.Lake + radial.Rotated(angle));
+            var right = Terrain.WaterPoint(Terrain.Lake + radial.Rotated(-angle));
+            bool leftOpen = CanStand(left), rightOpen = CanStand(right);
+            if (leftOpen && (!rightOpen || left.DistanceSquaredTo(from) <= right.DistanceSquaredTo(from))) return left;
+            if (rightOpen) return right;
+        }
+        return null;
     }
 
     private static void StartWater(Worker w, WorkerWaterAction action, Thing target) {

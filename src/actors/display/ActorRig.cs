@@ -508,6 +508,7 @@ public sealed class ActorRig {
         // A shovel is only ever dug with, held in both fists.
         if (shovel.Visible) LayShovel();
         crate.Visible = carrying;
+        if (barrel?.Visible == true) torch.Transform = new Transform3D(Basis.Identity, new Vector3(0, -build.Forearm, Palm));
         barrel?.Hide();
         bucket?.Hide();
         bottle?.Hide();
@@ -516,7 +517,7 @@ public sealed class ActorRig {
     }
 
     /// <summary>Reaches around the two sides of the barrel, resting its back against the trunk.</summary>
-    public void HugBarrel(Pose pose) {
+    public void HugBarrel(Pose pose, bool lit = false) {
         if (barrel == null) return;
         pose = pose with { Lean = -5, Twist = 0, Head = 2 };
         // Hold the front half of the lower band with both exposed palms.
@@ -524,9 +525,15 @@ public sealed class ActorRig {
         var right = barrel.Transform * new Vector3(-.147f, .24f, .125f);
         (pose, float leftRoll) = ArmReach.WithHandAt(pose, true, left, new Vector3(1, -1, -.25f));
         (pose, float rightRoll) = ArmReach.WithHandAt(pose, false, right, new Vector3(-1, -1, -.25f));
-        Show(pose, null, false);
+        Show(pose, null, false, lit: lit);
         RollArm(true, leftRoll);
         RollArm(false, rightRoll);
+        if (lit) {
+            var arm = (torso.Basis * chest.Basis * shoulderL.Basis * elbowL.Basis).Inverse();
+            // Keep the torch upright just outside the left palm, clear of the barrel wall.
+            torch.Transform = new Transform3D(arm * new Basis(Vector3.Right, -Mathf.Pi / 2),
+                new Vector3(0, -build.Forearm, Palm) + arm * Vector3.Right * .04f);
+        }
         barrel.Show();
     }
 

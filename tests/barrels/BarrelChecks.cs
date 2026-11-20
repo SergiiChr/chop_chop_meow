@@ -17,9 +17,13 @@ internal static class BarrelChecks {
         Test(CheckSaveKeepsVesselFillLevels, data);
         Test(CheckRecoveryKeepsWorkerBarrelAndWaterVessel, data);
         Test(CheckFullBucketsDoNotPreventRefillingABottle, data);
+        Test(CheckAFullBucketDoesNotPreventDrinkingAtTheLake, data);
+        Test(CheckHotbarBoundBarrelAcceptsWaterFromSpareBottles, data);
         Test(CheckBucketsRefillAndPourWithoutLosingTheirStack, data);
         Test(CheckFillingABucketInAFullCrateKeepsItsItemCount, data);
         Test(CheckWorkerFetchesWaterFromClosestFullBarrelAndClimbsToCabin, data);
+        Test(CheckWorkerFindsShoreAccessAroundACabin, data);
+        Test(CheckBlockedToolSwapLetsTheWorkerDoTheirNextJob, data);
         Test(CheckCabinServesThirstBeforeBottlesInEntryOrder, data);
         Test(CheckRemovingCabinReturnsItsBarrelWithWater, data);
     }
@@ -128,6 +132,26 @@ internal static class BarrelChecks {
             "a bottle can fill at the lake even when the bucket is already full");
     }
 
+    private static void CheckAFullBucketDoesNotPreventDrinkingAtTheLake(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, Bucket.AtFill(10));
+        SetNeeds(world, thirst: 0);
+        var lake = world.Add(ThingKind.Water, Terrain.WaterPoint(world.Player), 10);
+        Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceLiter && world.Thirst > 33
+            && world.Backpack[Bucket.AtFill(10)] == 1, "without bottles a player can drink at the lake while keeping a full bucket");
+    }
+
+    private static void CheckHotbarBoundBarrelAcceptsWaterFromSpareBottles(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, Barrel.Item);
+        Give(world, Water.Full, 2);
+        PutOnHotbar(world, SlotOf(world.Backpack, Barrel.Item), 0);
+        PutOnHotbar(world, SlotOf(world.Backpack, Water.Full), 1);
+        world.FromSpares(() => world.MoveInBarrel(Barrel.Item, Water.Full, 2, true));
+        Require(world.HotbarItem(0) == Barrel.AtFill(3) && world.HotbarItem(1) == Water.Full && world.Backpack[Water.Empty] == 1,
+            "Ctrl pours the unbound bottle into the barrel and preserves both hotbar bindings");
+    }
+
     private static void CheckBucketsRefillAndPourWithoutLosingTheirStack(GameData data) {
         var world = new World(data, false);
         Give(world, Bucket.Item, 3);
@@ -179,6 +203,37 @@ internal static class BarrelChecks {
         Require(climbed && cabin.Inventory[Barrel.AtFill(10)] == 1, $"worker delivers ten liters by ladder, status was {worker.Status}");
         Require(source.Inventory[Water.Liquid] == 40 && farther.Inventory[Water.Liquid] == 50 && worker.Tool == Bucket.Item,
             "the closest full barrel loses only what reaches the cabin and the bucket is kept");
+    }
+
+    private static void CheckWorkerFindsShoreAccessAroundACabin(GameData data) {
+        var world = EmptyWorld(data);
+        var at = new Vector2(111.6f, 111.5f);
+        var cabin = world.Add(ThingKind.Hut, new Vector2(111, 113));
+        world.Add(ThingKind.Water, Terrain.WaterPoint(at), 10);
+        cabin.Inventory.Add(Barrel.Item, 1);
+        Require(world.CanStand(at) && !world.CanStand(Terrain.WaterPoint(at)), "the cabin blocks the direct shore point");
+        var worker = AddWorker(world, at);
+        worker.Tool = Water.Empty;
+        world.SetDuty(worker, cabin, JobKind.Haul, true);
+        for (int i = 0; i < 600 && cabin.Inventory[Barrel.AtFill(3)] == 0; i++) SafeTick(world, .05f);
+        Require(cabin.Inventory[Barrel.AtFill(3)] == 1, $"worker should go around the obstruction to fill the barrel: {worker.Status}");
+    }
+
+    private static void CheckBlockedToolSwapLetsTheWorkerDoTheirNextJob(GameData data) {
+        var world = EmptyWorld(data);
+        var at = Terrain.Spawn + new Vector2(0, 6);
+        var barrel = world.Add(ThingKind.Barrel, at);
+        var rack = world.Add(ThingKind.Toolstation, at + Vector2.Right * 4);
+        rack.Inventory.Add(Bucket.Item, 1);
+        rack.Inventory.InputFilter.Add(Bucket.Item);
+        var tree = world.Add(ThingKind.Tree, at + Vector2.Left * 4, 10);
+        world.Add(ThingKind.Chest, at + Vector2.Down * 4);
+        var worker = AddWorker(world, tree.Pos + Vector2.Down);
+        worker.Tool = "steel_axe";
+        world.SetDuty(worker, barrel, JobKind.Haul, true);
+        world.SetDuty(worker, tree, JobKind.Gather, true);
+        Work(world, 10, () => tree.Remaining < 10);
+        Require(tree.Remaining < 10, "a worker who cannot put back their axe moves on to the woodcutting job");
     }
 
     private static void CheckCabinServesThirstBeforeBottlesInEntryOrder(GameData data) {

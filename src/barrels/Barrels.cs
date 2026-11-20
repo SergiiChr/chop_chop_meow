@@ -78,7 +78,8 @@ public sealed partial class World {
 
     /// <summary>Pours a vessel into the backpack barrel, or draws water into vessels already in the backpack.</summary>
     public int MoveInBarrel(string barrelItem, string item, int quantity, bool puttingIn) {
-        if (!Barrel.Is(barrelItem) || S.Backpack.Free(barrelItem) != 1 || quantity <= 0) return 0;
+        if (!Barrel.Is(barrelItem) || S.Backpack[barrelItem] != 1 || quantity <= 0) return 0;
+        if (Held is { Box: 0 } held && held.Item == barrelItem) return 0;
         if (puttingIn && !Barrels.CanPour(Data, item)) { Say("The barrel only holds water."); return 0; }
         if (!puttingIn && item != Water.Liquid) return 0;
         if (Busy() || Forwarded(Verb.MoveInBarrel, Barrel.Liters(barrelItem), puttingIn ? 1 : 0, item, quantity, new Vector2(S.Backpack.PreferredSlot, 0))) return 0;

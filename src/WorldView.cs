@@ -699,7 +699,7 @@ public partial class WorldView : Node3D {
         state.HipHeight = pose.HipHeight;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
-        if (barrel) rig.HugBarrel(pose);
+        if (barrel) rig.HugBarrel(pose, torch);
         else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel);
         else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
         if (jamb is Vector3 frame) DoorwayView.HandOnFrame(rig, pose, frame, door!.Value.Grip, tool, torch);

@@ -524,6 +524,7 @@ The steel bucket is a refillable 10-liter vessel. Empty buckets stack where the 
 A worker's tool slot holds one bucket or bottle.
 A water haul uses the tool slot to preserve the bucket or bottle and its fill throughout the trip.
 Workers fetch water from the nearest full floor barrel or the lake.
+If a building blocks the nearest shoreline point, the worker looks along the shore for open ground.
 A cabin haul walks to the outside ladder, climbs, pours into the mounted barrel and climbs back down.
 The window advances the visible haul phase between server updates through `LocalClock`.
 Construction keeps the ladder approach on dry ground and clear of other buildings.
