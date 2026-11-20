@@ -200,8 +200,13 @@ public partial class WorldView {
     private static readonly float ReviewZoom = Launch.Number("--animation-zoom", 1);
     /// <summary>Degrees <c>--animation-turn</c> turns the close-up clip's rig from where it moves, to see it from the front or behind.</summary>
     private static readonly float ReviewTurn = Launch.Number("--animation-turn", 0);
-    /// <summary>How far ahead of someone felling a tree the middle of its trunk stands, and the trunk's radius, for the close-up's trunk.</summary>
-    private const float ReviewTrunkAhead = 1.33f, ReviewTrunkRadius = .13f;
+    /// <summary>
+    /// How far from the close-up's actor <c>--animation-target</c> stands what a blow works, the tree, rock, anvil, bench or stump it
+    /// lands on, in metres from its spot; by default as far as a player stops from it to work it.
+    /// </summary>
+    private static readonly float ReviewTargetAt = Launch.Number("--animation-target", 1.3f);
+    /// <summary>What the close-up's blow works, and its model, built once the clip starts.</summary>
+    private (Thing Thing, Prop Prop)? reviewTarget;
     /// <summary>The close-up clip's actor, moved and posed the way the game moves and poses everyone.</summary>
     private readonly ActorState reviewActor = new();
 
@@ -234,8 +239,19 @@ public partial class WorldView {
             review = ReviewTrack();
             var rig = new ActorRig(skin);
             review.AddChild(rig.Root); reviewRigs.Add(rig);
-            // A felling stroke plays against a trunk standing where a tree does when the player stops to chop it.
-            if (action is ActorAction.Chop or ActorAction.SteelChop) Post(review, ReviewTrunkRadius, ReviewTrunkRadius, 3, ScreenRight * ReviewTrunkAhead, Mat("6b4a32", 1), 12);
+            // A blow plays against what it works, standing where it does when the player stops to work it and turned the way the views turn the actor.
+            if (ReviewWorked(action) is ThingKind kind) {
+                var target = new Thing { Id = ReviewTargetId, Kind = kind, Remaining = 1, Pos = new Vector2(ScreenRight.X, ScreenRight.Z).Rotated(-Mathf.DegToRad(ReviewTurn)) * ReviewTargetAt };
+                var prop = WorldModels.Build(target);
+                prop.Root.Position = To3(target.Pos);
+                // A stump stands where its tree's trunk did, as the world view places it.
+                if (prop is DugProp dug) prop.Body.Position = dug.Seat;
+                // A tree's leaves would hide the swing: only its trunk and branches show, which the leaves are drawn by their own shader over.
+                if (prop is TreeProp tree)
+                    foreach (var part in tree.Sway.GetChildren()) if (part is MeshInstance3D mesh && mesh.GetActiveMaterial(0) is ShaderMaterial) mesh.Visible = false;
+                review.AddChild(prop.Root);
+                reviewTarget = (target, prop);
+            }
         }
         if (ReviewClips[ReviewClip].Name == "player cabin") { ReviewCabin(dt); return; }
         if (ReviewClips[ReviewClip].Name.EndsWith(" back")) {
@@ -255,6 +271,13 @@ public partial class WorldView {
             Pose(reviewRigs[0], reviewActor, null);
             return;
         }
+        if (reviewTarget is var (worked, model)) {
+            // The actor stands facing what it works and lands each blow on it, as the game has them.
+            reviewActor.Update(Vector2.Zero, action, worked.Pos, dt);
+            reviewActor.Mark = strikes.At(worked, reviewActor.Position, action, model);
+            Pose(reviewRigs[0], reviewActor, Grade(ActorAnimation.Tool(action), null, null));
+            return;
+        }
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);
         float along = Mathf.PosMod(Elapsed * ReviewSpeed(action) + 20, 40) - 20;
@@ -264,6 +287,18 @@ public partial class WorldView {
         reviewRigs[0].Flame.Visible = action == ActorAction.TorchSwing;
         reviewRigs[0].Root.Rotation += new Vector3(0, Mathf.DegToRad(ReviewTurn), 0);
     }
+
+    /// <summary>The id the close-up's target is built with, which picks its look: a tree of middling height, and a rock and a stump like it.</summary>
+    private const int ReviewTargetId = 1035;
+
+    /// <summary>What a close-up's blow lands on, or null for an action that lands on nothing.</summary>
+    private static ThingKind? ReviewWorked(ActorAction action) => action switch {
+        ActorAction.Chop or ActorAction.SteelChop => ThingKind.Tree,
+        ActorAction.Mine or ActorAction.SteelMine => ThingKind.Stone,
+        ActorAction.Hammer => ThingKind.Anvil,
+        ActorAction.Dig => ThingKind.Stump,
+        _ => null
+    };
 
     /// <summary>
     /// A player walks up to a cabin at the middle of the ground and through each doorway stage as the game shows them:

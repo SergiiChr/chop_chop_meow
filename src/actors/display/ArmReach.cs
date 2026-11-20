@@ -7,19 +7,20 @@ namespace ChopChopMeow;
 public static class ArmReach {
     /// <summary>
     /// The arm raise, outward swing and elbow bend, in degrees, that put a fist at <paramref name="grip"/>, measured from the hips in the trunk's own frame.
-    /// With <paramref name="palm"/> it is what the fist holds that goes there, that far ahead of the forearm's line.
+    /// With <paramref name="palm"/> it is what the fist holds that goes there, that far ahead of the forearm's line; with
+    /// <paramref name="along"/> that point is that far from the elbow along the forearm's line, as the end of a tool held in line with it is.
     /// </summary>
-    public static (float Raise, float Out, float Elbow) ArmTo(Vector3 grip, bool left, float palm = 0) {
+    public static (float Raise, float Out, float Elbow) ArmTo(Vector3 grip, bool left, float palm = 0, float along = ActorRig.Forearm) {
         var reach = grip - new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
         // A held thing ahead of the forearm's line is reached by a slightly longer forearm bent a little further.
         const float upper = ActorRig.UpperArm;
-        float fore = MathF.Sqrt(ActorRig.Forearm * ActorRig.Forearm + palm * palm);
+        float fore = MathF.Sqrt(along * along + palm * palm);
         // The elbow folds until the fist is that far from the shoulder, then the shoulder swings the bent arm onto the point.
         float bend = MathF.Acos(Math.Clamp((reach.LengthSquared() - upper * upper - fore * fore) / (2 * upper * fore), -1, 1));
-        float along = upper + fore * MathF.Cos(bend), ahead = fore * MathF.Sin(bend);
-        float outward = MathF.Asin(Math.Clamp((left ? reach.X : -reach.X) / along, -1, 1));
-        float raise = Mathf.RadToDeg(MathF.Atan2(reach.Z, -reach.Y) - MathF.Atan2(ahead, along * MathF.Cos(outward)));
-        return (Mathf.PosMod(raise + 180, 360) - 180, Mathf.RadToDeg(outward), Mathf.RadToDeg(bend - MathF.Atan2(palm, ActorRig.Forearm)));
+        float straight = upper + fore * MathF.Cos(bend), ahead = fore * MathF.Sin(bend);
+        float outward = MathF.Asin(Math.Clamp((left ? reach.X : -reach.X) / straight, -1, 1));
+        float raise = Mathf.RadToDeg(MathF.Atan2(reach.Z, -reach.Y) - MathF.Atan2(ahead, straight * MathF.Cos(outward)));
+        return (Mathf.PosMod(raise + 180, 360) - 180, Mathf.RadToDeg(outward), Mathf.RadToDeg(bend - MathF.Atan2(palm, along)));
     }
 
     /// <summary>
@@ -72,6 +73,35 @@ public static class ArmReach {
 
     /// <summary>How a pose turns the trunk on the hips, as <see cref="ActorRig.Show"/> applies it.</summary>
     public static Basis TrunkBasis(Pose pose) => Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway)));
+
+    /// <summary>How a pose turns an arm at the shoulder and how far that arm's elbow folds, as <see cref="ActorRig.Show"/> applies them, from the trunk's frame.</summary>
+    private static (Basis Shoulder, Basis Forearm) ArmBases(Pose pose, bool left) {
+        var shoulder = left
+            ? Basis.FromEuler(new Vector3(Mathf.DegToRad(-pose.RaiseL), 0, Mathf.DegToRad(pose.OutL)))
+            : Basis.FromEuler(new Vector3(Mathf.DegToRad(-pose.RaiseR), 0, Mathf.DegToRad(-pose.OutR)));
+        return (shoulder, shoulder * new Basis(Vector3.Right, Mathf.DegToRad(-(left ? pose.ElbowL : pose.ElbowR))));
+    }
+
+    /// <summary>Where a fist is for a pose, from the hips in the trunk's own frame, as <see cref="ActorRig.Fist"/> has it on a rig shown in it.</summary>
+    public static Vector3 FistInTrunk(Pose pose, bool left) {
+        var (shoulder, forearm) = ArmBases(pose, left);
+        return new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0) + shoulder * new Vector3(0, -ActorRig.UpperArm, 0) + forearm * new Vector3(0, -ActorRig.Forearm, ActorRig.Palm);
+    }
+
+    /// <summary>The way a forearm points from the elbow to the fist for a pose, in the trunk's own frame.</summary>
+    public static Vector3 ForearmInTrunk(Pose pose, bool left) => ArmBases(pose, left).Forearm * Vector3.Down;
+
+    /// <summary>Where a fist is for a pose, from the rig's root.</summary>
+    public static Vector3 Fist(Pose pose, bool left) => Vector3.Up * pose.HipHeight + TrunkBasis(pose) * FistInTrunk(pose, left);
+
+    /// <summary>
+    /// Where a point of something in the right fist is for a pose, from the rig's root: <paramref name="held"/> is in the grip's
+    /// own frame, the tool's handle running down along -Y from the fist, turned about its length by <see cref="Pose.Grip"/>.
+    /// </summary>
+    public static Vector3 InRightHand(Pose pose, Vector3 held) {
+        var forearm = ArmBases(pose, false).Forearm;
+        return Fist(pose, false) + TrunkBasis(pose) * (forearm * (new Basis(Vector3.Up, Mathf.DegToRad(pose.Grip)) * held));
+    }
 
     /// <summary>Where a shoulder is in the world for a pose, on a rig placed at <paramref name="root"/>.</summary>
     public static Vector3 Shoulder(Pose pose, Transform3D root, bool left) =>

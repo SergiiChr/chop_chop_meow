@@ -32,6 +32,10 @@ public sealed class ActorState {
     public float FromTime;
     public bool FromMoving;
     public float Blend = 1;
+    /// <summary>Where a blow lands its tool's working end, a point in the world, or null when the action strikes nothing.</summary>
+    public Vector3? Mark;
+    /// <summary>That point in the rig's own frame as the rig was last placed, which the pose aims at.</summary>
+    public Vector3? MarkInRig;
     /// <summary>Moves and poses the actor for a frame; it faces where it moves, or <paramref name="facingTarget"/> while standing or <paramref name="backing"/> away from it.</summary>
     public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt, bool backing = false) {
         float moved = position.DistanceTo(Position);
@@ -48,7 +52,7 @@ public sealed class ActorState {
         Blend = Math.Min(1, Blend + dt / ActorAnimation.BlendSeconds);
         Moving = moving;
     }
-    public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend);
+    public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend, MarkInRig);
 
     /// <summary>True on the frame an action loop passes its impact moment.</summary>
     public bool Struck(float at) {

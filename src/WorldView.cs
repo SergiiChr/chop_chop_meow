@@ -58,6 +58,7 @@ public partial class WorldView : Node3D {
     private Node3D scene = null!;
     private Overlay overlay = null!;
     private readonly Dictionary<int, Prop> props = new();
+    private readonly StrikePoints strikes = new();
     private readonly ActorState player = new();
     private ActorRig playerRig = null!;
     private string playerShirt = "";
@@ -270,6 +271,10 @@ public partial class WorldView : Node3D {
 
     public ActorAction PlayerAnimation => player.Action;
     public float PlayerAnimationTime => player.Time;
+    /// <summary>The window's own player's rig, as last posed.</summary>
+    public ActorRig PlayerRig => playerRig;
+    /// <summary>Where the window's own player's blow lands, or null when it lands on nothing.</summary>
+    public Vector3? PlayerMark => player.Mark;
     public ActorAction OtherAnimation(int id) => others.TryGetValue(id, out var other) ? other.State.Action : ActorAction.Idle;
     public ActorAction WorkerAnimation(int id) => crew.TryGetValue(id, out var entry) ? entry.State.Action : ActorAction.Idle;
 
@@ -491,6 +496,7 @@ public partial class WorldView : Node3D {
         var door = doorways.AtDoor(World.Me, player, dt);
         if (door is DoorShown shown) { at = shown.At; target = shown.Facing; action = shown.Action; subject = null; }
         player.Update(at, action, target, dt, door?.Backing ?? false);
+        player.Mark = Mark(subject, player, action);
         // A foot lands at each extreme of the stride.
         if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
@@ -521,6 +527,7 @@ public partial class WorldView : Node3D {
                 : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down
                 : assignment is { Kind: ThingKind.Mine } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
+            state.Mark = Mark(assignment, state, work);
             Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
             entry.Rig.Root.Visible = World.Sees(worker);
             Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
@@ -605,6 +612,7 @@ public partial class WorldView : Node3D {
             var door = doorways.AtDoor(p, state, dt);
             if (door is DoorShown shown) { at = shown.At; facing = shown.Facing; action = shown.Action; subject = null; }
             state.Update(at, action, facing, dt, door?.Backing ?? false);
+            state.Mark = Mark(subject, state, action);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
@@ -638,6 +646,7 @@ public partial class WorldView : Node3D {
         rig.Root.Position = To3(state.Position);
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
+        state.MarkInRig = state.Mark is Vector3 mark ? rig.Root.Transform.AffineInverse() * mark : null;
         var pose = state.Pose;
         state.Lift = 0;
         Vector3? jamb = null;
@@ -671,6 +680,10 @@ public partial class WorldView : Node3D {
 
     /// <summary>Whether working on a thing hammers in a mine's frame and rails rather than digging.</summary>
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
+
+    /// <summary>Where a blow of <paramref name="action"/> lands on <paramref name="subject"/> for an actor standing as <paramref name="state"/> has them, or null when it lands on nothing.</summary>
+    private Vector3? Mark(Thing? subject, ActorState state, ActorAction action) =>
+        subject != null && props.TryGetValue(subject.Id, out var prop) ? strikes.At(subject, state.Position, action, prop) : null;
 
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
     private void Work(ActorState actor, Thing? subject, ActorRig rig) {
@@ -720,21 +733,23 @@ public partial class WorldView : Node3D {
         var impactAt = World.GatherAt(subject, actor.Position);
         var toward = (actor.Position - impactAt).Normalized();
         var side = To3(impactAt + toward * .35f);
+        // Chips and soil fly from where the blow lands, or from the side of what is worked toward the worker where no blow is aimed.
+        Vector3 Hit(float height) => actor.Mark is Vector3 mark ? mark + Vector3.Up * (height < .2f ? height : 0) : side + Vector3.Up * height;
         switch (subject.Kind) {
             case ThingKind.Tree:
-                Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
+                Burst(Hit(1.1f), Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
                 Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id)), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
             case ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Mine:
                 var color = subject.Kind is ThingKind.Stone or ThingKind.Mine ? "9a9d99" : subject.Kind == ThingKind.Iron ? "a35a2e" : subject.Kind == ThingKind.Tin ? "b9bbb4" : "26282b";
-                Burst(side + Vector3.Up * .5f, Mat(color), 6, 2.4f, .5f, 9, .07f);
-                Burst(side + Vector3.Up * .4f, GatherDust, 3, .5f, .9f, -.3f, .16f, 1.5f);
-                if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Sparks, 5, 3.2f, .3f, 4, .025f);
+                Burst(Hit(.5f), Mat(color), 6, 2.4f, .5f, 9, .07f);
+                Burst(Hit(.4f), GatherDust, 3, .5f, .9f, -.3f, .16f, 1.5f);
+                if (action == ActorAction.SteelMine) Burst(Hit(.5f), Sparks, 5, 3.2f, .3f, 4, .025f);
                 break;
             case ThingKind.Stump or ThingKind.Bush:
                 // The blade goes in at the foot of it and throws up soil, and a bush sheds leaves as it is rocked.
-                Burst(side + Vector3.Up * .08f, Soil, 6, 2, .5f, 9, .06f);
-                Burst(side + Vector3.Up * .1f, GatherDust, 2, .4f, .8f, -.3f, .14f, 1.5f);
+                Burst(Hit(.08f), Soil, 6, 2, .5f, 9, .06f);
+                Burst(Hit(.1f), GatherDust, 2, .4f, .8f, -.3f, .14f, 1.5f);
                 if (subject.Kind == ThingKind.Bush) Burst(To3(subject.Pos, .5f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f);
                 break;
             case ThingKind.WolfCorpse: Burst(side + Vector3.Up * .3f, Mat("7a1414", .6f), 5, 1.4f, .45f, 8, .04f); break;

@@ -384,14 +384,20 @@ public static class WorldModels {
     private static DugProp Stump(int tree) {
         var prop = new DugProp();
         var stump = Add(prop.Body, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
+        var (seat, radius) = Trunk(tree);
+        float width = radius / NatureShape.StumpRadius;
+        stump.Scale = new Vector3(width, TreeScale(tree), width);
+        prop.Seat = seat;
+        return prop;
+    }
+
+    /// <summary>Where a tree's trunk stands from the tree's spot, and how thick it is at the ground, in metres.</summary>
+    public static (Vector3 Seat, float Radius) Trunk(int tree) {
         float scale = TreeScale(tree);
         var (species, variant) = TreeLook(tree);
         var (foot, radius) = Tree3DShape.Foot(species, variant);
-        float width = radius * scale / NatureShape.StumpRadius;
-        stump.Scale = new Vector3(width, scale, width);
         // The tree's model was turned by its id, and its trunk with it.
-        prop.Seat = new Vector3(foot.X, 0, foot.Y).Rotated(Vector3.Up, Mathf.DegToRad(Turn(tree))) * scale;
-        return prop;
+        return (new Vector3(foot.X, 0, foot.Y).Rotated(Vector3.Up, Mathf.DegToRad(Turn(tree))) * scale, radius * scale);
     }
 
     /// <summary>A plain bush of three lobes around its middle, each a little different in size and green by its id; it casts a shadow.</summary>

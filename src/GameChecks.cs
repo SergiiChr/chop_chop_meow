@@ -1305,6 +1305,62 @@ public partial class Game {
         Drop(Hosted, "steel_pick", 1);
         RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
+    /// <summary>
+    /// Every blow at work lands its tool on what is worked as it is heard, wherever the player stands to work it: the axe's head on
+    /// the trunk's side, the pick's point on the rock, the hammer's face on the anvil's and the bench's work tops, and the shovel's
+    /// blade in the ground at a stump's foot.
+    /// </summary>
+    private async Task CheckEveryBlowLandsItsToolOnWhatItWorks() {
+        var start = Hosted.Player;
+        var (wood, stone) = (world.Backpack["wood"], world.Backpack["stone"]);
+        Give(Hosted, "steel_pick", 1); Give(Hosted, "steel_shovel", 1);
+        var rig = view.PlayerRig;
+        foreach (var (kind, offset) in new[] {
+            (ThingKind.Tree, new Vector2(2, 1)), (ThingKind.Tree, new Vector2(-1.6f, 1.9f)), (ThingKind.Stone, new Vector2(2, -1)), (ThingKind.Stone, new Vector2(-2.1f, .4f)),
+            (ThingKind.Stump, new Vector2(1.5f, 1.5f)), (ThingKind.Stump, new Vector2(-2, -.6f)), (ThingKind.Anvil, new Vector2(-.5f, -1.2f)), (ThingKind.Bench, new Vector2(1.2f, 0)) }) {
+            Warp(Hosted, start); await Frames(3);
+            var thing = Hosted.Add(kind, start + offset, kind == ThingKind.Stone ? World.StonePile : 40);
+            string sound = kind switch { ThingKind.Tree => "chop_tree", ThingKind.Stone => "mine_ore", ThingKind.Stump => "dig_earth", ThingKind.Anvil => "anvil_work", _ => "bench_work" };
+            if (kind == ThingKind.Anvil) thing.Inventory.Add("steel_bar", 1);
+            if (kind == ThingKind.Bench) { thing.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(thing, "crate"); thing.Inventory.Add("planks", 6); }
+            await Frames(2);
+            int soundsBefore = sounds.Played;
+            var point = kind is ThingKind.Anvil or ThingKind.Bench ? (Vector2?)null : RightPress(thing.Pos);
+            await Until(() => sounds.Heard(sound, soundsBefore) && view.PlayerMark != null, $"the player working a {kind} {offset} away and its blow heard", 8);
+            var mark = view.PlayerMark!.Value;
+            var root = rig.Root.Transform;
+            var end = root * (kind switch { ThingKind.Tree => rig.Holds(ActorRig.AxeHeadPoint), ThingKind.Stone => rig.Holds(ActorRig.PickPoint), ThingKind.Stump => rig.ShovelTip, _ => rig.Holds(ActorRig.HammerFace) });
+            var flat = new Vector2(end.X, end.Z);
+            switch (kind) {
+                case ThingKind.Tree: {
+                        var (seat, radius) = WorldModels.Trunk(thing.Id);
+                        float gap = flat.DistanceTo(thing.Pos + new Vector2(seat.X, seat.Z)) - radius;
+                        Require(gap is > -.08f and < .04f, $"An axe's head must bite the side of the trunk {offset} away as the chop is heard, not {gap:0.00} m off it.");
+                        break;
+                    }
+                case ThingKind.Stump: {
+                        var (seat, radius) = WorldModels.Trunk(thing.OfTree != 0 ? thing.OfTree : thing.Id);
+                        float gap = flat.DistanceTo(thing.Pos + new Vector2(seat.X, seat.Z)) - radius;
+                        Require(gap is > -.02f and < .12f && end.Y < 0, $"A shovel's blade must go into the ground at the foot of the stump {offset} away, not {gap:0.00} m out from it and {end.Y:0.00} m up.");
+                        break;
+                    }
+                case ThingKind.Stone:
+                    Require(mark.Y is > .05f and < .95f && new Vector2(mark.X, mark.Z).DistanceTo(thing.Pos) < .8f && end.DistanceTo(mark) < .04f,
+                        $"A pick's point must land on the rock {offset} away, at {mark}, not {end.DistanceTo(mark):0.00} m from it.");
+                    break;
+                default:
+                    Require(mark.Y is > .75f and < .97f && end.DistanceTo(mark) < .04f, $"A hammer's face must land on the {kind}'s work top at {mark}, not {end.DistanceTo(mark):0.00} m from it.");
+                    break;
+            }
+            if (point is Vector2 held) RightRelease(held);
+            await Frames(2);
+            // A rock sheds chips as it is mined, which land round it.
+            RemoveThings(Hosted, t => t == thing || t.Kind == ThingKind.Stump && t.Pos == thing.Pos || t.IsLoose && t.Pos.DistanceTo(thing.Pos) < 4);
+            Drop(Hosted, "wood", world.Backpack["wood"] - wood); Drop(Hosted, "stone", world.Backpack["stone"] - stone);
+        }
+        Drop(Hosted, "steel_pick", 1); Drop(Hosted, "steel_shovel", 1);
+        Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
     /// <summary>A tree felled in front of the player topples over the stump it leaves, and holding the right mouse button on the stump digs it up with the shovel.</summary>
     private async Task CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
@@ -2067,6 +2123,7 @@ public partial class Game {
             await TestClean(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
             await TestClean(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await TestClean(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
+            await TestClean(CheckEveryBlowLandsItsToolOnWhatItWorks);
             await TestClean(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
             await TestClean(CheckMinePageFollowsTheMineThroughItsStages);
             await TestClean(CheckStrikerBesideAStationLeavesThePlayerHammering);

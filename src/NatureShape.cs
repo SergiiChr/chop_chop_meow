@@ -466,7 +466,7 @@ internal static class NatureShape {
     });
 
     /// <summary>Distance along a ray to a triangle, or null when it misses (Möller–Trumbore).</summary>
-    private static float? Hit(Vector3 origin, Vector3 direction, Vector3 a, Vector3 b, Vector3 c) {
+    internal static float? Hit(Vector3 origin, Vector3 direction, Vector3 a, Vector3 b, Vector3 c) {
         Vector3 ab = b - a, ac = c - a, p = direction.Cross(ac);
         float det = ab.Dot(p);
         if (MathF.Abs(det) < 1e-7f) return null;

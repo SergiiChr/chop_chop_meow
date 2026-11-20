@@ -220,7 +220,16 @@ public sealed class ActorRig {
     public Vector3 Elbow(bool left) => FromForearm(left, Vector3.Zero);
 
     /// <summary>Where the middle of the axe's head is from the rig's root, under the pose just shown.</summary>
-    public Vector3 AxeHead => FromForearm(false, wrist.Transform * new Vector3(0, HeadAt, AxeHeadOut));
+    public Vector3 AxeHead => Holds(AxeHeadPoint);
+
+    /// <summary>Where a point of what the right fist holds, given in the grip's own frame, is from the rig's root, under the pose just shown.</summary>
+    public Vector3 Holds(Vector3 point) => FromForearm(false, wrist.Transform * point);
+
+    /// <summary>
+    /// The working ends of the tools the right fist swings, in the grip's own frame (<see cref="ArmReach.InRightHand"/>): the
+    /// middle of an axe's head, the point of a pickaxe and the face of a hammer.
+    /// </summary>
+    public static readonly Vector3 AxeHeadPoint = new(0, HeadAt, AxeHeadOut), PickPoint = new(0, HeadAt, -.3f), HammerFace = new(0, HammerHead, -.09f);
 
     /// <summary>Where the tip of the shovel's blade is from the rig's root, under the pose just shown.</summary>
     public Vector3 ShovelTip => FromForearm(false, shovel.Transform * new Vector3(0, -ActorAnimation.ShovelLength, 0));
@@ -257,6 +266,8 @@ public sealed class ActorRig {
 
     /// <summary>How long an axe's or a pickaxe's handle is, how far along it from the grip its head sits, and how far toward its edge the middle of an axe's head is.</summary>
     private const float ToolLength = .72f, HeadAt = .06f - ToolLength, AxeHeadOut = -.1f;
+    /// <summary>How far down a hammer's handle from the grip the middle of its head is.</summary>
+    private const float HammerHead = .06f - .38f;
 
     /// <summary>A held tool gripped at the origin, handle down along -Y and blade toward -Z; the icon renderer shows it on its own.</summary>
     public static Node3D Tool(string name) {
@@ -306,7 +317,7 @@ public sealed class ActorRig {
     /// </summary>
     private static Node3D Hammer(bool steel) {
         var tool = new Node3D();
-        const float length = .38f, end = .06f - length;
+        const float length = .38f, end = HammerHead;
         Cylinder(tool, .02f, .024f, length, new Vector3(0, .08f - length / 2, 0), steel ? Mat("e87d1e", .7f) : Wood("8a5a32", .7f));
         if (steel) {
             var metal = Metal("c9d3d8", .35f, .85f);

@@ -49,7 +49,9 @@ def require_clip(ref: str | None, clip: str) -> None:
         raise SystemExit(f"No clip {clip!r} in {where}; clips: {', '.join(names)}")
 
 
-def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> None:
+def record(
+    checkout: Path, clip: str, view: str, slow: float, movie: Path, target: float | None
+) -> None:
     """Records a checkout's clip from one view to a movie of FRAMES frames at FPS a second of slowed game time."""
     pitch, turn = VIEWS[view]
     movie.parent.mkdir(parents=True, exist_ok=True)
@@ -61,6 +63,7 @@ def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> No
         str(pitch),
         "--animation-turn",
         str(turn),
+        *(["--animation-target", str(target)] if target is not None else []),
     ]
     log = movie.with_suffix(".log")
     launcher = (checkout / "build.py").read_text()
@@ -135,6 +138,7 @@ def record_all(
             view,
             options.slow,
             OUTPUT / slug(options.clip) / name / f"{view}.avi",
+            options.target,
         )
 
 
@@ -168,6 +172,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--slow", type=float, default=1, help="slow motion factor (default %(default)s, real speed)"
+    )
+    parser.add_argument(
+        "--target",
+        type=float,
+        metavar="METRES",
+        help="how far from the actor what a blow works stands (default: where a player stops to work it)",
     )
     parser.add_argument(
         "--base", metavar="REF", help="also record this branch or commit, such as main"
