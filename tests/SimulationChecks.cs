@@ -91,6 +91,7 @@ public static class SimulationChecks {
         DoorTugChecks.Run(data);
         DoorCheckChecks.Run(data);
         DoorCheckViewChecks.Run();
+        CatgirlDanceChecks.Run();
         Test(CheckOnlyCoinsUseTheLargerStack, data);
         Test(CheckSaveFromAnotherVersionIsRefused, data);
         Test(CheckSaveWithUnknownItemRefused, data);

@@ -22,8 +22,8 @@ this project turns them into the movie.
 
    Put them on one sheet and look at the sheet, not at each still (see [Tools](#tools)).
    For the catgirl's solo dance (`CatgirlDance.Solo`), `./tools/intro_film.py --dance` draws only her, as tall as
-   the picture, into `build/intro/dance` and writes the beat to its cue sheet. Work on the dance there and draw
-   the film only once it is approved.
+   the picture, into `build/intro/dance`, and writes the beat she dances to into its cue sheet.
+   Work on the dance there and draw the film only once it is approved.
 3. When the stills are right, draw the whole film (about 50 seconds) and look at each changed shot as a strip of
    frames:
 

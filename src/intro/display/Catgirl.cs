@@ -35,6 +35,8 @@ internal sealed class Catgirl {
     /// How far each joint of the tail bends at rest, in degrees: back and down from the spine, then curling up.
     /// </summary>
     private static readonly float[] TailCurl = { -115, 28, 30, 30, 25 };
+    /// <summary>How much deeper than wide the maid's skirt, its hem, waistband and collar are, as the slim trunk is.</summary>
+    private static readonly Vector3 Deeper = new(1, 1, 1.28f);
 
     private static Look LookOf(CatgirlOutfit outfit) {
         const string skin = "e8bdab";
@@ -49,7 +51,7 @@ internal sealed class Catgirl {
     public Catgirl(CatgirlOutfit outfit, Vector3 at) {
         this.outfit = outfit;
         look = LookOf(outfit);
-        Rig = new ActorRig(look.Body, HumanShape.Slim, joinBody: true);
+        Rig = new ActorRig(look.Body, HumanShape.Slim);
         home = at;
         skin = Mat(look.Body.Skin); locks = Mat(look.Body.Hair);
         BuildFace();
@@ -151,25 +153,23 @@ internal sealed class Catgirl {
             DressBlouse(Rig.Chest, Mat(look.Body.Top), Mat(look.Trim));
             return;
         }
-        Node3D head = Rig.Head;
-        var torso = FittedTo(Rig.Torso);
-        var chest = FittedTo(Rig.Chest);
+        Node3D head = Rig.Head, torso = Rig.Torso, chest = Rig.Chest;
         StandardMaterial3D top = Cloth(look.Body.Top), trim = Cloth(look.Trim);
         switch (outfit) {
             case CatgirlOutfit.Maid: {
                     // A flared skirt over a petticoat, an apron with a bib, and a waistband tied in a bow at the back.
                     // Puffed sleeves and a collar.
-                    Cylinder(torso, .3f, .125f, .3f, new Vector3(0, -.03f, 0), top, sides: 16);
-                    Cylinder(torso, .31f, .29f, .03f, new Vector3(0, -.185f, 0), trim, sides: 16);
-                    Box(torso, new Vector3(.2f, .25f, .012f), new Vector3(0, -.03f, .227f), trim, new Vector3(-30.3f, 0, 0));
-                    Box(chest, new Vector3(.12f, .13f, .012f), new Vector3(0, .31f, .112f), trim);
-                    Cylinder(torso, .12f, .12f, .03f, new Vector3(0, .13f, 0), trim, sides: 14);
+                    Cylinder(torso, .276f, .115f, .234f, new Vector3(0, -.023f, 0), top, sides: 16).Scale = Deeper;
+                    Cylinder(torso, .285f, .267f, .023f, new Vector3(0, -.144f, 0), trim, sides: 16).Scale = Deeper;
+                    Box(torso, new Vector3(.184f, .225f, .012f), new Vector3(0, -.023f, .268f), trim, new Vector3(-41.5f, 0, 0));
+                    Box(chest, new Vector3(.11f, .101f, .014f), new Vector3(0, .242f, .132f), trim);
+                    Cylinder(torso, .11f, .11f, .023f, new Vector3(0, .101f, 0), trim, sides: 14).Scale = Deeper;
                     foreach (float side in new[] { -1f, 1f }) {
-                        Box(torso, new Vector3(.1f, .06f, .02f), new Vector3(side * .05f, .14f, -.1f), trim, new Vector3(0, 0, side * 20));
-                        Sphere(chest, .05f, new Vector3(side * .136f, .447f, -.026f), top, new Vector3(1.03f, .95f, .86f), 12);
-                        Box(chest, new Vector3(.03f, .022f, .012f), new Vector3(side * .02f, .5f, .07f), Cloth(Red), new Vector3(0, 0, side * 18));
+                        Box(torso, new Vector3(.091f, .048f, .024f), new Vector3(side * .046f, .109f, -.118f), trim, new Vector3(0, 0, side * 20));
+                        Sphere(chest, .05f, new Vector3(side * .125f, .349f, -.031f), top, new Vector3(.948f, .741f, 1.015f), 12);
+                        Box(chest, new Vector3(.027f, .017f, .014f), new Vector3(side * .018f, .39f, .083f), Cloth(Red), new Vector3(0, 0, side * 18));
                     }
-                    Cylinder(chest, .05f, .05f, .02f, new Vector3(0, .535f, 0), trim);
+                    Cylinder(chest, .046f, .046f, .016f, new Vector3(0, .417f, 0), trim).Scale = Deeper;
                     // A frilled band over the crown, from ear to ear.
                     for (int frill = -2; frill <= 2; frill++) {
                         float angle = Mathf.DegToRad(frill * 25);
@@ -181,12 +181,6 @@ internal sealed class Catgirl {
                 DressHoodie(torso, chest, top, trim);
                 break;
         }
-    }
-
-    private static Node3D FittedTo(Node3D joint) {
-        var clothes = Pivot(joint, Vector3.Zero);
-        clothes.Scale = new Vector3(.92f, .78f, 1.18f);
-        return clothes;
     }
 
     private static void DressBlouse(Node3D chest, Material top, Material ribbon) {
@@ -209,26 +203,26 @@ internal sealed class Catgirl {
     private static void DressHoodie(Node3D torso, Node3D chest, Material fleece, Material trim) {
         var white = Colors.White;
         ActorShape.Add(chest, new Ring[] {
-            new(.542f, .076f, .063f, white), new(.501f, .147f, .108f, white),
-            new(.475f, .182f, .122f, white), new(.438f, .189f, .134f, white),
-            new(.33f, .169f, .141f, white), new(.172f, .153f, .124f, white),
+            new(.423f, .07f, .074f, white), new(.391f, .135f, .127f, white),
+            new(.371f, .167f, .144f, white), new(.342f, .174f, .158f, white),
+            new(.257f, .155f, .166f, white), new(.134f, .141f, .146f, white),
         }, material: fleece);
         ActorShape.Add(torso, new Ring[] {
-            new(.265f, .158f, .127f, white), new(.14f, .171f, .136f, white),
-            new(.051f, .187f, .154f, white, .008f), new(-.047f, .209f, .18f, white, .026f),
-            new(-.112f, .221f, .202f, white, .045f), new(-.174f, .217f, .211f, white, .055f),
-            new(-.215f, .211f, .205f, white, .059f),
+            new(.207f, .145f, .15f, white), new(.109f, .157f, .16f, white),
+            new(.04f, .172f, .182f, white, .009f), new(-.037f, .192f, .212f, white, .031f),
+            new(-.087f, .203f, .238f, white, .053f), new(-.136f, .2f, .249f, white, .065f),
+            new(-.168f, .194f, .242f, white, .07f),
         }, material: fleece);
-        Cylinder(torso, .212f, .218f, .038f, new Vector3(0, -.201f, .057f), trim, sides: 16).Scale = new Vector3(1, 1, .98f);
-        Sphere(chest, .125f, new Vector3(0, .481f, -.104f), fleece, new Vector3(1.2f, .72f, .8f), 16);
-        Sphere(chest, .089f, new Vector3(0, .522f, -.125f), trim, new Vector3(1.23f, .27f, .71f), 14);
-        Sphere(torso, .102f, new Vector3(0, -.013f, .166f), trim, new Vector3(1.18f, .63f, .32f), 16);
+        Cylinder(torso, .195f, .201f, .03f, new Vector3(0, -.157f, .067f), trim, sides: 16).Scale = new Vector3(1, 1, 1.257f);
+        Sphere(chest, .125f, new Vector3(0, .375f, -.123f), fleece, new Vector3(1.104f, .562f, .944f), 16);
+        Sphere(chest, .089f, new Vector3(0, .407f, -.148f), trim, new Vector3(1.132f, .211f, .838f), 14);
+        Sphere(torso, .102f, new Vector3(0, -.01f, .196f), trim, new Vector3(1.086f, .491f, .378f), 16);
         foreach (float side in new[] { -1f, 1f })
-            Accent(torso, new Vector3(side * .074f, .02f, .184f), new Vector3(side * .098f, -.027f, .181f), .003f, fleece);
+            Accent(torso, new Vector3(side * .068f, .016f, .217f), new Vector3(side * .09f, -.021f, .214f), .003f, fleece);
         var cord = Cloth("51515e");
         foreach (float side in new[] { -1f, 1f }) {
-            Accent(chest, new Vector3(side * .033f, .527f, .087f), new Vector3(side * .039f, .476f, .121f), .005f, cord);
-            Accent(chest, new Vector3(side * .039f, .476f, .121f), new Vector3(side * .045f, .407f, .137f), .004f, cord);
+            Accent(chest, new Vector3(side * .03f, .411f, .103f), new Vector3(side * .036f, .371f, .143f), .005f, cord);
+            Accent(chest, new Vector3(side * .036f, .371f, .143f), new Vector3(side * .041f, .317f, .162f), .004f, cord);
         }
     }
 
@@ -240,7 +234,6 @@ internal sealed class Catgirl {
         Rig.TurnHips(frame.Hips.X, frame.Hips.Y, frame.Hips.Z);
         // Each foot tips back by as much as its leg leans out, so its sole lies flat on the floor.
         Rig.RollFoot(true, -frame.Pose.SplayL - frame.Hips.Z); Rig.RollFoot(false, -frame.Pose.SplayR + frame.Hips.Z);
-        Rig.MoveShoulder(true, frame.ShoulderL.X, frame.ShoulderL.Y); Rig.MoveShoulder(false, frame.ShoulderR.X, frame.ShoulderR.Y);
         Rig.Root.Position = home + new Vector3(frame.Shift, 0, frame.Depth);
         Rig.Root.RotationDegrees = new Vector3(0, frame.Facing, 0);
         Rig.Head.RotationDegrees += frame.Head;
@@ -268,9 +261,9 @@ internal sealed class Catgirl {
             inward = isLeft ? -1 : 1;
             // The wrist is where the forearm ends, a little above where a fist would be.
             wrist = new Node3D(); rig.Hold(wrist, right: !isLeft);
-            wrist.Position += new Vector3(0, .05f, 0);
+            wrist.Position += Vector3.Up * ActorRig.WristAboveFist;
             if (cuff != null) Cylinder(wrist.GetParent<Node3D>(), .025f, .026f, .043f, new Vector3(0, wrist.Position.Y + .006f, 0), cuff, sides: 12);
-            var root = Pivot(wrist, new Vector3(0, -.05f, 0));
+            var root = Pivot(wrist, Vector3.Down * ActorRig.WristAboveFist);
             // The index finger is the one next to the thumb, ahead.
             for (int i = 0; i < fingers.Length; i++) {
                 fingers[i] = Pivot(root, new Vector3(0, -.02f, .019f - i * .0127f));

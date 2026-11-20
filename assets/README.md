@@ -104,10 +104,12 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   workers and couriers. It shares five neutral mesh resources (hips, torso, leg, left arm and right arm) across all
   human roles and player shirt colors. Each actor keeps its own skeletons and pose. Cached three-color texture palettes
   preserve sleeve/skin, trousers/boots and sole transitions using the fade-compatible StandardMaterial3D path.
-  It also holds the dancers' shared slim build, with a shaped face, defined shoulders, tapered arms, rounded
-  thighs, shallow kneecaps, longer lower legs with calves set back from the shins, and a torso skinned across the waist.
-  The soloist's shorts and thigh-high socks follow the same mesh as her legs.
-- `JoinedHuman` — connects the dancers' trunk, legs, arms and palms in one skinned surface.
+  It also holds the dancers' shared slim build, with a shaped face, defined shoulders, tapered arms, rounded thighs,
+  shallow kneecaps, and longer lower legs with calves set back from the shins.
+  The soloist's shorts and thigh-high socks are colours of her legs.
+- `src/actors/display/JoinedHuman.cs` — the dancers' trunk, legs, arms and palms as one skinned surface, which bends
+  across the waist.
+  `JoinedTrunk` holds the trunk's rings and where the limbs meet them.
 - `src/ActorShape.cs` — profile, skinning and curved strap builders. Outfit colors use cached palette materials rather than duplicating body geometry. These meshes are cached across actors while each rig poses its own joints.
 - `CourierShape` — fits a reflective hi-vis vest and curved cap to the same core, with the common face details.
 - `src/actors/enemies/wolf/display/WolfShape.cs` — one cached skinned wolf mesh on a skeleton: deep chest, full belly with a slight tuck, a croup sloping into heavy thighs, thick maned neck, wedge muzzle with a jaw and teeth, upright ears, legs with elbows, hocks and paws, and a three-bone brush tail. The coat darkens along the back, warms to tan on the flanks and pales underneath.
@@ -278,7 +280,8 @@ them out of the game.
 - `office.mp3` — thirteen seconds of "IT office 3" by thellywellyn (Pixabay 535970).
 - `office_room.mp3` — thirteen seconds of "Office ambience 01 (owi)" by freesound_community (Pixabay 57193), laid over
   it.
-- `dance_beat.ogg` — five seconds of drums, bass and synth chords synthesized for the stage shot at 135 beats per minute.
+- `dance_beat.ogg` — twelve beats of drums, bass and synth chords at 135 beats per minute, synthesized to time the
+  catgirl's dance in its preview; the film does not play it.
 - `mouse_click.ogg` and `mouse_release.ogg` — the first mouse click and mouse release of Kenney's
   [UI Audio](https://kenney.nl/assets/ui-audio) pack, CC0 1.0, downloaded from Patch's asset library (patch.gg).
 

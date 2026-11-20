@@ -1174,28 +1174,32 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   (`ActorSkin.Boss`), the catgirls (`Catgirl`) and the poses in `IntroPoses`.
 - The hero's screen shows a web page of three catgirls dancing (`CatgirlPage`). The page is a small world of its own,
   drawn to a picture that a sheet over his screen wears; it is drawn again each frame only while his screen is seen.
-  All three catgirls (`Catgirl`) share the same slim build (`HumanShape.Slim`), with a shaped face, defined
-  shoulders, tapered arms, rounded thighs, defined knees, slim calves, articulated fingers, cat ears and a five-joint tail.
+  All three catgirls (`Catgirl`) share the same slim build (`HumanShape.Slim`), with a shaped face, defined shoulders,
+  tapered arms, rounded thighs, defined knees, slim calves, articulated fingers, cat ears and a five-joint tail.
   The build follows front and side figure studies, with arms set back at the shoulders, thighs set into the pelvis,
-  and slightly longer lower legs with the calf bulging behind the shin. The torso bends as one mesh from neck to hips.
-  The soloist's waistband follows that same mesh.
-  The dancers' shoulders, pelvis and wrists join the limbs into one skinned surface (`JoinedHuman`).
+  and slightly longer lower legs with the calf bulging behind the shin.
+  Its trunk, limbs and palms are one skinned surface (`JoinedHuman`), which bends at the waist, shoulders, elbows,
+  wrists, hips, knees and ankles.
+  The build's trunk (`JoinedTrunk`) says where the arms and legs meet it, each as a distance from its own joint.
+  The soloist's waistband, shorts and thigh-high socks are colours of that same surface.
   The five-second close-up starts square on to the dancers and moves around the stage to their left.
   The dancer on the left wears a maid's dress, the soloist wears a sleeveless collared blouse, ribbon tie, tailored
   shorts and thigh-high socks, and the dancer on the right wears a long black hoodie.
   All three dance at 135 beats per minute, on a clock that starts with the close-up of the screen.
-  Pink and blue spotlights and the bars behind the dancers take turns pulsing on that beat, over a dim
-  violet stage. The original drum-and-synth track starts with the shot.
+  Pink and blue spotlights and the bars behind the dancers take turns pulsing on that beat, over a dim violet stage.
+  The film plays no music under them; the beat they dance to plays only in the dance's preview.
   `CatgirlDance.PoseTime` holds each pose for two to four drawing frames, changing all three dancers together.
+  Every step of the dance falls on one of those poses.
   In `CatgirlDance.Solo`, the middle dancer reaches up, sweeps her arms out, frames her face, crosses her knees,
   then steps wide and rings one eye, followed by a shoulder accent and the eye gesture on the other side.
   The two at the sides answer her gestures with `CatgirlDance.Chorus`.
   The dancers put their weight into the beat, then rebound, with heads and wrists following the hips.
-  Each step places the wrists and ankles. `ArmReach.WithHandAt` bends the arms from their shoulders, and the legs
-  bend to keep the planted feet where the step puts them.
+  Each step places the hands and ankles and sets the hips' height, all for the slim build.
+  `ArmReach.WithHandAt` bends the arms from that build's shoulders, and the legs bend to keep the planted feet where
+  the step puts them.
   The person model has joints the game's own poses leave at rest, which any rig has: the chest turns on the belly at
-  the waist (`ActorRig.BendChest`), the hips tuck, turn and tilt (`TurnHips`) and each shoulder shrugs or hunches
-  (`MoveShoulder`), all kept until set again; and each foot tips at the ankle (`RollFoot`), on top of the pose shown.
+  the waist (`ActorRig.BendChest`) and the hips tuck, turn and tilt (`TurnHips`), both kept until set again; and each
+  foot tips at the ankle (`RollFoot`), on top of the pose shown.
   Each thigh tips out on its own through `Pose.SplayL` and `Pose.SplayR`.
   `Catgirl` adds wrists that bend, twist and tip, a head that nods, turns and tilts, and a turn of the whole body.
   A `DanceFrame` also holds where the dancer stands, so the soloist can move her weight over a planted leg.

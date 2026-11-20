@@ -2,24 +2,39 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using Ring = ChopChopMeow.ActorShape.Ring;
+using Tone = ChopChopMeow.HumanShape.Tone;
 
 namespace ChopChopMeow;
 
 /// <summary>A closed body surface from the neck to the shoes and palms, posed by the film rig's joints.</summary>
 internal sealed class JoinedHuman {
+    /// <summary>How many points go around each ring, the same on the trunk and every limb.</summary>
     private const int Sides = 12;
+    /// <summary>
+    /// How many trunk rings an arm's opening takes: one for each point down the front and back of the arm's first ring,
+    /// with the points at its top and bottom between them.
+    /// </summary>
+    private const int OpeningRows = Sides / 2 - 1;
+    /// <summary>Where the left side, the front and the right side are around a ring.</summary>
+    private const int LeftSide = 0, Front = Sides / 4, RightSide = Sides / 2;
     private enum Bone {
         Pelvis, Chest, LeftShoulder, LeftElbow, LeftWrist, RightShoulder, RightElbow, RightWrist,
         LeftHip, LeftKnee, LeftAnkle, RightHip, RightKnee, RightAnkle, LeftSocket, RightSocket,
         LeftUnderarm, RightUnderarm,
     }
     private static readonly Bone[] Bones = Enum.GetValues<Bone>();
+    /// <summary>The palm's rings, from just above the wrist toward the fingers, in the wrist's frame.</summary>
+    private static readonly Ring[] Palm = [
+        new(.008f, .017f, .019f, Colors.White), new(-.005f, .014f, .022f, Colors.White),
+        new(-.019f, .013f, .027f, Colors.White), new(-.04f, .013f, .028f, Colors.White),
+        new(-.061f, .011f, .025f, Colors.White), new(-.074f, .006f, .016f, Colors.White),
+    ];
     private static readonly Dictionary<(BodyBuild, Outfit), ArrayMesh> meshes = new();
     private static StandardMaterial3D? material;
     private readonly Skeleton3D skeleton = new() { Name = "JoinedHuman" };
     private readonly Transform3D chestRest;
 
-    public JoinedHuman(Node3D parent, BodyBuild build, Outfit outfit) {
+    public JoinedHuman(Node3D parent, BodyBuild build, JoinedTrunk trunk, Outfit outfit) {
         var rest = RestPose(build);
         chestRest = rest[(int)Bone.Chest];
         var skin = new Skin();
@@ -31,9 +46,9 @@ internal sealed class JoinedHuman {
         }
         skeleton.ResetBonePoses();
         var key = (build, outfit);
-        if (!meshes.TryGetValue(key, out var mesh)) meshes[key] = mesh = new Surface(build, outfit, rest).Build();
+        if (!meshes.TryGetValue(key, out var mesh)) meshes[key] = mesh = new Surface(build, trunk, outfit, rest).Build();
         parent.AddChild(skeleton);
-        skeleton.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = material ??= CreateMaterial(), Skin = skin, Skeleton = new NodePath("..") });
+        skeleton.AddChild(new MeshInstance3D { Name = "HumanBody", Mesh = mesh, MaterialOverride = material ??= CreateMaterial(), Skin = skin, Skeleton = new NodePath("..") });
     }
 
     public void Chest(Transform3D chest) => Set(Bone.Chest, chest * chestRest);
@@ -66,18 +81,18 @@ internal sealed class JoinedHuman {
     private static Transform3D[] RestPose(BodyBuild build) {
         var rest = new Transform3D[Bones.Length];
         rest[(int)Bone.Pelvis] = Transform3D.Identity;
-        rest[(int)Bone.Chest] = At(Vector3.Up * build.WaistHeight);
+        rest[(int)Bone.Chest] = At(Vector3.Up * build.Waist);
         foreach (bool left in new[] { true, false }) {
             int arm = (int)(left ? Bone.LeftShoulder : Bone.RightShoulder);
             rest[arm] = new Transform3D(ShoulderBasis(left), build.Shoulder(left));
             rest[(int)(left ? Bone.LeftSocket : Bone.RightSocket)] = rest[arm];
             rest[(int)UnderarmBone(left)] = rest[(int)Bone.Chest];
-            rest[arm + 1] = rest[arm] * At(Vector3.Down * build.UpperArmLength);
-            rest[arm + 2] = rest[arm + 1] * At(new Vector3(0, .05f - build.GripLength, ActorRig.Palm));
+            rest[arm + 1] = rest[arm] * At(Vector3.Down * build.UpperArm);
+            rest[arm + 2] = rest[arm + 1] * At(new Vector3(0, ActorRig.WristAboveFist - build.Forearm, ActorRig.Palm));
             int leg = (int)(left ? Bone.LeftHip : Bone.RightHip);
             rest[leg] = At(build.Hip(left));
             rest[leg + 1] = rest[leg] * At(Vector3.Down * ActorAnimation.Thigh);
-            rest[leg + 2] = rest[leg + 1] * At(Vector3.Down * build.ShinLength);
+            rest[leg + 2] = rest[leg + 1] * At(Vector3.Down * build.Shin);
         }
         return rest;
     }
@@ -106,57 +121,60 @@ internal sealed class JoinedHuman {
 
     private readonly record struct Vertex(Vector3 Point, Paint Paint, Weights Weights);
 
-    private sealed class Surface(BodyBuild build, Outfit outfit, Transform3D[] rest) {
+    private sealed class Surface(BodyBuild build, JoinedTrunk trunk, Outfit outfit, Transform3D[] rest) {
         private readonly List<Vertex> vertices = new();
         private readonly List<int> triangles = new();
 
         public ArrayMesh Build() {
-            var trunk = build.Trunk ?? throw new ArgumentException("The joined body needs a trunk profile.", nameof(build));
-            var topPaint = Paints(HumanShape.TrunkPalette(outfit));
-            int top = Array.FindIndex(trunk, ring => AtHeight(ring, .379f));
-            int bottom = Array.FindIndex(trunk, ring => AtHeight(ring, .305f));
-            int pelvis = Array.FindIndex(trunk, ring => AtHeight(ring, .028f));
-            if (top <= 0 || bottom - top != 4 || pelvis <= bottom)
-                throw new ArgumentException("The trunk profile must contain the shoulder and hip rims.", nameof(build));
-            var rows = new int[pelvis + 1][];
-            for (int i = 0; i <= pelvis; i++) {
-                var ring = trunk[i] with { Y = trunk[i].Y + HumanShape.TrunkOrigin };
-                float chestWeight = Mathf.SmoothStep(build.WaistHeight - .065f, build.WaistHeight + .065f, ring.Y);
-                rows[i] = Row(ring, Transform3D.Identity, Sample(topPaint, ring.Tone), Weights.Between(Bone.Pelvis, Bone.Chest, chestWeight));
-                if (i < 1) continue;
-                bool shoulders = i > top && i <= bottom;
-                Sew(rows[i - 1], rows[i], shoulders);
+            var rings = trunk.Rings;
+            int top = ShoulderOpening(rings);
+            var paints = Paints(HumanShape.TrunkTones(outfit));
+            var rows = new int[rings.Length][];
+            for (int i = 0; i < rings.Length; i++) {
+                var ring = rings[i];
+                var weights = Weights.Between(Bone.Pelvis, Bone.Chest, ActorShape.PastJoint(ring.Y, build.Waist));
+                rows[i] = Row(ring, Transform3D.Identity, Sample(paints, ring.Tone), weights);
+                if (i > 0) Sew(rows[i - 1], rows[i], i > top && i < top + OpeningRows);
             }
             Close(rows[0], true);
-            int[] crotch = Crotch(rows[pelvis]);
+            int[] crotch = Crotch(rows[^1]);
             foreach (bool left in new[] { true, false }) {
-                AddArm(ShoulderRim(rows, top, bottom, left), left);
-                AddLeg(HipRim(rows[pelvis], crotch, left), left);
+                AddArm(ShoulderRim(rows, top, left), left);
+                AddLeg(HipRim(rows[^1], crotch, left), left);
             }
             return Finish();
         }
 
-        private static bool AtHeight(Ring ring, float y) => Math.Abs(ring.Y + HumanShape.TrunkOrigin - y) < .0001f;
+        /// <summary>The first of the trunk's rings that the arms' openings take: those within the trunk's reach of the shoulder.</summary>
+        private int ShoulderOpening(Ring[] rings) {
+            float highest = build.ShoulderUp + trunk.ShoulderAbove, lowest = build.ShoulderUp - trunk.ShoulderBelow;
+            int top = Array.FindIndex(rings, ring => ring.Y <= highest);
+            int count = Array.FindAll(rings, ring => ring.Y <= highest && ring.Y >= lowest).Length;
+            if (top <= 0 || count != OpeningRows)
+                throw new ArgumentException($"The arm's opening takes {OpeningRows} trunk rings below the neck, found {count}.", nameof(trunk));
+            return top;
+        }
 
         // The rectangular openings each have 12 edges. The rims follow the same winding as the arm sections.
-        private int[] ShoulderRim(int[][] rows, int top, int bottom, bool left) {
-            int side = left ? 0 : Sides / 2;
+        private int[] ShoulderRim(int[][] rows, int top, bool left) {
+            int side = left ? LeftSide : RightSide;
             int front = (side + (left ? 1 : -1) + Sides) % Sides;
             int back = (side + (left ? -1 : 1) + Sides) % Sides;
-            int[] rim = [rows[top][side], rows[top][front], rows[top + 1][front], rows[top + 2][front], rows[top + 3][front],
-                rows[bottom][front], rows[bottom][side], rows[bottom][back], rows[top + 3][back], rows[top + 2][back],
-                rows[top + 1][back], rows[top][back]];
+            int bottom = top + OpeningRows - 1;
+            var rim = new List<int>(Sides) { rows[top][side] };
+            for (int row = top; row <= bottom; row++) rim.Add(rows[row][front]);
+            rim.Add(rows[bottom][side]);
+            for (int row = bottom; row >= top; row--) rim.Add(rows[row][back]);
             // The chest sweeps out into the front fold, which is fuller than the hollow behind it.
-            for (int i = 4; i <= 8; i++) {
-                int offset = i - 6;
+            for (int offset = -2; offset <= 2; offset++) {
                 float fullness = 1 - offset * offset / 9f;
                 float fore = Math.Max(0, -offset) * .5f;
-                int index = rim[i];
+                int index = rim[Sides / 2 + offset];
                 var vertex = vertices[index];
                 var point = vertex.Point + fullness * new Vector3((left ? 1 : -1) * .015f, .005f + .010f * fore, .023f * fore);
                 vertices[index] = vertex with { Point = point, Weights = Weights.Between(Bone.Chest, UnderarmBone(left), .9f * fullness) };
             }
-            if (left) return rim;
+            if (left) return rim.ToArray();
             var reversed = new int[Sides];
             for (int i = 0; i < Sides; i++) reversed[i] = rim[(Sides + Sides / 2 - i) % Sides];
             return reversed;
@@ -164,38 +182,50 @@ internal sealed class JoinedHuman {
 
         // The leg openings share this centre line from the front of the pelvis under to its back.
         private int[] Crotch(int[] pelvis) {
-            var front = vertices[pelvis[3]];
-            return [
-                Add(front with { Point = new Vector3(0, -.022f, .079f) }),
-                Add(front with { Point = new Vector3(0, -.068f, .041f) }),
-                Add(front with { Point = new Vector3(0, -.083f, .007f) }),
-                Add(front with { Point = new Vector3(0, -.066f, -.033f) }),
-                Add(front with { Point = new Vector3(0, -.018f, -.076f) }),
-            ];
+            if (trunk.Crotch.Length != Sides / 2 - 1)
+                throw new ArgumentException($"The crotch takes {Sides / 2 - 1} points, found {trunk.Crotch.Length}.", nameof(trunk));
+            var front = vertices[pelvis[Front]];
+            var between = (build.Hip(true) + build.Hip(false)) / 2;
+            return Array.ConvertAll(trunk.Crotch, point => Add(front with { Point = between + point }));
         }
 
-        private static int[] HipRim(int[] pelvis, int[] crotch, bool left) => left
-            ? [pelvis[0], pelvis[1], pelvis[2], pelvis[3], crotch[0], crotch[1], crotch[2], crotch[3], crotch[4], pelvis[9], pelvis[10], pelvis[11]]
-            : [crotch[2], crotch[1], crotch[0], pelvis[3], pelvis[4], pelvis[5], pelvis[6], pelvis[7], pelvis[8], pelvis[9], crotch[4], crotch[3]];
+        /// <summary>
+        /// A leg's opening: the pelvis rim on its own side from front to back, closed by the crotch line between the legs.
+        /// </summary>
+        private static int[] HipRim(int[] pelvis, int[] crotch, bool left) {
+            int middle = crotch.Length / 2;
+            var rim = new List<int>(Sides);
+            if (left) {
+                for (int i = LeftSide; i <= Front; i++) rim.Add(pelvis[i]);
+                rim.AddRange(crotch);
+                for (int i = Sides - Front; i < Sides; i++) rim.Add(pelvis[i]);
+            } else {
+                for (int i = middle; i >= 0; i--) rim.Add(crotch[i]);
+                for (int i = Front; i <= Sides - Front; i++) rim.Add(pelvis[i]);
+                for (int i = crotch.Length - 1; i > middle; i--) rim.Add(crotch[i]);
+            }
+            return rim.ToArray();
+        }
 
         private void AddArm(int[] rim, bool left) {
             var shoulder = left ? Bone.LeftShoulder : Bone.RightShoulder;
             var socket = left ? Bone.LeftSocket : Bone.RightSocket;
             var elbow = left ? Bone.LeftElbow : Bone.RightElbow;
             var wrist = left ? Bone.LeftWrist : Bone.RightWrist;
-            var colors = Paints(HumanShape.ArmPalette(outfit.Top, outfit.Skin, outfit.Sleeves));
-            var rings = left ? build.LeftArm : build.RightArm;
+            var paints = Paints(HumanShape.ArmTones(outfit.Top, outfit.Skin, outfit.Sleeves));
+            // The arm's own rings run from where the trunk's opening reaches them down to the palm above the wrist.
+            float palm = build.UpperArm + build.Forearm - ActorRig.WristAboveFist - Palm[0].Y;
             int[] previous = rim;
-            foreach (var ring in rings) {
-                if (ring.Y > -.074f || ring.Y < -.427f) continue;
-                float bend = Mathf.SmoothStep(build.UpperArmLength - .065f, build.UpperArmLength + .065f, -ring.Y);
-                var weight = -ring.Y < .15f
-                    ? Weights.Between(socket, shoulder, Mathf.SmoothStep(.08f, .15f, -ring.Y))
-                    : Weights.Between(shoulder, elbow, bend);
+            foreach (var ring in left ? build.LeftArm : build.RightArm) {
+                float along = -ring.Y;
+                if (along < trunk.LimbSeam || along > palm) continue;
+                var weight = along < .15f
+                    ? Weights.Between(socket, shoulder, Mathf.SmoothStep(.08f, .15f, along))
+                    : Weights.Between(shoulder, elbow, ActorShape.PastJoint(along, build.UpperArm));
                 // Leave room against the ribcage when the arm hangs close to the body.
-                float ease = .010f * (1 - Mathf.SmoothStep(.075f, .17f, -ring.Y));
+                float ease = .010f * (1 - Mathf.SmoothStep(.075f, .17f, along));
                 var profile = ring with { Width = ring.Width - ease, Sideways = ring.Sideways + (left ? ease : -ease) };
-                var row = Row(profile, rest[(int)shoulder], Sample(colors, ring.Tone), weight);
+                var row = Row(profile, rest[(int)shoulder], Sample(paints, ring.Tone), weight);
                 if (previous == rim) {
                     var inner = Bridge(rim, row, .29f, Bone.Chest, socket, 0);
                     var outer = Bridge(rim, row, .34f, Bone.Chest, socket, 1);
@@ -212,6 +242,7 @@ internal sealed class JoinedHuman {
 
         /// <summary>Rounds the hollow on the underside of the arm as it leaves the chest.</summary>
         private void RoundArmFold(int[] row, bool left, float rise) {
+            // An arm's rings lie turned out to its side, so the underside is half way round on the left arm.
             int crease = left ? Sides / 2 : 0;
             for (int offset = -2; offset <= 2; offset++) {
                 int index = row[(Sides + crease + offset) % Sides];
@@ -229,12 +260,7 @@ internal sealed class JoinedHuman {
 
         private void AddPalm(int[] previous, Bone elbow, Bone wrist) {
             var skin = new Paint(new Color(outfit.Skin), 0);
-            Ring[] palm = [
-                new(.008f, .017f, .019f, Colors.White), new(-.005f, .014f, .022f, Colors.White),
-                new(-.019f, .013f, .027f, Colors.White), new(-.04f, .013f, .028f, Colors.White),
-                new(-.061f, .011f, .025f, Colors.White), new(-.074f, .006f, .016f, Colors.White),
-            ];
-            foreach (var ring in palm) {
+            foreach (var ring in Palm) {
                 float bend = 1 - Mathf.SmoothStep(-.019f, .021f, ring.Y);
                 var row = Row(ring, rest[(int)wrist], skin, Weights.Between(elbow, wrist, bend));
                 Sew(previous, row);
@@ -247,16 +273,17 @@ internal sealed class JoinedHuman {
             var hip = left ? Bone.LeftHip : Bone.RightHip;
             var knee = left ? Bone.LeftKnee : Bone.RightKnee;
             var ankle = left ? Bone.LeftAnkle : Bone.RightAnkle;
-            float length = ActorAnimation.Thigh + build.ShinLength;
-            var (rings, material) = HumanShape.LegShape(length, outfit, build, left);
-            var colors = Paints(material);
+            float length = ActorAnimation.Thigh + build.Shin;
+            var (rings, tones) = HumanShape.LegShape(length, outfit, build, left);
+            var paints = Paints(tones);
             int[] previous = rim;
             foreach (var ring in rings) {
-                if (ring.Y > -.081f) continue;
-                float bend = Mathf.SmoothStep(ActorAnimation.Thigh - .065f, ActorAnimation.Thigh + .065f, -ring.Y);
-                float shoe = Mathf.SmoothStep(length - .03f, length + .015f, -ring.Y);
+                float along = -ring.Y;
+                if (along < trunk.LimbSeam) continue;
+                float bend = ActorShape.PastJoint(along, ActorAnimation.Thigh);
+                float shoe = ActorShape.PastAnkle(along, length);
                 var weights = new Weights(hip, knee, ankle, bend * (1 - shoe), bend * shoe);
-                var row = Row(ring, rest[(int)hip], Sample(colors, ring.Tone), weights);
+                var row = Row(ring, rest[(int)hip], Sample(paints, ring.Tone), weights);
                 if (previous == rim) {
                     var seat = Bridge(rim, row, .24f, Bone.Pelvis, hip, .24f);
                     var crease = Bridge(rim, row, .52f, Bone.Pelvis, hip, .52f);
@@ -290,13 +317,7 @@ internal sealed class JoinedHuman {
 
         private int[] Row(Ring ring, Transform3D rest, Paint paint, Weights weights) {
             var row = new int[Sides];
-            for (int i = 0; i < Sides; i++) {
-                float angle = Mathf.Tau * i / Sides, x = MathF.Cos(angle), z = MathF.Sin(angle);
-                float front = Math.Max(z, 0);
-                float lobe = 6.75f * x * x * front * front * front * front * ring.FrontLobes;
-                var point = new Vector3(ring.Width * x + ring.Sideways, ring.Y, ring.Depth * z + ring.Forward + lobe);
-                row[i] = Add(new Vertex(rest * point, paint, weights));
-            }
+            for (int i = 0; i < Sides; i++) row[i] = Add(new Vertex(rest * ring.Point(i, Sides), paint, weights));
             return row;
         }
 
@@ -317,9 +338,10 @@ internal sealed class JoinedHuman {
             return index;
         }
 
+        /// <summary>Sews two rings together; beside the arms, it leaves open the faces either side of each side's point.</summary>
         private void Sew(int[] upper, int[] lower, bool openings = false) {
             for (int i = 0; i < Sides; i++) {
-                if (openings && i is 11 or 0 or 5 or 6) continue;
+                if (openings && i % (Sides / 2) is 0 or Sides / 2 - 1) continue;
                 int next = (i + 1) % Sides;
                 Triangle(upper[i], lower[i], upper[next]);
                 Triangle(upper[next], lower[i], lower[next]);
@@ -363,13 +385,7 @@ internal sealed class JoinedHuman {
             return surface.Commit();
         }
 
-        private static Paint[] Paints(StandardMaterial3D material) {
-            using var color = material.AlbedoTexture.GetImage();
-            using var mask = material.DetailMask.GetImage();
-            var paints = new Paint[color.GetWidth()];
-            for (int i = 0; i < paints.Length; i++) paints[i] = new Paint(color.GetPixel(i, 0), mask.GetPixel(i, 0).R);
-            return paints;
-        }
+        private static Paint[] Paints(Tone[] tones) => Array.ConvertAll(tones, tone => new Paint(new Color(tone.Color), tone.Cloth ? 1 : 0));
 
         private static Paint Sample(Paint[] paints, float tone) => paints[Math.Clamp((int)(tone * paints.Length), 0, paints.Length - 1)];
     }

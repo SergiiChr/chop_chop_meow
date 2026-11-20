@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -30,114 +29,8 @@ public static class AnimationChecks {
         CheckEveryMomentOfAStrideHasAPose();
         CheckDiggingKeepsBothFeetWhereTheyStand();
         CheckAHandReachesItsPointWithTheElbowTheWayAsked();
-        CheckAHandReachesItsPointFromAShruggedShoulder();
-        CheckDancersHoldAndChangePosesTogether();
-        CheckDancersDipTogetherOnTheBeat();
-        CheckLongerShinsKeepAPlantedFoot();
-        CheckTheChestBendsAboveAStablePelvis();
-        CheckTheDancerBodyHasClosedJoints();
+        CheckAHandReachesItsPointOnTheSlimBuild();
         CheckPosingAllocatesNothing();
-    }
-
-    /// <summary>The dancers share pose changes, with time to read a pose and quicker changes through a flourish.</summary>
-    private static void CheckDancersHoldAndChangePosesTogether() {
-        var lead = CatgirlDance.Solo(0);
-        var sides = CatgirlDance.Chorus(0);
-        int lastChange = 0, shortestHold = 4, longestHold = 0;
-        for (int frame = 1; frame < 150; frame++) {
-            float time = frame / 30f;
-            var nextLead = CatgirlDance.Solo(time);
-            var nextSides = CatgirlDance.Chorus(time);
-            Require((nextLead == lead) == (nextSides == sides), $"lead and chorus should change pose together at frame {frame}");
-            if (nextLead == lead) continue;
-            int hold = frame - lastChange;
-            Require(hold >= 2 && hold <= 4, $"pose from frame {lastChange} should hold for two to four frames, held for {hold}");
-            shortestHold = Math.Min(shortestHold, hold);
-            longestHold = Math.Max(longestHold, hold);
-            lastChange = frame;
-            lead = nextLead;
-            sides = nextSides;
-        }
-        Require(shortestHold == 2 && longestHold == 4 && lastChange >= 146,
-            "both quick and slow pose changes should play across the dance");
-    }
-
-    /// <summary>The center and side dancers put weight into the same accented poses.</summary>
-    private static void CheckDancersDipTogetherOnTheBeat() {
-        foreach (int frame in new[] { 13, 40, 93, 147 }) {
-            float before = (frame - 3) / 30f, on = frame / 30f, after = (frame + 4) / 30f;
-            float lead = CatgirlDance.Solo(on).Pose.HipHeight;
-            float sides = CatgirlDance.Chorus(on).Pose.HipHeight;
-            Require(lead < CatgirlDance.Solo(before).Pose.HipHeight && lead < CatgirlDance.Solo(after).Pose.HipHeight,
-                $"the lead should dip and rebound at frame {frame}");
-            Require(sides < CatgirlDance.Chorus(before).Pose.HipHeight && sides < CatgirlDance.Chorus(after).Pose.HipHeight,
-                $"the sides should dip and rebound at frame {frame}");
-        }
-    }
-
-    /// <summary>Check the skinned ankle positions throughout the phrase, including poses with one foot in the air.</summary>
-    private static void CheckLongerShinsKeepAPlantedFoot() {
-        var rig = new ActorRig(ActorRig.OutfitOf(ActorSkin.Player), HumanShape.Slim, joinBody: true);
-        var skeleton = rig.Torso.GetNode<Skeleton3D>("JoinedHuman");
-        int hip = skeleton.FindBone("LeftHip"), knee = skeleton.FindBone("LeftKnee");
-        int left = skeleton.FindBone("LeftAnkle"), right = skeleton.FindBone("RightAnkle");
-        float thigh = Distance(hip, knee), shin = Distance(knee, left);
-        Require(shin / thigh is > 1.05f and < 1.12f, $"the dancers' shins should be slightly longer than their thighs, got {shin / thigh:0.00}");
-        for (int frame = 0; frame < 160; frame++) {
-            CheckFrame(CatgirlDance.Solo(frame / 30f), frame, "soloist");
-            CheckFrame(CatgirlDance.Chorus(frame / 30f), frame, "chorus");
-        }
-        rig.Root.Free();
-
-        float Distance(int from, int to) => skeleton.GetBoneRest(from).Origin.DistanceTo(skeleton.GetBoneRest(to).Origin);
-
-        void CheckFrame(DanceFrame dance, int frame, string dancer) {
-            rig.Show(dance.Pose, null, false);
-            rig.TurnHips(dance.Hips.X, dance.Hips.Y, dance.Hips.Z);
-            rig.PoseJoinedBody(Transform3D.Identity, Transform3D.Identity);
-            var torso = rig.Torso.GetParent<Node3D>().Transform * rig.Torso.Transform;
-            float lowest = Math.Min((torso * skeleton.GetBonePosePosition(left)).Y, (torso * skeleton.GetBonePosePosition(right)).Y);
-            Require(Math.Abs(lowest - .05f) < .002f, $"the {dancer} should plant a foot at frame {frame}, lowest ankle is {lowest:0.000} m");
-        }
-    }
-
-    private static void CheckTheChestBendsAboveAStablePelvis() {
-        var dancer = new Catgirl(CatgirlOutfit.Blouse, Vector3.Zero);
-        var skeleton = dancer.Rig.Torso.GetNode<Skeleton3D>("JoinedHuman");
-        int pelvis = skeleton.FindBone("Pelvis"), chest = skeleton.FindBone("Chest");
-        var hip = new Vector3(.09f, .04f, -.03f);
-        var collar = new Vector3(.06f, .43f, .02f);
-        dancer.Show(new DanceFrame(), 0);
-        var hipAtRest = Skin(pelvis, hip);
-        var collarAtRest = Skin(chest, collar);
-        dancer.Show(new DanceFrame { Chest = new Vector3(-10, 16, 14) }, 0);
-        Require(Skin(pelvis, hip).DistanceTo(hipAtRest) < .001f, "the pelvis should stay over the legs when the chest bends");
-        Require(Skin(chest, collar).DistanceTo(collarAtRest) > .04f, "the collar should follow the chest as it bends");
-        dancer.Rig.Root.Free();
-
-        Vector3 Skin(int bone, Vector3 point) =>
-            skeleton.GetBonePose(bone) * (skeleton.GetBoneRest(bone).AffineInverse() * point);
-    }
-
-    private static void CheckTheDancerBodyHasClosedJoints() {
-        var rig = new ActorRig(ActorRig.OutfitOf(ActorSkin.Player), HumanShape.Slim, joinBody: true);
-        var mesh = rig.Torso.GetNode<Skeleton3D>("JoinedHuman").GetChild<MeshInstance3D>(0).Mesh;
-        var indices = mesh.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Index].AsInt32Array();
-        var edges = new Dictionary<(int Low, int High), (int Count, int Winding)>();
-        for (int i = 0; i < indices.Length; i += 3) {
-            AddEdge(indices[i], indices[i + 1]);
-            AddEdge(indices[i + 1], indices[i + 2]);
-            AddEdge(indices[i + 2], indices[i]);
-        }
-        Require(edges.Values.All(edge => edge is (2, 0)), "each edge of the dancer's body should join two faces with opposite winding");
-        Require(indices.Distinct().Count() - edges.Count + indices.Length / 3 == 2, "the dancer's body should be one closed surface");
-        rig.Root.Free();
-
-        void AddEdge(int from, int to) {
-            var key = (Math.Min(from, to), Math.Max(from, to));
-            var edge = edges.GetValueOrDefault(key);
-            edges[key] = (edge.Count + 1, edge.Winding + (from < to ? 1 : -1));
-        }
     }
 
     /// <summary>Every worker and player in the world is posed every frame, so working out a pose makes no garbage.</summary>
@@ -270,21 +163,19 @@ public static class AnimationChecks {
     }
 
     /// <summary>
-    /// On the slim build, a fist that <c>ArmReach.WithHandAt</c> places from a shrugged shoulder reaches its point.
+    /// On the slim build, a fist that <c>ArmReach.WithHandAt</c> places from that build's shoulders and arms reaches its point.
     /// </summary>
-    private static void CheckAHandReachesItsPointFromAShruggedShoulder() {
-        const float up = .03f, forward = .02f;
+    private static void CheckAHandReachesItsPointOnTheSlimBuild() {
         var build = HumanShape.Slim;
         var rig = new ActorRig(ActorRig.OutfitOf(ActorSkin.Player), build);
         foreach (bool left in new[] { true, false }) {
             float side = left ? 1 : -1;
             var aim = new Vector3(.05f * side, .55f, .3f);
-            var (pose, roll) = ArmReach.WithHandAt(new Pose(), left, aim, new Vector3(side, -1, 0), build, up, forward);
+            var (pose, roll) = ArmReach.WithHandAt(new Pose(), left, aim, new Vector3(side, -1, 0), build);
             rig.Show(pose, null, false);
-            rig.MoveShoulder(left, up, forward);
             rig.RollArm(left, roll);
-            float miss = (rig.Fist(left) - Vector3.Up * pose.HipHeight).DistanceTo(aim);
-            Require(miss < .005f, $"a {(left ? "left" : "right")} fist should reach {aim} from a shrugged shoulder: it missed by {miss:0.000} m");
+            float miss = (rig.Fist(left) - Vector3.Up * pose.HipHeightFor(build.Shin)).DistanceTo(aim);
+            Require(miss < .005f, $"a {(left ? "left" : "right")} fist should reach {aim} on the slim build: it missed by {miss:0.000} m");
         }
         rig.Root.Free();
     }

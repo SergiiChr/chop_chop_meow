@@ -6,7 +6,32 @@ namespace ChopChopMeow;
 
 /// <summary>Smooth elliptical profiles, with optional two-bone weights across a limb's joint.</summary>
 internal static class ActorShape {
-    internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0, float Tone = 0, float FrontLobes = 0);
+    /// <param name="FrontLobes">
+    /// How far two broad curves stand out from the front of the ring, either side of its middle.
+    /// Only the joined body draws them (<see cref="JoinedHuman"/>), which shades them by its faces.
+    /// </param>
+    internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0, float Tone = 0, float FrontLobes = 0) {
+        /// <summary>The ring's point on one of <paramref name="sides"/> equal turns around it, from +X toward +Z.</summary>
+        public Vector3 Point(int side, int sides) {
+            float angle = Mathf.Tau * side / sides, x = MathF.Cos(angle), z = MathF.Sin(angle);
+            return new Vector3(Width * x + Sideways, Y, Depth * z + Forward + FrontLobes * Lobe(x, z));
+        }
+
+        /// <summary>The share of <see cref="FrontLobes"/> that stands out at this direction around the ring.</summary>
+        private static float Lobe(float x, float z) => z > 0 ? 6.75f * x * x * z * z * z * z : 0;
+    }
+
+    /// <summary>How far the bones meet across a joint, either side of it, in metres along the limb.</summary>
+    private const float JointBlend = .065f;
+
+    /// <summary>
+    /// How much of a point <paramref name="along"/> a limb follows the bone past <paramref name="joint"/>: none well before
+    /// it, all well after it.
+    /// </summary>
+    public static float PastJoint(float along, float joint) => Mathf.SmoothStep(joint - JointBlend, joint + JointBlend, along);
+
+    /// <summary>How much of a point <paramref name="along"/> a leg turns with the foot below <paramref name="ankle"/>; the boot top flexes with the shin.</summary>
+    public static float PastAnkle(float along, float ankle) => Mathf.SmoothStep(ankle - .03f, ankle + .015f, along);
 
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
     private static readonly StandardMaterial3D Skin = ModelKit.Vertex(Surface.Flat, .85f);
@@ -101,9 +126,8 @@ internal static class ActorShape {
 
     /// <summary>Skins a ring to the upper bone, blending into the lower one across the joint and, past an ankle, into the foot.</summary>
     private static void SetWeights(SurfaceTool surface, float y, float joint, float ankle) {
-        float lower = Mathf.SmoothStep(joint - .065f, joint + .065f, -y);
-        // The boot top flexes with the shin; the rings from the ankle down turn with the foot.
-        float foot = ankle > 0 ? Mathf.SmoothStep(ankle - .03f, ankle + .015f, -y) : 0;
+        float lower = PastJoint(-y, joint);
+        float foot = ankle > 0 ? PastAnkle(-y, ankle) : 0;
         surface.SetBones(new[] { 0, 1, ankle > 0 ? 2 : 0, 0 });
         surface.SetWeights(new[] { 1 - lower, lower * (1 - foot), lower * foot, 0f });
     }
@@ -119,21 +143,13 @@ internal static class ActorShape {
             float height = above.Y - below.Y;
             for (int side = 0; side < sides; side++) {
                 float angle = Mathf.Tau * side / sides, x = MathF.Cos(angle), z = MathF.Sin(angle);
-                // Two broad curves peak off the centre of the front of the chest.
-                float lobe = 0, slope = 0;
-                if (z > 0 && (ring.FrontLobes != 0 || above.FrontLobes != 0 || below.FrontLobes != 0)) {
-                    float z2 = z * z;
-                    lobe = 6.75f * x * x * z2 * z2;
-                    slope = 13.5f * x * z2 * z * (2 * x * x - z2);
-                }
-                var tangent = new Vector3(-ring.Width * z, 0, ring.Depth * x + ring.FrontLobes * slope);
-                var down = new Vector3((below.Width - above.Width) * x + below.Sideways - above.Sideways, -height,
-                    (below.Depth - above.Depth) * z + below.Forward - above.Forward + (below.FrontLobes - above.FrontLobes) * lobe);
+                var tangent = new Vector3(-ring.Width * z, 0, ring.Depth * x);
+                var down = new Vector3((below.Width - above.Width) * x + below.Sideways - above.Sideways, -height, (below.Depth - above.Depth) * z + below.Forward - above.Forward);
                 surface.SetNormal(tangent.Cross(down).Normalized());
                 surface.SetColor(ring.Color);
                 surface.SetUV(new Vector2(ring.Tone, .5f));
                 if (joint > 0) SetWeights(surface, ring.Y, joint, ankle);
-                surface.AddVertex(new Vector3(ring.Width * x + ring.Sideways, ring.Y, ring.Depth * z + ring.Forward + ring.FrontLobes * lobe));
+                surface.AddVertex(ring.Point(side, sides));
             }
         }
         for (int row = 0; row < rings.Length - 1; row++)

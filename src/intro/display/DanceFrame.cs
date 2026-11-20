@@ -21,9 +21,8 @@ namespace ChopChopMeow;
 /// <param name="WristL">
 /// The left hand at the wrist: a bend toward its palm, a twist of the forearm and a tip toward the thumb, in degrees.
 /// </param>
-/// <param name="ShoulderL">How far the left shoulder is shrugged up and hunched forward, in metres.</param>
 /// <param name="Facing">Degrees her whole body is turned toward her left.</param>
 /// <param name="Depth">How far she has stepped toward the camera, in metres.</param>
 internal readonly record struct DanceFrame(Pose Pose, float RollL, float RollR, HandShape HandL, HandShape HandR, float Shift, float Swing, float Trail,
     Vector3 Chest = default, Vector3 Hips = default, Vector3 Head = default, Vector3 WristL = default, Vector3 WristR = default,
-    Vector2 ShoulderL = default, Vector2 ShoulderR = default, float Facing = 0, float Depth = 0);
+    float Facing = 0, float Depth = 0);

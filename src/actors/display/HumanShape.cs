@@ -12,10 +12,12 @@ namespace ChopChopMeow;
 /// </summary>
 internal static class HumanShape {
     private const float Cloth = 1f / 6, Middle = .5f, End = 5f / 6;
-    internal const float TrunkOrigin = .5f;
     private const float NeckTone = .125f, ShirtTone = .375f, BandTone = .625f, HipsTone = .875f;
     private static readonly Color Neutral = Colors.White;
     private static readonly Dictionary<string, StandardMaterial3D> palettes = new();
+
+    /// <summary>One colour of a palette, and whether it is cloth, which takes the weave, or bare skin and shoes.</summary>
+    internal readonly record struct Tone(string Color, bool Cloth);
     private static readonly Ring[] hips = {
         new(.13f,.13f,.085f,Neutral),new(.08f,.155f,.1f,Neutral),
         new(.02f,.165f,.09f,Neutral),new(-.015f,.165f,.088f,Neutral)
@@ -54,13 +56,11 @@ internal static class HumanShape {
     public static BodyBuild Slim => SlimBuild.Build;
 
     private static class SlimBuild {
+        // Down to the rim the legs hang from; the leg openings take the body on from there.
         private static readonly Ring[] hips = {
             new(.105f, .098f, .075f, Neutral, .022f), new(.086f, .107f, .082f, Neutral, .017f),
             new(.066f, .116f, .089f, Neutral, .012f), new(.046f, .123f, .096f, Neutral, .005f),
-            new(.028f, .127f, .101f, Neutral, -.001f), new(.013f, .128f, .104f, Neutral, -.003f),
-            new(-.003f, .121f, .102f, Neutral, -.003f), new(-.020f, .107f, .094f, Neutral, -.001f),
-            new(-.037f, .087f, .079f, Neutral, .002f), new(-.054f, .06f, .061f, Neutral, .007f),
-            new(-.068f, .039f, .046f, Neutral, .008f), new(-.083f, .016f, .021f, Neutral, .005f),
+            new(.028f, .127f, .101f, Neutral, -.001f),
         };
         // Front and profile sections from the shoulder girdle through the ribcage into the waist.
         private static readonly Ring[] chest = {
@@ -134,22 +134,25 @@ internal static class HumanShape {
         };
 
         public static readonly BodyBuild Build = new(hips, chest, legs, Arm(-1), Arm(1), .123f, 1, .011f, face) {
-            HipSide = .077f,
-            ShinLength = .42f,
-            ShoulderHeight = .35f,
+            LegSide = .077f,
+            Shin = .42f,
+            ShoulderUp = .35f,
             ShoulderDepth = -.032f,
-            UpperArmLength = .221f,
-            GripLength = .275f,
-            WaistHeight = .113f,
+            UpperArm = .221f,
+            Forearm = .275f,
+            Waist = .113f,
             HeadOffset = new(0, .42f, .008f),
             HeadScale = new(.675f, .87f, .76f),
             RightLeg = Array.ConvertAll(legs, ring => ring with { Sideways = -ring.Sideways }),
-            Trunk = [
-                .. Array.ConvertAll(neck, ring => ring with { Y = ring.Y - TrunkOrigin }),
-                .. Array.ConvertAll(chest, ring => ring with { Y = ring.Y - TrunkOrigin, Tone = ShirtTone }),
-                .. Array.ConvertAll(waistband, ring => ring with { Y = ring.Y - TrunkOrigin }),
-                .. Array.ConvertAll(hips, ring => ring with { Y = ring.Y - TrunkOrigin, Tone = HipsTone }),
-            ],
+            // The arm's opening takes the five chest rings from the collarbone down past the armpit.
+            Trunk = new([
+                .. neck,
+                .. Array.ConvertAll(chest, ring => ring with { Tone = ShirtTone }),
+                .. waistband,
+                .. Array.ConvertAll(hips, ring => ring with { Tone = HipsTone }),
+            ], ShoulderAbove: .035f, ShoulderBelow: .06f, LimbSeam: .055f, Crotch: [
+                new(0, -.002f, .079f), new(0, -.048f, .041f), new(0, -.063f, .007f), new(0, -.046f, -.033f), new(0, .002f, -.076f),
+            ]),
         };
 
         /// <summary>The round shoulder draws into the slimmer elbow, with a fuller forearm just below it.</summary>
@@ -168,43 +171,33 @@ internal static class HumanShape {
         };
     }
 
-    /// <summary>Builds the trunk and returns its skeleton when the waist bends.</summary>
-    public static Skeleton3D? Torso(Node3D pelvis, Node3D chest, Outfit outfit, BodyBuild build) {
-        if (build.Trunk is { } trunk) {
-            var skin = ActorShape.Limb(chest, trunk, TrunkOrigin - build.WaistHeight, TrunkPalette(outfit));
-            skin.Position = Vector3.Up * TrunkOrigin;
-            skin.GetChild<MeshInstance3D>(0).Name = "HumanTorso";
-            return skin;
-        }
+    /// <param name="chest">
+    /// What turns at the waist: the build's chest goes on it, its hips on <paramref name="pelvis"/>.
+    /// </param>
+    public static void Torso(Node3D pelvis, Node3D chest, Outfit outfit, BodyBuild build) {
         ActorShape.Add(pelvis, build.Hips, material: ModelKit.Cloth(outfit.Hips)).Name = "HumanHips";
         ActorShape.Add(chest, build.Chest, material: ModelKit.Cloth(outfit.Top)).Name = "HumanTorso";
-        return null;
     }
 
-    internal static StandardMaterial3D TrunkPalette(Outfit outfit) {
-        bool textured = outfit.Sleeves != Sleeves.None;
+    /// <summary>The joined trunk's colours: the neck's skin, then the top, a waistband and the hips, all three woven.</summary>
+    internal static Tone[] TrunkTones(Outfit outfit) {
         string band = outfit.Top == outfit.Hips ? outfit.Hips : new Color(outfit.Hips).Darkened(.23f).ToHtml(false);
-        return Palette((outfit.Skin, false), (outfit.Top, textured), (band, textured), (outfit.Hips, false));
+        return [new(outfit.Skin, false), new(outfit.Top, true), new(band, true), new(outfit.Hips, true)];
     }
 
     /// <summary>Draws the leg's clothing on the same bending mesh as the leg itself.</summary>
     public static Skeleton3D Leg(Node3D parent, float joint, float ankle, Outfit outfit, BodyBuild build, bool left) {
-        var (rings, palette) = LegShape(ankle, outfit, build, left);
-        var skeleton = ActorShape.Limb(parent, rings, joint, palette, ankle);
+        var (rings, tones) = LegShape(ankle, outfit, build, left);
+        var skeleton = ActorShape.Limb(parent, rings, joint, Palette(tones), ankle);
         skeleton.GetChild<MeshInstance3D>(0).Name = "HumanLeg";
         return skeleton;
     }
 
-    internal static (Ring[] Profile, StandardMaterial3D Palette) LegShape(float ankle, Outfit outfit, BodyBuild build, bool left) {
+    /// <summary>A leg's rings and the colours they take, down to a sole <paramref name="ankle"/> below the hip.</summary>
+    internal static (Ring[] Profile, Tone[] Tones) LegShape(float ankle, Outfit outfit, BodyBuild build, bool left) {
         var rings = left ? build.Leg : build.RightLeg ?? build.Leg;
-        StandardMaterial3D palette;
-        if (outfit.Socks is { } socks) {
-            rings = WithSocks(rings, .043f - ankle);
-            palette = Palette((outfit.Legs ?? outfit.Skin, false), (outfit.Skin, false), (socks, false), (outfit.Shoes, false));
-        } else {
-            palette = Palette(outfit.Legs ?? outfit.Skin, outfit.Shoes, "302d29", false, outfit.Legs is not null);
-        }
-        return (rings, palette);
+        if (outfit.Socks is not { } socks) return (rings, Tones(outfit.Legs ?? outfit.Skin, outfit.Shoes, "302d29", false, outfit.Legs is not null));
+        return (WithSocks(rings, .043f - ankle), [new(outfit.Legs ?? outfit.Skin, false), new(outfit.Skin, false), new(socks, false), new(outfit.Shoes, false)]);
     }
     /// <summary>The edges of the shorts, thigh-high socks and shoes follow the same leg as it bends.</summary>
     private static Ring[] WithSocks(Ring[] leg, float shoeTop) {
@@ -235,22 +228,24 @@ internal static class HumanShape {
     /// <param name="sleeves">How far the shirt covers the arm; with none it is all skin and no weave.</param>
     public static Skeleton3D Arm(Node3D parent, float joint, bool left, string shirt, string skin, Sleeves sleeves, BodyBuild build) {
         var rings = left ? build.LeftArm : build.RightArm;
-        var skeleton = ActorShape.Limb(parent, rings, joint, ArmPalette(shirt, skin, sleeves));
+        var skeleton = ActorShape.Limb(parent, rings, joint, Palette(ArmTones(shirt, skin, sleeves)));
         skeleton.GetChild<MeshInstance3D>(0).Name = left ? "HumanArmLeft" : "HumanArmRight";
         return skeleton;
     }
 
-    internal static StandardMaterial3D ArmPalette(string shirt, string skin, Sleeves sleeves) => sleeves switch {
-        Sleeves.None => Palette(skin, skin, skin, false, false),
-        Sleeves.Short => Palette(shirt, skin, skin, false),
-        _ => Palette(shirt, shirt, skin, true),
+    /// <summary>An arm's colours from the shoulder: sleeve, forearm and hand.</summary>
+    internal static Tone[] ArmTones(string shirt, string skin, Sleeves sleeves) => sleeves switch {
+        Sleeves.None => Tones(skin, skin, skin, false, false),
+        Sleeves.Short => Tones(shirt, skin, skin, false),
+        _ => Tones(shirt, shirt, skin, true),
     };
+
     /// <param name="middleCloth">Whether the middle tone is cloth too; the weave covers the cloth tones and leaves skin and boots smooth.</param>
     /// <param name="firstCloth">Whether the first tone is cloth; a bare leg's is skin.</param>
-    private static StandardMaterial3D Palette(string cloth, string middle, string end, bool middleCloth, bool firstCloth = true) =>
-        Palette((cloth, firstCloth), (middle, middleCloth), (end, false));
+    private static Tone[] Tones(string cloth, string middle, string end, bool middleCloth, bool firstCloth = true) =>
+        [new(cloth, firstCloth), new(middle, middleCloth), new(end, false)];
 
-    private static StandardMaterial3D Palette(params (string Color, bool Cloth)[] colors) {
+    private static StandardMaterial3D Palette(Tone[] colors) {
         string key = string.Join('|', colors);
         if (palettes.TryGetValue(key, out var material)) return material;
         // Texel centres map the mesh to skin, clothing and shoes. The second texture confines weaving to fabric.

@@ -435,11 +435,7 @@ public partial class WorldView {
 
     /// <summary>What he has on his screen: a web page of catgirls dancing, until the boss's voice breaks in.</summary>
     private void ScreenShot(float t, float dt) {
-        if (cut) {
-            OfficeLight();
-            hero.Root.Visible = false;
-            CueDanceBeat();
-        }
+        if (cut) { OfficeLight(); hero.Root.Visible = false; }
         office.Page.FrameStage(t / ScreenSeconds);
         OfficeAround();
         if (Reached(ScreenSeconds - BossHeardBefore, t, dt))
@@ -449,8 +445,6 @@ public partial class WorldView {
         Frame(screen + new Vector3(0, .01f, -.56f + .08f * Mathf.SmoothStep(0, ScreenSeconds, t)), screen, 34);
     }
 
-    private void CueDanceBeat() => Cue("intro/dance_beat", -11.5f);
-
     /// <summary>The soloist's dance alone: the page as tall as the picture, on black, and nothing else drawn.</summary>
     private void DanceShot(float t, float dt) {
         if (cut) {
@@ -458,7 +452,8 @@ public partial class WorldView {
             GetViewport().Disable3D = true;
             office.Page.Live = true;
             office.Page.Rehearse();
-            CueDanceBeat();
+            // The beat is only for timing the moves while the dance is worked on; the film has no music here.
+            Cue("intro/dance_beat", -11.5f);
             // The page is narrower than the picture, so black fills its sides.
             var backdrop = new ColorRect { Color = Colors.Black };
             var page = new TextureRect { Texture = office.Page.Picture.AlbedoTexture, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };
