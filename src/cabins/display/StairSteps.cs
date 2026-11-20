@@ -33,6 +33,9 @@ public static class StairSteps {
     // How much higher than its toe reaches the body may stand over a boot lifting off, by the time it is off the ground.
     private const float Unborne = .1f;
 
+    /// <summary>Seconds a body new to the steps is given to settle onto them in one frame, so it starts where it stands.</summary>
+    public const float Settle = 1;
+
     /// <summary>Half the width of a cabin's step, which lies centred on its door point, and how far in from the door point the door itself is.</summary>
     public const float StepHalfWidth = .5f, DoorDepth = .925f;
 

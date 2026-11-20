@@ -309,7 +309,7 @@ public partial class WorldView {
         var door = Doorways.DoorPoint(ReviewHut);
         float time = Elapsed % ReviewDoorwayLoop;
         // Starting over puts the player back on the ground in front of the cabin.
-        if (time < dt) { reviewActor.Lift = 0; reviewActor.LiftSpeed = 0; }
+        if (time < dt) reviewActor.OnSteps = false;
         int stage = ReviewDoorway.Length - 1;
         while (ReviewDoorway[stage].At > time) stage--;
         float start = ReviewDoorway[stage].At, end = stage + 1 < ReviewDoorway.Length ? ReviewDoorway[stage + 1].At : ReviewDoorwayLoop;

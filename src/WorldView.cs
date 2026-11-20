@@ -654,9 +654,10 @@ public partial class WorldView : Node3D {
         var pose = state.Pose;
         Vector3? jamb = null;
         if (door is DoorShown at) {
-            (pose, jamb) = DoorwayView.StandAt(pose, state, at, dt);
+            (pose, jamb) = DoorwayView.StandAt(pose, state, at, state.OnSteps ? dt : StairSteps.Settle);
             rig.Root.Position += Vector3.Up * state.Lift;
-        } else { state.Lift = 0; state.LiftSpeed = 0; }
+            state.OnSteps = true;
+        } else { state.Lift = 0; state.LiftSpeed = 0; state.OnSteps = false; }
         state.HipHeight = pose.HipHeight;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
@@ -1119,9 +1120,10 @@ public partial class WorldView : Node3D {
                 else {
                     var through = live ? doorways.Passing(t.Id) : null;
                     if (through != null) hut.Slam = through.DoorRush;
-                    if (dt > 0 && through != null && hut.Open == 0) {
-                        if (through.DoorRush) hut.SlamCue = Sounds?.Next("hut_door_escaping"); else Sounds?.Play("hut_door_normal", t.Pos);
-                    }
+                    if (dt > 0 && through is { DoorRush: false } && hut.Open == 0) Sounds?.Play("hut_door_normal", t.Pos);
+                    // A runner's slam is picked as they start through, also when the door has not yet shut behind the one before.
+                    if (dt > 0 && through is { DoorRush: true } && !hut.Passing) hut.SlamCue = Sounds?.Next("hut_door_escaping");
+                    if (dt > 0) hut.Passing = through != null;
                     bool slams = through == null && hut.Slam;
                     DoorwayView.SwingDoor(hut, through != null, dt, slams ? DoorwayView.SlamSeconds : Doorways.ShutSeconds, slams);
                     // The slam is heard as the door hits its frame, so its sound starts that far ahead: for a sound that builds up longer than the slam, while the runner is still in the doorway.

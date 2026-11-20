@@ -21,6 +21,8 @@ public sealed class ActorState {
     public float SteppingDown;
     /// <summary>How high the steps of a cabin's door lift the actor as last drawn, and how fast, in metres a second, that height is changing.</summary>
     public float Lift, LiftSpeed;
+    /// <summary>Whether the actor was drawn on a cabin's steps last frame; one that was not starts where it stands on them.</summary>
+    public bool OnSteps;
     /// <summary>How high the actor's hips stand above the ground it is posed on, as last drawn.</summary>
     public float HipHeight;
     public ActorAction Action;
@@ -36,6 +38,8 @@ public sealed class ActorState {
     public Vector3? Mark;
     /// <summary>That point in the rig's own frame as the rig was last placed, which the pose aims at.</summary>
     public Vector3? MarkInRig;
+    /// <summary>Where the action blended out of landed its blows in the rig's frame, which its pose keeps aiming at through the blend.</summary>
+    public Vector3? FromMarkInRig;
     /// <summary>Moves and poses the actor for a frame; it faces where it moves, or <paramref name="facingTarget"/> while standing or <paramref name="backing"/> away from it.</summary>
     public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt, bool backing = false) {
         float moved = position.DistanceTo(Position);
@@ -45,14 +49,14 @@ public sealed class ActorState {
         Turning.Step(ref Yaw, yaw, dt > 0 ? Math.Min(moved / dt, 8) : 0, dt, action == ActorAction.Run);
         Position = position;
         if (Action != action) {
-            From = Action; FromTime = Time; FromMoving = Moving; Blend = 0;
+            From = Action; FromTime = Time; FromMoving = Moving; FromMarkInRig = MarkInRig; Blend = 0;
             Action = action; Time = 0; PreviousTime = -1;
         } else { PreviousTime = Time; Time += ActorAnimation.Advance(action, dt, moved); }
         FromTime += ActorAnimation.Advance(From, dt, moved);
         Blend = Math.Min(1, Blend + dt / ActorAnimation.BlendSeconds);
         Moving = moving;
     }
-    public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend, MarkInRig);
+    public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend, MarkInRig, FromMarkInRig);
 
     /// <summary>True on the frame an action loop passes its impact moment.</summary>
     public bool Struck(float at) {

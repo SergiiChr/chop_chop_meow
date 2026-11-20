@@ -464,8 +464,6 @@ public static class CabinChecks {
     private const int Fps = 60;
     /// <summary>How near the ground a boot is that a pose has standing on it, in metres.</summary>
     private const float OnTheGround = .001f;
-    /// <summary>Seconds the steps check lets the body settle on the steps before its first frame, so it starts where it stands.</summary>
-    private const float StartSettled = 1;
 
     /// <summary>
     /// A cabin's door has two treads 14 cm high and then the floor, 40, 62 and 80 cm in from where a player stands at it,
@@ -488,7 +486,7 @@ public static class CabinChecks {
                 float depth = Mathf.Lerp(from, to, i / (float)frames), travelled = Math.Abs(to - from) * i / frames, time = seconds * i / frames;
                 var pose = ActorAnimation.PoseAt(action, ActorAnimation.Stride(action) > 0 ? ActorAnimation.Advance(action, 0, travelled) : time, from != to);
                 var flat = pose;
-                pose = StairSteps.OnSteps(pose, depth, up, facingIn != to > from, edges, rise, ref lift, ref speed, i == 0 ? StartSettled : 1f / Fps);
+                pose = StairSteps.OnSteps(pose, depth, up, facingIn != to > from, edges, rise, ref lift, ref speed, i == 0 ? StairSteps.Settle : 1f / Fps);
                 if (!float.IsNaN(top)) jump = Math.Max(jump, Math.Abs(lift + pose.HipHeight - top));
                 top = lift + pose.HipHeight;
                 float lowest = float.MaxValue;

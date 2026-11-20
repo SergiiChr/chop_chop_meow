@@ -58,18 +58,21 @@ public sealed class StrikePoints {
             var next = rig * ActorAnimation.Swing(action, i / (float)SwingSteps)!.Value;
             if (subject.Kind == ThingKind.Tree) {
                 // A trunk stands upright: the axe meets it where it comes within the trunk's thickness of its middle.
-                if (new Vector2(next.X - axis.X, next.Z - axis.Z).Length() <= trunk.Radius) return Into(last, next, at => new Vector2(at.X - axis.X, at.Z - axis.Z).Length() <= trunk.Radius);
+                if (InTrunk(next, axis, trunk.Radius)) return Into(last, next, axis, trunk.Radius);
             } else if (Across(prop, last, next) is float t) return last.Lerp(next, t);
             last = next;
         }
         return null;
     }
 
-    /// <summary>The first point between two places a swing passes where <paramref name="inside"/> holds, found by halving.</summary>
-    private static Vector3 Into(Vector3 outside, Vector3 inside, Func<Vector3, bool> isInside) {
+    /// <summary>Whether a point is within a trunk of <paramref name="radius"/> standing upright through <paramref name="axis"/>.</summary>
+    private static bool InTrunk(Vector3 at, Vector3 axis, float radius) => new Vector2(at.X - axis.X, at.Z - axis.Z).Length() <= radius;
+
+    /// <summary>The first point between two places a swing passes where it is within the trunk, found by halving.</summary>
+    private static Vector3 Into(Vector3 outside, Vector3 inside, Vector3 axis, float radius) {
         for (int i = 0; i < 12; i++) {
             var mid = outside.Lerp(inside, .5f);
-            if (isInside(mid)) inside = mid; else outside = mid;
+            if (InTrunk(mid, axis, radius)) inside = mid; else outside = mid;
         }
         return inside;
     }
@@ -149,11 +152,20 @@ public sealed class StrikePoints {
         return reach;
     }
 
+    /// <summary>The meshes <see cref="Meshes"/> last found, kept so a search makes no garbage.</summary>
+    private static readonly List<(Mesh Mesh, Transform3D Place)> found = new();
+
     /// <summary>Every mesh drawn under a node, with where it is placed in the world.</summary>
-    private static IEnumerable<(Mesh Mesh, Transform3D Place)> Meshes(Node node) {
-        if (node is MeshInstance3D { Mesh: Mesh mesh, Visible: true } drawn) yield return (mesh, drawn.GlobalTransform);
-        foreach (var child in node.GetChildren())
-            foreach (var found in Meshes(child)) yield return found;
+    private static List<(Mesh Mesh, Transform3D Place)> Meshes(Node node) {
+        found.Clear();
+        AddMeshes(node);
+        return found;
+    }
+
+    /// <summary>Adds the meshes drawn under a node to <see cref="found"/>, walking its children by index.</summary>
+    private static void AddMeshes(Node node) {
+        if (node is MeshInstance3D { Mesh: Mesh mesh, Visible: true } drawn) found.Add((mesh, drawn.GlobalTransform));
+        for (int i = 0; i < node.GetChildCount(); i++) AddMeshes(node.GetChild(i));
     }
 
     /// <summary>The distance along a line to the nearest or the farthest face of a mesh it crosses, or null when it crosses none.</summary>

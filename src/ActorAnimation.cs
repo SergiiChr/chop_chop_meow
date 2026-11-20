@@ -880,11 +880,14 @@ public static class ActorAnimation {
     /// <summary>How long a change of action blends from the old pose into the new one.</summary>
     public const float BlendSeconds = .22f;
 
-    /// <summary>The pose part way through a change of action, eased from the old action's pose at <paramref name="blend"/> 0 to the new one's at 1.</summary>
-    public static Pose Blended(ActorAction from, float fromTime, bool fromMoving, ActorAction to, float time, bool moving, float blend, Vector3? mark = null) {
+    /// <summary>
+    /// The pose part way through a change of action, eased from the old action's pose at <paramref name="blend"/> 0 to the new one's at 1.
+    /// The new action's blows land on <paramref name="mark"/> and the old one's on <paramref name="fromMark"/>.
+    /// </summary>
+    public static Pose Blended(ActorAction from, float fromTime, bool fromMoving, ActorAction to, float time, bool moving, float blend, Vector3? mark = null, Vector3? fromMark = null) {
         var now = PoseAt(to, time, moving, mark);
         if (blend >= 1) return now;
-        return Pose.Lerp(PoseAt(from, fromTime, fromMoving, mark), now, Mathf.SmoothStep(0, 1, blend));
+        return Pose.Lerp(PoseAt(from, fromTime, fromMoving, fromMark), now, Mathf.SmoothStep(0, 1, blend));
     }
 
     /// <summary>
