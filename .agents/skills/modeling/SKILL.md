@@ -13,6 +13,8 @@ description: Build, change, or review 3D models and their in-game icons for Chop
    Keep the source links for references found online.
    Show the same design from the front, side, and three-quarter view when shape or fit depends on the angle.
    Mark the scale, materials, and points that have to line up, such as grips, mounting feet, and openings.
+   For a roof-mounted barrel, use the cabin render to show the mount footprint and roof clearance.
+   For a bucket, show where the hand grips its handle.
 3. Build the model with Godot meshes in the existing shape builder or alongside related shapes.
    Reuse [ModelKit](../../../src/ModelKit.cs) primitives and materials and share meshes across uses when the shape is
    the same.

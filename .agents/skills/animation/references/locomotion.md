@@ -44,11 +44,6 @@ Use these notes when changing a walk, jog, sprint, or the transitions between th
 - A running elbow stays bent about 90°: tighter in front with the hand rising toward the chin, more open behind. Hands
   barely cross the body's middle.
 - Time the arms from the legs' phase so the two stay in step.
-- Work actions such as chopping move the whole body: the weight shifts from the back foot to the front as the tool comes
-  down.
-- A hand held close to its own shoulder or at the middle of the chest folds the arm into the torso, since an elbow folds
-  only forward. Keep work hands out in front or to their own side, and look at the `facing` view: a buried arm does not
-  show from the side.
 
 ## Trunk and head
 
@@ -60,8 +55,6 @@ Use these notes when changing a walk, jog, sprint, or the transitions between th
 ## This game's gait rig
 
 - The pelvis is part of the torso model, so it cannot turn or drop on its own.
-- Only the walk, jog and sprint set the ankle. Other actions leave the boot square to the shin, so toes can dip into the
-  ground at a steep shin.
 - The walk's, jog's and sprint's clocks move with distance through `ActorAnimation.Advance`, each `Stride` matched to
   the speed it is timed for: a change of a worker's, walking or sprint speed fails a check until the gait is retimed.
 - A gait's planted leg is solved from where its foot touches the ground, and its swinging leg is keyed. A key change can
