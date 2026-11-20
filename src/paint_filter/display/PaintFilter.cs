@@ -6,7 +6,8 @@ namespace ChopChopMeow;
 /// The paint filter: one full-screen pass of a Kuwahara filter over the drawn world, under the name tags and the
 /// interface, so the world looks painted.
 /// Hiding it skips its cost.
-/// Each pixel takes its colour from an area 9 render pixels across, half the shader's <c>kernel_size</c> to each side.
+/// Each pixel takes its colour from half the shader's <c>kernel_size</c> to each side.
+/// In the game that is an area 9 render pixels across.
 /// </summary>
 public partial class PaintFilter : CanvasLayer {
     private const string ShaderPath = "res://assets/environment/paint_filter/paint_filter.gdshader";

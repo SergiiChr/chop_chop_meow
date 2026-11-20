@@ -10,7 +10,7 @@ public static class ArmReach {
     /// With <paramref name="palm"/> it is what the fist holds that goes there, that far ahead of the forearm's line.
     /// </summary>
     public static (float Raise, float Out, float Elbow) ArmTo(Vector3 grip, bool left, float palm = 0) {
-        var reach = grip - new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
+        var reach = grip - HumanShape.Standard.Shoulder(left);
         // A held thing ahead of the forearm's line is reached by a slightly longer forearm bent a little further.
         const float upper = ActorRig.UpperArm;
         float fore = MathF.Sqrt(ActorRig.Forearm * ActorRig.Forearm + palm * palm);
@@ -67,12 +67,12 @@ public static class ArmReach {
     }
 
     /// <summary>
-    /// A pose with one arm bent so its fist lies on <paramref name="grip"/>, from the hips in the trunk's own frame,
-    /// with the elbow toward <paramref name="elbowToward"/>, and the roll of the arm to apply after it.
+    /// A pose with one arm bent so its fist lies on <paramref name="grip"/>, from the hips in the trunk's own frame.
+    /// The elbow points toward <paramref name="elbowToward"/>; the roll of the arm to apply after it comes too.
     /// <paramref name="shoulder"/> is where the shoulder is in that frame, the game's build at rest unless given.
     /// </summary>
     public static (Pose Pose, float Roll) WithHandAt(Pose pose, bool left, Vector3 grip, Vector3 elbowToward, Vector3? shoulder = null) {
-        var (raise, outward, elbow, roll) = ArmTo(grip, left, elbowToward, 0, shoulder);
+        var (raise, outward, elbow, roll) = ArmTo(grip, left, elbowToward, ActorRig.Palm, shoulder);
         return (WithArm(pose, left, raise, outward, elbow, 1), roll);
     }
 
@@ -86,5 +86,5 @@ public static class ArmReach {
 
     /// <summary>Where a shoulder is in the world for a pose, on a rig placed at <paramref name="root"/>.</summary>
     public static Vector3 Shoulder(Pose pose, Transform3D root, bool left) =>
-        root * (Vector3.Up * pose.HipHeight + TrunkBasis(pose) * new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0));
+        root * (Vector3.Up * pose.HipHeight + TrunkBasis(pose) * HumanShape.Standard.Shoulder(left));
 }

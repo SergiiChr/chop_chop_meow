@@ -6,8 +6,8 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// One neutral human core: outfits use palette textures while geometry and skin weights are shared.
-/// It comes in two builds: the game's, and a slim one for the intro film's catgirls with a waist, a bust, thinner
-/// limbs, narrower shoulders and wrists that end without a fist.
+/// It comes in the game's build and a slim one for the intro film's catgirls.
+/// The slim one has a waist, a bust, thinner limbs, narrower shoulders and wrists that end without a fist.
 /// </summary>
 internal static class HumanShape {
     private const float Cloth = 1f / 6, Middle = .5f, End = 5f / 6;

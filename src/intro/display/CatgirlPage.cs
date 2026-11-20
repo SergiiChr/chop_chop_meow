@@ -6,8 +6,8 @@ using static ChopChopMeow.ModelKit;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The web page on the hero's screen in the intro film: three catgirls dancing on a stage, the one in the middle a
-/// solo, inside a browser window.
+/// The web page on the hero's screen in the intro film: three catgirls dancing on a stage inside a browser window.
+/// The one in the middle dances a solo.
 /// The page is drawn in a world of its own, and <see cref="Picture"/> shows it on whatever wears that material.
 /// </summary>
 internal sealed class CatgirlPage {
@@ -48,13 +48,11 @@ internal sealed class CatgirlPage {
         };
         stage.AddChild(new WorldEnvironment { Environment = air });
         stage.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-42, 24, 0), LightEnergy = .55f, ShadowEnabled = true });
-        // The stage sits in the part of the page the browser's bars
-        // leave free, so the camera aims above the dancers' middle.
+        // The stage fills what the browser's bars leave free, so the camera aims above the dancers' middle.
         camera = new Camera3D { Position = new Vector3(0, 1.02f, 4.5f), Fov = 30 };
         stage.AddChild(camera);
         camera.Basis = Basis.LookingAt(new Vector3(0, .08f, -4.5f), Vector3.Up);
-        // A pink floor, and behind it a darker wall with a lighter disc
-        // on it and stars around the disc, which cast no shadows.
+        // A pink floor, and behind it a darker wall with a lighter disc and stars around it, which cast no shadows.
         Cylinder(stage, 2.6f, 2.6f, .05f, new Vector3(0, -.025f, 0), Mat("f3b4d2", .9f), sides: 32);
         var backdrop = Pivot(stage, Vector3.Zero);
         Box(backdrop, new Vector3(9, 5, .1f), new Vector3(0, 2, -1.9f), Mat("b8377c", .9f));
@@ -101,8 +99,7 @@ internal sealed class CatgirlPage {
     }
 
     /// <summary>
-    /// Shows the soloist alone, without the browser's window and
-    /// with the camera level on her, for working on her dance.
+    /// Shows the soloist alone, with no browser window and the camera level on her, for working on her dance.
     /// </summary>
     public void Rehearse() {
         browser.Visible = false;
@@ -111,8 +108,7 @@ internal sealed class CatgirlPage {
     }
 
     /// <summary>
-    /// Poses the page for a moment of the film, in seconds since
-    /// the solo began: the dances, the stars and the "LIVE" tag.
+    /// Poses the page for a moment, in seconds since the solo began: the dances, the stars and the "LIVE" tag.
     /// </summary>
     public void Play(float time) {
         var chorus = CatgirlDance.Chorus(time);

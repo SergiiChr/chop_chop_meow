@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 /// The turn of the left upper arm about its own length (<see cref="ActorRig.RollArm"/>), in degrees.
 /// </param>
 /// <param name="Shift">How far she has stepped to her left, in metres.</param>
-/// <param name="Swing">How far she sways to her left, from -1 to 1.</param>
+/// <param name="Swing">How far she sways to her left: 1 is a full sway, and a hard pop of the hips goes further.</param>
 /// <param name="Trail">The same a moment ago, for the tail's tip and tied hair that follow.</param>
 /// <param name="Chest">
 /// The chest on the belly: a lean forward, a twist toward her left and a tip toward her right shoulder, in degrees.

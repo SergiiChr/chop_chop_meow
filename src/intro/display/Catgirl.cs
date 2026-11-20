@@ -13,8 +13,8 @@ internal enum CatgirlOutfit { Maid, Shorts, Hoodie }
 internal enum HandShape { Open, Fist, Point, Ring }
 
 /// <summary>
-/// A catgirl dancing on the web page in the intro film: the game's person model in its slim build, with a face, hair,
-/// cat ears, a tail, hands with fingers and an outfit of her own.
+/// A catgirl dancing on the web page in the intro film: the game's person model in its slim build.
+/// She has a face, hair, cat ears, a tail, hands with fingers and an outfit of her own.
 /// The outfits are a maid's dress, a sleeveless shirt with shorts and knee socks, and a long hoodie.
 /// </summary>
 internal sealed class Catgirl {
@@ -64,8 +64,7 @@ internal sealed class Catgirl {
         var head = Rig.Head;
         StandardMaterial3D dark = Mat("2c2530"), iris = Mat(look.Eyes);
         foreach (float side in new[] { -1f, 1f }) {
-            // An eye follows the head's curve: white, iris, pupil and
-            // a glint, under a lash with a flick at its outer end.
+            // An eye follows the head's curve: white, iris, pupil and glint, under a lash flicked up at its outer end.
             var eye = Pivot(head, new Vector3(side * .047f, .135f, .106f), new Vector3(0, side * 12, 0));
             Box(eye, new Vector3(.04f, .044f, .008f), Vector3.Zero, snow);
             Box(eye, new Vector3(.03f, .037f, .009f), new Vector3(0, -.002f, .002f), iris);
@@ -142,16 +141,15 @@ internal sealed class Catgirl {
     }
 
     /// <summary>
-    /// What she wears over the body's own colours: what is above the
-    /// waist rides on the chest, the rest on the torso under it.
+    /// What she wears over the body's colours: things above the waist ride on the chest, the rest on the torso.
     /// </summary>
     private void BuildOutfit() {
         Node3D head = Rig.Head, torso = Rig.Torso, chest = Rig.Chest;
         StandardMaterial3D top = Cloth(look.Body.Top), hips = Cloth(look.Body.Hips), trim = Cloth(look.Trim);
         switch (outfit) {
             case CatgirlOutfit.Maid: {
-                    // A flared skirt over a petticoat, an apron with a bib, a waistband tied in a bow at the back,
-                    // puffed sleeves and a collar.
+                    // A flared skirt over a petticoat, an apron with a bib, and a waistband tied in a bow at the back.
+                    // Puffed sleeves and a collar.
                     Cylinder(torso, .3f, .1f, .3f, new Vector3(0, -.03f, 0), top, sides: 16);
                     Cylinder(torso, .31f, .29f, .03f, new Vector3(0, -.185f, 0), trim, sides: 16);
                     Box(torso, new Vector3(.2f, .25f, .012f), new Vector3(0, -.03f, .207f), trim, new Vector3(-33.7f, 0, 0));
@@ -171,8 +169,7 @@ internal sealed class Catgirl {
                     break;
                 }
             case CatgirlOutfit.Shorts: {
-                    // A sleeveless shirt: a cap over each shoulder where a sleeve
-                    // would start, a small collar and three buttons.
+                    // A sleeveless shirt: a cap over each shoulder where a sleeve would be, a collar and three buttons.
                     foreach (float side in new[] { -1f, 1f }) {
                         Sphere(chest, .05f, new Vector3(side * .14f, .455f, 0), top, new Vector3(.8f, .8f, 1.1f), 10);
                         Box(chest, new Vector3(.05f, .03f, .012f), new Vector3(side * .032f, .515f, .062f), top, new Vector3(-20, 0, side * 28));
@@ -190,9 +187,8 @@ internal sealed class Catgirl {
                     break;
                 }
             default: {
-                    // A hoodie several sizes too large, down to the thighs: its body in two lengths that overlap at the
-                    // waist, a hem
-                    // band, a hood, a pouch pocket and two cords.
+                    // A hoodie several sizes too large, down to the thighs, in two lengths that overlap at the waist.
+                    // It has a hem band, a hood, a pouch pocket and two cords.
                     Cylinder(torso, .2f, .174f, .33f, new Vector3(0, .095f, 0), top, sides: 14).Scale = new Vector3(1, 1, .78f);
                     Cylinder(chest, .18f, .155f, .3f, new Vector3(0, .34f, 0), top, sides: 14).Scale = new Vector3(1, 1, .78f);
                     Cylinder(torso, .205f, .2f, .05f, new Vector3(0, -.08f, 0), trim, sides: 14).Scale = new Vector3(1, 1, .78f);
@@ -256,8 +252,8 @@ internal sealed class Catgirl {
         }
 
         /// <summary>
-        /// Turns the hand at the wrist: a bend toward its palm, a twist of the forearm that brings the thumb in toward
-        /// the body, and a tip toward the thumb's side, in degrees.
+        /// Turns the hand at the wrist, in degrees: a bend to the palm, a twist of the forearm and a tip to the thumb.
+        /// The twist brings the thumb in toward the body.
         /// </summary>
         public void Turn(Vector3 wristTurn) => wrist.RotationDegrees = new Vector3(wristTurn.Z, wristTurn.Y * inward, wristTurn.X * inward);
 
@@ -269,8 +265,7 @@ internal sealed class Catgirl {
         }
 
         private void Curl() {
-            // How far the index finger and the other three bend at each
-            // joint, and how far the thumb turns in, in degrees.
+            // How far the index finger and the other three bend at each joint, and the thumb turns in, in degrees.
             var (index, others, thumbIn) = shape switch {
                 HandShape.Fist => (80f, 80f, 40f),
                 HandShape.Point => (0f, 85f, 45f),

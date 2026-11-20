@@ -18,6 +18,7 @@ public sealed class ActorRig {
     /// <summary>How far ahead of the forearm's line a held thing sits in the fist, in metres.</summary>
     public const float Palm = .01f;
     private readonly BodyBuild build;
+    private readonly Outfit outfit;
     private readonly Node3D hips, torso, chest, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     /// <summary>The right fist's grip, which turns a held tool about its own length (<see cref="Pose.Grip"/>).</summary>
     private readonly Node3D wrist;
@@ -35,8 +36,8 @@ public sealed class ActorRig {
     /// <summary>The torso and head, for a film to dress and turn beyond what a <see cref="Pose"/> holds.</summary>
     public Node3D Torso => torso;
     /// <summary>
-    /// What carries the head and arms: the trunk above the waist, which <see cref="BendChest"/> turns on the belly and
-    /// which otherwise rests as the torso does.
+    /// What carries the head and arms: the trunk above the waist, which <see cref="BendChest"/> turns on the belly.
+    /// At rest it lies as the torso does.
     /// </summary>
     public Node3D Chest => chest;
     /// <summary>Where the chest turns on the belly, from the hips.</summary>
@@ -53,9 +54,12 @@ public sealed class ActorRig {
         _ => new("d9a27c", "5a3b25", "2f7f86", "34465e", "34465e", "6b4428", Sleeves.Short),
     };
 
+    /// <summary>A skin's outfit, in <paramref name="shirtColor"/> when one is given.</summary>
+    private static Outfit Dressed(ActorSkin skin, string? shirtColor) => shirtColor is null ? OutfitOf(skin) : OutfitOf(skin) with { Top = shirtColor };
+
     /// <param name="shirtColor">Tells players apart; each skin has its own otherwise.</param>
-    public ActorRig(ActorSkin skin, string? shirtColor = null) : this(OutfitOf(skin) with { Top = shirtColor ?? OutfitOf(skin).Top }, HumanShape.Standard) {
-        var worn = OutfitOf(skin);
+    public ActorRig(ActorSkin skin, string? shirtColor = null) : this(Dressed(skin, shirtColor), HumanShape.Standard) {
+        var worn = outfit;
         switch (skin) {
             case ActorSkin.Player:
                 Pack = BuildPlayerDetails(worn.Skin, worn.Hair);
@@ -76,11 +80,11 @@ public sealed class ActorRig {
     }
 
     /// <summary>
-    /// A person of <paramref name="build"/> in <paramref name="outfit"/>'s colours, with no face, hair or kit of a
-    /// kind: the intro film's catgirls are dressed by <c>Catgirl</c>.
+    /// A person of <paramref name="build"/> in <paramref name="outfit"/>'s colours, with no face, hair or kit.
+    /// The intro film's catgirls are dressed by <c>Catgirl</c>.
     /// </summary>
     internal ActorRig(Outfit outfit, BodyBuild build) {
-        this.build = build;
+        this.build = build; this.outfit = outfit;
         hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
         (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, outfit);
         (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, outfit);
@@ -263,8 +267,7 @@ public sealed class ActorRig {
     public void RollArm(bool left, float degrees) => (left ? shoulderL : shoulderR).RotateObjectLocal(Vector3.Up, Mathf.DegToRad(degrees));
 
     /// <summary>
-    /// Turns the chest on the belly at the waist: a lean forward, a twist toward the left and a tip toward the right
-    /// shoulder, in degrees.
+    /// Turns the chest at the waist, in degrees: a lean forward, a twist left and a tip toward the right shoulder.
     /// On the game's build, whose trunk is one piece, the whole trunk turns about the waist.
     /// It stays until set again.
     /// </summary>
@@ -274,8 +277,7 @@ public sealed class ActorRig {
     }
 
     /// <summary>
-    /// Turns the hips with the legs and all above them: a tuck forward, a turn toward the left and a tilt that lifts
-    /// the left hip, in degrees.
+    /// Turns the hips and all they carry, in degrees: a tuck forward, a turn left and a tilt that lifts the left hip.
     /// It stays until set again.
     /// </summary>
     public void TurnHips(float tuck, float turn, float tilt) => hips.RotationDegrees = new Vector3(tuck, turn, tilt);

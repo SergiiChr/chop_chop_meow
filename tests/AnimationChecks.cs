@@ -29,6 +29,7 @@ public static class AnimationChecks {
         CheckEveryMomentOfAStrideHasAPose();
         CheckDiggingKeepsBothFeetWhereTheyStand();
         CheckAHandReachesItsPointWithTheElbowTheWayAsked();
+        CheckAHandReachesItsPointFromAShruggedShoulder();
         CheckPosingAllocatesNothing();
     }
 
@@ -158,6 +159,26 @@ public static class AnimationChecks {
                 bool outside = at.X * side > ActorRig.ShoulderOut || at.Z > .2f;
                 Require(at.X * side > .05f && at.Y < ActorRig.ShoulderUp && outside, $"a {(left ? "left" : "right")} elbow should stay out and down, reaching {aim}: it is at {at}");
             }
+        rig.Root.Free();
+    }
+
+    /// <summary>
+    /// On the slim build, a fist that <c>ArmReach.WithHandAt</c> places from a shrugged shoulder reaches its point.
+    /// </summary>
+    private static void CheckAHandReachesItsPointFromAShruggedShoulder() {
+        const float up = .03f, forward = .02f;
+        var build = HumanShape.Slim;
+        var rig = new ActorRig(ActorRig.OutfitOf(ActorSkin.Player), build);
+        foreach (bool left in new[] { true, false }) {
+            float side = left ? 1 : -1;
+            var aim = new Vector3(.05f * side, .55f, .3f);
+            var (pose, roll) = ArmReach.WithHandAt(new Pose(), left, aim, new Vector3(side, -1, 0), build.Shoulder(left, up, forward));
+            rig.Show(pose, null, false);
+            rig.MoveShoulder(left, up, forward);
+            rig.RollArm(left, roll);
+            float miss = (rig.Fist(left) - Vector3.Up * pose.HipHeight).DistanceTo(aim);
+            Require(miss < .005f, $"a {(left ? "left" : "right")} fist should reach {aim} from a shrugged shoulder: it missed by {miss:0.000} m");
+        }
         rig.Root.Free();
     }
 

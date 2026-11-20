@@ -13,17 +13,15 @@ namespace ChopChopMeow;
 /// The intro film: the hero's last day at the office, the trip out, his arrival at the shore and his first night by a fire.
 /// <c>--render-intro DIR</c> plays it in place of a game, under a film camera at eye level rather than the game's view from above.
 /// Each frame is saved to DIR with a cue sheet of its sounds; a movie tool outside this project turns them into <c>assets/intro.ogv</c>.
-/// With <c>--intro-dance</c> it draws only the solo of the catgirl
-/// on the hero's screen, as tall as the picture, once through.
+/// With <c>--intro-dance</c> it draws only the catgirl's solo on the hero's screen, as tall as the picture, once.
 /// </summary>
 public partial class WorldView {
     public const int IntroFps = 30;
     /// <summary>The film's frame size; the movie tool shrinks it to the old console's resolution.</summary>
     public static readonly Vector2I IntroSize = new(1280, 720);
     /// <summary>
-    /// The paint filter's width over the film's frames, in the shader's <c>kernel_size</c>.
-    /// The movie tool shrinks a frame to 480 pixels across, so its strokes are drawn that much wider than the game's 8
-    /// to come out the same size.
+    /// The paint filter's width over the film's frames, in the shader's <c>kernel_size</c>: an area 21 pixels across.
+    /// The movie shrinks a frame from 1280 pixels across to 480, leaving that area about 8 across, near the game's 9.
     /// </summary>
     public const int IntroPaintWidth = 21;
     private const float IntroStep = 1f / IntroFps;
@@ -279,7 +277,7 @@ public partial class WorldView {
     /// <paramref name="fist"/> is where the fist ends up, for whatever it holds.
     /// </summary>
     private static RigPose Reaching(RigPose pose, bool left, Vector3 target, out Vector3 fist) {
-        var shoulder = new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
+        var shoulder = HumanShape.Standard.Shoulder(left);
         var torso = Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway)));
         var hips = new Vector3(0, pose.HipHeight, 0);
         var to = torso.Inverse() * (target - hips) - shoulder;
@@ -341,14 +339,14 @@ public partial class WorldView {
     // ---------- The office ----------
 
     private static readonly Vector3 BossSpot = new(.86f, 0, .12f);
-    /// <summary>The hero's eyelids stretched down over his eyes.</summary>
-    private static readonly Vector3 LidsShut = new(1, .01f, 1);
+    /// <summary>The hero's eyelids drawn up out of sight, so his eyes are wide open.</summary>
+    private static readonly Vector3 LidsRaised = new(1, .01f, 1);
     /// <summary>How long each shot in the office runs, in seconds.</summary>
     private const float DeskSeconds = 5, MouseSeconds = 2.5f, ScreenSeconds = 4, BossSeconds = 4, StareSeconds = 2, SmashSeconds = 3;
     private const float OfficeSeconds = DeskSeconds + MouseSeconds + ScreenSeconds + BossSeconds + StareSeconds + SmashSeconds;
     /// <summary>
-    /// The boss is first heard this many seconds before the cut to him,
-    /// from <see cref="BossVoiceStarts"/> seconds into his recording.
+    /// The boss is first heard this many seconds before the cut to him.
+    /// His recording is played from <see cref="BossVoiceStarts"/> seconds in.
     /// Under the stare that follows he is heard again, muffled, from <see cref="BossVoiceAgain"/>.
     /// </summary>
     private const float BossHeardBefore = 1, BossVoiceStarts = 1.6f, BossVoiceAgain = 2.1f;
@@ -385,8 +383,7 @@ public partial class WorldView {
         if (cut) {
             OfficeLight(); office.LeaningBat.Visible = true;
             // Two recordings of an office hum under every shot here.
-            // Each is shorter than the shots together, so it is laid
-            // twice, the second fading in as the first fades out.
+            // Each is shorter than the office shots, so it is laid twice, the second fading in as the first fades out.
             const float second = 10.5f, cross = 1.5f;
             foreach (var (hum, gain) in new[] { ("intro/office", 2f), ("intro/office_room", -6f) }) {
                 Cue(hum, gain, string.Create(CultureInfo.InvariantCulture, $"length={OfficeSeconds - second + cross:0.00}\tfadein=0.4\tfadeout={cross:0.00}"));
@@ -465,8 +462,8 @@ public partial class WorldView {
     }
 
     /// <summary>
-    /// The boss bent over the hero's left shoulder, <paramref name="yelling"/> seconds into his rant, his mouth as wide
-    /// open as he shouts.
+    /// The boss bent over the hero's left shoulder, <paramref name="yelling"/> seconds into his rant.
+    /// His mouth opens as wide as he shouts.
     /// </summary>
     private void YellingBoss(float yelling, float shout) {
         boss.Root.Visible = true;
@@ -482,7 +479,7 @@ public partial class WorldView {
         float shout = Shout(BossVoiceStarts + BossHeardBefore + t);
         Place(hero, Vector3.Zero, 0, IntroPoses.Cowering(t));
         TurnHead(hero, 0, 38, 0);
-        heroLids.Scale = LidsShut;
+        heroLids.Scale = LidsRaised;
         YellingBoss(t, shout);
         // From the desk top, looking up past his face at the boss, with a tremor on every shout.
         var tremor = new Vector3(MathF.Sin(t * 47), MathF.Sin(t * 61 + 1), 0) * .006f * shout;
@@ -490,8 +487,7 @@ public partial class WorldView {
     }
 
     /// <summary>
-    /// His face, square on and still, staring at nothing; the boss
-    /// goes on yelling beside him, heard as if through a wall.
+    /// His face, square on and still, staring at nothing; the boss yells on beside him, heard as if through a wall.
     /// </summary>
     private void StareShot(float t, float dt) {
         if (cut) {
@@ -502,7 +498,7 @@ public partial class WorldView {
         office.Monitor.Visible = false;
         OfficeAround();
         Place(hero, Vector3.Zero, 0, IntroPoses.Staring);
-        heroLids.Scale = LidsShut;
+        heroLids.Scale = LidsRaised;
         YellingBoss(BossSeconds + t, Shout(BossVoiceAgain + t));
         Frame(new Vector3(0, 1.14f, .82f).Lerp(new Vector3(0, 1.14f, .7f), Mathf.SmoothStep(0, StareSeconds, t)), new Vector3(0, 1.13f, .1f), 28);
     }

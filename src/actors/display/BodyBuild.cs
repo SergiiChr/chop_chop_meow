@@ -4,8 +4,7 @@ using static ChopChopMeow.ActorShape;
 namespace ChopChopMeow;
 
 /// <summary>
-/// A person's shape: the rings the hips, trunk, legs and arms are drawn from, how far out the shoulders sit, how thick
-/// the neck is and how big the nose.
+/// A person's shape: the rings the body is drawn from, how far out the shoulders sit, and the neck's and nose's size.
 /// <see cref="HumanShape"/> holds the game's build and the slim one of the intro film's catgirls.
 /// </summary>
 /// <param name="Belly">

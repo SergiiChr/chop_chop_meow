@@ -4,8 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The dances on the web page in the intro film: one the catgirls
-/// at the sides do in step, and the solo of the one between them.
+/// The dances on the web page in the intro film: the side catgirls' dance in step, and the middle one's solo.
 /// </summary>
 internal static class CatgirlDance {
     /// <summary>Seconds a beat of the dance at the sides lasts.</summary>
@@ -16,8 +15,7 @@ internal static class CatgirlDance {
     private static float Sway(float time) => MathF.Sin(time / Beat * MathF.PI);
 
     /// <summary>
-    /// A dance of eight beats: bouncing on the knees with the hips swaying,
-    /// the fists up by the chin like paws, pawing in turn.
+    /// Eight beats of bouncing on the knees with the hips swaying, the fists up by the chin like paws, pawing in turn.
     /// Over its second half both arms wave overhead with open hands.
     /// </summary>
     public static DanceFrame Chorus(float time) {
@@ -46,8 +44,7 @@ internal static class CatgirlDance {
     /// <param name="SplayL">Degrees the left thigh tips out sideways.</param>
     /// <param name="Kick">How far her right foot is kicked up behind her, from 0 to 1.</param>
     /// <param name="Nod">
-    /// Degrees the head nods down, turns toward her left (<paramref name="Turn"/>)
-    /// and tilts toward her right shoulder (<paramref name="Tilt"/>).
+    /// Degrees the head nods; <paramref name="Turn"/> turns it to her left, <paramref name="Tilt"/> tips it right.
     /// </param>
     /// <param name="Toes">Degrees both feet turn out.</param>
     /// <param name="WristL">Degrees the left hand bends toward its palm; negative cocks it back.</param>
@@ -93,8 +90,7 @@ internal static class CatgirlDance {
 
     // The steps the solo is made of, each for the left side; the other side is its mirror.
     /// <summary>
-    /// Fists flexed by the head over a wide stance with the toes out, the chest twisted one way and the hips turned the
-    /// other, shoulders up.
+    /// Fists flexed by the head over a wide stance, toes out, chest twisted one way and hips the other, shoulders up.
     /// </summary>
     private static Step Shimmy(float twist) =>
         new(Flexed, Out, Fist, Mirror(Flexed), Mirror(Out), Fist, Hip: -twist * .25f, HipTurn: -twist * .5f, Twist: twist, SplayL: 13, SplayR: 13, KneeL: 12, KneeR: 12,
@@ -106,8 +102,8 @@ internal static class CatgirlDance {
     private static readonly Step Pop = new(Overhead, High, Open, Mirror(Low), Mirror(Down), Open, Hip: -11, HipTurn: 6, Tip: 17, SplayL: 26, SplayR: 3, KneeR: 6,
         Tilt: -10, Toes: 8, WristL: 30, WristR: -45, ShrugL: .02f);
     /// <summary>
-    /// The left hand rings her left eye: weight on the right leg, hips turned toward the hand, chest tipped back over
-    /// them, head leaning into it.
+    /// The left hand rings her left eye, weight on the right leg, hips turned to the hand, chest tipped back over them.
+    /// Her head leans into it.
     /// </summary>
     private static readonly Step Framed = new(AtEye, High, Ring, Mirror(Low), Mirror(Down), Open, Hip: -13, HipTurn: 10, Tip: 21, Twist: -8, SplayL: 30, SplayR: 1, KneeR: 5,
         Turn: 12, Tilt: -16, Toes: 8, WristR: -45, ShrugL: .02f);
@@ -118,8 +114,7 @@ internal static class CatgirlDance {
     private static readonly Step Gathered = new(AtChest, Tucked, Fist, Mirror(AtChest), Mirror(Tucked), Fist, KneeL: 28, KneeR: 28, Lean: 8, Nod: 10,
         ShrugL: .015f, ShrugR: .015f, Bounce: 0);
     /// <summary>
-    /// A finger at the sky from a straight left arm, weight on the right leg and the left knee loose, head thrown up
-    /// toward the hand.
+    /// A finger at the sky from a straight left arm, weight on the right leg, left knee loose, head thrown back.
     /// </summary>
     private static readonly Step Reached = new(Sky, Out, Point, Mirror(Low), Mirror(Down), Open, Hip: -10, Tip: 12, SplayL: 10, KneeL: 18, Nod: -16, Turn: 10,
         WristR: -45, ShrugL: .03f, Bounce: 2);
@@ -138,12 +133,10 @@ internal static class CatgirlDance {
 
     /// <summary>
     /// The solo, four bars of four beats.
-    /// One: a fast shimmy, the hips pop out, a hand rings one eye,
-    /// both hands flick down and she hops back into the flex.
+    /// One: a fast shimmy, the hips pop out, a hand rings one eye, both hands flick down, and a hop back into the flex.
     /// Two: the same the other way round, then she gathers her fists and bursts into a finger at the sky.
     /// Three: the finger sweeps down before her face, a quarter turn into a pose, back to the front, a hop and a kick.
-    /// Four: she lands low, poses the other way, waves, sweeps both
-    /// arms wide and down, and rises into the first step again.
+    /// Four: she lands low, poses the other way, waves, sweeps both arms wide and down, and rises into the first step.
     /// </summary>
     private static readonly (float At, Step Step)[] SoloSteps = {
         (0, Shimmy(14)), (.125f, Shimmy(-14)), (.25f, Shimmy(14)), (.375f, Shimmy(-14)),
@@ -181,16 +174,14 @@ internal static class CatgirlDance {
         // Between beats the knees dip a little, so she bounces to the beat whatever the step.
         float dip = step.Bounce * (.5f - .5f * MathF.Cos(time / Beat * MathF.Tau));
         float kneeL = step.KneeL + dip, kneeR = step.KneeR + dip + 105 * step.Kick, swingR = (step.KneeR + dip) / 2 - 12 * step.Kick;
-        // Each leg reaches the floor less far the more it tips out,
-        // and the tilt lifts one hip joint and lowers the other.
+        // A leg reaches less far down the more it tips out, and the tilt lifts one hip joint and lowers the other.
         // The hips sit where the leg that reaches furthest down stands on the floor.
         float tilt = Mathf.DegToRad(step.Hip), lift = ActorAnimation.LegSide * MathF.Sin(tilt);
         float standL = ActorAnimation.Reach(kneeL / 2, kneeL) * MathF.Cos(Mathf.DegToRad(step.SplayL) + tilt) - lift;
         float standR = ActorAnimation.Reach(swingR, kneeR) * MathF.Cos(Mathf.DegToRad(step.SplayR) - tilt) + lift;
         var pose = new Pose(Lean: step.Lean, SwingL: kneeL / 2, KneeL: kneeL, SwingR: swingR, KneeR: kneeR, TurnL: step.Toes, TurnR: step.Toes,
             Hips: Math.Max(standL, standR) + ActorAnimation.Sole, SplayL: step.SplayL, SplayR: step.SplayR);
-        // Each hand is solved from where its shoulder is with the shrug, so a raised shoulder does not push the hand
-        // off its mark.
+        // Each hand is solved from its shoulder as shrugged, so a raised shoulder does not push the hand off its mark.
         var slim = HumanShape.Slim;
         (pose, float rollL) = ArmReach.WithHandAt(pose, true, step.HandL, step.ElbowL, slim.Shoulder(true, step.ShrugL));
         (pose, float rollR) = ArmReach.WithHandAt(pose, false, step.HandR, step.ElbowR, slim.Shoulder(false, step.ShrugR));

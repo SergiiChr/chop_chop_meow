@@ -43,8 +43,7 @@ internal static class IntroPoses {
     }
 
     /// <summary>
-    /// At the desk with the left hand on the keyboard and the eyes
-    /// on the screen; the film puts the right hand on the mouse.
+    /// At the desk, the left hand on the keys and the eyes on the screen; the film puts the right hand on the mouse.
     /// </summary>
     public static readonly Pose Browsing = Seated with { Lean = 12, Head = 6, RaiseL = 46, OutL = -6, ElbowL = 56 };
 
