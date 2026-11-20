@@ -377,7 +377,7 @@ public partial class WorldView {
             case "wolf fall": {
                     // Thrown back by the killing blow while in the air, as a carcass is.
                     float dying = Math.Clamp((Elapsed % 2.2f - .4f) / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
-                    wolf.Fall(dying); place = To3(track * (.7f * thrown * (2 - thrown) - .35f));
+                    wolf.Fall(dying); place = To3(track * (.7f * thrown - .35f));
                     break;
                 }
             case "wolf feed": {
@@ -396,10 +396,11 @@ public partial class WorldView {
                     if (c < .6f) { wolf.Pinned = 0; wolf.Stand(Elapsed, dt, true); } else {
                         wolf.Pinned = gap <= WolfModel.ContactReach ? wolf.Pinned + dt : 0;
                         var chest = FeedingSpots.PawsOnChest(wolf, reviewRigs[0]);
-                        if (wolf.Pinned > 0) wolf.Feed(Elapsed, dt, true, wolf.Pinned / ActorAnimation.FallBackSeconds, chest: chest);
-                        else { wolf.Leap(progress, contact, dt, chest); flight = progress / contact; }
+                        if (wolf.Motion != WolfMotion.Leap && wolf.Pinned == 0) wolf.StepFrom = wolf.Root.Position;
+                        if (wolf.Pinned > 0) PinAt(wolf, Vector2.Zero, chest, Elapsed, dt);
+                        else { wolf.Leap(progress, contact, dt, chest, FallBackView.Throat(Vector2.Zero, Vector2.Up, 0).Y); flight = progress / contact; }
                     }
-                    place = c < .6f ? To3(track * start) : AtTheThroat(wolf, Vector2.Zero, To3(track * gap), flight);
+                    place = c < .6f ? To3(track * start) : AtTheThroat(wolf, Vector2.Zero, flight, contact * World.LeapSeconds);
                     if (wolf.Pinned > 0) { person = wolf.Pinned < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled; downed = wolf.Pinned; }
                     break;
                 }
@@ -408,7 +409,7 @@ public partial class WorldView {
                     float c = Elapsed % 2.4f, punch = c - .4f, lands = ActorAnimation.Contact(ActorAction.Attack), near = WolfBodies.StandOff, far = near + World.KnockBackDistance, gap;
                     if (punch < lands) { wolf.Stand(Elapsed, dt, true); gap = near; } else if (punch < lands + WolfModel.RecoilSeconds) {
                         float recoil = (punch - lands) / WolfModel.RecoilSeconds, hop = Math.Min(1, recoil / WolfModel.HopShare);
-                        gap = far - (far - near) * (1 - hop) * (1 - hop);
+                        gap = near + (far - near) * hop;
                         wolf.Recoil(recoil, dt);
                     } else { wolf.Stand(Elapsed, dt, true); gap = far; }
                     place = To3(track * gap);
@@ -420,8 +421,9 @@ public partial class WorldView {
                     float c = Elapsed % 2.4f, snap = c - .6f, landed = snap - WolfSnap.Windup - WolfSnap.Flight, near = WolfBodies.StandOff, close = WolfSnap.JawsAhead, gap;
                     if (snap < 0) { wolf.Stand(Elapsed, dt, true); gap = near; } else if (landed < 0) {
                         float drive = Math.Max(0, snap - WolfSnap.Windup) / WolfSnap.Flight;
-                        wolf.Snap(Math.Min(1, snap / WolfSnap.Windup), drive, 0, dt); gap = Mathf.Lerp(near, close, drive);
-                    } else if (landed < WolfModel.SnapHold) { wolf.Snap(1, 1, landed / WolfModel.SnapHold, dt); gap = close; } else {
+                        gap = Mathf.Lerp(near, close, drive);
+                        wolf.Snap(Math.Min(1, snap / WolfSnap.Windup), drive, 0, dt, WolfModel.SnapReach(track * gap, Vector2.Zero, reviewPerson.Yaw));
+                    } else if (landed < WolfModel.SnapHold) { gap = close; wolf.Snap(1, 1, landed / WolfModel.SnapHold, dt, WolfModel.SnapReach(track * gap, Vector2.Zero, reviewPerson.Yaw)); } else {
                         gap = Math.Min(near, reviewLunge + WolfBodies.BackOffSpeed * dt);
                         if (gap < near) wolf.Move(reviewLunge - gap, dt, false, true); else wolf.Stand(Elapsed, dt, true);
                     }
@@ -455,6 +457,7 @@ public partial class WorldView {
                 }
         }
         wolf.Root.Position = place;
+        wolf.Plant();
         // The camera keeps the wolf in view, and the player too while one is in the clip.
         reviewActor.Position = reviewRigs.Count > 0 ? track * 1.1f : new Vector2(place.X, place.Z);
         if (reviewRigs.Count == 0) return;
