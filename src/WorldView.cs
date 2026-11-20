@@ -692,10 +692,10 @@ public partial class WorldView : Node3D {
         // The soil a dig throws aside flies off the blade.
         if (handSound == "dig_toss" && World.Sees(actor.Position)) Burst(rig.Root.Transform * rig.ShovelTip, Soil, 5, 1.6f, .5f, 9, .06f);
         float impact = action switch {
-            ActorAction.Chop or ActorAction.SteelChop => .52f,
-            ActorAction.Mine or ActorAction.SteelMine => .55f,
+            ActorAction.Chop or ActorAction.SteelChop => ActorAnimation.ChopStrike,
+            ActorAction.Mine or ActorAction.SteelMine => ActorAnimation.MineStrike,
             ActorAction.Dig => ActorAnimation.DigStrike,
-            ActorAction.Hammer => .5f,
+            ActorAction.Hammer => ActorAnimation.HammerStrike,
             ActorAction.Pump => .35f,
             ActorAction.Gather => .1f,
             _ => -1

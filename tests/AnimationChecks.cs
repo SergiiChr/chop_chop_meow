@@ -366,8 +366,8 @@ public static class AnimationChecks {
         var swingStanding = ActorAnimation.PoseAt(ActorAction.TorchSwing, .27f, false);
         Require(swingWalking.RaiseL == swingStanding.RaiseL && swingWalking.SwingL == ActorAnimation.PoseAt(ActorAction.Jog, .27f, true).SwingL,
             "a torch swing on the move should keep the swinging arm while the legs keep walking");
-        Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Hips is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Hips == 0,
-            "a cross-legged worker should sit on the ground, and one on a rock should not");
+        Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Hips is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Hips > .25f,
+            "a cross-legged worker should sit on the ground, and one on a rock should sit up on it");
         Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick", "steel mining should show the steel pick");
         Require(ActorAnimation.Tool(ActorAction.Hammer) == "hammer", "hammering should show the hammer");
         Require(ActorAnimation.Tool(ActorAction.Grind) == "mortar", "grinding should show the mortar in hand");
