@@ -297,6 +297,8 @@ public partial class Sounds : Node {
             ? new[] { single }
             : Enumerable.Range(1, 9).Select(i => $"{Folder}/{name}_{i}.mp3").TakeWhile(path => ResourceLoader.Exists(path)).ToArray();
         if (found.Length == 0) GD.PushError($"Missing sound: {name}");
+        if (Loudest.TryGetValue(name, out var peaks) && peaks.Length != found.Length)
+            GD.PushError($"Sound {name} has {found.Length} recordings but {peaks.Length} loudest moments");
         return variants[name] = found.Select(path => GD.Load<AudioStream>(path)).ToArray();
     }
 }

@@ -565,7 +565,7 @@ A tree falls away from whoever landed the last blow, player or worker, the way i
 It turns about the foot of its trunk on the side it falls to, as a stiff pole hinged at its foot does (`TreeFall`): slowly at first, then faster, a taller tree taking longer and landing faster.
 It starts upright at the speed a 5° lean would give it, and comes to rest where its trunk or a branch first touches the ground, between about 45° over and lying flat; its leaf cards bear no weight and lie flat on the ground where they reach it.
 The shake of the last blow carries on as it goes over.
-A dug out stump or bush is thrown straight up and comes back down in `WorldView.DugOutSeconds` under gravity, tumbling steadily over about its middle (`Thrown`), and no part of it goes lower than it stood as it came out.
+A dug out stump or bush is thrown straight up and comes back down in `Thrown.DugOutSeconds` under gravity, tumbling steadily over about its middle (`Thrown.DugOut`), and no part of it goes lower than it stood as it came out.
 A chip knocked off rock flies in an arc under gravity, spinning steadily round its middle, lands where it lies and skids and turns to a stop over `WorldModels.ChipSettle`.
 While it is dug at, a stump or bush leans further over with `Thing.Progress` (`DugProp`).
 Work out of sight shakes nothing and throws no chips.

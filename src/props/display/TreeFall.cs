@@ -54,7 +54,7 @@ public sealed class TreeFall {
     }
 
     /// <summary>The tree turned by the fall, about its hinge, before anything else turns it: a point of the model as drawn goes to <c>Turn * point</c>.</summary>
-    public Transform3D Turn => new Transform3D(new Basis(Axis, Angle), Vector3.Zero).TranslatedLocal(-Hinge).Translated(Hinge);
+    public Transform3D Turn => Movement.About(new Basis(Axis, Angle), Hinge);
 
     /// <summary>Moves the fall on by <paramref name="dt"/> seconds; true on the step that lands it.</summary>
     public bool Advance(float dt) {

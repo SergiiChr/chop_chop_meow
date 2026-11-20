@@ -18,13 +18,12 @@ public sealed class LocalClock(float jump) {
     private const float CatchUp = 12;
     private float count, stamp, rate, since, way;
     private bool started;
-
     /// <summary>The count as drawn now.</summary>
-    public float Shown { get; private set; }
+    private float shown;
 
     /// <summary>Takes the count as it is, as a thing drawn from memory or seen again shows it.</summary>
     public float Set(float now, float time) {
-        (Shown, count, stamp, rate, since, way, started) = (now, now, time, 0, 0, 0, true);
+        (shown, count, stamp, rate, since, way, started) = (now, now, time, 0, 0, 0, true);
         return now;
     }
 
@@ -38,13 +37,13 @@ public sealed class LocalClock(float jump) {
             rate = (now - count) / (time - stamp);
             if (rate != 0) way = Math.Sign(rate);
             (count, stamp, since) = (now, time, 0);
-            if (Math.Abs(now - Shown) > jump) { Shown = now; return Shown; }
+            if (Math.Abs(now - shown) > jump) { shown = now; return shown; }
         } else since += dt;
         float target = count + rate * Math.Min(since, MaxAhead);
-        float next = Shown + rate * dt;
+        float next = shown + rate * dt;
         next += (target - next) * (1 - MathF.Exp(-CatchUp * dt));
         // A small lead is held rather than given back, so the motion never turns back on itself.
-        Shown = way > 0 ? Math.Max(next, Shown) : way < 0 ? Math.Min(next, Shown) : next;
-        return Shown;
+        shown = way > 0 ? Math.Max(next, shown) : way < 0 ? Math.Min(next, shown) : next;
+        return shown;
     }
 }

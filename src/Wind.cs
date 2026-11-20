@@ -45,6 +45,8 @@ internal static class Wind {
         // vectors where they stand, two to each.
         vec3 push_from(vec3 world, vec2 at) {
             vec2 away = world.xz - at;
+            // Most grass stands beyond everyone's reach, which leaves it alone.
+            if (dot(away, away) >= wind_push.y * wind_push.y) return vec3(0.0);
             float near = 1.0 - smoothstep(0.0, wind_push.y, length(away));
             vec2 out_way = normalize(away + vec2(0.0001));
             return vec3(out_way.x, -0.6, out_way.y) * near;

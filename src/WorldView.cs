@@ -787,10 +787,6 @@ public partial class WorldView : Node3D {
     // Models of things that left the world in front of the player, shown until they have played their way out.
     private readonly List<int> departed = new();
     private readonly List<Prop> leaving = new();
-    /// <summary>Seconds a dug out stump or bush takes to come out of the ground and be gone: thrown up, it rises and falls back in that time.</summary>
-    internal const float DugOutSeconds = .6f;
-    /// <summary>How far over a dug out stump or bush tumbles in the air, in radians.</summary>
-    internal static readonly float DugTumble = Mathf.DegToRad(150);
     private SaveState? builtFor;
     // How many things the world held, and the newest of them, when models were last cleared away: a tree swapped for its stump changes only the second.
     private int thingsCounted = -1, newestThing;
@@ -937,10 +933,10 @@ public partial class WorldView : Node3D {
                     Burst(foot + Vector3.Up * .15f, GatherDust, 4, .6f, .9f, -.3f, .2f, 1.5f);
                     if (prop.Kind == ThingKind.Bush) Burst(foot + Vector3.Up * .5f, Mat("5d8a3c"), 6, 1.6f, .8f, 5, .06f);
                 }
-                dug.Out = Math.Min(DugOutSeconds, dug.Out + dt);
-                // Thrown up from the lean digging left it at, it rises and falls under gravity, tumbling steadily over about its middle.
-                prop.Body.Transform = Thrown.Tumble(dug.Launch, dug.Middle, Movement.Rise(dug.Out, DugOutSeconds), DugTumble * dug.Out / DugOutSeconds, 1 - Mathf.SmoothStep(.45f, 1, dug.Out / DugOutSeconds));
-                return dug.Out < DugOutSeconds;
+                dug.Out = Math.Min(Thrown.DugOutSeconds, dug.Out + dt);
+                // Thrown up from the lean digging left it at.
+                prop.Body.Transform = Thrown.DugOut(dug.Launch, dug.Middle, dug.Out);
+                return dug.Out < Thrown.DugOutSeconds;
             default: return false;
         }
     }
@@ -983,10 +979,10 @@ public partial class WorldView : Node3D {
                 // An arc under gravity from the rock, spinning steadily round its middle, then a short skid to a stop where it lies.
                 chip.Flight += dt;
                 float way = Thrown.ChipWay(chip.Flight, WorldModels.ChipFlight, WorldModels.ChipSettle);
-                var spin = new Basis(Vector3.Up, MathF.Tau * WorldModels.ChipTurns * way);
-                prop.Body.Basis = spin * chip.Rest;
-                prop.Body.Position = new Vector3(chip.From.X, 0, chip.From.Z) * (1 - way) + chip.Middle - spin * chip.Middle
+                var spin = Movement.About(new Basis(Vector3.Up, MathF.Tau * WorldModels.ChipTurns * way), chip.Middle);
+                var along = new Vector3(chip.From.X, 0, chip.From.Z) * (1 - way)
                     + Vector3.Up * Thrown.ChipHeight(chip.Flight, WorldModels.ChipFlight, chip.From.Y);
+                prop.Body.Transform = spin.Translated(along) * new Transform3D(chip.Rest, Vector3.Zero);
                 break;
             case Prop when t.IsLoose || t.Kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Leaves:
                 if (still) break;
@@ -1479,8 +1475,7 @@ public partial class WorldView : Node3D {
     /// <summary>How far out a cart is <paramref name="elapsed"/> seconds into a trip of <paramref name="trip"/> seconds, from 0 at the signpost to 1 where it has gone from view.</summary>
     internal static float CartLeg(float elapsed, float trip) {
         float walking = Math.Max(0, Math.Min(elapsed, trip - elapsed));
-        float walked = walking < CartPicksUp ? CartSpeed * walking * walking / (2 * CartPicksUp) : CartSpeed * (walking - CartPicksUp / 2);
-        return Math.Clamp(walked / CartDistance, 0, 1);
+        return Math.Clamp(CartSpeed * Movement.Ramped(walking, CartPicksUp) / CartDistance, 0, 1);
     }
     /// <summary>Fully drawn for most of the walk, fading out over its last quarter.</summary>
     private static float CartFade(float leg) => Math.Clamp((leg - .75f) / .25f, 0, 1);

@@ -48,6 +48,7 @@ internal static class Tree3DShape {
     private const float CoreScale = .75f;
 
     private static Mesh Trunk(int kind, int variant) => trunks[kind, variant] ??= GD.Load<Mesh>($"{Folder}{species[kind]}{variant}_trunk.res");
+    private static Mesh Leaves(int kind, int variant) => leaves[kind, variant] ??= GD.Load<Mesh>($"{Folder}{species[kind]}{variant}_leaves.res");
 
     private static readonly (Vector2 Center, float Radius, float Height, float Foot)?[,] starts = new (Vector2, float, float, float)?[4, 3];
     /// <summary>How much thicker a trunk is at the ground for every metre its model starts above it.</summary>
@@ -84,9 +85,8 @@ internal static class Tree3DShape {
     /// </summary>
     public static (Vector3[] Wood, float Top) Outline(int kind, int variant) {
         if (outlines[kind, variant] is { } known) return known;
-        leaves[kind, variant] ??= GD.Load<Mesh>($"{Folder}{species[kind]}{variant}_leaves.res");
         var wood = Trunk(kind, variant).SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-        float top = Math.Max(Trunk(kind, variant).GetAabb().End.Y, leaves[kind, variant]!.GetAabb().End.Y);
+        float top = Math.Max(Trunk(kind, variant).GetAabb().End.Y, Leaves(kind, variant).GetAabb().End.Y);
         var outline = (wood, top);
         outlines[kind, variant] = outline;
         return outline;
@@ -97,7 +97,6 @@ internal static class Tree3DShape {
     private const float StemOverlap = .05f;
 
     public static Mesh Add(Node3D parent, int kind, int variant) {
-        leaves[kind, variant] ??= GD.Load<Mesh>($"{Folder}{species[kind]}{variant}_leaves.res");
         bark[kind] ??= new StandardMaterial3D {
             AlbedoTexture = GD.Load<Texture2D>(Folder + (kind == 2 ? "birch_bark.svg" : "bark.svg")),
             CullMode = BaseMaterial3D.CullModeEnum.Front,
@@ -117,8 +116,8 @@ internal static class Tree3DShape {
             ModelKit.Post(parent, foot, radius, height + StemOverlap, new Vector3(center.X, 0, center.Y), stemBark[kind]!, 6);
         }
         ModelKit.Add(parent, Trunk(kind, variant), bark[kind]!, Vector3.Zero);
-        ModelKit.Add(parent, leaves[kind, variant]!, foliage[kind]!, Vector3.Zero);
-        return leaves[kind, variant]!;
+        ModelKit.Add(parent, Leaves(kind, variant), foliage[kind]!, Vector3.Zero);
+        return Leaves(kind, variant);
     }
 
     /// <summary>

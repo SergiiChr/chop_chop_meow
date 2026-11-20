@@ -53,8 +53,8 @@ internal static class PropMotionSteps {
         var launch = dug.Body.Transform;
         float start = points.Min(p => (launch * p).Y), lowest = start;
         var heights = new List<float>();
-        for (float t = dt; t <= WorldView.DugOutSeconds; t += dt) {
-            var drawn = Thrown.Tumble(launch, dug.Middle, Movement.Rise(t, WorldView.DugOutSeconds), WorldView.DugTumble * t / WorldView.DugOutSeconds, 1 - Mathf.SmoothStep(.45f, 1, t / WorldView.DugOutSeconds));
+        for (float t = dt; t <= Thrown.DugOutSeconds; t += dt) {
+            var drawn = Thrown.DugOut(launch, dug.Middle, t);
             lowest = Math.Min(lowest, points.Min(p => (drawn * p).Y));
             heights.Add((drawn * dug.Middle).Y);
         }
