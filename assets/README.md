@@ -52,7 +52,8 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
 - `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
 - `src/intro/display/CatgirlPage.cs` — the web page of dancing catgirls on the hero's screen in the intro film.
 - `src/intro/display/Catgirl.cs` — a catgirl of that page: the person model's slim build with a face, hair, cat ears,
-  a tail, hands with fingers and a maid's dress, a sleeveless shirt with shorts and knee socks, or a long hoodie.
+  a tail and hands with fingers.
+  Her outfit is a maid's dress, a sleeveless blouse with shorts and thigh-high socks, or a long black hoodie.
 - `src/ModelKit.cs` — shared primitive, material and fade helpers.
   A material is flat colour or one of the surfaces wood, metal, stone, cloth and earth: the colour stays the model's
   own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
@@ -103,7 +104,10 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   workers and couriers. It shares five neutral mesh resources (hips, torso, leg, left arm and right arm) across all
   human roles and player shirt colors. Each actor keeps its own skeletons and pose. Cached three-color texture palettes
   preserve sleeve/skin, trousers/boots and sole transitions using the fade-compatible StandardMaterial3D path.
-  It also holds the slim build of the intro film's catgirls, whose trunk is a chest and a belly that meet at the waist.
+  It also holds the dancers' shared slim build, with a shaped face, defined shoulders, tapered arms, rounded
+  thighs, shallow kneecaps, longer lower legs with calves set back from the shins, and a torso skinned across the waist.
+  The soloist's shorts and thigh-high socks follow the same mesh as her legs.
+- `JoinedHuman` — connects the dancers' trunk, legs, arms and palms in one skinned surface.
 - `src/ActorShape.cs` — profile, skinning and curved strap builders. Outfit colors use cached palette materials rather than duplicating body geometry. These meshes are cached across actors while each rig poses its own joints.
 - `CourierShape` — fits a reflective hi-vis vest and curved cap to the same core, with the common face details.
 - `src/actors/enemies/wolf/display/WolfShape.cs` — one cached skinned wolf mesh on a skeleton: deep chest, full belly with a slight tuck, a croup sloping into heavy thighs, thick maned neck, wedge muzzle with a jaw and teeth, upright ears, legs with elbows, hocks and paws, and a three-bone brush tail. The coat darkens along the back, warms to tan on the flanks and pales underneath.
@@ -274,6 +278,7 @@ them out of the game.
 - `office.mp3` — thirteen seconds of "IT office 3" by thellywellyn (Pixabay 535970).
 - `office_room.mp3` — thirteen seconds of "Office ambience 01 (owi)" by freesound_community (Pixabay 57193), laid over
   it.
+- `dance_beat.ogg` — five seconds of drums, bass and synth chords synthesized for the stage shot at 135 beats per minute.
 - `mouse_click.ogg` and `mouse_release.ogg` — the first mouse click and mouse release of Kenney's
   [UI Audio](https://kenney.nl/assets/ui-audio) pack, CC0 1.0, downloaded from Patch's asset library (patch.gg).
 

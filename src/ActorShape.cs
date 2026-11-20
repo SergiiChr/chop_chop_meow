@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>Smooth elliptical profiles, with optional two-bone weights across a limb's joint.</summary>
 internal static class ActorShape {
-    internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0, float Tone = 0);
+    internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0, float Tone = 0, float FrontLobes = 0);
 
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
     private static readonly StandardMaterial3D Skin = ModelKit.Vertex(Surface.Flat, .85f);
@@ -119,13 +119,21 @@ internal static class ActorShape {
             float height = above.Y - below.Y;
             for (int side = 0; side < sides; side++) {
                 float angle = Mathf.Tau * side / sides, x = MathF.Cos(angle), z = MathF.Sin(angle);
-                var tangent = new Vector3(-ring.Width * z, 0, ring.Depth * x);
-                var down = new Vector3((below.Width - above.Width) * x + below.Sideways - above.Sideways, -height, (below.Depth - above.Depth) * z + below.Forward - above.Forward);
+                // Two broad curves peak off the centre of the front of the chest.
+                float lobe = 0, slope = 0;
+                if (z > 0 && (ring.FrontLobes != 0 || above.FrontLobes != 0 || below.FrontLobes != 0)) {
+                    float z2 = z * z;
+                    lobe = 6.75f * x * x * z2 * z2;
+                    slope = 13.5f * x * z2 * z * (2 * x * x - z2);
+                }
+                var tangent = new Vector3(-ring.Width * z, 0, ring.Depth * x + ring.FrontLobes * slope);
+                var down = new Vector3((below.Width - above.Width) * x + below.Sideways - above.Sideways, -height,
+                    (below.Depth - above.Depth) * z + below.Forward - above.Forward + (below.FrontLobes - above.FrontLobes) * lobe);
                 surface.SetNormal(tangent.Cross(down).Normalized());
                 surface.SetColor(ring.Color);
                 surface.SetUV(new Vector2(ring.Tone, .5f));
                 if (joint > 0) SetWeights(surface, ring.Y, joint, ankle);
-                surface.AddVertex(new Vector3(ring.Width * x + ring.Sideways, ring.Y, ring.Depth * z + ring.Forward));
+                surface.AddVertex(new Vector3(ring.Width * x + ring.Sideways, ring.Y, ring.Depth * z + ring.Forward + ring.FrontLobes * lobe));
             }
         }
         for (int row = 0; row < rings.Length - 1; row++)
@@ -171,6 +179,13 @@ internal static class ActorShape {
 
     /// <summary>A limb skinned to an upper and a lower bone that meet at <paramref name="joint"/> below the top, and to a foot bone from <paramref name="ankle"/> down when it is set.</summary>
     public static Skeleton3D Limb(Node3D parent, Ring[] rings, float joint, Material? material = null, float ankle = 0) {
+        var skeleton = LimbJoints(parent, joint, ankle);
+        Add(skeleton, rings, joint, material, ankle);
+        return skeleton;
+    }
+
+    /// <summary>A limb's joints without the profile, for rigs which skin one mesh across several limbs.</summary>
+    internal static Skeleton3D LimbJoints(Node3D parent, float joint, float ankle) {
         var skeleton = new Skeleton3D();
         parent.AddChild(skeleton);
         skeleton.AddBone("upper"); skeleton.AddBone("lower");
@@ -183,7 +198,6 @@ internal static class ActorShape {
             skeleton.SetBoneRest(2, new Transform3D(Basis.Identity, new Vector3(0, joint - ankle, 0)));
         }
         skeleton.ResetBonePoses();
-        Add(skeleton, rings, joint, material, ankle);
         return skeleton;
     }
 }

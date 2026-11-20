@@ -7,191 +7,361 @@ namespace ChopChopMeow;
 /// The dances on the web page in the intro film: the side catgirls' dance in step, and the middle one's solo.
 /// </summary>
 internal static class CatgirlDance {
-    /// <summary>Seconds a beat of the dance at the sides lasts.</summary>
-    private const float Beat = .5f;
+    /// <summary>Seconds per beat of the dance, at 135 beats per minute.</summary>
+    public const float Beat = 4f / 9;
+    private const int PhraseBeats = 12;
     /// <summary>Seconds by which a tail's tip and tied hair follow the hips.</summary>
     private const float Lag = .15f;
 
-    private static float Sway(float time) => MathF.Sin(time / Beat * MathF.PI);
+    /// <summary>Both dances repeat on the same beat.</summary>
+    public const float SoloSeconds = PhraseBeats * Beat;
 
     /// <summary>
-    /// Eight beats of bouncing on the knees with the hips swaying, the fists up by the chin like paws, pawing in turn.
-    /// Over its second half both arms wave overhead with open hands.
+    /// Holds each drawing for two to four frames at the film's drawing rate.
+    /// The opening and eye gesture have four poses to a beat, and the quicker figures have five.
     /// </summary>
-    public static DanceFrame Chorus(float time) {
-        float beat = time / Beat, sway = Sway(time), knee = 10 + 26 * MathF.Abs(sway);
-        var paws = new Pose(Lean: 6, Sway: 9 * sway, Twist: 10 * sway, Head: -4,
-            RaiseL: 62 + 22 * sway, OutL: 24, ElbowL: 128, RaiseR: 62 - 22 * sway, OutR: 24, ElbowR: 128,
-            SwingL: knee / 2, KneeL: knee, SwingR: knee / 2, KneeR: knee);
-        var waving = paws with { RaiseL = 158, OutL = 14 + 18 * sway, ElbowL = 24, RaiseR = 158, OutR = 14 - 18 * sway, ElbowR = 24 };
-        float bar = Mathf.PosMod(beat, 8), up = Mathf.SmoothStep(3.6f, 4, bar) - Mathf.SmoothStep(7.6f, 8, bar);
-        var hands = up > .5f ? HandShape.Open : HandShape.Fist;
-        // The hips swing out under the swaying chest, and the head tips with them.
-        return new DanceFrame(Pose.Lerp(paws, waving, up), 0, 0, hands, hands, 0, sway, Sway(time - Lag),
-            Hips: new Vector3(0, 0, -5 * sway), Head: new Vector3(0, 0, 8 * sway));
+    public static float PoseTime(float time) {
+        float beat = Mathf.PosMod((time + .5f / WorldView.IntroFps) / Beat, PhraseBeats);
+        int whole = (int)beat;
+        int poses = whole < 4 || whole == 7 ? 4 : 5;
+        int pose = (int)((beat - whole) * poses);
+        return (whole + pose / (float)poses) * Beat;
     }
 
-    /// <summary>
-    /// A moment the solo passes through.
-    /// Each hand has a place in the chest's space, with its elbow swung toward a direction; her left is +X.
-    /// </summary>
-    /// <param name="Hip">
-    /// Degrees the hips tilt, lifting the left one: negative puts her weight on her right leg.
-    /// </param>
-    /// <param name="HipTurn">Degrees the hips turn toward her left under the chest.</param>
-    /// <param name="Tip">Degrees the chest tips on the belly toward her right shoulder.</param>
-    /// <param name="Twist">Degrees the chest twists on the belly toward her left.</param>
-    /// <param name="SplayL">Degrees the left thigh tips out sideways.</param>
-    /// <param name="Kick">How far her right foot is kicked up behind her, from 0 to 1.</param>
-    /// <param name="Nod">
-    /// Degrees the head nods; <paramref name="Turn"/> turns it to her left, <paramref name="Tilt"/> tips it right.
-    /// </param>
-    /// <param name="Toes">Degrees both feet turn out.</param>
-    /// <param name="WristL">Degrees the left hand bends toward its palm; negative cocks it back.</param>
-    /// <param name="ShrugL">How far the left shoulder is lifted, in metres.</param>
-    /// <param name="Facing">Degrees her whole body is turned toward her left.</param>
-    /// <param name="Lift">How far off the floor she is, in metres.</param>
-    /// <param name="Bounce">Degrees her knees dip between beats.</param>
-    private readonly record struct Step(Vector3 HandL, Vector3 ElbowL, HandShape ShapeL, Vector3 HandR, Vector3 ElbowR, HandShape ShapeR,
-        float Hip = 0, float HipTurn = 0, float Tip = 0, float Twist = 0, float SplayL = 0, float SplayR = 0, float KneeL = 0, float KneeR = 0, float Kick = 0,
-        float Lean = 0, float Nod = 0, float Turn = 0, float Tilt = 0, float Toes = 0, float WristL = 0, float WristR = 0, float ShrugL = 0, float ShrugR = 0,
-        float Facing = 0, float Lift = 0, float Bounce = 5) {
-        /// <summary>The step part of the way to <paramref name="to"/>; a hand takes its new shape half way.</summary>
-        public Step Toward(Step to, float blend) {
-            float Mix(float from, float next) => Mathf.Lerp(from, next, blend);
-            return new(HandL.Lerp(to.HandL, blend), ElbowL.Lerp(to.ElbowL, blend), blend < .5f ? ShapeL : to.ShapeL,
-                HandR.Lerp(to.HandR, blend), ElbowR.Lerp(to.ElbowR, blend), blend < .5f ? ShapeR : to.ShapeR,
-                Mix(Hip, to.Hip), Mix(HipTurn, to.HipTurn), Mix(Tip, to.Tip), Mix(Twist, to.Twist), Mix(SplayL, to.SplayL), Mix(SplayR, to.SplayR),
-                Mix(KneeL, to.KneeL), Mix(KneeR, to.KneeR), Mix(Kick, to.Kick), Mix(Lean, to.Lean), Mix(Nod, to.Nod), Mix(Turn, to.Turn), Mix(Tilt, to.Tilt),
-                Mix(Toes, to.Toes), Mix(WristL, to.WristL), Mix(WristR, to.WristR), Mix(ShrugL, to.ShrugL), Mix(ShrugR, to.ShrugR),
-                Mix(Facing, to.Facing), Mix(Lift, to.Lift), Mix(Bounce, to.Bounce));
-        }
-
-        /// <summary>
-        /// The same step the other way round: what her left side did, her right side does.
-        /// A kick stays her right foot's.
-        /// </summary>
-        public Step Mirrored() => new(Mirror(HandR), Mirror(ElbowR), ShapeR, Mirror(HandL), Mirror(ElbowL), ShapeL,
-            -Hip, -HipTurn, -Tip, -Twist, SplayR, SplayL, KneeR, KneeL, Kick, Lean, Nod, -Turn, -Tilt, Toes, WristR, WristL, ShrugR, ShrugL, -Facing, Lift, Bounce);
-    }
-
-    private static Vector3 Mirror(Vector3 left) => left with { X = -left.X };
-
-    // Where a left hand goes, and the way its elbow swings; a right hand takes the mirror of each.
-    private static readonly Vector3 Out = new(1, -.1f, 0), Down = new(.3f, -1, -.3f), High = new(1, .4f, .1f), Tucked = new(1, -.5f, 0), Back = new(.6f, -.3f, -1);
-    private static readonly Vector3 Flexed = new(.27f, .68f, .04f), Low = new(.4f, .1f, .05f), Overhead = new(.1f, .86f, .04f), AtEye = new(.05f, .69f, .15f),
-        Sky = new(.17f, .99f, .02f), BeforeFace = new(0, .63f, .24f), AtChest = new(.05f, .42f, .15f), AtMouth = new(.02f, .6f, .14f),
-        ByCheek = new(.1f, .69f, .14f), ByShoulder = new(.2f, .62f, .1f), Raised = new(.21f, .76f, .06f), OnHip = new(.19f, .16f, .02f),
-        Swept = new(.34f, .2f, .2f), Wide = new(.5f, .52f, .06f);
-
+    private static readonly Vector3 LeftOut = new(1, -.1f, 0), RightOut = new(-1, -.1f, 0);
+    private static readonly Vector3 LeftUp = new(1, .65f, -.1f), RightUp = new(-1, .65f, -.1f);
+    private static readonly Vector3 LeftDown = new(1, -1, 0), RightDown = new(-1, -1, 0);
     private const HandShape Open = HandShape.Open, Fist = HandShape.Fist, Point = HandShape.Point, Ring = HandShape.Ring;
-    /// <summary>Seconds a bar of the solo lasts: four beats.</summary>
-    private const float Bar = 2;
 
-    // The steps the solo is made of, each for the left side; the other side is its mirror.
-    /// <summary>
-    /// Fists flexed by the head over a wide stance, toes out, chest twisted one way and hips the other, shoulders up.
-    /// </summary>
-    private static Step Shimmy(float twist) =>
-        new(Flexed, Out, Fist, Mirror(Flexed), Mirror(Out), Fist, Hip: -twist * .25f, HipTurn: -twist * .5f, Twist: twist, SplayL: 13, SplayR: 13, KneeL: 12, KneeR: 12,
-            Tilt: twist * .45f, Toes: 10, WristL: 25, WristR: 25, ShrugL: .012f + twist * .0008f, ShrugR: .012f - twist * .0008f);
+    /// <summary>A hand's position in the chest's frame, the direction its elbow points, and how its wrist bends.</summary>
+    private readonly record struct Gesture(Vector3 Hand, Vector3 Elbow, HandShape Shape = Open, float Wrist = 0) {
+        public Gesture Toward(Gesture to, float blend) =>
+            new(Hand.Lerp(to.Hand, blend), Elbow.Lerp(to.Elbow, blend), blend < .5f ? Shape : to.Shape, Mathf.Lerp(Wrist, to.Wrist, blend));
+    }
 
     /// <summary>
-    /// The hips pop out to her right as the left arm arcs over her head and the right arm drops, its hand cocked back.
+    /// A pose in the dance. Feet are ankle positions on the stage, the hips give the rise and shift,
+    /// and the chest and head turn over them. Her left and the viewer's right are +X.
     /// </summary>
-    private static readonly Step Pop = new(Overhead, High, Open, Mirror(Low), Mirror(Down), Open, Hip: -11, HipTurn: 6, Tip: 17, SplayL: 26, SplayR: 3, KneeR: 6,
-        Tilt: -10, Toes: 8, WristL: 30, WristR: -45, ShrugL: .02f);
-    /// <summary>
-    /// The left hand rings her left eye, weight on the right leg, hips turned to the hand, chest tipped back over them.
-    /// Her head leans into it.
-    /// </summary>
-    private static readonly Step Framed = new(AtEye, High, Ring, Mirror(Low), Mirror(Down), Open, Hip: -13, HipTurn: 10, Tip: 21, Twist: -8, SplayL: 30, SplayR: 1, KneeR: 5,
-        Turn: 12, Tilt: -16, Toes: 8, WristR: -45, ShrugL: .02f);
-    /// <summary>Both hands flick down to her sides, cocked back, as the knees dip and the head nods.</summary>
-    private static readonly Step Flick = new(Low, Down, Open, Mirror(Low), Mirror(Down), Open, SplayL: 8, SplayR: 8, KneeL: 28, KneeR: 28, Lean: 6, Nod: 10,
-        WristL: -55, WristR: -55, Toes: 6, Bounce: 0);
-    /// <summary>Both fists gathered at her chest, knees bent and feet together, before a burst.</summary>
-    private static readonly Step Gathered = new(AtChest, Tucked, Fist, Mirror(AtChest), Mirror(Tucked), Fist, KneeL: 28, KneeR: 28, Lean: 8, Nod: 10,
-        ShrugL: .015f, ShrugR: .015f, Bounce: 0);
-    /// <summary>
-    /// A finger at the sky from a straight left arm, weight on the right leg, left knee loose, head thrown back.
-    /// </summary>
-    private static readonly Step Reached = new(Sky, Out, Point, Mirror(Low), Mirror(Down), Open, Hip: -10, Tip: 12, SplayL: 10, KneeL: 18, Nod: -16, Turn: 10,
-        WristR: -45, ShrugL: .03f, Bounce: 2);
-    /// <summary>
-    /// Turned a quarter toward her left with the near hand on her hip and the far one by her cheek, hips pushed back.
-    /// </summary>
-    private static readonly Step Posed = new(OnHip, Back, Fist, Mirror(ByCheek), Mirror(Tucked), Open, Hip: -10, Tip: 14, Twist: -12, SplayL: 4, SplayR: 6, KneeL: 20,
-        Turn: -24, Tilt: -8, WristR: 20, Facing: 38);
-    /// <summary>
-    /// On her left leg with the right foot kicked up behind, a fist at her mouth and the other arm out low.
-    /// </summary>
-    private static readonly Step Kicked = new(AtMouth, Tucked, Fist, Mirror(Low), Mirror(Down), Open, Hip: 11, Tip: -15, Kick: 1, Tilt: -11, WristR: -45, ShrugL: .015f, Bounce: 3);
-    /// <summary>The left hand up beside her head, open, waving at the wrist; the right on her hip.</summary>
-    private static Step Waving(float wrist) =>
-        new(Raised, Out, Open, Mirror(OnHip), Mirror(Back), Fist, Hip: wrist * .15f, Tip: -wrist * .2f, SplayL: 6, SplayR: 6, Tilt: -wrist * .2f, WristL: wrist);
+    private readonly record struct Step(Gesture Left, Gesture Right, Vector3 FootL, Vector3 FootR, Vector3 Hips, Vector3 Chest, Vector3 Head,
+        float Tilt = 0, float Turn = 0, float Facing = 0, float Toes = 5) {
+        public Step Toward(Step to, float blend) =>
+            new(Left.Toward(to.Left, blend), Right.Toward(to.Right, blend), FootL.Lerp(to.FootL, blend), FootR.Lerp(to.FootR, blend),
+                Hips.Lerp(to.Hips, blend), Chest.Lerp(to.Chest, blend), Head.Lerp(to.Head, blend),
+                Mathf.Lerp(Tilt, to.Tilt, blend), Mathf.Lerp(Turn, to.Turn, blend), Mathf.Lerp(Facing, to.Facing, blend), Mathf.Lerp(Toes, to.Toes, blend));
+    }
 
-    /// <summary>
-    /// The solo, four bars of four beats.
-    /// One: a fast shimmy, the hips pop out, a hand rings one eye, both hands flick down, and a hop back into the flex.
-    /// Two: the same the other way round, then she gathers her fists and bursts into a finger at the sky.
-    /// Three: the finger sweeps down before her face, a quarter turn into a pose, back to the front, a hop and a kick.
-    /// Four: she lands low, poses the other way, waves, sweeps both arms wide and down, and rises into the first step.
-    /// </summary>
-    private static readonly (float At, Step Step)[] SoloSteps = {
-        (0, Shimmy(14)), (.125f, Shimmy(-14)), (.25f, Shimmy(14)), (.375f, Shimmy(-14)),
-        (.5f, Pop), (.75f, Framed), (1.05f, Framed), (1.3f, Framed with { Tilt = -4, Nod = 5, ShrugL = .035f }),
-        (1.5f, Flick),
-        (1.75f, Shimmy(10) with { Lift = .035f, KneeL = 0, KneeR = 0 }), (1.875f, Shimmy(0)),
+    private const float AnkleHeight = .05f;
+    private static readonly Vector3 CloseL = new(.071f, AnkleHeight, .008f), CloseR = new(-.069f, AnkleHeight, 0);
+    private static readonly Vector3 WideL = new(.283f, AnkleHeight, -.012f), WideR = new(-.236f, AnkleHeight, .012f);
 
-        (Bar, Shimmy(-14)), (Bar + .125f, Shimmy(14)), (Bar + .25f, Shimmy(-14)), (Bar + .375f, Shimmy(14)),
-        (Bar + .5f, Pop.Mirrored()), (Bar + .75f, Framed.Mirrored()), (Bar + 1.05f, Framed.Mirrored()),
-        (Bar + 1.3f, (Framed with { Tilt = -4, Nod = 5, ShrugL = .035f }).Mirrored()),
-        (Bar + 1.5f, Gathered),
-        (Bar + 1.75f, Reached), (Bar * 2 + .1f, Reached),
-
-        (Bar * 2 + .35f, new(BeforeFace, Tucked, Point, Mirror(Low), Mirror(Down), Open, Hip: 5, Tip: -8, SplayR: 7, KneeR: 10, Lean: 5, Tilt: 8, WristL: 20, WristR: -30)),
-        (Bar * 2 + .6f, Posed), (Bar * 2 + .9f, Posed with { Hip = -9, Tip = 13, ShrugR = .02f }),
-        (Bar * 2 + 1.15f, Gathered with { KneeL = 16, KneeR = 16 }),
-        (Bar * 2 + 1.3f, Gathered with { KneeL = 0, KneeR = 0, Lean = 0, Nod = 0, Lift = .05f }),
-        (Bar * 2 + 1.5f, Kicked), (Bar * 3, Kicked),
-
-        (Bar * 3 + .2f, new(ByCheek, Tucked, Point, Mirror(Low), Mirror(Down), Open, Twist: 10, KneeL: 24, KneeR: 24, Tilt: -8, WristR: -30, Bounce: 0)),
-        (Bar * 3 + .45f, Posed.Mirrored()), (Bar * 3 + .75f, (Posed with { Hip = -9, Tip = 13, ShrugR = .02f }).Mirrored()),
-        (Bar * 3 + 1, Waving(30)), (Bar * 3 + 1.125f, Waving(-30)), (Bar * 3 + 1.25f, Waving(30)), (Bar * 3 + 1.375f, Waving(-30)),
-        (Bar * 3 + 1.55f, new(Wide, Out, Open, Mirror(Wide), Mirror(Out), Open, SplayL: 10, SplayR: 10, Nod: -6, WristL: -20, WristR: -20, ShrugL: .02f, ShrugR: .02f)),
-        (Bar * 3 + 1.75f, Flick with { HandL = Swept, HandR = Mirror(Swept), SplayL = 12, SplayR = 12 }),
-        (Bar * 4 - .1f, Shimmy(0) with { Lift = .03f, KneeL = 0, KneeR = 0 }),
-        (Bar * 4, Shimmy(14)),
+    private static readonly Step Paws = new(
+        new(new(.164f, .609f, .243f), LeftDown, Fist, 11), new(new(-.172f, .564f, .238f), RightDown, Fist, 7),
+        new(.132f, AnkleHeight, -.008f), new(-.138f, AnkleHeight, .013f), new(.011f, .792f, -.018f),
+        new(1, -4, 3), new(-3, 3, -4), Tilt: -3, Toes: 7);
+    private static readonly Step OpenPaws = Paws with {
+        Left = new(new(.149f, .495f, .272f), new(.27f, -1, .2f), Open, -26),
+        Right = new(new(-.151f, .499f, .269f), new(-.27f, -1, .2f), Open, -24),
+        Hips = new(-.013f, .784f, -.009f),
+        Chest = new(3, 2, -3),
+        Head = new(-1, -2, 4),
+    };
+    private static readonly Step OneHigh = Paws with {
+        Left = new(new(.167f, .812f, .114f), LeftOut, Open, -16),
+        Hips = new(-.037f, .788f, -.018f),
+        Chest = new(-2, 6, 8),
+        Head = new(1, -5, -6),
+        Tilt = 4,
+    };
+    private static readonly Step OtherHigh = Paws with {
+        Right = new(new(-.177f, .824f, .106f), RightOut, Open, -20),
+        Hips = new(.034f, .788f, -.011f),
+        Chest = new(-2, -7, -8),
+        Head = new(0, 5, 6),
+        Tilt = -4,
+    };
+    private static readonly Step BothHigh = Paws with {
+        Left = new(new(.252f, .88f, .079f), LeftUp, Open, -10),
+        Right = new(new(-.248f, .872f, .087f), RightUp, Open, -12),
+        Hips = new(.004f, .805f, -.009f),
+        Chest = new(-3, 2, -1),
+        Head = new(-4, -2, 1),
+        Tilt = 1,
     };
 
-    /// <summary>Seconds the solo runs before it comes round again.</summary>
-    public static float SoloSeconds => SoloSteps[^1].At;
+    /// <summary>The side dancers open their hands, alternate overhead gestures, then come back to their paws.</summary>
+    private static readonly (float At, Step Step)[] ChorusSteps = {
+        (0, Paws),
+        (.5f * Beat, Paws with { Head = new(2, 4, -4), Left = new(new(.179f, .642f, .231f), LeftDown, Fist, 16) }),
+        (Beat, OpenPaws),
+        (1.5f * Beat, OpenPaws with { Right = Paws.Right }),
+        (2 * Beat, OneHigh),
+        (2.5f * Beat, OneHigh with { Left = new(new(.148f, .833f, .106f), LeftUp, Open, -25) }),
+        (3 * Beat, OneHigh with { Hips = new(-.051f, .781f, -.017f), Head = new(4, -8, -7) }),
+        (3.5f * Beat, Paws with { Hips = new(-.035f, .782f, -.033f), Left = OneHigh.Left }),
+        (4 * Beat, BothHigh),
+        (4.5f * Beat, BothHigh with { Left = OneHigh.Left }),
+        (5 * Beat, OtherHigh),
+        (5.6f * Beat, Paws with { Right = OtherHigh.Right, Head = new(2, 4, 3) }),
+        (6 * Beat, OneHigh),
+        (6.5f * Beat, OneHigh with { Right = new(new(-.275f, .287f, .214f), RightDown, Open, 6) }),
+        (7 * Beat, OtherHigh with { Left = new(new(.275f, .308f, .215f), LeftDown, Open, 2), Head = new(1, 2, 8) }),
+        (7.5f * Beat, OtherHigh with { Left = OpenPaws.Left }),
+        (8 * Beat, BothHigh),
+        (8.4f * Beat, BothHigh with { Left = OneHigh.Left, Head = new(-3, -5, 4) }),
+        (8.8f * Beat, Paws with { Right = OtherHigh.Right }),
+        (9.2f * Beat, OpenPaws),
+        (9.7f * Beat, Paws with { Right = OpenPaws.Right }),
+        (10 * Beat, OneHigh),
+        (10.6f * Beat, OtherHigh with { Left = OneHigh.Left }),
+        (11 * Beat, OtherHigh with { Left = new(new(.27f, .317f, .215f), LeftDown, Open, 7) }),
+        (11.4f * Beat, OtherHigh with { Left = OpenPaws.Left }),
+        (SoloSeconds, Paws),
+    };
 
-    /// <summary>The solo of the catgirl in the middle at a moment of its loop.</summary>
-    public static DanceFrame Solo(float time) {
-        var step = SoloStep(time);
-        // Between beats the knees dip a little, so she bounces to the beat whatever the step.
-        float dip = step.Bounce * (.5f - .5f * MathF.Cos(time / Beat * MathF.Tau));
-        float kneeL = step.KneeL + dip, kneeR = step.KneeR + dip + 105 * step.Kick, swingR = (step.KneeR + dip) / 2 - 12 * step.Kick;
-        // A leg reaches less far down the more it tips out, and the tilt lifts one hip joint and lowers the other.
-        // The hips sit where the leg that reaches furthest down stands on the floor.
-        float tilt = Mathf.DegToRad(step.Hip), lift = ActorAnimation.LegSide * MathF.Sin(tilt);
-        float standL = ActorAnimation.Reach(kneeL / 2, kneeL) * MathF.Cos(Mathf.DegToRad(step.SplayL) + tilt) - lift;
-        float standR = ActorAnimation.Reach(swingR, kneeR) * MathF.Cos(Mathf.DegToRad(step.SplayR) - tilt) + lift;
-        var pose = new Pose(Lean: step.Lean, SwingL: kneeL / 2, KneeL: kneeL, SwingR: swingR, KneeR: kneeR, TurnL: step.Toes, TurnR: step.Toes,
-            Hips: Math.Max(standL, standR) + ActorAnimation.Sole, SplayL: step.SplayL, SplayR: step.SplayR);
-        // Each hand is solved from its shoulder as shrugged, so a raised shoulder does not push the hand off its mark.
-        var slim = HumanShape.Slim;
-        (pose, float rollL) = ArmReach.WithHandAt(pose, true, step.HandL, step.ElbowL, slim.Shoulder(true, step.ShrugL));
-        (pose, float rollR) = ArmReach.WithHandAt(pose, false, step.HandR, step.ElbowR, slim.Shoulder(false, step.ShrugR));
-        // Her sway to her left is where her hips have gone: out from under the chest, the way the far hip lifts.
-        return new DanceFrame(pose, rollL, rollR, step.ShapeL, step.ShapeR, step.Hip * -.006f, step.Hip / -8, SoloStep(time - Lag).Hip / -8,
-            new Vector3(0, step.Twist, step.Tip), new Vector3(0, step.HipTurn, step.Hip), new Vector3(step.Nod, step.Turn, step.Tilt),
-            new Vector3(step.WristL, 0, 0), new Vector3(step.WristR, 0, 0), new Vector2(step.ShrugL, 0), new Vector2(step.ShrugR, 0), step.Facing, step.Lift);
+    private static readonly Step Reach = new(
+        new(new(.119f, .99f, .008f), LeftUp, Point), new(new(-.032f, .48f, .476f), RightUp, Open, 19),
+        CloseL, CloseR, new(0, .817f, 0), new(0, 0, -1), new(0, -2, -2));
+    private static readonly Step FaceFrame = new(
+        new(new(.065f, .558f, .143f), new(.16f, -1, -.04f), Open, -17),
+        new(new(-.024f, .848f, .11f), RightUp, Open, -31),
+        CloseL, CloseR, new(-.007f, .812f, 0), new(0, -4, -2), new(3, 8, -8));
+    private static readonly Step Crossed = FaceFrame with {
+        FootL = new Vector3(.045f, AnkleHeight, -.104f),
+        Hips = new Vector3(-.081f, .761f, -.024f),
+        Chest = new Vector3(-4, 12, -6),
+        Head = new Vector3(7, 3, -12),
+        Tilt = 7,
+        Turn = -15,
+        Facing = -7,
+        Toes = -18,
+    };
+
+    private static readonly Step Flex = new(
+        new(new(.25f, .75f, .055f), LeftUp, Fist, 18), new(new(-.31f, .64f, .13f), RightOut, Fist, 15),
+        WideL, WideR, new(-.025f, .785f, -.015f), new(1, -4, 4), new(-3, -7, 3), Tilt: 4, Toes: 11);
+    private static readonly Step EyeRing = Flex with {
+        Left = new(new(-.017f, .696f, .182f), LeftUp, Ring, 12),
+        Right = new(new(-.43f, .166f, .055f), RightDown, Open, -24),
+        Hips = new(-.093f, .772f, -.015f),
+        Chest = new(-2, 10, 12),
+        Head = new(3, -8, 8),
+        Tilt = 8,
+        Turn = 6,
+        Facing = -5,
+    };
+    private static readonly Step OppositeFlex = Flex with {
+        Left = new(new(.31f, .645f, .13f), LeftOut, Fist, 15),
+        Right = new(new(-.245f, .746f, .065f), RightUp, Fist, 18),
+        Hips = new(.087f, .780f, -.015f),
+        Chest = new(0, 12, -10),
+        Head = new(4, 8, -6),
+        Tilt = -7,
+        Turn = -4,
+        Facing = 4,
+    };
+
+    private static readonly Step OtherEye = OppositeFlex with {
+        Left = new(new(.406f, .174f, .087f), LeftDown, Open, -25),
+        Right = new(new(.012f, .696f, .183f), RightUp, Ring, 13),
+        Hips = new(.086f, .773f, -.02f),
+        Chest = new(-2, -10, -12),
+        Head = new(3, 10, -9),
+        Tilt = -8,
+        Turn = -6,
+        Facing = 5,
+    };
+
+    /// <summary>The opening phrase: reach, sweep, hands around the face, crossed knees, then a wide stance and an eye ring.</summary>
+    private static readonly (float At, Step Step)[] SoloSteps = {
+        (0, Reach),
+        (.25f * Beat, Reach with {
+            Left = new(new(.205f, .965f, .04f), LeftUp, Point, -9),
+            Right = new(new(-.108f, .47f, .472f), RightOut, Open, 40),
+        }),
+        (.5f * Beat, Reach with {
+            Left = new(new(.236f, .936f, .04f), LeftUp, Open),
+            Right = new(new(-.24f, .399f, .435f), RightDown, Open, 6),
+        }),
+        (.75f * Beat, Reach with {
+            Left = new(new(.448f, .599f, .071f), LeftDown, Open, 17),
+            Right = new(new(-.535f, .596f, .159f), RightUp, Open, -13),
+            Chest = new(-3, -4, 3),
+            Head = new(-1, -3, 4),
+        }),
+        (Beat, Reach with {
+            Left = new(new(.648f, .248f, .035f), LeftDown, Open),
+            Right = new(new(-.63f, .698f, .047f), RightUp, Open, -3),
+            Head = new(-4, -2, 1),
+        }),
+        (1.25f * Beat, FaceFrame with {
+            Left = new(new(.46f, .261f, .087f), LeftDown, Open),
+            Right = new(new(-.295f, .884f, .066f), RightUp, Open, -10),
+        }),
+        (1.5f * Beat, FaceFrame),
+        (2 * Beat, FaceFrame with { Head = new(0, 7, -5), Chest = new(0, -4, -1) }),
+        (1.04f, FaceFrame with {
+            Right = new(new(-.048f, .913f, .077f), RightUp, Open, -16),
+            Head = new(-7, 7, 2),
+        }),
+        (1.20f, Crossed with { FootL = new(.053f, .067f, -.075f), FootR = CloseR, Hips = new(-.068f, .772f, -.02f) }),
+        (3 * Beat, Crossed),
+        (1.55f, Crossed with {
+            Hips = new(-.08f, .765f, -.022f), Head = new(6, 10, -13),
+            Right = new(new(-.051f, .849f, .106f), RightUp, Open, -25),
+        }),
+        (3.75f * Beat, Crossed with { Head = new(5, 5, -11), Hips = new(-.065f, .756f, -.022f) }),
+        (4 * Beat, Crossed with {
+            Left = new(new(.147f, .671f, .176f), LeftUp, Fist, 10), Hips = new(-.053f, .779f, -.021f),
+        }),
+        (4.2f * Beat, Flex with {
+            FootL = new(.173f, .074f, -.044f), FootR = Crossed.FootR, Hips = new(-.044f, .788f, -.015f),
+            Left = new(new(.181f, .762f, .175f), LeftUp, Fist, 24), Right = new(new(-.42f, .47f, .194f), RightOut, Fist, 22),
+        }),
+        (1.99f, Flex with { FootR = Crossed.FootR, Hips = new(.03f, .779f, -.014f), Right = new(new(-.27f, .673f, .20f), RightOut, Fist, 35) }),
+        (2.11f, Flex with {
+            FootR = new(-.147f, .077f, .018f), Hips = new(-.027f, .77f, -.016f), Chest = new(3, -7, 4),
+            Left = new(new(.184f, .674f, .102f), LeftOut, Fist, 20), Right = new(new(-.154f, .677f, .163f), RightOut, Fist, 22),
+        }),
+        (5 * Beat, Flex with { Right = new(new(-.30f, .70f, .12f), RightDown, Fist, 12), Head = new(1, -12, 4) }),
+        (2.33f, Flex with {
+            Hips = new(-.044f, .779f, -.015f), Chest = new(2, -8, 6),
+            Right = new(new(-.313f, .574f, .20f), RightOut, Fist, 32), Head = new(-1, -7, 6),
+        }),
+        (2.43f, Flex with { Right = new(new(-.255f, .677f, .14f), RightDown, Fist, 17), Head = new(2, -9, 4) }),
+        (2.5f, Flex with {
+            Hips = new(-.085f, .767f, -.015f), Left = new(new(.162f, .684f, .115f), LeftUp, Fist, 11),
+            Right = new(new(-.175f, .661f, .142f), RightOut, Fist, 17), Head = new(5, -7, 8), Tilt = 7,
+        }),
+        (6 * Beat, Flex with {
+            Hips = new(-.074f, .775f, -.015f), Head = new(2, -6, 5), Tilt = 6,
+            Right = new(new(-.37f, .652f, .092f), RightDown, Open, 5), Left = new(new(.24f, .727f, .073f), LeftUp, Fist, 18),
+        }),
+        (6.4f * Beat, EyeRing with {
+            Left = new(new(.053f, .833f, .121f), LeftUp, Open, 27),
+            Right = new(new(-.41f, .284f, .102f), RightDown, Open, -20),
+        }),
+        (7 * Beat, EyeRing),
+        (3.17f, EyeRing with {
+            Left = new(new(-.034f, .655f, .205f), LeftOut, Ring, 15),
+            Chest = new(-1, 9, 7), Head = new(8, -9, 4),
+        }),
+        (3.37f, EyeRing with { Hips = new(-.092f, .771f, -.015f), Head = new(6, -7, 9) }),
+        (8 * Beat, Flex with {
+            Hips = new(.016f, .785f, -.015f), Left = new(new(.204f, .795f, .068f), LeftUp, Fist, 20),
+            Right = new(new(-.41f, .277f, .115f), RightDown, Open, 18), Head = new(-7, 7, -8),
+        }),
+        (3.73f, OppositeFlex with {
+            Left = new(new(.254f, .518f, .182f), LeftUp, Fist, 35),
+            Right = new(new(-.16f, .685f, .115f), RightUp, Fist, 28), Head = new(8, 10, -10),
+        }),
+        (3.88f, OppositeFlex with {
+            Left = new(new(.258f, .744f, .075f), LeftDown, Fist, 17),
+            Right = new(new(-.204f, .689f, .10f), RightUp, Fist, 26),
+        }),
+        (9 * Beat, OppositeFlex),
+        (9.32f * Beat, OppositeFlex with {
+            Hips = new(.063f, .775f, -.018f), Chest = new(4, 15, -5), Head = new(6, 10, -7),
+            Left = new(new(.31f, .612f, .219f), LeftOut, Fist, 28), Right = new(new(-.151f, .674f, .123f), RightUp, Fist, 21),
+        }),
+        (9.64f * Beat, OppositeFlex with {
+            Hips = new(.039f, .784f, -.016f), Head = new(-5, 10, 0),
+            Left = new(new(.301f, .724f, .103f), LeftOut, Fist, 10), Right = new(new(-.267f, .709f, .10f), RightOut, Fist, 14),
+        }),
+        (10 * Beat, OppositeFlex with {
+            Hips = new(.028f, .783f, -.016f), Chest = new(1, -8, -2), Head = new(1, 4, -3),
+            Left = new(new(.275f, .468f, .195f), LeftDown, Open, -18), Right = new(new(-.28f, .732f, .087f), RightOut, Open, 11),
+        }),
+        (10.4f * Beat, OtherEye with {
+            Left = new(new(.36f, .266f, .098f), LeftDown, Open, -19),
+            Right = new(new(-.13f, .851f, .123f), RightUp, Open, 22),
+            Hips = new(.052f, .781f, -.019f), Head = new(-3, 9, -6),
+        }),
+        (11 * Beat, OtherEye),
+        (11.25f * Beat, OtherEye with { Right = new(new(.02f, .676f, .198f), RightOut, Ring, 9), Head = new(6, 9, -6) }),
+        (11.43f * Beat, OppositeFlex with { FootR = new(-.141f, .076f, .01f), Hips = new(.026f, .772f, -.012f) }),
+        (11.56f * Beat, OppositeFlex with { FootR = CloseR, Hips = new(-.017f, .785f, -.01f) }),
+        (11.76f * Beat, Reach with {
+            FootL = new(.163f, .077f, .005f), Hips = new(-.01f, .787f, -.006f),
+            Left = new(new(.21f, .816f, .14f), LeftUp, Open), Right = new(new(-.29f, .41f, .15f), RightDown, Open, 24),
+        }),
+        (SoloSeconds, Reach),
+    };
+
+    /// <summary>The solo of the catgirl in the middle at a moment of the dance.</summary>
+    public static DanceFrame Solo(float time) => Perform(SoloSteps, PoseTime(time), 1);
+
+    /// <summary>The side catgirls' response at the same moment of the dance.</summary>
+    public static DanceFrame Chorus(float time) => Perform(ChorusSteps, PoseTime(time), 1.15f);
+
+    private static DanceFrame Perform(ReadOnlySpan<(float At, Step Step)> steps, float time, float weight) {
+        var step = Accented(steps, time, weight);
+        float trailing = Accented(steps, time - Lag, weight).Hips.X;
+        return PlaceDancer(step, trailing);
     }
 
-    /// <summary>The blend of the two steps the solo is between at a moment of its loop.</summary>
-    private static Step SoloStep(float time) =>
-        IntroPoses.Keyed<Step>(Mathf.PosMod(time, SoloSeconds), static (from, to, blend) => from.Toward(to, blend), SoloSteps);
+    /// <summary>Weight drops into the beat, then rebounds. The chest, head and wrists follow the hips.</summary>
+    private static Step Accented(ReadOnlySpan<(float At, Step Step)> steps, float time, float weight) {
+        var step = IntroPoses.Keyed<Step>(Mathf.PosMod(time, SoloSeconds), static (from, to, blend) => from.Toward(to, blend), steps);
+        float beat = time / Beat, phase = Mathf.PosMod(beat, 1);
+        float down = 1 - Mathf.SmoothStep(0, .53f, phase) + Mathf.SmoothStep(.72f, 1, phase);
+        float transfer = weight * MathF.Cos(MathF.PI * beat - .2f);
+        float follow = weight * MathF.Cos(MathF.Tau * (beat - .19f));
+        return step with {
+            Hips = step.Hips + new Vector3(.017f * transfer, -.028f * down * weight, -.008f * down),
+            Tilt = step.Tilt - 2.4f * transfer,
+            Chest = step.Chest + new Vector3(3.8f * follow, -2.8f * transfer, 2.5f * transfer),
+            Head = step.Head + new Vector3(3.5f * follow, 2.6f * transfer, -3.2f * transfer),
+            Left = step.Left with { Wrist = step.Left.Wrist + 9 * follow },
+            Right = step.Right with { Wrist = step.Right.Wrist + 9 * follow },
+        };
+    }
+
+    private static DanceFrame PlaceDancer(Step step, float trailing) {
+        var facing = new Basis(Vector3.Up, Mathf.DegToRad(step.Facing));
+        var tilt = new Vector3(0, Mathf.DegToRad(step.Turn), Mathf.DegToRad(step.Tilt));
+        var hips = Basis.FromEuler(tilt);
+        var build = HumanShape.Slim;
+        var leftLeg = hips * build.Hip(true);
+        var rightLeg = hips * build.Hip(false);
+        var leftFoot = facing.Inverse() * step.FootL;
+        var rightFoot = facing.Inverse() * step.FootR;
+        var shift = step.Hips with { Y = 0 };
+        leftFoot -= shift + leftLeg;
+        rightFoot -= shift + rightLeg;
+        float reach = ActorAnimation.Thigh + build.ShinLength - .001f;
+        // Carry the body higher by the added shin length while the feet stay on their choreographed marks.
+        float wantedHeight = step.Hips.Y + (build.ShinLength - ActorAnimation.Shin);
+        float height = Math.Min(wantedHeight, Math.Min(StandingHeight(leftFoot, reach), StandingHeight(rightFoot, reach)));
+        var left = PlaceFoot(hips.Inverse() * (leftFoot - Vector3.Up * height), step.Toes, build.ShinLength);
+        var right = PlaceFoot(hips.Inverse() * (rightFoot - Vector3.Up * height), -step.Toes, build.ShinLength);
+        var pose = new Pose(SwingL: left.Swing, KneeL: left.Knee, FootL: left.Swing - left.Knee,
+            SwingR: right.Swing, KneeR: right.Knee, FootR: right.Swing - right.Knee,
+            Hips: height, SplayL: left.Splay, SplayR: -right.Splay, TurnL: step.Toes, TurnR: step.Toes);
+        (pose, float rollL) = ArmReach.WithHandAt(pose, true, HandTarget(step.Left.Hand), step.Left.Elbow, build);
+        (pose, float rollR) = ArmReach.WithHandAt(pose, false, HandTarget(step.Right.Hand), step.Right.Elbow, build);
+        var root = facing * shift;
+        return new DanceFrame(pose, rollL, rollR, step.Left.Shape, step.Right.Shape, root.X, step.Hips.X / .09f, trailing / .09f,
+            step.Chest, new Vector3(0, step.Turn, step.Tilt), step.Head,
+            new Vector3(step.Left.Wrist, 0, 0), new Vector3(step.Right.Wrist, 0, 0), Facing: step.Facing, Depth: root.Z);
+    }
+
+    /// <summary>Fits the gestures to the shorter chest and narrower head, including the eye rings.</summary>
+    private static Vector3 HandTarget(Vector3 hand) => new(hand.X * .85f, hand.Y * .81f - .027f, hand.Z * .88f);
+
+    private static float StandingHeight(Vector3 foot, float reach) =>
+        foot.Y + MathF.Sqrt(Math.Max(0, reach * reach - foot.X * foot.X - foot.Z * foot.Z));
+
+    /// <summary>Finds the thigh and knee bend that put an ankle at its mark, with the toes turned out.</summary>
+    private static (float Splay, float Swing, float Knee) PlaceFoot(Vector3 ankle, float toes, float shin) {
+        float turn = Mathf.DegToRad(toes);
+        float sideways = new Vector2(ankle.X, ankle.Y).Length();
+        float splay = MathF.Atan2(ankle.X, -ankle.Y) - MathF.Asin(Math.Clamp(ankle.Z * MathF.Tan(turn) / sideways, -1, 1));
+        var ankleInPlane = new Basis(Vector3.Up, -turn) * (new Basis(Vector3.Back, -splay) * ankle);
+        const float thigh = ActorAnimation.Thigh;
+        float knee = MathF.Acos(Math.Clamp((ankle.LengthSquared() - thigh * thigh - shin * shin) / (2 * thigh * shin), -1, 1));
+        float swing = MathF.Atan2(ankleInPlane.Z, -ankleInPlane.Y) + MathF.Atan2(shin * MathF.Sin(knee), thigh + shin * MathF.Cos(knee));
+        return (Mathf.RadToDeg(splay), Mathf.RadToDeg(swing), Mathf.RadToDeg(knee));
+    }
+
 }

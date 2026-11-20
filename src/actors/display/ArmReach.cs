@@ -28,10 +28,10 @@ public static class ArmReach {
     /// as the arm allows; <see cref="ActorRig.RollArm"/> applies the roll after the pose.
     /// <paramref name="shoulder"/> is where the shoulder is in that frame, the game's build at rest unless given.
     /// </summary>
-    public static (float Raise, float Out, float Elbow, float Roll) ArmTo(Vector3 grip, bool left, Vector3 elbowToward, float palm = 0, Vector3? shoulder = null) {
+    public static (float Raise, float Out, float Elbow, float Roll) ArmTo(Vector3 grip, bool left, Vector3 elbowToward, float palm = 0,
+        Vector3? shoulder = null, float upper = ActorRig.UpperArm, float gripLength = ActorRig.Forearm) {
         var from = shoulder ?? HumanShape.Standard.Shoulder(left);
-        const float upper = ActorRig.UpperArm;
-        float fore = MathF.Sqrt(ActorRig.Forearm * ActorRig.Forearm + palm * palm);
+        float fore = MathF.Sqrt(gripLength * gripLength + palm * palm);
         var reach = grip - from;
         float d = Math.Clamp(reach.Length(), Math.Abs(upper - fore) + 1e-3f, upper + fore - 1e-3f);
         var along = reach.Normalized();
@@ -50,7 +50,7 @@ public static class ArmReach {
         var basis = new Basis(y.Cross(z), y, z);
         // The shoulder turns as Rx(-raise) Rz(out) and RollArm then turns it about its length.
         var euler = basis.GetEuler(EulerOrder.Xzy);
-        float elbow = Mathf.RadToDeg(MathF.Acos(Math.Clamp(down.Dot(forearm), -1, 1)) - MathF.Atan2(palm, ActorRig.Forearm));
+        float elbow = Mathf.RadToDeg(MathF.Acos(Math.Clamp(down.Dot(forearm), -1, 1)) - MathF.Atan2(palm, gripLength));
         float outward = Mathf.RadToDeg(euler.Z);
         return (-Mathf.RadToDeg(euler.X), left ? outward : -outward, elbow, Mathf.RadToDeg(euler.Y));
     }
@@ -73,6 +73,12 @@ public static class ArmReach {
     /// </summary>
     public static (Pose Pose, float Roll) WithHandAt(Pose pose, bool left, Vector3 grip, Vector3 elbowToward, Vector3? shoulder = null) {
         var (raise, outward, elbow, roll) = ArmTo(grip, left, elbowToward, ActorRig.Palm, shoulder);
+        return (WithArm(pose, left, raise, outward, elbow, 1), roll);
+    }
+
+    /// <summary>Places a hand with the shoulder insertion and bone lengths of the given build.</summary>
+    internal static (Pose Pose, float Roll) WithHandAt(Pose pose, bool left, Vector3 grip, Vector3 elbowToward, BodyBuild build, float up = 0, float forward = 0) {
+        var (raise, outward, elbow, roll) = ArmTo(grip, left, elbowToward, ActorRig.Palm, build.Shoulder(left, up, forward), build.UpperArmLength, build.GripLength);
         return (WithArm(pose, left, raise, outward, elbow, 1), roll);
     }
 
