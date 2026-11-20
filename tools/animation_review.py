@@ -18,7 +18,8 @@ sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
 OUTPUT = build.BUILD / "animation-review"
-# Frames a second a view records, the rate the game is drawn at, and how many frames it records by default: two seconds of game time unslowed.
+# Frames a second a view records, the rate the game is drawn at, and how many frames it records by default:
+# two seconds of game time unslowed.
 FPS = 60
 FRAMES = 120
 
@@ -74,8 +75,11 @@ def record(
     log = movie.with_suffix(".log")
     launcher = (checkout / "build.py").read_text()
     records = '"record"' in launcher
+    # A ref from before the rate could be set records 30 frames a second: it takes that many fewer frames to cover
+    # the same game time, so its movie is as long but does not match the branch's frame for frame.
+    if '"--fps"' not in launcher:
+        count = count * 30 // FPS
     if records:
-        # A ref from before the rate could be set records at its own default of 30 a second.
         rate = ["--fps", str(FPS)] if '"--fps"' in launcher else []
         command = [
             sys.executable,
@@ -216,7 +220,8 @@ def main() -> None:
     if options.base:
         record_base(options.base, options)
     print(
-        f"{options.frames} frames a view at {FPS} a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
+        f"{options.frames} frames a view at {FPS} a second of {options.slow}x slow motion"
+        f" in {OUTPUT / slug(options.clip)}"
     )
 
 

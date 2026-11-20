@@ -415,7 +415,7 @@ public static class WorldModels {
     }
 
     /// <summary>The fall of a felled tree toward <paramref name="heading"/>, a way across the world's ground in radians from the x axis toward y, in the frame of its model's turn.</summary>
-    public static TreeFall Fall(TreeProp tree, float heading) {
+    public static TreeFall Topple(TreeProp tree, float heading) {
         var (species, variant) = TreeLook(tree.Id);
         var toward = new Vector3(MathF.Cos(heading), 0, MathF.Sin(heading)).Rotated(Vector3.Up, -Mathf.DegToRad(Turn(tree.Id)));
         var (wood, top) = Tree3DShape.Outline(species, variant);

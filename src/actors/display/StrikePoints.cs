@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 /// working end goes to, for someone working it from where they stand.
 /// </summary>
 public sealed class StrikePoints {
-    /// <summary>The height a pick lands on a rock's face, and a shovel's blade at the foot of a stump or bush, measured over the ground.</summary>
+    /// <summary>The highest a pick lands on a rock's face, and the height of a shovel's blade at the foot of a stump or bush, over the ground.</summary>
     private const float RockFace = .45f, Foot = .05f;
     /// <summary>How far in from the edge of a work top a hammer lands, and how far out from a stump's or bush's foot a shovel goes in.</summary>
     private const float TopInset = .08f, FootOut = .04f;
@@ -37,9 +37,11 @@ public sealed class StrikePoints {
     /// </summary>
     private readonly record struct Part(Vector3[] Corners, Aabb Box, Transform3D Place, Transform3D Inverse);
 
-    /// <summary>Spots worked out by thing, the cell its worker stands in and action, and the model used.</summary>
-    private readonly Dictionary<(int Thing, int X, int Y, ActorAction Action), (Prop Prop, Vector3? Spot)> known =
+    /// <summary>Spots worked out by thing, the cell its worker stands in and action, and the model used and its size then.</summary>
+    private readonly Dictionary<(int Thing, int X, int Y, ActorAction Action), (Prop Prop, float Size, Vector3? Spot)> known =
         new();
+    /// <summary>How much a model's size changes, as a share, before its spots are worked out again, as a rock shrinks while mined.</summary>
+    private const float Resized = .01f;
     /// <summary>The keys of <see cref="known"/> in the order they were added, oldest first.</summary>
     private readonly Queue<(int Thing, int X, int Y, ActorAction Action)> added = new();
     /// <summary>The meshes of the model searched, refilled for each spot so a search makes no garbage.</summary>
@@ -48,12 +50,13 @@ public sealed class StrikePoints {
     /// <summary>
     /// The point in the world where <paramref name="action"/>'s tool lands on <paramref name="subject"/>, drawn as <paramref name="prop"/>,
     /// for someone working it from <paramref name="from"/>, turned to face it as they come to; null for an action that lands on nothing there.
-    /// A spot found on another model, as in a world loaded since, is worked out again.
+    /// A spot found on another model, as in a world loaded since, or on the model at another size, is worked out again.
     /// </summary>
     public Vector3? At(Thing? subject, Vector2 from, ActorAction action, Prop? prop) {
         if (subject == null || prop == null || !ActorAnimation.Works(action).Contains(subject.Kind)) return null;
         var key = (subject.Id, (int)MathF.Round(from.X / Cell), (int)MathF.Round(from.Y / Cell), action);
-        if (known.TryGetValue(key, out var was) && was.Prop == prop) return was.Spot;
+        float size = prop.Body.Scale.X;
+        if (known.TryGetValue(key, out var was) && was.Prop == prop && Math.Abs(was.Size - size) < Resized) return was.Spot;
         if (!known.ContainsKey(key)) {
             if (added.Count == Kept) known.Remove(added.Dequeue());
             added.Enqueue(key);
@@ -64,7 +67,7 @@ public sealed class StrikePoints {
         var rig = new Transform3D(Basis.FromEuler(new Vector3(0, ActorAnimation.Yaw(subject.Pos - from, 0), 0)), WorldView.To3(from));
         var spot = action == ActorAction.Dig ? AtTheFoot(subject, from, prop, meshes)
             : OnTheSwing(subject, rig, action, meshes) ?? Facing(subject, from, action, prop, meshes);
-        known[key] = (prop, spot);
+        known[key] = (prop, size, spot);
         return spot;
     }
 
@@ -121,10 +124,12 @@ public sealed class StrikePoints {
                     return null;
                 }
             default: {
+                    // A rock mined down is lower: the pick comes down halfway up it at most.
+                    float height = Math.Min(RockFace, (prop.Body.GlobalTransform * WorldModels.Bounds(prop.Body)).GetCenter().Y);
                     var toward = (from - subject.Pos).Normalized();
-                    var face = new Vector3(subject.Pos.X, RockFace, subject.Pos.Y);
+                    var face = new Vector3(subject.Pos.X, height, subject.Pos.Y);
                     return Out(meshes, face, new Vector3(toward.X, 0, toward.Y)) is float reach
-                        ? WorldView.To3(subject.Pos + toward * reach, RockFace) : null;
+                        ? WorldView.To3(subject.Pos + toward * reach, height) : null;
                 }
         }
     }

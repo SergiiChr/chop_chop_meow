@@ -17,7 +17,7 @@ public static class StairSteps {
     private const float OffTheGround = .03f;
     // The body heads onto the other boot's tread this many metres per metre a boot lifting off behind rises, easing out
     // over this far either side of the hips as the boot swings past them.
-    private const float LiftEase = 3, Passing = .1f;
+    private const float LiftEase = 3, PastHips = .1f;
     // How quickly the body's height over the steps follows where it heads, up and down, as the rate of a critically damped
     // spring a second (Movement.Spring). It comes down quicker, since a boot it holds up over a lower tread would show in the air.
     private const float RiseRate = 20, DropRate = 40;
@@ -130,7 +130,7 @@ public static class StairSteps {
     /// a tread <paramref name="rise"/> or more lower.
     /// </summary>
     private static float Easing(Boot boot, bool backing, float rise) =>
-        LiftEase * (1 - Mathf.SmoothStep(-Passing, Passing, backing ? -boot.Toe.X : boot.Toe.X)) * (1 - Math.Clamp(boot.Drops / rise, 0, 1));
+        LiftEase * (1 - Mathf.SmoothStep(-PastHips, PastHips, backing ? -boot.Toe.X : boot.Toe.X)) * (1 - Math.Clamp(boot.Drops / rise, 0, 1));
 
     /// <summary>
     /// How low over the ground under the pose the body heads with <paramref name="boot"/> bearing its weight alone, the

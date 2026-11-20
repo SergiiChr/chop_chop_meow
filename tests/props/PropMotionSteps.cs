@@ -19,7 +19,7 @@ internal static class PropMotionSteps {
         var (species, variant) = WorldModels.TreeLook(id);
         var (wood, _) = Tree3DShape.Outline(species, variant);
         float scale = WorldModels.TreeScale(id);
-        var fall = WorldModels.Fall(tree, heading);
+        var fall = WorldModels.Topple(tree, heading);
         float lowest = float.MaxValue, moved = 0, before = 0, step = 0, topSpeed = 0;
         int slowed = 0, frames = 0;
         while (!fall.Landed && frames < 10000) {

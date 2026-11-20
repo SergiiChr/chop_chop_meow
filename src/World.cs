@@ -290,9 +290,9 @@ public sealed partial class World {
     public const float WorkerSpeed = 2.25f;
     /// <summary>
     /// How far down the valley a worker walking off is, from 0 at the signpost to 1 out of view, after <paramref name="out"/> seconds away and <paramref name="back"/> seconds before coming back.
-    /// The walker goes at <paramref name="speed"/>, a worker's walking pace unless given, over <paramref name="distance"/>, and waits out of view for the rest of the trip.
+    /// The walker goes at a worker's walking pace over <see cref="TripDistance"/>, and waits out of view for the rest of the trip.
     /// </summary>
-    public static float WalkLeg(float @out, float back, float speed = WorkerSpeed, float distance = TripDistance) => Math.Clamp(Math.Min(@out, back) * speed / distance, 0, 1);
+    public static float WalkLeg(float @out, float back) => Math.Clamp(Math.Min(@out, back) * WorkerSpeed / TripDistance, 0, 1);
     /// <summary>How far down the valley a worker is, from 0 at the signpost to 1 out of view: running off for prices, or walking home or back over half a trade trip.</summary>
     public float TripLeg(Worker w) => w.Away > 0 ? WalkLeg(Data.TradeSeconds - w.Away, w.Away) : WalkLeg(w.Commute, Data.TradeSeconds / 2);
     public const float LeapSeconds = .4f;

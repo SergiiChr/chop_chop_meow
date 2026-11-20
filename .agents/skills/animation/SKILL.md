@@ -160,6 +160,7 @@ Felled trees, thrown stumps and chips, doors, carts, crates and fires follow the
   stops while paused.
 - In a normal game the window applies the server's state 30 times a second. A motion drawn from a count the server keeps
   steps every other frame unless the window runs its own clock between updates (`LocalClock`).
+  Check an update that brings a big change, such as a bellows pump or a new stage, and the frame after it too.
 - Wolves: measure a paw's pad, its lowest point, not the paw bone; a pad reaches 7 cm ahead of it.
 
 ## This game's rigs
@@ -196,8 +197,14 @@ git fetch origin
 ```
 
 - Movies land in `build/animation-review/<clip>/<current or ref>/<view>.avi`, 120 frames a view at 60 a second of
-  game time, slowed by `--slow` (1 by default). Recordings of the same sources match frame for frame, and so do a branch and its base; anything
-  that varies by run, such as an object's hash code, breaks that, so key motion off saved ids instead.
+  game time, slowed by `--slow` (1 by default).
+- Recordings of the same sources match frame for frame, and so do a branch and a base that records at 60 a second;
+  anything that varies by run, such as an object's hash code, breaks that, so key motion off saved ids instead.
+  An older base records 30 a second over the same game time, so its frames fall between the branch's.
+  Keep the mouse off the recording window, since the wheel zooms the view, and record the base twice before blaming
+  the branch for a difference.
+  Compare frames by the largest change of any one pixel and the count of pixels changed by more than about 32 of 255:
+  scattered small changes come from compression or a reordered sum, and an edge that moves shows as large ones.
 - The first frames show the start from standing: pick frames after it for a steady cycle.
 - `--base` records a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
   A ref without the close-up review (`--animation-clip`) cannot be recorded.

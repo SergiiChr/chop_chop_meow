@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace ChopChopMeow;
@@ -85,9 +86,11 @@ internal static class Tree3DShape {
     /// </summary>
     public static (Vector3[] Wood, float Top) Outline(int kind, int variant) {
         if (outlines[kind, variant] is { } known) return known;
-        var wood = Trunk(kind, variant).SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+        var trunk = Trunk(kind, variant);
+        var wood = new List<Vector3>();
+        for (int surface = 0; surface < trunk.GetSurfaceCount(); surface++) wood.AddRange(trunk.SurfaceGetArrays(surface)[(int)Mesh.ArrayType.Vertex].AsVector3Array());
         float top = Math.Max(Trunk(kind, variant).GetAabb().End.Y, Leaves(kind, variant).GetAabb().End.Y);
-        var outline = (wood, top);
+        var outline = (wood.ToArray(), top);
         outlines[kind, variant] = outline;
         return outline;
     }

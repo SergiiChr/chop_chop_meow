@@ -452,7 +452,7 @@ public partial class WorldView : Node3D {
         UpdateEffects(dt);
         UpdateMarkers();
         // The sun and the light move every frame by the window's own clock, which each server update corrects.
-        UpdateLighting(Shown(dayClock, World.Time, true, dt));
+        UpdateLighting(Clocked(dayClock, World.Time, true, dt));
         UpdateLook(dt);
         UpdateFog();
         overlay.QueueRedraw();
@@ -907,7 +907,7 @@ public partial class WorldView : Node3D {
             case TreeProp tree:
                 // The wood gives as the tree starts to go: the tearing of a tall tree lasts about as long as its fall.
                 if (tree.Falling == null) {
-                    tree.Falling = WorldModels.Fall(tree, FellToward(tree));
+                    tree.Falling = WorldModels.Topple(tree, FellToward(tree));
                     Sounds?.Play(tree.Tall >= TearsFrom ? "tree_bend" : "tree_crack", prop.Look.Pos, pitch: TreePitch(tree.Tall));
                 }
                 var fall = tree.Falling;
@@ -963,7 +963,7 @@ public partial class WorldView : Node3D {
                 if (first || shaking) tree.Sway.Basis = TreeShake(prop.Shake).Scaled(Vector3.One * WorldModels.TreeScale(tree.Id));
                 break;
             case DugProp dug:
-                float worked = Shown(dug.Worked, t.Progress, live, dt);
+                float worked = Clocked(dug.Worked, t.Progress, live, dt);
                 if (still && worked == dug.Drawn) break;
                 dug.Drawn = worked;
                 // Digging works it loose: it leans further over with the work done, and rocks as each push of the shovel lands.
@@ -988,7 +988,7 @@ public partial class WorldView : Node3D {
                 break;
             case CarcassProp carcass:
                 // Thrown, the carcass covers the knockback while it is in the air and stays where it lands.
-                float since = Shown(carcass.Dead, t.Progress, live, dt) - carcass.HitIn, dying = Math.Clamp(since / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
+                float since = Clocked(carcass.Dead, t.Progress, live, dt) - carcass.HitIn, dying = Math.Clamp(since / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
                 // The killing blow thuds as it lands, heard only where the player saw the wolf fall.
                 if (!carcass.Landed && since >= 0) { carcass.Landed = true; if (watched) Sounds?.Play("wolf_hit", t.Pos); }
                 carcass.Body.Position = carcass.From * (1 - thrown);
@@ -1019,7 +1019,7 @@ public partial class WorldView : Node3D {
                 Smoke(stove, t, cooking, dt, FurnaceSmoke);
                 break;
             case ForgeProp forge:
-                float heat = Shown(forge.Heat, t.Heat, live, dt) / 100;
+                float heat = Clocked(forge.Heat, t.Heat, live, dt) / 100;
                 bool forging = Lit(forge, t.Processing, dt);
                 forge.Glow.Visible = heat > .05f || forging;
                 forge.Light.LightEnergy = (heat * 1.5f + (forging ? .4f : 0)) * (1 + flicker * .15f) * (.5f + night);
@@ -1113,9 +1113,9 @@ public partial class WorldView : Node3D {
                     var through = live ? doorways.Passing(t.Id) : null;
                     if (through != null) hut.Slam = through.DoorRush;
                     if (dt > 0 && through is { DoorRush: false } && hut.Open == 0) Sounds?.Play("hut_door_normal", t.Pos);
-                    // A runner's slam is picked as they start through, also when the door has not yet shut behind the one before.
-                    if (dt > 0 && through is { DoorRush: true } && !hut.Passing) hut.SlamCue = Sounds?.Next("hut_door_escaping");
-                    if (dt > 0) hut.Passing = through != null;
+                    // A runner's slam is picked as they start through, also when they follow straight after someone else.
+                    if (dt > 0 && through is { DoorRush: true } && hut.Through != through.Id) hut.SlamCue = Sounds?.Next("hut_door_escaping");
+                    if (dt > 0) hut.Through = through?.Id;
                     bool slams = through == null && hut.Slam;
                     DoorwayView.SwingDoor(hut, through != null, dt, slams ? DoorwayView.SlamSeconds : Doorways.ShutSeconds, slams);
                     // The slam is heard as the door hits its frame, so its sound starts that far ahead: for a sound that builds up longer than the slam, while the runner is still in the doorway.
@@ -1131,7 +1131,7 @@ public partial class WorldView : Node3D {
                 break;
             case MineProp mine:
                 // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty, and the lantern is out.
-                float stageShare = Math.Clamp(Shown(mine.Built, t.Progress, live, dt) / World.MineStageSeconds, 0, 1);
+                float stageShare = Math.Clamp(Clocked(mine.Built, t.Progress, live, dt) / World.MineStageSeconds, 0, 1);
                 bool finished = t.MineStage == MineStage.Open;
                 mine.Outline.Visible = !finished;
                 mine.Hole.Visible = t.MineStage > MineStage.Marked || stageShare > 0;
@@ -1159,7 +1159,7 @@ public partial class WorldView : Node3D {
     internal static float Ease(float t) => t * t * (3 - 2 * t);
 
     /// <summary>A count the server keeps as a motion shows it: run on by the window's clock in sight, as it is out of sight.</summary>
-    private float Shown(LocalClock clock, float count, bool live, float dt) => live ? clock.Follow(count, World.Time, dt) : clock.Set(count, World.Time);
+    private float Clocked(LocalClock clock, float count, bool live, float dt) => live ? clock.Follow(count, World.Time, dt) : clock.Set(count, World.Time);
 
     /// <summary>Metres a crate rises as it is lifted.</summary>
     private const float CrateLift = .35f;

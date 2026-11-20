@@ -34,10 +34,12 @@ public sealed class LocalClock(float jump) {
     public float Follow(float now, float time, float dt) {
         if (!started || time < stamp) return Set(now, time);
         if (time != stamp) {
-            rate = (now - count) / (time - stamp);
-            if (rate != 0) way = Math.Sign(rate);
+            float ran = (now - count) / (time - stamp);
             (count, stamp, since) = (now, time, 0);
-            if (Math.Abs(now - shown) > jump) { shown = now; return shown; }
+            // A jump is taken at once and runs at no rate of its own: the next update gives the count's rate again.
+            if (Math.Abs(now - shown) > jump) { (shown, rate) = (now, 0); return shown; }
+            rate = ran;
+            if (rate != 0) way = Math.Sign(rate);
         } else since += dt;
         float target = count + rate * Math.Min(since, MaxAhead);
         float next = shown + rate * dt;

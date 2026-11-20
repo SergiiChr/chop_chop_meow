@@ -200,4 +200,38 @@ public partial class Game {
         await Frames();
         Require(!view.ShowsPlayer(host), "The start menu must not show the players of the game left behind.");
     }
+
+    /// <summary>How far <paramref name="point"/>, in the world, is from the nearest face of a model's visible meshes, in metres.</summary>
+    private static float SurfaceGap(Node node, Vector3 point) {
+        float nearest = float.MaxValue;
+        if (node is MeshInstance3D { Mesh: Mesh mesh, Visible: true } drawn) {
+            var corners = mesh.GetFaces();
+            var place = drawn.GlobalTransform;
+            for (int i = 0; i + 2 < corners.Length; i += 3)
+                nearest = Math.Min(nearest, point.DistanceTo(NearestOnTriangle(point, place * corners[i], place * corners[i + 1], place * corners[i + 2])));
+        }
+        foreach (var child in node.GetChildren()) nearest = Math.Min(nearest, SurfaceGap(child, point));
+        return nearest;
+    }
+
+    /// <summary>The point of a triangle nearest to <paramref name="p"/> (Ericson, Real-Time Collision Detection, 5.1.5).</summary>
+    private static Vector3 NearestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c) {
+        Vector3 ab = b - a, ac = c - a, ap = p - a;
+        float d1 = ab.Dot(ap), d2 = ac.Dot(ap);
+        if (d1 <= 0 && d2 <= 0) return a;
+        var bp = p - b;
+        float d3 = ab.Dot(bp), d4 = ac.Dot(bp);
+        if (d3 >= 0 && d4 <= d3) return b;
+        float vc = d1 * d4 - d3 * d2;
+        if (vc <= 0 && d1 >= 0 && d3 <= 0) return a + ab * (d1 / (d1 - d3));
+        var cp = p - c;
+        float d5 = ab.Dot(cp), d6 = ac.Dot(cp);
+        if (d6 >= 0 && d5 <= d6) return c;
+        float vb = d5 * d2 - d1 * d6;
+        if (vb <= 0 && d2 >= 0 && d6 <= 0) return a + ac * (d2 / (d2 - d6));
+        float va = d3 * d6 - d5 * d4;
+        if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) return b + (c - b) * ((d4 - d3) / (d4 - d3 + d5 - d6));
+        float denom = 1 / (va + vb + vc);
+        return a + ab * (vb * denom) + ac * (vc * denom);
+    }
 }

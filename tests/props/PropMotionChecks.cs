@@ -93,5 +93,7 @@ public static class PropMotionChecks {
         var clock = new LocalClock(1);
         clock.Follow(5, 1, Frame); clock.Follow(5.03f, 1.03f, Frame);
         Require(clock.Follow(20, 1.06f, Frame) == 20, "a big change of the count, such as a new stage, should be taken at once");
+        float after = clock.Follow(20, 1.06f, Frame);
+        Require(Math.Abs(after - 20) < .01f, $"a count taken at once should hold there until the next update, not run on to {after:0.00}");
     }
 }

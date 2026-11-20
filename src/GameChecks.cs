@@ -1327,7 +1327,6 @@ public partial class Game {
             int soundsBefore = sounds.Played;
             var point = kind is ThingKind.Anvil or ThingKind.Bench ? (Vector2?)null : RightPress(thing.Pos);
             await Until(() => sounds.Heard(sound, soundsBefore) && view.PlayerMark != null, $"the player working a {kind} {offset} away and its blow heard", 8);
-            var mark = view.PlayerMark!.Value;
             var root = rig.Root.Transform;
             var end = root * (kind switch { ThingKind.Tree => rig.Holds(ActorRig.AxeHeadPoint), ThingKind.Stone => rig.Holds(ActorRig.PickPoint), ThingKind.Stump => rig.ShovelTip, _ => rig.Holds(ActorRig.HammerFace) });
             var flat = new Vector2(end.X, end.Z);
@@ -1344,13 +1343,24 @@ public partial class Game {
                         Require(gap is > -.02f and < .12f && end.Y < 0, $"A shovel's blade must go into the ground at the foot of the stump {offset} away, not {gap:0.00} m out from it and {end.Y:0.00} m up.");
                         break;
                     }
-                case ThingKind.Stone:
-                    Require(mark.Y is > .05f and < .95f && new Vector2(mark.X, mark.Z).DistanceTo(thing.Pos) < .8f && end.DistanceTo(mark) < .04f,
-                        $"A pick's point must land on the rock {offset} away, at {mark}, not {end.DistanceTo(mark):0.00} m from it.");
-                    break;
-                default:
-                    Require(mark.Y is > .75f and < .97f && end.DistanceTo(mark) < .04f, $"A hammer's face must land on the {kind}'s work top at {mark}, not {end.DistanceTo(mark):0.00} m from it.");
-                    break;
+                case ThingKind.Stone: {
+                        float gap = SurfaceGap(view.PropOf(thing.Id)!.Body, end);
+                        Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away, not {gap:0.00} m off it.");
+                        // Mined down to its last stones, the rock shrinks, and the pick follows its face in.
+                        thing.Remaining = 2;
+                        soundsBefore = sounds.Played;
+                        await Until(() => sounds.Heard(sound, soundsBefore), $"the player mining a shrunken rock {offset} away and its blow heard", 8);
+                        end = rig.Root.Transform * rig.Holds(ActorRig.PickPoint);
+                        gap = SurfaceGap(view.PropOf(thing.Id)!.Body, end);
+                        Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away once it has shrunk, not {gap:0.00} m off it.");
+                        break;
+                    }
+                default: {
+                        // The anvil's face and the bench's top stand between 0.75 m and 0.97 m up.
+                        float gap = SurfaceGap(view.PropOf(thing.Id)!.Body, end);
+                        Require(gap < .04f && end.Y is > .73f and < .99f, $"A hammer's face must land on the {kind}'s work top, not {gap:0.00} m off the model at {end.Y:0.00} m up.");
+                        break;
+                    }
             }
             if (point is Vector2 held) RightRelease(held);
             await Frames(2);
