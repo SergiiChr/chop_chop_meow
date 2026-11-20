@@ -2194,8 +2194,8 @@ public partial class Game {
             await TestClean(CheckAHaulDragsIntoAHaulGroupAndStaysWhenItIsTakenApart);
             await TestClean(CheckAJobBelowAHaulGroupDragsIntoIt);
             await TestClean(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
-            await TestClean(CheckCratePutIntoCrateStopsAtWarning);
             await TestClean(CheckBarrelOpensInTheBackpackAndCanBePlacedWithWater);
+            await TestClean(CheckCratePutIntoCrateStopsAtWarning);
             RemoveCheckFiles();
             await TestClean(CheckRestartBuildsFreshModelsForReusedIds);
             await TestClean(CheckIntroFilmCoversTheStartMenuUntilEsc);
