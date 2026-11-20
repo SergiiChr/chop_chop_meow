@@ -27,6 +27,7 @@ internal static class BarrelChecks {
         Test(CheckWorkerSwapsABottleForAnAxe, data);
         Test(CheckWorkerFetchesABottleFromTheRack, data);
         Test(CheckBlockedBarrelLetsTheWorkerDoTheirNextJob, data);
+        Test(CheckWorkerReachesBarrelAroundAChest, data);
         Test(CheckWorkerKeepsTheirWaterSourceWhileWalking, data);
         Test(CheckCabinServesThirstBeforeBottlesInEntryOrder, data);
         Test(CheckRemovingCabinReturnsItsBarrelWithWater, data);
@@ -285,6 +286,20 @@ internal static class BarrelChecks {
         world.SetDuty(worker, tree, JobKind.Gather, true);
         Work(world, 16, () => tree.Remaining < 10);
         Require(tree.Remaining < 10 && barrel.Inventory[Water.Liquid] == 0, "a worker who cannot pour at the barrel switches to the tree");
+    }
+
+    private static void CheckWorkerReachesBarrelAroundAChest(GameData data) {
+        var world = EmptyWorld(data);
+        var barrel = world.Add(ThingKind.Barrel, new Vector2(74.08f, 123.28f));
+        world.Add(ThingKind.Chest, new Vector2(74.98f, 124.44f));
+        var worker = AddWorker(world, new Vector2(80.91f, 126.81f));
+        worker.Tool = Bucket.AtFill(10);
+        Require(world.CanStand(barrel.Pos + BarrelJobs.SpoutApproach), "the chest leaves the barrel's spout on open ground");
+        world.SetDuty(worker, barrel, JobKind.Haul, true);
+        for (int i = 0; i < 300 && barrel.Inventory[Water.Liquid] == 0 && worker.Status != World.BlockedPath; i++)
+            SafeTick(world, .05f);
+        Require(barrel.Inventory[Water.Liquid] == 10,
+            $"a worker should go around the chest to pour at the barrel, at {worker.Pos} with status {worker.Status}");
     }
 
     private static void CheckWorkerKeepsTheirWaterSourceWhileWalking(GameData data) {

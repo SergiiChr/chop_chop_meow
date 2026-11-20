@@ -641,10 +641,15 @@ public sealed partial class World {
     public string ToolKind(string item) => Water.IsBottle(item) ? Water.BottleTool : Data.Items.GetValueOrDefault(item)?.Tool ?? "";
 
     /// <summary>The fastest carried tool of a kind at or above <paramref name="tier"/>, or null when none is carried.</summary>
-    public string? BestTool(string tool, Inventory? from = null, int tier = 0) {
+    public string? BestTool(string tool, Inventory? from = null, int tier = 0) => BestTool(tool, from ?? S.Backpack, tier, requireFree: false);
+
+    private string? BestTool(string tool, Inventory from, int tier, bool requireFree) {
         string? best = null; float speed = 0;
-        foreach (var pair in (from ?? S.Backpack).Items)
-            if (Data.Items.TryGetValue(pair.Key, out var def) && def.Tool == tool && def.Tier >= tier && (best == null || def.Speed > speed)) { best = pair.Key; speed = def.Speed; }
+        foreach (var (item, _) in from.Items) {
+            if (!Data.Items.TryGetValue(item, out var def) || def.Tool != tool || def.Tier < tier || best != null && def.Speed <= speed) continue;
+            if (requireFree && from.Free(item) == 0) continue;
+            best = item; speed = def.Speed;
+        }
         return best;
     }
     public float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
@@ -1777,12 +1782,10 @@ public sealed partial class World {
         if (exact && !RouteOpen(destination)) return;
         var start = Terrain.TileAt(from);
         if (!Terrain.OnMap(start)) return;
-        if (exact && RouteOpen(from)) {
-            if (ExactRouteStart(from, start) is not Vector2I openStart) return;
-            start = openStart;
-        }
-        routeQueue.Clear(); routeQueue.Enqueue(start);
-        routeSeen[Terrain.TileIndex(start)] = search;
+        routeQueue.Clear();
+        // An exact walk can start between tiles, with a route from a directly reachable tile or from the rounded tile.
+        if (exact && RouteOpen(from) && ExactRouteStart(from, start) is Vector2I open && open != start) Seed(open);
+        Seed(start);
         int end = -1;
         // A walker beside a building, with the building between them and where they go, may stand on a square near enough to it while they are not:
         // that square then never ends the search, and they step round. One already as near as a walk's usual reach finds no route and counts as there.
@@ -1799,10 +1802,18 @@ public sealed partial class World {
             }
         }
         if (end < 0) return;
-        int first = route.Count;
-        for (int node = end; node != Terrain.TileIndex(start); node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
-        if (exact && RouteOpen(start) && from.DistanceSquaredTo(start) > RouteAtWaypoint * RouteAtWaypoint) route.Add(start);
+        int first = route.Count, node = end;
+        for (; routeFrom[node] >= 0; node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
+        var firstTile = new Vector2(node % Terrain.Size, node / Terrain.Size);
+        if (exact && RouteOpen(firstTile) && from.DistanceSquaredTo(firstTile) > RouteAtWaypoint * RouteAtWaypoint) route.Add(firstTile);
         route.Reverse(first, route.Count - first);
+
+        void Seed(Vector2I tile) {
+            int index = Terrain.TileIndex(tile);
+            routeSeen[index] = search;
+            routeFrom[index] = -1;
+            routeQueue.Enqueue(tile);
+        }
     }
 
     /// <summary>Finds a reachable waypoint even when the center of the walker's current tile is blocked.</summary>
@@ -2011,10 +2022,10 @@ public sealed partial class World {
     internal void ToolsChanged() => toolsChanged = true;
     /// <summary>Has a tool station's contents and filters report to the tool kinds stations give out.</summary>
     private void WatchTools(Thing station) { station.Inventory.Changed = ToolsChanged; toolsChanged = true; }
-    /// <summary>The tool of a kind a tool station gives out: its best, when its filter lets that one out; otherwise null.</summary>
+    /// <summary>The rack's best free tool of a kind when its filter lets it out, or null.</summary>
     private string? ToolGivenOut(Thing station, string kind) {
         var items = station.Inventory;
-        if (kind != BarrelJobs.WaterTool) return BestTool(kind, items) is string best && items.AllowsWithdrawal(best) && items.Free(best) > 0 ? best : null;
+        if (kind != BarrelJobs.WaterTool) return BestTool(kind, items, tier: 0, requireFree: true) is string best && items.AllowsWithdrawal(best) ? best : null;
         string? bottle = null;
         foreach (var (item, _) in items.Items) {
             if (!BarrelJobs.Vessel(item) || !items.AllowsWithdrawal(item) || items.Free(item) == 0) continue;
