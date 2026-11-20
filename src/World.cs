@@ -123,8 +123,6 @@ public readonly record struct Cliff(ThingKind Ore, Vector2 Center, Vector2 Face,
     /// <summary>Distance to the cliff's spine, so the whole wall blocks movement rather than only its middle.</summary>
     public float DistanceTo(Vector2 p) => p.DistanceTo(Center + Along * Math.Clamp((p - Center).Dot(Along), -HalfLength, HalfLength));
 }
-public enum WorkerWaterAction { None, Fill, ClimbUp, Pour, ClimbDown }
-
 public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting, Digging, Underground }
 
 public sealed class Worker : IWalker {
@@ -153,6 +151,8 @@ public sealed class Worker : IWalker {
     [JsonIgnore] public int Mark { get; set; }
     /// <summary>The carry a hauler is on the way to pick up.</summary>
     internal Carry Plan;
+    /// <summary>The stand chosen for a water haul and, when filling a vessel, its source.</summary>
+    internal (Thing Target, Thing? Source, Vector2 Stand)? WaterWalk;
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public WorkerWaterAction WaterAction { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int WaterTarget { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float WaterProgress { get; set; }
@@ -329,7 +329,8 @@ public sealed partial class World {
         Data = data;
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
-        Construction = new Construction(this); barrels = new Barrels(this); GravelPaths = new GravelPaths(this);
+        Construction = new Construction(this); GravelPaths = new GravelPaths(this);
+        barrels = new Barrels(this); barrelJobs = new BarrelJobs(this, barrels); bedtimeWater = new BedtimeWater(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
     }
@@ -340,6 +341,8 @@ public sealed partial class World {
     /// <summary>Putting buildings, yards and crates up and taking buildings down.</summary>
     public Construction Construction { get; }
     private readonly Barrels barrels;
+    private readonly BarrelJobs barrelJobs;
+    private readonly BedtimeWater bedtimeWater;
     /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
     public GravelPaths GravelPaths { get; }
     /// <summary>Cabin doors: stepping in and out, the queue at the door and knocking.</summary>
@@ -634,6 +637,9 @@ public sealed partial class World {
         int n = (int)MathF.Round(value, MidpointRounding.AwayFromZero);
         return n >= 0 && n < Numbers.Length ? Numbers[n] : n.ToString();
     }
+    /// <summary>The kind of tool an item counts as in a worker's slot and on the tool rack.</summary>
+    public string ToolKind(string item) => Water.IsBottle(item) ? Water.BottleTool : Data.Items.GetValueOrDefault(item)?.Tool ?? "";
+
     /// <summary>The fastest carried tool of a kind at or above <paramref name="tier"/>, or null when none is carried.</summary>
     public string? BestTool(string tool, Inventory? from = null, int tier = 0) {
         string? best = null; float speed = 0;
@@ -1016,29 +1022,30 @@ public sealed partial class World {
     /// <summary>Bedtime comes a little before night falls, so the player can turn in without waiting for the dark.</summary>
     public const int SleepHour = 22;
     public float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
+    public float ThirstAtDawn() => Math.Max(0, bedtimeWater.Thirst(S.Actor) - SecondsToDawn * Data.ThirstPerSecond);
     /// <summary>Hunger and thirst both above this let sleep heal, at <see cref="SleepHeal"/> health a second.</summary>
     public const float FedNeed = 45, SleepHeal = .12f;
     /// <summary>The acting player's health after sleeping until dawn: sleep heals while hunger and thirst both stay above <see cref="FedNeed"/>.</summary>
     public float HealthAtDawn() {
-        float fed = Math.Min(SecondsToDawn, Math.Min((S.Hunger - FedNeed) / Data.HungerPerSecond, (BedtimeThirst(S.Actor) - FedNeed) / Data.ThirstPerSecond));
+        float fed = Math.Min(SecondsToDawn, Math.Min((S.Hunger - FedNeed) / Data.HungerPerSecond, (bedtimeWater.Thirst(S.Actor) - FedNeed) / Data.ThirstPerSecond));
         return Math.Min(100, S.Health + Math.Max(0, fed) * SleepHeal);
     }
     /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
     public string? SleepBlock() {
         if (Hour is >= 6 and < SleepHour) return "You can only sleep after 10 pm.";
-        bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = BedtimeThirst(S.Actor) - SecondsToDawn * Data.ThirstPerSecond <= 0;
+        bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = ThirstAtDawn() <= 0;
         if (hungry || thirsty) return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : "You are too thirsty to sleep.";
         // The night passes for everyone at once, so the others have to be inside and fed too.
         foreach (var p in S.Players) if (p != S.Actor && p.Sheltered == 0) return "Everyone has to be inside a cabin to sleep.";
         foreach (var p in S.Players)
-            if (p != S.Actor && (p.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0 || BedtimeThirst(p) - SecondsToDawn * Data.ThirstPerSecond <= 0)) return "Someone is too hungry or thirsty to sleep.";
+            if (p != S.Actor && (p.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0 || bedtimeWater.Thirst(p) - SecondsToDawn * Data.ThirstPerSecond <= 0)) return "Someone is too hungry or thirsty to sleep.";
         return null;
     }
     public void Sleep(Thing hut) {
         if (hut.Kind != ThingKind.Hut || !Near(hut)) return;
         if (SleepBlock() is string blocked) { Say(blocked); return; }
         if (Forwarded(Verb.Sleep, hut.Id)) return;
-        if (!DoorCheck.Waking) DrinkAtBedtime();
+        if (!DoorCheck.Waking) bedtimeWater.Serve();
         PassNight();
     }
     /// <summary>
@@ -1319,8 +1326,8 @@ public sealed partial class World {
     public string? CrateGood(string entry) => entry.StartsWith(PackedPrefix) && Data.Items.ContainsKey(entry[PackedPrefix.Length..]) ? entry[PackedPrefix.Length..] : null;
     /// <summary>What a pile's filter names for an item: the kind of crate for a packed crate of one good, a vessel's liquid for a vessel holding some, or the item itself, a <see cref="CrateOf"/> entry included.</summary>
     public string PileEntry(string item) {
-        if (Barrel.Is(item)) return Barrel.Item;
-        if (Bucket.Is(item)) return Bucket.Item;
+        string kindOfContainer = ContainerItem.Base(item);
+        if (kindOfContainer is Barrel.Item or Bucket.Item) return kindOfContainer;
         if (CrateGood(item) != null) return item;
         var kind = PackedKind(item);
         if (!kind.IsEmpty) return new string(kind);
@@ -1409,6 +1416,50 @@ public sealed partial class World {
     // ---------- Crafting ----------
     /// <summary>Hand recipes for the personal crafting menu.</summary>
     public IEnumerable<string> HandRecipes => Data.Recipes.Where(p => p.Value.Hand).Select(p => p.Key);
+    public Thing? PlaceBarrel(string item, Vector2 at) {
+        if (!Barrel.Is(item)) return null;
+        if (Construction.PlacementBlock(ThingKind.Barrel, at, item) is string blocked) { Say(blocked); return null; }
+        if (Busy() || Forwarded(Verb.PlaceBarrel, item: item, count: S.Backpack.PreferredSlot, at: at)) return null;
+        return barrels.Place(item, at, MarkedSource ?? S.Backpack);
+    }
+
+    public bool PickUpBarrel(Thing barrel) {
+        if (barrel.Kind != ThingKind.Barrel || !Near(barrel) || Find(barrel.Id) != barrel) return false;
+        if (Barrel.In(S.Backpack) != null) { Say("You can only carry one barrel."); return false; }
+        string item = Barrel.AtFill(Barrels.WaterIn(barrel));
+        if (S.Backpack.Room(item) == 0) { Say("Backpack full. Make room for the barrel."); return false; }
+        if (Busy() || Forwarded(Verb.PickUpBarrel, barrel.Id)) return true;
+        if (HeldByOthers(barrel)) return false;
+        S.Backpack.Add(item, 1);
+        S.Things.Remove(barrel);
+        Play("wood_rocks_inventory", barrel.Pos);
+        PlayerActed?.Invoke(ActorAction.PickUp, barrel.Pos);
+        return true;
+    }
+
+    /// <summary>Pours a vessel into the backpack barrel, or draws water into vessels already in the backpack.</summary>
+    public int MoveInBarrel(string barrelItem, string item, int quantity, bool puttingIn) {
+        if (!Barrel.Is(barrelItem) || S.Backpack[barrelItem] != 1 || quantity <= 0) return 0;
+        if (Held is { Box: 0 } held && held.Item == barrelItem) return 0;
+        if (puttingIn && !Barrels.CanPour(Data, item)) { Say("The barrel only holds water."); return 0; }
+        if (!puttingIn && item != Water.Liquid) return 0;
+        if (Busy() || Forwarded(Verb.MoveInBarrel, Barrel.Liters(barrelItem), puttingIn ? 1 : 0, item, quantity, new Vector2(S.Backpack.PreferredSlot, 0))) return 0;
+        var tank = Barrels.NewTank();
+        int before = Barrel.Liters(barrelItem);
+        tank.Add(Water.Liquid, before);
+        if (puttingIn) {
+            if (Data.VesselOf(item) is not VesselDef vessel) return 0;
+            PourVessels(S.Backpack, item, tank, vessel, MarkedSource == S.Backpack ? Math.Min(quantity, heldCount) : quantity, tank.Room(Water.Liquid));
+        } else {
+            if (FillBlock(tank, S.Backpack, item) is string dry) { Say(dry); return 0; }
+            Carry(tank, S.Backpack, null, item, quantity);
+        }
+        int after = tank[Water.Liquid];
+        S.Backpack.Replace(barrelItem, Barrel.AtFill(after));
+        if (before == after && puttingIn && tank.Room(Water.Liquid) == 0) Say("The barrel is full.");
+        return Math.Abs(after - before);
+    }
+
     private enum CraftRefusal { None, StationOnly, Busy, NoTool, NoInputs, QueueFull }
     /// <summary>The one place the hand-crafting rules live; <see cref="CanCraft"/> and <see cref="CraftBlock"/> both read it.</summary>
     private CraftRefusal CraftCheck(string recipe) {
@@ -1552,14 +1603,14 @@ public sealed partial class World {
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
     private enum HoldRefusal { None, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly }
-    /// <summary>The one place the storage rules live: a tool station holds only tools, a pile one resource, compost what rots and a campfire wood; other storage holds anything.</summary>
+    /// <summary>A tool station holds tools and water vessels, a pile one resource, compost what rots and a campfire wood.</summary>
     private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
         ThingKind.Hut when Barrel.Is(item) => HoldRefusal.None,
         _ when Barrel.Is(item) && (t.Kind != ThingKind.Pile || t.Compost) => HoldRefusal.Barrel,
         ThingKind.Barrel when Barrels.CanPour(Data, item) => HoldRefusal.None,
         ThingKind.Barrel => HoldRefusal.LiquidOnly,
         ThingKind.Hut => HoldRefusal.BarrelOnly,
-        ThingKind.Toolstation when !(Data.Items.TryGetValue(item, out var def) && def.Tool != "") => HoldRefusal.ToolsOnly,
+        ThingKind.Toolstation when ToolKind(item) == "" => HoldRefusal.ToolsOnly,
         ThingKind.Pile when t.Compost && !Compostable(item) && item != "fertilizer" => HoldRefusal.CompostOnly,
         ThingKind.Pile when !t.Compost && !PileTakes(t.Inventory, item) => HoldRefusal.OtherResource,
         ThingKind.Farm when !Data.Farm.Sow.ContainsKey(item) => HoldRefusal.FarmOnly,
@@ -1575,7 +1626,7 @@ public sealed partial class World {
         HoldRefusal.Barrel => $"Barrel does not fit in {Lower(Data.Name(t.Kind))}.",
         HoldRefusal.LiquidOnly => "The barrel only holds water.",
         HoldRefusal.BarrelOnly => "The cabin slot only holds a steel barrel.",
-        HoldRefusal.ToolsOnly => "The tool station only holds tools.",
+        HoldRefusal.ToolsOnly => "The tool station only holds tools, buckets and bottles.",
         HoldRefusal.CompostOnly => "The compost takes leaves, grass and food.",
         HoldRefusal.OtherResource => Phrase("This is ", A(PileName(t)!), " pile."),
         HoldRefusal.PackerOnly => t.Packs == "" ? "Choose what to pack first." : $"The packing station takes {Data.Name(t.Packs).ToLowerInvariant()} and empty crates.",
@@ -1697,13 +1748,12 @@ public sealed partial class World {
     private readonly List<Thing> routeBlockers = new();
     private int routeSearch;
     private static readonly Vector2I[] RouteSteps = { new(1, 0), new(-1, 0), new(0, 1), new(0, -1), new(1, 1), new(1, -1), new(-1, 1), new(-1, -1) };
-    private bool RouteOpen(Vector2I p) {
+    private bool RouteOpen(Vector2 p) {
         if (!Open(p)) return false;
         foreach (var t in routeBlockers) if (Blocks(t, p)) return false;
         return true;
     }
-    /// <summary>Appends the tiles from <paramref name="from"/> to within reach of <paramref name="destination"/> to <paramref name="route"/>, or nothing when there is no way.</summary>
-    private const float RouteRetrySeconds = 1;
+    private const float RouteRetrySeconds = 1, RouteAtWaypoint = .06f;
     private static readonly float[] Swerves = { 0, MathF.PI / 4, -MathF.PI / 4, MathF.PI / 2, -MathF.PI / 2 };
     /// <summary>
     /// A step toward <paramref name="to"/> on ground a player can stand on.
@@ -1717,14 +1767,20 @@ public sealed partial class World {
         foreach (float swerve in Swerves) if (CanStand(from + heading.Rotated(swerve))) return from + heading.Rotated(swerve);
         return from;
     }
-    private void FindRoute(Vector2 from, Vector2 destination, List<Vector2> route) {
+    /// <summary>Appends waypoints to <paramref name="route"/> when the destination can be reached.</summary>
+    private void FindRoute(Vector2 from, Vector2 destination, List<Vector2> route, bool exact) {
         routeSeen ??= new int[Terrain.Size * Terrain.Size]; routeFrom ??= new int[Terrain.Size * Terrain.Size];
         int search = ++routeSearch;
         // Collected once, since a search on the large map can visit thousands of tiles.
         routeBlockers.Clear();
         foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) routeBlockers.Add(t);
+        if (exact && !RouteOpen(destination)) return;
         var start = Terrain.TileAt(from);
         if (!Terrain.OnMap(start)) return;
+        if (exact && RouteOpen(from)) {
+            if (ExactRouteStart(from, start) is not Vector2I openStart) return;
+            start = openStart;
+        }
         routeQueue.Clear(); routeQueue.Enqueue(start);
         routeSeen[Terrain.TileIndex(start)] = search;
         int end = -1;
@@ -1733,7 +1789,8 @@ public sealed partial class World {
         bool near = from.DistanceTo(destination) < WalkReach;
         while (routeQueue.Count > 0) {
             var current = routeQueue.Dequeue();
-            if ((near || current != start) && ((Vector2)current).DistanceTo(destination) <= 1.15f) { end = Terrain.TileIndex(current); break; }
+            if ((near || exact || current != start) && ((Vector2)current).DistanceSquaredTo(destination) <= 1.15f * 1.15f
+                && (!exact || RouteOpen(current) && OpenRouteSegment(current, destination))) { end = Terrain.TileIndex(current); break; }
             foreach (var step in RouteSteps) {
                 var next = current + step;
                 if (!Terrain.OnMap(next) || routeSeen[Terrain.TileIndex(next)] == search || !RouteOpen(next)) continue;
@@ -1744,22 +1801,46 @@ public sealed partial class World {
         if (end < 0) return;
         int first = route.Count;
         for (int node = end; node != Terrain.TileIndex(start); node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
+        if (exact && RouteOpen(start) && from.DistanceSquaredTo(start) > RouteAtWaypoint * RouteAtWaypoint) route.Add(start);
         route.Reverse(first, route.Count - first);
+    }
+
+    /// <summary>Finds a reachable waypoint even when the center of the walker's current tile is blocked.</summary>
+    private Vector2I? ExactRouteStart(Vector2 from, Vector2I rounded) {
+        if (OpenRouteSegment(from, rounded)) return rounded;
+        Vector2I? closest = null;
+        float nearest = float.MaxValue;
+        foreach (var step in RouteSteps) {
+            var tile = rounded + step;
+            float distance = from.DistanceSquaredTo(tile);
+            if (distance < nearest && Terrain.OnMap(tile) && OpenRouteSegment(from, tile)) { closest = tile; nearest = distance; }
+        }
+        return closest;
+    }
+
+    /// <summary>Whether the way between a route tile and a walker's exact start or destination is clear.</summary>
+    private bool OpenRouteSegment(Vector2 from, Vector2 destination) {
+        if (!RouteOpen(destination)) return false;
+        var heading = (destination - from).Normalized();
+        float length = from.DistanceTo(destination);
+        for (float d = .1f; d < length; d += .1f) if (!RouteOpen(from + heading * d)) return false;
+        return true;
     }
     /// <summary>How near a worker counts as at a place: the reach of a walk, and how near a closer spot they cannot get to counts as there.</summary>
     private const float WalkReach = 1.2f;
+    internal const string BlockedPath = "Path blocked · clear a route";
     /// <summary>
     /// Moves a worker toward a destination and reports arrival within <paramref name="reach"/>.
-    /// A spot closer than the usual reach is a preference: if it cannot be reached, the usual reach counts as arrival.
+    /// The usual reach counts as arrival when the closer spot is inaccessible, unless the job needs that exact spot.
     /// </summary>
-    private bool Walk(Worker w, Vector2 destination, float dt, float reach = WalkReach) {
+    internal bool Walk(Worker w, Vector2 destination, float dt, float reach = WalkReach, bool exact = false) {
         float distance = w.Pos.DistanceTo(destination);
         if (distance < reach) return true;
         // Stop at arrival range rather than overshooting into the target's footprint, where the step would be refused.
         float step = dt * WorkerSpeed * GravelPaths.SpeedAt(w.Pos) * (Barrel.In(w.Bag) is string barrel ? Barrel.Speed(barrel) : 1);
-        if (Travel(w, destination, Math.Min(step, distance - reach + .05f), step)) return false;
-        if (distance < WalkReach) return true;
-        w.Status = "Path blocked · clear a route"; w.WorkState = WorkerWorkState.Blocked;
+        if (Travel(w, destination, Math.Min(step, distance - reach + .05f), step, exact: exact)) return false;
+        if (!exact && distance < WalkReach) return true;
+        w.Status = BlockedPath; w.WorkState = WorkerWorkState.Blocked;
         return false;
     }
     /// <summary>
@@ -1767,24 +1848,29 @@ public sealed partial class World {
     /// otherwise <paramref name="step"/> along a route around what blocks it, found again once the destination has moved more than <paramref name="repath"/>.
     /// False when no way leads there.
     /// </summary>
-    internal bool Travel(IWalker walker, Vector2 destination, float direct, float step, float repath = .2f) {
+    internal bool Travel(IWalker walker, Vector2 destination, float direct, float step, float repath = .2f, bool exact = false) {
         if (walker.RouteTarget.DistanceTo(destination) > repath) { walker.Route.Clear(); walker.RouteTarget = destination; walker.RouteRetry = 0; }
         var next = walker.Pos.MoveToward(destination, direct);
         if (walker.Route.Count == 0 && CanStand(next)) { walker.Pos = next; return true; }
         if (walker.Route.Count > 0 && !CanStand(walker.Route[0])) walker.Route.Clear();
         // A search covers the whole map when no way leads there, so a failed one waits a while before the next.
         if (walker.Route.Count == 0 && S.Time >= walker.RouteRetry) {
-            FindRoute(walker.Pos, destination, walker.Route);
+            FindRoute(walker.Pos, destination, walker.Route, exact);
             if (walker.Route.Count == 0) walker.RouteRetry = S.Time + RouteRetrySeconds;
         }
         if (walker.Route.Count == 0) return false;
-        walker.Pos = StepAround(walker.Pos, walker.Route[0], step);
-        if (walker.Pos.DistanceTo(walker.Route[0]) < .06f) walker.Route.RemoveAt(0);
+        var along = StepAround(walker.Pos, walker.Route[0], step);
+        if (exact && along == walker.Pos && step > 0 && walker.Pos.DistanceSquaredTo(walker.Route[0]) >= RouteAtWaypoint * RouteAtWaypoint) {
+            walker.Route.Clear(); walker.RouteRetry = S.Time + RouteRetrySeconds;
+            return false;
+        }
+        walker.Pos = along;
+        if (walker.Pos.DistanceTo(walker.Route[0]) < RouteAtWaypoint) walker.Route.RemoveAt(0);
         return true;
     }
     private void WorkerTick(Worker w, float dt) {
         w.WorkState = WorkerWorkState.Idle;
-        if (FinishWaterAction(w, dt)) return;
+        if (barrelJobs.FinishAction(w, dt)) return;
         if (w.Away > 0) {
             w.Away = Math.Max(0, w.Away - dt); w.Status = Phrase("Fetching village prices · back in ", Number(w.Away), "s");
             // Like a cart, the runner walks a little way down the valley and fades from view rather than pathing around the woods.
@@ -1926,38 +2012,50 @@ public sealed partial class World {
     /// <summary>Has a tool station's contents and filters report to the tool kinds stations give out.</summary>
     private void WatchTools(Thing station) { station.Inventory.Changed = ToolsChanged; toolsChanged = true; }
     /// <summary>The tool of a kind a tool station gives out: its best, when its filter lets that one out; otherwise null.</summary>
-    private string? ToolGivenOut(Thing station, string kind) => BestTool(kind, station.Inventory) is string best && station.Inventory.AllowsWithdrawal(best) ? best : null;
+    private string? ToolGivenOut(Thing station, string kind) {
+        var items = station.Inventory;
+        if (kind != BarrelJobs.WaterTool) return BestTool(kind, items) is string best && items.AllowsWithdrawal(best) && items.Free(best) > 0 ? best : null;
+        string? bottle = null;
+        foreach (var (item, _) in items.Items) {
+            if (!BarrelJobs.Vessel(item) || !items.AllowsWithdrawal(item) || items.Free(item) == 0) continue;
+            if (Bucket.Is(item)) return item;
+            bottle ??= item;
+        }
+        return bottle;
+    }
     /// <summary>Whether any tool station gives out a tool of a kind.</summary>
-    private bool StationsHold(string kind) {
+    internal bool StationsHold(string kind) {
         if (toolsChanged) {
             stationTools.Clear();
             foreach (var t in S.Things.Of(ThingKind.Toolstation))
-                foreach (var (item, _) in t.Inventory.Items)
-                    if (Data.Items.TryGetValue(item, out var def) && def.Tool != "" && ToolGivenOut(t, def.Tool) != null) stationTools.Add(def.Tool);
+                foreach (var (item, _) in t.Inventory.Items) {
+                    string role = BarrelJobs.Vessel(item) ? BarrelJobs.WaterTool : ToolKind(item);
+                    if (role != "" && !stationTools.Contains(role) && ToolGivenOut(t, role) != null) stationTools.Add(role);
+                }
             toolsChanged = false;
         }
         return stationTools.Contains(kind);
     }
     /// <summary>The nearest tool station a worker may take a tool of a kind from, or null.</summary>
-    private Thing? ToolStationWith(string kind, Vector2 from) {
+    private (Thing Station, string Item)? ToolStationWith(string kind, Vector2 from) {
         if (!StationsHold(kind)) return null;
-        Thing? station = null; float nearest = 0;
+        (Thing Station, string Item)? closest = null; float nearest = 0;
         foreach (var t in S.Things.Of(ThingKind.Toolstation))
-            if (ToolGivenOut(t, kind) != null && (station == null || t.Pos.DistanceSquaredTo(from) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(from); }
-        return station;
+            if (ToolGivenOut(t, kind) is string item && (closest == null || t.Pos.DistanceSquaredTo(from) < nearest)) { closest = (t, item); nearest = t.Pos.DistanceSquaredTo(from); }
+        return closest;
     }
     /// <summary>Takes the best tool of a kind from the nearest tool station holding one; without one, the worker says once what they need and waits.</summary>
     private void FetchTool(Worker w, string kind, Thing target, float dt) {
-        var station = ToolStationWith(kind, w.Pos);
-        if (station == null) {
+        if (ToolStationWith(kind, w.Pos) is not (Thing station, string item)) {
             w.Status = Phrase("Needs ", A(kind), " to ", Task(target));
             if (w.Missing != kind) { w.Missing = kind; Say($"{w.Name} needs {A(kind)} to {Task(target)}. Put one in a tool station."); }
             return;
         }
         w.Missing = "";
-        w.Status = Phrase("Fetching ", A(kind), " from the tool station");
+        string tool = kind == BarrelJobs.WaterTool ? Lower(Data.Name(item)) : kind;
+        w.Status = Phrase("Fetching ", A(tool), " from the tool station");
         if (!Walk(w, station.Pos, dt)) return;
-        w.Tool = ToolGivenOut(station, kind)!; station.Inventory.Remove(w.Tool, 1);
+        station.Inventory.TransferTo(w.ToolSlot, item, 1, true);
     }
     /// <summary>Walks to an evenly spaced seat around the lunch fire and sits; without a campfire the worker sits where they are.</summary>
     private void EatLunch(Worker w, float dt) {

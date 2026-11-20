@@ -77,7 +77,8 @@ public sealed class ActorRig {
             bucket = VesselShape.AddBucket(Root, Vector3.Zero);
             bucketBail = bucket.GetChild<Node3D>(1);
             bucketWater = Cylinder(bucket, .135f, .135f, .012f, new Vector3(0, .21f, 0), Mat("5a9eb8", .34f), sides: 14);
-            bottle = BottleShape.Create(0, capped: false);
+            bottle = BottleShape.Create(0, capped: false, adjustable: true);
+            bottle.Name = "CarriedBottle";
             for (int index = 0; index < bottle.GetChildCount(); index++) {
                 var part = bottle.GetChild<Node3D>(index);
                 part.Position *= BottleScale;

@@ -36,12 +36,13 @@ internal static class WorkerWaterView {
 
         float climb = action == WorkerWaterAction.ClimbDown ? 1 - progress : progress;
         if (climb > RoofEdgeShare) {
-            // Take two short steps across the roof. Going back, the worker feels for the ladder without turning away.
+            // Take two short steps across the roof.
+            // Going back, the worker feels for the ladder without turning away.
             float across = (climb - RoofEdgeShare) / (1 - RoofEdgeShare);
             var entry = CabinWaterModel.RoofEntry;
             var stand = CabinWaterModel.PourStand;
             var onRoof = entry.Lerp(stand, across);
-            onRoof.Y = CabinWaterModel.RoofSurface(onRoof.Z);
+            onRoof.Y = CabinShape.RoofSurface(onRoof.Z);
             rig.Root.Transform = new Transform3D(TowardRoof, cabin + onRoof);
             float walk = across * ActorAnimation.Duration(ActorAction.Walk);
             var pose = ActorAnimation.PoseAt(ActorAction.Walk, walk, true);
@@ -89,7 +90,8 @@ internal static class WorkerWaterView {
             leftSteps ? raised : planted, leftSteps ? planted : raised, leftSteps ? toePlant : toeSwing,
             lean: Mathf.Lerp(11, 18, nearRoof));
 
-        // One hand moves to the next rung and finally onto the rail above the roof. The other carries the vessel.
+        // One hand moves to the next rung and finally onto the rail above the roof.
+        // The other carries the vessel.
         float reach = Mathf.SmoothStep(.50f, .92f, phase);
         var handPoint = HandRung(stepIndex + 2).Lerp(HandRung(stepIndex + 3), reach);
         var hand = TowardRoof.Inverse() * (handPoint - foot - Vector3.Up * height);
@@ -104,7 +106,7 @@ internal static class WorkerWaterView {
 
     private static Vector3 RailGrip() {
         float z = CabinWaterModel.LadderZ + CabinWaterModel.LadderWidth / 2;
-        return new Vector3(CabinWaterModel.LadderX - .07f, CabinWaterModel.RoofSurface(z) + .43f, z);
+        return new Vector3(CabinWaterModel.LadderX - .07f, CabinShape.RoofSurface(z) + .43f, z);
     }
 
     private static Pose LadderFeet(float hips, float toeL, float yL, float yR, float toeR, float lean) {

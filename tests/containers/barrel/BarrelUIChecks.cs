@@ -2,12 +2,21 @@ using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static PlayerSteps;
 using static SetupSteps;
 
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>The barrel can be opened, filled and drawn from in the backpack; its water and filter are visible after putting it down.</summary>
+    private async Task RunBarrelUIChecks() {
+        await TestClean(CheckBarrelOpensInTheBackpackAndCanBePlacedWithWater);
+        await TestClean(CheckHotbarShowsTheCountOfAnEmptyBucketStack);
+    }
+
+    /// <summary>
+    /// The barrel can be opened, filled and drawn from in the backpack.
+    /// Its water and filter are visible after putting it down.
+    /// </summary>
     private async Task CheckBarrelOpensInTheBackpackAndCanBePlacedWithWater() {
         int full = Drop(Hosted, Water.Full);
         int empty = Drop(Hosted, Water.Empty);
@@ -15,17 +24,13 @@ public partial class Game {
         int twoLiters = Drop(Hosted, Water.TwoLiters);
         Give(Hosted, Barrel.Item);
         Give(Hosted, Water.Full);
-        await KeyStroke(Key.Tab);
-        await DoubleClick(BagCell(c => c.TooltipText.StartsWith("Steel barrel")));
-        await Until(() => panel.Page == Page.Barrel && Named("barrel_water")?.TooltipText.Contains("0/50 L") == true, "the empty barrel opening in the backpack", 2);
+        await OpenEmptyBackpackBarrel();
         await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(Water.Full))), Named("barrel_water")!);
         await Until(() => Named("barrel_water")?.TooltipText.Contains("3/50 L") == true, "the barrel holding three liters after the bottle is poured", 2);
 
         await Click(Named("barrel_water")!);
         await Until(() => Named("barrel_water")?.TooltipText.Contains("2/50 L") == true && world.Backpack[Water.OneLiter] == 1, "taking one liter of water from the barrel into the bottle", 2);
-        await Click(FindButton(panel, "Put it down")!);
-        var spot = SpotsNearby().First(p => world.Construction.PlacementBlock(ThingKind.Barrel, p, Barrel.AtFill(2)) == null && Uncovered(view.Screen(p)));
-        await Click(view.Screen(spot));
+        var spot = await PutDownBackpackBarrel(Barrel.AtFill(2));
         await Until(() => Hosted.Things.Any(t => t.Kind == ThingKind.Barrel && t.Pos == spot), "putting the barrel down", 2);
         var barrel = Hosted.Things.Single(t => t.Kind == ThingKind.Barrel && t.Pos == spot);
         await ClickOn(barrel);
@@ -50,6 +55,26 @@ public partial class Game {
         Give(Hosted, Water.Empty, empty);
         Give(Hosted, Water.OneLiter, oneLiter);
         Give(Hosted, Water.TwoLiters, twoLiters);
+        await Frames();
+    }
+
+    private async Task CheckHotbarShowsTheCountOfAnEmptyBucketStack() {
+        const int slot = 8;
+        string previousItem = world.HotbarItem(slot);
+        int previousStack = world.HotbarStack(slot);
+        int previousBuckets = Drop(Hosted, Bucket.Item);
+        Give(Hosted, Bucket.Item, 5);
+        await KeyStroke(Key.Tab);
+        await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(Bucket.Item))), hotbar.Buttons[slot]);
+        await Until(() => world.HotbarItem(slot) == Bucket.Item && world.HotbarCount(slot) == 5 && cursor.Empty, "five empty buckets bound to the hotbar", 2);
+        await Frames();
+        Require(hotbar.Counts[slot].Visible && hotbar.Counts[slot].Text == "5",
+            $"Five empty buckets must show a count of 5 in their hotbar slot, which showed {hotbar.Counts[slot].Text}.");
+        await CloseWithEsc();
+        Drop(Hosted, Bucket.Item, 5);
+        Give(Hosted, Bucket.Item, previousBuckets);
+        if (previousStack >= 0) PutOnHotbar(Hosted, previousStack, slot);
+        else SetHotbarSlot(Hosted, slot, previousItem);
         await Frames();
     }
 }

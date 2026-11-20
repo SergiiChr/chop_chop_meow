@@ -167,6 +167,7 @@ public sealed class PackerProp : Prop {
 public sealed class RackProp : Prop {
     /// <summary>One peg per tool slot, each with a hanging tool of every kind it can show; the view shows the one its slot holds.</summary>
     public readonly Dictionary<string, Node3D>[] Pegs = new Dictionary<string, Node3D>[World.ToolSlots];
+    public readonly int[] BottleLiters = new int[World.ToolSlots];
 }
 
 public sealed class SignpostProp : Prop {
@@ -201,7 +202,10 @@ public static class WorldModels {
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
-                if (prop is RackProp rack) rack.Pegs[0][Bucket.Item].Visible = true;
+                if (prop is RackProp rack) {
+                    rack.Pegs[0][Bucket.Item].Visible = true;
+                    rack.Pegs[1][Water.BottleTool].Visible = true;
+                }
                 Stage(prop.Root);
             }
         }
@@ -359,15 +363,15 @@ public static class WorldModels {
         }
         // A liquid has no model: only a station holds it, and its icon is drawn (assets/ui).
         if (data.VesselFor(id) != null) return null;
-        switch (id) {
+        switch (ContainerItem.Base(id)) {
             case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
             case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
-            case var barrel when Barrel.Is(barrel): return Build(new Thing { Kind = ThingKind.Barrel }).Root;
-            case var bucket when Bucket.Is(bucket): { var root = new Node3D(); VesselShape.AddBucket(root, Vector3.Zero); return root; }
+            case Barrel.Item: return Build(new Thing { Kind = ThingKind.Barrel }).Root;
+            case Bucket.Item: { var root = new Node3D(); VesselShape.AddBucket(root, Vector3.Zero); return root; }
             case var bottle when Water.IsBottle(bottle): return BottleShape.Create(Water.BottleLiters(bottle));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
@@ -728,6 +732,9 @@ public static class WorldModels {
             var bucket = VesselShape.AddBucket(body, RackShape.BucketSeat(slot));
             bucket.Visible = false;
             peg[Bucket.Item] = bucket;
+            var bottle = RackShape.AddBottle(body, slot);
+            bottle.Visible = false;
+            peg[Water.BottleTool] = bottle;
         }
         return prop;
     }

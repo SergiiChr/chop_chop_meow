@@ -6,6 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>The refillable three-liter bottle, and a liter drunk straight from a water source.</summary>
 public static class Water {
+    public const string BottleTool = "bottle";
     /// <summary>The bottle's item ids, full to empty, and the water a full one pours into a station.</summary>
     public const string Full = "water", TwoLiters = "water_2", OneLiter = "water_1", Empty = "empty_bottle", Liquid = "fresh_water";
     public const float LiterThirst = 100f / 3f;

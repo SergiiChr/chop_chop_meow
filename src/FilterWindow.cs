@@ -14,7 +14,8 @@ public sealed class FilterState {
 /// Drop an item on a row to add it, click one to take it off; an empty row allows anything.
 /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
 /// A plain pile has only the row of what workers bring, naming one resource, which also sets what they take.
-/// A barrel has the same single row and names water. Water in a full or partly filled vessel is one entry.
+/// A barrel has the same single row and names water.
+/// Water in a full or partly filled vessel is one entry.
 /// </summary>
 /// <param name="redraw">Draws the page again after a change to this window; the page does so itself when the filters change.</param>
 /// <param name="scrolls">Takes the item list's scroll area and the list, so the panel fits it to the screen.</param>

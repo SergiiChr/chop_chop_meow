@@ -84,7 +84,7 @@ internal static class VesselShape {
     private static Vector3 Point(Ring ring, float angle) =>
         new(MathF.Cos(angle) * ring.Radius, ring.Height, MathF.Sin(angle) * ring.Radius);
 
-    /// <summary>A wire bail in the XY plane. Its middle has a thicker grip.</summary>
+    /// <summary>A wire bail in the XY plane with a thicker grip in the middle.</summary>
     private static ArrayMesh BuildBail() {
         const int sides = 6;
         float[] angles = [0, 15, 30, 45, 67, 71, 90, 109, 113, 135, 150, 165, 180];

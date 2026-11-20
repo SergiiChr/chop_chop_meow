@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -10,6 +11,7 @@ internal static class BarrelAnimationChecks {
         CheckBarrelCarryKeepsTheTorchVisible();
         CheckWorkerKeepsTheirHandOnTheLadderUntilTheNextReach();
         CheckBothVesselsPourIntoTheRoofOpening();
+        CheckBottleGaugeKeepsItsFillAfterFading();
     }
 
     private static void CheckActorsHugTheBarrelThroughAFullStride() {
@@ -67,6 +69,22 @@ internal static class BarrelAnimationChecks {
             Require(stream.Visible && inlet.DistanceTo(CabinWaterModel.FillOpening) < .004f && outlet.Y > inlet.Y,
                 $"the water from {vessel} should run down into the roof barrel, ends at {inlet} and {outlet}");
         }
+        rig.Root.Free();
+    }
+
+    private static void CheckBottleGaugeKeepsItsFillAfterFading() {
+        var rig = new ActorRig(ActorSkin.Worker);
+        var bottle = rig.Root.GetNode<Node3D>("CarriedBottle");
+        var parts = ModelKit.FadeParts(rig.Root);
+        var blue = new Color("43b9e6");
+        WorkerWaterView.Carry(rig, new Pose(), Water.Full);
+        ModelKit.SetFade(parts, .5f);
+        WorkerWaterView.Carry(rig, new Pose(), Water.TwoLiters);
+        ModelKit.SetFade(parts, 0);
+        WorkerWaterView.Carry(rig, new Pose(), Water.TwoLiters);
+        int lit = bottle.GetChildren().OfType<MeshInstance3D>().Count(mesh =>
+            mesh.Visible && mesh.MaterialOverride is StandardMaterial3D gauge && gauge.AlbedoColor == blue);
+        Require(lit == 2, $"the bottle should still show two filled marks after the worker returns, found {lit}");
         rig.Root.Free();
     }
 }

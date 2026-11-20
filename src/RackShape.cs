@@ -18,6 +18,20 @@ internal static class RackShape {
 
     /// <summary>The bucket hangs by the middle of its bail, just clear of the planks.</summary>
     public static Vector3 BucketSeat(int slot) => new Vector3(PegX(slot), 1.349f, .174f) - VesselShape.BucketGrip;
+
+    /// <summary>A metal clip holds the bottle by its neck just below the peg.</summary>
+    public static Node3D AddBottle(Node3D rack, int slot) {
+        var hook = ModelKit.Pivot(rack, new Vector3(PegX(slot), 1.32f, .14f));
+        var bottle = BottleShape.Create(0, adjustable: true);
+        bottle.Position = Vector3.Down * .366f;
+        bottle.Scale = Vector3.One * .48f;
+        hook.AddChild(bottle);
+        var metal = ModelKit.Metal("637878", .45f, .55f);
+        ModelKit.Torus(hook, .041f, .052f, new Vector3(0, -.025f, 0), metal);
+        for (int side = -1; side <= 1; side += 2)
+            ModelKit.Box(hook, new Vector3(.012f, .031f, .012f), new Vector3(side * .016f, -.011f, -.041f), metal);
+        return hook;
+    }
     public static readonly StandardMaterial3D Concrete = ModelKit.Vertex(Surface.Stone, .95f);
     public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .85f);
     public static readonly StandardMaterial3D Tool = ModelKit.Vertex(Surface.Metal, .65f, .15f);

@@ -16,6 +16,7 @@ public sealed partial class World {
             w.InHand = null;
         }
         w.Plan = default;
+        w.WaterWalk = null;
         // A gatherer with no spot left carries off what they picked so far.
         if (w.Loading) {
             w.Loading = false;
@@ -54,7 +55,7 @@ public sealed partial class World {
     /// </summary>
     private void Idle(Worker w, string? lacking, float dt) {
         w.Assignment = FirstPlace(w); w.Doing = null;
-        if (w.Tool != "" && !JobUses(w, Data.Items[w.Tool].Tool) && !ReturnTool(w, dt)) return;
+        if (w.Tool != "" && !JobUses(w, ToolKind(w.Tool)) && !ReturnTool(w, dt)) return;
         WaitAtPost(w, dt);
         if (w.WorkState != WorkerWorkState.Blocked) w.Status = lacking ?? "Available";
     }
@@ -163,11 +164,11 @@ public sealed partial class World {
         return w.Tool == "" || ReturnTool(w, dt);
     }
 
-    private enum Kit { Ready, Busy, Lacking }
+    internal enum Kit { Ready, Busy, Lacking }
 
     /// <summary>Gets a worker the tool a job needs: puts back one of another kind, then takes the best from a tool station; tells whether they hold it, are on the way, or have none to take.</summary>
-    private Kit Equip(Worker w, string need, Thing target, float dt) {
-        if (w.Tool != "" && Data.Items[w.Tool].Tool != need) {
+    internal Kit Equip(Worker w, string need, Thing target, float dt) {
+        if (w.Tool != "" && ToolKind(w.Tool) != need) {
             if (!ReturnTool(w, dt)) return Kit.Busy;
             // With no room in a tool station the tool stays in hand, and a job that needs another kind waits for room.
             if (w.Tool != "") { w.Status = Phrase("No room to put back the ", Lower(Data.Name(w.Tool))); return Kit.Lacking; }

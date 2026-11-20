@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 /// <summary>A reusable tin flask with a wood stopper and a three-liter sight gauge.</summary>
 internal static class BottleShape {
     private static Material GaugeColor(bool filled) => ModelKit.Mat(filled ? "43b9e6" : "293e46", .3f);
-    public static Node3D Create(int liters, bool capped = true) {
+    public static Node3D Create(int liters, bool capped = true, bool adjustable = false) {
         var root = new Node3D();
         var tin = ModelKit.Metal("bbcaca", .35f, .65f);
         var rim = ModelKit.Metal("637878", .45f, .55f);
@@ -22,16 +22,25 @@ internal static class BottleShape {
         ModelKit.Cylinder(root, .21f, .21f, .045f, new(0, .055f, 0), rim, sides: 8);
         // A broad front sight gauge makes the fill state visible even at inventory scale.
         ModelKit.Box(root, new(.17f, .39f, .025f), new(0, .29f, .20f), rim);
-        for (int i = 0; i < 3; i++)
-            ModelKit.Box(root, new(.125f, .095f, .035f), new(0, .17f + i * .12f, .22f),
-                GaugeColor(i < liters));
+        for (int i = 0; i < Water.Capacity; i++) {
+            var center = new Vector3(0, .17f + i * .12f, .22f);
+            var size = new Vector3(.125f, .095f, .035f);
+            bool filled = i < liters;
+            if (adjustable) {
+                // Fading keeps each mesh's original material, so an adjustable gauge changes which mesh is shown.
+                ModelKit.Box(root, size, center, GaugeColor(false)).Visible = !filled;
+                ModelKit.Box(root, size, center, GaugeColor(true)).Visible = filled;
+            } else ModelKit.Box(root, size, center, GaugeColor(filled));
+        }
         return root;
     }
 
-    /// <summary>The three cells are the last pieces added to the bottle, counted from the lowest mark.</summary>
+    /// <summary>An adjustable bottle ends with one empty and one full mesh per mark, from lowest to highest.</summary>
     public static void SetGauge(Node3D bottle, int liters) {
-        int first = bottle.GetChildCount() - Water.Capacity;
-        for (int i = 0; i < Water.Capacity; i++)
-            bottle.GetChild<MeshInstance3D>(first + i).MaterialOverride = GaugeColor(i < liters);
+        int first = bottle.GetChildCount() - 2 * Water.Capacity;
+        for (int i = 0; i < Water.Capacity; i++) {
+            bottle.GetChild<MeshInstance3D>(first + 2 * i).Visible = i >= liters;
+            bottle.GetChild<MeshInstance3D>(first + 2 * i + 1).Visible = i < liters;
+        }
     }
 }

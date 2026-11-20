@@ -105,7 +105,7 @@ public partial class Hotbar : PanelContainer {
             bool building = world.Data.IsBuilding(id);
             Counts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? ""
                 : Barrel.Is(id) ? $"{Barrel.Liters(id)}/{Barrel.Capacity} L"
-                : world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
+                : count == 1 && world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}\nLMB: select · Double LMB: use · RMB: empty";

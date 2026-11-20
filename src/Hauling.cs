@@ -38,9 +38,10 @@ public sealed partial class World {
         if (w.Plan.Place is not Thing planned || !Covers(job, planned) || !Stands(w.Plan)) w.Plan = NextCarry(w, job);
         if (w.Plan.Place is not Thing place) {
             w.Status = HaulWait(job);
-            return WaterHaul(w, job, dt);
+            return barrelJobs.Haul(w, job, dt);
         }
         // The job in hand is the haul at the place the carry is for, also when a haul group picked it.
+        w.WaterWalk = null;
         w.Assignment = place.Id; w.Doing = JobKind.Haul;
         if (!HandsFree(w, dt)) return true;
         var c = w.Plan;
@@ -66,7 +67,7 @@ public sealed partial class World {
     }
 
     /// <summary>Whether a haul job still holds a place: its own, or one of a haul group's.</summary>
-    private static bool Covers(JobEntry job, Thing place) {
+    internal static bool Covers(JobEntry job, Thing place) {
         if (job is Duty duty) return duty.Thing == place.Id;
         foreach (var haul in ((HaulGroup)job).Hauls) if (haul.Thing == place.Id) return true;
         return false;

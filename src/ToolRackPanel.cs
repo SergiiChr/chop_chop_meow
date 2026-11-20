@@ -3,10 +3,10 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A tool rack: four slots that take any tool, then which tools workers have out and who waits for one.</summary>
+/// <summary>The tool rack's slots, what workers have borrowed and who waits for a tool.</summary>
 public partial class ToolRackPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        HeaderAction("stash", "Hang spare tools · keeps your best of each", () => moves.StoreAll(thing, id => world.BestTool(world.Data.Items[id].Tool) == id ? world.Backpack[id] - 1 : world.Backpack[id]), Style.ActionRound, "deposit");
+        HeaderAction("stash", "Hang spare tools · keeps your best of each", () => moves.StoreAll(thing, SpareTools), Style.ActionRound, "deposit");
         FilterButton();
         var well = Well(new VBoxContainer()); well.AddThemeConstantOverride("separation", 10);
         well.AddChild(StorageGrid(World.ToolSlots, 60));
@@ -14,6 +14,12 @@ public partial class ToolRackPanel(PageTools tools, Thing subject) : ThingPage(t
         live.Bind(shown => crew.Text = shown, CrewTools);
         StoreBagGrid(id => world.Holds(thing, id) && thing.Inventory.Accepts(id));
         JobButtons();
+    }
+
+    private int SpareTools(string item) {
+        string kind = world.Data.Items[item].Tool;
+        if (kind == "") return 0;
+        return world.Backpack[item] - (world.BestTool(kind) == item ? 1 : 0);
     }
 
     /// <summary>Which worker has which tool out, and who waits for one.</summary>

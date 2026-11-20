@@ -49,7 +49,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var rack = world.Add(ThingKind.Toolstation, at + new Vector2(3.1f, -.8f));
         rack.Inventory.Add(Bucket.Item, 2);
         rack.Inventory.Add("steel_axe", 1);
-        rack.Inventory.Add("rake", 1);
+        rack.Inventory.Add(Water.Full, 1);
         var barrel = world.Add(ThingKind.Barrel, at + new Vector2(.8f, 2.35f));
         barrel.Inventory.Add(Water.Liquid, 25);
         var pile = world.Add(ThingKind.Pile, at + new Vector2(-2.7f, 1.8f));
@@ -208,7 +208,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             const int perRow = 8;
             var at = Terrain.Spawn + new Vector2(-3, 9);
             string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins
-                && (!Barrel.Is(item) || item == Barrel.Item) && (!Bucket.Is(item) || item == Bucket.Item)).ToArray();
+                && ContainerItem.Base(item) == item).ToArray();
             float share = Launch.Number("--goods-share", .6f); int look = (int)Launch.Number("--goods-pile", 0);
             Vector2 Spot(int pile) => at + new Vector2(pile % perRow * 3.2f, pile / perRow * 3.2f);
             world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + perRow * 3.2f + 4 && t.Pos.Y > at.Y - 4 && t.Pos.Y < at.Y + (goods.Length / perRow + 1) * 3.2f + 4);

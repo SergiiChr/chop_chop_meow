@@ -11,8 +11,8 @@ internal static class CabinWaterModel {
     public const float FirstRung = .24f, RungSpacing = .28f;
     public const int RungCount = 10;
     public static readonly Vector3 LadderApproach = new(BarrelJobs.LadderApproach.X, 0, LadderZ);
-    public static readonly Vector3 RoofEntry = new(1.18f, RoofSurface(LadderZ), LadderZ);
-    public static readonly Vector3 PourStand = new(.25f, RoofSurface(.62f), .62f);
+    public static readonly Vector3 RoofEntry = new(1.18f, CabinShape.RoofSurface(LadderZ), LadderZ);
+    public static readonly Vector3 PourStand = new(.25f, CabinShape.RoofSurface(.62f), .62f);
     public static readonly Vector3 FillOpening = new(-.31f, 3.30f, .62f);
     private static readonly Vector3 BarrelCenter = new(-.54f, 3.09f, .62f);
     private const float FootLength = .19f, FootWidth = .17f;
@@ -37,16 +37,15 @@ internal static class CabinWaterModel {
         CapBottom = false,
     };
 
-    public static float RoofSurface(float z) => CabinShape.RoofSurface(z);
-
     public static void AddLadder(Node3D parent) {
         var rail = Metal("526069", .59f, .41f);
         var rung = Metal("909a9d", .57f, .4f);
         for (int side = -1; side <= 1; side += 2) {
             float z = LadderZ + side * LadderWidth / 2;
-            float top = RoofSurface(z) + .41f;
+            float top = CabinShape.RoofSurface(z) + .41f;
             Box(parent, new Vector3(.055f, top - .08f, .045f), new Vector3(LadderX, (top + .08f) / 2, z), rail);
-            // The grab rails turn in over the roof. Brackets carry the ladder back to the wall.
+            // The grab rails turn in over the roof.
+            // Brackets carry the ladder back to the wall.
             Box(parent, new Vector3(.19f, .045f, .045f), new Vector3(LadderX - .0675f, top, z), rail);
             foreach (float y in new[] { .49f, 1.4f, 2.5f }) {
                 Box(parent, new Vector3(.39f, .043f, .045f), new Vector3(1.391f, y, z), rail);
@@ -65,7 +64,7 @@ internal static class CabinWaterModel {
             float x = BarrelCenter.X + along * FootLength;
             foreach (int across in new[] { -1, 1 }) {
                 float z = BarrelCenter.Z + across * FootWidth;
-                float from = RoofSurface(z) - .016f;
+                float from = CabinShape.RoofSurface(z) - .016f;
                 var bottom = new Vector3(x, from, z);
                 var top = new Vector3(x, BarrelCenter.Y - .09f, BarrelCenter.Z + across * .142f);
                 var leg = Box(mount, new Vector3(.066f, top.DistanceTo(bottom), .057f), (bottom + top) / 2, bracket);

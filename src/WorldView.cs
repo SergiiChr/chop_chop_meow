@@ -542,7 +542,7 @@ public partial class WorldView : Node3D {
             bool sameAction = state.Action == work;
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
-            string? vessel = worker.Tool is string held && (Bucket.Is(held) || Water.IsBottle(held)) ? held : null;
+            string? vessel = BarrelJobs.Vessel(worker.Tool) ? worker.Tool : null;
             var waterTarget = worker.WaterAction != WorkerWaterAction.None ? World.Find(worker.WaterTarget) : null;
             if (waterTarget != null && vessel != null) {
                 var point = waterTarget.Kind switch {
@@ -1113,8 +1113,14 @@ public partial class WorldView : Node3D {
                 var layout = t.Inventory.Layout;
                 for (int slot = 0; slot < rack.Pegs.Length; slot++) {
                     string held = slot < layout.Count ? layout[slot].Item : "";
-                    string kind = held != "" && World.Data.Items.TryGetValue(held, out var def) ? def.Tool : "";
+                    string kind = World.ToolKind(held);
                     foreach (var (tool, hook) in rack.Pegs[slot]) hook.Visible = tool == kind;
+                    if (kind == Water.BottleTool) {
+                        int liters = Water.BottleLiters(held);
+                        if (liters == rack.BottleLiters[slot]) continue;
+                        BottleShape.SetGauge(rack.Pegs[slot][kind].GetChild<Node3D>(0), liters);
+                        rack.BottleLiters[slot] = liters;
+                    }
                 }
                 break;
             case BoxProp box:

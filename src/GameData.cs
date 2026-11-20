@@ -227,7 +227,8 @@ public sealed partial class GameData {
         data.Validate();
         Inventory.Unstacked.Clear();
         foreach (var (id, item) in data.Items) if (item.Tool != "" && id != Bucket.Item) Inventory.Unstacked.Add(id);
-        // Empty buckets stack. Filled vessels and barrels each take a cell.
+        // Empty buckets stack.
+        // Filled vessels and barrels each take a cell.
         foreach (var vessel in data.Vessels) foreach (string id in vessel.States) if (id != Bucket.Item) Inventory.Unstacked.Add(id);
         foreach (string item in Barrel.Fills) if (item != Barrel.Item) Inventory.Unstacked.Add(item);
         return data;

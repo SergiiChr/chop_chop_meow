@@ -245,7 +245,7 @@ public sealed partial class World {
         : at <= 0 ? null : Find(at / BoxCodes) is Thing t ? BoxBlock(t, to, item)
         : Carrier(at) is Worker w && to == w.ToolSlot && !FitsWorkerToolSlot(item) ? "A worker's tool slot only takes tools." : null;
 
-    internal bool FitsWorkerToolSlot(string item) => Water.IsBottle(item) || Data.Items.TryGetValue(item, out var def) && def.Tool != "";
+    internal bool FitsWorkerToolSlot(string item) => ToolKind(item) != "";
 
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {
