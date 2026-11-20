@@ -41,6 +41,8 @@ public sealed class Thing {
     public float Regrow { get; set; }
     /// <summary>The id of the tree that left a stump, whose species and size shape the stump; zero for a stump with no tree on record, which is shaped by its own id.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OfTree { get; set; }
+    /// <summary>The way a stump's tree fell across the ground, away from whoever landed the last blow on it, in radians from the x axis toward y.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float FellToward { get; set; }
     /// <summary>A signpost's market output: bought goods arrive here with the returning cart.</summary>
     public Inventory? Output { get; set; }
     /// <summary>A signpost's coins for wages, with no limit: sale coins land here, and dawn wages come out of it before any backpack.</summary>
@@ -354,14 +356,19 @@ public sealed partial class World {
     /// <summary>At this much health or less, a wolf's attack takes a player down rather than biting.</summary>
     public const float TakedownHealth = 50;
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
-    public float DayPhase => S.Time % Data.DaySeconds / Data.DaySeconds;
+    public float DayPhase => DayPhaseAt(S.Time);
+    /// <summary>How far through its day the world's clock is at <paramref name="time"/>, from 0 at dawn to 1 at the next.</summary>
+    public float DayPhaseAt(float time) => time % Data.DaySeconds / Data.DaySeconds;
     public bool Night => DayPhase >= Data.NightStarts;
     /// <summary>Whether the moon rather than the sun is in the sky, from sunset until dawn.</summary>
-    public bool MoonUp => DayPhase >= Data.Sunset;
+    public bool MoonUp => MoonUpAt(S.Time);
+    public bool MoonUpAt(float time) => DayPhaseAt(time) >= Data.Sunset;
     /// <summary>How far the sun, or the moon after sunset, has crossed the sky, from 0 where it rises to 1 where it sets.</summary>
-    public float SkyArc => MoonUp ? (DayPhase - Data.Sunset) / (1 - Data.Sunset) : DayPhase / Data.Sunset;
+    public float SkyArc => SkyArcAt(S.Time);
+    public float SkyArcAt(float time) => MoonUpAt(time) ? (DayPhaseAt(time) - Data.Sunset) / (1 - Data.Sunset) : DayPhaseAt(time) / Data.Sunset;
     /// <summary>How much of the moon is lit, from 0 at new moon to 1 at full; a new game starts near full moon so the first night is not the darkest.</summary>
-    public float Moonlight => (1 + MathF.Cos(MathF.Tau * S.Time / Data.DaySeconds / Data.MoonCycleDays)) / 2;
+    public float Moonlight => MoonlightAt(S.Time);
+    public float MoonlightAt(float time) => (1 + MathF.Cos(MathF.Tau * time / Data.DaySeconds / Data.MoonCycleDays)) / 2;
     /// <summary>Clock hour, with the day starting at 06:00.</summary>
     public float Hour => (DayPhase * 24 + 6) % 24;
     /// <summary>From the first fading light until dawn; workers are off duty and wolves hunt.</summary>
@@ -690,7 +697,7 @@ public sealed partial class World {
         int amount = Math.Min(t.Remaining, GatherYield(t.Kind));
         string item = ResourceItem(t);
         amount = S.Backpack.Add(item, amount); t.Remaining -= amount;
-        if (t.Kind == ThingKind.Tree && t.Remaining <= 0) Fell(t);
+        if (t.Kind == ThingKind.Tree && t.Remaining <= 0) Fell(t, Player);
         if (amount > 0) Chip(t, tool);
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
         if (amount > 0) { S.Milestones.Add("gather"); Got(item); }

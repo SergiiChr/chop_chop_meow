@@ -22,13 +22,16 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 // - The sampler scale is the demo material's; LakeAppearance gives each body of water its colours, waves and how much
 //   foam it has.
 // - The waves live in waves.gdshaderinc, which the lily pads share, and review_time can hold them at one moment.
+// - The water moves by the game's own clock rather than TIME, so it stands still while the game is paused.
+// - The caustic pictures blend one into the next instead of snapping.
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx, blend_mix;
 
 #include "res://assets/environment/lake/waves.gdshaderinc"
 
 uniform vec2 sampler_scale = vec2(0.2, 0.2); // Scale for the sampler
-uniform vec2 sampler_direction = vec2(0.05, 0.04); // Direction and speed for the sampler offset
+// Direction and speed for the sampler offset; whole tiles every WaterLoop seconds, so the water clock comes round unseen.
+uniform vec2 sampler_direction = vec2(0.05, 0.04);
 
 uniform sampler2D uv_sampler : filter_linear_mipmap_anisotropic, repeat_enable; // UV motion sampler for shifting the normalmap
 uniform vec2 uv_sampler_scale = vec2(0.25, 0.25); // UV sampler scale
@@ -130,7 +133,11 @@ void fragment() {
 
 	// Caustic projection onto the ground under the water
 	vec2 ground_world = (INV_VIEW_MATRIX * vec4(ground, 1.0)).xz;
-	vec4 caustic_color = texture(caustic_sampler, vec3(ground_world * 300.0 / 1024.0, mod(time * 14.0, 16.0)));
+	// The 16 caustic pictures follow one another 14 times a second, each blending into the next.
+	float caustic_frame = mod(time * 14.0, 16.0);
+	vec2 caustic_uv = ground_world * 300.0 / 1024.0;
+	vec4 caustic_color = mix(texture(caustic_sampler, vec3(caustic_uv, floor(caustic_frame))),
+		texture(caustic_sampler, vec3(caustic_uv, mod(floor(caustic_frame) + 1.0, 16.0))), fract(caustic_frame));
 
 	color *= 1.0 + pow(caustic_color.r, 1.50) * (1.0 - depth_blend) * 6.0;
 

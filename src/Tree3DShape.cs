@@ -15,7 +15,7 @@ internal static class Tree3DShape {
     public static readonly StringName Opacity = "opacity";
 
     /// <summary>
-    /// Leaf cards that sway in the wind, more toward the crown.
+    /// Leaf cards that sway in the wind, more toward the crown, and lie flat on the ground where a felled tree's crown meets it.
     /// Cut out like the alpha-scissor material they replace; the fading twin blends instead, so a canopy in front of the player keeps swaying while it fades.
     /// The solid variant draws whole cards and is only used for shadows.
     /// </summary>
@@ -29,7 +29,10 @@ internal static class Tree3DShape {
         void vertex() {
             vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
             float bend = clamp(VERTEX.y / 4.9, 0.0, 1.0);
-            VERTEX += to_local(MODEL_MATRIX, wind_offset(world, bend * bend, 0.3));
+            vec3 offset = wind_offset(world, bend * bend, 0.3);
+            // A felled crown squashes flat where it meets the ground rather than passing into it.
+            offset.y += max(0.0, 0.02 - world.y - offset.y);
+            VERTEX += to_local(MODEL_MATRIX, offset);
         }
         void fragment() {
             vec4 color = texture(albedo_texture, UV) * albedo;
@@ -72,6 +75,21 @@ internal static class Tree3DShape {
     public static (Vector2 Center, float Radius) Foot(int kind, int variant) {
         var start = Start(kind, variant);
         return (start.Center, start.Foot);
+    }
+
+    private static readonly (Vector3[] Wood, float Top)?[,] outlines = new (Vector3[], float)?[4, 3];
+    /// <summary>
+    /// The corners of a tree's trunk and branches in its model, which bear a felled tree's weight where it comes to rest,
+    /// and the height of its top; read once, when a tree of that look first falls.
+    /// </summary>
+    public static (Vector3[] Wood, float Top) Outline(int kind, int variant) {
+        if (outlines[kind, variant] is { } known) return known;
+        leaves[kind, variant] ??= GD.Load<Mesh>($"{Folder}{species[kind]}{variant}_leaves.res");
+        var wood = Trunk(kind, variant).SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+        float top = Math.Max(Trunk(kind, variant).GetAabb().End.Y, leaves[kind, variant]!.GetAabb().End.Y);
+        var outline = (wood, top);
+        outlines[kind, variant] = outline;
+        return outline;
     }
 
     private static readonly StandardMaterial3D?[] stemBark = new StandardMaterial3D?[4];

@@ -176,6 +176,8 @@ Rendering and sound:
 | File | Owns |
 | --- | --- |
 | `src/WorldView.cs` | The 3D scene, orthographic camera, picking, lighting and world animation |
+| `src/props/display/TreeFall.cs`, `src/props/display/Thrown.cs` | A felled tree going over about its trunk's foot, and a dug out stump or bush or a chip thrown through the air |
+| `src/props/display/LocalClock.cs` | A count the server keeps, run on by the window between updates for a motion that follows it |
 | `src/WorldScene.cs` | Ground dressing, particles and the animation review |
 | `src/terrain/display/TerrainView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
@@ -183,10 +185,10 @@ Rendering and sound:
 | `src/paths/display/GravelPathView.cs` | Laid gravel paths as the ground draws them: the map of how far each spot is from the gravel's edge |
 | `src/paths/display/GravelPathShape.cs` | One gravel path tile as a model, for the plan's icon, its ghost while placing and the remove selector's red pad |
 | `src/buildings/display/RemovalMark.cs` | The red mark on the building or gravel path tile the remove selector points at |
-| `src/WorldLook.cs`, `src/Wind.cs` | The sound listener and the wind |
+| `src/WorldLook.cs`, `src/Wind.cs` | The sound listener, the wind and the grass parting round the people in sight |
 | `src/terrain/display/FootpathWear.cs` | Footpaths worn where the player and workers walk, and their growing back |
 | `src/actors/display/Footsteps.cs` | Which footstep sound the ground gives at a spot |
-| `src/water/display/LakeAppearance.cs` | The lake and sea surfaces, their tiles, and the water and lily pad materials |
+| `src/water/display/LakeAppearance.cs` | The lake and sea surfaces, their tiles, the water and lily pad materials, and the water's clock |
 | `src/water/display/ShorelineAppearance.cs` | The sand and stony bank strips along the lake and the coast, and the coast's water |
 | `src/water/display/LakeDressing.cs` | The lake's bank, water, stones, reeds and lily pads |
 | `src/water/model/ShoreLook.cs`, `src/water/model/WaterBody.cs` | The shore photoscans' looks, and the sea's and the lake's waves and colours |
@@ -313,6 +315,7 @@ The welcome is a guest's first update, with the fog uncovered so far.
 - An action's result comes back with a later update. A window checks what it can before sending, and `Net.Made` names a new mine or worker so the panel opens on it. Panels refresh with every update while `Net.AwaitingAnswer` holds, and a page draws itself again when what sets its layout changes (`PagePanel.RedrawOnChange`), since drawing it right after an action would show the world before the answer.
 - Leaving waits for the server to confirm before the line closes, so actions still in flight arrive; the owner's server closes instead, and the line going is the confirmation.
 - Joining another game from your own autosaves it and leaves with `Game.StepAway`, which keeps its server up: a failed or cancelled join goes back to it, and after a good one it ends with nobody in it, 30 seconds later.
+- A window applies updates thirty times a second and draws more often, so a motion the view drives from a count the server keeps runs on its own clock in between (`LocalClock`): a stump or bush leaning as it is dug, a thrown wolf carcass, a mine's hole and frame, a forge's heat and gauge, a cart's trip and the time of day the sun and light show. The clock moves every drawn frame at the rate the count last ran at against the world's clock; an update makes up a small difference over the next frames without turning the motion back, and a big one, such as a pump of the bellows or a sleep that skips the night, is taken at once.
 - A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key. It goes on trying while the server says the game is not open yet, as after the host loads a save.
 - Until the owner opens the game, the server refuses peers that are not on this computer. Only the owner can save; any player can hold the world, and it stands still while all of them do.
 - The server's welcome says whether the player owns the game, from their machine's key, so an owner who types their own game's address into the join popup still owns it.
@@ -547,6 +550,12 @@ A thing out of sight is drawn once as its snapshot, moved on far enough to finis
 A change that did not happen in front of the player is not played when they see it (`WorldView.Watched`): a tree felled out of sight is a stump, a chest filled out of sight keeps its lid shut, and a chip or a building that appeared out of sight neither flies nor lands in dust.
 A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
 A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one a building now stands over (`World.Clears`), or a gravel path tile lies on (`GravelPaths.Laid`), just goes.
+A tree falls away from whoever landed the last blow, player or worker, the way its stump records (`Thing.FellToward`), so it falls the same way on every machine.
+It turns about the foot of its trunk on the side it falls to, as a stiff pole hinged at its foot does (`TreeFall`): slowly at first, then faster, a taller tree taking longer and landing faster.
+It starts upright at the speed a 5° lean would give it, and comes to rest where its trunk or a branch first touches the ground, between about 45° over and lying flat; its leaf cards bear no weight and lie flat on the ground where they reach it.
+The shake of the last blow carries on as it goes over.
+A dug out stump or bush is thrown straight up and comes back down in `WorldView.DugOutSeconds` under gravity, tumbling steadily over about its middle (`Thrown`), and no part of it goes lower than it stood as it came out.
+A chip knocked off rock flies in an arc under gravity, spinning steadily round its middle, lands where it lies and skids and turns to a stop over `WorldModels.ChipSettle`.
 While it is dug at, a stump or bush leans further over with `Thing.Progress` (`DugProp`).
 Work out of sight shakes nothing and throws no chips.
 It is silent too, since `SightRadius` (20 metres) lies beyond the 16 metres a sound carries ([Sound effects](#sound-effects)).
@@ -655,6 +664,8 @@ The window draws that picture through the VHS shader.
 
 The animation review's `player cabin` clip plays every stage at a cabin, `player jog back` and `player run back` a run braking and turning round, and `player jog turns` and `player run turns` the keys A, W, D and S pressed in quick turn.
 The door opens while someone steps in or out: it swings with `hut_door_normal` after a walk, and slams shut with `hut_door_escaping` after a run.
+A swing eases in and out over `Doorways.ShutSeconds`; a slam from wide open speeds up all the way into the frame over `DoorwayView.SlamSeconds`.
+The slam's sound and a chest's or crate's `close_chest` start as far ahead of the shut as each variant's loudest moment lies into it (`Sounds.Lead`), so it lands as the door hits its frame or the lid shuts; a slam's sound that builds up longer than the slam starts while the runner is still in the doorway.
 
 #### Swings
 
@@ -1218,7 +1229,7 @@ Sounds come from three places:
 - The view plays sounds tied to animation timing: footsteps by ground type (`Footsteps.Sound`: gravel paths, water, rock, grass), axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
-A tree felled in sight takes 1 second to reach the ground when it is among the shortest and 2.1 when among the tallest (`WorldView.FallSeconds`).
+A tree felled in sight takes about 1.7 seconds to come to rest when it is among the shortest and 2.5 when among the tallest, depending on the way it falls, its top landing at 6 to 13 metres a second (`TreeFall`).
 It is heard twice, each sound started by the animation so both land on their moment whatever the tree's height:
 
 - As it starts to go: `tree_crack`, about a second of cracking or less, or for the tallest three in ten `tree_bend`, 1.8 seconds of wood tearing that lasts about as long as their fall.

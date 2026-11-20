@@ -332,7 +332,7 @@ public partial class WorldView {
             shown = DoorwayView.DoorStep(now, door, door, reviewActor.StageFrom, time - start, seconds, false, 0);
         }
         bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Tugged && shown.At.DistanceTo(door) < ReviewSeen;
-        DoorwayView.SwingDoor(reviewCabin, open, dt / Doorways.ShutSeconds);
+        DoorwayView.SwingDoor(reviewCabin, open, dt, Doorways.ShutSeconds, false);
         reviewActor.Update(shown.At, shown.Action, shown.Facing, dt, shown.Backing);
         Pose(reviewRigs[0], reviewActor, null, door: new DoorShown(shown.At, shown.Facing, shown.Action, door, shown.Backing, 0, 0, 0));
         reviewRigs[0].Root.Visible = shown.At.DistanceTo(door) < ReviewSeen || now is Doorway.None or Doorway.Knocking;

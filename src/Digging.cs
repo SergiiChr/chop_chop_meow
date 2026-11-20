@@ -20,11 +20,15 @@ public partial class World {
         }
     }
 
-    /// <summary>Takes a tree whose last wood is gone out of the world and returns the stump it leaves in its place.</summary>
-    internal Thing Fell(Thing tree) {
+    /// <summary>
+    /// Takes a tree whose last wood is gone out of the world and returns the stump it leaves in its place; the tree falls
+    /// away from <paramref name="feller"/>, who landed the last blow.
+    /// </summary>
+    internal Thing Fell(Thing tree, Vector2 feller) {
         S.Things.Remove(tree);
         var stump = Add(ThingKind.Stump, tree.Pos, StumpWood);
         stump.OfTree = tree.Id;
+        stump.FellToward = (tree.Pos - feller).Angle();
         return stump;
     }
 

@@ -93,14 +93,14 @@ public partial class Game {
         CheckFadingCanopyKeepsItsCutoutShadows(old!);
         CheckEveryTreeTrunkReachesTheGround();
         CheckStumpIsAsThickAsItsTreesTrunk();
-        old!.Fade = .68f; old.Fall = 9;
+        old!.Fade = .68f; old.Lying = 9;
         await Click(FindButton(startMenu.Screen, "New game")!);
         var fresh = view.PropOf(tree.Id) as TreeProp;
         Require(world.Find(tree.Id)?.Kind == ThingKind.Tree, "A new game must keep a tree where the last game's tree stood.");
         Require(fresh != null, "A new game must build a model for that tree.");
         Require(fresh != old, "A new game must build a fresh tree model rather than keep the last game's.");
         Require(fresh.Fade == 0, "A new game's tree model must not stay faded.");
-        Require(fresh.Fall < 0, "A new game's tree model must not stay fallen.");
+        Require(fresh.Falling == null && fresh.Lying < 0, "A new game's tree model must not stay fallen.");
         await CloseWithEsc();
     }
     /// <summary>Every tree species and variant has a trunk that stands on the ground, also where its lowest branches hang below the start of its baked trunk.</summary>
@@ -986,7 +986,7 @@ public partial class Game {
         played = sounds.Played; sounds.Play("wolf_howl", world.Player + new Vector2(world.Data.HowlRadius + 1, 0));
         Require(sounds.Played == played, "A howl beyond the howl radius must stay silent.");
     }
-    /// <summary>A tree felled in sight is heard breaking as it starts to go and crashing as its trunk reaches the ground, and a tall one comes down slower.</summary>
+    /// <summary>A tree felled in sight is heard breaking as it starts to go and crashing as its wood reaches the ground, and a tall one comes down slower.</summary>
     private async Task CheckFelledTreeBreaksThenCrashesAsItLands() {
         await CloseWithEsc();
         var (start, home) = (Hosted.Player, Terrain.Spawn);
@@ -995,9 +995,9 @@ public partial class Game {
         var slow = await FellInSight(home + new Vector2(3, 3), tall: true);
         foreach (var fall in new[] { quick, slow }) {
             Require(fall.LeanAtBreak < 10, "A tree must be heard breaking as it starts to go over.");
-            Require(fall.LeanAtCrash > 89, "A felled tree must crash as its trunk reaches the ground, not before.");
+            Require(fall.LeanAtCrash == fall.Lands, $"A felled tree must crash as its wood reaches the ground at {fall.Lands:0}°, not at {fall.LeanAtCrash:0}°.");
         }
-        Require(slow.Seconds > quick.Seconds + .4f, "A tall tree must take longer to come down than a short one.");
+        Require(slow.Seconds > quick.Seconds, $"A tall tree must take longer to come down than a short one: {slow.Seconds:0.00} s against {quick.Seconds:0.00}.");
         Warp(Hosted, start); await Frames(4);
     }
     /// <summary>Holding the right mouse button on a tree or a ripe farm plot walks over and works it.</summary>

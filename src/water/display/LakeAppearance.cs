@@ -16,6 +16,32 @@ public static class LakeAppearance {
     /// <summary>Columns and rows of vertices in one tile of a large surface, which Godot leaves undrawn while it is off screen.</summary>
     private const int TileVertices = 100;
     private static Shader? shader;
+    /// <summary>
+    /// Seconds after which the water's flow and caustics come back to where they started: the shader's sampler direction
+    /// moves its maps by whole tiles in that time, and its 16 caustic pictures at 14 a second come round whole.
+    /// </summary>
+    private const double WaterLoop = 800;
+    private static readonly StringName WavesUniform = "water_waves", TimeUniform = "water_time";
+    /// <summary>Seconds the water has moved for, kept in double precision so it never loses its step however long the game runs.</summary>
+    private static double clock;
+
+    /// <summary>
+    /// Moves every water surface on by <paramref name="dt"/> seconds: by the game's own clock, so the water stands still
+    /// while the game is paused, and with each wave's phase kept below a turn, so nothing jumps however long it runs.
+    /// </summary>
+    internal static void Advance(float dt) {
+        clock += dt;
+        // The sea and the lake share their waves' lengths, and so their speeds.
+        var waves = WaterBody.Sea.Waves;
+        RenderingServer.GlobalShaderParameterSet(WavesUniform, new Vector3(Phase(waves[0].W), Phase(waves[1].W), Phase(waves[2].W)));
+        RenderingServer.GlobalShaderParameterSet(TimeUniform, (float)(clock % WaterLoop));
+    }
+
+    /// <summary>How far round its turn a wave of <paramref name="length"/> metres is: its crests run at the speed deep water gives that length, slowed to the water's speed.</summary>
+    private static float Phase(float length) {
+        double k = Math.Tau / length;
+        return (float)(Math.Sqrt(9.8 * k) * WaterBody.Speed * clock % Math.Tau);
+    }
 
     /// <summary>Adds the lake's water surface, which ends at the shore that bounds walking.</summary>
     public static void BuildLakeAppearance(Node3D parent, bool still) {

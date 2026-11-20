@@ -21,7 +21,7 @@ public partial class WorldView {
 
     /// <summary>
     /// Plants shrink away on worn ground and on gravel paths; wear is read at each plant's origin so the whole plant scales evenly.
-    /// Plants sway in the wind and part around the player.
+    /// Plants sway in the wind and part around the players and workers in sight.
     /// </summary>
     private static readonly string DressingCode = $$"""
         shader_type spatial;
