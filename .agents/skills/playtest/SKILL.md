@@ -19,7 +19,7 @@ and sends them through `Input.ParseInputEvent`, like real input.
    in a 1440x900 window. Don't copy the player's settings in.
    To test with one of the player's saves, copy it to a `playtest-` name first; loading it, you play the player who
    saved it.
-2. Start the game in the background with a folder in your scratchpad:
+2. Start the game in the background with a scratch folder (in the session's scratchpad when the harness gives one):
 
    ```sh
    env -u WAYLAND_DISPLAY ./build.py play -- --drive <dir>
@@ -36,7 +36,7 @@ The game opens with the intro film over the start menu: send `key Escape` and ta
 Write commands, one per line, to `<dir>/cmd.txt`.
 The driver runs them, renames the file to `cmd-N.done`, appends `ok …` or `failed …` per line to `log.txt`, and sets `status.txt` to `ready` when idle.
 Wait for `ready` before writing the next `cmd.txt`.
-`.claude/skills/playtest/drive.sh <dir> "cmd" …` does both: it waits for `ready`, sends the commands, waits until they ran and prints their log lines.
+`.agents/skills/playtest/drive.sh <dir> "cmd" …` does both: it waits for `ready`, sends the commands, waits until they ran and prints their log lines.
 
 | Command | Does |
 | --- | --- |

@@ -33,8 +33,8 @@ this project turns them into the movie.
 4. Make the movie the game plays, and a large one to show:
 
    ```sh
-   T=~/projects/cgi_tools
-   $T/retro_movie.py build/intro/frames --cues build/intro/frames/cues.tsv --sounds assets/sounds --sounds assets \
+   T=~/projects/agents/skills
+   $T/retro-movie/retro_movie.py build/intro/frames --cues build/intro/frames/cues.tsv --sounds assets/sounds --sounds assets \
        --gain 6 --ogv assets/intro.ogv --mp4 build/intro/intro.mp4
    ```
 
@@ -43,15 +43,15 @@ this project turns them into the movie.
 
 ## Tools
 
-The movie, sound and sheet tools live in `~/projects/cgi_tools`, with skills of their own (`retro-movie`,
+The movie, sound and sheet tools are in `~/projects/agents/skills`, each with its own skill (`retro-movie`,
 `sound-cues`, `shot-review`).
 They are not part of this project and nothing in it may call them: only `assets/intro.ogv` is committed.
 
 ```sh
-T=~/projects/cgi_tools
-$T/contact_sheet.py build/intro/stills sheet.png --cols 3                       # every still, named
-$T/contact_sheet.py build/intro/frames strip.png --from 12 --to 17 --count 12   # a shot as a strip, timed
-$T/loudness.py assets/intro/bag.mp3 --from 5.4 --length 1.6 --step 0.02         # where a sound's parts are
+T=~/projects/agents/skills
+$T/shot-review/contact_sheet.py build/intro/stills sheet.png --cols 3                       # every still, named
+$T/shot-review/contact_sheet.py build/intro/frames strip.png --from 12 --to 17 --count 12   # a shot as a strip, timed
+$T/sound-cues/loudness.py assets/intro/bag.mp3 --from 5.4 --length 1.6 --step 0.02         # where a sound's parts are
 ```
 
 ## Shots
