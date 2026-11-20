@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
 OUTPUT = build.BUILD / "animation-review"
-# Frames a second a view records, the rate the game is drawn at, and how many frames it records: two seconds of game time unslowed.
+# Frames a second a view records, the rate the game is drawn at, and how many frames it records by default: two seconds of game time unslowed.
 FPS = 60
 FRAMES = 120
 
@@ -50,9 +50,15 @@ def require_clip(ref: str | None, clip: str) -> None:
 
 
 def record(
-    checkout: Path, clip: str, view: str, slow: float, movie: Path, target: float | None
+    checkout: Path,
+    clip: str,
+    view: str,
+    slow: float,
+    movie: Path,
+    target: float | None,
+    count: int,
 ) -> None:
-    """Records a checkout's clip from one view to a movie of FRAMES frames at FPS a second of slowed game time."""
+    """Records a checkout's clip from one view to a movie of count frames at FPS a second of slowed game time."""
     pitch, turn = VIEWS[view]
     movie.parent.mkdir(parents=True, exist_ok=True)
     flags = [
@@ -82,7 +88,7 @@ def record(
             "--slow",
             str(slow),
             "--frames",
-            str(FRAMES),
+            str(count),
         ]
     else:
         # A ref from before recording captured numbered frames 30 a second, which become a movie of that rate here.
@@ -90,7 +96,7 @@ def record(
         shutil.rmtree(frames, ignore_errors=True)
         command = [
             sys.executable, checkout / "build.py", "play", "--", *flags,
-            "--animation-slow", str(slow), "--animation-frames", str(FRAMES), "--animation-capture", frames,
+            "--animation-slow", str(slow), "--animation-frames", str(count), "--animation-capture", frames,
         ]  # fmt: skip
     # A native Wayland window draws about one frame a second; XWayland draws at full speed.
     env = {key: value for key, value in os.environ.items() if key != "WAYLAND_DISPLAY"}
@@ -139,6 +145,7 @@ def record_all(
             options.slow,
             OUTPUT / slug(options.clip) / name / f"{view}.avi",
             options.target,
+            options.frames,
         )
 
 
@@ -177,6 +184,12 @@ def main() -> None:
         help="slow motion factor (default %(default)s, real speed)",
     )
     parser.add_argument(
+        "--frames",
+        type=int,
+        default=FRAMES,
+        help="frames a view records (default %(default)s, two seconds)",
+    )
+    parser.add_argument(
         "--target",
         type=float,
         metavar="METRES",
@@ -203,7 +216,7 @@ def main() -> None:
     if options.base:
         record_base(options.base, options)
     print(
-        f"{FRAMES} frames a view at {FPS} a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
+        f"{options.frames} frames a view at {FPS} a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
     )
 
 
