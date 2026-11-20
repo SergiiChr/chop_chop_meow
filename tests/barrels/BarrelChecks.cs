@@ -15,6 +15,8 @@ internal static class BarrelChecks {
         Test(CheckBarrelKeepsWaterWhenPlacedAndLifted, data);
         Test(CheckWorkerHandsOnlyFitOneBarrel, data);
         Test(CheckSaveKeepsVesselFillLevels, data);
+        Test(CheckRecoveryKeepsWorkerBarrelAndWaterVessel, data);
+        Test(CheckFullBucketsDoNotPreventRefillingABottle, data);
         Test(CheckBucketsRefillAndPourWithoutLosingTheirStack, data);
         Test(CheckWorkerFetchesWaterFromClosestFullBarrelAndClimbsToCabin, data);
         Test(CheckCabinServesThirstBeforeBottlesInEntryOrder, data);
@@ -97,6 +99,32 @@ internal static class BarrelChecks {
         loaded.Deserialize(world.Serialize());
         Require(loaded.Backpack[Barrel.AtFill(13)] == 1 && loaded.Backpack[Bucket.AtFill(7)] == 1 && !loaded.CanSprint,
             "the barrel and bucket keep their fill and carry rules after a save loads");
+        world.Die();
+        loaded.Deserialize(world.Serialize());
+        Require(loaded.Dead && loaded.CanSprint && loaded.Nearest(ThingKind.Grave, world.Player)?.Inventory[Barrel.AtFill(13)] == 1,
+            "the new backpack and the recovery box both load after death");
+    }
+
+    private static void CheckRecoveryKeepsWorkerBarrelAndWaterVessel(GameData data) {
+        var world = EmptyWorld(data);
+        var worker = AddWorker(world, world.Player + Vector2.Right);
+        Give(world, Water.OneLiter);
+        Require(world.Transfer(world.Backpack, worker.ToolSlot, Water.OneLiter, 1) == 1, "worker tool slots take a bottle");
+        Give(world, Barrel.AtFill(17));
+        Require(world.Transfer(world.Backpack, worker.Bag, Barrel.AtFill(17), 1) == 1, "worker can carry a barrel with a bottle in the tool slot");
+        world.Fire(worker);
+        var grave = world.Nearest(ThingKind.Grave, worker.Pos);
+        Require(grave != null && grave.Inventory[Barrel.AtFill(17)] == 1 && grave.Inventory[Water.OneLiter] == 1,
+            "dismissing the worker leaves the barrel with its water and their tool");
+    }
+
+    private static void CheckFullBucketsDoNotPreventRefillingABottle(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, Bucket.AtFill(10));
+        Give(world, Water.Empty);
+        var lake = world.Add(ThingKind.Water, Terrain.WaterPoint(world.Player), 10);
+        Require(Water.CollectWater(world, lake) == WaterCollectResult.RefilledBottle && world.Backpack[Water.Full] == 1,
+            "a bottle can fill at the lake even when the bucket is already full");
     }
 
     private static void CheckBucketsRefillAndPourWithoutLosingTheirStack(GameData data) {

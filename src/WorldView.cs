@@ -886,7 +886,7 @@ public partial class WorldView : Node3D {
         if (props.TryGetValue(t.Id, out var prop) && prop.Kind == t.Kind) return prop;
         // A building or crate put down in front of the player lands with a puff of dust; a kind changing in place, such as a dug mine, does not.
         bool appeared = Watched(t.Pos);
-        if (prop == null && appeared && (t.Kind == ThingKind.Crate || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
+        if (prop == null && appeared && (t.Kind is ThingKind.Crate or ThingKind.Barrel || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
         if (prop != null) prop.Root.QueueFree();
         prop = WorldModels.Build(t);
         scene.AddChild(prop.Root);
@@ -1521,7 +1521,7 @@ public partial class WorldView : Node3D {
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
     }
 
-    /// <summary>Builds a hidden, faded ghost of every building and of a crate, so picking one in build mode compiles nothing mid-game.</summary>
+    /// <summary>Builds a hidden, faded ghost of every building, crate and barrel, so picking one in build mode compiles nothing mid-game.</summary>
     private void BuildGhosts() {
         Prop Ghost(ThingKind kind, Vector2 at) {
             var built = WorldModels.Build(new Thing { Kind = kind, Pos = at });
@@ -1533,6 +1533,7 @@ public partial class WorldView : Node3D {
         }
         foreach (var kind in World.Data.Buildings.Keys) if (kind != ThingKind.Mine) ghosts[kind] = Ghost(kind, Vector2.Zero);
         ghosts[ThingKind.Crate] = Ghost(ThingKind.Crate, Vector2.Zero);
+        ghosts[ThingKind.Barrel] = Ghost(ThingKind.Barrel, Vector2.Zero);
         foreach (var ore in World.MineOres) mineGhosts[ore] = Ghost(ThingKind.Mine, World.MineSpot(World.CliffOf(ore)));
     }
 

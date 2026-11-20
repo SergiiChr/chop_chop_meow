@@ -243,9 +243,9 @@ public sealed partial class World {
         at == 0 && Barrel.Is(item) && Barrel.In(to) != null ? "You can only carry one barrel."
         : at <= CrateCode && Barrel.Is(item) ? "Barrel does not fit in wood crate."
         : at <= 0 ? null : Find(at / BoxCodes) is Thing t ? BoxBlock(t, to, item)
-        : Carrier(at) is Worker w && to == w.ToolSlot && !WorkerTool(item) ? "A worker's tool slot only takes tools." : null;
+        : Carrier(at) is Worker w && to == w.ToolSlot && !FitsWorkerToolSlot(item) ? "A worker's tool slot only takes tools." : null;
 
-    private bool WorkerTool(string item) => Water.IsBottle(item) || Data.Items.TryGetValue(item, out var def) && def.Tool != "";
+    internal bool FitsWorkerToolSlot(string item) => Water.IsBottle(item) || Data.Items.TryGetValue(item, out var def) && def.Tool != "";
 
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {

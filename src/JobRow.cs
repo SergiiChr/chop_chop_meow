@@ -58,7 +58,7 @@ public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, JobChoice choi
         JobKind.Haul when t.Kind == ThingKind.Farm => "Brings seeds and fertilizer and carries the harvest to storage.",
         JobKind.Haul when t.Kind == ThingKind.Mine => "Brings the timber, iron and stone the mine needs.",
         JobKind.Haul when t.Kind == ThingKind.Barrel => "Hauls water to fill this barrel.",
-        JobKind.Haul when t.Kind == ThingKind.Hut => "Refills the cabin's water barrel at bedtime.",
+        JobKind.Haul when t.Kind == ThingKind.Hut => "Climbs the ladder to fill the roof barrel with water.",
         JobKind.Mine => $"{World.Def(job).Hint} Up to {world.Data.Mine.Workers} workers.",
         _ => World.Def(job).Hint
     };

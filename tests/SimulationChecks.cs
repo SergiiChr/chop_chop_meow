@@ -2244,8 +2244,12 @@ public static class SimulationChecks {
             // Crates of berries sold at a signpost buy what the village sells, the first pickaxe among it.
             if (built.Contains(ThingKind.Signpost) && have.Contains("crate") && have.Contains("berries")) foreach (var item in data.Market.Buys.Keys) grew |= have.Add(item);
             if (HasTool("rake")) grew |= have.Add("leaves");
-            // A full vessel pours its liquid into a station.
-            foreach (var vessel in data.Vessels) if (have.Contains(vessel.Full)) grew |= have.Add(vessel.Liquid);
+            // Crafting the vessel and reaching its liquid opens every fill state.
+            foreach (var vessel in data.Vessels) {
+                if (have.Contains(vessel.Full)) grew |= have.Add(vessel.Liquid);
+                if (have.Contains(vessel.Empty) && have.Contains(vessel.Liquid)) foreach (string fill in vessel.States) grew |= have.Add(fill);
+            }
+            if (have.Contains(Barrel.Item) && have.Contains(Water.Liquid)) foreach (string fill in Barrel.Fills) grew |= have.Add(fill);
             foreach (var (id, b) in data.Buildings) if (b.Cost.Keys.All(have.Contains)) grew |= built.Add(id);
             if (built.Contains(ThingKind.Pile) && have.Any(data.IsFood)) grew |= have.Add("fertilizer");
             // Seeds are bought with berry money to start the first plot.

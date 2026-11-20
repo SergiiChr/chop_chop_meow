@@ -49,10 +49,15 @@ public sealed class Construction(World world) {
             var door = Doorways.DoorPoint(new Thing { Pos = p });
             if (!world.CanStand(door) || Terrain.InLake(door, .8f) || world.S.Things.Any(t => !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
                 return "Leave open ground in front of the door.";
+            if (!world.CanStand(p + BarrelJobs.LadderApproach)) return "Leave dry, open ground at the cabin's ladder.";
         }
-        foreach (var hut in world.S.Things.Of(ThingKind.Hut)) if (Doorways.DoorPoint(hut).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
+        foreach (var hut in world.S.Things.Of(ThingKind.Hut)) {
+            if (Doorways.DoorPoint(hut).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
+            if ((hut.Pos + BarrelJobs.LadderApproach).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's ladder clear.";
+        }
         if (!portable) return Unaffordable(kind);
-        return item != null && (world.MarkedSource ?? world.S.Backpack)[item] == 0 ? $"That {world.Lower(world.Data.Name(kind))} is no longer available." : null;
+        if (item == null || (world.MarkedSource ?? world.S.Backpack)[item] > 0) return null;
+        return kind == ThingKind.Crate ? "That crate is no longer in your backpack." : "That barrel is no longer available.";
     }
     /// <summary>
     /// What refuses a building the acting player's backpack does not hold the cost of, or null when it does.

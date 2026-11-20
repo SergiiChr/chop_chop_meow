@@ -10,7 +10,7 @@ public sealed class Inventory {
     public enum Carrier { None, Player, Worker }
 
     /// <summary>A player carries one barrel, and a worker with a barrel carries nothing else in their hands.</summary>
-    public Carrier CarriedBy { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public Carrier CarriedBy { get; set; }
 
     private int CarryRoom(string item) {
         if (CarriedBy == Carrier.None) return int.MaxValue;
@@ -112,7 +112,7 @@ public sealed class Inventory {
         return free;
     }
     /// <summary>Empty with the settings of a new inventory, so it saves the same as one.</summary>
-    [JsonIgnore] public bool Fresh => items.Count == 0 && slots == NewSlots && stackSize == NewStackSize && CoinStack == NewCoinStack && Capacity == 0 && InputFilter.Count == 0 && OutputFilter.Count == 0 && Layout.Count == NewSlots && UsedSlots == 0;
+    [JsonIgnore] public bool Fresh => items.Count == 0 && CarriedBy == Carrier.None && slots == NewSlots && stackSize == NewStackSize && CoinStack == NewCoinStack && Capacity == 0 && InputFilter.Count == 0 && OutputFilter.Count == 0 && Layout.Count == NewSlots && UsedSlots == 0;
 
     /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Unstacked = new();

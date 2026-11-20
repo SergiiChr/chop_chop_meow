@@ -4,9 +4,6 @@ using System.Linq;
 namespace ChopChopMeow;
 
 public sealed partial class World {
-    private Thing? SleepingCabin(PlayerState player, Thing? selected) =>
-        Find(player.Sheltered) ?? (player == S.Actor ? selected : null);
-
     private static bool BeforeBed(PlayerState first, PlayerState second) =>
         first.CabinEntry < second.CabinEntry || first.CabinEntry == second.CabinEntry && first.Id < second.Id;
 
@@ -17,24 +14,24 @@ public sealed partial class World {
         Barrel.In(cabin.Inventory) is string item && cabin.Inventory.Free(item) > 0 ? Barrel.Liters(item) : 0;
 
     /// <summary>Thirst after the cabin barrel serves everyone ahead of this player.</summary>
-    private float BedtimeThirst(PlayerState player, Thing? selected) {
-        if (SleepingCabin(player, selected) is not Thing cabin) return player.Thirst;
+    private float BedtimeThirst(PlayerState player) {
+        if (Find(player.Sheltered) is not Thing cabin) return player.Thirst;
         int available = BedtimeSupply(cabin);
         if (available == 0) return player.Thirst;
         foreach (var other in S.Players)
-            if (BeforeBed(other, player) && SleepingCabin(other, selected) == cabin) available -= ThirstLiters(other.Thirst);
+            if (BeforeBed(other, player) && other.Sheltered == cabin.Id) available -= ThirstLiters(other.Thirst);
         return Drank(player.Thirst, Math.Min(Math.Max(0, available), ThirstLiters(player.Thirst)));
     }
 
-    public float ThirstAtDawn() => Math.Max(0, BedtimeThirst(S.Actor, null) - SecondsToDawn * Data.ThirstPerSecond);
+    public float ThirstAtDawn() => Math.Max(0, BedtimeThirst(S.Actor) - SecondsToDawn * Data.ThirstPerSecond);
 
     /// <summary>Spends water on every occupant's thirst first, then fills their bottles in the same order.</summary>
-    private void DrinkAtBedtime(Thing selected) {
+    private void DrinkAtBedtime() {
         var inOrder = S.Players.OrderBy(p => p.CabinEntry).ThenBy(p => p.Id).ToArray();
         foreach (var p in inOrder)
-            if (SleepingCabin(p, selected) is Thing cabin) p.Thirst = Drank(p.Thirst, Barrels.TakeWater(cabin, ThirstLiters(p.Thirst)));
+            if (Find(p.Sheltered) is Thing cabin) p.Thirst = Drank(p.Thirst, Barrels.TakeWater(cabin, ThirstLiters(p.Thirst)));
         foreach (var p in inOrder) {
-            if (SleepingCabin(p, selected) is not Thing cabin || BedtimeSupply(cabin) == 0) continue;
+            if (Find(p.Sheltered) is not Thing cabin || BedtimeSupply(cabin) == 0) continue;
             for (int held = Water.Capacity - 1; held >= 0; held--) {
                 string bottle = Water.WaterItem(held);
                 while (p.Backpack.Free(bottle) > 0 && BedtimeSupply(cabin) is > 0 and int available) {

@@ -1013,25 +1013,25 @@ public sealed partial class World {
     public const float FedNeed = 45, SleepHeal = .12f;
     /// <summary>The acting player's health after sleeping until dawn: sleep heals while hunger and thirst both stay above <see cref="FedNeed"/>.</summary>
     public float HealthAtDawn() {
-        float fed = Math.Min(SecondsToDawn, Math.Min((S.Hunger - FedNeed) / Data.HungerPerSecond, (BedtimeThirst(S.Actor, null) - FedNeed) / Data.ThirstPerSecond));
+        float fed = Math.Min(SecondsToDawn, Math.Min((S.Hunger - FedNeed) / Data.HungerPerSecond, (BedtimeThirst(S.Actor) - FedNeed) / Data.ThirstPerSecond));
         return Math.Min(100, S.Health + Math.Max(0, fed) * SleepHeal);
     }
     /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
-    public string? SleepBlock(Thing? selected = null) {
+    public string? SleepBlock() {
         if (Hour is >= 6 and < SleepHour) return "You can only sleep after 10 pm.";
-        bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = BedtimeThirst(S.Actor, selected) - SecondsToDawn * Data.ThirstPerSecond <= 0;
+        bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = BedtimeThirst(S.Actor) - SecondsToDawn * Data.ThirstPerSecond <= 0;
         if (hungry || thirsty) return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : "You are too thirsty to sleep.";
         // The night passes for everyone at once, so the others have to be inside and fed too.
         foreach (var p in S.Players) if (p != S.Actor && p.Sheltered == 0) return "Everyone has to be inside a cabin to sleep.";
         foreach (var p in S.Players)
-            if (p != S.Actor && (p.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0 || BedtimeThirst(p, selected) - SecondsToDawn * Data.ThirstPerSecond <= 0)) return "Someone is too hungry or thirsty to sleep.";
+            if (p != S.Actor && (p.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0 || BedtimeThirst(p) - SecondsToDawn * Data.ThirstPerSecond <= 0)) return "Someone is too hungry or thirsty to sleep.";
         return null;
     }
     public void Sleep(Thing hut) {
         if (hut.Kind != ThingKind.Hut || !Near(hut)) return;
-        if (SleepBlock(hut) is string blocked) { Say(blocked); return; }
+        if (SleepBlock() is string blocked) { Say(blocked); return; }
         if (Forwarded(Verb.Sleep, hut.Id)) return;
-        if (!DoorCheck.Waking) DrinkAtBedtime(hut);
+        if (!DoorCheck.Waking) DrinkAtBedtime();
         PassNight();
     }
     /// <summary>
@@ -1154,8 +1154,9 @@ public sealed partial class World {
         // The player falls backwards facing the wolf that leapt, so the feet point back the way it came.
         var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
         var box = Add(ThingKind.Grave, killer == null ? Player : Player + (killer.Pos - Player).Normalized() * 1.5f); box.Inventory = S.Backpack;
+        box.Inventory.CarriedBy = Inventory.Carrier.None;
         int cabin = S.Sheltered;
-        S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
+        S.Backpack = new Inventory { Slots = 24, CarriedBy = Inventory.Carrier.Player }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
         Doorways.UnlockEmpty(cabin);
         // A wolf that pinned the player, or bit them down without a leap, eats every scrap of food.
         bool wolfKill = S.Mauled || Hunters.Any(w => w.Pos.DistanceTo(Player) < LeapRange);
@@ -1169,7 +1170,7 @@ public sealed partial class World {
     private void Respawn() {
         // The player wakes inside the cabin with a place left nearest to where they fell, the last one in, or in the clearing without one.
         var cabin = Doorways.NearestFreeCabin(Player);
-        if (cabin != null) S.Actor.DoorQueued = ++S.DoorArrivals;
+        if (cabin != null) S.Actor.CabinEntry = S.Actor.DoorQueued = ++S.DoorArrivals;
         S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Terrain.Spawn : Doorways.Doorstep(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
         Say(cabin == null ? "You wake in the clearing. Recover your belongings from the box." : "You wake in the cabin. Recover your belongings from the box.");
     }
@@ -1533,7 +1534,14 @@ public sealed partial class World {
     public void Fire(Worker w) {
         if (Busy() || Forwarded(Verb.Fire, other: w.Id)) return;
         ReleaseIn(w.Bag); ReleaseIn(w.ToolSlot);
-        if (w.Bag.Count > 0 || w.Tool != "") { var box = Add(ThingKind.Grave, w.Pos); box.Inventory = w.Bag; box.Inventory.Capacity = 0; box.Inventory.Slots = box.Inventory.UsedSlots + 1; box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1); }
+        if (w.Bag.Count > 0 || w.Tool != "") {
+            var box = Add(ThingKind.Grave, w.Pos);
+            box.Inventory = w.Bag;
+            box.Inventory.CarriedBy = Inventory.Carrier.None;
+            box.Inventory.Capacity = 0;
+            box.Inventory.Slots = box.Inventory.UsedSlots + 1;
+            box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1);
+        }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
     private enum HoldRefusal { None, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly }
@@ -2319,7 +2327,7 @@ public sealed partial class World {
     }
     /// <summary>Whether a worker's tool slot from a save is one slot holding nothing or one tool.</summary>
     private bool ValidToolSlot(Inventory? slot, Dictionary<int, Inventory> crates) =>
-        ValidInventory(slot, crates) && slot.Slots == 1 && slot.Count <= 1 && (slot.First() is not string item || WorkerTool(item));
+        ValidInventory(slot, crates) && slot.Slots == 1 && slot.Count <= 1 && (slot.First() is not string item || FitsWorkerToolSlot(item));
 
     /// <summary>Empties the hotbar slots that name nothing the game knows or the player carries, such as a packed crate since sold.</summary>
     private void TidyHotbar(PlayerState p) {

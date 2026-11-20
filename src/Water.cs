@@ -33,12 +33,12 @@ public static class Water {
         if (source.Kind != ThingKind.Water) return WaterCollectResult.NoChange;
         Inventory backpack = world.S.Backpack;
         string? bottle = FindBottle(backpack);
-        if ((bottle == null || bottle == Full) && FillBucket(backpack)) return WaterCollectResult.RefilledBottle;
-        if (bottle == Full || backpack[Bucket.AtFill(Bucket.Capacity)] > 0) return WaterCollectResult.NoChange;
-        if (bottle != null) {
+        if (bottle != null && bottle != Full) {
             Replace(backpack, bottle, Full);
             return WaterCollectResult.RefilledBottle;
         }
+        if (FillBucket(backpack)) return WaterCollectResult.RefilledBottle;
+        if (bottle == Full || backpack[Bucket.AtFill(Bucket.Capacity)] > 0) return WaterCollectResult.NoChange;
         world.S.Thirst = System.Math.Min(100, world.Thirst + LiterThirst);
         return WaterCollectResult.SourceLiter;
     }

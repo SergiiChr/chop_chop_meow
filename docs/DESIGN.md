@@ -505,6 +505,7 @@ A worker's tool slot holds one bucket or bottle.
 A water haul uses the tool slot to preserve the bucket or bottle and its fill throughout the trip.
 Workers fetch water from the nearest full floor barrel or the lake.
 A cabin haul walks to the outside ladder, climbs, pours into the mounted barrel and climbs back down.
+Construction keeps the ladder approach on dry ground and clear of other buildings.
 
 Before the night advances, players inside each cabin draw enough liters to fill their thirst in cabin-entry order.
 Bottles are filled with what remains once thirst is served, in the same order.
@@ -948,7 +949,7 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
   A stack spent to nothing (`Inventory.Remove`, unlike a move out) notes its slot in `Inventory.UsedUp`, and the slot waits for its item again, so it binds the next stack at once.
   Ctrl batches from the backpack drawer and Store all carry the mark "spares only" (`World.FromSpares`, `Command.Spares`, `Inventory.SparesOnly`), which leaves bound stacks behind.
 - Esc, a click on open ground or on the interface anywhere but an item slot, or closing the side panel lets go of the held stack (`HeldCursor`).
-- A held crate or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
+- A held crate, barrel or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
 - A held stack put on storage clicked in the world goes into it; an item only selected on the hotbar never does.
 - Bulk buttons and recipe batch actions say what they move.
 

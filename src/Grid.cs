@@ -97,7 +97,7 @@ public partial class PagePanel {
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = Icons.Of(contents.Items.OrderByDescending(p => p.Value).First().Key);
             count.Text = stack is (string barrel, 1) && Barrel.Is(barrel) ? $"{Barrel.Liters(barrel)}/{Barrel.Capacity} L"
-                : stack is (string bottle, _) && world.Data.VesselOf(bottle) is VesselDef vessel ? $"{vessel.LitersIn(bottle)}/{vessel.Capacity}" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
+                : stack is (string bottle, 1) && world.Data.VesselOf(bottle) is VesselDef vessel ? $"{vessel.LitersIn(bottle)}/{vessel.Capacity}" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
             bool takes = wanted != null && stack is (string item, _) && wanted(item);
             if (wanted != null) cell.AddThemeColorOverride(ItemSlot.IconNormal, stack == null || takes ? Colors.White : Style.Faded);
             // A backpack stack bound to the hotbar has the selected hotbar slot's rim.
