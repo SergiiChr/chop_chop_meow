@@ -19,7 +19,8 @@ and sends them through `Input.ParseInputEvent`, like real input.
    in a 1440x900 window. Don't copy the player's settings in.
    To test with one of the player's saves, copy it to a `playtest-` name first; loading it, you play the player who
    saved it.
-2. Start the game in the background with a scratch folder (in the session's scratchpad when the harness gives one):
+2. Start the game in the background with a folder in the scratch folder (the scratchpad the harness defines for the session, otherwise
+   `/tmp/scratch`):
 
    ```sh
    env -u WAYLAND_DISPLAY ./build.py play -- --drive <dir>
