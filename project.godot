@@ -30,3 +30,43 @@ wind_push={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
 }
+wind_pushers_0={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+wind_pushers_1={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+wind_pushers_2={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+wind_pushers_3={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+wind_pushers_4={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+wind_pushers_5={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+wind_pushers_6={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+wind_pushers_7={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+water_waves={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}
+water_time={
+"type": "float",
+"value": 0.0
+}

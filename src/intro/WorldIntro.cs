@@ -217,7 +217,7 @@ public partial class WorldView {
         World.Player = around;
         // The game's flames and shakes go by the view's clock, which stands still while filming.
         Elapsed = filmTime;
-        SyncThings(dt); UpdateEffects(dt); UpdateLighting(); UpdateLook(dt); UpdateFog();
+        SyncThings(dt); UpdateEffects(dt); UpdateLighting(World.Time); UpdateLook(dt); UpdateFog();
         sun.DirectionalShadowMaxDistance = 70;
         PaintSky(skyTop, skyHorizon, stars);
         environment.FogEnabled = true; environment.FogDensity = haze; environment.FogLightColor = new Color(skyHorizon);
@@ -532,7 +532,7 @@ public partial class WorldView {
             PaintSky("2f6fd0", "c3daee");
             hero.Pack!.Visible = false;
         }
-        Wind.Update(dt, Vector2.Zero);
+        Wind.Update(dt, [Vector2.Zero]);
         foreach (var passing in train.Passing) {
             float z = passing.Position.Z - 30 * dt;
             passing.Position = passing.Position with { Z = z < -IntroSets.TrackLoop / 2 ? z + IntroSets.TrackLoop : z };

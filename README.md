@@ -141,7 +141,7 @@ The display choices are stored in `settings.cfg` and applied at launch.
 The interface is drawn at 0.8 of the size it is laid out for (`Game.InterfaceScale`).
 It keeps that share of the screen at every resolution, with its text drawn at the size it shows.
 
-Wind sways grass, bushes and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
+Wind sways grass, bushes and tree foliage, drifting between calm spells and gusty ones, and grass parts around the players and workers in sight.
 Footpaths wear in where the player and workers walk, not where they stand, and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
 meet (SSAO), and world sounds pan with their place on screen.

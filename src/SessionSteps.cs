@@ -132,9 +132,10 @@ public partial class Game {
 
     /// <summary>
     /// Plants a tree among the tallest or the shortest at a spot in the player's sight and fells it.
-    /// Returns the seconds on the view's clock from the sound of it breaking to its crash, and how far over its trunk was, in degrees, at each.
+    /// Returns the seconds on the view's clock from the sound of it breaking to its crash, how far over its trunk was, in
+    /// degrees, at each, and the lean at which its wood meets the ground.
     /// </summary>
-    private async Task<(float Seconds, float LeanAtBreak, float LeanAtCrash)> FellInSight(Vector2 at, bool tall) {
+    private async Task<(float Seconds, float LeanAtBreak, float LeanAtCrash, float Lands)> FellInSight(Vector2 at, bool tall) {
         var tree = SetupSteps.PlantTree(Hosted, at, tall);
         await Frames(4);
         // The model outlives its tree while it falls, so it is taken before the tree leaves the world.
@@ -143,9 +144,9 @@ public partial class Game {
         var stump = SetupSteps.Fell(Hosted, tree);
         await Until(() => sounds.Heard(tall ? "tree_bend" : "tree_crack", soundsBefore), tall ? "a tall tree tearing at length as it breaks" : "a short tree cracking as it breaks", 2);
         // The fall is timed on the view's own clock, which a slow frame does not stretch the way it stretches real time.
-        float brokeAt = view.Elapsed, leanAtBreak = falling.Sway.RotationDegrees.X;
+        float brokeAt = view.Elapsed, leanAtBreak = Mathf.RadToDeg(falling.Falling!.Angle);
         await Until(() => sounds.Heard("tree_crash", soundsBefore), "a felled tree crashing", 4);
-        var fall = (view.Elapsed - brokeAt, leanAtBreak, falling.Sway.RotationDegrees.X);
+        var fall = (view.Elapsed - brokeAt, leanAtBreak, Mathf.RadToDeg(falling.Falling.Angle), Mathf.RadToDeg(falling.Falling.Lands));
         SetupSteps.RemoveThings(Hosted, t => t == stump); await Frames(2);
         return fall;
     }

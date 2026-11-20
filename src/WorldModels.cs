@@ -31,8 +31,12 @@ public sealed class TreeProp : Prop {
     public Node3D Sway = null!;
     /// <summary>The crown's meshes and their own materials, for fading it without walking its nodes.</summary>
     public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
-    /// <summary>Seconds since the tree was felled, or below zero while it stands; its stump is a thing of its own.</summary>
-    public float Fall = -1;
+    /// <summary>The tree's id, which its look and size and the stump it leaves go by.</summary>
+    public int Id;
+    /// <summary>The tree going over once it is felled, or null while it stands; its stump is a thing of its own.</summary>
+    public TreeFall? Falling;
+    /// <summary>Seconds the felled tree has lain on the ground, or below zero until it lands.</summary>
+    public float Lying = -1;
     /// <summary>How tall the tree stands among trees, from 0 to 1 (<see cref="WorldModels.TreeTall"/>).</summary>
     public float Tall;
     /// <summary>How see-through the crown is while it hides something behind it.</summary>
@@ -43,8 +47,11 @@ public sealed class TreeProp : Prop {
 public sealed class LooseProp : Prop {
     /// <summary>Where a chip flew from, relative to where it lands.</summary>
     public Vector3 From;
-    /// <summary>Seconds into the chip's flight, or past <see cref="WorldModels.ChipFlight"/> once it lies still.</summary>
+    /// <summary>Seconds into the chip's flight, or past <see cref="WorldModels.ChipFlight"/> and <see cref="WorldModels.ChipSettle"/> once it lies still.</summary>
     public float Flight = float.MaxValue;
+    /// <summary>How its body is turned lying still, and the middle of its model there, which it spins round flat in the air so no part of it dips.</summary>
+    public Basis Rest;
+    public Vector3 Middle;
 }
 
 /// <summary>A stump or a bush, which leans further out of the ground the more it is dug at, then comes out and is gone.</summary>
@@ -55,6 +62,13 @@ public sealed class DugProp : Prop {
     public float Out = -1;
     /// <summary>Where it stands from its thing's spot: a stump stands where its tree's trunk did, which is off the middle of the tree.</summary>
     public Vector3 Seat;
+    /// <summary>The middle of its model, which it tumbles about once it is thrown out of the ground.</summary>
+    public Vector3 Middle;
+    /// <summary>Where and how it was turned as it came out of the ground, which its throw starts from.</summary>
+    public Transform3D Launch;
+    /// <summary>Seconds of digging done on it as its lean shows them, and the count it was last drawn at.</summary>
+    public readonly LocalClock Worked = new(1);
+    public float Drawn = -1;
 }
 
 public sealed class BushProp : Prop {
@@ -69,6 +83,8 @@ public sealed class CarcassProp : Prop {
     public float HitIn;
     /// <summary>Whether the killing blow has landed, so its thud plays once.</summary>
     public bool Landed;
+    /// <summary>Seconds since the wolf was killed as its fall shows them.</summary>
+    public readonly LocalClock Dead = new(.5f);
 }
 
 /// <summary>A chest, crate or dropped backpack, whose lid opens while it is used.</summary>
@@ -79,6 +95,10 @@ public sealed class BoxProp : Prop {
     public float Open;
     /// <summary>Seconds the lid stays open after the contents changed.</summary>
     public float Puff;
+    /// <summary>How high a crate stands lifted off the ground, and how fast it drops when let go.</summary>
+    public float Raised, Dropping;
+    /// <summary>The sound of the lid shutting, picked as it starts to close and started so its loudest moment lands as it shuts; null once started.</summary>
+    public Sounds.Cue? ShutCue;
     public int LastCount;
 }
 
@@ -88,6 +108,8 @@ public abstract class HearthProp : Prop {
     public Vector3 Vent;
     /// <summary>Seconds until the next puff of smoke.</summary>
     public float Smoke;
+    /// <summary>Seconds since its fire last had work, which keeps it lit through the moment between one batch and the next.</summary>
+    public float Idle = float.MaxValue;
 }
 
 public sealed class CampfireProp : HearthProp {
@@ -110,6 +132,10 @@ public sealed class StoveProp : HearthProp {
 public sealed class ForgeProp : HearthProp {
     public MeshInstance3D Glow = null!;
     public Node3D Needle = null!, Lever = null!;
+    /// <summary>The forge's heat as its glow and gauge show it; a pump of the bellows jumps it at once.</summary>
+    public readonly LocalClock Heat = new(5);
+    /// <summary>How far the bellows board was last pressed down, from 0 to 1, and seconds since it was let go.</summary>
+    public float Press, Released;
     public Node3D[] Pleats = Array.Empty<Node3D>();
 }
 
@@ -151,6 +177,8 @@ public sealed class SignpostProp : Prop {
 /// <summary>A mine's parts, shown stage by stage: the marked outline, the dug hole, the delivered materials, the timber frame, the rails and the cart with its load.</summary>
 public sealed class MineProp : Prop {
     public Node3D Outline = null!, Hole = null!, Supplies = null!, Frame = null!, Rails = null!, Cart = null!, Load = null!, Fire = null!;
+    /// <summary>Seconds of work on the mine's stage as its hole and frame show them.</summary>
+    public readonly LocalClock Built = new(2);
     public MeshInstance3D Glow = null!;
     public OmniLight3D Light = null!;
 }
@@ -294,8 +322,17 @@ public static class WorldModels {
         var body = prop.Body;
         if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Turn(t.Id) : 0, 0);
         if (t.Kind == ThingKind.Mine) body.Rotation = MineYaw(t.Pos);
-        if (prop is DugProp dug) dug.Yaw = body.RotationDegrees.Y;
+        if (prop is DugProp dug) { dug.Yaw = body.RotationDegrees.Y; dug.Middle = Bounds(body).GetCenter(); }
+        if (prop is LooseProp loose) (loose.Rest, loose.Middle) = (body.Basis, body.Basis * Bounds(body).GetCenter() with { Y = 0 });
         return prop;
+    }
+
+    /// <summary>The box round the meshes a model's body holds, in the body's own frame.</summary>
+    public static Aabb Bounds(Node3D body) {
+        Aabb? box = null;
+        for (int i = 0; i < body.GetChildCount(); i++)
+            if (body.GetChild(i) is MeshInstance3D { Mesh: Mesh mesh } part) box = box?.Merge(part.Transform * mesh.GetAabb()) ?? part.Transform * mesh.GetAabb();
+        return box ?? new Aabb();
     }
 
     /// <summary>
@@ -366,7 +403,7 @@ public static class WorldModels {
         var prop = new TreeProp();
         var sway = Pivot(prop.Body, Vector3.Zero);
         prop.Sway = sway; // the whole tree shakes and falls about its base
-        prop.Tall = TreeTall(id);
+        prop.Id = id; prop.Tall = TreeTall(id);
         float scale = TreeScale(id);
         sway.Scale = Vector3.One * scale;
         var (species, variant) = TreeLook(id);
@@ -375,6 +412,14 @@ public static class WorldModels {
         Tree3DShape.AddShadowCore(sway, species, leaves);
         prop.SwayParts = FadeParts(sway);
         return prop;
+    }
+
+    /// <summary>The fall of a felled tree toward <paramref name="heading"/>, a way across the world's ground in radians from the x axis toward y, in the frame of its model's turn.</summary>
+    public static TreeFall Fall(TreeProp tree, float heading) {
+        var (species, variant) = TreeLook(tree.Id);
+        var toward = new Vector3(MathF.Cos(heading), 0, MathF.Sin(heading)).Rotated(Vector3.Up, -Mathf.DegToRad(Turn(tree.Id)));
+        var (wood, top) = Tree3DShape.Outline(species, variant);
+        return new TreeFall(wood, top, Tree3DShape.Foot(species, variant), TreeScale(tree.Id), toward);
     }
 
     /// <summary>
@@ -412,8 +457,10 @@ public static class WorldModels {
         Add(body, NatureShape.OreChips(variant), NatureShape.OreMaterial(chunks, .4f, .3f), Vector3.Zero);
     }
 
-    /// <summary>How long a chip takes to fly from the rock it came off to where it lands.</summary>
-    public const float ChipFlight = .55f;
+    /// <summary>How long a chip takes to fly from the rock it came off to where it lands, and how long it then skids and turns to a stop.</summary>
+    public const float ChipFlight = .55f, ChipSettle = .15f;
+    /// <summary>How many turns a chip makes from the rock to where it comes to rest.</summary>
+    public const int ChipTurns = 1;
 
     /// <summary>A fallen stick lying on the ground, turned by its id.</summary>
     private static void Stick(Node3D body, int id) {
@@ -903,6 +950,8 @@ public static class WorldModels {
         private readonly Node3D[] wheels = new Node3D[2];
         public float Distance, Yaw;
         public Vector2 Last;
+        /// <summary>Seconds into its order's trip as the cart's walk shows them.</summary>
+        public readonly LocalClock Trip = new(1);
         /// <summary>The meshes and their own materials, whose faded copies are made with the cart, for fading it as it leaves view.</summary>
         public readonly (MeshInstance3D Mesh, Material Material)[] Parts;
 
