@@ -7,9 +7,11 @@ import argparse
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,11 +20,19 @@ sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
 OUTPUT = build.BUILD / "animation-review"
-# Frames a view records, at 30 a second of slowed game time.
-FRAMES = 96
+DEFAULT_FRAMES = 96
+DEFAULT_VIEWS = ("side", "front", "game", "facing")
+# Time for the launcher to prepare the export before it starts recording.
+RECORD_STARTUP_SECONDS = 600
 
-# Camera pitch and rig turn in degrees: low from the side, low facing the camera, and the game's own angle from the side and facing the camera.
-VIEWS = {"side": (4, 0), "front": (4, -90), "game": (30, 0), "facing": (30, -90)}
+# Camera pitch and rig turn in degrees.
+VIEWS = {
+    "side": (4, 0),  # Low from the side.
+    "front": (4, -90),  # Low with the rig facing the camera.
+    "game": (30, 0),  # The game camera angle.
+    "facing": (30, -90),  # The game camera angle with the rig facing the camera.
+    "top": (89, 0),  # Almost straight down.
+}
 
 
 def review_source(ref: str | None) -> str:
@@ -48,8 +58,10 @@ def require_clip(ref: str | None, clip: str) -> None:
         raise SystemExit(f"No clip {clip!r} in {where}; clips: {', '.join(names)}")
 
 
-def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> None:
-    """Records a checkout's clip from one view to a movie of FRAMES frames at 30 a second of slowed game time."""
+def record(
+    checkout: Path, clip: str, view: str, slow: float, frames: int, movie: Path
+) -> None:
+    """Records one view of a checkout's clip at 30 frames a second of slowed game time."""
     pitch, turn = VIEWS[view]
     movie.parent.mkdir(parents=True, exist_ok=True)
     flags = [
@@ -62,6 +74,7 @@ def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> No
         str(turn),
     ]
     log = movie.with_suffix(".log")
+    capture_folder = movie.with_suffix("")
     records = '"record"' in (checkout / "build.py").read_text()
     if records:
         command = [
@@ -74,43 +87,53 @@ def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> No
             "--slow",
             str(slow),
             "--frames",
-            str(FRAMES),
+            str(frames),
         ]
     else:
         # A ref from before recording captured numbered frames, which become a movie of the same rate here.
-        frames = movie.with_suffix("")
-        shutil.rmtree(frames, ignore_errors=True)
+        shutil.rmtree(capture_folder, ignore_errors=True)
         command = [
             sys.executable, checkout / "build.py", "play", "--", *flags,
-            "--animation-slow", str(slow), "--animation-frames", str(FRAMES), "--animation-capture", frames,
+            "--animation-slow", str(slow), "--animation-frames", str(frames), "--animation-capture", capture_folder,
         ]  # fmt: skip
     # A native Wayland window draws about one frame a second; XWayland draws at full speed.
     env = {key: value for key, value in os.environ.items() if key != "WAYLAND_DISPLAY"}
-    with log.open("w") as output:
-        result = subprocess.run(
-            [str(part) for part in command],
-            cwd=checkout,
-            env=env,
-            stdout=output,
-            stderr=subprocess.STDOUT,
-            timeout=600,
-            check=False,
-        )
-    if result.returncode:
+    timeout = RECORD_STARTUP_SECONDS + build.record_timeout(frames)
+    try:
+        with (
+            log.open("w") as output,
+            subprocess.Popen(
+                [str(part) for part in command],
+                cwd=checkout,
+                env=env,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            ) as recording,
+        ):
+            try:
+                status = recording.wait(timeout=timeout)
+            except (subprocess.TimeoutExpired, KeyboardInterrupt):
+                with suppress(ProcessLookupError):
+                    os.killpg(recording.pid, signal.SIGKILL)
+                raise
+    except subprocess.TimeoutExpired:
+        raise SystemExit(
+            f"Recording {view} timed out after {timeout} seconds. See {log}"
+        ) from None
+    if status:
         text = log.read_text(errors="replace")
         errors = dict.fromkeys(
             line.strip() for line in text.splitlines() if build.ERRORS.search(line)
         )
         print("\n".join(list(errors)[:20]), file=sys.stderr)
-        raise SystemExit(
-            f"Recording {view} failed (exit {result.returncode}); see {log}"
-        )
+        raise SystemExit(f"Recording {view} failed (exit {status}); see {log}")
     if not records:
         subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-framerate", "30", "-i", frames / "%03d.png", "-c:v", "mjpeg", "-q:v", "2", movie],
+            ["ffmpeg", "-y", "-loglevel", "error", "-framerate", "30", "-i", capture_folder / "%03d.png", "-c:v", "mjpeg", "-q:v", "2", movie],
             check=True,
         )  # fmt: skip
-        shutil.rmtree(frames)
+        shutil.rmtree(capture_folder)
     print(f"Recorded {movie}")
 
 
@@ -129,6 +152,7 @@ def record_all(
             clip,
             view,
             options.slow,
+            options.frames,
             OUTPUT / slug(options.clip) / name / f"{view}.avi",
         )
 
@@ -143,6 +167,15 @@ def record_base(ref: str, options: argparse.Namespace) -> None:
         try:
             (checkout / ".tools").symlink_to(build.TOOLS.resolve())
             record_all(checkout, options.base_clip, slug(ref), options)
+        except SystemExit:
+            logs = list((checkout / "build").glob("*.log"))
+            if logs:
+                saved = OUTPUT / slug(options.clip) / slug(ref) / "build"
+                saved.mkdir(parents=True, exist_ok=True)
+                for log in logs:
+                    shutil.copy2(log, saved / log.name)
+                print(f"Base launcher logs saved in {saved}", file=sys.stderr)
+            raise
         finally:
             subprocess.run(
                 ["git", "worktree", "remove", "--force", checkout], cwd=ROOT, check=True
@@ -158,8 +191,14 @@ def main() -> None:
         "--views",
         nargs="+",
         choices=VIEWS,
-        default=list(VIEWS),
+        default=DEFAULT_VIEWS,
         help="camera views to record",
+    )
+    parser.add_argument(
+        "--frames",
+        type=int,
+        default=DEFAULT_FRAMES,
+        help="frames per view (default %(default)s)",
     )
     parser.add_argument(
         "--slow", type=float, default=4, help="slow motion factor (default %(default)s)"
@@ -175,6 +214,8 @@ def main() -> None:
     options = parser.parse_args()
     if not options.slow > 0:
         parser.error("--slow must be positive")
+    if options.frames < 1:
+        parser.error("--frames must be positive")
     require_clip(None, options.clip)
     options.base_clip = options.base_clip or options.clip
     if options.base:
@@ -185,7 +226,7 @@ def main() -> None:
     if options.base:
         record_base(options.base, options)
     print(
-        f"{FRAMES} frames a view at 30 a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
+        f"{options.frames} frames a view at 30 a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
     )
 
 
