@@ -39,7 +39,10 @@ public enum ActorAction {
     FallBack,
     /// <summary>An axe swept sideways in the air, from behind the left shoulder round the front to the right at chest height; it takes turns with the overhead swing.</summary>
     AxeSweep,
-    SteelAxeSweep
+    SteelAxeSweep,
+    ClimbLadder,
+    PourWater,
+    FillVessel
 }
 
 /// <summary>
@@ -567,7 +570,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>The leg angles that put the boot's toe on the ground <paramref name="toe"/> ahead of the hips, with the foot tipped <paramref name="tilt"/> radians up about it.</summary>
-    private static LegAngles OnToe(float toe, float hips, float tilt) {
+    internal static LegAngles OnToe(float toe, float hips, float tilt) {
         var (swing, knee) = LegTo(toe - Toe * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt), hips - LegDrop - AboveSole * MathF.Cos(tilt) - Toe * MathF.Sin(tilt));
         return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
     }
@@ -794,6 +797,11 @@ public static class ActorAnimation {
     };
 
     public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving, GameData data) {
+        switch (worker.WaterAction) {
+            case WorkerWaterAction.Fill: return ActorAction.FillVessel;
+            case WorkerWaterAction.ClimbUp or WorkerWaterAction.ClimbDown: return ActorAction.ClimbLadder;
+            case WorkerWaterAction.Pour: return ActorAction.PourWater;
+        }
         // The sign hides any load in the worker's bag, which stays there until the strike ends.
         if (worker.WageDebt > 0 && !moving) return ActorAction.Protest;
         // Every other worker sits on a rock rather than the ground.

@@ -11,7 +11,7 @@ Buildings are DIY:
 
 - a cinder-block furnace with a steel stovepipe
 - a propane-tank forge on an angle-iron stand, fed by a plywood lever bellows with a heat gauge
-- an OSB cabin on block piers with a corrugated shed roof and solar panel
+- an OSB cabin on block piers with a corrugated shed roof, solar panel and fixed steel ladder
 - a plywood storage box
 - a dropped canvas backpack
 - an anvil on a welded stand
@@ -71,6 +71,11 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   The surfaces' grain and bump textures and the scans' colour, bump and height maps are in `models/surfaces/`, packed
   by `tools/surface_textures.py`.
 - `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
+- `src/barrels/display/VesselShape.cs` — a ribbed 50 L steel barrel with a tap and a movable bung in its recessed lid,
+  and a 10 L tapered steel bucket with a hollow interior and a wire bail with a wood grip.
+  World props, carried props, heaps and icons use the same shapes. Water levels share the vessel's icon.
+- `src/cabins/display/CabinWaterModel.cs` — the exterior ladder's rails and rungs, and the roof barrel's four feet
+  and fill opening. The mounted barrel uses the ground barrel's shell turned sideways.
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons, and by heaps as six-packs. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
 - `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
   The icon shows the model as built, and a heap is made of pieces of it.

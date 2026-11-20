@@ -76,6 +76,8 @@ public sealed partial class GameData {
         ["meat_stew"] = new() { Name = "Meat stew", Color = "8f5a33", Food = true, Hunger = 60, Thirst = 15 },
         ["canned_jam"] = new() { Name = "Canned jam", Color = "9b2f4f", Food = true, Hunger = 30 },
         ["canned_meat_stew"] = new() { Name = "Canned meat stew", Color = "a8643a", Food = true, Hunger = 60, Thirst = 15 },
+        [Barrel.Item] = new() { Name = "Steel barrel", Color = "657e92" },
+        [Bucket.Item] = new() { Name = "Steel bucket", Color = "8a9ca5", Tool = Bucket.Item },
         ["crate"] = new() { Name = "Wood crate", Color = "c9a46e" },
         ["coins"] = new() { Name = "Coins", Color = "e3b94a" },
     };
@@ -115,6 +117,7 @@ public sealed partial class GameData {
     };
     public List<VesselDef> Vessels { get; } = new() {
         new() { States = new(Water.BottleItems), Liquid = Water.Liquid },
+        new() { States = new(Bucket.Fills), Liquid = Water.Liquid },
     };
     public List<MapRowDef> MapRows { get; } = new() {
         new() { Title = "Wood", Roots = new() { "wood" } },
@@ -138,6 +141,8 @@ public sealed partial class GameData {
         ["wood_parts"] = new() { Name = "Wood parts", Group = RecipeGroup.Materials, Station = ThingKind.Bench, Hand = true, Tool = "chisel", Inputs = new() { ["wood"] = 1 }, Output = "wood_parts", Amount = 2, Seconds = 10 },
         ["wood_hammer"] = new() { Name = "Wooden mallet", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = true, Tool = "chisel", Inputs = new() { ["wood_parts"] = 1 }, Output = "wood_hammer", Amount = 1, Seconds = 10 },
         ["crate"] = new() { Name = "Wood crate", Group = RecipeGroup.Containers, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["planks"] = 6 }, Output = "crate", Amount = 1, Seconds = 10 },
+        [Barrel.Item] = new() { Name = "Steel barrel", Group = RecipeGroup.Containers, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Tier = 2, Inputs = new() { ["steel_bar"] = 5 }, Output = Barrel.Item, Amount = 1, Seconds = 10 },
+        [Bucket.Item] = new() { Name = "Steel bucket", Group = RecipeGroup.Containers, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Tier = 2, Inputs = new() { ["steel_bar"] = 3 }, Output = Bucket.Item, Amount = 1, Seconds = 10 },
         ["steel_axe"] = new() { Name = "Steel axe", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 2, ["wood_parts"] = 1 }, Output = "steel_axe", Amount = 1, Seconds = 10 },
         ["steel_pick"] = new() { Name = "Steel pickaxe", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 2, ["wood_parts"] = 1 }, Output = "steel_pick", Amount = 1, Seconds = 10 },
         ["steel_shovel"] = new() { Name = "Steel shovel", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 2, ["wood_parts"] = 1 }, Output = "steel_shovel", Amount = 1, Seconds = 10 },

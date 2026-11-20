@@ -92,6 +92,9 @@ Simulation and data:
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
+| `src/barrels/Barrels.cs`, `src/barrels/model/Barrel.cs` | Portable and placed steel barrels, with a fill encoded in each portable barrel |
+| `src/barrels/model/Bucket.cs`, `src/barrels/BarrelJobs.cs` | Steel buckets and worker water hauling |
+| `src/barrels/BedtimeWater.cs` | Cabin water at bedtime and its effect on dawn's needs |
 | `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
 | `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
@@ -203,6 +206,8 @@ Rendering and sound:
 | `src/actors/player/display/FallBackView.cs` | A player knocked or tugged off their feet falling onto their back, their throat as they go over and their hands at the wolf |
 | `src/cabins/display/DoorwayView.cs`, `src/cabins/model/DoorShown.cs` | Players at cabin doors: stepping in and out, following, knocking, standing aside and squeezing past with a palm on the frame |
 | `src/cabins/display/CabinModel.cs`, `src/cabins/display/CabinShape.cs`, `src/cabins/display/HutProp.cs` | Builds the cabin's model, its wall shell, roof and interior, and the cabin as drawn: its door, window and lamp |
+| `src/cabins/display/CabinWaterModel.cs` | Exterior ladder, roof walk points and the mounted barrel's feet and fill opening |
+| `src/barrels/display/VesselShape.cs`, `src/barrels/display/BarrelProp.cs` | Steel barrel, its tap and sliding bung, and the bucket and its bail, shared by placed, carried, heaped and icon views |
 | `src/cabins/display/StairSteps.cs` | The cabin's steps, how high they stand at a spot, and a pose's boots fitted onto them |
 | `src/cabins/display/DoorKeyView.cs` | The round lock of a cabin's door with its key in it, drawn into a picture for the cabin's page |
 | `src/cabins/display/InsideDoorPOV.cs` | What a player inside sees of a wolf forcing the door: a dark cabin with copies of the wolves and the player taken out, in a window that shows it as an old tape ([assets/environment/vhs](../assets/environment/vhs/README.md)) |
@@ -392,6 +397,13 @@ The player's carried tool selects its matching action and the tool shown in hand
 Workers animate according to movement and an explicit transient `WorkerWorkState`, not localized or presentation status text.
 The transient state is excluded from saves and recalculated on the next simulation tick.
 
+Players and workers hug a carried steel barrel to their trunk with both hands on its front sides (`ActorRig.HugBarrel`).
+Their legs keep the gait of the walk, jog or run while they carry it.
+For a water haul, `WorkerWaterView` poses the worker using the water action, target and progress sent by the world.
+A worker climbs the fitted ladder holding the vessel in one hand, walks across the roof, tips the vessel using both
+hands, and returns down the ladder.
+The stream starts at the vessel's lip and ends at the barrel's opening.
+
 At a packing station the packer stands behind the table (`World.PackStand`) and the `Pack` action rummages in the heap of goods, lifts a piece across and settles it into the crate, then turns back.
 The player working a station they stand near packs the same way.
 
@@ -471,14 +483,32 @@ There are no iron tools; iron bars only go into buildings and steel.
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
 Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the lake shore is a collection target.
-A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many liters.
+A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon. Stations and barrels hold it loose, and a recipe asks for so many liters.
 `GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
 a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
 Loading a station by hand and a worker's delivery pass it what the input slot has left (`Inventory.SlotRoom`).
-Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
+Station haulers fetch a liquid input in the fullest bottles storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
 No hand recipe takes a liquid, which `GameData` checks.
+
+#### Steel barrels and buckets
+
+A barrel holds up to 50 liters of water. Its item id records its fill, so moving it between a player, a worker,
+the ground, a pile and a cabin preserves its water without a separate packed inventory.
+The ground barrel uses a one-slot tank and the same filter rules as a plain pile.
+A cabin's only storage slot holds the actual barrel item. Refills update that item in place.
+The carry slows proportionally to its fill level. A worker with a barrel cannot carry other goods in their hands.
+
+The steel bucket is a refillable 10-liter vessel. Empty buckets stack where the inventory allows it.
+A worker's tool slot holds one bucket or bottle.
+A water haul uses the tool slot to preserve the bucket or bottle and its fill throughout the trip.
+Workers fetch water from the nearest full floor barrel or the lake.
+A cabin haul walks to the outside ladder, climbs, pours into the mounted barrel and climbs back down.
+
+Before the night advances, players inside each cabin draw enough liters to fill their thirst in cabin-entry order.
+Bottles are filled with what remains once thirst is served, in the same order.
+The preview and sleep gate both use the projected thirst after that drink.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
 It advances normal simulation through dawn, including needs, trades, production and wages.

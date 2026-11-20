@@ -31,8 +31,8 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         buttons.AddChild(doorSide); buttons.AddChild(sleep);
         panel.DoorKey.Rest(thing.Locked);
         live.Watch(() => thing.Locked, locked => { panel.DoorKey.Turn(locked); key.TooltipText = locked ? "Unlock the door" : "Lock the door · keeps wolves out"; });
-        live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), world.Data.GameMinutes(world.SecondsToDawn)), now => {
-            var (inside, blocked, _) = now;
+        live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), world.Data.GameMinutes(world.SecondsToDawn), Barrel.In(thing.Inventory)), now => {
+            var (inside, blocked, _, _) = now;
             tag.Text = inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);
             door.Text = inside ? "Step outside" : "Enter";
@@ -44,8 +44,14 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
             float seconds = world.SecondsToDawn;
             Show(0, "Health", world.HealthAtDawn());
             Show(1, "Hunger", world.Hunger - seconds * world.Data.HungerPerSecond);
-            Show(2, "Thirst", world.Thirst - seconds * world.Data.ThirstPerSecond);
+            Show(2, "Thirst", world.ThirstAtDawn());
         });
+        var storage = Well(new VBoxContainer());
+        storage.AddChild(Style.Text("Barrel storage", 14, Style.Ink));
+        storage.AddChild(StorageGrid(1));
+        StoreBagGrid(Barrel.Is);
+        JobButtons();
+
         void Show(int i, string need, float after) {
             var vial = dawn[i].Vial;
             vial.Level = Math.Max(0, after); vial.Warn = after <= 25; vial.TooltipText = $"{need} at dawn {vial.Level:0}%";

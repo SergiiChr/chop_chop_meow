@@ -124,7 +124,7 @@ public sealed partial class World {
     public JobKind[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {
         ThingKind.Reinforced => BellowsJobs,
         ThingKind.Bench or ThingKind.Anvil or ThingKind.Cooktable or ThingKind.Packer => CraftJobs,
-        ThingKind.Furnace or ThingKind.Cannery => HaulJobs,
+        ThingKind.Furnace or ThingKind.Cannery or ThingKind.Barrel or ThingKind.Hut => HaulJobs,
         ThingKind.Signpost => DeliveryJobs,
         ThingKind.Campfire => FireJobs,
         ThingKind.Farm => FarmJobs,

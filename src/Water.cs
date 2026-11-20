@@ -33,13 +33,26 @@ public static class Water {
         if (source.Kind != ThingKind.Water) return WaterCollectResult.NoChange;
         Inventory backpack = world.S.Backpack;
         string? bottle = FindBottle(backpack);
-        if (bottle == Full) return WaterCollectResult.NoChange;
+        if ((bottle == null || bottle == Full) && FillBucket(backpack)) return WaterCollectResult.RefilledBottle;
+        if (bottle == Full || backpack[Bucket.AtFill(Bucket.Capacity)] > 0) return WaterCollectResult.NoChange;
         if (bottle != null) {
             Replace(backpack, bottle, Full);
             return WaterCollectResult.RefilledBottle;
         }
         world.S.Thirst = System.Math.Min(100, world.Thirst + LiterThirst);
         return WaterCollectResult.SourceLiter;
+    }
+
+    internal static bool HasBucketRoom(Inventory backpack) {
+        foreach (var (item, _) in backpack.Items)
+            if (Bucket.Liters(item) is >= 0 and < Bucket.Capacity && backpack.CanReplaceOne(item, Bucket.AtFill(Bucket.Capacity))) return true;
+        return false;
+    }
+
+    private static bool FillBucket(Inventory backpack) {
+        for (int liters = Bucket.Capacity - 1; liters >= 0; liters--)
+            if (backpack.ReplaceOne(Bucket.AtFill(liters), Bucket.AtFill(Bucket.Capacity))) return true;
+        return false;
     }
 
     /// <summary>Drinks one liter and preserves the same individual bottle in its next state.</summary>

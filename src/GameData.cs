@@ -220,11 +220,16 @@ public sealed partial class GameData {
     /// <summary>The game's values, checked to fit together.</summary>
     public static GameData Create() {
         var data = new GameData();
+        for (int liters = 1; liters <= Barrel.Capacity; liters++)
+            data.Items.Add(Barrel.AtFill(liters), new() { Name = $"Steel barrel ({liters} L)", Color = data.Items[Barrel.Item].Color });
+        for (int liters = 1; liters <= Bucket.Capacity; liters++)
+            data.Items.Add(Bucket.AtFill(liters), new() { Name = $"Steel bucket ({liters} L)", Color = data.Items[Bucket.Item].Color, Tool = Bucket.Item });
         data.Validate();
         Inventory.Unstacked.Clear();
-        foreach (var (id, item) in data.Items) if (item.Tool != "") Inventory.Unstacked.Add(id);
-        // Each vessel takes a cell of its own, at any fill.
-        foreach (var vessel in data.Vessels) foreach (string id in vessel.States) Inventory.Unstacked.Add(id);
+        foreach (var (id, item) in data.Items) if (item.Tool != "" && id != Bucket.Item) Inventory.Unstacked.Add(id);
+        // Empty buckets stack. Filled vessels and barrels each take a cell.
+        foreach (var vessel in data.Vessels) foreach (string id in vessel.States) if (id != Bucket.Item) Inventory.Unstacked.Add(id);
+        foreach (string item in Barrel.Fills) if (item != Barrel.Item) Inventory.Unstacked.Add(item);
         return data;
     }
     private void Validate() {
@@ -265,8 +270,9 @@ public sealed partial class GameData {
             if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
                 || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Output == v.Liquid || r.Hand && r.Inputs.ContainsKey(v.Liquid)))
                 throw new InvalidOperationException($"Invalid vessel: {v.Full}. Its liquid is only poured into stations, and no hand recipe takes it.");
-            if (!vesselFor.TryAdd(v.Liquid, v) || !v.States.All(id => vesselOf.TryAdd(id, v)))
-                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Each liquid, and each fill of a vessel, belongs to one vessel.");
+            vesselFor.TryAdd(v.Liquid, v);
+            if (!v.States.All(id => vesselOf.TryAdd(id, v)))
+                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Each fill belongs to one vessel.");
         }
         ValidateMap();
     }
@@ -282,7 +288,7 @@ public sealed partial class GameData {
     private readonly Dictionary<string, string[]> endsUpIn = new();
     private static readonly List<string> Nothing = new();
     /// <summary>Items the recipe map leaves out: coins, and the part-drunk bottles that stand with the full one.</summary>
-    public static bool OffTheMap(string item) => item == Inventory.Coins || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
+    public static bool OffTheMap(string item) => item == Inventory.Coins || Barrel.Liters(item) > 0 || Bucket.Liters(item) > 0 || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
     /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
     public string? RecipeIdOf(string item) => recipeIdOf.GetValueOrDefault(item);
     /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
@@ -363,6 +369,7 @@ public sealed partial class GameData {
     public bool IsBuilding(string id) => TryBuilding(id, out _);
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' ');
     public string Name(ThingKind kind) => Items.TryGetValue(kind.Id(), out var i) ? i.Name : Buildings.TryGetValue(kind, out var b) ? b.Name : kind switch {
+        ThingKind.Barrel => Items[Barrel.Item].Name,
         ThingKind.Tree => "Tree",
         ThingKind.Stump => "Stump",
         ThingKind.Bush => "Bush",

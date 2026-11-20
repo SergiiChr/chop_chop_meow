@@ -245,6 +245,7 @@ public sealed class Doorways(World world) {
                 // A door left locked with nobody behind it, as in a save loaded without whoever locked it, is unlocked by the first one in.
                 UnlockEmpty(p.DoorCabin);
                 p.Sheltered = p.DoorCabin; p.Door = Doorway.None;
+                p.CabinEntry = world.S.NextId++;
                 break;
             case Doorway.Following:
                 // The door shuts in front of a follower once the player ahead is inside; with nobody ahead any more, it is their turn.

@@ -23,7 +23,7 @@ public sealed class PageMemory {
 public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory, HeldCursor Cursor);
 
 /// <summary>The pages of the side panel.</summary>
-public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, Crate }
+public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, Crate, Barrel }
 
 /// <summary>What the side panel inspects: a thing, a worker or nothing, never both.</summary>
 public readonly record struct Selection {
@@ -53,6 +53,7 @@ public partial class SidePanel : MovableWindow {
         ("Crafting", (tools, _) => new CraftPanel(tools)),
         ("Inspect", InspectPage.For),
         ("Wood crate", (tools, _) => new CarriedCratePanel(tools, tools.Memory.CarriedCrate)),
+        ("Steel barrel", (tools, _) => new CarriedBarrelPanel(tools)),
     };
     private readonly World world;
     private readonly UiKit kit;

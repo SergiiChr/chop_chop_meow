@@ -170,7 +170,12 @@ public static class WorldModels {
             if (kind == ThingKind.Mine) continue;
             // Natural things and farm plots look different by id; buildings, crates and backpacks look the same.
             int looks = kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
-            for (int id = 0; id < looks; id++) Stage(Build(new Thing { Id = id, Kind = kind }).Root);
+            for (int id = 0; id < looks; id++) {
+                var prop = Build(new Thing { Id = id, Kind = kind });
+                if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
+                if (prop is RackProp rack) rack.Pegs[0][Bucket.Item].Visible = true;
+                Stage(prop.Root);
+            }
         }
         foreach (var ore in World.MineOres) Stage(Build(new Thing { Kind = ThingKind.Mine, Pos = World.MineSpot(World.CliffOf(ore)) }).Root);
         Stage(new WolfModel().Root);
@@ -230,7 +235,8 @@ public static class WorldModels {
         ThingKind.Water => new[] { new Hit(1.2f, 0, .5f) },
         ThingKind.Furnace => new[] { new Hit(.72f, 0, 1.15f) },
         ThingKind.Reinforced => new[] { new Hit(.95f, 0, 1.45f) },
-        ThingKind.Hut => new[] { new Hit(1.6f, 0, 3.1f) },
+        ThingKind.Hut => new[] { new Hit(1.6f, 0, 3.4f) },
+        ThingKind.Barrel => new[] { new Hit(.34f, 0, VesselShape.BarrelHeight) },
         ThingKind.Chest => new[] { new Hit(.5f, 0, .65f) },
         ThingKind.Crate => new[] { new Hit(.4f, 0, .55f) },
         ThingKind.Bench => new[] { new Hit(.6f, 0, .95f) },
@@ -273,6 +279,7 @@ public static class WorldModels {
             case ThingKind.Furnace: prop = BlockFurnace(); break;
             case ThingKind.Reinforced: prop = DrumForge(); break;
             case ThingKind.Hut: prop = CabinModel.Build(); break;
+            case ThingKind.Barrel: prop = new BarrelProp(); break;
             case ThingKind.Chest: prop = Chest(); break;
             case ThingKind.Grave: prop = DroppedBackpack(); break;
             case ThingKind.Anvil: prop = Anvil(); break;
@@ -322,6 +329,8 @@ public static class WorldModels {
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
+            case var barrel when Barrel.Is(barrel): return Build(new Thing { Kind = ThingKind.Barrel }).Root;
+            case var bucket when Bucket.Is(bucket): { var root = new Node3D(); VesselShape.AddBucket(root, Vector3.Zero); return root; }
             case var bottle when Water.IsBottle(bottle): return BottleShape.Create(Water.BottleLiters(bottle));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
@@ -663,6 +672,9 @@ public static class WorldModels {
                 hook.Visible = false;
                 peg[kind] = hook;
             }
+            var bucket = VesselShape.AddBucket(body, RackShape.BucketSeat(slot));
+            bucket.Visible = false;
+            peg[Bucket.Item] = bucket;
         }
         return prop;
     }

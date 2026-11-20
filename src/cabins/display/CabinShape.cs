@@ -7,11 +7,17 @@ namespace ChopChopMeow;
 internal static class CabinShape {
     private static ArrayMesh? walls, roof, interior;
     public static readonly StandardMaterial3D WallMaterial = ModelKit.Vertex(Surface.Wood, .95f);
-    private const float Pitch = 9 * Mathf.Pi / 180;
+    public const float RoofPitchDegrees = -9;
+    public static readonly Vector3 RoofCenter = new(0, 2.68f, -.05f);
+    private const float Pitch = -RoofPitchDegrees * Mathf.Pi / 180;
     private const float Thickness = .06f, Ripple = .018f;
 
     // Seat the walls inside the sheet thickness so raised corrugations cannot leave daylight gaps.
-    public static float WallTop(float z) => 2.68f + MathF.Tan(Pitch) * (z + .05f) + (Ripple - Thickness / 2) / MathF.Cos(Pitch);
+    public static float WallTop(float z) => RoofPlane(z) + (Ripple - Thickness / 2) / MathF.Cos(Pitch);
+
+    public static float RoofSurface(float z) => RoofPlane(z) + (Ripple + Thickness / 2) / MathF.Cos(Pitch);
+
+    private static float RoofPlane(float z) => RoofCenter.Y + MathF.Tan(Pitch) * (z - RoofCenter.Z);
 
     public static Mesh Walls => walls ??= BuildWalls();
     public static Mesh Roof => roof ??= BuildRoof();

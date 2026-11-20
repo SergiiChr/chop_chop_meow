@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 /// <summary>Packing stations: one chosen good goes into empty crates one item at a time while someone works the station.</summary>
 public sealed partial class World {
     /// <summary>Whether a packing station can be set to pack an item: anything a crate holds, other than crates and coins.</summary>
-    public bool Packable(string item) => Data.Items.ContainsKey(item) && item is not ("crate" or Inventory.Coins);
+    public bool Packable(string item) => Data.Items.ContainsKey(item) && item is not ("crate" or Inventory.Coins) && !Barrel.Is(item);
 
     public void SetPacking(Thing t, string item) {
         if (t.Kind != ThingKind.Packer || !Packable(item) || item == t.Packs || Busy() || Forwarded(Verb.SetPacking, t.Id, item: item)) return;

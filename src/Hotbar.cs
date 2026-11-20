@@ -103,7 +103,9 @@ public partial class Hotbar : PanelContainer {
             if (shownSlots[slot] == shown) continue;
             shownSlots[slot] = shown;
             bool building = world.Data.IsBuilding(id);
-            Counts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
+            Counts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? ""
+                : Barrel.Is(id) ? $"{Barrel.Liters(id)}/{Barrel.Capacity} L"
+                : world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}\nLMB: select · Double LMB: use · RMB: empty";
@@ -154,6 +156,7 @@ public partial class Hotbar : PanelContainer {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Run(() => { if (stack >= 0) FromStack(stack, () => world.Consume(id)); else world.Consume(id); });
         else if (id == "torch" && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
         else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
+        else if (Barrel.Is(id)) panel.Open(Page.Barrel);
         else return false;
         return true;
     }
@@ -173,7 +176,7 @@ public partial class Hotbar : PanelContainer {
         string id = world.HotbarItem(slot);
         panel.Player.Mode = new ClickMode.Normal();
         if (string.IsNullOrEmpty(id)) kit.Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
-        else if (world.Data.TryBuilding(id, out var kind)) { panel.Player.Mode = new ClickMode.Build(kind); panel.Close(); } else if (id == "crate") panel.Player.PlaceCrate(id);
+        else if (world.Data.TryBuilding(id, out var kind)) { panel.Player.Mode = new ClickMode.Build(kind); panel.Close(); } else if (id == "crate" || Barrel.Is(id)) panel.Player.PlaceContainer(id);
         kit.Refresh();
     }
 

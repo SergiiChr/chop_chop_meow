@@ -39,6 +39,8 @@ internal static class PileShape {
     /// <summary>The heap an item makes; an item without a model heaps as plain blocks of its colour.</summary>
     public static Heap HeapOf(string item, string color) {
         if (World.IsCrate(item)) item = "crate";
+        else if (Barrel.Is(item)) item = Barrel.Item;
+        else if (Bucket.Is(item)) item = Bucket.Item;
         if (heaps.TryGetValue(item, out var heap)) return heap;
         return heaps[item] = ItemShape.Has(item)
             ? new Heap(ItemShape.Piece(item), ItemShape.Material(item, color), ItemShape.LayOf(item), ItemShape.RiseOf(item))
@@ -60,7 +62,10 @@ internal static class PileShape {
     /// <summary>Adds one piece of every heap to the stage that loading draws, so the first pile to show a good builds nothing mid-game.</summary>
     public static void Stage(Node3D stage, GameData data) {
         // A liquid never lies in a pile: only stations hold it.
-        foreach (string item in data.Items.Keys) if (data.VesselFor(item) == null) new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(item, 1, data);
+        foreach (string item in data.Items.Keys) {
+            if (data.VesselFor(item) != null || Barrel.Is(item) && item != Barrel.Item || Bucket.Is(item) && item != Bucket.Item) continue;
+            new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(item, 1, data);
+        }
         new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(ItemShape.Compost, 1, data);
     }
 

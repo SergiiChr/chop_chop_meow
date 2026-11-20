@@ -62,6 +62,7 @@ public sealed partial class World {
     /// <summary>Whether one of a worker's jobs uses a kind of tool: building or working a mine, or gathering what needs it or goes faster with it.</summary>
     private bool JobUses(Worker w, string kind) {
         foreach (var d in w.Duties) {
+            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind is ThingKind.Hut or ThingKind.Barrel && BarrelJobs.Vessel(w.Tool)) return true;
             if (Array.IndexOf(Def(d.Job).Tools, kind) >= 0) return true;
             // A woodcutter's job covers trees and stumps, so the spot it is on now counts as well as the kind it was given.
             if (d.Job == JobKind.Gather && (Uses(d.Kind) || Uses(Find(d.Thing)?.Kind))) return true;

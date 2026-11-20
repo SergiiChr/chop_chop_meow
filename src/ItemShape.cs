@@ -82,6 +82,8 @@ internal static class ItemShape {
         ["steel_chisel"] = Held("steel_chisel"),
         ["torch"] = new(f => Lighter(f, ActorRig.Torch().Torch, Basis.Identity), Plain, Lay: Lay.Rows),
         ["rake"] = new(f => Copy(f, RackShape.Rake, new Transform3D(new Basis(Vector3.Right, MathF.PI / 2), Vector3.Zero), Colors.White), Plain, Lay: Lay.Rows),
+        [Barrel.Item] = new(f => Copy(f, VesselShape.BarrelHeap, Transform3D.Identity, Colors.White), VesselShape.Finish),
+        [Bucket.Item] = new(BucketPiece, VesselShape.Finish),
         ["mortar"] = new(f => Copy(f, CookShape.BuildMortar(6, 5), Transform3D.Identity, Colors.White), Plain, .3f),
         ["crate"] = new(f => Copy(f, CrateShape.Cargo, Transform3D.Identity, Colors.White), Plain, .5f),
         [Water.Full] = Bottle(Water.Full),
@@ -105,6 +107,11 @@ internal static class ItemShape {
     /// <summary>One loose lump of ore or coal, the first of those the world scatters, in the given colour.</summary>
     private static Look Nugget(string kind, string colour) =>
         new(f => First(f, NatureShape.Loose(kind, new Color(colour), new Color(colour), 0), 20), NatureShape.Rock, .24f, Lay.Loose, .7f);
+
+    private static void BucketPiece(List<Face> faces) {
+        Copy(faces, VesselShape.BucketBody, Transform3D.Identity, Colors.White);
+        Copy(faces, VesselShape.BucketBail, Transform3D.Identity, Colors.White);
+    }
 
     public static IEnumerable<string> Items => looks.Keys;
     public static bool Has(string item) => looks.ContainsKey(item);

@@ -19,6 +19,7 @@ public static class SimulationChecks {
         Test(HeldStackChecks.Run, data);
         Test(HotbarStackChecks.Run, data);
         Test(ChopChopMeow.Tests.WaterChecks.Run, data);
+        Test(ChopChopMeow.Tests.BarrelChecks.Run, data);
         Test(LakeChecks.Run, data);
         Test(EconomyChecks.Run, data);
         Test(AnimationChecks.Run, data);

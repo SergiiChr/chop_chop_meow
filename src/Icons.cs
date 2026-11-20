@@ -9,6 +9,8 @@ public static class Icons {
 
     public static Texture2D? Of(string id) {
         if (World.IsCrate(id)) id = "crate";
+        else if (Barrel.Is(id) || id == ThingKind.Barrel.Id()) id = Barrel.Item;
+        else if (Bucket.Is(id)) id = Bucket.Item;
         if (cache.TryGetValue(id, out var cached)) return cached;
         // Items, buildings and the hard hat have icons rendered from their models; the line glyphs are drawn icons.
         foreach (var path in new[] { $"res://assets/icons/{id}.png", $"res://assets/ui/{id}.svg" })

@@ -7,6 +7,16 @@ namespace ChopChopMeow;
 
 /// <summary>Item quantities and explicit automation access rules. Player access is independent of automation filters.</summary>
 public sealed class Inventory {
+    public enum Carrier { None, Player, Worker }
+
+    /// <summary>A player carries one barrel, and a worker with a barrel carries nothing else in their hands.</summary>
+    public Carrier CarriedBy { get; set; }
+
+    private int CarryRoom(string item) {
+        if (CarriedBy == Carrier.None) return int.MaxValue;
+        if (Barrel.Is(item)) return Barrel.In(this) == null && (CarriedBy != Carrier.Worker || Count == 0) ? 1 : 0;
+        return CarriedBy == Carrier.Worker && Barrel.In(this) != null ? 0 : int.MaxValue;
+    }
     /// <summary>
     /// A persisted stack in a particular inventory cell.
     /// <see cref="Held"/> of its units are a player's held stack: they stay in the cell and count as here, but nothing takes them out until that player puts them down or lets go.
@@ -123,7 +133,7 @@ public sealed class Inventory {
         }
         room = Math.Max(0, room);
         if (Capacity > 0) room = Math.Min(room, Math.Max(0, Capacity - Count));
-        return used > Slots ? 0 : room;
+        return used > Slots ? 0 : Math.Min(room, CarryRoom(item));
     }
 
     /// <summary>
@@ -138,11 +148,14 @@ public sealed class Inventory {
         if (more != null) foreach (var (item, count) in more.items) goods[item] = goods.GetValueOrDefault(item) + count;
         if (leaveOut != null) foreach (string item in goods.Keys.Where(leaveOut).ToArray()) goods.Remove(item);
         foreach (var (item, count) in goods) {
+            if (count > CarryRoom(item)) return false;
             int stack = StackOf(item), spare = 0;
             for (int i = 0; i < limit; i++) if (Layout[i].Item == item) spare += stack - Layout[i].Count;
             empty -= (Math.Max(0, count - spare) + stack - 1) / stack;
         }
-        return empty >= 0 && (Capacity == 0 || Count + goods.Values.Sum() <= Capacity);
+        int barrels = CarriedBy == Carrier.None ? 0 : goods.Where(pair => Barrel.Is(pair.Key)).Sum(pair => pair.Value);
+        return barrels <= 1 && (CarriedBy != Carrier.Worker || barrels == 0 || goods.Values.Sum() == 1) &&
+            empty >= 0 && (Capacity == 0 || Count + goods.Values.Sum() <= Capacity);
     }
 
     /// <summary>Slots to show: every stack, plus one single-item slot per unit of capacity left.</summary>
@@ -151,7 +164,8 @@ public sealed class Inventory {
             if (Capacity <= 0) return Slots;
             int last = 0;
             for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item != "") last = i + 1;
-            return Math.Min(Slots, Math.Max(last, UsedSlots + Math.Max(0, Capacity - Count)));
+            int left = CarriedBy == Carrier.Worker && Barrel.In(this) != null ? 0 : Math.Max(0, Capacity - Count);
+            return Math.Min(Slots, Math.Max(last, UsedSlots + left));
         }
     }
 
@@ -373,6 +387,49 @@ public sealed class Inventory {
         items[oldItem] -= quantity; if (items[oldItem] <= 0) items.Remove(oldItem);
         items[newItem] = items.GetValueOrDefault(newItem) + quantity;
         Changed?.Invoke();
+        return true;
+    }
+
+    internal bool CanReplaceOne(string oldItem, string newItem) {
+        if (Free(oldItem) <= 0) return false;
+        if (oldItem == newItem || Room(newItem) > 0) return true;
+        foreach (var slot in Layout) if (slot.Item == oldItem && slot.Count == 1 && Takeable(slot) > 0) return true;
+        return false;
+    }
+
+    /// <summary>The units that can become an item that takes one cell per unit.</summary>
+    internal int RoomForFilled(string empty, string filled) {
+        if (StackOf(empty) == 1) return Free(empty);
+        int room = Room(filled), count = 0;
+        for (int i = Math.Min(Slots, Layout.Count) - 1; i >= 0; i--) {
+            var slot = Layout[i];
+            if (slot.Item != empty) continue;
+            int available = Takeable(slot);
+            if (available == 0) continue;
+            int split = Math.Min(room, Math.Max(0, Math.Min(available, slot.Count - 1)));
+            count += split;
+            room -= split;
+            if (split + 1 == slot.Count && available == slot.Count) count++;
+        }
+        return count;
+    }
+
+    /// <summary>Changes one vessel, preserving its cell whenever the whole cell changes.</summary>
+    public bool ReplaceOne(string oldItem, string newItem) {
+        if ((uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == oldItem) {
+            if (Takeable(Layout[PreferredSlot]) == 0) return false;
+            if (Layout[PreferredSlot].Count == 1) return Replace(oldItem, newItem);
+        } else {
+            for (int i = 0; i < Layout.Count; i++) {
+                if (Layout[i].Item != oldItem || Layout[i].Count != 1 || Takeable(Layout[i]) <= 0) continue;
+                int previous = PreferredSlot;
+                PreferredSlot = i;
+                try { return Replace(oldItem, newItem); } finally { PreferredSlot = previous; }
+            }
+        }
+        if (oldItem == newItem || Free(oldItem) == 0 || Room(newItem) == 0) return false;
+        Take(oldItem, 1, false);
+        Add(newItem, 1);
         return true;
     }
 
