@@ -5,9 +5,11 @@ Use these notes for wolf motion and scenes at a cabin's door.
 ## Four legs and tails
 
 - A walk sets each foot down in turn, a trot moves diagonal pairs together, and a gallop lands the feet in order with
-  time in the air. Wolves trot for distance and gallop to chase.
+  time in the air.
+  Wolves trot for distance and gallop to chase.
 - In a gallop the spine flexes to gather the legs under the body and extends to stretch them out.
-- The head bobs to balance the front legs. The tail trails the body and swings out to balance turns.
+- The head bobs to balance the front legs.
+  The tail trails the body and swings out to balance turns.
 - Apply the [contact, ground and timing rules](locomotion.md#any-body) to every paw.
   `CheckWolfGaitsPlantEachPaw` in
   [WolfGaitChecks.cs](../../../../tests/actors/enemies/wolf/WolfGaitChecks.cs) checks paw contact through each gait.
@@ -37,7 +39,8 @@ Use these notes for wolf motion and scenes at a cabin's door.
   `wolf turn` reverses a gallop every two seconds and shows the head leading the turn and the braking step.
   The other clips are `wolf leap`, `wolf hit`, `wolf feed`, `wolf fall`, `wolf snap` (the bite) and `wolf brace`.
   Leap, hit, feed, snap and brace play against a player, as `SyncWolves` sets them up.
-  `./build.py play -- --animation-review` shows every clip on one screen.
+  `./build.py play -- --animation-review` shows seven wolf clips alongside the human clips.
+  Use `--animation-clip` to see any of the 13 wolf close-ups individually.
 - Wolves moved by the game's own rules play in `--showcase --wolf-scene patrol` (turns on a patrol), `howl` (turning to
   a player and howling), `feast` (a takedown and feeding), `follow`, `rout` and `stand` (follow mode behind a torch)
   and `fight` (snaps against axe swings), and at a cabin's door in the `--doorway` scenes

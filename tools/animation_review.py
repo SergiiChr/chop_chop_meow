@@ -19,14 +19,17 @@ import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
 OUTPUT = build.BUILD / "animation-review"
 DEFAULT_FRAMES = 96
+DEFAULT_VIEWS = ("side", "front", "game", "facing")
+# Time for the launcher to prepare the export before it starts recording.
+RECORD_STARTUP_SECONDS = 600
 
 # Camera pitch and rig turn in degrees.
 VIEWS = {
-    "side": (4, 0),
-    "front": (4, -90),
-    "game": (30, 0),
-    "facing": (30, -90),
-    "top": (89, 0),
+    "side": (4, 0),  # Low from the side.
+    "front": (4, -90),  # Low with the rig facing the camera.
+    "game": (30, 0),  # The game camera angle.
+    "facing": (30, -90),  # The game camera angle with the rig facing the camera.
+    "top": (89, 0),  # Almost straight down.
 }
 
 
@@ -54,7 +57,7 @@ def require_clip(ref: str | None, clip: str) -> None:
 
 
 def record(
-    checkout: Path, clip: str, view: str, slow: float, frame_count: int, movie: Path
+    checkout: Path, clip: str, view: str, slow: float, frames: int, movie: Path
 ) -> None:
     """Records one view of a checkout's clip at 30 frames a second of slowed game time."""
     pitch, turn = VIEWS[view]
@@ -69,6 +72,7 @@ def record(
         str(turn),
     ]
     log = movie.with_suffix(".log")
+    capture_folder = movie.with_suffix("")
     records = '"record"' in (checkout / "build.py").read_text()
     if records:
         command = [
@@ -81,28 +85,33 @@ def record(
             "--slow",
             str(slow),
             "--frames",
-            str(frame_count),
+            str(frames),
         ]
     else:
         # A ref from before recording captured numbered frames, which become a movie of the same rate here.
-        frames = movie.with_suffix("")
-        shutil.rmtree(frames, ignore_errors=True)
+        shutil.rmtree(capture_folder, ignore_errors=True)
         command = [
             sys.executable, checkout / "build.py", "play", "--", *flags,
-            "--animation-slow", str(slow), "--animation-frames", str(frame_count), "--animation-capture", frames,
+            "--animation-slow", str(slow), "--animation-frames", str(frames), "--animation-capture", capture_folder,
         ]  # fmt: skip
     # A native Wayland window draws about one frame a second; XWayland draws at full speed.
     env = {key: value for key, value in os.environ.items() if key != "WAYLAND_DISPLAY"}
-    with log.open("w") as output:
-        result = subprocess.run(
-            [str(part) for part in command],
-            cwd=checkout,
-            env=env,
-            stdout=output,
-            stderr=subprocess.STDOUT,
-            timeout=600,
-            check=False,
-        )
+    timeout = RECORD_STARTUP_SECONDS + build.record_timeout(frames)
+    try:
+        with log.open("w") as output:
+            result = subprocess.run(
+                [str(part) for part in command],
+                cwd=checkout,
+                env=env,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+                check=False,
+            )
+    except subprocess.TimeoutExpired:
+        raise SystemExit(
+            f"Recording {view} timed out after {timeout} seconds. See {log}"
+        ) from None
     if result.returncode:
         text = log.read_text(errors="replace")
         errors = dict.fromkeys(
@@ -114,10 +123,10 @@ def record(
         )
     if not records:
         subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-framerate", "30", "-i", frames / "%03d.png", "-c:v", "mjpeg", "-q:v", "2", movie],
+            ["ffmpeg", "-y", "-loglevel", "error", "-framerate", "30", "-i", capture_folder / "%03d.png", "-c:v", "mjpeg", "-q:v", "2", movie],
             check=True,
         )  # fmt: skip
-        shutil.rmtree(frames)
+        shutil.rmtree(capture_folder)
     print(f"Recorded {movie}")
 
 
@@ -166,7 +175,7 @@ def main() -> None:
         "--views",
         nargs="+",
         choices=VIEWS,
-        default=[view for view in VIEWS if view != "top"],
+        default=DEFAULT_VIEWS,
         help="camera views to record",
     )
     parser.add_argument(

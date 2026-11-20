@@ -62,6 +62,8 @@ OUTPUT = BUILD / "ChopChopMeow.x86_64"
 # Each play launch exports into a folder named after its process id, which the game keeps after exec.
 PLAY_EXPORTS = BUILD / "play"
 RECORD_EXPORTS = BUILD / "record"
+RECORD_MIN_SECONDS = 600
+RECORD_SECONDS_PER_FRAME = 2
 PYTHON_TOOLS = TOOLS / "python"
 REQUIREMENTS = ROOT / "requirements-dev.txt"
 # Seconds all test stages together may take, so a run that hangs outside any check still stops.
@@ -819,6 +821,11 @@ def export_record() -> tuple[Path, dict[str, str]]:
     return output, env
 
 
+def record_timeout(frames: int) -> int:
+    """Allow time for slow rendering while still stopping a recording that hangs."""
+    return max(RECORD_MIN_SECONDS, frames * RECORD_SECONDS_PER_FRAME)
+
+
 def run_record(movie: Path, fps: int, game_args: list[str]) -> None:
     """Record the exported game to a movie at a fixed frame rate, with its sound, through Godot's Movie Maker.
 
@@ -834,11 +841,15 @@ def run_record(movie: Path, fps: int, game_args: list[str]) -> None:
     game, env = export_record()
     # A native Wayland window draws about one frame a second; XWayland draws at full speed.
     env.pop("WAYLAND_DISPLAY", None)
+    # Godot reports invalid frame arguments. They still get the minimum timeout.
+    frames = 0
+    with suppress(IndexError, ValueError, OverflowError):
+        frames = int(float(game_args[game_args.index("--frames") + 1]))
     run_godot(
         "record",
         [game, "--write-movie", movie, "--fixed-fps", str(fps), "--", *game_args],
         env,
-        timeout=600,
+        timeout=record_timeout(frames),
     )
     if not movie.is_file() or movie.stat().st_size == 0:
         raise SystemExit(

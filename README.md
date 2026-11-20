@@ -70,7 +70,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
-| `--animation-review` | Show every actor action on rotating rigs |
+| `--animation-review` | Show a grid of player and worker actions and seven wolf clips |
 | `--frames 240` | Quit after this many frames, to end a recording (`./build.py record`) |
 | `--slow 4` | Slow game time this many times, for a recording in slow motion |
 | `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following; a felling clip such as `"player steel axe"` plays against a trunk |
