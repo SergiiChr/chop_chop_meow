@@ -212,40 +212,62 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
 
     /// <summary>Stands a cabin's door <paramref name="degrees"/> open, as a wolf pushing it holds it, for the door to swing on from there.</summary>
     public static void PushDoor(HutProp hut, float degrees) {
-        // The door's swing eases in and out, so the share of the swing that stands it this far open is found by halving.
+        hut.Open = SwungShare(degrees); hut.Slamming = false;
+        hut.Door.RotationDegrees = new Vector3(0, -degrees, 0);
+    }
+
+    /// <summary>The share of an eased swing that stands a door <paramref name="degrees"/> open.</summary>
+    private static float SwungShare(float degrees) {
+        // The door's swing eases in and out, so the share is found by halving.
         float low = 0, high = 1;
         for (int i = 0; i < 12; i++) {
             float middle = (low + high) / 2;
             if (FullSwing * WorldView.Ease(middle) < degrees) low = middle; else high = middle;
         }
-        hut.Open = (low + high) / 2;
-        hut.Door.RotationDegrees = new Vector3(0, -degrees, 0);
+        return (low + high) / 2;
     }
+
     /// <summary>How many degrees a cabin's door swings open.</summary>
     private const float FullSwing = 100;
+    /// <summary>Seconds a door slammed from wide open takes to hit its frame.</summary>
+    public const float SlamSeconds = 1 / 8f;
 
-    /// <summary>Swings a cabin's door <paramref name="step"/> of the way further open, or shut.</summary>
-    public static void SwingDoor(HutProp hut, bool open, float step) {
-        hut.Open = Mathf.MoveToward(hut.Open, open ? 1 : 0, step);
-        hut.Door.RotationDegrees = new Vector3(0, -FullSwing * WorldView.Ease(hut.Open), 0);
+    /// <summary>How far open a door stands, from 0 shut to 1 wide open, at a share of its slam: starting at rest, it hits the frame at its fastest.</summary>
+    private static float Slammed(float share) => share * (2 - share);
+
+    /// <summary>
+    /// Swings a cabin's door further open, or shut, over <paramref name="seconds"/> for the whole swing; a door that
+    /// <paramref name="slams"/> shut speeds up all the way into its frame, and any other swing eases in and out.
+    /// </summary>
+    public static void SwingDoor(HutProp hut, bool open, float dt, float seconds, bool slams) {
+        slams &= !open;
+        if (slams != hut.Slamming) {
+            // Changing between a slam and a swing carries on from where the door stands.
+            float shown = hut.Slamming ? Slammed(hut.Open) : WorldView.Ease(hut.Open);
+            hut.Open = slams ? 1 - MathF.Sqrt(1 - shown) : SwungShare(shown * FullSwing);
+            hut.Slamming = slams;
+        }
+        hut.Open = Mathf.MoveToward(hut.Open, open ? 1 : 0, dt / seconds);
+        hut.Door.RotationDegrees = new Vector3(0, -FullSwing * (slams ? Slammed(hut.Open) : WorldView.Ease(hut.Open)), 0);
     }
 
     /// <summary>
-    /// A player's pose at a cabin's door as <paramref name="at"/> shows them, for a body at <paramref name="position"/> facing
-    /// <paramref name="yaw"/>: shoulders turned, arms drawn in to pass someone and boots stood on the steps; with how high the
-    /// steps lift the body, and where on the door frame the right hand goes, when it does.
+    /// A player's pose at a cabin's door as <paramref name="at"/> shows them, for a body drawn as <paramref name="state"/>
+    /// has it: shoulders turned, arms drawn in to pass someone and boots stood on the steps, which carry the body up and down
+    /// over <paramref name="dt"/> seconds in its <see cref="ActorState.Lift"/>; with where on the door frame the right hand
+    /// goes, when it does.
     /// </summary>
-    public static (Pose Pose, float Lift, Vector3? Jamb) StandAt(Pose pose, Vector2 position, float yaw, DoorShown at) {
+    public static (Pose Pose, Vector3? Jamb) StandAt(Pose pose, ActorState state, DoorShown at, float dt) {
         pose = pose with { Twist = pose.Twist + at.Twist };
         // Passing someone in a doorway, the arms hang at the sides, a tool held low and pointing ahead, instead of swinging out.
         if (at.Tuck > 0) pose = ArmReach.WithArm(ArmReach.WithArm(pose, true, TuckRaise, TuckOut, TuckElbow, at.Tuck), false, TuckRaise, TuckOut, TuckElbow, at.Tuck);
         // The way up the steps, in the body's frame: X toward its left and Y ahead.
         var inward = IntoCabin.Normalized();
-        var up = inward.Rotated(yaw);
-        float depth = (position - at.Door).Dot(inward);
-        (pose, float lift) = StairSteps.OnSteps(pose, depth, up, StairSteps.StepEdges, StairSteps.StepRise);
+        var up = inward.Rotated(state.Yaw);
+        float depth = (state.Position - at.Door).Dot(inward);
+        pose = StairSteps.OnSteps(pose, depth, up, at.Backing, StairSteps.StepEdges, StairSteps.StepRise, ref state.Lift, ref state.LiftSpeed, dt);
         Vector3? jamb = at.Grip > 0 ? WorldView.To3(at.Door + Doorways.AsideWay * JambOut + inward * JambIn, JambUp) : null;
-        return (pose, lift, jamb);
+        return (pose, jamb);
     }
 
     /// <summary>

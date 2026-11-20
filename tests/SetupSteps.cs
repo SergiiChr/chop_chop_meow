@@ -93,8 +93,8 @@ internal static class SetupSteps {
         }
     }
 
-    /// <summary>Fells a tree at once and returns the stump it leaves: a woodcutter out of the player's sight would take minutes over it.</summary>
-    public static Thing Fell(World world, Thing tree) => world.Fell(tree);
+    /// <summary>Fells a tree at once, away from the player, and returns the stump it leaves: a woodcutter out of the player's sight would take minutes over it.</summary>
+    public static Thing Fell(World world, Thing tree) => world.Fell(tree, world.Player);
 
     /// <summary>Sets a cart on the road with an exact value and trip time, which a real sale's changing price would not give.</summary>
     public static TradeOrder PlaceOrder(World world, TradeOrder order) { world.S.Orders.Add(order); return order; }

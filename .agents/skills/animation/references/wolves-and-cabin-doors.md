@@ -23,6 +23,7 @@ Use these notes for wolf motion and scenes at a cabin's door.
   For doorway and wolf showcase scenes use `--camera-pitch 89`.
   For a close-up clip use `./tools/animation_review.py "wolf leap" --views top`.
 - Check anything that glows, such as wolf eyes, in a dark scene as well.
+- Measure a paw's pad, its lowest point, not the paw bone: a pad reaches 7 cm ahead of it.
 
 ## Rig
 
@@ -52,5 +53,5 @@ For example, turn the idle wolf toward the camera and record through its wary ha
 
 ```sh
 ./build.py record build/recordings/face.avi -- --animation-review --animation-clip "wolf idle" \
-    --animation-pitch 3 --animation-turn 90 --animation-zoom 2.6 --frames 200
+    --animation-pitch 3 --animation-turn 90 --animation-zoom 2.6 --frames 400
 ```

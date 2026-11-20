@@ -179,6 +179,8 @@ Rendering and sound:
 | File | Owns |
 | --- | --- |
 | `src/WorldView.cs` | The 3D scene, orthographic camera, picking, lighting and world animation |
+| `src/props/display/TreeFall.cs`, `src/props/display/Thrown.cs` | A felled tree going over about its trunk's foot, and a dug out stump or bush or a chip thrown through the air |
+| `src/props/display/LocalClock.cs` | A count the server keeps, run on by the window between updates for a motion that follows it |
 | `src/WorldScene.cs` | Ground dressing, particles and the animation review |
 | `src/terrain/display/TerrainView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
@@ -186,10 +188,10 @@ Rendering and sound:
 | `src/paths/display/GravelPathView.cs` | Laid gravel paths as the ground draws them: the map of how far each spot is from the gravel's edge |
 | `src/paths/display/GravelPathShape.cs` | One gravel path tile as a model, for the plan's icon, its ghost while placing and the remove selector's red pad |
 | `src/buildings/display/RemovalMark.cs` | The red mark on the building or gravel path tile the remove selector points at |
-| `src/WorldLook.cs`, `src/Wind.cs` | The sound listener and the wind |
+| `src/WorldLook.cs`, `src/Wind.cs` | The sound listener, the wind and the grass parting round the people in sight |
 | `src/terrain/display/FootpathWear.cs` | Footpaths worn where the player and workers walk, and their growing back |
 | `src/actors/display/Footsteps.cs` | Which footstep sound the ground gives at a spot |
-| `src/water/display/LakeAppearance.cs` | The lake and sea surfaces, their tiles, and the water and lily pad materials |
+| `src/water/display/LakeAppearance.cs` | The lake and sea surfaces, their tiles, the water and lily pad materials, and the water's clock |
 | `src/water/display/ShorelineAppearance.cs` | The sand and stony bank strips along the lake and the coast, and the coast's water |
 | `src/water/display/LakeDressing.cs` | The lake's bank, water, stones, reeds and lily pads |
 | `src/water/model/ShoreLook.cs`, `src/water/model/WaterBody.cs` | The shore photoscans' looks, and the sea's and the lake's waves and colours |
@@ -203,6 +205,7 @@ Rendering and sound:
 | `src/actors/display/Turning.cs` | How an actor's head, then body, turn toward where it heads, with inertia |
 | `src/actors/display/ActorState.cs` | How a player or worker is drawn: where, facing which way, doing what, and at which doorway stage |
 | `src/actors/display/ArmReach.cs` | Putting a hand on a point: the arm's joint angles for it, and a pose with the arm moved there |
+| `src/actors/display/StrikePoints.cs` | Where a blow lands its tool on what is worked: a trunk's side, a rock, a work top or a stump's foot |
 | `src/actors/player/display/FallBackView.cs` | A player knocked or tugged off their feet falling onto their back, their throat as they go over and their hands at the wolf |
 | `src/cabins/display/DoorwayView.cs`, `src/cabins/model/DoorShown.cs` | Players at cabin doors: stepping in and out, following, knocking, standing aside and squeezing past with a palm on the frame |
 | `src/cabins/display/CabinModel.cs`, `src/cabins/display/CabinShape.cs`, `src/cabins/display/HutProp.cs` | Builds the cabin's model, its wall shell, roof and interior, and the cabin as drawn: its door, window and lamp |
@@ -322,6 +325,7 @@ The welcome is a guest's first update, with the fog uncovered so far.
 - An action's result comes back with a later update. A window checks what it can before sending, and `Net.Made` names a new mine or worker so the panel opens on it. Panels refresh with every update while `Net.AwaitingAnswer` holds, and a page draws itself again when what sets its layout changes (`PagePanel.RedrawOnChange`), since drawing it right after an action would show the world before the answer.
 - Leaving waits for the server to confirm before the line closes, so actions still in flight arrive; the owner's server closes instead, and the line going is the confirmation.
 - Joining another game from your own autosaves it and leaves with `Game.StepAway`, which keeps its server up: a failed or cancelled join goes back to it, and after a good one it ends with nobody in it, 30 seconds later.
+- A window applies updates thirty times a second and draws more often, so a motion the view drives from a count the server keeps runs on its own clock in between (`LocalClock`): a stump or bush leaning as it is dug, a thrown wolf carcass, a mine's hole and frame, a forge's heat and gauge, a cart's trip and the time of day the sun and light show. The clock moves every drawn frame at the rate the count last ran at against the world's clock; an update makes up a small difference over the next frames without turning the motion back, and a big one, such as a pump of the bellows or a sleep that skips the night, is taken at once.
 - A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key. It goes on trying while the server says the game is not open yet, as after the host loads a save.
 - Until the owner opens the game, the server refuses peers that are not on this computer. Only the owner can save; any player can hold the world, and it stands still while all of them do.
 - The server's welcome says whether the player owns the game, from their machine's key, so an owner who types their own game's address into the join popup still owns it.
@@ -422,7 +426,17 @@ The player turns to face the way they aim: toward the pointer for a click, the w
 
 Manual bellows pumping, the unarmed punch and the axe swing trigger one loop of their action.
 Each striking work action has an impact moment that shakes its target and spawns chips, leaves, soil, splashes or sparks; packing and grinding strike nothing.
+The axe, pick and hammer land there (`ActorAnimation.ChopStrike`, `MineStrike`, `HammerStrike`), speeding up all the way into the blow; a punch draws the fist back first.
 A dig strikes at `ActorAnimation.DigStrike` and throws its soil off the blade (`ActorRig.ShovelTip`) at `DigToss`.
+
+A blow lands its tool's working end on what is worked, wherever within reach the worker stands (`StrikePoints`, `ActorState.Mark`): the axe's head on the trunk's side, the pick's point where its swing first meets the rock, the hammer's face on the anvil's or bench's work top, and the shovel's blade in the ground at a stump's or bush's foot.
+Chips and soil fly from there.
+Where the blow's own swing meets what is worked, the swing is cut short there (`ActorAnimation.Swing`).
+Where it passes it by, the right arm is solved to reach it with the tool held in line with the forearm (`ArmReach.ArmTo`), the trunk turning to face it and leaning in or back as far as the arm needs; an arm that would have to swing behind the trunk or fold its elbow tight stops where its swing passes nearest instead.
+A dig turns toward its spot, the hands go part of the way further out and the shaft leans out the rest, the trunk bending just far enough for both hands to keep hold.
+The blow and what follows it move; the wind-up stays as keyed.
+
+Work done in place stands both boots on fixed spots (`ActorAnimation.FeetOf`): a pose gives only its hip height, and the legs bend to it with the boots flat, a heel lifting only where the ankle would bend past 30° or the leg would straighten.
 An action's key poses are made once (`ActorAnimation.ChopKeys` and the like): every worker and player is posed every frame, so a pose is worked out without allocating.
 Pausing freezes animation and effects.
 
@@ -434,28 +448,34 @@ A wolf's own forepaws take the spots on their own sides (`WolfModel.Uncrossed`).
 
 At a gallop, or scared off, a wolf turns fast; reversing at a gallop it brakes.
 At a walk or a trot its head turns first and its body comes round over about a second (`WolfModel.SlowTurn`), the spine curling into the turn by `WolfModel.CurlShare` of the head's lead and the tail swinging in after it, as a dog walking a circle bends.
-Setting off more than 75 degrees from the way it faces (`WolfModel.SetsOffWithin`), it turns round where it stands first, about its hips with its forepaws stepping round (`WolfModel.HipsBehind`, `WolfModel.TurnStep`), then catches up with its place in the world at `WolfModel.CatchUp` more than its pace (`WolfModel.Drift`).
+Setting off more than 75 degrees from the way it faces (`WolfModel.SetsOffWithin`), it turns round where it stands first, about its hips with its forepaws stepping round (`WolfModel.HipsBehind`, `WolfModel.TurnStep`), then catches up with its place in the world at `WolfModel.CatchUp` more than its pace (`WolfModel.Drift`), though a wolf walking in the world catches up no faster than it still walks, so it never trots to do it (`WolfModel.CatchingUp`).
 
 `WolfShape` builds one skinned wolf mesh on a skeleton of spine, neck, head, jaw, ears, upper lips, brows, a three-bone tail and four legs of three segments and a paw; `WolfModel` poses it.
 The head has a broad skull with a ruff of fur spikes down each cheek, a mane of them round the neck and hackles along the back (`WolfShape.FurSpikes`), and fangs, front teeth and cheek teeth in both jaws.
 The upper lips hang over the upper teeth on a bone of their own: `WolfPose.Snarl`, 0 to 1, lifts them and lowers the inner end of each brow.
 A wolf snarls while it stalks behind torchlight, leaps, tugs, holds an arm, feeds, recoils from a hit, and stares in at a cabin's door; otherwise its mouth is relaxed.
-Legs are placed by two-bone IK from where each paw should stand, with the front elbow bending back and the hind stifle forward as in a real canine.
-A stance moves the paw back at exactly the body's speed, so paws stay where they land.
+Legs are placed by two-bone IK from where each paw should stand, with the front elbow bending back and the hind stifle forward as in a real canine (`WolfModel.Reach`, `WolfModel.ReachTo`).
+No joint bends past a dog's range (Jaegger, Marcellin-Little and Levine 2002): the elbow stops 15 degrees short of straight and the stifle 18, the wrist opens 16 past straight and the hock stops 16 short of it; where the lowest segment's angle asked for would take the wrist or hock past that, the leg takes the nearest angle that does not, and a paw out of reach is reached for as far as the leg goes.
+`WolfModel.Plant`, once the view has placed the model for the frame, holds each paw that comes down where its toe pads landed in the world while the body moves and turns over it, until its pose lifts it; a lifted paw goes on from where it left the ground to where its pose has it, lifting clear rather than dragging, and no part of a sole goes into the ground.
+Standing, braced, feeding, howling, pinning, reared or recoiling, a paw left more than `WolfModel.StepAfter` from where its pose has it steps there, one paw at a time, and a paw its leg cannot keep where it stands steps too.
+`WolfModel.SolePoint` gives the outline of each paw's underside, which the checks measure the ground against.
+A stance moves the paw back at exactly the body's speed, so paws stay where they land; to push off the heel lifts about the toe pads (`WolfModel.PushOff`), and each swing leaves and lands moving as fast as the ground goes under it, so a paw neither slides as it lands nor as it leaves.
 `WolfModel.Move` picks a lateral-sequence walk, a diagonal trot or a rotary gallop from the wolf's smoothed speed; the gallop folds the spine at the gathered float and stretches it at the extended one.
-A change of motion blends from the last shown pose over a short smoothstep, so standing, walking, trotting, galloping, leaping and recoiling run into each other.
+The gallop takes about two and a half strides a second, a few more the faster (`WolfModel.GallopStride`, after Heglund, Taylor and McMahon 1974), so a faster gallop mostly reaches further; it runs a little low (`WolfModel.GallopLow`) so the forelegs reach the ground ahead, and in its floats the body rises and falls under gravity, the legs taking its weight like springs on the ground between them (`WolfModel.Bounce`).
+Galloping, the hind paws pass outside the fore, which land close to one line.
+A change of motion, or of a motion's wary or calm form, blends from the last shown pose over a short smoothstep: the body's angles go in between and each paw goes from where it is in one pose to where it is in the other (`WolfModel.Blended`), so standing, walking, trotting, galloping, leaping and recoiling run into each other without a paw on the ground in both leaving it.
 A wolf turns as people do (`WolfModel.Turning`, `WolfModel.TurnToward`): its neck and head turn toward a new heading first and the body follows, leaning into the turn at a gallop; one struck turns straight to its hitter, and one tugging, lunging or feeding is turned by that motion.
 Reversing at speed, a wolf's body faces the way it came for a moment while it moves the other way; it brakes then (`WolfModel.Brake`), the forelegs braced out ahead and the paws sliding, instead of running backward.
 The path is the simulation's, unchanged: the brake is only drawn.
 
 `WorldView` times the wolf against the player:
 
-- a leap arcs up and comes down jaws first on the throat (`FallBackView.Throat`); contact at `WolfModel.ContactReach` knocks the player onto their back facing the wolf, and the jaws stay on the throat as they go over, so the wolf ends standing over them;
-- a wolf a swing lands on (`Wolf.Stagger` rising) hops back `World.KnockBackDistance`, moving only while in the air, and ducks low before rising wary; where the blow reaches a machine a moment before the swing it shows comes down (`ActorAnimation.Contact`), the wolf stands until it does (`WolfModel.Struck`);
-- a snapping wolf (`Wolf.Snap`) that stands sinks back onto its haunches while it gathers itself, and one still running with its player keeps running; then it throws chest, neck and wide jaws out ahead (`WolfModel.Snap`, `WolfModel.SnapSurge`) and shuts them a moment after it lands (`WolfModel.SnapHold`);
+- a leap pushes off from where the wolf stood, speeding up from a stand on its planted hind legs, then flies at an even pace under gravity and comes down on its hind paws reared up with its jaws on the throat (`WolfModel.LeapPath`, `FallBackView.Throat`); contact at `WolfModel.ContactReach` knocks the player onto their back facing the wolf, and the wolf rears on its hind legs to keep its jaws on the throat as they go over, then leans to keep them there once they lie, so it ends standing over them;
+- a wolf a swing lands on (`Wolf.Stagger` rising) hops back `World.KnockBackDistance`, moving only while in the air, at an even pace and rising and falling under gravity (`WolfModel.HopSeconds`), and ducks low once it has landed before rising wary; where the blow reaches a machine a moment before the swing it shows comes down (`ActorAnimation.Contact`), the wolf stands until it does (`WolfModel.Struck`);
+- a snapping wolf (`Wolf.Snap`) that stands sinks back onto its haunches while it gathers itself, and one still running with its player keeps running; then it throws chest, neck and wide jaws out ahead and shuts them on the near side of the player's hips and thighs as drawn (`WolfModel.Snap`, `WolfModel.SnapReach`) a moment after it lands (`WolfModel.SnapHold`);
 - a following wolf its player has walked up to (`FollowStage.Braced`) stands braced, low over forepaws set wide, ears flat and lips drawn back (`WolfModel.Brace`);
 - a following wolf walking round its player turns its head to them for `GlanceSeconds` in every `GlanceEvery`, each wolf at its own moments by its id (`WolfModel.Glance`, up to `WolfModel.MaxGlance` from its body);
-- a killing blow throws the wolf off its feet onto its side, covering the knockback in the air, and it lands with a bounce and lies limp.
+- a killing blow throws the wolf off its feet onto its side from the pose it was killed in (`WolfModel.FallFrom`), covering the knockback in the air at an even pace and dropping under gravity with its paws clear of the ground, and it lands with a bounce and lies limp.
 - a howling wolf (`Wolf.Howl`) braces, lifts its chest and throws its head back, muzzle to the sky, its jaw opening as the note swells (`WolfModel.Howl`).
 
 Wolf eyes glow faintly, so they show in the dark.
@@ -505,6 +525,7 @@ A worker's tool slot holds one bucket or bottle.
 A water haul uses the tool slot to preserve the bucket or bottle and its fill throughout the trip.
 Workers fetch water from the nearest full floor barrel or the lake.
 A cabin haul walks to the outside ladder, climbs, pours into the mounted barrel and climbs back down.
+The window advances the visible haul phase between server updates through `LocalClock`.
 Construction keeps the ladder approach on dry ground and clear of other buildings.
 
 Before the night advances, players inside each cabin draw enough liters to fill their thirst in cabin-entry order.
@@ -572,6 +593,12 @@ A thing out of sight is drawn once as its snapshot, moved on far enough to finis
 A change that did not happen in front of the player is not played when they see it (`WorldView.Watched`): a tree felled out of sight is a stump, a chest filled out of sight keeps its lid shut, and a chip or a building that appeared out of sight neither flies nor lands in dust.
 A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
 A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one a building now stands over (`World.Clears`), or a gravel path tile lies on (`GravelPaths.Laid`), just goes.
+A tree falls away from whoever landed the last blow, player or worker, the way its stump records (`Thing.FellToward`), so it falls the same way on every machine.
+It turns about the foot of its trunk on the side it falls to, as a stiff pole hinged at its foot does (`TreeFall`): slowly at first, then faster, a taller tree taking longer and landing faster.
+It starts upright at the speed a 5° lean would give it, and comes to rest where its trunk or a branch first touches the ground, between about 45° over and lying flat; its leaf cards bear no weight and lie flat on the ground where they reach it.
+The shake of the last blow carries on as it goes over.
+A dug out stump or bush is thrown straight up and comes back down in `Thrown.DugOutSeconds` under gravity, tumbling steadily over about its middle (`Thrown.DugOut`), and no part of it goes lower than it stood as it came out.
+A chip knocked off rock flies in an arc under gravity, spinning steadily round its middle, lands where it lies and skids and turns to a stop over `WorldModels.ChipSettle`.
 While it is dug at, a stump or bush leans further over with `Thing.Progress` (`DugProp`).
 Work out of sight shakes nothing and throws no chips.
 It is silent too, since `SightRadius` (20 metres) lies beyond the 16 metres a sound carries ([Sound effects](#sound-effects)).
@@ -645,8 +672,10 @@ Building keeps `Construction.DoorRoom` clear round every cabin's door spot, and 
   The view walks them in from there up the side of the step (`DoorwayView.Inward`), the two turning chest to chest with their arms hanging as they pass (`DoorwayView.SqueezePast`), the one going in with the right palm on the door frame (`ArmReach.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
 - A follower waits aside, out of the way, while the one ahead is tugged back out (`DoorwayView.Behind`).
 
-The view walks the player through the doorway over the stage (`DoorwayView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
-On the two treads of the step and the floor (`StairSteps.StepEdges`) the body stands on the boot that bears its weight and the other knee bends to put its boot on its tread, a swinging boot rising ahead of each edge (`StairSteps.OnSteps`), so no boot sinks into the step.
+The view walks the player through the doorway over the stage (`DoorwayView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, lifting or lowering its neck to their waist as drawn, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
+On the two treads of the step and the floor (`StairSteps.StepEdges`) the body heads for the tread of the boot that bears its weight, rising onto the other boot's tread as one lifts off behind, and lowering ahead of a boot about to step down (`StairSteps.OnSteps`).
+It gets there over several frames, carried from frame to frame in `ActorState.Lift`, never higher than a boot on the ground reaches down to its tread toe first, never lower than a leg bearing the weight alone bends, and never dropping faster than falling.
+A knee bends to put a boot on a higher tread, so no boot sinks into the step; a boot a tug drags off a tread's edge hangs over the lower one while the body falls onto it.
 Every takedown falls the player backward onto their seat and back (`ActorAction.FallBack`, `FallBackView.FallBack`, `FallBackView.FallPath`), facing the wolf after a leap; a leaping or pinning wolf puts its forepaws on the player's chest (`FeedingSpots.PawsOnChest`), astride with its hind paws wide of the legs, while the player's hands push its head off by the jaw within reach, or by the neck when the jaw is too close, elbows out at the sides (`WolfModel.NeckLine`, `ArmReach.ArmTo` with an elbow direction and `ActorRig.RollArm`), and every other wolf feeding there stands perpendicular to the body at the part of it nearest to it where it touches neither another wolf nor the player's arms (`FeedingSpots.FreeSpot`, `WolfModel.Volumes`), keeping that spot while it stays free.
 A wounded player tugged out falls backward still facing the door, and the wolf lets go, steps round to the side of them it stands on, their left for one straight behind them (`Wolf.LungeFrom`), and lunges onto the throat from there as they land.
 A player knocking on the door stands on the lower tread, with the front boot on the upper one, and steps back down off it when done.
@@ -669,6 +698,8 @@ The cabin's door opens outward, so the wolf cannot push it in.
 It stands in front of the door's free half to scratch, its right forepaw raking the boards once for each scratch of the recording, then shuffles round to face the gap the free edge opens and puts its nose to the seam.
 Prying, it hooks its snout behind the edge and levers the door out toward itself in three pries, its nose following the edge (`DoorCheckView.Nose`, `DoorCheckView.NoseTo`); then it walks straight on along that line, in between the door and its frame, stands with its shoulders in the doorway looking at where whoever is inside watches from, the inside view's camera (`DoorCheckView.Watcher`, `WolfModel.LookingAt`), and springs in (`DoorCheckView.PoseAt`, `DoorCheckView.Placement`).
 Its paws stay where they stand while the body moves over them and step one at a time, timed by how far the body has come, each paw's height running from what it left to what it lands on (`StairSteps.HeightAt`, `WolfModel.Stood`, `WolfModel.ReachTo`).
+A paw stands on the highest tread under any part of its sole, from the heel to the tips of the toes (`DoorCheckView.Under`), so its toes are never in a tread's front.
+Springing in, it starts from the height and tip it stands at in the doorway (`DoorCheckView.DoorwayLift`, `DoorCheckView.DoorwayPitch`); each paw stays where it stands as the body springs on until it lifts, the forepaws lifting flat before they fold and tucking under the shoulders clear of the floor (`DoorCheckView.TuckBelow`).
 The door stands as far open as the wolf has levered and pushed it (`DoorCheckView.DoorDegrees`, `DoorwayView.PushDoor`): a table made once of the least opening that clears the hooked snout and every part of the wolf behind the door that is as high as the door's lower edge, which only grows and swings no faster than `DoorCheckView.SwingRate` until the launch.
 On top of it the door rattles: at each pry it jumps a few degrees out off the snout in quick knocks that die away (`DoorCheckView.Rattle`), with `door_rattle` played `DoorCheck.RattleFrom` into each of the `DoorCheck.Pries` pries.
 A player the wolf takes out is drawn from where they stood inside (`DoorwayView.IntoCabin`).
@@ -680,6 +711,8 @@ The window draws that picture through the VHS shader.
 
 The animation review's `player cabin` clip plays every stage at a cabin, `player jog back` and `player run back` a run braking and turning round, and `player jog turns` and `player run turns` the keys A, W, D and S pressed in quick turn.
 The door opens while someone steps in or out: it swings with `hut_door_normal` after a walk, and slams shut with `hut_door_escaping` after a run.
+A swing eases in and out over `Doorways.ShutSeconds`; a slam from wide open speeds up all the way into the frame over `DoorwayView.SlamSeconds`.
+The slam's sound and a chest's or crate's `close_chest` start as far ahead of the shut as each variant's loudest moment lies into it (`Sounds.Lead`), so it lands as the door hits its frame or the lid shuts; a slam's sound that builds up longer than the slam starts while the runner is still in the doorway.
 
 #### Swings
 
@@ -1278,7 +1311,7 @@ Sounds come from three places:
 - The view plays sounds tied to animation timing: footsteps by ground type (`Footsteps.Sound`: gravel paths, water, rock, grass), axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
-A tree felled in sight takes 1 second to reach the ground when it is among the shortest and 2.1 when among the tallest (`WorldView.FallSeconds`).
+A tree felled in sight takes about 1.7 seconds to come to rest when it is among the shortest and 2.5 when among the tallest, depending on the way it falls, its top landing at 6 to 13 metres a second (`TreeFall`).
 It is heard twice, each sound started by the animation so both land on their moment whatever the tree's height:
 
 - As it starts to go: `tree_crack`, about a second of cracking or less, or for the tallest three in ten `tree_bend`, 1.8 seconds of wood tearing that lasts about as long as their fall.

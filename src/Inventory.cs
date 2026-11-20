@@ -124,7 +124,9 @@ public sealed class Inventory {
     /// </summary>
     public int SlotRoom(string item) => Math.Min(Room(item), Math.Max(StackSize, StackOf(item)) - this[item]);
     /// <summary>Units of an item that still fit: empty slots plus the unfilled part of its last stack.</summary>
-    public int Room(string item) {
+    public int Room(string item) => Room(item, replacing: false);
+
+    private int Room(string item, bool replacing) {
         int stack = StackOf(item), room = 0, used = 0;
         for (int i = 0; i < Math.Min(Slots, Layout.Count); i++) {
             var slot = Layout[i];
@@ -132,7 +134,7 @@ public sealed class Inventory {
             else { used++; if (slot.Item == item) room += Math.Max(0, stack - slot.Count); }
         }
         room = Math.Max(0, room);
-        if (Capacity > 0) room = Math.Min(room, Math.Max(0, Capacity - Count));
+        if (Capacity > 0 && !replacing) room = Math.Min(room, Math.Max(0, Capacity - Count));
         return used > Slots ? 0 : Math.Min(room, CarryRoom(item));
     }
 
@@ -392,7 +394,7 @@ public sealed class Inventory {
 
     internal bool CanReplaceOne(string oldItem, string newItem) {
         if (Free(oldItem) <= 0) return false;
-        if (oldItem == newItem || Room(newItem) > 0) return true;
+        if (oldItem == newItem || Room(newItem, replacing: true) > 0) return true;
         foreach (var slot in Layout) if (slot.Item == oldItem && slot.Count == 1 && Takeable(slot) > 0) return true;
         return false;
     }
@@ -400,7 +402,7 @@ public sealed class Inventory {
     /// <summary>The units that can become an item that takes one cell per unit.</summary>
     internal int RoomForFilled(string empty, string filled) {
         if (StackOf(empty) == 1) return Free(empty);
-        int room = Room(filled), count = 0;
+        int room = Room(filled, replacing: true), count = 0;
         for (int i = Math.Min(Slots, Layout.Count) - 1; i >= 0; i--) {
             var slot = Layout[i];
             if (slot.Item != empty) continue;
@@ -427,7 +429,7 @@ public sealed class Inventory {
                 try { return Replace(oldItem, newItem); } finally { PreferredSlot = previous; }
             }
         }
-        if (oldItem == newItem || Free(oldItem) == 0 || Room(newItem) == 0) return false;
+        if (oldItem == newItem || Free(oldItem) == 0 || Room(newItem, replacing: true) == 0) return false;
         Take(oldItem, 1, false);
         Add(newItem, 1);
         return true;

@@ -29,9 +29,9 @@ public struct Turning {
         float gap = Mathf.AngleDifference(angle, target);
         float way = speed != 0 ? speed : side;
         if (MathF.Abs(gap) > MathF.PI - .05f && way != 0) gap = MathF.CopySign(MathF.Abs(gap), way);
-        float behind = -gap, push = speed + rate * behind, fade = MathF.Exp(-rate * dt);
-        speed = (speed - rate * push * dt) * fade;
-        return Mathf.Wrap(angle + gap + (behind + push * dt) * fade, -MathF.PI, MathF.PI);
+        float turned = angle;
+        Movement.Spring(ref turned, ref speed, angle + gap, rate, dt);
+        return Mathf.Wrap(turned, -MathF.PI, MathF.PI);
     }
 
     /// <summary>
@@ -45,7 +45,7 @@ public struct Turning {
         yaw = Spring(yaw, heading, rate, dt, ref speed, Look);
         Look = Math.Clamp(Mathf.AngleDifference(yaw, head), -MaxLook, MaxLook);
         // Turning toward +X, the rig's left, tips it that way: a negative roll about its forward line.
-        float most = running ? MaxBank : MaxJogBank, lean = Math.Clamp(-MathF.Atan(pace * speed / 9.8f), -most, most);
+        float most = running ? MaxBank : MaxJogBank, lean = Math.Clamp(-MathF.Atan(pace * speed / Movement.Gravity), -most, most);
         Bank = Mathf.Lerp(Bank, lean, Math.Min(1, dt * 12));
     }
 

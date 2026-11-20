@@ -18,6 +18,7 @@ internal static class BarrelChecks {
         Test(CheckRecoveryKeepsWorkerBarrelAndWaterVessel, data);
         Test(CheckFullBucketsDoNotPreventRefillingABottle, data);
         Test(CheckBucketsRefillAndPourWithoutLosingTheirStack, data);
+        Test(CheckFillingABucketInAFullCrateKeepsItsItemCount, data);
         Test(CheckWorkerFetchesWaterFromClosestFullBarrelAndClimbsToCabin, data);
         Test(CheckCabinServesThirstBeforeBottlesInEntryOrder, data);
         Test(CheckRemovingCabinReturnsItsBarrelWithWater, data);
@@ -141,6 +142,19 @@ internal static class BarrelChecks {
         Require(world.Transfer(world.Backpack, barrel.Inventory, Bucket.AtFill(10), 2) == 1, "only one bucket starts pouring into five liters of room");
         Require(barrel.Inventory[Water.Liquid] == 50 && world.Backpack[Bucket.AtFill(5)] == 1 && world.Backpack[Bucket.AtFill(10)] == 1,
             "partial pouring preserves the excess and the other bucket");
+    }
+
+    private static void CheckFillingABucketInAFullCrateKeepsItsItemCount(GameData data) {
+        var world = EmptyWorld(data);
+        var crate = world.Add(ThingKind.Crate, world.Player + Vector2.Right);
+        var barrel = world.Add(ThingKind.Barrel, world.Player + Vector2.Left);
+        Give(world, Bucket.Item, 12);
+        Require(world.Transfer(world.Backpack, crate.Inventory, Bucket.Item, 12) == 12, "a crate takes twelve empty buckets");
+        barrel.Inventory.Add(Water.Liquid, 10);
+        Require(world.Transfer(barrel.Inventory, crate.Inventory, Water.Liquid, 10) == 10,
+            "a bucket can take water even when the crate already holds its limit of items");
+        Require(crate.Inventory[Bucket.Item] == 11 && crate.Inventory[Bucket.AtFill(10)] == 1 && barrel.Inventory.Count == 0,
+            "one bucket becomes full, leaving eleven empty buckets and no water in the barrel");
     }
 
     private static void CheckWorkerFetchesWaterFromClosestFullBarrelAndClimbsToCabin(GameData data) {

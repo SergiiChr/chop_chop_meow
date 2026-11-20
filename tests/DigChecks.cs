@@ -11,6 +11,7 @@ using static WorkerSteps;
 public static class DigChecks {
     public static void Run(GameData data) {
         CheckFelledTreeLeavesAStumpThatNeedsAShovel(data);
+        CheckFelledTreeFallsAwayFromWhoeverLandedTheLastBlow(data);
         CheckShovelDigsUpAStumpForThreeWood(data);
         CheckShovelDigsUpABushForThreeLeafPatches(data);
         CheckDiggingWaitsForRoomInTheBackpack(data);
@@ -34,6 +35,21 @@ public static class DigChecks {
         Require(world.GatherBlock(stump)?.Contains("shovel") == true, $"a stump should ask for a shovel: {world.GatherBlock(stump)}");
         HoldGather(world, stump, 10);
         Require(world.Find(stump.Id) != null && stump.Progress == 0 && world.Backpack["wood"] == 4, "a stump should stay in the ground untouched without a shovel");
+    }
+
+    private static void CheckFelledTreeFallsAwayFromWhoeverLandedTheLastBlow(GameData data) {
+        var world = EmptyWorld(data);
+        var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 4);
+        Give(world, "steel_axe");
+        HoldGather(world, tree, 10);
+        var felled = world.Things.Single(t => t.Kind == ThingKind.Stump);
+        // The player chops from the tree's east side, so it falls west.
+        Require(Vector2.FromAngle(felled.FellToward).DistanceTo(Vector2.Left) < .01f, $"a tree the player fells from its east side should fall west: {Vector2.FromAngle(felled.FellToward)}");
+        var lot = Woodlot(data);
+        Vector2 cutter = Vector2.Zero;
+        Work(lot.World, 300, () => { cutter = lot.Cutter.Pos; return lot.World.Things.Any(t => t.Kind == ThingKind.Stump); });
+        var stump = lot.World.Things.Single(t => t.Kind == ThingKind.Stump);
+        Require(Vector2.FromAngle(stump.FellToward).Dot((stump.Pos - cutter).Normalized()) > .999f, $"a tree a woodcutter fells should fall away from them: {Vector2.FromAngle(stump.FellToward)} from {cutter}");
     }
 
     private static void CheckShovelDigsUpAStumpForThreeWood(GameData data) {

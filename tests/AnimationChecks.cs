@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -29,6 +30,7 @@ public static class AnimationChecks {
         CheckEveryMomentOfAStrideHasAPose();
         CheckDiggingKeepsBothFeetWhereTheyStand();
         CheckAHandReachesItsPointWithTheElbowTheWayAsked();
+        CheckABlowLandsItsToolOnItsMarkSmoothlyWithinReach();
         CheckAHandReachesItsPointOnTheSlimBuild();
         BarrelAnimationChecks.Run();
         CheckPosingAllocatesNothing();
@@ -38,9 +40,14 @@ public static class AnimationChecks {
     private static void CheckPosingAllocatesNothing() {
         var actions = Enum.GetValues<ActorAction>();
         float time = 0;
+        var aim = new ActorAnimation.BlowAim { Mark = new Vector3(.1f, .5f, .9f) };
         AllocationChecks.Check("pose: every action, blending out of the last", () => {
             time += 1 / 60f;
             foreach (var action in actions) ActorAnimation.Blended(ActorAction.Idle, time, false, action, time, false, .5f);
+        });
+        AllocationChecks.Check("pose: every action aimed at a mark", () => {
+            time += 1 / 60f;
+            foreach (var action in actions) ActorAnimation.PoseAt(action, time, false, aim);
         });
     }
 
@@ -139,6 +146,43 @@ public static class AnimationChecks {
             Require(Math.Abs(cycle - ActorAnimation.Duration(gait)) < .02f,
                 $"{gait}'s stride should take as long at its speed as its timing assumes: {cycle:0.000} s against {ActorAnimation.Duration(gait):0.000} s");
         }
+    }
+
+    /// <summary>
+    /// A blow lands its tool's working end on a mark anywhere a worker stands from what they work: the axe on a trunk 1 to 1.4 m
+    /// ahead at chest height, the pick on a rock 0.9 to 1.4 m ahead low down and 1.1 to 1.4 m higher up, the hammer on a work top
+    /// 0.7 to 1 m ahead and the shovel's blade into the ground 0.8 to 1.1 m ahead, up to 0.3 m to either side.
+    /// Nearer than that a straight-armed swing passes over its mark, and the game finds where the swing meets what is worked instead.
+    /// Every frame of the aimed loop follows the last without a jump, at 60 frames a second.
+    /// </summary>
+    private static void CheckABlowLandsItsToolOnItsMarkSmoothlyWithinReach() {
+        var rig = new ActorRig(ActorSkin.Player);
+        foreach (var (action, end, heights, nearest, farthest, aside) in new[] {
+            (ActorAction.SteelChop, ActorRig.AxeHeadPoint, new[] { 1.13f }, 1, 1.4f, .3f), (ActorAction.SteelMine, ActorRig.PickPoint, new[] { .45f }, .9f, 1.4f, .3f),
+            (ActorAction.SteelMine, ActorRig.PickPoint, new[] { .7f }, 1.1f, 1.4f, .3f), (ActorAction.Hammer, ActorRig.HammerFace, new[] { .84f }, .7f, 1, .3f), (ActorAction.Dig, Vector3.Zero, new[] { 0f }, .8f, 1.1f, .2f) }) {
+            float strike = ActorAnimation.StrikeShare(action)!.Value, loop = ActorAnimation.Duration(action);
+            var aim = new ActorAnimation.BlowAim();
+            foreach (float height in heights)
+                foreach (float side in new[] { -aside, 0, aside })
+                    for (float ahead = nearest; ahead <= farthest + .001f; ahead += .1f) {
+                        var mark = new Vector3(side, height, ahead);
+                        aim.Mark = mark;
+                        var struck = ActorAnimation.PoseAt(action, strike * loop, false, aim);
+                        rig.Show(struck, ActorAnimation.Tool(action), false);
+                        // A shovel's blade goes into the ground there, its tip a little under it.
+                        var lands = action == ActorAction.Dig ? rig.ShovelTip with { Y = 0 } : rig.Holds(end);
+                        Require(lands.DistanceTo(mark) < .03f, $"{action} should land on a mark {side:0.0} m aside, {height:0.00} m up and {ahead:0.0} m ahead: it lands {lands.DistanceTo(mark):0.00} m off it");
+                        var last = ActorAnimation.PoseAt(action, 0, false, aim);
+                        for (int frame = 1; frame <= loop * 60; frame++) {
+                            var pose = ActorAnimation.PoseAt(action, frame / 60f, false, aim);
+                            var (joint, step) = new[] { ("right raise", pose.RaiseR - last.RaiseR), ("right swing out", pose.OutR - last.OutR), ("right elbow", pose.ElbowR - last.ElbowR),
+                                ("left raise", pose.RaiseL - last.RaiseL), ("left swing out", pose.OutL - last.OutL), ("left elbow", pose.ElbowL - last.ElbowL), ("lean", pose.Lean - last.Lean), ("turn", pose.Twist - last.Twist) }.MaxBy(j => Math.Abs(j.Item2));
+                            Require(Math.Abs(step) < 30, $"{action} aimed {side:0.0} m aside and {ahead:0.0} m ahead should move each joint under 30° a frame, not its {joint} {step:0}° at frame {frame}");
+                            last = pose;
+                        }
+                    }
+        }
+        rig.Root.Free();
     }
 
     /// <summary>Hands pushed at points in front of the chest and face reach them, the elbow on its own side and down, outside the trunk rather than across or in it.</summary>
@@ -387,8 +431,8 @@ public static class AnimationChecks {
         var swingStanding = ActorAnimation.PoseAt(ActorAction.TorchSwing, .27f, false);
         Require(swingWalking.RaiseL == swingStanding.RaiseL && swingWalking.SwingL == ActorAnimation.PoseAt(ActorAction.Jog, .27f, true).SwingL,
             "a torch swing on the move should keep the swinging arm while the legs keep walking");
-        Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Hips is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Hips == 0,
-            "a cross-legged worker should sit on the ground, and one on a rock should not");
+        Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Hips is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Hips > .25f,
+            "a cross-legged worker should sit on the ground, and one on a rock should sit up on it");
         Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick", "steel mining should show the steel pick");
         Require(ActorAnimation.Tool(ActorAction.Hammer) == "hammer", "hammering should show the hammer");
         Require(ActorAnimation.Tool(ActorAction.Grind) == "mortar", "grinding should show the mortar in hand");

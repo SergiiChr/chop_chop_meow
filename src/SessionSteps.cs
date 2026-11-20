@@ -132,9 +132,10 @@ public partial class Game {
 
     /// <summary>
     /// Plants a tree among the tallest or the shortest at a spot in the player's sight and fells it.
-    /// Returns the seconds on the view's clock from the sound of it breaking to its crash, and how far over its trunk was, in degrees, at each.
+    /// Returns the seconds on the view's clock from the sound of it breaking to its crash, how far over its trunk was, in
+    /// degrees, at each, and the lean at which its wood meets the ground.
     /// </summary>
-    private async Task<(float Seconds, float LeanAtBreak, float LeanAtCrash)> FellInSight(Vector2 at, bool tall) {
+    private async Task<(float Seconds, float LeanAtBreak, float LeanAtCrash, float Lands)> FellInSight(Vector2 at, bool tall) {
         var tree = SetupSteps.PlantTree(Hosted, at, tall);
         await Frames(4);
         // The model outlives its tree while it falls, so it is taken before the tree leaves the world.
@@ -143,9 +144,9 @@ public partial class Game {
         var stump = SetupSteps.Fell(Hosted, tree);
         await Until(() => sounds.Heard(tall ? "tree_bend" : "tree_crack", soundsBefore), tall ? "a tall tree tearing at length as it breaks" : "a short tree cracking as it breaks", 2);
         // The fall is timed on the view's own clock, which a slow frame does not stretch the way it stretches real time.
-        float brokeAt = view.Elapsed, leanAtBreak = falling.Sway.RotationDegrees.X;
+        float brokeAt = view.Elapsed, leanAtBreak = Mathf.RadToDeg(falling.Falling!.Angle);
         await Until(() => sounds.Heard("tree_crash", soundsBefore), "a felled tree crashing", 4);
-        var fall = (view.Elapsed - brokeAt, leanAtBreak, falling.Sway.RotationDegrees.X);
+        var fall = (view.Elapsed - brokeAt, leanAtBreak, Mathf.RadToDeg(falling.Falling.Angle), Mathf.RadToDeg(falling.Falling.Lands));
         SetupSteps.RemoveThings(Hosted, t => t == stump); await Frames(2);
         return fall;
     }
@@ -198,5 +199,39 @@ public partial class Game {
         Require(startMenu.Visible, "Leaving must return to the start menu.");
         await Frames();
         Require(!view.ShowsPlayer(host), "The start menu must not show the players of the game left behind.");
+    }
+
+    /// <summary>How far <paramref name="point"/>, in the world, is from the nearest face of a model's visible meshes, in metres.</summary>
+    private static float SurfaceGap(Node node, Vector3 point) {
+        float nearest = float.MaxValue;
+        if (node is MeshInstance3D { Mesh: Mesh mesh, Visible: true } drawn) {
+            var corners = mesh.GetFaces();
+            var place = drawn.GlobalTransform;
+            for (int i = 0; i + 2 < corners.Length; i += 3)
+                nearest = Math.Min(nearest, point.DistanceTo(NearestOnTriangle(point, place * corners[i], place * corners[i + 1], place * corners[i + 2])));
+        }
+        foreach (var child in node.GetChildren()) nearest = Math.Min(nearest, SurfaceGap(child, point));
+        return nearest;
+    }
+
+    /// <summary>The point of a triangle nearest to <paramref name="p"/> (Ericson, Real-Time Collision Detection, 5.1.5).</summary>
+    private static Vector3 NearestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c) {
+        Vector3 ab = b - a, ac = c - a, ap = p - a;
+        float d1 = ab.Dot(ap), d2 = ac.Dot(ap);
+        if (d1 <= 0 && d2 <= 0) return a;
+        var bp = p - b;
+        float d3 = ab.Dot(bp), d4 = ac.Dot(bp);
+        if (d3 >= 0 && d4 <= d3) return b;
+        float vc = d1 * d4 - d3 * d2;
+        if (vc <= 0 && d1 >= 0 && d3 <= 0) return a + ab * (d1 / (d1 - d3));
+        var cp = p - c;
+        float d5 = ab.Dot(cp), d6 = ac.Dot(cp);
+        if (d6 >= 0 && d5 <= d6) return c;
+        float vb = d5 * d2 - d1 * d6;
+        if (vb <= 0 && d2 >= 0 && d6 <= 0) return a + ac * (d2 / (d2 - d6));
+        float va = d3 * d6 - d5 * d4;
+        if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) return b + (c - b) * ((d4 - d3) / (d4 - d3 + d5 - d6));
+        float denom = 1 / (va + vb + vc);
+        return a + ab * (vb * denom) + ac * (vc * denom);
     }
 }

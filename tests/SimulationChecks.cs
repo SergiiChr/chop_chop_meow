@@ -23,6 +23,7 @@ public static class SimulationChecks {
         Test(LakeChecks.Run, data);
         Test(EconomyChecks.Run, data);
         Test(AnimationChecks.Run, data);
+        Test(PropMotionChecks.Run);
         Test(HumanModelChecks.Run);
         Test(NatureModelChecks.Run);
         Test(PileModelChecks.Run, data);

@@ -73,6 +73,14 @@ public partial class Sounds : Node {
         ["takedown_scream"] = -5,
         ["wolf_hit"] = -5.5f,
     };
+    /// <summary>
+    /// Seconds into each variant at which it is loudest, for sounds whose loudest moment is timed onto what makes it, such
+    /// as a lid shutting: measured a hundredth of a second at a time with the sound-cues skill's loudness tool.
+    /// </summary>
+    private static readonly Dictionary<string, float[]> Loudest = new() {
+        ["close_chest"] = [.11f],
+        ["hut_door_escaping"] = [.07f, .20f],
+    };
     private const float MusicDb = -14;
     public const float MusicFadeSeconds = 4;
     private Track day = null!, night = null!;
@@ -171,29 +179,51 @@ public partial class Sounds : Node {
     /// A <paramref name="pitch"/> below one plays it lower and slower, as from something bigger.
     /// </summary>
     public void Play(string name, Vector2? at = null, float pitch = 1) {
-        var streams = Variants(name);
-        if (streams.Length == 0 || silenced) return;
-        var place = at ?? World.Player;
-        float away = World.Player.DistanceTo(place), fade = MathF.Pow(1 - Math.Min(1, away / ReachOf(name)), 2);
-        bool placed = away > OwnSpot;
-        if (fade <= 0) return;
-        int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
-        if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
+        if (Audible(name, at)) Play(Next(name, pitch), at);
+    }
+
+    /// <summary>Whether a sound would be heard from <paramref name="at"/>: it has a recording, sound is on and the player is within its reach.</summary>
+    private bool Audible(string name, Vector2? at) => Variants(name).Length > 0 && !silenced && World.Player.DistanceTo(at ?? World.Player) < ReachOf(name);
+
+    /// <summary>One play of a sound: which variant and at what pitch.</summary>
+    public readonly record struct Cue(string Name, int Variant, float Pitch);
+
+    /// <summary>
+    /// Picks the variant and pitch the next play of a sound has, so a caller can start it <see cref="Lead"/> seconds ahead
+    /// of the moment its loudest part marks; a variant other than the previous one, its pitch nudged unless it keeps it.
+    /// </summary>
+    public Cue Next(string name, float pitch = 1) {
+        int count = Variants(name).Length;
+        int pick = count == 0 ? 0 : random.Next(count - (count > 1 && previous.ContainsKey(name) ? 1 : 0));
+        if (previous.TryGetValue(name, out int last) && count > 1 && pick >= last) pick++;
         previous[name] = pick;
         if (!KeepsPitch(name)) pitch *= 1 + (float)(random.NextDouble() * .12 - .06);
-        float volume = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
+        return new Cue(name, pick, pitch);
+    }
+
+    /// <summary>Seconds from a play's start to its loudest moment, or zero for a sound not timed that way.</summary>
+    public static float Lead(Cue cue) => Loudest.TryGetValue(cue.Name, out var peaks) ? peaks[cue.Variant] / cue.Pitch : 0;
+
+    /// <summary>Plays a picked play of a sound, as <see cref="Play(string, Vector2?, float)"/> does.</summary>
+    public void Play(Cue cue, Vector2? at = null) {
+        if (!Audible(cue.Name, at)) return;
+        var streams = Variants(cue.Name);
+        var place = at ?? World.Player;
+        float away = World.Player.DistanceTo(place), fade = MathF.Pow(1 - Math.Min(1, away / ReachOf(cue.Name)), 2);
+        bool placed = away > OwnSpot;
+        float volume = Levels.GetValueOrDefault(cue.Name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
         if (placed) {
             var source = FreeVoice(placedVoices, ref nextPlacedVoice, static voice => voice.Playing);
             source.Position = new Vector3(place.X, 0, place.Y);
-            source.Stream = streams[pick]; source.PitchScale = pitch; source.VolumeDb = volume;
+            source.Stream = streams[cue.Variant]; source.PitchScale = cue.Pitch; source.VolumeDb = volume;
             source.Play();
         } else {
             var player = FreeVoice(voices, ref nextVoice, static voice => voice.Playing);
-            player.Stream = streams[pick]; player.PitchScale = pitch; player.VolumeDb = volume;
+            player.Stream = streams[cue.Variant]; player.PitchScale = cue.Pitch; player.VolumeDb = volume;
             player.Play();
         }
-        recent[Played % recent.Length] = name;
-        Played++; Last = name; LastFade = fade; LastPlaced = placed;
+        recent[Played % recent.Length] = cue.Name;
+        Played++; Last = cue.Name; LastFade = fade; LastPlaced = placed;
     }
 
     /// <summary>The next idle player in turn; with all of them busy, the next in turn is cut off.</summary>
@@ -267,6 +297,8 @@ public partial class Sounds : Node {
             ? new[] { single }
             : Enumerable.Range(1, 9).Select(i => $"{Folder}/{name}_{i}.mp3").TakeWhile(path => ResourceLoader.Exists(path)).ToArray();
         if (found.Length == 0) GD.PushError($"Missing sound: {name}");
+        if (Loudest.TryGetValue(name, out var peaks) && peaks.Length != found.Length)
+            GD.PushError($"Sound {name} has {found.Length} recordings but {peaks.Length} loudest moments");
         return variants[name] = found.Select(path => GD.Load<AudioStream>(path)).ToArray();
     }
 }

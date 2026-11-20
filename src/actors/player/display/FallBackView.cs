@@ -69,7 +69,7 @@ public static class FallBackView {
     /// </summary>
     public static void FallBack(ActorRig rig, ActorState state, float downedFor, bool torch, WolfModel? wolf) {
         var (pose, tip, hips) = FallingBack(state.Pose, downedFor / ActorAnimation.FallBackSeconds, KnockDownSlide - FallHips);
-        state.HipHeight = pose.HipHeight; state.Lift = 0;
+        state.HipHeight = pose.HipHeight; state.Lift = 0; state.LiftSpeed = 0; state.OnSteps = false;
         float t = Mathf.DegToRad(tip);
         rig.Root.Position = FallRoot(state.Position, ActorAnimation.Forward(state.Yaw), t, hips);
         rig.Root.Rotation = new Vector3(-t, state.Yaw, 0);

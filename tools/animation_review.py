@@ -20,7 +20,10 @@ sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
 OUTPUT = build.BUILD / "animation-review"
-DEFAULT_FRAMES = 96
+# Frames a second a view records, the rate the game is drawn at, and how many frames it records by default:
+# two seconds of game time unslowed.
+FPS = 60
+DEFAULT_FRAMES = 120
 DEFAULT_VIEWS = ("side", "front", "game", "facing")
 # Time for the launcher to prepare the export before it starts recording.
 RECORD_STARTUP_SECONDS = 600
@@ -59,9 +62,15 @@ def require_clip(ref: str | None, clip: str) -> None:
 
 
 def record(
-    checkout: Path, clip: str, view: str, slow: float, frames: int, movie: Path
+    checkout: Path,
+    clip: str,
+    view: str,
+    slow: float,
+    frames: int,
+    movie: Path,
+    target: float | None,
 ) -> None:
-    """Records one view of a checkout's clip at 30 frames a second of slowed game time."""
+    """Records one view of a checkout's clip to a movie of `frames` frames at FPS a second of slowed game time."""
     pitch, turn = VIEWS[view]
     movie.parent.mkdir(parents=True, exist_ok=True)
     flags = [
@@ -72,15 +81,23 @@ def record(
         str(pitch),
         "--animation-turn",
         str(turn),
+        *(["--animation-target", str(target)] if target is not None else []),
     ]
     log = movie.with_suffix(".log")
     capture_folder = movie.with_suffix("")
-    records = '"record"' in (checkout / "build.py").read_text()
+    launcher = (checkout / "build.py").read_text()
+    records = '"record"' in launcher
+    # A ref from before the rate could be set records 30 frames a second: it takes that many fewer frames to cover
+    # the same game time, so its movie is as long but does not match the branch's frame for frame.
+    if '"--fps"' not in launcher:
+        frames = frames * 30 // FPS
     if records:
+        rate = ["--fps", str(FPS)] if '"--fps"' in launcher else []
         command = [
             sys.executable,
             checkout / "build.py",
             "record",
+            *rate,
             movie,
             "--",
             *flags,
@@ -90,7 +107,7 @@ def record(
             str(frames),
         ]
     else:
-        # A ref from before recording captured numbered frames, which become a movie of the same rate here.
+        # A ref from before recording captured numbered frames 30 a second, which become a movie of that rate here.
         shutil.rmtree(capture_folder, ignore_errors=True)
         command = [
             sys.executable, checkout / "build.py", "play", "--", *flags,
@@ -154,6 +171,7 @@ def record_all(
             options.slow,
             options.frames,
             OUTPUT / slug(options.clip) / name / f"{view}.avi",
+            options.target,
         )
 
 
@@ -195,13 +213,22 @@ def main() -> None:
         help="camera views to record",
     )
     parser.add_argument(
+        "--slow",
+        type=float,
+        default=1,
+        help="slow motion factor (default %(default)s, real speed)",
+    )
+    parser.add_argument(
         "--frames",
         type=int,
         default=DEFAULT_FRAMES,
-        help="frames per view (default %(default)s)",
+        help="frames a view records (default %(default)s, two seconds)",
     )
     parser.add_argument(
-        "--slow", type=float, default=4, help="slow motion factor (default %(default)s)"
+        "--target",
+        type=float,
+        metavar="METRES",
+        help="how far from the actor what a blow works stands (default: where a player stops to work it)",
     )
     parser.add_argument(
         "--base", metavar="REF", help="also record this branch or commit, such as main"
@@ -226,7 +253,8 @@ def main() -> None:
     if options.base:
         record_base(options.base, options)
     print(
-        f"{options.frames} frames a view at 30 a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
+        f"{options.frames} frames a view at {FPS} a second of {options.slow}x slow motion"
+        f" in {OUTPUT / slug(options.clip)}"
     )
 
 

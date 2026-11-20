@@ -58,6 +58,7 @@ public partial class WorldView : Node3D {
     private Node3D scene = null!;
     private Overlay overlay = null!;
     private readonly Dictionary<int, Prop> props = new();
+    private readonly StrikePoints strikes = new();
     private readonly ActorState player = new();
     private ActorRig playerRig = null!;
     private string playerShirt = "";
@@ -79,7 +80,7 @@ public partial class WorldView : Node3D {
     }
     // The host keeps the original teal; each guest keeps the first one free when it joined.
     internal static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
-    private readonly Dictionary<int, (ActorRig Rig, ActorState State, (MeshInstance3D Mesh, Material Material)[] Parts)> crew = new();
+    private readonly Dictionary<int, (ActorRig Rig, ActorState State, LocalClock WaterClock, (MeshInstance3D Mesh, Material Material)[] Parts)> crew = new();
     private readonly Dictionary<Wolf, WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
     /// <summary>The village's carts no order holds, built while loading and reused for every trip.</summary>
@@ -271,6 +272,10 @@ public partial class WorldView : Node3D {
 
     public ActorAction PlayerAnimation => player.Action;
     public float PlayerAnimationTime => player.Time;
+    /// <summary>The window's own player's rig, as last posed.</summary>
+    public ActorRig PlayerRig => playerRig;
+    /// <summary>Where the window's own player's blow lands, or null when it lands on nothing.</summary>
+    public Vector3? PlayerMark => player.Mark;
     public ActorAction OtherAnimation(int id) => others.TryGetValue(id, out var other) ? other.State.Action : ActorAction.Idle;
     public ActorAction WorkerAnimation(int id) => crew.TryGetValue(id, out var entry) ? entry.State.Action : ActorAction.Idle;
 
@@ -457,7 +462,8 @@ public partial class WorldView : Node3D {
         worldReplaced = false;
         UpdateEffects(dt);
         UpdateMarkers();
-        UpdateLighting();
+        // The sun and the light move every frame by the window's own clock, which each server update corrects.
+        UpdateLighting(Clocked(dayClock, World.Time, true, dt));
         UpdateLook(dt);
         UpdateFog();
         overlay.QueueRedraw();
@@ -502,6 +508,7 @@ public partial class WorldView : Node3D {
         var door = doorways.AtDoor(World.Me, player, dt);
         if (door is DoorShown shown) { at = shown.At; target = shown.Facing; action = shown.Action; subject = null; }
         player.Update(at, action, target, dt, door?.Backing ?? false);
+        player.Mark = Mark(subject, player, action);
         // A foot lands at each extreme of the stride.
         if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
@@ -509,7 +516,7 @@ public partial class WorldView : Node3D {
         bool torch = World.Torch > 0 && !World.Dead;
         // A downed player is posed by the fall alone.
         if (downedFor > 0) FallBackView.FallBack(playerRig, player, downedFor, torch, World.Dead ? null : HoldingOff(World.Me.Id));
-        else Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door,
+        else Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door, dt,
             barrel: HugsBarrel(action, World.S.Backpack));
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
@@ -519,7 +526,7 @@ public partial class WorldView : Node3D {
             if (!crew.TryGetValue(worker.Id, out var entry)) {
                 var rig = new ActorRig(ActorSkin.Worker);
                 // Gathered and warmed now, so the first walk home at dusk makes no faded materials.
-                entry = (rig, new ActorState { Position = worker.Pos }, FadeParts(rig.Root));
+                entry = (rig, new ActorState { Position = worker.Pos }, new LocalClock(.25f), FadeParts(rig.Root));
                 scene.AddChild(entry.Rig.Root); crew.Add(worker.Id, entry);
             }
             var state = entry.State;
@@ -532,7 +539,9 @@ public partial class WorldView : Node3D {
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down
                 : assignment is { Kind: ThingKind.Mine } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
+            bool sameAction = state.Action == work;
             state.Update(worker.Pos, work, facing, dt);
+            state.Mark = Mark(assignment, state, work);
             string? vessel = worker.Tool is string held && (Bucket.Is(held) || Water.IsBottle(held)) ? held : null;
             var waterTarget = worker.WaterAction != WorkerWaterAction.None ? World.Find(worker.WaterTarget) : null;
             if (waterTarget != null && vessel != null) {
@@ -542,7 +551,7 @@ public partial class WorldView : Node3D {
                     ThingKind.Water => To3(Terrain.WaterPoint(worker.Pos) - (worker.Pos - Terrain.Lake).Normalized() * .45f),
                     _ => To3(waterTarget.Pos)
                 };
-                float progress = worker.WaterProgress;
+                float progress = Math.Clamp(Clocked(entry.WaterClock, worker.WaterProgress, sameAction, dt), 0, 1);
                 WorkerWaterView.Show(entry.Rig, worker.Pos, point, worker.WaterAction, waterTarget.Kind == ThingKind.Hut, progress, vessel);
                 if (waterTarget.Kind == ThingKind.Barrel && worker.WaterAction == WorkerWaterAction.Pour) {
                     float opening = Mathf.SmoothStep(0, .28f, progress) * (1 - Mathf.SmoothStep(.73f, 1, progress));
@@ -588,13 +597,16 @@ public partial class WorldView : Node3D {
         return null;
     }
 
+    /// <summary>How high a flame leaps at <paramref name="phase"/>, from 0 to 1 and back twice a turn, smoothly at both ends.</summary>
+    private static float Rising(float phase) => MathF.Sin(phase) * MathF.Sin(phase);
+
     /// <summary>The flame of a torch in hand, fanned by a swing, and the sparks of each strike while it is being lit.</summary>
     private void Torch(ActorRig rig, ActorState state, bool lit, float flare, Vector2? at) {
         rig.Flame.Visible = lit;
         if (lit) {
             // A slow flicker: a fast one makes the shadows the torch casts jitter.
             float slow = Elapsed / 3, flicker = MathF.Sin(slow * 13) * .5f + MathF.Sin(slow * 29 + 1) * .5f; flare /= .5f;
-            rig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + MathF.Abs(MathF.Sin(slow * 11)) * .3f, 1 - flicker * .1f) * (1 + flare * .25f);
+            rig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + Rising(slow * 11) * .3f, 1 - flicker * .1f) * (1 + flare * .25f);
             // A swing fans the flame: the lit circle grows by a fifth and settles back.
             rig.TorchLight.OmniRange = 5 * (1 + .2f * flare);
             rig.TorchLight.LightEnergy = (1 + flicker * .25f + flare * .3f) * (.3f + night * 1.3f);
@@ -640,11 +652,12 @@ public partial class WorldView : Node3D {
             var door = doorways.AtDoor(p, state, dt);
             if (door is DoorShown shown) { at = shown.At; facing = shown.Facing; action = shown.Action; subject = null; }
             state.Update(at, action, facing, dt, door?.Backing ?? false);
+            state.Mark = Mark(subject, state, action);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             if (other.DownedFor > 0) FallBackView.FallBack(other.Rig, state, other.DownedFor, torch, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
-            else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door,
+            else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door, dt,
                 barrel: HugsBarrel(action, p.Backpack));
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
@@ -669,18 +682,20 @@ public partial class WorldView : Node3D {
         return null;
     }
 
-    /// <summary>Poses an actor's rig; one at the steps of the cabin door at <paramref name="door"/> stands on them.</summary>
-    private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null, bool barrel = false, string? vessel = null) {
+    /// <summary>Poses the actor and settles its feet onto the cabin steps while it is at the door.</summary>
+    private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null,
+        float dt = 0, bool barrel = false, string? vessel = null) {
         rig.Root.Position = To3(state.Position);
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
+        state.MarkInRig = state.Mark is Vector3 mark ? rig.Root.Transform.AffineInverse() * mark : null;
         var pose = state.Pose;
-        state.Lift = 0;
         Vector3? jamb = null;
         if (door is DoorShown at) {
-            (pose, float lift, jamb) = DoorwayView.StandAt(pose, state.Position, state.Yaw, at);
-            rig.Root.Position += Vector3.Up * lift; state.Lift = lift;
-        }
+            (pose, jamb) = DoorwayView.StandAt(pose, state, at, state.OnSteps ? dt : StairSteps.Settle);
+            rig.Root.Position += Vector3.Up * state.Lift;
+            state.OnSteps = true;
+        } else { state.Lift = 0; state.LiftSpeed = 0; state.OnSteps = false; }
         state.HipHeight = pose.HipHeight;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
@@ -710,6 +725,10 @@ public partial class WorldView : Node3D {
     /// <summary>Whether working on a thing hammers in a mine's frame and rails rather than digging.</summary>
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
 
+    /// <summary>Where a blow of <paramref name="action"/> lands on <paramref name="subject"/> for an actor standing as <paramref name="state"/> has them, or null when it lands on nothing.</summary>
+    private Vector3? Mark(Thing? subject, ActorState state, ActorAction action) =>
+        subject != null && props.TryGetValue(subject.Id, out var prop) ? strikes.At(subject, state.Position, action, prop) : null;
+
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
     private void Work(ActorState actor, Thing? subject, ActorRig rig) {
         if (subject == null) return;
@@ -729,11 +748,7 @@ public partial class WorldView : Node3D {
         if (handSound != null) Sounds?.Play(handSound, subject.Pos);
         // The soil a dig throws aside flies off the blade.
         if (handSound == "dig_toss" && World.Sees(actor.Position)) Burst(rig.Root.Transform * rig.ShovelTip, Soil, 5, 1.6f, .5f, 9, .06f);
-        float impact = action switch {
-            ActorAction.Chop or ActorAction.SteelChop => .52f,
-            ActorAction.Mine or ActorAction.SteelMine => .55f,
-            ActorAction.Dig => ActorAnimation.DigStrike,
-            ActorAction.Hammer => .5f,
+        float impact = ActorAnimation.StrikeShare(action) ?? action switch {
             ActorAction.Pump => .35f,
             ActorAction.Gather => .1f,
             _ => -1
@@ -758,21 +773,23 @@ public partial class WorldView : Node3D {
         var impactAt = World.GatherAt(subject, actor.Position);
         var toward = (actor.Position - impactAt).Normalized();
         var side = To3(impactAt + toward * .35f);
+        // Chips and soil fly from where the blow lands, or from the side of what is worked toward the worker where no blow is aimed.
+        Vector3 Hit(float height) => actor.Mark is Vector3 mark ? mark + Vector3.Up * (height < .2f ? height : 0) : side + Vector3.Up * height;
         switch (subject.Kind) {
             case ThingKind.Tree:
-                Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
+                Burst(Hit(1.1f), Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
                 Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id)), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
             case ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Mine:
                 var color = subject.Kind is ThingKind.Stone or ThingKind.Mine ? "9a9d99" : subject.Kind == ThingKind.Iron ? "a35a2e" : subject.Kind == ThingKind.Tin ? "b9bbb4" : "26282b";
-                Burst(side + Vector3.Up * .5f, Mat(color), 6, 2.4f, .5f, 9, .07f);
-                Burst(side + Vector3.Up * .4f, GatherDust, 3, .5f, .9f, -.3f, .16f, 1.5f);
-                if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Sparks, 5, 3.2f, .3f, 4, .025f);
+                Burst(Hit(.5f), Mat(color), 6, 2.4f, .5f, 9, .07f);
+                Burst(Hit(.4f), GatherDust, 3, .5f, .9f, -.3f, .16f, 1.5f);
+                if (action == ActorAction.SteelMine) Burst(Hit(.5f), Sparks, 5, 3.2f, .3f, 4, .025f);
                 break;
             case ThingKind.Stump or ThingKind.Bush:
                 // The blade goes in at the foot of it and throws up soil, and a bush sheds leaves as it is rocked.
-                Burst(side + Vector3.Up * .08f, Soil, 6, 2, .5f, 9, .06f);
-                Burst(side + Vector3.Up * .1f, GatherDust, 2, .4f, .8f, -.3f, .14f, 1.5f);
+                Burst(Hit(.08f), Soil, 6, 2, .5f, 9, .06f);
+                Burst(Hit(.1f), GatherDust, 2, .4f, .8f, -.3f, .14f, 1.5f);
                 if (subject.Kind == ThingKind.Bush) Burst(To3(subject.Pos, .5f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f);
                 break;
             case ThingKind.WolfCorpse: Burst(side + Vector3.Up * .3f, Mat("7a1414", .6f), 5, 1.4f, .45f, 8, .04f); break;
@@ -785,8 +802,15 @@ public partial class WorldView : Node3D {
         }
     }
 
-    /// <summary>Seconds a felled tree takes to reach the ground: a second for the shortest, just over two for the tallest.</summary>
-    private static float FallSeconds(float tall) => 1 + 1.1f * tall;
+    /// <summary>The way a felled tree goes over: as its stump has it, or for a tree that left no stump, the way its model faces.</summary>
+    private float FellToward(TreeProp tree) {
+        foreach (var stump in World.ThingsOf(ThingKind.Stump)) if (stump.OfTree == tree.Id) return stump.FellToward;
+        return -Mathf.DegToRad(tree.Body.RotationDegrees.Y) + MathF.PI / 2;
+    }
+    /// <summary>How fast a shake from a blow dies away, its share a second.</summary>
+    private const float ShakeFades = 2.5f;
+    /// <summary>A tree's turn as it shakes from a blow, a share <paramref name="shake"/> of the full shake.</summary>
+    private Basis TreeShake(float shake) => Basis.FromEuler(new Vector3(Mathf.DegToRad(shake * MathF.Sin(Elapsed * 34) * 3), 0, Mathf.DegToRad(shake * 2 * MathF.Cos(Elapsed * 29))));
     /// <summary>Seconds a felled tree lies where it landed before it starts to fade, and seconds its trunk and crown then take to fade away over the stump.</summary>
     private const float TreeLiesSeconds = .1f, TreeFadeSeconds = .5f;
     /// <summary>How tall a tree stands (<see cref="WorldModels.TreeTall"/>) before it tears at length as it goes over rather than cracks.</summary>
@@ -799,8 +823,6 @@ public partial class WorldView : Node3D {
     // Models of things that left the world in front of the player, shown until they have played their way out.
     private readonly List<int> departed = new();
     private readonly List<Prop> leaving = new();
-    /// <summary>Seconds a dug out stump or bush takes to come out of the ground and be gone.</summary>
-    private const float DugOutSeconds = .6f;
     private SaveState? builtFor;
     // How many things the world held, and the newest of them, when models were last cleared away: a tree swapped for its stump changes only the second.
     private int thingsCounted = -1, newestThing;
@@ -897,6 +919,7 @@ public partial class WorldView : Node3D {
         if (prop is CarcassProp carcass && Dying(t.Pos) is { } dying) {
             prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
             carcass.From = dying.Root.Position - To3(t.Pos); carcass.HitIn = SwingLands(dying.Last + dying.KnockBack).In;
+            carcass.Wolf.FallFrom(dying);
         }
         // A chip that appears in front of the player was knocked off the rock beside it, and flies from there.
         if (prop is LooseProp chip && appeared && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
@@ -922,33 +945,34 @@ public partial class WorldView : Node3D {
     private bool Depart(Prop prop, float dt) {
         switch (prop) {
             case TreeProp tree:
-                float lands = FallSeconds(tree.Tall);
                 // The wood gives as the tree starts to go: the tearing of a tall tree lasts about as long as its fall.
-                if (tree.Fall < 0) Sounds?.Play(tree.Tall >= TearsFrom ? "tree_bend" : "tree_crack", prop.Look.Pos, pitch: TreePitch(tree.Tall));
-                float before = Math.Max(0, tree.Fall); tree.Fall = before + dt;
-                float drop = Math.Min(1, tree.Fall / lands);
-                tree.Sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
-                if (before < lands && tree.Fall >= lands) {
-                    Burst(prop.Root.Position + tree.Sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
-                    Sounds?.Play("tree_crash", prop.Look.Pos, pitch: TreePitch(tree.Tall));
+                if (tree.Falling == null) {
+                    tree.Falling = WorldModels.Topple(tree, FellToward(tree));
+                    Sounds?.Play(tree.Tall >= TearsFrom ? "tree_bend" : "tree_crack", prop.Look.Pos, pitch: TreePitch(tree.Tall));
                 }
-                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - lands - TreeLiesSeconds) / TreeFadeSeconds, 0, 1));
-                return tree.Fall < lands + TreeLiesSeconds + TreeFadeSeconds;
+                var fall = tree.Falling;
+                if (fall.Advance(dt)) {
+                    tree.Lying = 0;
+                    Burst(tree.Sway.GlobalTransform * new Vector3(0, 3.5f, 0) + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
+                    Sounds?.Play("tree_crash", prop.Look.Pos, pitch: TreePitch(tree.Tall));
+                } else if (tree.Lying >= 0) tree.Lying += dt;
+                // The last blow's shake carries on as it goes over.
+                prop.Shake = Math.Max(0, prop.Shake - dt * ShakeFades);
+                tree.Sway.Transform = fall.Turn * new Transform3D(TreeShake(prop.Shake).Scaled(Vector3.One * WorldModels.TreeScale(tree.Id)), Vector3.Zero);
+                SetFade(tree.SwayParts, Math.Clamp((tree.Lying - TreeLiesSeconds) / TreeFadeSeconds, 0, 1));
+                return tree.Lying < TreeLiesSeconds + TreeFadeSeconds;
             case DugProp dug:
                 if (dug.Out < 0) {
-                    dug.Out = 0;
+                    dug.Out = 0; dug.Launch = prop.Body.Transform;
                     var foot = prop.Root.Position + dug.Seat;
                     Burst(foot + Vector3.Up * .1f, Soil, 10, 2.4f, .6f, 9, .07f);
                     Burst(foot + Vector3.Up * .15f, GatherDust, 4, .6f, .9f, -.3f, .2f, 1.5f);
                     if (prop.Kind == ThingKind.Bush) Burst(foot + Vector3.Up * .5f, Mat("5d8a3c"), 6, 1.6f, .8f, 5, .06f);
                 }
-                dug.Out += dt;
-                float u = Math.Min(1, dug.Out / DugOutSeconds);
-                // It carries on from the lean digging left it at.
-                prop.Body.Position = dug.Seat + new Vector3(0, .07f + MathF.Sin(u * MathF.PI) * .45f, 0);
-                prop.Body.RotationDegrees = new Vector3(16 + 150 * Ease(u), dug.Yaw, 0);
-                prop.Body.Scale = Vector3.One * (1 - Mathf.SmoothStep(.45f, 1, u));
-                return u < 1;
+                dug.Out = Math.Min(Thrown.DugOutSeconds, dug.Out + dt);
+                // Thrown up from the lean digging left it at.
+                prop.Body.Transform = Thrown.DugOut(dug.Launch, dug.Middle, dug.Out);
+                return dug.Out < Thrown.DugOutSeconds;
             default: return false;
         }
     }
@@ -971,26 +995,30 @@ public partial class WorldView : Node3D {
         // Most things in sight stand still: one that is neither shaking nor holding more or less than when last drawn needs no writing to.
         bool still = !first && !shaking && prop.Look.Remaining == t.Remaining;
         prop.Seen = true;
-        prop.Shake = Math.Max(0, prop.Shake - dt * 2.5f);
+        prop.Shake = Math.Max(0, prop.Shake - dt * ShakeFades);
         float wobble = prop.Shake * MathF.Sin(Elapsed * 34);
         float flicker = MathF.Sin(Elapsed * 13 + t.Id) * .5f + MathF.Sin(Elapsed * 7.3f + t.Id * 3) * .5f;
         switch (prop) {
             case TreeProp tree:
-                if (first || shaking) tree.Sway.RotationDegrees = new Vector3(wobble * 3, 0, prop.Shake * 2 * MathF.Cos(Elapsed * 29));
+                if (first || shaking) tree.Sway.Basis = TreeShake(prop.Shake).Scaled(Vector3.One * WorldModels.TreeScale(tree.Id));
                 break;
             case DugProp dug:
-                if (still && prop.Look.Progress == t.Progress) break;
+                float worked = Clocked(dug.Worked, t.Progress, live, dt);
+                if (still && worked == dug.Drawn) break;
+                dug.Drawn = worked;
                 // Digging works it loose: it leans further over with the work done, and rocks as each push of the shovel lands.
-                float loose = Ease(Math.Clamp(t.Progress / GatherRules.DigSeconds, 0, 1));
+                float loose = Ease(Math.Clamp(worked / GatherRules.DigSeconds, 0, 1));
                 prop.Body.RotationDegrees = new Vector3(loose * 16 + wobble * 5, dug.Yaw, wobble * 3);
                 prop.Body.Position = dug.Seat + new Vector3(wobble * .02f, loose * .07f, 0);
                 break;
-            case LooseProp chip when chip.Flight < WorldModels.ChipFlight:
-                // An arc from the rock with a hop at the end, spinning as it goes.
+            case LooseProp chip when chip.Flight < WorldModels.ChipFlight + WorldModels.ChipSettle:
+                // An arc under gravity from the rock, spinning steadily round its middle, then a short skid to a stop where it lies.
                 chip.Flight += dt;
-                float flown = Math.Min(1, chip.Flight / WorldModels.ChipFlight);
-                prop.Body.Position = chip.From * (1 - flown) + Vector3.Up * (MathF.Sin(flown * MathF.PI) * .6f + MathF.Abs(MathF.Sin(flown * MathF.PI * 3)) * .08f * flown);
-                prop.Body.Rotation = new Vector3(flown * 9, flown * 4, 0) * (1 - flown);
+                float way = Thrown.ChipWay(chip.Flight, WorldModels.ChipFlight, WorldModels.ChipSettle);
+                var spin = Movement.About(new Basis(Vector3.Up, MathF.Tau * WorldModels.ChipTurns * way), chip.Middle);
+                var along = new Vector3(chip.From.X, 0, chip.From.Z) * (1 - way)
+                    + Vector3.Up * Thrown.ChipHeight(chip.Flight, WorldModels.ChipFlight, chip.From.Y);
+                prop.Body.Transform = spin.Translated(along) * new Transform3D(chip.Rest, Vector3.Zero);
                 break;
             case Prop when t.IsLoose || t.Kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Leaves:
                 if (still) break;
@@ -1000,10 +1028,10 @@ public partial class WorldView : Node3D {
                 break;
             case CarcassProp carcass:
                 // Thrown, the carcass covers the knockback while it is in the air and stays where it lands.
-                float since = t.Progress - carcass.HitIn, dying = Math.Clamp(since / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
+                float since = Clocked(carcass.Dead, t.Progress, live, dt) - carcass.HitIn, dying = Math.Clamp(since / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
                 // The killing blow thuds as it lands, heard only where the player saw the wolf fall.
                 if (!carcass.Landed && since >= 0) { carcass.Landed = true; if (watched) Sounds?.Play("wolf_hit", t.Pos); }
-                carcass.Body.Position = carcass.From * (1 - thrown * (2 - thrown));
+                carcass.Body.Position = carcass.From * (1 - thrown);
                 carcass.Wolf.Fall(dying);
                 // Butchering flattens the carcass while the blood pool spreads out from under it.
                 carcass.Wolf.Root.Scale = new Vector3(1, .6f + .4f * WorldModels.Fullness(t), 1);
@@ -1017,32 +1045,37 @@ public partial class WorldView : Node3D {
                 break;
             case FurnaceProp furnace:
                 if (live) WorldModels.SyncFuel(furnace, t, World.Data);
-                furnace.Glow.Visible = t.Processing;
-                furnace.Light.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
-                Smoke(furnace, t, t.Processing, dt, FurnaceSmoke);
+                bool smelting = Lit(furnace, t.Processing, dt);
+                furnace.Glow.Visible = smelting;
+                furnace.Light.LightEnergy = smelting ? (1.1f + flicker * .25f) * (.5f + night) : 0;
+                Smoke(furnace, t, smelting, dt, FurnaceSmoke);
                 break;
             case StoveProp stove:
                 // The fire only burns for recipes that take fuel; the mortar's work and kneading dough are cold.
-                bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Burns;
+                bool cooking = Lit(stove, t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Burns, dt);
                 stove.Glow.Visible = cooking;
                 stove.Light.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
                 if (stove.Mortar != null && live) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null && !grinding.Contains(t.Id);
                 Smoke(stove, t, cooking, dt, FurnaceSmoke);
                 break;
             case ForgeProp forge:
-                float heat = t.Heat / 100;
-                forge.Glow.Visible = heat > .05f || t.Processing;
-                forge.Light.LightEnergy = (heat * 1.5f + (t.Processing ? .4f : 0)) * (1 + flicker * .15f) * (.5f + night);
-                forge.Needle.RotationDegrees = new Vector3(0, 0, Mathf.Lerp(forge.Needle.RotationDegrees.Z, WorldModels.Gauge(heat), Math.Min(1, dt * 6)));
-                float lift = 18 * (1 - pumping.GetValueOrDefault(t.Id));
+                float heat = Clocked(forge.Heat, t.Heat, live, dt) / 100;
+                bool forging = Lit(forge, t.Processing, dt);
+                forge.Glow.Visible = heat > .05f || forging;
+                forge.Light.LightEnergy = (heat * 1.5f + (forging ? .4f : 0)) * (1 + flicker * .15f) * (.5f + night);
+                forge.Needle.RotationDegrees = new Vector3(0, 0, Mathf.Lerp(forge.Needle.RotationDegrees.Z, WorldModels.Gauge(heat), 1 - MathF.Exp(-6 * dt)));
+                // Let go, the board rises back as the body that pressed it blends out of pumping.
+                if (pumping.TryGetValue(t.Id, out float pressed)) (forge.Press, forge.Released) = (pressed, 0);
+                else forge.Released += dt;
+                float lift = 18 * (1 - forge.Press * (1 - Mathf.SmoothStep(0, 1, forge.Released / ActorAnimation.BlendSeconds)));
                 forge.Lever.RotationDegrees = new Vector3(0, 0, lift);
                 for (int i = 0; i < forge.Pleats.Length; i++) forge.Pleats[i].RotationDegrees = new Vector3(0, 0, lift * (i + 1) / (forge.Pleats.Length + 1));
-                Smoke(forge, t, t.Processing || heat > .3f, dt, ForgeSmoke);
+                Smoke(forge, t, forging || heat > .3f, dt, ForgeSmoke);
                 break;
             case CampfireProp campfire:
                 bool burning = t.Burn > 0;
                 campfire.Fire.Visible = burning;
-                campfire.Fire.Scale = new Vector3(1 + flicker * .08f, .85f + MathF.Abs(MathF.Sin(Elapsed * 9 + t.Id)) * .3f, 1 - flicker * .08f);
+                campfire.Fire.Scale = new Vector3(1 + flicker * .08f, .85f + Rising(Elapsed * 9 + t.Id) * .3f, 1 - flicker * .08f);
                 campfire.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
                 campfire.Light.LightEnergy = burning ? (1.2f + flicker * .3f) * (.35f + night * 1.4f) : 0;
                 if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Cinders, 1, .5f, 1.1f, -1.4f, .025f);
@@ -1092,16 +1125,25 @@ public partial class WorldView : Node3D {
                 box.LastCount = count;
                 box.Puff = Math.Max(0, box.Puff - dt);
                 bool open = box.Puff > 0 || t.Id == Selection.Thing && PanelOpen && World.Reaches(t);
-                if (dt > 0 && (open ? box.Open == 0 : box.Open == 1)) Sounds?.Play(open ? "open_chest" : "close_chest", t.Pos);
-                box.Open = Mathf.MoveToward(box.Open, open ? 1 : 0, dt * 4);
+                if (dt > 0 && open && box.Open == 0) { Sounds?.Play("open_chest", t.Pos); box.ShutCue = null; }
+                // The lid's sound is heard as it shuts, so it starts as far ahead as its loudest moment is into it.
+                if (dt > 0 && !open && box.Open == 1) box.ShutCue = Sounds?.Next("close_chest");
+                box.Open = Mathf.MoveToward(box.Open, open ? 1 : 0, dt / LidSeconds);
+                if (box.ShutCue is Sounds.Cue shut && box.Open * LidSeconds <= Sounds.Lead(shut)) { Sounds?.Play(shut, t.Pos); box.ShutCue = null; }
                 box.Lid.RotationDegrees = new Vector3(-80 * Ease(box.Open), 0, 0);
                 if (box.Marker != null) {
                     box.Marker.Position = new Vector3(0, 1.2f + .08f * MathF.Sin(Elapsed * 2.5f), 0);
                     box.Marker.Rotation = new Vector3(0, Elapsed * 1.5f, 0);
                 }
-                // A crate being lifted rises and rocks before it goes into the backpack.
-                float lifted = t.Id == Lifting ? Ease(LiftProgress) : 0;
-                if (t.Kind == ThingKind.Crate) { prop.Body.Position = new Vector3(0, lifted * .35f, 0); prop.Body.RotationDegrees = new Vector3(lifted * 9 * MathF.Sin(Elapsed * 18), 0, lifted * 6 * MathF.Cos(Elapsed * 15)); }
+                // A crate being lifted rises and rocks before it goes into the backpack; let go, it drops back under gravity.
+                if (t.Kind == ThingKind.Crate) {
+                    float lifted = t.Id == Lifting ? Ease(LiftProgress) * CrateLift : 0;
+                    if (lifted >= box.Raised) (box.Raised, box.Dropping) = (lifted, 0);
+                    else { box.Dropping += Movement.Gravity * dt; box.Raised = Math.Max(lifted, box.Raised - box.Dropping * dt); }
+                    float rocking = box.Raised / CrateLift;
+                    prop.Body.Position = new Vector3(0, box.Raised, 0);
+                    prop.Body.RotationDegrees = new Vector3(rocking * 9 * MathF.Sin(Elapsed * 18), 0, rocking * 6 * MathF.Cos(Elapsed * 15));
+                }
                 break;
             case BarrelProp barrel:
                 if (live) {
@@ -1119,9 +1161,15 @@ public partial class WorldView : Node3D {
                 else {
                     var through = live ? doorways.Passing(t.Id) : null;
                     if (through != null) hut.Slam = through.DoorRush;
-                    if (dt > 0 && through != null && hut.Open == 0 && !through.DoorRush) Sounds?.Play("hut_door_normal", t.Pos);
-                    if (dt > 0 && through == null && hut.Open == 1 && hut.Slam) Sounds?.Play("hut_door_escaping", t.Pos);
-                    DoorwayView.SwingDoor(hut, through != null, Math.Max(dt, .016f) * (through == null && hut.Slam ? 8 : 1 / Doorways.ShutSeconds));
+                    if (dt > 0 && through is { DoorRush: false } && hut.Open == 0) Sounds?.Play("hut_door_normal", t.Pos);
+                    // A runner's slam is picked as they start through, also when they follow straight after someone else.
+                    if (dt > 0 && through is { DoorRush: true } && hut.Through != through.Id) hut.SlamCue = Sounds?.Next("hut_door_escaping");
+                    if (dt > 0) hut.Through = through?.Id;
+                    bool slams = through == null && hut.Slam;
+                    DoorwayView.SwingDoor(hut, through != null, dt, slams ? DoorwayView.SlamSeconds : Doorways.ShutSeconds, slams);
+                    // The slam is heard as the door hits its frame, so its sound starts that far ahead: for a sound that builds up longer than the slam, while the runner is still in the doorway.
+                    float untilShut = through != null ? Doorways.DoorSeconds(through) - through.DoorTime + DoorwayView.SlamSeconds : hut.Open * DoorwayView.SlamSeconds;
+                    if (dt > 0 && hut.SlamCue is Sounds.Cue slam && hut.Slam && untilShut <= Sounds.Lead(slam)) { Sounds?.Play(slam, t.Pos); hut.SlamCue = null; }
                 }
                 bool lit = Dark;
                 if (lit != hut.Lit) {
@@ -1132,7 +1180,7 @@ public partial class WorldView : Node3D {
                 break;
             case MineProp mine:
                 // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty, and the lantern is out.
-                float stageShare = Math.Clamp(t.Progress / World.MineStageSeconds, 0, 1);
+                float stageShare = Math.Clamp(Clocked(mine.Built, t.Progress, live, dt) / World.MineStageSeconds, 0, 1);
                 bool finished = t.MineStage == MineStage.Open;
                 mine.Outline.Visible = !finished;
                 mine.Hole.Visible = t.MineStage > MineStage.Marked || stageShare > 0;
@@ -1151,13 +1199,32 @@ public partial class WorldView : Node3D {
                 break;
             case SignpostProp sign:
                 bool waiting = live && OrderAt(t.Id);
-                sign.Open = Mathf.MoveToward(sign.Open, waiting ? 1 : 0, Math.Max(dt, .016f) * 3);
+                sign.Open = Mathf.MoveToward(sign.Open, waiting ? 1 : 0, dt * 3);
                 sign.Flag.RotationDegrees = new Vector3(-90 * (1 - Ease(sign.Open)), 0, 0);
                 break;
         }
     }
 
     internal static float Ease(float t) => t * t * (3 - 2 * t);
+
+    /// <summary>A count the server keeps as a motion shows it: run on by the window's clock in sight, as it is out of sight.</summary>
+    private float Clocked(LocalClock clock, float count, bool live, float dt) => live ? clock.Follow(count, World.Time, dt) : clock.Set(count, World.Time);
+
+    /// <summary>Metres a crate rises as it is lifted.</summary>
+    private const float CrateLift = .35f;
+    /// <summary>Seconds a chest's or crate's lid takes to open or shut.</summary>
+    private const float LidSeconds = .25f;
+
+    /// <summary>
+    /// Seconds a station's fire stays lit once its work stops.
+    /// A batch ends on one tick and the next starts on the following one, and a fire does not go out in between.
+    /// </summary>
+    private const float BetweenBatches = .1f;
+    /// <summary>Whether a station's fire shows lit, with <paramref name="working"/> telling whether it has work now.</summary>
+    private static bool Lit(HearthProp hearth, bool working, float dt) {
+        hearth.Idle = working ? 0 : hearth.Idle + dt;
+        return hearth.Idle <= BetweenBatches;
+    }
 
     // Lookups that would otherwise capture the thing in a lambda, which allocates on every call for every thing drawn.
     private WolfModel? Dying(Vector2 at) {
@@ -1234,7 +1301,7 @@ public partial class WorldView : Node3D {
                 if (bounds.HasPoint(OnScreen(o.Pos)) && seen.Contains(o.Id)) structures.Add(o);
         foreach (var t in World.ThingsOf(ThingKind.Tree)) {
             if (t.Remaining <= 0 || !bounds.HasPoint(OnScreen(t.Pos)) || !seen.Contains(t.Id) || props.GetValueOrDefault(t.Id) is not TreeProp tree) continue;
-            float fade = Mathf.MoveToward(tree.Fade, CoversSomething(t, ppu) ? .68f : 0, Math.Max(dt, .016f) * 3);
+            float fade = Mathf.MoveToward(tree.Fade, CoversSomething(t, ppu) ? .68f : 0, dt * 3);
             if (Math.Abs(fade - tree.Fade) < .001f) continue;
             tree.Fade = fade; SetFade(tree.SwayParts, fade);
         }
@@ -1281,10 +1348,10 @@ public partial class WorldView : Node3D {
                     model.Struck = false; model.Recoiling = WolfModel.RecoilSeconds; model.KnockBackFrom = model.KnockBack; FurAndEmbers(To3(at, .6f)); Sounds?.Play("wolf_hit", at);
                 }
             } else if (model.Recoiling > 0) {
-                // The wolf goes back only while it is in the air, so its paws never slide.
+                // The wolf goes back only while it is in the air, at an even pace, so its paws never slide.
                 model.Recoiling = Math.Max(0, model.Recoiling - dt);
                 float hop = Math.Min(1, (1 - model.Recoiling / WolfModel.RecoilSeconds) / WolfModel.HopShare);
-                model.KnockBack = model.KnockBackFrom * (1 - hop * (2 - hop));
+                model.KnockBack = model.KnockBackFrom * (1 - hop);
             } else model.KnockBack = Vector2.Zero;
             // A following wolf walking round its player turns its head to them now and then, each at its own moments.
             bool glances = wolf.Follow == FollowStage.Circling && wolf.Flee <= 0 && (Elapsed + wolf.Id * WolfModel.GlanceApart) % WolfModel.GlanceEvery < WolfModel.GlanceSeconds;
@@ -1305,7 +1372,7 @@ public partial class WorldView : Node3D {
             // Where it is drawn away from its place in the world, after turning round or letting go of a player it tugged,
             // closes up only as it walks, so it never slides.
             var drifted = model.Drift;
-            model.Drift = turnsRound ? model.Drift - moved : model.Drift.MoveToward(Vector2.Zero, moved.Length() * WolfModel.CatchUp);
+            model.Drift = turnsRound ? model.Drift - moved : model.Drift.MoveToward(Vector2.Zero, WolfModel.CatchingUp(moved.Length(), dt));
             float walked = (moved + model.Drift - drifted).Length(), faced = model.Yaw;
             // A struck wolf keeps facing whoever hit it; a running one turns into its path.
             var facing = struck ? model.Striker - wolf.Pos - model.KnockBack : running && !backing ? moved : hunted - wolf.Pos;
@@ -1335,15 +1402,20 @@ public partial class WorldView : Node3D {
                 float contact = start <= WolfModel.ContactReach ? 0 : (start - WolfModel.ContactReach) / (start - World.PinDistance);
                 model.Pinned = gap <= WolfModel.ContactReach ? model.Pinned + dt : 0;
                 var chest = FeedingSpots.PawsOnChest(model, RigOf(wolf.Target));
-                if (model.Pinned > 0) model.Feed(Elapsed, dt, true, model.Pinned / ActorAnimation.FallBackSeconds, chest: chest);
-                else { model.Leap(progress, contact, dt, chest); flight = contact > 0 ? progress / contact : 1; }
+                if (model.Motion != WolfMotion.Leap && model.Pinned == 0) model.StepFrom = model.Root.Position;
+                if (model.Pinned > 0) PinAt(model, hunted, chest, Elapsed, dt);
+                else { model.Leap(progress, contact, dt, chest, (tugs.InTheDoorway(wolf) ?? FallBackView.Throat(hunted, Vector2.Up, 0)).Y); flight = contact > 0 ? progress / contact : 1; }
                 if (model.Pinned == 0) model.Toward = (wolf.Pos - hunted).Normalized();
             } else if (wolf.Feeding) {
-                if (wolf.Pinning) model.Pinned += dt;
-                model.Feed(Elapsed + wolf.Id % 7, dt, wolf.Pinning, model.Pinned / ActorAnimation.FallBackSeconds, chest: wolf.Pinning ? FeedingSpots.PawsOnChest(model, RigOf(wolf.Target)) : null);
+                if (wolf.Pinning) {
+                    model.Pinned += dt;
+                    PinAt(model, hunted, FeedingSpots.PawsOnChest(model, RigOf(wolf.Target)), Elapsed + wolf.Id % 7, dt);
+                } else model.Feed(Elapsed + wolf.Id % 7, dt, false);
             } else if (gathers || model.SnapHeld > 0) {
                 float wind = gathers ? 1 - (wolf.Snap - WolfSnap.Flight) / WolfSnap.Windup : 1;
-                model.Snap(wind, gathers ? 0 : 1 - wolf.Snap / WolfSnap.Flight, wolf.Snap > 0 ? 0 : 1 - model.SnapHeld / WolfModel.SnapHold, dt);
+                var bitten = StateOf(wolf.Target);
+                model.Snap(wind, gathers ? 0 : 1 - wolf.Snap / WolfSnap.Flight, wolf.Snap > 0 ? 0 : 1 - model.SnapHeld / WolfModel.SnapHold, dt,
+                    WolfModel.SnapReach(wolf.Pos + model.KnockBack + model.Drift, bitten?.Position ?? hunted, bitten?.Yaw ?? model.Yaw + Mathf.Pi));
             } else if (stepsRound) model.Move(Math.Abs(turned) * WolfModel.TurnStep, dt, false, wary);
             else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (braking) model.Brake(moved.Length(), dt);
@@ -1353,11 +1425,13 @@ public partial class WorldView : Node3D {
             var place = To3(wolf.Pos + model.KnockBack + model.Drift);
             if (wolf.Leap > 0 || wolf.Pinning) {
                 if (model.Toward == Vector2.Zero) model.Toward = (wolf.Pos - hunted).Normalized();
-                place = AtTheThroat(model, hunted, place, flight, tugs.InTheDoorway(wolf));
+                place = AtTheThroat(model, hunted, flight, (1 - wolf.Leap / World.LeapSeconds) * World.LeapSeconds / Math.Max(flight, 1e-3f), tugs.InTheDoorway(wolf));
             } else model.Toward = Vector2.Zero;
             if (wolf.Feeding && !wolf.Pinning && Fallen(wolf) is var (lying, lyingRig)) place = feeding.Place(wolf, model, lying, lyingRig, dt);
             else { model.Fed = 0; model.FeedSide = 0; }
             model.Root.Position = place;
+            // Only a wolf in sight has its paws set on the ground; one coming into sight stands where its pose has it.
+            if (model.Root.Visible) model.Plant();
         }
         foreach (var (wolf, model) in wolves)
             if (!World.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
@@ -1390,15 +1464,27 @@ public partial class WorldView : Node3D {
 
     /// <summary>
     /// Where a leaping or pinning wolf stands so its jaws are at the hunted player's throat.
-    /// The flight eases from the world's path onto the throat by the moment of contact; the jaws then ride the throat down as the player goes over, and the wolf holds that spot once they are down.
+    /// The flight pushes off from where the leap began and flies under gravity onto the throat by the moment of contact,
+    /// <paramref name="seconds"/> after it set off, coming down on its hind paws reared up to it; the jaws then ride the throat
+    /// down as the player goes over, the wolf rearing on its hind legs rather than leaving the ground, and it holds that spot
+    /// once they are down.
     /// A player in a cabin's doorway is leapt at by the <paramref name="waist"/>, where the wolf takes hold to tug them back out.
     /// </summary>
-    private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted, Vector3 path, float flight, Vector3? waist = null) {
+    private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted, float flight, float seconds, Vector3? waist = null) {
         if (model.Pinned > ActorAnimation.FallBackSeconds) return model.Held;
         var held = (waist ?? FallBackView.Throat(hunted, model.Toward, model.Pinned)) - model.Root.Basis * model.Bite;
-        held.Y = Math.Max(0, held.Y);
-        if (model.Pinned > 0) return model.Held = held;
-        return path.Lerp(held, Ease(Math.Clamp(flight, 0, 1)));
+        if (model.Pinned > 0) return model.Held = held with { Y = 0 };
+        return WolfModel.LeapPath(model.StepFrom, held with { Y = 0 }, flight, seconds);
+    }
+
+    /// <summary>
+    /// Poses a wolf pinning the player it hunts, <see cref="WolfModel.Pinned"/> seconds after its jaws reached their throat: reared
+    /// up to hold it as they go down, then leaning to keep its jaws on it where they lie, with its forepaws at <paramref name="chest"/>.
+    /// </summary>
+    private static void PinAt(WolfModel model, Vector2 hunted, (Vector3 Left, Vector3 Right)? chest, float time, float dt) {
+        var throat = FallBackView.Throat(hunted, model.Toward, model.Pinned);
+        bool lying = model.Pinned > ActorAnimation.FallBackSeconds;
+        model.Feed(time, dt, true, model.Pinned / ActorAnimation.FallBackSeconds, chest: chest, jawsUp: lying ? null : throat.Y, jaws: lying ? model.Root.Transform.AffineInverse() * throat : null);
     }
 
     /// <summary>The wolf a downed player pushes at: the one knocking them down or pinning them, as drawn, or null.</summary>
@@ -1428,9 +1514,14 @@ public partial class WorldView : Node3D {
     /// <summary>Fully drawn for the first part of a trip, then fading to nothing at the turn.</summary>
     private static float TripFade(float leg) => Math.Clamp((leg - .35f) / .55f, 0, 1);
     // The cart walks at a steady pace until it is well down the valley, waits there out of view, and walks back for the return; the trade delay is unchanged.
-    private const float CartSpeed = 2.2f, CartDistance = 16;
-    /// <summary>How far out a cart is, from 0 at the signpost to 1 where it has gone from view.</summary>
-    private float CartLeg(float elapsed) => World.WalkLeg(elapsed, World.Data.TradeSeconds - elapsed, CartSpeed, CartDistance);
+    internal const float CartSpeed = 2.2f, CartDistance = 16;
+    /// <summary>Seconds a cart takes to reach its pace as it sets off, and to stop at the signpost on its return, gathering and losing pace evenly.</summary>
+    private const float CartPicksUp = 1;
+    /// <summary>How far out a cart is <paramref name="elapsed"/> seconds into a trip of <paramref name="trip"/> seconds, from 0 at the signpost to 1 where it has gone from view.</summary>
+    internal static float CartLeg(float elapsed, float trip) {
+        float walking = Math.Max(0, Math.Min(elapsed, trip - elapsed));
+        return Math.Clamp(CartSpeed * Movement.Ramped(walking, CartPicksUp) / CartDistance, 0, 1);
+    }
     /// <summary>Fully drawn for most of the walk, fading out over its last quarter.</summary>
     private static float CartFade(float leg) => Math.Clamp((leg - .75f) / .25f, 0, 1);
     private readonly Dictionary<Node, float> fades = new();
@@ -1452,19 +1543,20 @@ public partial class WorldView : Node3D {
             if (!World.Orders.Contains(order)) { fades.Remove(cart.Root); SetFade(cart.Parts, 0); cart.Root.Visible = false; carts.Remove(order); idleCarts.Push(cart); }
         foreach (var order in World.Orders) {
             var sign = World.Find(order.Signpost);
-            float phase = order.Elapsed / World.Data.TradeSeconds;
-            // The cart sets off down the valley and fades out on its way to Bramblewick, then fades back in on return.
-            float leg = CartLeg(order.Elapsed);
-            var pos = (sign?.Pos ?? Terrain.Spawn) + Terrain.Seaward * CartDistance * leg;
             if (!carts.TryGetValue(order, out var cart)) {
                 // An order beyond the village's carts, such as an edited save's, gets a new one.
                 cart = idleCarts.Count > 0 ? idleCarts.Pop() : NewCart();
-                cart.Last = pos; cart.Distance = 0; cart.Yaw = 0;
+                cart.Trip.Set(order.Elapsed, World.Time); cart.Distance = 0;
                 carts[order] = cart;
             }
-            var moved = pos - cart.Last;
-            cart.Distance += moved.Length();
-            cart.Yaw = Mathf.LerpAngle(cart.Yaw, ActorAnimation.Yaw(moved, cart.Yaw), Math.Min(1, dt * 8));
+            float elapsed = cart.Trip.Follow(order.Elapsed, World.Time, dt), phase = elapsed / World.Data.TradeSeconds;
+            // The cart sets off down the valley and fades out on its way to Bramblewick, then fades back in on return.
+            float leg = CartLeg(elapsed, World.Data.TradeSeconds);
+            var pos = (sign?.Pos ?? Terrain.Spawn) + Terrain.Seaward * CartDistance * leg;
+            if (cart.Distance == 0) cart.Last = pos;
+            cart.Distance += (pos - cart.Last).Length();
+            // Out of view at the far end, it turns round to come back.
+            cart.Yaw = ActorAnimation.Yaw(phase < .5f ? Terrain.Seaward : -Terrain.Seaward, 0);
             cart.Last = pos;
             cart.Root.Position = To3(pos);
             cart.Root.Visible = World.Sees(pos) && leg < 1;
@@ -1565,21 +1657,25 @@ public partial class WorldView : Node3D {
     /// <summary>The sky light last written.</summary>
     private Color skyAmbient;
 
-    private void UpdateLighting() {
+    /// <summary>The world's time of day as the sun and light show it; a sleep that skips the night jumps it.</summary>
+    private readonly LocalClock dayClock = new(1);
+
+    /// <summary>Lights the world for <paramref name="time"/> on the world's clock.</summary>
+    private void UpdateLighting(float time) {
         // The sun rises at dawn and sets halfway through dusk, then the moon takes the same path until dawn.
         // Each fades out near the horizon, so the hand-over at sunset moves no visible shadow.
-        float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts, sunset = World.Data.Sunset;
+        float dayPhase = World.DayPhaseAt(time), dusk = World.Data.DuskStarts, sunset = World.Data.Sunset;
         // Dusk deepens into full night soon after sunset and dawn fades out, so neither boundary jumps in brightness.
         night = dayPhase >= dusk ? Mathf.SmoothStep(dusk, sunset + .02f, dayPhase) : dayPhase < .05f ? 1 - dayPhase / .05f : 0;
-        bool moon = World.MoonUp;
-        float arc = World.SkyArc;
+        bool moon = World.MoonUpAt(time);
+        float arc = World.SkyArcAt(time);
         float height = MathF.Sin(MathF.PI * arc);
         // The light turns a little every frame; the engine redraws the sun's shadows every frame anyway.
         float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, arc)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 40, height));
         var heading = NoonHeading.Rotated(swing);
         sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
         // The moon waxes and wanes over the month: a full moon lights the night sky, a new moon leaves only firelight to see by.
-        float moonlight = World.Moonlight;
+        float moonlight = World.MoonlightAt(time);
         sun.LightEnergy = (moon ? MoonEnergy * moonlight : Mathf.Lerp(DaySun, .08f, night)) * Mathf.SmoothStep(0, .25f, height);
         // A low sun gives warm light at sunrise and sunset.
         float low = moon ? 0 : 1 - Mathf.SmoothStep(.1f, .45f, height);
