@@ -145,8 +145,8 @@ public static class DoorCheckView {
             float x = WolfShape.Pivot(leg).X * Spread;
             // Every paw stays where it stands as the body springs on until it lifts: the hind paws push off the treads and trail
             // out behind, and the forepaws tuck under the chest, then reach out and down onto the floor.
-            var at = hind ? new Vector3(x, WolfShape.Sole + Mathf.Lerp(Under(Doorway, leg), floor - .1f, air), Mathf.Lerp(WolfModel.Home(leg) - Sprung * launched, -.72f, air))
-                : new Vector3(x, Mathf.Lerp(Mathf.Lerp(WolfShape.Sole + Under(Doorway, leg), tucked, 1 - (1 - drive) * (1 - drive)), floor + WolfShape.Sole, reach), Mathf.Lerp(WolfModel.Home(leg) - Sprung * launched, .3f, drive) + .22f * reach);
+            var at = hind ? new Vector3(x, WolfShape.Sole + Mathf.Lerp(UnderDoorway[leg], floor - .1f, air), Mathf.Lerp(WolfModel.Home(leg) - Sprung * launched, -.72f, air))
+                : new Vector3(x, Mathf.Lerp(Mathf.Lerp(WolfShape.Sole + UnderDoorway[leg], tucked, 1 - (1 - drive) * (1 - drive)), floor + WolfShape.Sole, reach), Mathf.Lerp(WolfModel.Home(leg) - Sprung * launched, .3f, drive) + .22f * reach);
             float lower = hind ? Mathf.Lerp(2, -60, air) : Mathf.Lerp(10, -80, drive * (1 - reach)) + 30 * reach;
             // A forepaw lifts flat off the step before it folds, so its toes clear the front of the floor.
             body = body.WithLeg(leg, WolfModel.ReachTo(body, leg, at, lower, hind ? lower - 25 * air : Mathf.Lerp(0, lower - 15, drive * drive)));
@@ -168,7 +168,7 @@ public static class DoorCheckView {
         // Launching, the wolf's paws leave what they stood on in the doorway.
         float standing = 1 - Mathf.SmoothStep(0, .25f, Launched(clock));
         for (int leg = 0; leg < 4; leg++) {
-            if (clock >= LaunchAt) { ground[leg] = standing * Under(Doorway, leg); continue; }
+            if (clock >= LaunchAt) { ground[leg] = standing * UnderDoorway[leg]; continue; }
             var (starts, lands) = Swing(leg, from, to);
             float swung = Math.Clamp((along - starts) / (lands - starts), 0, 1);
             float left = Under(from, leg), landing = Under(to, leg);
@@ -190,12 +190,15 @@ public static class DoorCheckView {
     }
     /// <summary>How far behind and ahead of the paw bone a paw's sole runs, and how far to either side.</summary>
     private static readonly float[] SoleAlong = { -.04f, 0, .04f, .08f }, SoleAcross = { -.04f, 0, .04f };
+    /// <summary>How high what each paw stands on is in the doorway, and what the scratching right forepaw stands on in front of the door.</summary>
+    private static readonly float[] UnderDoorway = { Under(Doorway, 0), Under(Doorway, 1), Under(Doorway, 2), Under(Doorway, 3) };
+    private static readonly float UnderScratchingPaw = Under(Front, 1);
     /// <summary>
     /// How high, in metres, a wolf standing in the doorway has its body lifted onto the step and floor its paws stand on, and how
     /// many degrees it is tipped up to stand on them, as <see cref="WolfModel.Stood"/> lifts and tips it.
     /// </summary>
-    private static readonly float DoorwayLift = (Under(Doorway, 0) + Under(Doorway, 1) + Under(Doorway, 2) + Under(Doorway, 3)) / 4,
-        DoorwayPitch = -Mathf.RadToDeg(MathF.Atan2((Under(Doorway, 0) + Under(Doorway, 1) - Under(Doorway, 2) - Under(Doorway, 3)) / 2, WolfModel.Home(0) - WolfModel.Home(2)));
+    private static readonly float DoorwayLift = (UnderDoorway[0] + UnderDoorway[1] + UnderDoorway[2] + UnderDoorway[3]) / 4,
+        DoorwayPitch = -Mathf.RadToDeg(MathF.Atan2((UnderDoorway[0] + UnderDoorway[1] - UnderDoorway[2] - UnderDoorway[3]) / 2, WolfModel.Home(0) - WolfModel.Home(2)));
 
     /// <summary>How much higher, in metres, a paw swings to clear a tread's edge on its way up or down a step.</summary>
     private const float OverEdge = .07f;
@@ -288,7 +291,7 @@ public static class DoorCheckView {
     /// </summary>
     private static WolfPose Scratching(WolfPose body, float clock) {
         // The paw's place in the model: beside the right shoulder on whatever it stands on there, up the door and ahead to its boards.
-        var ground = new Vector3(WolfShape.Pivot(1).X * Spread, WolfShape.Sole + Under(Front, 1), WolfModel.Home(1));
+        var ground = new Vector3(WolfShape.Pivot(1).X * Spread, WolfShape.Sole + UnderScratchingPaw, WolfModel.Home(1));
         // The boards start above the deck the door stands on, and the paw comes back down over the step in an arc that clears it.
         Vector3 top = new(-.13f, .86f, .845f), bottom = new(-.13f, .52f, .855f);
         const float overStep = .26f;
