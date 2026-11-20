@@ -50,6 +50,7 @@ FOLDERS = (
     "scenes/",
     "addons/",
     ".agents/",
+    ".claude/",
     ".github/",
 )
 SOURCE_ENDINGS = (".cs", ".py", ".gd", ".md")

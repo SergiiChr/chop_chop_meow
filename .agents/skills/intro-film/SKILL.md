@@ -34,8 +34,8 @@ this project turns them into the movie.
 
    ```sh
    T=~/projects/agents/skills
-   $T/retro-movie/retro_movie.py build/intro/frames --cues build/intro/frames/cues.tsv --sounds assets/sounds --sounds assets \
-       --gain 6 --ogv assets/intro.ogv --mp4 build/intro/intro.mp4
+   $T/retro-movie/retro_movie.py build/intro/frames --cues build/intro/frames/cues.tsv \
+       --sounds assets/sounds --sounds assets --gain 6 --ogv assets/intro.ogv --mp4 build/intro/intro.mp4
    ```
 
 5. Play it in the real window with the `playtest` skill: a shot of the film right after launch, Esc, a shot of the menu.
