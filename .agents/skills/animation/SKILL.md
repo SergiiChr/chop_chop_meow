@@ -32,8 +32,8 @@ description: Animate players, workers, or creatures in Chop Chop Meow and check 
   Keep a knockback short and show it as a hop or a throw.
 - Human poses are in [ActorAnimation.cs](../../../src/ActorAnimation.cs) and are applied by
   [ActorRig](../../../src/actors/display/ActorRig.cs).
-  Use the existing arm solver [ArmReach.ArmTo](../../../src/actors/display/ArmReach.cs) for every reach in the
-  trunk's frame.
+  Use [ArmReach.ArmTo](../../../src/actors/display/ArmReach.cs) for all arm reach calculations.
+  It takes a target point in the trunk's frame.
   For a point in the intro rig's own space, use `Reaching` in [WorldIntro.cs](../../../src/intro/WorldIntro.cs).
   Keep work hands forward or to their own side so elbows can bend without pushing the arms into the torso.
   Check grips from the front as well as the side.
@@ -84,6 +84,7 @@ git fetch origin
   Fetch origin before comparing with `origin/main` so the recording uses the current remote base.
   The base must support close-up review and contain the action.
   The base uses its own launcher and may have a shorter recording limit.
+  If a base recording fails, its build logs are kept beside the view logs.
   When it has a different name there, select it with `--base-clip`.
   Matching recordings use the same view, frame count, and slow-motion rate.
   Key any variation in motion off saved IDs so repeated recordings of the same action stay aligned.

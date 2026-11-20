@@ -7,9 +7,11 @@ import argparse
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -98,29 +100,34 @@ def record(
     env = {key: value for key, value in os.environ.items() if key != "WAYLAND_DISPLAY"}
     timeout = RECORD_STARTUP_SECONDS + build.record_timeout(frames)
     try:
-        with log.open("w") as output:
-            result = subprocess.run(
+        with (
+            log.open("w") as output,
+            subprocess.Popen(
                 [str(part) for part in command],
                 cwd=checkout,
                 env=env,
                 stdout=output,
                 stderr=subprocess.STDOUT,
-                timeout=timeout,
-                check=False,
-            )
+                start_new_session=True,
+            ) as recording,
+        ):
+            try:
+                status = recording.wait(timeout=timeout)
+            except (subprocess.TimeoutExpired, KeyboardInterrupt):
+                with suppress(ProcessLookupError):
+                    os.killpg(recording.pid, signal.SIGKILL)
+                raise
     except subprocess.TimeoutExpired:
         raise SystemExit(
             f"Recording {view} timed out after {timeout} seconds. See {log}"
         ) from None
-    if result.returncode:
+    if status:
         text = log.read_text(errors="replace")
         errors = dict.fromkeys(
             line.strip() for line in text.splitlines() if build.ERRORS.search(line)
         )
         print("\n".join(list(errors)[:20]), file=sys.stderr)
-        raise SystemExit(
-            f"Recording {view} failed (exit {result.returncode}); see {log}"
-        )
+        raise SystemExit(f"Recording {view} failed (exit {status}); see {log}")
     if not records:
         subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-framerate", "30", "-i", capture_folder / "%03d.png", "-c:v", "mjpeg", "-q:v", "2", movie],
@@ -160,6 +167,15 @@ def record_base(ref: str, options: argparse.Namespace) -> None:
         try:
             (checkout / ".tools").symlink_to(build.TOOLS.resolve())
             record_all(checkout, options.base_clip, slug(ref), options)
+        except SystemExit:
+            logs = list((checkout / "build").glob("*.log"))
+            if logs:
+                saved = OUTPUT / slug(options.clip) / slug(ref) / "build"
+                saved.mkdir(parents=True, exist_ok=True)
+                for log in logs:
+                    shutil.copy2(log, saved / log.name)
+                print(f"Base launcher logs saved in {saved}", file=sys.stderr)
+            raise
         finally:
             subprocess.run(
                 ["git", "worktree", "remove", "--force", checkout], cwd=ROOT, check=True

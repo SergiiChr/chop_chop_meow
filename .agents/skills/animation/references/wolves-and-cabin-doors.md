@@ -28,7 +28,7 @@ Use these notes for wolf motion and scenes at a cabin's door.
 
 - `WolfShape` builds one skinned mesh on a skeleton.
   `WolfModel` poses its spine, neck, head, jaw, ears, tail and legs from a `WolfPose`.
-  `Reach` solves the leg angles from where each paw stands.
+  `WolfModel.Reach` solves the leg angles from where each paw stands.
   `WolfModel.Paw` and `WolfModel.Bite` give where a paw and the jaws are in the pose shown.
   `SyncWolves` in `src/WorldView.cs` times the wolf against the player.
 

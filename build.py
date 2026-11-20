@@ -841,7 +841,7 @@ def run_record(movie: Path, fps: int, game_args: list[str]) -> None:
     game, env = export_record()
     # A native Wayland window draws about one frame a second; XWayland draws at full speed.
     env.pop("WAYLAND_DISPLAY", None)
-    # Godot reports invalid frame arguments. They still get the minimum timeout.
+    # Read the count for the timeout. Godot validates the forwarded arguments.
     frames = 0
     with suppress(IndexError, ValueError, OverflowError):
         frames = int(float(game_args[game_args.index("--frames") + 1]))
