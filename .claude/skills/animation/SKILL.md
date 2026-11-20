@@ -24,8 +24,11 @@ description: Make a character or creature animation look physically right, check
 Every new or changed motion is checked on every frame before anyone is shown it.
 A frame that fails sends the motion back for another pass, as many passes as it takes.
 
-- Record at a fixed frame rate with `./build.py record` (see [Review](#review)), so a frame number is the same moment in
-  every recording, before and after a change.
+- Every motion is made for 60 frames a second, the rate the game is drawn at: judge it at that rate and real speed,
+  where neighbouring frames must join without a jump and a fast stroke still has frames between its key poses.
+  Slow motion is for looking closer, not for passing a motion.
+- Record at a fixed frame rate with `./build.py record`, 60 a second by default (see [Review](#review)), so a frame
+  number is the same moment in every recording, before and after a change.
   When recording is slow or unreliable, fix the tooling first, then carry on.
 - Cover every scenario the motion plays in, not only the one asked about: each way into and out of it, one player and
   two, with and without wolves, on flat ground and on steps.
@@ -158,13 +161,13 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 camera and the game camera with the actor facing it (`facing`):
 
 ```sh
-./tools/animation_review.py "player run"                       # all four views at 4x slow motion
+./tools/animation_review.py "player run"                       # all four views at real speed
 git fetch origin
-./tools/animation_review.py "player run" --base origin/main --views side --slow 1  # add the same views from main
+./tools/animation_review.py "player run" --base origin/main --views side --slow 4  # the side view from main too, 4x slower
 ```
 
-- Movies land in `build/animation-review/<clip>/<current or ref>/<view>.avi`, 96 frames a view at 30 a second of
-  slowed game time. Recordings of the same sources match frame for frame, and so do a branch and its base; anything
+- Movies land in `build/animation-review/<clip>/<current or ref>/<view>.avi`, 120 frames a view at 60 a second of
+  game time, slowed by `--slow` (1 by default). Recordings of the same sources match frame for frame, and so do a branch and its base; anything
   that varies by run, such as an object's hash code, breaks that, so key motion off saved ids instead.
 - The first frames show the start from standing: pick frames after it for a steady cycle.
 - `--base` records a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
@@ -185,17 +188,17 @@ git fetch origin
   them as they are.
 - For a face or a paw, record the clip yourself with `--animation-zoom`, which brings the camera that many times
   closer; idle wolves face the middle, so `--animation-turn 90` shows one from the front:
-  `./build.py record build/recordings/face.avi -- --animation-review --animation-clip "wolf idle" --animation-pitch 3 --animation-turn 90 --animation-zoom 2.6 --frames 200`.
+  `./build.py record build/recordings/face.avi -- --animation-review --animation-clip "wolf idle" --animation-pitch 3 --animation-turn 90 --animation-zoom 2.6 --frames 400`.
   The wary half of `wolf idle` shows the snarl.
 
 Any scene records the same way, such as a showcase, with `./build.py record`:
 
 ```sh
-./build.py record build/recordings/queue.avi -- --showcase --hide-ui --doorway queue --zoom 5 --frames 120
-./build.py record build/recordings/queue-slow.avi -- --showcase --hide-ui --doorway queue --slow 4 --frames 480
+./build.py record build/recordings/queue.avi -- --showcase --hide-ui --doorway queue --zoom 5 --frames 240
+./build.py record build/recordings/queue-slow.avi -- --showcase --hide-ui --doorway queue --slow 4 --frames 960
 ```
 
-- Each frame moves the game on by exactly 1/30 of a second (`--fps` sets another rate), however long it takes to draw,
+- Each frame moves the game on by exactly 1/60 of a second (`--fps` sets another rate), however long it takes to draw,
   and `--slow` slows game time. The movie carries the game's sound too.
 - That holds for scenes whose world runs inside the window: `--showcase`, its `--doorway` scenes and
   `--animation-review`. A normal game's world runs in its own server process on real time, so a recording of one

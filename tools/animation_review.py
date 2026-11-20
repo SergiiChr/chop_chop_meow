@@ -18,8 +18,9 @@ sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
 OUTPUT = build.BUILD / "animation-review"
-# Frames a view records, at 30 a second of slowed game time.
-FRAMES = 96
+# Frames a second a view records, the rate the game is drawn at, and how many frames it records: two seconds of game time unslowed.
+FPS = 60
+FRAMES = 120
 
 # Camera pitch and rig turn in degrees: low from the side, low facing the camera, and the game's own angle from the side and facing the camera.
 VIEWS = {"side": (4, 0), "front": (4, -90), "game": (30, 0), "facing": (30, -90)}
@@ -49,7 +50,7 @@ def require_clip(ref: str | None, clip: str) -> None:
 
 
 def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> None:
-    """Records a checkout's clip from one view to a movie of FRAMES frames at 30 a second of slowed game time."""
+    """Records a checkout's clip from one view to a movie of FRAMES frames at FPS a second of slowed game time."""
     pitch, turn = VIEWS[view]
     movie.parent.mkdir(parents=True, exist_ok=True)
     flags = [
@@ -62,12 +63,16 @@ def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> No
         str(turn),
     ]
     log = movie.with_suffix(".log")
-    records = '"record"' in (checkout / "build.py").read_text()
+    launcher = (checkout / "build.py").read_text()
+    records = '"record"' in launcher
     if records:
+        # A ref from before the rate could be set records at its own default of 30 a second.
+        rate = ["--fps", str(FPS)] if '"--fps"' in launcher else []
         command = [
             sys.executable,
             checkout / "build.py",
             "record",
+            *rate,
             movie,
             "--",
             *flags,
@@ -77,7 +82,7 @@ def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> No
             str(FRAMES),
         ]
     else:
-        # A ref from before recording captured numbered frames, which become a movie of the same rate here.
+        # A ref from before recording captured numbered frames 30 a second, which become a movie of that rate here.
         frames = movie.with_suffix("")
         shutil.rmtree(frames, ignore_errors=True)
         command = [
@@ -162,7 +167,7 @@ def main() -> None:
         help="camera views to record",
     )
     parser.add_argument(
-        "--slow", type=float, default=4, help="slow motion factor (default %(default)s)"
+        "--slow", type=float, default=1, help="slow motion factor (default %(default)s, real speed)"
     )
     parser.add_argument(
         "--base", metavar="REF", help="also record this branch or commit, such as main"
@@ -185,7 +190,7 @@ def main() -> None:
     if options.base:
         record_base(options.base, options)
     print(
-        f"{FRAMES} frames a view at 30 a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
+        f"{FRAMES} frames a view at {FPS} a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
     )
 
 

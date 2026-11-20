@@ -23,6 +23,6 @@ $S/compare.py out.mp4 before.avi:Before after.avi:After --first 60 --count 40
 - The output's extension picks the format: `.mp4` (default choice, small and easy to share), `.gif` or `.png`.
 - Each panel is `folder:label` or `movie:label`; the label defaults to the folder's or movie's name. Frames are `%03d.png`
   unless `--pattern` says otherwise. A movie's frames count from 0 as a folder's do, and play at `--fps`.
-- `--fps` sets playback speed; frames captured in slow motion play slowly at the capture rate.
+- `--fps` sets playback speed, 60 by default as the game records; frames captured in slow motion play slowly at the capture rate.
 - `--numbers` prints each frame's number, which helps to name a frame when describing a problem.
 - Look at the result before sharing: pull a frame with `ffmpeg -ss 1 -i out.mp4 -frames:v 1 frame.png` and read it.

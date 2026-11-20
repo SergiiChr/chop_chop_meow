@@ -914,7 +914,7 @@ def build_parser() -> argparse.ArgumentParser:
             subparser.add_argument(
                 "--fps",
                 type=int,
-                default=30,
+                default=60,
                 help="frames a second (default %(default)s)",
             )
     return parser

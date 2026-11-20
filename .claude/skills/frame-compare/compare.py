@@ -86,7 +86,7 @@ def main() -> None:
     parser.add_argument("--pattern", default="%03d.png", help="frame file names, printf style (default %(default)s)")
     parser.add_argument("--first", type=int, default=0, help="first frame number (default %(default)s)")
     parser.add_argument("--count", type=int, required=True, help="frames to use from each folder or movie")
-    parser.add_argument("--fps", type=float, default=30, help="playback rate (default %(default)s)")
+    parser.add_argument("--fps", type=float, default=60, help="playback rate (default %(default)s)")
     parser.add_argument("--crop", type=parse_size, default=(0, 0), help="crop each panel around its centre, as WxH")
     parser.add_argument("--shift", type=int, default=0, help="move the crop down this many pixels")
     parser.add_argument("--scale", type=float, default=1, help="scale the whole picture (default %(default)s)")

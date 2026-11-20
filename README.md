@@ -38,7 +38,7 @@ The project uses Godot's Forward+ renderer, which picks a discrete GPU over an i
 ./build.py test     # run only the tests
 ./build.py build    # check, export, and smoke-test build/ChopChopMeow.x86_64
 ./build.py icons    # re-render item and building icons from their models (opens a window)
-./build.py record build/recordings/out.avi -- --showcase --frames 120  # record the game to a movie at 30 frames a second
+./build.py record build/recordings/out.avi -- --showcase --frames 120  # record the game to a movie at 60 frames a second
 ```
 
 ### Release bundle
@@ -87,7 +87,7 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 ```sh
 ./build.py play -- --showcase --screenshot /tmp/chop-chop-meow.png
-./build.py record build/recordings/review.avi -- --animation-review --frames 96  # a movie at 30 frames a second
+./build.py record build/recordings/review.avi -- --animation-review --frames 120  # a movie at 60 frames a second
 ./tools/environment_review.py             # landscape views, saved in build/environment-review/
 ./tools/environment_review.py --shoreline # coast, lake edge and mine views
 ./tools/animation_review.py "player run"   # one clip from the side, front and game camera, as movies in build/animation-review/
