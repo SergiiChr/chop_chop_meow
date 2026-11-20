@@ -505,7 +505,7 @@ public partial class WorldView : Node3D {
         bool torch = World.Torch > 0 && !World.Dead;
         // A downed player is posed by the fall alone.
         if (downedFor > 0) FallBackView.FallBack(playerRig, player, downedFor, torch, World.Dead ? null : HoldingOff(World.Me.Id));
-        else Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door);
+        else Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door, dt);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject, playerRig);
@@ -621,7 +621,7 @@ public partial class WorldView : Node3D {
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             if (other.DownedFor > 0) FallBackView.FallBack(other.Rig, state, other.DownedFor, torch, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
-            else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door);
+            else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door, dt);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, subject, other.Rig);
@@ -645,19 +645,18 @@ public partial class WorldView : Node3D {
         return null;
     }
 
-    /// <summary>Poses an actor's rig; one at the steps of the cabin door at <paramref name="door"/> stands on them.</summary>
-    private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null) {
+    /// <summary>Poses an actor's rig; one at the steps of the cabin door at <paramref name="door"/> stands on them, climbing over the <paramref name="dt"/> seconds since the last frame.</summary>
+    private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null, float dt = 0) {
         rig.Root.Position = To3(state.Position);
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
         state.MarkInRig = state.Mark is Vector3 mark ? rig.Root.Transform.AffineInverse() * mark : null;
         var pose = state.Pose;
-        state.Lift = 0;
         Vector3? jamb = null;
         if (door is DoorShown at) {
-            (pose, float lift, jamb) = DoorwayView.StandAt(pose, state.Position, state.Yaw, at);
-            rig.Root.Position += Vector3.Up * lift; state.Lift = lift;
-        }
+            (pose, jamb) = DoorwayView.StandAt(pose, state, at, dt);
+            rig.Root.Position += Vector3.Up * state.Lift;
+        } else { state.Lift = 0; state.LiftSpeed = 0; }
         state.HipHeight = pose.HipHeight;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };

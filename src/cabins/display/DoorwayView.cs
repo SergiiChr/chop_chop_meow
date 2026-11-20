@@ -252,21 +252,22 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
     }
 
     /// <summary>
-    /// A player's pose at a cabin's door as <paramref name="at"/> shows them, for a body at <paramref name="position"/> facing
-    /// <paramref name="yaw"/>: shoulders turned, arms drawn in to pass someone and boots stood on the steps; with how high the
-    /// steps lift the body, and where on the door frame the right hand goes, when it does.
+    /// A player's pose at a cabin's door as <paramref name="at"/> shows them, for a body drawn as <paramref name="state"/>
+    /// has it: shoulders turned, arms drawn in to pass someone and boots stood on the steps, which carry the body up and down
+    /// over <paramref name="dt"/> seconds in its <see cref="ActorState.Lift"/>; with where on the door frame the right hand
+    /// goes, when it does.
     /// </summary>
-    public static (Pose Pose, float Lift, Vector3? Jamb) StandAt(Pose pose, Vector2 position, float yaw, DoorShown at) {
+    public static (Pose Pose, Vector3? Jamb) StandAt(Pose pose, ActorState state, DoorShown at, float dt) {
         pose = pose with { Twist = pose.Twist + at.Twist };
         // Passing someone in a doorway, the arms hang at the sides, a tool held low and pointing ahead, instead of swinging out.
         if (at.Tuck > 0) pose = ArmReach.WithArm(ArmReach.WithArm(pose, true, TuckRaise, TuckOut, TuckElbow, at.Tuck), false, TuckRaise, TuckOut, TuckElbow, at.Tuck);
         // The way up the steps, in the body's frame: X toward its left and Y ahead.
         var inward = IntoCabin.Normalized();
-        var up = inward.Rotated(yaw);
-        float depth = (position - at.Door).Dot(inward);
-        (pose, float lift) = StairSteps.OnSteps(pose, depth, up, StairSteps.StepEdges, StairSteps.StepRise);
+        var up = inward.Rotated(state.Yaw);
+        float depth = (state.Position - at.Door).Dot(inward);
+        pose = StairSteps.OnSteps(pose, depth, up, at.Backing, StairSteps.StepEdges, StairSteps.StepRise, ref state.Lift, ref state.LiftSpeed, dt);
         Vector3? jamb = at.Grip > 0 ? WorldView.To3(at.Door + Doorways.AsideWay * JambOut + inward * JambIn, JambUp) : null;
-        return (pose, lift, jamb);
+        return (pose, jamb);
     }
 
     /// <summary>

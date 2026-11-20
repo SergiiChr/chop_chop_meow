@@ -19,8 +19,8 @@ public sealed class ActorState {
     public Doorway StageBefore;
     /// <summary>Seconds left stepping back down off a cabin's step after knocking on its door.</summary>
     public float SteppingDown;
-    /// <summary>How high the steps of a cabin's door lift the actor as last drawn.</summary>
-    public float Lift;
+    /// <summary>How high the steps of a cabin's door lift the actor as last drawn, and how fast, in metres a second, that height is changing.</summary>
+    public float Lift, LiftSpeed;
     /// <summary>How high the actor's hips stand above the ground it is posed on, as last drawn.</summary>
     public float HipHeight;
     public ActorAction Action;

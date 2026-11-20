@@ -38,7 +38,7 @@ public static class CabinChecks {
         Test(CheckSleepHealsOnlyWhileFed, data);
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
         Test(CheckSleepWaitsForEveryone, data);
-        Test(CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem);
+        Test(CheckBootsStandOnACabinsStepsAndTheBodyClimbsThemWithoutJumps);
     }
 
     private static void CheckPlayerBehindACabinWalksRoundItToTheDoor(GameData data) {
@@ -460,37 +460,56 @@ public static class CabinChecks {
         Require(world.Backpack[Inventory.Coins] == 40 && guest.Backpack[Inventory.Coins] == 50, "the host's backpack should pay the wages even when a guest sleeps");
     }
 
+    /// <summary>Frames a second the steps check goes through, as the game's recordings show them.</summary>
+    private const int Fps = 60;
+    /// <summary>How near the ground a boot is that a pose has standing on it, in metres.</summary>
+    private const float OnTheGround = .001f;
+    /// <summary>Seconds the steps check lets the body settle on the steps before its first frame, so it starts where it stands.</summary>
+    private const float StartSettled = 1;
+
     /// <summary>
     /// A cabin's door has two treads 14 cm high and then the floor, 40, 62 and 80 cm in from where a player stands at it,
     /// as the cabin model builds them; a player walks, runs and is tugged over them and knocks on the door from the lower one.
+    /// No boot sinks into them, a boot the pose puts on the ground stands on them, and the body takes at least three frames
+    /// to climb or come down a tread's height.
     /// </summary>
-    private static void CheckBootsStandOnACabinsStepsAndNeverSinkIntoThem() {
+    private static void CheckBootsStandOnACabinsStepsAndTheBodyClimbsThemWithoutJumps() {
         ReadOnlySpan<float> edges = stackalloc float[] { .4f, .62f, .8f };
         const float rise = .14f;
-        // How far in from the door point the hips go, facing in or out, over how many seconds, and whether the lowest boot must stay on the ground.
-        foreach (var (action, from, to, facingIn, seconds, grounded) in new[] {
-            (ActorAction.Walk, 0f, 1.8f, true, 1.5f, true), (ActorAction.Walk, 1.8f, 0f, false, 1.5f, true), (ActorAction.Jog, 0f, 1.8f, true, .7f, false),
-            (ActorAction.Walk, .1f, .5f, true, .3f, true), (ActorAction.Knock, .5f, .5f, true, 1f, true), (ActorAction.Tugged, .7f, -.3f, true, 1.5f, true) }) {
+        // How far in from the door point the hips go, facing in or out, over how many seconds, whether the lowest boot must stay on the
+        // ground, and whether a boot the pose stands on the ground may hang over a tread it is dragged off while the body falls onto it.
+        foreach (var (action, from, to, facingIn, seconds, grounded, dragged) in new[] {
+            (ActorAction.Walk, 0f, 1.8f, true, 1.5f, true, false), (ActorAction.Walk, 1.8f, 0f, false, 1.5f, true, false), (ActorAction.Jog, 0f, 1.8f, true, .7f, false, false),
+            (ActorAction.Walk, .1f, .5f, true, .3f, true, false), (ActorAction.Knock, .5f, .5f, true, 1f, true, false), (ActorAction.Tugged, .7f, -.3f, true, 1.5f, true, true) }) {
             var up = new Vector2(0, facingIn ? 1 : -1);
-            float time = 0, deepest = 0, highest = 0;
-            for (int i = 0; i <= 300; i++) {
-                float depth = Mathf.Lerp(from, to, i / 300f), travelled = Math.Abs(to - from) * i / 300f;
-                time = seconds * i / 300f;
+            float deepest = 0, highest = 0, hovering = 0, lift = 0, speed = 0, top = float.NaN, jump = 0;
+            int frames = (int)(seconds * Fps);
+            for (int i = 0; i <= frames; i++) {
+                float depth = Mathf.Lerp(from, to, i / (float)frames), travelled = Math.Abs(to - from) * i / frames, time = seconds * i / frames;
                 var pose = ActorAnimation.PoseAt(action, ActorAnimation.Stride(action) > 0 ? ActorAnimation.Advance(action, 0, travelled) : time, from != to);
-                (pose, float lift) = StairSteps.OnSteps(pose, depth, up, edges, rise);
+                var flat = pose;
+                pose = StairSteps.OnSteps(pose, depth, up, facingIn != to > from, edges, rise, ref lift, ref speed, i == 0 ? StartSettled : 1f / Fps);
+                if (!float.IsNaN(top)) jump = Math.Max(jump, Math.Abs(lift + pose.HipHeight - top));
+                top = lift + pose.HipHeight;
                 float lowest = float.MaxValue;
                 for (int side = 0; side < 2; side++) {
                     var (toe, heel) = side == 0 ? ActorAnimation.SoleOf(pose.SwingL, pose.KneeL, pose.FootL) : ActorAnimation.SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
+                    var (flatToe, flatHeel) = side == 0 ? ActorAnimation.SoleOf(flat.SwingL, flat.KneeL, flat.FootL) : ActorAnimation.SoleOf(flat.SwingR, flat.KneeR, flat.FootR);
+                    float boot = float.MaxValue;
                     foreach (var point in new[] { toe, heel }) {
                         // Facing out, a point ahead of the hips is further out from the door.
                         float clear = lift + pose.HipHeight - point.Y - StairSteps.StepGround(depth + up.Y * point.X, edges, rise);
-                        deepest = Math.Min(deepest, clear); lowest = Math.Min(lowest, clear);
+                        deepest = Math.Min(deepest, clear); boot = Math.Min(boot, clear);
                     }
+                    lowest = Math.Min(lowest, boot);
+                    if (!dragged && flat.HipHeight - Math.Max(flatToe.Y, flatHeel.Y) < OnTheGround) hovering = Math.Max(hovering, boot);
                 }
                 if (grounded) highest = Math.Max(highest, lowest);
             }
             Require(deepest > -.003f, $"{action} from {from} m to {to} m in from a cabin's door should never sink a boot into its steps: {deepest:0.000} m");
             Require(highest < .01f, $"{action} from {from} m to {to} m in from a cabin's door should keep a boot on the steps: the lowest rose {highest:0.000} m off them");
+            Require(hovering < .01f, $"{action} from {from} m to {to} m in from a cabin's door should stand a boot on the ground on the steps: one hung {hovering:0.000} m over them");
+            Require(jump < rise / 3, $"{action} from {from} m to {to} m in from a cabin's door should take three frames or more over a tread's height: the body moved {jump:0.000} m in one");
         }
     }
 }

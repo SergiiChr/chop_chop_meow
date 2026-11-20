@@ -308,6 +308,8 @@ public partial class WorldView {
         if (reviewCabin == null) { reviewCabin = (HutProp)WorldModels.Build(ReviewHut); review!.AddChild(reviewCabin.Root); }
         var door = Doorways.DoorPoint(ReviewHut);
         float time = Elapsed % ReviewDoorwayLoop;
+        // Starting over puts the player back on the ground in front of the cabin.
+        if (time < dt) { reviewActor.Lift = 0; reviewActor.LiftSpeed = 0; }
         int stage = ReviewDoorway.Length - 1;
         while (ReviewDoorway[stage].At > time) stage--;
         float start = ReviewDoorway[stage].At, end = stage + 1 < ReviewDoorway.Length ? ReviewDoorway[stage + 1].At : ReviewDoorwayLoop;
@@ -334,7 +336,7 @@ public partial class WorldView {
         bool open = now is Doorway.Entering or Doorway.Leaving or Doorway.Tugged && shown.At.DistanceTo(door) < ReviewSeen;
         DoorwayView.SwingDoor(reviewCabin, open, dt, Doorways.ShutSeconds, false);
         reviewActor.Update(shown.At, shown.Action, shown.Facing, dt, shown.Backing);
-        Pose(reviewRigs[0], reviewActor, null, door: new DoorShown(shown.At, shown.Facing, shown.Action, door, shown.Backing, 0, 0, 0));
+        Pose(reviewRigs[0], reviewActor, null, door: new DoorShown(shown.At, shown.Facing, shown.Action, door, shown.Backing, 0, 0, 0), dt: dt);
         reviewRigs[0].Root.Visible = shown.At.DistanceTo(door) < ReviewSeen || now is Doorway.None or Doorway.Knocking;
     }
 

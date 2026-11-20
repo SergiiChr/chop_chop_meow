@@ -566,7 +566,7 @@ public static class ActorAnimation {
     // The legs hang from this far below the hips, so the ankle is the rest of Sole above the bottom of the boot.
     // The boot's sole reaches this far ahead of the ankle to the toe and behind it to the heel, as HumanShape builds it.
     private const float LegDrop = .02f, Toe = .155f, Heel = .065f, AboveSole = Sole - LegDrop;
-    private const float Gravity = 9.8f;
+    internal const float Gravity = 9.8f;
     /// <summary>How far below the hip a leg's ankle is, for a thigh swung forward and a knee folded back by these angles.</summary>
     public static float Reach(float swing, float knee) => Ankle(swing, knee).Y;
 
@@ -635,7 +635,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>The leg angles that put the boot's toe on the ground <paramref name="toe"/> ahead of the hips, with the foot tipped <paramref name="tilt"/> radians up about it.</summary>
-    private static LegAngles OnToe(float toe, float hips, float tilt) {
+    internal static LegAngles OnToe(float toe, float hips, float tilt) {
         var (swing, knee) = LegTo(toe - Toe * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt), hips - LegDrop - AboveSole * MathF.Cos(tilt) - Toe * MathF.Sin(tilt));
         return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
     }
@@ -644,6 +644,16 @@ public static class ActorAnimation {
     private static LegAngles OnHeel(float heel, float hips, float tilt) {
         var (swing, knee) = LegTo(heel + Heel * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt), hips - LegDrop - AboveSole * MathF.Cos(tilt) + Heel * MathF.Sin(tilt));
         return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
+    }
+
+    /// <summary>
+    /// How high above the ground the hips can stand for a leg bent <paramref name="knee"/> degrees to touch it with the toe,
+    /// <paramref name="toe"/> ahead of them, the foot tipped <paramref name="tilt"/> radians down about the toe.
+    /// </summary>
+    internal static float ToeReach(float toe, float tilt, float knee) {
+        float reach = Thigh * Thigh + Shin * Shin + 2 * Thigh * Shin * MathF.Cos(Mathf.DegToRad(knee));
+        float ahead = toe - Toe * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt);
+        return LegDrop + AboveSole * MathF.Cos(tilt) + Toe * MathF.Sin(tilt) + MathF.Sqrt(Math.Max(0, reach - ahead * ahead));
     }
 
     /// <summary>How far a leg hangs to the side of the hips' middle, toward the body's left for the left leg.</summary>
@@ -670,7 +680,7 @@ public static class ActorAnimation {
     };
 
     // A standing leg keeps its knee bent at least this much, and its shin leans at most this far over the foot, as far as an ankle bends under the body's weight.
-    private const float StoodKnee = 5, AnkleBend = 30;
+    internal const float StoodKnee = 5, AnkleBend = 30;
 
     /// <summary>
     /// The leg angles that stand a boot on the ground, its ankle <paramref name="ankle"/> ahead of the hips when the boot is flat.
@@ -689,7 +699,7 @@ public static class ActorAnimation {
     /// How far, in radians, a boot's heel lifts about its toe, <paramref name="toe"/> ahead of the hips, to leave the hip the reach of a leg bent <paramref name="knee"/> degrees at the knee.
     /// The ankle circles the toe as the heel lifts; a lift below zero means the leg is bent further than that with the boot flat.
     /// </summary>
-    private static float HeelLift(float toe, float hips, float knee) {
+    internal static float HeelLift(float toe, float hips, float knee) {
         float pivot = MathF.Sqrt(Toe * Toe + AboveSole * AboveSole);
         var centre = new Vector2(toe, hips - LegDrop);
         float reach = Thigh * Thigh + Shin * Shin + 2 * Thigh * Shin * MathF.Cos(Mathf.DegToRad(knee));
