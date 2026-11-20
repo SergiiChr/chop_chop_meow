@@ -822,6 +822,7 @@ Clicking the mine shows its three stages:
 3. A worker with a hammer fits the timber frame and the rails, which run into the dark tunnel, in another working day.
 
 You can dig and fit too: hold right mouse on the mine with a pickaxe or a hammer in your backpack, and your work adds to the workers'.
+The entrance is dug at the rock face beside the cave mouth, so you and the workers step up to it.
 
 Workers take the pickaxe and hammer from a tool station.
 
@@ -1053,7 +1054,8 @@ The world reacts too:
 
 - trees shake and topple over the stumps they leave, a tall one slower than a short one;
 - a stump or a bush leans further out of the ground as it is dug at, then is thrown up out of a spray of soil and is gone;
-- deposits shrink and throw chips;
+- deposits shrink and throw chips, and crumble into chips and dust when their last piece is mined;
+- a fire that runs out of work or fuel dies down over half a second;
 - the bellows board travels with each press, and the heat gauge tracks the forge;
 - a bar under the reinforced furnace and its panel dial mark the heat steel needs;
 - furnaces smoke (the reinforced furnace darker and thicker), and anvils spark;

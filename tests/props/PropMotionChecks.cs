@@ -5,7 +5,10 @@ using Godot;
 using static Checks;
 using static PropMotionSteps;
 
-/// <summary>Checks of world objects in motion, stepped frame by frame: a felled tree, a dug out stump or bush, a chip, a slammed door, a cart and the window's clock.</summary>
+/// <summary>
+/// Checks of world objects in motion, stepped frame by frame: a felled tree, a dug out stump or bush, a chip, a slammed door,
+/// a cart, the window's clock and a fire going out.
+/// </summary>
 public static class PropMotionChecks {
     private const float Frame = 1 / 60f;
 
@@ -18,6 +21,31 @@ public static class PropMotionChecks {
         CheckASlammedDoorSpeedsUpIntoItsFrame();
         CheckACartSetsOffAndStopsWithoutAJump();
         CheckTheWindowsClockMovesEveryFrameBetweenUpdates();
+        CheckAFireThatGoesOutFadesOverHalfASecond();
+    }
+
+    /// <summary>
+    /// A station's fire burns fully while it has work and through the tick between one batch and the next, and once its
+    /// work stops it dies down over half a second after that tick, never brightening on the way.
+    /// </summary>
+    private static void CheckAFireThatGoesOutFadesOverHalfASecond() {
+        var fire = new CampfireProp();
+        Require(fire.Burning(true, Frame) == 1, "a fire with work should burn fully");
+        Require(fire.Burning(false, 1 / 30f) == 1 && fire.Burning(true, Frame) == 1, "a fire should burn fully through the tick between two batches");
+        float time = 0, shown = 1, at = 0, mid = float.NaN;
+        bool brightened = false;
+        while (time < .8f) {
+            time += Frame;
+            float now = fire.Burning(false, Frame);
+            brightened |= now > shown;
+            if (Math.Abs(time - .1f) < Frame / 2) at = now;
+            if (Math.Abs(time - .35f) < Frame / 2) mid = now;
+            if (time > .6f + Frame / 2) Require(now == 0, $"a fire should be out 0.6 s after its work stops, not still at {now:0.00} at {time:0.00} s");
+            shown = now;
+        }
+        Require(at > .99f, $"a fire should still burn fully 0.1 s after its work stops, not at {at:0.00}");
+        Require(Math.Abs(mid - .5f) < .1f, $"a fire should be half out 0.35 s after its work stops, not at {mid:0.00}");
+        Require(!brightened, "a fire going out should never brighten");
     }
 
     /// <summary>Every look of tree, felled eight ways: its foot stays where it stood, its wood never goes into the ground, and it gathers speed until it lands.</summary>

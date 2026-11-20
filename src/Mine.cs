@@ -35,7 +35,7 @@ public sealed partial class World {
     private static bool InOutcrop(Vector2 offset, Vector2 face, float margin) {
         float depth = offset.Dot(face);
         // The margin reaches twice as far out in front, so scattered trees and rocks also stay off the rails and cart.
-        if (depth > -2.28f + margin * 2) return false;
+        if (depth > -MineFace + margin * 2) return false;
         float across = Math.Abs(offset.Dot(new Vector2(-face.Y, face.X)));
         float width = depth >= -4.2f ? 2.55f + (depth + 2.28f) * (2.8f - 2.55f) / (-4.2f + 2.28f)
             : depth >= -6 ? 2.8f + (depth + 4.2f) * (3.35f - 2.8f) / (-6 + 4.2f)
@@ -46,6 +46,24 @@ public sealed partial class World {
 
     /// <summary>Where diggers and miners stand: at the entrance, against the rock.</summary>
     public static Vector2 MineDoor(Thing mine) => mine.Pos - CliffAt(mine.Pos).Face * 1.4f;
+    /// <summary>
+    /// How far behind a mine's spot its cliff's rock face stands, with the cave mouth in it, and half the mouth's width.
+    /// </summary>
+    public const float MineFace = 2.28f, MouthHalfWidth = .72f;
+    /// <summary>How far beside the cave mouth's edge a pick digging the entrance strikes the rock, and how far out from it a worker stands to dig.</summary>
+    private const float BesideMouth = .12f, DigOut = 1;
+    /// <summary>
+    /// The spot on a marked mine's rock face, just beside its cave mouth, that someone digging the entrance from
+    /// <paramref name="from"/> strikes, on their side of the mouth.
+    /// </summary>
+    public static Vector2 MineDigFace(Thing mine, Vector2 from) {
+        var face = CliffAt(mine.Pos).Face;
+        var mouth = mine.Pos - face * MineFace;
+        var along = new Vector2(-face.Y, face.X);
+        return mouth + along * ((from - mouth).Dot(along) < 0 ? -1 : 1) * (MouthHalfWidth + BesideMouth);
+    }
+    /// <summary>Where a worker stands to dig a marked mine's entrance: a step out from the rock face they strike.</summary>
+    private static Vector2 MineDig(Thing mine, Vector2 from) => MineDigFace(mine, from) + CliffAt(mine.Pos).Face * DigOut;
     /// <summary>Where a plan placed at <paramref name="p"/> goes: a mine near a cliff snaps to that cliff's spot.</summary>
     private static bool NearMineSite(Cliff cliff, Vector2 p) => cliff.DistanceTo(p) <= MineReach || p.DistanceTo(MineSpot(cliff)) <= 2.5f;
     internal static Vector2 SnapMine(Vector2 p) => CliffAt(p) is var c && NearMineSite(c, p) ? MineSpot(c) : p;
@@ -125,7 +143,7 @@ public sealed partial class World {
             case Kit.Lacking: return false;
         }
         w.Status = digging ? "Digging the mine entrance" : "Fitting the mine frame and rails";
-        if (!Walk(w, MineDoor(mine), dt, .5f)) return true;
+        if (!Walk(w, digging ? MineDig(mine, w.Pos) : MineDoor(mine), dt, digging ? .2f : .5f)) return true;
         w.WorkState = digging ? WorkerWorkState.Digging : WorkerWorkState.Hammering;
         BuildMine(mine, dt);
         return true;

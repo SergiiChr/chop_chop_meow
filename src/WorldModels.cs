@@ -23,6 +23,8 @@ public class Prop {
     public (Vector2 Pos, int Remaining, float Progress, MineStage Mine, FarmStage Farm, bool Night, bool Live) Look;
     /// <summary>Whether the model is drawn, kept here so it is set in Godot only when it changes.</summary>
     public bool Shown = true;
+    /// <summary>Seconds since a rock or ore deposit mined of its last piece broke apart, or below zero while it has some left.</summary>
+    public float Crumbled = -1;
     public Prop() { Body = Pivot(Root, Vector3.Zero); }
 }
 
@@ -108,8 +110,22 @@ public abstract class HearthProp : Prop {
     public Vector3 Vent;
     /// <summary>Seconds until the next puff of smoke.</summary>
     public float Smoke;
-    /// <summary>Seconds since its fire last had work, which keeps it lit through the moment between one batch and the next.</summary>
-    public float Idle = float.MaxValue;
+    /// <summary>Seconds since its fire last had work.</summary>
+    private float idle = float.MaxValue;
+    /// <summary>
+    /// Seconds a fire stays fully lit once its work stops, and then takes to die down.
+    /// A batch ends on one tick and the next starts on the following one, and a fire does not go out in between.
+    /// </summary>
+    private const float BetweenBatches = .1f, DiesDown = .5f;
+
+    /// <summary>
+    /// How brightly the fire burns, from 0 out to 1 fully, moving on <paramref name="dt"/> seconds with
+    /// <paramref name="working"/> telling whether it has work now: lit at once, and dying down once its work stops.
+    /// </summary>
+    public float Burning(bool working, float dt) {
+        idle = working ? 0 : idle + dt;
+        return 1 - Mathf.SmoothStep(BetweenBatches, BetweenBatches + DiesDown, idle);
+    }
 }
 
 public sealed class CampfireProp : HearthProp {

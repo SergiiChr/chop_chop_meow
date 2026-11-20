@@ -1290,7 +1290,10 @@ public partial class Game {
         Require(view.PropOf(table.Id) is StoveProp { Mortar.Visible: false }, "The mortar must be off the counter while the player grinds with it.");
         RemoveThings(Hosted, t => t == table);
     }
-    /// <summary>Holding the right mouse button on a marked mine walks the player to its entrance and digs it with the pickaxe.</summary>
+    /// <summary>
+    /// Holding the right mouse button on a marked mine walks the player up to the rock face beside its cave mouth and digs
+    /// the entrance with the pickaxe, which lands on the rock.
+    /// </summary>
     private async Task CheckRightMouseOnAMarkedMineDigsItWithAPickaxe() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
         var start = Hosted.Player;
@@ -1300,6 +1303,14 @@ public partial class Game {
         await Frames(2);
         var point = RightPress(mine.Pos);
         await Until(() => mine.Progress > 0 && view.PlayerAnimation == ActorAction.SteelMine, "holding RMB on a marked mine walking to its entrance and digging with the pickaxe", 6);
+        // The pick lands on the cliff's rock face beside the cave mouth, which is 1.44 m wide in a face 2.28 m behind the mine's spot.
+        int soundsBefore = sounds.Played;
+        await Until(() => sounds.Heard("mine_ore", soundsBefore), "a pick's blow heard at the mine's entrance", 4);
+        var end = view.PlayerRig.Root.Transform * view.PlayerRig.Holds(ActorRig.PickPoint);
+        var flat = new Vector2(end.X, end.Z) - (mine.Pos - cliff.Face * 2.28f);
+        float behind = -flat.Dot(cliff.Face), aside = Math.Abs(flat.Dot(new Vector2(-cliff.Face.Y, cliff.Face.X)));
+        Require(Math.Abs(behind) < .06f && aside > .72f && aside < 1.2f && end.Y is > .5f and < 1.4f,
+            $"A pick digging a mine's entrance must land on the rock face beside its mouth, not {behind:0.00} m into the face, {aside:0.00} m aside and {end.Y:0.00} m up.");
         RightRelease(point);
         await Frames();
         Drop(Hosted, "steel_pick", 1);
@@ -1308,7 +1319,7 @@ public partial class Game {
     /// <summary>
     /// Every blow at work lands its tool on what is worked as it is heard, wherever the player stands to work it: the axe's head on
     /// the trunk's side, the pick's point on the rock, the hammer's face on the anvil's and the bench's work tops, and the shovel's
-    /// blade in the ground at a stump's foot.
+    /// blade in the ground at a stump's foot. A rock mined of its last piece crumbles away.
     /// </summary>
     private async Task CheckEveryBlowLandsItsToolOnWhatItWorks() {
         var start = Hosted.Player;
@@ -1325,7 +1336,7 @@ public partial class Game {
             if (kind == ThingKind.Bench) { thing.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(thing, "crate"); thing.Inventory.Add("planks", 6); }
             await Frames(2);
             int soundsBefore = sounds.Played;
-            var point = kind is ThingKind.Anvil or ThingKind.Bench ? (Vector2?)null : RightPress(thing.Pos);
+            Vector2? point = kind is ThingKind.Anvil or ThingKind.Bench ? null : RightPress(thing.Pos);
             await Until(() => sounds.Heard(sound, soundsBefore) && view.PlayerMark != null, $"the player working a {kind} {offset} away and its blow heard", 8);
             var root = rig.Root.Transform;
             var end = root * (kind switch { ThingKind.Tree => rig.Holds(ActorRig.AxeHeadPoint), ThingKind.Stone => rig.Holds(ActorRig.PickPoint), ThingKind.Stump => rig.ShovelTip, _ => rig.Holds(ActorRig.HammerFace) });
@@ -1347,12 +1358,18 @@ public partial class Game {
                         float gap = SurfaceGap(view.PropOf(thing.Id)!.Body, end);
                         Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away, not {gap:0.00} m off it.");
                         // Mined down to its last stones, the rock shrinks, and the pick follows its face in.
-                        thing.Remaining = 2;
+                        // Ten stones, at two a blow, leave the shrunken rock blows enough for its swing to come round.
+                        thing.Remaining = 10;
                         soundsBefore = sounds.Played;
                         await Until(() => sounds.Heard(sound, soundsBefore), $"the player mining a shrunken rock {offset} away and its blow heard", 8);
                         end = rig.Root.Transform * rig.Holds(ActorRig.PickPoint);
                         gap = SurfaceGap(view.PropOf(thing.Id)!.Body, end);
                         Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away once it has shrunk, not {gap:0.00} m off it.");
+                        // Its last piece mined, the rock breaks apart and crumbles away.
+                        thing.Remaining = 1;
+                        await Until(() => view.PropOf(thing.Id) is { Crumbled: >= 0, Body.Visible: true }, $"the rock {offset} away mined of its last piece and crumbling", 8);
+                        if (point is Vector2 mined) { RightRelease(mined); point = null; }
+                        await Until(() => view.PropOf(thing.Id) is { Body.Visible: false }, $"the crumbled rock {offset} away gone", 2);
                         break;
                     }
                 default: {

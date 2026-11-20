@@ -202,7 +202,7 @@ Rendering and sound:
 | `src/actors/display/Turning.cs` | How an actor's head, then body, turn toward where it heads, with inertia |
 | `src/actors/display/ActorState.cs` | How a player or worker is drawn: where, facing which way, doing what, and at which doorway stage |
 | `src/actors/display/ArmReach.cs` | Putting a hand on a point: the arm's joint angles for it, and a pose with the arm moved there |
-| `src/actors/display/StrikePoints.cs` | Where a blow lands its tool on what is worked: a trunk's side, a rock, a work top or a stump's foot |
+| `src/actors/display/StrikePoints.cs` | Where a blow lands its tool on what is worked: a trunk's side, a rock, a mine's rock face, a work top or a stump's foot |
 | `src/actors/player/display/FallBackView.cs` | A player knocked or tugged off their feet falling onto their back, their throat as they go over and their hands at the wolf |
 | `src/cabins/display/DoorwayView.cs`, `src/cabins/model/DoorShown.cs` | Players at cabin doors: stepping in and out, following, knocking, standing aside and squeezing past with a palm on the frame |
 | `src/cabins/display/CabinModel.cs`, `src/cabins/display/CabinShape.cs`, `src/cabins/display/HutProp.cs` | Builds the cabin's model, its wall shell, roof and interior, and the cabin as drawn: its door, window and lamp |
@@ -417,7 +417,7 @@ Each striking work action has an impact moment that shakes its target and spawns
 The axe, pick and hammer land there (`ActorAnimation.ChopStrike`, `MineStrike`, `HammerStrike`), speeding up all the way into the blow; a punch draws the fist back first.
 A dig strikes at `ActorAnimation.DigStrike` and throws its soil off the blade (`ActorRig.ShovelTip`) at `DigToss`.
 
-A blow lands its tool's working end on what is worked, wherever within reach the worker stands (`StrikePoints`, `ActorState.Mark`): the axe's head on the trunk's side, the pick's point where its swing first meets the rock, the hammer's face on the anvil's or bench's work top, and the shovel's blade in the ground at a stump's or bush's foot.
+A blow lands its tool's working end on what is worked, wherever within reach the worker stands (`StrikePoints`, `ActorState.Mark`): the axe's head on the trunk's side, the pick's point where its swing first meets the rock or on the cliff's rock face beside a marked mine's cave mouth (`World.MineDigFace`), the hammer's face on the anvil's or bench's work top, and the shovel's blade in the ground at a stump's or bush's foot.
 Chips and soil fly from there.
 Where the blow's own swing meets what is worked, the swing is cut short there (`ActorAnimation.Swing`).
 Where it passes it by, the right arm is solved to reach it with the tool held in line with the forearm (`ArmReach.ArmTo`), the trunk turning to face it and leaning in or back as far as the arm needs; an arm that would have to swing behind the trunk or fold its elbow tight stops where its swing passes nearest instead.
@@ -560,6 +560,8 @@ Only what is in sight is drawn every frame (`WorldView.SyncThings`).
 A thing out of sight is drawn once as its snapshot, moved on far enough to finish whatever it was doing, and left alone until its snapshot changes, night falls or lifts, or it is seen again.
 A change that did not happen in front of the player is not played when they see it (`WorldView.Watched`): a tree felled out of sight is a stump, a chest filled out of sight keeps its lid shut, and a chip or a building that appeared out of sight neither flies nor lands in dust.
 A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
+A rock or ore deposit mined of its last piece in front of the player breaks into chips with a puff of dust and crumbles away in a fifth of a second (`Prop.Crumbled`), though the depleted thing stays in the world.
+A station's or campfire's fire burns fully while it has work or fuel and through the tick between one batch and the next, and dies down over half a second once they run out (`HearthProp.Burning`).
 A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one a building now stands over (`World.Clears`), or a gravel path tile lies on (`GravelPaths.Laid`), just goes.
 A tree falls away from whoever landed the last blow, player or worker, the way its stump records (`Thing.FellToward`), so it falls the same way on every machine.
 It turns about the foot of its trunk on the side it falls to, as a stiff pole hinged at its foot does (`TreeFall`): slowly at first, then faster, a taller tree taking longer and landing faster.
