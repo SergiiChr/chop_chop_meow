@@ -47,7 +47,7 @@ description: Animate players, workers, or creatures in Chop Chop Meow and check 
 2. Check for clipping, unreachable poses, missed or sliding contacts, and jumps in the motion.
    Check contacts at the bodies and props as drawn, using their posed positions.
    Measure contacts on every frame where you can, such as a boot's height over a tread.
-   Add or extend a check in [AnimationChecks.cs](../../../tests/AnimationChecks.cs) for measurable rules.
+   Add or extend a check for measurable rules in the feature's tests.
 3. Use the [playtest skill](../playtest/SKILL.md) to check the action in the real window, including its speeds, turns,
    and transitions that apply.
 4. Use the shared `frame-compare` skill to review numbered contact sheets and share the finished recording.

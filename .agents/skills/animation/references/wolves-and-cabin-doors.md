@@ -9,6 +9,8 @@ Use these notes for wolf motion and scenes at a cabin's door.
 - In a gallop the spine flexes to gather the legs under the body and extends to stretch them out.
 - The head bobs to balance the front legs. The tail trails the body and swings out to balance turns.
 - Apply the [contact, ground and timing rules](locomotion.md#any-body) to every paw.
+  `CheckWolfGaitsPlantEachPaw` in
+  [WolfGaitChecks.cs](../../../../tests/actors/enemies/wolf/WolfGaitChecks.cs) checks paw contact through each gait.
 
 ## Contacts
 

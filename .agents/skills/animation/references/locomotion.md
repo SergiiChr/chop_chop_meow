@@ -58,4 +58,6 @@ Use these notes when changing a walk, jog, sprint, or the transitions between th
 - The walk's, jog's and sprint's clocks move with distance through `ActorAnimation.Advance`, each `Stride` matched to
   the speed it is timed for: a change of a worker's, walking or sprint speed fails a check until the gait is retimed.
 - A gait's planted leg is solved from where its foot touches the ground, and its swinging leg is keyed. A key change can
-  push a toe through the ground: the gait check in `tests/AnimationChecks.cs` catches that.
+  push a toe through the ground.
+  `CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning` in
+  [AnimationChecks.cs](../../../../tests/AnimationChecks.cs) catches that for people.
