@@ -22,7 +22,8 @@ this project turns them into the movie.
 
    Put them on one sheet and look at the sheet, not at each still (see [Tools](#tools)).
    For the catgirl's solo dance (`CatgirlDance.Solo`), `./tools/intro_film.py --dance` draws only her, as tall as
-   the picture, into `build/intro/dance`; work on the dance there and draw the film only once it is approved.
+   the picture, into `build/intro/dance`, and writes the beat she dances to into its cue sheet.
+   Work on the dance there and draw the film only once it is approved.
 3. When the stills are right, draw the whole film (about 50 seconds) and look at each changed shot as a strip of
    frames:
 
@@ -63,16 +64,16 @@ Times are from the film's start; a change to a shot's length moves every later s
 | 0 | Bored at the desk | `DeskShot` |
 | 5 | Hand on the mouse | `MouseShot` |
 | 7.5 | Catgirls dancing on his screen | `ScreenShot` |
-| 11.5 | Boss yelling | `BossShot` |
-| 15.5 | Blank stare | `StareShot` |
-| 17.5 | Bat and run | `SmashShot` |
-| 20.5 | Packing at home | `PackingShot` |
-| 25.5 | Train | `TrainShot` |
-| 28.5 | Forest trail | `ForestShot` |
-| 31.5 | Arrival at the shore | `ArrivalShot` |
-| 35.9 | Touching the sea, fade | `ShoreShot` |
-| 39.5 | Black | |
-| 41.5 | Night by the fire, fade | `NightShot` |
+| 12.5 | Boss yelling | `BossShot` |
+| 16.5 | Blank stare | `StareShot` |
+| 18.5 | Bat and run | `SmashShot` |
+| 21.5 | Packing at home | `PackingShot` |
+| 26.5 | Train | `TrainShot` |
+| 29.5 | Forest trail | `ForestShot` |
+| 32.5 | Arrival at the shore | `ArrivalShot` |
+| 36.9 | Touching the sea, fade | `ShoreShot` |
+| 40.5 | Black | |
+| 42.5 | Night by the fire, fade | `NightShot` |
 
 ## What goes wrong
 

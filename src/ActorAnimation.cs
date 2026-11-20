@@ -73,7 +73,10 @@ public readonly record struct Pose(
     }
 
     /// <summary>The hip height above the ground: Hips when set, otherwise standing on the lower foot.</summary>
-    public float HipHeight => Hips > 0 ? Hips : Standing;
+    public float HipHeight => HipHeightFor(ActorAnimation.Shin);
+
+    /// <summary>The hip height above the ground on legs with this <paramref name="shin"/>: Hips when set, otherwise standing on the lower foot.</summary>
+    public float HipHeightFor(float shin) => Hips > 0 ? Hips : StandingFor(shin);
 
     /// <summary>The left leg's angles, or the right's.</summary>
     internal ActorAnimation.LegAngles Leg(bool left) => left ? new(SwingL, KneeL, FootL) : new(SwingR, KneeR, FootR);
@@ -86,7 +89,9 @@ public readonly record struct Pose(
     internal Pose WithLegs(ActorAnimation.LegAngles left, ActorAnimation.LegAngles right) => WithLeg(true, left).WithLeg(false, right);
 
     /// <summary>The hip height that puts the lower foot on the ground.</summary>
-    private float Standing => Math.Max(ActorAnimation.Reach(SwingL, KneeL), ActorAnimation.Reach(SwingR, KneeR)) + ActorAnimation.Sole;
+    private float Standing => StandingFor(ActorAnimation.Shin);
+
+    private float StandingFor(float shin) => Math.Max(ActorAnimation.Reach(SwingL, KneeL, shin), ActorAnimation.Reach(SwingR, KneeR, shin)) + ActorAnimation.Sole;
 }
 
 /// <summary>Pure actor animation selection, timing and keyframed poses.</summary>
@@ -581,12 +586,12 @@ public static class ActorAnimation {
     // The boot's sole reaches this far ahead of the ankle to the toe and behind it to the heel, as HumanShape builds it.
     private const float LegDrop = .02f, Toe = .155f, Heel = .065f, AboveSole = Sole - LegDrop;
     /// <summary>How far below the hip a leg's ankle is, for a thigh swung forward and a knee folded back by these angles.</summary>
-    public static float Reach(float swing, float knee) => Ankle(swing, knee).Y;
+    public static float Reach(float swing, float knee, float shin = Shin) => Ankle(swing, knee, shin).Y;
 
     /// <summary>Where a leg's ankle is, ahead of the hip and below it, for a thigh swung forward and a knee folded back by these angles.</summary>
-    internal static Vector2 Ankle(float swing, float knee) {
-        float thigh = Mathf.DegToRad(swing), shin = Mathf.DegToRad(swing - knee);
-        return new Vector2(Thigh * MathF.Sin(thigh) + Shin * MathF.Sin(shin), Thigh * MathF.Cos(thigh) + Shin * MathF.Cos(shin));
+    internal static Vector2 Ankle(float swing, float knee, float shin = Shin) {
+        float upper = Mathf.DegToRad(swing), lower = Mathf.DegToRad(swing - knee);
+        return new Vector2(Thigh * MathF.Sin(upper) + shin * MathF.Sin(lower), Thigh * MathF.Cos(upper) + shin * MathF.Cos(lower));
     }
 
     /// <summary>
