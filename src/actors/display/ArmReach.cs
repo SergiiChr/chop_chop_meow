@@ -62,7 +62,7 @@ public static class ArmReach {
     /// elbow points that way as far as the arm allows, and the roll of the arm to apply after the pose is returned too.
     /// </summary>
     public static (Pose Pose, float Roll) Reaching(Pose pose, Vector3 aim, Transform3D root, bool left = false, float weight = 1, Vector3? elbowToward = null) {
-        var inTrunk = TrunkBasis(pose).Inverse() * (root.AffineInverse() * aim - Vector3.Up * pose.HipHeight);
+        var inTrunk = ToTrunk(pose, root.AffineInverse() * aim);
         var (raise, outward, elbow, roll) = elbowToward is Vector3 way ? ArmTo(inTrunk, left, way, ActorRig.Palm) : ArmTo(inTrunk, left, ActorRig.Palm) is var (r, o, e) ? (r, o, e, 0f) : default;
         return (WithArm(pose, left, raise, outward, elbow, weight), roll * weight);
     }
@@ -85,6 +85,13 @@ public static class ArmReach {
     /// <summary>How a pose turns the trunk on the hips, as <see cref="ActorRig.Show"/> applies it.</summary>
     public static Basis TrunkBasis(Pose pose) => Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway)));
 
+    /// <summary>A point given from the rig's root, measured instead from the hips in a pose's trunk frame.</summary>
+    public static Vector3 ToTrunk(Pose pose, Vector3 point) =>
+        TrunkBasis(pose).Inverse() * (point - Vector3.Up * pose.HipHeight);
+
+    /// <summary>A point given from the hips in a pose's trunk frame, measured instead from the rig's root.</summary>
+    public static Vector3 FromTrunk(Pose pose, Vector3 point) => Vector3.Up * pose.HipHeight + TrunkBasis(pose) * point;
+
     /// <summary>How a pose turns an arm at the shoulder and how far that arm's elbow folds, as <see cref="ActorRig.Show"/> applies them, from the trunk's frame.</summary>
     private static (Basis Shoulder, Basis Forearm) ArmBases(Pose pose, bool left) {
         var shoulder = left
@@ -93,28 +100,35 @@ public static class ArmReach {
         return (shoulder, shoulder * new Basis(Vector3.Right, Mathf.DegToRad(-(left ? pose.ElbowL : pose.ElbowR))));
     }
 
-    /// <summary>Where a fist is for a pose, from the hips in the trunk's own frame, as <see cref="ActorRig.Fist"/> has it on a rig shown in it.</summary>
-    public static Vector3 FistInTrunk(Pose pose, bool left) {
+    /// <summary>
+    /// Where a fist is for an arm turned at the shoulder and bent at the elbow by these (<see cref="ArmBases"/>), from
+    /// the hips in the trunk's own frame, as <see cref="ActorRig.Fist"/> has it on a rig shown in them.
+    /// </summary>
+    private static Vector3 FistInTrunk(Basis shoulder, Basis forearm, bool left) => HumanShape.Standard.Shoulder(left)
+        + shoulder * new Vector3(0, -ActorRig.UpperArm, 0) + forearm * new Vector3(0, -ActorRig.Forearm, ActorRig.Palm);
+
+    /// <summary>
+    /// Where a point <paramref name="past"/> metres beyond a pose's fist along its forearm's line is, from the hips in
+    /// the trunk's own frame.
+    /// </summary>
+    public static Vector3 PastFist(Pose pose, bool left, float past) {
         var (shoulder, forearm) = ArmBases(pose, left);
-        return HumanShape.Standard.Shoulder(left) + shoulder * new Vector3(0, -ActorRig.UpperArm, 0) + forearm * new Vector3(0, -ActorRig.Forearm, ActorRig.Palm);
+        return FistInTrunk(shoulder, forearm, left) + forearm * Vector3.Down * past;
     }
-
-    /// <summary>The way a forearm points from the elbow to the fist for a pose, in the trunk's own frame.</summary>
-    public static Vector3 ForearmInTrunk(Pose pose, bool left) => ArmBases(pose, left).Forearm * Vector3.Down;
-
-    /// <summary>Where a fist is for a pose, from the rig's root.</summary>
-    public static Vector3 Fist(Pose pose, bool left) => Vector3.Up * pose.HipHeight + TrunkBasis(pose) * FistInTrunk(pose, left);
 
     /// <summary>
     /// Where a point of something in the right fist is for a pose, from the rig's root: <paramref name="held"/> is in the grip's
     /// own frame, the tool's handle running down along -Y from the fist, turned about its length by <see cref="Pose.Grip"/>.
     /// </summary>
     public static Vector3 InRightHand(Pose pose, Vector3 held) {
-        var forearm = ArmBases(pose, false).Forearm;
-        return Fist(pose, false) + TrunkBasis(pose) * (forearm * (new Basis(Vector3.Up, Mathf.DegToRad(pose.Grip)) * held));
+        var (shoulder, forearm) = ArmBases(pose, false);
+        var trunk = TrunkBasis(pose);
+        var grip = new Basis(Vector3.Up, Mathf.DegToRad(pose.Grip));
+        return Vector3.Up * pose.HipHeight + trunk * FistInTrunk(shoulder, forearm, false)
+            + trunk * (forearm * (grip * held));
     }
 
     /// <summary>Where a shoulder is in the world for a pose, on a rig placed at <paramref name="root"/>.</summary>
     public static Vector3 Shoulder(Pose pose, Transform3D root, bool left) =>
-        root * (Vector3.Up * pose.HipHeight + TrunkBasis(pose) * HumanShape.Standard.Shoulder(left));
+        root * FromTrunk(pose, HumanShape.Standard.Shoulder(left));
 }

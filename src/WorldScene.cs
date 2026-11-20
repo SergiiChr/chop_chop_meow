@@ -292,13 +292,8 @@ public partial class WorldView {
     private const int ReviewTargetId = 1035;
 
     /// <summary>What a close-up's blow lands on, or null for an action that lands on nothing.</summary>
-    private static ThingKind? ReviewWorked(ActorAction action) => action switch {
-        ActorAction.Chop or ActorAction.SteelChop => ThingKind.Tree,
-        ActorAction.Mine or ActorAction.SteelMine => ThingKind.Stone,
-        ActorAction.Hammer => ThingKind.Anvil,
-        ActorAction.Dig => ThingKind.Stump,
-        _ => null
-    };
+    private static ThingKind? ReviewWorked(ActorAction action) =>
+        ActorAnimation.Works(action) is [var kind, ..] ? kind : null;
 
     /// <summary>
     /// A player walks up to a cabin at the middle of the ground and through each doorway stage as the game shows them:
