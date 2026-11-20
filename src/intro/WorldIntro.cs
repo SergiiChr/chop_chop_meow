@@ -438,7 +438,7 @@ public partial class WorldView {
         if (cut) {
             OfficeLight();
             hero.Root.Visible = false;
-            Cue("intro/dance_beat", -11.5f);
+            CueDanceBeat();
         }
         office.Page.FrameStage(t / ScreenSeconds);
         OfficeAround();
@@ -449,6 +449,8 @@ public partial class WorldView {
         Frame(screen + new Vector3(0, .01f, -.56f + .08f * Mathf.SmoothStep(0, ScreenSeconds, t)), screen, 34);
     }
 
+    private void CueDanceBeat() => Cue("intro/dance_beat", -11.5f);
+
     /// <summary>The soloist's dance alone: the page as tall as the picture, on black, and nothing else drawn.</summary>
     private void DanceShot(float t, float dt) {
         if (cut) {
@@ -456,6 +458,7 @@ public partial class WorldView {
             GetViewport().Disable3D = true;
             office.Page.Live = true;
             office.Page.Rehearse();
+            CueDanceBeat();
             // The page is narrower than the picture, so black fills its sides.
             var backdrop = new ColorRect { Color = Colors.Black };
             var page = new TextureRect { Texture = office.Page.Picture.AlbedoTexture, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };

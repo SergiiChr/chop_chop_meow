@@ -102,19 +102,21 @@ public static class AnimationChecks {
     }
 
     private static void CheckTheChestBendsAboveAStablePelvis() {
-        var rig = new ActorRig(ActorRig.OutfitOf(ActorSkin.Player), HumanShape.Slim);
-        var trunk = rig.Chest.GetChildren().OfType<Skeleton3D>().Single();
-        var pelvisVertex = new Vector3(.09f, -.11f, -.03f);
-        var collarVertex = new Vector3(.06f, -.10f, .02f);
-        var pelvisAtRest = InTorso(1, pelvisVertex);
-        var collarAtRest = InTorso(0, collarVertex);
-        rig.BendChest(-10, 16, 14);
-        Require(InTorso(1, pelvisVertex).DistanceTo(pelvisAtRest) < .001f, "the pelvis should stay over the legs when the chest bends");
-        Require(InTorso(0, collarVertex).DistanceTo(collarAtRest) > .04f, "the collar should follow the chest as it bends");
-        rig.Root.Free();
+        var dancer = new Catgirl(CatgirlOutfit.Blouse, Vector3.Zero);
+        var skeleton = dancer.Rig.Torso.GetNode<Skeleton3D>("JoinedHuman");
+        int pelvis = skeleton.FindBone("Pelvis"), chest = skeleton.FindBone("Chest");
+        var hip = new Vector3(.09f, .04f, -.03f);
+        var collar = new Vector3(.06f, .43f, .02f);
+        dancer.Show(new DanceFrame(), 0);
+        var hipAtRest = Skin(pelvis, hip);
+        var collarAtRest = Skin(chest, collar);
+        dancer.Show(new DanceFrame { Chest = new Vector3(-10, 16, 14) }, 0);
+        Require(Skin(pelvis, hip).DistanceTo(hipAtRest) < .001f, "the pelvis should stay over the legs when the chest bends");
+        Require(Skin(chest, collar).DistanceTo(collarAtRest) > .04f, "the collar should follow the chest as it bends");
+        dancer.Rig.Root.Free();
 
-        Vector3 InTorso(int bone, Vector3 position) =>
-            rig.Chest.Transform * (trunk.Transform * (trunk.GetBonePose(bone) * position));
+        Vector3 Skin(int bone, Vector3 point) =>
+            skeleton.GetBonePose(bone) * (skeleton.GetBoneRest(bone).AffineInverse() * point);
     }
 
     private static void CheckTheDancerBodyHasClosedJoints() {
