@@ -117,8 +117,10 @@ public partial class Game : Node, IGameFlow {
                 // --intro-dance draws only the solo of the catgirl on the hero's screen, for working on that dance.
                 var stills = Launch.Value("--intro-stills")?.Split(',').Select(at => float.Parse(at, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
                 panel.Close(); ui.Visible = false; AudioServer.SetBusMute(0, true);
-                paintFilter.Width = WorldView.IntroPaintWidth;
-                view.RenderIntro(introFolder, stills, Launch.Has("--intro-dance"));
+                bool danceOnly = Launch.Has("--intro-dance");
+                // The dance alone draws no world, so it has nothing to paint over.
+                paintFilter.Width = WorldView.IntroPaintWidth; paintFilter.Visible &= !danceOnly;
+                view.RenderIntro(introFolder, stills, danceOnly);
             }
             if (Launch.Has("--animation-review")) { panel.Close(); ui.Visible = false; view.AnimationReview = true; }
             // A recording slows game time for a closer look, and ends after so many frames.

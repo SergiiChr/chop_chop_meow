@@ -15,30 +15,6 @@ internal static class IntroPoses {
     /// <summary>A pose eased through keys sorted by time.</summary>
     public static Pose Keyed(float time, params (float At, Pose Pose)[] keys) => Keyed<Pose>(time, Pose.Lerp, keys);
 
-    /// <summary>
-    /// Bends one arm of a pose so its fist lies on a point given in the torso's space, with the elbow
-    /// swung toward <paramref name="elbowToward"/>.
-    /// That takes a turn of the upper arm about its own length, which a pose cannot hold: <paramref name="roll"/> is that
-    /// turn in degrees, for <see cref="ActorRig.RollArm"/> once the pose is shown.
-    /// <paramref name="shoulderOut"/> is how far from the spine the rig's shoulders sit.
-    /// </summary>
-    public static Pose Folding(Pose pose, bool left, Vector3 target, Vector3 elbowToward, out float roll, float shoulderOut = ActorRig.ShoulderOut) {
-        const float upper = ActorRig.UpperArm, fore = ActorRig.Forearm;
-        var to = target - new Vector3(left ? shoulderOut : -shoulderOut, ActorRig.ShoulderUp, 0);
-        float reach = Math.Clamp(to.Length(), .1f, upper + fore - .005f);
-        var line = to.Normalized();
-        // The elbow can sit anywhere on a circle around the line from shoulder to fist; it takes the point nearest the hint.
-        float along = (upper * upper - fore * fore + reach * reach) / (2 * reach), off = MathF.Sqrt(Math.Max(0, upper * upper - along * along));
-        var elbow = line * along + (elbowToward - line * elbowToward.Dot(line)).Normalized() * off;
-        Vector3 arm = elbow / upper, forearm = (line * reach - elbow) / fore;
-        float bend = MathF.Acos(Math.Clamp(arm.Dot(forearm), -1, 1)), outward = MathF.Asin(Math.Clamp(arm.X, -1, 1)), raise = MathF.Atan2(arm.Z, -arm.Y);
-        // The way the bent forearm points, seen from the shoulder as the pose alone turns it, gives the turn still missing.
-        var folds = Basis.FromEuler(new Vector3(-raise, 0, outward)).Inverse() * ((forearm - arm * MathF.Cos(bend)) / MathF.Sin(bend));
-        roll = Mathf.RadToDeg(MathF.Atan2(folds.X, folds.Z));
-        return left ? pose with { RaiseL = Mathf.RadToDeg(raise), OutL = Mathf.RadToDeg(outward), ElbowL = Mathf.RadToDeg(bend) }
-            : pose with { RaiseR = Mathf.RadToDeg(raise), OutR = -Mathf.RadToDeg(outward), ElbowR = Mathf.RadToDeg(bend) };
-    }
-
     /// <summary>Sitting upright on a seat of <see cref="IntroSets.SeatTop"/> with the feet flat and the hands in the lap.</summary>
     public static readonly Pose Seated = new(Lean: 4, Head: 4, RaiseL: 30, OutL: 2, ElbowL: 58, RaiseR: 30, OutR: 2, ElbowR: 58,
         SwingL: 88, KneeL: 86, SwingR: 88, KneeR: 86, Hips: IntroSets.SeatTop + .085f);
@@ -66,7 +42,10 @@ internal static class IntroPoses {
         };
     }
 
-    /// <summary>At the desk with the left hand on the keyboard and the eyes on the screen; the film puts the right hand on the mouse.</summary>
+    /// <summary>
+    /// At the desk with the left hand on the keyboard and the eyes
+    /// on the screen; the film puts the right hand on the mouse.
+    /// </summary>
     public static readonly Pose Browsing = Seated with { Lean = 12, Head = 6, RaiseL = 46, OutL = -6, ElbowL = 56 };
 
     /// <summary>Sitting bolt upright with the hands in the lap, facing straight ahead.</summary>

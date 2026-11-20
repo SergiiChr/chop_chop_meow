@@ -13,7 +13,8 @@ namespace ChopChopMeow;
 /// The intro film: the hero's last day at the office, the trip out, his arrival at the shore and his first night by a fire.
 /// <c>--render-intro DIR</c> plays it in place of a game, under a film camera at eye level rather than the game's view from above.
 /// Each frame is saved to DIR with a cue sheet of its sounds; a movie tool outside this project turns them into <c>assets/intro.ogv</c>.
-/// With <c>--intro-dance</c> it draws only the solo of the catgirl on the hero's screen, as tall as the picture, once through.
+/// With <c>--intro-dance</c> it draws only the solo of the catgirl
+/// on the hero's screen, as tall as the picture, once through.
 /// </summary>
 public partial class WorldView {
     public const int IntroFps = 30;
@@ -21,7 +22,8 @@ public partial class WorldView {
     public static readonly Vector2I IntroSize = new(1280, 720);
     /// <summary>
     /// The paint filter's width over the film's frames, in the shader's <c>kernel_size</c>.
-    /// The movie tool shrinks a frame to 480 pixels across, so its strokes are drawn that much wider than the game's 8 to come out the same size.
+    /// The movie tool shrinks a frame to 480 pixels across, so its strokes are drawn that much wider than the game's 8
+    /// to come out the same size.
     /// </summary>
     public const int IntroPaintWidth = 21;
     private const float IntroStep = 1f / IntroFps;
@@ -161,7 +163,8 @@ public partial class WorldView {
         // Half-shut eyelids for the office, a loosened tie, and the bat.
         // The lids hang from their top edge, so stretching them lowers them over the eyes.
         heroLids = Pivot(hero.Head, new Vector3(0, .159f, 0));
-        foreach (float side in new[] { -1f, 1f }) Box(heroLids, new Vector3(.027f, .014f, .012f), new Vector3(side * .046f, -.007f, .113f), Mat("d9a27c"));
+        var heroSkin = Mat(ActorRig.OutfitOf(ActorSkin.Player).Skin);
+        foreach (float side in new[] { -1f, 1f }) Box(heroLids, new Vector3(.027f, .014f, .012f), new Vector3(side * .046f, -.007f, .113f), heroSkin);
         heroTie = ActorRig.Tie(hero.Torso, "4a5368"); heroTie.RotationDegrees = new Vector3(0, 0, 5);
         heldBat = IntroSets.Bat(); hero.Hold(heldBat);
         boss = new ActorRig(ActorSkin.Boss); film.AddChild(boss.Root);
@@ -172,13 +175,16 @@ public partial class WorldView {
         skyline = IntroSets.BuildSkyline(); film.AddChild(skyline);
         train = IntroSets.BuildTrain(); film.AddChild(train.Root);
         // Two fingers lie from his fist over the mouse's buttons, for the one shot that sees his hand on it.
-        // Each hinges at its knuckle; his left is +X, so the finger on that side is the index, over the left button.
+        // Each hinges at its knuckle over its button.
         mouseFingers = Pivot(office.Mouse, HandOnMouse + new Vector3(0, .012f, .02f));
-        foreach (float side in new[] { -1f, 1f }) {
-            var finger = Pivot(mouseFingers, new Vector3(side * .0155f, 0, 0), new Vector3(FingerSlope, 0, 0));
-            Box(finger, new Vector3(.021f, .02f, .075f), new Vector3(0, 0, .034f), Mat("d9a27c"));
-            if (side > 0) indexFinger = finger;
+        Node3D Finger(float side) {
+            var finger = Pivot(mouseFingers, new Vector3(side * IntroSets.ButtonSide, 0, 0), new Vector3(FingerSlope, 0, 0));
+            Box(finger, new Vector3(.021f, .02f, .075f), new Vector3(0, 0, .034f), heroSkin);
+            return finger;
         }
+        Finger(-1);
+        // His left is +X, so the finger on that side is the index, over the left button.
+        indexFinger = Finger(1);
         BuildShaders(film);
         FindWaters(scene);
         // The fire pit of the last shot stands in the clearing from the start, unlit, so it is not dropped in with a puff of dust.
@@ -205,8 +211,9 @@ public partial class WorldView {
     private void Stage(Node3D? set) {
         scene.Visible = set == null;
         office.Root.Visible = set == office.Root; room.Root.Visible = skyline.Visible = set == room.Root; train.Root.Visible = set == train.Root;
-        hero.Root.Visible = true; boss.Root.Visible = set == office.Root;
-        office.Page.Live = set == office.Root;
+        // The boss is in only the shots that show him yelling or watching the hero go.
+        hero.Root.Visible = true; boss.Root.Visible = false;
+        office.Page.Live = false;
         heroLids.Visible = heroTie.Visible = set == office.Root;
         heldBat.Visible = false; moon.Visible = false; mouseFingers.Visible = false;
     }
@@ -334,11 +341,14 @@ public partial class WorldView {
     // ---------- The office ----------
 
     private static readonly Vector3 BossSpot = new(.86f, 0, .12f);
+    /// <summary>The hero's eyelids stretched down over his eyes.</summary>
+    private static readonly Vector3 LidsShut = new(1, .01f, 1);
     /// <summary>How long each shot in the office runs, in seconds.</summary>
     private const float DeskSeconds = 5, MouseSeconds = 2.5f, ScreenSeconds = 4, BossSeconds = 4, StareSeconds = 2, SmashSeconds = 3;
     private const float OfficeSeconds = DeskSeconds + MouseSeconds + ScreenSeconds + BossSeconds + StareSeconds + SmashSeconds;
     /// <summary>
-    /// The boss is first heard this many seconds before the cut to him, from <see cref="BossVoiceStarts"/> seconds into his recording.
+    /// The boss is first heard this many seconds before the cut to him,
+    /// from <see cref="BossVoiceStarts"/> seconds into his recording.
     /// Under the stare that follows he is heard again, muffled, from <see cref="BossVoiceAgain"/>.
     /// </summary>
     private const float BossHeardBefore = 1, BossVoiceStarts = 1.6f, BossVoiceAgain = 2.1f;
@@ -357,10 +367,13 @@ public partial class WorldView {
         hero.Pack!.Visible = false;
     }
 
-    /// <summary>What goes on in the office by itself: colleagues typing, the catgirls dancing on his screen and its glow.</summary>
+    /// <summary>
+    /// What goes on in the office by itself: colleagues typing, the catgirls dancing on his screen and its glow.
+    /// </summary>
     private void OfficeAround() {
         for (int i = 0; i < office.Staff.Count; i++) office.Staff[i].Show(IntroPoses.Typing(filmTime + i * 1.37f), null, false);
-        // The page's clock starts with the close-up of it.
+        // The page's clock starts with the close-up of it; it is drawn again only while his screen can be seen.
+        office.Page.Live = office.PageOnScreen.IsVisibleInTree();
         office.Page.Play(filmTime - DeskSeconds - MouseSeconds);
         // The tube's glow wavers a little on his face.
         office.Glow.LightEnergy = .12f + .012f * MathF.Sin(filmTime * 31) + .008f * MathF.Sin(filmTime * 7.3f);
@@ -370,9 +383,10 @@ public partial class WorldView {
     private void DeskShot(float t, float dt) {
         // The camera sits where his screen is, so the monitor itself is out of the picture.
         if (cut) {
-            OfficeLight(); office.LeaningBat.Visible = true; boss.Root.Visible = false;
+            OfficeLight(); office.LeaningBat.Visible = true;
             // Two recordings of an office hum under every shot here.
-            // Each is shorter than the shots together, so it is laid twice, the second fading in as the first fades out.
+            // Each is shorter than the shots together, so it is laid
+            // twice, the second fading in as the first fades out.
             const float second = 10.5f, cross = 1.5f;
             foreach (var (hum, gain) in new[] { ("intro/office", 2f), ("intro/office_room", -6f) }) {
                 Cue(hum, gain, string.Create(CultureInfo.InvariantCulture, $"length={OfficeSeconds - second + cross:0.00}\tfadein=0.4\tfadeout={cross:0.00}"));
@@ -391,7 +405,9 @@ public partial class WorldView {
         Frame(new Vector3(.2f, 1.08f, 1.05f).Lerp(new Vector3(.12f, 1.05f, .82f), push), new Vector3(-.05f, .97f, .2f), 44);
     }
 
-    /// <summary>When the left mouse button goes down, in seconds into the mouse shot: a double click and one more.</summary>
+    /// <summary>
+    /// When the left mouse button goes down, in seconds into the mouse shot: a double click and one more.
+    /// </summary>
     private static readonly float[] MouseClicks = { 1.25f, 1.5f, 2.15f };
     /// <summary>Where the right fist lies on the mouse, from the mouse's origin.</summary>
     private static readonly Vector3 HandOnMouse = new(0, .034f, -.035f);
@@ -402,7 +418,7 @@ public partial class WorldView {
     private void MouseShot(float t, float dt) {
         const float pressSeconds = .09f;
         // The light falls steeper here, which moves a strip light's shadow off his hand.
-        if (cut) { OfficeLight(new Vector3(.02f, -1, -.05f)); boss.Root.Visible = false; mouseFingers.Visible = true; }
+        if (cut) { OfficeLight(new Vector3(.02f, -1, -.05f)); mouseFingers.Visible = true; }
         OfficeAround();
         // Round the pad, to a stop for the double click, then a short slide to the last click.
         office.Mouse.Position = IntroSets.MouseSpot + Path(t, (0, new Vector3(.03f, 0, -.02f)), (.35f, new Vector3(-.04f, 0, .03f)), (.7f, new Vector3(.05f, 0, .04f)),
@@ -422,7 +438,7 @@ public partial class WorldView {
 
     /// <summary>What he has on his screen: a web page of catgirls dancing, until the boss's voice breaks in.</summary>
     private void ScreenShot(float t, float dt) {
-        if (cut) { OfficeLight(); hero.Root.Visible = false; boss.Root.Visible = false; }
+        if (cut) { OfficeLight(); hero.Root.Visible = false; }
         OfficeAround();
         if (Reached(ScreenSeconds - BossHeardBefore, t, dt))
             Cue("intro/boss", 0, string.Create(CultureInfo.InvariantCulture, $"from={BossVoiceStarts:0.00}\tlength={BossHeardBefore + BossSeconds:0.00}\tfadein=0.03\tfadeout=0.1"));
@@ -431,12 +447,14 @@ public partial class WorldView {
         Frame(screen + new Vector3(0, .01f, -.56f + .08f * Mathf.SmoothStep(0, ScreenSeconds, t)), screen, 34);
     }
 
-    /// <summary>The soloist's dance alone: the page as tall as the picture, on black, over everything else and under no paint filter.</summary>
+    /// <summary>The soloist's dance alone: the page as tall as the picture, on black, and nothing else drawn.</summary>
     private void DanceShot(float t, float dt) {
         if (cut) {
-            OfficeLight();
+            // The page draws in a world of its own, so the film's own world need not be drawn at all.
+            GetViewport().Disable3D = true;
+            office.Page.Live = true;
             office.Page.Rehearse();
-            // The page is narrower than the picture, so black covers the office at its sides.
+            // The page is narrower than the picture, so black fills its sides.
             var backdrop = new ColorRect { Color = Colors.Black };
             var page = new TextureRect { Texture = office.Page.Picture.AlbedoTexture, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };
             backdrop.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); page.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -446,8 +464,12 @@ public partial class WorldView {
         office.Page.Play(t);
     }
 
-    /// <summary>The boss bent over the hero's left shoulder, <paramref name="yelling"/> seconds into his rant, his mouth as wide open as he shouts.</summary>
+    /// <summary>
+    /// The boss bent over the hero's left shoulder, <paramref name="yelling"/> seconds into his rant, his mouth as wide
+    /// open as he shouts.
+    /// </summary>
     private void YellingBoss(float yelling, float shout) {
+        boss.Root.Visible = true;
         Place(boss, BossSpot, -100, IntroPoses.Yelling(yelling));
         bossMouth.Scale = new Vector3(1 + shout * .2f, .25f + shout, 1);
     }
@@ -460,14 +482,17 @@ public partial class WorldView {
         float shout = Shout(BossVoiceStarts + BossHeardBefore + t);
         Place(hero, Vector3.Zero, 0, IntroPoses.Cowering(t));
         TurnHead(hero, 0, 38, 0);
-        heroLids.Scale = new Vector3(1, .01f, 1);
+        heroLids.Scale = LidsShut;
         YellingBoss(t, shout);
         // From the desk top, looking up past his face at the boss, with a tremor on every shout.
         var tremor = new Vector3(MathF.Sin(t * 47), MathF.Sin(t * 61 + 1), 0) * .006f * shout;
         Frame(new Vector3(-.6f, .84f, .34f).Lerp(new Vector3(-.52f, .86f, .3f), Mathf.SmoothStep(0, BossSeconds, t)) + tremor, new Vector3(.5f, 1.26f, .05f), 54);
     }
 
-    /// <summary>His face, square on and still, staring at nothing; the boss goes on yelling beside him, heard as if through a wall.</summary>
+    /// <summary>
+    /// His face, square on and still, staring at nothing; the boss
+    /// goes on yelling beside him, heard as if through a wall.
+    /// </summary>
     private void StareShot(float t, float dt) {
         if (cut) {
             OfficeLight();
@@ -477,7 +502,7 @@ public partial class WorldView {
         office.Monitor.Visible = false;
         OfficeAround();
         Place(hero, Vector3.Zero, 0, IntroPoses.Staring);
-        heroLids.Scale = new Vector3(1, .01f, 1);
+        heroLids.Scale = LidsShut;
         YellingBoss(BossSeconds + t, Shout(BossVoiceAgain + t));
         Frame(new Vector3(0, 1.14f, .82f).Lerp(new Vector3(0, 1.14f, .7f), Mathf.SmoothStep(0, StareSeconds, t)), new Vector3(0, 1.13f, .1f), 28);
     }
@@ -488,7 +513,7 @@ public partial class WorldView {
     private void SmashShot(float t, float dt) {
         const float drop = 1.9f, bolt = 2.02f;
         if (cut) {
-            OfficeLight(); office.LeaningBat.Visible = false;
+            OfficeLight(); office.LeaningBat.Visible = false; boss.Root.Visible = true;
             office.Chair.Position += new Vector3(-.35f, .2f, -1.25f); office.Chair.RotationDegrees = new Vector3(0, 40, 84);
         }
         OfficeAround();
@@ -741,8 +766,8 @@ public partial class WorldView {
         float scared = Mathf.SmoothStep(howl + .3f, howl + .6f, t);
         // Arms crossed over the chest, each palm on the other shoulder, the right arm outside, rubbing a little for warmth.
         float rub = .012f * MathF.Sin(t * 5.2f) * (1 - scared);
-        var huddled = IntroPoses.Folding(IntroPoses.Shivering(t, scared), true, new Vector3(-.15f, .44f + rub, .1f), new Vector3(.5f, -1, .3f), out float leftRoll);
-        huddled = IntroPoses.Folding(huddled, false, new Vector3(.15f, .44f - rub, .15f), new Vector3(-.5f, -1, .45f), out float rightRoll);
+        var (huddled, leftRoll) = ArmReach.WithHandAt(IntroPoses.Shivering(t, scared), true, new Vector3(-.15f, .44f + rub, .1f), new Vector3(.5f, -1, .3f));
+        (huddled, float rightRoll) = ArmReach.WithHandAt(huddled, false, new Vector3(.15f, .44f - rub, .15f), new Vector3(-.5f, -1, .45f));
         Place(hero, To3(seat), Mathf.RadToDeg(ActorAnimation.Yaw(toward, 0)), huddled);
         hero.RollArm(true, leftRoll); hero.RollArm(false, rightRoll);
         float look = Track(t, (howl + .3f, 0), (howl + .55f, 55), (pack + .2f, 50), (pack + .5f, -62), (pack + 1.9f, -55), (pack + 2.4f, -20));

@@ -6,7 +6,8 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// One neutral human core: outfits use palette textures while geometry and skin weights are shared.
-/// A slim build of it, for the intro film's catgirls, has a waist, a bust, thinner limbs and wrists that end without a fist.
+/// It comes in two builds: the game's, and a slim one for the intro film's catgirls with a waist, a bust, thinner
+/// limbs, narrower shoulders and wrists that end without a fist.
 /// </summary>
 internal static class HumanShape {
     private const float Cloth = 1f / 6, Middle = .5f, End = 5f / 6;
@@ -43,45 +44,60 @@ internal static class HumanShape {
         new(-.6f,.001f,.001f,Neutral,.015f,Tone:End)
     };
 
-    private static readonly Ring[] slimHips = {
-        new(.13f,.115f,.08f,Neutral),new(.08f,.145f,.096f,Neutral),
-        new(.02f,.152f,.094f,Neutral),new(-.015f,.148f,.088f,Neutral)
-    };
-    // The slim torso is two pieces that overlap at the waist, so the chest can turn on the belly.
-    private static readonly Ring[] slimChest = {
-        new(.54f,.042f,.04f,Neutral),new(.5f,.09f,.06f,Neutral),
-        new(.44f,.142f,.078f,Neutral),new(.37f,.132f,.098f,Neutral,.014f),
-        new(.31f,.112f,.08f,Neutral),new(.21f,.092f,.066f,Neutral),new(.16f,.088f,.064f,Neutral)
-    };
-    private static readonly Ring[] slimBelly = {
-        new(.27f,.1f,.072f,Neutral),new(.21f,.096f,.07f,Neutral),new(.13f,.112f,.078f,Neutral),new(.105f,.118f,.08f,Neutral)
-    };
-    private static readonly Ring[] slimLeg = Thinned(leg, .8f), slimLeftArm = Wrist(Thinned(leftArm, .7f)), slimRightArm = Wrist(Thinned(rightArm, .7f));
+    /// <summary>The build of every person in the game.</summary>
+    public static readonly BodyBuild Standard = new(hips, torso, null, leg, leftArm, rightArm, ActorRig.ShoulderOut, 1, .023f);
 
-    private static Ring[] Thinned(Ring[] rings, float by) => System.Array.ConvertAll(rings, ring => ring with { Width = ring.Width * by, Depth = ring.Depth * by });
+    /// <summary>The intro film's catgirls' build, made the first time it is asked for.</summary>
+    public static BodyBuild Slim => SlimBuild.Build;
 
-    /// <summary>An arm without its fist: it closes just past the wrist, where a hand with fingers is put on.</summary>
-    private static Ring[] Wrist(Ring[] arm) {
-        var rings = new List<Ring>(System.Array.FindAll(arm, ring => ring.Tone != End));
-        rings.Add(rings[^1] with { Y = rings[^1].Y - .012f, Width = .001f, Depth = .001f });
-        return rings.ToArray();
+    private static class SlimBuild {
+        private static readonly Ring[] hips = {
+            new(.13f,.115f,.08f,Neutral),new(.08f,.145f,.096f,Neutral),
+            new(.02f,.152f,.094f,Neutral),new(-.015f,.148f,.088f,Neutral)
+        };
+        // The trunk is two pieces that overlap at the waist, so the chest can turn on the belly.
+        private static readonly Ring[] chest = {
+            new(.54f,.042f,.04f,Neutral),new(.5f,.09f,.06f,Neutral),
+            new(.44f,.142f,.078f,Neutral),new(.37f,.132f,.098f,Neutral,.014f),
+            new(.31f,.112f,.08f,Neutral),new(.21f,.092f,.066f,Neutral),new(.16f,.088f,.064f,Neutral)
+        };
+        private static readonly Ring[] belly = {
+            new(.27f,.1f,.072f,Neutral),new(.21f,.096f,.07f,Neutral),new(.13f,.112f,.078f,Neutral),new(.105f,.118f,.08f,Neutral)
+        };
+        public static readonly BodyBuild Build = new(hips, chest, belly, Thinned(leg, .8f), Wrist(Thinned(leftArm, .7f)), Wrist(Thinned(rightArm, .7f)), .145f, .78f, .011f);
+
+        private static Ring[] Thinned(Ring[] rings, float by) => System.Array.ConvertAll(rings, ring => ring with { Width = ring.Width * by, Depth = ring.Depth * by });
+
+        /// <summary>
+        /// An arm without its fist: it closes just past the wrist, where a hand with fingers is put on.
+        /// </summary>
+        private static Ring[] Wrist(Ring[] arm) {
+            var rings = new List<Ring>(System.Array.FindAll(arm, ring => ring.Tone != End));
+            rings.Add(rings[^1] with { Y = rings[^1].Y - .012f, Width = .001f, Depth = .001f });
+            return rings.ToArray();
+        }
     }
 
-    /// <param name="chest">Where the chest goes: the torso itself, or in the slim build the part of it that turns at the waist.</param>
-    public static void Torso(Node3D parent, Node3D chest, string shirt, string trousers, bool slim = false) {
-        ActorShape.Add(parent, slim ? slimHips : hips, material: ModelKit.Cloth(trousers)).Name = "HumanHips";
-        if (slim) ActorShape.Add(parent, slimBelly, material: ModelKit.Cloth(shirt)).Name = "HumanBelly";
-        ActorShape.Add(chest, slim ? slimChest : torso, material: ModelKit.Cloth(shirt)).Name = "HumanTorso";
+    /// <param name="chest">
+    /// What turns at the waist: the build's chest goes on it, its hips and belly on <paramref name="parent"/>.
+    /// </param>
+    public static void Torso(Node3D parent, Node3D chest, string shirt, string trousers, BodyBuild build) {
+        ActorShape.Add(parent, build.Hips, material: ModelKit.Cloth(trousers)).Name = "HumanHips";
+        if (build.Belly is { } belly) ActorShape.Add(parent, belly, material: ModelKit.Cloth(shirt)).Name = "HumanBelly";
+        ActorShape.Add(chest, build.Chest, material: ModelKit.Cloth(shirt)).Name = "HumanTorso";
     }
-    /// <param name="bare">Whether the leg is bare skin of the colour given as trousers, which takes no weave.</param>
-    public static Skeleton3D Leg(Node3D parent, float joint, float ankle, string trousers, string boots, bool slim = false, bool bare = false) {
-        var skeleton = ActorShape.Limb(parent, slim ? slimLeg : leg, joint, Palette(trousers, boots, "302d29", false, !bare), ankle);
+    /// <param name="trousers">
+    /// The leg's colour; without one the leg is bare <paramref name="skin"/>, which takes no weave.
+    /// </param>
+    public static Skeleton3D Leg(Node3D parent, float joint, float ankle, string? trousers, string skin, string boots, BodyBuild build) {
+        var palette = trousers is null ? Palette(skin, boots, "302d29", false, false) : Palette(trousers, boots, "302d29", false);
+        var skeleton = ActorShape.Limb(parent, build.Leg, joint, palette, ankle);
         skeleton.GetChild<MeshInstance3D>(0).Name = "HumanLeg";
         return skeleton;
     }
     /// <param name="sleeves">How far the shirt covers the arm; with none it is all skin and no weave.</param>
-    public static Skeleton3D Arm(Node3D parent, float joint, bool left, string shirt, string skin, Sleeves sleeves, bool slim = false) {
-        var rings = slim ? left ? slimLeftArm : slimRightArm : left ? leftArm : rightArm;
+    public static Skeleton3D Arm(Node3D parent, float joint, bool left, string shirt, string skin, Sleeves sleeves, BodyBuild build) {
+        var rings = left ? build.LeftArm : build.RightArm;
         var palette = sleeves switch {
             Sleeves.None => Palette(skin, skin, skin, false, false),
             Sleeves.Short => Palette(shirt, skin, skin, false),

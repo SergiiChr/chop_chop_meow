@@ -27,7 +27,9 @@ internal static class IntroSets {
 
     public sealed class Office {
         public readonly Node3D Root = new();
-        /// <summary>The hero's own chair, monitor, keyboard, mug and mouse, and the bat leaning in the corner of his cubicle.</summary>
+        /// <summary>
+        /// The hero's own chair, monitor, keyboard, mug and mouse, and the bat leaning in the corner of his cubicle.
+        /// </summary>
         public Node3D Chair = null!, Monitor = null!, Keyboard = null!, Mug = null!, Mouse = null!, LeaningBat = null!;
         /// <summary>The mouse's left button, which flattens into the mouse as it is pressed.</summary>
         public Node3D MouseButton = null!;
@@ -139,6 +141,10 @@ internal static class IntroSets {
 
     /// <summary>Where a mouse rests on its pad, to the right of a cubicle's keyboard.</summary>
     public static readonly Vector3 MouseSpot = new(-.36f, DeskTop + .004f, .42f);
+    /// <summary>
+    /// How far each of a mouse's two buttons is from its middle, and how high its buttons sit on it, in metres.
+    /// </summary>
+    public const float ButtonSide = .0155f, ButtonTop = .03f;
 
     /// <summary>
     /// A beige two-button mouse lying at <paramref name="at"/>, its buttons toward +Z, where its cable runs off.
@@ -147,17 +153,18 @@ internal static class IntroSets {
     private static (Node3D Mouse, Node3D LeftButton) Mouse(Node3D parent, Vector3 at) {
         var mouse = Pivot(parent, at);
         var beige = Mat("d6cfbd", .5f);
-        Box(mouse, new Vector3(.06f, .03f, .1f), new Vector3(0, .015f, 0), beige);
+        Box(mouse, new Vector3(.06f, ButtonTop, .1f), new Vector3(0, ButtonTop / 2, 0), beige);
         Sphere(mouse, .03f, new Vector3(0, .024f, -.018f), beige, new Vector3(1, .55f, 1.3f), 10);
         Box(mouse, new Vector3(.006f, .006f, .14f), new Vector3(0, .008f, .12f), Mat("b8b1a0", .6f));
-        Node3D left = null!;
-        foreach (float side in new[] { -1f, 1f }) {
-            var button = Pivot(mouse, new Vector3(side * .0155f, .03f, .028f));
-            Box(button, new Vector3(.027f, .006f, .04f), new Vector3(0, .003f, 0), Mat("c4bdab", .5f));
-            // The sitter faces +Z, so his left is +X.
-            if (side > 0) left = button;
+        var buttons = Mat("c4bdab", .5f);
+        Node3D Button(float side) {
+            var button = Pivot(mouse, new Vector3(side * ButtonSide, ButtonTop, .028f));
+            Box(button, new Vector3(.027f, .006f, .04f), new Vector3(0, .003f, 0), buttons);
+            return button;
         }
-        return (mouse, left);
+        Button(-1);
+        // The sitter faces +Z, so his left is +X.
+        return (mouse, Button(1));
     }
 
     /// <summary>The middle of a monitor's screen from its origin, and the screen's size.</summary>
