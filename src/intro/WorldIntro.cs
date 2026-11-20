@@ -342,7 +342,7 @@ public partial class WorldView {
     /// <summary>The hero's eyelids drawn up out of sight, so his eyes are wide open.</summary>
     private static readonly Vector3 LidsRaised = new(1, .01f, 1);
     /// <summary>How long each shot in the office runs, in seconds.</summary>
-    private const float DeskSeconds = 5, MouseSeconds = 2.5f, ScreenSeconds = 4, BossSeconds = 4, StareSeconds = 2, SmashSeconds = 3;
+    private const float DeskSeconds = 5, MouseSeconds = 2.5f, ScreenSeconds = 5, BossSeconds = 4, StareSeconds = 2, SmashSeconds = 3;
     private const float OfficeSeconds = DeskSeconds + MouseSeconds + ScreenSeconds + BossSeconds + StareSeconds + SmashSeconds;
     /// <summary>
     /// The boss is first heard this many seconds before the cut to him.
@@ -436,6 +436,7 @@ public partial class WorldView {
     /// <summary>What he has on his screen: a web page of catgirls dancing, until the boss's voice breaks in.</summary>
     private void ScreenShot(float t, float dt) {
         if (cut) { OfficeLight(); hero.Root.Visible = false; }
+        office.Page.FrameStage(t / ScreenSeconds);
         OfficeAround();
         if (Reached(ScreenSeconds - BossHeardBefore, t, dt))
             Cue("intro/boss", 0, string.Create(CultureInfo.InvariantCulture, $"from={BossVoiceStarts:0.00}\tlength={BossHeardBefore + BossSeconds:0.00}\tfadein=0.03\tfadeout=0.1"));
@@ -451,6 +452,8 @@ public partial class WorldView {
             GetViewport().Disable3D = true;
             office.Page.Live = true;
             office.Page.Rehearse();
+            // The beat is only for timing the moves while the dance is worked on; the film has no music here.
+            Cue("intro/dance_beat", -11.5f);
             // The page is narrower than the picture, so black fills its sides.
             var backdrop = new ColorRect { Color = Colors.Black };
             var page = new TextureRect { Texture = office.Page.Picture.AlbedoTexture, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };

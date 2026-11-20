@@ -16,9 +16,9 @@ internal sealed class CatgirlPage {
     /// <summary>How tall the browser's bars above and below the stage are, in pixels.</summary>
     private const int TitleBar = 30, AddressBar = 34, Banner = 40, StatusBar = 24;
     /// <summary>How far apart the dancers stand, in metres.</summary>
-    private const float Spacing = .82f;
+    private const float Spacing = 1.04f;
     /// <summary>The dancers from the viewer's left to right; the one in the middle dances the solo.</summary>
-    private static readonly CatgirlOutfit[] Outfits = { CatgirlOutfit.Maid, CatgirlOutfit.Shorts, CatgirlOutfit.Hoodie };
+    private static readonly CatgirlOutfit[] Outfits = { CatgirlOutfit.Maid, CatgirlOutfit.Blouse, CatgirlOutfit.Hoodie };
     private const int Soloist = 1;
 
     private readonly SubViewport view = new() { Size = Size, OwnWorld3D = true, Msaa3D = Viewport.Msaa.Msaa4X, RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled };
@@ -26,6 +26,8 @@ internal sealed class CatgirlPage {
     private readonly List<Node3D> stars = new();
     private readonly Control live, browser;
     private readonly Camera3D camera;
+    private readonly SpotLight3D pinkSpot, blueSpot;
+    private readonly StandardMaterial3D pinkBar, blueBar;
 
     /// <summary>The page's own viewport, which draws only inside the scene tree.</summary>
     public Node Root => view;
@@ -41,23 +43,31 @@ internal sealed class CatgirlPage {
         var stage = new Node3D(); view.AddChild(stage);
         var air = new Godot.Environment {
             BackgroundMode = Godot.Environment.BGMode.Color,
-            BackgroundColor = new Color("b8377c"),
+            BackgroundColor = new Color("21162e"),
             AmbientLightSource = Godot.Environment.AmbientSource.Color,
-            AmbientLightColor = Colors.White,
-            AmbientLightEnergy = .5f,
+            AmbientLightColor = new Color("f6e8ff"),
+            AmbientLightEnergy = .27f,
         };
         stage.AddChild(new WorldEnvironment { Environment = air });
-        stage.AddChild(new DirectionalLight3D { RotationDegrees = new Vector3(-42, 24, 0), LightEnergy = .55f, ShadowEnabled = true });
-        // The stage fills what the browser's bars leave free, so the camera aims above the dancers' middle.
-        camera = new Camera3D { Position = new Vector3(0, 1.02f, 4.5f), Fov = 30 };
+        stage.AddChild(new DirectionalLight3D {
+            RotationDegrees = new Vector3(-42, 24, 0),
+            LightColor = new Color("ffe9f2"),
+            LightEnergy = .36f,
+            ShadowEnabled = true,
+        });
+        pinkSpot = AddSpot(stage, new Vector3(-1.95f, 2.55f, 1.7f), new Vector3(-.62f, .72f, 0), new Color("ff7bc7"));
+        blueSpot = AddSpot(stage, new Vector3(1.9f, 2.4f, 1.52f), new Vector3(.68f, .75f, 0), new Color("91aaff"));
+        camera = new Camera3D { Fov = 30 };
         stage.AddChild(camera);
-        camera.Basis = Basis.LookingAt(new Vector3(0, .08f, -4.5f), Vector3.Up);
-        // A pink floor, and behind it a darker wall with a lighter disc and stars around it, which cast no shadows.
-        Cylinder(stage, 2.6f, 2.6f, .05f, new Vector3(0, -.025f, 0), Mat("f3b4d2", .9f), sides: 32);
+        FrameStage(0);
+        // A dim floor and a violet backdrop with a disc and stars, which cast no shadows.
+        Cylinder(stage, 2.6f, 2.6f, .05f, new Vector3(0, -.025f, 0), Mat("60415b", .9f), sides: 32);
         var backdrop = Pivot(stage, Vector3.Zero);
-        Box(backdrop, new Vector3(9, 5, .1f), new Vector3(0, 2, -1.9f), Mat("b8377c", .9f));
-        Cylinder(backdrop, 1.35f, 1.35f, .04f, new Vector3(0, 1.15f, -1.82f), Mat("e770ac", .9f), new Vector3(90, 0, 0), 32);
-        var gold = Mat("ffe07a", .5f, 0, 1.2f);
+        Box(backdrop, new Vector3(9, 5, .1f), new Vector3(0, 2, -1.9f), Mat("362341", .9f));
+        Cylinder(backdrop, 1.35f, 1.35f, .04f, new Vector3(0, 1.15f, -1.82f), Mat("694068", .9f), new Vector3(90, 0, 0), 32);
+        pinkBar = AddLightBar(backdrop, -1.66f, new Color("f480cb"));
+        blueBar = AddLightBar(backdrop, 1.66f, new Color("809cff"));
+        var gold = Mat("ed9fd8", .65f, 0, .26f);
         var rng = new Random(3);
         for (int i = 0; i < 12; i++) {
             float angle = i / 12f * MathF.Tau, away = 1.6f + (float)rng.NextDouble() * .5f;
@@ -71,6 +81,31 @@ internal sealed class CatgirlPage {
             stage.AddChild(dancer.Rig.Root); dancers.Add(dancer);
         }
         (browser, live) = BuildBrowser();
+    }
+
+    private static SpotLight3D AddSpot(Node3D stage, Vector3 position, Vector3 aim, Color tint) {
+        var spot = new SpotLight3D {
+            Position = position,
+            Basis = Basis.LookingAt(aim - position, Vector3.Up),
+            LightColor = tint,
+            SpotRange = 6,
+            SpotAngle = 32,
+            SpotAngleAttenuation = 1.8f,
+        };
+        stage.AddChild(spot);
+        return spot;
+    }
+
+    /// <summary>A narrow lamp on the back wall, returned so its brightness can follow the spotlight.</summary>
+    private static StandardMaterial3D AddLightBar(Node3D backdrop, float x, Color tint) {
+        var glow = new StandardMaterial3D {
+            AlbedoColor = new Color("31293d"),
+            EmissionEnabled = true,
+            Emission = tint,
+        };
+        Box(backdrop, new Vector3(.105f, .56f, .046f), new Vector3(x, 1.10f, -1.83f), Mat("201c29"));
+        Box(backdrop, new Vector3(.041f, .45f, .012f), new Vector3(x, 1.10f, -1.801f), glow);
+        return glow;
     }
 
     /// <summary>Draws the browser's window around the stage and returns it with its blinking "LIVE" tag.</summary>
@@ -98,6 +133,16 @@ internal sealed class CatgirlPage {
         return (window, tag);
     }
 
+    /// <summary>Moves the stage camera from square-on to the view from the dancers' left.</summary>
+    public void FrameStage(float progress) {
+        float travel = Mathf.SmoothStep(0, .92f, progress);
+        float angle = Mathf.Atan2(2.9f, 4.4f) * travel;
+        float radius = Mathf.Lerp(4.5f, new Vector2(2.9f, 4.4f).Length(), travel);
+        camera.Position = new Vector3(Mathf.Sin(angle) * radius, Mathf.Lerp(1.02f, 1.22f, travel), Mathf.Cos(angle) * radius);
+        var aim = new Vector3(0, Mathf.Lerp(1.10f, .92f, travel), 0);
+        camera.Basis = Basis.LookingAt(aim - camera.Position, Vector3.Up);
+    }
+
     /// <summary>
     /// Shows the soloist alone, with no browser window and the camera level on her, for working on her dance.
     /// </summary>
@@ -112,9 +157,21 @@ internal sealed class CatgirlPage {
     /// </summary>
     public void Play(float time) {
         var chorus = CatgirlDance.Chorus(time);
-        // Each blinks by a clock of her own, so they do not blink together.
-        for (int i = 0; i < dancers.Count; i++) dancers[i].Show(i == Soloist ? CatgirlDance.Solo(time) : chorus, time + i * 1.1f);
-        for (int i = 0; i < stars.Count; i++) stars[i].Scale = Vector3.One * (.75f + .35f * MathF.Sin(time * 5 + i * 1.9f));
+        // Blinks are held with the pose, but happen at different times for each dancer.
+        float poseTime = CatgirlDance.PoseTime(time);
+        var solo = CatgirlDance.Solo(time);
+        for (int i = 0; i < dancers.Count; i++) dancers[i].Show(i == Soloist ? solo : chorus, poseTime + i * 1.1f);
+        float beat = (time + .5f / WorldView.IntroFps) / CatgirlDance.Beat;
+        int count = Mathf.FloorToInt(beat);
+        float flash = 1 - Mathf.SmoothStep(.035f, .55f, beat - count);
+        bool pink = (count & 1) == 0;
+        float pinkHit = flash * (pink ? 1 : .18f), blueHit = flash * (pink ? .18f : 1);
+        pinkSpot.LightEnergy = .14f + 1.66f * pinkHit;
+        blueSpot.LightEnergy = .16f + 1.77f * blueHit;
+        pinkBar.EmissionEnergyMultiplier = .15f + .82f * pinkHit;
+        blueBar.EmissionEnergyMultiplier = .15f + .82f * blueHit;
+        for (int i = 0; i < stars.Count; i++)
+            stars[i].Scale = Vector3.One * (.69f + .2f * MathF.Sin(time * 5 + i * 1.9f) + .13f * flash);
         live.Visible = Mathf.PosMod(time, .8f) < .5f;
     }
 }

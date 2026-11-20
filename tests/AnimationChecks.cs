@@ -29,7 +29,7 @@ public static class AnimationChecks {
         CheckEveryMomentOfAStrideHasAPose();
         CheckDiggingKeepsBothFeetWhereTheyStand();
         CheckAHandReachesItsPointWithTheElbowTheWayAsked();
-        CheckAHandReachesItsPointFromAShruggedShoulder();
+        CheckAHandReachesItsPointOnTheSlimBuild();
         CheckPosingAllocatesNothing();
     }
 
@@ -163,21 +163,19 @@ public static class AnimationChecks {
     }
 
     /// <summary>
-    /// On the slim build, a fist that <c>ArmReach.WithHandAt</c> places from a shrugged shoulder reaches its point.
+    /// On the slim build, a fist that <c>ArmReach.WithHandAt</c> places from that build's shoulders and arms reaches its point.
     /// </summary>
-    private static void CheckAHandReachesItsPointFromAShruggedShoulder() {
-        const float up = .03f, forward = .02f;
+    private static void CheckAHandReachesItsPointOnTheSlimBuild() {
         var build = HumanShape.Slim;
         var rig = new ActorRig(ActorRig.OutfitOf(ActorSkin.Player), build);
         foreach (bool left in new[] { true, false }) {
             float side = left ? 1 : -1;
             var aim = new Vector3(.05f * side, .55f, .3f);
-            var (pose, roll) = ArmReach.WithHandAt(new Pose(), left, aim, new Vector3(side, -1, 0), build.Shoulder(left, up, forward));
+            var (pose, roll) = ArmReach.WithHandAt(new Pose(), left, aim, new Vector3(side, -1, 0), build);
             rig.Show(pose, null, false);
-            rig.MoveShoulder(left, up, forward);
             rig.RollArm(left, roll);
-            float miss = (rig.Fist(left) - Vector3.Up * pose.HipHeight).DistanceTo(aim);
-            Require(miss < .005f, $"a {(left ? "left" : "right")} fist should reach {aim} from a shrugged shoulder: it missed by {miss:0.000} m");
+            float miss = (rig.Fist(left) - Vector3.Up * pose.HipHeightFor(build.Shin)).DistanceTo(aim);
+            Require(miss < .005f, $"a {(left ? "left" : "right")} fist should reach {aim} on the slim build: it missed by {miss:0.000} m");
         }
         rig.Root.Free();
     }

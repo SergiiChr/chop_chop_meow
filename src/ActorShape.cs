@@ -6,7 +6,32 @@ namespace ChopChopMeow;
 
 /// <summary>Smooth elliptical profiles, with optional two-bone weights across a limb's joint.</summary>
 internal static class ActorShape {
-    internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0, float Tone = 0);
+    /// <param name="FrontLobes">
+    /// How far two broad curves stand out from the front of the ring, either side of its middle.
+    /// Only the joined body draws them (<see cref="JoinedHuman"/>), which shades them by its faces.
+    /// </param>
+    internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0, float Tone = 0, float FrontLobes = 0) {
+        /// <summary>The ring's point on one of <paramref name="sides"/> equal turns around it, from +X toward +Z.</summary>
+        public Vector3 Point(int side, int sides) {
+            float angle = Mathf.Tau * side / sides, x = MathF.Cos(angle), z = MathF.Sin(angle);
+            return new Vector3(Width * x + Sideways, Y, Depth * z + Forward + FrontLobes * Lobe(x, z));
+        }
+
+        /// <summary>The share of <see cref="FrontLobes"/> that stands out at this direction around the ring.</summary>
+        private static float Lobe(float x, float z) => z > 0 ? 6.75f * x * x * z * z * z * z : 0;
+    }
+
+    /// <summary>How far the bones meet across a joint, either side of it, in metres along the limb.</summary>
+    private const float JointBlend = .065f;
+
+    /// <summary>
+    /// How much of a point <paramref name="along"/> a limb follows the bone past <paramref name="joint"/>: none well before
+    /// it, all well after it.
+    /// </summary>
+    public static float PastJoint(float along, float joint) => Mathf.SmoothStep(joint - JointBlend, joint + JointBlend, along);
+
+    /// <summary>How much of a point <paramref name="along"/> a leg turns with the foot below <paramref name="ankle"/>; the boot top flexes with the shin.</summary>
+    public static float PastAnkle(float along, float ankle) => Mathf.SmoothStep(ankle - .03f, ankle + .015f, along);
 
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
     private static readonly StandardMaterial3D Skin = ModelKit.Vertex(Surface.Flat, .85f);
@@ -101,9 +126,8 @@ internal static class ActorShape {
 
     /// <summary>Skins a ring to the upper bone, blending into the lower one across the joint and, past an ankle, into the foot.</summary>
     private static void SetWeights(SurfaceTool surface, float y, float joint, float ankle) {
-        float lower = Mathf.SmoothStep(joint - .065f, joint + .065f, -y);
-        // The boot top flexes with the shin; the rings from the ankle down turn with the foot.
-        float foot = ankle > 0 ? Mathf.SmoothStep(ankle - .03f, ankle + .015f, -y) : 0;
+        float lower = PastJoint(-y, joint);
+        float foot = ankle > 0 ? PastAnkle(-y, ankle) : 0;
         surface.SetBones(new[] { 0, 1, ankle > 0 ? 2 : 0, 0 });
         surface.SetWeights(new[] { 1 - lower, lower * (1 - foot), lower * foot, 0f });
     }
@@ -125,7 +149,7 @@ internal static class ActorShape {
                 surface.SetColor(ring.Color);
                 surface.SetUV(new Vector2(ring.Tone, .5f));
                 if (joint > 0) SetWeights(surface, ring.Y, joint, ankle);
-                surface.AddVertex(new Vector3(ring.Width * x + ring.Sideways, ring.Y, ring.Depth * z + ring.Forward));
+                surface.AddVertex(ring.Point(side, sides));
             }
         }
         for (int row = 0; row < rings.Length - 1; row++)
@@ -171,6 +195,13 @@ internal static class ActorShape {
 
     /// <summary>A limb skinned to an upper and a lower bone that meet at <paramref name="joint"/> below the top, and to a foot bone from <paramref name="ankle"/> down when it is set.</summary>
     public static Skeleton3D Limb(Node3D parent, Ring[] rings, float joint, Material? material = null, float ankle = 0) {
+        var skeleton = LimbJoints(parent, joint, ankle);
+        Add(skeleton, rings, joint, material, ankle);
+        return skeleton;
+    }
+
+    /// <summary>A limb's joints without the profile, for rigs which skin one mesh across several limbs.</summary>
+    internal static Skeleton3D LimbJoints(Node3D parent, float joint, float ankle) {
         var skeleton = new Skeleton3D();
         parent.AddChild(skeleton);
         skeleton.AddBone("upper"); skeleton.AddBone("lower");
@@ -183,7 +214,6 @@ internal static class ActorShape {
             skeleton.SetBoneRest(2, new Transform3D(Basis.Identity, new Vector3(0, joint - ankle, 0)));
         }
         skeleton.ResetBonePoses();
-        Add(skeleton, rings, joint, material, ankle);
         return skeleton;
     }
 }

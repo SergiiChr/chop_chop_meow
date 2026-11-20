@@ -17,7 +17,10 @@ public sealed class ActorRig {
     public const float ShoulderOut = .17f, ShoulderUp = .45f, UpperArm = .28f, Forearm = .27f;
     /// <summary>How far ahead of the forearm's line a held thing sits in the fist, in metres.</summary>
     public const float Palm = .01f;
+    /// <summary>How far up the forearm from the fist the wrist is, where a hand with fingers bends, in metres.</summary>
+    public const float WristAboveFist = .05f;
     private readonly BodyBuild build;
+    private readonly JoinedHuman? joined;
     private readonly Outfit outfit;
     private readonly Node3D hips, torso, chest, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     /// <summary>The right fist's grip, which turns a held tool about its own length (<see cref="Pose.Grip"/>).</summary>
@@ -41,7 +44,7 @@ public sealed class ActorRig {
     /// </summary>
     public Node3D Chest => chest;
     /// <summary>Where the chest turns on the belly, from the hips.</summary>
-    private static readonly Vector3 Waist = new(0, .21f, 0);
+    private readonly Vector3 waist;
     public Node3D Head => head;
     /// <summary>The player's backpack and its straps, which a film hides before the journey starts; null on other skins.</summary>
     public Node3D? Pack { get; private set; }
@@ -81,24 +84,32 @@ public sealed class ActorRig {
 
     /// <summary>
     /// A person of <paramref name="build"/> in <paramref name="outfit"/>'s colours, with no face, hair or kit.
+    /// A build with a joined trunk is drawn as one surface (<see cref="JoinedHuman"/>), the game's as separate parts.
     /// The intro film's catgirls are dressed by <c>Catgirl</c>.
     /// </summary>
     internal ActorRig(Outfit outfit, BodyBuild build) {
         this.build = build; this.outfit = outfit;
-        hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
-        (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, outfit);
-        (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, outfit);
+        bool joinBody = build.Trunk is not null;
+        waist = Vector3.Up * build.Waist;
+        hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + build.Shin + ActorAnimation.Sole, 0));
+        (legL, kneeL, footL) = Leg(true, outfit, joinBody);
+        (legR, kneeR, footR) = Leg(false, outfit, joinBody);
         torso = Pivot(hips, Vector3.Zero);
         chest = Pivot(torso, Vector3.Zero);
-        HumanShape.Torso(torso, chest, outfit.Top, outfit.Hips, build);
-        Cylinder(chest, .055f * build.Neck, .05f * build.Neck, .08f, new Vector3(0, .54f, 0), Mat(outfit.Skin));
-        head = Pivot(chest, new Vector3(0, .56f, 0));
-        Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(outfit.Skin), new Vector3(.95f, 1.05f, 1), 16);
+        if (!joinBody) {
+            HumanShape.Torso(torso, chest, outfit, build);
+            Cylinder(chest, .055f * build.Neck, .05f * build.Neck, .08f, new Vector3(0, .54f, 0), Mat(outfit.Skin));
+        }
+        head = Pivot(chest, build.HeadOffset);
+        head.Scale = build.HeadScale;
+        if (build.Head is { } face) ActorShape.Add(head, face, material: Mat(outfit.Skin));
+        else Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(outfit.Skin), new Vector3(.95f, 1.05f, 1), 16);
         Sphere(head, build.Nose, new Vector3(0, .12f, .115f), Mat(outfit.Skin), new Vector3(.7f, 1, 1), 8);
         shoulderL = Pivot(chest, build.Shoulder(true));
         shoulderR = Pivot(chest, build.Shoulder(false));
-        elbowL = Arm(shoulderL, outfit);
-        elbowR = Arm(shoulderR, outfit);
+        elbowL = Arm(shoulderL, outfit, joinBody);
+        elbowR = Arm(shoulderR, outfit, joinBody);
+        if (build.Trunk is { } trunk) joined = new JoinedHuman(torso, build, trunk, outfit);
         crate = Pivot(torso, new Vector3(0, .37f, .33f));
         // Reuse the compact shipping crate, fitted to the existing centered carry volume.
         Add(crate, CrateShape.Cargo, CrateShape.Timber, new Vector3(0, -.14f, 0), scale: new Vector3(.7f, .62f, .73f));
@@ -207,18 +218,22 @@ public sealed class ActorRig {
         return (holder, flame, light);
     }
 
-    private (Node3D Hip, Node3D Knee, Skeleton3D Skin) Leg(float x, Outfit outfit) {
-        var hip = Pivot(hips, new Vector3(x, -.02f, 0));
+    private (Node3D Hip, Node3D Knee, Skeleton3D Skin) Leg(bool left, Outfit outfit, bool joinBody) {
+        var hip = Pivot(hips, build.Hip(left));
         var knee = Pivot(hip, new Vector3(0, -ActorAnimation.Thigh, 0));
-        var skin = HumanShape.Leg(hip, ActorAnimation.Thigh, ActorAnimation.Thigh + ActorAnimation.Shin, outfit.Legs, outfit.Skin, outfit.Shoes, build);
-        limbs.Add((skin, knee));
+        float ankle = ActorAnimation.Thigh + build.Shin;
+        var skin = joinBody
+            ? ActorShape.LimbJoints(hip, ActorAnimation.Thigh, ankle)
+            : HumanShape.Leg(hip, ActorAnimation.Thigh, ankle, outfit, build, left);
+        if (!joinBody) limbs.Add((skin, knee));
         return (hip, knee, skin);
     }
 
     /// <summary>Every role shares the continuous arm and its skin weights; the palette selects sleeve length.</summary>
-    private Node3D Arm(Node3D shoulder, Outfit outfit) {
-        var elbow = Pivot(shoulder, new Vector3(0, -UpperArm, 0));
-        limbs.Add((HumanShape.Arm(shoulder, UpperArm, shoulder.Position.X > 0, outfit.Top, outfit.Skin, outfit.Sleeves, build), elbow));
+    private Node3D Arm(Node3D shoulder, Outfit outfit, bool joinBody) {
+        var elbow = Pivot(shoulder, Vector3.Down * build.UpperArm);
+        if (!joinBody)
+            limbs.Add((HumanShape.Arm(shoulder, build.UpperArm, shoulder.Position.X > 0, outfit.Top, outfit.Skin, outfit.Sleeves, build), elbow));
         return elbow;
     }
 
@@ -238,7 +253,7 @@ public sealed class ActorRig {
         hips.Transform * (torso.Transform * (chest.Transform * ((left ? shoulderL : shoulderR).Transform * ((left ? elbowL : elbowR).Transform * point))));
 
     /// <summary>Where a fist is from the rig's root, under the pose just shown.</summary>
-    public Vector3 Fist(bool left) => FromForearm(left, new Vector3(0, -Forearm, Palm));
+    public Vector3 Fist(bool left) => FromForearm(left, new Vector3(0, -build.Forearm, Palm));
 
     /// <summary>Where an elbow is from the rig's root, under the pose just shown.</summary>
     public Vector3 Elbow(bool left) => FromForearm(left, Vector3.Zero);
@@ -273,7 +288,7 @@ public sealed class ActorRig {
     /// </summary>
     public void BendChest(float lean, float twist, float tip) {
         var turn = Basis.FromEuler(new Vector3(Mathf.DegToRad(lean), Mathf.DegToRad(twist), Mathf.DegToRad(tip)));
-        chest.Transform = new Transform3D(turn, Waist - turn * Waist);
+        chest.Transform = new Transform3D(turn, waist - turn * waist);
     }
 
     /// <summary>
@@ -282,27 +297,31 @@ public sealed class ActorRig {
     /// </summary>
     public void TurnHips(float tuck, float turn, float tilt) => hips.RotationDegrees = new Vector3(tuck, turn, tilt);
 
-    /// <summary>
-    /// Moves a shoulder from its place on the chest, up for a shrug and forward for a hunch, in metres.
-    /// It stays until set again.
-    /// </summary>
-    public void MoveShoulder(bool left, float up, float forward) => (left ? shoulderL : shoulderR).Position = build.Shoulder(left, up, forward);
-
     /// <summary>Tips a foot sideways at the ankle, its outer edge up, on top of the pose just shown.</summary>
     public void RollFoot(bool left, float degrees) {
         var foot = left ? footL : footR;
         foot.SetBonePoseRotation(2, foot.GetBonePoseRotation(2) * new Quaternion(Vector3.Back, Mathf.DegToRad(left ? degrees : -degrees)));
     }
 
-    /// <summary>
-    /// A thigh, from its hip joint down along -Y, and the shin under it from the knee, for a film to dress.
-    /// </summary>
-    public Node3D Thigh(bool left) => left ? legL : legR;
-    public Node3D Shin(bool left) => left ? kneeL : kneeR;
+    /// <summary>Applies the rig's chest, limb and wrist transforms to the connected film mesh.</summary>
+    internal void PoseJoinedBody(Transform3D wristLeft, Transform3D wristRight) {
+        if (joined is null) return;
+        joined.Chest(chest.Transform);
+        joined.Arm(true, chest.Transform, shoulderL.Transform, elbowL.Transform, wristLeft);
+        joined.Arm(false, chest.Transform, shoulderR.Transform, elbowR.Transform, wristRight);
+        Leg(true, legL, kneeL, footL);
+        Leg(false, legR, kneeR, footR);
+
+        void Leg(bool left, Node3D hip, Node3D knee, Skeleton3D foot) {
+            var upper = torso.Transform.AffineInverse() * hip.Transform;
+            var lower = upper * knee.Transform;
+            joined.Leg(left, upper, lower, lower * foot.GetBonePose(2));
+        }
+    }
 
     /// <summary>Puts something gripped at its origin into the right fist, or the left one.</summary>
     public void Hold(Node3D item, bool right = true) {
-        item.Position = new Vector3(0, -Forearm, Palm);
+        item.Position = new Vector3(0, -build.Forearm, Palm);
         (right ? elbowR : elbowL).AddChild(item);
     }
 
@@ -443,7 +462,7 @@ public sealed class ActorRig {
             skeleton.SetBonePoseRotation(1, joint.Quaternion);
         footL.SetBonePoseRotation(2, new Quaternion(Vector3.Right, Mathf.DegToRad(pose.FootL)));
         footR.SetBonePoseRotation(2, new Quaternion(Vector3.Right, Mathf.DegToRad(pose.FootR)));
-        hips.Position = new Vector3(0, pose.HipHeight, 0);
+        hips.Position = new Vector3(0, pose.HipHeightFor(build.Shin), 0);
         rock.Visible = onRock;
         if (pose.Grip != grip) { grip = pose.Grip; wrist.RotationDegrees = new Vector3(0, grip, 0); }
         foreach (var (name, node) in tools) node.Visible = name == tool;

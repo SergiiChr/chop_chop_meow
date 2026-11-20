@@ -26,12 +26,13 @@ public static class ArmReach {
     /// The arm raise, outward swing, elbow bend and roll of the arm about its own length, in degrees, that put a fist at
     /// <paramref name="grip"/>, from the hips in the trunk's own frame, with the elbow as far toward <paramref name="elbowToward"/>
     /// as the arm allows; <see cref="ActorRig.RollArm"/> applies the roll after the pose.
-    /// <paramref name="shoulder"/> is where the shoulder is in that frame, the game's build at rest unless given.
+    /// <paramref name="shoulder"/> is where the shoulder is in that frame, and <paramref name="upper"/> and
+    /// <paramref name="forearm"/> how long the arm is from shoulder to elbow and elbow to fist, the game's build's unless given.
     /// </summary>
-    public static (float Raise, float Out, float Elbow, float Roll) ArmTo(Vector3 grip, bool left, Vector3 elbowToward, float palm = 0, Vector3? shoulder = null) {
+    public static (float Raise, float Out, float Elbow, float Roll) ArmTo(Vector3 grip, bool left, Vector3 elbowToward, float palm = 0,
+        Vector3? shoulder = null, float upper = ActorRig.UpperArm, float forearm = ActorRig.Forearm) {
         var from = shoulder ?? HumanShape.Standard.Shoulder(left);
-        const float upper = ActorRig.UpperArm;
-        float fore = MathF.Sqrt(ActorRig.Forearm * ActorRig.Forearm + palm * palm);
+        float fore = MathF.Sqrt(forearm * forearm + palm * palm);
         var reach = grip - from;
         float d = Math.Clamp(reach.Length(), Math.Abs(upper - fore) + 1e-3f, upper + fore - 1e-3f);
         var along = reach.Normalized();
@@ -41,16 +42,16 @@ public static class ArmReach {
         if (toward.LengthSquared() < 1e-8f) toward = Vector3.Down - along * Vector3.Down.Dot(along);
         var elbowAt = from + along * toCentre + toward.Normalized() * radius;
         var hand = from + along * d;
-        Vector3 down = (elbowAt - from).Normalized(), forearm = (hand - elbowAt).Normalized();
+        Vector3 down = (elbowAt - from).Normalized(), lower = (hand - elbowAt).Normalized();
         // The forearm bends toward the shoulder's +Z; the fist sits a palm ahead of the forearm's line.
-        var bend = forearm - down * forearm.Dot(down);
+        var bend = lower - down * lower.Dot(down);
         if (bend.LengthSquared() < 1e-8f) bend = Vector3.Back - down * Vector3.Back.Dot(down);
         var z = bend.Normalized();
         var y = -down;
         var basis = new Basis(y.Cross(z), y, z);
         // The shoulder turns as Rx(-raise) Rz(out) and RollArm then turns it about its length.
         var euler = basis.GetEuler(EulerOrder.Xzy);
-        float elbow = Mathf.RadToDeg(MathF.Acos(Math.Clamp(down.Dot(forearm), -1, 1)) - MathF.Atan2(palm, ActorRig.Forearm));
+        float elbow = Mathf.RadToDeg(MathF.Acos(Math.Clamp(down.Dot(lower), -1, 1)) - MathF.Atan2(palm, forearm));
         float outward = Mathf.RadToDeg(euler.Z);
         return (-Mathf.RadToDeg(euler.X), left ? outward : -outward, elbow, Mathf.RadToDeg(euler.Y));
     }
@@ -69,10 +70,15 @@ public static class ArmReach {
     /// <summary>
     /// A pose with one arm bent so its fist lies on <paramref name="grip"/>, from the hips in the trunk's own frame.
     /// The elbow points toward <paramref name="elbowToward"/>; the roll of the arm to apply after it comes too.
-    /// <paramref name="shoulder"/> is where the shoulder is in that frame, the game's build at rest unless given.
     /// </summary>
-    public static (Pose Pose, float Roll) WithHandAt(Pose pose, bool left, Vector3 grip, Vector3 elbowToward, Vector3? shoulder = null) {
-        var (raise, outward, elbow, roll) = ArmTo(grip, left, elbowToward, ActorRig.Palm, shoulder);
+    public static (Pose Pose, float Roll) WithHandAt(Pose pose, bool left, Vector3 grip, Vector3 elbowToward) {
+        var (raise, outward, elbow, roll) = ArmTo(grip, left, elbowToward, ActorRig.Palm);
+        return (WithArm(pose, left, raise, outward, elbow, 1), roll);
+    }
+
+    /// <summary>Places a hand as <see cref="WithHandAt(Pose, bool, Vector3, Vector3)"/> does, from the shoulders and with the arm lengths of <paramref name="build"/>.</summary>
+    internal static (Pose Pose, float Roll) WithHandAt(Pose pose, bool left, Vector3 grip, Vector3 elbowToward, BodyBuild build) {
+        var (raise, outward, elbow, roll) = ArmTo(grip, left, elbowToward, ActorRig.Palm, build.Shoulder(left), build.UpperArm, build.Forearm);
         return (WithArm(pose, left, raise, outward, elbow, 1), roll);
     }
 
