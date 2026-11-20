@@ -78,6 +78,16 @@ public readonly record struct Pose(
     /// <summary>The hip height above the ground on legs with this <paramref name="shin"/>: Hips when set, otherwise standing on the lower foot.</summary>
     public float HipHeightFor(float shin) => Hips > 0 ? Hips : StandingFor(shin);
 
+    /// <summary>The left leg's angles, or the right's.</summary>
+    internal ActorAnimation.LegAngles Leg(bool left) => left ? new(SwingL, KneeL, FootL) : new(SwingR, KneeR, FootR);
+
+    /// <summary>The pose with the left leg, or the right, at <paramref name="leg"/>'s angles.</summary>
+    internal Pose WithLeg(bool left, ActorAnimation.LegAngles leg) =>
+        left ? this with { SwingL = leg.Swing, KneeL = leg.Knee, FootL = leg.Foot } : this with { SwingR = leg.Swing, KneeR = leg.Knee, FootR = leg.Foot };
+
+    /// <summary>The pose with both legs at the given angles.</summary>
+    internal Pose WithLegs(ActorAnimation.LegAngles left, ActorAnimation.LegAngles right) => WithLeg(true, left).WithLeg(false, right);
+
     /// <summary>The hip height that puts the lower foot on the ground.</summary>
     private float Standing => StandingFor(ActorAnimation.Shin);
 
@@ -156,16 +166,18 @@ public static class ActorAnimation {
         _ => null
     };
 
-    private static readonly Pose Stance = new(SwingL: 16, KneeL: 16, SwingR: -10, KneeR: 10);
-    private static readonly Pose Crouch = new(Lean: 38, Head: 18, SwingL: 72, KneeL: 118, SwingR: 50, KneeR: 112);
+    // Standing to work with the left boot ahead and the right behind (StanceFeet), and squatting low on the balls of both feet (SquatFeet).
+    // A pose done in place gives only its hip height: OnFeet bends the legs to keep both boots where they stand.
+    private static readonly Pose Stance = new(Hips: .805f);
+    private static readonly Pose Crouch = new(Lean: 38, Head: 18, Hips: .49f);
 
     // Each action's key poses are made once: every worker and player is posed every frame, and a list made per call is garbage.
     // An axe swung in the air goes up overhead and comes straight down in front.
     private static readonly Pose AxeSwingReady = Stance with { Lean = 6, RaiseL = 50, OutL = -24, ElbowL = 35, RaiseR = 55, OutR = -16, ElbowR = 25 };
     private static readonly (float At, Pose Pose)[] AxeSwingKeys = {
         (0, AxeSwingReady),
-        (.38f, AxeSwingReady with { Lean = -8, Twist = 24, RaiseL = 150, OutL = -26, ElbowL = 60, RaiseR = 168, OutR = -10, ElbowR = 45 }),
-        (.52f, AxeSwingReady with { Lean = 18, Twist = -12, RaiseL = 80, OutL = -26, ElbowL = 14, RaiseR = 86, OutR = -12, ElbowR = 4 }),
+        (.3f, AxeSwingReady with { Lean = -8, Twist = 24, RaiseL = 150, OutL = -26, ElbowL = 60, RaiseR = 168, OutR = -10, ElbowR = 45 }),
+        (AxeSwingStrike, AxeSwingReady with { Lean = 18, Twist = -12, RaiseL = 80, OutL = -26, ElbowL = 14, RaiseR = 86, OutR = -12, ElbowR = 4 }),
         (.66f, AxeSwingReady with { Lean = 20, Twist = -14, RaiseL = 76, OutL = -26, ElbowL = 14, RaiseR = 80, OutR = -12, ElbowR = 6 }),
     };
     // Felling: the axe is wound round to the left at shoulder height, then swung across, almost level, into the trunk's flank.
@@ -173,9 +185,9 @@ public static class ActorAnimation {
     private static readonly Pose ChopReady = TwoHanded(Stance with { Lean = 6, Twist = 14, RaiseR = 42, OutR = -30, ElbowR = 40, Grip = 35 });
     private static readonly (float At, Pose Pose)[] ChopKeys = {
         (0, ChopReady),
-        (.38f, TwoHanded(Stance with { Twist = 48, Sway = -4, RaiseR = 66, OutR = -62, ElbowR = 30, Grip = 75 })),
-        (.52f, TwoHanded(Stance with { Lean = 19, Twist = -14, Sway = 2, RaiseR = 77, OutR = -39, ElbowR = 28, Grip = 90, KneeL = 24, KneeR = 16 })),
-        (.66f, TwoHanded(Stance with { Lean = 20, Twist = -16, Sway = 2, RaiseR = 74, OutR = -40, ElbowR = 30, Grip = 90, KneeL = 24, KneeR = 16 })),
+        (.34f, TwoHanded(Stance with { Twist = 48, Sway = -4, RaiseR = 66, OutR = -62, ElbowR = 30, Grip = 75 })),
+        (ChopStrike, TwoHanded(Stance with { Lean = 19, Twist = -14, Sway = 2, RaiseR = 77, OutR = -39, ElbowR = 28, Grip = 90, Hips = .796f })),
+        (.66f, TwoHanded(Stance with { Lean = 20, Twist = -16, Sway = 2, RaiseR = 74, OutR = -40, ElbowR = 30, Grip = 90, Hips = .796f })),
     };
     // An axe swept sideways in the air: wound far round behind the left shoulder with the arms out level, then swung wide
     // across the front at chest height and on round to the right in one stroke, the shoulders turning all the way with it.
@@ -183,10 +195,18 @@ public static class ActorAnimation {
     private static readonly (float At, Pose Pose)[] SweepKeys = {
         (0, SweepReady),
         (.34f, TwoHanded(Stance with { Lean = -2, Twist = 75, Sway = -5, RaiseR = 74, OutR = -72, ElbowR = 18, Grip = 85 })),
-        (.6f, TwoHanded(Stance with { Lean = 4, Twist = -60, Sway = 4, RaiseR = 82, OutR = -15, ElbowR = 10, Grip = 90, KneeL = 22, KneeR = 16 })),
-        (.74f, TwoHanded(Stance with { Lean = 4, Twist = -55, Sway = 3, RaiseR = 80, OutR = -18, ElbowR = 16, Grip = 90, KneeL = 20, KneeR = 14 })),
+        (.6f, TwoHanded(Stance with { Lean = 4, Twist = -60, Sway = 4, RaiseR = 82, OutR = -15, ElbowR = 10, Grip = 90, Hips = .799f })),
+        (.74f, TwoHanded(Stance with { Lean = 4, Twist = -55, Sway = 3, RaiseR = 80, OutR = -18, ElbowR = 16, Grip = 90, Hips = .801f })),
     };
     private static readonly Pose MineGuard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
+    /// <summary>
+    /// The shares of a loop at which a felling axe bites the trunk, a pickaxe the rock and a hammer its work, and at which an axe swung overhead in the air is brought up short.
+    /// The stroke arrives there at its full speed and stops.
+    /// </summary>
+    private const float ChopStrike = .52f, MineStrike = .55f, HammerStrike = .5f, AxeSwingStrike = .52f;
+    /// <summary>Which of its keys an axe swung overhead in the air is brought up short at.</summary>
+    private const int AxeSwingStop = 2;
+
     /// <summary>Seconds a player knocked or yanked off their feet backward takes to land on their back and lie there under the wolf.</summary>
     public const float FallBackSeconds = .8f;
 
@@ -202,9 +222,9 @@ public static class ActorAnimation {
     };
     private static readonly (float At, Pose Pose)[] MineKeys = {
         (0, MineGuard),
-        (.4f, MineGuard with { Lean = -6, RaiseL = 160, OutL = -24, ElbowL = 50, RaiseR = 175, OutR = -10, ElbowR = 35 }),
-        (.55f, MineGuard with { Lean = 32, Head = 10, RaiseL = 34, OutL = -26, ElbowL = 10, RaiseR = 36, OutR = -12, ElbowR = 0, KneeL = 28, KneeR = 22 }),
-        (.68f, MineGuard with { Lean = 30, Head = 10, RaiseL = 32, OutL = -26, ElbowL = 12, RaiseR = 34, OutR = -12, ElbowR = 2, KneeL = 26, KneeR = 20 }),
+        (.28f, MineGuard with { Lean = -6, RaiseL = 160, OutL = -24, ElbowL = 50, RaiseR = 175, OutR = -10, ElbowR = 35 }),
+        (MineStrike, MineGuard with { Lean = 32, Head = 10, RaiseL = 34, OutL = -26, ElbowL = 10, RaiseR = 36, OutR = -12, ElbowR = 0, Hips = .79f }),
+        (.68f, MineGuard with { Lean = 30, Head = 10, RaiseL = 32, OutL = -26, ElbowL = 12, RaiseR = 34, OutR = -12, ElbowR = 2, Hips = .793f }),
     };
     // Reach with one hand, close it on the find and pull it in while the other hand reaches.
     private static readonly (float At, Pose Pose)[] GatherKeys = {
@@ -222,13 +242,13 @@ public static class ActorAnimation {
     };
     // A quick shove down on the lever, a short hold, then a slower lift as the bellows refill.
     private static readonly Pose PumpLever = Stance with { Lean = 16, RaiseL = 78, OutL = -12, ElbowL = 42, RaiseR = 78, OutR = -12, ElbowR = 42 };
-    private static readonly Pose PumpPressed = PumpLever with { Lean = 32, RaiseL = 44, ElbowL = 6, RaiseR = 44, ElbowR = 6, KneeL = 30, KneeR = 24 };
-    private static readonly (float At, Pose Pose)[] PumpKeys = { (0, PumpLever), (.35f, PumpPressed), (.5f, PumpPressed with { Lean = 30, KneeL = 27, KneeR = 21 }) };
+    private static readonly Pose PumpPressed = PumpLever with { Lean = 32, RaiseL = 44, ElbowL = 6, RaiseR = 44, ElbowR = 6, Hips = .787f };
+    private static readonly (float At, Pose Pose)[] PumpKeys = { (0, PumpLever), (.35f, PumpPressed), (.5f, PumpPressed with { Lean = 30, Hips = .792f }) };
     private static readonly Pose HammerHold = Stance with { Lean = 15, RaiseL = 48, OutL = -16, ElbowL = 52, RaiseR = 70, OutR = -8, ElbowR = 50 };
     private static readonly (float At, Pose Pose)[] HammerKeys = {
         (0, HammerHold),
-        (.35f, HammerHold with { Lean = 8, RaiseR = 150, ElbowR = 96 }),
-        (.5f, HammerHold with { Lean = 18, RaiseR = 58, ElbowR = 22 }),
+        (.22f, HammerHold with { Lean = 8, RaiseR = 120, ElbowR = 105 }),
+        (HammerStrike, HammerHold with { Lean = 18, RaiseR = 58, ElbowR = 22 }),
         (.7f, HammerHold with { Lean = 18, RaiseR = 60, ElbowR = 24 }),
     };
     // Both hands rummage in the heap of goods, lift a piece across, and settle it into the crate on the other side.
@@ -247,15 +267,17 @@ public static class ActorAnimation {
         (.94f, PackTable with { Lean = 6, RaiseL = 62, ElbowL = 70, RaiseR = 62, ElbowR = 70 }),
     };
     private static readonly Pose Fists = Stance with { Twist = 10, RaiseL = 48, OutL = -14, ElbowL = 112, RaiseR = 44, OutR = -14, ElbowR = 115 };
+    // The fist is drawn back as the shoulders wind up, then thrown out straight.
     private static readonly (float At, Pose Pose)[] AttackKeys = {
         (0, Fists),
+        (.18f, Fists with { Twist = 18, RaiseR = 40, OutR = -8, ElbowR = 128 }),
         (.32f, Fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
         (.5f, Fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }),
     };
     // A wide forehand sweep of the torch arm across the body, bent over at the waist with the knees giving, so the flame
     // passes low enough to reach a wolf.
     private static readonly Pose TorchUp = Stance with { RaiseL = 30, OutL = 4, ElbowL = 60, RaiseR = 20, OutR = 10, ElbowR = 30 };
-    private static readonly Pose TorchLow = TorchUp with { KneeL = 46, SwingL = 34, KneeR = 34, SwingR = -4, Head = -20 };
+    private static readonly Pose TorchLow = TorchUp with { Hips = .75f, Head = -20 };
     private static readonly (float At, Pose Pose)[] TorchSwingKeys = {
         (0, TorchUp),
         (.2f, TorchLow with { Twist = 22, Lean = 34, RaiseL = 46, OutL = 50, ElbowL = 24 }),
@@ -266,7 +288,7 @@ public static class ActorAnimation {
     // Now and then a bite goes up to the mouth.
     private static readonly (float At, Pose Pose)[] SitKeys = Eating(new Pose(Lean: 6, Head: 2, RaiseL: 30, OutL: 22, ElbowL: 34, RaiseR: 30, OutR: 22, ElbowR: 34,
         SwingL: 86, KneeL: 150, TurnL: 40, RollL: 90, SwingR: 82, KneeR: 150, TurnR: 40, RollR: 90, Hips: .15f));
-    private static readonly (float At, Pose Pose)[] PerchKeys = Eating(new Pose(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, SwingL: 112, KneeL: 100, SwingR: 108, KneeR: 96));
+    private static readonly (float At, Pose Pose)[] PerchKeys = Eating(new Pose(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, Hips: .315f));
     private static (float At, Pose Pose)[] Eating(Pose seated) {
         var bite = seated with { Head = seated.Head + 6, Lean = seated.Lean + 6, RaiseR = 40, OutR = -24, ElbowR = 140 };
         return new[] { (0, seated), (.55f, seated), (.68f, bite), (.8f, bite), (.92f, seated) };
@@ -304,10 +326,7 @@ public static class ActorAnimation {
     /// A handle out of the left arm's reach gets the arm stretched toward it.
     /// </summary>
     private static Pose TwoHanded(Pose pose) {
-        var shoulder = Basis.FromEuler(new Vector3(Mathf.DegToRad(-pose.RaiseR), 0, Mathf.DegToRad(-pose.OutR)));
-        var arm = shoulder * new Basis(Vector3.Right, Mathf.DegToRad(-pose.ElbowR));
-        var fist = new Vector3(-ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0) + shoulder * new Vector3(0, -ActorRig.UpperArm, 0) + arm * new Vector3(0, -ActorRig.Forearm, ActorRig.Palm);
-        var (raise, outward, elbow) = ArmReach.ArmTo(fist + arm * Vector3.Down * SecondGrip, left: true);
+        var (raise, outward, elbow) = ArmReach.ArmTo(ArmReach.PastFist(pose, false, SecondGrip), left: true);
         return pose with { RaiseL = raise, OutL = outward, ElbowL = elbow };
     }
 
@@ -323,34 +342,77 @@ public static class ActorAnimation {
     /// <summary>
     /// A moment of a dig: the trunk's lean and turn in degrees and the height of the hips, where the blade's tip is from the spot under the hips, in metres to the left, up and ahead,
     /// and how far the shaft leans from straight down toward ahead, <paramref name="Pitch"/>, turned to the left by <paramref name="Yaw"/>, in degrees.
+    /// <paramref name="Aim"/> is how much of a turn and reach toward the blade's spot the moment takes, from 0 to 1.
     /// </summary>
-    private readonly record struct DigKey(float At, float Lean, float Twist, float Hips, Vector3 Tip, float Pitch, float Yaw);
+    internal readonly record struct DigKey(
+        float At, float Lean, float Twist, float Hips, Vector3 Tip, float Pitch, float Yaw, float Aim);
 
     // The blade is driven into the ground ahead, the weight goes onto it, the handle is pushed down to lever the load out, and the load is heaved up and thrown aside to the left.
     // The handle stays ahead of the right side of the chest and below the shoulders, with the shaft crossing toward the left hand out in front:
     // held at the middle of the chest the right arm folds into the torso, and held higher the handle is in front of the face.
     // The blade goes in short of where a digger stands from a stump or a bush, so it enters the ground at its foot.
+    // Each key takes all of a turn and reach toward the blade's spot while the blade goes in and levers, less as it
+    // heaves, and none as it throws.
     private static readonly DigKey[] DigKeys = {
-        new(0, 10, 0, .74f, new(.15f, .3f, .73f), 30, 41),
-        new(DigStrike, 54, 0, .7f, new(.1f, -.08f, .78f), 26, 43),
-        new(.32f, 58, 0, .65f, new(.1f, -.13f, .8f), 28, 43),
-        new(.55f, 45, 0, .684f, new(.12f, .09f, .94f), 40, 33),
-        new(.64f, 34, 9, .627f, new(.4f, .26f, 1.01f), 52, 44),
-        new(.72f, 33, 24, .671f, new(.52f, .33f, .98f), 52, 45),
-        new(.82f, 26, 22, .769f, new(.79f, .65f, .79f), 72, 70),
-        new(.92f, 7, 10, .71f, new(.34f, .46f, .87f), 48, 42),
+        new(0, 10, 0, .74f, new(.15f, .3f, .73f), 30, 41, 1),
+        new(DigStrike, 54, 0, .7f, new(.1f, -.08f, .78f), 26, 43, 1),
+        new(.32f, 58, 0, .65f, new(.1f, -.13f, .8f), 28, 43, 1),
+        new(.55f, 45, 0, .684f, new(.12f, .09f, .94f), 40, 33, 1),
+        new(.64f, 34, 9, .627f, new(.4f, .26f, 1.01f), 52, 44, .6f),
+        new(.72f, 33, 24, .671f, new(.52f, .33f, .98f), 52, 45, .3f),
+        new(.82f, 26, 22, .769f, new(.79f, .65f, .79f), 72, 70, 0),
+        new(.92f, 7, 10, .71f, new(.34f, .46f, .87f), 48, 42, .5f),
     };
+    // Of a reach further out to the blade's spot, the share the hands take; the shaft leans the rest of the way.
+    private const float DigHandsAhead = .3f;
+    // The least and most a dug shaft leans from straight down, and the most the trunk leans to keep the hands on it, in degrees.
+    private const float DigPitchLeast = 5, DigPitchMost = 70, DigLeanMost = 75;
+    // How far a hand reaches from its shoulder holding the shaft, short of the arm's full length.
+    private const float DigArm = .53f;
+
+    /// <summary>
+    /// A dig key turned and reached out so the blade goes in its <see cref="DigKey.Aim"/> of the way from where it is
+    /// keyed to go in to <paramref name="spot"/>, metres to the left and ahead of the hips.
+    /// The trunk, the hands and the shaft turn toward the spot; the hands go part of the way further out and the shaft runs from
+    /// them to the blade, leaning further out or standing straighter as that takes, within how far a dug shaft leans.
+    /// </summary>
+    private static DigKey Aimed(DigKey key, Vector2 spot) {
+        var keyed = new Vector2(DigKeys[1].Tip.X, DigKeys[1].Tip.Z);
+        float share = key.Aim;
+        if (share == 0 || spot == keyed) return key;
+        // Bearings are measured as a body turns, toward the left from straight ahead.
+        float turn = Mathf.AngleDifference(Yaw(keyed, 0), Yaw(spot, 0)) * share;
+        float further = (spot.Length() - keyed.Length()) * share;
+        float pitch = Mathf.DegToRad(key.Pitch), yaw = Mathf.DegToRad(key.Yaw) + turn;
+        var tip = new Vector2(key.Tip.X, key.Tip.Z).Rotated(-turn);
+        var outward = tip.Normalized();
+        // Where the hands hold the top of the shaft, seen from above, and the blade's tip, both taken further out.
+        var hands = tip - Forward(yaw) * (MathF.Sin(pitch) * ShovelLength) + outward * (further * DigHandsAhead);
+        tip += outward * further;
+        var reach = tip - hands;
+        float least = MathF.Sin(Mathf.DegToRad(DigPitchLeast)) * ShovelLength, most = MathF.Sin(Mathf.DegToRad(DigPitchMost)) * ShovelLength;
+        if (reach.Length() < least) reach = (reach == Vector2.Zero ? outward : reach.Normalized()) * least;
+        if (reach.Length() > most) reach = reach.Normalized() * most;
+        return key with {
+            Twist = key.Twist + Mathf.RadToDeg(turn),
+            Tip = new Vector3(tip.X, key.Tip.Y, tip.Y),
+            Pitch = Mathf.RadToDeg(MathF.Asin(reach.Length() / ShovelLength)),
+            Yaw = Mathf.RadToDeg(MathF.Atan2(reach.X, reach.Y))
+        };
+    }
 
     /// <summary>
     /// Digging with a shovel in both hands, the right on top of the handle and the left down the shaft.
     /// Both arms are solved from where the handle has to be for the blade's tip to be where the dig takes it, and the rig lays the shaft through both fists.
     /// The front foot stays flat and the back one on its toe, the heel lifting as the hips come down.
     /// </summary>
-    private static Pose Dig(float p) {
-        int from = DigKeys.Length - 1;
-        while (from > 0 && p < DigKeys[from].At) from--;
-        var (a, b) = (DigKeys[from], DigKeys[(from + 1) % DigKeys.Length]);
-        float t = Mathf.SmoothStep(0, 1, (p - a.At) / ((from + 1 < DigKeys.Length ? b.At : 1) - a.At));
+    /// <param name="keys">The dig's keys, as keyed or turned and reached out to where the blade goes in.</param>
+    private static Pose Dig(float p, ReadOnlySpan<DigKey> keys) {
+        int from = keys.Length - 1;
+        while (from > 0 && p < keys[from].At) from--;
+        int to = (from + 1) % keys.Length;
+        var (a, b) = (keys[from], keys[to]);
+        float t = Mathf.SmoothStep(0, 1, (p - a.At) / ((from + 1 < keys.Length ? b.At : 1) - a.At));
         float lean = Mathf.Lerp(a.Lean, b.Lean, t), twist = Mathf.Lerp(a.Twist, b.Twist, t), height = Mathf.Lerp(a.Hips, b.Hips, t);
         float pitch = Mathf.DegToRad(Mathf.Lerp(a.Pitch, b.Pitch, t)), yaw = Mathf.DegToRad(Mathf.Lerp(a.Yaw, b.Yaw, t));
         var along = new Vector3(MathF.Sin(pitch) * MathF.Sin(yaw), -MathF.Cos(pitch), MathF.Sin(pitch) * MathF.Cos(yaw));
@@ -358,26 +420,54 @@ public static class ActorAnimation {
         var front = OnHeel(DigFrontHeel, height, 0);
         var back = OnToe(DigBackToe, height, Mathf.DegToRad(8 + (.78f - height) * 200));
         var hips = new Vector3(0, height, 0);
-        // Measured from the ground under the hips, then turned into the leaning, twisted trunk's frame.
-        Vector3 InTrunk(Vector3 point) => (point - hips).Rotated(Vector3.Up, -Mathf.DegToRad(twist)).Rotated(Vector3.Right, -Mathf.DegToRad(lean));
-        var right = ArmReach.ArmTo(InTrunk(top), left: false, ActorRig.Palm);
-        var left = ArmReach.ArmTo(InTrunk(top + along * ShovelGrip), left: true, ActorRig.Palm);
+        // Both hands' holds, measured from the ground under the hips and turned with the trunk, then leaned with it.
+        var topTurned = (top - hips).Rotated(Vector3.Up, -Mathf.DegToRad(twist));
+        var gripTurned = (top + along * ShovelGrip - hips).Rotated(Vector3.Up, -Mathf.DegToRad(twist));
+        static Vector3 Leaned(Vector3 turned, float bent) => turned.Rotated(Vector3.Right, -Mathf.DegToRad(bent));
+        // A blade sent further out than the hands reach from this lean bends the trunk further, just far enough for both to hold the shaft.
+        float Short(float bent) => Math.Max(Leaned(topTurned, bent).DistanceTo(HumanShape.Standard.Shoulder(false)),
+            Leaned(gripTurned, bent).DistanceTo(HumanShape.Standard.Shoulder(true))) - DigArm;
+        if (Short(lean) > 0) {
+            float within = DigLeanMost, beyond = lean;
+            if (Short(within) < 0)
+                for (int i = 0; i < 16; i++) {
+                    float mid = (within + beyond) / 2;
+                    if (Short(mid) > 0) beyond = mid; else within = mid;
+                }
+            lean = within;
+        }
+        var right = ArmReach.ArmTo(Leaned(topTurned, lean), left: false, ActorRig.Palm);
+        var left = ArmReach.ArmTo(Leaned(gripTurned, lean), left: true, ActorRig.Palm);
         return new Pose(Lean: lean, Twist: twist, Head: 14 + lean * .3f, Hips: height,
-            RaiseL: left.Raise, OutL: left.Out, ElbowL: left.Elbow, RaiseR: right.Raise, OutR: right.Out, ElbowR: right.Elbow,
-            SwingL: front.Swing, KneeL: front.Knee, FootL: front.Foot, SwingR: back.Swing, KneeR: back.Knee, FootR: back.Foot);
+            RaiseL: left.Raise, OutL: left.Out, ElbowL: left.Elbow,
+            RaiseR: right.Raise, OutR: right.Out, ElbowR: right.Elbow).WithLegs(front, back);
     }
 
     /// <summary>Swings that play out in full on the move: the arms and body keep swinging while the legs keep walking.</summary>
     public static bool SwingsOnTheMove(ActorAction action) => Contact(action) > 0;
 
-    public static Pose PoseAt(ActorAction action, float elapsed, bool moving) {
+    /// <summary>
+    /// An action's pose <paramref name="elapsed"/> seconds in.
+    /// A blow that lands on something, chopping, picking, hammering or digging, lands its tool's working end on
+    /// <paramref name="aim"/>'s mark, a point in the rig's own frame, when one is given and within reach.
+    /// </summary>
+    public static Pose PoseAt(ActorAction action, float elapsed, bool moving, BlowAim? aim = null) {
         if (moving && SwingsOnTheMove(action)) {
             // The swing keeps its own clock, which keeps the jog's pace at the player's speed.
             var legs = PoseAt(ActorAction.Jog, elapsed, true);
-            return PoseAt(action, elapsed, false) with { SwingL = legs.SwingL, KneeL = legs.KneeL, FootL = legs.FootL, SwingR = legs.SwingR, KneeR = legs.KneeR, FootR = legs.FootR, Sway = legs.Sway, Hips = legs.Hips, SplayL = legs.SplayL, SplayR = legs.SplayR };
+            return Posed(action, elapsed, false, null).WithLegs(legs.Leg(true), legs.Leg(false))
+                with { Sway = legs.Sway, Hips = legs.Hips, SplayL = legs.SplayL, SplayR = legs.SplayR };
         }
+        var pose = Posed(action, elapsed, moving, aim);
+        return FeetOf(action) is Footing feet ? OnFeet(pose, feet) : pose;
+    }
+
+    /// <summary>An action's pose before its boots are stood on the ground; an action with a <see cref="Footing"/> gives only its hip height for the legs.</summary>
+    private static Pose Posed(ActorAction action, float elapsed, bool moving, BlowAim? aim) {
         float p = Phase(action, elapsed);
         float wave = MathF.Sin(p * Mathf.Tau);
+        if (BlowOf(action)?.Swung is ToolSwing swung)
+            return Keys(p, swung.Keys, swung.StrikeKey, aim?.Mark is Vector3 at ? aim.Offset(action, swung, at) : default);
         switch (action) {
             case ActorAction.Walk:
                 return Walk(p);
@@ -390,27 +480,21 @@ public static class ActorAnimation {
                     float a = MathF.Sin(p * Mathf.Tau * 3), b = MathF.Sin(p * Mathf.Tau * 2 + 1.3f), c = MathF.Sin(p * Mathf.Tau * 5 + .4f);
                     return new Pose(Lean: 30 + b * 2, Head: 24 + a * 3, Twist: a * 4,
                         RaiseL: 48 + a * 9, OutL: -22 + c * 6, ElbowL: 78 + b * 16, RaiseR: 50 - b * 8, OutR: -22 - c * 5, ElbowR: 76 + a * 14,
-                        SwingL: 98, KneeL: 150, SwingR: 92, KneeR: 146, TurnL: 14, TurnR: 14);
+                        Hips: .28f, TurnL: 14, TurnR: 14);
                 }
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
                 return moving ? Walk(p) with { Lean = carry.Lean, Head = -carry.Lean / 2, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
-            case ActorAction.Chop or ActorAction.SteelChop:
-                return Keys(p, ChopKeys);
             case ActorAction.AxeSweep or ActorAction.SteelAxeSweep:
                 return Keys(p, SweepKeys);
             case ActorAction.AxeSwing or ActorAction.SteelAxeSwing:
-                return Keys(p, AxeSwingKeys);
-            case ActorAction.Mine or ActorAction.SteelMine:
-                return Keys(p, MineKeys);
+                return Keys(p, AxeSwingKeys, AxeSwingStop);
             case ActorAction.Gather:
                 return Keys(p, GatherKeys);
             case ActorAction.PickUp:
                 return Keys(p, PickUpKeys);
             case ActorAction.Pump:
                 return Keys(p, PumpKeys);
-            case ActorAction.Hammer:
-                return Keys(p, HammerKeys);
             case ActorAction.Pack:
                 return Keys(p, PackKeys);
             case ActorAction.Grind: {
@@ -422,7 +506,7 @@ public static class ActorAnimation {
                     return Grinding(new Vector2(MathF.Cos(angle), across) * (GrindCircle * open), lift * PoundLift) with { Twist = across * open * 5, Head = 22 - lift * 5 };
                 }
             case ActorAction.Dig:
-                return Dig(p);
+                return Dig(p, aim?.Mark is Vector3 spot ? aim.AimedDigKeys(new Vector2(spot.X, spot.Z)) : DigKeys);
             case ActorAction.Attack:
                 return Keys(p, AttackKeys);
             case ActorAction.Kindle:
@@ -436,18 +520,21 @@ public static class ActorAnimation {
                 // A runner stopping hard plants the front heel well ahead with the leg nearly straight, sinks onto the bent back
                 // leg and leans back against the run, arms thrown forward for balance, the weight rocking a little as it holds.
                 return new Pose(Lean: -14 + wave * 2, Head: 10 + MathF.Cos(p * Mathf.Tau) * 2, RaiseL: 55, OutL: 18, ElbowL: 45, RaiseR: 40, OutR: 22, ElbowR: 55,
-                    SwingL: 42, KneeL: 6, FootL: -18, SwingR: -18, KneeR: 58, SplayL: 4, SplayR: 4);
+                    Hips: BrakeHips, SplayL: 4, SplayR: 4).WithLegs(BrakeFront, BrakeBack);
             case ActorAction.Tugged: {
                     // Tugged back by the waist: bent over at the hips with the arms reaching for the doorway and the head up to keep it in sight.
-                    // Each tug, half the loop, jerks the hips back and the trunk lower; the front foot steps back in the air while the other stays
-                    // planted, the hips passing back over it until it is in front.
-                    float half = p * 2 % 1, jerk = Mathf.SmoothStep(0, 1, Math.Min(1, half / DoorTug.Heave)), heave = DoorTug.HeavePulse(half);
-                    float stepping = Mathf.Lerp(18, -8, jerk), planted = Mathf.Lerp(-8, 18, jerk), lift = 45 * heave, struggle = MathF.Sin(half * Mathf.Tau);
-                    bool left = p < .5f;
+                    // Each tug, half the loop, jerks the hips back and the trunk lower; the front boot steps back in the air while the other stays
+                    // where it stands, the hips passing back over it until it is in front.
+                    float half = p * 2 % 1, back = Mathf.SmoothStep(0, 1, Math.Min(1, half / DoorTug.Heave)), heave = DoorTug.HeavePulse(half);
+                    float struggle = MathF.Sin(half * Mathf.Tau), step = heave * heave;
+                    var planted = Stood(TugBehind + TugStep * back, TugHips);
+                    // The stepping boot stands on ground that rises under it and sinks again, its toes hanging as it swings back; it lifts and sets down gently.
+                    var stepping = Stood(TugBehind + TugStep * (1 - back), TugHips - TugLift * step) + new LegAngles(0, 0, TugToes * step);
+                    var (left, right) = p < .5f ? (stepping, planted) : (planted, stepping);
                     // Between tugs the player strains toward the door, the arms clawing at it.
                     return new Pose(Lean: 42 + 8 * heave - 3 * struggle, Head: -28 - 4 * heave, RaiseL: 105 - 10 * heave + 8 * struggle, OutL: 14, ElbowL: 22,
                         RaiseR: 115 - 10 * heave - 8 * struggle, OutR: 12, ElbowR: 16,
-                        SwingL: left ? stepping : planted, KneeL: 24 + (left ? lift : 0), SwingR: left ? planted : stepping, KneeR: 24 + (left ? 0 : lift), SplayL: 3, SplayR: 3);
+                        Hips: TugHips, SplayL: 3, SplayR: 3).WithLegs(left, right);
                 }
             case ActorAction.Knock: {
                     // The right fist beats on a door at head height, landing as each loop starts: drawn back with the elbow bent, then thrown at the boards.
@@ -498,7 +585,6 @@ public static class ActorAnimation {
     // The legs hang from this far below the hips, so the ankle is the rest of Sole above the bottom of the boot.
     // The boot's sole reaches this far ahead of the ankle to the toe and behind it to the heel, as HumanShape builds it.
     private const float LegDrop = .02f, Toe = .155f, Heel = .065f, AboveSole = Sole - LegDrop;
-    private const float Gravity = 9.8f;
     /// <summary>How far below the hip a leg's ankle is, for a thigh swung forward and a knee folded back by these angles.</summary>
     public static float Reach(float swing, float knee, float shin = Shin) => Ankle(swing, knee, shin).Y;
 
@@ -521,6 +607,8 @@ public static class ActorAnimation {
 
     /// <summary>A leg's thigh swing, knee bend and foot tip in degrees, as in <see cref="Pose"/>.</summary>
     internal readonly record struct LegAngles(float Swing, float Knee, float Foot) {
+        /// <summary>How far, in degrees, the boot's toes tip down from level ground.</summary>
+        public float Tilt => Foot - Swing + Knee;
         public static LegAngles operator +(LegAngles a, LegAngles b) => new(a.Swing + b.Swing, a.Knee + b.Knee, a.Foot + b.Foot);
         public static LegAngles operator -(LegAngles a, LegAngles b) => new(a.Swing - b.Swing, a.Knee - b.Knee, a.Foot - b.Foot);
         public static LegAngles operator *(LegAngles a, float by) => new(a.Swing * by, a.Knee * by, a.Foot * by);
@@ -567,7 +655,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>The leg angles that put the boot's toe on the ground <paramref name="toe"/> ahead of the hips, with the foot tipped <paramref name="tilt"/> radians up about it.</summary>
-    private static LegAngles OnToe(float toe, float hips, float tilt) {
+    internal static LegAngles OnToe(float toe, float hips, float tilt) {
         var (swing, knee) = LegTo(toe - Toe * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt), hips - LegDrop - AboveSole * MathF.Cos(tilt) - Toe * MathF.Sin(tilt));
         return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
     }
@@ -578,8 +666,82 @@ public static class ActorAnimation {
         return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
     }
 
+    /// <summary>
+    /// How high above the ground the hips can stand for a leg bent <paramref name="knee"/> degrees to touch it with the toe,
+    /// <paramref name="toe"/> ahead of them, the foot tipped <paramref name="tilt"/> radians down about the toe.
+    /// </summary>
+    internal static float ToeReach(float toe, float tilt, float knee) {
+        float reach = Thigh * Thigh + Shin * Shin + 2 * Thigh * Shin * MathF.Cos(Mathf.DegToRad(knee));
+        float ahead = toe - Toe * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt);
+        return LegDrop + AboveSole * MathF.Cos(tilt) + Toe * MathF.Sin(tilt) + MathF.Sqrt(Math.Max(0, reach - ahead * ahead));
+    }
+
     /// <summary>How far a leg hangs to the side of the hips' middle, toward the body's left for the left leg.</summary>
     public const float LegSide = .09f;
+
+    // ---------- Standing in place ----------
+
+    /// <summary>Where the boots stand in an action done in place: how far ahead of the hips the left boot's ankle is, and the right's, with the boots flat.</summary>
+    private readonly record struct Footing(float Left, float Right);
+
+    // Standing to work with the left boot ahead, squatting to gather, squatting on the heels to make something, sitting on a rock, and bending down from standing.
+    private static readonly Footing StanceFeet = new(.105f, -.1925f), SquatFeet = new(.095f, -.036f), CraftFeet = new(.085f, .08f), PerchFeet = new(.43f, .44f), TogetherFeet = new(0, 0);
+
+    /// <summary>Where an action done in place stands its boots, or null for one that moves its legs itself.</summary>
+    private static Footing? FeetOf(ActorAction action) => action switch {
+        ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep
+            or ActorAction.Mine or ActorAction.SteelMine or ActorAction.Pump or ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind
+            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock => StanceFeet,
+        ActorAction.Gather => SquatFeet,
+        ActorAction.Craft => CraftFeet,
+        ActorAction.Perch => PerchFeet,
+        ActorAction.PickUp => TogetherFeet,
+        _ => null
+    };
+
+    // A standing leg keeps its knee bent at least this much, and its shin leans at most this far over the foot, as far as an ankle bends under the body's weight.
+    internal const float StoodKnee = 5;
+    private const float AnkleBend = 30;
+
+    /// <summary>
+    /// The leg angles that stand a boot on the ground, its ankle <paramref name="ankle"/> ahead of the hips when the boot is flat.
+    /// The heel lifts about the toe by as much as the shin leans further over a flat foot than an ankle bends, as squatting low,
+    /// and as far as it takes to bend the knee a little where the leg would be stretched straight or not reach, as with a boot far behind.
+    /// </summary>
+    private static LegAngles Stood(float ankle, float hips) {
+        float toe = ankle + Toe;
+        var flat = OnToe(toe, hips, 0);
+        float tilt = Mathf.DegToRad(Math.Max(0, -AnkleBend - flat.Foot));
+        if (flat.Knee < StoodKnee) tilt = Math.Max(tilt, HeelLift(toe, hips, StoodKnee));
+        return tilt > 0 ? OnToe(toe, hips, tilt) : flat;
+    }
+
+    /// <summary>
+    /// How far, in radians, a boot's heel lifts about its toe, <paramref name="toe"/> ahead of the hips, to leave the hip the reach of a leg bent <paramref name="knee"/> degrees at the knee.
+    /// The ankle circles the toe as the heel lifts; a lift below zero means the leg is bent further than that with the boot flat.
+    /// </summary>
+    internal static float HeelLift(float toe, float hips, float knee) {
+        float pivot = MathF.Sqrt(Toe * Toe + AboveSole * AboveSole);
+        var centre = new Vector2(toe, hips - LegDrop);
+        float reach = Thigh * Thigh + Shin * Shin + 2 * Thigh * Shin * MathF.Cos(Mathf.DegToRad(knee));
+        float along = (centre.LengthSquared() + pivot * pivot - reach) / (2 * pivot * centre.Length());
+        return MathF.Atan2(centre.Y, centre.X) - MathF.Acos(Math.Clamp(along, -1, 1)) - MathF.Atan2(AboveSole, Toe);
+    }
+
+    /// <summary>A pose with both legs bent to stand its boots on the ground where <paramref name="feet"/> has them, under hips at the pose's height.</summary>
+    private static Pose OnFeet(Pose pose, Footing feet) {
+        float hips = pose.HipHeight;
+        return pose.WithLegs(Stood(feet.Left, hips), Stood(feet.Right, hips)) with { Hips = hips };
+    }
+
+    // A runner braking: the hips this high, the left heel dug in this far ahead of them with the toes up this many degrees,
+    // and the right boot on its toe this far behind with the heel lifted this many degrees.
+    private const float BrakeHips = .652f;
+    private static readonly LegAngles BrakeFront = OnHeel(.44f, BrakeHips, -Mathf.DegToRad(25)), BrakeBack = OnToe(-.4f, BrakeHips, Mathf.DegToRad(55));
+
+    // Tugged back by the waist: the hips this high, a boot this far behind them as a tug starts and the other a tug's distance ahead of it;
+    // the stepping boot lifts this high, its toes hanging this many degrees.
+    private const float TugHips = .765f, TugBehind = -.2f, TugStep = DoorTug.TugDistance / DoorTug.Tugs, TugLift = .09f, TugToes = 12;
 
     // ---------- Walking ----------
 
@@ -608,8 +770,7 @@ public static class ActorAnimation {
         float raiseL = (right.Swing - 5) * .9f, raiseR = (left.Swing - 5) * .9f;
         return new Pose(Lean: lean, Head: 4 - lean, Twist: (left.Swing - right.Swing) * .15f, Sway: -3 * MathF.Cos(Mathf.Tau * settled),
             RaiseL: raiseL, OutL: 9, ElbowL: 20 + Math.Max(0, raiseL) * .9f, RaiseR: raiseR, OutR: 9, ElbowR: 20 + Math.Max(0, raiseR) * .9f,
-            SwingL: left.Swing, KneeL: left.Knee, FootL: left.Foot, SwingR: right.Swing, KneeR: right.Knee, FootR: right.Foot,
-            Hips: WalkHips(p - .25f), SplayL: -1.5f, SplayR: -1.5f);
+            Hips: WalkHips(p - .25f), SplayL: -1.5f, SplayR: -1.5f).WithLegs(left, right);
     }
 
     /// <summary>The hip height a share <paramref name="sinceLanding"/> of the cycle after the left heel lands: highest over each planted leg, lowest while both feet are down.</summary>
@@ -634,13 +795,8 @@ public static class ActorAnimation {
         var flat = OnHeel(heel, hips, 0);
         float ahead = heel + Heel, below = hips - LegDrop - AboveSole;
         if (flat.Knee >= knee && ahead * ahead + below * below < (Thigh + Shin) * (Thigh + Shin)) return flat;
-        // The ankle circles the toe as the heel lifts: find the lift that leaves the hip the reach of a leg bent by this much.
-        float toe = heel + Heel + Toe, pivot = MathF.Sqrt(Toe * Toe + AboveSole * AboveSole);
-        var centre = new Vector2(toe, hips - LegDrop);
-        float reach = Thigh * Thigh + Shin * Shin + 2 * Thigh * Shin * MathF.Cos(Mathf.DegToRad(knee));
-        float along = (centre.LengthSquared() + pivot * pivot - reach) / (2 * pivot * centre.Length());
-        float tilt = MathF.Atan2(centre.Y, centre.X) - MathF.Acos(Math.Clamp(along, -1, 1)) - MathF.Atan2(AboveSole, Toe);
-        return OnToe(toe, hips, Math.Max(0, tilt));
+        float toe = heel + Heel + Toe;
+        return OnToe(toe, hips, Math.Max(0, HeelLift(toe, hips, knee)));
     }
 
     // ---------- Running ----------
@@ -664,7 +820,7 @@ public static class ActorAnimation {
         public RunGait(float speed, float cycle, float stance, float landing, float hipHeight, float pushOffTilt, float lean, float splay, float armGain, float armPivot, (float At, LegAngles Leg)[] swing) {
             (Stride, Cycle, Stance, Landing, HipHeight, PushOffTilt) = (speed * cycle, cycle, stance, landing, hipHeight, pushOffTilt);
             (Lean, Splay, ArmGain, ArmPivot) = (lean, splay, armGain, armPivot);
-            LandingSpeed = Gravity * (.5f - stance) * cycle / 2;
+            LandingSpeed = Movement.Gravity * (.5f - stance) * cycle / 2;
             Swing = SwingCurve(stance, q => Planted(this, q), swing);
         }
     }
@@ -700,8 +856,7 @@ public static class ActorAnimation {
         float lean = gait.Lean + 1.5f * MathF.Cos(Mathf.Tau * 2 * settled);
         return new Pose(Lean: lean, Head: -.4f * gait.Lean - (lean - gait.Lean) * .6f, Twist: (left.Swing - right.Swing) * .12f, Sway: -2 * MathF.Cos(Mathf.Tau * settled),
             RaiseL: raiseL, OutL: outL, ElbowL: elbowL, RaiseR: raiseR, OutR: outR, ElbowR: elbowR,
-            SwingL: left.Swing, KneeL: left.Knee, FootL: left.Foot, SwingR: right.Swing, KneeR: right.Knee, FootR: right.Foot,
-            Hips: RunHips(gait, p - .25f), SplayL: gait.Splay, SplayR: gait.Splay);
+            Hips: RunHips(gait, p - .25f), SplayL: gait.Splay, SplayR: gait.Splay).WithLegs(left, right);
     }
 
     /// <summary>
@@ -721,7 +876,7 @@ public static class ActorAnimation {
         float q = Mathf.PosMod(sinceLanding, .5f);
         if (q < gait.Stance) return gait.HipHeight - gait.LandingSpeed * gait.Stance * gait.Cycle / MathF.PI * MathF.Sin(MathF.PI * q / gait.Stance);
         float t = (q - gait.Stance) * gait.Cycle;
-        return gait.HipHeight + gait.LandingSpeed * t - Gravity * t * t / 2;
+        return gait.HipHeight + gait.LandingSpeed * t - Movement.Gravity * t * t / 2;
     }
 
     /// <summary>A running leg's angles a share <paramref name="sinceLanding"/> of the cycle after its foot lands.</summary>
@@ -743,24 +898,233 @@ public static class ActorAnimation {
     /// <summary>How long a change of action blends from the old pose into the new one.</summary>
     public const float BlendSeconds = .22f;
 
-    /// <summary>The pose part way through a change of action, eased from the old action's pose at <paramref name="blend"/> 0 to the new one's at 1.</summary>
-    public static Pose Blended(ActorAction from, float fromTime, bool fromMoving, ActorAction to, float time, bool moving, float blend) {
-        var now = PoseAt(to, time, moving);
+    /// <summary>
+    /// The pose part way through a change of action, eased from the old action's pose at <paramref name="blend"/> 0 to the new one's at 1.
+    /// The new action's blows land on <paramref name="aim"/>'s mark and the old one's on <paramref name="fromAim"/>'s.
+    /// </summary>
+    public static Pose Blended(ActorAction from, float fromTime, bool fromMoving, ActorAction to, float time,
+        bool moving, float blend, BlowAim? aim = null, BlowAim? fromAim = null) {
+        var now = PoseAt(to, time, moving, aim);
         if (blend >= 1) return now;
-        return Pose.Lerp(PoseAt(from, fromTime, fromMoving), now, Mathf.SmoothStep(0, 1, blend));
+        return Pose.Lerp(PoseAt(from, fromTime, fromMoving, fromAim), now, Mathf.SmoothStep(0, 1, blend));
     }
 
-    /// <summary>Loops smoothly through keys sorted by phase; the last key eases back into the first.</summary>
-    private static Pose Keys(float phase, (float At, Pose Pose)[] keys) {
+    /// <summary>
+    /// Loops smoothly through keys sorted by phase; the last key eases back into the first.
+    /// The key at index <paramref name="strike"/>, if any, is a blow landing on something: the stroke into it speeds up
+    /// all the way and stops there.
+    /// </summary>
+    /// <param name="by">How far the blow and the keys after it move to land on its mark (<see cref="Plus"/>).</param>
+    private static Pose Keys(float phase, (float At, Pose Pose)[] keys, int strike = -1, Pose by = default) {
+        bool moved = by != default;
         for (int i = 0; i < keys.Length; i++) {
             var from = keys[i];
             var (toAt, toPose) = i + 1 < keys.Length ? keys[i + 1] : (1f, keys[0].Pose);
             if (phase < from.At || phase >= toAt) continue;
             float t = (phase - from.At) / (toAt - from.At);
-            return Pose.Lerp(from.Pose, toPose, t * t * (3 - 2 * t));
+            var a = moved && i >= strike ? Plus(from.Pose, by) : from.Pose;
+            var b = moved && i + 1 < keys.Length && i + 1 >= strike ? Plus(toPose, by) : toPose;
+            return Pose.Lerp(a, b, i + 1 == strike ? 1 - MathF.Cos(t * MathF.PI / 2) : t * t * (3 - 2 * t));
         }
         return keys[0].Pose;
     }
+
+    // ---------- Aiming a blow ----------
+
+    /// <summary>
+    /// A blow that lands on something: the kinds of thing it works, the first of them the one the animation review
+    /// stands it against, and the share of its loop at which it lands; a tool swung in the right fist also gives how it
+    /// is swung.
+    /// </summary>
+    private sealed record Blow(ThingKind[] Works, float StrikeShare, ToolSwing? Swung) {
+        /// <summary>A blow of a tool swung in the right fist, landing at its strike key.</summary>
+        public Blow(ThingKind[] works, ToolSwing swung) : this(works, swung.Keys[swung.StrikeKey].At, swung) { }
+    }
+
+    /// <summary>
+    /// How a tool in the right fist is swung in a blow: its keys and the index of the one the blow lands in, the tool's
+    /// working end in the grip's own frame (<see cref="ArmReach.InRightHand"/>), whether the left fist holds the handle
+    /// too, and the most, in degrees, the striking elbow folds reaching out to a mark.
+    /// </summary>
+    internal sealed record ToolSwing(
+        (float At, Pose Pose)[] Keys, int StrikeKey, Vector3 End, bool TwoHanded, float ElbowMost);
+
+    /// <summary>
+    /// The least raise of a striking arm, in degrees from hanging, and the most its elbow folds, for a blow reaching
+    /// out to a mark; both hands on an axe fold further to cut into a trunk close by.
+    /// </summary>
+    private const float ArmBehind = -10, ElbowMost = 120, ChopElbowMost = 140;
+
+    // Felling a tree with an axe, picking at rock, hammering on an anvil or bench, and digging out a stump or bush.
+    private static readonly Blow Felling = new(new[] { ThingKind.Tree },
+        new ToolSwing(ChopKeys, 2, ActorRig.AxeHeadPoint, TwoHanded: true, ChopElbowMost));
+    private static readonly Blow Picking = new(new[] { ThingKind.Stone, ThingKind.Iron, ThingKind.Coal, ThingKind.Tin },
+        new ToolSwing(MineKeys, 2, ActorRig.PickPoint, TwoHanded: true, ElbowMost));
+    private static readonly Blow Hammering = new(new[] { ThingKind.Anvil, ThingKind.Bench },
+        new ToolSwing(HammerKeys, 2, ActorRig.HammerFace, TwoHanded: false, ElbowMost));
+    private static readonly Blow Digging = new(new[] { ThingKind.Stump, ThingKind.Bush }, DigStrike, null);
+
+    /// <summary>The blow an action lands on what it works, or null for an action that lands none.</summary>
+    private static Blow? BlowOf(ActorAction action) => action switch {
+        ActorAction.Chop or ActorAction.SteelChop => Felling,
+        ActorAction.Mine or ActorAction.SteelMine => Picking,
+        ActorAction.Hammer => Hammering,
+        ActorAction.Dig => Digging,
+        _ => null
+    };
+
+    /// <summary>The share of an action's loop at which its blow lands on what it works, or null for no blow.</summary>
+    public static float? StrikeShare(ActorAction action) => BlowOf(action)?.StrikeShare;
+
+    /// <summary>
+    /// The kinds of thing an action's blow lands on, the first of them the one the animation review stands it against;
+    /// none for an action that lands no blow.
+    /// </summary>
+    public static ReadOnlySpan<ThingKind> Works(ActorAction action) => BlowOf(action)?.Works;
+
+    /// <summary>How far the trunk may lean further back or in than a blow is keyed with, to bring its mark within the arms' reach, and turn either way to face it.</summary>
+    private const float AimLeanBack = 12, AimLeanIn = 30, AimTurn = 40;
+    /// <summary>Degrees the trunk leans further in for each metre a mark lies past the arms' reach, or back for each metre it lies too near.</summary>
+    private const float LeanPerMetre = 90;
+    /// <summary>The shares of the arm and tool's full length within which a blow lands without the trunk leaning: the elbow neither locked nor folded tight.</summary>
+    private const float ReachMost = .97f, ReachLeast = .55f;
+    /// <summary>How far, in metres, a mark moves before the blow is aimed at it again.</summary>
+    private const float AimMoves = .001f;
+
+    /// <summary>
+    /// Where an actor's blow lands, and how the blow is bent to land there, worked out once and kept while the action
+    /// stays and the mark moves less than <see cref="AimMoves"/>: every aimed actor is posed every frame.
+    /// </summary>
+    public sealed class BlowAim {
+        /// <summary>Where the blow lands its tool's working end in the rig's frame, or null to land as keyed.</summary>
+        public Vector3? Mark;
+        /// <summary>The action and the mark the aim below was worked out for, or null before it is.</summary>
+        private (ActorAction Action, Vector3 Mark)? aimed;
+        /// <summary>How far a swung tool's blow and the keys after it move to land on the mark.</summary>
+        private Pose offset;
+        /// <summary>A dig's keys turned and reached out to where the blade goes into the ground.</summary>
+        private readonly DigKey[] dig = new DigKey[ActorAnimation.DigKeys.Length];
+
+        /// <summary>How far the blow and keys after it move to land on <paramref name="mark"/>.</summary>
+        internal Pose Offset(ActorAction action, ToolSwing swung, Vector3 mark) {
+            if (Moved(action, mark)) {
+                var blow = swung.Keys[swung.StrikeKey].Pose;
+                offset = Minus(Struck(swung.Keys[swung.StrikeKey - 1].Pose, blow, swung, mark), blow);
+            }
+            return offset;
+        }
+
+        /// <summary>
+        /// The dig's keys turned and reached out so the blade goes in at <paramref name="spot"/>, metres to the left
+        /// and ahead of the hips.
+        /// </summary>
+        internal ReadOnlySpan<DigKey> AimedDigKeys(Vector2 spot) {
+            if (Moved(ActorAction.Dig, new Vector3(spot.X, 0, spot.Y)))
+                for (int k = 0; k < dig.Length; k++) dig[k] = Aimed(ActorAnimation.DigKeys[k], spot);
+            return dig;
+        }
+
+        /// <summary>Whether the aim is to be worked out again for this action and mark, which it is kept for.</summary>
+        private bool Moved(ActorAction action, Vector3 mark) {
+            bool kept = aimed is (ActorAction was, Vector3 at) && was == action && at.DistanceTo(mark) <= AimMoves;
+            if (!kept) aimed = (action, mark);
+            return !kept;
+        }
+    }
+
+    /// <summary>
+    /// A blow's key pose moved so the tool's working end lands on <paramref name="mark"/>, or as near it as the body goes.
+    /// The right arm is solved to put the tool's end there, as a forearm as long as forearm and tool, the left fist following on
+    /// the handle where it holds one; the trunk leans further in where the mark lies past the arm's reach, or back where it lies too near.
+    /// </summary>
+    private static Pose StrikeAt(Pose blow, ToolSwing swung, Vector3 mark) {
+        var end = swung.End;
+        var held = new Basis(Vector3.Up, Mathf.DegToRad(blow.Grip)) * end;
+        float along = ActorRig.Forearm - held.Y, palm = ActorRig.Palm + held.Z;
+        float full = ActorRig.UpperArm + MathF.Sqrt(along * along + palm * palm);
+        var shoulder = HumanShape.Standard.Shoulder(false);
+        var pose = blow;
+        var goal = mark;
+        var (best, nearest) = (blow, float.MaxValue);
+        for (int i = 0; i < 12; i++) {
+            float far = ArmReach.ToTrunk(pose, goal).DistanceTo(shoulder) / full;
+            float lean = far > ReachMost ? (far - ReachMost) * full * LeanPerMetre : far < ReachLeast ? (far - ReachLeast) * full * LeanPerMetre : 0;
+            pose = pose with { Lean = Math.Clamp(pose.Lean + lean, blow.Lean - AimLeanBack, blow.Lean + AimLeanIn) };
+            var (raise, outward, elbow) = ArmReach.ArmTo(ArmReach.ToTrunk(pose, goal), left: false, palm, along);
+            pose = pose with { RaiseR = raise, OutR = outward, ElbowR = elbow };
+            // The tool's end sits a little to the side of the long forearm's line: the trunk turns that much further round to the
+            // mark, and the arm aims part of what is left the other way, keeping the nearest try.
+            var lands = ArmReach.InRightHand(pose, end);
+            float round = Mathf.RadToDeg(Mathf.AngleDifference(MathF.Atan2(lands.X, lands.Z), MathF.Atan2(mark.X, mark.Z)));
+            pose = pose with { Twist = Math.Clamp(pose.Twist + round, blow.Twist - AimTurn, blow.Twist + AimTurn) };
+            var miss = mark - ArmReach.InRightHand(pose, end);
+            if (miss.LengthSquared() < nearest) (best, nearest) = (pose, miss.LengthSquared());
+            if (nearest < 1e-5f) break;
+            goal += miss * .7f;
+        }
+        return swung.TwoHanded ? TwoHanded(best) : best;
+    }
+
+    /// <summary>How near a blow's own swing has to pass a mark for the blow to land there by being cut short, in metres.</summary>
+    private const float OnTheSwing = .03f;
+
+    /// <summary>
+    /// The pose a blow lands on <paramref name="mark"/> in, swung from <paramref name="raised"/> down to <paramref name="blow"/>:
+    /// the swing cut short where its tool's working end meets the mark, which is where it first meets what is worked, or, for a
+    /// mark the swing passes by, the blow reached out to it (<see cref="StrikeAt"/>).
+    /// </summary>
+    private static Pose Struck(Pose raised, Pose blow, ToolSwing swung, Vector3 mark) {
+        var end = swung.End;
+        float Off(float share) => ArmReach.InRightHand(Pose.Lerp(raised, blow, share), end).DistanceSquaredTo(mark);
+        const int steps = 24;
+        float best = 1, nearest = Off(1);
+        for (int i = 0; i < steps; i++) if (Off(i / (float)steps) is float off && off < nearest) (best, nearest) = (i / (float)steps, off);
+        // Halve the step round the nearest share until it is a hair wide.
+        for (float step = .5f / steps; step > 1e-4f; step /= 2) {
+            float before = best;
+            if (before - step >= 0 && Off(before - step) is float early && early < nearest) (best, nearest) = (before - step, early);
+            if (before + step <= 1 && Off(before + step) is float late && late < nearest) (best, nearest) = (before + step, late);
+        }
+        var cut = Pose.Lerp(raised, blow, best);
+        if (nearest < OnTheSwing * OnTheSwing) return cut;
+        // An arm swung back behind the trunk or folded tight to reach a mark close in is no blow: the swing passes as near as it goes.
+        var reached = StrikeAt(blow, swung, mark);
+        return reached.RaiseR < ArmBehind || reached.ElbowR > swung.ElbowMost ? cut : reached;
+    }
+
+    /// <summary>
+    /// Where a blow's tool's working end is <paramref name="share"/> of the way through its swing down from the key
+    /// before the blow to the blow, from the rig's root; null for an action that swings no tool onto what it works.
+    /// What is worked stands in the swing's way; the blow lands where the swing first meets it.
+    /// </summary>
+    public static Vector3? Swing(ActorAction action, float share) {
+        if (BlowOf(action)?.Swung is not ToolSwing swung) return null;
+        var (raised, blow) = (swung.Keys[swung.StrikeKey - 1].Pose, swung.Keys[swung.StrikeKey].Pose);
+        return ArmReach.InRightHand(Pose.Lerp(raised, blow, share), swung.End);
+    }
+
+    /// <summary>A pose with <paramref name="by"/> added to its trunk, head, arms, grip and hip height, which are what a blow moves; the legs are stood again after.</summary>
+    private static Pose Plus(Pose pose, Pose by) => pose with {
+        Lean = pose.Lean + by.Lean,
+        Twist = pose.Twist + by.Twist,
+        Head = pose.Head + by.Head,
+        Sway = pose.Sway + by.Sway,
+        RaiseL = pose.RaiseL + by.RaiseL,
+        OutL = pose.OutL + by.OutL,
+        ElbowL = pose.ElbowL + by.ElbowL,
+        RaiseR = pose.RaiseR + by.RaiseR,
+        OutR = pose.OutR + by.OutR,
+        ElbowR = pose.ElbowR + by.ElbowR,
+        Hips = pose.HipHeight + by.Hips,
+        Grip = pose.Grip + by.Grip
+    };
+
+    /// <summary>How far one pose's trunk, head, arms, grip and hip height are from another's, for <see cref="Plus"/>.</summary>
+    private static Pose Minus(Pose pose, Pose from) => new(
+        Lean: pose.Lean - from.Lean, Twist: pose.Twist - from.Twist, Head: pose.Head - from.Head, Sway: pose.Sway - from.Sway,
+        RaiseL: pose.RaiseL - from.RaiseL, OutL: pose.OutL - from.OutL, ElbowL: pose.ElbowL - from.ElbowL,
+        RaiseR: pose.RaiseR - from.RaiseR, OutR: pose.OutR - from.OutR, ElbowR: pose.ElbowR - from.ElbowR,
+        Hips: pose.HipHeight - from.HipHeight, Grip: pose.Grip - from.Grip);
 
     /// <param name="crafting">Something is being made by hand, which the player squats over while standing still.</param>
     public static ActorAction PlayerAction(

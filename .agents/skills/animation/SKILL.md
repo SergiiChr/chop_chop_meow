@@ -38,16 +38,23 @@ description: Animate players, workers, or creatures in Chop Chop Meow and check 
   Keep work hands forward or to their own side so elbows can bend without pushing the arms into the torso.
   Check grips from the front as well as the side.
   Check feet at steep shin angles.
-  A pose that leaves the ankle at its default keeps the boot square to the shin.
+  Work done in place gives only a hip height: `ActorAnimation.FeetOf` names where its boots stand, and `OnFeet` bends
+  the legs to keep them there, flat, with a heel lifting only past 30° of ankle bend.
+  Do not key leg angles for work: a keyed leg sinks or floats a boot as the hips move.
 - Take left and right from [BodySide](../../../src/actors/model/BodySide.cs).
   Set angles and their speed so they carry smoothly between poses.
 - Read [Locomotion](references/locomotion.md) for gait timing, foot placement, and the movement clock.
   Read [Wolves and cabin doors](references/wolves-and-cabin-doors.md) for wolf poses, contact with another body, and
   recordings at a cabin's door.
+  Read [Blows and things that move](references/blows-and-moving-things.md) for a tool landing on what it works, and for
+  falls, throws, doors and other moving things.
 
 ## Review the Godot render
 
 1. Record at a fixed frame rate.
+   Make every motion for 60 frames a second, the rate the game is drawn at, and judge it at that rate and real speed.
+   Neighbouring frames join without a jump, and a fast stroke still has frames between its key poses.
+   Slow motion is for looking closer, not for passing a motion.
    Fix slow or unreliable recording tools before continuing.
    Review every frame of the changed motion in the game-camera view and from the angles that expose its contacts.
    Use overhead for placement, low side for height, and facing for grip.
@@ -72,22 +79,28 @@ description: Animate players, workers, or creatures in Chop Chop Meow and check 
 ./tools/animation_review.py "player run"
 ./tools/animation_review.py "player run" --views game side top --frames 240
 git fetch origin
-./tools/animation_review.py "player run" --base origin/main --views side --slow 1
+./tools/animation_review.py "player run" --base origin/main --views side --slow 4
 ```
 
 - The default views are `side`, `front`, `game`, and `facing`.
   Select `top` in `--views` for an 89-degree view from overhead.
-  The default is 96 frames per view at 30 frames a second and 4× slow motion.
-  Set `--frames` for a longer action.
-  At 4× slow motion, record 120 frames for each second of game time.
+  The default is 120 frames per view at 60 frames a second and real speed: two seconds of game time.
+  Set `--frames` for a longer action and `--slow` to look closer.
+  At 4× slow motion, record 240 frames for each second of game time.
 - Movies go in `build/animation-review/<clip>/<current or ref>/<view>.avi`.
   Fetch origin before comparing with `origin/main` so the recording uses the current remote base.
   The base must support close-up review and contain the action.
   The base uses its own launcher and may have a shorter recording limit.
+  A base from before the rate could be set records 30 frames a second over the same game time, so its frames fall
+  between the branch's.
   If a base recording fails, its build logs are kept beside the view logs.
   When it has a different name there, select it with `--base-clip`.
   Matching recordings use the same view, frame count, and slow-motion rate.
   Key any variation in motion off saved IDs so repeated recordings of the same action stay aligned.
+  Keep the mouse off the recording window, since the wheel zooms the view.
+  Record the base twice before blaming the branch for a difference.
+  Compare frames by the largest change of any one pixel and the count of pixels changed by more than about 32 of 255.
+  Scattered small changes come from compression or a reordered sum; an edge that moves shows as large ones.
 - For a close crop use `--animation-zoom` in a direct `./build.py record` command.
   Use `xvfb-run -a` on a machine without a display.
   The first recording after a game source change exports the game.
@@ -107,10 +120,12 @@ The close-up recordings start from standing, so use the first frames to check th
 For an action that depends on the world around it, record its showcase scene directly.
 
 ```sh
-./build.py record build/recordings/queue.avi -- --showcase --hide-ui --doorway queue --zoom 5 --frames 120
+./build.py record build/recordings/queue.avi -- --showcase --hide-ui --doorway queue --zoom 5 --frames 240
+./build.py record build/recordings/queue-slow.avi -- --showcase --hide-ui --doorway queue --slow 4 --frames 960
 ```
 
-`--slow` slows game time and `--fps` on `./build.py record` sets the capture rate.
+Each frame moves the game on by exactly 1/60 of a second, however long it takes to draw.
+`--fps` on `./build.py record` sets another capture rate, and `--slow` slows game time.
 Showcase and animation review run the world in the window, so their frames advance on a fixed clock.
 A normal game uses a separate server that keeps running in real time with `--slow`.
 Its recordings vary from frame to frame between takes.

@@ -223,7 +223,7 @@ public sealed partial class World {
         if (spot.Remaining > 0) return true;
         // Whoever fells a tree digs its stump up next while a shovel is to be had, and otherwise goes on to the next tree.
         if (spot.Kind == ThingKind.Tree) {
-            var stump = Fell(spot);
+            var stump = Fell(spot, w.Pos);
             if (CanWork(w, stump.Kind)) { MoveTo(w, spot.Id, stump); return true; }
         }
         if (spot.IsLoose) S.Things.Remove(spot);

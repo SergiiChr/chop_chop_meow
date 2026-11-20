@@ -22,7 +22,10 @@ public static class WolfBodiesChecks {
         Test(CheckAWolfsHeightInTheWorldFollowsItsModel, data);
     }
 
-    /// <summary>A wolf is as tall in the world, where swings are tried against it, as its model stands: on the ground, reared up, and through a leap for the throat.</summary>
+    /// <summary>
+    /// A wolf is as tall in the world, where swings are tried against it, as its model is drawn: on the ground, reared up, and
+    /// through a leap for a standing player's throat, its body posed and flown onto the throat.
+    /// </summary>
     private static void CheckAWolfsHeightInTheWorldFollowsItsModel(GameData data) {
         var model = new WolfModel();
         model.Stand(0, 1, false);
@@ -30,9 +33,12 @@ public static class WolfBodiesChecks {
         Require(Math.Abs(standing - WolfBodies.StandingTop) < .03f, $"a standing wolf's model is {standing:0.00} m tall, not {WolfBodies.StandingTop} m");
         float reared = ModelSteps.WolfTop(WolfModel.Rearing(1.1f, 0));
         Require(Math.Abs(reared - WolfBodies.RearedTop) < .05f, $"a reared wolf's model is {reared:0.00} m tall, not {WolfBodies.RearedTop} m");
+        // The flight comes down on the hind paws, reared up with the jaws at the throat.
+        float throat = FallBackView.Throat(Vector2.Zero, Vector2.Down, 0).Y;
         for (float progress = 0; progress <= 1; progress += .125f) {
-            model.Stand(0, 1, true); model.Leap(progress, 1, 1);
-            float leaping = ModelSteps.WolfTop(model), world = WolfBodies.Top(new Wolf { Leap = World.LeapSeconds * (1 - progress) + 1e-4f });
+            model.Stand(0, 1, true); model.Leap(progress, 1, 1, jawsUp: throat);
+            float flown = WolfModel.LeapPath(Vector3.Zero, Vector3.Zero, progress, World.LeapSeconds).Y;
+            float leaping = ModelSteps.WolfTop(model) + flown, world = WolfBodies.Top(new Wolf { Leap = World.LeapSeconds * (1 - progress) + 1e-4f });
             Require(Math.Abs(leaping - world) < .12f, $"a wolf {progress:0.000} through its leap is {leaping:0.00} m tall in its model and {world:0.00} m in the world");
         }
         model.Root.Free();

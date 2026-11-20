@@ -48,7 +48,10 @@ Lake stones cluster in patches rather than an even ring.
 
 The `--environment-review` flag freezes the waves, the water's maps and the lily pads at 1.25 seconds for comparable
 screenshots, and the intro film moves them by its own clock.
-Normal play uses Godot's `TIME`.
+Normal play moves them by the game's own water clock (`LakeAppearance.Advance`), which stands still while the game is
+paused: each wave's phase is kept below a turn, and the maps' scroll and the caustics' 16 frames come round whole every
+800 seconds, so nothing jumps however long the game runs.
+The caustic frames blend one into the next.
 Capture the lake view with:
 
 ```sh

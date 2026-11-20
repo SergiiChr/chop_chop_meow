@@ -38,7 +38,7 @@ The project uses Godot's Forward+ renderer, which picks a discrete GPU over an i
 ./build.py test     # run only the tests
 ./build.py build    # check, export, and smoke-test build/ChopChopMeow.x86_64
 ./build.py icons    # re-render item and building icons from their models (opens a window)
-./build.py record build/recordings/out.avi -- --showcase --frames 120  # record the game to a movie at 30 frames a second
+./build.py record build/recordings/out.avi -- --showcase --frames 120  # record the game to a movie at 60 frames a second
 ```
 
 ### Release bundle
@@ -77,6 +77,7 @@ Play accepts Godot arguments after `--`:
 | `--animation-review --animation-clip "wolf leap"` | Show one wolf clip close up; the leap, hit, feed, snap and brace play against a player |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
+| `--animation-target 1.3` | Stand what the close-up's blow works, a tree, rock, anvil or stump, this many metres from the actor |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
 | `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
 | `--render-intro /absolute/directory --intro-dance` | Save only the solo dance of the catgirl on the hero's screen, as tall as the picture |
@@ -88,7 +89,7 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 ```sh
 ./build.py play -- --showcase --screenshot /tmp/chop-chop-meow.png
-./build.py record build/recordings/review.avi -- --animation-review --frames 96  # a movie at 30 frames a second
+./build.py record build/recordings/review.avi -- --animation-review --frames 120  # a movie at 60 frames a second
 ./tools/environment_review.py             # landscape views, saved in build/environment-review/
 ./tools/environment_review.py --shoreline # coast, lake edge and mine views
 ./tools/animation_review.py "player run"   # four views of a clip in build/animation-review/
@@ -146,7 +147,7 @@ The display choices are stored in `settings.cfg` and applied at launch.
 The interface is drawn at 0.8 of the size it is laid out for (`Game.InterfaceScale`).
 It keeps that share of the screen at every resolution, with its text drawn at the size it shows.
 
-Wind sways grass, bushes and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
+Wind sways grass, bushes and tree foliage, drifting between calm spells and gusty ones, and grass parts around the players and workers in sight.
 Footpaths wear in where the player and workers walk, not where they stand, and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
 meet (SSAO), and world sounds pan with their place on screen.
