@@ -134,6 +134,33 @@ Start from these, and search freely for more: photos and slow-motion footage of 
   far out to that side it is drawn. Take every left and right of a body from `BodySide`
   (`src/actors/model/BodySide.cs`), never from a sign worked out on the spot.
 
+## Blows and tools
+
+- A tool's working end lands on what it works at the moment its sound plays: an axe's head on the trunk, a pick's
+  point on the rock, a hammer's face on the work top, a shovel's blade at the stump's foot. `StrikePoints` finds the
+  spot and `ActorAnimation` cuts the swing short there, or reaches the arm out to it.
+- Measure the tool's end, not the fist: `ActorRig.Holds` with `ActorRig.AxeHeadPoint`, `PickPoint` or `HammerFace`, and
+  `ActorRig.ShovelTip`. `CheckEveryBlowLandsItsToolOnWhatItWorks` does it in the real view.
+- Review a blow against its target with `--animation-target` (`tools/animation_review.py --target`): the close-up builds
+  the real tree, rock, anvil or stump that far away.
+- A blow speeds up all the way into its contact and stops there; a swing in the air eases out.
+- The arm solver flips where a hand points straight down or an elbow folds tight: keep marks in the range play gives,
+  and step the aimed loop at 60 frames a second for joints that jump.
+
+## Things that move
+
+Felled trees, thrown stumps and chips, doors, carts, crates and fires follow the rules of [Any body](#any-body) too.
+
+- A fall, a throw or a drop follows gravity; a tree falls as a stiff pole hinged at its foot, slow at first.
+- A slam reaches its frame at its fastest; time a sound so its loudest moment lands on the contact, not its start.
+- Nothing rests in the ground: measure the lowest point of the mesh, not the node's origin. Euler angles read off a scaled
+  node gives wrong angles near 90°: measure from points.
+- Move by `dt`, never by a fixed step or a floor on it, so a motion runs the same at 30, 60 and 144 frames a second and
+  stops while paused.
+- In a normal game the window applies the server's state 30 times a second. A motion drawn from a count the server keeps
+  steps every other frame unless the window runs its own clock between updates (`LocalClock`).
+- Wolves: measure a paw's pad, its lowest point, not the paw bone; a pad reaches 7 cm ahead of it.
+
 ## This game's rigs
 
 - People: `Pose` in `src/ActorAnimation.cs` lists joint angles, and `src/ActorRig.cs` applies them to hips, torso, head,
@@ -148,8 +175,9 @@ Start from these, and search freely for more: photos and slow-motion footage of 
   where a paw and the jaws are under the pose shown.
   `SyncWolves` in `src/WorldView.cs` times the wolf against the player.
 - The pelvis is part of the torso model, so it cannot turn or drop on its own.
-- Only the walk, jog and sprint set the ankle. Other actions leave the boot square to the shin, so toes can dip into the
-  ground at a steep shin.
+- Work done in place gives only a hip height; `ActorAnimation.FeetOf` names where its boots stand and `OnFeet` bends the
+  legs to keep them there, flat, a heel lifting only past 30° of ankle bend. Do not key leg angles for work: a keyed
+  leg sinks or floats a boot as the hips move.
 - The walk's, jog's and sprint's clocks move with distance through `ActorAnimation.Advance`, each `Stride` matched to
   the speed it is timed for: a change of a worker's, walking or sprint speed fails a check until the gait is retimed.
 - A gait's planted leg is solved from where its foot touches the ground, and its swinging leg is keyed. A key change can

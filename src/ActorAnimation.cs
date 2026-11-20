@@ -1002,10 +1002,18 @@ public static class ActorAnimation {
 
     /// <summary>A pose with <paramref name="by"/> added to its trunk, head, arms, grip and hip height, which are what a blow moves; the legs are stood again after.</summary>
     private static Pose Plus(Pose pose, Pose by) => pose with {
-        Lean = pose.Lean + by.Lean, Twist = pose.Twist + by.Twist, Head = pose.Head + by.Head, Sway = pose.Sway + by.Sway,
-        RaiseL = pose.RaiseL + by.RaiseL, OutL = pose.OutL + by.OutL, ElbowL = pose.ElbowL + by.ElbowL,
-        RaiseR = pose.RaiseR + by.RaiseR, OutR = pose.OutR + by.OutR, ElbowR = pose.ElbowR + by.ElbowR,
-        Hips = pose.HipHeight + by.Hips, Grip = pose.Grip + by.Grip
+        Lean = pose.Lean + by.Lean,
+        Twist = pose.Twist + by.Twist,
+        Head = pose.Head + by.Head,
+        Sway = pose.Sway + by.Sway,
+        RaiseL = pose.RaiseL + by.RaiseL,
+        OutL = pose.OutL + by.OutL,
+        ElbowL = pose.ElbowL + by.ElbowL,
+        RaiseR = pose.RaiseR + by.RaiseR,
+        OutR = pose.OutR + by.OutR,
+        ElbowR = pose.ElbowR + by.ElbowR,
+        Hips = pose.HipHeight + by.Hips,
+        Grip = pose.Grip + by.Grip
     };
 
     /// <summary>How far one pose's trunk, head, arms, grip and hip height are from another's, for <see cref="Plus"/>.</summary>

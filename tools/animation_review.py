@@ -171,7 +171,10 @@ def main() -> None:
         help="camera views to record",
     )
     parser.add_argument(
-        "--slow", type=float, default=1, help="slow motion factor (default %(default)s, real speed)"
+        "--slow",
+        type=float,
+        default=1,
+        help="slow motion factor (default %(default)s, real speed)",
     )
     parser.add_argument(
         "--target",
