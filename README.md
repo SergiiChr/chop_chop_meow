@@ -91,7 +91,8 @@ These options are developer review tools; they do not represent a normal fresh-s
 ./build.py record build/recordings/review.avi -- --animation-review --frames 96  # a movie at 30 frames a second
 ./tools/environment_review.py             # landscape views, saved in build/environment-review/
 ./tools/environment_review.py --shoreline # coast, lake edge and mine views
-./tools/animation_review.py "player run"   # one clip from the side, front and game camera, as movies in build/animation-review/
+./tools/animation_review.py "player run"   # four views of a clip in build/animation-review/
+./tools/animation_review.py "player run" --views game side top --frames 240  # include overhead and record longer
 ./tools/intro_film.py                     # the intro film's frames and sound cue sheet, in build/intro/frames/
 ./tools/intro_film.py --stills 1.5,9.2    # single frames of the film, in build/intro/stills/
 ./tools/intro_film.py --dance             # only the catgirl's solo dance, in build/intro/dance/

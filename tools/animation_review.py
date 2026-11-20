@@ -18,11 +18,16 @@ sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
 OUTPUT = build.BUILD / "animation-review"
-# Frames a view records, at 30 a second of slowed game time.
-FRAMES = 96
+DEFAULT_FRAMES = 96
 
-# Camera pitch and rig turn in degrees: low from the side, low facing the camera, and the game's own angle from the side and facing the camera.
-VIEWS = {"side": (4, 0), "front": (4, -90), "game": (30, 0), "facing": (30, -90)}
+# Camera pitch and rig turn in degrees.
+VIEWS = {
+    "side": (4, 0),
+    "front": (4, -90),
+    "game": (30, 0),
+    "facing": (30, -90),
+    "top": (89, 0),
+}
 
 
 def review_source(ref: str | None) -> str:
@@ -48,8 +53,10 @@ def require_clip(ref: str | None, clip: str) -> None:
         raise SystemExit(f"No clip {clip!r} in {where}; clips: {', '.join(names)}")
 
 
-def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> None:
-    """Records a checkout's clip from one view to a movie of FRAMES frames at 30 a second of slowed game time."""
+def record(
+    checkout: Path, clip: str, view: str, slow: float, frame_count: int, movie: Path
+) -> None:
+    """Records one view of a checkout's clip at 30 frames a second of slowed game time."""
     pitch, turn = VIEWS[view]
     movie.parent.mkdir(parents=True, exist_ok=True)
     flags = [
@@ -74,7 +81,7 @@ def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> No
             "--slow",
             str(slow),
             "--frames",
-            str(FRAMES),
+            str(frame_count),
         ]
     else:
         # A ref from before recording captured numbered frames, which become a movie of the same rate here.
@@ -82,7 +89,7 @@ def record(checkout: Path, clip: str, view: str, slow: float, movie: Path) -> No
         shutil.rmtree(frames, ignore_errors=True)
         command = [
             sys.executable, checkout / "build.py", "play", "--", *flags,
-            "--animation-slow", str(slow), "--animation-frames", str(FRAMES), "--animation-capture", frames,
+            "--animation-slow", str(slow), "--animation-frames", str(frame_count), "--animation-capture", frames,
         ]  # fmt: skip
     # A native Wayland window draws about one frame a second; XWayland draws at full speed.
     env = {key: value for key, value in os.environ.items() if key != "WAYLAND_DISPLAY"}
@@ -129,6 +136,7 @@ def record_all(
             clip,
             view,
             options.slow,
+            options.frames,
             OUTPUT / slug(options.clip) / name / f"{view}.avi",
         )
 
@@ -158,8 +166,14 @@ def main() -> None:
         "--views",
         nargs="+",
         choices=VIEWS,
-        default=list(VIEWS),
+        default=[view for view in VIEWS if view != "top"],
         help="camera views to record",
+    )
+    parser.add_argument(
+        "--frames",
+        type=int,
+        default=DEFAULT_FRAMES,
+        help="frames per view (default %(default)s)",
     )
     parser.add_argument(
         "--slow", type=float, default=4, help="slow motion factor (default %(default)s)"
@@ -175,6 +189,8 @@ def main() -> None:
     options = parser.parse_args()
     if not options.slow > 0:
         parser.error("--slow must be positive")
+    if options.frames < 1:
+        parser.error("--frames must be positive")
     require_clip(None, options.clip)
     options.base_clip = options.base_clip or options.clip
     if options.base:
@@ -185,7 +201,7 @@ def main() -> None:
     if options.base:
         record_base(options.base, options)
     print(
-        f"{FRAMES} frames a view at 30 a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
+        f"{options.frames} frames a view at 30 a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
     )
 
 
