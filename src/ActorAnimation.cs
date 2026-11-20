@@ -50,7 +50,7 @@ public enum ActorAction {
 /// Hips sets the hip height above the ground, as for sitting or running; zero keeps the lower foot on the ground instead.
 /// Sway tips the torso sideways over the hips; positive tips it toward the right side.
 /// Foot tips the toes down from square to the shin, and negative pulls them up.
-/// Splay tips both thighs sideways away from the body, and negative draws the feet in under it.
+/// SplayL and SplayR tip each thigh sideways away from the body, and negative draws that foot in under it.
 /// Grip turns an axe, pick, hammer or sign in the right fist about its own length: at 90 a blade that cuts downward at the end of a level arm cuts toward the right.
 /// </summary>
 public readonly record struct Pose(
@@ -58,7 +58,7 @@ public readonly record struct Pose(
     float RaiseL = 6, float OutL = 7, float ElbowL = 12,
     float RaiseR = 6, float OutR = 7, float ElbowR = 12,
     float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0,
-    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Hips = 0, float Sway = 0, float FootL = 0, float FootR = 0, float Splay = 0, float Grip = 0) {
+    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Hips = 0, float Sway = 0, float FootL = 0, float FootR = 0, float SplayL = 0, float SplayR = 0, float Grip = 0) {
     /// <summary>Blends two poses; set hips blend by how far they sit above or below a standing foot, so a foot on or above the ground in both poses stays there.</summary>
     public static Pose Lerp(Pose a, Pose b, float t) {
         if (t <= 0) return a;
@@ -68,7 +68,7 @@ public readonly record struct Pose(
             Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
             Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t),
             Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), 0, Mathf.Lerp(a.Sway, b.Sway, t),
-            Mathf.Lerp(a.FootL, b.FootL, t), Mathf.Lerp(a.FootR, b.FootR, t), Mathf.Lerp(a.Splay, b.Splay, t), Mathf.Lerp(a.Grip, b.Grip, t));
+            Mathf.Lerp(a.FootL, b.FootL, t), Mathf.Lerp(a.FootR, b.FootR, t), Mathf.Lerp(a.SplayL, b.SplayL, t), Mathf.Lerp(a.SplayR, b.SplayR, t), Mathf.Lerp(a.Grip, b.Grip, t));
         return a.Hips == 0 && b.Hips == 0 ? blend : blend with { Hips = blend.Standing + Mathf.Lerp(a.Hips > 0 ? a.Hips - a.Standing : 0, b.Hips > 0 ? b.Hips - b.Standing : 0, t) };
     }
 
@@ -197,10 +197,10 @@ public static class ActorAnimation {
     // for the door and the front foot slips out ahead; the knees fold as the body drops onto its seat and back, the arms thrown
     // wide at the landing, and then it lies fighting the wolf as Mauled has it. The rig tips back as FallBackView.FallBack has it.
     private static readonly (float At, Pose Pose)[] FallBackKeys = {
-        (0, new Pose(Lean: 12, Head: -10, RaiseL: 80, OutL: 14, ElbowL: 30, RaiseR: 85, OutR: 12, ElbowR: 26, SwingL: 6, KneeL: 16, SwingR: 6, KneeR: 16, Splay: 3)),
-        (.18f, new Pose(Lean: -8, Head: 26, RaiseL: 140, OutL: 20, ElbowL: 30, RaiseR: 128, OutR: 24, ElbowR: 40, SwingL: 38, KneeL: 8, FootL: -20, SwingR: 4, KneeR: 34, Splay: 5)),
-        (.45f, new Pose(Lean: -14, Head: 32, RaiseL: 125, OutL: 34, ElbowL: 40, RaiseR: 105, OutR: 38, ElbowR: 48, SwingL: 70, KneeL: 42, FootL: -10, SwingR: 58, KneeR: 70, Splay: 6)),
-        (.7f, new Pose(Lean: 0, Head: 18, RaiseL: 150, OutL: 46, ElbowL: 34, RaiseR: 145, OutR: 50, ElbowR: 30, SwingL: 26, KneeL: 40, SwingR: 20, KneeR: 48, Splay: 6)),
+        (0, new Pose(Lean: 12, Head: -10, RaiseL: 80, OutL: 14, ElbowL: 30, RaiseR: 85, OutR: 12, ElbowR: 26, SwingL: 6, KneeL: 16, SwingR: 6, KneeR: 16, SplayL: 3, SplayR: 3)),
+        (.18f, new Pose(Lean: -8, Head: 26, RaiseL: 140, OutL: 20, ElbowL: 30, RaiseR: 128, OutR: 24, ElbowR: 40, SwingL: 38, KneeL: 8, FootL: -20, SwingR: 4, KneeR: 34, SplayL: 5, SplayR: 5)),
+        (.45f, new Pose(Lean: -14, Head: 32, RaiseL: 125, OutL: 34, ElbowL: 40, RaiseR: 105, OutR: 38, ElbowR: 48, SwingL: 70, KneeL: 42, FootL: -10, SwingR: 58, KneeR: 70, SplayL: 6, SplayR: 6)),
+        (.7f, new Pose(Lean: 0, Head: 18, RaiseL: 150, OutL: 46, ElbowL: 34, RaiseR: 145, OutR: 50, ElbowR: 30, SwingL: 26, KneeL: 40, SwingR: 20, KneeR: 48, SplayL: 6, SplayR: 6)),
         (.999f, new Pose(Head: -26, RaiseL: 128, OutL: -8, ElbowL: 55, RaiseR: 128, OutR: -8, ElbowR: 55, SwingL: 10, KneeL: 22, SwingR: 10, KneeR: 22)),
     };
     private static readonly (float At, Pose Pose)[] MineKeys = {
@@ -406,7 +406,7 @@ public static class ActorAnimation {
         Vector3 InTrunk(Vector3 point, float bent) => (point - hips).Rotated(Vector3.Up, -Mathf.DegToRad(twist)).Rotated(Vector3.Right, -Mathf.DegToRad(bent));
         var grip = top + along * ShovelGrip;
         // A blade sent further out than the hands reach from this lean bends the trunk further, just far enough for both to hold the shaft.
-        float Short(float bent) => Math.Max(InTrunk(top, bent).DistanceTo(new Vector3(-ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0)), InTrunk(grip, bent).DistanceTo(new Vector3(ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0))) - DigArm;
+        float Short(float bent) => Math.Max(InTrunk(top, bent).DistanceTo(HumanShape.Standard.Shoulder(false)), InTrunk(grip, bent).DistanceTo(HumanShape.Standard.Shoulder(true))) - DigArm;
         if (Short(lean) > 0) {
             float within = DigLeanMost, beyond = lean;
             for (int i = 0; i < 16 && Short(within) < 0; i++) {
@@ -433,7 +433,7 @@ public static class ActorAnimation {
         if (moving && SwingsOnTheMove(action)) {
             // The swing keeps its own clock, which keeps the jog's pace at the player's speed.
             var legs = PoseAt(ActorAction.Jog, elapsed, true);
-            return Posed(action, elapsed, false, null) with { SwingL = legs.SwingL, KneeL = legs.KneeL, FootL = legs.FootL, SwingR = legs.SwingR, KneeR = legs.KneeR, FootR = legs.FootR, Sway = legs.Sway, Hips = legs.Hips, Splay = legs.Splay };
+            return Posed(action, elapsed, false, null) with { SwingL = legs.SwingL, KneeL = legs.KneeL, FootL = legs.FootL, SwingR = legs.SwingR, KneeR = legs.KneeR, FootR = legs.FootR, Sway = legs.Sway, Hips = legs.Hips, SplayL = legs.SplayL, SplayR = legs.SplayR };
         }
         var pose = Posed(action, elapsed, moving, mark);
         return FeetOf(action) is Footing feet ? OnFeet(pose, feet) : pose;
@@ -501,7 +501,7 @@ public static class ActorAnimation {
                 // A runner stopping hard plants the front heel well ahead with the leg nearly straight, sinks onto the bent back
                 // leg and leans back against the run, arms thrown forward for balance, the weight rocking a little as it holds.
                 return new Pose(Lean: -14 + wave * 2, Head: 10 + MathF.Cos(p * Mathf.Tau) * 2, RaiseL: 55, OutL: 18, ElbowL: 45, RaiseR: 40, OutR: 22, ElbowR: 55,
-                    SwingL: BrakeFront.Swing, KneeL: BrakeFront.Knee, FootL: BrakeFront.Foot, SwingR: BrakeBack.Swing, KneeR: BrakeBack.Knee, FootR: BrakeBack.Foot, Hips: BrakeHips, Splay: 4);
+                    SwingL: BrakeFront.Swing, KneeL: BrakeFront.Knee, FootL: BrakeFront.Foot, SwingR: BrakeBack.Swing, KneeR: BrakeBack.Knee, FootR: BrakeBack.Foot, Hips: BrakeHips, SplayL: 4, SplayR: 4);
             case ActorAction.Tugged: {
                     // Tugged back by the waist: bent over at the hips with the arms reaching for the doorway and the head up to keep it in sight.
                     // Each tug, half the loop, jerks the hips back and the trunk lower; the front boot steps back in the air while the other stays
@@ -515,7 +515,7 @@ public static class ActorAnimation {
                     // Between tugs the player strains toward the door, the arms clawing at it.
                     return new Pose(Lean: 42 + 8 * heave - 3 * struggle, Head: -28 - 4 * heave, RaiseL: 105 - 10 * heave + 8 * struggle, OutL: 14, ElbowL: 22,
                         RaiseR: 115 - 10 * heave - 8 * struggle, OutR: 12, ElbowR: 16,
-                        SwingL: left.Swing, KneeL: left.Knee, FootL: left.Foot, SwingR: right.Swing, KneeR: right.Knee, FootR: right.Foot, Hips: TugHips, Splay: 3);
+                        SwingL: left.Swing, KneeL: left.Knee, FootL: left.Foot, SwingR: right.Swing, KneeR: right.Knee, FootR: right.Foot, Hips: TugHips, SplayL: 3, SplayR: 3);
                 }
             case ActorAction.Knock: {
                     // The right fist beats on a door at head height, landing as each loop starts: drawn back with the elbow bent, then thrown at the boards.
@@ -751,7 +751,7 @@ public static class ActorAnimation {
         return new Pose(Lean: lean, Head: 4 - lean, Twist: (left.Swing - right.Swing) * .15f, Sway: -3 * MathF.Cos(Mathf.Tau * settled),
             RaiseL: raiseL, OutL: 9, ElbowL: 20 + Math.Max(0, raiseL) * .9f, RaiseR: raiseR, OutR: 9, ElbowR: 20 + Math.Max(0, raiseR) * .9f,
             SwingL: left.Swing, KneeL: left.Knee, FootL: left.Foot, SwingR: right.Swing, KneeR: right.Knee, FootR: right.Foot,
-            Hips: WalkHips(p - .25f), Splay: -1.5f);
+            Hips: WalkHips(p - .25f), SplayL: -1.5f, SplayR: -1.5f);
     }
 
     /// <summary>The hip height a share <paramref name="sinceLanding"/> of the cycle after the left heel lands: highest over each planted leg, lowest while both feet are down.</summary>
@@ -838,7 +838,7 @@ public static class ActorAnimation {
         return new Pose(Lean: lean, Head: -.4f * gait.Lean - (lean - gait.Lean) * .6f, Twist: (left.Swing - right.Swing) * .12f, Sway: -2 * MathF.Cos(Mathf.Tau * settled),
             RaiseL: raiseL, OutL: outL, ElbowL: elbowL, RaiseR: raiseR, OutR: outR, ElbowR: elbowR,
             SwingL: left.Swing, KneeL: left.Knee, FootL: left.Foot, SwingR: right.Swing, KneeR: right.Knee, FootR: right.Foot,
-            Hips: RunHips(gait, p - .25f), Splay: gait.Splay);
+            Hips: RunHips(gait, p - .25f), SplayL: gait.Splay, SplayR: gait.Splay);
     }
 
     /// <summary>
@@ -936,7 +936,7 @@ public static class ActorAnimation {
         var held = new Basis(Vector3.Up, Mathf.DegToRad(blow.Grip)) * end;
         float along = ActorRig.Forearm - held.Y, palm = ActorRig.Palm + held.Z;
         float full = ActorRig.UpperArm + MathF.Sqrt(along * along + palm * palm);
-        var shoulder = new Vector3(-ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
+        var shoulder = HumanShape.Standard.Shoulder(false);
         var pose = blow;
         var goal = mark;
         var (best, nearest) = (blow, float.MaxValue);

@@ -768,7 +768,7 @@ def export_play(env: dict[str, str]) -> Path:
 
 
 # Files that never go into the game: its docs, the launcher's tools and agent skills.
-NOT_EXPORTED = re.compile(rb"\.md$|^(docs|tools|\.claude|\.github)/")
+NOT_EXPORTED = re.compile(rb"\.md$|^(docs|tools|\.agents|\.claude|\.github)/")
 
 
 def source_fingerprint() -> str:

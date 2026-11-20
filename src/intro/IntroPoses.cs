@@ -42,6 +42,14 @@ internal static class IntroPoses {
         };
     }
 
+    /// <summary>
+    /// At the desk, the left hand on the keys and the eyes on the screen; the film puts the right hand on the mouse.
+    /// </summary>
+    public static readonly Pose Browsing = Seated with { Lean = 12, Head = 6, RaiseL = 46, OutL = -6, ElbowL = 56 };
+
+    /// <summary>Sitting bolt upright with the hands in the lap, facing straight ahead.</summary>
+    public static readonly Pose Staring = Seated with { Lean = 2, Head = 0 };
+
     /// <summary>Shrinking in the chair from someone standing over the left shoulder.</summary>
     public static Pose Cowering(float time) {
         float flinch = MathF.Sin(time * 9) * 1.2f;

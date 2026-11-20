@@ -17,13 +17,18 @@ OUTPUT = build.BUILD / "intro"
 MARKER = "INTRO RENDERED"
 
 
-def render(env: dict[str, str], folder: Path, stills: str | None) -> None:
-    """Plays the film in the game and saves its frames, or only the frames at the given seconds."""
+def render(env: dict[str, str], folder: Path, stills: str | None, dance: bool) -> None:
+    """Plays the film in the game and saves its frames, or only the frames at the given seconds.
+
+    With `dance` the film is only the solo of the catgirl on the hero's screen.
+    """
     shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True)
     flags: list[str | Path] = ["--render-intro", folder]
     if stills:
         flags += ["--intro-stills", stills]
+    if dance:
+        flags.append("--intro-dance")
     # The optimized release export draws the film several times faster than the debug build.
     build.run_godot(
         f"intro-{folder.name}",
@@ -40,10 +45,15 @@ def main() -> int:
         "--stills",
         help="save only the frames at these seconds, such as 1.5,9.2, in build/intro/stills",
     )
+    parser.add_argument(
+        "--dance",
+        action="store_true",
+        help="draw only the solo of the catgirl on the hero's screen, in build/intro/dance",
+    )
     args = parser.parse_args()
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    folder = OUTPUT / ("stills" if args.stills else "frames")
-    render(build.setup(), folder, args.stills)
+    folder = OUTPUT / ("dance" if args.dance else "stills" if args.stills else "frames")
+    render(build.setup(), folder, args.stills, args.dance)
     print(
         f"{'Stills' if args.stills else 'Frames'} and cue sheet: {folder.relative_to(ROOT)}"
     )

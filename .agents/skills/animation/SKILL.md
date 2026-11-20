@@ -11,7 +11,8 @@ description: Make a character or creature animation look physically right, check
 2. Find references for the motion and write down its key poses and timings: contact, mid-stance, push-off, mid-swing,
    how long a foot is down, how long the body is in the air.
 3. Work out the geometry first: leg reach, foot placement, hip height.
-   A short script in the scratchpad that solves the poses is quicker to iterate than the game.
+   A short script in the scratch folder (the scratchpad the harness defines for the session, otherwise
+   `/tmp/scratch`) that solves the poses is quicker to iterate than the game.
 4. Change the poses, record again and go through it as [Frame by frame](#frame-by-frame) says, until every frame passes.
 5. Add or extend a check in `tests/AnimationChecks.cs` for what can be measured: feet on the ground, no sliding, nothing
    below it, time in the air. `CheckWolfGaitsPlantEachPaw` and
@@ -163,9 +164,9 @@ Felled trees, thrown stumps and chips, doors, carts, crates and fires follow the
 
 ## This game's rigs
 
-- People: `Pose` in `src/ActorAnimation.cs` lists joint angles, and `src/ActorRig.cs` applies them to hips, torso, head,
-  shoulders, elbows, thighs, knees and ankles. [docs/DESIGN.md](../../../docs/DESIGN.md) describes the walk, jog and
-  sprint.
+- People: `Pose` in `src/ActorAnimation.cs` lists joint angles, and `src/actors/display/ActorRig.cs` applies them to
+  hips, torso, head, shoulders, elbows, thighs, knees and ankles.
+  [docs/DESIGN.md](../../../docs/DESIGN.md) describes the walk, jog and sprint.
 - To put a hand on a point, use `ArmReach.ArmTo`: it gives the shoulder and elbow angles for a fist, or for what
   the fist holds, at a point in the trunk's frame. Grinding places both arms with it. The intro film's `Reaching` in
   `src/intro/WorldIntro.cs` wraps it for a point in the rig's own space. Do not write another arm solver.

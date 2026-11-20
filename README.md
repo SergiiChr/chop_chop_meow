@@ -80,6 +80,7 @@ Play accepts Godot arguments after `--`:
 | `--animation-target 1.3` | Stand what the close-up's blow works, a tree, rock, anvil or stump, this many metres from the actor |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
 | `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
+| `--render-intro /absolute/directory --intro-dance` | Save only the solo dance of the catgirl on the hero's screen, as tall as the picture |
 | `--performance-run /absolute/directory` | Record a benchmark: sprinting from the sea past a staffed camp and the lake to the valley's top corner, by day and again at night with a lit torch; summarise it with `python3 tools/performance_report.py /absolute/directory` |
 | `--drive /absolute/directory` | Play the window from command files written to that directory, as keys and mouse, and save screenshots there; it keeps `playtest-` saves and settings of its own (`playtest` skill) |
 
@@ -94,23 +95,26 @@ These options are developer review tools; they do not represent a normal fresh-s
 ./tools/animation_review.py "player run"   # one clip from the side, front and game camera, as movies in build/animation-review/
 ./tools/intro_film.py                     # the intro film's frames and sound cue sheet, in build/intro/frames/
 ./tools/intro_film.py --stills 1.5,9.2    # single frames of the film, in build/intro/stills/
+./tools/intro_film.py --dance             # only the catgirl's solo dance, in build/intro/dance/
 ```
 
 ### Intro film
 
-The game opens with a 42-second film, `assets/intro.ogv`, played over the start menu; Esc skips it.
-It shows the hero bored at his office desk, his boss yelling at him, the bat he takes to his computer, packing at home,
-the train, the walk through the forest, the shore where he squats to touch the sea, and a cold first night by a fire
-with wolves howling.
+The game opens with a film of about 50 seconds, `assets/intro.ogv`, played over the start menu; Esc skips it.
+It shows the hero bored at his office desk, his hand on the mouse, the catgirls dancing on his screen, his boss yelling
+at him, his blank stare, the bat he takes to his computer, packing at home, the train, the walk through the forest, the
+shore where he squats to touch the sea, and a cold first night by a fire with wolves howling.
 It is made to look like a movie on a 1990s console: small frames, 15 a second, lightly blocky from compression.
 
 The game draws the film itself, so a change to a model or a shot means making the movie again:
 
 1. `./tools/intro_film.py` draws the frames, 30 a second, and writes the cue sheet of the film's sounds beside them.
+   The paint filter is drawn over them 21 pixels wide, not the game's 8, so its strokes are still there after step 2
+   shrinks them.
 2. A movie tool turns the frames and cue sheet into `assets/intro.ogv`: keep every second frame, shrink it to 480×270,
    pack each as a JPEG so its blocks just show, mix the cue sheet's sounds from `assets/sounds` and `assets`, and write
    Ogg Theora, which the game plays and blows up to the window.
-   The movie tool is not part of this project; the `intro-film` skill (`.claude/skills/intro-film`) has the commands.
+   The movie tool is not part of this project; the `intro-film` skill (`.agents/skills/intro-film`) has the commands.
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures

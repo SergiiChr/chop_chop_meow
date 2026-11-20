@@ -17,7 +17,9 @@ public sealed class ActorRig {
     public const float ShoulderOut = .17f, ShoulderUp = .45f, UpperArm = .28f, Forearm = .27f;
     /// <summary>How far ahead of the forearm's line a held thing sits in the fist, in metres.</summary>
     public const float Palm = .01f;
-    private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
+    private readonly BodyBuild build;
+    private readonly Outfit outfit;
+    private readonly Node3D hips, torso, chest, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     /// <summary>The right fist's grip, which turns a held tool about its own length (<see cref="Pose.Grip"/>).</summary>
     private readonly Node3D wrist;
     private float grip;
@@ -33,49 +35,70 @@ public sealed class ActorRig {
     public readonly OmniLight3D TorchLight;
     /// <summary>The torso and head, for a film to dress and turn beyond what a <see cref="Pose"/> holds.</summary>
     public Node3D Torso => torso;
+    /// <summary>
+    /// What carries the head and arms: the trunk above the waist, which <see cref="BendChest"/> turns on the belly.
+    /// At rest it lies as the torso does.
+    /// </summary>
+    public Node3D Chest => chest;
+    /// <summary>Where the chest turns on the belly, from the hips.</summary>
+    private static readonly Vector3 Waist = new(0, .21f, 0);
     public Node3D Head => head;
     /// <summary>The player's backpack and its straps, which a film hides before the journey starts; null on other skins.</summary>
     public Node3D? Pack { get; private set; }
 
+    /// <summary>The colours each kind of person in the game is drawn in.</summary>
+    public static Outfit OutfitOf(ActorSkin skin) => skin switch {
+        ActorSkin.Worker => new("c48d66", "2e2420", "e9dfc6", "3c5e94", "3c5e94", "5c3a22", Sleeves.Long),
+        ActorSkin.Courier => new("b98060", "3a2c22", "6d7378", "3b3f45", "3b3f45", "2d2a28", Sleeves.Long),
+        ActorSkin.Boss => new("dba083", "8c8a86", "ece8dc", "2c2f36", "2c2f36", "1d1c1c", Sleeves.Long),
+        _ => new("d9a27c", "5a3b25", "2f7f86", "34465e", "34465e", "6b4428", Sleeves.Short),
+    };
+
+    /// <summary>A skin's outfit, in <paramref name="shirtColor"/> when one is given.</summary>
+    private static Outfit Dressed(ActorSkin skin, string? shirtColor) => shirtColor is null ? OutfitOf(skin) : OutfitOf(skin) with { Top = shirtColor };
+
     /// <param name="shirtColor">Tells players apart; each skin has its own otherwise.</param>
-    public ActorRig(ActorSkin skin, string? shirtColor = null) {
-        var (skinTone, hair, shirt, legs, boots) = skin switch {
-            ActorSkin.Worker => ("c48d66", "2e2420", "e9dfc6", "3c5e94", "5c3a22"),
-            ActorSkin.Courier => ("b98060", "3a2c22", "6d7378", "3b3f45", "2d2a28"),
-            ActorSkin.Boss => ("dba083", "8c8a86", "ece8dc", "2c2f36", "1d1c1c"),
-            _ => ("d9a27c", "5a3b25", "2f7f86", "34465e", "6b4428"),
-        };
-        shirt = shirtColor ?? shirt;
-        hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
-        (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, legs, boots);
-        (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, legs, boots);
-        torso = Pivot(hips, Vector3.Zero);
-        HumanShape.Torso(torso, shirt, legs);
-        Cylinder(torso, .055f, .05f, .08f, new Vector3(0, .54f, 0), Mat(skinTone));
-        head = Pivot(torso, new Vector3(0, .56f, 0));
-        Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(skinTone), new Vector3(.95f, 1.05f, 1), 16);
-        Sphere(head, .023f, new Vector3(0, .12f, .115f), Mat(skinTone), new Vector3(.7f, 1, 1), 8);
-        shoulderL = Pivot(torso, new Vector3(ShoulderOut, ShoulderUp, 0));
-        shoulderR = Pivot(torso, new Vector3(-ShoulderOut, ShoulderUp, 0));
-        elbowL = Arm(shoulderL, shirt, skinTone, skin == ActorSkin.Player);
-        elbowR = Arm(shoulderR, shirt, skinTone, skin == ActorSkin.Player);
+    public ActorRig(ActorSkin skin, string? shirtColor = null) : this(Dressed(skin, shirtColor), HumanShape.Standard) {
+        var worn = outfit;
         switch (skin) {
             case ActorSkin.Player:
-                Pack = BuildPlayerDetails(skinTone, hair);
+                Pack = BuildPlayerDetails(worn.Skin, worn.Hair);
                 break;
             case ActorSkin.Worker:
-                BuildWorkerDetails(skinTone, hair, legs);
+                BuildWorkerDetails(worn.Skin, worn.Hair, worn.Hips);
                 HardHat(head);
                 break;
             case ActorSkin.Courier:
-                BuildFace(skinTone, hair);
+                BuildFace(worn.Skin, worn.Hair);
                 Add(torso, CourierShape.Vest, CourierShape.VestMaterial, Vector3.Zero);
                 Add(head, CourierShape.Cap, CourierShape.CapMaterial, Vector3.Zero);
                 break;
             case ActorSkin.Boss:
-                BuildBossDetails(skinTone, hair, shirt);
+                BuildBossDetails(worn.Skin, worn.Hair, worn.Top);
                 break;
         }
+    }
+
+    /// <summary>
+    /// A person of <paramref name="build"/> in <paramref name="outfit"/>'s colours, with no face, hair or kit.
+    /// The intro film's catgirls are dressed by <c>Catgirl</c>.
+    /// </summary>
+    internal ActorRig(Outfit outfit, BodyBuild build) {
+        this.build = build; this.outfit = outfit;
+        hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
+        (legL, kneeL, footL) = Leg(ActorAnimation.LegSide, outfit);
+        (legR, kneeR, footR) = Leg(-ActorAnimation.LegSide, outfit);
+        torso = Pivot(hips, Vector3.Zero);
+        chest = Pivot(torso, Vector3.Zero);
+        HumanShape.Torso(torso, chest, outfit.Top, outfit.Hips, build);
+        Cylinder(chest, .055f * build.Neck, .05f * build.Neck, .08f, new Vector3(0, .54f, 0), Mat(outfit.Skin));
+        head = Pivot(chest, new Vector3(0, .56f, 0));
+        Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(outfit.Skin), new Vector3(.95f, 1.05f, 1), 16);
+        Sphere(head, build.Nose, new Vector3(0, .12f, .115f), Mat(outfit.Skin), new Vector3(.7f, 1, 1), 8);
+        shoulderL = Pivot(chest, build.Shoulder(true));
+        shoulderR = Pivot(chest, build.Shoulder(false));
+        elbowL = Arm(shoulderL, outfit);
+        elbowR = Arm(shoulderR, outfit);
         crate = Pivot(torso, new Vector3(0, .37f, .33f));
         // Reuse the compact shipping crate, fitted to the existing centered carry volume.
         Add(crate, CrateShape.Cargo, CrateShape.Timber, new Vector3(0, -.14f, 0), scale: new Vector3(.7f, .62f, .73f));
@@ -99,8 +122,8 @@ public sealed class ActorRig {
         tools.Add(("mortar", bowl)); tools.Add(("mortar", pestle));
         // The rig stands in the grinding pose to read how its forearms are turned there, until it is first shown.
         Show(ActorAnimation.GrindRest, null, false);
-        bowl.Basis = (torso.Basis * shoulderL.Basis * elbowL.Basis).Inverse();
-        pestle.Basis = (torso.Basis * shoulderR.Basis * elbowR.Basis).Inverse() * new Basis(Vector3.Back, Mathf.DegToRad(ActorAnimation.PestleLean));
+        bowl.Basis = (torso.Basis * chest.Basis * shoulderL.Basis * elbowL.Basis).Inverse();
+        pestle.Basis = (torso.Basis * chest.Basis * shoulderR.Basis * elbowR.Basis).Inverse() * new Basis(Vector3.Back, Mathf.DegToRad(ActorAnimation.PestleLean));
         Add(bowl, CookShape.Bowl, CookShape.Ceramic, new Vector3(0, ActorAnimation.BowlOverFist, 0));
         Add(pestle, CookShape.Pestle, CookShape.Ceramic, new Vector3(0, -ActorAnimation.PestleGrip, 0));
     }
@@ -184,18 +207,18 @@ public sealed class ActorRig {
         return (holder, flame, light);
     }
 
-    private (Node3D Hip, Node3D Knee, Skeleton3D Skin) Leg(float x, string trousers, string boots) {
+    private (Node3D Hip, Node3D Knee, Skeleton3D Skin) Leg(float x, Outfit outfit) {
         var hip = Pivot(hips, new Vector3(x, -.02f, 0));
         var knee = Pivot(hip, new Vector3(0, -ActorAnimation.Thigh, 0));
-        var skin = HumanShape.Leg(hip, ActorAnimation.Thigh, ActorAnimation.Thigh + ActorAnimation.Shin, trousers, boots);
+        var skin = HumanShape.Leg(hip, ActorAnimation.Thigh, ActorAnimation.Thigh + ActorAnimation.Shin, outfit.Legs, outfit.Skin, outfit.Shoes, build);
         limbs.Add((skin, knee));
         return (hip, knee, skin);
     }
 
     /// <summary>Every role shares the continuous arm and its skin weights; the palette selects sleeve length.</summary>
-    private Node3D Arm(Node3D shoulder, string sleeve, string skinTone, bool shortSleeve) {
+    private Node3D Arm(Node3D shoulder, Outfit outfit) {
         var elbow = Pivot(shoulder, new Vector3(0, -UpperArm, 0));
-        limbs.Add((HumanShape.Arm(shoulder, UpperArm, shoulder.Position.X > 0, sleeve, skinTone, shortSleeve), elbow));
+        limbs.Add((HumanShape.Arm(shoulder, UpperArm, shoulder.Position.X > 0, outfit.Top, outfit.Skin, outfit.Sleeves, build), elbow));
         return elbow;
     }
 
@@ -211,7 +234,8 @@ public sealed class ActorRig {
     }
 
     /// <summary>Where a point on a forearm is from the rig's root, under the pose just shown.</summary>
-    private Vector3 FromForearm(bool left, Vector3 point) => hips.Transform * (torso.Transform * ((left ? shoulderL : shoulderR).Transform * ((left ? elbowL : elbowR).Transform * point)));
+    private Vector3 FromForearm(bool left, Vector3 point) =>
+        hips.Transform * (torso.Transform * (chest.Transform * ((left ? shoulderL : shoulderR).Transform * ((left ? elbowL : elbowR).Transform * point))));
 
     /// <summary>Where a fist is from the rig's root, under the pose just shown.</summary>
     public Vector3 Fist(bool left) => FromForearm(left, new Vector3(0, -Forearm, Palm));
@@ -242,7 +266,7 @@ public sealed class ActorRig {
         // The face looks ahead with the shaft upright and at the sky with it level.
         var face = along.Cross(Vector3.Right).Normalized();
         var held = new Basis(along.Cross(face), -along, -face);
-        shovel.Basis = (torso.Basis * shoulderR.Basis * elbowR.Basis).Inverse() * held;
+        shovel.Basis = (torso.Basis * chest.Basis * shoulderR.Basis * elbowR.Basis).Inverse() * held;
     }
 
     /// <summary>
@@ -250,6 +274,40 @@ public sealed class ActorRig {
     /// A <see cref="Pose"/> has no such turn, so an elbow folds only forward; with it a forearm can lie across the chest.
     /// </summary>
     public void RollArm(bool left, float degrees) => (left ? shoulderL : shoulderR).RotateObjectLocal(Vector3.Up, Mathf.DegToRad(degrees));
+
+    /// <summary>
+    /// Turns the chest at the waist, in degrees: a lean forward, a twist left and a tip toward the right shoulder.
+    /// On the game's build, whose trunk is one piece, the whole trunk turns about the waist.
+    /// It stays until set again.
+    /// </summary>
+    public void BendChest(float lean, float twist, float tip) {
+        var turn = Basis.FromEuler(new Vector3(Mathf.DegToRad(lean), Mathf.DegToRad(twist), Mathf.DegToRad(tip)));
+        chest.Transform = new Transform3D(turn, Waist - turn * Waist);
+    }
+
+    /// <summary>
+    /// Turns the hips and all they carry, in degrees: a tuck forward, a turn left and a tilt that lifts the left hip.
+    /// It stays until set again.
+    /// </summary>
+    public void TurnHips(float tuck, float turn, float tilt) => hips.RotationDegrees = new Vector3(tuck, turn, tilt);
+
+    /// <summary>
+    /// Moves a shoulder from its place on the chest, up for a shrug and forward for a hunch, in metres.
+    /// It stays until set again.
+    /// </summary>
+    public void MoveShoulder(bool left, float up, float forward) => (left ? shoulderL : shoulderR).Position = build.Shoulder(left, up, forward);
+
+    /// <summary>Tips a foot sideways at the ankle, its outer edge up, on top of the pose just shown.</summary>
+    public void RollFoot(bool left, float degrees) {
+        var foot = left ? footL : footR;
+        foot.SetBonePoseRotation(2, foot.GetBonePoseRotation(2) * new Quaternion(Vector3.Back, Mathf.DegToRad(left ? degrees : -degrees)));
+    }
+
+    /// <summary>
+    /// A thigh, from its hip joint down along -Y, and the shin under it from the knee, for a film to dress.
+    /// </summary>
+    public Node3D Thigh(bool left) => left ? legL : legR;
+    public Node3D Shin(bool left) => left ? kneeL : kneeR;
 
     /// <summary>Puts something gripped at its origin into the right fist, or the left one.</summary>
     public void Hold(Node3D item, bool right = true) {
@@ -388,8 +446,8 @@ public sealed class ActorRig {
         shoulderR.RotationDegrees = new Vector3(-pose.RaiseR, 0, -pose.OutR);
         elbowL.RotationDegrees = new Vector3(-pose.ElbowL, 0, 0);
         elbowR.RotationDegrees = new Vector3(-pose.ElbowR, 0, 0);
-        legL.Basis = HipTurn(pose.Splay, pose.SwingL, pose.TurnL, pose.RollL);
-        legR.Basis = HipTurn(-pose.Splay, pose.SwingR, -pose.TurnR, -pose.RollR);
+        legL.Basis = HipTurn(pose.SplayL, pose.SwingL, pose.TurnL, pose.RollL);
+        legR.Basis = HipTurn(-pose.SplayR, pose.SwingR, -pose.TurnR, -pose.RollR);
         kneeL.RotationDegrees = new Vector3(pose.KneeL, 0, 0);
         kneeR.RotationDegrees = new Vector3(pose.KneeR, 0, 0);
         foreach (var (skeleton, joint) in limbs)

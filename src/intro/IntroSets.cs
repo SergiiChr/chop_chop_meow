@@ -27,10 +27,17 @@ internal static class IntroSets {
 
     public sealed class Office {
         public readonly Node3D Root = new();
-        /// <summary>The hero's own chair, monitor, keyboard and mug, and the bat leaning in the corner of his cubicle.</summary>
-        public Node3D Chair = null!, Monitor = null!, Keyboard = null!, Mug = null!, LeaningBat = null!;
+        /// <summary>
+        /// The hero's own chair, monitor, keyboard, mug and mouse, and the bat leaning in the corner of his cubicle.
+        /// </summary>
+        public Node3D Chair = null!, Monitor = null!, Keyboard = null!, Mug = null!, Mouse = null!, LeaningBat = null!;
+        /// <summary>The mouse's left button, which flattens into the mouse as it is pressed.</summary>
+        public Node3D MouseButton = null!;
         /// <summary>The hero's screen, which dies under the bat; everyone else's keeps glowing.</summary>
         public readonly StandardMaterial3D Screen = Glowing("a9d8ee", 1.3f);
+        /// <summary>The web page of dancing catgirls he has up, and the picture of it over his screen.</summary>
+        public readonly CatgirlPage Page = new();
+        public Node3D PageOnScreen = null!;
         public OmniLight3D Glow = null!;
         /// <summary>The colleagues typing at the other desks.</summary>
         public readonly List<ActorRig> Staff = new();
@@ -61,7 +68,10 @@ internal static class IntroSets {
         Unshadowed(ceiling);
 
         var shared = Glowing("a9d8ee", 1.3f);
-        (office.Chair, office.Monitor, office.Keyboard, office.Mug) = Cubicle(root, Vector3.Zero, office.Screen, 0);
+        root.AddChild(office.Page.Root);
+        (office.Chair, office.Monitor, office.Keyboard, office.Mug, office.Mouse, office.MouseButton) = Cubicle(root, Vector3.Zero, office.Screen, 0);
+        // The page covers his screen's own rows of a spreadsheet.
+        office.PageOnScreen = Add(office.Monitor, new QuadMesh { Size = ScreenSize }, office.Page.Picture, ScreenMiddle + new Vector3(0, 0, -.012f), new Vector3(0, 180, 0));
         office.Glow = new OmniLight3D { Position = new Vector3(.08f, 1, .36f), LightColor = new Color("8fc4ff"), LightEnergy = .12f, OmniRange = 1.7f, OmniAttenuation = 1.2f };
         root.AddChild(office.Glow);
         office.LeaningBat = Pivot(root, new Vector3(-.84f, .78f, -.42f), new Vector3(4, 0, 8));
@@ -91,7 +101,7 @@ internal static class IntroSets {
     }
 
     /// <summary>A desk with its computer and chair inside fabric partitions; <paramref name="seed"/> varies the clutter.</summary>
-    private static (Node3D Chair, Node3D Monitor, Node3D Keyboard, Node3D Mug) Cubicle(Node3D parent, Vector3 at, StandardMaterial3D screen, int seed) {
+    private static (Node3D Chair, Node3D Monitor, Node3D Keyboard, Node3D Mug, Node3D Mouse, Node3D MouseButton) Cubicle(Node3D parent, Vector3 at, StandardMaterial3D screen, int seed) {
         var cell = Pivot(parent, at);
         var laminate = Mat("cdc4b0", .6f);
         Box(cell, new Vector3(1.7f, .04f, .8f), new Vector3(0, DeskTop - .02f, .62f), laminate);
@@ -108,8 +118,8 @@ internal static class IntroSets {
         var keyboard = Pivot(cell, new Vector3(.02f, DeskTop, .4f));
         Box(keyboard, new Vector3(.44f, .02f, .16f), new Vector3(0, .01f, 0), Mat("cfc8b4", .6f));
         Box(keyboard, new Vector3(.4f, .008f, .12f), new Vector3(0, .024f, 0), Mat("aea793", .7f));
-        Box(cell, new Vector3(.22f, .004f, .2f), new Vector3(-.36f, DeskTop + .002f, .42f), Mat("3d4a63", .9f));
-        Box(cell, new Vector3(.06f, .028f, .1f), new Vector3(-.36f, DeskTop + .018f, .42f), Mat("d6cfbd", .5f));
+        Box(cell, new Vector3(.22f, .004f, .2f), MouseSpot - new Vector3(0, .002f, 0), Mat("3d4a63", .9f));
+        var (mouse, mouseButton) = Mouse(cell, MouseSpot);
         // The tower, with a floppy slot and a power light.
         var tower = Pivot(cell, new Vector3(-.62f, DeskTop, .76f));
         Box(tower, new Vector3(.19f, .4f, .42f), new Vector3(0, .2f, 0), Mat("d6cfbd", .55f));
@@ -121,13 +131,45 @@ internal static class IntroSets {
         // Paperwork: a stack and a loose sheet.
         Box(cell, new Vector3(.21f, .04f + seed % 3 * .02f, .3f), new Vector3(.6f, DeskTop + .03f, .74f), Mat("f1eee4", .9f), new Vector3(0, 4, 0));
         Box(cell, new Vector3(.21f, .004f, .3f), new Vector3(.66f, DeskTop + .002f, .38f), Mat("f6f3ea", .9f), new Vector3(0, -14, 0));
-        return (Chair(cell, new Vector3(0, 0, -.03f)), monitor, keyboard, mug);
+        return (Chair(cell, new Vector3(0, 0, -.03f)), monitor, keyboard, mug, mouse, mouseButton);
     }
 
     private static void Partition(Node3D parent, Vector3 size, Vector3 at) {
         Box(parent, size, at, Cloth("8792a0"));
         Box(parent, new Vector3(size.X + .01f, .04f, size.Z + .01f), at + new Vector3(0, size.Y / 2, 0), Mat("5d6470", .5f));
     }
+
+    /// <summary>Where a mouse rests on its pad, to the right of a cubicle's keyboard.</summary>
+    public static readonly Vector3 MouseSpot = new(-.36f, DeskTop + .004f, .42f);
+    /// <summary>
+    /// How far each of a mouse's two buttons is from its middle, and how high its buttons sit on it, in metres.
+    /// </summary>
+    public const float ButtonSide = .0155f, ButtonTop = .03f;
+
+    /// <summary>
+    /// A beige two-button mouse lying at <paramref name="at"/>, its buttons toward +Z, where its cable runs off.
+    /// Returned with its left button, which stands on the mouse's top so that squashing it presses it.
+    /// </summary>
+    private static (Node3D Mouse, Node3D LeftButton) Mouse(Node3D parent, Vector3 at) {
+        var mouse = Pivot(parent, at);
+        var beige = Mat("d6cfbd", .5f);
+        Box(mouse, new Vector3(.06f, ButtonTop, .1f), new Vector3(0, ButtonTop / 2, 0), beige);
+        Sphere(mouse, .03f, new Vector3(0, .024f, -.018f), beige, new Vector3(1, .55f, 1.3f), 10);
+        Box(mouse, new Vector3(.006f, .006f, .14f), new Vector3(0, .008f, .12f), Mat("b8b1a0", .6f));
+        var buttons = Mat("c4bdab", .5f);
+        Node3D Button(float side) {
+            var button = Pivot(mouse, new Vector3(side * ButtonSide, ButtonTop, .028f));
+            Box(button, new Vector3(.027f, .006f, .04f), new Vector3(0, .003f, 0), buttons);
+            return button;
+        }
+        Button(-1);
+        // The sitter faces +Z, so his left is +X.
+        return (mouse, Button(1));
+    }
+
+    /// <summary>The middle of a monitor's screen from its origin, and the screen's size.</summary>
+    public static readonly Vector3 ScreenMiddle = new(0, .28f, -.132f);
+    public static readonly Vector2 ScreenSize = new(.34f, .26f);
 
     /// <summary>A beige tube monitor standing at <paramref name="at"/>, its screen toward -Z and its origin under the stand.</summary>
     private static Node3D Monitor(Node3D parent, Vector3 at, StandardMaterial3D screen) {
@@ -137,7 +179,7 @@ internal static class IntroSets {
         Box(monitor, new Vector3(.1f, .06f, .1f), new Vector3(0, .06f, 0), beige);
         Box(monitor, new Vector3(.42f, .36f, .3f), new Vector3(0, .27f, .02f), beige);
         Box(monitor, new Vector3(.3f, .28f, .2f), new Vector3(0, .27f, .25f), Mat("c4bdab", .6f));
-        Box(monitor, new Vector3(.34f, .26f, .012f), new Vector3(0, .28f, -.132f), screen);
+        Box(monitor, new Vector3(ScreenSize.X, ScreenSize.Y, .012f), ScreenMiddle, screen);
         // Rows of a spreadsheet.
         for (int row = 0; row < 6; row++) Box(monitor, new Vector3(row == 0 ? .3f : .26f - row % 3 * .04f, .012f, .004f), new Vector3(row == 0 ? 0 : -.02f - row % 3 * .02f, .375f - row * .036f, -.139f), Mat(row == 0 ? "2f6f8c" : "5c93ab", .4f, 0, .5f));
         Box(monitor, new Vector3(.015f, .015f, .01f), new Vector3(.17f, .115f, -.132f), Mat("57d66b", .4f, 0, 1.5f));
