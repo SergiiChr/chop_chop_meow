@@ -75,9 +75,16 @@ description: Animate players, workers, or creatures in Chop Chop Meow and check 
 - For a close crop use `--animation-zoom` in a direct `./build.py record` command.
   Use `xvfb-run -a` on a machine without a display.
   Save recordings in `build/`, where there is space for large movies.
-- To review every frame in manageable sheets, use `frame-compare` with `--numbers --step 1` and advance `--first` by
-  `--count` for each sheet.
-  The close-up recordings start from standing and the first frames can be used to check the transition into a cycle.
+  If space in `/tmp` is tight, set `TMPDIR` to an existing directory on disk for the base checkout.
+
+Use the shared `frame-compare` tool to make small sheets that show every frame.
+Advance the starting frame by 12 for each sheet.
+The close-up recordings start from standing, so use the first frames to check the transition into a cycle.
+
+```sh
+~/projects/agents/skills/frame-compare/compare.py build/run-000.png \
+    build/animation-review/player-run/current/top.avi --first 0 --count 12 --step 1 --numbers --columns 4 --scale .5
+```
 
 For an action that depends on the world around it, record its showcase scene directly.
 
