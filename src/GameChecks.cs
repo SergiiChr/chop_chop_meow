@@ -2126,7 +2126,6 @@ public partial class Game {
             await TestClean(CheckAPressLetGoOverAnotherSlotDoesNothing);
             await TestClean(CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround);
             await TestClean(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
-            await TestClean(CheckBarrelOpensInTheBackpackAndCanBePlacedWithWater);
             await TestClean(CheckHeldPlanPlacesOnOpenGround);
             await TestClean(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
             await TestClean(CheckHarvestingBesideAStationStopsHammering);
@@ -2196,6 +2195,7 @@ public partial class Game {
             await TestClean(CheckAJobBelowAHaulGroupDragsIntoIt);
             await TestClean(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
             await TestClean(CheckCratePutIntoCrateStopsAtWarning);
+            await TestClean(CheckBarrelOpensInTheBackpackAndCanBePlacedWithWater);
             RemoveCheckFiles();
             await TestClean(CheckRestartBuildsFreshModelsForReusedIds);
             await TestClean(CheckIntroFilmCoversTheStartMenuUntilEsc);
