@@ -38,7 +38,17 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
     }
 
     /// <summary>Seconds a wolf taking hold of a player to tug them takes to lunge in to their waist.</summary>
-    private const float TugLunge = .2f;
+    internal const float TugLunge = .2f;
+
+    /// <summary>A wolf catching a forearm draws the elbow out and down. A free hand still reaches for the door.</summary>
+    internal static Pose PulledArms(Pose pose, Vector2 pull) {
+        float left = Mathf.SmoothStep(.25f, 1, pull.X), right = Mathf.SmoothStep(.25f, 1, pull.Y);
+        float both = Math.Min(left, right);
+        pose = pose with { Lean = pose.Lean - 19 * both, Twist = pose.Twist + 13 * (left - right) };
+        pose = ArmReach.WithArm(pose, true, 48, 55, 55, left);
+        return ArmReach.WithArm(pose, false, 48, 55, 55, right);
+    }
+
     /// <summary>How near two tugged players are when their wolves angle apart, and by how many degrees.</summary>
     private const float TuggersApart = 1.2f, SplayTugger = 35;
 
@@ -124,11 +134,15 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
             model.Plant();
             return true;
         }
-        model.Feed(elapsed + wolf.Id % 7, dt, true, 1, lunged: true);
-        if (fell < LungeEnd) {
+        // Land at the throat even if this frame crossed the end of the lunge. Once planted, reach with the neck.
+        bool holding = model.Motion == WolfMotion.Pin && fell - dt / ActorAnimation.FallBackSeconds >= LungeEnd;
+        model.Feed(elapsed + wolf.Id % 7, dt, true, 1, lunged: true,
+            jawsUp: holding ? null : throat.Y, jaws: holding ? model.Root.Transform.AffineInverse() * throat : null);
+        if (!holding) {
             var bite = (throat - model.Root.Basis * model.Bite) with { Y = 0 };
-            model.Root.Position = model.Held = wait.Lerp(bite, WorldView.Ease((fell - LungeStart) / (LungeEnd - LungeStart)));
-        } else model.Root.Position = model.Held;
+            float reach = Mathf.SmoothStep(LungeStart, LungeEnd, fell);
+            model.Root.Position = wait.Lerp(bite, reach);
+        }
         model.Plant();
         return true;
     }

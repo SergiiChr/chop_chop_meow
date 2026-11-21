@@ -500,9 +500,9 @@ public sealed class WolfModel {
     /// <paramref name="jawsUp"/>, when given, is how high off the ground a pinning wolf's jaws hold the throat, which it rears up on
     /// its hind legs to reach as the player goes down; <paramref name="jaws"/>, where in the model they hold it once the player lies.
     public void Feed(float time, float dt, bool pinning, float down = 1, bool lunged = false, (Vector3 Left, Vector3 Right)? chest = null, float? jawsUp = null, Vector3? jaws = null) {
-        float pull = MathF.Pow(Math.Max(0, MathF.Sin(time * 2.6f)), 3), shake = MathF.Sin(time * 13) * (1 - pull * .6f), bite = Math.Max(0, MathF.Sin(time * 4.5f));
         WolfPose body;
         if (pinning) {
+            float pull = MathF.Pow(Math.Max(0, MathF.Sin(time * 2.6f)), 3), shake = MathF.Sin(time * 13) * (1 - pull * .6f), bite = Math.Max(0, MathF.Sin(time * 4.5f));
             // Riding the player down: high and nose up while they still stand, then low over them with the jaws at the throat.
             float up = 1 - Mathf.SmoothStep(0, 1, down);
             body = new WolfPose(Lift: -.05f - .02f * pull, Pitch: 14 - 34 * up - 4 * pull, Surge: -.03f * pull, Flex: 4,
@@ -522,20 +522,28 @@ public sealed class WolfModel {
                 var halves = new Halves(body);
                 body = body.WithLeg(0, ReachTo(halves, 0, left, lower, lower - 20)).WithLeg(1, ReachTo(halves, 1, right, lower, lower - 20));
             }
-        } else body = Tearing(time, pull, shake, bite);
+        } else body = Tearing(time);
         Show(pinning ? WolfMotion.Pin : WolfMotion.Feed, body, dt);
     }
 
     /// <summary>How far apart a pinning wolf's hind paws stand, as a share of its legs' own width, wide of the legs of the player under it, and how far it leans its body to keep its jaws on the throat.</summary>
     private const float PinStance = 2.5f, MostLean = .15f;
 
-    /// <summary>A feeding wolf's pose: head down, pulling back by <paramref name="pull"/>, shaking and biting, with all four paws planted.</summary>
-    private static WolfPose Tearing(float time, float pull, float shake, float bite) =>
-        Planted(new WolfPose(Lift: -.07f, Pitch: 12 - 4 * pull, Surge: -.05f * pull, Flex: 6, Neck: 46 - 14 * pull + 6 * MathF.Sin(time * 9), Head: 18,
-            HeadTurn: 18 * shake, HeadTilt: 6 * shake, Jaw: 6 + 18 * bite, Ears: 22, Snarl: 1, Tail: -74 + 5 * MathF.Sin(time * 1.7f), Wag: 12 * MathF.Sin(time * 2.1f)), 1.25f, 0, .1f);
+    /// <summary>A feeder grips low, rocks back on its haunches, then lets go and dips for another bite.</summary>
+    private static WolfPose Tearing(float time) {
+        float beat = time / 1.35f, u = Mathf.PosMod(beat, 1);
+        float pull = Mathf.SmoothStep(.16f, .39f, u) * (1 - Mathf.SmoothStep(.48f, .84f, u));
+        float open = Mathf.SmoothStep(.48f, .61f, u) * (1 - Mathf.SmoothStep(.78f, .96f, u));
+        float wrench = pull * MathF.Sin(beat * Mathf.Pi);
+        var body = new WolfPose(Lift: -.07f - .045f * pull, Pitch: 12 - 12 * pull, Surge: -.11f * pull,
+            Flex: 6 + 10 * pull, Bend: 8 * wrench, Neck: 46 - 23 * pull, Head: 18 + 6 * pull,
+            HeadTurn: 16 * wrench, HeadTilt: 12 * wrench, Jaw: 6 + 19 * open, Ears: 22, Snarl: 1,
+            Tail: -74 + 12 * pull, Wag: -14 * wrench);
+        return Planted(body, 1.25f, 0, .1f);
+    }
 
     /// <summary>Where a feeding wolf's jaws close, in the model, between its pulls.</summary>
-    public static readonly Vector3 FeedingBite = BiteOf(Tearing(0, 0, 0, 0));
+    public static readonly Vector3 FeedingBite = BiteOf(Tearing(0));
 
     /// <summary>
     /// Tugging a player back by the waist like a dog at tug of war, low on bent hind legs with the forelegs braced wide
@@ -761,7 +769,7 @@ public sealed class WolfModel {
     public static readonly (Vector3 At, float Radius)[] FeedingVolumes = Feeding();
     private static (Vector3 At, float Radius)[] Feeding() {
         var volumes = new (Vector3 At, float Radius)[VolumeCount];
-        VolumesOf(Tearing(0, 0, 0, 0), volumes);
+        VolumesOf(Tearing(0), volumes);
         return volumes;
     }
 

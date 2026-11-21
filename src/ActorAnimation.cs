@@ -527,14 +527,19 @@ public static class ActorAnimation {
                     // where it stands, the hips passing back over it until it is in front.
                     float half = p * 2 % 1, back = Mathf.SmoothStep(0, 1, Math.Min(1, half / DoorTug.Heave)), heave = DoorTug.HeavePulse(half);
                     float struggle = MathF.Sin(half * Mathf.Tau), step = heave * heave;
-                    var planted = Stood(TugBehind + TugStep * back, TugHips);
+                    // The waist gives first. The chest follows the pull, then the knees catch the weight on landing.
+                    float catchStep = Mathf.SmoothStep(.24f, .43f, half) * (1 - Mathf.SmoothStep(.46f, .91f, half));
+                    float hips = TugHips - .085f * catchStep;
+                    var planted = Stood(TugBehind + TugStep * back, hips);
                     // The stepping boot stands on ground that rises under it and sinks again, its toes hanging as it swings back; it lifts and sets down gently.
-                    var stepping = Stood(TugBehind + TugStep * (1 - back), TugHips - TugLift * step) + new LegAngles(0, 0, TugToes * step);
+                    var stepping = Stood(TugBehind + TugStep * (1 - back), hips - TugLift * step) + new LegAngles(0, 0, TugToes * step);
                     var (left, right) = p < .5f ? (stepping, planted) : (planted, stepping);
                     // Between tugs the player strains toward the door, the arms clawing at it.
-                    return new Pose(Lean: 42 + 8 * heave - 3 * struggle, Head: -28 - 4 * heave, RaiseL: 105 - 10 * heave + 8 * struggle, OutL: 14, ElbowL: 22,
+                    float side = p < .5f ? 1 : -1;
+                    return new Pose(Lean: 34 + 20 * heave - 9 * catchStep, Twist: 9 * side * heave, Sway: 5 * side * catchStep,
+                        Head: -23 - 8 * heave, RaiseL: 105 - 10 * heave + 8 * struggle, OutL: 14, ElbowL: 22,
                         RaiseR: 115 - 10 * heave - 8 * struggle, OutR: 12, ElbowR: 16,
-                        Hips: TugHips, SplayL: 3, SplayR: 3).WithLegs(left, right);
+                        Hips: hips, SplayL: 3, SplayR: 3).WithLegs(left, right);
                 }
             case ActorAction.Knock: {
                     // The right fist beats on a door at head height, landing as each loop starts: drawn back with the elbow bent, then thrown at the boards.

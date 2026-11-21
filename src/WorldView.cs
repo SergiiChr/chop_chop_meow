@@ -1559,8 +1559,11 @@ public partial class WorldView : Node3D {
         return cart;
     }
 
+    /// <summary>Clean showcase recordings omit the selection and player rings with the rest of the interface.</summary>
+    private readonly bool hideMarkers = Launch.Has("--showcase") && Launch.Has("--hide-ui");
+
     private void UpdateMarkers() {
-        if (EnvironmentReview) {
+        if (EnvironmentReview || hideMarkers) {
             selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = placeTile.Visible = false;
             return;
         }
