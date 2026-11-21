@@ -397,7 +397,12 @@ public sealed partial class World {
         foreach (var t in S.Remembered.Values) if (!Sees(t.Pos)) known.Add(t);
     }
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
-    public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind switch { ThingKind.Water => Terrain.WaterPoint(from), ThingKind.Mine => MineDoor(t), _ => t.Pos };
+    public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind switch {
+        ThingKind.Water => Terrain.WaterPoint(from),
+        // A marked mine's entrance is dug at the rock face beside its cave mouth.
+        ThingKind.Mine => t.MineStage == MineStage.Marked ? MineDigFace(t, from) : MineDoor(t),
+        _ => t.Pos
+    };
     /// <summary>How far, in metres, the player reaches to move items in and out of storage and stations.</summary>
     public const float ItemReach = 15;
     /// <summary>Whether the player can move items to or from a thing.</summary>

@@ -526,6 +526,7 @@ public partial class WorldView : Node3D {
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down
+                : assignment is { Kind: ThingKind.Mine, MineStage: MineStage.Marked } marked ? World.MineDigFace(marked, worker.Pos)
                 : assignment is { Kind: ThingKind.Mine } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
@@ -741,8 +742,7 @@ public partial class WorldView : Node3D {
                 Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id)), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
             case ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Mine:
-                var color = subject.Kind is ThingKind.Stone or ThingKind.Mine ? "9a9d99" : subject.Kind == ThingKind.Iron ? "a35a2e" : subject.Kind == ThingKind.Tin ? "b9bbb4" : "26282b";
-                Burst(Hit(.5f), Mat(color), 6, 2.4f, .5f, 9, .07f);
+                Burst(Hit(.5f), Mat(RockColor(subject.Kind)), 6, 2.4f, .5f, 9, .07f);
                 Burst(Hit(.4f), GatherDust, 3, .5f, .9f, -.3f, .16f, 1.5f);
                 if (action == ActorAction.SteelMine) Burst(Hit(.5f), Sparks, 5, 3.2f, .3f, 4, .025f);
                 break;
@@ -773,6 +773,8 @@ public partial class WorldView : Node3D {
     private Basis TreeShake(float shake) => Basis.FromEuler(new Vector3(Mathf.DegToRad(shake * MathF.Sin(Elapsed * 34) * 3), 0, Mathf.DegToRad(shake * 2 * MathF.Cos(Elapsed * 29))));
     /// <summary>Seconds a felled tree lies where it landed before it starts to fade, and seconds its trunk and crown then take to fade away over the stump.</summary>
     private const float TreeLiesSeconds = .1f, TreeFadeSeconds = .5f;
+    /// <summary>How small a rock or deposit has grown as it is mined down to its last piece, and the seconds it then takes to crumble away.</summary>
+    private const float MinedSize = .55f, CrumbleSeconds = .2f;
     /// <summary>How tall a tree stands (<see cref="WorldModels.TreeTall"/>) before it tears at length as it goes over rather than cracks.</summary>
     private const float TearsFrom = .7f;
     /// <summary>How much lower and slower a tree's sounds play the taller it stands.</summary>
@@ -889,6 +891,13 @@ public partial class WorldView : Node3D {
     /// <summary>Whether a model whose thing has left the world plays its way out: a felled tree, and a stump or bush that was dug out rather than built over.</summary>
     private bool Departs(Prop prop) => prop is TreeProp || prop is DugProp && !BuiltOver(prop.Look.Pos);
 
+    /// <summary>Whether a thing is a rock or ore deposit, mined down piece by piece until it breaks apart.</summary>
+    private static bool Mined(ThingKind kind) => kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin;
+
+    /// <summary>The colour of a rock's chips, by the stone or ore it is.</summary>
+    private static string RockColor(ThingKind kind) =>
+        kind switch { ThingKind.Iron => "a35a2e", ThingKind.Tin => "b9bbb4", ThingKind.Coal => "26282b", _ => "9a9d99" };
+
     /// <summary>Whether a building, yard, crate or gravel path tile now lies over a spot, having cleared away the stump or bush that was there.</summary>
     private bool BuiltOver(Vector2 at) {
         if (World.GravelPaths.Laid(Terrain.TileAt(at))) return true;
@@ -980,10 +989,30 @@ public partial class WorldView : Node3D {
                     + Vector3.Up * Thrown.ChipHeight(chip.Flight, WorldModels.ChipFlight, chip.From.Y);
                 prop.Body.Transform = spin.Translated(along) * new Transform3D(chip.Rest, Vector3.Zero);
                 break;
-            case Prop when t.IsLoose || t.Kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Leaves:
+            case Prop rock when Mined(rock.Kind):
+                // Its last piece mined while watched, the rock breaks into chips with a puff of dust and crumbles away.
+                if (t.Remaining <= 0 && watched && prop.Look.Remaining > 0) {
+                    rock.Crumbled = 0;
+                    var middle = rock.Body.GlobalTransform * WorldModels.Bounds(rock.Body).GetCenter();
+                    Burst(middle, Mat(RockColor(rock.Kind)), 14, 2.6f, .6f, 9, .08f);
+                    Burst(middle + Vector3.Down * .1f, GatherDust, 7, .8f, 1.2f, -.3f, .3f, 1.6f);
+                }
+                if (rock.Crumbled >= 0 && rock.Crumbled < CrumbleSeconds) {
+                    rock.Crumbled += dt;
+                    rock.Body.Scale = Vector3.One * MinedSize * (1 - Mathf.SmoothStep(0, CrumbleSeconds, rock.Crumbled));
+                    rock.Body.Visible = rock.Crumbled < CrumbleSeconds;
+                    break;
+                }
+                if (still) break;
+                if (t.Remaining > 0) rock.Crumbled = -1;
+                rock.Body.Visible = t.Remaining > 0;
+                rock.Body.Scale = Vector3.One * (MinedSize + (1 - MinedSize) * Math.Clamp(WorldModels.Fullness(t), 0, 1));
+                rock.Body.Position = new Vector3(wobble * .03f, 0, 0);
+                break;
+            case Prop when t.IsLoose || t.Kind is ThingKind.Leaves:
                 if (still) break;
                 prop.Body.Visible = t.Remaining > 0;
-                prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
+                prop.Body.Scale = Vector3.One * (MinedSize + (1 - MinedSize) * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
                 break;
             case CarcassProp carcass:
@@ -1005,24 +1034,25 @@ public partial class WorldView : Node3D {
                 break;
             case FurnaceProp furnace:
                 if (live) WorldModels.SyncFuel(furnace, t, World.Data);
-                bool smelting = Lit(furnace, t.Processing, dt);
-                furnace.Glow.Visible = smelting;
-                furnace.Light.LightEnergy = smelting ? (1.1f + flicker * .25f) * (.5f + night) : 0;
-                Smoke(furnace, t, smelting, dt, FurnaceSmoke);
+                float smelting = furnace.Burning(t.Processing, dt);
+                ShowGlow(furnace.Glow, smelting);
+                furnace.Light.LightEnergy = smelting * (1.1f + flicker * .25f) * (.5f + night);
+                Smoke(furnace, t, smelting > 0, dt, FurnaceSmoke);
                 break;
             case StoveProp stove:
                 // The fire only burns for recipes that take fuel; the mortar's work and kneading dough are cold.
-                bool cooking = Lit(stove, t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Burns, dt);
-                stove.Glow.Visible = cooking;
-                stove.Light.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
+                float cooking = stove.Burning(t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Burns, dt);
+                ShowGlow(stove.Glow, cooking);
+                stove.Light.LightEnergy = cooking * (.9f + flicker * .25f) * (.5f + night);
                 if (stove.Mortar != null && live) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null && !grinding.Contains(t.Id);
-                Smoke(stove, t, cooking, dt, FurnaceSmoke);
+                Smoke(stove, t, cooking > 0, dt, FurnaceSmoke);
                 break;
             case ForgeProp forge:
                 float heat = Clocked(forge.Heat, t.Heat, live, dt) / 100;
-                bool forging = Lit(forge, t.Processing, dt);
-                forge.Glow.Visible = heat > .05f || forging;
-                forge.Light.LightEnergy = (heat * 1.5f + (forging ? .4f : 0)) * (1 + flicker * .15f) * (.5f + night);
+                float forging = forge.Burning(t.Processing, dt);
+                // Hot coals glow on their own, as the fire over them dies down.
+                ShowGlow(forge.Glow, Math.Max(forging, Math.Clamp(heat / HotCoals, 0, 1)));
+                forge.Light.LightEnergy = (heat * 1.5f + forging * .4f) * (1 + flicker * .15f) * (.5f + night);
                 forge.Needle.RotationDegrees = new Vector3(0, 0, Mathf.Lerp(forge.Needle.RotationDegrees.Z, WorldModels.Gauge(heat), 1 - MathF.Exp(-6 * dt)));
                 // Let go, the board rises back as the body that pressed it blends out of pumping.
                 if (pumping.TryGetValue(t.Id, out float pressed)) (forge.Press, forge.Released) = (pressed, 0);
@@ -1030,16 +1060,18 @@ public partial class WorldView : Node3D {
                 float lift = 18 * (1 - forge.Press * (1 - Mathf.SmoothStep(0, 1, forge.Released / ActorAnimation.BlendSeconds)));
                 forge.Lever.RotationDegrees = new Vector3(0, 0, lift);
                 for (int i = 0; i < forge.Pleats.Length; i++) forge.Pleats[i].RotationDegrees = new Vector3(0, 0, lift * (i + 1) / (forge.Pleats.Length + 1));
-                Smoke(forge, t, forging || heat > .3f, dt, ForgeSmoke);
+                Smoke(forge, t, forging > 0 || heat > .3f, dt, ForgeSmoke);
                 break;
             case CampfireProp campfire:
                 bool burning = t.Burn > 0;
-                campfire.Fire.Visible = burning;
-                campfire.Fire.Scale = new Vector3(1 + flicker * .08f, .85f + Rising(Elapsed * 9 + t.Id) * .3f, 1 - flicker * .08f);
+                // Out of fuel, the flames sink and shrink as the fire dies down.
+                float flames = campfire.Burning(burning, dt);
+                campfire.Fire.Visible = flames > 0;
+                campfire.Fire.Scale = new Vector3(1 + flicker * .08f, .85f + Rising(Elapsed * 9 + t.Id) * .3f, 1 - flicker * .08f) * flames;
                 campfire.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
-                campfire.Light.LightEnergy = burning ? (1.2f + flicker * .3f) * (.35f + night * 1.4f) : 0;
+                campfire.Light.LightEnergy = flames * (1.2f + flicker * .3f) * (.35f + night * 1.4f);
                 if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Cinders, 1, .5f, 1.1f, -1.4f, .025f);
-                Smoke(campfire, t, burning, dt, CampfireSmoke);
+                Smoke(campfire, t, flames > 0, dt, CampfireSmoke);
                 break;
             case BenchProp bench:
                 // Slotted tools lie on the bench top.
@@ -1166,16 +1198,14 @@ public partial class WorldView : Node3D {
     /// <summary>Seconds a chest's or crate's lid takes to open or shut.</summary>
     private const float LidSeconds = .25f;
 
-    /// <summary>
-    /// Seconds a station's fire stays lit once its work stops.
-    /// A batch ends on one tick and the next starts on the following one, and a fire does not go out in between.
-    /// </summary>
-    private const float BetweenBatches = .1f;
-    /// <summary>Whether a station's fire shows lit, with <paramref name="working"/> telling whether it has work now.</summary>
-    private static bool Lit(HearthProp hearth, bool working, float dt) {
-        hearth.Idle = working ? 0 : hearth.Idle + dt;
-        return hearth.Idle <= BetweenBatches;
+    /// <summary>A station's glowing fire, shown as brightly as it burns, from 0 out to 1 fully, fading as it dies down.</summary>
+    private static void ShowGlow(MeshInstance3D glow, float burning) {
+        glow.Visible = burning > 0;
+        glow.Transparency = 1 - burning;
     }
+
+    /// <summary>The forge's heat, from 0 to 1, at which its coals glow fully on their own.</summary>
+    private const float HotCoals = .05f;
 
     // Lookups that would otherwise capture the thing in a lambda, which allocates on every call for every thing drawn.
     private WolfModel? Dying(Vector2 at) {

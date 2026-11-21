@@ -955,10 +955,11 @@ public static class ActorAnimation {
     /// </summary>
     private const float ArmBehind = -10, ElbowMost = 120, ChopElbowMost = 140;
 
-    // Felling a tree with an axe, picking at rock, hammering on an anvil or bench, and digging out a stump or bush.
+    // Felling a tree with an axe, picking at rock and at a mine's entrance, hammering on an anvil or bench, and digging out
+    // a stump or bush.
     private static readonly Blow Felling = new(new[] { ThingKind.Tree },
         new ToolSwing(ChopKeys, 2, ActorRig.AxeHeadPoint, TwoHanded: true, ChopElbowMost));
-    private static readonly Blow Picking = new(new[] { ThingKind.Stone, ThingKind.Iron, ThingKind.Coal, ThingKind.Tin },
+    private static readonly Blow Picking = new(new[] { ThingKind.Stone, ThingKind.Iron, ThingKind.Coal, ThingKind.Tin, ThingKind.Mine },
         new ToolSwing(MineKeys, 2, ActorRig.PickPoint, TwoHanded: true, ElbowMost));
     private static readonly Blow Hammering = new(new[] { ThingKind.Anvil, ThingKind.Bench },
         new ToolSwing(HammerKeys, 2, ActorRig.HammerFace, TwoHanded: false, ElbowMost));

@@ -66,6 +66,7 @@ public sealed class StrikePoints {
         var meshes = CollectionsMarshal.AsSpan(parts);
         var rig = new Transform3D(Basis.FromEuler(new Vector3(0, ActorAnimation.Yaw(subject.Pos - from, 0), 0)), WorldView.To3(from));
         var spot = action == ActorAction.Dig ? AtTheFoot(subject, from, prop, meshes)
+            : subject.Kind == ThingKind.Mine ? BesideTheMouth(subject, from)
             : OnTheSwing(subject, rig, action, meshes) ?? Facing(subject, from, action, prop, meshes);
         known[key] = (prop, size, spot);
         return spot;
@@ -133,6 +134,15 @@ public sealed class StrikePoints {
                 }
         }
     }
+
+    /// <summary>
+    /// Where a pick digging a mine's entrance lands: on the cliff's rock face just beside the cave mouth, on the digger's
+    /// side, halfway up the mouth; the mine's own model is only a see-through marking.
+    /// </summary>
+    private static Vector3 BesideTheMouth(Thing mine, Vector2 from) => WorldView.To3(World.MineDigFace(mine, from), MouthBlow);
+
+    /// <summary>How high over the ground a pick digging a mine's entrance lands on the rock, halfway up the cave mouth.</summary>
+    private const float MouthBlow = .9f;
 
     /// <summary>Where a shovel goes into the ground: just out from the foot of a stump or bush, on the side facing the digger.</summary>
     private static Vector3? AtTheFoot(Thing subject, Vector2 from, Prop prop, ReadOnlySpan<Part> meshes) {
