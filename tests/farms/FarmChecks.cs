@@ -17,6 +17,7 @@ public static class FarmChecks {
         Test(CheckSpareSeedCannotTakeTheWaterSlot, data);
         Test(CheckSownWheatGrowsToRipeInItsDays, data);
         Test(CheckPlotHarvestedAloneKeepsSeedInItsOutput, data);
+        Test(CheckRipeWheatKeepsStoredWater, data);
         Test(CheckWorkerFinishesHarvestHaulsCropAndSowsAgain, data);
         Test(CheckPlotHoldsTenLitersAndKeepsWaterOnLoad, data);
         Test(CheckHaulerPoursABucketAtFourCorners, data);
@@ -93,6 +94,16 @@ public static class FarmChecks {
         Require(lone.FarmStage == FarmStage.Fallow, "a harvested plot should lie fallow");
         Require(lone.Output!["wheat_seeds"] == 2, "harvested seed should wait in the output");
         Require(lone.Inventory["wheat_seeds"] == 0, "harvested seed should not go into the plot by itself");
+    }
+
+    private static void CheckRipeWheatKeepsStoredWater(GameData data) {
+        var world = EmptyWorld(data);
+        var farm = world.Add(ThingKind.Farm, new Vector2(20, 14));
+        farm.FarmStage = FarmStage.Ripe;
+        farm.Inventory.Add(Water.Liquid, 4);
+        Work(world, data.DaySeconds);
+        Require(farm.FarmStage == FarmStage.Ripe && world.Farms.WaterLevel(farm) == 4,
+            "ripe wheat should keep its water for the next crop");
     }
 
     private static void CheckWorkerFinishesHarvestHaulsCropAndSowsAgain(GameData data) {

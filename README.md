@@ -754,6 +754,7 @@ Wheat uses 10 liters of water per day of growth and pauses when the plot runs dr
 The plot holds up to 10 liters.
 Pour from a filled bucket or bottle into the water droplet slot, just like at the cooking table.
 The blue bar under fertilizer shows how much water is left.
+When the wheat ripens, the water slot and fill bar hide until the harvest is done.
 
 Hold right mouse on a ripe plot to harvest it by hand, no tool needed.
 An assigned worker also harvests, and everyone adds to one shared progress, so you can stop and come back.

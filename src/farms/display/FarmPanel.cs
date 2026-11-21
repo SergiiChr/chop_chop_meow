@@ -96,6 +96,7 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
         live.Watch(() => (int)(world.Farms.WaterLevel(thing) * 20), at => bar.Value = at / 20f);
         level.AddChild(bar);
         row.AddChild(level);
+        live.Watch(() => thing.FarmStage != FarmStage.Ripe, showing => row.Visible = showing);
         return row;
     }
 

@@ -44,6 +44,11 @@ public partial class Game {
         await Until(() => HasLabel(panel, "Ripe") && HasLabel(panel, "harvest"), "a ripe plot's page offering the harvest", 2);
         var farCrop = view.Screen(farm.Pos - new Vector2(2.3f, 2.3f), .8f);
         Require(view.Pick(farCrop)?.Id == farm.Id, "clicks on the far corner's ripe wheat should reach the plot");
+        Require(OnPage($"input_{Water.Liquid}")?.IsVisibleInTree() != true && OnPage("farm_water")?.IsVisibleInTree() != true,
+            "a ripe crop should hide both its water slot and its fill bar");
+        farm.FarmStage = FarmStage.Fallow;
+        await Until(() => HasLabel(panel, "Sows once") && OnPage($"input_{Water.Liquid}")?.IsVisibleInTree() == true
+            && OnPage("farm_water")?.IsVisibleInTree() == true, "the water controls returning for the next crop", 2);
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == farm);
     }

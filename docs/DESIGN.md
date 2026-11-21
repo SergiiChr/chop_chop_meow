@@ -1242,6 +1242,7 @@ A farm plot (`farm`, `src/farms/model/Farms.cs`) is a walkable 6×6 zone that sn
 `Thing.FarmStage` is `Fallow`, `Growing` or `Ripe`.
 A fallow plot sows itself from its own inventory.
 The water slot stores up to 10 liters, which supply one day of growth.
+A ripe plot keeps any water left for the next crop, and its panel hides the water slot and fill bar.
 Each liter in use grants a tenth of a day of growth and counts toward capacity until spent.
 `Thing.FarmWaterLeft` counts the growth seconds still covered by that liter.
 `Thing.Progress` counts completed growth from whole liters, then harvest work.
