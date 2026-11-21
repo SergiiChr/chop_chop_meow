@@ -10,8 +10,8 @@ public abstract record ClickMode {
     public sealed record Normal : ClickMode;
     /// <summary>A click places a building of this kind.</summary>
     public sealed record Build(ThingKind Kind) : ClickMode;
-    /// <summary>A click places this crate or barrel from the backpack.</summary>
-    public sealed record Container(string Item) : ClickMode;
+    /// <summary>A click places a crate or barrel, from a specific backpack cell when one is named.</summary>
+    public sealed record Container(string Item, int BackpackSlot = -1) : ClickMode;
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
     /// <summary>The remove selector: a click takes down the building or gravel path tile under it, and the next click the next one.</summary>
@@ -58,9 +58,10 @@ public sealed class PlayerControl {
     public void WalkInto(Thing cabin) => entering = cabin;
 
     /// <summary>Enters placement for a container from the backpack.</summary>
-    public void PlaceContainer(string item) {
-        if (world.Backpack[item] == 0) { kit.Notify(Barrel.Is(item) ? "No barrel in your backpack." : "No empty crate in your backpack."); return; }
-        Mode = new ClickMode.Container(item); panel.Close();
+    public void PlaceContainer(string item, int backpackSlot = -1) {
+        var container = new ClickMode.Container(item, backpackSlot);
+        if (ContainerCount(container) == 0) { kit.Notify(Barrel.Is(item) ? "No barrel in your backpack." : "No empty crate in your backpack."); return; }
+        Mode = container; panel.Close();
     }
 
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started; <paramref name="overPanel"/> tells that the mouse is on the interface.</summary>
@@ -82,7 +83,7 @@ public sealed class PlayerControl {
         if ((plan != null || container != null) && !overPanel) {
             // Built only when it changes, as this runs every frame.
             if (plan is ThingKind kind && !(Mode is ClickMode.Build build && build.Kind == kind)) Mode = new ClickMode.Build(kind);
-            if (container != null && !(Mode is ClickMode.Container placing && placing.Item == container)) Mode = new ClickMode.Container(container);
+            if (container != null && !(Mode is ClickMode.Container { BackpackSlot: -1 } placing && placing.Item == container)) Mode = new ClickMode.Container(container);
             placingHeld = true;
         } else if (placingHeld) { placingHeld = false; Mode = new ClickMode.Normal(); }
     }
@@ -239,8 +240,12 @@ public sealed class PlayerControl {
     /// The backpack still holds what a placement just sent will cost, and the mine's panel opens when the server names it.
     /// </summary>
     private void Place(Vector2 at) {
+        if (Mode is ClickMode.Container { BackpackSlot: >= 0 } selected && ContainerCount(selected) == 0) {
+            Mode = new ClickMode.Normal();
+            return;
+        }
         bool sent = Sent(at);
-        if (Mode is ClickMode.Container container) PlaceContainerAt(container.Item, at);
+        if (Mode is ClickMode.Container container) PlaceContainerAt(container, at);
         else world.Construction.Build(Mode.Placing!.Value, at);
         if (!sent || Mode.Placing != ThingKind.Mine && CanPlaceAgain()) return;
         Mode = new ClickMode.Normal();
@@ -248,12 +253,14 @@ public sealed class PlayerControl {
         if (placingHeld && cursor.Plan != null) cursor.Release();
     }
 
-    /// <summary>Places the container from the cursor or the hotbar's own stack if either is in use.</summary>
-    private void PlaceContainerAt(string item, Vector2 at) {
+    /// <summary>Places the container from the cursor, its chosen backpack cell or the active hotbar stack.</summary>
+    private void PlaceContainerAt(ClickMode.Container container, Vector2 at) {
+        string item = container.Item;
         void Put() {
             if (Barrel.Is(item)) world.PlaceBarrel(item, at); else world.PlaceCrate(item, at);
         }
         if (placingHeld && cursor.Stack?.Item == item) world.FromHeldStack(Put);
+        else if (container.BackpackSlot >= 0) hotbar.FromStack(container.BackpackSlot, Put);
         else if (hotbar.ActiveItem() == item) hotbar.FromStack(hotbar.ActiveStack(), Put);
         else Put();
     }
@@ -267,8 +274,17 @@ public sealed class PlayerControl {
 
     /// <summary>Whether another can be paid for, on top of the one just sent.</summary>
     private bool CanPlaceAgain() => Mode switch {
-        ClickMode.Container container => world.Backpack[container.Item] > 1,
+        ClickMode.Container container => ContainerCount(container) > 1,
         ClickMode.Build build => world.Data.Buildings[build.Kind].Cost.All(cost => world.Backpack[cost.Key] >= cost.Value * 2),
         _ => false
     };
+
+    /// <summary>How many matching containers can be placed from the chosen cell or the backpack as a whole.</summary>
+    private int ContainerCount(ClickMode.Container container) {
+        if (container.BackpackSlot < 0) return world.Backpack[container.Item];
+        var layout = world.Backpack.Layout;
+        if (container.BackpackSlot >= layout.Count) return 0;
+        var slot = layout[container.BackpackSlot];
+        return slot.Item == container.Item ? slot.Free : 0;
+    }
 }

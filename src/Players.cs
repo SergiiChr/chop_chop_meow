@@ -140,7 +140,10 @@ public sealed partial class World {
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At)); break;
             case Verb.PlaceBarrel: Preferring(S.Backpack, c.Count, () => PlaceBarrel(c.Item, c.At)); break;
-            case Verb.MoveInBarrel: if ((uint)c.Target <= Barrel.Capacity) Preferring(S.Backpack, (int)c.At.X, () => MoveInBarrel(Barrel.AtFill(c.Target), c.Item, c.Count, c.Other != 0)); break;
+            case Verb.MoveInBarrel:
+                if ((uint)c.Target <= Barrel.Capacity)
+                    Preferring(S.Backpack, (int)c.At.X, () => MoveInBarrel(Barrel.AtFill(c.Target), c.Item, c.Count, c.Other != 0, (int)c.At.Y));
+                break;
             case Verb.MoveInCrate: MoveInCrate(c.Target, c.Item, c.Count, c.Other != 0); break;
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
             case Verb.Torch: UseTorch(c.At); break;
@@ -240,7 +243,7 @@ public sealed partial class World {
 
     /// <summary>Why an item cannot go into a box by hand, by the box's number from <see cref="Locate"/>, or null.</summary>
     private string? BoxBlock(int at, Inventory to, string item) =>
-        at == 0 && Barrel.Is(item) && Barrel.In(to) != null ? "You can only carry one barrel."
+        at == 0 ? CarryBarrelBlock(to, item)
         : at <= CrateCode && Barrel.Is(item) ? "Barrel does not fit in wood crate."
         : at <= 0 ? null : Find(at / BoxCodes) is Thing t ? BoxBlock(t, to, item)
         : Carrier(at) is Worker w && to == w.ToolSlot && !FitsWorkerToolSlot(item) ? "A worker's tool slot only takes tools." : null;

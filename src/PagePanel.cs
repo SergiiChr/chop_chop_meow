@@ -101,7 +101,7 @@ public abstract partial class PagePanel : VBoxContainer {
     /// <summary>The hint on backpack cells: what each click does, with the page's own Ctrl- and Shift-click when it has one.</summary>
     protected const string BagHint = "LMB: pick up · RMB: pick up half · Double LMB: use";
     /// <summary>
-    /// A double click on a backpack item: eats or drinks it, lights a torch, opens a crate as storage, or selects a tool on the hotbar.
+    /// A double click on a backpack item eats or drinks it, lights a torch, opens a container, or selects a tool on the hotbar.
     /// </summary>
     protected void UseFromBag(string id) {
         if (!panel.Hotbar.UseItem(id) && world.Data.Items.TryGetValue(id, out var def) && def.Tool != "") panel.Hotbar.SelectTool(id);

@@ -10,38 +10,40 @@ public partial class Game {
 
     private async Task HostSeesGuestPlaceLiftAndFillABarrel(PlayerState guest) {
         Drop(guest, Water.Empty);
-        Give(guest, Barrel.Item);
+        Give(guest, Barrel.Item, 5);
         Give(guest, Water.Full);
 
         await Until(() => Hosted.Things.Any(t => t.Kind == ThingKind.Barrel), "the guest placing the empty barrel");
         var empty = Hosted.Things.Single(t => t.Kind == ThingKind.Barrel);
-        await Until(() => world.Find(empty.Id)?.Inventory[Water.Liquid] == 0 && empty.Inventory[Water.Liquid] == 0 && guest.Backpack[Barrel.Item] == 0,
-            "the host's window showing the guest's empty barrel on the ground");
+        await Until(() => world.Find(empty.Id)?.Inventory[Water.Liquid] == 0 && empty.Inventory[Water.Liquid] == 0 && guest.Backpack[Barrel.Item] == 4,
+            "the host's window showing the empty barrel the guest placed from their stack");
         Signal("barrel-placed");
 
-        await Until(() => Hosted.Find(empty.Id) == null && world.Find(empty.Id) == null && guest.Backpack[Barrel.Item] == 1,
-            "the guest lifting the empty barrel and it disappearing for the host");
+        await Until(() => Hosted.Find(empty.Id) == null && world.Find(empty.Id) == null &&
+            guest.Backpack.Layout.Any(s => s.Item == Barrel.Item && s.Count == 5), "the guest lifting the empty barrel back into its stack");
         Signal("barrel-lifted");
 
-        await Until(() => guest.Backpack[Barrel.AtFill(3)] == 1 && guest.Backpack[Water.Full] == 0 && guest.Backpack[Water.Empty] == 1,
-            "the host moving all three liters from the guest's bottle into their portable barrel");
+        await Until(() => guest.Backpack[Barrel.AtFill(3)] == 1 && guest.Backpack.Layout.Any(s => s.Item == Barrel.Item && s.Count == 4) &&
+            guest.Backpack[Water.Full] == 0 && guest.Backpack[Water.Empty] == 1, "the host moving three liters into one barrel from the guest's stack");
         Signal("barrel-filled");
 
         await Until(() => Hosted.Things.Any(t => t.Kind == ThingKind.Barrel && t.Inventory[Water.Liquid] == 2),
             "the guest placing the barrel's two remaining liters");
         var filled = Hosted.Things.Single(t => t.Kind == ThingKind.Barrel);
-        Require(guest.Backpack[Water.OneLiter] == 1 && Water.BottleItems.Sum(item => guest.Backpack[item]) == 1 && Barrel.In(guest.Backpack) == null,
-            "The host must keep one liter in the guest's bottle and the other two only in the placed barrel.");
+        Require(guest.Backpack[Water.OneLiter] == 1 && Water.BottleItems.Sum(item => guest.Backpack[item]) == 1 &&
+            guest.Backpack[Barrel.Item] == 4 && guest.Backpack.Items.All(pair => Barrel.Liters(pair.Key) <= 0),
+            "The host must keep one liter in the guest's bottle, two in the placed barrel, and four empty barrels in the backpack.");
         await Until(() => world.Find(filled.Id)?.Inventory[Water.Liquid] == 2,
             "the host's window showing two liters in the guest's placed barrel");
     }
 
     private async Task GuestPlacesLiftsAndFillsABarrel() {
-        await Until(() => world.Backpack[Barrel.Item] == 1 && world.Backpack[Water.Full] == 1, "the guest receiving an empty barrel and a full bottle");
+        await Until(() => world.Backpack.Layout.Any(s => s.Item == Barrel.Item && s.Count == 5) && world.Backpack[Water.Full] == 1,
+            "the guest receiving a stack of five empty barrels and a full bottle");
         await OpenEmptyBackpackBarrel();
         var spot = await PutDownBackpackBarrel(Barrel.Item, CanApproachBarrel);
-        await Until(() => world.Things.Any(t => t.Kind == ThingKind.Barrel && t.Pos == spot && t.Inventory[Water.Liquid] == 0) && world.Backpack[Barrel.Item] == 0,
-            "the guest's empty barrel leaving the backpack and appearing on the ground");
+        await Until(() => world.Things.Any(t => t.Kind == ThingKind.Barrel && t.Pos == spot && t.Inventory[Water.Liquid] == 0) && world.Backpack[Barrel.Item] == 4,
+            "one empty barrel from the guest's stack appearing on the ground");
         await Signaled("barrel-placed");
 
         var barrel = world.Things.Single(t => t.Kind == ThingKind.Barrel);
@@ -49,9 +51,9 @@ public partial class Game {
             "the placed barrel being in reach of the pointer", 5);
         var point = RightPress(spot);
         try {
-            await Until(() => view.Lifting == barrel.Id || world.Backpack[Barrel.Item] == 1, "the right press starting to lift the barrel", 5);
-            await Until(() => world.Backpack[Barrel.Item] == 1 && !world.Things.Any(t => t.Kind == ThingKind.Barrel),
-                "a held right click lifting the barrel back into the guest's backpack", 10);
+            await Until(() => view.Lifting == barrel.Id || world.Backpack[Barrel.Item] == 5, "the right press starting to lift the barrel", 5);
+            await Until(() => world.Backpack.Layout.Any(s => s.Item == Barrel.Item && s.Count == 5) && !world.Things.Any(t => t.Kind == ThingKind.Barrel),
+                "a held right click lifting the barrel back into its stack in the guest's backpack", 10);
         } finally {
             RightRelease(point);
         }
@@ -59,8 +61,9 @@ public partial class Game {
 
         await OpenEmptyBackpackBarrel();
         await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(Water.Full))), Named("barrel_water")!);
-        await Until(() => world.Backpack[Barrel.AtFill(3)] == 1 && world.Backpack[Water.Empty] == 1 && cursor.Empty,
-            "the guest's full bottle pouring three liters into the portable barrel");
+        await Until(() => world.Backpack[Barrel.AtFill(3)] == 1 && world.Backpack.Layout.Any(s => s.Item == Barrel.Item && s.Count == 4) &&
+            world.Backpack[Water.Empty] == 1 && cursor.Empty && Named("barrel_water")?.TooltipText.Contains("3/50 L") == true,
+            "the guest filling the open barrel from their bottle and keeping four empty barrels in one stack");
         await Signaled("barrel-filled");
         await Click(Named("barrel_water")!);
         await Until(() => world.Backpack[Barrel.AtFill(2)] == 1 && world.Backpack[Water.OneLiter] == 1,
@@ -68,8 +71,8 @@ public partial class Game {
 
         var filled = await PutDownBackpackBarrel(Barrel.AtFill(2));
         await Until(() => world.Things.Any(t => t.Kind == ThingKind.Barrel && t.Pos == filled && t.Inventory[Water.Liquid] == 2) &&
-            world.Backpack[Barrel.AtFill(2)] == 0 && world.Backpack[Water.OneLiter] == 1,
-            "the guest seeing the remaining two liters in the placed barrel and one liter in the bottle");
+            world.Backpack[Barrel.Item] == 4 && world.Backpack.Items.All(pair => Barrel.Liters(pair.Key) <= 0) && world.Backpack[Water.OneLiter] == 1,
+            "the guest seeing two liters in the placed barrel, one in the bottle, and four empty barrels in the backpack");
         await CloseWithEsc();
     }
 }

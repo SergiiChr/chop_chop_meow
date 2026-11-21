@@ -243,7 +243,8 @@ Most items stack to 64.
 Coins stack to 1000.
 Packed crates, tools and refillable bottles take a slot each.
 Empty steel buckets and barrels can stack, and each filled one takes its own slot.
-A backpack carries one barrel and a worker carrying one has only their tool slot free.
+Empty barrels stack in your backpack alongside up to one barrel containing water.
+A worker carrying a barrel has only their tool slot free.
 
 | Inventory | Capacity |
 | --- | --- |
@@ -589,17 +590,21 @@ Putting a crate inside a crate asks first; saying yes ends the game.
 ### Steel barrels and buckets
 
 A crafting bench with a steel hammer makes a barrel from five steel bars and a bucket from three.
+The barrel recipe takes 30 seconds of base work before the bench and hammer speed bonuses.
 Barrels stack in the bench output.
 A pile can store barrels at every fill level together.
-A barrel takes one backpack slot, and you can carry only one.
+You can carry stacks of empty barrels alongside one barrel containing water.
 Workers carry a single barrel in both arms and keep their tool slot free.
 Carrying a barrel prevents sprinting.
 A player carrying water in the barrel braces it and walks.
 Each liter makes the carry slower, down to half speed at 50 liters.
 
-Double-click a barrel in your backpack to open its water slot, or select it on the hotbar to place it.
+Double-click a barrel in the backpack or on the hotbar to open its water slot.
+Select it on the hotbar to place it.
 Hold right-click on a placed barrel to pick it up with its water.
 Pour from a bottle or bucket into its one slot, or take water back into vessels in your backpack.
+Filling from an empty stack fills one barrel in the opened cell and stores the remaining empties elsewhere in the backpack.
+The pour needs room for the split before it uses any water.
 Shift-click or Ctrl-click a vessel to pour into an open barrel, including vessels bound to the hotbar.
 A placed barrel's single filter names water, like a pile's filter names its resource.
 A barrel holds 50 liters.

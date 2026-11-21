@@ -12,6 +12,9 @@ internal static class BarrelChecks {
     public static void Run(GameData data) {
         Test(CheckBenchStacksBarrelsMadeWithSteelHammer, data);
         Test(CheckPileStacksEmptyBarrelsAndKeepsFullBarrelsSeparate, data);
+        Test(CheckBackpackCarriesEmptyBarrelsAlongsideOneFilledBarrel, data);
+        Test(CheckFillingOneBarrelKeepsItsCell, data);
+        Test(CheckFillingABarrelNeedsRoomToSplitTheStack, data);
         Test(CheckBarrelKeepsWaterWhenPlacedAndLifted, data);
         Test(CheckWorkerHandsOnlyFitOneBarrel, data);
         Test(CheckSaveKeepsVesselFillLevels, data);
@@ -48,13 +51,14 @@ internal static class BarrelChecks {
         Require(bench.Inventory[Barrel.Item] == 0 && !bench.Processing, "the barrel recipe should wait for the steel hammer");
         world.UnslotTool(bench, "wood_hammer");
         Require(Give(world, "steel_hammer") == 1 && world.SlotTool(bench, "steel_hammer"), "bench should accept a steel hammer");
+        Require(data.Recipes[Barrel.Item].Seconds == 30, "one barrel should require thirty seconds of base crafting work");
+        Work(world, 5);
+        Require(bench.Inventory[Barrel.Item] == 0 && bench.Processing, "a steel hammer should still be working on the first barrel after five seconds");
         CompleteBatches(world, bench, Barrel.Item, 2);
         Require(bench.Inventory.UsedSlots == 1 && world.Backpack["steel_bar"] == 3, "two barrels stack and cost ten steel bars");
-        Require(world.Transfer(bench.Inventory, world.Backpack, Barrel.Item, 2) == 1, "a backpack can take only one barrel");
-        Require(world.Transfer(bench.Inventory, world.Backpack, Barrel.Item, 1) == 0, "a second barrel stays in the output");
+        Require(world.Transfer(bench.Inventory, world.Backpack, Barrel.Item, 2) == 2, "both empty barrels go into the backpack");
         var pile = world.Add(ThingKind.Pile, world.Player + Vector2.Down * 3);
-        Require(world.Transfer(world.Backpack, pile.Inventory, Barrel.Item, 1) == 1, "the pile should take the barrel");
-        Require(world.Transfer(bench.Inventory, pile.Inventory, Barrel.Item, 1) == 1, "the pile accepts the second barrel from the bench");
+        Require(world.Transfer(world.Backpack, pile.Inventory, Barrel.Item, 2) == 2, "the backpack can move the stack into a pile");
         world.QueueBatch(bench, Bucket.Item);
         CompleteBatches(world, bench, Bucket.Item, 1);
         Require(world.Backpack["steel_bar"] == 0, "one bucket costs three steel bars");
@@ -76,6 +80,57 @@ internal static class BarrelChecks {
             Require(world.Transfer(world.Backpack, pile.Inventory, Barrel.AtFill(50), 1) == 1, "the pile takes filled barrels");
         }
         Require(pile.Inventory.UsedSlots == 3 && pile.Inventory[Barrel.Item] == 2, "empty barrels share one cell and each full barrel needs its own");
+    }
+
+    private static void CheckBackpackCarriesEmptyBarrelsAlongsideOneFilledBarrel(GameData data) {
+        var world = EmptyWorld(data);
+        var pile = world.Add(ThingKind.Pile, world.Player + Vector2.Down * 3);
+        string full = Barrel.AtFill(50), other = Barrel.AtFill(7);
+        pile.Inventory.Add(Barrel.Item, 4);
+        pile.Inventory.Add(full, 1);
+        pile.Inventory.Add(other, 1);
+        Require(world.Transfer(pile.Inventory, world.Backpack, Barrel.Item, 4) == 4, "a backpack takes a stack of four empty barrels");
+        Require(world.Transfer(pile.Inventory, world.Backpack, full, 1) == 1 && world.Backpack.UsedSlots == 2,
+            "one filled barrel fits alongside the stack and has its own cell");
+        Require(world.Transfer(pile.Inventory, world.Backpack, other, 1) == 0 && pile.Inventory[other] == 1,
+            "a second filled barrel of a different fill stays in the pile");
+        var empty = world.Add(ThingKind.Barrel, world.Player + Vector2.Right * 2);
+        Require(world.PickUpBarrel(empty) && world.Backpack[Barrel.Item] == 5 && world.Backpack.UsedSlots == 2,
+            "lifting an empty barrel adds it to the existing stack");
+        var filled = world.Add(ThingKind.Barrel, world.Player + Vector2.Left * 2);
+        filled.Inventory.Add(Water.Liquid, 7);
+        Require(!world.PickUpBarrel(filled) && filled.Inventory[Water.Liquid] == 7, "a second filled barrel stays placed with its water");
+        Require(System.Math.Abs(world.PlayerSpeed - data.WalkSpeed / 2) < .01f, "the filled barrel determines speed when the empty stack came first");
+    }
+
+    private static void CheckFillingOneBarrelKeepsItsCell(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, Barrel.Item, 5);
+        Give(world, Water.Full, 2);
+        int cell = SlotOf(world.Backpack, Barrel.Item);
+        PutOnHotbar(world, cell, 0);
+        Require(world.MoveInBarrel(Barrel.Item, Water.Full, 1, true) == 3, "one barrel takes the water from one bottle");
+        Require(world.HotbarStack(0) == cell && world.HotbarItem(0) == Barrel.AtFill(3) && world.Backpack[Barrel.Item] == 4,
+            "the filled barrel stays in its cell with its binding and the four empty barrels stay carried");
+        Require(world.MoveInBarrel(Barrel.Item, Water.Full, 1, true) == 0 && world.Backpack[Water.Full] == 1,
+            "pouring into a second barrel leaves the other bottle full");
+        Require(world.MoveInBarrel(Barrel.AtFill(3), Water.Liquid, 3, false) == 3 && world.HotbarItem(0) == Barrel.Item,
+            "drawing the water back out keeps the same barrel available");
+        world.SortBackpack();
+        Require(world.Backpack[Barrel.Item] == 5 && world.Backpack.UsedSlots == 3, "all five empty barrels can share one cell again");
+    }
+
+    private static void CheckFillingABarrelNeedsRoomToSplitTheStack(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, Barrel.Item, 4);
+        Give(world, Water.Full);
+        Give(world, "steel_axe", 22);
+        Require(world.Backpack.UsedSlots == 24, "the player starts with a full backpack");
+        Require(world.MoveInBarrel(Barrel.Item, Water.Full, 1, true) == 0 && world.Backpack[Water.Full] == 1 && world.Backpack[Barrel.Item] == 4,
+            "the full backpack leaves the water in its bottle when a barrel cannot split from its stack");
+        Drop(world, "steel_axe", 1);
+        Require(world.MoveInBarrel(Barrel.Item, Water.Full, 1, true) == 3 && world.Backpack[Barrel.Item] == 3,
+            "opening a cell makes room to split and fill one barrel");
     }
 
     private static void CheckBarrelKeepsWaterWhenPlacedAndLifted(GameData data) {
@@ -108,11 +163,12 @@ internal static class BarrelChecks {
 
     private static void CheckSaveKeepsVesselFillLevels(GameData data) {
         var world = EmptyWorld(data);
+        Give(world, Barrel.Item, 4);
         Give(world, Barrel.AtFill(13));
         Give(world, Bucket.AtFill(7));
         var loaded = EmptyWorld(data);
         loaded.Deserialize(world.Serialize());
-        Require(loaded.Backpack[Barrel.AtFill(13)] == 1 && loaded.Backpack[Bucket.AtFill(7)] == 1 && !loaded.CanSprint,
+        Require(loaded.Backpack[Barrel.Item] == 4 && loaded.Backpack[Barrel.AtFill(13)] == 1 && loaded.Backpack[Bucket.AtFill(7)] == 1 && !loaded.CanSprint,
             "the barrel and bucket keep their fill and carry rules after a save loads");
         world.Die();
         loaded.Deserialize(world.Serialize());
@@ -430,8 +486,10 @@ internal static class BarrelChecks {
     private static void CheckRemovingCabinReturnsItsBarrelWithWater(GameData data) {
         var world = EmptyWorld(data);
         var cabin = world.Add(ThingKind.Hut, world.Player + Vector2.Left * 3);
+        Give(world, Barrel.Item, 4);
         Give(world, Barrel.AtFill(13));
         Require(world.Transfer(world.Backpack, cabin.Inventory, Barrel.AtFill(13), 1) == 1, "the dedicated slot mounts a barrel");
-        Require(world.Construction.Dismantle(cabin) && world.Backpack[Barrel.AtFill(13)] == 1, "taking down the cabin returns its barrel and water");
+        Require(world.Construction.Dismantle(cabin) && world.Backpack[Barrel.AtFill(13)] == 1 && world.Backpack[Barrel.Item] == 4,
+            "taking down the cabin returns its barrel and water alongside the carried empties");
     }
 }

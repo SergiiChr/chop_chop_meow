@@ -12,12 +12,18 @@ public static class Barrel {
     private static readonly Dictionary<string, int> byFill = IndexFills(Fills);
 
     public static bool Is(string item) => item.StartsWith(Item, StringComparison.Ordinal) && byFill.ContainsKey(item);
+    public static bool IsFilled(string item) => item != Item && Is(item);
     public static int Liters(string item) => byFill.GetValueOrDefault(item, -1);
     public static string AtFill(int liters) => Fills[liters];
     public static float Speed(string item) => 1 - .5f * Liters(item) / Capacity;
 
     public static string? In(Inventory inventory) {
         foreach (var (item, _) in inventory.Items) if (Is(item)) return item;
+        return null;
+    }
+
+    public static string? FilledIn(Inventory inventory) {
+        foreach (var (item, _) in inventory.Items) if (IsFilled(item)) return item;
         return null;
     }
 

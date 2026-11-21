@@ -9,13 +9,25 @@ namespace ChopChopMeow;
 public sealed class Inventory {
     public enum Carrier { None, Player, Worker }
 
-    /// <summary>A player carries one barrel, and a worker with a barrel carries nothing else in their hands.</summary>
+    /// <summary>A player's empty barrels stack beside one filled barrel, and a worker with a barrel carries nothing else in their hands.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public Carrier CarriedBy { get; set; }
 
     private int CarryRoom(string item) {
-        if (CarriedBy == Carrier.None) return int.MaxValue;
-        if (Barrel.Is(item)) return Barrel.In(this) == null && (CarriedBy != Carrier.Worker || Count == 0) ? 1 : 0;
-        return CarriedBy == Carrier.Worker && Barrel.In(this) != null ? 0 : int.MaxValue;
+        if (CarriedBy == Carrier.Player && Barrel.IsFilled(item)) return Barrel.FilledIn(this) == null ? 1 : 0;
+        if (CarriedBy != Carrier.Worker) return int.MaxValue;
+        if (Barrel.Is(item)) return Count == 0 ? 1 : 0;
+        return Barrel.In(this) == null ? int.MaxValue : 0;
+    }
+
+    private bool CountsTowardBarrelLimit(string item) => CarriedBy == Carrier.Player ? Barrel.IsFilled(item) : CarriedBy == Carrier.Worker && Barrel.Is(item);
+    private bool WithinBarrelLimit(int barrels, int incoming) =>
+        barrels <= 1 && (CarriedBy != Carrier.Worker || barrels == 0 || incoming == 1);
+
+    internal bool ValidFor(Carrier carrier) {
+        if (CarriedBy != carrier) return false;
+        int barrels = 0;
+        foreach (var (item, count) in items) if (CountsTowardBarrelLimit(item)) barrels += count;
+        return WithinBarrelLimit(barrels, Count);
     }
     /// <summary>
     /// A persisted stack in a particular inventory cell.
@@ -155,9 +167,9 @@ public sealed class Inventory {
             for (int i = 0; i < limit; i++) if (Layout[i].Item == item) spare += stack - Layout[i].Count;
             empty -= (Math.Max(0, count - spare) + stack - 1) / stack;
         }
-        int barrels = CarriedBy == Carrier.None ? 0 : goods.Where(pair => Barrel.Is(pair.Key)).Sum(pair => pair.Value);
-        return barrels <= 1 && (CarriedBy != Carrier.Worker || barrels == 0 || goods.Values.Sum() == 1) &&
-            empty >= 0 && (Capacity == 0 || Count + goods.Values.Sum() <= Capacity);
+        int barrels = CarriedBy == Carrier.None ? 0 : goods.Where(pair => CountsTowardBarrelLimit(pair.Key)).Sum(pair => pair.Value);
+        int incoming = goods.Values.Sum();
+        return WithinBarrelLimit(barrels, incoming) && empty >= 0 && (Capacity == 0 || Count + incoming <= Capacity);
     }
 
     /// <summary>Slots to show: every stack, plus one single-item slot per unit of capacity left.</summary>
@@ -433,6 +445,26 @@ public sealed class Inventory {
         Take(oldItem, 1, false);
         Add(newItem, 1);
         return true;
+    }
+
+    /// <summary>Whether the other empty barrels can fit elsewhere when one barrel changes fill in its own cell.</summary>
+    internal bool CanSplitBarrelStack(int at) {
+        var stack = Layout[at];
+        return stack.Count == 1 || Room(stack.Item, replacing: true) >= StackOf(stack.Item) - 1;
+    }
+
+    /// <summary>Changes the chosen barrel's fill in its cell and returns the rest of its stack to the backpack.</summary>
+    internal void SetBarrelFill(int at, string item) {
+        var stack = Layout[at];
+        string before = stack.Item;
+        if (before == item) return;
+        int rest = stack.Count - 1;
+        int elsewhere = this[before] - stack.Count;
+        if (elsewhere == 0) items.Remove(before); else items[before] = elsewhere;
+        stack.Item = item; stack.Count = 1;
+        items[item] = this[item] + 1;
+        if (rest > 0) Add(before, rest);
+        else Changed?.Invoke();
     }
 
     /// <summary>Whether units nobody holds cover the cost.</summary>

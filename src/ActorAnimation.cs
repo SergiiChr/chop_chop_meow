@@ -1138,7 +1138,7 @@ public static class ActorAnimation {
         bool sprinting = false,
         bool crafting = false,
         bool fitting = false) {
-        if (moving && Barrel.In(backpack) is string barrel && Barrel.Liters(barrel) > 0) return ActorAction.Walk;
+        if (moving && Barrel.FilledIn(backpack) != null) return ActorAction.Walk;
         if (moving) return sprinting ? ActorAction.Run : ActorAction.Jog;
         if (!gathering || resourceKind == null) return crafting ? ActorAction.Craft : ActorAction.Idle;
 

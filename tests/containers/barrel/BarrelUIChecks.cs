@@ -10,8 +10,43 @@ namespace ChopChopMeow;
 public partial class Game {
     private async Task RunBarrelUIChecks() {
         await TestClean(CheckBarrelOpensInTheBackpackAndCanBePlacedWithWater);
+        await TestClean(CheckBackpackAndHotbarOpenTheirOwnBarrel);
         await TestClean(CheckCtrlPoursFromAHotbarBoundBucketIntoAPlacedBarrel);
         await TestClean(CheckHotbarShowsTheCountOfAnEmptyBucketStack);
+    }
+
+    /// <summary>Four empty barrels share a cell and open independently of the filled barrel beside them.</summary>
+    private async Task CheckBackpackAndHotbarOpenTheirOwnBarrel() {
+        const int slot = 8;
+        string previous = world.HotbarItem(slot), filled = Barrel.AtFill(12);
+        int previousStack = world.HotbarStack(slot);
+        Give(Hosted, Barrel.Item, 4);
+        Give(Hosted, filled);
+        await Frames();
+
+        await OpenBackpackBarrel(filled);
+        await Carry(BagCellOf(Barrel.Item), hotbar.Buttons[slot]);
+        await Until(() => world.HotbarCount(slot) == 4 && cursor.Empty, "four empty barrels bound to one hotbar slot", 2);
+        Require(panel.Page == Page.Barrel && Named("barrel_water")?.TooltipText.Contains("12/50 L") == true,
+            "Holding a stack of empty barrels must leave the filled barrel page open.");
+        Require(hotbar.Counts[slot].Visible && hotbar.Counts[slot].Text == "4",
+            $"A hotbar stack of four empty barrels must show 4, which showed {hotbar.Counts[slot].Text}.");
+
+        await DoubleClick(hotbar.Buttons[slot]);
+        await Until(() => panel.Page == Page.Barrel && Named("barrel_water")?.TooltipText.Contains("0/50 L") == true,
+            "the hotbar opening an empty barrel while a filled one is in the backpack", 2);
+        await OpenBackpackBarrel(filled);
+        var spot = await PutDownBackpackBarrel(filled);
+        await Until(() => Hosted.Things.Any(t => t.Kind == ThingKind.Barrel && t.Pos == spot && t.Inventory[Water.Liquid] == 12),
+            "placing the selected filled barrel with its water", 2);
+        Require(Hosted.Backpack[Barrel.Item] == 4, "Placing the filled barrel must leave all four empty barrels in the backpack.");
+
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t.Kind == ThingKind.Barrel && t.Pos == spot);
+        Drop(Hosted, Barrel.Item, 4);
+        if (previousStack >= 0) PutOnHotbar(Hosted, previousStack, slot);
+        else SetHotbarSlot(Hosted, slot, previous);
+        await Frames();
     }
 
     /// <summary>

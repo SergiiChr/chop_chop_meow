@@ -104,7 +104,7 @@ public partial class Hotbar : PanelContainer {
             shownSlots[slot] = shown;
             bool building = world.Data.IsBuilding(id);
             Counts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? ""
-                : Barrel.Is(id) ? $"{Barrel.Liters(id)}/{Barrel.Capacity} L"
+                : count == 1 && Barrel.Is(id) ? $"{Barrel.Liters(id)}/{Barrel.Capacity} L"
                 : count == 1 && world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
@@ -149,14 +149,14 @@ public partial class Hotbar : PanelContainer {
     }
 
     /// <summary>
-    /// Uses a carried item as a double click does, here or in the backpack: eats or drinks it, lights a torch or opens a crate as storage; false when it has no such use.
-    /// What it eats or drinks comes from backpack cell <paramref name="stack"/>, or with -1 from the cell already first in line.
+    /// Uses a carried item as a double click does, here or in the backpack: eats or drinks it, lights a torch or opens a container.
+    /// The item comes from backpack cell <paramref name="stack"/>, or with -1 from the cell already first in line.
     /// </summary>
     public bool UseItem(string id, int stack = -1) {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Run(() => { if (stack >= 0) FromStack(stack, () => world.Consume(id)); else world.Consume(id); });
         else if (id == "torch" && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
         else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
-        else if (Barrel.Is(id)) panel.Open(Page.Barrel);
+        else if (Barrel.Is(id)) panel.OpenBarrel(stack >= 0 ? stack : world.S.Backpack.PreferredSlot);
         else return false;
         return true;
     }
@@ -169,14 +169,15 @@ public partial class Hotbar : PanelContainer {
         kit.Refresh();
     }
 
-    /// <summary>Selects a hotbar slot, which puts its item in the player's hand; building plans and crates go straight to placement, everything else waits for a left click in the world.</summary>
+    /// <summary>Selects a hotbar slot, putting building plans and containers into placement or another item into the player's hand.</summary>
     public void Select(int slot) {
         slot = Math.Clamp(slot, 0, 8);
         world.SelectHotbar(slot);
         string id = world.HotbarItem(slot);
         panel.Player.Mode = new ClickMode.Normal();
         if (string.IsNullOrEmpty(id)) kit.Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
-        else if (world.Data.TryBuilding(id, out var kind)) { panel.Player.Mode = new ClickMode.Build(kind); panel.Close(); } else if (id == "crate" || Barrel.Is(id)) panel.Player.PlaceContainer(id);
+        else if (world.Data.TryBuilding(id, out var kind)) { panel.Player.Mode = new ClickMode.Build(kind); panel.Close(); } else if (id == "crate") panel.Player.PlaceContainer(id);
+        else if (Barrel.Is(id) && world.HotbarStack(slot) is int barrelSlot and >= 0) panel.Player.PlaceContainer(id, barrelSlot);
         kit.Refresh();
     }
 

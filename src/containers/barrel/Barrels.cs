@@ -11,6 +11,9 @@ public sealed class Barrels(World world) {
         item == Water.Liquid || data.VesselOf(item) is VesselDef v && v.LitersIn(item) > 0;
 
     internal Thing? Place(string item, Vector2 at, Inventory source) {
+        if (source.PreferredSlot is >= 0 and int preferred &&
+            ((uint)preferred >= (uint)source.Layout.Count || source.Layout[preferred] is not { Free: > 0 } cell ||
+                cell.Item != item || source.SparesOnly && cell.Hotbar != 0)) return null;
         if (source.Remove(item, 1) != 1) return null;
         var barrel = world.Add(ThingKind.Barrel, at);
         barrel.Inventory.Add(Water.Liquid, Barrel.Liters(item));

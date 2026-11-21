@@ -18,7 +18,8 @@ internal static class BarrelAnimationChecks {
     private static void CheckPlayerWalksUnderTheWeightOfWater() {
         foreach (int liters in new[] { 0, 1, Barrel.Capacity }) {
             var backpack = new Inventory();
-            backpack.Add(Barrel.AtFill(liters), 1);
+            backpack.Add(Barrel.Item, 4);
+            if (liters > 0) backpack.Add(Barrel.AtFill(liters), 1);
             var expected = liters == 0 ? ActorAction.Jog : ActorAction.Walk;
             Require(ActorAnimation.PlayerAction(null, false, true, backpack) == expected,
                 $"the player should use {expected} while carrying a barrel with {liters} L");

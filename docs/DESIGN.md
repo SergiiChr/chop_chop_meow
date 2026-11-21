@@ -526,7 +526,8 @@ The ground barrel uses a one-slot tank and the same filter rules as a plain pile
 A cabin's only storage slot holds the actual barrel item.
 The Roof barrel window sits beside the cabin page in `SidePanel.Aside`, like a station's tool window.
 Refills update that item in place.
-The carry slows proportionally to its fill level.
+A backpack stacks empty barrels and carries up to one barrel containing water, whose fill determines how much it slows the player.
+Pouring into an empty stack keeps the barrel being filled in its original cell and requires room for the remaining empty barrels.
 A worker with a barrel cannot carry other goods in their hands.
 
 The steel bucket is a refillable 10-liter vessel.

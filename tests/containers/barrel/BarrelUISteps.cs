@@ -7,11 +7,14 @@ namespace ChopChopMeow;
 
 public partial class Game {
     /// <summary>Opens an empty barrel from its backpack cell and waits for its water gauge.</summary>
-    private async Task OpenEmptyBackpackBarrel() {
-        await KeyStroke(Key.Tab);
-        await DoubleClick(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(Barrel.Item))));
-        await Until(() => panel.Page == Page.Barrel && Named("barrel_water")?.TooltipText.Contains("0/50 L") == true,
-            "the empty barrel opening in the backpack", 2);
+    private Task OpenEmptyBackpackBarrel() => OpenBackpackBarrel(Barrel.Item);
+
+    /// <summary>Opens the barrel with the given fill from its backpack cell.</summary>
+    private async Task OpenBackpackBarrel(string item) {
+        if (panel.Page != Page.Backpack) await KeyStroke(Key.Tab);
+        await DoubleClick(BagCellOf(item));
+        await Until(() => panel.Page == Page.Barrel && Named("barrel_water")?.TooltipText.Contains($"{Barrel.Liters(item)}/{Barrel.Capacity} L") == true,
+            $"the {world.Data.Name(item)} opening in the backpack", 2);
     }
 
     /// <summary>Uses the portable barrel page's placement button and clicks a spot in reach.</summary>

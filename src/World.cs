@@ -657,7 +657,8 @@ public sealed partial class World {
     public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
     /// <summary>Tiles a second the acting player moves where they stand: walking or sprinting, and faster on gravel.</summary>
     public bool CanSprint => Barrel.In(S.Backpack) == null;
-    public float PlayerSpeed => (Barrel.In(S.Backpack) is string barrel ? Data.WalkSpeed * Barrel.Speed(barrel) : Data.MoveSpeed(S.Actor.Sprinting)) * GravelPaths.SpeedAt(Player);
+    public float PlayerSpeed => (Barrel.FilledIn(S.Backpack) is string barrel ? Data.WalkSpeed * Barrel.Speed(barrel)
+        : Data.MoveSpeed(S.Actor.Sprinting && CanSprint)) * GravelPaths.SpeedAt(Player);
     public void MovePlayer(Vector2 delta) {
         // Inside a cabin the player stays put until they step outside on purpose.
         if (Occupied || S.Sheltered != 0) return;
@@ -1435,10 +1436,13 @@ public sealed partial class World {
         return barrels.Place(item, at, MarkedSource ?? S.Backpack);
     }
 
+    private static string? CarryBarrelBlock(Inventory backpack, string item) =>
+        Barrel.IsFilled(item) && Barrel.FilledIn(backpack) != null ? "You can only carry one barrel with water." : null;
+
     public bool PickUpBarrel(Thing barrel) {
         if (barrel.Kind != ThingKind.Barrel || !Near(barrel) || Find(barrel.Id) != barrel) return false;
-        if (Barrel.In(S.Backpack) != null) { Say("You can only carry one barrel."); return false; }
         string item = Barrel.AtFill(Barrels.WaterIn(barrel));
+        if (CarryBarrelBlock(S.Backpack, item) is string blocked) { Say(blocked); return false; }
         if (S.Backpack.Room(item) == 0) { Say("Backpack full. Make room for the barrel."); return false; }
         if (Busy() || Forwarded(Verb.PickUpBarrel, barrel.Id)) return true;
         if (HeldByOthers(barrel)) return false;
@@ -1449,15 +1453,23 @@ public sealed partial class World {
         return true;
     }
 
-    /// <summary>Pours a vessel into the backpack barrel, or draws water into vessels already in the backpack.</summary>
-    public int MoveInBarrel(string barrelItem, string item, int quantity, bool puttingIn) {
-        if (!Barrel.Is(barrelItem) || S.Backpack[barrelItem] != 1 || quantity <= 0) return 0;
-        if (Held is { Box: 0 } held && held.Item == barrelItem) return 0;
+    /// <summary>Pours into one barrel in the named backpack cell, or draws water into carried vessels.</summary>
+    public int MoveInBarrel(string barrelItem, string item, int quantity, bool puttingIn, int barrelSlot = -1) {
+        int before = Barrel.Liters(barrelItem);
+        if (before < 0 || quantity <= 0) return 0;
+        var backpack = S.Backpack;
+        if (barrelSlot == -1) barrelSlot = backpack.Layout.FindIndex(cell => cell.Item == barrelItem && cell.Held == 0);
+        if ((uint)barrelSlot >= (uint)Math.Min(backpack.Layout.Count, backpack.Slots)) return 0;
+        var barrel = backpack.Layout[barrelSlot];
+        if (barrel.Item != barrelItem || barrel.Held > 0) return 0;
         if (puttingIn && !Barrels.CanPour(Data, item)) { Say("The barrel only holds water."); return 0; }
         if (!puttingIn && item != Water.Liquid) return 0;
-        if (Busy() || Forwarded(Verb.MoveInBarrel, Barrel.Liters(barrelItem), puttingIn ? 1 : 0, item, quantity, new Vector2(S.Backpack.PreferredSlot, 0))) return 0;
+        if (puttingIn && before == 0) {
+            if (CarryBarrelBlock(backpack, Barrel.AtFill(1)) is string blocked) { Say(blocked); return 0; }
+            if (!backpack.CanSplitBarrelStack(barrelSlot)) { Say("Make room in your backpack to fill a barrel."); return 0; }
+        }
+        if (Busy() || Forwarded(Verb.MoveInBarrel, before, puttingIn ? 1 : 0, item, quantity, new Vector2(backpack.PreferredSlot, barrelSlot))) return 0;
         var tank = Barrels.NewTank();
-        int before = Barrel.Liters(barrelItem);
         tank.Add(Water.Liquid, before);
         if (puttingIn) {
             if (Data.VesselOf(item) is not VesselDef vessel) return 0;
@@ -1467,7 +1479,7 @@ public sealed partial class World {
             Carry(tank, S.Backpack, null, item, quantity);
         }
         int after = tank[Water.Liquid];
-        S.Backpack.Replace(barrelItem, Barrel.AtFill(after));
+        if (before != after) backpack.SetBarrelFill(barrelSlot, Barrel.AtFill(after));
         if (before == after && puttingIn && tank.Room(Water.Liquid) == 0) Say("The barrel is full.");
         return Math.Abs(after - before);
     }
@@ -2415,7 +2427,7 @@ public sealed partial class World {
     /// The crafting queue must hold only recipes made by hand.
     /// </summary>
     private bool ValidPlayer(PlayerState p, Dictionary<int, Inventory> crates) {
-        if (p.HotbarSlots == null || p.Crafting == null || p.Making == null || !ValidInventory(p.Backpack, crates) || !ValidCarrier(p.Backpack, Inventory.Carrier.Player)) return false;
+        if (p.HotbarSlots == null || p.Crafting == null || p.Making == null || !ValidInventory(p.Backpack, crates) || !p.Backpack.ValidFor(Inventory.Carrier.Player)) return false;
         foreach (var q in p.Crafting) if (q == null || !Hand(q.Recipe) || q.Count is <= 0 or > MaxQueued) return false;
         if (p.Making != "" && !Hand(p.Making)) return false;
         // A player who left while dead comes back still waiting to respawn.
@@ -2444,7 +2456,7 @@ public sealed partial class World {
             if (t.Batches > 0 && t.Keep != "" && t.Keep != t.Asked) return false;
         }
         foreach (var w in save.Workers)
-            if (w == null || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates) || !ValidCarrier(w.Bag, Inventory.Carrier.Worker)) return false;
+            if (w == null || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates) || !w.Bag.ValidFor(Inventory.Carrier.Worker)) return false;
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }
@@ -2459,13 +2471,6 @@ public sealed partial class World {
         if (!(Data.Items.TryGetValue(p.InHand ?? "", out var def) && def.Tool != "")) p.InHand = "";
         TidyBindings(p);
     }
-    private static bool ValidCarrier(Inventory inventory, Inventory.Carrier carrier) {
-        if (inventory.CarriedBy != carrier) return false;
-        int barrels = 0;
-        foreach (var (item, count) in inventory.Items) if (Barrel.Is(item)) barrels += count;
-        return barrels <= 1 && (carrier != Inventory.Carrier.Worker || barrels == 0 || inventory.Count == 1);
-    }
-
     private bool Hand(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand;
     /// <summary>Brings the stacks of every inventory of a freshly parsed save in line with its totals.</summary>
     private static void RebuildAllStacks(SaveState save) {
