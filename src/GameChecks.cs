@@ -256,6 +256,27 @@ public partial class Game {
         await CloseWithEsc();
     }
 
+    /// <summary>A chest and a placed crate offer Haul, and a placed crate's filters name goods but no crate, since a crate never goes into one.</summary>
+    private async Task CheckChestAndPlacedCrateOfferHaulAndCrateFiltersNameNoCrate() {
+        await CloseWithEsc();
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(-2, 0));
+        var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(2, 0)); await Frames();
+        panel.Select(Shown(chest)); await Frames();
+        Require(OnPage("job_haul") != null, "A chest's page must offer Haul.");
+        panel.Select(Shown(crate)); await Frames();
+        Require(OnPage("job_haul") != null, "A placed crate's page must offer Haul.");
+        await Click(Named("filters")!);
+        Require(OnPage("filter_in") != null && OnPage("filter_out") != null, "A placed crate's filter must show a row of what workers bring and one of what they take.");
+        await Click(Named("filter_add_in")!);
+        Require(Named("pick_wood") != null && Named("pick_crate") == null && Named($"pick_{World.CrateOf("berries")}") == null,
+            "A placed crate's filter must offer goods but no crate.");
+        await Click(Named("pick_wood")!);
+        await Until(() => Shown(crate).Inventory.InputFilter.SetEquals(new[] { "wood" }), "picking wood adding it to the placed crate's filter", 2);
+        await Click(Named("filters_close")!);
+        RemoveThings(Hosted, t => t == chest || t == crate);
+        await CloseWithEsc();
+    }
+
     /// <summary>The autosave comes every five minutes, more than this stage has, so the check asks for it.</summary>
     private async Task CheckAutosaveTellsTheOwner() {
         await CloseWithEsc();
@@ -364,6 +385,21 @@ public partial class Game {
         Require(!cursor.Empty && Cells(0).All(c => c.Icon == null), "A worker's tool slot must not take planks.");
         await Click(Cells(1).First(c => c.Visible));
         await Until(() => cursor.Empty && Cells(1).Any(c => c.TooltipText.StartsWith("Wood planks ·", StringComparison.Ordinal)), "the planks going into the worker's hands", 2);
+        await CloseWorkerPage(bench, worker);
+    }
+
+    /// <summary>A packed crate put into a worker's hands fills them alone, and the page says so above them.</summary>
+    private async Task CheckAWorkerHoldingAPackedCrateSaysSoAboveTheirHands() {
+        string packed = PackCrate(Hosted, ("berries", 1));
+        var (bench, worker) = await OpenBenchWorkerPage();
+        var carrying = (Label)OnPage("hands")!.GetChild(0);
+        await PickUp(BagCell(c => c.TooltipText.StartsWith("Wood crate of", StringComparison.Ordinal)));
+        await Click(Cells(1).First(c => c.Visible));
+        await Until(() => cursor.Empty && worker.Bag[packed] == 1 && carrying.Text == "Carrying a packed crate", "the worker's page saying their hands carry a packed crate", 2);
+        await PickUp(await Showing(1, c => c.TooltipText.StartsWith("Wood crate of", StringComparison.Ordinal)));
+        await Click(BagCell(c => c.Visible && c.Icon == null));
+        await Until(() => cursor.Empty && worker.Bag.Count == 0, "the packed crate going back into the backpack", 2);
+        Drop(Hosted, packed);
         await CloseWorkerPage(bench, worker);
     }
 
@@ -2107,6 +2143,7 @@ public partial class Game {
             await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
             await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
             await TestClean(CheckPileFilterNamesOneResource);
+            await TestClean(CheckChestAndPlacedCrateOfferHaulAndCrateFiltersNameNoCrate);
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await TestClean(CheckPackingStationListsGoodsAndTakesBackpackClicks);
             await TestClean(CheckEndGoalsShowInThePauseMenuAndTheEndingOnce);
@@ -2148,6 +2185,7 @@ public partial class Game {
             await TestClean(CheckAHaulDragsIntoAHaulGroupAndStaysWhenItIsTakenApart);
             await TestClean(CheckAJobBelowAHaulGroupDragsIntoIt);
             await TestClean(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
+            await TestClean(CheckAWorkerHoldingAPackedCrateSaysSoAboveTheirHands);
             await RunBarrelUIChecks();
             await TestClean(CheckCratePutIntoCrateStopsAtWarning);
             RemoveCheckFiles();

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
@@ -35,6 +36,17 @@ public static class WorkerJobChecks {
         CheckAToolHeldFromAWorkerIsLetGoOnLoad(data);
         CheckALoadForATradingPostGoesElsewhereOnceItsFilterNoLongerAsks(data);
         CheckAWorkerDeliversWhatAPlayerDoesNotHold(data);
+        CheckAChestsHaulerCarriesCratesTheTradingPostAsksForOneAtATime(data);
+        CheckAWorkersHandsHoldOnePackedCrateAndNothingBesideIt(data);
+        CheckAChestsHaulerFillsItFromStorageThatDoesNotAskForTheItem(data);
+        CheckAChestAskingForCratesSendsThemToTheTradingPostNotAnotherChestAskingForThem(data);
+        CheckAChestsHaulerFetchesFinishedGoodsFromAStation(data);
+        CheckAChestsHaulerCarriesOutBeforeFilling(data);
+        CheckAHaulGroupTakesAChestsCarryBeforeToppingUpAStation(data);
+        CheckAPlacedCrateTakesLoadsLikeAChestButNoCrate(data);
+        CheckAPackedCrateKeepsItsFiltersWhenPutDownAgain(data);
+        CheckAChestsHaulerNeverCarriesWaterOutOfAStationByHand(data);
+        CheckAChestsHaulerTakesAStationOnlyTheBottlesItsWaterRoomNeeds(data);
         CheckSaveWithAJobOtherThanAHaulInAGroupIsRefused(data);
         CheckAJobMovedUpComesFirst(data);
         CheckAHaulGroupBringsTheShortestInputAcrossItsPlaces(data);
@@ -516,5 +528,157 @@ public static class WorkerJobChecks {
         world.Hold(worker.Bag, worker.Bag.Layout.FindIndex(s => s.Item == "wood"), 6);
         Work(world, 20, () => chest.Inventory["stone"] > 0);
         Require(chest.Inventory["stone"] == 6 && worker.Bag["wood"] == 6, "a worker should store the stone while the player holds the wood");
+    }
+
+    /// <summary>The case from a player's save: crates of a good in a chest with no filter, and a trading post whose filter asks for them.</summary>
+    private static void CheckAChestsHaulerCarriesCratesTheTradingPostAsksForOneAtATime(GameData data) {
+        var world = EmptyWorld(data);
+        var chest = StoreCrates(world, new Vector2(10, 10), 3)[0];
+        var post = world.Add(ThingKind.Signpost, new Vector2(20, 10));
+        world.SetFilter(post, World.CrateOf("berries"), false, true);
+        var hauler = Staff(world, chest, JobKind.Haul);
+        int most = 0;
+        Work(world, 120, () => { most = Math.Max(most, hauler.Bag.Count); return post.Inventory.Count == 3; });
+        Require(post.Inventory.Count == 3 && chest.Inventory.Count == 0,
+            $"a chest's hauler should carry its three crates of berries to the trading post asking for them: the post holds {post.Inventory.Count}, the chest {chest.Inventory.Count}");
+        Require(most == 1, $"a hauler should carry one packed crate at a time, not {most}");
+    }
+
+    private static void CheckAWorkersHandsHoldOnePackedCrateAndNothingBesideIt(GameData data) {
+        var world = EmptyWorld(data);
+        var worker = AddWorker(world, world.Player + Vector2.One);
+        string first = PackCrate(world, ("berries", 12)), second = PackCrate(world, ("berries", 12));
+        Give(world, "stone", 5);
+        Require(world.Transfer(world.Backpack, worker.Bag, "stone", 5) == 5 && world.Transfer(world.Backpack, worker.Bag, first, 1) == 0,
+            "a worker holding stone should take no packed crate beside it");
+        world.Transfer(worker.Bag, world.Backpack, "stone", 5);
+        Require(world.Transfer(world.Backpack, worker.Bag, first, 1) == 1, "a worker with empty hands should take a packed crate");
+        Require(world.Transfer(world.Backpack, worker.Bag, second, 1) == 0 && world.Transfer(world.Backpack, worker.Bag, "stone", 5) == 0,
+            "a worker holding a packed crate should take neither a second crate nor stone beside it");
+    }
+
+    private static void CheckAChestsHaulerFillsItFromStorageThatDoesNotAskForTheItem(GameData data) {
+        var world = EmptyWorld(data);
+        var asking = world.Add(ThingKind.Chest, new Vector2(10, 10));
+        world.SetFilter(asking, "stone", false, true);
+        var alsoAsking = world.Add(ThingKind.Chest, new Vector2(12, 12));
+        alsoAsking.Inventory.Add("stone", 20);
+        world.SetFilter(alsoAsking, "stone", false, true);
+        var open = world.Add(ThingKind.Chest, new Vector2(18, 10));
+        open.Inventory.Add("stone", 20);
+        Staff(world, asking, JobKind.Haul);
+        Work(world, 90, () => asking.Inventory["stone"] == 20);
+        Work(world, 20);
+        Require(asking.Inventory["stone"] == 20 && open.Inventory["stone"] == 0 && alsoAsking.Inventory["stone"] == 20,
+            $"a chest's hauler should fill it from the chest with no filter and leave the nearer chest asking for stone alone: {asking.Inventory["stone"]} brought, {alsoAsking.Inventory["stone"]} left there");
+    }
+
+    private static void CheckAChestAskingForCratesSendsThemToTheTradingPostNotAnotherChestAskingForThem(GameData data) {
+        var world = EmptyWorld(data);
+        string berries = World.CrateOf("berries");
+        var chest = StoreCrates(world, new Vector2(10, 10), 1)[0];
+        world.SetFilter(chest, berries, false, true);
+        var nearer = world.Add(ThingKind.Chest, new Vector2(13, 10));
+        world.SetFilter(nearer, berries, false, true);
+        var post = world.Add(ThingKind.Signpost, new Vector2(24, 10));
+        world.SetFilter(post, berries, false, true);
+        Staff(world, chest, JobKind.Haul);
+        Work(world, 90, () => post.Inventory.Count == 1);
+        Require(post.Inventory.Count == 1 && nearer.Inventory.Count == 0,
+            "a chest asking for crates of berries should send its crate to the trading post asking for it, not to a nearer chest that asks too");
+    }
+
+    private static void CheckAChestsHaulerFetchesFinishedGoodsFromAStation(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, new Vector2(10, 10), "planks");
+        bench.Inventory.Add("planks", 20);
+        var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
+        world.SetFilter(chest, "planks", false, true);
+        Staff(world, chest, JobKind.Haul);
+        Work(world, 60, () => chest.Inventory["planks"] == 20);
+        Require(chest.Inventory["planks"] == 20 && bench.Inventory["planks"] == 0, $"a chest's hauler should fetch the table's planks for its filter: {chest.Inventory["planks"]} brought");
+    }
+
+    private static void CheckAChestsHaulerCarriesOutBeforeFilling(GameData data) {
+        var world = EmptyWorld(data);
+        var chest = world.Add(ThingKind.Chest, new Vector2(10, 10));
+        chest.Inventory.Add("wood", 12);
+        world.SetFilter(chest, "stone", false, true);
+        world.Add(ThingKind.Chest, new Vector2(13, 10)).Inventory.Add("stone", 12);
+        Bench(world, new Vector2(16, 10), "planks");
+        var hauler = Staff(world, chest, JobKind.Haul);
+        Require(FirstCarry(world, hauler) == "wood", $"a chest's hauler should carry wood out to the table asking for it before fetching stone, not carry {hauler.Bag.First()}");
+    }
+
+    private static void CheckAHaulGroupTakesAChestsCarryBeforeToppingUpAStation(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, new Vector2(10, 10), "planks");
+        bench.Inventory.Add("wood", 5);
+        world.Add(ThingKind.Chest, new Vector2(13, 10)).Inventory.Add("wood", 40);
+        var asking = world.Add(ThingKind.Chest, new Vector2(10, 16));
+        world.SetFilter(asking, "stone", false, true);
+        world.Add(ThingKind.Chest, new Vector2(13, 16)).Inventory.Add("stone", 12);
+        var hauler = Staff(world, bench, JobKind.Haul);
+        world.SetDuty(hauler, asking, JobKind.Haul, true);
+        GroupHauls(world, hauler, bench, asking);
+        Require(FirstCarry(world, hauler) == "stone", $"in a haul group, a chest's carry should come before topping up the table's wood, not {hauler.Bag.First()}");
+    }
+
+    private static void CheckAPlacedCrateTakesLoadsLikeAChestButNoCrate(GameData data) {
+        var world = EmptyWorld(data);
+        var crate = world.Add(ThingKind.Crate, new Vector2(14, 10));
+        var worker = AddWorker(world, new Vector2(10, 10));
+        worker.Bag.Add("stone", 6);
+        Work(world, 30, () => worker.Bag.Count == 0);
+        Require(crate.Inventory["stone"] == 6, "a worker should store a load in a placed crate as in a chest");
+        world.SetFilter(crate, World.CrateOf("berries"), false, true);
+        Require(crate.Inventory.InputFilter.Count == 0, "a placed crate's filter should not name a crate");
+        string packed = PackCrate(world, ("berries", 12));
+        Warp(world, worker.Pos + Vector2.One);
+        Require(world.Transfer(world.Backpack, worker.Bag, packed, 1) == 1, "a player should hand a worker a packed crate");
+        Work(world, 10);
+        Require(crate.Inventory.Count == 6 && worker.Bag.Count == 1, "a worker should never put a packed crate into a placed crate");
+    }
+
+    private static void CheckAPackedCrateKeepsItsFiltersWhenPutDownAgain(GameData data) {
+        var world = EmptyWorld(data);
+        var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
+        crate.Inventory.Add("wood", 3);
+        world.SetFilter(crate, "wood", false, true); world.SetFilter(crate, "stone", true, true);
+        Require(world.PickUpCrate(crate), "a nearby crate should be picked up");
+        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        var placed = world.PlaceCrate(packed, world.Player + new Vector2(2, 0))!;
+        Require(placed.Inventory.InputFilter.SetEquals(new[] { "wood" }) && placed.Inventory.OutputFilter.SetEquals(new[] { "stone" }),
+            "a crate of goods put down again should keep the filters it had");
+        world.Transfer(placed.Inventory, world.Backpack, "wood", 3);
+        Require(world.PickUpCrate(placed), "the emptied crate should be picked up");
+        var empty = world.PlaceCrate("crate", world.Player + new Vector2(2, 0))!;
+        Require(empty.Inventory.InputFilter.Count == 0 && empty.Inventory.OutputFilter.Count == 0, "an empty crate put down again should have no filters");
+    }
+
+    private static void CheckAChestsHaulerNeverCarriesWaterOutOfAStationByHand(GameData data) {
+        var world = EmptyWorld(data);
+        var table = world.Add(ThingKind.Cooktable, new Vector2(10, 10));
+        world.SetRecipe(table, "crushed_berries");
+        table.Inventory.Add(Water.Liquid, 5);
+        var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
+        world.SetFilter(chest, Water.Liquid, false, true);
+        var hauler = Staff(world, chest, JobKind.Haul);
+        Work(world, 30);
+        Require(table.Inventory[Water.Liquid] == 5 && hauler.Bag[Water.Liquid] == 0 && chest.Inventory[Water.Liquid] == 0,
+            $"a chest's hauler should leave the water a station holds, which leaves it only in vessels: {chest.Inventory[Water.Liquid]} liters in the chest");
+    }
+
+    private static void CheckAChestsHaulerTakesAStationOnlyTheBottlesItsWaterRoomNeeds(GameData data) {
+        var world = EmptyWorld(data);
+        var table = world.Add(ThingKind.Cooktable, new Vector2(10, 10));
+        world.SetRecipe(table, "meat_stew");
+        // A stack of 64 liters with 58 in it has room for 6: two full bottles of 3 liters.
+        table.Inventory.Add(Water.Liquid, 58);
+        var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
+        chest.Inventory.Add(Water.Full, 5);
+        var hauler = Staff(world, chest, JobKind.Haul);
+        Work(world, 30, () => hauler.Bag.Count > 0);
+        Require(hauler.Bag[Water.Full] == 2, $"a chest's hauler should take the table two full bottles for its 6 liters of room, not {hauler.Bag[Water.Full]}");
     }
 }

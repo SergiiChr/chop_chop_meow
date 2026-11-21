@@ -1014,6 +1014,7 @@ The server keeps only the slot each player's held stack lies in (`PlayerState.He
 It lets go of the stack when the player is down, walks out of reach of the building it lies in, or leaves, and when its crate is put down or sold; a load starts with nothing held.
 
 A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (12) items in all, one stack or up to twelve kinds, for every load.
+A barrel or a packed crate fills them alone, one at a time (`Inventory.CarriedBy`).
 The one tool a worker holds lies in `Worker.ToolSlot`, which `Worker.Tool` names.
 Both are boxes a player in reach of the worker (`World.Reaches`) picks up from and puts into as with a building's slots: anything goes into the hands, only a tool into the tool slot.
 
@@ -1021,7 +1022,7 @@ Both are boxes a player in reach of the worker (`World.Reaches`) picks up from a
 
 Chests have separate item allowlists for input and output, and empty lists allow all items.
 Automated deposits go to the nearest place that asks for the item, then to the nearest unrestricted storage (`World.DepositFor`).
-Asking for it are a chest, pile or trading post whose input filter names it, a packing station packing it, a station whose recipe takes it as an input or burns it, a farm plot short of it for a sowing and a mine site short of it.
+Asking for it are a chest, pile, placed crate or trading post whose input filter names it, a packing station packing it, a station whose recipe takes it as an input or burns it, a farm plot short of it for a sowing and a mine site short of it.
 `World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
 Manual transfers ignore those filters.
@@ -1054,7 +1055,8 @@ Those contents have an update entry of their own (`EntryKey.Crates`), sent only 
 A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
 `World.PackedKind` gives `World.MixedCrate` for a crate of mixed goods, which only a pile's filter can name.
 A pile of crates holds crates of one good, or crates of mixed goods.
-Placed crates are manual storage only.
+A placed crate takes part in automation like a chest, and its filters stay with its contents while it is packed.
+No worker carries a crate into one, and its filters name none (`World.Nests`).
 
 #### Packing station
 
@@ -1085,6 +1087,7 @@ Workers are tracked individually.
 The kinds of work are `JobKind`, each with an id in saves and commands (`JobKinds.Id`), and one table holds each job's title, hint, whether a round of it is a unit of the place's work, the tools it takes and what it does (`World.Def`, `JobDef`).
 A place offers some of them (`World.Jobs`), such as Craft and Haul at a crafting bench.
 
+- Haul at a chest or placed crate carries out and fills it by its filters ([hauling](#hauling)).
 - Stock brings tools from storage to a tool station.
 - Tend fetches what a compost pile's filters take from storage and carries its fertilizer out.
 - Deliveries runs price errands and carries the trading post's mail, other than coins, to storage.
@@ -1114,7 +1117,7 @@ On a worker's page `JobList` draws the list and turns a row dragged by its `JobG
 #### Hauling
 
 A haul job carries one load at a time (`World.Haul`).
-Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, `FarmCarries`, `MineCarries`), and the best is the hauler's plan (`Worker.Plan`, a `Carry`) until the load is picked up:
+Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, `FarmCarries`, `MineCarries`, `StoreCarries`), and the best is the hauler's plan (`Worker.Plan`, a `Carry`) until the load is picked up:
 
 1. an input or the fuel slot holding less than one batch, and fuel the recipe does not burn, which leaves the slot;
 2. an output that is full, or anything another recipe left in the slots;
@@ -1124,6 +1127,9 @@ Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, 
 Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold one sowing (`World.SowRoom`) and a mine site what it lacks.
 A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
 Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
+
+A chest's or placed crate's hauler carries out what its output filter lets go to the nearest place asking for it (`World.AskerFor`), then fills it with what its input filter names (`World.FillSource`); every such carry comes under the first rule.
+Storage that asks for an item never passes it to other storage asking for it, nor takes it from one, so two never trade it back and forth.
 
 #### Gathering and the bellows
 

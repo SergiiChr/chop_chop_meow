@@ -130,6 +130,7 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
         var carrying = Style.WellLabel(""); hands.AddChild(carrying);
         live.Bind(carrying, text => {
             if (Barrel.In(w.Bag) != null) text.Append("Carrying a barrel");
+            else if (w.Bag.ArmsFull) text.Append("Carrying a packed crate");
             else text.Append("Carrying ").Append(w.Bag.Count).Append(" of ").Append(Worker.BagStack);
         });
         hands.AddChild(NewInventoryGrid(() => w.Bag, null, id => moves.Stack(w.Bag, world.S.Backpack, id), $"{StationSlots.SlotHint}\nPut a stack here and they carry it to where it goes", columns: 6, size: 46));

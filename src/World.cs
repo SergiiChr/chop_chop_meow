@@ -1318,6 +1318,8 @@ public sealed partial class World {
     /// </summary>
     public const string PackedPrefix = "crate_";
     public static bool IsCrate(string item) => item == "crate" || item.StartsWith(PackedPrefix, StringComparison.Ordinal);
+    /// <summary>Whether an item is a crate, empty or packed, going into a placed crate: no worker carries one there and no filter names one.</summary>
+    public static bool Nests(Thing t, string item) => t.Kind == ThingKind.Crate && IsCrate(item);
     /// <summary>The number that keys a packed crate's contents, or 0 for any other item.</summary>
     public static int PackedId(string item) => item.StartsWith(PackedPrefix, StringComparison.Ordinal) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
     /// <summary>The filter entry that stands for any packed crate of one good, such as <c>crate_bread</c>.</summary>
@@ -1701,20 +1703,32 @@ public sealed partial class World {
         for (int left = CompostBatch; left > 0;) left -= pile.Inventory.Remove(pile.Inventory.Items.Keys.First(Compostable), left);
         pile.Inventory.Add("fertilizer", 1); Got("fertilizer");
     }
-    // Only chests and piles take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
-    private static readonly ThingKind[] Stores = { ThingKind.Chest, ThingKind.Pile };
+    // Only chests, piles and placed crates take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
+    private static readonly ThingKind[] Stores = { ThingKind.Chest, ThingKind.Pile, ThingKind.Crate };
     // Trading posts also take deliveries, of the crates they ask for, and packing stations of the good they pack.
-    private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Signpost, ThingKind.Packer };
-    public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) {
+    private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Crate, ThingKind.Signpost, ThingKind.Packer };
+    /// <summary>Where a load of an item goes: the nearest place asking for it, else the nearest storage with no filter, and compost last for food.</summary>
+    public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) => Deposit(item, origin, exclude, null);
+    /// <summary>
+    /// The nearest place asking for an item that a chest's or crate's hauler carries out to, or null.
+    /// Storage with no filter does not count, and other storage only while this one does not ask for the item too, so two that ask never pass it back and forth.
+    /// </summary>
+    private Thing? AskerFor(string item, Thing store) => Deposit(item, store.Pos, store.Id, store);
+    /// <param name="outOf">The storage a chest's or crate's hauler carries the item out of, for <see cref="AskerFor"/>; null for any other load.</param>
+    private Thing? Deposit(string item, Vector2 origin, int exclude, Thing? outOf) {
         Thing? best = null; int bestRank = 0; float bestDistance = 0;
-        foreach (var kind in Depots)
+        bool storesTake = outOf == null || !outOf.Inventory.Wants(item);
+        foreach (var kind in Depots) {
+            if (!storesTake && Array.IndexOf(Stores, kind) >= 0) continue;
             foreach (var t in S.Things.Of(kind)) {
-                if (t.Id == exclude || Intake(t, item, false) == null) continue;
+                if (t.Id == exclude) continue;
                 // Compost names every food in its filter, but takes food only when nothing else will, so harvests and picked berries are not left to rot.
                 int rank = t.Compost && Data.IsFood(item) ? 2 : kind == ThingKind.Packer || t.Inventory.Wants(item) ? 0 : 1;
+                if (outOf != null && rank > 0 || Intake(t, item, false) == null) continue;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || rank < bestRank || rank == bestRank && distance < bestDistance) { best = t; bestRank = rank; bestDistance = distance; }
             }
+        }
         // A station, farm plot or mine site that uses the item takes it as storage asking for it does: its input slots, its fuel slot, the materials it lacks.
         foreach (var kind in stationKinds) Users(kind);
         Users(ThingKind.Farm); Users(ThingKind.Mine);
@@ -1734,7 +1748,7 @@ public sealed partial class World {
     /// </summary>
     private static bool PackerTakes(Thing packer, string item) =>
         item == packer.Packs && packer.Inventory[item] <= (packer.Inventory.Slots - 2) * packer.Inventory.StackOf(item);
-    /// <summary>The nearest chest or pile that gives out an item, or station holding it as a finished good, or null.</summary>
+    /// <summary>The nearest chest, pile or placed crate that gives out an item, or station holding it as a finished good, or null.</summary>
     public Thing? SourceFor(string item, Vector2 origin, int exclude = 0) {
         Thing? best = null; float bestDistance = 0;
         foreach (var kind in Stores) Nearer(kind, false);

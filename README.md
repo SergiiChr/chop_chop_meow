@@ -244,13 +244,14 @@ Coins stack to 1000.
 Packed crates, tools and refillable bottles take a slot each.
 Empty steel buckets and barrels can stack, and each filled one takes its own slot.
 Empty barrels stack in your backpack alongside up to one barrel containing water.
-A worker carrying a barrel has only their tool slot free.
+A worker carries one barrel or one packed crate at a time, with only their tool slot free beside it.
+Their page then says "Carrying a barrel" or "Carrying a packed crate" above their hands, instead of how many items they carry.
 
 | Inventory | Capacity |
 | --- | --- |
 | Backpack | 24 slots |
 | Chest | 5 slots |
-| Worker | 12 items, like a crate: one stack of 12 or up to 12 different items |
+| Worker | 12 items, like a crate: one stack of 12 or up to 12 different items; or one barrel or packed crate alone |
 | Tool station | 4 slots for tools, buckets or bottles |
 
 - You can move items in and out of storage and stations up to 15 metres away (`World.ItemReach`).
@@ -352,6 +353,7 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 | Mine | Build, Haul, Mine |
 | Farm plot | Farm, Haul |
 | Trading post | Manage deliveries |
+| Chest, placed crate | Haul |
 | Campfire | Tend fire |
 | Tool station | Stock |
 | Compost pile | Tend |
@@ -585,6 +587,9 @@ Double-click a crate in the backpack or on the hotbar to open it as storage wher
 Picking up the open crate itself closes it, and it is then a held stack like any other.
 
 Workers never open or place crates; they pack them at a packing station.
+A placed crate takes part in worker automation like a chest: gatherers and haulers store in it and take from it by its filters, and it offers Haul.
+Its filters never name a crate, and no worker puts a crate into it.
+A crate of goods keeps its filters when picked up and put down again; an empty crate loses them.
 Putting a crate inside a crate asks first; saying yes ends the game.
 
 ### Steel barrels and buckets
@@ -665,7 +670,7 @@ Manual inventory transfers ignore these automation filters.
 
 A load a worker carries goes to the nearest place that asks for it:
 
-- a chest, pile or trading post whose input filter names it, or a packing station packing it;
+- a chest, pile, placed crate or trading post whose input filter names it, or a packing station packing it;
 - a station whose recipe uses it, into the input slot or the fuel slot, up to a stack;
 - a farm plot short of seed or fertilizer for a sowing, or a mine site short of a material.
 
@@ -675,7 +680,7 @@ A chest or pile near a source fills first and buffers the goods; without one, a 
 
 ### Hauling
 
-A worker on Haul carries one load at a time for their station, up to 12 items.
+A worker on Haul carries one load at a time for their station, up to 12 items or one packed crate.
 The next load is picked in this order:
 
 1. an input or the fuel slot that holds less than one batch;
@@ -687,6 +692,13 @@ Inputs and fuel are filled to a stack.
 A load of something the recipe uses both as an input and as fuel, such as coal for steel, is shared between the two slots as a batch uses them: of 12 coal, 8 go in as input and 4 as fuel.
 A station keeps the goods it makes when no storage takes them, and goes on working until its output stack is full.
 Workers fetching a station's inputs take them from storage or straight from another station's finished goods, such as steel parts from the anvil.
+
+A chest or placed crate offers Haul too.
+Its hauler first carries out what its output filter lets go, to the nearest place asking for it: never to storage with no filter.
+Then they bring what its input filter names, from storage or from a station's finished goods.
+Two storages that both ask for an item never pass it to each other.
+So a chest asking for crates of bread sends them on to a trading post asking for them, but not to another chest asking for them.
+In a haul group, every carry for a chest or crate comes first, as an input short of a batch does.
 
 ### Tool station
 

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
@@ -50,12 +51,14 @@ internal static class PlayerSteps {
 
     /// <summary>
     /// Packs <paramref name="count"/> crates of berries as a player does and stores them in new chests along a row from
-    /// <paramref name="from"/>, five to a chest, then puts the player back where they stood.
+    /// <paramref name="from"/>, five to a chest, then puts the player back where they stood; returns the chests.
     /// </summary>
-    public static void StoreCrates(World world, Vector2 from, int count) {
+    public static List<Thing> StoreCrates(World world, Vector2 from, int count) {
         var stood = world.Player;
+        var chests = new List<Thing>();
         for (var at = from; count > 0; at += new Vector2(2, 0)) {
             var chest = world.Add(ThingKind.Chest, at);
+            chests.Add(chest);
             Warp(world, at + new Vector2(0, 1));
             for (int i = 0; i < 5 && count > 0; i++, count--) {
                 string packed = PackCrate(world, ("berries", world.Data.CrateCapacity));
@@ -63,6 +66,7 @@ internal static class PlayerSteps {
             }
         }
         Warp(world, stood);
+        return chests;
     }
 
     /// <summary>A compost pile on open ground with a farm plot built beside it, the player standing by with one sowing's seeds and fertilizer.</summary>
