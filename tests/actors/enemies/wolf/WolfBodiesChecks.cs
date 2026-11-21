@@ -20,6 +20,23 @@ public static class WolfBodiesChecks {
         Test(CheckAWolfClosingInKeepsOffWhereAnotherTugsThePlayer, data);
         Test(CheckTwoWolvesAtOnePlayerKeepTheirBodiesApart, data);
         Test(CheckAWolfsHeightInTheWorldFollowsItsModel, data);
+        Test(CheckAFeedingSpotLeavesRoomForTheWholePull);
+    }
+
+    private static void CheckAFeedingSpotLeavesRoomForTheWholePull() {
+        var wolf = new WolfModel();
+        var reserved = WolfModel.FeedingVolumes;
+        Span<(Vector3 At, float Radius)> drawn = stackalloc (Vector3, float)[WolfModel.VolumeCount];
+        wolf.Feed(0, 1, false);
+        float outside = 0;
+        for (int frame = 0; frame < 180; frame++) {
+            wolf.Feed(frame / 60f, 1f / 60, false);
+            wolf.Volumes(drawn);
+            for (int i = 0; i < drawn.Length; i++)
+                outside = Math.Max(outside, drawn[i].At.DistanceTo(reserved[i].At) + drawn[i].Radius - reserved[i].Radius);
+        }
+        wolf.Root.Free();
+        Require(outside < .004f, $"A feeding wolf must fit in its spot through both pulls; it reached {outside:0.000} m outside.");
     }
 
     /// <summary>

@@ -529,9 +529,10 @@ public sealed class WolfModel {
     /// <summary>How far apart a pinning wolf's hind paws stand, as a share of its legs' own width, wide of the legs of the player under it, and how far it leans its body to keep its jaws on the throat.</summary>
     private const float PinStance = 2.5f, MostLean = .15f;
 
+    private const float FeedingBeat = 1.35f;
     /// <summary>A feeder grips low, rocks back on its haunches, then lets go and dips for another bite.</summary>
     private static WolfPose Tearing(float time) {
-        float beat = time / 1.35f, u = Mathf.PosMod(beat, 1);
+        float beat = time / FeedingBeat, u = Mathf.PosMod(beat, 1);
         float pull = Mathf.SmoothStep(.16f, .39f, u) * (1 - Mathf.SmoothStep(.48f, .84f, u));
         float open = Mathf.SmoothStep(.48f, .61f, u) * (1 - Mathf.SmoothStep(.78f, .96f, u));
         float wrench = pull * MathF.Sin(beat * Mathf.Pi);
@@ -765,11 +766,21 @@ public sealed class WolfModel {
         }
     }
 
-    /// <summary>The spheres of a feeding wolf between its pulls, in the model.</summary>
+    /// <summary>The space each part of a feeding wolf needs through its left and right pulls, in the model.</summary>
     public static readonly (Vector3 At, float Radius)[] FeedingVolumes = Feeding();
     private static (Vector3 At, float Radius)[] Feeding() {
         var volumes = new (Vector3 At, float Radius)[VolumeCount];
         VolumesOf(Tearing(0), volumes);
+        Span<Aabb> travel = stackalloc Aabb[VolumeCount];
+        for (int i = 0; i < VolumeCount; i++) travel[i] = new Aabb(volumes[i].At, Vector3.Zero);
+        // Enclose each sphere's path once, so testing a spot costs the same as testing a single pose.
+        const int samples = 64;
+        for (int frame = 1; frame <= samples; frame++) {
+            VolumesOf(Tearing(2 * FeedingBeat * frame / samples), volumes);
+            for (int i = 0; i < VolumeCount; i++) travel[i] = travel[i].Expand(volumes[i].At);
+        }
+        for (int i = 0; i < VolumeCount; i++)
+            volumes[i] = (travel[i].GetCenter(), volumes[i].Radius + travel[i].Size.Length() / 2);
         return volumes;
     }
 

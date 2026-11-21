@@ -94,9 +94,11 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
         Span<(Vector3 At, float Radius)> theirs = stackalloc (Vector3, float)[WolfModel.VolumeCount];
         foreach (var (wolf, model) in wolves) {
             if (wolf == feeder || !liveWolves.Contains(wolf)) continue;
-            model.Volumes(theirs);
+            ReadOnlySpan<(Vector3 At, float Radius)> occupied = theirs;
+            if (model.Motion == WolfMotion.Feed) occupied = WolfModel.FeedingVolumes;
+            else model.Volumes(theirs);
             var other = model.Root.Transform;
-            foreach (var (at, radius) in theirs) obstacles.Add((other * at, radius));
+            foreach (var (at, radius) in occupied) obstacles.Add((other * at, radius));
         }
         var body = rig.Root.Transform;
         for (int arm = 0; arm < 2; arm++) {
