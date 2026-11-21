@@ -5,6 +5,10 @@ namespace ChopChopMeow;
 
 /// <summary>Cached tilled rows and three seeded field variants with tapered leaves and grain heads.</summary>
 internal static class FarmShape {
+    private const float Bed = Farms.HalfSize - .15f, RowEnd = Bed - .05f;
+    private const int Rows = 10, PlantsPerRow = 8;
+    private static float RowZ(int row) => (row - (Rows - 1) / 2f) * .54f;
+
     private static ArrayMesh? soil;
     private static readonly ArrayMesh?[,] crops = new ArrayMesh?[3, 3];
     public static Mesh Soil => soil ??= BuildSoil();
@@ -18,16 +22,16 @@ internal static class FarmShape {
     private static ArrayMesh BuildSoil() {
         const string ground = "e6e6e6", ridge = "ffffff";
         var s = Begin();
-        Quad(s, new(-1.35f, .03f, -1.35f), new(1.35f, .03f, -1.35f), new(1.35f, .03f, 1.35f), new(-1.35f, .03f, 1.35f), Vector3.Up, ground);
-        foreach (float side in new[] { -1.35f, 1.35f }) {
-            Quad(s, new(side, .01f, -1.35f), new(side, .03f, -1.35f), new(side, .03f, 1.35f), new(side, .01f, 1.35f), new(side, 0, 0), ground);
-            Quad(s, new(-1.35f, .01f, side), new(-1.35f, .03f, side), new(1.35f, .03f, side), new(1.35f, .01f, side), new(0, 0, side), ground);
+        Quad(s, new(-Bed, .03f, -Bed), new(Bed, .03f, -Bed), new(Bed, .03f, Bed), new(-Bed, .03f, Bed), Vector3.Up, ground);
+        foreach (float side in new[] { -Bed, Bed }) {
+            Quad(s, new(side, .01f, -Bed), new(side, .03f, -Bed), new(side, .03f, Bed), new(side, .01f, Bed), new(side, 0, 0), ground);
+            Quad(s, new(-Bed, .01f, side), new(-Bed, .03f, side), new(Bed, .03f, side), new(Bed, .01f, side), new(0, 0, side), ground);
         }
-        for (int row = 0; row < 5; row++) {
-            float z = -1.08f + row * .54f;
+        for (int row = 0; row < Rows; row++) {
+            float z = RowZ(row);
             Vector3[] profile = { new(0, .03f, z - .11f), new(0, .08f, z - .065f), new(0, .08f, z + .065f), new(0, .03f, z + .11f) };
-            Vector3 Left(int i) => profile[i] + Vector3.Left * 1.3f;
-            Vector3 Right(int i) => profile[i] + Vector3.Right * 1.3f;
+            Vector3 Left(int i) => profile[i] + Vector3.Left * RowEnd;
+            Vector3 Right(int i) => profile[i] + Vector3.Right * RowEnd;
             for (int i = 0; i < 3; i++)
                 Quad(s, Left(i), Right(i), Right(i + 1), Left(i + 1), Vector3.Up, i == 1 ? ridge : ground);
             Quad(s, Left(0), Left(1), Left(2), Left(3), Vector3.Left, ground);
@@ -39,10 +43,10 @@ internal static class FarmShape {
 
     private static ArrayMesh BuildField(int stage, int variant) {
         var s = Begin();
-        for (int row = 0; row < 5; row++)
-            for (int i = 0; i < 7; i++) {
-                int n = row * 7 + i;
-                var at = new Vector3(-1.14f + i * .38f + (WorldModels.Jitter(variant, n) - .5f) * .1f, .078f, -1.08f + row * .54f);
+        for (int row = 0; row < Rows; row++)
+            for (int i = 0; i < PlantsPerRow; i++) {
+                int n = row * PlantsPerRow + i;
+                var at = new Vector3((i - (PlantsPerRow - 1) / 2f) * .68f + (WorldModels.Jitter(variant, n) - .5f) * .1f, .078f, RowZ(row));
                 float turn = n * 2.4f + variant;
                 Vector3 Direction(float angle) => new(MathF.Cos(angle), 0, MathF.Sin(angle));
                 if (stage < 2) {
@@ -86,8 +90,9 @@ internal static class FarmShape {
 
     private static void Ear(SurfaceTool s, Vector3 bottom, string tint) {
         var middle = bottom + Vector3.Up * .075f; var tip = bottom + Vector3.Up * .18f;
-        for (int i = 0; i < 4; i++) {
-            float a = i * Mathf.Tau / 4, b = (i + 1) * Mathf.Tau / 4;
+        const int sides = 3;
+        for (int i = 0; i < sides; i++) {
+            float a = i * Mathf.Tau / sides, b = (i + 1) * Mathf.Tau / sides;
             var first = middle + new Vector3(MathF.Cos(a) * .035f, 0, MathF.Sin(a) * .035f);
             var next = middle + new Vector3(MathF.Cos(b) * .035f, 0, MathF.Sin(b) * .035f);
             Triangle(s, bottom, next, first, (first + next) / 2 - middle - Vector3.Up * .02f, tint);

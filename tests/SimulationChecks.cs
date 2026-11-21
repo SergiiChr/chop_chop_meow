@@ -133,10 +133,7 @@ public static class SimulationChecks {
         Test(CheckTenderFeedsCompostWithoutFood, data);
         Test(CheckRunnerCarriesDeliveriesIntoStorage, data);
         Test(CheckWorkerLeavesToolTheFilterHolds, data);
-        Test(CheckFarmPlotBuildsBesidePileAndTakesOnlyFarmGoods, data);
-        Test(CheckSownWheatGrowsToRipeInItsDays, data);
-        Test(CheckPlotHarvestedAloneKeepsSeedInItsOutput, data);
-        Test(CheckWorkerFinishesHarvestHaulsCropAndSowsAgain, data);
+        Test(FarmChecks.Run, data);
         Test(CheckFoodsFeedAndWaterByTheirDataWithoutHealing, data);
         Test(CheckMarketTakesCratesAndDonations, data);
         Test(CheckDonationIsNoSale, data);
@@ -2065,73 +2062,6 @@ public static class SimulationChecks {
         Require(world.CraftBlock("crushed_berries") == null, "berries should be crushed by hand with a carried mortar");
         Drop(world, "mortar", 1);
         Require(world.CraftBlock("crushed_berries") != null, "crushing berries by hand should need the mortar");
-    }
-
-    /// <summary>
-    /// A farm plot snaps beside a pile, sows itself from seeds and fertilizer, shows its growth over its days, and is harvested by the player and a worker sharing one progress.
-    /// The worker carries the wheat to storage rather than to compost and the grass to compost, keeps the seeds and sows again.
-    /// </summary>
-    private static void CheckFarmPlotBuildsBesidePileAndTakesOnlyFarmGoods(GameData data) {
-        var (world, compost, farm) = FarmBesideCompost(data);
-        Require(farm.Pos == compost.Pos + new Vector2(3, 0), "a farm plot should snap edge to edge with a pile");
-        Require(world.CanStand(farm.Pos), "a plot should be walkable");
-        Require(!world.Holds(farm, "stone"), "a plot should take only farm goods");
-        Require(world.GatherBlock(farm) != null, "a plot should have nothing to harvest before sowing");
-    }
-
-    private static void CheckSownWheatGrowsToRipeInItsDays(GameData data) {
-        var (world, _, farm) = FarmBesideCompost(data);
-        world.Transfer(world.Backpack, farm.Inventory, "wheat_seeds", 1); world.Transfer(world.Backpack, farm.Inventory, "fertilizer", 1);
-        world.Tick(.1f);
-        Require(farm.FarmStage == FarmStage.Growing, "seeds and fertilizer should sow the plot");
-        Require(farm.Inventory.Count == 0, "sowing should use up the seeds and fertilizer");
-        Require(World.CropLook(farm, world.GrowSeconds) == 1, "a sown plot should show soil");
-        var looks = new List<int>();
-        for (int day = 0; day < 3; day++) { SafeTick(world, data.DaySeconds - 1); looks.Add(World.CropLook(farm, world.GrowSeconds)); SafeTick(world, 1); }
-        Require(looks.SequenceEqual(new[] { 1, 2, 3 }),
-            $"wheat should grow through soil, straws and green plants: {string.Join(",", looks)}");
-        Require(farm.FarmStage == FarmStage.Ripe, $"wheat should be ripe in {data.Farm.GrowDays} days");
-        Require(World.CropLook(farm, world.GrowSeconds) == 4, "ripe wheat should look ripe");
-    }
-
-    /// <summary>A plot harvested with nobody to haul keeps its seed in the output: nothing sows it back on its own.</summary>
-    private static void CheckPlotHarvestedAloneKeepsSeedInItsOutput(GameData data) {
-        var world = EmptyWorld(data);
-        var lone = world.Add(ThingKind.Farm, new Vector2(20, 14));
-        lone.FarmStage = FarmStage.Ripe; world.Player = lone.Pos;
-        world.Gather(lone, world.HarvestSeconds); world.Tick(1);
-        Require(lone.FarmStage == FarmStage.Fallow, "a harvested plot should lie fallow");
-        Require(lone.Output!["wheat_seeds"] == 2, "harvested seed should wait in the output");
-        Require(lone.Inventory["wheat_seeds"] == 0, "harvested seed should not go into the plot by itself");
-    }
-
-    private static void CheckWorkerFinishesHarvestHaulsCropAndSowsAgain(GameData data) {
-        var (world, compost, farm) = FarmBesideCompost(data);
-        farm.FarmStage = FarmStage.Ripe;
-        var origin = compost.Pos;
-        world.Player = farm.Pos;
-        world.Gather(farm, world.HarvestSeconds / 2);
-        Require(farm.FarmStage == FarmStage.Ripe && Math.Abs(farm.Progress - world.HarvestSeconds / 2) < .01f, "the player should harvest by hand, without a tool");
-        var chest = world.Add(ThingKind.Chest, origin + new Vector2(3, 4));
-        var worker = AddWorker(world, chest.Pos);
-        world.Assign(worker, farm);
-        Give(world, Inventory.Coins, 500);
-        // The player waits out the nights in a cabin, out of the wolves' reach.
-        var hut = world.Add(ThingKind.Hut, new Vector2(40, 40));
-        StepInside(world, hut);
-        for (int i = 0; i < 4 * data.DaySeconds && farm.FarmStage == FarmStage.Ripe; i++) SafeTick(world, 1);
-        Require(farm.FarmStage == FarmStage.Fallow && farm.Output!["wheat_seeds"] + farm.Inventory["wheat_seeds"] == 2, "a worker should finish the shared harvest into the plot");
-        SafeTick(world, 30);
-        Require(farm.Inventory["wheat_seeds"] == 1 && chest.Inventory["wheat_seeds"] == 1,
-                "the hauler should move one sowing's seeds from the output into the plot and carry the rest to storage");
-        Require(chest.Inventory["wheat"] == 4, "the wheat should go to storage");
-        Require(compost.Inventory["wheat"] == 0, "the wheat should not rot in the compost");
-        Require(compost.Inventory["grass"] == 1, "the grass should go to the compost");
-        chest.Inventory.Add("fertilizer", 1);
-        SafeTick(world, 60);
-        Require(farm.FarmStage == FarmStage.Growing, "the worker should sow again");
-        Require(chest.Inventory["fertilizer"] == 0, "the worker should bring the fertilizer");
-        Require(farm.Inventory["wheat_seeds"] == 1 && chest.Inventory["wheat_seeds"] == 0, "the worker should use the seeds moved back in and bring the spare seed for the next sowing");
     }
 
     /// <summary>Foods restore the hunger and thirst their data says and no health, and raw ones only say they need cooking.</summary>

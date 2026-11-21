@@ -12,9 +12,10 @@ public enum Lay { Neat, Rows, Loose, Mound }
 /// <see cref="ItemShape"/>, and where the pieces go on a pad of a given size.
 /// </summary>
 internal static class PileShape {
-    private static ArrayMesh? yard, frame, stack;
+    private static ArrayMesh? yard, frame, farmFrame, stack;
     public static Mesh Yard => yard ??= BuildYard();
-    public static Mesh Frame => frame ??= BuildFrame();
+    public static Mesh Frame => frame ??= BuildFrame(Construction.ZoneSize / 2);
+    public static Mesh FarmFrame => farmFrame ??= BuildFrame(Farms.HalfSize);
     public static Mesh Stack => stack ??= BuildStack();
     public static readonly StandardMaterial3D Ground = ModelKit.Vertex(Surface.Earth, 1);
     public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .9f);
@@ -179,11 +180,11 @@ internal static class PileShape {
     }
 
     /// <summary>The logs edging the yard; the cross logs butt against the long side logs rather than crossing through their ends.</summary>
-    private static ArrayMesh BuildFrame() {
+    private static ArrayMesh BuildFrame(float half) {
         var s = Begin();
-        foreach (float side in new[] { -1.4f, 1.4f }) {
-            Log(s, new(side, .08f, -1.49f), new(side, .08f, 1.49f));
-            Log(s, new(-1.31f, .08f, side), new(1.31f, .08f, side));
+        foreach (float side in new[] { -(half - .10f), half - .10f }) {
+            Log(s, new(side, .08f, -half + .01f), new(side, .08f, half - .01f));
+            Log(s, new(-half + .19f, .08f, side), new(half - .19f, .08f, side));
         }
         return s.Commit();
     }

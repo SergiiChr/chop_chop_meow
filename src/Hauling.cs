@@ -197,7 +197,7 @@ public sealed partial class World {
     /// <summary>A plot's hauler puts seed from its own harvest back into its input slots, brings what a sowing takes and carries the harvest out.</summary>
     private void FarmCarries(Worker w, Thing farm, ref Carry best) {
         foreach (var (item, sowing) in Data.Farm.Sow) {
-            int room = SowRoom(farm, item);
+            int room = Farms.SowRoom(farm, item);
             if (room <= 0) continue;
             if (farm.Output?.Free(item) > 0) Offer(ref best, Bring(farm, farm, item, room, farm.Inventory[item], sowing) with { Box = CarryBox.Output });
             else if (SourceFor(item, w.Pos, farm.Id) is Thing source) Offer(ref best, Bring(farm, source, item, room, farm.Inventory[item], sowing));

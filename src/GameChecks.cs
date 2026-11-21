@@ -1026,17 +1026,6 @@ public partial class Game {
         Warp(Hosted, home); await Frames(4);
     }
     /// <summary>A growing plot's page says how long until the wheat is ripe without a word of harvesting, which it offers once ripe.</summary>
-    private async Task CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest() {
-        var farm = Hosted.Add(ThingKind.Farm, world.Player + new Vector2(-3, 3));
-        farm.FarmStage = FarmStage.Growing; farm.Progress = Hosted.GrowSeconds - 2.5f * world.Data.DaySeconds;
-        await ClickOn(farm);
-        await Until(() => HasLabel(panel, "Growing, 2 days until ripe"), "a growing plot's page saying it ripens in 2 days", 2);
-        Require(!HasLabel(panel, "harvest"), "A growing plot's page must not mention harvesting.");
-        farm.FarmStage = FarmStage.Ripe; farm.Progress = 0;
-        await Until(() => HasLabel(panel, "Ripe") && HasLabel(panel, "harvest"), "a ripe plot's page offering the harvest", 2);
-        await CloseWithEsc();
-        RemoveThings(Hosted, t => t == farm);
-    }
     /// <summary>The red cross in the building plans hands over the remove selector, which turns a building in reach red and takes it down on one click, then stays for the next; a building's page has no take-down button.</summary>
     private async Task CheckRemoveSelectorTakesBuildingsDownAtOnce() {
         var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("coal", 5);
@@ -2096,7 +2085,7 @@ public partial class Game {
             await TestClean(CheckSoundsRotateAndMusicCrossfades);
             await TestClean(CheckSoundsFadeWithDistanceFromThePlayerAtAnyZoom);
             await TestClean(CheckRightClickGathersTreeAndHarvestsFarm);
-            await TestClean(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
+            await RunFarmUIChecks();
             await TestClean(CheckRemoveSelectorTakesBuildingsDownAtOnce);
             await RunGravelPathUIChecks();
             await TestClean(CheckPageClosesWhenWhatItShowsIsGone);

@@ -12,6 +12,7 @@ internal static class BarrelAnimationChecks {
         CheckBarrelCarryKeepsTheTorchVisible();
         CheckWorkerKeepsTheirHandOnTheLadderUntilTheNextReach();
         CheckBothVesselsPourIntoTheRoofOpening();
+        CheckBucketPoursOntoTheFarmSoil();
         CheckBottleGaugeKeepsItsFillAfterFading();
     }
 
@@ -81,6 +82,26 @@ internal static class BarrelAnimationChecks {
             Require(stream.Visible && inlet.DistanceTo(CabinWaterModel.FillOpening) < .004f && outlet.Y > inlet.Y,
                 $"the water from {vessel} should run down into the roof barrel, ends at {inlet} and {outlet}");
         }
+        rig.Root.Free();
+    }
+
+    private static void CheckBucketPoursOntoTheFarmSoil() {
+        var rig = new ActorRig(ActorSkin.Worker);
+        var stream = rig.Root.GetNode<Node3D>("WaterStream");
+        var soil = new Vector3(.4f, .03f, .4f);
+        int flowing = 0;
+        const int frames = 120;
+        for (int frame = 0; frame <= frames; frame++) {
+            WorkerWaterView.Show(rig, Vector2.Zero, soil, WorkerWaterAction.Pour, false,
+                frame / (float)frames, Bucket.AtFill(10), ground: true);
+            if (!stream.Visible) continue;
+            flowing++;
+            var end = rig.Root.Transform * (stream.Position - stream.Basis.Y * .5f);
+            var lip = rig.Root.Transform * (stream.Position + stream.Basis.Y * .5f);
+            Require(end.DistanceTo(soil) < .004f && lip.Y - end.Y > .35f,
+                $"the bucket should pour down onto the soil at frame {frame}");
+        }
+        Require(flowing is >= 20 and <= 35, "the bucket should pour visibly for about half a second");
         rig.Root.Free();
     }
 

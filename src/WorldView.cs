@@ -353,9 +353,15 @@ public partial class WorldView : Node3D {
         return distance < float.MaxValue;
     }
 
+    private static bool RayFarm(Vector3 origin, Vector3 direction, Vector2 at, out float distance) {
+        distance = (.03f - origin.Y) / direction.Y;
+        var ground = origin + direction * distance;
+        return distance > 0 && Math.Abs(ground.X - at.X) <= Farms.HalfSize && Math.Abs(ground.Z - at.Y) <= Farms.HalfSize;
+    }
+
     private readonly List<Thing> picking = new();
     private const float StumpHeight = 1.3f;
-    /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit cylinders.</summary>
+    /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit shapes.</summary>
     public Thing? Pick(Vector2 screen) {
         SyncCamera();
         // One ray for the whole pick: asking the camera again for every thing is most of what a pick costs.
@@ -371,7 +377,9 @@ public partial class WorldView : Node3D {
                 if (hits.Length > 0 && RayHits(origin, direction, t.Pos, [hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) }], out float s) && s < nearest) { nearest = s; best = t; }
                 continue;
             }
-            if (RayHits(origin, direction, t.Pos, hits, out float d) && d < nearest) { nearest = d; best = t; }
+            bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, t.Pos, out float d)
+                : RayHits(origin, direction, t.Pos, hits, out d);
+            if (hit && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
         var point = ToWorld(screen);
@@ -543,16 +551,19 @@ public partial class WorldView : Node3D {
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
             string? vessel = BarrelJobs.Vessel(worker.Tool) ? worker.Tool : null;
-            var waterTarget = worker.WaterAction != WorkerWaterAction.None ? World.Find(worker.WaterTarget) : null;
+            var waterTarget = worker.WaterAction is WorkerWaterAction.None or WorkerWaterAction.WalkFarm ? null : World.Find(worker.WaterTarget);
             if (waterTarget != null && vessel != null) {
                 var point = waterTarget.Kind switch {
                     ThingKind.Barrel when worker.WaterAction == WorkerWaterAction.Fill => To3(waterTarget.Pos) + VesselShape.BarrelSpout,
                     ThingKind.Barrel => To3(waterTarget.Pos) + VesselShape.BarrelFillOpening,
+                    ThingKind.Farm => To3(BarrelJobs.FarmPourPoint(waterTarget, worker.FarmWaterStop)) + Vector3.Up * .03f,
                     ThingKind.Water => To3(Terrain.WaterPoint(worker.Pos) - (worker.Pos - Terrain.Lake).Normalized() * .45f),
                     _ => To3(waterTarget.Pos)
                 };
                 float progress = Math.Clamp(Clocked(entry.WaterClock, worker.WaterProgress, sameAction, dt), 0, 1);
-                WorkerWaterView.Show(entry.Rig, worker.Pos, point, worker.WaterAction, waterTarget.Kind == ThingKind.Hut, progress, vessel);
+                bool watering = waterTarget.Kind == ThingKind.Farm;
+                WorkerWaterView.Show(entry.Rig, worker.Pos, point, worker.WaterAction, waterTarget.Kind == ThingKind.Hut, progress, vessel,
+                    ground: watering, facing: watering ? state.Yaw : null);
                 if (waterTarget.Kind == ThingKind.Barrel && worker.WaterAction == WorkerWaterAction.Pour) {
                     float opening = Mathf.SmoothStep(0, .28f, progress) * (1 - Mathf.SmoothStep(.73f, 1, progress));
                     openBungs[waterTarget.Id] = Math.Max(openBungs.GetValueOrDefault(waterTarget.Id), opening);
@@ -1141,7 +1152,7 @@ public partial class WorldView : Node3D {
                 break;
             case FarmProp farm:
                 if (!live) break;
-                int look = World.CropLook(t, World.GrowSeconds);
+                int look = World.Farms.CropLook(t);
                 farm.Crops[0].Visible = look > 0;
                 for (int i = 1; i < farm.Crops.Length; i++) farm.Crops[i].Visible = look == i + 1;
                 break;

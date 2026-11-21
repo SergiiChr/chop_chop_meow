@@ -91,7 +91,7 @@ public sealed partial class GameData {
         [ThingKind.Reinforced] = new() { Name = "Reinforced furnace", Cost = new() { ["stone"] = 20, ["iron_bar"] = 5, ["wood"] = 8 }, Description = "Steel from iron + coal. Coal fuel only. Pump the bellows to reach 1450\u00b0C.", Recipe = "steel_bar" },
         [ThingKind.Mine] = new() { Name = "Mine", Description = "Marking is free and snaps to an ore cliff, one mine per cliff. It is built in stages, then miners with pickaxes bring out ore and rocks for good." },
         [ThingKind.Pile] = new() { Name = "Pile", Cost = new() { ["wood"] = 8 }, Description = "A 3\u00d73 yard holding 14 stacks of one resource, named by its filter or by the first one in; it stays when emptied. Snaps edge to edge with other piles. Tick Compost on an empty pile with no filter to turn leaves, grass and food into fertilizer." },
-        [ThingKind.Farm] = new() { Name = "Farm plot", Cost = new() { ["wood"] = 8 }, Description = "A 3\u00d73 field that snaps edge to edge with piles and other plots. Wheat seeds and fertilizer sow it; the wheat grows for 3 days and is harvested by hand, by you or a worker, for wheat, more seeds and grass." },
+        [ThingKind.Farm] = new() { Name = "Farm plot", Cost = new() { ["wood"] = 8 }, Description = "A 6\u00d76 field that snaps edge to edge with piles and other plots. Wheat seeds and fertilizer sow it; the wheat grows for 3 days with 10L of water per day and is harvested by hand, by you or a worker, for wheat, more seeds and grass." },
         [ThingKind.Toolstation] = new() {
             Name = "Tool station",
             Cost = new() { ["planks"] = 8, ["stone"] = 4 },
