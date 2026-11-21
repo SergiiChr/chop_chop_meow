@@ -280,6 +280,8 @@ public sealed partial class GameData {
     private readonly Dictionary<string, string> recipeIdOf = new();
     private readonly Dictionary<string, List<string>> madeOutOf = new();
     private readonly Dictionary<string, string[]> endsUpIn = new();
+    // The recipe groups in the order lists of items show them, after the items no recipe makes.
+    private static readonly RecipeGroup[] ListedGroups = [RecipeGroup.Materials, RecipeGroup.Tools, RecipeGroup.Containers, RecipeGroup.Food];
     private static readonly List<string> Nothing = new();
     /// <summary>Items the recipe map leaves out: coins, and the part-drunk bottles that stand with the full one.</summary>
     public static bool OffTheMap(string item) => item == Inventory.Coins || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
@@ -303,6 +305,11 @@ public sealed partial class GameData {
     private IEnumerable<string> ProductsOf(string item) => Recipes.Values.Where(r => r.Inputs.ContainsKey(item)).Select(r => r.Output).Concat(Sources.Where(p => p.Value.From.Contains(item) || p.Value.Also.Contains(item)).Select(p => p.Key));
     /// <summary>Everything an item ends up in: its products, their products and so on down every chain.</summary>
     public string[] EndsUpIn(string item) => endsUpIn[item];
+    /// <summary>
+    /// Every item in the order a list of items such as the filter window's shows them: items no recipe makes, then materials, tools, containers and food.
+    /// Each group runs from the fewest making steps to the most, in recipe map order where they tie.
+    /// </summary>
+    public IReadOnlyList<string> ListOrder { get; private set; } = [];
     /// <summary>Works out the recipe map's chains and checks that every item is on the map once.</summary>
     private void ValidateMap() {
         foreach (var (id, recipe) in Recipes)
@@ -321,9 +328,10 @@ public sealed partial class GameData {
         }
         // A stable sort, so chains of one length keep the tables' order.
         foreach (var (parent, children) in madeOutOf.ToList()) madeOutOf[parent] = children.OrderByDescending(ChainLength).ToList();
-        var placed = new Dictionary<string, MapRowDef>();
+        var placed = new Dictionary<string, MapRowDef>(); var mapOrder = new Dictionary<string, int>();
         void Place(string item, MapRowDef row) {
             if (!placed.TryAdd(item, row)) throw new InvalidOperationException($"{item} is on the recipe map twice.");
+            mapOrder[item] = mapOrder.Count;
             foreach (string child in MadeOutOf(item)) Place(child, row);
         }
         foreach (var row in MapRows) {
@@ -343,6 +351,23 @@ public sealed partial class GameData {
             while (open.TryPop(out var at)) foreach (string product in ProductsOf(at)) if (reached.Add(product)) open.Push(product);
             endsUpIn[item] = reached.ToArray();
         }
+        SetListOrder(mapOrder);
+    }
+    /// <summary>Works out <see cref="ListOrder"/> from the recipes and each item's place on the recipe map.</summary>
+    private void SetListOrder(Dictionary<string, int> mapOrder) {
+        if (Enum.GetValues<RecipeGroup>().Except(ListedGroups).Any()) throw new InvalidOperationException("Every recipe group needs a place in lists of items.");
+        // Making steps from items no recipe makes: one more than the most any input takes, counting what a source comes out of.
+        var steps = new Dictionary<string, int>();
+        int Steps(string item) {
+            if (steps.TryGetValue(item, out int known)) return known >= 0 ? known : throw new InvalidOperationException($"{item} is made out of itself.");
+            steps[item] = -1;
+            var inputs = RecipeOf(item)?.Inputs.Keys ?? (Sources.TryGetValue(item, out var source) ? source.From.Concat(source.Also) : []);
+            return steps[item] = inputs.Select(input => 1 + Steps(input)).DefaultIfEmpty(0).Max();
+        }
+        // A part-drunk bottle stands with the full one, and a vessel's fills and liquid go in the empty vessel's group.
+        string Standing(string item) => VesselOf(item) is VesselDef v && OffTheMap(item) ? v.Full : item;
+        int Group(string item) => RecipeOf(VesselOf(item)?.Empty ?? VesselFor(item)?.Empty ?? item) is RecipeDef r ? 1 + Array.IndexOf(ListedGroups, r.Group) : 0;
+        ListOrder = Items.Keys.OrderBy(Group).ThenBy(item => Steps(Standing(item))).ThenBy(item => mapOrder.GetValueOrDefault(Standing(item), mapOrder.Count)).ToArray();
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
     public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);

@@ -218,7 +218,7 @@ public partial class Game {
         Require(sign.AutoSell, "Ticking Send when full must set the post to send the cart on its own.");
         await Click(Named("filters")!); await Click(Named("filter_add_in")!);
         await Click(Named($"pick_{World.CrateOf("berries")}")!);
-        Require(sign.Inventory.InputFilter.SetEquals(new[] { World.CrateOf("berries") }),
+        Require(sign.Inventory.InputFilter.SequenceEqual(new[] { World.CrateOf("berries") }),
             "The post's filter must offer the crate of berries.");
         Require(Named("filter_add_out") == null,
             "The post's filter must not offer a row of goods that workers do not bring.");
@@ -245,7 +245,7 @@ public partial class Game {
             "A pile's filter must offer water at any fill as one entry, apart from empty bottles.");
         Require(Named($"pick_{World.MixedCrate}") != null, "A pile's filter must offer crates of mixed goods.");
         await Click(Named($"pick_{Water.Liquid}")!);
-        await Until(() => pile.Inventory.InputFilter.SetEquals(new[] { Water.OneLiter, Water.TwoLiters, Water.Full }) && ShownPage() == "Pile · water",
+        await Until(() => pile.Inventory.InputFilter.SequenceEqual(new[] { Water.OneLiter, Water.TwoLiters, Water.Full }) && ShownPage() == "Pile · water",
             "picking water making the empty pile a water pile, named in its heading", 2);
         Require(Named("filter_add_in") == null, "A pile whose filter names a resource must offer no second one.");
         await Click(Named($"filter_in_{Water.Liquid}")!);
@@ -253,6 +253,45 @@ public partial class Game {
         Require(FindButton(panel, "Clear") != null, "The filter window's clear button must read Clear.");
         await Click(Named("filters_close")!);
         RemoveThings(Hosted, t => t == pile);
+        await CloseWithEsc();
+    }
+
+    /// <summary>A chest's filter list runs by group, each simplest first: items no recipe makes, materials, tools, containers, food, then crates of goods.</summary>
+    private async Task CheckFilterListRunsByGroupSimplestFirst() {
+        await CloseWithEsc();
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(4, 0)); await Frames();
+        panel.Select(Shown(chest)); await Frames();
+        await Click(Named("filters")!); await Click(Named("filter_add_in")!);
+        var listed = OnPage("filter_list")!.GetChild(0).GetChildren().Select(cell => cell.Name.ToString()["pick_".Length..]).ToList();
+        string[] expected = ["wood", "planks", "iron_bar", "steel_bar", "steel_parts", "stone_chisel", "steel_chisel", Water.Empty, "flour", "dough", "bread", World.CrateOf("berries"), World.CrateOf("bread")];
+        Require(listed.Where(expected.Contains).SequenceEqual(expected), $"The filter list must run by group, simplest first, not {string.Join(" ", listed)}.");
+        Require(listed.FindIndex(id => id.StartsWith(World.PackedPrefix)) > listed.FindLastIndex(id => !id.StartsWith(World.PackedPrefix)), "The filter list must show crates of goods after every item.");
+        await Click(Named("filters_close")!);
+        RemoveThings(Hosted, t => t == chest);
+        await CloseWithEsc();
+    }
+
+    /// <summary>A filter row shows its items in the order they were added, also after one of them comes off, or comes off and goes back on between two looks of the page.</summary>
+    private async Task CheckFilterRowKeepsTheOrderAdded() {
+        await CloseWithEsc();
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(4, 0)); await Frames();
+        panel.Select(Shown(chest)); await Frames();
+        await Click(Named("filters")!);
+        foreach (string item in new[] { "stone", "planks" }) {
+            await Click(Named("filter_add_in")!); await Click(Named($"pick_{item}")!);
+            await Until(() => Named($"filter_in_{item}") != null, $"picking {item} adding it to the row", 2);
+        }
+        await Click(Named("filter_in_stone")!);
+        await Until(() => Named("filter_in_stone") == null, "clicking stone taking it off the row", 2);
+        await Click(Named("filter_add_in")!); await Click(Named("pick_coal")!);
+        await Until(() => OnPage("filter_in")!.GetChildren().Select(cell => cell.Name.ToString()).Where(name => name.StartsWith("filter_in_")).SequenceEqual(["filter_in_planks", "filter_in_coal"]),
+            "coal added after stone came off showing after planks", 2);
+        // As another player would, between two looks of the page: the row's items stay the same, only their order changes.
+        Hosted.SetFilter(chest, "planks", false, false); Hosted.SetFilter(chest, "planks", false, true);
+        await Until(() => OnPage("filter_in")!.GetChildren().Select(cell => cell.Name.ToString()).Where(name => name.StartsWith("filter_in_")).SequenceEqual(["filter_in_coal", "filter_in_planks"]),
+            "planks taken off and put back at once moving after coal", 2);
+        await Click(Named("filters_close")!);
+        RemoveThings(Hosted, t => t == chest);
         await CloseWithEsc();
     }
 
@@ -2170,6 +2209,8 @@ public partial class Game {
             await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
             await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
             await TestClean(CheckPileFilterNamesOneResource);
+            await TestClean(CheckFilterListRunsByGroupSimplestFirst);
+            await TestClean(CheckFilterRowKeepsTheOrderAdded);
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await TestClean(CheckPackingStationListsGoodsAndTakesBackpackClicks);
             await TestClean(CheckEndGoalsShowEndingOnceAndKeepPlaying);

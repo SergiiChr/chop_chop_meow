@@ -974,6 +974,10 @@ Asking for it are a chest, pile or trading post whose input filter names it, a p
 `World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
 Manual transfers ignore those filters.
+A filter is a list in the order the player named its items, which the filter window's rows show.
+The window's list to add from runs in `GameData.ListOrder`, with crates of goods after the items in their goods' order.
+`GameData.Create` works `ListOrder` out once: it puts items no recipe makes first, then materials, tools, containers and food; in each, fewer making steps come first, and recipe map order breaks ties.
+Making steps count the longest way through a recipe's inputs or the items a source comes out of, from items no recipe makes.
 
 #### Piles
 

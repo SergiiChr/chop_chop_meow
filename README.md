@@ -613,6 +613,8 @@ A worker on its Tend job fetches what its filters take from storage and carries 
 
 Storage input filters govern automated deposits; output filters govern worker withdrawals.
 Empty filters allow all items.
+A row shows its items in the order they were added.
+The list to add from shows items in groups, each simplest first: those no recipe makes, then materials, tools, containers and food, and last crates of goods.
 **Clear** takes everything off both rows.
 Manual inventory transfers ignore these automation filters.
 

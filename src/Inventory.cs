@@ -43,8 +43,10 @@ public sealed class Inventory {
     [JsonInclude, JsonPropertyName("Items")] internal Dictionary<string, int> SavedItems { get => items; set { if (!ReferenceEquals(value, items)) { items.Clear(); foreach (var pair in value) items[pair.Key] = pair.Value; } } }
     /// <summary>Physical stack positions; <see cref="Items"/> holds each item's total across them.</summary>
     public List<Slot> Layout { get; set; } = new();
-    public HashSet<string> InputFilter { get; set; } = new();
-    public HashSet<string> OutputFilter { get; set; } = new();
+    /// <summary>What workers bring here, in the order the player named them; empty for anything.</summary>
+    public List<string> InputFilter { get; set; } = new();
+    /// <summary>What workers take from here, in the order the player named them; empty for anything.</summary>
+    public List<string> OutputFilter { get; set; } = new();
     /// <summary>Number of cells. Changing it adds empty cells or moves stacks out of removed ones.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
     /// <summary>Most units of one item per cell. Changing it splits or merges stacks to fit.</summary>
@@ -304,7 +306,7 @@ public sealed class Inventory {
     /// <summary>Lets an item in or out through a filter, or stops naming it there.</summary>
     public void Filter(string item, bool output, bool allowed) {
         var filter = output ? OutputFilter : InputFilter;
-        if (allowed) filter.Add(item); else filter.Remove(item);
+        if (!allowed) filter.Remove(item); else if (!filter.Contains(item)) filter.Add(item);
         Changed?.Invoke();
     }
     /// <summary>Empties both filters, so anything goes in and out.</summary>
@@ -314,10 +316,12 @@ public sealed class Inventory {
     /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over unrestricted ones.</summary>
     public bool Wants(string item) => InputFilter.Count > 0 && Names(InputFilter, item);
     /// <summary>A filter names an item itself, or for a packed crate the kind of crate it is (<see cref="World.CrateOf"/>).</summary>
-    private static bool Names(HashSet<string> filter, string item) {
+    private static bool Names(List<string> filter, string item) {
         if (filter.Contains(item)) return true;
         var kind = World.PackedKind(item);
-        return !kind.IsEmpty && filter.GetAlternateLookup<ReadOnlySpan<char>>().Contains(kind);
+        if (kind.IsEmpty) return false;
+        foreach (string named in filter) if (kind.SequenceEqual(named)) return true;
+        return false;
     }
 
     public int Add(string item, int quantity) {

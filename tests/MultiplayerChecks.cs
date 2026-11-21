@@ -96,7 +96,7 @@ public static class MultiplayerChecks {
             var inventory = new Inventory();
             object changed = field.PropertyType switch {
                 var type when type == typeof(int) => 1,
-                var type when type == typeof(HashSet<string>) => new HashSet<string> { "wood" },
+                var type when type == typeof(List<string>) => new List<string> { "wood" },
                 var type when type == typeof(List<Inventory.Slot>) => new List<Inventory.Slot>(),
                 var type when type == typeof(Dictionary<string, int>) => new Dictionary<string, int> { ["wood"] = 1 },
                 var type => throw new InvalidOperationException($"Change Inventory.{field.Name}, a {type.Name}, here and count it in Inventory.Fresh."),
