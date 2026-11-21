@@ -760,7 +760,7 @@ An assigned worker also harvests, and everyone adds to one shared progress, so y
 A harvest takes one worker about 1 working day and gives 4 wheat, 2 wheat seeds and 1 grass into the plot's output.
 
 Seeds do not sow themselves: move them from the output into the input slot by hand, or let a hauler do it.
-The farm panel stacks the seed, fertilizer and water slots on the left and shows wheat, seeds and grass in one row on the right.
+The farm panel stacks seeds, fertilizer and water on the left, with wheat, seeds and grass in a row on the right.
 While the wheat grows, the panel shows how much growing time is left and says when it needs water.
 
 - A worker on Farm harvests.
