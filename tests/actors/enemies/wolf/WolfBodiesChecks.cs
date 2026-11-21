@@ -20,6 +20,50 @@ public static class WolfBodiesChecks {
         Test(CheckAWolfClosingInKeepsOffWhereAnotherTugsThePlayer, data);
         Test(CheckTwoWolvesAtOnePlayerKeepTheirBodiesApart, data);
         Test(CheckAWolfsHeightInTheWorldFollowsItsModel, data);
+        Test(CheckAFeedingSpotLeavesRoomForTheWholePull);
+        Test(CheckAFeedingWolfKeepsClearOfAnotherLoweringItsHead);
+    }
+
+    private static void CheckAFeedingWolfKeepsClearOfAnotherLoweringItsHead() {
+        var feeder = new Wolf();
+        var neighbor = new Wolf();
+        var model = new WolfModel();
+        var lowering = new WolfModel();
+        var spots = new FeedingSpots(new Dictionary<Wolf, WolfModel> { [feeder] = model, [neighbor] = lowering });
+        var fallen = new ActorState();
+        var rig = new ActorRig(ActorSkin.Player);
+        FallBackView.FallBack(rig, fallen, fallen.Pose, 1, false, null);
+        var line = FeedingSpots.BodyLine(fallen);
+        model.Root.Position = FeedingSpots.OnTheBody(line, .3f, BodySide.Left).At;
+        var free = spots.Place(feeder, model, fallen, rig, 1);
+        // The neighbor stands nose to tail behind this spot. Its resting feeding pose clears the feeder,
+        // but its muzzle still reaches into the spot as it lowers its head from standing.
+        lowering.Root.Transform = new Transform3D(model.Root.Basis, free - model.Root.Basis.Z * 1.4f);
+        spots.Remember(new ListView<Wolf>([feeder, neighbor]));
+        lowering.Feed(0, 1, false);
+        var besideSettled = spots.Place(feeder, model, fallen, rig, 1);
+        lowering.Stand(0, 1, false);
+        lowering.Feed(0, 1f / 60, false);
+        var besideLowering = spots.Place(feeder, model, fallen, rig, 1);
+        model.Root.Free(); lowering.Root.Free(); rig.Root.Free();
+        Require(besideSettled.DistanceTo(free) < .001f, "A feeding wolf should keep a spot that clears its neighbor.");
+        Require(besideLowering.DistanceTo(free) > .01f, "A feeding wolf should leave a spot its neighbor still occupies while lowering its head.");
+    }
+
+    private static void CheckAFeedingSpotLeavesRoomForTheWholePull() {
+        var wolf = new WolfModel();
+        var reserved = WolfModel.FeedingVolumes;
+        Span<(Vector3 At, float Radius)> drawn = stackalloc (Vector3, float)[WolfModel.VolumeCount];
+        wolf.Feed(0, 1, false);
+        float outside = 0;
+        for (int frame = 0; frame < 180; frame++) {
+            wolf.Feed(frame / 60f, 1f / 60, false);
+            wolf.Volumes(drawn);
+            for (int i = 0; i < drawn.Length; i++)
+                outside = Math.Max(outside, drawn[i].At.DistanceTo(reserved[i].At) + drawn[i].Radius - reserved[i].Radius);
+        }
+        wolf.Root.Free();
+        Require(outside < .004f, $"A feeding wolf must fit in its spot through both pulls; it reached {outside:0.000} m outside.");
     }
 
     /// <summary>

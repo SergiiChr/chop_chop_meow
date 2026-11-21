@@ -35,6 +35,21 @@ public partial class Game {
 
     private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => Cells(grid).First(match);
 
+    /// <summary>Places a building of a kind beside the player, shows its page and opens its filter window.</summary>
+    private async Task<Thing> OpenFilters(ThingKind kind) {
+        await CloseWithEsc();
+        var thing = Hosted.Add(kind, world.Player + new Vector2(4, 0)); await Frames();
+        panel.Select(Shown(thing)); await Frames();
+        await Click(Named("filters")!);
+        return thing;
+    }
+
+    /// <summary>
+    /// The entries a list of the open filter window shows, in its order, read off the names of its cells, which start with <paramref name="cell"/>.
+    /// The rows are <c>filter_in</c> and <c>filter_out</c>, with cells <c>filter_in_</c> and <c>filter_out_</c>; the item list is <c>item_list</c>, with cells <c>pick_</c>.
+    /// </summary>
+    private IEnumerable<string> FilterEntries(string list, string cell) => OnPage(list)!.FindChildren($"{cell}*", "", true, false).Select(node => node.Name.ToString()[cell.Length..]);
+
     /// <summary>
     /// The text of a named label in a recipe card's hover popup, or "" when the popup has none.
     /// The popup is built as Godot builds it for a hover, which shows it only after a real delay in a window of its own.

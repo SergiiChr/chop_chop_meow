@@ -36,6 +36,7 @@ public static class SimulationChecks {
         GatheringChecks.Run(data);
         CraftingChecks.Run(data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
+        Test(CheckFilterNamesEachEntryOnceInTheOrderNamed);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
         Test(CheckDismantlingABuildingReturnsItsCostAndContents, data);
         Test(CheckBuildingsKnockIntoPlaceAndClatterDown, data);
@@ -281,6 +282,15 @@ public static class SimulationChecks {
         Require(world.Transfer(world.Backpack, chest.Inventory, "wood", 2) == 2, "a chest 14 m away should take items from the backpack");
         Require(world.LoadInput(furnace, "iron_ore", 4) == 4, "a station 14 m away should take its inputs from the backpack");
         Require(world.Transfer(world.Backpack, far.Inventory, "wood", 2) == 0, "a chest 17 m away should be out of reach");
+    }
+
+    /// <summary>A filter keeps its entries in the order they were named, and naming one it has again leaves it where it is.</summary>
+    private static void CheckFilterNamesEachEntryOnceInTheOrderNamed() {
+        var chest = new Inventory();
+        chest.Filter("stone", false, true); chest.Filter("wood", false, true); chest.Filter("stone", false, true);
+        Require(chest.InputFilter.SequenceEqual(["stone", "wood"]), $"naming stone again should leave the filter as stone, wood, not {string.Join(", ", chest.InputFilter)}");
+        chest.Filter("stone", false, false);
+        Require(chest.InputFilter.SequenceEqual(["wood"]) && !chest.Accepts("stone"), "taking stone off once should leave no stone in the filter");
     }
 
     private static void CheckOutputFilterBlocksAutomatedWithdrawal(GameData data) {
@@ -1174,18 +1184,18 @@ public static class SimulationChecks {
         world.Notify += said.Add;
         world.Transfer(world.Backpack, pile.Inventory, "wood", 10); world.Tick(.1f);
         world.SetFilter(pile, "wood", false, false); world.ClearFilters(pile);
-        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && said.Count(m => m == "Can't change filter on a non-empty pile.") == 2,
+        Require(pile.Inventory.InputFilter.SequenceEqual(new[] { "wood" }) && said.Count(m => m == "Can't change filter on a non-empty pile.") == 2,
             "a pile holding something should refuse to have its filter taken off or cleared");
         pile.Inventory.Remove("wood", 10);
         world.Tick(.1f);
-        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && world.HoldBlock(pile, "stone") == "This is a wood pile." && world.DepositFor("wood", chest.Pos) == pile,
+        Require(pile.Inventory.InputFilter.SequenceEqual(new[] { "wood" }) && world.HoldBlock(pile, "stone") == "This is a wood pile." && world.DepositFor("wood", chest.Pos) == pile,
             "an emptied pile should keep its filter and still ask for its resource");
         world.SetFilter(pile, "stone", false, true);
-        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }), "an empty pile should keep its resource until it is taken off");
+        Require(pile.Inventory.InputFilter.SequenceEqual(new[] { "wood" }), "an empty pile should keep its resource until it is taken off");
         world.SetFilter(pile, "wood", false, false);
         Require(pile.Inventory.InputFilter.Count == 0 && world.Holds(pile, "stone"), "taking an empty pile's filter off should free it");
         world.SetFilter(pile, "stone", false, true);
-        Require(pile.Inventory.InputFilter.SetEquals(new[] { "stone" }) && pile.Inventory.OutputFilter.SetEquals(new[] { "stone" }) && world.HoldBlock(pile, "wood") == "This is a stone pile.",
+        Require(pile.Inventory.InputFilter.SequenceEqual(new[] { "stone" }) && pile.Inventory.OutputFilter.SequenceEqual(new[] { "stone" }) && world.HoldBlock(pile, "wood") == "This is a stone pile.",
             "a filter set on an empty pile should make it a pile of that resource, in and out");
         Require(world.DepositFor("stone", chest.Pos) == pile, "workers should bring stone to an empty pile set to stone");
         Require(world.Transfer(world.Backpack, pile.Inventory, "wood", 1) == 0, "a pile set to stone should refuse wood put in by hand");
@@ -1193,7 +1203,7 @@ public static class SimulationChecks {
         Require(pile.Inventory.InputFilter.Count == 0, "clearing an empty pile's filter should free it");
         world.SetFilter(pile, World.CrateOf("raw_meat"), false, true); world.SetFilter(pile, World.CrateOf("raw_meat"), false, false);
         world.SetFilter(pile, World.CrateOf("raw_meat"), false, true); world.SetFilter(pile, "stone", false, false);
-        Require(pile.Inventory.InputFilter.SetEquals(new[] { World.CrateOf("raw_meat") }) && world.HoldBlock(pile, "stone") == "This is a crate of raw meat pile.",
+        Require(pile.Inventory.InputFilter.SequenceEqual(new[] { World.CrateOf("raw_meat") }) && world.HoldBlock(pile, "stone") == "This is a crate of raw meat pile.",
             "a pile set to crates of a good should name that good, and keep it when another resource is taken off");
     }
 
@@ -1232,7 +1242,7 @@ public static class SimulationChecks {
         world.Player = origin;
         Require(world.Transfer(world.Backpack, pile!.Inventory, "wood", 10) == 10 && world.HoldBlock(pile, "stone") == "This is a wood pile.", "the first resource in should be the only one the pile takes");
         world.Tick(.1f);
-        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && pile.Inventory.OutputFilter.SetEquals(new[] { "wood" }), "the first resource in should set the pile's filters, in and out");
+        Require(pile.Inventory.InputFilter.SequenceEqual(new[] { "wood" }) && pile.Inventory.OutputFilter.SequenceEqual(new[] { "wood" }), "the first resource in should set the pile's filters, in and out");
         var chest = world.Add(ThingKind.Chest, origin + new Vector2(0, 5));
         Require(world.DepositFor("wood", chest.Pos) == pile && world.DepositFor("stone", origin) != pile, "workers should prefer the matching pile and keep other goods out of it");
 
@@ -1240,7 +1250,7 @@ public static class SimulationChecks {
         Require(east.Inventory.InputFilter.Contains("leaves"), "compost should take leaves");
         Require(east.Inventory.InputFilter.Contains("crushed_berries"), "compost should take crushed berries");
         Require(!east.Inventory.InputFilter.Contains("stone"), "compost should refuse stone");
-        Require(east.Inventory.OutputFilter.SetEquals(new[] { "fertilizer" }), "compost should give only fertilizer");
+        Require(east.Inventory.OutputFilter.SequenceEqual(new[] { "fertilizer" }), "compost should give only fertilizer");
         east.Inventory.Add("leaves", 6); east.Inventory.Add("burnt_steak", 2);
         Require(world.HoldBlock(east, "stone") != null && !world.SetCompost(east, false), "compost should refuse stone and stay compost while mixed");
         SafeTick(world, data.DaySeconds / 24 + .5f);

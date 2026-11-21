@@ -146,6 +146,8 @@ public partial class WorldView {
         viewport.UseTaa = false; viewport.Scaling3DMode = Viewport.Scaling3DModeEnum.Bilinear; viewport.Scaling3DScale = 1; viewport.Msaa3D = Viewport.Msaa.Msaa4X;
         camera.Projection = Camera3D.ProjectionType.Perspective; camera.Near = .05f; camera.Far = 700; camera.HOffset = 0; camera.VOffset = 0;
         sun.DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel4Splits; sun.DirectionalShadowBlendSplits = true;
+        // The film's perspective shots use their own shadow offset and softness.
+        sun.ShadowBias = .1f; sun.ShadowNormalBias = 2; sun.ShadowBlur = 1.5f;
         environment.FogLightEnergy = 1; environment.FogSkyAffect = 0;
         film = new Node3D(); AddChild(film);
         skyColors = new ShaderMaterial { Shader = new Shader { Code = SkyShader } };

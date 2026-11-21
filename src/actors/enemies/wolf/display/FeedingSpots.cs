@@ -54,8 +54,8 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
     private static readonly Vector3 ChestSpot = new(.05f, .3f, .18f);
     /// <summary>
     /// The spot a feeding wolf takes at a lying player: perpendicular to the body at the part nearest to where the wolf is
-    /// drawn, on the side it is on before the other, where it touches neither another wolf as drawn nor the player's arms;
-    /// its last spot while that stays free.
+    /// drawn, preferring its own side. It keeps its last spot while its whole pull clears the player's arms,
+    /// the other wolves as drawn and the space each feeding neighbor needs through its pull.
     /// With no free spot it keeps its last one.
     /// </summary>
     private (Vector3 At, float Yaw, int Along, int Side) FreeSpot(Wolf wolf, WolfModel model, ActorState lying, ActorRig rig) {
@@ -86,7 +86,7 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
 
     /// <summary>The wolves still in the world this frame; a dead one's model stays drawn a while after.</summary>
     private readonly HashSet<Wolf> liveWolves = new();
-    /// <summary>What a feeding wolf must not touch, as spheres in the world: every other wolf as drawn and the lying player's arms.</summary>
+    /// <summary>The lying player's arms, every other wolf as drawn and each feeding neighbor's whole pull, as spheres in the world.</summary>
     private readonly List<(Vector3 At, float Radius)> obstacles = new();
     /// <summary>Fills <see cref="obstacles"/> for <paramref name="feeder"/> at the player drawn by <paramref name="rig"/>, once for all the spots it weighs.</summary>
     private void FillObstacles(Wolf feeder, ActorRig rig) {
@@ -97,6 +97,9 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
             model.Volumes(theirs);
             var other = model.Root.Transform;
             foreach (var (at, radius) in theirs) obstacles.Add((other * at, radius));
+            // A wolf lowering its head can still stand outside the space it needs for its feeding pulls.
+            if (model.Motion == WolfMotion.Feed)
+                foreach (var (at, radius) in WolfModel.FeedingVolumes) obstacles.Add((other * at, radius));
         }
         var body = rig.Root.Transform;
         for (int arm = 0; arm < 2; arm++) {

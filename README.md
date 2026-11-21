@@ -665,6 +665,9 @@ A worker on its Tend job fetches what its filters take from storage and carries 
 
 Storage input filters govern automated deposits; output filters govern worker withdrawals.
 Empty filters allow all items.
+A row shows its items in the order they were added.
+The item list that **+** opens shows items in groups, each simplest first: what is gathered, grown or bought, then materials, tools, containers and food, and last crates of goods.
+Bottles, buckets and barrels come among containers at any fill.
 **Clear** takes everything off both rows.
 Manual inventory transfers ignore these automation filters.
 
@@ -1004,7 +1007,7 @@ The wolf scratches at the door for 3.6 seconds, which you hear from inside.
   It squeezes in between the door and its frame over 2.5 seconds, stands in the doorway growling at you with its fangs bared for 2 seconds and launches itself at you.
 - It bites and takes you out by the waist, as a wolf tugging you out of the doorway does: at more than half health it lets go and leaves you standing outside.
 - With two players inside it takes the one who came in last.
-- Other wolves that come to the same door wait a few metres behind it and go for you once you are out, one taking each of your arms while the first tugs.
+- Other wolves that come to the same door wait a few metres behind it and go for you once you are out, one catching each forearm and drawing it out to the side while the first wolf tugs.
 - While a wolf is at the door, Step outside does nothing.
 - A wolf at the door turns to a player out in the open within its sight until its snout is in the door, and a hit knocks it off the door.
 
@@ -1100,6 +1103,7 @@ There are three tree types (oak, spruce, birch), from short trees to ones two th
 
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.
 The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset.
+Daylight shadows meet the ground at boots, tree trunks and the feet of buildings.
 The moon takes the same path at night and waxes and wanes over a cycle of `MoonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by.
 Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows.
 Trees in front of the player, a worker or a structure turn see-through.

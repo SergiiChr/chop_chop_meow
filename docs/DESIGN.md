@@ -72,7 +72,7 @@ Simulation and data:
 | `src/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView` |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
 | `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
@@ -350,6 +350,8 @@ Meshes and materials are cached by parameters, so repeated objects share resourc
 `WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, and `WorldView` draws them behind the ground for its first frames, so a building, crate, carcass or wolf that first appears mid-game builds no mesh, material, shader or pipeline; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
 The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
+The sun and moon share one shadow map across this view.
+Its small shadow offset keeps the shade attached to feet, trunks and low props, while ambient occlusion shades creases.
 
 Picking, the hover ring and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`), so selection matches what is drawn.
 A tree crown only wins a click when nothing else is under the cursor, so objects behind a canopy stay selectable.
@@ -691,6 +693,7 @@ Building keeps `Construction.DoorRoom` clear round every cabin's door spot, and 
   A wolf with no side to take, with both held, without open ground or not out of the door yet, waits at biting distance and snaps again once the tug has ended (`WolfSnap.Start`).
   A player a wolf takes out of a cabin has no sides to take until `DoorTug.OutOfDoorBy` into the tug, when they are out of its door.
   `TugView.ShowHolding` draws it reared up (`WolfModel.Rearing`, `WolfModel.Rear`) as steeply as puts its jaws on the player's forearm as their rig draws it, its forepaws on their flank and its hind paws on the ground.
+  Each captured arm opens out at the elbow as the wolf takes its weight. With both arms held, the chest comes up.
 - `Leaving` puts the player on the doorstep and takes `Doorways.LeaveSeconds`.
   Anyone knocking on that door goes `Aside` to `Doorways.AsideSpot`, a step along `Doorways.AsideWay`, and steps in once the leaver is through the doorway, in the order they came, while the leaver keeps `Doorways.MakeWay` to the other side; a player just standing at the door stays put, and the leaver ends `Doorways.ClearOf` beside them.
   The view walks them in from there up the side of the step (`DoorwayView.Inward`), the two turning chest to chest with their arms hanging as they pass (`DoorwayView.SqueezePast`), the one going in with the right palm on the door frame (`ArmReach.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
@@ -701,6 +704,8 @@ On the two treads of the step and the floor (`StairSteps.StepEdges`) the body he
 It gets there over several frames, carried from frame to frame in `ActorState.Lift`, never higher than a boot on the ground reaches down to its tread toe first, never lower than a leg bearing the weight alone bends, and never dropping faster than falling.
 A knee bends to put a boot on a higher tread, so no boot sinks into the step; a boot a tug drags off a tread's edge hangs over the lower one while the body falls onto it.
 Every takedown falls the player backward onto their seat and back (`ActorAction.FallBack`, `FallBackView.FallBack`, `FallBackView.FallPath`), facing the wolf after a leap; a leaping or pinning wolf puts its forepaws on the player's chest (`FeedingSpots.PawsOnChest`), astride with its hind paws wide of the legs, while the player's hands push its head off by the jaw within reach, or by the neck when the jaw is too close, elbows out at the sides (`WolfModel.NeckLine`, `ArmReach.ArmTo` with an elbow direction and `ActorRig.RollArm`), and every other wolf feeding there stands perpendicular to the body at the part of it nearest to it where it touches neither another wolf nor the player's arms (`FeedingSpots.FreeSpot`, `WolfModel.Volumes`), keeping that spot while it stays free.
+Feeding wolves close their jaws low, rock back over their hind paws, then release and reach down for the next bite.
+A wolf choosing a spot leaves room for its neighbor's present pose and the whole feeding pull.
 A wounded player tugged out falls backward still facing the door, and the wolf lets go, steps round to the side of them it stands on, their left for one straight behind them (`Wolf.LungeFrom`), and lunges onto the throat from there as they land.
 A player knocking on the door stands on the lower tread, with the front boot on the upper one, and steps back down off it when done.
 #### Wolves at a cabin's door
@@ -1030,6 +1035,12 @@ Asking for it are a chest, pile, placed crate or trading post whose input filter
 `World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
 Manual transfers ignore those filters.
+A filter is a `FilterList`: its entries in the order they were named, each once, which the filter window's rows show.
+The window's item list runs in `GameData.ListOrder`, with crates of goods after the items in their goods' order.
+`GameData.Create` works `ListOrder` out once: what is gathered, grown or bought comes first, then materials, tools, containers and food, by the recipe that makes each item.
+An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel bucket or barrel at any fill stands with the empty one (`ContainerItem.Base`), and a part-drunk bottle with the full one.
+In each group fewer making steps come first, and recipe map order breaks ties.
+Making steps count the longest way through a recipe's inputs, or the items a source comes out of and also takes, from items that take no other item, such as wood.
 
 #### Piles
 

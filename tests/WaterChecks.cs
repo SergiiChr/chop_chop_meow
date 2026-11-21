@@ -231,7 +231,7 @@ public static class WaterChecks {
         Require(world.Transfer(world.Backpack, water.Inventory, Water.Full, 1) == 1, "a pile should take a full bottle");
         Require(world.Transfer(world.Backpack, water.Inventory, Water.Empty, 1) == 0, "a pile of water should refuse an empty bottle before its filter is set");
         world.Tick(.1f);
-        Require(water.Inventory.InputFilter.SetEquals(new[] { Water.OneLiter, Water.TwoLiters, Water.Full }) && world.PileFilter(water) == Water.Liquid,
+        Require(water.Inventory.InputFilter.SequenceEqual(new[] { Water.OneLiter, Water.TwoLiters, Water.Full }) && world.PileFilter(water) == Water.Liquid,
             "a full bottle should set the pile's filter to water at any fill");
         Require(world.Transfer(world.Backpack, water.Inventory, Water.OneLiter, 1) == 1 && world.Transfer(world.Backpack, water.Inventory, Water.TwoLiters, 1) == 1,
             "a pile of water should take part-full bottles");
@@ -239,7 +239,7 @@ public static class WaterChecks {
             "a pile of water should take no empty bottle and nothing else");
         Require(world.Transfer(world.Backpack, empties.Inventory, Water.Empty, 2) == 2, "a pile should take empty bottles");
         world.Tick(.1f);
-        Require(empties.Inventory.InputFilter.SetEquals(new[] { Water.Empty }) && world.HoldBlock(empties, Water.Full) == "This is an empty bottle pile.",
+        Require(empties.Inventory.InputFilter.SequenceEqual(new[] { Water.Empty }) && world.HoldBlock(empties, Water.Full) == "This is an empty bottle pile.",
             "a pile of empty bottles should take no bottle holding water");
         empties.Inventory.Remove(Water.Empty, 2);
         world.SetFilter(empties, Water.Empty, false, false); world.SetFilter(empties, Water.TwoLiters, false, true);
