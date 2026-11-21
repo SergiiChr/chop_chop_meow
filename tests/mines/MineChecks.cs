@@ -113,10 +113,15 @@ public static class MineChecks {
         Give(world, "steel_pick", 1);
         for (float held = 0; held <= world.Mines.StageSeconds && mine.MineStage == MineStage.Marked; held++) world.Gather(mine, 1);
         Require(mine.MineStage == MineStage.Dug, "a player holding right mouse on a marked mine with a pickaxe should dig its entrance in a working day");
+        Require(world.GatherBlock(mine) == "Deliver 50 Wood, 10 Iron bar, 50 Stone first.", $"a dug mine should name the materials it takes: {world.GatherBlock(mine)}");
         Give(world, data.Mine.Materials);
         foreach (var (item, amount) in data.Mine.Materials) world.Mines.Supply(mine, item, amount);
+        var said = new List<string>();
+        world.Notify = said.Add;
         world.Tick(.1f);
         Require(mine.MineStage == MineStage.Supplied, "the delivered materials should shore the mine up");
+        Require(said.Contains("The iron mine has its 50 Wood, 10 Iron bar, 50 Stone. You or a worker with a hammer can fit the frame and rails."),
+            $"a supplied mine should name the materials it took: {string.Join(" | ", said)}");
         world.Gather(mine, 1);
         Require(mine.Progress == 0 && world.GatherBlock(mine)?.Contains("hammer") == true, $"fitting the frame should need a hammer: {world.GatherBlock(mine)}");
         Give(world, "wood_hammer", 1);

@@ -22,6 +22,9 @@ public sealed class Mines(World world) {
     private readonly HashSet<int> fullReported = new();
     // The waiting status names what the site lacks; it is rebuilt only when that changes.
     private readonly Dictionary<int, (int Key, string Text)> wants = new();
+    private string? materials;
+    /// <summary>The materials a dug site takes before its frame goes in, as messages name them.</summary>
+    private string Materials => materials ??= world.Goods(world.Data.Mine.Materials);
 
     /// <summary>Whether a point lies within the solid rock skin; the tunnel approach at depth -1.4 stays open.</summary>
     public static bool InRock(Vector2 p, float margin = 0) {
@@ -113,7 +116,7 @@ public sealed class Mines(World world) {
     /// <summary>Why the player cannot work on a mine now, or null: a pickaxe digs the entrance and a hammer fits the frame and rails.</summary>
     internal string? BuildBlock(Thing mine) => mine.MineStage switch {
         MineStage.Marked => world.BestTool("pickaxe") == null ? "A pickaxe is required to dig the entrance." : null,
-        MineStage.Dug => "Deliver the timber, iron and stone first.",
+        MineStage.Dug => world.Phrase("Deliver ", Materials, " first."),
         MineStage.Supplied => world.BestTool("hammer") == null ? "A hammer is required to fit the frame and rails." : null,
         _ => "The mine is open. Workers with pickaxes mine it."
     };
@@ -123,14 +126,14 @@ public sealed class Mines(World world) {
         if (mine.Progress < StageSeconds) return;
         bool dug = mine.MineStage == MineStage.Marked;
         mine.MineStage++; mine.Progress = 0; mine.Rounds++;
-        world.Say(dug ? $"The {Name(mine)} entrance is dug. Deliver {world.Goods(world.Data.Mine.Materials)}." : $"The {Name(mine)} is open. Up to {world.Data.Mine.Workers} workers with pickaxes can mine it.");
+        world.Say(dug ? $"The {Name(mine)} entrance is dug. Deliver {Materials}." : $"The {Name(mine)} is open. Up to {world.Data.Mine.Workers} workers with pickaxes can mine it.");
     }
 
     /// <summary>A dug site takes its delivered materials at once; an open mine brings out ore and stone at its miners' pace.</summary>
     internal void Tick(Thing mine, float dt) {
         var data = world.Data.Mine;
         if (mine.MineStage == MineStage.Dug && mine.Inventory.Spend(data.Materials)) {
-            mine.MineStage = MineStage.Supplied; mine.Progress = 0; world.Say($"The {Name(mine)} has its timber, iron and stone. You or a worker with a hammer can fit the frame and rails.");
+            mine.MineStage = MineStage.Supplied; mine.Progress = 0; world.Say($"The {Name(mine)} has its {Materials}. You or a worker with a hammer can fit the frame and rails.");
         }
         if (mine.MineStage != MineStage.Open || Full(mine)) return;
         mine.Progress += dt * Underground(mine);
