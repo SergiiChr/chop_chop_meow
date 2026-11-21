@@ -64,6 +64,7 @@ public sealed partial class World {
     private bool JobUses(Worker w, string kind) {
         foreach (var d in w.Duties) {
             if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind is ThingKind.Hut or ThingKind.Barrel && BarrelJobs.Vessel(w.Tool)) return true;
+            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind == ThingKind.Farm && Bucket.Is(w.Tool)) return true;
             if (Array.IndexOf(Def(d.Job).Tools, kind) >= 0) return true;
             // A woodcutter's job covers trees and stumps, so the spot it is on now counts as well as the kind it was given.
             if (d.Job == JobKind.Gather && (Uses(d.Kind) || Uses(Find(d.Thing)?.Kind))) return true;
@@ -120,7 +121,7 @@ public sealed partial class World {
         }
         room = dest.Kind switch {
             ThingKind.Mine => Mines.Need(dest, item),
-            ThingKind.Farm => SowRoom(dest, item),
+            ThingKind.Farm => Farms.SowRoom(dest, item),
             // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
             ThingKind.Signpost when !dest.Inventory.Wants(item) => 0,
             ThingKind.Packer when item == dest.Packs && !PackerTakes(dest, item) => 0,
@@ -230,6 +231,20 @@ public sealed partial class World {
         }
         if (spot.IsLoose) S.Things.Remove(spot);
         if (!NextSpot(w, spot.Id, spot.Kind, spot.Pos)) w.Loading = false;
+        return true;
+    }
+
+    private bool Reap(Worker w, Thing farm, float dt) {
+        if (farm.FarmStage != FarmStage.Ripe) {
+            w.Status = farm.FarmStage == FarmStage.Growing && Farms.Dry(farm) ? "Waiting for water" : "Waiting for the wheat to grow";
+            return false;
+        }
+        if (farm.Progress >= Farms.HarvestSeconds && !Farms.YieldFits(farm)) { w.Status = "Harvest waiting for room on the plot"; return false; }
+        if (!HandsFree(w, dt)) return true;
+        w.Status = Phrase("Harvesting wheat · ", Number(farm.Progress / Farms.HarvestSeconds * 100), "%");
+        if (!Walk(w, farm.Pos, dt)) return true;
+        w.WorkState = WorkerWorkState.Gathering;
+        Farms.Harvest(farm, dt);
         return true;
     }
 

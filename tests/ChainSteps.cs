@@ -50,7 +50,7 @@ internal sealed class ChainSite(World world) {
         var rack = Place(ThingKind.Toolstation);
         rack.Inventory.Add("steel_axe", 2); rack.Inventory.Add("steel_pick", 2);
         var spare = Place(ThingKind.Toolstation);
-        spare.Inventory.Add("steel_pick", 1); spare.Inventory.Add("rake", 1);
+        spare.Inventory.Add("steel_pick", 1); spare.Inventory.Add("rake", 1); spare.Inventory.Add(Bucket.Item, 2);
         Place(ThingKind.Campfire);
 
         foreach (string item in new[] { "planks", "crate", "iron_bar", "tin_bar", "steel_bar", "steel_parts", "wood_parts", "tin_can",
@@ -93,7 +93,12 @@ internal sealed class ChainSite(World world) {
     public Thing[] AddBreadChain() {
         var compost = Place(ThingKind.Pile); world.SetCompost(compost, true); world.SetSkipFood(compost, true); Employ(compost, JobKind.Tend);
         var farms = new[] { Place(ThingKind.Farm), Place(ThingKind.Farm) };
-        foreach (var farm in farms) { farm.FarmStage = FarmStage.Growing; farm.Progress = world.GrowSeconds - 30; Employ(farm, JobKind.Farm, JobKind.Haul); }
+        foreach (var farm in farms) {
+            farm.FarmStage = FarmStage.Growing;
+            farm.Progress = world.Farms.GrowSeconds - 30;
+            farm.Inventory.Add(Water.Liquid, 10);
+            Employ(farm, JobKind.Farm, JobKind.Haul);
+        }
         var flour = Place(ThingKind.Cooktable, "flour"); flour.Tools!.Add("mortar", 1); Employ(flour, JobKind.Craft, JobKind.Haul);
         Employ(Place(ThingKind.Cooktable, "dough"), JobKind.Craft, JobKind.Haul);
         Employ(Place(ThingKind.Furnace, "bread"), JobKind.Haul);

@@ -57,6 +57,8 @@ public sealed class Thing {
     public MineStage MineStage { get; set; }
     /// <summary>Where a farm plot is in its growing cycle.</summary>
     public FarmStage FarmStage { get; set; }
+    /// <summary>Growth seconds left in the liter already in use by the plot.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float FarmWaterLeft { get; set; }
     /// <summary>A pile turned into compost: it takes leaves, grass and food and slowly turns them into fertilizer.</summary>
     public bool Compost { get; set; }
     /// <summary>A compost that workers bring no food to; food put in by hand still rots into fertilizer.</summary>
@@ -149,6 +151,7 @@ public sealed class Worker : IWalker {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public WorkerWaterAction WaterAction { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int WaterTarget { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float WaterProgress { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int FarmWaterStop { get; set; }
 
     /// <summary>What the first job lacked when the worker last found nothing to do, and when on the world's clock they read their list again; a change to the list reads it at once.</summary>
     [JsonIgnore] public string? Lacking { get; set; }
@@ -215,7 +218,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 14;
+    public int Version { get; set; } = 15;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -317,6 +320,7 @@ public sealed partial class World {
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
+        Farms = new Farms(this);
         barrels = new Barrels(this); barrelJobs = new BarrelJobs(this, barrels); bedtimeWater = new BedtimeWater(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
@@ -327,6 +331,7 @@ public sealed partial class World {
     public Vector2 Player { get => new(S.PlayerX, S.PlayerY); set { S.PlayerX = value.X; S.PlayerY = value.Y; } }
     /// <summary>Putting buildings, yards and crates up and taking buildings down.</summary>
     public Construction Construction { get; }
+    public Farms Farms { get; }
     private readonly Barrels barrels;
     private readonly BarrelJobs barrelJobs;
     private readonly BedtimeWater bedtimeWater;
@@ -492,7 +497,7 @@ public sealed partial class World {
         if (kind == ThingKind.Toolstation) { t.Inventory.Slots = ToolSlots; WatchTools(t); }
         if (kind == ThingKind.Pile) t.Inventory.Slots = PileStacks;
         if (kind == ThingKind.Chest) t.Inventory.Slots = ChestStacks;
-        if (kind == ThingKind.Farm) { t.Inventory.Slots = Data.Farm.Sow.Count; t.Output = new() { Slots = Data.Farm.Yield.Count }; }
+        if (kind == ThingKind.Farm) { t.Inventory.Slots = Data.Farm.Sow.Count + 1; t.Output = new() { Slots = Data.Farm.Yield.Count }; }
         S.Things.Add(t); return t;
     }
     public void NewGame() {
@@ -602,7 +607,7 @@ public sealed partial class World {
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
     /// <summary>Where a packer stands: behind the packing table, facing the camera, between the open crate and the heap of goods.</summary>
     public static readonly Vector2 PackStand = new(-.3f, -.8f);
-    public static float Footprint(ThingKind kind) => kind switch { ThingKind.Pile or ThingKind.Farm => 1.5f, ThingKind.Cooktable => .6f, ThingKind.Packer => .7f, ThingKind.Cannery => .5f, ThingKind.Hut => 1.55f, ThingKind.Reinforced => .8f, ThingKind.Furnace => .65f, ThingKind.Bench => .6f, ThingKind.Chest or ThingKind.Anvil or ThingKind.Toolstation => .45f, _ => .35f };
+    public static float Footprint(ThingKind kind) => kind switch { ThingKind.Pile => 1.5f, ThingKind.Farm => Farms.HalfSize, ThingKind.Cooktable => .6f, ThingKind.Packer => .7f, ThingKind.Cannery => .5f, ThingKind.Hut => 1.55f, ThingKind.Reinforced => .8f, ThingKind.Furnace => .65f, ThingKind.Bench => .6f, ThingKind.Chest or ThingKind.Anvil or ThingKind.Toolstation => .45f, _ => .35f };
     /// <summary>A word with "a" or "an" before it, built once.</summary>
     public string A(string word) => Phrase("aeiou".Contains(word[0]) ? "an " : "a ", word);
     private string Task(Thing t) => t.Kind switch {
@@ -695,7 +700,7 @@ public sealed partial class World {
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
         if (t.Kind == ThingKind.Mine) { Mines.Work(t, dt); return; }
-        if (t.Kind == ThingKind.Farm) { Harvest(t, dt); if (t.FarmStage == FarmStage.Fallow) Say("Harvested. Take the wheat, seeds and grass from the plot, and put seeds back in to sow again."); return; }
+        if (t.Kind == ThingKind.Farm) { Farms.Harvest(t, dt); if (t.FarmStage == FarmStage.Fallow) Say("Harvested. Take the wheat, seeds and grass from the plot, and put seeds back in to sow again."); return; }
         gatherClock += dt;
         var rule = GatherRules.Of(t.Kind);
         string? tool = (rule?.Needs ?? rule?.Helps) is string kind ? BestTool(kind) : null;
@@ -1632,7 +1637,7 @@ public sealed partial class World {
         ThingKind.Toolstation when ToolKind(item) == "" => HoldRefusal.ToolsOnly,
         ThingKind.Pile when t.Compost && !Compostable(item) && item != "fertilizer" => HoldRefusal.CompostOnly,
         ThingKind.Pile when !t.Compost && !PileTakes(t.Inventory, item) => HoldRefusal.OtherResource,
-        ThingKind.Farm when !Data.Farm.Sow.ContainsKey(item) => HoldRefusal.FarmOnly,
+        ThingKind.Farm when !Data.Farm.Sow.ContainsKey(item) && !Barrels.CanPour(Data, item) => HoldRefusal.FarmOnly,
         ThingKind.Packer when item != "crate" && item != t.Packs => HoldRefusal.PackerOnly,
         ThingKind.Signpost when !CanSell(item) => HoldRefusal.SellOnly,
         ThingKind.Campfire when item != "wood" => HoldRefusal.WoodOnly,
@@ -1651,7 +1656,7 @@ public sealed partial class World {
         HoldRefusal.PackerOnly => t.Packs == "" ? "Choose what to pack first." : $"The packing station takes {Data.Name(t.Packs).ToLowerInvariant()} and empty crates.",
         HoldRefusal.SellOnly => "The village only takes packed crates.",
         HoldRefusal.WoodOnly => "The campfire burns only wood.",
-        HoldRefusal.FarmOnly => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}.",
+        HoldRefusal.FarmOnly => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}, and water.",
         _ => null
     };
     /// <summary>Whether a pile takes an item: what its filter names, or with no filter yet, what it holds or anything while empty.</summary>
@@ -2039,14 +2044,14 @@ public sealed partial class World {
     /// <summary>The rack's best free tool of a kind when its filter lets it out, or null.</summary>
     private string? ToolGivenOut(Thing station, string kind) {
         var items = station.Inventory;
-        if (kind != BarrelJobs.WaterTool) return BestTool(kind, items, tier: 0, requireFree: true) is string best && items.AllowsWithdrawal(best) ? best : null;
+        if (kind is not (BarrelJobs.WaterTool or Bucket.Item)) return BestTool(kind, items, tier: 0, requireFree: true) is string best && items.AllowsWithdrawal(best) ? best : null;
         string? bottle = null;
         foreach (var (item, _) in items.Items) {
             if (!BarrelJobs.Vessel(item) || !items.AllowsWithdrawal(item) || items.Free(item) == 0) continue;
             if (Bucket.Is(item)) return item;
             bottle ??= item;
         }
-        return bottle;
+        return kind == BarrelJobs.WaterTool ? bottle : null;
     }
     /// <summary>Whether any tool station gives out a tool of a kind.</summary>
     internal bool StationsHold(string kind) {
@@ -2056,6 +2061,7 @@ public sealed partial class World {
                 foreach (var (item, _) in t.Inventory.Items) {
                     string role = BarrelJobs.Vessel(item) ? BarrelJobs.WaterTool : ToolKind(item);
                     if (role != "" && !stationTools.Contains(role) && ToolGivenOut(t, role) != null) stationTools.Add(role);
+                    if (Bucket.Is(item) && !stationTools.Contains(Bucket.Item) && ToolGivenOut(t, Bucket.Item) != null) stationTools.Add(Bucket.Item);
                 }
             toolsChanged = false;
         }
@@ -2077,7 +2083,7 @@ public sealed partial class World {
             return;
         }
         w.Missing = "";
-        string tool = kind == BarrelJobs.WaterTool ? Lower(Data.Name(item)) : kind;
+        string tool = kind == BarrelJobs.WaterTool ? Lower(Data.Name(item)) : kind == Bucket.Item ? Lower(Data.Name(Bucket.Item)) : kind;
         w.Status = Phrase("Fetching ", A(tool), " from the tool station");
         if (!Walk(w, station.Pos, dt)) return;
         station.Inventory.TransferTo(w.ToolSlot, item, 1, true);
@@ -2186,7 +2192,7 @@ public sealed partial class World {
         foreach (var t in Ticking(ThingKind.Mine)) Mines.Tick(t, dt);
         foreach (var t in Ticking(ThingKind.Barrel)) PileFilters(t);
         foreach (var t in Ticking(ThingKind.Pile)) { PileFilters(t); if (t.Compost) CompostTick(t, dt); }
-        foreach (var t in Ticking(ThingKind.Farm)) FarmTick(t, dt);
+        foreach (var t in Ticking(ThingKind.Farm)) Farms.Tick(t, dt);
         foreach (var t in Ticking(ThingKind.Packer)) PackTick(t, dt);
         foreach (var t in Ticking(ThingKind.Signpost)) AutoSell(t);
         // A bush fruits again its hours after the first berry was picked, whether or not it was picked clean.
@@ -2434,6 +2440,7 @@ public sealed partial class World {
             if (t.Kind == ThingKind.Barrel && (t.Inventory.Slots != 1 || t.Inventory.StackSize != Barrel.Capacity
                 || t.Inventory.Capacity != Barrel.Capacity || t.Inventory.Count != t.Inventory[Water.Liquid]
                 || t.Inventory.Count > Barrel.Capacity)) return false;
+            if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t)) return false;
             if (t.Kind == ThingKind.Hut && (t.Inventory.Slots != 1 || t.Inventory.StackSize != 1 || t.Inventory.Count > 1
                 || t.Inventory.Count == 1 && Barrel.In(t.Inventory) == null)) return false;
             // A building has the boxes its kind is made with.
@@ -2445,7 +2452,7 @@ public sealed partial class World {
             if (t.Batches > 0 && t.Keep != "" && t.Keep != t.Asked) return false;
         }
         foreach (var w in save.Workers)
-            if (w == null || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates) || !w.Bag.ValidFor(Inventory.Carrier.Worker)) return false;
+            if (w == null || w.FarmWaterStop < 0 || w.FarmWaterStop >= BarrelJobs.FarmStops || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates) || !w.Bag.ValidFor(Inventory.Carrier.Worker)) return false;
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }

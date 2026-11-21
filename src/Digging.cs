@@ -51,7 +51,7 @@ public partial class World {
     /// <summary>Whether a spot is on the ground a building, yard or crate keeps clear of other resources, where it leaves no stump or bush.</summary>
     public static bool Clears(Thing built, Vector2 p) {
         if (!Construction.IsZone(built.Kind)) return p.DistanceTo(built.Pos) < Footprint(built.Kind) + Construction.ResourceRoom;
-        float room = Construction.ZoneSize / 2 + Construction.YardResourceRoom;
+        float room = Footprint(built.Kind) + Construction.YardResourceRoom;
         return Math.Abs(p.X - built.Pos.X) < room && Math.Abs(p.Y - built.Pos.Y) < room;
     }
 

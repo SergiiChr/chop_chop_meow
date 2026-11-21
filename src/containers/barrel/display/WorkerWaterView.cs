@@ -10,17 +10,17 @@ internal static class WorkerWaterView {
     private static readonly Basis TowardRoof = new(Vector3.Up, -Mathf.Pi / 2);
     private static readonly Vector3 TravelGrip = new(-.34f, .80f, .13f);
 
-    public static void Show(ActorRig rig, Vector2 at, Vector3 target, WorkerWaterAction action, bool roof, float progress, string vessel) {
+    public static void Show(ActorRig rig, Vector2 at, Vector3 target, WorkerWaterAction action, bool roof, float progress, string vessel, bool ground = false, float? facing = null) {
         var origin = new Vector3(at.X, 0, at.Y);
         if (roof) {
             ShowOnCabin(rig, target, action, progress, vessel);
             return;
         }
         var toward = target - origin;
-        float yaw = ActorAnimation.Yaw(new Vector2(toward.X, toward.Z), 0);
+        float yaw = facing ?? ActorAnimation.Yaw(new Vector2(toward.X, toward.Z), 0);
         rig.Root.Transform = new Transform3D(new Basis(Vector3.Up, yaw), origin);
         var opening = rig.Root.Transform.AffineInverse() * target;
-        WorkAtOpening(rig, vessel, opening, progress, action == WorkerWaterAction.Fill, roof: false);
+        WorkAtOpening(rig, vessel, opening, progress, action == WorkerWaterAction.Fill, roof: false, ground);
     }
 
     public static void Carry(ActorRig rig, Pose pose, string vessel) =>
@@ -119,7 +119,7 @@ internal static class WorkerWaterView {
     private static Transform3D VesselAtGrip(string vessel, Vector3 grip) =>
         new(Basis.Identity, grip - (Bucket.Is(vessel) ? VesselShape.BucketGrip : ActorRig.BottleGrip));
 
-    private static void WorkAtOpening(ActorRig rig, string vessel, Vector3 opening, float progress, bool fill, bool roof) {
+    private static void WorkAtOpening(ActorRig rig, string vessel, Vector3 opening, float progress, bool fill, bool roof, bool ground = false) {
         float extend = Mathf.SmoothStep(0, .30f, progress) * (1 - Mathf.SmoothStep(.72f, 1, progress));
         float tip = Mathf.SmoothStep(.23f, .43f, progress) * (1 - Mathf.SmoothStep(.61f, .79f, progress));
         bool bucket = Bucket.Is(vessel);
@@ -133,7 +133,7 @@ internal static class WorkerWaterView {
         var bail = new Basis(Vector3.Right, -.90f * angle);
         var grip = bucket ? VesselShape.BucketHinge + bail * (VesselShape.BucketGrip - VesselShape.BucketHinge) : ActorRig.BottleGrip;
         var rest = VesselAtGrip(vessel, TravelGrip);
-        var spout = opening + Vector3.Up * (tap ? -.04f : fill ? .015f : .16f + .045f * (1 - tip));
+        var spout = opening + Vector3.Up * (tap ? -.04f : fill ? .015f : ground ? .48f : .16f + .045f * (1 - tip));
         var inReach = spout - turn * mouth;
         if (tap) inReach.Y = Math.Max(inReach.Y, bucket ? .005f : .09f * MathF.Sin(angle));
         var held = new Transform3D(turn, rest.Origin.Lerp(inReach, extend));
@@ -144,7 +144,7 @@ internal static class WorkerWaterView {
         Vector3? support = extend > .1f && (!scooping || bucket)
             ? new Vector3(.22f, .73f, .07f).Lerp(held * left, Mathf.SmoothStep(.1f, .4f, extend)) : null;
         var correction = rig.HoldWater(Pose.Lerp(new Pose(), squat, Mathf.SmoothStep(0, .25f, extend)), vessel, held, held * grip, support, bail);
-        if (!fill && tip > .91f) rig.WaterStream(held * mouth + correction, opening);
+        if (!fill && tip > .91f) rig.WaterStream(held * mouth + correction, opening, width: ground ? 1.65f : 1);
         if (tap && tip > .91f) rig.WaterStream(opening, held * mouth + correction);
     }
 }
