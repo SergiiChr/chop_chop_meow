@@ -14,6 +14,7 @@ public static class FarmChecks {
     public static void Run(GameData data) {
         Test(CheckFarmPlotBuildsBesidePileAndTakesOnlyFarmGoods, data);
         Test(CheckDryWheatWaitsForWater, data);
+        Test(CheckSpareSeedCannotTakeTheWaterSlot, data);
         Test(CheckSownWheatGrowsToRipeInItsDays, data);
         Test(CheckPlotHarvestedAloneKeepsSeedInItsOutput, data);
         Test(CheckWorkerFinishesHarvestHaulsCropAndSowsAgain, data);
@@ -41,6 +42,23 @@ public static class FarmChecks {
         world.Transfer(world.Backpack, farm.Inventory, "fertilizer", 1);
         SafeTick(world, data.DaySeconds);
         Require(farm.FarmStage == FarmStage.Growing && farm.Progress == 0, "a dry plot sows but makes no progress");
+    }
+
+    private static void CheckSpareSeedCannotTakeTheWaterSlot(GameData data) {
+        var (world, _, farm) = FarmBesideCompost(data);
+        farm.FarmStage = FarmStage.Growing;
+        farm.Inventory.Add("wheat_seeds", 63);
+        farm.Inventory.Add("fertilizer", 1);
+        farm.Output!.Add("wheat_seeds", 2);
+        var worker = AddWorker(world, farm.Pos + new Vector2(0, 5));
+        world.SetDuty(worker, farm, JobKind.Haul, true);
+        Work(world, .25f);
+        Require(worker.Status.StartsWith("Sowing back "), "the hauler should be on the way to move the spare seed");
+        world.Transfer(world.Backpack, farm.Inventory, "wheat_seeds", 1);
+        Work(world, 8);
+        Give(world, Bucket.AtFill(10));
+        Require(farm.Inventory["wheat_seeds"] == 64 && world.Transfer(world.Backpack, farm.Inventory, Bucket.AtFill(10), 1) == 1,
+            "a seed stack filled while the hauler walks must still leave a slot for water");
     }
 
     private static void CheckSownWheatGrowsToRipeInItsDays(GameData data) {
@@ -111,7 +129,7 @@ public static class FarmChecks {
         Give(world, Bucket.AtFill(10), 2);
         Require(world.Transfer(world.Backpack, farm.Inventory, Bucket.AtFill(10), 2) == 1, "only one full bucket fits in the plot");
         Require(world.Backpack[Bucket.AtFill(10)] == 1 && world.Backpack[Bucket.Item] == 1, "the other bucket stays full");
-        SafeTick(world, data.DaySeconds / 2);
+        Work(world, data.DaySeconds / 2);
         Require(farm.Inventory[Water.Liquid] == 10, "a fallow plot does not use water");
 
         world.Transfer(world.Backpack, farm.Inventory, "wheat_seeds", 1);
@@ -123,7 +141,7 @@ public static class FarmChecks {
         loaded.Deserialize(world.Serialize());
         var restored = loaded.Find(farm.Id)!;
         Require(Math.Abs(loaded.Farms.WaterLevel(restored) - 9.5f) < .001f, "water left in the opened liter survives a load");
-        SafeTick(loaded, data.DaySeconds / 2 - 42);
+        Work(loaded, data.DaySeconds / 2 - 42);
         Require(Math.Abs(loaded.Farms.Growth(restored) - data.DaySeconds / 2) < .01f && restored.Inventory[Water.Liquid] == 5,
             "a half day of growth consumes five liters");
         Require(loaded.Transfer(loaded.Backpack, restored.Inventory, Bucket.AtFill(10), 1) == 1
@@ -132,13 +150,17 @@ public static class FarmChecks {
     }
 
     private static void CheckHaulerPoursABucketAtFourCorners(GameData data) {
+        foreach (int liters in new[] { 0, 1 }) CheckFarmWateringTrip(data, liters);
+    }
+
+    private static void CheckFarmWateringTrip(GameData data, int liters) {
         var world = EmptyWorld(data);
         var farm = world.Add(ThingKind.Farm, new Vector2(20, 20));
         farm.FarmStage = FarmStage.Growing;
         var source = world.Add(ThingKind.Barrel, new Vector2(15, 18));
         source.Inventory.Add(Water.Liquid, 50);
         var rack = world.Add(ThingKind.Toolstation, new Vector2(14, 20));
-        rack.Inventory.Add(Bucket.Item, 1);
+        rack.Inventory.Add(Bucket.AtFill(liters), 1);
         var worker = AddWorker(world, new Vector2(15, 19));
         world.SetDuty(worker, farm, JobKind.Haul, true);
         var stops = new HashSet<Vector2>();
@@ -151,7 +173,7 @@ public static class FarmChecks {
         Require(stops.Count == 4 && walked, $"a farm hauler should walk between four pouring spots (saw {stops.Count})");
         Require(stops.All(at => Math.Abs(at.X - 20) is > 1 and < 3 && Math.Abs(at.Y - 20) is > 1 and < 3),
             "the stops should sit inside the four corners of the plot");
-        Require(world.Farms.WaterLevel(farm) is > 9.8f and <= 10 && worker.Tool == Bucket.Item && source.Inventory[Water.Liquid] == 40,
+        Require(world.Farms.WaterLevel(farm) is > 9.8f and <= 10 && worker.Tool == Bucket.Item && source.Inventory[Water.Liquid] == 40 + liters,
             "the hauler should pour ten liters from one bucket and keep the empty bucket");
     }
     private static void CheckWateredGrowthAllocatesNothing(GameData data) {

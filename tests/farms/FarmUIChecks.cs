@@ -27,6 +27,8 @@ public partial class Game {
         Require(!HasLabel(panel, "harvest"), "A growing plot's page must not mention harvesting.");
         farm.FarmStage = FarmStage.Ripe; farm.Progress = 0;
         await Until(() => HasLabel(panel, "Ripe") && HasLabel(panel, "harvest"), "a ripe plot's page offering the harvest", 2);
+        var farCrop = view.Screen(farm.Pos - new Vector2(2.3f, 2.3f), .8f);
+        Require(view.Pick(farCrop)?.Id == farm.Id, "clicks on the far corner's ripe wheat should reach the plot");
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == farm);
     }

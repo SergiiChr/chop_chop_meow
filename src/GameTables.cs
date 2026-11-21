@@ -117,7 +117,7 @@ public sealed partial class GameData {
         [Water.Full] = new() { How = "Fill at the lake", From = new() { Water.Empty } },
         [Water.Liquid] = new() { How = "Pour from a water bottle", From = new() { Water.Full } },
         ["fertilizer"] = new() { How = "Compost pile", From = new() { "leaves", "grass" } },
-        ["wheat"] = new() { How = "Farm plot", From = new() { "wheat_seeds" }, Also = new() { "fertilizer" } },
+        ["wheat"] = new() { How = "Farm plot", From = new() { "wheat_seeds" }, Also = new() { "fertilizer", Water.Liquid } },
     };
     public List<VesselDef> Vessels { get; } = new() {
         new() { States = new(Water.BottleItems), Liquid = Water.Liquid },

@@ -353,10 +353,30 @@ public partial class WorldView : Node3D {
         return distance < float.MaxValue;
     }
 
-    private static bool RayFarm(Vector3 origin, Vector3 direction, Vector2 at, out float distance) {
-        distance = (.03f - origin.Y) / direction.Y;
-        var ground = origin + direction * distance;
-        return distance > 0 && Math.Abs(ground.X - at.X) <= Farms.HalfSize && Math.Abs(ground.Z - at.Y) <= Farms.HalfSize;
+    private bool RayFarm(Vector3 origin, Vector3 direction, Thing farm, out float distance) {
+        origin -= To3(farm.Pos);
+        RayBox(origin, direction, Farms.HalfSize, .16f, out distance);
+        float height = World.Farms.CropLook(farm) switch { 2 => .23f, 3 => .62f, 4 => .95f, _ => 0 };
+        if (height > 0 && RayBox(origin, direction, 2.6f, height, out float crop)) distance = Math.Min(distance, crop);
+        return distance < float.MaxValue;
+    }
+
+    /// <summary>Finds the nearest point of a ray through a square pad or the crops above it.</summary>
+    private static bool RayBox(Vector3 origin, Vector3 direction, float half, float height, out float distance) {
+        float enter = 0, exit = float.MaxValue;
+        bool hit = Clip(origin.X, direction.X, -half, half, ref enter, ref exit) &&
+            Clip(origin.Z, direction.Z, -half, half, ref enter, ref exit) &&
+            Clip(origin.Y, direction.Y, 0, height, ref enter, ref exit);
+        distance = hit ? enter : float.MaxValue;
+        return hit;
+
+        static bool Clip(float start, float step, float low, float high, ref float enter, ref float exit) {
+            if (Math.Abs(step) < 1e-5f) return start >= low && start <= high;
+            float a = (low - start) / step, b = (high - start) / step;
+            enter = Math.Max(enter, Math.Min(a, b));
+            exit = Math.Min(exit, Math.Max(a, b));
+            return enter <= exit;
+        }
     }
 
     private readonly List<Thing> picking = new();
@@ -377,7 +397,7 @@ public partial class WorldView : Node3D {
                 if (hits.Length > 0 && RayHits(origin, direction, t.Pos, [hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) }], out float s) && s < nearest) { nearest = s; best = t; }
                 continue;
             }
-            bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, t.Pos, out float d)
+            bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, drawn, out float d)
                 : RayHits(origin, direction, t.Pos, hits, out d);
             if (hit && d < nearest) { nearest = d; best = t; }
         }

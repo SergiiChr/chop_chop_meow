@@ -23,7 +23,7 @@ internal sealed class BarrelJobs(World world, Barrels barrels) {
 
     internal bool Haul(Worker w, JobEntry job, float dt) {
         if (w.WaterWalk is { } walk && Vessel(w.Tool) && World.Covers(job, walk.Target) && world.Find(walk.Target.Id) == walk.Target
-            && NeedsWater(walk.Target) && ToolFits(walk.Target, w.Tool) && ValidWalk(w, walk.Source)) {
+            && NeedsWater(walk.Target) && ToolFits(walk.Target, w.Tool) && ValidWalk(w, walk.Target, walk.Source)) {
             return Follow(w, walk.Target, walk.Source, walk.Stand, dt);
         }
         w.WaterWalk = null;
@@ -57,7 +57,7 @@ internal sealed class BarrelJobs(World world, Barrels barrels) {
             if (kit != World.Kit.Ready) return kit == World.Kit.Busy;
         }
         Thing? source = null;
-        if (world.Data.VesselOf(w.Tool)!.LitersIn(w.Tool) == 0) {
+        if (NeedsFill(target, w.Tool)) {
             if (NearestWaterFor(w, target) is not (Thing from, Vector2 at)) { w.Status = "Needs an accessible lake shore or full barrel"; return false; }
             source = from; stand = at;
         }
@@ -65,9 +65,12 @@ internal sealed class BarrelJobs(World world, Barrels barrels) {
         return Follow(w, target, source, stand, dt);
     }
 
-    private bool ValidWalk(Worker w, Thing? source) {
-        bool empty = world.Data.VesselOf(w.Tool)!.LitersIn(w.Tool) == 0;
-        return source == null ? !empty : empty && world.Find(source.Id) == source && GivesWater(source);
+    private bool NeedsFill(Thing target, string item) =>
+        target.Kind == ThingKind.Farm ? Bucket.Liters(item) < Bucket.Capacity : world.Data.VesselOf(item)!.LitersIn(item) == 0;
+
+    private bool ValidWalk(Worker w, Thing target, Thing? source) {
+        bool refill = NeedsFill(target, w.Tool);
+        return source == null ? !refill : refill && world.Find(source.Id) == source && GivesWater(source);
     }
 
     private bool Follow(Worker w, Thing target, Thing? source, Vector2 stand, float dt) {
