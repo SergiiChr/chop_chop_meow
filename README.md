@@ -1088,6 +1088,7 @@ There are three tree types (oak, spruce, birch), from short trees to ones two th
 
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.
 The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset.
+Daylight shadows meet the ground at boots, tree trunks and the feet of buildings.
 The moon takes the same path at night and waxes and wanes over a cycle of `MoonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by.
 Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows.
 Trees in front of the player, a worker or a structure turn see-through.

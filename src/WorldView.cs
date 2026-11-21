@@ -188,7 +188,17 @@ public partial class WorldView : Node3D {
         // Shadows this soft need the Ultra filter set in project.godot: lower qualities break their wide edges into a hatched pattern that flickers.
         // The blur has one width everywhere: a penumbra that widens with the caster's height is shaded per pixel, and at low sun the trees' long shadows cost 20 ms a frame at 1440p.
         // The sun lights the scene directly and stays out of the sky, so its turning does not rebuild the sky's light.
-        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = DaySun, SkyMode = DirectionalLight3D.SkyModeEnum.LightOnly };
+        sun = new DirectionalLight3D {
+            ShadowEnabled = true,
+            DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal,
+            DirectionalShadowMaxDistance = 90,
+            // A smaller offset keeps the shadow attached to feet and low props within the wide shadow map.
+            ShadowBias = .018f,
+            ShadowNormalBias = .7f,
+            ShadowBlur = 1,
+            LightEnergy = DaySun,
+            SkyMode = DirectionalLight3D.SkyModeEnum.LightOnly,
+        };
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
         explored = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.L8, World.S.Explored);
