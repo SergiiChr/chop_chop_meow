@@ -414,7 +414,8 @@ public sealed partial class World {
     public bool Reaches(Worker w) => Sees(w) && w.Away <= 0 && w.Commute == 0 && Reaches(w.Pos);
     /// <summary>Whether a spot on the ground is within the player's reach, which nothing is while they are down or in a cabin.</summary>
     public bool Reaches(Vector2 spot) => !Downed && S.Sheltered == 0 && Player.DistanceTo(spot) <= ItemReach;
-    public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(GatherAt(t, Player)) <= radius;
+    public bool Near(Thing t, float radius = 3.2f, Vector2? at = null) =>
+        !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(at ?? GatherAt(t, Player)) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
     /// <summary>What every worker's wage comes to each dawn.</summary>
     public int DailyWages {

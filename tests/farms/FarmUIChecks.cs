@@ -6,8 +6,21 @@ using static SetupSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    private async Task RunFarmUIChecks() => await TestClean(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
+    private async Task RunFarmUIChecks() {
+        await TestClean(CheckInspectKeyOpensThePlotFromACorner);
+        await TestClean(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
+    }
 
+    private async Task CheckInspectKeyOpensThePlotFromACorner() {
+        var farm = Hosted.Add(ThingKind.Farm, world.Player + Vector2.One * Farms.HalfSize);
+        await Frames();
+        await KeyStroke(Key.E);
+        Require(panel.Selection.Thing == farm.Id, "E should open the farm when the player stands at its corner");
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == farm);
+    }
+
+    /// <summary>A growing plot's page says how long until the wheat is ripe without a word of harvesting, which it offers once ripe.</summary>
     private async Task CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest() {
         var farm = Hosted.Add(ThingKind.Farm, world.Player + new Vector2(-3, 3));
         farm.FarmStage = FarmStage.Growing; farm.Progress = Hosted.Farms.GrowSeconds - 2.5f * world.Data.DaySeconds;

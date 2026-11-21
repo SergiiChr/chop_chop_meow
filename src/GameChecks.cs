@@ -258,7 +258,7 @@ public partial class Game {
         var chest = await OpenFilters(ThingKind.Chest);
         await Click(Named("filter_add_in")!);
         var listed = FilterEntries("item_list", "pick_").ToList();
-        string[] expected = ["wood", "planks", "iron_bar", "steel_bar", "steel_parts", "stone_chisel", "steel_chisel", Water.Empty, Bucket.AtFill(5), "flour", "dough", "bread", World.CrateOf("berries"), World.CrateOf("bread")];
+        string[] expected = ["wood", "planks", "iron_bar", "steel_bar", "steel_parts", "stone_chisel", "steel_chisel", Water.Empty, Bucket.AtFill(5), "flour", "meat_stew", "dough", "canned_meat_stew", "bread", World.CrateOf("berries"), World.CrateOf("bread")];
         Require(listed.Where(expected.Contains).SequenceEqual(expected), $"The item list must run by group, simplest first, not {string.Join(" ", listed)}.");
         Require(listed.SkipWhile(id => !id.StartsWith(World.PackedPrefix)).All(id => id.StartsWith(World.PackedPrefix)), "The item list must show crates of goods after every item.");
         await Click(Named("filters_close")!);
@@ -1025,7 +1025,6 @@ public partial class Game {
         RemoveThings(Hosted, t => t == farm);
         Warp(Hosted, home); await Frames(4);
     }
-    /// <summary>A growing plot's page says how long until the wheat is ripe without a word of harvesting, which it offers once ripe.</summary>
     /// <summary>The red cross in the building plans hands over the remove selector, which turns a building in reach red and takes it down on one click, then stays for the next; a building's page has no take-down button.</summary>
     private async Task CheckRemoveSelectorTakesBuildingsDownAtOnce() {
         var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("coal", 5);

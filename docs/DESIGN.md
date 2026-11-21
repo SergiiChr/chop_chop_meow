@@ -79,7 +79,8 @@ Simulation and data:
 | `src/buildings/model/Removal.cs` | `Removal`, what the remove selector points at: a building or a gravel path tile |
 | `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
 | `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
-| `src/farms/model/Farms.cs` | Farm plots |
+| `src/farms/Farms.cs` | Farm plots, from sowing and watered growth to harvest |
+| `src/farms/model/FarmStage.cs` | Whether a plot is fallow, growing or ripe |
 | `src/mines/Mines.cs` | Mines: where one is marked and stands at its cliff, its three building stages, supplying it, working it underground and the end goal's working mines |
 | `src/mines/model/Cliff.cs`, `src/mines/model/MineStage.cs` | `Cliff`, the valley's ore cliffs and the mine spot at each, and `MineStage`, how far a mine is built |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
@@ -219,6 +220,7 @@ Rendering and sound:
 | `src/cabins/display/StairSteps.cs` | The cabin's steps, how high they stand at a spot, and a pose's boots fitted onto them |
 | `src/cabins/display/DoorKeyView.cs` | The round lock of a cabin's door with its key in it, drawn into a picture for the cabin's page |
 | `src/cabins/display/InsideDoorPOV.cs` | What a player inside sees of a wolf forcing the door: a dark cabin with copies of the wolves and the player taken out, in a window that shows it as an old tape ([assets/environment/vhs](../assets/environment/vhs/README.md)) |
+| `src/farms/display/FarmShape.cs` | Tilled soil and the shapes of wheat at each growth stage |
 | `src/mines/display/MineModel.cs`, `src/mines/display/MineShape.cs`, `src/mines/display/MineRockShape.cs`, `src/mines/display/MineProp.cs` | Builds a mine's model and the outcrop at every cliff, and the mine as drawn stage by stage |
 | `src/actors/enemies/wolf/display/DoorCheckView.cs` | A wolf at a cabin's door: its stands, scratching paw, prying snout, steps, launch, and how far it has levered and pushed the door open |
 | `src/actors/enemies/wolf/display/TugView.cs` | A wolf tugging a player out of a doorway, wolves reared up onto the player's arms, and the lunge onto them as they fall |
@@ -230,7 +232,7 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | A feature's rules, UI and network checks beside its steps, including `tests/paths/`, `tests/cabins/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/<feature>/` | A feature's rules, UI and network checks beside its steps, including `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
 | `tests/*Checks.cs` | Simulation checks of the features whose code is still flat, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
@@ -1036,6 +1038,7 @@ The window's item list runs in `GameData.ListOrder`, with crates of goods after 
 An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel bucket or barrel at any fill stands with the empty one (`ContainerItem.Base`), and a part-drunk bottle with the full one.
 In each group fewer making steps come first, and recipe map order breaks ties.
 Making steps count the longest way through a recipe's inputs, or the items a source comes out of and also takes, from items that take no other item, such as wood.
+Gathered water used to grow wheat adds no making steps.
 
 #### Piles
 
@@ -1236,7 +1239,8 @@ A miner then carries a load of it to the nearest place that takes it (`Mines.Min
 
 ### Farming
 
-A farm plot (`farm`, `src/farms/model/Farms.cs`) is a walkable 6×6 zone that snaps beside piles and other plots.
+A farm plot (`farm`, `src/farms/Farms.cs`) is a walkable 6×6 zone that snaps beside piles and other plots.
+The ground dressing clears meadow plants across the square, and E measures reach from the nearest point on the plot.
 `Farm` in `GameTables` sets what sows it, how many days the wheat grows, how many working days the harvest takes and what it yields.
 
 `Thing.FarmStage` is `Fallow`, `Growing` or `Ripe`.

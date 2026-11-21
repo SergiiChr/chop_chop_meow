@@ -88,6 +88,18 @@ public partial class WorldView {
     private void ShadeObject(Vector2 at, float radius, float strength) => Stamp(objectShade, at, radius, strength, ContactScale, 2, 0);
     private void BareSoil(Vector2 at, float radius) => Stamp(objectShade, at, radius, 1, ContactScale, 2, 1);
 
+    /// <summary>Clears meadow plants across the entire square of a farm plot.</summary>
+    private void ClearFarm(Vector2 at) {
+        const int size = Terrain.Size;
+        // Fill the texels on either side of each edge so linear filtering keeps the edge clear too.
+        int left = Math.Max(0, Mathf.FloorToInt(at.X - Farms.HalfSize - .5f));
+        int right = Math.Min(size - 1, Mathf.CeilToInt(at.X + Farms.HalfSize - .5f));
+        int top = Math.Max(0, Mathf.FloorToInt(at.Y - Farms.HalfSize - .5f));
+        int bottom = Math.Min(size - 1, Mathf.CeilToInt(at.Y + Farms.HalfSize - .5f));
+        if (left > right) return;
+        for (int y = top; y <= bottom; y++) Array.Fill(disturbed, byte.MaxValue, y * size + left, right - left + 1);
+    }
+
     /// <summary>Contact shade and bare soil under one world object; a stump keeps the dark ring its tree had at the trunk.</summary>
     private void ShadeThing(Thing t) {
         if (t.IsDeposit) { ShadeObject(t.Pos, .9f, .7f); BareSoil(t.Pos, 1.6f); return; }
@@ -113,7 +125,8 @@ public partial class WorldView {
         }
         foreach (var t in World.Things) {
             if (t.IsResource || t.Kind is ThingKind.Crate or ThingKind.Grave) continue;
-            float radius = t.Kind switch { ThingKind.Hut or ThingKind.Pile or ThingKind.Farm => 3.4f, ThingKind.Mine => 3, ThingKind.Campfire => 2.3f, _ => 1.8f };
+            if (t.Kind == ThingKind.Farm) { ClearFarm(t.Pos); continue; }
+            float radius = t.Kind switch { ThingKind.Hut or ThingKind.Pile => 3.4f, ThingKind.Mine => 3, ThingKind.Campfire => 2.3f, _ => 1.8f };
             Stamp(disturbed, t.Pos, radius, 1);
         }
         disturbanceImage.SetData(Terrain.Size, Terrain.Size, false, Image.Format.R8, disturbed);

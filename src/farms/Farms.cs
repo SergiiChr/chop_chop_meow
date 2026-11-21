@@ -3,9 +3,6 @@ using System.Linq;
 
 namespace ChopChopMeow;
 
-/// <summary>Where a farm plot is: waiting for seeds and fertilizer, growing, or ripe for harvest.</summary>
-public enum FarmStage { Fallow, Growing, Ripe }
-
 /// <summary>The sowing, watering and harvesting of wheat on a farm plot.</summary>
 public sealed class Farms(World world) {
     public const float HalfSize = 3;

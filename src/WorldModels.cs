@@ -770,13 +770,13 @@ public static class WorldModels {
         prop.Stock.Fill(item, room > 0 ? count / (float)room : 0, data);
     }
 
-    /// <summary>The packed-earth yard with its log frame that a pile or a farm plot stands on.</summary>
+    /// <summary>The packed-earth pad and log frame under a pile.</summary>
     private static void Yard(Node3D body) {
         Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
         Add(body, PileShape.Frame, PileShape.Timber, new Vector3(0, .01f, 0));
     }
 
-    /// <summary>A farm plot: an empty pile's yard that, once sown, shows dark tilled rows and then the wheat growing on them.</summary>
+    /// <summary>A farm plot with a 6×6 packed-earth pad and a long log frame, showing tilled rows and crops once sown.</summary>
     private static FarmProp Farm(int id) {
         var prop = new FarmProp();
         var body = prop.Body;

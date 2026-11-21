@@ -168,8 +168,12 @@ public sealed class PlayerControl {
 
     /// <summary>E: inspects the selected thing if it is in reach, else what is nearest.</summary>
     public void InspectNearest() {
+        var half = Vector2.One * Farms.HalfSize;
+        Vector2 FarmEdge(Thing t) => world.Player.Clamp(t.Pos - half, t.Pos + half);
+        bool CanInspect(Thing t) => world.Near(t, at: t.Kind == ThingKind.Farm ? FarmEdge(t) : null);
         var t = world.Find(panel.Selection.Thing);
-        if (t == null || !world.Near(t)) t = world.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
+        if (t == null || !CanInspect(t))
+            t = world.Things.Where(CanInspect).OrderBy(t => world.Player.DistanceSquaredTo(t.Kind == ThingKind.Farm ? FarmEdge(t) : t.Pos)).FirstOrDefault();
         if (t != null) panel.Select(t);
     }
 

@@ -748,6 +748,7 @@ Take tiles up with the remove selector, which gives the 4 gravel back ([Taking b
 ## Farming
 
 A farm plot (8 wood) is 6×6 tiles and snaps edge to edge with piles and other plots.
+Press E to inspect a nearby plot from its edge or corner.
 Put 1 wheat seeds and 1 fertilizer in it and it sows.
 The soil darkens, and over 3 days of watered growth small green straws come up, grow into tall green plants and turn into yellow wheat.
 Wheat uses 10 liters of water per day of growth and pauses when the plot runs dry.

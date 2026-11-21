@@ -174,31 +174,21 @@ public static class FarmChecks {
     }
 
     private static void CheckHaulerPoursABucketAtFourCorners(GameData data) {
-        foreach (int liters in new[] { 0, 1 }) CheckFarmWateringTrip(data, liters);
-    }
-
-    private static void CheckFarmWateringTrip(GameData data, int liters) {
-        var world = EmptyWorld(data);
-        var farm = world.Add(ThingKind.Farm, new Vector2(20, 20));
-        farm.FarmStage = FarmStage.Growing;
-        var source = world.Add(ThingKind.Barrel, new Vector2(15, 18));
-        source.Inventory.Add(Water.Liquid, 50);
-        var rack = world.Add(ThingKind.Toolstation, new Vector2(14, 20));
-        rack.Inventory.Add(Bucket.AtFill(liters), 1);
-        var worker = AddWorker(world, new Vector2(15, 19));
-        world.SetDuty(worker, farm, JobKind.Haul, true);
-        var stops = new HashSet<Vector2>();
-        bool walked = false;
-        for (int i = 0; i < 700 && !(stops.Count == 4 && worker.Tool == Bucket.Item); i++) {
-            SafeTick(world, .05f);
-            if (worker.WaterAction == WorkerWaterAction.Pour && worker.WaterTarget == farm.Id) stops.Add(worker.Pos);
-            walked |= worker.WaterAction == WorkerWaterAction.WalkFarm;
+        foreach (int liters in new[] { 0, 1 }) {
+            var (world, farm, source, worker) = FarmWithBucketHauler(data, liters);
+            var stops = new HashSet<Vector2>();
+            bool walked = false;
+            for (int i = 0; i < 700 && !(stops.Count == 4 && worker.Tool == Bucket.Item); i++) {
+                SafeTick(world, .05f);
+                if (worker.WaterAction == WorkerWaterAction.Pour && worker.WaterTarget == farm.Id) stops.Add(worker.Pos);
+                walked |= worker.WaterAction == WorkerWaterAction.WalkFarm;
+            }
+            Require(stops.Count == 4 && walked, $"a farm hauler should walk between four pouring spots (saw {stops.Count})");
+            Require(stops.All(at => Math.Abs(at.X - 20) is > 1 and < 3 && Math.Abs(at.Y - 20) is > 1 and < 3),
+                "the stops should sit inside the four corners of the plot");
+            Require(world.Farms.WaterLevel(farm) is > 9.8f and <= 10 && worker.Tool == Bucket.Item && source.Inventory[Water.Liquid] == 40 + liters,
+                "the hauler should pour ten liters from one bucket and keep the empty bucket");
         }
-        Require(stops.Count == 4 && walked, $"a farm hauler should walk between four pouring spots (saw {stops.Count})");
-        Require(stops.All(at => Math.Abs(at.X - 20) is > 1 and < 3 && Math.Abs(at.Y - 20) is > 1 and < 3),
-            "the stops should sit inside the four corners of the plot");
-        Require(world.Farms.WaterLevel(farm) is > 9.8f and <= 10 && worker.Tool == Bucket.Item && source.Inventory[Water.Liquid] == 40 + liters,
-            "the hauler should pour ten liters from one bucket and keep the empty bucket");
     }
     private static void CheckWateredGrowthAllocatesNothing(GameData data) {
         var (world, _, farm) = FarmBesideCompost(data);
