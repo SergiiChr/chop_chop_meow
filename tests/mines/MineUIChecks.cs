@@ -10,13 +10,13 @@ namespace ChopChopMeow;
 public partial class Game {
     /// <summary>The UI checks of mines: marking one at every ore, digging a marked mine's entrance by hand and its page through the stages.</summary>
     private async Task RunMineUIChecks() {
-        await TestClean(CheckAMineIsMarkedAtEveryOresCliffByAClick);
+        await TestClean(CheckAMineIsMarkedAtTheCliffOfEveryOreByAClick);
         await TestClean(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
         await TestClean(CheckMinePageFollowsTheMineThroughItsStages);
     }
 
     /// <summary>Marks a mine on every ore through the build plan and a ground click, which snaps it to the cliff and opens its page on its three stages.</summary>
-    private async Task CheckAMineIsMarkedAtEveryOresCliffByAClick() {
+    private async Task CheckAMineIsMarkedAtTheCliffOfEveryOreByAClick() {
         var home = Hosted.Player;
         foreach (var ore in Cliff.Ores) {
             var cliff = Cliff.Of(ore);

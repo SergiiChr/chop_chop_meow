@@ -548,7 +548,7 @@ public sealed partial class World {
         }
         for (int placed = 0, tried = 0; placed < count && tried < tries; tried++) {
             var p = new Vector2(rng.Next(3, Terrain.Size - 3), rng.Next(3, Terrain.Size - 3));
-            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliff.All.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InRock(p, 2.5f) || WolfPatrols.NearDen(p, 5)) continue;
+            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliff.All.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InOutcrop(p, 2.5f) || WolfPatrols.NearDen(p, 5)) continue;
             if (rng.NextDouble() > chance(p) || Crowded(p)) continue;
             var t = Add(kind, p, remaining); placed++;
             if (!near.TryGetValue(Cell(p), out var cellList)) near[Cell(p)] = cellList = new();
@@ -569,14 +569,14 @@ public sealed partial class World {
         foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) if (Blocks(t, p)) return false;
         return true;
     }
-    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their spurs.</summary>
+    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their outcrops.</summary>
     internal static bool Open(Vector2 p) {
         if (!Terrain.Open(p)) return false;
         foreach (var c in Cliff.All) if (c.DistanceTo(p) < Cliff.Depth) return false;
-        return !InRock(p);
+        return !InOutcrop(p);
     }
-    /// <summary>Whether a point lies within the solid rock of a cliff's or a den's outcrop.</summary>
-    private static bool InRock(Vector2 p, float margin = 0) => Mines.InRock(p, margin) || WolfPatrols.InRock(p, margin);
+    /// <summary>Whether a point lies within a cliff's or a den's outcrop of solid rock.</summary>
+    private static bool InOutcrop(Vector2 p, float margin = 0) => Mines.InOutcrop(p, margin) || WolfPatrols.InOutcrop(p, margin);
     /// <summary>The kinds that are not resources: buildings, yards and what is left on the ground, such as graves.</summary>
     public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null);
     /// <summary>The kinds that stand in the way; resources, yards, campfires, graves, signposts and mines are walked past.</summary>

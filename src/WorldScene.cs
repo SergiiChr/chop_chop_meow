@@ -29,7 +29,7 @@ public partial class WorldView {
     private static void BuildDen(Node3D parent, Den den) {
         // The outcrop is built around a cliff's mine spot; this cliff puts that spot at the den's.
         var rock = new Cliff(ThingKind.Stone, den.Spot - den.Face * Cliff.MineOut, den.Face, 0);
-        var cave = Pivot(parent, new Vector3(den.Spot.X, 0, den.Spot.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(den.Face.X, den.Face.Y)), 0));
+        var cave = Pivot(parent, new Vector3(den.Spot.X, 0, den.Spot.Y)); cave.Rotation = MineModel.Yaw(den.Face);
         cave.Scale = Vector3.One * Den.Scale;
         Add(cave, MineRockShape.Mesh(rock, new[] { "5b5a52", "66645a", "4f4f48" }, Den.Scale), MineRockShape.Rock, Vector3.Zero);
         Add(Pivot(cave, new Vector3(0, 0, MineModel.PortalDepth)), MineShape.Tunnel, MineShape.Unlit, Vector3.Zero);
@@ -44,8 +44,8 @@ public partial class WorldView {
             _ => (new[] { "535d4b", "606753", "495440" }, Stone("15161a", .5f, .3f), 23),
         };
         // Local +Z is the face, so everything toward the camera and the deposits is built on the positive side.
-        var wall = Pivot(parent, new Vector3(cliff.Center.X, 0, cliff.Center.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(cliff.Face.X, cliff.Face.Y)), 0));
-        MineModel.Spur(parent, cliff, rock);
+        var wall = Pivot(parent, new Vector3(cliff.Center.X, 0, cliff.Center.Y)); wall.Rotation = MineModel.Yaw(cliff.Face);
+        MineModel.Outcrop(parent, cliff, rock);
         var rng = new Random(seed);
         float R() => (float)rng.NextDouble();
         for (float x = -cliff.HalfLength - .4f; x <= cliff.HalfLength + .4f; x += .8f) {

@@ -4,7 +4,7 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-/// <summary>Builds a mine's model and the rock spur every cliff has for a mine's tunnel to run into.</summary>
+/// <summary>Builds a mine's model and the outcrop every cliff has for a mine's tunnel to run into.</summary>
 internal static class MineModel {
     /// <summary>Turns a mine's local +Z along its rails, out along its cliff's <paramref name="face"/>.</summary>
     public static Vector3 Yaw(Vector2 face) => new(0, MathF.Atan2(face.X, face.Y), 0);
@@ -14,21 +14,21 @@ internal static class MineModel {
 
     /// <summary>The portal, this far behind a mine's spot along its rails; the cart stands at the spot (see <see cref="Cliff.MineSpot"/>).</summary>
     public const float PortalDepth = -2.2f;
-    /// <summary>How far the tunnel runs into the spur before it is black.</summary>
+    /// <summary>How far the tunnel runs into the outcrop before it is black.</summary>
     public const float TunnelLength = 3;
 
     /// <summary>
     /// The rock site beside a cliff, built in that cliff's face-aligned mine frame: rock to both sides of and over a cave mouth, so a mine's tunnel can run into it.
     /// Part of the scenery, so every cliff has one whether or not it is mined.
     /// </summary>
-    public static void Spur(Node3D parent, Cliff cliff, string[] rock) {
+    public static void Outcrop(Node3D parent, Cliff cliff, string[] rock) {
         var spot = cliff.MineSpot;
-        var spur = Pivot(parent, new Vector3(spot.X, 0, spot.Y));
-        spur.Rotation = Yaw(cliff.Face);
-        Add(spur, MineRockShape.Mesh(cliff, rock), MineRockShape.Rock, Vector3.Zero);
+        var outcrop = Pivot(parent, new Vector3(spot.X, 0, spot.Y));
+        outcrop.Rotation = Yaw(cliff.Face);
+        Add(outcrop, MineRockShape.Mesh(cliff, rock), MineRockShape.Rock, Vector3.Zero);
     }
 
-    /// <summary>A timbered adit into the cliff's spur, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>
+    /// <summary>A timbered adit into the cliff's outcrop, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>
     public static MineProp Build(ThingKind ore) {
         var prop = new MineProp();
         var body = prop.Body;

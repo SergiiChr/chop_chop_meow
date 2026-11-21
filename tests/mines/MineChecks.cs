@@ -54,7 +54,7 @@ public static class MineChecks {
         Require(world.Backpack.Count == carried, "marking must be free");
         Require(world.Construction.Build(ThingKind.Mine, cliff.MineSpot - cliff.Along * 2) == null && world.Things.Count(t => t.Kind == ThingKind.Mine) == 1, "a cliff must take only one mine");
         Require(Cliff.All.All(c => world.CanStand(c.MineSpot) && world.CanStand(Mines.Door(new Thing { Kind = ThingKind.Mine, Pos = c.MineSpot }))), "every cliff's mine spot and entrance must be open ground");
-        Require(!world.CanStand(Mines.Door(mine) - cliff.Face * 2), "the rock spur the tunnel runs into must block walking");
+        Require(!world.CanStand(Mines.Door(mine) - cliff.Face * 2), "the outcrop the tunnel runs into must block walking");
         var coal = MarkMine(world, ThingKind.Coal);
         Require(Mines.Ore(coal) == "coal" && Mines.Ore(mine) == "iron_ore", "each mine must yield the ore of its own cliff");
     }

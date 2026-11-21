@@ -207,10 +207,10 @@ Rendering and sound:
 | `src/actors/player/display/FallBackView.cs` | A player knocked or tugged off their feet falling onto their back, their throat as they go over and their hands at the wolf |
 | `src/cabins/display/DoorwayView.cs`, `src/cabins/model/DoorShown.cs` | Players at cabin doors: stepping in and out, following, knocking, standing aside and squeezing past with a palm on the frame |
 | `src/cabins/display/CabinModel.cs`, `src/cabins/display/CabinShape.cs`, `src/cabins/display/HutProp.cs` | Builds the cabin's model, its wall shell, roof and interior, and the cabin as drawn: its door, window and lamp |
-| `src/mines/display/MineModel.cs`, `src/mines/display/MineShape.cs`, `src/mines/display/MineRockShape.cs`, `src/mines/display/MineProp.cs` | Builds a mine's model and the rock spur at every cliff, and the mine as drawn stage by stage |
 | `src/cabins/display/StairSteps.cs` | The cabin's steps, how high they stand at a spot, and a pose's boots fitted onto them |
 | `src/cabins/display/DoorKeyView.cs` | The round lock of a cabin's door with its key in it, drawn into a picture for the cabin's page |
 | `src/cabins/display/InsideDoorPOV.cs` | What a player inside sees of a wolf forcing the door: a dark cabin with copies of the wolves and the player taken out, in a window that shows it as an old tape ([assets/environment/vhs](../assets/environment/vhs/README.md)) |
+| `src/mines/display/MineModel.cs`, `src/mines/display/MineShape.cs`, `src/mines/display/MineRockShape.cs`, `src/mines/display/MineProp.cs` | Builds a mine's model and the outcrop at every cliff, and the mine as drawn stage by stage |
 | `src/actors/enemies/wolf/display/DoorCheckView.cs` | A wolf at a cabin's door: its stands, scratching paw, prying snout, steps, launch, and how far it has levered and pushed the door open |
 | `src/actors/enemies/wolf/display/TugView.cs` | A wolf tugging a player out of a doorway, wolves reared up onto the player's arms, and the lunge onto them as they fall |
 | `src/actors/enemies/wolf/display/FeedingSpots.cs` | Where wolves stand round a fallen player: feeders side-on to the body, a pinner's paws on the chest |
@@ -585,7 +585,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 `Travel` swerves round anything a route's straight leg clips instead of walking through it, and after a search finds no way it waits `RouteRetrySeconds` before the next.
 
 - **Dens.** `WolfPatrols.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
-  The outcrop is solid like a mine's (`WolfPatrols.InRock`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
+  The outcrop is solid like a mine's (`WolfPatrols.InOutcrop`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
   From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
   After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`).
 - **Strength.** A wolf's health, bite and pace are `GameData.WolfHealth`, `WolfBite` and `WolfTrot`, the same every night: it stands two blows of a steel axe and falls to the third or fourth, and its fourth bite brings a healthy player to half health.
@@ -1154,7 +1154,7 @@ Trades always use the live price, so the sheet can be out of date.
 
 A mine (`src/mines/`, `Mine` in `GameTables`) is marked free and snaps to `Cliff.MineSpot`, in front of the middle of an ore cliff's face between its two deposits, one per cliff.
 Each portal follows its own cliff face, its tunnel runs into the rock, and its rails point outward toward the valley.
-A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`Mines.InRock`), and holds the tunnel, which `MineModel.Build` darkens step by step to black.
+A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`Mines.InOutcrop`), and holds the tunnel, which `MineModel.Build` darkens step by step to black.
 
 `Thing.MineStage` counts finished stages from `MineStage.Marked`:
 
@@ -1165,7 +1165,7 @@ A continuous outcrop extends from the mountain foot, blocks walking with a match
 | Fitted | a worker with a hammer | `MineStage.Open` |
 
 The two worker stages take `StageWorkdays` of `GameData.WorkdaySeconds`.
-The player holding a gather on the mine (`World.Gather`, standing at `Mines.Door`) adds to the same progress with a pickaxe or hammer carried (`Mines.Work`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
+The player holding a gather on the mine (`World.Gather`, standing at `Mines.WorkSpot`) adds to the same progress with a pickaxe or hammer carried (`Mines.Work`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
 
 Up to `Mine.Workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).
