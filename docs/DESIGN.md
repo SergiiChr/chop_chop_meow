@@ -338,7 +338,8 @@ An update holds only what changed since the last one the guest confirmed.
 The host keeps the world of each recent update as one JSON entry per thing, worker, wolf, trade cart and player, plus shared entries for the rest of the state, worker jobs, gravel paths, steel pipes and packed crates.
 Entries leave out fields at their type's default and write a fresh inventory as `{}` (`UpdateJson`).
 A field whose new object starts elsewhere is marked to be always written, which `MultiplayerChecks` enforces.
-A changed entry whose set of fields changed is sent whole.
+A changed entry whose field names or order changed is sent whole.
+When the field order matches, the host and guest step through the fields once to write or apply changed values.
 `WorldUpdates` writes them into reused buffers and keeps the last update's array for every entry that did not change, so only changed entries allocate (`tests/AllocationChecks.cs`).
 The welcome is a guest's first update, with the fog uncovered so far.
 
