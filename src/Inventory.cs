@@ -13,12 +13,13 @@ public sealed class Inventory {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public Carrier CarriedBy { get; set; }
 
     /// <summary>Whether a worker carries an item in both arms, one at a time and with nothing beside it: a barrel or a packed crate.</summary>
-    private static bool BothArms(string item) => Barrel.Is(item) || item.StartsWith(World.PackedPrefix, StringComparison.Ordinal);
+    private static bool BothArms(string item) => Barrel.Is(item) || World.IsPacked(item);
 
     /// <summary>Whether a worker's hands hold a barrel or a packed crate, which leaves room for nothing else.</summary>
     public bool ArmsFull {
         get {
-            if (CarriedBy != Carrier.Worker) return false;
+            // Such an item is always the only one in hand.
+            if (CarriedBy != Carrier.Worker || Count != 1) return false;
             foreach (string item in items.Keys) if (BothArms(item)) return true;
             return false;
         }
@@ -183,6 +184,12 @@ public sealed class Inventory {
         int limited = CarriedBy == Carrier.None ? 0 : goods.Where(pair => CountsTowardCarryLimit(pair.Key)).Sum(pair => pair.Value);
         int incoming = goods.Values.Sum();
         return WithinCarryLimit(limited, incoming) && empty >= 0 && (Capacity == 0 || Count + incoming <= Capacity);
+    }
+
+    /// <summary>The first item this box holds less of than one batch takes, or null.</summary>
+    public string? Short(Dictionary<string, int> batch) {
+        foreach (var (item, needed) in batch) if (this[item] < needed) return item;
+        return null;
     }
 
     /// <summary>Slots to show: every stack, plus one single-item slot per unit of capacity left.</summary>

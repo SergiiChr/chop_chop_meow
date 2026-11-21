@@ -1322,7 +1322,9 @@ public sealed partial class World {
     /// A crate of one good also carries its name in between, such as <c>crate_bread_17</c>, so filters can ask for crates of it.
     /// </summary>
     public const string PackedPrefix = "crate_";
-    public static bool IsCrate(string item) => item == "crate" || item.StartsWith(PackedPrefix, StringComparison.Ordinal);
+    public static bool IsCrate(string item) => item == "crate" || IsPacked(item);
+    /// <summary>Whether an item is a packed crate, one with goods in it.</summary>
+    public static bool IsPacked(string item) => item.StartsWith(PackedPrefix, StringComparison.Ordinal);
     /// <summary>Whether an item is a crate, empty or packed, going into a placed crate: no worker carries one there and no filter names one.</summary>
     public static bool Nests(Thing t, string item) => t.Kind == ThingKind.Crate && IsCrate(item);
     /// <summary>The number that keys a packed crate's contents, or 0 for any other item.</summary>
@@ -1713,23 +1715,23 @@ public sealed partial class World {
     // Trading posts also take deliveries, of the crates they ask for, and packing stations of the good they pack.
     private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Crate, ThingKind.Signpost, ThingKind.Packer };
     /// <summary>Where a load of an item goes: the nearest place asking for it, else the nearest storage with no filter, and compost last for food.</summary>
-    public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) => Deposit(item, origin, exclude, null);
+    public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) => Deposit(item, origin, exclude, askersOnly: false, storesTake: true);
     /// <summary>
     /// The nearest place asking for an item that a chest's or crate's hauler carries out to, or null.
     /// Storage with no filter does not count, and other storage only while this one does not ask for the item too, so two that ask never pass it back and forth.
     /// </summary>
-    internal Thing? AskerFor(string item, Thing store) => Deposit(item, store.Pos, store.Id, store);
-    /// <param name="outOf">The storage a chest's or crate's hauler carries the item out of, for <see cref="AskerFor"/>; null for any other load.</param>
-    private Thing? Deposit(string item, Vector2 origin, int exclude, Thing? outOf) {
+    internal Thing? AskerFor(string item, Thing store) => Deposit(item, store.Pos, store.Id, askersOnly: true, storesTake: !store.Inventory.Wants(item));
+    /// <param name="askersOnly">Only places asking for the item count, not storage with no filter nor compost.</param>
+    /// <param name="storesTake">Chests, piles and placed crates count; without them only trading posts, packing stations and places that use the item do.</param>
+    private Thing? Deposit(string item, Vector2 origin, int exclude, bool askersOnly, bool storesTake) {
         Thing? best = null; int bestRank = 0; float bestDistance = 0;
-        bool storesTake = outOf == null || !outOf.Inventory.Wants(item);
         foreach (var kind in Depots) {
             if (!storesTake && Array.IndexOf(Stores, kind) >= 0) continue;
             foreach (var t in S.Things.Of(kind)) {
                 if (t.Id == exclude) continue;
                 // Compost names every food in its filter, but takes food only when nothing else will, so harvests and picked berries are not left to rot.
                 int rank = t.Compost && Data.IsFood(item) ? 2 : kind == ThingKind.Packer || t.Inventory.Wants(item) ? 0 : 1;
-                if (outOf != null && rank > 0 || Intake(t, item, false) == null) continue;
+                if (askersOnly && rank > 0 || Intake(t, item, false) == null) continue;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || rank < bestRank || rank == bestRank && distance < bestDistance) { best = t; bestRank = rank; bestDistance = distance; }
             }

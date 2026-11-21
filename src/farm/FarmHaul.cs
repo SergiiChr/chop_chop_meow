@@ -28,5 +28,5 @@ internal sealed class FarmHaul : PlaceHaul {
     }
 
     public override string Wait(Thing farm) =>
-        Short(farm.Inventory, world.Data.Farm.Sow) is string seed ? world.Phrase("Needs ", world.Data.Name(seed), " in output-enabled storage") : base.Wait(farm);
+        farm.Inventory.Short(world.Data.Farm.Sow) is string seed ? world.Phrase("Needs ", world.Data.Name(seed), " in output-enabled storage") : base.Wait(farm);
 }

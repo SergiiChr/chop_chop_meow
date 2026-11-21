@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace ChopChopMeow;
 
 /// <summary>
@@ -30,10 +28,4 @@ internal abstract class PlaceHaul {
     /// <summary>A carry that takes an output out of a place: a full one comes under the second rule, otherwise under the fourth, most held first.</summary>
     protected static Carry TakeOut(Thing place, Thing to, CarryBox box, string item, int count, bool full) =>
         new() { Place = place, From = place, To = to, Box = box, Item = item, Count = count, Rule = full ? 2 : 4, Order = -count };
-
-    /// <summary>The first item a box holds less of than one batch takes, or null.</summary>
-    protected static string? Short(Inventory box, Dictionary<string, int> batch) {
-        foreach (var (item, needed) in batch) if (box[item] < needed) return item;
-        return null;
-    }
 }

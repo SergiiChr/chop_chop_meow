@@ -41,7 +41,7 @@ internal sealed class StationHaul : PlaceHaul {
 
     public override string Wait(Thing place) {
         if (!world.Data.Recipes.ContainsKey(place.Recipe)) return "Nothing queued or marked to make";
-        if (!place.Processing && Short(place.Inventory, world.BatchCost(place)) is string input) return world.Phrase("Needs ", world.Data.Name(input), " in output-enabled storage");
+        if (!place.Processing && place.Inventory.Short(world.BatchCost(place)) is string input) return world.Phrase("Needs ", world.Data.Name(input), " in output-enabled storage");
         return base.Wait(place);
     }
 

@@ -7,31 +7,31 @@ namespace ChopChopMeow;
 internal sealed class WaterGathering : Gathering {
     public WaterGathering(World world) : base(world) { }
 
-    public override bool Work(Worker worker, Duty duty, Thing? spot, float dt) {
-        string? carried = Water.FindBottle(worker.Bag);
+    public override bool Work(Worker w, Duty duty, Thing? spot, float dt) {
+        string? carried = Water.FindBottle(w.Bag);
         if (carried != null && carried != Water.Full) {
-            worker.Loading = true;
-            worker.Status = "Collecting water";
-            if (!world.Walk(worker, Terrain.WaterPoint(worker.Pos), dt, 2.5f)) return true;
-            worker.WorkState = WorkerWorkState.Gathering;
-            worker.Timer += dt;
-            if (worker.Timer < world.Data.GatherSeconds) return true;
-            worker.Timer = 0; worker.Bag.Replace(carried, Water.Full); world.Got(Water.Full);
+            w.Loading = true;
+            w.Status = "Collecting water";
+            if (!world.Walk(w, Terrain.WaterPoint(w.Pos), dt, 2.5f)) return true;
+            w.WorkState = WorkerWorkState.Gathering;
+            w.Timer += dt;
+            if (w.Timer < world.Data.GatherSeconds) return true;
+            w.Timer = 0; w.Bag.Replace(carried, Water.Full); world.Got(Water.Full);
             return true;
         }
         // Every bottle in hand is full: off they go.
-        if (worker.Loading) { worker.Loading = false; return true; }
+        if (w.Loading) { w.Loading = false; return true; }
         Thing? source = null; string item = Water.Empty;
         foreach (var candidate in Water.BottleItems) {
             if (candidate == Water.Full) break;
-            source = world.SourceFor(candidate, worker.Pos);
+            source = world.SourceFor(candidate, w.Pos);
             if (source != null) { item = candidate; break; }
         }
-        if (source == null) { worker.Status = "Needs refillable bottles in output-enabled storage"; return false; }
-        if (world.DepositFor(Water.Full, worker.Pos) == null) { worker.Status = "Needs storage for filled bottles"; return false; }
-        if (!world.HandsFree(worker, dt)) return true;
-        worker.Status = "Fetching empty bottles";
-        if (world.Walk(worker, source.Pos, dt)) { source.Inventory.TransferTo(worker.Bag, item, Worker.BagStack, true); worker.Loading = worker.Bag.Count > 0; }
+        if (source == null) { w.Status = "Needs refillable bottles in output-enabled storage"; return false; }
+        if (world.DepositFor(Water.Full, w.Pos) == null) { w.Status = "Needs storage for filled bottles"; return false; }
+        if (!world.HandsFree(w, dt)) return true;
+        w.Status = "Fetching empty bottles";
+        if (world.Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, item, Worker.BagStack, true); w.Loading = w.Bag.Count > 0; }
         return true;
     }
 }

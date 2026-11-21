@@ -4,11 +4,11 @@ namespace ChopChopMeow;
 internal sealed class PackCraft : Crafting {
     public PackCraft(World world) : base(world) { }
 
-    public override bool Work(Worker w, Thing t, float dt) {
-        if (!world.CanPack(t)) { w.Status = t.Packs == "" ? "Choose what to pack" : "Waiting for goods and crates"; return false; }
+    public override bool Work(Worker w, Thing station, float dt) {
+        if (!world.CanPack(station)) { w.Status = station.Packs == "" ? "Choose what to pack" : "Waiting for goods and crates"; return false; }
         if (!world.HandsFree(w, dt)) return true;
         w.Status = "Packing crates";
-        if (world.Walk(w, t.Pos + World.PackStand, dt, .1f)) w.WorkState = WorkerWorkState.Hammering;
+        if (world.Walk(w, station.Pos + World.PackStand, dt, .1f)) w.WorkState = WorkerWorkState.Hammering;
         return true;
     }
 }

@@ -40,8 +40,8 @@ internal sealed class StoreHaul : PlaceHaul {
                 foreach (var (held, _) in t.Inventory.Items) {
                     int free = t.Inventory.Free(held);
                     // A liquid leaves a station only in vessels, which its own hauler brings.
-                    if (free == 0 || world.Data.VesselFor(held) != null || !store.Inventory.Wants(held) || !t.Inventory.AllowsWithdrawal(held) || (station ? world.Pending(t, held) : t.Inventory.Wants(held))
-                        || world.Intake(store, held, false) is not (_, int room)) continue;
+                    if (free == 0 || !store.Inventory.Wants(held) || !t.Inventory.AllowsWithdrawal(held) || (station ? world.Pending(t, held) : t.Inventory.Wants(held))
+                        || world.Data.VesselFor(held) != null || world.Intake(store, held, false) is not (_, int room)) continue;
                     item = held; best = t; nearest = distance; count = Math.Min(free, room);
                     break;
                 }

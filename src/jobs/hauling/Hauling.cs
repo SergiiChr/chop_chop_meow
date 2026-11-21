@@ -52,7 +52,7 @@ internal sealed class Hauling(World world, BarrelHaul barrels) {
         if (c.Clears) return world.Phrase("Fetching ", world.Lower(data.Name(c.Item)), "s for leftover ", world.Lower(data.Name(data.VesselOf(c.Item)!.Liquid)));
         if (c.Box == CarryBox.Burner) return world.Phrase("Clearing ", world.Lower(data.Name(c.Item)), " from the fire");
         // Every packed crate has a name of its own, so the status names none.
-        if (c.From == place) return c.Item.StartsWith(World.PackedPrefix) ? "Carrying out a packed crate" : world.Phrase("Carrying out ", data.Name(c.Item));
+        if (c.From == place) return World.IsPacked(c.Item) ? "Carrying out a packed crate" : world.Phrase("Carrying out ", data.Name(c.Item));
         if (c.Fuel) return world.Phrase("Fetching ", data.Name(c.Item), " for the fire");
         return place.Kind == ThingKind.Mine ? world.Phrase("Fetching ", data.Name(c.Item), " for the ", Mines.Name(place)) : world.Phrase("Fetching ", data.Name(c.Item));
     }

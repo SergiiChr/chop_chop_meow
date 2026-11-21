@@ -29,8 +29,6 @@ internal class Crafting {
     }
 
     /// <summary>The first input a station is short of for a batch, or the fuel it lacks, named for a status; null when something else keeps it from starting.</summary>
-    private string? Lacks(Thing station, RecipeDef recipe) {
-        foreach (var (input, needed) in recipe.Inputs) if (station.Inventory[input] < needed) return input;
-        return recipe.Fuels.Count > 0 && world.FuelOf(station) == null ? recipe.Fuels[0] : null;
-    }
+    private string? Lacks(Thing station, RecipeDef recipe) =>
+        station.Inventory.Short(recipe.Inputs) ?? (recipe.Fuels.Count > 0 && world.FuelOf(station) == null ? recipe.Fuels[0] : null);
 }
