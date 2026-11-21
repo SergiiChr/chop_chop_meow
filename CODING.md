@@ -44,9 +44,14 @@ Project rules on top of the global coding and testing guides.
   - `Input.ParseInputEvent` and what the player sees catch broken controls and panels, and miss how the game looks.
   - `Net`'s messages between a host and a guest process catch sync breaks and miss a real network.
 - Use representative end-to-end checks plus focused edge cases.
-- Checks are filed by feature, not by the kind of check. A feature whose code has a folder under `src/` has one under `tests/` with every check of it, named as in `tests/paths/`: `GravelPathChecks.cs` for its rules through `World`, `GravelPathUIChecks.cs` for what the player does and sees, `GravelPathNetChecks.cs` for its scene in the network session, and its steps beside them. Gravel paths, cabins, mines, wolves and a player's swings are filed this way.
-- The checks of features whose code is still flat are in `tests/*Checks.cs` (rules) and in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs` (UI, network and server). They move to a feature's folder when its code does, and a check that covers two features is split first.
-- UI and network check files are parts of `Game` wherever they are, so a change to a shared step covers them all. Each feature's UI file has a runner, such as `RunGravelPathUIChecks`, that `Game.RunUIChecks` calls; its rule checks' `Run` is called from `SimulationChecks.Run`.
+- Checks are filed by feature: what the game does, as a player or worker sees it (hauling, gravel paths, wolves), never by the kind of check or by where its code lives in `src/`.
+- Each feature has a folder under `tests/` named for it, with every check of it.
+  `tests/paths/` holds `GravelPathChecks.cs` (rules through `World`), `GravelPathUIChecks.cs` (what the player does and sees), `GravelPathNetChecks.cs` (its scene in the network session) and its steps.
+- Moving or renaming code moves no check.
+- No check lives in a flat file: checks still in `tests/*Checks.cs`, `src/GameChecks.cs` and the other flat check files move to their feature's folder when a change touches them.
+  A check that covers two features is split first, one check per feature, each keeping its assertions.
+- UI and network check files are parts of `Game` wherever they are, so a change to a shared step covers them all.
+  Each feature's UI file has a runner, such as `RunGravelPathUIChecks`, that `Game.RunUIChecks` calls; its rule checks' `Run` is called from `SimulationChecks.Run`.
 - The network session plays `Game.NetScenes` in order between the guest joining and leaving. A feature adds a `NetScene` in its folder: what the host puts down before the guest joins, the host's half and the guest's half. Both sides finish a scene before either starts the next, so a scene never waits on another's signals.
 - Input tests go through `Input.ParseInputEvent`, not direct calls to input handlers.
 - UI checks play on a server inside the window: they set up through `Hosted`, its world, then use real input and read what the screen shows or the window's `world`. A direct call into private `Game` code says in a comment why no input reaches it.

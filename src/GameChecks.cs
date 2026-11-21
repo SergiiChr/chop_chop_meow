@@ -256,27 +256,6 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    /// <summary>A chest and a placed crate offer Haul, and a placed crate's filters name goods but no crate, since a crate never goes into one.</summary>
-    private async Task CheckChestAndPlacedCrateOfferHaulAndCrateFiltersNameNoCrate() {
-        await CloseWithEsc();
-        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(-2, 0));
-        var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(2, 0)); await Frames();
-        panel.Select(Shown(chest)); await Frames();
-        Require(OnPage("job_haul") != null, "A chest's page must offer Haul.");
-        panel.Select(Shown(crate)); await Frames();
-        Require(OnPage("job_haul") != null, "A placed crate's page must offer Haul.");
-        await Click(Named("filters")!);
-        Require(OnPage("filter_in") != null && OnPage("filter_out") != null, "A placed crate's filter must show a row of what workers bring and one of what they take.");
-        await Click(Named("filter_add_in")!);
-        Require(Named("pick_wood") != null && Named("pick_crate") == null && Named($"pick_{World.CrateOf("berries")}") == null,
-            "A placed crate's filter must offer goods but no crate.");
-        await Click(Named("pick_wood")!);
-        await Until(() => Shown(crate).Inventory.InputFilter.SetEquals(new[] { "wood" }), "picking wood adding it to the placed crate's filter", 2);
-        await Click(Named("filters_close")!);
-        RemoveThings(Hosted, t => t == chest || t == crate);
-        await CloseWithEsc();
-    }
-
     /// <summary>The autosave comes every five minutes, more than this stage has, so the check asks for it.</summary>
     private async Task CheckAutosaveTellsTheOwner() {
         await CloseWithEsc();
@@ -331,41 +310,6 @@ public partial class Game {
             "A job dragged by its grip must follow the mouse and mark where it would land.");
         await LetGo(held);
         await Until(() => OnPage("lifted") == null && Named($"drop_haul_{bench.Id}") != null && Row("haul") < Row("craft"), "the craft job landing below the haul job", 2);
-        await CloseWorkerPage(bench, worker);
-    }
-
-    private async Task CheckAHaulDragsIntoAHaulGroupAndStaysWhenItIsTakenApart() {
-        var (bench, worker) = await OpenBenchWorkerPage();
-        await Click(Named("new_group")!);
-        await Until(() => OnPage("group_1") != null, "the new haul group's box", 2);
-        Require(HasLabel(OnPage("group_1")!, "Drag haul jobs here"), "A new haul group must say what to do with it.");
-        var held = await HoldOver(await At(OnPage("grip_1")!), await At(OnPage("group_1")!));
-        await LetGo(held);
-        await Until(() => OnPage("group_1")?.FindChild($"drop_haul_{bench.Id}", true, false) != null, "the haul showing inside the group", 2);
-        Require(HasLabel(OnPage("group_1")!, "1 place"), "A haul group must count its places.");
-        await Click(Named("ungroup_1")!);
-        await Until(() => OnPage("group_1") == null && Named($"drop_haul_{bench.Id}") != null, "the group gone and its haul back as a job of its own", 2);
-        await CloseWorkerPage(bench, worker);
-    }
-
-    private async Task CheckAJobBelowAHaulGroupDragsIntoIt() {
-        var (bench, worker) = await OpenBenchWorkerPage();
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-4, 0));
-        Hosted.SetDuty(worker, anvil, JobKind.Craft, true); Hosted.SetDuty(worker, anvil, JobKind.Haul, true);
-        await Until(() => OnPage("job_3") != null, "the worker's page listing the anvil's jobs", 2);
-        await Click(Named("new_group")!);
-        await Until(() => OnPage("group_1") != null, "the new haul group's box", 2);
-        await LetGo(await HoldOver(await At(OnPage("grip_1")!), await At(OnPage("group_1")!)));
-        await Until(() => OnPage("group_1")?.FindChild($"drop_haul_{bench.Id}", true, false) != null, "the bench's haul showing inside the group", 2);
-        // The group goes above the anvil's haul, which is then the row right under its box.
-        await LetGo(await HoldOver(await At(OnPage("grip_3")!), await AtFoot(Named($"drop_craft_{anvil.Id}")!)));
-        await Until(() => OnPage("group_1") is Control box && Named($"drop_haul_{anvil.Id}") is Button below && box.GlobalPosition.Y < below.GlobalPosition.Y, "the group landing above the anvil's haul", 2);
-        // The anvil's haul is the fourth entry, the group, holding the bench's haul, the third.
-        var held = await HoldOver(await At(OnPage("grip_3")!), await At(OnPage("group_1")!));
-        Require(OnPage("lifted") != null, "A job right under a haul group must lift onto the mouse like any other.");
-        await LetGo(held);
-        await Until(() => OnPage("group_1")?.FindChild($"drop_haul_{anvil.Id}", true, false) != null, "the anvil's haul showing inside the group", 2);
-        RemoveThings(Hosted, t => t == anvil);
         await CloseWorkerPage(bench, worker);
     }
 
@@ -499,43 +443,11 @@ public partial class Game {
         Hosted.Fire(hired); Hosted.Tick(world.Data.TradeSeconds); RemoveThings(Hosted, t => t == sign || t.Kind == ThingKind.Grave); Drop(Hosted, Inventory.Coins, 999);
         await CloseWithEsc();
     }
-    /// <summary>A new packing station opens its list of goods; picking one sets what it packs, Shift on a backpack stack loads it, and the idle player beside it packs.</summary>
-    private async Task CheckPackingStationListsGoodsAndTakesBackpackClicks() {
-        await CloseWithEsc();
-        var packer = Hosted.Add(ThingKind.Packer, world.Player + new Vector2(1.6f, 0));
-        Give(Hosted, "berries", 5);
-        await Click(view.Screen(packer.Pos, .8f));
-        Require(Shows(packer) && Named("pack_berries") != null, "A packing station with nothing chosen must open its list of goods.");
-        await Click(Named("pack_berries")!);
-        Require(packer.Packs == "berries", "Picking berries must set what the station packs.");
-        Require(Named("pack_berries") == null, "Picked berries must leave the list of goods to pack.");
-        Require(Named("packed_crate") != null, "The station must show the crate being packed.");
-        await Holding(Key.Shift, () => Click(Slots().First(c => c.TooltipText.StartsWith("Berries ·"))));
-        await Until(() => packer.Inventory["berries"] > 0, "Shift on berries in the backpack loading them into the packing station", 2);
-        int soundsBefore = sounds.Played;
-        packer.Inventory.Add("crate", 1);
-        await Until(() => view.PlayerAnimation == ActorAction.Pack && sounds.Heard("rustle", soundsBefore), "the idle player packing at the station beside it, rustling through the goods", 4);
-        RemoveThings(Hosted, t => t == packer); Drop(Hosted, "berries"); await CloseWithEsc();
-    }
-    private async Task CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings() {
+
+    /// <summary>A torch in the backpack is lit by a click after the kindling animation, and swung by the next click, standing still or walking.</summary>
+    private async Task CheckATorchIsKindledByAClickAndSwungStandingAndWalking() {
         var home = Hosted.Player;
-        await CloseWithEsc(); Drop(Hosted, "stone_chisel"); Give(Hosted, "stone", 2); Give(Hosted, "wood", 3);
-        await KeyStroke(Key.C);
-        Require(ShownPage() == "Crafting", "C must open the crafting menu.");
-        // The page rebuilds when the queue moves on, so the card's line is looked up afresh.
-        Label Lacks() => (Label)Named("craft_torch")!.FindChild("lacks", true, false);
-        Require(Lacks().Visible && Lacks().Text == "No chisel" && !ShowsChild(Named("craft_torch")!, "inputs"), "A torch must name the chisel it lacks in place of its inputs.");
-        Require(PopupLabel("torch", "tool_hint") == "Make one by hand: 2 Stone", "The torch's popup must say how to come by the chisel it lacks.");
-        await Click(Named("craft_stone_chisel")!);
-        Require(World.Waiting(world.Crafting, "stone_chisel") + (world.Making == "stone_chisel" ? 1 : 0) == 1 && world.Backpack["stone"] == 0, "Clicking a recipe must queue it and take its materials.");
-        // Hand crafting only goes on once the player has stood still a moment.
-        Hosted.Tick(World.CraftSettle); Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
-        await Until(() => world.Backpack["stone_chisel"] == 1 && !Lacks().Visible && ShowsChild(Named("craft_torch")!, "inputs"), "the chisel arriving and the torch showing its inputs again", 2);
-        int wood = world.Backpack["wood"];
-        await Click(Named("craft_torch")!);
-        Hosted.Tick(World.CraftSettle); Hosted.Tick(world.Data.Recipes["torch"].Seconds); await Frames(10);
-        Require(world.Backpack["torch"] == 1 && world.Backpack["wood"] == wood - 3, "A torch must be made by hand from 3 wood.");
-        await CloseWithEsc(); SetHotbarSlot(Hosted, 8, "torch");
+        await CloseWithEsc(); Give(Hosted, "torch", 1); SetHotbarSlot(Hosted, 8, "torch");
         await KeyStroke(Key.Key9);
         Require(world.Torch == 0, "Selecting a torch must not light it.");
         await ClickGround();
@@ -708,17 +620,6 @@ public partial class Game {
         await Wheel(GetViewport().GetVisibleRect().GetCenter(), MouseButton.WheelUp);
     }
 
-    /// <summary>A loose piece far enough behind a tree sits under its crown on screen and is still the one picked; a crown alone picks nothing, and the foot of the trunk picks the tree.</summary>
-    private async Task CheckATreeCrownKeepsALoosePieceBehindItClickable() {
-        var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
-        var hidden = Hosted.Add(ThingKind.LooseCoal, tree.Pos - new Vector2(3.3f, 3.3f), 2);
-        await Frames();
-        var point = view.Screen(hidden.Pos, .15f);
-        Require(view.Pick(point)?.Id == hidden.Id, "A tree crown must not steal the click from a loose piece behind it.");
-        RemoveThings(Hosted, t => t == hidden); await Frames();
-        Require(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
-        Require(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
-    }
     /// <summary>What changed while the player was away shows as it now is when they come back, without playing the change in front of them.</summary>
     private async Task CheckChangesOutOfSightDoNotReplayWhenSeenAgain() {
         await CloseWithEsc();
@@ -1007,31 +908,6 @@ public partial class Game {
         Require(slow.Seconds > quick.Seconds, $"A tall tree must take longer to come down than a short one: {slow.Seconds:0.00} s against {quick.Seconds:0.00}.");
         Warp(Hosted, start); await Frames(4);
     }
-    /// <summary>Holding the right mouse button on a tree or a ripe farm plot walks over and works it.</summary>
-    private async Task CheckRightClickGathersTreeAndHarvestsFarm() {
-        var home = Hosted.Player;
-        var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
-        int wood = world.Backpack["wood"];
-        var point = view.Screen(tree.Pos) - new Vector2(0, 70);
-        Require(view.Pick(point)?.Id == tree.Id, "Illustrated tree hit area must select the visible resource.");
-        var windowPoint = GetViewport().GetFinalTransform() * point;
-        int soundsBefore = sounds.Played;
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-        await Until(() => view.PlayerAnimation == ActorAction.SteelChop && sounds.Heard("chop_tree", soundsBefore) && world.Backpack["wood"] > wood,
-            "holding RMB approaching and gathering a tree with the starting axe's steel stroke and chop sound", 8);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
-        await Frames();
-        var farm = Hosted.Add(ThingKind.Farm, world.Player + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
-        await Frames(2);
-        var farmPoint = GetViewport().GetFinalTransform() * view.Screen(farm.Pos);
-        Require(view.Pick(view.Screen(farm.Pos))?.Id == farm.Id, "A farm plot must be picked where it is drawn.");
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = farmPoint, GlobalPosition = farmPoint, Pressed = true });
-        await Until(() => farm.Progress > 0, "holding RMB on a ripe farm plot walking over and harvesting by hand", 6);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = farmPoint, Pressed = false });
-        await Frames(); Require(farm.Progress > 0 && farm.FarmStage == FarmStage.Ripe, "holding RMB on a ripe farm plot must walk over and harvest by hand.");
-        RemoveThings(Hosted, t => t == farm);
-        Warp(Hosted, home); await Frames(4);
-    }
     /// <summary>A growing plot's page says how long until the wheat is ripe without a word of harvesting, which it offers once ripe.</summary>
     private async Task CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest() {
         var farm = Hosted.Add(ThingKind.Farm, world.Player + new Vector2(-3, 3));
@@ -1263,40 +1139,6 @@ public partial class Game {
         await Until(() => sign.Wages![Inventory.Coins] == 0 && world.Backpack[Inventory.Coins] == 40, "the bank's coins going into the backpack", 2);
         RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 40); Give(Hosted, Inventory.Coins, coins); await CloseWithEsc();
     }
-    /// <summary>A player harvesting beside a running station is busy with the harvest, so their figure stops hammering.</summary>
-    private async Task CheckHarvestingBesideAStationStopsHammering() {
-        var start = world.Player;
-        var farm = Hosted.Add(ThingKind.Farm, start + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
-        Warp(Hosted, farm.Pos + new Vector2(.9f, -.9f)); await Frames();
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -1.2f)); anvil.Inventory.Add("steel_bar", 1);
-        await Until(() => view.PlayerAnimation == ActorAction.Hammer, "the idle player hammering at the anvil beside it", 3);
-        var point = RightPress(farm.Pos);
-        await Until(() => farm.Progress > 0, "holding RMB on a ripe farm plot beside the anvil harvesting by hand", 3);
-        await Frames();
-        Require(anvil.Processing && world.Near(anvil) && view.PlayerAnimation != ActorAction.Hammer, "A player harvesting beside a running anvil must not be shown hammering.");
-        RightRelease(point);
-        await Frames();
-        RemoveThings(Hosted, t => t == farm || t == anvil); Warp(Hosted, start);
-    }
-    /// <summary>A player standing idle beside a bench that is making a crate hammers it with the bench's own knock.</summary>
-    private async Task CheckIdlePlayerBesideABenchKnocksWithItsHammer() {
-        // The server's position, since the window's copy may not have caught up with the last check's warp.
-        int soundsBefore = sounds.Played;
-        var bench = Hosted.Add(ThingKind.Bench, Hosted.Player + new Vector2(1.2f, 0));
-        bench.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 6);
-        await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Heard("bench_work", soundsBefore), "the idle player hammering at the bench beside it with its knock", 4);
-        RemoveThings(Hosted, t => t == bench);
-    }
-    /// <summary>A player standing idle beside a cooking table that is crushing berries grinds with its mortar, which leaves the counter for their hands.</summary>
-    private async Task CheckIdlePlayerBesideACookingTableGrindsWithItsMortar() {
-        // The server's position, since the window's copy may not have caught up with the last check's warp.
-        int soundsBefore = sounds.Played;
-        var table = Hosted.Add(ThingKind.Cooktable, Hosted.Player + new Vector2(1.2f, 0));
-        table.Tools!.Add("mortar", 1); Hosted.SetRecipe(table, "crushed_berries"); table.Inventory.Add("berries", 8);
-        await Until(() => table.Processing && view.PlayerAnimation == ActorAction.Grind && sounds.Heard("grind_mortar", soundsBefore), "the idle player grinding at the cooking table beside it, with the pestle heard", 4);
-        Require(view.PropOf(table.Id) is StoveProp { Mortar.Visible: false }, "The mortar must be off the counter while the player grinds with it.");
-        RemoveThings(Hosted, t => t == table);
-    }
     /// <summary>
     /// Every blow at work lands its tool on what is worked as it is heard, wherever the player stands to work it: the axe's head on
     /// the trunk's side, the pick's point on the rock, the hammer's face on the anvil's and the bench's work tops, and the shovel's
@@ -1369,43 +1211,6 @@ public partial class Game {
         Drop(Hosted, "steel_pick", 1); Drop(Hosted, "steel_shovel", 1);
         Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
-    /// <summary>A tree felled in front of the player topples over the stump it leaves, and holding the right mouse button on the stump digs it up with the shovel.</summary>
-    private async Task CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp() {
-        // The server's position, since the window's copy may not have caught up with the last check's warp.
-        var start = Hosted.Player;
-        var tree = Hosted.Add(ThingKind.Tree, start + new Vector2(2, 2), 4);
-        Give(Hosted, "steel_shovel", 1);
-        await Frames(2);
-        int wood = world.Backpack["wood"];
-        var point = RightPress(tree.Pos);
-        await Until(() => world.Find(tree.Id) == null && view.Departing == 1, "holding RMB on a tree felling it, its model toppling once the tree is gone", 8);
-        RightRelease(point);
-        var stump = world.Things.Single(t => t.Kind == ThingKind.Stump && t.Pos == tree.Pos);
-        Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "The stump must stand under the toppling tree.");
-        await Until(() => view.Departing == 0, "the felled tree fading away over its stump", 4);
-        int soundsBefore = sounds.Played;
-        point = RightPress(stump.Pos);
-        await Until(() => stump.Progress > 0 && view.PlayerAnimation == ActorAction.Dig && (sounds.Heard("dig_earth", soundsBefore) || sounds.Heard("dig_toss", soundsBefore)), "holding RMB on a stump digging at it with the shovel, heard in the soil", 6);
-        await Until(() => world.Find(stump.Id) == null && view.Departing == 1, "the stump coming out of the ground, thrown up as it goes", 8);
-        // The tree held 4 wood and its stump 3.
-        await Until(() => world.Backpack["wood"] == wood + 7 && view.Departing == 0 && view.PlayerAnimation != ActorAction.Dig, "the stump's wood in the backpack, its model gone and the digging done", 3);
-        RightRelease(point); await Frames();
-        Drop(Hosted, "steel_shovel", 1); Drop(Hosted, "wood", 7);
-        Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
-    }
-    /// <summary>A stump a building goes up over just goes, however far it was dug: only one dug out is thrown up out of the ground.</summary>
-    private async Task CheckStumpBuiltOverGoesWithoutBeingThrownUp() {
-        var at = Hosted.Player + new Vector2(2, 2);
-        var stump = Hosted.Add(ThingKind.Stump, at, World.StumpWood); stump.Progress = GatherRules.DigSeconds * .8f;
-        await Frames(2);
-        Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "A stump in sight must be drawn.");
-        Give(Hosted, world.Data.Buildings[ThingKind.Chest].Cost);
-        var chest = Hosted.Construction.Build(ThingKind.Chest, at);
-        await Frames(2);
-        Require(chest != null && world.Find(stump.Id) == null, "A chest must go up over a stump and clear it away.");
-        Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump built over must just go, not be thrown up through the building.");
-        RemoveThings(Hosted, t => t == chest); await Frames(2);
-    }
     /// <summary>A page about a thing closes when the thing goes, as a recovery box does once it is emptied.</summary>
     private async Task CheckPageClosesWhenWhatItShowsIsGone() {
         await CloseWithEsc();
@@ -1415,34 +1220,6 @@ public partial class Game {
         await Click(FindButton(panel, "Take all")!);
         await Until(() => !panel.Visible && view.Selection.Thing == 0, "the page closing once its box is emptied and gone", 3);
         Drop(Hosted, "wood", 3);
-    }
-    /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
-    private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 4);
-        var smith = AddWorker(Hosted, anvil.Pos + new Vector2(0, 1.2f)); Hosted.Assign(smith, anvil);
-        await Until(() => anvil.Processing && smith.WorkState == WorkerWorkState.Hammering, "the smith hammering a batch at the anvil", 3);
-        smith.WageDebt = 1;
-        await Until(() => view.PlayerAnimation == ActorAction.Hammer, "the player hammering beside a worker on strike", 2);
-        smith.WageDebt = 0; Hosted.Fire(smith);
-        RemoveThings(Hosted, t => t == anvil);
-    }
-    private async Task CheckRightClickGathersAndLeavesASelectedWorkerMarked() {
-        var home = Hosted.Player;
-        var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
-        var worker = AddWorker(Hosted, world.Player + new Vector2(-2, 2));
-        await Frames(); await Click(view.Screen(worker.Pos, 1));
-        Require(view.Selection.Worker == worker.Id, "A left click on a worker must select them.");
-        var point = view.Screen(tree.Pos) - new Vector2(0, 70);
-        Require(Uncovered(point), "The tree must be clear of the worker's page.");
-        var windowPoint = GetViewport().GetFinalTransform() * point;
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-        await Until(() => view.Gathering, "a right click on a tree starting to gather", 4);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
-        await Frames();
-        Require(view.Selection.Worker == worker.Id, "A right click on a tree must leave a selected worker marked.");
-        Require(panel.HeadingTitle.Text == worker.Name, "A right click on a tree must leave the worker's page open.");
-        Hosted.Fire(worker); await CloseWithEsc();
-        Warp(Hosted, home); await Frames(4);
     }
     /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item selected on it.</summary>
     private async Task CheckHudAndHotbarEatAndDrinkSelected() {
@@ -1709,274 +1486,7 @@ public partial class Game {
         Require(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
         RemoveThings(Hosted, t => t.Kind == ThingKind.Mine);
     }
-    /// <summary>A recipe group closes on a click on its heading and opens on the next, on the crafting menu and on a station alike.</summary>
-    private async Task CheckRecipeGroupsCloseAndOpenOnAClick() {
-        await CloseWithEsc();
-        await KeyStroke(Key.C);
-        Require(Named("craft_planks") != null && Named("craft_stone_chisel") != null, "The crafting menu must open with its groups showing their recipes.");
-        await Click(Named("group_Materials")!);
-        await Until(() => Named("craft_planks") == null && Named("craft_stone_chisel") != null, "a click on the Materials heading hiding its recipes only", 2);
-        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
-        await ClickOn(furnace);
-        // A new stone furnace keeps making iron, whose group opens with the page.
-        Require(Named("craft_iron_bar") != null, "A station's page must open the group of what it is making, closed or not.");
-        await Click(Named("group_Materials")!);
-        await Until(() => Named("craft_iron_bar") == null && ShowsChild(Named("group_Materials")!, "kept"), "the closed group wearing the hard hat of the recipe it hides", 2);
-        await Click(Named("group_Materials")!);
-        await Until(() => Named("craft_iron_bar") != null, "a second click opening the group again", 2);
-        RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
-    }
-    /// <summary>
-    /// A bench's tool slots sit in a window of their own beside its page. A recipe's popup says where its tool is:
-    /// not available, in the backpack, which works for the player alone, or available once slotted.
-    /// </summary>
-    private async Task CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs() {
-        await CloseWithEsc(); Drop(Hosted, "stone_chisel", world.Backpack["stone_chisel"]);
-        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
-        await ClickOn(workbench);
-        var slot = panel.Aside.FindChild("tool_chisel", true, false) as ItemSlot;
-        Require(panel.Aside.Visible && slot != null && HasLabel(panel.Aside, "Available tools") && HasLabel(panel.Aside, "Empty"), "A bench must show its empty tool slots in a window beside its page.");
-        Require(panel.Aside.GetGlobalRect().End.X <= panel.GetGlobalRect().Position.X, "The tool window must stand left of the page.");
-        string ToolState() => PopupLabel("planks", "tool_state");
-        Label Lacks() => (Label)Named("craft_planks")!.FindChild("lacks", true, false);
-        Require(ToolState() == "not available" && Lacks().Visible && Lacks().Text == "No chisel", "With no chisel anywhere a bench recipe must say so on its card and in its popup.");
-        Give(Hosted, "stone_chisel", 1);
-        await Until(() => !Lacks().Visible, "the card showing its inputs once a chisel is carried", 2);
-        Require(ToolState() == "in your backpack", "A carried chisel at a bench with an empty slot must show as in the backpack.");
-        await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Stone chisel"))));
-        await Until(() => world.BenchTool(workbench, "chisel") == "stone_chisel" && HasLabel(panel.Aside, "Stone chisel"), "Shift on the carried chisel slotting it, named in the tool window", 2);
-        Require(ToolState() == "available", "A slotted chisel must show as available.");
-        RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
-        Require(!panel.Aside.Visible, "The tool window must close with the page.");
-    }
-    /// <summary>A recipe list that has scrolled keeps its place when a click on a recipe makes the page draw again.</summary>
-    private async Task CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain() {
-        await CloseWithEsc();
-        // A bench that is making something shows its work under the list; moved down the screen, the page leaves the list too little room for all its recipes.
-        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(workbench, "planks");
-        await ClickOn(workbench);
-        await MoveWindow(panel, new Vector2(0, 150));
-        ScrollContainer List() => (ScrollContainer)panel.FindChild("recipe_list", true, false);
-        await Until(() => List().GetVScrollBar().MaxValue > List().Size.Y, "the bench's recipes outgrowing the room the page leaves them", 2);
-        await Wheel((layer.Transform * List().GetGlobalRect()).GetCenter());
-        int scrolled = List().ScrollVertical;
-        Require(scrolled > 0, "The wheel must scroll the recipe list.");
-        var card = panel.FindChildren("craft_*", "Button", true, false).OfType<Control>().First(c => c.Name != "craft_planks" && List().GetGlobalRect().Encloses(c.GetGlobalRect()));
-        string recipe = card.Name.ToString()["craft_".Length..];
-        var before = List();
-        await Click(card);
-        // Every frame until it is back in place, the new list is out of sight or already where the old one was scrolled to.
-        for (int frame = 0; frame < 120 && !(List() != before && List().ScrollVertical == scrolled && List().Modulate.A > 0); frame++) {
-            Require(List() == before || List().Modulate.A == 0 || List().ScrollVertical == scrolled, "A list drawn again must not show from the top before it goes back to where the old one was scrolled to.");
-            await Frames(1);
-        }
-        Require(workbench.Keep == recipe && List() != before && List().ScrollVertical == scrolled, "The click must mark the recipe for workers, and the list drawn again must go back to where the old one was scrolled to.");
-        RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
-    }
-    /// <summary>The crafting menu's map button opens the recipe map with every item on it once, those the settlement has had drawn as known; Escape closes it.</summary>
-    private async Task CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce() {
-        await CloseWithEsc();
-        await KeyStroke(Key.C);
-        await Click(Named("open_map")!);
-        Require(recipeMap.Visible, "The crafting menu's map button must open the recipe map.");
-        Require(world.Data.Items.Keys.Where(id => !GameData.OffTheMap(id)).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
-        Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as not made yet.");
-        Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources") && HasLabel(recipeMap, "Hunt animals"), "The map must name its marks and where raw meat comes from.");
-        await KeyStroke(Key.Escape);
-        Require(!recipeMap.Visible && ShownPage() == "Crafting", "Escape must close the map and leave the crafting menu open.");
-        await CloseWithEsc();
-    }
-    /// <summary>The game goes on under the open recipe map: time passes and an item first made meanwhile turns to made before, while a held walking key leaves the player in place.</summary>
-    private async Task CheckGameGoesOnUnderTheOpenRecipeMap() {
-        await CloseWithEsc();
-        await KeyStroke(Key.C);
-        await Click(Named("open_map")!);
-        var stew = recipeMap.NodeOf("canned_meat_stew")!;
-        Require(!stew.Known, "Canned stew nobody has made must be drawn as not made yet.");
-        float opened = world.Time;
-        await Until(() => !view.Paused && world.Time > opened + .2f, "time passing under the open map", 2);
-        Achieve(Hosted, "canned_meat_stew");
-        await Until(() => stew.Known, "the stew turning to made before on the open map", 2);
-        await Click((Control)stew.FindChild("slot", true, false));
-        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "Made before"), "The stew's details must say it was made before.");
-        var stood = world.Player;
-        await Holding(Key.D, () => Seconds(.3));
-        Require(world.Player.DistanceTo(stood) < .01f, "A walking key held under the map must not move the player.");
-        await KeyStroke(Key.Escape);
-        await CloseWithEsc();
-    }
-    /// <summary>On the recipe map a click on a chip goes to its item and lights it up for a moment, a click on an item shows its details, and Show leaves the map for where it is made.</summary>
-    private async Task CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation() {
-        await CloseWithEsc();
-        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
-        await KeyStroke(Key.C);
-        await Click(Named("open_map")!);
-        var coal = recipeMap.NodeOf("coal")!;
-        await Click((Control)recipeMap.NodeOf("steel_bar")!.FindChild("also_coal", true, false));
-        Require(coal.Lit, "A click on the steel bar's coal chip must light coal up.");
-        await Until(() => !coal.Lit, "the light on coal going out again", RecipeMap.LitSeconds + 2);
-        await Click((Control)recipeMap.NodeOf("crate")!.FindChild("slot", true, false));
-        Require(recipeMap.Chosen == "crate" && ((Label)recipeMap.FindChild("detail_name", true, false)).Text == "Wood crate" && HasLabel((Node)recipeMap.FindChild("map_details", true, false), "6 Wood planks"), "A click on the crate must show its name and the six planks it requires.");
-        await Click((Control)recipeMap.NodeOf("planks")!.FindChild("slot", true, false));
-        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "10 s by hand, 5 s at the crafting bench"), "Planks must show their time by hand and at the bench.");
-        await Click((Control)recipeMap.NodeOf("tin_can")!.FindChild("slot", true, false));
-        // Ten seconds, halved by the bench and divided by the steel hammer's 1.8.
-        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "steel hammer · 2.8 s"), "Tin cans must show their time with the steel hammer they require.");
-        await Click((Control)recipeMap.NodeOf("crate")!.FindChild("slot", true, false));
-        await Click((Control)recipeMap.FindChild("map_show", true, false));
-        await Until(() => !recipeMap.Visible && Shows(workbench) && Named("craft_crate") != null, "Show leaving the map for the bench's page with the crate on it", 2);
-        RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
-    }
-    /// <summary>At a bench, one held unit put on an input slot loads one, a double click on the recipe loads a batch and a right click picks up half back.</summary>
-    private async Task CheckBenchLoadsInputsByClickDoubleClickAndSplit() {
-        await CloseWithEsc();
-        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(workbench, "crate"); Give(Hosted, "planks", 6);
-        await ClickOn(workbench);
-        await PickUp(BagCell(c => c.TooltipText.StartsWith("Wood planks")));
-        await RightClick(Named("input_planks")!);
-        await Until(() => workbench.Inventory["planks"] == 1, "a right click with planks held putting one in the input slot", 2);
-        await KeyStroke(Key.Escape);
-        await Until(() => cursor.Empty && world.Backpack["planks"] == 5, "Esc letting go of the rest", 2);
-        await DoubleClick(Named("craft_crate")!);
-        Require(workbench.Inventory["planks"] == 6 && world.Backpack["planks"] == 0, "Double-clicking a bench recipe must load one batch of its inputs.");
-        Require(workbench.Keep == "crate", "Double-clicking the marked recipe of an idle bench must keep it marked.");
-        await SplitTo(Named("input_planks")!, BagCell(c => c.TooltipText == ""));
-        await Until(() => workbench.Inventory["planks"] == 3 && world.Backpack["planks"] == 3, "a right click on a bench input picking up half of it", 2);
-        RemoveThings(Hosted, t => t == workbench); Drop(Hosted, "planks", 3); await CloseWithEsc();
-    }
-    /// <summary>
-    /// At a station Shift and Ctrl queue and load 5 and 10 with the count on the plate and put the worker mark on the recipe queued,
-    /// a click unmarks what workers keep making, a right-click takes batches off, and no queue is drawn below.
-    /// By hand a double-click queues just one, and a right-click on a slot in the queue takes a waiting batch off.
-    /// </summary>
-    private async Task CheckRecipeBoardsMarkAndQueueWithModifiers() {
-        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
-        await ClickOn(furnace);
-        string Queued(string plate) => ((Label)Named(plate)!.FindChild("queued", true, false)).Text;
-        Require(((Control)Named("craft_iron_bar")!.FindChild("kept", true, false)).Visible, "A new stone furnace must show iron marked for workers.");
-        bool Kept(string plate) => ((Control)Named(plate)!.FindChild("kept", true, false)).Visible;
-        await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
-        await Until(() => furnace.Keep == "charcoal" && Named("craft_charcoal") != null && Kept("craft_charcoal") && Queued("craft_charcoal") == "5", "a Shift-click queueing 5 charcoal and moving the worker mark to it", 2);
-        await Click(Named("craft_charcoal")!);
-        await Until(() => furnace.Keep == "" && !Kept("craft_charcoal"), "a click on the marked recipe taking the mark off", 2);
-        await Holding(Key.Ctrl, () => Click(Named("craft_charcoal")!));
-        await Until(() => Queued("craft_charcoal") == "15", "a Ctrl-click queueing 10 more charcoal, shown on the plate", 2);
-        Require(furnace.Keep == "charcoal" && Kept("craft_charcoal"), "Queueing at a station with no mark must put the mark on the recipe queued.");
-        await Holding(Key.Shift, () => RightClick(Named("craft_charcoal")!));
-        await Until(() => Queued("craft_charcoal") == "10", "a Shift right-click taking 5 batches off", 2);
-        Require(panel.FindChildren("queued_*", "", true, false).Count == 0, "A station must show what waits only as the count on its card.");
-        RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
 
-        Give(Hosted, "stone", 4);
-        await KeyStroke(Key.C);
-        await DoubleClick(Named("craft_stone_chisel")!);
-        await Frames(3);
-        Require(world.Backpack["stone"] == 2, "A double-click on a hand recipe must queue just one.");
-        await RightClick(Named("craft_stone_chisel")!);
-        await Until(() => world.Backpack["stone"] == 4 || world.Making == "stone_chisel", "a right-click taking the queued chisel off unless it is already being made", 2);
-        if (world.Making != "") Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
-        await Until(() => world.Making == "" && world.Crafting.Count == 0, "the hand queue emptying", 2);
-        // Of three chisels one is being made, so the other two wait in one slot under the work.
-        Give(Hosted, "stone", 6);
-        await Frames();
-        int stone = world.Backpack["stone"];
-        await Click(Named("craft_stone_chisel")!);
-        await Until(() => world.Making == "stone_chisel" && Named("making") != null && Named("queued_stone_chisel") == null, "the page showing the first chisel being made with nothing waiting", 2);
-        await Click(Named("craft_stone_chisel")!);
-        await Until(() => Named("queued_stone_chisel") != null, "the second chisel waiting in the queue's slot", 2);
-        await Click(Named("craft_stone_chisel")!);
-        await Until(() => Named("queued_stone_chisel")!.GetChildren().OfType<Badge>().First().Text == "2", "a third chisel counted on the queue's slot", 2);
-        await RightClick(Named("queued_stone_chisel")!);
-        await Until(() => World.Waiting(world.Crafting, "stone_chisel") == 1 && world.Backpack["stone"] == stone - 4, "a right-click on the queue's slot taking one waiting chisel off and giving its stone back", 2);
-        await RightClick(Named("queued_stone_chisel")!);
-        await Until(() => world.Crafting.Count == 0 && world.Backpack["stone"] == stone - 2, "a second right-click emptying the queue", 2);
-        Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
-        await Until(() => world.Making == "", "the chisel in progress being finished", 2);
-        await CloseWithEsc(); Drop(Hosted, "stone", world.Backpack["stone"]); Drop(Hosted, "stone_chisel", world.Backpack["stone_chisel"]);
-    }
-
-    /// <summary>
-    /// At a station, queueing another recipe while a batch is worked shakes the boxes and changes nothing.
-    /// Once the batch is done, it takes what the boxes hold into the backpack and turns the station to the new recipe.
-    /// </summary>
-    private async Task CheckStationShakesWhileBusyThenTurnsToAnotherRecipe() {
-        await CloseWithEsc();
-        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0)); Hosted.SetRecipe(furnace, "");
-        Give(Hosted, "tin_ore", 2); Give(Hosted, "coal", 1); Give(Hosted, "wood", 2);
-        await ClickOn(furnace);
-        await DoubleClick(Named("craft_tin_bar")!);
-        await Until(() => furnace.Processing && Named("input_tin_ore") != null, "the furnace starting the tin a double-click asked for", 2);
-        await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
-        Require(WorkRow().Shaking, "Queueing another recipe while a batch is worked must shake the boxes.");
-        await Until(() => !WorkRow().Shaking, "the boxes coming to rest", 2);
-        Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
-        Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
-        await Until(() => !furnace.Processing && furnace.Inventory["tin_bar"] == 1, "the tin bar coming out", 2);
-        // An idle page refreshes a few times a second; one that drew itself again without its slots would never show the bar's count.
-        await Until(() => Named("output_tin_bar")?.GetChildren().OfType<Badge>().First().Text == "1", "the furnace that has run out of batches still showing the bar in its slot", 2);
-        await DoubleClick(Named("craft_charcoal")!);
-        await Until(() => furnace.Recipe == "charcoal" && world.Backpack["tin_bar"] == 1 && furnace.Inventory["wood"] == 2 && Named("input_wood") != null,
-            "a double-click on charcoal taking the bar into the backpack and turning the furnace to charcoal, loaded with its wood", 2);
-        RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "tin_bar", 1); await CloseWithEsc();
-    }
-
-    /// <summary>
-    /// With no room in the backpack for what a station's slots hold, a double-click on another recipe leaves the station as it is, its slots shaking.
-    /// So does a click that would move the worker mark to another recipe while the slots hold something.
-    /// </summary>
-    private async Task CheckStationSlotsShakeWhenTheBackpackHasNoRoomForThem() {
-        await CloseWithEsc();
-        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0)); Hosted.SetRecipe(furnace, "charcoal");
-        Give(Hosted, "wood", 2); Hosted.LoadInput(furnace, "wood", 2);
-        // Stone in every free slot leaves no room for the furnace's wood.
-        int stone = Give(Hosted, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
-        await ClickOn(furnace);
-        await DoubleClick(Named("craft_iron_bar")!);
-        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the slots.");
-        Require(furnace.Recipe == "charcoal" && furnace.Keep == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0,
-            "A furnace whose slots the backpack has no room for must stay on its recipe with its wood and its mark.");
-        await Until(() => !WorkRow().Shaking, "the slots coming to rest", 2);
-        await Click(Named("craft_iron_bar")!);
-        await Until(() => WorkRow().Shaking, "a click on another recipe shaking the slots of a furnace that holds wood", 2);
-        Require(furnace.Keep == "charcoal", "A furnace that holds something must keep its mark where it is.");
-        RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "stone", stone); await CloseWithEsc();
-    }
-
-    /// <summary>A station whose mark is taken off stays on its recipe: the card keeps an outline and the page its slots.</summary>
-    private async Task CheckUnmarkedStationStaysOnItsRecipe() {
-        await CloseWithEsc();
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
-        await ClickOn(anvil);
-        await Click(Named("craft_steel_parts")!);
-        await Until(() => anvil.Keep == "" && !((Control)Named("craft_steel_parts")!.FindChild("kept", true, false)).Visible, "a click taking the mark off steel parts", 2);
-        Require(Named("input_steel_bar") != null && Named("craft_steel_parts")!.GetThemeStylebox("normal") == Style.PlateSelected,
-            "An anvil with no mark must stay on steel parts, its card outlined and its slots on the page.");
-        RemoveThings(Hosted, t => t == anvil); await CloseWithEsc();
-    }
-
-    /// <summary>A double-click whose batch is refused leaves the worker mark on: at its 99 batches the marked recipe gets back the mark the first press took off.</summary>
-    private async Task CheckRefusedDoubleClickKeepsTheWorkerMark() {
-        await CloseWithEsc();
-        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
-        Hosted.QueueBatch(furnace, "iron_bar", World.MaxQueued);
-        await ClickOn(furnace);
-        await DoubleClick(Named("craft_iron_bar")!);
-        await Frames(4);
-        Require(furnace.Keep == "iron_bar" && world.Waiting(furnace, "iron_bar") == World.MaxQueued, "A double-click refused at 99 batches must leave the marked recipe marked.");
-        RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
-    }
-
-    /// <summary>A new anvil's page shows steel bars in, steel parts out, and Ctrl on a backpack bar loads them.</summary>
-    private async Task CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack() {
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
-        Give(Hosted, "steel_bar", 2);
-        await ClickOn(anvil);
-        Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
-        Require(Named("output_steel_parts") != null, "A new anvil must show a slot for steel parts.");
-        await Holding(Key.Ctrl, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel bar"))));
-        await Until(() => world.Backpack["steel_bar"] == 0, "Ctrl on steel bars in the backpack loading them into the anvil", 2);
-        RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "steel_bar"); await CloseWithEsc();
-    }
     /// <summary>The steel furnace shows one slot per input and output, loads held stacks put on its input slots, and Space pumps its bellows. Returns the furnace.</summary>
     private async Task<Thing> CheckSteelFurnaceSlotsLoadHeldStacksThenPump() {
         var furnace = Hosted.Add(ThingKind.Reinforced, world.Player + new Vector2(1, 0));
@@ -2039,54 +1549,6 @@ public partial class Game {
         foregroundTree.Pos = world.Player + new Vector2(8, -8);
         Require(!view.TreeCanopyCoversThing(foregroundTree, occluded), "A distant tree must not fade for a building.");
     }
-    /// <summary>One right click walks over to a loose piece and picks it up whole, without the gather animation.</summary>
-    private async Task CheckOneRightClickWalksOverAndPicksUpAWholeLoosePiece() {
-        var home = Hosted.Player;
-        var gatheringPosition = Terrain.Spawn - new Vector2(30, 30);
-        // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
-        RemoveThings(Hosted, t => t.Pos.DistanceTo(gatheringPosition) < 12);
-        Warp(Hosted, gatheringPosition);
-        // Far enough that the player has to keep walking after the button is released.
-        var looseOre = Hosted.Add(ThingKind.LooseCoal, gatheringPosition + new Vector2(2, 0), 2);
-        int oreBefore = world.Backpack["coal"];
-        await Frames();
-        var point = view.Screen(looseOre.Pos) - new Vector2(0, 12) * view.Zoom;
-        Require(view.Pick(point)?.Id == looseOre.Id, "The loose ore fixture must be selectable.");
-        var windowPoint = GetViewport().GetFinalTransform() * point;
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
-        bool harvestAnimation = false;
-        for (int i = 0; i < 120 && world.Find(looseOre.Id) != null; i++) { await Frames(); harvestAnimation |= view.PlayerAnimation == ActorAction.Gather; }
-        Require(world.Find(looseOre.Id) == null && world.Backpack["coal"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
-        Require(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
-        Warp(Hosted, home); await Frames(4);
-    }
-    /// <summary>Picking a bush clean hides only its fruit, which shows again once it is replenished.</summary>
-    private async Task CheckBerryBushHidesOnlyItsFruitWhenPicked() {
-        // Exercise the rendered bush's independent fruit handle through real gathering input.
-        var berryBush = Hosted.Add(ThingKind.Berries, world.Player + new Vector2(1, -1), 4);
-        Drop(Hosted, "berries");
-        await Frames(2);
-        var bushProp = (BushProp)view.PropOf(berryBush.Id)!;
-        Require(bushProp.Fruit is { Visible: true }, "A ripe berry bush must display its fruit.");
-        var point = view.Screen(berryBush.Pos, .35f);
-        Require(view.Pick(point)?.Id == berryBush.Id, "The bush foliage must select its berry resource.");
-        var windowPoint = GetViewport().GetFinalTransform() * point;
-        int soundsBefore = sounds.Played;
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-        await Until(() => sounds.Heard("rustle", soundsBefore), "picking a berry bush by hand rustling its leaves", 3);
-        await Until(() => berryBush.Remaining == 0, "holding RMB on a berry bush picking it clean", world.Data.GatherSeconds + 3);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
-        await Frames(2);
-        Require(berryBush.Remaining == 0, "Harvesting must empty the berry bush.");
-        Require(world.Backpack["berries"] == 4, "Harvesting must put the berries in the backpack.");
-        Require(!bushProp.Fruit.Visible, "Harvesting must hide the fruit.");
-        Require(bushProp.Body.Visible, "Harvesting must leave the bush body visible.");
-        berryBush.Remaining = 4; await Frames(2);
-        Require(bushProp.Fruit.Visible, "A replenished bush must show its fruit again.");
-        RemoveThings(Hosted, t => t == berryBush);
-    }
     private async void RunUIChecks() {
         try {
             await TestClean(CheckLaunchOpensTheStartMenuWithNoSaveToContinue);
@@ -2102,7 +1564,7 @@ public partial class Game {
             await TestClean(CheckLowFoodGlowsScreenEdges);
             await TestClean(CheckSoundsRotateAndMusicCrossfades);
             await TestClean(CheckSoundsFadeWithDistanceFromThePlayerAtAnyZoom);
-            await TestClean(CheckRightClickGathersTreeAndHarvestsFarm);
+            await RunGatheringUIChecks();
             await TestClean(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
             await TestClean(CheckRemoveSelectorTakesBuildingsDownAtOnce);
             await RunGravelPathUIChecks();
@@ -2119,15 +1581,8 @@ public partial class Game {
             await TestClean(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
             await TestClean(CheckHeldPlanPlacesOnOpenGround);
             await TestClean(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
-            await TestClean(CheckHarvestingBesideAStationStopsHammering);
-            await TestClean(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
-            await TestClean(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
-            await TestClean(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
             await TestClean(CheckEveryBlowLandsItsToolOnWhatItWorks);
-            await TestClean(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
             await RunMineUIChecks();
-            await TestClean(CheckStrikerBesideAStationLeavesThePlayerHammering);
-            await TestClean(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
             await TestClean(CheckHudAndHotbarEatAndDrinkSelected);
             var chest = await Test(CheckBuildPlanPlacesChest);
             await Test(() => CheckChestMovesSplitsAndFiltersStacks(chest));
@@ -2138,37 +1593,19 @@ public partial class Game {
             await TestClean(CheckPinnedPlayerStaysDownAndDeathCountsDown);
             await TestClean(CheckMouseWheelOverPanelDoesNotZoom);
             await RunCabinUIChecks();
-            await TestClean(CheckATreeCrownKeepsALoosePieceBehindItClickable);
             await TestClean(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
             await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
             await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
             await TestClean(CheckPileFilterNamesOneResource);
-            await TestClean(CheckChestAndPlacedCrateOfferHaulAndCrateFiltersNameNoCrate);
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
-            await TestClean(CheckPackingStationListsGoodsAndTakesBackpackClicks);
             await TestClean(CheckEndGoalsShowInThePauseMenuAndTheEndingOnce);
-            await TestClean(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
-            await TestClean(CheckRecipeBoardsMarkAndQueueWithModifiers);
-            await TestClean(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);
-            await TestClean(CheckStationSlotsShakeWhenTheBackpackHasNoRoomForThem);
-            await TestClean(CheckUnmarkedStationStaysOnItsRecipe);
-            await TestClean(CheckRefusedDoubleClickKeepsTheWorkerMark);
-            await RunRecipeReadyChecks();
-            await TestClean(CheckRecipeGroupsCloseAndOpenOnAClick);
-            await TestClean(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
-            await TestClean(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
-            await TestClean(CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce);
-            await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
-            await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
-            await TestClean(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
+            await RunCraftingUIChecks();
             var furnace = await Test(CheckSteelFurnaceSlotsLoadHeldStacksThenPump);
             await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));
             Test(CheckForegroundCanopyFadesOnlyOverBuildings);
             await RunSwingsUIChecks();
-            await TestClean(CheckOneRightClickWalksOverAndPicksUpAWholeLoosePiece);
             await RunWolfUIChecks();
-            await TestClean(CheckBerryBushHidesOnlyItsFruitWhenPicked);
-            await TestClean(CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings);
+            await TestClean(CheckATorchIsKindledByAClickAndSwungStandingAndWalking);
             await TestClean(CheckStackLargerThanCrateFillsItAndRestStaysHeld);
             await TestClean(CheckCarriedStackShowsItsCount);
             await TestClean(CheckWindowsMoveByDragAndOpenInTheirUsualSpots);
@@ -2182,8 +1619,7 @@ public partial class Game {
             await TestClean(CheckWorkerPageFollowsItsJobs);
             await TestClean(CheckWorkerPageShowsWhatEachPlaceIsSetToMake);
             await TestClean(CheckDraggingAJobBelowAnotherMakesItComeAfter);
-            await TestClean(CheckAHaulDragsIntoAHaulGroupAndStaysWhenItIsTakenApart);
-            await TestClean(CheckAJobBelowAHaulGroupDragsIntoIt);
+            await RunHaulingUIChecks();
             await TestClean(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
             await TestClean(CheckAWorkerHoldingAPackedCrateSaysSoAboveTheirHands);
             await RunBarrelUIChecks();

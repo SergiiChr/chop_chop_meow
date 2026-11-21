@@ -234,12 +234,12 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | A feature's rules, UI and network checks beside its steps, including `tests/paths/`, `tests/cabins/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
-| `tests/*Checks.cs` | Simulation checks of the features whose code is still flat, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
+| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps: `tests/hauling/`, `tests/gathering/`, `tests/crafting/`, `tests/paths/`, `tests/cabins/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/*Checks.cs` | Simulation checks of the features that have no folder yet, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
-| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events for the features whose code is still flat, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
-| `src/RecipeReadyChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
+| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events for the features that have no folder yet, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
+| `tests/crafting/RecipeReadyUIChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
 | `src/NetChecks.cs` | The host and guest network session (`NET-HOST PASS`, `NET-GUEST PASS`): joining, leaving and reconnecting, with each feature's `NetScene` played in between (`Game.NetScenes`) |
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps several features' UI and network checks share, and `Game.TestClean`, which fails a UI check that leaves a mess |
@@ -265,10 +265,10 @@ Checks and review tools:
 Keep balance and recipe values in `GameData` and `GameTables`, apart from the rules in the simulation code.
 Keep rendering and input separate from state transitions, so headless checks can exercise gameplay rules without relying on screenshots.
 
-- `tests/SimulationChecks.cs` covers filters, worker routing, furnace work, trade, wages, recovery after death, saves and a material-driven progression run.
+- `tests/SimulationChecks.cs` covers filters, worker routing, trade, wages, recovery after death, saves and a material-driven progression run.
 - `tests/EconomyChecks.cs` measures real workers through a day and checks the economy rules.
 - `tests/AllocationChecks.cs` holds ticks to their allocation budgets.
-- `tests/ProductionChainChecks.cs` covers the packing station, the trading post's filter and auto-sell, and workers alone running the berry, bread, canned stew and steel pickaxe chains to a sale.
+- `tests/ProductionChainChecks.cs` covers the trading post's filter and auto-sell, and workers alone running the berry, bread, canned stew and steel pickaxe chains to a sale.
 
 ### HUD and backpack
 
