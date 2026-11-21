@@ -759,21 +759,29 @@ Take tiles up with the remove selector, which gives the 4 gravel back ([Taking b
 
 ## Farming
 
-A farm plot (8 wood) looks like an empty pile and snaps edge to edge with piles and other plots.
+A farm plot (8 wood) is 6×6 tiles and snaps edge to edge with piles and other plots.
+Press E to inspect a nearby plot from its edge or corner.
 Put 1 wheat seeds and 1 fertilizer in it and it sows.
-The soil darkens, and over 3 days small green straws come up, grow into tall green plants and turn into yellow wheat.
+The soil darkens, and over 3 days of watered growth small green straws come up, grow into tall green plants and turn into yellow wheat.
+Wheat uses 10 liters of water per day of growth and pauses when the plot runs dry.
+The plot holds up to 10 liters.
+Pour from a filled bucket or bottle into the water droplet slot, just like at the cooking table.
+The blue bar under fertilizer shows how much water is left.
+When the wheat ripens, the water slot and fill bar hide until the harvest is done.
 
 Hold right mouse on a ripe plot to harvest it by hand, no tool needed.
 An assigned worker also harvests, and everyone adds to one shared progress, so you can stop and come back.
 A harvest takes one worker about 1 working day and gives 4 wheat, 2 wheat seeds and 1 grass into the plot's output.
 
 Seeds do not sow themselves: move them from the output into the input slot by hand, or let a hauler do it.
-Its panel shows seeds as the input, fertilizer as its fuel and wheat, seeds and grass as outputs.
-While the wheat grows it says how long until it is ripe, such as "Growing, 2 days until ripe", and offers the harvest only once it is.
+The farm panel stacks seeds, fertilizer and water on the left, with wheat, seeds and grass in a row on the right.
+While the wheat grows, the panel shows how much growing time is left and says when it needs water.
 
 - A worker on Farm harvests.
 - A worker on Haul keeps the plot's input slots at one sowing, also while the wheat grows: seed from the plot's own harvest first, then seed and fertilizer from storage.
   The rest of the harvest goes to storage; spare seed that no storage takes stacks up in the plot's seed slot.
+  When a growing plot runs dry, the hauler takes a steel bucket from a tool station, fills it at the lake or a full
+  barrel, and walks around the plot, pouring at four spots.
 
 Wheat seeds and fertilizer can also be bought from the village.
 

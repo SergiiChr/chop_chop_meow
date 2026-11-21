@@ -55,7 +55,7 @@ public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, JobChoice choi
 
     /// <summary>What a job does here: the table's words, with a haul's goods and a mine's crew named for the place.</summary>
     private string Hint(JobKind job) => job switch {
-        JobKind.Haul when t.Kind == ThingKind.Farm => "Brings seeds and fertilizer and carries the harvest to storage.",
+        JobKind.Haul when t.Kind == ThingKind.Farm => "Brings seeds and fertilizer, waters wheat with a steel bucket and carries the harvest to storage.",
         JobKind.Haul when t.Kind == ThingKind.Mine => "Brings the timber, iron and stone the mine needs.",
         JobKind.Haul when t.Kind == ThingKind.Barrel => "Hauls water to fill this barrel.",
         JobKind.Haul when t.Kind == ThingKind.Hut => "Climbs the ladder to fill the roof barrel with water.",

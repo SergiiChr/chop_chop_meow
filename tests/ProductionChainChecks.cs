@@ -101,7 +101,7 @@ public static class ProductionChainChecks {
             meat.Inventory.Add("raw_meat", 64 - meat.Inventory["raw_meat"]);
             SafeTick(world, 5);
             foreach (var order in world.Orders) if (!order.Buying && seen.Add(order)) sold.UnionWith(order.Goods.Keys);
-            resown |= farms.Any(f => f.FarmStage == FarmStage.Growing && f.Progress < world.GrowSeconds - 60);
+            resown |= farms.Any(f => f.FarmStage == FarmStage.Growing && f.Progress < world.Farms.GrowSeconds - 60);
         }
         GD.Print($"Production chains: sold {string.Join(", ", sold)} in {days / data.DaySeconds:0.0} days with {world.Workers.Count} workers; farm sown again: {resown}");
         string statuses = string.Join("\n", world.Workers.Select(w => $"  {w.Name} at {world.Find(w.Assignment)?.Kind}: {w.Status}"));

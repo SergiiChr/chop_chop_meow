@@ -363,9 +363,35 @@ public partial class WorldView : Node3D {
         return distance < float.MaxValue;
     }
 
+    private bool RayFarm(Vector3 origin, Vector3 direction, Thing farm, out float distance) {
+        origin -= To3(farm.Pos);
+        RayBox(origin, direction, Farms.HalfSize, .16f, out distance);
+        float height = World.Farms.CropLook(farm) switch { 2 => .23f, 3 => .62f, 4 => .95f, _ => 0 };
+        if (height > 0 && RayBox(origin, direction, 2.6f, height, out float crop)) distance = Math.Min(distance, crop);
+        return distance < float.MaxValue;
+    }
+
+    /// <summary>Finds the nearest point of a ray through a square pad or the crops above it.</summary>
+    private static bool RayBox(Vector3 origin, Vector3 direction, float half, float height, out float distance) {
+        float enter = 0, exit = float.MaxValue;
+        bool hit = Clip(origin.X, direction.X, -half, half, ref enter, ref exit) &&
+            Clip(origin.Z, direction.Z, -half, half, ref enter, ref exit) &&
+            Clip(origin.Y, direction.Y, 0, height, ref enter, ref exit);
+        distance = hit ? enter : float.MaxValue;
+        return hit;
+
+        static bool Clip(float start, float step, float low, float high, ref float enter, ref float exit) {
+            if (Math.Abs(step) < 1e-5f) return start >= low && start <= high;
+            float a = (low - start) / step, b = (high - start) / step;
+            enter = Math.Max(enter, Math.Min(a, b));
+            exit = Math.Min(exit, Math.Max(a, b));
+            return enter <= exit;
+        }
+    }
+
     private readonly List<Thing> picking = new();
     private const float StumpHeight = 1.3f;
-    /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit cylinders.</summary>
+    /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit shapes.</summary>
     public Thing? Pick(Vector2 screen) {
         SyncCamera();
         // One ray for the whole pick: asking the camera again for every thing is most of what a pick costs.
@@ -381,7 +407,9 @@ public partial class WorldView : Node3D {
                 if (hits.Length > 0 && RayHits(origin, direction, t.Pos, [hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) }], out float s) && s < nearest) { nearest = s; best = t; }
                 continue;
             }
-            if (RayHits(origin, direction, t.Pos, hits, out float d) && d < nearest) { nearest = d; best = t; }
+            bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, drawn, out float d)
+                : RayHits(origin, direction, t.Pos, hits, out d);
+            if (hit && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
         var point = ToWorld(screen);
@@ -553,16 +581,19 @@ public partial class WorldView : Node3D {
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
             string? vessel = BarrelHaul.Vessel(worker.Tool) ? worker.Tool : null;
-            var waterTarget = worker.WaterAction != WorkerWaterAction.None ? World.Find(worker.WaterTarget) : null;
+            var waterTarget = worker.WaterAction is WorkerWaterAction.None or WorkerWaterAction.WalkFarm ? null : World.Find(worker.WaterTarget);
             if (waterTarget != null && vessel != null) {
                 var point = waterTarget.Kind switch {
                     ThingKind.Barrel when worker.WaterAction == WorkerWaterAction.Fill => To3(waterTarget.Pos) + VesselShape.BarrelSpout,
                     ThingKind.Barrel => To3(waterTarget.Pos) + VesselShape.BarrelFillOpening,
+                    ThingKind.Farm => To3(BarrelHaul.FarmPourPoint(waterTarget, worker.FarmWaterStop)) + Vector3.Up * .03f,
                     ThingKind.Water => To3(Terrain.WaterPoint(worker.Pos) - (worker.Pos - Terrain.Lake).Normalized() * .45f),
                     _ => To3(waterTarget.Pos)
                 };
                 float progress = Math.Clamp(Clocked(entry.WaterClock, worker.WaterProgress, sameAction, dt), 0, 1);
-                WorkerWaterView.Show(entry.Rig, worker.Pos, point, worker.WaterAction, waterTarget.Kind == ThingKind.Hut, progress, vessel);
+                bool watering = waterTarget.Kind == ThingKind.Farm;
+                WorkerWaterView.Show(entry.Rig, worker.Pos, point, worker.WaterAction, waterTarget.Kind == ThingKind.Hut, progress, vessel,
+                    ground: watering, facing: watering ? state.Yaw : null);
                 if (waterTarget.Kind == ThingKind.Barrel && worker.WaterAction == WorkerWaterAction.Pour) {
                     float opening = Mathf.SmoothStep(0, .28f, progress) * (1 - Mathf.SmoothStep(.73f, 1, progress));
                     openBungs[waterTarget.Id] = Math.Max(openBungs.GetValueOrDefault(waterTarget.Id), opening);
@@ -1151,7 +1182,7 @@ public partial class WorldView : Node3D {
                 break;
             case FarmProp farm:
                 if (!live) break;
-                int look = World.CropLook(t, World.GrowSeconds);
+                int look = World.Farms.CropLook(t);
                 farm.Crops[0].Visible = look > 0;
                 for (int i = 1; i < farm.Crops.Length; i++) farm.Crops[i].Visible = look == i + 1;
                 break;

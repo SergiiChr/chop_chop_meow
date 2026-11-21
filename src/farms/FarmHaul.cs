@@ -9,7 +9,7 @@ internal sealed class FarmHaul : PlaceHaul {
     public override void Carries(Worker w, Thing farm, ref Carry best) {
         var plot = world.Data.Farm;
         foreach (var (item, sowing) in plot.Sow) {
-            int room = world.SowRoom(farm, item);
+            int room = world.Farms.SowRoom(farm, item);
             if (room <= 0) continue;
             if (farm.Output?.Free(item) > 0) Offer(ref best, Bring(farm, farm, item, room, farm.Inventory[item], sowing) with { Box = CarryBox.Output });
             else if (world.SourceFor(item, w.Pos, farm.Id) is Thing source) Offer(ref best, Bring(farm, source, item, room, farm.Inventory[item], sowing));

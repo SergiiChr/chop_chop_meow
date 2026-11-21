@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 /// or a crate cannot go somewhere, what building spends and what taking down gives back.
 /// </summary>
 public sealed class Construction(World world) {
-    /// <summary>Square 3×3 yards laid out on the ground, walkable and snapping edge to edge into grids.</summary>
+    /// <summary>Square yards laid out on the ground, walkable and snapping edge to edge.</summary>
     public static bool IsZone(ThingKind kind) => kind is ThingKind.Pile or ThingKind.Farm;
     private static readonly ThingKind[] Zones = { ThingKind.Pile, ThingKind.Farm };
     public const float ZoneSize = 3;
@@ -21,8 +21,19 @@ public sealed class Construction(World world) {
     public Vector2 Snap(ThingKind kind, Vector2 p) {
         if (kind == ThingKind.Mine) return Mines.Snap(p);
         if (kind == ThingKind.GravelPath) return Terrain.TileAt(p);
-        if (!IsZone(kind) || world.Nearest(Zones, p) is not Thing near || near.Pos.DistanceTo(p) > ZoneSize * 1.6f) return p;
-        return near.Pos + ((p - near.Pos) / ZoneSize).Round() * ZoneSize;
+        if (!IsZone(kind) || world.Nearest(Zones, p) is not Thing near) return p;
+        float half = World.Footprint(kind), other = World.Footprint(near.Kind);
+        float touch = half + other;
+        var delta = p - near.Pos;
+        if (half == other)
+            return delta.LengthSquared() <= touch * touch * 1.6f * 1.6f ? near.Pos + (delta / touch).Round() * touch : p;
+
+        float step = 2 * Math.Min(half, other), offset = Math.Abs(half - other);
+        float Aligned(float axis) => Math.Clamp(Mathf.Round((axis - offset) / step) * step + offset, -touch, touch);
+        var across = new Vector2(MathF.CopySign(touch, delta.X), Aligned(delta.Y));
+        var along = new Vector2(Aligned(delta.X), MathF.CopySign(touch, delta.Y));
+        var snapped = across.DistanceSquaredTo(delta) <= along.DistanceSquaredTo(delta) ? across : along;
+        return snapped.DistanceSquaredTo(delta) <= 1.8f * 1.8f ? near.Pos + snapped : p;
     }
     /// <summary>
     /// The room a building keeps from a resource's middle beyond its own footprint, and a yard beyond its own edge.
@@ -44,7 +55,8 @@ public sealed class Construction(World world) {
         if (world.Player.DistanceTo(p) < 1.2f || Terrain.Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
         if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         foreach (var t in world.S.Things)
-            if (!World.BuiltOver(t.Kind) && t.Pos.DistanceTo(p) < (t.IsResource ? World.Footprint(kind) + ResourceRoom : World.Footprint(kind) + World.Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
+            if (!World.BuiltOver(t.Kind) && (t.Remaining > 0 || !t.IsResource) && TooClose(t, kind, p))
+                return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
             var door = Doorways.DoorPoint(new Thing { Pos = p });
             if (!world.CanStand(door) || Terrain.InLake(door, .8f) || world.S.Things.Any(t => !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
@@ -71,19 +83,27 @@ public sealed class Construction(World world) {
     /// How far past their own footprint buildings keep from a cabin's door spot, where players step in and out.
     /// </summary>
     private const float DoorRoom = .45f;
+    private static bool TooClose(Thing t, ThingKind kind, Vector2 at) {
+        float margin = World.Footprint(kind) + (t.IsResource ? ResourceRoom : World.Footprint(t.Kind) + .45f);
+        var delta = t.Pos - at;
+        return t.Kind == ThingKind.Farm ? Math.Abs(delta.X) < margin && Math.Abs(delta.Y) < margin
+            : delta.LengthSquared() < margin * margin;
+    }
+
     private string? ZoneBlock(ThingKind kind, Vector2 p) {
         if (TooFar(p) is string far) return far;
-        // Every tile the yard covers.
-        for (int x = -1; x <= 1; x++)
-            for (int y = -1; y <= 1; y++) {
+        float half = World.Footprint(kind);
+        // The farm's outer edge is a full tile beyond its outermost whole-tile centers.
+        float sample = kind == ThingKind.Farm ? half : ZoneSize / 2 - .5f;
+        for (float x = -sample; x <= sample; x++)
+            for (float y = -sample; y <= sample; y++) {
                 var q = p + new Vector2(x, y);
                 if (!world.CanStand(q) || Terrain.InLake(q, .8f) || Terrain.Spawn.DistanceTo(q) < 1) return "Choose dry, open ground.";
             }
-        float half = ZoneSize / 2;
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in world.S.Things) {
             if (!IsZone(t.Kind) && t.IsResource && t.Remaining <= 0 || World.BuiltOver(t.Kind)) continue;
-            float margin = IsZone(t.Kind) ? half - .05f : t.IsResource ? YardResourceRoom : World.Footprint(t.Kind) + .2f;
+            float margin = IsZone(t.Kind) ? World.Footprint(t.Kind) - .05f : t.IsResource ? YardResourceRoom : World.Footprint(t.Kind) + .2f;
             if (Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin) return "Leave room around resources and buildings.";
         }
         return Unaffordable(kind);

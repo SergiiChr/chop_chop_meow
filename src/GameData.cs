@@ -126,7 +126,7 @@ public sealed class MineDef {
 /// <summary>A farm plot's season: what sows it, how long the wheat grows and how much work its harvest takes.</summary>
 public sealed class FarmDef {
     public Dictionary<string, int> Sow { get; set; } = new();
-    /// <summary>Whole days from sowing to ripe wheat, nights included.</summary>
+    /// <summary>Days of watered growth, with nights included.</summary>
     public float GrowDays { get; set; } = 3;
     /// <summary>Working days of one worker that a harvest takes; several workers share it.</summary>
     public float HarvestWorkdays { get; set; } = 2;
@@ -369,7 +369,9 @@ public sealed partial class GameData {
         int Steps(string item) {
             if (steps.TryGetValue(item, out int known)) return known >= 0 ? known : throw new InvalidOperationException($"{item} is made out of itself.");
             steps[item] = -1;
-            var inputs = RecipeOf(item)?.Inputs.Keys ?? (Sources.TryGetValue(item, out var source) ? source.From.Concat(source.Also) : []);
+            // Water for growing a crop is gathered, so it adds no vessel-making steps.
+            var inputs = RecipeOf(item)?.Inputs.Keys ?? (Sources.TryGetValue(item, out var source)
+                ? source.From.Concat(source.Also.Where(input => input != Water.Liquid)) : []);
             return steps[item] = inputs.Select(input => 1 + Steps(input)).DefaultIfEmpty(0).Max();
         }
         // A steel container at any fill stands with the container, and a part-drunk bottle with the full one.

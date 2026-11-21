@@ -17,10 +17,10 @@ A crate's chain cost is:
 - the coins spent buying what a harvest uses up: a farm plot sows 1 seed and 1 fertilizer, gets 2 seeds back and buys the fertilizer;
 - the crate itself, made from planks, and packing it at a packing station, measured the same way: one worker packs 19 crates a day.
 
-Carrying goods between stations and out to the market is not counted.
+The estimate leaves out deliveries between stations, watering trips to farm plots and hauling to market.
 
-A farm plot's work comes from its data: a harvest takes 1 worker-day (`FarmDef.HarvestWorkdays`) and gives 4 wheat after growing 3 days (`GrowDays`), which a chain waits for.
-Waiting costs nothing; the table shows it, and the days one worker needs to make a crate from nothing: the wait plus the crate's worker-days, with a quarter of a harvest for a crate of bread.
+A farm plot's work comes from its data: a harvest takes 1 worker-day (`FarmDef.HarvestWorkdays`) and gives 4 wheat after 3 days of watered growth (`GrowDays`).
+The table shows the growth wait and the days one worker needs to make a crate from nothing, including a quarter of a harvest for a crate of bread.
 One wheat grinds into 1 flour, kneads into 3 dough and bakes into 12 bread, a crate.
 Meat comes from wolves the player kills at night, which no worker's day accounts for, so goods made from it are not costed.
 

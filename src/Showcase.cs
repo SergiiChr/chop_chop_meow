@@ -65,7 +65,35 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         ui.Visible = false;
     }
 
+    private void FarmWateringReview() {
+        var at = Terrain.Spawn + new Vector2(2, -4);
+        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 13);
+        world.S.Time = world.Data.DaySeconds * .16f;
+        var farm = world.Add(ThingKind.Farm, at);
+        farm.FarmStage = FarmStage.Growing;
+        farm.Progress = world.Farms.GrowSeconds * .5f;
+        var barrel = world.Add(ThingKind.Barrel, at + new Vector2(-3.8f, -2));
+        barrel.Inventory.Add(Water.Liquid, 50);
+        var sign = world.Add(ThingKind.Signpost, at + new Vector2(-4, 1.5f));
+        world.Player = sign.Pos;
+        world.S.Backpack.Add(Inventory.Coins, 100);
+        if (world.Hire(sign, world.Data.HireOffers[1]) is Worker worker) {
+            worker.Pos = barrel.Pos + BarrelHaul.SpoutApproach;
+            worker.Tool = Bucket.Item;
+            world.SetDuty(worker, farm, JobKind.Haul, true);
+        }
+        world.Player = at + new Vector2(4.8f, 3);
+        world.Tick(0);
+        view.CameraOn = at;
+        view.CameraTurn = Launch.Number("--camera-turn", view.CameraTurn);
+        view.CameraPitch = Launch.Number("--camera-pitch", view.CameraPitch ?? 30);
+        view.Zoom = 1.3f;
+        if (Launch.Has("--panel")) panel.Select(farm); else panel.Close();
+        if (Launch.Has("--hide-ui")) ui.Visible = false;
+    }
+
     private void Place() {
+        if (Launch.Has("--farm-watering")) { FarmWateringReview(); return; }
         if (Launch.Has("--steel-vessels")) { VesselReview(); return; }
         if (Launch.Has("--environment-review")) {
             string location = Launch.Value("--environment-review") ?? "forest";
@@ -245,12 +273,12 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
             var at = Terrain.Spawn + new Vector2(-6, 9);
             for (int i = 0; i < 5; i++) {
-                var plot = world.Add(ThingKind.Farm, at + new Vector2(i * Construction.ZoneSize, 0));
+                var plot = world.Add(ThingKind.Farm, at + new Vector2(i * Farms.HalfSize * 2, 0));
                 plot.FarmStage = i switch { 0 => FarmStage.Fallow, 4 => FarmStage.Ripe, _ => FarmStage.Growing };
-                plot.Progress = i == 4 ? world.HarvestSeconds / 2 : (i - 1) * world.GrowSeconds / 3 + 1;
+                plot.Progress = i == 4 ? world.Farms.HarvestSeconds / 2 : (i - 1) * world.Farms.GrowSeconds / 3 + 1;
             }
-            var wheat = world.Add(ThingKind.Pile, at + new Vector2(0, Construction.ZoneSize)); wheat.Inventory.Add("wheat", 300);
-            world.Player = at + new Vector2(6, 2.5f); world.Tick(0); view.Zoom = 1.2f;
+            var wheat = world.Add(ThingKind.Pile, at + new Vector2(0, Farms.HalfSize + Construction.ZoneSize / 2)); wheat.Inventory.Add("wheat", 300);
+            world.Player = at + new Vector2(12, 2.5f); world.Tick(0); view.Zoom = .7f;
             if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Farm)); else panel.Close();
         }
         if (Launch.Has("--cabin")) {
