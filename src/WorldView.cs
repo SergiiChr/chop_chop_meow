@@ -534,12 +534,10 @@ public partial class WorldView : Node3D {
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking, World.Data);
             if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
-            // At a mine the worker faces the rock past the entrance, not the cart out front.
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down
-                : assignment is { Kind: ThingKind.Mine, MineStage: MineStage.Marked } marked ? World.MineDigFace(marked, worker.Pos)
-                : assignment is { Kind: ThingKind.Mine } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
+                : assignment is { Kind: ThingKind.Mine } mine ? Mines.Facing(mine, worker.Pos) : assignment?.Pos ?? worker.Pos;
             bool sameAction = state.Action == work;
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
@@ -1218,7 +1216,7 @@ public partial class WorldView : Node3D {
                 break;
             case MineProp mine:
                 // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty, and the lantern is out.
-                float stageShare = Math.Clamp(Clocked(mine.Built, t.Progress, live, dt) / World.MineStageSeconds, 0, 1);
+                float stageShare = Math.Clamp(Clocked(mine.Built, t.Progress, live, dt) / World.Mines.StageSeconds, 0, 1);
                 bool finished = t.MineStage == MineStage.Open;
                 mine.Outline.Visible = !finished;
                 mine.Hole.Visible = t.MineStage > MineStage.Marked || stageShare > 0;
@@ -1226,7 +1224,7 @@ public partial class WorldView : Node3D {
                 mine.Supplies.Visible = t.MineStage == MineStage.Supplied;
                 mine.Frame.Visible = finished || t.MineStage == MineStage.Supplied && stageShare > 0;
                 mine.Frame.Scale = new Vector3(1, finished ? 1 : Math.Max(.05f, stageShare), 1);
-                bool mining = finished && live && Underground(t.Id);
+                bool mining = finished && live && World.Mines.Underground(t) > 0;
                 mine.Rails.Visible = finished;
                 mine.Cart.Visible = finished && !mining;
                 mine.Load.Visible = (t.Output?.Count ?? 0) > 0;
@@ -1297,10 +1295,6 @@ public partial class WorldView : Node3D {
                 lands = ActorAnimation.UntilContact(other.Pulse, other.PulseRemaining);
             }
         return (lands, best == float.MaxValue ? World.Player : from);
-    }
-    private bool Underground(int mine) {
-        foreach (var w in World.Workers) if (w.Assignment == mine && w.WorkState == WorkerWorkState.Underground) return true;
-        return false;
     }
     private bool OrderAt(int signpost) {
         foreach (var o in World.Orders) if (o.Signpost == signpost) return true;
@@ -1634,7 +1628,7 @@ public partial class WorldView : Node3D {
         placeTile.Visible = Placing != null;
         var kind = Placing.GetValueOrDefault();
         var at = Placing == null ? Vector2.Zero : World.Construction.Snap(kind, ToWorld(Mouse).Round());
-        var shown = Placing == null ? null : kind == ThingKind.Mine ? mineGhosts[World.CliffAt(at).Ore] : ghosts[kind];
+        var shown = Placing == null ? null : kind == ThingKind.Mine ? mineGhosts[Cliff.Nearest(at).Ore] : ghosts[kind];
         if (shown != ghost) {
             if (ghost != null) ghost.Root.Visible = false;
             if (shown != null) shown.Root.Visible = true;
@@ -1644,7 +1638,7 @@ public partial class WorldView : Node3D {
         bool valid = World.Construction.PlacementBlock(kind, at) == null;
         if (shown.Tint != valid) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid; }
         shown.Root.Position = To3(at);
-        if (kind == ThingKind.Mine) shown.Body.Rotation = WorldModels.MineYaw(at);
+        if (kind == ThingKind.Mine) shown.Body.Rotation = MineModel.Yaw(Cliff.Nearest(at).Face);
         placeTile.Position = To3(at, .02f);
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
     }
@@ -1662,7 +1656,7 @@ public partial class WorldView : Node3D {
         foreach (var kind in World.Data.Buildings.Keys) if (kind != ThingKind.Mine) ghosts[kind] = Ghost(kind, Vector2.Zero);
         ghosts[ThingKind.Crate] = Ghost(ThingKind.Crate, Vector2.Zero);
         ghosts[ThingKind.Barrel] = Ghost(ThingKind.Barrel, Vector2.Zero);
-        foreach (var ore in World.MineOres) mineGhosts[ore] = Ghost(ThingKind.Mine, World.MineSpot(World.CliffOf(ore)));
+        foreach (var ore in Cliff.Ores) mineGhosts[ore] = Ghost(ThingKind.Mine, Cliff.Of(ore).MineSpot);
     }
 
     /// <summary>What the remove selector has turned red: the building or gravel path tile it points at, while that is in reach.</summary>

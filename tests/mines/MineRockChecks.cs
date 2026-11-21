@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 /// <summary>The cave scenery must join the actual mountain mesh without growing into a tall detached fin.</summary>
 public static class MineRockChecks {
     public static void Run() {
-        foreach (var cliff in World.Cliffs) {
+        foreach (var cliff in Cliff.All) {
             var mesh = MineRockShape.Mesh(cliff, new[] { "7d5b45", "8a6650", "6e4f3c" });
             var vertices = mesh.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
             float rear = float.MaxValue;
@@ -17,7 +17,7 @@ public static class MineRockChecks {
             foreach (var vertex in vertices) {
                 Require(vertex.IsFinite() && vertex.Y <= 4.31f, "the cave rock must stay a low outcrop at the mountain foot");
                 if (Math.Abs(vertex.Z - rear) > .001f) continue;
-                var position = World.MineSpot(cliff) + across * vertex.X + cliff.Face * vertex.Z;
+                var position = cliff.MineSpot + across * vertex.X + cliff.Face * vertex.Z;
                 Require(vertex.Y < MountainShape.Surface(position) - .7f, "the whole rear edge must be buried below the actual mountain triangles");
                 embedded++;
             }

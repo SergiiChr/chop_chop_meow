@@ -7,8 +7,8 @@ namespace ChopChopMeow;
 /// <summary>A mine's three building steps while it is built, then its miners and its two outputs once it is open.</summary>
 public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        string name = World.MineName(thing); headingTitle.Text = char.ToUpper(name[0]) + name[1..];
-        headingIcon.Texture = Icons.Of(World.MineOre(thing)); headingIcon.Visible = true;
+        string name = Mines.Name(thing); headingTitle.Text = char.ToUpper(name[0]) + name[1..];
+        headingIcon.Texture = Icons.Of(Mines.Ore(thing)); headingIcon.Visible = true;
         var data = world.Data.Mine;
         int stage = (int)thing.MineStage; bool open = thing.MineStage == MineStage.Open;
         // Everything below is laid out for this stage.
@@ -36,7 +36,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                 foreach (var (item, amount) in data.Materials) {
                     var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); row.AddChild(column);
                     var (cell, count) = ItemSlot.Create($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
-                    moves.TakeCell(cell, thing.Inventory, item, thing, held => held.Stack is { Box: 0 } stack && stack.Item == item, (good, units) => world.SupplyMine(thing, good, units));
+                    moves.TakeCell(cell, thing.Inventory, item, thing, held => held.Stack is { Box: 0 } stack && stack.Item == item, (good, units) => world.Mines.Supply(thing, good, units));
                     column.AddChild(Style.PerBatch($"/ {amount}"));
                     live.Watch(() => thing.Inventory[item], drawn => {
                         count.Text = drawn.ToString();
@@ -44,8 +44,8 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                         cell.TooltipText = $"{world.Data.Name(item)} · {drawn} of {amount}\nPut it here from your backpack · {StationSlots.SlotHint}";
                     });
                 }
-            } else Dynamic(text => text.Append(stages[stage].Needs).Append(" · ").Append((int)(thing.Progress / world.MineStageSeconds * 100)).Append("% done"), 14, Style.Beige);
-            BagGrid(id => world.SupplyMine(thing, id, ItemMoves.Amount(world.S.Backpack, id)), $"{BagHint}\nShift: deliver a stack · Ctrl: all the mine needs", wanted: id => world.MineNeed(thing, id) > 0);
+            } else Dynamic(text => text.Append(stages[stage].Needs).Append(" · ").Append((int)(thing.Progress / world.Mines.StageSeconds * 100)).Append("% done"), 14, Style.Beige);
+            BagGrid(id => world.Mines.Supply(thing, id, ItemMoves.Amount(world.S.Backpack, id)), $"{BagHint}\nShift: deliver a stack · Ctrl: all the mine needs", wanted: id => world.Mines.Need(thing, id) > 0);
         } else {
             // Miners as hardhats, lit while underground, and the two outputs with how fast they fill.
             var crew = Row(); crew.AddThemeConstantOverride("separation", 8);
@@ -53,7 +53,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
             var hats = Enumerable.Range(0, data.Workers).Select(_ => Style.Icon(Icons.Of("hardhat"), 30)).ToArray();
             foreach (var hat in hats) crew.AddChild(hat);
             var row = Well(new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }); row.AddThemeConstantOverride("separation", 36);
-            var rates = new Label[2]; var bars = new ColorRect[2]; var items = new[] { World.MineOre(thing), "stone" };
+            var rates = new Label[2]; var bars = new ColorRect[2]; var items = new[] { Mines.Ore(thing), "stone" };
             for (int i = 0; i < 2; i++) {
                 string item = items[i];
                 var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 10); row.AddChild(pair);
@@ -70,17 +70,11 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                     cell.TooltipText = $"{world.Data.Name(item)} · {drawn}/{thing.Output!.StackSize}\nClick to take · mining stops when either is full";
                 });
             }
-            live.Watch(MinersUnderground, now => {
+            live.Watch(() => world.Mines.Underground(thing), now => {
                 for (int i = 0; i < hats.Length; i++) hats[i].Modulate = i < now ? Colors.White : Style.Unready;
                 rates[0].Text = rates[1].Text = $"{MathF.Round(now / data.Seconds * 100) / 100} /s";
             });
         }
         JobButtons();
-    }
-
-    private int MinersUnderground() {
-        int miners = 0;
-        foreach (var w in world.Workers) if (w.Assignment == thing.Id && w.WorkState == WorkerWorkState.Underground) miners++;
-        return miners;
     }
 }

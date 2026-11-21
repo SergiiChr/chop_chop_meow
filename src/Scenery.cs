@@ -35,8 +35,8 @@ public static class Scenery {
     /// <summary>Whether scenery may stand at a spot: dry open ground off the beach, the lake shore, the mountain feet and the mine approaches.</summary>
     public static bool Dressable(Vector2 p) {
         if (!Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 1.1f) || Terrain.FromMountains(p) < 2) return false;
-        foreach (var cliff in World.Cliffs) {
-            var offset = p - World.MineSpot(cliff); float depth = offset.Dot(cliff.Face);
+        foreach (var cliff in Cliff.All) {
+            var offset = p - cliff.MineSpot; float depth = offset.Dot(cliff.Face);
             if (Math.Abs(offset.Dot(cliff.Along)) < 3 && depth > -6 && depth < 2) return false;
         }
         return Density(p) >= Bare;

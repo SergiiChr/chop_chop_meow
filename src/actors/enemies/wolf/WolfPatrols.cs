@@ -22,6 +22,11 @@ public sealed class WolfPatrols(World world) {
 
     /// <summary>Seconds after dusk between one den opening and the next, so their wolves do not all appear on the same frame.</summary>
     public const float DenGapSeconds = 2;
+    /// <summary>Whether a point lies within a den's outcrop: a mine's outcrop at the den's smaller size.</summary>
+    public static bool InOutcrop(Vector2 p, float margin = 0) {
+        foreach (var den in Dens) if (Mines.OutcropCovers((p - den.Spot) / Den.Scale, den.Face, margin / Den.Scale)) return true;
+        return false;
+    }
     public static bool NearDen(Vector2 p, float distance) {
         foreach (var den in Dens) if (den.Door.DistanceTo(p) < distance) return true;
         return false;

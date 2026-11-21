@@ -336,7 +336,7 @@ internal static class BarrelChecks {
 
     private static void CheckBlockedBarrelLetsTheWorkerDoTheirNextJob(GameData data) {
         var world = EmptyWorld(data);
-        var cliff = World.CliffOf(ThingKind.Coal);
+        var cliff = Cliff.Of(ThingKind.Coal);
         var barrel = world.Add(ThingKind.Barrel, cliff.Center + cliff.Face * 1.7f);
         var tree = world.Add(ThingKind.Tree, barrel.Pos + cliff.Face * 4, 10);
         world.Add(ThingKind.Chest, tree.Pos + cliff.Face * 2);

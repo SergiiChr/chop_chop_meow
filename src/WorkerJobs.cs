@@ -119,7 +119,7 @@ public sealed partial class World {
             return dest.Burner is Inventory burner && Fuels(dest).Contains(item) && FuelTakes(dest, item) && (room = burner.Room(item)) > 0 ? (burner, room) : null;
         }
         room = dest.Kind switch {
-            ThingKind.Mine => MineNeed(dest, item),
+            ThingKind.Mine => Mines.Need(dest, item),
             ThingKind.Farm => SowRoom(dest, item),
             // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
             ThingKind.Signpost when !dest.Inventory.Wants(item) => 0,

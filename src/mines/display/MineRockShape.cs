@@ -14,13 +14,14 @@ internal static class MineRockShape {
     /// </summary>
     public static Mesh Mesh(Cliff cliff, string[] palette, float scale = 1) {
         if (meshes.TryGetValue((cliff, scale), out var mesh)) return mesh;
-        var spot = World.MineSpot(cliff); var outwards = cliff.Face; var across = new Vector2(outwards.Y, -outwards.X);
+        var spot = cliff.MineSpot; var outwards = cliff.Face; var across = new Vector2(outwards.Y, -outwards.X);
         Vector2 WorldPoint(float x, float z) => spot + (across * x + outwards * z) * scale;
         float Ground(float x, float z) => MountainShape.Surface(WorldPoint(x, z)) / scale;
         float root = -7;
-        while (root > -32 && (Terrain.FromMountains(WorldPoint(-4.6f, root)) > -6 || Terrain.FromMountains(WorldPoint(0, root)) > -6 || Terrain.FromMountains(WorldPoint(4.6f, root)) > -6)) root -= 1;
-        float[] depth = { -World.MineFace, -4.2f, -6, root };
-        float[] width = { 2.55f, 2.8f, 3.35f, 4.6f };
+        var (deepest, widest) = Mines.OutcropWidths[^1];
+        while (root > deepest && (Terrain.FromMountains(WorldPoint(-widest, root)) > -6 || Terrain.FromMountains(WorldPoint(0, root)) > -6 || Terrain.FromMountains(WorldPoint(widest, root)) > -6)) root -= 1;
+        float[] depth = Array.ConvertAll(Mines.OutcropWidths, station => station.Depth); depth[^1] = root;
+        float[] width = Array.ConvertAll(Mines.OutcropWidths, station => station.HalfWidth);
         float[] crown = { 3.05f, 3.6f, 4.3f, 0 };
         // More angular stations break up the long straight shoulders while retaining a broad, clear adit.
         Vector2[] section = {
@@ -84,7 +85,7 @@ internal static class MineRockShape {
                 Quad(rings[row][i], rings[row][next], rings[row + 1][next], rings[row + 1][i], outward, row + i / 2, blend);
             }
         // The mouth is a deliberate aperture; nothing is drawn across the tunnel opening.
-        Vector3[] corners = { new(-World.MouthHalfWidth, .02f, depth[0]), new(-World.MouthHalfWidth, .9f, depth[0]), new(-World.MouthHalfWidth, 1.66f, depth[0]), new(-.4f, 1.76f, depth[0]), new(.4f, 1.76f, depth[0]), new(World.MouthHalfWidth, 1.66f, depth[0]), new(World.MouthHalfWidth, .9f, depth[0]), new(World.MouthHalfWidth, .02f, depth[0]) };
+        Vector3[] corners = { new(-Mines.MouthHalfWidth, .02f, depth[0]), new(-Mines.MouthHalfWidth, .9f, depth[0]), new(-Mines.MouthHalfWidth, 1.66f, depth[0]), new(-.4f, 1.76f, depth[0]), new(.4f, 1.76f, depth[0]), new(Mines.MouthHalfWidth, 1.66f, depth[0]), new(Mines.MouthHalfWidth, .9f, depth[0]), new(Mines.MouthHalfWidth, .02f, depth[0]) };
         var mouth = new Vector3[15];
         for (int i = 0; i < corners.Length - 1; i++) {
             mouth[i * 2] = corners[i]; mouth[i * 2 + 1] = corners[i].Lerp(corners[i + 1], .5f);

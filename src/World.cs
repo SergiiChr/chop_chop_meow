@@ -116,13 +116,6 @@ public sealed class QueueJson : JsonConverter<List<Queued>> {
         writer.WriteEndArray();
     }
 }
-/// <summary>An impassable rock face whose ore deposits sit at its foot, with loose pieces scattered toward the clearing.</summary>
-public readonly record struct Cliff(ThingKind Ore, Vector2 Center, Vector2 Face, float HalfLength) {
-    public const float Depth = 1.4f;
-    public Vector2 Along => new(-Face.Y, Face.X);
-    /// <summary>Distance to the cliff's spine, so the whole wall blocks movement rather than only its middle.</summary>
-    public float DistanceTo(Vector2 p) => p.DistanceTo(Center + Along * Math.Clamp((p - Center).Dot(Along), -HalfLength, HalfLength));
-}
 public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting, Digging, Underground }
 
 public sealed class Worker : IWalker {
@@ -312,12 +305,6 @@ public sealed partial class World {
     public const float SteelHeat = 80;
     /// <summary>Heat as degrees Celsius for display: the steel line sits where steel forms, 1450 °C.</summary>
     public static int Celsius(float heat) => (int)MathF.Round(heat * 1450 / SteelHeat / 10) * 10;
-    // Rock faces at the foot of both ranges, facing into the valley; the first iron and coal cliffs are the nearer ones, with loose coal below the coal cliff.
-    // Iron and tin have no loose pieces: they wait for a pickaxe.
-    public static readonly Cliff[] Cliffs = { FootCliff(ThingKind.Iron, 172, 1), FootCliff(ThingKind.Coal, 140, -1), FootCliff(ThingKind.Tin, 108, 1), FootCliff(ThingKind.Iron, 80, -1), FootCliff(ThingKind.Coal, 62, 1) };
-    private static Cliff FootCliff(ThingKind ore, float along, int side) =>
-        new(ore, Terrain.Point(along, side * (Terrain.HalfWidth(along, side) + .6f)), Terrain.Sideways * -side, 4.5f);
-    public static Cliff CliffOf(ThingKind ore) => Cliffs.First(c => c.Ore == ore);
     private float gatherClock { get => S.Actor.GatherClock; set => S.Actor.GatherClock = value; }
     private float attackClock { get => S.Actor.AttackClock; set => S.Actor.AttackClock = value; }
     private bool asleep;
@@ -329,7 +316,7 @@ public sealed partial class World {
         Data = data;
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
-        Construction = new Construction(this); GravelPaths = new GravelPaths(this);
+        Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
         barrels = new Barrels(this); barrelJobs = new BarrelJobs(this, barrels); bedtimeWater = new BedtimeWater(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
@@ -345,6 +332,8 @@ public sealed partial class World {
     private readonly BedtimeWater bedtimeWater;
     /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
     public GravelPaths GravelPaths { get; }
+    /// <summary>Mines: marking one at a cliff, building it in stages and working it underground.</summary>
+    public Mines Mines { get; }
     /// <summary>Cabin doors: stepping in and out, the queue at the door and knocking.</summary>
     public Doorways Doorways { get; }
     /// <summary>Wolves tugging players back out of cabin doorways.</summary>
@@ -409,8 +398,7 @@ public sealed partial class World {
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
     public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind switch {
         ThingKind.Water => Terrain.WaterPoint(from),
-        // A marked mine's entrance is dug at the rock face beside its cave mouth.
-        ThingKind.Mine => t.MineStage == MineStage.Marked ? MineDigFace(t, from) : MineDoor(t),
+        ThingKind.Mine => Mines.WorkSpot(t, from),
         _ => t.Pos
     };
     /// <summary>How far, in metres, the player reaches to move items in and out of storage and stations.</summary>
@@ -470,7 +458,7 @@ public sealed partial class World {
     }
     /// <summary>What the settlement gathered, bought or started with is in its record of items, and what it made is among its milestones.</summary>
     private bool HadItself(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item);
-    private void Got(string item) => S.Obtained.Add(item);
+    internal void Got(string item) => S.Obtained.Add(item);
     public int DayRevenue => S.DayRevenue;
     public ListView<int> Profits => new(S.Profits);
     public bool EndingShown => S.EndingShown;
@@ -513,10 +501,10 @@ public sealed partial class World {
         S.Backpack.Add(Water.Empty, 1);
         foreach (var pair in S.Backpack.Items) Got(pair.Key);
         var rng = new Random(4271);
-        foreach (var cliff in Cliffs) {
+        foreach (var cliff in Cliff.All) {
             // Two deposits flank the mine's mouth in the middle of the cliff, holding what three did before.
             foreach (float along in new[] { -3.5f, 3.5f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, DepositOre);
-            if (cliff != CliffOf(cliff.Ore) || cliff.Ore != ThingKind.Coal) continue;
+            if (cliff != Cliff.Of(cliff.Ore) || cliff.Ore != ThingKind.Coal) continue;
             // Loose coal rolls well out past the deposits of the nearer coal cliff, so collecting it takes a search.
             // Iron has no loose pieces: the first pickaxe is bought with berry money.
             for (int placed = 0; placed < 6;) {
@@ -572,7 +560,7 @@ public sealed partial class World {
         }
         for (int placed = 0, tried = 0; placed < count && tried < tries; tried++) {
             var p = new Vector2(rng.Next(3, Terrain.Size - 3), rng.Next(3, Terrain.Size - 3));
-            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InSpur(p, 2.5f) || WolfPatrols.NearDen(p, 5)) continue;
+            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliff.All.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InOutcrop(p, 2.5f) || WolfPatrols.NearDen(p, 5)) continue;
             if (rng.NextDouble() > chance(p) || Crowded(p)) continue;
             var t = Add(kind, p, remaining); placed++;
             if (!near.TryGetValue(Cell(p), out var cellList)) near[Cell(p)] = cellList = new();
@@ -593,12 +581,14 @@ public sealed partial class World {
         foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) if (Blocks(t, p)) return false;
         return true;
     }
-    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their spurs.</summary>
+    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their outcrops.</summary>
     internal static bool Open(Vector2 p) {
         if (!Terrain.Open(p)) return false;
-        foreach (var c in Cliffs) if (c.DistanceTo(p) < Cliff.Depth) return false;
-        return !InSpur(p);
+        foreach (var c in Cliff.All) if (c.DistanceTo(p) < Cliff.Depth) return false;
+        return !InOutcrop(p);
     }
+    /// <summary>Whether a point lies within a cliff's or a den's outcrop of solid rock.</summary>
+    private static bool InOutcrop(Vector2 p, float margin = 0) => Mines.InOutcrop(p, margin) || WolfPatrols.InOutcrop(p, margin);
     /// <summary>The kinds that are not resources: buildings, yards and what is left on the ground, such as graves.</summary>
     public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null);
     /// <summary>The kinds that stand in the way; resources, yards, campfires, graves, signposts and mines are walked past.</summary>
@@ -621,14 +611,14 @@ public sealed partial class World {
         ThingKind.Stump => "dig up the stump",
         ThingKind.Bush => "dig up the bush",
         _ when t.IsLoose => Phrase("pick up ", Lower(Data.Name(t.Kind))),
-        ThingKind.Mine => t.MineStage == MineStage.Marked ? "dig the mine" : t.MineStage == MineStage.Supplied ? "fit the mine frame" : Phrase("mine ", CliffAt(t.Pos).Ore.Id()),
+        ThingKind.Mine => Mines.Task(t),
         _ => Phrase("mine ", t.Kind.Id())
     };
     // Status lines are made of a few phrases, names and small numbers, so each line is built once and reused rather than on every tick.
     private readonly Dictionary<(string, string, string, string), string> phrases = new();
     private readonly Dictionary<string, string> lowered = new();
     private static readonly string[] Numbers = Enumerable.Range(0, 1000).Select(n => n.ToString()).ToArray();
-    private string Phrase(string a, string b, string c = "", string d = "") {
+    internal string Phrase(string a, string b, string c = "", string d = "") {
         if (!phrases.TryGetValue((a, b, c, d), out var text)) phrases[(a, b, c, d)] = text = a + b + c + d;
         return text;
     }
@@ -673,7 +663,7 @@ public sealed partial class World {
     }
     public string? GatherBlock(Thing t, bool worker = false) {
         if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == Water.Full && !Water.HasBucketRoom(S.Backpack)) return "Your bottles are filled.";
-        if (t.Kind == ThingKind.Mine) return MineBuildBlock(t);
+        if (t.Kind == ThingKind.Mine) return Mines.BuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (!t.IsResource) return "Select a natural resource.";
         if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again within ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
@@ -704,7 +694,7 @@ public sealed partial class World {
         var blocked = GatherBlock(t);
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
-        if (t.Kind == ThingKind.Mine) { BuildMine(t, dt); return; }
+        if (t.Kind == ThingKind.Mine) { Mines.Work(t, dt); return; }
         if (t.Kind == ThingKind.Farm) { Harvest(t, dt); if (t.FarmStage == FarmStage.Fallow) Say("Harvested. Take the wheat, seeds and grass from the plot, and put seeds back in to sow again."); return; }
         gatherClock += dt;
         var rule = GatherRules.Of(t.Kind);
@@ -1309,7 +1299,7 @@ public sealed partial class World {
         S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count });
         Say($"Goods sent: {string.Join(", ", goods.Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;
     }
-    private string Goods(IEnumerable<KeyValuePair<string, int>> goods) => string.Join(", ", goods.Select(p => $"{p.Value} {Data.Name(p.Key)}"));
+    internal string Goods(IEnumerable<KeyValuePair<string, int>> goods) => string.Join(", ", goods.Select(p => $"{p.Value} {Data.Name(p.Key)}"));
     /// <summary>Orders <paramref name="lots"/> purchases of a good the village sells: tools one by one, the rest in crates.</summary>
     public bool Buy(Thing sign, string item, int lots) {
         if (!Data.Market.Buys.ContainsKey(item) || lots <= 0) return false;
@@ -2193,7 +2183,7 @@ public sealed partial class World {
         // Only kinds that change by themselves tick, so trees and rocks cost nothing; a tick that can add or remove things walks a copy.
         // A carcass keeps its age so the death animation plays once and not again after loading.
         foreach (var t in S.Things.Of(ThingKind.WolfCorpse)) t.Progress = Math.Min(60, t.Progress + dt);
-        foreach (var t in Ticking(ThingKind.Mine)) MineTick(t, dt);
+        foreach (var t in Ticking(ThingKind.Mine)) Mines.Tick(t, dt);
         foreach (var t in Ticking(ThingKind.Barrel)) PileFilters(t);
         foreach (var t in Ticking(ThingKind.Pile)) { PileFilters(t); if (t.Compost) CompostTick(t, dt); }
         foreach (var t in Ticking(ThingKind.Farm)) FarmTick(t, dt);
@@ -2387,12 +2377,6 @@ public sealed partial class World {
         _ => ("A settlement of your own", "The starter goals are done. Work toward the end goals: a working mine on every ore and a week of steady profit.")
     };
     // ---------- End goals ----------
-    /// <summary>Ores found in the valley's cliffs; the end goal wants a working mine on each.</summary>
-    public static readonly ThingKind[] MineOres = Cliffs.Select(c => c.Ore).Distinct().ToArray();
-    public bool HasMine(ThingKind ore) {
-        foreach (var t in S.Things.Of(ThingKind.Mine)) if (t.MineStage == MineStage.Open && CliffAt(t.Pos).Ore == ore) return true;
-        return false;
-    }
     /// <summary>Finished days in a row, up to today, whose profit reached the goal.</summary>
     public int ProfitStreak => S.Profits.AsEnumerable().Reverse().TakeWhile(p => p >= Data.Goals.DailyProfit).Count();
     /// <summary>Once reached, the week of profit stays reached even if later days fall short.</summary>
@@ -2401,7 +2385,7 @@ public sealed partial class World {
     public bool EndGoalsComplete {
         get {
             if (!ProfitGoalMet) return false;
-            foreach (var ore in MineOres) if (!HasMine(ore)) return false;
+            foreach (var ore in Cliff.Ores) if (!Mines.Working(ore)) return false;
             return true;
         }
     }

@@ -19,7 +19,7 @@ public sealed class Construction(World world) {
     /// the middle of its tile.
     /// </summary>
     public Vector2 Snap(ThingKind kind, Vector2 p) {
-        if (kind == ThingKind.Mine) return World.SnapMine(p);
+        if (kind == ThingKind.Mine) return Mines.Snap(p);
         if (kind == ThingKind.GravelPath) return Terrain.TileAt(p);
         if (!IsZone(kind) || world.Nearest(Zones, p) is not Thing near || near.Pos.DistanceTo(p) > ZoneSize * 1.6f) return p;
         return near.Pos + ((p - near.Pos) / ZoneSize).Round() * ZoneSize;
@@ -37,7 +37,7 @@ public sealed class Construction(World world) {
         if (world.Occupied) return "You are busy.";
         if (world.S.Sheltered != 0) return "Leave the cabin first.";
         if (WolfPatrols.NearDen(p, Den.Clearance)) return "Leave the wolf den's mouth clear.";
-        if (kind == ThingKind.Mine) return world.MineBlock(p);
+        if (kind == ThingKind.Mine) return world.Mines.Block(p);
         if (kind == ThingKind.GravelPath) return world.GravelPaths.Block(Terrain.TileAt(p));
         if (IsZone(kind)) return ZoneBlock(kind, p);
         if (TooFar(p) is string far) return far;
@@ -103,7 +103,7 @@ public sealed class Construction(World world) {
         if (kind == ThingKind.GravelPath) { world.GravelPaths.Lay(Terrain.TileAt(p)); world.Play("place_building", p); return null; }
         var t = world.Add(kind, p); world.ClearGround(t); world.Play("place_building", p);
         if (kind == ThingKind.Campfire) { t.Burn = world.Data.CampfireSeconds; world.Play("start_fire", p); }
-        if (kind == ThingKind.Mine) { world.Say($"Marked the {World.MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); world.Made?.Invoke(world.S.Actor.Id, t.Id); }
+        if (kind == ThingKind.Mine) { world.Say($"Marked the {Mines.Name(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); world.Made?.Invoke(world.S.Actor.Id, t.Id); }
         return t;
     }
     /// <summary>

@@ -107,8 +107,8 @@ public partial class WorldView {
     private void RefreshDressing() {
         if (disturbanceTexture == null) return;
         Array.Clear(disturbed);
-        foreach (var cliff in World.Cliffs) {
-            var at = World.MineSpot(cliff); var outwards = cliff.Face;
+        foreach (var cliff in Cliff.All) {
+            var at = cliff.MineSpot; var outwards = cliff.Face;
             for (float d = -3; d < 2; d += .75f) Stamp(disturbed, at + outwards * d, 2.6f, .95f);
         }
         foreach (var t in World.Things) {

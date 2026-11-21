@@ -139,7 +139,7 @@ public sealed class StrikePoints {
     /// Where a pick digging a mine's entrance lands: on the cliff's rock face just beside the cave mouth, on the digger's
     /// side, halfway up the mouth; the mine's own model is only a see-through marking.
     /// </summary>
-    private static Vector3 BesideTheMouth(Thing mine, Vector2 from) => WorldView.To3(World.MineDigFace(mine, from), MouthBlow);
+    private static Vector3 BesideTheMouth(Thing mine, Vector2 from) => WorldView.To3(Mines.DigFace(mine, from), MouthBlow);
 
     /// <summary>How high over the ground a pick digging a mine's entrance lands on the rock, halfway up the cave mouth.</summary>
     private const float MouthBlow = .9f;
