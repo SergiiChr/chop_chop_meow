@@ -98,8 +98,8 @@ public sealed partial class World {
             static (world, w, _, place, dt) => place!.Kind == ThingKind.Packer ? world.PackWork(w, place, dt) : world.Craft(w, place, dt)),
         new(JobKind.Bellows, "Bellows", "Keeps the fire hot. Only one worker pumps at a time.", true, [], static (world, w, _, place, dt) => world.Pump(w, place!, dt)),
         new(JobKind.Farm, "Farm", "Harvests the ripe wheat.", true, [], static (world, w, _, place, dt) => world.Reap(w, place!, dt)),
-        new(JobKind.Build, "Build", "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.", true, ["pickaxe", "hammer"], static (world, w, _, place, dt) => world.BuildSite(w, place!, dt)),
-        new(JobKind.Mine, "Mine", "Mines ore and stone underground with a pickaxe.", true, ["pickaxe"], static (world, w, _, place, dt) => world.Dig(w, place!, dt)),
+        new(JobKind.Build, "Build", "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.", true, ["pickaxe", "hammer"], static (world, w, _, place, dt) => world.Mines.Build(w, place!, dt)),
+        new(JobKind.Mine, "Mine", "Mines ore and stone underground with a pickaxe.", true, ["pickaxe"], static (world, w, _, place, dt) => world.Mines.Mine(w, place!, dt)),
         new(JobKind.Deliveries, "Manage deliveries", "Fetches fresh prices on request and carries deliveries to storage.", false, [], static (world, w, _, place, dt) => world.ManageDeliveries(w, place!, dt)),
         new(JobKind.Fuel, "Tend fire", "Keeps the fire fed with wood from storage.", false, [], static (world, w, _, place, dt) => world.TendFire(w, place!, dt)),
         new(JobKind.Stock, "Stock", "Brings tools from storage to the rack.", false, [], static (world, w, _, place, dt) => world.StockTools(w, place!, dt)),
@@ -124,7 +124,8 @@ public sealed partial class World {
     public JobKind[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {
         ThingKind.Reinforced => BellowsJobs,
         ThingKind.Bench or ThingKind.Anvil or ThingKind.Cooktable or ThingKind.Packer => CraftJobs,
-        ThingKind.Furnace or ThingKind.Cannery => HaulJobs,
+        ThingKind.Furnace or ThingKind.Cannery or ThingKind.Barrel => HaulJobs,
+        ThingKind.Hut when Barrel.In(t.Inventory) != null => HaulJobs,
         ThingKind.Signpost => DeliveryJobs,
         ThingKind.Campfire => FireJobs,
         ThingKind.Farm => FarmJobs,
@@ -162,7 +163,7 @@ public sealed partial class World {
 
     /// <summary>Gives a worker one job at a place, at the end of their list, or takes it away wherever it is, keeping their other jobs.</summary>
     public void SetDuty(Worker w, Thing target, JobKind job, bool on) {
-        if (on == HasDuty(w, target.Id, job) || Array.IndexOf(Jobs(target), job) < 0) return;
+        if (on == HasDuty(w, target.Id, job) || on && Array.IndexOf(Jobs(target), job) < 0) return;
         if (on && NoRoomAt(w, target)) return;
         if (Busy() || Forwarded(Verb.Duty, target.Id, w.Id, job.Id(), on ? 1 : 0)) return;
         if (on) w.Jobs.Add(NewDuty(target, job));

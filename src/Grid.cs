@@ -49,16 +49,21 @@ public partial class PagePanel {
             cell.Controls = new SlotInput(cursor) {
                 Pick = () => stacks[slot] != null ? (inventory(), slot) : null,
                 // A building's own rules answer at once, so a slot that will not take the stack shakes; a liquid with no vessel to go into also says why.
-                Takes = takes ?? (held => held.Stack is HeldStack stack && (container == null || world.BoxBlock(container, inventory(), stack.Item) == null) && Fills(stack.Item)),
+                Takes = takes ?? (held => held.Stack is HeldStack stack && Accepts(stack.Item) && Fills(stack.Item)),
                 Put = (_, units) => kit.Run(() => moves.PutDown(inventory(), slot, units, container, put == null ? null : (item, count) => put(slot, item, count))),
                 Batch = On(batch),
                 Use = On(use),
             };
             grid.AddChild(cell);
         }
+        bool Accepts(string item) {
+            if (container == null || world.BoxBlock(container, inventory(), item) is not string refused) return true;
+            if (Barrel.Is(item)) kit.Notify(refused);
+            return false;
+        }
         // A liquid held from another box goes only into vessels here with room for it.
         bool Fills(string item) {
-            if (world.HeldBox is not Inventory from || from == inventory() || world.FillBlock(from, inventory(), item) is not string dry) return true;
+            if (world.HeldBox is not Inventory from || from == inventory() || world.FillBlock(from, inventory(), item, container) is not string dry) return true;
             kit.Notify(dry); return false;
         }
         // What each slot last drew: its stack, the inventory's total of that item and whether the stack is bound to the hotbar. A slot is redrawn only when they change.
@@ -91,7 +96,8 @@ public partial class PagePanel {
             var badge = cell.GetNode<TextureRect>("badge");
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = Icons.Of(contents.Items.OrderByDescending(p => p.Value).First().Key);
-            count.Text = stack is (string bottle, _) && world.Data.VesselOf(bottle) is VesselDef vessel ? $"{vessel.LitersIn(bottle)}/{vessel.Capacity}" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
+            count.Text = stack is (string barrel, 1) && Barrel.Is(barrel) ? $"{Barrel.Liters(barrel)}/{Barrel.Capacity} L"
+                : stack is (string bottle, 1) && world.Data.VesselOf(bottle) is VesselDef vessel ? $"{vessel.LitersIn(bottle)}/{vessel.Capacity}" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
             bool takes = wanted != null && stack is (string item, _) && wanted(item);
             if (wanted != null) cell.AddThemeColorOverride(ItemSlot.IconNormal, stack == null || takes ? Colors.White : Style.Faded);
             // A backpack stack bound to the hotbar has the selected hotbar slot's rim.

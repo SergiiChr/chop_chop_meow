@@ -33,8 +33,8 @@ public partial class Game {
 
     /// <summary>Puts the player in front of the first iron cliff, where a mine is marked, and gives the cliff.</summary>
     private async Task<Cliff> StandAtIronCliff() {
-        var cliff = World.CliffOf(ThingKind.Iron);
-        SetupSteps.Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        var cliff = Cliff.Of(ThingKind.Iron);
+        SetupSteps.Warp(Hosted, cliff.MineSpot + cliff.Face * 3); await Frames(4);
         return cliff;
     }
 
@@ -172,7 +172,7 @@ public partial class Game {
     /// <summary>How many buildings, crates and boxes stand in the server's world.</summary>
     private int Built() {
         int count = 0;
-        foreach (var t in Hosted.Things) if (t.Kind is ThingKind.Crate or ThingKind.Grave || Hosted.Data.Buildings.ContainsKey(t.Kind)) count++;
+        foreach (var t in Hosted.Things) if (t.Kind is ThingKind.Crate or ThingKind.Barrel or ThingKind.Grave || Hosted.Data.Buildings.ContainsKey(t.Kind)) count++;
         return count;
     }
 

@@ -20,7 +20,7 @@ public partial class WorldView {
         // Sea and its feathered bank follow the coastline at the valley's mouth.
         ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
         LakeDressing.Build(parent, EnvironmentReview);
-        foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
+        foreach (var cliff in Cliff.All) BuildCliff(parent, cliff);
         foreach (var den in WolfPatrols.Dens) BuildDen(parent, den);
         BuildPlacedEnvironment(parent);
     }
@@ -28,11 +28,11 @@ public partial class WorldView {
     /// <summary>A wolf den: a mine's rock outcrop and dark tunnel at half size, with no timber, rails or cart, so the mouth is about a wolf's height.</summary>
     private static void BuildDen(Node3D parent, Den den) {
         // The outcrop is built around a cliff's mine spot; this cliff puts that spot at the den's.
-        var rock = new Cliff(ThingKind.Stone, den.Spot - den.Face * World.MineOut, den.Face, 0);
-        var cave = Pivot(parent, new Vector3(den.Spot.X, 0, den.Spot.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(den.Face.X, den.Face.Y)), 0));
+        var rock = new Cliff(ThingKind.Stone, den.Spot - den.Face * Cliff.MineOut, den.Face, 0);
+        var cave = Pivot(parent, new Vector3(den.Spot.X, 0, den.Spot.Y)); cave.Rotation = MineModel.Yaw(den.Face);
         cave.Scale = Vector3.One * Den.Scale;
         Add(cave, MineRockShape.Mesh(rock, new[] { "5b5a52", "66645a", "4f4f48" }, Den.Scale), MineRockShape.Rock, Vector3.Zero);
-        Add(Pivot(cave, new Vector3(0, 0, WorldModels.MineDoor)), MineShape.Tunnel, MineShape.Unlit, Vector3.Zero);
+        Add(Pivot(cave, new Vector3(0, 0, MineModel.PortalDepth)), MineShape.Tunnel, MineShape.Unlit, Vector3.Zero);
     }
 
     /// <summary>A jagged wall of faceted columns with ore seams on the face and scree at its foot.</summary>
@@ -44,8 +44,8 @@ public partial class WorldView {
             _ => (new[] { "535d4b", "606753", "495440" }, Stone("15161a", .5f, .3f), 23),
         };
         // Local +Z is the face, so everything toward the camera and the deposits is built on the positive side.
-        var wall = Pivot(parent, new Vector3(cliff.Center.X, 0, cliff.Center.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(cliff.Face.X, cliff.Face.Y)), 0));
-        WorldModels.MineSpur(parent, cliff, rock);
+        var wall = Pivot(parent, new Vector3(cliff.Center.X, 0, cliff.Center.Y)); wall.Rotation = MineModel.Yaw(cliff.Face);
+        MineModel.Outcrop(parent, cliff, rock);
         var rng = new Random(seed);
         float R() => (float)rng.NextDouble();
         for (float x = -cliff.HalfLength - .4f; x <= cliff.HalfLength + .4f; x += .8f) {
@@ -164,6 +164,7 @@ public partial class WorldView {
         ("player shovel", ActorSkin.Player, ActorAction.Dig), ("worker shovel", ActorSkin.Worker, ActorAction.Dig),
         ("player jog turns", ActorSkin.Player, ActorAction.Jog), ("player run turns", ActorSkin.Player, ActorAction.Run),
         ("player cabin", ActorSkin.Player, ActorAction.Walk), ("player jog back", ActorSkin.Player, ActorAction.Jog), ("player run back", ActorSkin.Player, ActorAction.Run),
+        ("player barrel", ActorSkin.Player, ActorAction.Walk), ("worker barrel", ActorSkin.Worker, ActorAction.Carry),
     };
     /// <summary>Seconds each key is held in a back clip, which presses D and A in turn.</summary>
     private const float ReviewBackSeconds = 1.2f;
@@ -187,13 +188,19 @@ public partial class WorldView {
     private static Vector3 ReviewCenter => new(0, 1, 0);
     private static Vector3 ReviewSpot(int index) => ScreenRight * ((index % 7 - 3) * 2f) + ScreenDown * ((index / 7 - 2f) * 3.3f);
     /// <summary>The clip <c>--animation-clip</c> names, shown alone and close up, moving across marked ground at its speed in the world; -1 shows every clip.</summary>
-    private static readonly int ReviewClip = Array.FindIndex(ReviewClips, clip => clip.Name == Launch.Value("--animation-clip"));
+    private static readonly string? ReviewRequestedClip = Launch.Value("--animation-clip");
+    private static readonly int ReviewClip = Array.FindIndex(ReviewClips, clip => clip.Name == ReviewRequestedClip);
     /// <summary>Wolf close-ups for <c>--animation-clip</c>; the leap, hit, feed, snap and brace play against a player the way SyncWolves sets them up.</summary>
     /// <summary>How fast, in metres a second, a wolf in the review gallops, and how many seconds the turn clip takes to go out and back.</summary>
     private const float ReviewGallop = 6.3f, ReviewTurnLoop = 4;
     private static readonly string[] WolfClips = { "wolf idle", "wolf howl", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf turn", "wolf leap", "wolf hit", "wolf feed", "wolf fall", "wolf snap", "wolf brace" };
-    private static readonly int ReviewWolfClip = Array.IndexOf(WolfClips, Launch.Value("--animation-clip"));
-    private string? ReviewCloseUpName => ReviewClip >= 0 ? ReviewClips[ReviewClip].Name : ReviewWolfClip >= 0 ? WolfClips[ReviewWolfClip] : null;
+    private static readonly int ReviewWolfClip = Array.IndexOf(WolfClips, ReviewRequestedClip);
+    private static readonly string? WaterReview = ReviewRequestedClip switch {
+        "worker bucket roof" => Bucket.AtFill(Bucket.Capacity),
+        "worker bottle roof" => Water.Full,
+        _ => null
+    };
+    private string? ReviewCloseUpName => WaterReview != null ? ReviewRequestedClip : ReviewClip >= 0 ? ReviewClips[ReviewClip].Name : ReviewWolfClip >= 0 ? WolfClips[ReviewWolfClip] : null;
     /// <summary>The camera's pitch in degrees for <c>--animation-pitch</c>, low for a side view; the game's otherwise.</summary>
     private static readonly float ReviewPitch = Launch.Number("--animation-pitch", Pitch);
     /// <summary>How many times closer <c>--animation-zoom</c> brings the review's camera, for a look at a face or a paw.</summary>
@@ -280,10 +287,13 @@ public partial class WorldView {
         }
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);
-        float along = Mathf.PosMod(Elapsed * ReviewSpeed(action) + 20, 40) - 20;
+        float speed = ReviewClips[ReviewClip].Name == "player barrel"
+            ? World.Data.WalkSpeed * Barrel.Speed(Barrel.AtFill(Barrel.Capacity)) : ReviewSpeed(action);
+        float along = Mathf.PosMod(Elapsed * speed + 20, 40) - 20;
         if (reviewActor.Position.Dot(track) > along + 1) reviewActor.Position -= track * 40;
         reviewActor.Update(track * along, action, track * (along + 1), dt);
-        Pose(reviewRigs[0], reviewActor, ActorAnimation.Tool(action), torch: action == ActorAction.TorchSwing);
+        Pose(reviewRigs[0], reviewActor, ActorAnimation.Tool(action), torch: action == ActorAction.TorchSwing,
+            barrel: ReviewClips[ReviewClip].Name.EndsWith(" barrel"));
         reviewRigs[0].Flame.Visible = action == ActorAction.TorchSwing;
         reviewRigs[0].Root.Rotation += new Vector3(0, Mathf.DegToRad(ReviewTurn), 0);
     }
@@ -463,7 +473,34 @@ public partial class WorldView {
         if (downed > 0) FallBackView.FallBack(reviewRigs[0], reviewPerson, downed, false, clip == "wolf leap" ? wolf : null);
     }
 
+    private void UpdateWaterReview(string vessel) {
+        if (review == null) {
+            review = ReviewStage(30);
+            var rig = new ActorRig(ActorSkin.Worker);
+            review.AddChild(rig.Root); reviewRigs.Add(rig);
+            var cabin = (HutProp)WorldModels.Build(ReviewHut);
+            review.AddChild(cabin.Root);
+            cabin.RoofBarrel.Show();
+        }
+        const float climb = BarrelJobs.ClimbSeconds, pour = BarrelJobs.PourSeconds, cycle = climb * 2 + pour + .5f;
+        float time = Elapsed % cycle;
+        var action = time < climb ? WorkerWaterAction.ClimbUp : time < climb + pour ? WorkerWaterAction.Pour : WorkerWaterAction.ClimbDown;
+        float progress = action switch {
+            WorkerWaterAction.ClimbUp => time / climb,
+            WorkerWaterAction.Pour => (time - climb) / pour,
+            _ => Math.Min(1, (time - climb - pour) / climb)
+        };
+        var rigShown = reviewRigs[0];
+        if (action == WorkerWaterAction.ClimbDown || action == WorkerWaterAction.Pour && progress > .60f)
+            vessel = Bucket.Is(vessel) ? Bucket.Item : Water.Empty;
+        WorkerWaterView.Show(rigShown, Vector2.Zero, Vector3.Zero, action, roof: true, progress, vessel);
+        var at = rigShown.Root.Position;
+        reviewActor.Position = new Vector2(at.X, at.Z);
+        reviewActor.Lift = at.Y;
+    }
+
     private void UpdateReview(float dt) {
+        if (WaterReview is string vessel) { UpdateWaterReview(vessel); return; }
         if (ReviewClip >= 0) { UpdateClipReview(dt); return; }
         if (ReviewWolfClip >= 0) { UpdateWolfClipReview(dt); return; }
         if (review == null) {
@@ -489,7 +526,9 @@ public partial class WorldView {
         for (int i = 0; i < ReviewClips.Length; i++) {
             var action = ReviewClips[i].Action;
             reviewRigs[i].Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
-            reviewRigs[i].Show(ActorAnimation.PoseAt(action, Elapsed, action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Carry), ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch);
+            var pose = ActorAnimation.PoseAt(action, Elapsed, action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Carry);
+            if (ReviewClips[i].Name.EndsWith(" barrel")) reviewRigs[i].HugBarrel(pose);
+            else reviewRigs[i].Show(pose, ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch);
         }
     }
 

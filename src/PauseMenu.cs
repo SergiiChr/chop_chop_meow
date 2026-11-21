@@ -92,7 +92,7 @@ public partial class PauseMenu : PanelContainer {
         if (world.GoalComplete) { var hint = Style.Text(world.Objective.Hint, 13, Style.Tan, wrap: true); goals.AddChild(hint); }
         goals.AddChild(new HSeparator());
         goals.AddChild(Style.WellLabel("End goals"));
-        foreach (var ore in World.MineOres) goals.AddChild(GoalRow($"A working {ore.Id()} mine", world.HasMine(ore), false, Icons.Of(World.ResourceItem(ore))));
+        foreach (var ore in Cliff.Ores) goals.AddChild(GoalRow($"A working {ore.Id()} mine", world.Mines.Working(ore), false, Icons.Of(World.ResourceItem(ore))));
         var target = world.Data.Goals;
         goals.AddChild(GoalRow($"{target.DailyProfit} coins profit a day for {target.ProfitDays} days in a row", world.ProfitGoalMet, false, Icons.Of(Inventory.Coins)));
         var streak = new HBoxContainer(); streak.AddThemeConstantOverride("separation", 4); goals.AddChild(streak);

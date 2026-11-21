@@ -9,59 +9,61 @@ using static WorldSteps;
 using static PlayerSteps;
 using static WorkerSteps;
 
-/// <summary>Simulation checks for mines and the end goals.</summary>
+/// <summary>Simulation checks for mines: marking, building, supplying and mining one, and the end goal's mines.</summary>
 public static class MineChecks {
     public static void Run(GameData data) {
         CheckMineSitesAlignWithCliffs(data);
         CheckMinesAreMarkedAtCliffsOnceEach(data);
         CheckWorkersDigAndFrameMineWithTheirTools(data);
+        CheckWorkerTakesTheFreeHammerFromTheRack(data);
         CheckPlayerDigsAndFitsAMineWithTheirTools(data);
         CheckPlayerDeliversOnlyWhatAMineStillNeeds(data);
         CheckMinersBringOreOutAndStopWhenOutputIsFull(data);
         CheckOnlyAvailableMinersUnload(data);
+        CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(data);
         CheckFullMineUnloadsIntoAPackingStationPackingItsOre(data);
         CheckMiningIsSlowerThanDeposits(data);
-        CheckDailyProfitIsSalesMinusWagesAndMeetsEndGoals(data);
+        CheckEndGoalsWantAWorkingMineOnEveryOre(data);
     }
 
     private static void CheckMineSitesAlignWithCliffs(GameData data) {
-        foreach (var cliff in World.Cliffs) {
-            Require(World.CliffAt(World.MineSpot(cliff)) == cliff, "each aligned site must belong to its own cliff");
-            var marking = FundedWorld(data); marking.Player = World.MineSpot(cliff) + cliff.Face * 3;
-            Require(marking.Construction.Build(ThingKind.Mine, World.MineSpot(cliff) + cliff.Along + cliff.Face)?.Pos == World.MineSpot(cliff), "every aligned site must remain markable and snap correctly");
+        foreach (var cliff in Cliff.All) {
+            Require(Cliff.Nearest(cliff.MineSpot) == cliff, "each aligned site must belong to its own cliff");
+            var marking = FundedWorld(data); marking.Player = cliff.MineSpot + cliff.Face * 3;
+            Require(marking.Construction.Build(ThingKind.Mine, cliff.MineSpot + cliff.Along + cliff.Face)?.Pos == cliff.MineSpot, "every aligned site must remain markable and snap correctly");
             var outward = cliff.Face;
-            var basis = Basis.FromEuler(WorldModels.MineYaw(World.MineSpot(cliff)));
+            var basis = Basis.FromEuler(MineModel.Yaw(cliff.Face));
             var renderedOut = basis * Vector3.Back;
             var renderedHeader = basis * Vector3.Right;
             Require(outward.Dot(cliff.Face) > .999f && Math.Abs(outward.Dot(cliff.Along)) < .001f,
                 "a mine must face outward from its own cliff rather than a common camera direction");
             Require(new Vector2(renderedOut.X, renderedOut.Z).Dot(outward) > .999f && Math.Abs(new Vector2(renderedHeader.X, renderedHeader.Z).Dot(cliff.Along)) > .999f,
                 "the rendered portal must follow the cliff and its rails must face out from it");
-            Require(World.MineSpot(cliff).IsEqualApprox(cliff.Center + cliff.Face * 4.2f), "each new entrance must project directly from its cliff center");
+            Require(cliff.MineSpot.IsEqualApprox(cliff.Center + cliff.Face * 4.2f), "each new entrance must project directly from its cliff center");
         }
     }
 
     private static void CheckMinesAreMarkedAtCliffsOnceEach(GameData data) {
         var world = FundedWorld(data);
-        var cliff = World.CliffOf(ThingKind.Iron);
-        world.Player = World.MineSpot(cliff) + cliff.Face * 3;
+        var cliff = Cliff.Of(ThingKind.Iron);
+        world.Player = cliff.MineSpot + cliff.Face * 3;
         Require(world.Construction.PlacementBlock(ThingKind.Mine, world.Player + cliff.Face * 15) != null, "a mine must be marked at a cliff, not out in the valley");
         int carried = world.Backpack.Count;
         var mine = MarkMine(world);
-        Require(mine.Pos == World.MineSpot(cliff), "marking must snap to the cliff's mine spot");
+        Require(mine.Pos == cliff.MineSpot, "marking must snap to the cliff's mine spot");
         Require(mine.MineStage == MineStage.Marked, "marking must leave the mine in the marked stage");
         Require(world.Backpack.Count == carried, "marking must be free");
-        Require(world.Construction.Build(ThingKind.Mine, World.MineSpot(cliff) - cliff.Along * 2) == null && world.Things.Count(t => t.Kind == ThingKind.Mine) == 1, "a cliff must take only one mine");
-        Require(World.Cliffs.All(c => world.CanStand(World.MineSpot(c)) && world.CanStand(World.MineDoor(new Thing { Kind = ThingKind.Mine, Pos = World.MineSpot(c) }))), "every cliff's mine spot and entrance must be open ground");
-        Require(!world.CanStand(World.MineDoor(mine) - cliff.Face * 2), "the rock spur the tunnel runs into must block walking");
+        Require(world.Construction.Build(ThingKind.Mine, cliff.MineSpot - cliff.Along * 2) == null && world.Things.Count(t => t.Kind == ThingKind.Mine) == 1, "a cliff must take only one mine");
+        Require(Cliff.All.All(c => world.CanStand(c.MineSpot) && world.CanStand(Mines.Door(new Thing { Kind = ThingKind.Mine, Pos = c.MineSpot }))), "every cliff's mine spot and entrance must be open ground");
+        Require(!world.CanStand(Mines.Door(mine) - cliff.Face * 2), "the outcrop the tunnel runs into must block walking");
         var coal = MarkMine(world, ThingKind.Coal);
-        Require(World.MineOre(coal) == "coal" && World.MineOre(mine) == "iron_ore", "each mine must yield the ore of its own cliff");
+        Require(Mines.Ore(coal) == "coal" && Mines.Ore(mine) == "iron_ore", "each mine must yield the ore of its own cliff");
     }
 
     private static void CheckWorkersDigAndFrameMineWithTheirTools(GameData data) {
         var world = FundedWorld(data);
         var mine = MarkMine(world);
-        var cliff = World.CliffAt(mine.Pos);
+        var cliff = Cliff.Nearest(mine.Pos);
         var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 - cliff.Along * 2);
         foreach (var (item, amount) in data.Mine.Materials) chest.Inventory.Add(item, amount);
         chest.Inventory.Add("wood", 20);
@@ -79,7 +81,7 @@ public static class MineChecks {
         Work(world, data.DaySeconds * 3, () => mine.MineStage > MineStage.Marked);
         Require(mine.MineStage == MineStage.Dug,
             $"one worker must dig the entrance: stage {mine.MineStage}, progress {mine.Progress:0}, {worker.Status}");
-        Require(world.Time - started >= world.MineStageSeconds,
+        Require(world.Time - started >= world.Mines.StageSeconds,
             $"digging the entrance must take at least one working day: {world.Time - started:0}s");
         Require(world.Time - started < data.DaySeconds * 2,
             $"digging the entrance must take less than two days: {world.Time - started:0}s");
@@ -101,26 +103,49 @@ public static class MineChecks {
         station.Inventory.Add("wood_hammer", 1);
         started = world.Time;
         Work(world, data.DaySeconds * 3, () => mine.MineStage == MineStage.Open);
-        Require(mine.MineStage == MineStage.Open && world.Time - started >= world.MineStageSeconds, "a worker with a hammer must fit the frame in about one working day");
+        Require(mine.MineStage == MineStage.Open && world.Time - started >= world.Mines.StageSeconds, "a worker with a hammer must fit the frame in about one working day");
+    }
+
+    private static void CheckWorkerTakesTheFreeHammerFromTheRack(GameData data) {
+        var world = EmptyWorld(data);
+        var cliff = Cliff.Of(ThingKind.Iron);
+        var mine = world.Add(ThingKind.Mine, cliff.MineSpot);
+        mine.MineStage = MineStage.Supplied;
+        var rack = world.Add(ThingKind.Toolstation, mine.Pos + cliff.Face * 2);
+        rack.Inventory.Add("steel_hammer", 1);
+        rack.Inventory.Add("wood_hammer", 1);
+        world.Player = rack.Pos + cliff.Along;
+        world.Hold(rack.Inventory, SlotOf(rack.Inventory, "steel_hammer"), 1);
+        Require(world.Held is { Item: "steel_hammer" }, "the player is holding the steel hammer from the rack");
+        var worker = AddWorker(world, world.Player);
+        world.SetDuty(worker, mine, JobKind.Build, true);
+        Work(world, 10, () => mine.Progress > 0);
+        Require(worker.Tool == "wood_hammer" && mine.Progress > 0 && world.Held is { Item: "steel_hammer" },
+            "the worker takes the free wooden mallet and fits the frame while the player still holds the steel hammer");
     }
 
     private static void CheckPlayerDigsAndFitsAMineWithTheirTools(GameData data) {
         var world = FundedWorld(data);
         var mine = MarkMine(world);
-        world.Player = World.MineDoor(mine);
+        world.Player = Mines.Door(mine);
         world.Gather(mine, 1);
         Require(mine.Progress == 0 && world.GatherBlock(mine)?.Contains("pickaxe") == true, $"digging the entrance should need a pickaxe: {world.GatherBlock(mine)}");
         Give(world, "steel_pick", 1);
-        for (float held = 0; held <= world.MineStageSeconds && mine.MineStage == MineStage.Marked; held++) world.Gather(mine, 1);
+        for (float held = 0; held <= world.Mines.StageSeconds && mine.MineStage == MineStage.Marked; held++) world.Gather(mine, 1);
         Require(mine.MineStage == MineStage.Dug, "a player holding right mouse on a marked mine with a pickaxe should dig its entrance in a working day");
+        Require(world.GatherBlock(mine) == "Deliver 50 Wood, 10 Iron bar, 50 Stone first.", $"a dug mine should name the materials it takes: {world.GatherBlock(mine)}");
         Give(world, data.Mine.Materials);
-        foreach (var (item, amount) in data.Mine.Materials) world.SupplyMine(mine, item, amount);
+        foreach (var (item, amount) in data.Mine.Materials) world.Mines.Supply(mine, item, amount);
+        var said = new List<string>();
+        world.Notify = said.Add;
         world.Tick(.1f);
         Require(mine.MineStage == MineStage.Supplied, "the delivered materials should shore the mine up");
+        Require(said.Contains("The iron mine has its 50 Wood, 10 Iron bar, 50 Stone. You or a worker with a hammer can fit the frame and rails."),
+            $"a supplied mine should name the materials it took: {string.Join(" | ", said)}");
         world.Gather(mine, 1);
         Require(mine.Progress == 0 && world.GatherBlock(mine)?.Contains("hammer") == true, $"fitting the frame should need a hammer: {world.GatherBlock(mine)}");
         Give(world, "wood_hammer", 1);
-        for (float held = 0; held <= world.MineStageSeconds && mine.MineStage == MineStage.Supplied; held++) world.Gather(mine, 1);
+        for (float held = 0; held <= world.Mines.StageSeconds && mine.MineStage == MineStage.Supplied; held++) world.Gather(mine, 1);
         Require(mine.MineStage == MineStage.Open, "a player holding right mouse on a supplied mine with a hammer should fit its frame in a working day");
     }
 
@@ -130,7 +155,7 @@ public static class MineChecks {
         other.MineStage = MineStage.Dug;
         world.Player = other.Pos + Vector2.One;
         Give(world, "wood", 60); Give(world, "stone", 10);
-        world.SupplyMine(other, "wood", 60); world.SupplyMine(other, "stone", 10);
+        world.Mines.Supply(other, "wood", 60); world.Mines.Supply(other, "stone", 10);
         Require(other.Inventory["wood"] == data.Mine.Materials["wood"],
             "delivering from the backpack must hand over only the wood the mine still needs");
         Require(other.Inventory["stone"] == 10,
@@ -142,7 +167,7 @@ public static class MineChecks {
         var world = FundedWorld(data);
         var mine = MarkMine(world);
         mine.MineStage = MineStage.Open;
-        var cliff = World.CliffAt(mine.Pos);
+        var cliff = Cliff.Nearest(mine.Pos);
         var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
         var crew = Enumerable.Range(0, 4).Select(_ => AddWorker(world, chest.Pos + cliff.Along)).ToList();
         foreach (var w in crew) { w.Tool = "steel_pick"; world.Assign(w, mine); }
@@ -187,10 +212,21 @@ public static class MineChecks {
         Require(world.Things.Any(t => t.Kind == ThingKind.Grave && t.Inventory["stone"] == 12), "dismissing a miner must not lose the load they carry");
     }
 
+    private static void CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(GameData data) {
+        var world = FundedWorld(data);
+        var mine = MarkMine(world); OpenMine(mine);
+        mine.Output!.Add(Mines.Ore(mine), mine.Output.StackSize);
+        var rack = world.Add(ThingKind.Toolstation, mine.Pos + Cliff.Nearest(mine.Pos).Face * 4);
+        rack.Inventory.Add("steel_pick", 1);
+        var miner = Staff(world, mine, JobKind.Mine);
+        Work(world, 20);
+        Require(rack.Inventory["steel_pick"] == 1 && miner.Tool == "", "a miner should not fetch a pickaxe for a full mine with nowhere to unload");
+    }
+
     private static void CheckFullMineUnloadsIntoAPackingStationPackingItsOre(GameData data) {
         var world = FundedWorld(data);
         var mine = MarkMine(world); mine.MineStage = MineStage.Open;
-        var cliff = World.CliffAt(mine.Pos);
+        var cliff = Cliff.Nearest(mine.Pos);
         var packer = world.Add(ThingKind.Packer, mine.Pos + cliff.Face * 3);
         world.SetPacking(packer, "iron_ore");
         var miner = AddWorker(world, packer.Pos + cliff.Along);
@@ -203,7 +239,7 @@ public static class MineChecks {
     private static void CheckOnlyAvailableMinersUnload(GameData data) {
         var world = FundedWorld(data);
         var mine = MarkMine(world); mine.MineStage = MineStage.Open;
-        var cliff = World.CliffAt(mine.Pos);
+        var cliff = Cliff.Nearest(mine.Pos);
         var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
         var builder = AddWorker(world, mine.Pos);
         world.SetDuty(builder, mine, JobKind.Build, true);
@@ -212,7 +248,7 @@ public static class MineChecks {
         world.SetDuty(elsewhere, tree, JobKind.Gather, true);
         world.SetDuty(elsewhere, mine, JobKind.Mine, true);
         // This earlier-hired worker has no axe for the tree and no pickaxe for the mine.
-        var miner = AddWorker(world, World.MineDoor(mine)); miner.Tool = "steel_pick";
+        var miner = AddWorker(world, Mines.Door(mine)); miner.Tool = "steel_pick";
         world.SetDuty(miner, mine, JobKind.Mine, true);
         mine.Output!.Add("iron_ore", mine.Output.StackSize);
         Work(world, 15, () => chest.Inventory["iron_ore"] > 0);
@@ -225,9 +261,9 @@ public static class MineChecks {
     private static void CheckMiningIsSlowerThanDeposits(GameData data) {
         int Gathered(bool mining) {
             var world = FundedWorld(data);
-            var cliff = World.CliffOf(ThingKind.Iron);
+            var cliff = Cliff.Of(ThingKind.Iron);
             Thing source;
-            if (mining) { source = MarkMine(world); source.MineStage = MineStage.Open; } else source = world.Add(ThingKind.Iron, World.MineSpot(cliff), 400);
+            if (mining) { source = MarkMine(world); source.MineStage = MineStage.Open; } else source = world.Add(ThingKind.Iron, cliff.MineSpot, 400);
             var chest = world.Add(ThingKind.Chest, source.Pos + cliff.Face * 2.5f);
             var worker = AddWorker(world, chest.Pos);
             worker.Tool = "steel_pick";
@@ -240,32 +276,11 @@ public static class MineChecks {
         Require(mined > 0 && mined < dug, "a mine must be slower than working a deposit, at the gain of never running out");
     }
 
-    private static void CheckDailyProfitIsSalesMinusWagesAndMeetsEndGoals(GameData data) {
+    private static void CheckEndGoalsWantAWorkingMineOnEveryOre(GameData data) {
         var world = FundedWorld(data);
-        var worker = AddWorker(world, new Vector2(30, 30));
-        worker.Wage = 26;
-        var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
-        world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("berries", 12)), 1);
-        Require(world.Sell(sign), "a crate of berries should go to the village");
-        Work(world, data.TradeSeconds + .5f);
-        int revenue = sign.Wages![Inventory.Coins] + sign.Output![Inventory.Coins];
-        Require(revenue > 0 && world.DayRevenue == revenue, "coins from a returned sale must count as the day's revenue");
-
-        RunUntilDawn(world);
-        Require(world.Profits.SequenceEqual(new[] { revenue - 26 }) && world.DayRevenue == 0, "a day's profit must be its sales minus the wages charged at dawn");
-
-        int goal = data.Goals.DailyProfit;
-        for (int day = 0; day < data.Goals.ProfitDays - 1; day++) { SetDayRevenue(world, goal + 26); RunUntilDawn(world); }
-        Require(world.ProfitStreak == data.Goals.ProfitDays - 1 && !world.ProfitGoalMet, "a streak one day short must not meet the profit goal");
-        SetDayRevenue(world, goal + 25); RunUntilDawn(world);
-        Require(world.ProfitStreak == 0, "a day below the target must break the streak");
-        for (int day = 0; day < data.Goals.ProfitDays; day++) { SetDayRevenue(world, goal + 26); RunUntilDawn(world); }
-        Require(world.ProfitGoalMet, "enough days in a row at the target must meet the profit goal");
-        RunUntilDawn(world);
-        Require(world.ProfitGoalMet && world.ProfitStreak == 0, "the profit goal must stay met after a later slow day");
-
-        Require(!world.EndGoalsComplete, "the end goals must also need a working mine on every ore");
-        foreach (var ore in World.MineOres) { var mine = MarkMine(world, ore); if (ore != World.MineOres.Last()) OpenMine(mine); }
+        Achieve(world, "profit_week");
+        Require(world.ProfitGoalMet && !world.EndGoalsComplete, "the profit goal alone must not complete the end goals");
+        foreach (var ore in Cliff.Ores) { var mine = MarkMine(world, ore); if (ore != Cliff.Ores.Last()) OpenMine(mine); }
         Require(!world.EndGoalsComplete, "an unfinished mine must not count");
         OpenMine(world.Things.Last(t => t.Kind == ThingKind.Mine));
         Require(world.EndGoalsComplete, "a working mine on every ore and a week of profit must complete the end goals");

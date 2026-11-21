@@ -11,7 +11,7 @@ internal static class Footsteps {
     public static string Sound(World world, Vector2 p) {
         if (world.GravelPaths.Covers(p)) return "footsteps_gravel";
         if (Terrain.InLake(p, 1)) return "footsteps_water";
-        foreach (var c in World.Cliffs) if (c.DistanceTo(p) < Cliff.Depth + 3) return "footsteps_rocks";
+        foreach (var c in Cliff.All) if (c.DistanceTo(p) < Cliff.Depth + 3) return "footsteps_rocks";
         foreach (var t in world.Things) if ((t.Kind == ThingKind.Stone || t.IsDeposit) && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f) return "footsteps_rocks";
         return "footsteps_default";
     }

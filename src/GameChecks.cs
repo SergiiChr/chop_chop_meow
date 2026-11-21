@@ -235,10 +235,7 @@ public partial class Game {
 
     /// <summary>An empty pile's filter window has one row naming one resource: water there is one entry for every fill, shows in the heading, and comes off with a click.</summary>
     private async Task CheckPileFilterNamesOneResource() {
-        await CloseWithEsc();
-        var pile = Hosted.Add(ThingKind.Pile, world.Player + new Vector2(4, 0)); await Frames();
-        panel.Select(Shown(pile)); await Frames();
-        await Click(Named("filters")!);
+        var pile = await OpenFilters(ThingKind.Pile);
         Require(OnPage("filter_in") != null && OnPage("filter_out") == null, "A pile's filter must show only the row of what workers bring.");
         await Click(Named("filter_add_in")!);
         Require(Named($"pick_{Water.OneLiter}") == null && Named($"pick_{Water.Full}") == null && Named($"pick_{Water.Empty}") != null,
@@ -261,7 +258,7 @@ public partial class Game {
         var chest = await OpenFilters(ThingKind.Chest);
         await Click(Named("filter_add_in")!);
         var listed = FilterEntries("item_list", "pick_").ToList();
-        string[] expected = ["wood", "planks", "iron_bar", "steel_bar", "steel_parts", "stone_chisel", "steel_chisel", Water.Empty, "flour", "dough", "bread", World.CrateOf("berries"), World.CrateOf("bread")];
+        string[] expected = ["wood", "planks", "iron_bar", "steel_bar", "steel_parts", "stone_chisel", "steel_chisel", Water.Empty, Bucket.AtFill(5), "flour", "dough", "bread", World.CrateOf("berries"), World.CrateOf("bread")];
         Require(listed.Where(expected.Contains).SequenceEqual(expected), $"The item list must run by group, simplest first, not {string.Join(" ", listed)}.");
         Require(listed.SkipWhile(id => !id.StartsWith(World.PackedPrefix)).All(id => id.StartsWith(World.PackedPrefix)), "The item list must show crates of goods after every item.");
         await Click(Named("filters_close")!);
@@ -451,9 +448,9 @@ public partial class Game {
         await CloseWithEsc();
         var home = world.Player;
         var tree = world.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(Terrain.Spawn))!;
-        var cliff = World.CliffOf(ThingKind.Iron);
+        var cliff = Cliff.Of(ThingKind.Iron);
         Warp(Hosted, Terrain.Spawn); await Frames(4);
-        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        Warp(Hosted, cliff.MineSpot + cliff.Face * 3); await Frames(4);
         Require(world.Remembered(tree.Id) != null && !world.Sees(tree.Pos), "The player must remember a tree they have walked away from.");
         await KeyStroke(Key.Escape); await Click(menu.SaveButton); await Click(FindButton(startMenu.Screen, Saves.SlotLabel(2))!);
         await Until(() => Saves.SlotUsed(2), "the server writing the save");
@@ -513,35 +510,6 @@ public partial class Game {
         await Until(() => view.PlayerAnimation == ActorAction.Pack && sounds.Heard("rustle", soundsBefore), "the idle player packing at the station beside it, rustling through the goods", 4);
         RemoveThings(Hosted, t => t == packer); Drop(Hosted, "berries"); await CloseWithEsc();
     }
-    /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
-    private async Task CheckMineIsMarkedByClickAndEndGoalsShowInPauseMenu() {
-        var home = world.Player;
-        foreach (var ore in World.MineOres) {
-            var cliff = World.CliffOf(ore);
-            var spot = World.MineSpot(cliff);
-            Warp(Hosted, spot + cliff.Face * 3); await Frames(4);
-            await KeyStroke(Key.B);
-            await DoubleClick(Named("build_mine")!);
-            Require(player.Mode.Placing == ThingKind.Mine, "A double click on the mine plan must enter placement mode.");
-            // Off the exact spot, so the click shows the plan snapping to the cliff.
-            await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
-            var mine = world.Things.LastOrDefault(t => t.Kind == ThingKind.Mine);
-            Require(mine != null, $"A click near the {ore} cliff must create a mine.");
-            Require(mine.Pos == spot, $"A click near the {ore} cliff must mark the mine on the cliff's spot.");
-            Require(panel.Visible && view.Selection.Thing == mine.Id, $"A click near the {ore} cliff must select the new mine.");
-            Require(player.Mode.Placing == null, $"A click near the {ore} cliff must end placement mode.");
-            Require(new[] { "Stage 1 · Dig the entrance", "Stage 2 · Shore it up", "Stage 3 · Fit the frame and rails" }.Select((title, i) => panel.FindChild($"stage_{i + 1}", true, false) is Control node && node.TooltipText.StartsWith(title)).All(found => found),
-                "The mine panel must show its three stages.");
-        }
-        Warp(Hosted, home); await CloseWithEsc();
-        await KeyStroke(Key.Escape);
-        Require(HasLabel(menu, "END GOALS"), "The pause menu must have an end goals heading.");
-        Require(HasLabel(menu, "A working iron mine"), "The pause menu must list the iron mine goal.");
-        Require(HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"),
-            "The pause menu must list the daily profit goal.");
-        await KeyStroke(Key.Escape);
-    }
-
     private async Task CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings() {
         var home = Hosted.Player;
         await CloseWithEsc(); Drop(Hosted, "stone_chisel"); Give(Hosted, "stone", 2); Give(Hosted, "wood", 3);
@@ -1323,32 +1291,6 @@ public partial class Game {
         RemoveThings(Hosted, t => t == table);
     }
     /// <summary>
-    /// Holding the right mouse button on a marked mine walks the player up to the rock face beside its cave mouth and digs
-    /// the entrance with the pickaxe, which lands on the rock.
-    /// </summary>
-    private async Task CheckRightMouseOnAMarkedMineDigsItWithAPickaxe() {
-        // The server's position, since the window's copy may not have caught up with the last check's warp.
-        var start = Hosted.Player;
-        var cliff = await StandAtIronCliff();
-        var mine = Hosted.Construction.Build(ThingKind.Mine, World.MineSpot(cliff))!;
-        Give(Hosted, "steel_pick", 1);
-        await Frames(2);
-        var point = RightPress(mine.Pos);
-        await Until(() => mine.Progress > 0 && view.PlayerAnimation == ActorAction.SteelMine, "holding RMB on a marked mine walking to its entrance and digging with the pickaxe", 6);
-        // The pick lands on the cliff's rock face beside the cave mouth, which is 1.44 m wide in a face 2.28 m behind the mine's spot.
-        int soundsBefore = sounds.Played;
-        await Until(() => sounds.Heard("mine_ore", soundsBefore), "a pick's blow heard at the mine's entrance", 4);
-        var end = view.PlayerRig.Root.Transform * view.PlayerRig.Holds(ActorRig.PickPoint);
-        var flat = new Vector2(end.X, end.Z) - (mine.Pos - cliff.Face * 2.28f);
-        float behind = -flat.Dot(cliff.Face), aside = Math.Abs(flat.Dot(new Vector2(-cliff.Face.Y, cliff.Face.X)));
-        Require(Math.Abs(behind) < .06f && aside > .72f && aside < 1.2f && end.Y is > .5f and < 1.4f,
-            $"A pick digging a mine's entrance must land on the rock face beside its mouth, not {behind:0.00} m into the face, {aside:0.00} m aside and {end.Y:0.00} m up.");
-        RightRelease(point);
-        await Frames();
-        Drop(Hosted, "steel_pick", 1);
-        RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
-    }
-    /// <summary>
     /// Every blow at work lands its tool on what is worked as it is heard, wherever the player stands to work it: the axe's head on
     /// the trunk's side, the pick's point on the rock, the hammer's face on the anvil's and the bench's work tops, and the shovel's
     /// blade in the ground at a stump's foot. A rock mined of its last piece crumbles away.
@@ -1456,21 +1398,6 @@ public partial class Game {
         Require(chest != null && world.Find(stump.Id) == null, "A chest must go up over a stump and clear it away.");
         Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump built over must just go, not be thrown up through the building.");
         RemoveThings(Hosted, t => t == chest); await Frames(2);
-    }
-    /// <summary>A mine's page left open follows the mine from stage to stage and on to the open mine.</summary>
-    private async Task CheckMinePageFollowsTheMineThroughItsStages() {
-        var start = Hosted.Player;
-        var cliff = await StandAtIronCliff();
-        var mine = Hosted.Construction.Build(ThingKind.Mine, World.MineSpot(cliff))!;
-        await ClickOn(mine);
-        await Until(() => HasLabel(panel, "Stage 1 · Dig the entrance"), "the mine's page opening on its first stage", 3);
-        mine.MineStage = MineStage.Dug;
-        await Until(() => HasLabel(panel, "Stage 2 · Shore it up") && ShowsChild(panel, "supply_wood"), "the open mine page moving on to the supplies", 3);
-        mine.MineStage = MineStage.Supplied;
-        await Until(() => HasLabel(panel, "Stage 3 · Fit the frame and rails"), "the open mine page moving on to the fitting", 3);
-        mine.MineStage = MineStage.Open;
-        await Until(() => ShowsChild(panel, "output_stone") && !HasLabel(panel, "Stage 3"), "the open mine page showing the mine's outputs once it opens", 3);
-        RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
     /// <summary>A page about a thing closes when the thing goes, as a recovery box does once it is emptied.</summary>
     private async Task CheckPageClosesWhenWhatItShowsIsGone() {
@@ -1749,13 +1676,21 @@ public partial class Game {
         RemoveThings(Hosted, t => t.Kind == ThingKind.Grave); await CloseWithEsc();
         Warp(Hosted, home); await Frames(4);
     }
-    /// <summary>The starter goals alone do not end the game; mines and the profit goal show the ending, and keep playing closes it for good.</summary>
-    private async Task CheckEndGoalsShowEndingOnceAndKeepPlaying() {
+    /// <summary>
+    /// The starter goals alone do not end the game; the pause menu lists the end goals, mines and the profit goal show the
+    /// ending, and keep playing closes it for good.
+    /// </summary>
+    private async Task CheckEndGoalsShowInThePauseMenuAndTheEndingOnce() {
         Achieve(Hosted, new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" });
         await Frames(3);
         Require(!ending.Visible && !view.Paused, "The starter goal chain alone must not end the game.");
-        await CheckMineIsMarkedByClickAndEndGoalsShowInPauseMenu();
-        foreach (var mine in Hosted.Things.Where(t => t.Kind == ThingKind.Mine)) OpenMine(mine);
+        await KeyStroke(Key.Escape);
+        Require(HasLabel(menu, "END GOALS"), "The pause menu must have an end goals heading.");
+        Require(HasLabel(menu, "A working iron mine"), "The pause menu must list the iron mine goal.");
+        Require(HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"),
+            "The pause menu must list the daily profit goal.");
+        await KeyStroke(Key.Escape);
+        foreach (var ore in Cliff.Ores) OpenMine(Hosted.Add(ThingKind.Mine, Cliff.Of(ore).MineSpot));
         Achieve(Hosted, "profit_week");
         await Frames(3);
         Require(ending.Visible && view.Paused, "Reaching the end goals must show the ending and pause the world.");
@@ -2180,11 +2115,10 @@ public partial class Game {
             await TestClean(CheckHarvestingBesideAStationStopsHammering);
             await TestClean(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await TestClean(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
-            await TestClean(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await TestClean(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
             await TestClean(CheckEveryBlowLandsItsToolOnWhatItWorks);
             await TestClean(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
-            await TestClean(CheckMinePageFollowsTheMineThroughItsStages);
+            await RunMineUIChecks();
             await TestClean(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await TestClean(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
             await TestClean(CheckHudAndHotbarEatAndDrinkSelected);
@@ -2206,7 +2140,7 @@ public partial class Game {
             await TestClean(CheckFilterRowKeepsTheOrderAdded);
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await TestClean(CheckPackingStationListsGoodsAndTakesBackpackClicks);
-            await TestClean(CheckEndGoalsShowEndingOnceAndKeepPlaying);
+            await TestClean(CheckEndGoalsShowInThePauseMenuAndTheEndingOnce);
             await TestClean(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
             await TestClean(CheckRecipeBoardsMarkAndQueueWithModifiers);
             await TestClean(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);
@@ -2245,6 +2179,7 @@ public partial class Game {
             await TestClean(CheckAHaulDragsIntoAHaulGroupAndStaysWhenItIsTakenApart);
             await TestClean(CheckAJobBelowAHaulGroupDragsIntoIt);
             await TestClean(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
+            await RunBarrelUIChecks();
             await TestClean(CheckCratePutIntoCrateStopsAtWarning);
             RemoveCheckFiles();
             await TestClean(CheckRestartBuildsFreshModelsForReusedIds);

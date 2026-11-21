@@ -99,6 +99,7 @@ public static class MultiplayerChecks {
                 var type when type == typeof(FilterList) => new FilterList { "wood" },
                 var type when type == typeof(List<Inventory.Slot>) => new List<Inventory.Slot>(),
                 var type when type == typeof(Dictionary<string, int>) => new Dictionary<string, int> { ["wood"] = 1 },
+                var type when type == typeof(Inventory.Carrier) => Inventory.Carrier.Player,
                 var type => throw new InvalidOperationException($"Change Inventory.{field.Name}, a {type.Name}, here and count it in Inventory.Fresh."),
             };
             field.Set(inventory, changed);

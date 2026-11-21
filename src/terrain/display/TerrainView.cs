@@ -143,10 +143,10 @@ internal sealed class TerrainView {
         RenderingServer.MaterialSetParam(materialRid, "woods_band", WoodsBand);
         Use("beds", BedMap.Bake(new Vector2(-regionSize, -regionSize), span));
         // The shader's tunnel cut-outs hold exactly one entry per cliff.
-        if (World.Cliffs.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {World.Cliffs.Length}.");
-        var mines = new Vector4[World.Cliffs.Length];
+        if (Cliff.All.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {Cliff.All.Length}.");
+        var mines = new Vector4[Cliff.All.Length];
         for (int i = 0; i < mines.Length; i++) {
-            var cliff = World.Cliffs[i]; var at = World.MineSpot(cliff);
+            var cliff = Cliff.All[i]; var at = cliff.MineSpot;
             mines[i] = new Vector4(at.X, at.Y, cliff.Face.X, cliff.Face.Y);
         }
         RenderingServer.MaterialSetParam(materialRid, "mines", mines);

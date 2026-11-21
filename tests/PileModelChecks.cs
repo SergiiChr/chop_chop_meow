@@ -59,7 +59,8 @@ public static class PileModelChecks {
     public static void Goods(GameData data) {
         var goods = data.Items.Keys.Where(item => data.VesselFor(item) == null).ToList();
         foreach (string item in goods.Append("hardhat"))
-            Require(ResourceLoader.Exists($"res://assets/icons/{item}.png"), $"{item} must have an icon rendered from its model");
+            Require(Icons.Of(item)?.ResourcePath.EndsWith(".png", StringComparison.Ordinal) == true,
+                $"{item} must have an icon rendered from its model");
         foreach (var vessel in data.Vessels)
             Require(ResourceLoader.Exists($"res://assets/ui/{vessel.Liquid}.svg"), $"{vessel.Liquid} must have a drawn icon");
         PileShape.Warm(data);

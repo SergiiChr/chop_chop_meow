@@ -19,6 +19,7 @@ public static class SimulationChecks {
         Test(HeldStackChecks.Run, data);
         Test(HotbarStackChecks.Run, data);
         Test(ChopChopMeow.Tests.WaterChecks.Run, data);
+        Test(ChopChopMeow.Tests.BarrelChecks.Run, data);
         Test(LakeChecks.Run, data);
         Test(EconomyChecks.Run, data);
         Test(AnimationChecks.Run, data);
@@ -1163,7 +1164,7 @@ public static class SimulationChecks {
 
     private static void CheckFogHidesUnseenGroundAndRemembersExploredGround(GameData data) {
         var fresh = new World(data);
-        var far = World.CliffOf(ThingKind.Coal).Center;
+        var far = Cliff.Of(ThingKind.Coal).Center;
         Require(fresh.Explored(Terrain.Spawn) && !fresh.Explored(far),
                 "a new game should reveal only the clearing around the player");
         Require(Known(fresh).All(t => t.Pos.DistanceTo(Terrain.Spawn) <= data.SightRadius),
@@ -1204,7 +1205,7 @@ public static class SimulationChecks {
 
     private static void CheckCliffsHaveDepositsAndLooseCoal(GameData data) {
         var world = new World(data);
-        foreach (var cliff in World.Cliffs) {
+        foreach (var cliff in Cliff.All) {
             Require(!world.CanStand(cliff.Center), $"each {cliff.Ore} cliff should block movement");
             Require(Terrain.FromMountains(cliff.Center) < 0,
                 $"each {cliff.Ore} cliff's middle should be off the mountain range");
@@ -1212,12 +1213,12 @@ public static class SimulationChecks {
                 $"each {cliff.Ore} cliff should stand at the foot of a mountain range");
             Require(world.Things.Count(t => t.Kind == cliff.Ore && cliff.DistanceTo(t.Pos) < 3) == 2, $"each {cliff.Ore} cliff should have deposits at its foot");
         }
-        foreach (var cliff in new[] { World.CliffOf(ThingKind.Iron), World.CliffOf(ThingKind.Coal) }) {
-            Require(world.Things.Where(t => t.Kind == cliff.Ore).All(t => World.Cliffs.Any(c => c.Ore == cliff.Ore && c.DistanceTo(t.Pos) < 3)),
+        foreach (var cliff in new[] { Cliff.Of(ThingKind.Iron), Cliff.Of(ThingKind.Coal) }) {
+            Require(world.Things.Where(t => t.Kind == cliff.Ore).All(t => Cliff.All.Any(c => c.Ore == cliff.Ore && c.DistanceTo(t.Pos) < 3)),
                     $"{cliff.Ore} deposits should only spawn at the foot of their cliffs");
         }
         {
-            var cliff = World.CliffOf(ThingKind.Coal);
+            var cliff = Cliff.Of(ThingKind.Coal);
             var loose = world.Things.Where(t => t.Kind == ThingKind.LooseCoal).ToList();
             Require(loose.Count > 0 && loose.All(t => cliff.DistanceTo(t.Pos) is > 3 and < 12 && world.CanStand(t.Pos)),
                     $"loose {cliff.Ore} should spread further than the deposits but stay near the nearer cliff");
@@ -1741,7 +1742,7 @@ public static class SimulationChecks {
     private static void CheckTinNeedsPickaxeAndSmeltsIntoBars(GameData data) {
         var world = EmptyWorld(data);
         var fresh = new World(data);
-        var cliff = World.CliffOf(ThingKind.Tin);
+        var cliff = Cliff.Of(ThingKind.Tin);
         Require(fresh.Things.Count(t => t.Kind == ThingKind.Tin && cliff.DistanceTo(t.Pos) < 3) == 2,
                 "the tin cliff should have two deposits and no loose pieces");
         var tin = world.Add(ThingKind.Tin, Site(0, 0), 400);
@@ -2254,8 +2255,12 @@ public static class SimulationChecks {
             // Crates of berries sold at a signpost buy what the village sells, the first pickaxe among it.
             if (built.Contains(ThingKind.Signpost) && have.Contains("crate") && have.Contains("berries")) foreach (var item in data.Market.Buys.Keys) grew |= have.Add(item);
             if (HasTool("rake")) grew |= have.Add("leaves");
-            // A full vessel pours its liquid into a station.
-            foreach (var vessel in data.Vessels) if (have.Contains(vessel.Full)) grew |= have.Add(vessel.Liquid);
+            // Crafting the vessel and reaching its liquid opens every fill state.
+            foreach (var vessel in data.Vessels) {
+                if (have.Contains(vessel.Full)) grew |= have.Add(vessel.Liquid);
+                if (have.Contains(vessel.Empty) && have.Contains(vessel.Liquid)) foreach (string fill in vessel.States) grew |= have.Add(fill);
+            }
+            if (have.Contains(Barrel.Item) && have.Contains(Water.Liquid)) foreach (string fill in Barrel.Fills) grew |= have.Add(fill);
             foreach (var (id, b) in data.Buildings) if (b.Cost.Keys.All(have.Contains)) grew |= built.Add(id);
             if (built.Contains(ThingKind.Pile) && have.Any(data.IsFood)) grew |= have.Add("fertilizer");
             // Seeds are bought with berry money to start the first plot.

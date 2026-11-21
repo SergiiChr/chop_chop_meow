@@ -65,6 +65,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --paths` | Show gravel paths in every shape their tiles join into, two staircases, a path under a chest and a pile of gravel; `--top` looks straight down with the tiles square on screen |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
+| `--showcase --steel-vessels` | Show a cabin's ladder and roof barrel, standing and stacked barrels, and vessels on the tool rack, with `--zoom`, `--camera-turn` and `--camera-pitch` for a closer look |
 | `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door), `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm) or `takedown` (the same with a player hurt enough to go down, pinned and fed on; the scene keeps them alive); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
 | `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
@@ -75,6 +76,7 @@ Play accepts Godot arguments after `--`:
 | `--slow 4` | Slow game time this many times, for a recording in slow motion |
 | `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following; a felling clip such as `"player steel axe"` plays against a trunk |
 | `--animation-review --animation-clip "wolf leap"` | Show one wolf clip close up; the leap, hit, feed, snap and brace play against a player |
+| `--animation-review --animation-clip "worker bucket roof"` | Follow a worker carrying a bucket up the ladder to pour and back down, with `"worker bottle roof"` for a bottle and `"player barrel"` or `"worker barrel"` for carrying a barrel |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
 | `--animation-target 1.3` | Stand what the close-up's blow works, a tree, rock, anvil or stump, this many metres from the actor |
@@ -237,14 +239,19 @@ Building plans are an icon grid; hovering a plan shows its description and what 
 ### Inventories
 
 Inventories are grids of slots.
-Every item stacks to 64 except coins (1000), and packed crates, tools, and refillable bottles, which take a slot each.
+Most items stack to 64.
+Coins stack to 1000.
+Packed crates, tools and refillable bottles take a slot each.
+Empty steel buckets and barrels can stack, and each filled one takes its own slot.
+Empty barrels stack in your backpack alongside up to one barrel containing water.
+A worker carrying a barrel has only their tool slot free.
 
 | Inventory | Capacity |
 | --- | --- |
 | Backpack | 24 slots |
 | Chest | 5 slots |
 | Worker | 12 items, like a crate: one stack of 12 or up to 12 different items |
-| Tool station | 4 slots, any tool in any slot |
+| Tool station | 4 slots for tools, buckets or bottles |
 
 - You can move items in and out of storage and stations up to 15 metres away (`World.ItemReach`).
 - Inventory slots retain their positions. Pick up a stack and put it down to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
@@ -253,10 +260,12 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - A stack put down that does not all fit fills the slot, and the rest stays held until you put it down elsewhere.
 - A slot that does not take the held stack, such as an input slot for another item or an output slot, shakes, and the stack stays held.
 - Esc, a click on open ground or on the interface anywhere but an item slot, closing the side panel or walking out of reach of the building it came from lets go of the held stack, which is then back in its slot.
-- A held crate or building plan over open ground goes into placement: a click places it. Back over the interface it is a held stack again.
+- Click over open ground to place a held crate, barrel or building plan.
+  Moving back over the interface returns it to the cursor.
 - A press on one slot let go of anywhere else, such as over another slot, does nothing.
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
-- A double click uses an item: food is eaten, a filled bottle gives one liter and keeps the bottle, a torch lights, a crate opens as storage, and a tool is selected: on its hotbar slot, or in hand with no slot selected when it has none. A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
+- Double-click to eat, drink one liter, light a torch, open a crate or barrel, or select a tool in its hotbar slot or directly in hand.
+  A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A held stack put on storage clicked in the world, such as a chest, goes into it. An item only selected on the hotbar never does.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
@@ -378,11 +387,17 @@ A cabin someone is in, or a trading post with a cart out, stays up until they co
 A full stomach lasts one in-game day and a full water gauge lasts one day; a day lasts 14 minutes.
 Raw meat cannot be eaten.
 Your refillable bottle holds three liters, each restoring one third of the water gauge.
+Put a steel barrel into the Roof barrel window to the left of the cabin page to mount it on the roof.
+At bedtime, the barrel serves everyone's thirst first and fills bottles second, both in the order they entered.
+When players wake, any water left in the barrel goes to their thirst in the same order.
+Taking down a cabin returns its barrel with its water.
 Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one liter, taking the same gathering time.
 Filling a bottle takes the same time as one gather action.
 Empty or filled replacements can be bought individually.
 Craft an empty bottle at a bench from one tin bar and one wood part, with the same steel hammer used for tin cans.
-A recipe that uses water, such as meat stew or dough, takes liters of it poured out: a bottle put on the station's water input slot, or moved there with Shift or Ctrl, pours every liter it holds, and the bottle stays in your backpack, emptied.
+A recipe that uses water, such as meat stew or dough, takes liters of it poured out.
+Drag a bottle to the station's water input or Shift-click or Ctrl-click it to pour while the bottle stays in your backpack.
+Ctrl-click also pours from vessels bound to the hotbar.
 So water can come in batches, part-drunk bottles too; loading a batch pours from the least full bottles first.
 The input slot shows a water droplet and counts liters.
 Shift or Ctrl on it takes the water back into bottles in your backpack with room, the fullest first, and so does picking it up and putting it in the backpack; with no room, the slot shakes and says so.
@@ -443,7 +458,8 @@ The opening progression prioritizes water, shelter and fire, then hand gathering
 ### Buildings
 
 A building, yard or crate goes up over stumps and plain bushes and clears them away, giving nothing for them.
-A cabin needs dry, open ground in front of its door, and no other building goes up on that spot.
+A cabin needs dry, open ground at its door and at the foot of its ladder.
+Those spots stay clear of other buildings.
 
 | Building | Cost |
 | --- | --- |
@@ -571,6 +587,37 @@ Picking up the open crate itself closes it, and it is then a held stack like any
 Workers never open or place crates; they pack them at a packing station.
 Putting a crate inside a crate asks first; saying yes ends the game.
 
+### Steel barrels and buckets
+
+A crafting bench with a steel hammer makes a barrel from five steel bars and a bucket from three.
+The barrel recipe takes 30 seconds of base work before the bench and hammer speed bonuses.
+Barrels stack in the bench output.
+A pile can store barrels at every fill level together.
+You can carry stacks of empty barrels alongside one barrel containing water.
+Workers carry a single barrel in both arms and keep their tool slot free.
+Carrying a barrel prevents sprinting.
+A player carrying water in the barrel braces it and walks.
+Each liter makes the carry slower, down to half speed at 50 liters.
+
+Double-click a barrel in the backpack or on the hotbar to open its water slot.
+Select it on the hotbar to place it.
+Hold right-click on a placed barrel to pick it up with its water.
+Pour from a bottle or bucket into its one slot, or take water back into vessels in your backpack.
+Filling from an empty stack fills one barrel in the opened cell and stores the remaining empties elsewhere in the backpack.
+The pour needs room for the split before it uses any water.
+Sorting the backpack or swapping the opened barrel's cell returns you to the backpack.
+Shift-click or Ctrl-click a vessel to pour into an open barrel, including vessels bound to the hotbar.
+A placed barrel's single filter names water, like a pile's filter names its resource.
+A barrel holds 50 liters.
+A steel bucket holds 10 liters and hangs by its handle on the tool rack.
+
+A placed barrel offers Haul.
+A cabin offers Haul while its roof barrel is mounted.
+A worker fills the bucket or bottle in their tool slot at the lake or a nearer full placed barrel, then pours it
+into the barrel they were assigned to stock.
+Workers can fetch a bucket or bottle from the tool rack.
+They climb the outside ladder to fill a roof barrel and then climb down.
+
 ### Packing station
 
 The packing station (8 planks, 4 wood) packs one good into crates.
@@ -615,7 +662,7 @@ Storage input filters govern automated deposits; output filters govern worker wi
 Empty filters allow all items.
 A row shows its items in the order they were added.
 The item list that **+** opens shows items in groups, each simplest first: what is gathered, grown or bought, then materials, tools, containers and food, and last crates of goods.
-Water at any fill stands with the empty bottle among containers.
+Bottles, buckets and barrels come among containers at any fill.
 **Clear** takes everything off both rows.
 Manual inventory transfers ignore these automation filters.
 
@@ -646,7 +693,7 @@ Workers fetching a station's inputs take them from storage or straight from anot
 
 ### Tool station
 
-The tool station (8 planks, 4 stone) is a rack with four slots that each take any tool.
+The tool station (8 planks, 4 stone) is a rack with four slots for tools, buckets or bottles.
 Its page lists which worker has which tool out and who waits for one.
 Workers need tools for some jobs:
 
@@ -793,7 +840,8 @@ Clicking a worker, or their card in the crew overview, opens their page.
 - **Hands and tool.** The page shows what they carry, 12 items in all, and the tool they hold in a slot of its own.
   While you stand within reach, these slots work like a building's: left click picks a stack up, right click half, Shift or Ctrl sends it to the backpack.
   A stack put on their hands is theirs to carry to where it goes.
-  Only a tool goes into the tool slot, and a tool the job in hand has no use for goes back to a tool station.
+  The tool slot takes a tool, bucket or bottle.
+  A worker returns what their jobs have no use for to a tool station.
 - **Jobs.** Each job is a row with its number in the order, its place, what the place is set to make, mine, pack or grow, and a button to take the job away.
   Drag a row by its grip to move it up or down the order.
 - **Haul groups.** "New haul group" adds an empty group at the end of the list.

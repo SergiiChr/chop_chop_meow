@@ -80,7 +80,8 @@ Simulation and data:
 | `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
 | `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
 | `src/Farm.cs` | Farm plots |
-| `src/Mine.cs` | Mines |
+| `src/mines/Mines.cs` | Mines: where one is marked and stands at its cliff, its three building stages, supplying it, working it underground and the end goal's working mines |
+| `src/mines/model/Cliff.cs`, `src/mines/model/MineStage.cs` | `Cliff`, the valley's ore cliffs and the mine spot at each, and `MineStage`, how far a mine is built |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
@@ -92,6 +93,11 @@ Simulation and data:
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
+| `src/containers/ContainerItem.cs` | The base item shared by every fill of a steel bucket or barrel |
+| `src/containers/barrel/Barrels.cs`, `src/containers/barrel/model/Barrel.cs` | Portable and placed steel barrels, with a fill encoded in each portable barrel |
+| `src/containers/barrel/model/Bucket.cs`, `src/containers/barrel/BarrelJobs.cs` | Steel buckets and worker water hauling |
+| `src/containers/barrel/model/WorkerWaterAction.cs` | The haul actions sent to the window for rendering |
+| `src/containers/barrel/BedtimeWater.cs` | Cabin water at bedtime and its effect on dawn's needs |
 | `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
 | `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
@@ -111,7 +117,7 @@ UI and input:
 | `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
-| `src/MinePanel.cs` | The mine's building steps, miners and outputs |
+| `src/mines/display/MinePanel.cs` | The mine's building steps, miners and outputs |
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream slots, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
 | `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what outlasts a page |
 | `src/BackpackDrawer.cs` | The backpack drawer above the hotbar |
@@ -158,6 +164,7 @@ UI and input:
 | `src/ResourcePanel.cs` | A resource in the world |
 | `src/PilePanel.cs` | A pile or compost heap |
 | `src/ToolRackPanel.cs` | A tool station |
+| `src/containers/barrel/display/BarrelPanel.cs`, `src/containers/barrel/display/CarriedBarrelPanel.cs` | Water and hauling on a placed barrel and the water slot in a backpack barrel |
 | `src/CratePanel.cs` | A placed crate, and a packed crate opened from the backpack |
 | `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
@@ -206,9 +213,13 @@ Rendering and sound:
 | `src/actors/player/display/FallBackView.cs` | A player knocked or tugged off their feet falling onto their back, their throat as they go over and their hands at the wolf |
 | `src/cabins/display/DoorwayView.cs`, `src/cabins/model/DoorShown.cs` | Players at cabin doors: stepping in and out, following, knocking, standing aside and squeezing past with a palm on the frame |
 | `src/cabins/display/CabinModel.cs`, `src/cabins/display/CabinShape.cs`, `src/cabins/display/HutProp.cs` | Builds the cabin's model, its wall shell, roof and interior, and the cabin as drawn: its door, window and lamp |
+| `src/cabins/display/CabinWaterModel.cs` | Exterior ladder, roof walk points and the mounted barrel's feet and fill opening |
+| `src/containers/barrel/display/VesselShape.cs`, `src/containers/barrel/display/BarrelProp.cs` | Steel barrel, its tap and sliding bung, and the bucket and its bail, shared by placed, carried, heaped and icon views |
+| `src/containers/barrel/display/WorkerWaterView.cs` | A worker's carry, fill, ladder climb and pour poses |
 | `src/cabins/display/StairSteps.cs` | The cabin's steps, how high they stand at a spot, and a pose's boots fitted onto them |
 | `src/cabins/display/DoorKeyView.cs` | The round lock of a cabin's door with its key in it, drawn into a picture for the cabin's page |
 | `src/cabins/display/InsideDoorPOV.cs` | What a player inside sees of a wolf forcing the door: a dark cabin with copies of the wolves and the player taken out, in a window that shows it as an old tape ([assets/environment/vhs](../assets/environment/vhs/README.md)) |
+| `src/mines/display/MineModel.cs`, `src/mines/display/MineShape.cs`, `src/mines/display/MineRockShape.cs`, `src/mines/display/MineProp.cs` | Builds a mine's model and the outcrop at every cliff, and the mine as drawn stage by stage |
 | `src/actors/enemies/wolf/display/DoorCheckView.cs` | A wolf at a cabin's door: its stands, scratching paw, prying snout, steps, launch, and how far it has levered and pushed the door open |
 | `src/actors/enemies/wolf/display/TugView.cs` | A wolf tugging a player out of a doorway, wolves reared up onto the player's arms, and the lunge onto them as they fall |
 | `src/actors/enemies/wolf/display/FeedingSpots.cs` | Where wolves stand round a fallen player: feeders side-on to the body, a pinner's paws on the chest |
@@ -219,7 +230,7 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | Every check of a feature whose code has a folder, beside its steps: `*Checks.cs` its rules through `World`, `*UIChecks.cs` what the player does and sees, `*NetChecks.cs` its scene in the network session. So far `tests/paths/`, `tests/cabins/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/<feature>/` | A feature's rules, UI and network checks beside its steps, including `tests/paths/`, `tests/cabins/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
 | `tests/*Checks.cs` | Simulation checks of the features whose code is still flat, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
@@ -396,6 +407,13 @@ The player's carried tool selects its matching action and the tool shown in hand
 Workers animate according to movement and an explicit transient `WorkerWorkState`, not localized or presentation status text.
 The transient state is excluded from saves and recalculated on the next simulation tick.
 
+Players and workers hug a carried steel barrel to their trunk with both hands on its front sides (`ActorRig.HugBarrel`).
+A player carrying water in the barrel keeps a walking gait, with one or both feet planted through each step.
+For a water haul, `WorkerWaterView` poses the worker using the water action, target and progress sent by the world.
+A worker climbs the fitted ladder holding the vessel in one hand, walks across the roof, tips the vessel using both
+hands, and returns down the ladder.
+The stream starts at the vessel's lip and ends at the barrel's opening.
+
 At a packing station the packer stands behind the table (`World.PackStand`) and the `Pack` action rummages in the heap of goods, lifts a piece across and settles it into the crate, then turns back.
 The player working a station they stand near packs the same way.
 
@@ -417,7 +435,7 @@ Each striking work action has an impact moment that shakes its target and spawns
 The axe, pick and hammer land there (`ActorAnimation.ChopStrike`, `MineStrike`, `HammerStrike`), speeding up all the way into the blow; a punch draws the fist back first.
 A dig strikes at `ActorAnimation.DigStrike` and throws its soil off the blade (`ActorRig.ShovelTip`) at `DigToss`.
 
-A blow lands its tool's working end on what is worked, wherever within reach the worker stands (`StrikePoints`, `ActorState.Mark`): the axe's head on the trunk's side, the pick's point where its swing first meets the rock or on the cliff's rock face beside a marked mine's cave mouth (`World.MineDigFace`), the hammer's face on the anvil's or bench's work top, and the shovel's blade in the ground at a stump's or bush's foot.
+A blow lands its tool's working end on what is worked, wherever within reach the worker stands (`StrikePoints`, `ActorState.Mark`): the axe's head on the trunk's side, the pick's point where its swing first meets the rock or on the cliff's rock face beside a marked mine's cave mouth (`Mines.DigFace`), the hammer's face on the anvil's or bench's work top, and the shovel's blade in the ground at a stump's or bush's foot.
 Chips and soil fly from there.
 Where the blow's own swing meets what is worked, the swing is cut short there (`ActorAnimation.Swing`).
 Where it passes it by, the right arm is solved to reach it with the tool held in line with the forearm (`ArmReach.ArmTo`), the trunk turning to face it and leaning in or back as far as the arm needs; an arm that would have to swing behind the trunk or fold its elbow tight stops where its swing passes nearest instead.
@@ -491,14 +509,46 @@ There are no iron tools; iron bars only go into buildings and steel.
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
 Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the lake shore is a collection target.
-A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many liters.
+A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon.
+Stations and barrels hold it loose, and a recipe asks for so many liters.
 `GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
 a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
 Loading a station by hand and a worker's delivery pass it what the input slot has left (`Inventory.SlotRoom`).
-Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
+Station haulers fetch a liquid input in the fullest bottles storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
 No hand recipe takes a liquid, which `GameData` checks.
+
+#### Steel barrels and buckets
+
+A barrel holds up to 50 liters of water.
+Its item id records its fill, so moving it between a player, a worker,
+the ground, a pile and a cabin preserves its water without a separate packed inventory.
+The ground barrel uses a one-slot tank and the same filter rules as a plain pile.
+A cabin's only storage slot holds the actual barrel item.
+The Roof barrel window sits beside the cabin page in `SidePanel.Aside`, like a station's tool window.
+Refills update that item in place.
+A backpack stacks empty barrels and carries up to one barrel containing water, whose fill determines how much it slows the player.
+Pouring into an empty stack keeps the barrel being filled in its original cell and requires room for the remaining empty barrels.
+A worker with a barrel cannot carry other goods in their hands.
+
+The steel bucket is a refillable 10-liter vessel.
+Empty buckets stack where the inventory allows it.
+A worker's tool slot holds one bucket or bottle, and a tool rack accepts both.
+A water haul uses the tool slot to preserve the bucket or bottle and its fill throughout the trip.
+Workers fetch water from the nearest full floor barrel or the lake.
+If a building blocks the nearest shoreline point, the worker looks along the shore for open ground.
+The worker keeps the chosen source and standing point while walking there.
+If a worker cannot reach a barrel's pouring point, they move on to the next job they can do.
+A cabin haul walks to the outside ladder, climbs, pours into the mounted barrel and climbs back down.
+The cabin offers Haul only while a barrel is mounted.
+The window advances the visible haul phase between server updates through `LocalClock`.
+Construction keeps the ladder approach on dry ground and clear of other buildings.
+
+Before the night advances, players inside each cabin draw enough liters to fill their thirst in cabin-entry order.
+They then fill bottles in the same order.
+On waking, the players draw from any water left in the barrel.
+The sleep gate uses what a player can drink before sleep, and the dawn preview includes what they can drink on waking.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
 It advances normal simulation through dawn, including needs, trades, production and wages.
@@ -508,7 +558,7 @@ In multiplayer it is available only when everyone is downed; a living player pre
 
 The end goals:
 
-- a working mine on every ore in `World.Cliffs`;
+- a working mine on every ore in `Cliff.Ores`;
 - `Goals.ProfitDays` consecutive days of at least `Goals.DailyProfit` profit.
 
 `SaveState.DayRevenue` collects returned sale coins.
@@ -583,7 +633,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 `Travel` swerves round anything a route's straight leg clips instead of walking through it, and after a search finds no way it waits `RouteRetrySeconds` before the next.
 
 - **Dens.** `WolfPatrols.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
-  The outcrop is solid like a mine's (`World.InSpur`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
+  The outcrop is solid like a mine's (`WolfPatrols.InOutcrop`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
   From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
   After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`).
 - **Strength.** A wolf's health, bite and pace are `GameData.WolfHealth`, `WolfBite` and `WolfTrot`, the same every night: it stands two blows of a steel axe and falls to the third or fourth, and its fourth bite brings a healthy player to half health.
@@ -951,8 +1001,9 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
   `PlayerState.HotbarSlots` holds plans, and items a slot waits for until `World.BindWaitingHotbars` binds the first stack of one to come in; `World.HotbarItem` and `HotbarStack` read a slot.
   A stack spent to nothing (`Inventory.Remove`, unlike a move out) notes its slot in `Inventory.UsedUp`, and the slot waits for its item again, so it binds the next stack at once.
   Ctrl batches from the backpack drawer and Store all carry the mark "spares only" (`World.FromSpares`, `Command.Spares`, `Inventory.SparesOnly`), which leaves bound stacks behind.
+  Pouring from vessels with Ctrl includes hotbar-bound vessels and preserves their bindings.
 - Esc, a click on open ground or on the interface anywhere but an item slot, or closing the side panel lets go of the held stack (`HeldCursor`).
-- A held crate or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
+- A held crate, barrel or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
 - A held stack put on storage clicked in the world goes into it; an item only selected on the hotbar never does.
 - Bulk buttons and recipe batch actions say what they move.
 
@@ -974,10 +1025,10 @@ Asking for it are a chest, pile or trading post whose input filter names it, a p
 `World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
 Manual transfers ignore those filters.
-A filter is a `FilterList`: its entries in the order the player named them, each once, which the filter window's rows show.
+A filter is a `FilterList`: its entries in the order they were named, each once, which the filter window's rows show.
 The window's item list runs in `GameData.ListOrder`, with crates of goods after the items in their goods' order.
 `GameData.Create` works `ListOrder` out once: what is gathered, grown or bought comes first, then materials, tools, containers and food, by the recipe that makes each item.
-An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a part-drunk bottle stands with the full one.
+An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel bucket or barrel at any fill stands with the empty one (`ContainerItem.Base`), and a part-drunk bottle with the full one.
 In each group fewer making steps come first, and recipe map order breaks ties.
 Making steps count the longest way through a recipe's inputs, or the items a source comes out of and also takes, from items that take no other item, such as wood.
 
@@ -1027,7 +1078,8 @@ If confirmed, it ends the run in a black hole with a reload or main-menu choice.
 
 #### Tool station
 
-A tool station (`toolstation`) is storage for tools only: `World.ToolSlots` (4) slots, each taking any tool, and its rack hangs whatever each slot holds.
+A tool station (`toolstation`) holds tools, buckets and bottles in `World.ToolSlots` (4) slots.
+Its rack hangs whatever each slot holds.
 
 ### Workers
 
@@ -1156,9 +1208,9 @@ Trades always use the live price, so the sheet can be out of date.
 
 ### Mines
 
-A mine (`src/Mine.cs`, `Mine` in `GameTables`) is marked free and snaps to `World.MineSpot`, in front of the middle of an ore cliff's face between its two deposits, one per cliff.
+A mine (`src/mines/`, `Mine` in `GameTables`) is marked free and snaps to `Cliff.MineSpot`, in front of the middle of an ore cliff's face between its two deposits, one per cliff.
 Each portal follows its own cliff face, its tunnel runs into the rock, and its rails point outward toward the valley.
-A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`World.InSpur`), and holds the tunnel, which `WorldModels.Mine` darkens step by step to black.
+A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`Mines.InOutcrop`), and holds the tunnel, which `MineModel.Build` darkens step by step to black.
 
 `Thing.MineStage` counts finished stages from `MineStage.Marked`:
 
@@ -1169,13 +1221,13 @@ A continuous outcrop extends from the mountain foot, blocks walking with a match
 | Fitted | a worker with a hammer | `MineStage.Open` |
 
 The two worker stages take `StageWorkdays` of `GameData.WorkdaySeconds`.
-The player holding a gather on the mine (`World.Gather`, standing at `World.MineDoor`) adds to the same progress with a pickaxe or hammer carried (`World.BuildMine`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
+The player holding a gather on the mine (`World.Gather`, standing at `Mines.WorkSpot`) adds to the same progress with a pickaxe or hammer carried (`Mines.Work`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
 
 Up to `Mine.Workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).
 Each adds one ore and one stone to the mine's two-slot `Thing.Output` every `Mine.Seconds`.
 Mining stops while either slot holds a full stack.
-A miner then carries a load of it to the nearest place that takes it (`World.Dig`), and with none the mine reports once that it is full and the mine job has nothing to do.
+A miner then carries a load of it to the nearest place that takes it (`Mines.Mine`), and with none the mine reports once that it is full and the mine job has nothing to do.
 
 ### Farming
 

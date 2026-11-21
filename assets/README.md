@@ -11,7 +11,7 @@ Buildings are DIY:
 
 - a cinder-block furnace with a steel stovepipe
 - a propane-tank forge on an angle-iron stand, fed by a plywood lever bellows with a heat gauge
-- an OSB cabin on block piers with a corrugated shed roof and solar panel
+- an OSB cabin on block piers with a corrugated shed roof, solar panel and fixed steel ladder
 - a plywood storage box
 - a dropped canvas backpack
 - an anvil on a welded stand
@@ -71,6 +71,13 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   The surfaces' grain and bump textures and the scans' colour, bump and height maps are in `models/surfaces/`, packed
   by `tools/surface_textures.py`.
 - `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
+- `src/containers/barrel/display/VesselShape.cs` — a ribbed 50 L steel barrel with a tap and a movable bung in its recessed lid,
+  and a 10 L tapered steel bucket with a hollow interior and a wire bail with a wood grip.
+  World props, carried props, heaps and icons use the same shapes.
+  Water levels share the vessel's icon.
+- `src/cabins/display/CabinWaterModel.cs` — the exterior ladder's rails and rungs, and the roof barrel's four feet
+  and fill opening.
+  The mounted barrel uses the ground barrel's shell turned sideways.
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons, and by heaps as six-packs. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
 - `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
   The icon shows the model as built, and a heap is made of pieces of it.
@@ -130,7 +137,8 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   - Beside it a heap of the good grows toward a full one at a crate's worth: the same pieces a storage pile shows for that good, at half their size.
   - Up to three lidded crates stack beside the table, one for each empty crate the station holds.
   - Fully stocked it stays under its ceiling of 2,500 triangles, whichever good it heaps.
-- `RackShape` — caches the tool station's fitted concrete feet, bevelled planks and cap, and shaped axe, pickaxe, shovel, rake, hammer and chisel. Each of the four pegs has a pivot per tool shape in `RackProp.Pegs`, and shows the one its slot holds.
+- `RackShape` — caches the tool station's fitted concrete feet, bevelled planks and cap, and shaped hand tools.
+  Each peg shows what its slot holds, including a bucket hung by its bail or a bottle clipped around its neck.
 - `PileShape` — the pile's dirt pad with fitted log edging, and how every good heaps: the piece from `ItemShape` and its places on a pad. `WorldModels.SyncPile` fills the pile's `StockPile` from its inventory, the fuller the pile the more pieces, while `WorldView` keeps its sight guard, so a remembered heap shows in fog. A compost pile shows one mound for all it holds. The farm yard uses `PileShape.Yard`.
 - `GravelPathShape` (`src/paths/display/GravelPathShape.cs`) — one gravel path tile on its own, a flat round pad as wide
   as a path in the gravel photoscan, for the plan's icon and its ghost while placing. Laid tiles are drawn by the

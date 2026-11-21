@@ -10,18 +10,18 @@ public abstract record ClickMode {
     public sealed record Normal : ClickMode;
     /// <summary>A click places a building of this kind.</summary>
     public sealed record Build(ThingKind Kind) : ClickMode;
-    /// <summary>A click places this crate from the backpack.</summary>
-    public sealed record Crate(string Item) : ClickMode;
+    /// <summary>A click places a crate or barrel, from a specific backpack cell when one is named.</summary>
+    public sealed record Container(string Item, int BackpackSlot = -1) : ClickMode;
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
     /// <summary>The remove selector: a click takes down the building or gravel path tile under it, and the next click the next one.</summary>
     public sealed record Remove : ClickMode;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
-    public ThingKind? Placing => this switch { Build build => build.Kind, Crate => ThingKind.Crate, _ => null };
+    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, _ => null };
 }
 
-/// <summary>The player in the world: walking, gathering, lifting crates, placing buildings, taking them down and clicking things.</summary>
+/// <summary>The player in the world: walking, gathering, lifting containers, placing buildings, taking them down and clicking things.</summary>
 public sealed class PlayerControl {
     private const float LiftSeconds = .6f;
     private readonly UiKit kit;
@@ -31,7 +31,7 @@ public sealed class PlayerControl {
     private readonly HeldCursor cursor;
     private readonly ItemMoves moves;
     private readonly World world;
-    /// <summary>Whether <see cref="Mode"/> places the crate or plan on the cursor, which it does only while the mouse is over open ground.</summary>
+    /// <summary>Whether <see cref="Mode"/> places the container or plan on the cursor, which it does only while the mouse is over open ground.</summary>
     private bool placingHeld;
     private Thing? gathering;
     /// <summary>A cabin the player is walking to after clicking it; they step inside on arrival.</summary>
@@ -39,7 +39,7 @@ public sealed class PlayerControl {
     private Momentum momentum;
     /// <summary>The way the player last walked, which is the way Space swings.</summary>
     private Vector2 walked;
-    /// <summary>A crate held under the right mouse button; it is lifted once held for <see cref="LiftSeconds"/>.</summary>
+    /// <summary>A container held under the right mouse button; it is lifted once held for <see cref="LiftSeconds"/>.</summary>
     private Thing? lifting;
     private float liftClock;
 
@@ -51,16 +51,17 @@ public sealed class PlayerControl {
         world.Replaced += () => { Stop(); Mode = new ClickMode.Normal(); };
     }
 
-    /// <summary>Drops a gather, a crate lift and a walk into a cabin, whose targets belong to a world that went away.</summary>
+    /// <summary>Drops a gather, a container lift and a walk into a cabin, whose targets belong to a world that went away.</summary>
     private void Stop() { gathering = null; lifting = null; entering = null; }
 
     /// <summary>Walks the player to a cabin's door and inside.</summary>
     public void WalkInto(Thing cabin) => entering = cabin;
 
-    /// <summary>Enters placement for a crate from the backpack.</summary>
-    public void PlaceCrate(string item) {
-        if (world.Backpack[item] == 0) { kit.Notify("No empty crate in your backpack."); return; }
-        Mode = new ClickMode.Crate(item); panel.Close();
+    /// <summary>Enters placement for a container from the backpack.</summary>
+    public void PlaceContainer(string item, int backpackSlot = -1) {
+        var container = new ClickMode.Container(item, backpackSlot);
+        if (ContainerCount(container) == 0) { kit.Notify(Barrel.Is(item) ? "No barrel in your backpack." : "No empty crate in your backpack."); return; }
+        Mode = container; panel.Close();
     }
 
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started; <paramref name="overPanel"/> tells that the mouse is on the interface.</summary>
@@ -75,14 +76,14 @@ public sealed class PlayerControl {
         Walk(direction, right, dt);
     }
 
-    /// <summary>A crate or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>
+    /// <summary>A container or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>
     private void PlaceHeld(bool overPanel) {
         var plan = cursor.Plan is string id ? Kinds.Parse(id) : null;
-        string? crate = cursor.Stack is HeldStack held && World.IsCrate(held.Item) ? held.Item : null;
-        if ((plan != null || crate != null) && !overPanel) {
+        string? container = cursor.Stack is HeldStack held && (World.IsCrate(held.Item) || Barrel.Is(held.Item)) ? held.Item : null;
+        if ((plan != null || container != null) && !overPanel) {
             // Built only when it changes, as this runs every frame.
             if (plan is ThingKind kind && !(Mode is ClickMode.Build build && build.Kind == kind)) Mode = new ClickMode.Build(kind);
-            if (crate != null && !(Mode is ClickMode.Crate placing && placing.Item == crate)) Mode = new ClickMode.Crate(crate);
+            if (container != null && !(Mode is ClickMode.Container { BackpackSlot: -1 } placing && placing.Item == container)) Mode = new ClickMode.Container(container);
             placingHeld = true;
         } else if (placingHeld) { placingHeld = false; Mode = new ClickMode.Normal(); }
     }
@@ -134,13 +135,14 @@ public sealed class PlayerControl {
         return direction;
     }
 
-    /// <summary>A held right click walks to a crate and lifts it once the button has been held long enough.</summary>
+    /// <summary>A held right click walks to a container and lifts it once the button has been held long enough.</summary>
     private Vector2 Lift(Vector2 direction, bool right, float dt) {
         if (lifting != null && right && direction == Vector2.Zero && entering == null && world.Find(lifting.Id) != null) {
             if (!world.Near(lifting, 1.5f)) direction = (lifting.Pos - world.Player).Normalized();
             else if ((liftClock += dt) >= LiftSeconds) {
-                var crate = lifting; lifting = null;
-                if (world.PickUpCrate(crate) && panel.Deselect(crate.Id) && panel.Page == Page.Inspect) panel.Close();
+                var container = lifting; lifting = null;
+                bool took = container.Kind == ThingKind.Barrel ? world.PickUpBarrel(container) : world.PickUpCrate(container);
+                if (took && panel.Deselect(container.Id) && panel.Page == Page.Inspect) panel.Close();
             }
         } else { lifting = null; liftClock = 0; }
         view.Lifting = lifting?.Id ?? 0; view.LiftProgress = liftClock / LiftSeconds;
@@ -148,8 +150,9 @@ public sealed class PlayerControl {
     }
 
     private void Walk(Vector2 direction, bool right, float dt) {
+        // A carried barrel prevents sprinting.
         // Under 15% food or drink the player is too weak to sprint.
-        world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
+        world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
         var step = momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
         if (step != Vector2.Zero) walked = step.Normalized();
         world.Me.Braking = momentum.Braking;
@@ -191,15 +194,17 @@ public sealed class PlayerControl {
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         var t = view.Pick(at);
         if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
-        lifting = t?.Kind == ThingKind.Crate ? t : null; liftClock = 0;
+        lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
     }
 
     private void LeftPress(Vector2 at) {
         var t = view.Pick(at);
-        // A held stack goes into storage clicked in the world; a held crate or plan places on open ground, even before a frame has seen the mouse there;
+        // A held stack goes into storage clicked in the world; a held container or plan places on open ground, even before a frame has seen the mouse there;
         // and a click anywhere else lets go of the stack, back to its cell.
         if (!cursor.Empty) {
-            if (t is { IsStorage: true } && cursor.Stack != null) { kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return; }
+            if (cursor.Stack is HeldStack held && t != null && (t.IsStorage || t.Kind == ThingKind.Hut && Barrel.Is(held.Item))) {
+                kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return;
+            }
             PlaceHeld(false);
             if (Mode.Placing != null) Place(view.ToWorld(at).Round()); else cursor.Release();
             return;
@@ -230,31 +235,56 @@ public sealed class PlayerControl {
     }
 
     /// <summary>
-    /// Placement stays on without opening what was placed, so several go down in a row until the materials or crates run out.
+    /// Placement stays on without opening what was placed, so several go down in a row until the materials or containers run out.
     /// A mine opens its panel instead, since each cliff takes only one.
     /// The backpack still holds what a placement just sent will cost, and the mine's panel opens when the server names it.
     /// </summary>
     private void Place(Vector2 at) {
+        if (Mode is ClickMode.Container { BackpackSlot: >= 0 } selected && ContainerCount(selected) == 0) {
+            Mode = new ClickMode.Normal();
+            return;
+        }
         bool sent = Sent(at);
-        if (Mode is not ClickMode.Crate crate) world.Construction.Build(Mode.Placing!.Value, at);
-        // A held crate goes down from the held stack, wherever it lies.
-        else if (placingHeld && cursor.Stack?.Item == crate.Item) world.FromHeldStack(() => world.PlaceCrate(crate.Item, at));
-        // One from the hotbar goes down from the stack bound to the selected slot.
-        else if (hotbar.ActiveItem() == crate.Item) hotbar.FromStack(hotbar.ActiveStack(), () => world.PlaceCrate(crate.Item, at));
-        else world.PlaceCrate(crate.Item, at);
+        if (Mode is ClickMode.Container container) PlaceContainerAt(container, at);
+        else world.Construction.Build(Mode.Placing!.Value, at);
         if (!sent || Mode.Placing != ThingKind.Mine && CanPlaceAgain()) return;
         Mode = new ClickMode.Normal();
-        // A plan on the cursor goes once nothing more can be paid for; a held crate stack runs out by itself.
+        // A plan on the cursor goes once nothing more can be paid for; a held container stack runs out by itself.
         if (placingHeld && cursor.Plan != null) cursor.Release();
     }
 
+    /// <summary>Places the container from the cursor, its chosen backpack cell or the active hotbar stack.</summary>
+    private void PlaceContainerAt(ClickMode.Container container, Vector2 at) {
+        string item = container.Item;
+        void Put() {
+            if (Barrel.Is(item)) world.PlaceBarrel(item, at); else world.PlaceCrate(item, at);
+        }
+        if (placingHeld && cursor.Stack?.Item == item) world.FromHeldStack(Put);
+        else if (container.BackpackSlot >= 0) hotbar.FromStack(container.BackpackSlot, Put);
+        else if (hotbar.ActiveItem() == item) hotbar.FromStack(hotbar.ActiveStack(), Put);
+        else Put();
+    }
+
     /// <summary>Whether a placement at <paramref name="at"/> goes to the server, which it does when nothing here blocks it.</summary>
-    private bool Sent(Vector2 at) => (Mode is ClickMode.Crate crate ? world.Construction.PlacementBlock(ThingKind.Crate, at, crate.Item) : world.Construction.PlacementBlock(Mode.Placing!.Value, world.Construction.Snap(Mode.Placing.Value, at))) == null;
+    private bool Sent(Vector2 at) {
+        var kind = Mode.Placing!.Value;
+        return (Mode is ClickMode.Container container ? world.Construction.PlacementBlock(kind, at, container.Item)
+            : world.Construction.PlacementBlock(kind, world.Construction.Snap(kind, at))) == null;
+    }
 
     /// <summary>Whether another can be paid for, on top of the one just sent.</summary>
     private bool CanPlaceAgain() => Mode switch {
-        ClickMode.Crate crate => world.Backpack[crate.Item] > 1,
+        ClickMode.Container container => ContainerCount(container) > 1,
         ClickMode.Build build => world.Data.Buildings[build.Kind].Cost.All(cost => world.Backpack[cost.Key] >= cost.Value * 2),
         _ => false
     };
+
+    /// <summary>How many matching containers can be placed from the chosen cell or the backpack as a whole.</summary>
+    private int ContainerCount(ClickMode.Container container) {
+        if (container.BackpackSlot < 0) return world.Backpack[container.Item];
+        var layout = world.Backpack.Layout;
+        if (container.BackpackSlot >= layout.Count) return 0;
+        var slot = layout[container.BackpackSlot];
+        return slot.Item == container.Item ? slot.Free : 0;
+    }
 }

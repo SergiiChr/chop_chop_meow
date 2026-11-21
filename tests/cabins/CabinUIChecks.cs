@@ -17,6 +17,41 @@ public partial class Game {
     /// <summary>The UI checks of cabins: going in by a click, the page inside and stepping out.</summary>
     private async Task RunCabinUIChecks() {
         await TestClean(CheckAClickTakesAPlayerIntoACabinWhereTheyLockUpAndStepOutAgain);
+        await TestClean(CheckCabinHasABarrelWindowAndOffersHaulWhileABarrelIsMounted);
+    }
+
+    private async Task CheckCabinHasABarrelWindowAndOffersHaulWhileABarrelIsMounted() {
+        var home = Hosted.Player;
+        var cabin = Hosted.Add(ThingKind.Hut, home + new Vector2(0, 4));
+        string item = Barrel.AtFill(20);
+        Require(Give(Hosted, item) == 1, "the player starts with a barrel to mount");
+        await Until(() => world.Backpack[item] == 1, "the player carrying a barrel with twenty liters", 2);
+        await ClickOn(cabin);
+        await Until(() => Shows(cabin) && world.Sheltered == cabin.Id && world.Door == Doorway.None, "the cabin page after entering", 5);
+        var slot = panel.Aside.FindChild("cabin_barrel", true, false) as ItemSlot;
+        Require(panel.Aside.Visible && slot != null && HasLabel(panel.Aside, "Roof barrel") && HasLabel(panel.Aside, "Empty"),
+            "The cabin must show an empty barrel slot in its own window.");
+        Require(panel.Aside.GetGlobalRect().End.X <= panel.GetGlobalRect().Position.X, "The barrel window must stand left of the cabin page.");
+        Require(Named("job_haul") == null, "A cabin without a barrel must not offer Haul.");
+
+        await Carry(BagCell(cell => cell.TooltipText.StartsWith(world.Data.Name(item))), slot!);
+        await Until(() => cursor.Empty && world.Find(cabin.Id)?.Inventory[item] == 1 && Named("job_haul") is { Visible: true },
+            "the cabin offering Haul as soon as the barrel goes in", 3);
+        Require(HasLabel(panel.Aside, "Steel barrel") && HasLabel(panel.Aside, "20/50 L"),
+            "The barrel window must name the mounted barrel and show its fill.");
+        Require(OnPage("thirst")?.TooltipText == "Thirst at dawn 100%",
+            "A cabin barrel with plenty of water must show a full thirst gauge at dawn.");
+
+        await Holding(Key.Shift, () => Click((ItemSlot)panel.Aside.FindChild("cabin_barrel", true, false)!));
+        await Until(() => world.Backpack[item] == 1 && Named("job_haul") == null && HasLabel(panel.Aside, "Empty"),
+            "taking back the barrel, hiding Haul and leaving the slot empty", 3);
+        Drop(Hosted, item);
+        await Click(FindButton(panel, "Step outside")!);
+        await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "stepping out of the cabin", 4);
+        RemoveThings(Hosted, thing => thing == cabin);
+        await CloseWithEsc();
+        Require(!panel.Aside.Visible, "The barrel window must close with the cabin page.");
+        Warp(Hosted, home); await Frames(4);
     }
 
     /// <summary>

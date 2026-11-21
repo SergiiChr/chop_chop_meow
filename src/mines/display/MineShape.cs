@@ -23,11 +23,11 @@ internal static class MineShape {
     private static string Shade(string tint, int step) => new Color(tint).Lerp(Colors.Black, MathF.Pow((step + 1) / 6f, .45f)).ToHtml(false);
 
     private static ArrayMesh BuildOutline() {
-        var s = Begin(); const float door = WorldModels.MineDoor;
-        foreach (float x in new[] { -.8f, .8f }) Box(s, new(.06f, .03f, 3.3f), new(x, .02f, door + 1.65f), "ffffff");
-        foreach (float z in new[] { door, door + 3.3f }) Box(s, new(1.66f, .03f, .06f), new(0, .02f, z), "ffffff");
-        foreach (float x in new[] { -.7f, .7f }) Box(s, new(.08f, 1.75f, .08f), new(x, .88f, door), "ffffff");
-        Box(s, new(1.56f, .08f, .08f), new(0, 1.75f, door), "ffffff");
+        var s = Begin(); const float portal = MineModel.PortalDepth;
+        foreach (float x in new[] { -.8f, .8f }) Box(s, new(.06f, .03f, 3.3f), new(x, .02f, portal + 1.65f), "ffffff");
+        foreach (float z in new[] { portal, portal + 3.3f }) Box(s, new(1.66f, .03f, .06f), new(0, .02f, z), "ffffff");
+        foreach (float x in new[] { -.7f, .7f }) Box(s, new(.08f, 1.75f, .08f), new(x, .88f, portal), "ffffff");
+        Box(s, new(1.56f, .08f, .08f), new(0, 1.75f, portal), "ffffff");
         return s.Commit();
     }
 
@@ -35,7 +35,7 @@ internal static class MineShape {
         var s = Begin();
         // Only the inward faces are needed; all outer faces lie inside the mountain outcrop.
         for (int i = 0; i < 6; i++) {
-            float near = -i * WorldModels.MineDepth / 6, far = -(i + 1) * WorldModels.MineDepth / 6;
+            float near = -i * MineModel.TunnelLength / 6, far = -(i + 1) * MineModel.TunnelLength / 6;
             Quad(s, new(-.75f, .02f, near), new(.75f, .02f, near), new(.75f, .02f, far), new(-.75f, .02f, far), Vector3.Up, Shade("3a332c", i));
             foreach (float x in new[] { -.72f, .72f })
                 Quad(s, new(x, .02f, near), new(x, 1.78f, near), new(x, 1.78f, far), new(x, .02f, far), new(-x, 0, 0), Shade("3f3830", i));
@@ -69,7 +69,7 @@ internal static class MineShape {
     private static ArrayMesh BuildSupports() {
         var s = Begin();
         for (int i = 1; i < 6; i += 2) {
-            float z = -i * WorldModels.MineDepth / 6;
+            float z = -i * MineModel.TunnelLength / 6;
             foreach (float x in new[] { -.64f, .64f }) Box(s, new(.12f, 1.72f, .12f), new(x, .86f, z), Shade("6f6150", i));
             Box(s, new(1.4f, .12f, .14f), new(0, 1.7f, z), Shade("6f6150", i));
         }
@@ -87,11 +87,11 @@ internal static class MineShape {
     }
 
     private static ArrayMesh BuildRails(bool deep) {
-        var s = Begin(); const float door = WorldModels.MineDoor;
-        if (!deep) foreach (float x in new[] { -.28f, .28f }) Rail(s, x, 1, door, "6c7175", true, false);
+        var s = Begin(); const float portal = MineModel.PortalDepth;
+        if (!deep) foreach (float x in new[] { -.28f, .28f }) Rail(s, x, 1, portal, "6c7175", true, false);
         else
             for (int i = 0; i < 6; i++) {
-                float near = door - i * WorldModels.MineDepth / 6, far = door - (i + 1) * WorldModels.MineDepth / 6;
+                float near = portal - i * MineModel.TunnelLength / 6, far = portal - (i + 1) * MineModel.TunnelLength / 6;
                 foreach (float x in new[] { -.28f, .28f }) Rail(s, x, near, far, Shade("8a8f93", i), false, i == 5);
                 Box(s, new(.8f, .04f, .14f), new(0, .045f, (near + far) / 2), Shade("5a4030", i));
             }
@@ -100,7 +100,7 @@ internal static class MineShape {
 
     private static ArrayMesh BuildSleepers() {
         var s = Begin();
-        for (int i = 0; i < 6; i++) Box(s, new(.8f, .04f, .14f), new(0, .025f, WorldModels.MineDoor + .2f + i * .55f), "6e4a2e");
+        for (int i = 0; i < 6; i++) Box(s, new(.8f, .04f, .14f), new(0, .025f, MineModel.PortalDepth + .2f + i * .55f), "6e4a2e");
         return s.Commit();
     }
 

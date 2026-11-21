@@ -9,16 +9,16 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
         var stage = int.TryParse(Launch.Value("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
-        var cliff = World.CliffOf(Kinds.Parse(Launch.Value("--mine-ore")) ?? ThingKind.Iron);
-        world.Player = World.MineSpot(cliff) + cliff.Face * 3;
-        var mine = world.Construction.Build(ThingKind.Mine, World.MineSpot(cliff))!;
-        mine.MineStage = stage; mine.Progress = stage is MineStage.Marked or MineStage.Supplied ? world.MineStageSeconds / 2 : 0;
+        var cliff = Cliff.Of(Kinds.Parse(Launch.Value("--mine-ore")) ?? ThingKind.Iron);
+        world.Player = cliff.MineSpot + cliff.Face * 3;
+        var mine = world.Construction.Build(ThingKind.Mine, cliff.MineSpot)!;
+        mine.MineStage = stage; mine.Progress = stage is MineStage.Marked or MineStage.Supplied ? world.Mines.StageSeconds / 2 : 0;
         if (stage == MineStage.Dug) mine.Inventory.Add("wood", 20);
         world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 + cliff.Along * 2);
         foreach (var w in world.Workers.ToArray()) world.Assign(w, null);
         foreach (var w in world.Workers.Take(stage == MineStage.Open ? 3 : 1)) { w.Pos = world.Player; world.Assign(w, mine); }
-        if (stage == MineStage.Open && !Launch.Has("--idle")) mine.Output!.Add(World.MineOre(mine), 20);
-        if (Launch.Has("--idle")) { foreach (var w in world.Workers) world.Assign(w, null); mine.Output!.Add(World.MineOre(mine), 12); mine.Output.Add("stone", 12); }
+        if (stage == MineStage.Open && !Launch.Has("--idle")) mine.Output!.Add(Mines.Ore(mine), 20);
+        if (Launch.Has("--idle")) { foreach (var w in world.Workers) world.Assign(w, null); mine.Output!.Add(Mines.Ore(mine), 12); mine.Output.Add("stone", 12); }
         world.S.Time = world.Data.DaySeconds * (Launch.Has("--night") ? .55f : .2f);
         for (int i = 0; i < 80; i++) world.Tick(.25f);
         if (Launch.Has("--panel")) panel.Select(mine); else panel.Close();
@@ -41,17 +41,42 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Value("--wolf-scene") is string wolves) view.AddChild(new WolfReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = wolves });
     }
 
+    private void VesselReview() {
+        var at = Terrain.Spawn;
+        foreach (var t in world.Things.Where(t => t.Pos.DistanceTo(at) < 9).ToArray()) world.S.Things.Remove(t);
+        var cabin = world.Add(ThingKind.Hut, at);
+        cabin.Inventory.Add(Barrel.AtFill(20), 1);
+        var rack = world.Add(ThingKind.Toolstation, at + new Vector2(3.1f, -.8f));
+        rack.Inventory.Add(Bucket.Item, 2);
+        rack.Inventory.Add("steel_axe", 1);
+        rack.Inventory.Add(Water.Full, 1);
+        var barrel = world.Add(ThingKind.Barrel, at + new Vector2(.8f, 2.35f));
+        barrel.Inventory.Add(Water.Liquid, 25);
+        var pile = world.Add(ThingKind.Pile, at + new Vector2(-2.7f, 1.8f));
+        pile.Inventory.Add(Barrel.Item, pile.Inventory.Slots * pile.Inventory.StackOf(Barrel.Item));
+        world.Player = at + new Vector2(-2f, -2f);
+        world.S.Time = world.Data.DaySeconds * .2f;
+        world.Tick(0);
+        view.CameraOn = at + new Vector2(-.48f, -.86f);
+        view.CameraTurn = Launch.Number("--camera-turn", 0);
+        view.CameraPitch = Launch.Number("--camera-pitch", 30);
+        view.Zoom = 2.15f;
+        panel.Close();
+        ui.Visible = false;
+    }
+
     private void Place() {
+        if (Launch.Has("--steel-vessels")) { VesselReview(); return; }
         if (Launch.Has("--environment-review")) {
             string location = Launch.Value("--environment-review") ?? "forest";
             float coastAcross = Terrain.Across(Terrain.Spawn);
             var coastCenter = Terrain.Point(Terrain.Coast(coastAcross) - 2, coastAcross);
-            var reviewCliff = World.CliffOf(Kinds.Parse(Launch.Value("--mine-ore")) ?? ThingKind.Coal);
-            var mineCenter = World.MineSpot(reviewCliff) - reviewCliff.Face * 1.4f;
+            var reviewCliff = Cliff.Of(Kinds.Parse(Launch.Value("--mine-ore")) ?? ThingKind.Coal);
+            var mineCenter = reviewCliff.MineSpot - reviewCliff.Face * 1.4f;
             world.Player = location switch {
                 "lake" => Terrain.WaterPoint(Terrain.Lake + Terrain.Seaward) + Terrain.Seaward,
                 "coast" => coastCenter - Terrain.Seaward * 3,
-                "mine" => World.MineSpot(reviewCliff) + reviewCliff.Face,
+                "mine" => reviewCliff.MineSpot + reviewCliff.Face,
                 "terrain" => Terrain.Point(125, -18),
                 "den" => WolfPatrols.Dens[3].Door + WolfPatrols.Dens[3].Face * 2.5f,
                 _ => Terrain.Spawn,
@@ -62,9 +87,9 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             view.EnvironmentReviewFog = Launch.Has("--review-fog");
             view.EnvironmentCenter = location switch { "lake" => Terrain.Lake + Terrain.Seaward * 3, "terrain" => Terrain.Point(125, -18), "coast" => coastCenter, "mine" => mineCenter, _ => null };
             if (location == "mine") {
-                var mine = world.Construction.Build(ThingKind.Mine, World.MineSpot(reviewCliff))!;
+                var mine = world.Construction.Build(ThingKind.Mine, reviewCliff.MineSpot)!;
                 mine.MineStage = MineStage.Open;
-                mine.Output!.Add(World.MineOre(mine), 12);
+                mine.Output!.Add(Mines.Ore(mine), 12);
             }
             // The wide terrain camera must sit above the peaks rather than inside a near mountain face.
             if (location is "terrain" or "coast" or "mine") view.EnvironmentCameraDistance = 140;
@@ -182,7 +207,8 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // --goods-pile N looks at the Nth pile, counting from 0.
             const int perRow = 8;
             var at = Terrain.Spawn + new Vector2(-3, 9);
-            string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins).ToArray();
+            string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins
+                && ContainerItem.Base(item) == item).ToArray();
             float share = Launch.Number("--goods-share", .6f); int look = (int)Launch.Number("--goods-pile", 0);
             Vector2 Spot(int pile) => at + new Vector2(pile % perRow * 3.2f, pile / perRow * 3.2f);
             world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + perRow * 3.2f + 4 && t.Pos.Y > at.Y - 4 && t.Pos.Y < at.Y + (goods.Length / perRow + 1) * 3.2f + 4);
@@ -271,7 +297,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             if (Launch.Has("--post")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); Press("filters"); } else if (Launch.Has("--panel")) { panel.Select(packer); if (Launch.Has("--pick")) Press("pack_good"); } else panel.Close();
         }
         if (Launch.Has("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (Launch.Has("--panel")) panel.Select(rack); else panel.Close(); }
-        if (Launch.Has("--tin")) { var cliff = World.CliffOf(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }
+        if (Launch.Has("--tin")) { var cliff = Cliff.Of(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }
         if (Launch.Has("--pantry")) {
             foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
             panel.Open(Page.Backpack);

@@ -112,9 +112,9 @@ internal static class WorldSteps {
     public static World WorkingMine(GameData data, out Thing mine) {
         var world = new World(data, false);
         RunUntilPhase(world, .3f);
-        var cliff = World.CliffOf(ThingKind.Iron);
-        world.Player = World.MineSpot(cliff) + cliff.Face * 3;
-        mine = world.Add(ThingKind.Mine, World.MineSpot(cliff)); mine.MineStage = MineStage.Open;
+        var cliff = Cliff.Of(ThingKind.Iron);
+        world.Player = cliff.MineSpot + cliff.Face * 3;
+        mine = world.Add(ThingKind.Mine, cliff.MineSpot); mine.MineStage = MineStage.Open;
         world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
         for (int i = 0; i < data.Mine.Workers; i++) {
             var w = AddWorker(world, mine.Pos + cliff.Face * 2);
@@ -139,9 +139,9 @@ internal static class WorldSteps {
 
     /// <summary>A mine marked at the first cliff of an ore, with the player standing in front of it.</summary>
     public static Thing MarkMine(World world, ThingKind ore = ThingKind.Iron) {
-        var cliff = World.CliffOf(ore);
-        world.Player = World.MineSpot(cliff) + cliff.Face * 3;
-        var mine = world.Construction.Build(ThingKind.Mine, World.MineSpot(cliff) + cliff.Along + cliff.Face);
+        var cliff = Cliff.Of(ore);
+        world.Player = cliff.MineSpot + cliff.Face * 3;
+        var mine = world.Construction.Build(ThingKind.Mine, cliff.MineSpot + cliff.Along + cliff.Face);
         Require(mine != null, $"a mine should be marked at the {ore} cliff");
         return mine!;
     }

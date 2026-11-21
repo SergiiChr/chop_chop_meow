@@ -42,6 +42,7 @@ public enum ThingKind {
     Stump,
     Bush,
     GravelPath,
+    Barrel,
 }
 
 /// <summary>Converts kinds to and from the ids that hotbar slots, icons and sounds use.</summary>
