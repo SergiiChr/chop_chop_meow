@@ -605,6 +605,7 @@ Hold right-click on a placed barrel to pick it up with its water.
 Pour from a bottle or bucket into its one slot, or take water back into vessels in your backpack.
 Filling from an empty stack fills one barrel in the opened cell and stores the remaining empties elsewhere in the backpack.
 The pour needs room for the split before it uses any water.
+Sorting the backpack or swapping the opened barrel's cell returns you to the backpack.
 Shift-click or Ctrl-click a vessel to pour into an open barrel, including vessels bound to the hotbar.
 A placed barrel's single filter names water, like a pile's filter names its resource.
 A barrel holds 50 liters.

@@ -37,7 +37,14 @@ public partial class CarriedBarrelPanel(PageTools tools, int barrelSlot) : PageP
         AddButton("Put it down", () => { if (Item is string barrel) panel.Player.PlaceContainer(barrel, barrelSlot); });
         BagGrid(id => {
             if (Item is string barrel && CanPour(id)) world.MoveInBarrel(barrel, id, ItemMoves.Amount(world.S.Backpack, id), true, barrelSlot);
-        }, $"{BagHint}\nShift: pour a stack · Ctrl: all of it", wanted: CanPour);
+        }, $"{BagHint}\nShift: pour a stack · Ctrl: all of it", wanted: CanPour, put: PutInBackpack);
+    }
+
+    private void PutInBackpack(int slot, string item, int count) {
+        bool swapsBarrel = slot == barrelSlot && item != Item && world.Held is { Box: 0 } held &&
+            count == world.Backpack.Layout[held.Slot].Count;
+        moves.Store(world.S.Backpack, slot)(item, count);
+        if (swapsBarrel) panel.Open(Page.Backpack);
     }
 
     private bool CanPour(string item) => item != Water.Liquid && Barrels.CanPour(world.Data, item);

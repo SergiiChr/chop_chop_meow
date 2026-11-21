@@ -129,8 +129,11 @@ internal static class BarrelChecks {
         Require(world.MoveInBarrel(Barrel.Item, Water.Full, 1, true) == 0 && world.Backpack[Water.Full] == 1 && world.Backpack[Barrel.Item] == 4,
             "the full backpack leaves the water in its bottle when a barrel cannot split from its stack");
         Drop(world, "steel_axe", 1);
-        Require(world.MoveInBarrel(Barrel.Item, Water.Full, 1, true) == 3 && world.Backpack[Barrel.Item] == 3,
-            "opening a cell makes room to split and fill one barrel");
+        int opened = SlotOf(world.Backpack, Barrel.Item);
+        int other = SplitStack(world, opened, 2);
+        Require(world.Backpack.UsedSlots == 24 && world.Backpack.Layout[other].Count == 2, "the full backpack has two partial barrel stacks");
+        Require(world.MoveInBarrel(Barrel.Item, Water.Full, 1, true, opened) == 3 && world.Backpack.Layout[other].Count == 3,
+            "another stack with room for the remaining empty barrel allows filling in a full backpack");
     }
 
     private static void CheckBarrelKeepsWaterWhenPlacedAndLifted(GameData data) {

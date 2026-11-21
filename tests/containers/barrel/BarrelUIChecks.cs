@@ -13,6 +13,29 @@ public partial class Game {
         await TestClean(CheckBackpackAndHotbarOpenTheirOwnBarrel);
         await TestClean(CheckCtrlPoursFromAHotbarBoundBucketIntoAPlacedBarrel);
         await TestClean(CheckHotbarShowsTheCountOfAnEmptyBucketStack);
+        await TestClean(CheckReorderingBackpackClosesTheBarrel);
+    }
+
+    private async Task CheckReorderingBackpackClosesTheBarrel() {
+        string filled = Barrel.AtFill(12);
+        Give(Hosted, filled);
+        Give(Hosted, Barrel.Item, 4);
+        await Frames();
+        await OpenBackpackBarrel(filled);
+        await Click((Control)bag.FindChild("sort_bag", true, false));
+        await Until(() => panel.Page == Page.Backpack && SlotOf(world.Backpack, Barrel.Item) < SlotOf(world.Backpack, filled),
+            "sorting puts the empty barrels first and returns to inventory", 2);
+
+        await OpenBackpackBarrel(filled);
+        await Carry(BagCellOf(Barrel.Item), BagCellOf(filled));
+        await Until(() => panel.Page == Page.Backpack && SlotOf(world.Backpack, filled) < SlotOf(world.Backpack, Barrel.Item),
+            "swapping the opened barrel with the empty stack returns to inventory", 2);
+        Require(world.Backpack[Barrel.Item] == 4 && world.Backpack[filled] == 1,
+            "sorting and swapping preserve the barrels and their water");
+        await CloseWithEsc();
+        Drop(Hosted, Barrel.Item, 4);
+        Drop(Hosted, filled);
+        await Frames();
     }
 
     /// <summary>Four empty barrels share a cell and open independently of the filled barrel beside them.</summary>
