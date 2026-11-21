@@ -21,6 +21,33 @@ public static class WolfBodiesChecks {
         Test(CheckTwoWolvesAtOnePlayerKeepTheirBodiesApart, data);
         Test(CheckAWolfsHeightInTheWorldFollowsItsModel, data);
         Test(CheckAFeedingSpotLeavesRoomForTheWholePull);
+        Test(CheckAFeedingWolfKeepsClearOfAnotherLoweringItsHead);
+    }
+
+    private static void CheckAFeedingWolfKeepsClearOfAnotherLoweringItsHead() {
+        var feeder = new Wolf();
+        var neighbor = new Wolf();
+        var model = new WolfModel();
+        var lowering = new WolfModel();
+        var spots = new FeedingSpots(new Dictionary<Wolf, WolfModel> { [feeder] = model, [neighbor] = lowering });
+        var fallen = new ActorState();
+        var rig = new ActorRig(ActorSkin.Player);
+        FallBackView.FallBack(rig, fallen, 1, false, null);
+        var line = FeedingSpots.BodyLine(fallen);
+        model.Root.Position = FeedingSpots.OnTheBody(line, .3f, BodySide.Left).At;
+        var free = spots.Place(feeder, model, fallen, rig, 1);
+        // The neighbor stands nose to tail behind this spot. Its resting feeding pose clears the feeder,
+        // but its muzzle still reaches into the spot as it lowers its head from standing.
+        lowering.Root.Transform = new Transform3D(model.Root.Basis, free - model.Root.Basis.Z * 1.4f);
+        spots.Remember(new ListView<Wolf>([feeder, neighbor]));
+        lowering.Feed(0, 1, false);
+        var besideSettled = spots.Place(feeder, model, fallen, rig, 1);
+        lowering.Stand(0, 1, false);
+        lowering.Feed(0, 1f / 60, false);
+        var besideLowering = spots.Place(feeder, model, fallen, rig, 1);
+        model.Root.Free(); lowering.Root.Free(); rig.Root.Free();
+        Require(besideSettled.DistanceTo(free) < .001f, "A feeding wolf should keep a spot that clears its neighbor.");
+        Require(besideLowering.DistanceTo(free) > .01f, "A feeding wolf should leave a spot its neighbor still occupies while lowering its head.");
     }
 
     private static void CheckAFeedingSpotLeavesRoomForTheWholePull() {
