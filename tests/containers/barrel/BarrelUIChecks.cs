@@ -10,6 +10,7 @@ namespace ChopChopMeow;
 public partial class Game {
     private async Task RunBarrelUIChecks() {
         await TestClean(CheckBarrelOpensInTheBackpackAndCanBePlacedWithWater);
+        await TestClean(CheckCtrlPoursFromAHotbarBoundBucketIntoAPlacedBarrel);
         await TestClean(CheckHotbarShowsTheCountOfAnEmptyBucketStack);
     }
 
@@ -55,6 +56,32 @@ public partial class Game {
         Give(Hosted, Water.Empty, empty);
         Give(Hosted, Water.OneLiter, oneLiter);
         Give(Hosted, Water.TwoLiters, twoLiters);
+        await Frames();
+    }
+
+    private async Task CheckCtrlPoursFromAHotbarBoundBucketIntoAPlacedBarrel() {
+        const int slot = 8;
+        string previous = world.HotbarItem(slot), filled = Bucket.AtFill(6);
+        int previousStack = world.HotbarStack(slot);
+        int emptyBuckets = Drop(Hosted, Bucket.Item);
+        Give(Hosted, filled);
+        PutOnHotbar(Hosted, SlotOf(Hosted.Backpack, filled), slot);
+        var barrel = Hosted.Add(ThingKind.Barrel, SpotsNearby().First(p =>
+            world.CanStand(p) && view.Pick(view.Screen(p, .4f)) == null && Uncovered(view.Screen(p, .4f))));
+        await Frames();
+        await ClickOn(barrel);
+        await Until(() => Named("barrel_water") != null && world.HotbarItem(slot) == filled, "the barrel page and bound water bucket");
+
+        await Holding(Key.Ctrl, () => Click(BagCell(cell => cell.TooltipText.StartsWith(world.Data.Name(filled)))));
+        await Until(() => barrel.Inventory[Water.Liquid] == 6 && world.HotbarItem(slot) == Bucket.Item,
+            "Ctrl pouring six liters and leaving the empty bucket bound to the hotbar", 2);
+
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == barrel);
+        Drop(Hosted, Bucket.Item, 1);
+        Give(Hosted, Bucket.Item, emptyBuckets);
+        if (previousStack >= 0) PutOnHotbar(Hosted, previousStack, slot);
+        else SetHotbarSlot(Hosted, slot, previous);
         await Frames();
     }
 

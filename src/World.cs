@@ -1027,31 +1027,38 @@ public sealed partial class World {
     /// <summary>Bedtime comes a little before night falls, so the player can turn in without waiting for the dark.</summary>
     public const int SleepHour = 22;
     public float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
-    public float ThirstAtDawn() => Math.Max(0, bedtimeWater.Thirst(S.Actor) - SecondsToDawn * Data.ThirstPerSecond);
+    public float ThirstAtDawn(Thing? cabin = null) => bedtimeWater.Preview(S.Actor, SecondsToDawn * Data.ThirstPerSecond, cabin).Dawn;
     /// <summary>Hunger and thirst both above this let sleep heal, at <see cref="SleepHeal"/> health a second.</summary>
     public const float FedNeed = 45, SleepHeal = .12f;
     /// <summary>The acting player's health after sleeping until dawn: sleep heals while hunger and thirst both stay above <see cref="FedNeed"/>.</summary>
-    public float HealthAtDawn() {
-        float fed = Math.Min(SecondsToDawn, Math.Min((S.Hunger - FedNeed) / Data.HungerPerSecond, (bedtimeWater.Thirst(S.Actor) - FedNeed) / Data.ThirstPerSecond));
+    public float HealthAtDawn(Thing? cabin = null) {
+        float seconds = SecondsToDawn;
+        float watered = bedtimeWater.Preview(S.Actor, seconds * Data.ThirstPerSecond, cabin).Bedtime;
+        float fed = Math.Min(seconds, Math.Min((S.Hunger - FedNeed) / Data.HungerPerSecond, (watered - FedNeed) / Data.ThirstPerSecond));
         return Math.Min(100, S.Health + Math.Max(0, fed) * SleepHeal);
     }
     /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
-    public string? SleepBlock() {
+    public string? SleepBlock(Thing? cabin = null) {
         if (Hour is >= 6 and < SleepHour) return "You can only sleep after 10 pm.";
-        bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = ThirstAtDawn() <= 0;
+        float hungerLoss = SecondsToDawn * Data.HungerPerSecond, thirstLoss = SecondsToDawn * Data.ThirstPerSecond;
+        bool hungry = S.Hunger <= hungerLoss, thirsty = bedtimeWater.Preview(S.Actor, thirstLoss, cabin).Bedtime <= thirstLoss;
         if (hungry || thirsty) return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : "You are too thirsty to sleep.";
         // The night passes for everyone at once, so the others have to be inside and fed too.
         foreach (var p in S.Players) if (p != S.Actor && p.Sheltered == 0) return "Everyone has to be inside a cabin to sleep.";
         foreach (var p in S.Players)
-            if (p != S.Actor && (p.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0 || bedtimeWater.Thirst(p) - SecondsToDawn * Data.ThirstPerSecond <= 0)) return "Someone is too hungry or thirsty to sleep.";
+            if (p != S.Actor && (p.Hunger <= hungerLoss || bedtimeWater.Preview(p, thirstLoss).Bedtime <= thirstLoss)) return "Someone is too hungry or thirsty to sleep.";
         return null;
     }
     public void Sleep(Thing hut) {
         if (hut.Kind != ThingKind.Hut || !Near(hut)) return;
-        if (SleepBlock() is string blocked) { Say(blocked); return; }
+        if (SleepBlock(hut) is string blocked) { Say(blocked); return; }
         if (Forwarded(Verb.Sleep, hut.Id)) return;
-        if (!DoorCheck.Waking) bedtimeWater.Serve();
+        if (DoorCheck.Waking) { PassNight(); return; }
+        var occupants = bedtimeWater.Occupants(S.Actor, hut);
+        BedtimeWater.ServeThirst(occupants);
         PassNight();
+        BedtimeWater.ServeThirst(occupants);
+        BedtimeWater.FillBottles(occupants);
     }
     /// <summary>
     /// Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.
@@ -1223,7 +1230,7 @@ public sealed partial class World {
     private static Inventory NewWageSlot() => new() { Slots = 1, CoinStack = Inventory.UnlimitedCoins, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
-        Barrel.Is(item) && box != t.Inventory ? $"Barrel does not fit in {Lower(Data.Name(t.Kind))}." :
+        Barrel.Is(item) && box != t.Inventory && BoxIndex(t, box) >= 0 ? $"Barrel does not fit in {Lower(Data.Name(t.Kind))}." :
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
         box == t.Output ? "Things only come out of here." :
@@ -2285,7 +2292,7 @@ public sealed partial class World {
         Swings.Tick(dt);
         if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
-            float drain = S.Actor.Sprinting && CanSprint ? Data.SprintDrain : 1, fed = S.Hunger;
+            float drain = !asleep && S.Actor.Sprinting && CanSprint ? Data.SprintDrain : 1, fed = S.Hunger;
             S.Hunger = Math.Max(0, S.Hunger - dt * drain * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * drain * Data.ThirstPerSecond);
             if (S.Hunger < GameData.GrowlBelow && GrowlsBy(S.Hunger) > GrowlsBy(fed)) Play("stomach_growl", Player);
             if (S.Hunger <= 0 || S.Thirst <= 0) S.Health -= dt * 1.4f;

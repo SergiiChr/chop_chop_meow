@@ -406,7 +406,7 @@ Workers animate according to movement and an explicit transient `WorkerWorkState
 The transient state is excluded from saves and recalculated on the next simulation tick.
 
 Players and workers hug a carried steel barrel to their trunk with both hands on its front sides (`ActorRig.HugBarrel`).
-Their legs keep the gait of the walk, jog or run while they carry it.
+A player carrying water in the barrel keeps a walking gait, with one or both feet planted through each step.
 For a water haul, `WorkerWaterView` poses the worker using the water action, target and progress sent by the world.
 A worker climbs the fitted ladder holding the vessel in one hand, walks across the roof, tips the vessel using both
 hands, and returns down the ladder.
@@ -524,6 +524,7 @@ Its item id records its fill, so moving it between a player, a worker,
 the ground, a pile and a cabin preserves its water without a separate packed inventory.
 The ground barrel uses a one-slot tank and the same filter rules as a plain pile.
 A cabin's only storage slot holds the actual barrel item.
+The Roof barrel window sits beside the cabin page in `SidePanel.Aside`, like a station's tool window.
 Refills update that item in place.
 The carry slows proportionally to its fill level.
 A worker with a barrel cannot carry other goods in their hands.
@@ -537,12 +538,13 @@ If a building blocks the nearest shoreline point, the worker looks along the sho
 The worker keeps the chosen source and standing point while walking there.
 If a worker cannot reach a barrel's pouring point, they move on to the next job they can do.
 A cabin haul walks to the outside ladder, climbs, pours into the mounted barrel and climbs back down.
+The cabin offers Haul only while a barrel is mounted.
 The window advances the visible haul phase between server updates through `LocalClock`.
 Construction keeps the ladder approach on dry ground and clear of other buildings.
 
 Before the night advances, players inside each cabin draw enough liters to fill their thirst in cabin-entry order.
-Bottles are filled with what remains once thirst is served, in the same order.
-The preview and sleep gate both use the projected thirst after that drink.
+On waking, they draw again in the same order, then fill bottles with any water left.
+The sleep gate uses what a player can drink before sleep, and the dawn preview includes what they can drink on waking.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
 It advances normal simulation through dawn, including needs, trades, production and wages.
@@ -993,6 +995,7 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
   `PlayerState.HotbarSlots` holds plans, and items a slot waits for until `World.BindWaitingHotbars` binds the first stack of one to come in; `World.HotbarItem` and `HotbarStack` read a slot.
   A stack spent to nothing (`Inventory.Remove`, unlike a move out) notes its slot in `Inventory.UsedUp`, and the slot waits for its item again, so it binds the next stack at once.
   Ctrl batches from the backpack drawer and Store all carry the mark "spares only" (`World.FromSpares`, `Command.Spares`, `Inventory.SparesOnly`), which leaves bound stacks behind.
+  Pouring from vessels with Ctrl includes hotbar-bound vessels and preserves their bindings.
 - Esc, a click on open ground or on the interface anywhere but an item slot, or closing the side panel lets go of the held stack (`HeldCursor`).
 - A held crate, barrel or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
 - A held stack put on storage clicked in the world goes into it; an item only selected on the hotbar never does.

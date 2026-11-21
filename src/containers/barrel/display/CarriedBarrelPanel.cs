@@ -10,6 +10,7 @@ public partial class CarriedBarrelPanel(PageTools tools) : PagePanel(tools) {
     public override bool Current => Item != null && !(world.Held is { Box: 0 } held && Barrel.Is(held.Item));
     public override Page GivesWayTo => Page.Backpack;
     protected override bool StoresFromHotbar => true;
+    protected override bool PoursFromBag(string item) => CanPour(item);
 
     protected override void Build() {
         headingIcon.Texture = Icons.Of(Barrel.Item); headingIcon.Visible = true;

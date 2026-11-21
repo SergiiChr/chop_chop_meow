@@ -386,15 +386,17 @@ A cabin someone is in, or a trading post with a cart out, stays up until they co
 A full stomach lasts one in-game day and a full water gauge lasts one day; a day lasts 14 minutes.
 Raw meat cannot be eaten.
 Your refillable bottle holds three liters, each restoring one third of the water gauge.
-Put a steel barrel into the cabin's barrel slot to mount it on the roof.
-At bedtime it uses its water to refill the people inside, in the order they entered.
-It fills everyone's thirst first, then uses the remaining water to fill their bottles in the same order.
+Put a steel barrel into the Roof barrel window to the left of the cabin page to mount it on the roof.
+The barrel serves thirst at bedtime and tops it up again when players wake, both in the order they entered.
+It uses any remaining water to fill their bottles in the same order.
 Taking down a cabin returns its barrel with its water.
 Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one liter, taking the same gathering time.
 Filling a bottle takes the same time as one gather action.
 Empty or filled replacements can be bought individually.
 Craft an empty bottle at a bench from one tin bar and one wood part, with the same steel hammer used for tin cans.
-A recipe that uses water, such as meat stew or dough, takes liters of it poured out: a bottle put on the station's water input slot, or moved there with Shift or Ctrl, pours every liter it holds, and the bottle stays in your backpack, emptied.
+A recipe that uses water, such as meat stew or dough, takes liters of it poured out.
+Drag a bottle to the station's water input or Shift-click or Ctrl-click it to pour while the bottle stays in your backpack.
+Ctrl-click also pours from vessels bound to the hotbar.
 So water can come in batches, part-drunk bottles too; loading a batch pours from the least full bottles first.
 The input slot shows a water droplet and counts liters.
 Shift or Ctrl on it takes the water back into bottles in your backpack with room, the fullest first, and so does picking it up and putting it in the backpack; with no room, the slot shakes and says so.
@@ -591,17 +593,20 @@ Barrels stack in the bench output.
 A pile can store barrels at every fill level together.
 A barrel takes one backpack slot, and you can carry only one.
 Workers carry a single barrel in both arms and keep their tool slot free.
-Carrying a barrel keeps you at walking speed.
+Carrying a barrel prevents sprinting.
+A player carrying water in the barrel braces it and walks.
 Each liter makes the carry slower, down to half speed at 50 liters.
 
 Double-click a barrel in your backpack to open its water slot, or select it on the hotbar to place it.
 Hold right-click on a placed barrel to pick it up with its water.
 Pour from a bottle or bucket into its one slot, or take water back into vessels in your backpack.
+Shift-click or Ctrl-click a vessel to pour into an open barrel, including vessels bound to the hotbar.
 A placed barrel's single filter names water, like a pile's filter names its resource.
 A barrel holds 50 liters.
 A steel bucket holds 10 liters and hangs by its handle on the tool rack.
 
-Assign Haul to a placed barrel or to a cabin with a barrel mounted.
+A placed barrel offers Haul.
+A cabin offers Haul while its roof barrel is mounted.
 A worker fills the bucket or bottle in their tool slot at the lake or a nearer full placed barrel, then pours it
 into the barrel they were assigned to stock.
 Workers can fetch a bucket or bottle from the tool rack.

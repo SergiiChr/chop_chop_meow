@@ -7,6 +7,7 @@ using static Checks;
 /// <summary>Contact checks for the actual rig and props used to carry and fill a barrel.</summary>
 internal static class BarrelAnimationChecks {
     public static void Run() {
+        CheckPlayerWalksUnderTheWeightOfWater();
         CheckActorsHugTheBarrelThroughAFullStride();
         CheckBarrelCarryKeepsTheTorchVisible();
         CheckWorkerKeepsTheirHandOnTheLadderUntilTheNextReach();
@@ -14,8 +15,18 @@ internal static class BarrelAnimationChecks {
         CheckBottleGaugeKeepsItsFillAfterFading();
     }
 
+    private static void CheckPlayerWalksUnderTheWeightOfWater() {
+        foreach (int liters in new[] { 0, 1, Barrel.Capacity }) {
+            var backpack = new Inventory();
+            backpack.Add(Barrel.AtFill(liters), 1);
+            var expected = liters == 0 ? ActorAction.Jog : ActorAction.Walk;
+            Require(ActorAnimation.PlayerAction(null, false, true, backpack) == expected,
+                $"the player should use {expected} while carrying a barrel with {liters} L");
+        }
+    }
+
     private static void CheckActorsHugTheBarrelThroughAFullStride() {
-        foreach (var (skin, action) in new[] { (ActorSkin.Player, ActorAction.Jog), (ActorSkin.Worker, ActorAction.Carry) }) {
+        foreach (var (skin, action) in new[] { (ActorSkin.Player, ActorAction.Walk), (ActorSkin.Player, ActorAction.Jog), (ActorSkin.Worker, ActorAction.Carry) }) {
             var rig = new ActorRig(skin);
             var barrel = rig.Torso.GetNode<Node3D>("CarriedBarrel");
             for (int frame = 0; frame < 60; frame++) {

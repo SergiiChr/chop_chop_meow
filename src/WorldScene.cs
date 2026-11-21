@@ -164,7 +164,7 @@ public partial class WorldView {
         ("player shovel", ActorSkin.Player, ActorAction.Dig), ("worker shovel", ActorSkin.Worker, ActorAction.Dig),
         ("player jog turns", ActorSkin.Player, ActorAction.Jog), ("player run turns", ActorSkin.Player, ActorAction.Run),
         ("player cabin", ActorSkin.Player, ActorAction.Walk), ("player jog back", ActorSkin.Player, ActorAction.Jog), ("player run back", ActorSkin.Player, ActorAction.Run),
-        ("player barrel", ActorSkin.Player, ActorAction.Jog), ("worker barrel", ActorSkin.Worker, ActorAction.Carry),
+        ("player barrel", ActorSkin.Player, ActorAction.Walk), ("worker barrel", ActorSkin.Worker, ActorAction.Carry),
     };
     /// <summary>Seconds each key is held in a back clip, which presses D and A in turn.</summary>
     private const float ReviewBackSeconds = 1.2f;
@@ -287,7 +287,9 @@ public partial class WorldView {
         }
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);
-        float along = Mathf.PosMod(Elapsed * ReviewSpeed(action) + 20, 40) - 20;
+        float speed = ReviewClips[ReviewClip].Name == "player barrel"
+            ? World.Data.WalkSpeed * Barrel.Speed(Barrel.AtFill(Barrel.Capacity)) : ReviewSpeed(action);
+        float along = Mathf.PosMod(Elapsed * speed + 20, 40) - 20;
         if (reviewActor.Position.Dot(track) > along + 1) reviewActor.Position -= track * 40;
         reviewActor.Update(track * along, action, track * (along + 1), dt);
         Pose(reviewRigs[0], reviewActor, ActorAnimation.Tool(action), torch: action == ActorAction.TorchSwing,

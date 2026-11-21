@@ -30,6 +30,8 @@ internal static class BarrelChecks {
         Test(CheckWorkerReachesBarrelAroundAChest, data);
         Test(CheckWorkerKeepsTheirWaterSourceWhileWalking, data);
         Test(CheckCabinServesThirstBeforeBottlesInEntryOrder, data);
+        Test(CheckCabinBarrelReplacesThirstLostWhileSleeping, data);
+        Test(CheckCabinServesScarceWakeUpWaterInEntryOrder, data);
         Test(CheckRemovingCabinReturnsItsBarrelWithWater, data);
     }
 
@@ -335,6 +337,43 @@ internal static class BarrelChecks {
         Require(cabin.Inventory[Barrel.Item] == 1 && world.Backpack[Water.Empty] == 1 && guest.Backpack[Water.Empty] == 1,
             "both players' thirst takes all available water before either bottle");
         Require(guest.Thirst - world.Thirst > 11 && guest.Thirst - world.Thirst < 12, "the first player inside received two liters and the next received one");
+    }
+
+    private static void CheckCabinBarrelReplacesThirstLostWhileSleeping(GameData data) {
+        var world = EmptyWorld(data);
+        var cabin = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -7));
+        cabin.Inventory.Add(Barrel.AtFill(20), 1);
+        Give(world, Water.Empty);
+        StepInside(world, cabin);
+        world.Doorways.TurnKey();
+        RunUntilPhase(world, .75f);
+        SetNeeds(world, hunger: 100, thirst: 55);
+        Require(world.ThirstAtDawn() == 100, "enough water in the cabin barrel should predict full thirst at dawn");
+        world.Sleep(cabin);
+        Require(world.Thirst == 100 && world.Backpack[Water.Full] == 1, "the player wakes fully watered with a full bottle");
+        Require(cabin.Inventory[Barrel.AtFill(14)] == 1, "two liters at bedtime, one at dawn and three in the bottle leave fourteen");
+    }
+
+    private static void CheckCabinServesScarceWakeUpWaterInEntryOrder(GameData data) {
+        var world = EmptyWorld(data);
+        var guest = world.Arrive("first in", 2);
+        var cabin = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -7));
+        cabin.Inventory.Add(Barrel.AtFill(5), 1);
+        Give(world, Water.Empty);
+        StepInside(world, cabin, guest);
+        StepInside(world, cabin);
+        world.Doorways.TurnKey();
+        RunUntilPhase(world, .75f);
+        SetNeeds(world, hunger: 100, thirst: 55);
+        SetNeeds(guest, hunger: 100, thirst: 55);
+        float first = world.As(guest, () => world.ThirstAtDawn());
+        float second = world.ThirstAtDawn();
+        Require(first == 100 && second is > 74 and < 76, "the only wake-up liter goes to the first player who entered");
+        world.Sleep(cabin);
+        Require(guest.Thirst == first && System.Math.Abs(world.Thirst - second) < .1f,
+            "both players wake with the thirst their cabin preview showed");
+        Require(cabin.Inventory[Barrel.Item] == 1 && world.Backpack[Water.Full] == 0 && guest.Backpack[Water.Full] == 0,
+            "the last liter goes to thirst before either player's bottle");
     }
 
     private static void CheckRemovingCabinReturnsItsBarrelWithWater(GameData data) {

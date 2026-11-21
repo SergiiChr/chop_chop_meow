@@ -31,7 +31,7 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         buttons.AddChild(doorSide); buttons.AddChild(sleep);
         panel.DoorKey.Rest(thing.Locked);
         live.Watch(() => thing.Locked, locked => { panel.DoorKey.Turn(locked); key.TooltipText = locked ? "Unlock the door" : "Lock the door · keeps wolves out"; });
-        live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), world.Data.GameMinutes(world.SecondsToDawn), Barrel.In(thing.Inventory)), now => {
+        live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(thing), world.Data.GameMinutes(world.SecondsToDawn), Barrel.In(thing.Inventory)), now => {
             var (inside, blocked, _, _) = now;
             tag.Text = inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);
@@ -42,15 +42,14 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
             block.Visible = blocked != null; block.Text = blocked == null ? "" : ShortBlock(blocked);
             until.Text = LiveText.Of(text => PageText.AppendGameHours(world, text.Append("until dawn · +"), world.SecondsToDawn));
             float seconds = world.SecondsToDawn;
-            Show(0, "Health", world.HealthAtDawn());
+            Show(0, "Health", world.HealthAtDawn(thing));
             Show(1, "Hunger", world.Hunger - seconds * world.Data.HungerPerSecond);
-            Show(2, "Thirst", world.ThirstAtDawn());
+            Show(2, "Thirst", world.ThirstAtDawn(thing));
         });
-        var storage = Well(new VBoxContainer());
-        storage.AddChild(Style.Text("Barrel storage", 14, Style.Ink));
-        storage.AddChild(StorageGrid(1));
+        BarrelWindow();
         StoreBagGrid(Barrel.Is);
         JobButtons();
+        RedrawOnChange(() => world.Jobs(thing).Length);
 
         void Show(int i, string need, float after) {
             var vial = dawn[i].Vial;
@@ -58,6 +57,32 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
             vial.QueueRedraw();
         }
     }
+
+    /// <summary>The roof barrel's slot and fill, beside the cabin page.</summary>
+    private void BarrelWindow() {
+        var window = panel.ShowAside(190);
+        window.AddChild(Style.Heading("Roof barrel", 19));
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 8);
+        window.AddChild(Style.InWell(row));
+        var grid = StorageGrid(1);
+        var slot = grid.GetChild<ItemSlot>(0);
+        slot.Name = "cabin_barrel";
+        slot.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        row.AddChild(grid);
+        var label = Style.Text("", 13, Style.Ink, wrap: true);
+        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        label.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        row.AddChild(label);
+        live.Watch(() => Barrel.In(thing.Inventory), item => {
+            label.Text = item == null ? "Empty" : world.Data.Name(Barrel.Item);
+            slot.AddThemeColorOverride(ItemSlot.IconNormal, item == null ? Style.Ghost : Colors.White);
+            if (item != null) return;
+            slot.Icon = Icons.Of(Barrel.Item);
+            slot.TooltipText = "Empty barrel slot\nPut a steel barrel here to mount it on the roof";
+        });
+    }
+
     /// <summary>Pixels along each side of the door's key.</summary>
     private const float KeySide = 120;
     /// <summary>A sleep refusal cut to a tag: what stops it, in a word or two.</summary>
