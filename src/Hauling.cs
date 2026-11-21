@@ -49,7 +49,7 @@ public sealed partial class World {
         if (!Walk(w, c.From!.Pos, dt)) return true;
         var box = BoxOf(c);
         // Seed from a plot's own harvest goes straight back into its input slots.
-        if (c.From == c.To) box.TransferTo(c.To!.Inventory, c.Item, c.Count, true);
+        if (c.From == c.To) box.TransferTo(c.To!.Inventory, c.Item, Math.Min(c.Count, c.To.Inventory.SlotRoom(c.Item)), true);
         else { box.TransferTo(w.Bag, c.Item, c.Count, true); w.Destination = c.To!.Id; w.Fueling = c.Fuel; }
         w.Plan = default;
         return true;
@@ -78,7 +78,7 @@ public sealed partial class World {
     /// <summary>Whether a carry a hauler set out on can still be made: its places stand, the load is still there to take and where it goes still takes it.</summary>
     private bool Stands(in Carry c) =>
         Find(c.Place!.Id) == c.Place && Find(c.From!.Id) == c.From && Find(c.To!.Id) == c.To && BoxOf(c).Free(c.Item) > 0
-        && (c.From == c.To || c.Clears || Intake(c.To, c.Item, c.Fuel) != null);
+        && (c.From == c.To ? c.To.Inventory.SlotRoom(c.Item) > 0 : c.Clears || Intake(c.To, c.Item, c.Fuel) != null);
 
     /// <summary>What a hauler with nothing to carry says: what the place lacks, or for a haul group its first place.</summary>
     private string HaulWait(JobEntry job) {
@@ -197,7 +197,7 @@ public sealed partial class World {
     /// <summary>A plot's hauler puts seed from its own harvest back into its input slots, brings what a sowing takes and carries the harvest out.</summary>
     private void FarmCarries(Worker w, Thing farm, ref Carry best) {
         foreach (var (item, sowing) in Data.Farm.Sow) {
-            int room = SowRoom(farm, item);
+            int room = Farms.SowRoom(farm, item);
             if (room <= 0) continue;
             if (farm.Output?.Free(item) > 0) Offer(ref best, Bring(farm, farm, item, room, farm.Inventory[item], sowing) with { Box = CarryBox.Output });
             else if (SourceFor(item, w.Pos, farm.Id) is Thing source) Offer(ref best, Bring(farm, source, item, room, farm.Inventory[item], sowing));

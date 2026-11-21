@@ -571,11 +571,11 @@ public sealed class ActorRig {
     }
 
     /// <summary>Draws the short falling stream between the vessel's lip and the receiving opening.</summary>
-    internal void WaterStream(Vector3 from, Vector3 into) {
+    internal void WaterStream(Vector3 from, Vector3 into, float width = 1) {
         if (stream == null) return;
         var direction = from - into;
         stream.Transform = new Transform3D(
-            new Basis(new Quaternion(Vector3.Up, direction.Normalized())) * Basis.FromScale(new Vector3(1, direction.Length(), 1)),
+            new Basis(new Quaternion(Vector3.Up, direction.Normalized())) * Basis.FromScale(new Vector3(width, direction.Length(), width)),
             (from + into) / 2);
         stream.Show();
     }

@@ -57,7 +57,7 @@ public partial class JobList(UiKit kit, LiveUpdates live, Worker w) : VBoxContai
     public static string? Made(World world, Thing at) => at.Kind switch {
         ThingKind.Mine => Mines.Ore(at),
         ThingKind.Packer => at.Packs == "" ? null : at.Packs,
-        ThingKind.Farm => world.Crop,
+        ThingKind.Farm => world.Farms.Crop,
         _ => world.Data.Recipes.TryGetValue(at.Recipe, out var recipe) ? recipe.Output : null
     };
     public override void _Ready() {

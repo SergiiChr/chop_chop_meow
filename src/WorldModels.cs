@@ -170,7 +170,7 @@ public sealed class PileProp : Prop {
 }
 
 public sealed class FarmProp : Prop {
-    /// <summary>The plot's looks by <see cref="World.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
+    /// <summary>The plot's looks by <see cref="Farms.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
     public Node3D[] Crops = Array.Empty<Node3D>();
 }
 
@@ -284,7 +284,7 @@ public static class WorldModels {
         ThingKind.Packer => new[] { new Hit(1, 0, 1.1f) },
         ThingKind.Toolstation => new[] { new Hit(.55f, 0, 1.5f) },
         ThingKind.Pile => new[] { new Hit(1.5f, 0, .5f) },
-        ThingKind.Farm => new[] { new Hit(1.5f, 0, .5f) },
+        ThingKind.Farm => new[] { new Hit(Farms.HalfSize, 0, .5f) },
         ThingKind.GravelPath => Array.Empty<Hit>(),
         ThingKind.Leaves => new[] { new Hit(.6f, 0, .15f) },
         ThingKind.Grave => new[] { new Hit(.65f, 0, 1.5f) },
@@ -770,17 +770,21 @@ public static class WorldModels {
         prop.Stock.Fill(item, room > 0 ? count / (float)room : 0, data);
     }
 
-    /// <summary>The packed-earth yard with its log frame that a pile or a farm plot stands on.</summary>
+    /// <summary>The packed-earth pad and log frame under a pile.</summary>
     private static void Yard(Node3D body) {
         Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
         Add(body, PileShape.Frame, PileShape.Timber, new Vector3(0, .01f, 0));
     }
 
-    /// <summary>A farm plot: an empty pile's yard that, once sown, shows dark tilled rows and then the wheat growing on them.</summary>
+    /// <summary>A farm plot with a 6×6 packed-earth pad and a long log frame, showing tilled rows and crops once sown.</summary>
     private static FarmProp Farm(int id) {
         var prop = new FarmProp();
         var body = prop.Body;
-        Yard(body);
+        const float scale = Farms.HalfSize * 2 / Construction.ZoneSize;
+        var yard = Pivot(body, Vector3.Zero);
+        yard.Scale = new Vector3(scale, 1, scale);
+        Add(yard, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
+        Add(body, PileShape.FarmFrame, PileShape.Timber, new Vector3(0, .01f, 0));
         int variant = id % 3;
         var soil = Pivot(body, Vector3.Zero);
         Add(soil, FarmShape.Soil, FarmShape.Earth, Vector3.Zero);

@@ -79,7 +79,8 @@ Simulation and data:
 | `src/buildings/model/Removal.cs` | `Removal`, what the remove selector points at: a building or a gravel path tile |
 | `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
 | `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
-| `src/Farm.cs` | Farm plots |
+| `src/farms/Farms.cs` | Farm plots, from sowing and watered growth to harvest |
+| `src/farms/model/FarmStage.cs` | Whether a plot is fallow, growing or ripe |
 | `src/mines/Mines.cs` | Mines: where one is marked and stands at its cliff, its three building stages, supplying it, working it underground and the end goal's working mines |
 | `src/mines/model/Cliff.cs`, `src/mines/model/MineStage.cs` | `Cliff`, the valley's ore cliffs and the mine spot at each, and `MineStage`, how far a mine is built |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
@@ -143,7 +144,7 @@ UI and input:
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel, with their hands and tool slot |
 | `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
-| `src/FarmPanel.cs` | A farm plot's stages and process row |
+| `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, sleep and the needs a night would leave |
 | `src/cabins/Doorways.cs` | Cabin doors: walking round to the door, stepping in and out, following, knocking, standing aside and the key |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
@@ -219,6 +220,7 @@ Rendering and sound:
 | `src/cabins/display/StairSteps.cs` | The cabin's steps, how high they stand at a spot, and a pose's boots fitted onto them |
 | `src/cabins/display/DoorKeyView.cs` | The round lock of a cabin's door with its key in it, drawn into a picture for the cabin's page |
 | `src/cabins/display/InsideDoorPOV.cs` | What a player inside sees of a wolf forcing the door: a dark cabin with copies of the wolves and the player taken out, in a window that shows it as an old tape ([assets/environment/vhs](../assets/environment/vhs/README.md)) |
+| `src/farms/display/FarmShape.cs` | Tilled soil and the shapes of wheat at each growth stage |
 | `src/mines/display/MineModel.cs`, `src/mines/display/MineShape.cs`, `src/mines/display/MineRockShape.cs`, `src/mines/display/MineProp.cs` | Builds a mine's model and the outcrop at every cliff, and the mine as drawn stage by stage |
 | `src/actors/enemies/wolf/display/DoorCheckView.cs` | A wolf at a cabin's door: its stands, scratching paw, prying snout, steps, launch, and how far it has levered and pushed the door open |
 | `src/actors/enemies/wolf/display/TugView.cs` | A wolf tugging a player out of a doorway, wolves reared up onto the player's arms, and the lunge onto them as they fall |
@@ -230,7 +232,7 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | A feature's rules, UI and network checks beside its steps, including `tests/paths/`, `tests/cabins/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/<feature>/` | A feature's rules, UI and network checks beside its steps, including `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
 | `tests/*Checks.cs` | Simulation checks of the features whose code is still flat, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
@@ -414,7 +416,7 @@ A player carrying water in the barrel keeps a walking gait, with one or both fee
 For a water haul, `WorkerWaterView` poses the worker using the water action, target and progress sent by the world.
 A worker climbs the fitted ladder holding the vessel in one hand, walks across the roof, tips the vessel using both
 hands, and returns down the ladder.
-The stream starts at the vessel's lip and ends at the barrel's opening.
+The stream starts at the vessel's lip and ends at the barrel's opening or at the soil when watering a farm plot.
 
 At a packing station the packer stands behind the table (`World.PackStand`) and the `Pack` action rummages in the heap of goods, lifts a piece across and settles it into the crate, then turns back.
 The player working a station they stand near packs the same way.
@@ -1036,6 +1038,7 @@ The window's item list runs in `GameData.ListOrder`, with crates of goods after 
 An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel bucket or barrel at any fill stands with the empty one (`ContainerItem.Base`), and a part-drunk bottle with the full one.
 In each group fewer making steps come first, and recipe map order breaks ties.
 Making steps count the longest way through a recipe's inputs, or the items a source comes out of and also takes, from items that take no other item, such as wood.
+Gathered water used to grow wheat adds no making steps.
 
 #### Piles
 
@@ -1132,7 +1135,7 @@ Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, 
 3. the input or fuel covering the fewest batches;
 4. the output holding the most.
 
-Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold one sowing (`World.SowRoom`) and a mine site what it lacks.
+Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold one sowing (`Farms.SowRoom`) and a mine site what it lacks.
 A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
 Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
 
@@ -1236,19 +1239,27 @@ A miner then carries a load of it to the nearest place that takes it (`Mines.Min
 
 ### Farming
 
-A farm plot (`farm`, `src/Farm.cs`) is a zone like a pile and snaps with piles.
+A farm plot (`farm`, `src/farms/Farms.cs`) is a walkable 6×6 zone that snaps beside piles and other plots.
+The ground dressing clears meadow plants across the square, and E measures reach from the nearest point on the plot.
 `Farm` in `GameTables` sets what sows it, how many days the wheat grows, how many working days the harvest takes and what it yields.
 
 `Thing.FarmStage` is `Fallow`, `Growing` or `Ripe`.
-`Thing.Progress` counts growth seconds, then harvest work.
 A fallow plot sows itself from its own inventory.
-`World.CropLook` gives the look: bare, soil, straws, green plants or wheat.
+The water slot stores up to 10 liters, which supply one day of growth.
+A ripe plot keeps any water left for the next crop, and its panel hides the water slot and fill bar.
+Each liter in use grants a tenth of a day of growth and counts toward capacity until spent.
+`Thing.FarmWaterLeft` counts the growth seconds still covered by that liter.
+`Thing.Progress` counts completed growth from whole liters, then harvest work.
+`Farms.Growth` includes work from the liter in use and `Farms.CropLook` uses it to choose bare soil, tilled soil, straws,
+green plants or wheat.
 
 The player harvests through `World.Gather` and assigned workers through `World.Reap`, both adding to the one progress.
 The yield goes into the plot's `Thing.Output`; nothing moves seed back into the plot's input slots on its own.
 
 - A worker on Farm harvests.
 - A worker on Haul keeps the input slots at one sowing, from the plot's own output first and then from storage, and carries out the rest (`World.FarmCarries`).
+- `BarrelJobs` sends the hauler to fill a bucket when the growing plot is dry.
+  The worker walks between four places on the plot, stops to tip part of the bucket at each and keeps the empty bucket.
 
 ## Intro film
 

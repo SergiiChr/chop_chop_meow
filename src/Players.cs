@@ -301,7 +301,7 @@ public sealed partial class World {
         if (from != to && FillBlock(from, to, item, into) is string dry) { Say(dry); return 0; }
         // A drop on another item's cell in another inventory still stores the stack wherever it fits, and so does a liquid or a vessel that pours.
         int moved;
-        if (from != to && (Data.VesselFor(item) != null || PoursInto(into, to, item) != null)) {
+        if (from != to && (Data.VesselFor(item) != null || PoursInto(into, to, item) != null || into?.Kind == ThingKind.Farm)) {
             from.PreferredSlot = sourceSlot;
             try { moved = Carry(from, to, into, item, quantity); } finally { from.PreferredSlot = -1; }
         } else if (from != to && to.Layout[targetSlot].Item is var there && there != "" && there != item) {

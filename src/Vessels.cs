@@ -60,7 +60,7 @@ public sealed partial class World {
     internal VesselDef? PoursInto(Thing? t, Inventory to, string item) =>
         t != null && to == t.Inventory && Data.VesselOf(item) is VesselDef v && v.LitersIn(item) > 0 && TakesLiquid(t, v.Liquid) ? v : null;
 
-    private bool TakesLiquid(Thing t, string liquid) => t.Kind == ThingKind.Barrel ? liquid == Water.Liquid : Pending(t, liquid);
+    private bool TakesLiquid(Thing t, string liquid) => t.Kind is ThingKind.Barrel or ThingKind.Farm ? liquid == Water.Liquid : Pending(t, liquid);
 
     /// <summary>
     /// Moves items between two boxes, by hand or by a worker; <paramref name="quantity"/> counts liters of a liquid and vessels of anything else.
@@ -71,6 +71,8 @@ public sealed partial class World {
     /// <param name="into">The thing that owns <paramref name="to"/>, or null for the backpack or a worker's bag.</param>
     /// <param name="room">Most units, or liters of a liquid, that may land in <paramref name="to"/>, such as what a station's input slot has left.</param>
     private int Carry(Inventory from, Inventory to, Thing? into, string item, int quantity, int room = int.MaxValue) {
+        if (into?.Kind == ThingKind.Farm && to == into.Inventory)
+            room = Math.Min(room, Barrels.CanPour(Data, item) ? Farms.WaterRoom(into) : to.SlotRoom(item));
         if (Data.VesselFor(item) != null) {
             bool takes = into != null && to == into.Inventory && TakesLiquid(into, item);
             if (takes && from[item] > 0) return from.TransferTo(to, item, Math.Min(quantity, room));
