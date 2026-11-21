@@ -387,8 +387,8 @@ A full stomach lasts one in-game day and a full water gauge lasts one day; a day
 Raw meat cannot be eaten.
 Your refillable bottle holds three liters, each restoring one third of the water gauge.
 Put a steel barrel into the Roof barrel window to the left of the cabin page to mount it on the roof.
-The barrel serves thirst at bedtime and tops it up again when players wake, both in the order they entered.
-It uses any remaining water to fill their bottles in the same order.
+At bedtime, the barrel serves everyone's thirst first and fills bottles second, both in the order they entered.
+When players wake, any water left in the barrel goes to their thirst in the same order.
 Taking down a cabin returns its barrel with its water.
 Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one liter, taking the same gathering time.
 Filling a bottle takes the same time as one gather action.

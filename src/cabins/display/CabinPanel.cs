@@ -31,7 +31,7 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         buttons.AddChild(doorSide); buttons.AddChild(sleep);
         panel.DoorKey.Rest(thing.Locked);
         live.Watch(() => thing.Locked, locked => { panel.DoorKey.Turn(locked); key.TooltipText = locked ? "Unlock the door" : "Lock the door · keeps wolves out"; });
-        live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(thing), world.Data.GameMinutes(world.SecondsToDawn), Barrel.In(thing.Inventory)), now => {
+        live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), world.Data.GameMinutes(world.SecondsToDawn), Barrel.In(thing.Inventory)), now => {
             var (inside, blocked, _, _) = now;
             tag.Text = inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);
@@ -42,9 +42,9 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
             block.Visible = blocked != null; block.Text = blocked == null ? "" : ShortBlock(blocked);
             until.Text = LiveText.Of(text => PageText.AppendGameHours(world, text.Append("until dawn · +"), world.SecondsToDawn));
             float seconds = world.SecondsToDawn;
-            Show(0, "Health", world.HealthAtDawn(thing));
+            Show(0, "Health", world.HealthAtDawn());
             Show(1, "Hunger", world.Hunger - seconds * world.Data.HungerPerSecond);
-            Show(2, "Thirst", world.ThirstAtDawn(thing));
+            Show(2, "Thirst", world.ThirstAtDawn());
         });
         BarrelWindow();
         StoreBagGrid(Barrel.Is);

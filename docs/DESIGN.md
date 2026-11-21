@@ -543,7 +543,8 @@ The window advances the visible haul phase between server updates through `Local
 Construction keeps the ladder approach on dry ground and clear of other buildings.
 
 Before the night advances, players inside each cabin draw enough liters to fill their thirst in cabin-entry order.
-On waking, they draw again in the same order, then fill bottles with any water left.
+They then fill bottles in the same order.
+On waking, the players draw from any water left in the barrel.
 The sleep gate uses what a player can drink before sleep, and the dawn preview includes what they can drink on waking.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.

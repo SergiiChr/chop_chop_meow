@@ -1027,21 +1027,21 @@ public sealed partial class World {
     /// <summary>Bedtime comes a little before night falls, so the player can turn in without waiting for the dark.</summary>
     public const int SleepHour = 22;
     public float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
-    public float ThirstAtDawn(Thing? cabin = null) => bedtimeWater.Preview(S.Actor, SecondsToDawn * Data.ThirstPerSecond, cabin).Dawn;
+    public float ThirstAtDawn() => bedtimeWater.Preview(S.Actor, SecondsToDawn * Data.ThirstPerSecond).Dawn;
     /// <summary>Hunger and thirst both above this let sleep heal, at <see cref="SleepHeal"/> health a second.</summary>
     public const float FedNeed = 45, SleepHeal = .12f;
     /// <summary>The acting player's health after sleeping until dawn: sleep heals while hunger and thirst both stay above <see cref="FedNeed"/>.</summary>
-    public float HealthAtDawn(Thing? cabin = null) {
+    public float HealthAtDawn() {
         float seconds = SecondsToDawn;
-        float watered = bedtimeWater.Preview(S.Actor, seconds * Data.ThirstPerSecond, cabin).Bedtime;
+        float watered = bedtimeWater.Preview(S.Actor, seconds * Data.ThirstPerSecond).Bedtime;
         float fed = Math.Min(seconds, Math.Min((S.Hunger - FedNeed) / Data.HungerPerSecond, (watered - FedNeed) / Data.ThirstPerSecond));
         return Math.Min(100, S.Health + Math.Max(0, fed) * SleepHeal);
     }
     /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
-    public string? SleepBlock(Thing? cabin = null) {
+    public string? SleepBlock() {
         if (Hour is >= 6 and < SleepHour) return "You can only sleep after 10 pm.";
         float hungerLoss = SecondsToDawn * Data.HungerPerSecond, thirstLoss = SecondsToDawn * Data.ThirstPerSecond;
-        bool hungry = S.Hunger <= hungerLoss, thirsty = bedtimeWater.Preview(S.Actor, thirstLoss, cabin).Bedtime <= thirstLoss;
+        bool hungry = S.Hunger <= hungerLoss, thirsty = bedtimeWater.Preview(S.Actor, thirstLoss).Bedtime <= thirstLoss;
         if (hungry || thirsty) return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : "You are too thirsty to sleep.";
         // The night passes for everyone at once, so the others have to be inside and fed too.
         foreach (var p in S.Players) if (p != S.Actor && p.Sheltered == 0) return "Everyone has to be inside a cabin to sleep.";
@@ -1051,14 +1051,14 @@ public sealed partial class World {
     }
     public void Sleep(Thing hut) {
         if (hut.Kind != ThingKind.Hut || !Near(hut)) return;
-        if (SleepBlock(hut) is string blocked) { Say(blocked); return; }
+        if (SleepBlock() is string blocked) { Say(blocked); return; }
         if (Forwarded(Verb.Sleep, hut.Id)) return;
         if (DoorCheck.Waking) { PassNight(); return; }
-        var occupants = bedtimeWater.Occupants(S.Actor, hut);
-        BedtimeWater.ServeThirst(occupants);
-        PassNight();
+        var occupants = bedtimeWater.Occupants();
         BedtimeWater.ServeThirst(occupants);
         BedtimeWater.FillBottles(occupants);
+        PassNight();
+        BedtimeWater.ServeThirst(occupants);
     }
     /// <summary>
     /// Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.
