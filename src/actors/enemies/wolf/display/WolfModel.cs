@@ -73,9 +73,8 @@ public sealed class WolfModel {
     public const float GlanceEvery = 4.6f, GlanceSeconds = 1.7f, GlanceApart = 1.3f;
     /// <summary>Seconds left of holding the end of a snap, jaws shut, after the wolf has landed.</summary>
     public float SnapHeld;
-    /// <summary>A leap's bearing from the player to the wolf, and where it holds the throat once the player is down.</summary>
+    /// <summary>A leap's bearing from the player to the wolf.</summary>
     public Vector2 Toward;
-    public Vector3 Held;
     /// <summary>Where the wolf was drawn as its latest move began, to ease from: lunging in to take hold, stepping round to pin, or onto a feeding spot.</summary>
     public Vector3 StepFrom;
     /// <summary>How far the wolf is drawn from its place in the world after letting go of a player it tugged; it closes as the wolf walks.</summary>
@@ -529,6 +528,7 @@ public sealed class WolfModel {
     /// <summary>How far apart a pinning wolf's hind paws stand, as a share of its legs' own width, wide of the legs of the player under it, and how far it leans its body to keep its jaws on the throat.</summary>
     private const float PinStance = 2.5f, MostLean = .15f;
 
+    /// <summary>Seconds per feeding bite. A left pull and a right pull take two beats.</summary>
     private const float FeedingBeat = 1.35f;
     /// <summary>A feeder grips low, rocks back on its haunches, then lets go and dips for another bite.</summary>
     private static WolfPose Tearing(float time) {

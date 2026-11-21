@@ -19,17 +19,6 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
     /// A player at a cabin's door as their doorway stage shows them, null when they are at no door.
     /// </summary>
     public DoorShown? AtDoor(PlayerState p, ActorState state, float dt) {
-        if (p.Door is Doorway.Tugged or Doorway.TuggedOff || state.ArmPull != Vector2.Zero) {
-            var held = Vector2.Zero;
-            if (p.Door is Doorway.Tugged or Doorway.TuggedOff)
-                foreach (var wolf in world().Wolves) {
-                    if (wolf.Target != p.Id) continue;
-                    if (wolf.Side == BodySide.Left) held.X = 1;
-                    if (wolf.Side == BodySide.Right) held.Y = 1;
-                }
-            state.ArmPull = new(Mathf.MoveToward(state.ArmPull.X, held.X, dt / TugView.TugLunge),
-                Mathf.MoveToward(state.ArmPull.Y, held.Y, dt / TugView.TugLunge));
-        }
         if (state.Stage != p.Door) {
             if (state.Stage == Doorway.Knocking && p.Door == Doorway.None) state.SteppingDown = StepUpSeconds;
             state.StageBefore = state.Stage; state.Stage = p.Door; state.StageFrom = state.Position;

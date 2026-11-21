@@ -32,7 +32,7 @@ public static class WolfBodiesChecks {
         var spots = new FeedingSpots(new Dictionary<Wolf, WolfModel> { [feeder] = model, [neighbor] = lowering });
         var fallen = new ActorState();
         var rig = new ActorRig(ActorSkin.Player);
-        FallBackView.FallBack(rig, fallen, 1, false, null);
+        FallBackView.FallBack(rig, fallen, fallen.Pose, 1, false, null);
         var line = FeedingSpots.BodyLine(fallen);
         model.Root.Position = FeedingSpots.OnTheBody(line, .3f, BodySide.Left).At;
         var free = spots.Place(feeder, model, fallen, rig, 1);

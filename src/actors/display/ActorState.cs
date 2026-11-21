@@ -25,8 +25,6 @@ public sealed class ActorState {
     public bool OnSteps;
     /// <summary>How high the actor's hips stand above the ground it is posed on, as last drawn.</summary>
     public float HipHeight;
-    /// <summary>How far a wolf has drawn each forearm out to its side, left in X and right in Y.</summary>
-    public Vector2 ArmPull;
     public ActorAction Action;
     public float Time;
     public float PreviousTime = -1;
@@ -63,12 +61,7 @@ public sealed class ActorState {
         Blend = Math.Min(1, Blend + dt / ActorAnimation.BlendSeconds);
         Moving = moving;
     }
-    public Pose Pose {
-        get {
-            var pose = ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend, aim, fromAim);
-            return ArmPull == Vector2.Zero ? pose : TugView.PulledArms(pose, ArmPull);
-        }
-    }
+    public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend, aim, fromAim);
 
     /// <summary>True on the frame an action loop passes its impact moment.</summary>
     public bool Struck(float at) {

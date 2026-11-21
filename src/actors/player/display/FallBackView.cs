@@ -67,8 +67,8 @@ public static class FallBackView {
     /// Poses a player knocked or yanked off their feet backward as <see cref="FallingBack"/> has them, onto
     /// their back, <see cref="KnockDownSlide"/> on from where they stood, where <see cref="Throat"/> finds their throat.
     /// </summary>
-    public static void FallBack(ActorRig rig, ActorState state, float downedFor, bool torch, WolfModel? wolf) {
-        var (pose, tip, hips) = FallingBack(state.Pose, downedFor / ActorAnimation.FallBackSeconds, KnockDownSlide - FallHips);
+    public static void FallBack(ActorRig rig, ActorState state, Pose standing, float downedFor, bool torch, WolfModel? wolf) {
+        var (pose, tip, hips) = FallingBack(standing, downedFor / ActorAnimation.FallBackSeconds, KnockDownSlide - FallHips);
         state.HipHeight = pose.HipHeight; state.Lift = 0; state.LiftSpeed = 0; state.OnSteps = false;
         float t = Mathf.DegToRad(tip);
         rig.Root.Position = FallRoot(state.Position, ActorAnimation.Forward(state.Yaw), t, hips);
