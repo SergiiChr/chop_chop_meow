@@ -17,6 +17,10 @@ internal static class WaterPumps {
     internal static float Advance(Thing pump, float dt) {
         float working = Math.Min(dt, pump.PumpStrokeLeft);
         pump.PumpStrokeLeft -= working;
+        if (working > 0 && Mathf.IsZeroApprox(pump.PumpStrokeLeft)) {
+            pump.PumpStrokeLeft = 0;
+            pump.Rounds++;
+        }
         float falling = Math.Min(dt - working, pump.Pressure / LossPerSecond);
         float startRate = pump.FlowRate;
         pump.Pressure = Math.Max(0, pump.Pressure - falling * LossPerSecond);

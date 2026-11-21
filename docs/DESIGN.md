@@ -1034,6 +1034,7 @@ Each quarter-turn rotates the available openings.
 The underground view shows the pipes and their placement preview through the translucent surface.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.
 The building's equipment slot accepts ten steel pipes to install its plumbing.
+A worker finishes a round at the end of each pump stroke, then checks whether a higher-priority job is ready.
 A pump stroke holds pressure while the handle moves. Once it stops, pressure falls by ten percentage points per second.
 The simulation integrates flow over each tick, including the moment pressure reaches zero.
 `Plumbing` finds connected groups whenever the pipe layout changes.

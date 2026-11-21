@@ -9,6 +9,7 @@ public static class WaterPumpChecks {
         Test(CheckRepeatedStrokesRaiseTheFlowToFiveLitersPerSecond, data);
         Test(CheckFullPressureRunsDownInTenSeconds, data);
         Test(CheckAWorkerPumpsFromTheBank, data);
+        Test(CheckAPumpOperatorReturnsToHigherPriorityWork, data);
     }
 
     private static void CheckFullPressureRunsDownInTenSeconds(GameData data) {
@@ -41,6 +42,22 @@ public static class WaterPumpChecks {
         SafeTick(world, 12);
         Require(worker.WorkState == WorkerWorkState.Pumping && pump.Pressure == 100 && pump.FlowRate == 5,
             "An assigned worker should reach the handle on dry land and pump to 5 L/s.");
+    }
+
+    private static void CheckAPumpOperatorReturnsToHigherPriorityWork(GameData data) {
+        var world = WorkDay(data);
+        var shore = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
+        var pump = world.Add(ThingKind.Pump, Terrain.TileAt(shore + Vector2.Down * 1.1f));
+        var anvil = world.Add(ThingKind.Anvil, pump.ToWorld(World.BellowsStand) + Vector2.Up * 3);
+        world.SetRecipe(anvil, "steel_parts");
+        var operatorAtBank = AddWorker(world, pump.ToWorld(World.BellowsStand));
+        world.SetDuty(operatorAtBank, anvil, JobKind.Craft, true);
+        world.SetDuty(operatorAtBank, pump, JobKind.Pump, true);
+        Work(world, 5, () => pump.Pressure > 0);
+        Require(pump.Pressure > 0, "With the anvil empty, the worker should take their next job at the pump.");
+        anvil.Inventory.Add("steel_bar", 1);
+        Work(world, 15, () => anvil.Inventory["steel_parts"] > 0);
+        Require(anvil.Inventory["steel_parts"] == 1, "After a stroke the worker should return to the ready anvil.");
     }
 
     private static void CheckRepeatedStrokesRaiseTheFlowToFiveLitersPerSecond(GameData data) {

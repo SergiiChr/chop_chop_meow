@@ -229,7 +229,7 @@ public sealed partial class World {
         w.Status = "Pumping water";
         if (Walk(w, pump.ToWorld(BellowsStand), dt, .1f, exact: true)) {
             w.WorkState = WorkerWorkState.Pumping;
-            if (pump.PumpStrokeLeft <= .0001f) WaterPumps.Stroke(pump);
+            if (pump.PumpStrokeLeft == 0) WaterPumps.Stroke(pump);
         }
         return true;
     }
