@@ -346,6 +346,8 @@ Meshes and materials are cached by parameters, so repeated objects share resourc
 `WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, and `WorldView` draws them behind the ground for its first frames, so a building, crate, carcass or wolf that first appears mid-game builds no mesh, material, shader or pipeline; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
 The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
+The sun and moon share one shadow map across this view.
+Its small shadow offset keeps the shade attached to feet, trunks and low props, while ambient occlusion shades creases.
 
 Picking, the hover ring and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`), so selection matches what is drawn.
 A tree crown only wins a click when nothing else is under the cursor, so objects behind a canopy stay selectable.
