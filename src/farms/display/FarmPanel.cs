@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -29,22 +27,56 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
                 _ => "Sows once seeds and fertilizer are in"
             };
         });
-        var fertilizer = InputSlot("fertilizer", Style.SlotFuel);
-        var lasts = Style.Text("", 13, Style.Tan);
-        int perCrop = world.Data.Farm.Sow.GetValueOrDefault("fertilizer");
-        live.Watch(() => thing.Inventory["fertilizer"], stock => lasts.Text = $"×{perCrop} · {stock / Math.Max(1, perCrop)}{(stock == 1 ? " crop" : " crops")}");
-        var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => (Control)StationSlots.Labelled(InputSlot(k), $"×{world.Data.Farm.Sow[k]}"));
-        var main = StationSlots.Labelled(OutputSlot("wheat"), $"×{world.Data.Farm.Yield.GetValueOrDefault("wheat")}");
-        var side = world.Data.Farm.Yield.Keys.Where(k => k != "wheat").Select(k => (Control)StationSlots.Labelled(OutputSlot(k, 44), $"×{world.Data.Farm.Yield[k]}")).ToArray();
-        var supplies = new VBoxContainer();
-        supplies.AddThemeConstantOverride("separation", 8);
-        supplies.AddChild(new FuelRow("line_leaf", new Color("8fae7e"), fertilizer, lasts));
-        supplies.AddChild(WaterRow());
-        AddChild(new ProcessRow(live, inputs, $"{world.Data.Farm.GrowDays:0} d",
-            () => thing.FarmStage == FarmStage.Growing ? world.Farms.Growth(thing) / world.Farms.GrowSeconds : thing.FarmStage == FarmStage.Ripe ? 1 : 0,
-            supplies, main, side));
+        var row = Well(new HBoxContainer());
+        row.AddThemeConstantOverride("separation", 16);
+        row.AddChild(Inputs());
+        row.AddChild(Harvest());
         StoreBagGrid(id => world.Holds(thing, id));
         JobButtons();
+    }
+
+    private VBoxContainer Inputs() {
+        var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        column.AddThemeConstantOverride("separation", 8);
+        foreach (var (item, perSowing) in world.Data.Farm.Sow) {
+            bool fertilizer = item == "fertilizer";
+            var row = new HBoxContainer();
+            row.AddThemeConstantOverride("separation", 8);
+            row.AddChild(InputSlot(item, fertilizer ? Style.SlotFuel : null));
+            var amount = Style.Text($"×{perSowing}", 13, Style.Tan);
+            amount.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+            if (fertilizer) live.Watch(() => thing.Inventory[item], stock => amount.Text = $"×{perSowing} · {Count(stock / perSowing, "crop")}");
+            row.AddChild(amount);
+            column.AddChild(row);
+        }
+        column.AddChild(WaterRow());
+        return column;
+    }
+
+    private VBoxContainer Harvest() {
+        var column = new VBoxContainer();
+        column.AddThemeConstantOverride("separation", 12);
+        var outputs = new HBoxContainer();
+        outputs.AddThemeConstantOverride("separation", 10);
+        foreach (var (item, count) in world.Data.Farm.Yield)
+            outputs.AddChild(StationSlots.Labelled(OutputSlot(item), $"×{count}"));
+        column.AddChild(outputs);
+
+        var growth = new VBoxContainer { SizeFlagsVertical = SizeFlags.Expand | SizeFlags.ShrinkCenter };
+        growth.AddThemeConstantOverride("separation", 8);
+        var clock = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        clock.AddChild(Style.Glyph("line_clock", 16, Style.Ink));
+        clock.AddChild(Style.Text($"{world.Data.Farm.GrowDays:0} d", 14, Style.Ink));
+        growth.AddChild(clock);
+        var bar = new ProgressBar { Name = "progress", MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(60, 14) };
+        live.Watch(() => thing.FarmStage switch {
+            FarmStage.Growing => (int)(world.Farms.Growth(thing) / world.Farms.GrowSeconds * 200),
+            FarmStage.Ripe => 200,
+            _ => 0
+        }, at => bar.Value = at / 200f);
+        growth.AddChild(bar);
+        column.AddChild(growth);
+        return column;
     }
 
     private int HoursUntilRipe() => thing.FarmStage == FarmStage.Growing
@@ -76,6 +108,6 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
         stationSlots.Slot(thing.Inventory, item, true, held => $"{world.Data.Name(item)} · {held}\n{StationSlots.SlotHint} · put seeds here from the harvest or backpack to sow", look: look,
             takes: held => held.Stack is HeldStack stack && stack.Item == item && (stack.Box == 0 || thing.Output != null && stack.Box == world.Locate(thing.Output)));
 
-    private ItemSlot OutputSlot(string item, float size = 52) =>
-        stationSlots.Slot(thing.Output ?? thing.Inventory, item, false, held => $"{world.Data.Name(item)} · {held}\n{StationSlots.SlotHint} · put seeds back in the input slot", size);
+    private ItemSlot OutputSlot(string item) =>
+        stationSlots.Slot(thing.Output ?? thing.Inventory, item, false, held => $"{world.Data.Name(item)} · {held}\n{StationSlots.SlotHint} · put seeds back in the input slot");
 }

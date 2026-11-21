@@ -143,7 +143,7 @@ UI and input:
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel, with their hands and tool slot |
 | `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
-| `src/farms/display/FarmPanel.cs` | A farm plot's stages and process row |
+| `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, sleep and the needs a night would leave |
 | `src/cabins/Doorways.cs` | Cabin doors: walking round to the door, stepping in and out, following, knocking, standing aside and the key |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |

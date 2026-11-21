@@ -19,6 +19,21 @@ public partial class Game {
         await Until(() => HasLabel(panel, "Needs water"), "a dry plot asking for water", 2);
         var water = (ItemSlot)OnPage($"input_{Water.Liquid}")!;
         var level = (ProgressBar)OnPage("farm_water")!;
+        await Frames();
+        var seed = OnPage("input_wheat_seeds")!.GetGlobalRect();
+        var fertilizer = OnPage("input_fertilizer")!.GetGlobalRect();
+        var waterSlot = water.GetGlobalRect();
+        Require(seed.Position.X == fertilizer.Position.X && fertilizer.Position.X == waterSlot.Position.X
+            && seed.End.Y <= fertilizer.Position.Y && fertilizer.End.Y <= waterSlot.Position.Y,
+            "seeds, fertilizer and water should line up in a vertical column");
+        var wheat = OnPage("output_wheat")!.GetGlobalRect();
+        var returnedSeed = OnPage("output_wheat_seeds")!.GetGlobalRect();
+        var grass = OnPage("output_grass")!.GetGlobalRect();
+        Require(wheat.Position.Y == returnedSeed.Position.Y && returnedSeed.Position.Y == grass.Position.Y
+            && wheat.End.X <= returnedSeed.Position.X && returnedSeed.End.X <= grass.Position.X,
+            "wheat, seeds and grass should line up in a horizontal row");
+        Require(wheat.Size.X == wheat.Size.Y && wheat.Size == returnedSeed.Size && returnedSeed.Size == grass.Size,
+            "every harvest output should have the same square slot size");
         Require(water.Icon == Icons.Of(Water.Liquid) && level.Value == 0, "the farm starts with an empty water bar and droplet slot");
         await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(bucket))), water);
         await Until(() => level.Value > 4.9 && world.Backpack[Bucket.Item] > 0, "pouring the bucket into the plot fills its water bar", 2);
