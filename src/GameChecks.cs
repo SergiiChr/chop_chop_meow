@@ -256,16 +256,14 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    /// <summary>A chest's filter list runs by group, each simplest first: items no recipe makes, materials, tools, containers, food, then crates of goods.</summary>
-    private async Task CheckFilterListRunsByGroupSimplestFirst() {
-        await CloseWithEsc();
-        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(4, 0)); await Frames();
-        panel.Select(Shown(chest)); await Frames();
-        await Click(Named("filters")!); await Click(Named("filter_add_in")!);
-        var listed = OnPage("filter_list")!.GetChild(0).GetChildren().Select(cell => cell.Name.ToString()["pick_".Length..]).ToList();
+    /// <summary>A chest's item list runs by group, each simplest first: what is gathered, grown or bought, materials, tools, containers, food, then crates of goods.</summary>
+    private async Task CheckItemListRunsByGroupSimplestFirst() {
+        var chest = await OpenFilters(ThingKind.Chest);
+        await Click(Named("filter_add_in")!);
+        var listed = FilterEntries("item_list", "pick_").ToList();
         string[] expected = ["wood", "planks", "iron_bar", "steel_bar", "steel_parts", "stone_chisel", "steel_chisel", Water.Empty, "flour", "dough", "bread", World.CrateOf("berries"), World.CrateOf("bread")];
-        Require(listed.Where(expected.Contains).SequenceEqual(expected), $"The filter list must run by group, simplest first, not {string.Join(" ", listed)}.");
-        Require(listed.FindIndex(id => id.StartsWith(World.PackedPrefix)) > listed.FindLastIndex(id => !id.StartsWith(World.PackedPrefix)), "The filter list must show crates of goods after every item.");
+        Require(listed.Where(expected.Contains).SequenceEqual(expected), $"The item list must run by group, simplest first, not {string.Join(" ", listed)}.");
+        Require(listed.SkipWhile(id => !id.StartsWith(World.PackedPrefix)).All(id => id.StartsWith(World.PackedPrefix)), "The item list must show crates of goods after every item.");
         await Click(Named("filters_close")!);
         RemoveThings(Hosted, t => t == chest);
         await CloseWithEsc();
@@ -273,10 +271,7 @@ public partial class Game {
 
     /// <summary>A filter row shows its items in the order they were added, also after one of them comes off, or comes off and goes back on between two looks of the page.</summary>
     private async Task CheckFilterRowKeepsTheOrderAdded() {
-        await CloseWithEsc();
-        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(4, 0)); await Frames();
-        panel.Select(Shown(chest)); await Frames();
-        await Click(Named("filters")!);
+        var chest = await OpenFilters(ThingKind.Chest);
         foreach (string item in new[] { "stone", "planks" }) {
             await Click(Named("filter_add_in")!); await Click(Named($"pick_{item}")!);
             await Until(() => Named($"filter_in_{item}") != null, $"picking {item} adding it to the row", 2);
@@ -284,12 +279,10 @@ public partial class Game {
         await Click(Named("filter_in_stone")!);
         await Until(() => Named("filter_in_stone") == null, "clicking stone taking it off the row", 2);
         await Click(Named("filter_add_in")!); await Click(Named("pick_coal")!);
-        await Until(() => OnPage("filter_in")!.GetChildren().Select(cell => cell.Name.ToString()).Where(name => name.StartsWith("filter_in_")).SequenceEqual(["filter_in_planks", "filter_in_coal"]),
-            "coal added after stone came off showing after planks", 2);
+        await Until(() => FilterEntries("filter_in", "filter_in_").SequenceEqual(["planks", "coal"]), "coal added after stone came off showing after planks", 2);
         // As another player would, between two looks of the page: the row's items stay the same, only their order changes.
         Hosted.SetFilter(chest, "planks", false, false); Hosted.SetFilter(chest, "planks", false, true);
-        await Until(() => OnPage("filter_in")!.GetChildren().Select(cell => cell.Name.ToString()).Where(name => name.StartsWith("filter_in_")).SequenceEqual(["filter_in_coal", "filter_in_planks"]),
-            "planks taken off and put back at once moving after coal", 2);
+        await Until(() => FilterEntries("filter_in", "filter_in_").SequenceEqual(["coal", "planks"]), "planks taken off and put back at once moving after coal", 2);
         await Click(Named("filters_close")!);
         RemoveThings(Hosted, t => t == chest);
         await CloseWithEsc();
@@ -2209,7 +2202,7 @@ public partial class Game {
             await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
             await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
             await TestClean(CheckPileFilterNamesOneResource);
-            await TestClean(CheckFilterListRunsByGroupSimplestFirst);
+            await TestClean(CheckItemListRunsByGroupSimplestFirst);
             await TestClean(CheckFilterRowKeepsTheOrderAdded);
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await TestClean(CheckPackingStationListsGoodsAndTakesBackpackClicks);

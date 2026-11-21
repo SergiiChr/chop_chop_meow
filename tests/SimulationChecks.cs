@@ -32,6 +32,7 @@ public static class SimulationChecks {
         Test(WorkerStateChecks.Run, data);
         Test(WorkerJobChecks.Run, data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
+        Test(CheckFilterNamesEachEntryOnceInTheOrderNamed);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
         Test(CheckDismantlingABuildingReturnsItsCostAndContents, data);
         Test(CheckBuildingsKnockIntoPlaceAndClatterDown, data);
@@ -334,6 +335,15 @@ public static class SimulationChecks {
         Require(world.Transfer(world.Backpack, chest.Inventory, "wood", 2) == 2, "a chest 14 m away should take items from the backpack");
         Require(world.LoadInput(furnace, "iron_ore", 4) == 4, "a station 14 m away should take its inputs from the backpack");
         Require(world.Transfer(world.Backpack, far.Inventory, "wood", 2) == 0, "a chest 17 m away should be out of reach");
+    }
+
+    /// <summary>A filter keeps its entries in the order they were named, and naming one it has again leaves it where it is.</summary>
+    private static void CheckFilterNamesEachEntryOnceInTheOrderNamed() {
+        var chest = new Inventory();
+        chest.Filter("stone", false, true); chest.Filter("wood", false, true); chest.Filter("stone", false, true);
+        Require(chest.InputFilter.SequenceEqual(["stone", "wood"]), $"naming stone again should leave the filter as stone, wood, not {string.Join(", ", chest.InputFilter)}");
+        chest.Filter("stone", false, false);
+        Require(chest.InputFilter.SequenceEqual(["wood"]) && !chest.Accepts("stone"), "taking stone off once should leave no stone in the filter");
     }
 
     private static void CheckOutputFilterBlocksAutomatedWithdrawal(GameData data) {

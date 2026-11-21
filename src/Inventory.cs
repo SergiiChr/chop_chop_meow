@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text.Json.Serialization;
 
@@ -44,9 +45,9 @@ public sealed class Inventory {
     /// <summary>Physical stack positions; <see cref="Items"/> holds each item's total across them.</summary>
     public List<Slot> Layout { get; set; } = new();
     /// <summary>What workers bring here, in the order the player named them; empty for anything.</summary>
-    public List<string> InputFilter { get; set; } = new();
+    public FilterList InputFilter { get; set; } = new();
     /// <summary>What workers take from here, in the order the player named them; empty for anything.</summary>
-    public List<string> OutputFilter { get; set; } = new();
+    public FilterList OutputFilter { get; set; } = new();
     /// <summary>Number of cells. Changing it adds empty cells or moves stacks out of removed ones.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
     /// <summary>Most units of one item per cell. Changing it splits or merges stacks to fit.</summary>
@@ -306,7 +307,7 @@ public sealed class Inventory {
     /// <summary>Lets an item in or out through a filter, or stops naming it there.</summary>
     public void Filter(string item, bool output, bool allowed) {
         var filter = output ? OutputFilter : InputFilter;
-        if (!allowed) filter.Remove(item); else if (!filter.Contains(item)) filter.Add(item);
+        if (allowed) filter.Add(item); else filter.Remove(item);
         Changed?.Invoke();
     }
     /// <summary>Empties both filters, so anything goes in and out.</summary>
@@ -316,7 +317,7 @@ public sealed class Inventory {
     /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over unrestricted ones.</summary>
     public bool Wants(string item) => InputFilter.Count > 0 && Names(InputFilter, item);
     /// <summary>A filter names an item itself, or for a packed crate the kind of crate it is (<see cref="World.CrateOf"/>).</summary>
-    private static bool Names(List<string> filter, string item) {
+    private static bool Names(FilterList filter, string item) {
         if (filter.Contains(item)) return true;
         var kind = World.PackedKind(item);
         if (kind.IsEmpty) return false;
@@ -404,6 +405,14 @@ public sealed class Inventory {
         Take(item, amount, false);
         return destination.Add(item, amount);
     }
+}
+
+/// <summary>A filter's entries in the order they were named, each once: naming one again leaves it where it is.</summary>
+public sealed class FilterList : Collection<string> {
+    /// <summary>Walks the entries without allocating, as worker routing does on every tick.</summary>
+    public new List<string>.Enumerator GetEnumerator() => ((List<string>)Items).GetEnumerator();
+    protected override void InsertItem(int index, string item) { if (!Contains(item)) base.InsertItem(index, item); }
+    protected override void SetItem(int index, string item) { if (!Contains(item)) base.SetItem(index, item); }
 }
 
 /// <summary>Read-only view of an inventory's item totals whose enumerator is a struct, so a loop over it allocates nothing.</summary>
