@@ -58,12 +58,13 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         RedrawOnChange(() => (thing.Packs, world.Selected(thing), thing.Compost, FilterCode()));
     }
 
-    /// <summary>A number that changes with the filters' contents.</summary>
+    /// <summary>A number that changes with the filters' contents and their order.</summary>
     private int FilterCode() {
-        int code = 0;
-        foreach (string item in thing.Inventory.InputFilter) code += item.GetHashCode();
-        foreach (string item in thing.Inventory.OutputFilter) code += 31 * item.GetHashCode();
-        return code;
+        var code = new HashCode();
+        code.Add(thing.Inventory.InputFilter.Count);
+        foreach (string item in thing.Inventory.InputFilter) code.Add(item);
+        foreach (string item in thing.Inventory.OutputFilter) code.Add(item);
+        return code.ToHashCode();
     }
 
     /// <summary>What this kind of thing shows under its name.</summary>

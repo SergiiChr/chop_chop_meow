@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -11,7 +12,8 @@ public sealed class FilterState {
 
 /// <summary>
 /// The one filter window for any storage that has filters: a row of what workers bring and one of what they take.
-/// Drop an item on a row to add it, click one to take it off; an empty row allows anything.
+/// Drop an item on a row to add it, click one to take it off; an empty row allows anything, and a row shows its items in the order they were added.
+/// The item list runs in <see cref="GameData.ListOrder"/>, with crates of goods after the items in their goods' order, and crates of mixed goods last.
 /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
 /// A plain pile has only the row of what workers bring, naming one resource, which also sets what they take.
 /// A barrel has the same single row and names water.
@@ -37,7 +39,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             var glyph = Style.Glyph(output ? "line_out" : "line_in", 30, Style.Ink); glyph.MouseFilter = Control.MouseFilterEnum.Pass;
             glyph.TooltipText = output ? "Workers take only these from here" : post ? "Workers bring these crates here to sell" : "Workers bring only these here";
             row.AddChild(glyph);
-            var entries = pile ? (world.PileFilter(t) is string entry ? new[] { entry } : Array.Empty<string>()) : filter.OrderBy(world.FilterName).ToArray();
+            IReadOnlyList<string> entries = pile ? (world.PileFilter(t) is string entry ? [entry] : []) : filter;
             foreach (string item in entries) {
                 var cell = FilterCell($"filter_{(output ? "out" : "in")}_{item}", item); cell.TooltipText = $"{world.FilterName(item)}\nClick to take it off";
                 string id = item;
@@ -65,15 +67,15 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
         if (state.Picking && !(single && t.Inventory.InputFilter.Count > 0)) {
             var picker = new GridContainer { Columns = 6 }; picker.AddThemeConstantOverride("h_separation", 6); picker.AddThemeConstantOverride("v_separation", 6);
             // The list of every item outgrows short screens, so it scrolls.
-            var list = new ScrollContainer { Name = "filter_list", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+            var list = new ScrollContainer { Name = "item_list", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
             list.AddChild(picker); AddChild(Style.InWell(list));
             scrolls(list, picker);
-            var crates = world.Data.Market.Sells.Keys.Select(World.CrateOf).Where(id => post || world.Holds(t, id));
+            var crates = world.Data.ListOrder.Where(world.Data.Market.Sells.ContainsKey).Select(World.CrateOf).Where(id => post || world.Holds(t, id));
             if (pile) crates = crates.Append(World.MixedCrate);
-            var items = world.Data.Items.Keys.Where(id => world.Holds(t, id));
+            var items = world.Data.ListOrder.Where(id => world.Holds(t, id));
             if (pile) items = items.Select(world.PileEntry).Distinct();
             var choices = barrel ? new[] { Water.Liquid } : post ? crates : items.Concat(crates);
-            foreach (var id in choices.OrderBy(world.FilterName)) {
+            foreach (var id in choices) {
                 var cell = FilterCell($"pick_{id}", id); cell.TooltipText = world.FilterName(id);
                 cell.Pressed += () => { world.SetFilter(t, id, state.Output, true); state.Picking = false; redraw(); };
                 picker.AddChild(cell);

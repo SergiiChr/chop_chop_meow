@@ -72,7 +72,7 @@ Simulation and data:
 | `src/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView` |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
 | `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
@@ -1028,6 +1028,12 @@ Asking for it are a chest, pile or trading post whose input filter names it, a p
 `World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
 Manual transfers ignore those filters.
+A filter is a `FilterList`: its entries in the order they were named, each once, which the filter window's rows show.
+The window's item list runs in `GameData.ListOrder`, with crates of goods after the items in their goods' order.
+`GameData.Create` works `ListOrder` out once: what is gathered, grown or bought comes first, then materials, tools, containers and food, by the recipe that makes each item.
+An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel bucket or barrel at any fill stands with the empty one (`ContainerItem.Base`), and a part-drunk bottle with the full one.
+In each group fewer making steps come first, and recipe map order breaks ties.
+Making steps count the longest way through a recipe's inputs, or the items a source comes out of and also takes, from items that take no other item, such as wood.
 
 #### Piles
 
