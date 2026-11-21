@@ -11,10 +11,10 @@ namespace ChopChopMeow;
 public sealed class Mines(World world) {
     /// <summary>How far from a cliff a mine plan still snaps to it.</summary>
     private const float Reach = 10;
-    /// <summary>
-    /// How far behind a mine's spot its cliff's rock face stands, with the cave mouth in it, and half the mouth's width.
-    /// </summary>
-    public const float RockFace = 2.28f, MouthHalfWidth = .72f;
+    /// <summary>How far behind a mine's spot its cliff's rock face stands, with the cave mouth in it.</summary>
+    private const float RockFace = 2.28f;
+    /// <summary>Half the cave mouth's width.</summary>
+    public const float MouthHalfWidth = .72f;
     /// <summary>How far beside the cave mouth's edge a pick digging the entrance strikes the rock, and how far out from it a worker stands to dig.</summary>
     private const float BesideMouth = .12f, DigOut = 1;
 
@@ -22,9 +22,8 @@ public sealed class Mines(World world) {
     private readonly HashSet<int> fullReported = new();
     // The waiting status names what the site lacks; it is rebuilt only when that changes.
     private readonly Dictionary<int, (int Key, string Text)> wants = new();
-    private string? materials;
     /// <summary>The materials a dug site takes before its frame goes in, as messages name them.</summary>
-    private string Materials => materials ??= world.Goods(world.Data.Mine.Materials);
+    private readonly string materials = world.Goods(world.Data.Mine.Materials);
 
     /// <summary>
     /// The outcrop's half width at depths behind a mine's spot, from the rock face back into the mountain, narrowing
@@ -64,6 +63,16 @@ public sealed class Mines(World world) {
         var mouth = mine.Pos - cliff.Face * RockFace;
         return mouth + cliff.Along * ((from - mouth).Dot(cliff.Along) < 0 ? -1 : 1) * (MouthHalfWidth + BesideMouth);
     }
+    /// <summary>Where someone works on a mine from <paramref name="from"/>: beside the cave mouth while the entrance is dug, at the entrance after.</summary>
+    public static Vector2 WorkSpot(Thing mine, Vector2 from) => mine.MineStage == MineStage.Marked ? DigFace(mine, from) : Door(mine);
+    /// <summary>What someone working on a mine faces: the rock they dig, or past the entrance into the rock rather than the cart out front.</summary>
+    public static Vector2 Facing(Thing mine, Vector2 from) => mine.MineStage == MineStage.Marked ? DigFace(mine, from) : Door(mine) * 2 - mine.Pos;
+    /// <summary>The work a mine's stage asks for, as the player's status and refusals name it.</summary>
+    internal string Task(Thing mine) => mine.MineStage switch {
+        MineStage.Marked => "dig the mine",
+        MineStage.Supplied => "fit the mine frame",
+        _ => world.Phrase("mine ", Cliff.Nearest(mine.Pos).Ore.Id())
+    };
     /// <summary>Where a worker stands to dig a marked mine's entrance: a step out from the rock face they strike.</summary>
     private static Vector2 DigStand(Thing mine, Vector2 from) => DigFace(mine, from) + Cliff.Nearest(mine.Pos).Face * DigOut;
     /// <summary>Whether a plan placed at <paramref name="p"/> is close enough to a cliff to go to its mine spot.</summary>
@@ -75,7 +84,7 @@ public sealed class Mines(World world) {
 
     public float StageSeconds => world.Data.Mine.StageWorkdays * world.Data.WorkdaySeconds;
     /// <summary>Materials the site still needs before its frame can go in.</summary>
-    public Dictionary<string, int> Needs(Thing mine) {
+    private Dictionary<string, int> Needs(Thing mine) {
         var needs = new Dictionary<string, int>();
         foreach (var item in world.Data.Mine.Materials.Keys) if (Need(mine, item) is > 0 and int need) needs[item] = need;
         return needs;
@@ -91,7 +100,7 @@ public sealed class Mines(World world) {
     }
 
     /// <summary>Mining stops as soon as either the ore or the rock slot holds a full stack.</summary>
-    public static bool Full(Thing mine) => mine.Output is Inventory output && (output[Ore(mine)] >= output.StackSize || output["stone"] >= output.StackSize);
+    private static bool Full(Thing mine) => mine.Output is Inventory output && (output[Ore(mine)] >= output.StackSize || output["stone"] >= output.StackSize);
     /// <summary>How many workers are mining a mine underground now.</summary>
     public int Underground(Thing mine) {
         int miners = 0;
@@ -123,7 +132,7 @@ public sealed class Mines(World world) {
     /// <summary>Why the player cannot work on a mine now, or null: a pickaxe digs the entrance and a hammer fits the frame and rails.</summary>
     internal string? BuildBlock(Thing mine) => mine.MineStage switch {
         MineStage.Marked => world.BestTool("pickaxe") == null ? "A pickaxe is required to dig the entrance." : null,
-        MineStage.Dug => world.Phrase("Deliver ", Materials, " first."),
+        MineStage.Dug => world.Phrase("Deliver ", materials, " first."),
         MineStage.Supplied => world.BestTool("hammer") == null ? "A hammer is required to fit the frame and rails." : null,
         _ => "The mine is open. Workers with pickaxes mine it."
     };
@@ -133,14 +142,14 @@ public sealed class Mines(World world) {
         if (mine.Progress < StageSeconds) return;
         bool dug = mine.MineStage == MineStage.Marked;
         mine.MineStage++; mine.Progress = 0; mine.Rounds++;
-        world.Say(dug ? $"The {Name(mine)} entrance is dug. Deliver {Materials}." : $"The {Name(mine)} is open. Up to {world.Data.Mine.Workers} workers with pickaxes can mine it.");
+        world.Say(dug ? $"The {Name(mine)} entrance is dug. Deliver {materials}." : $"The {Name(mine)} is open. Up to {world.Data.Mine.Workers} workers with pickaxes can mine it.");
     }
 
     /// <summary>A dug site takes its delivered materials at once; an open mine brings out ore and stone at its miners' pace.</summary>
     internal void Tick(Thing mine, float dt) {
         var data = world.Data.Mine;
         if (mine.MineStage == MineStage.Dug && mine.Inventory.Spend(data.Materials)) {
-            mine.MineStage = MineStage.Supplied; mine.Progress = 0; world.Say($"The {Name(mine)} has its {Materials}. You or a worker with a hammer can fit the frame and rails.");
+            mine.MineStage = MineStage.Supplied; mine.Progress = 0; world.Say($"The {Name(mine)} has its {materials}. You or a worker with a hammer can fit the frame and rails.");
         }
         if (mine.MineStage != MineStage.Open || Full(mine)) return;
         mine.Progress += dt * Underground(mine);

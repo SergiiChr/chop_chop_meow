@@ -2086,10 +2086,10 @@ public partial class Game {
             await TestClean(CheckHarvestingBesideAStationStopsHammering);
             await TestClean(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await TestClean(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
-            await RunMineUIChecks();
             await TestClean(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
             await TestClean(CheckEveryBlowLandsItsToolOnWhatItWorks);
             await TestClean(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
+            await RunMineUIChecks();
             await TestClean(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await TestClean(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
             await TestClean(CheckHudAndHotbarEatAndDrinkSelected);

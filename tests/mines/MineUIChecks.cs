@@ -56,7 +56,7 @@ public partial class Game {
         await Until(() => sounds.Heard("mine_ore", soundsBefore), "a pick's blow heard at the mine's entrance", 4);
         var end = view.PlayerRig.Root.Transform * view.PlayerRig.Holds(ActorRig.PickPoint);
         var flat = new Vector2(end.X, end.Z) - (mine.Pos - cliff.Face * 2.28f);
-        float behind = -flat.Dot(cliff.Face), aside = Math.Abs(flat.Dot(new Vector2(-cliff.Face.Y, cliff.Face.X)));
+        float behind = -flat.Dot(cliff.Face), aside = Math.Abs(flat.Dot(cliff.Along));
         Require(Math.Abs(behind) < .06f && aside > .72f && aside < 1.2f && end.Y is > .5f and < 1.4f,
             $"A pick digging a mine's entrance must land on the rock face beside its mouth, not {behind:0.00} m into the face, {aside:0.00} m aside and {end.Y:0.00} m up.");
         RightRelease(point);

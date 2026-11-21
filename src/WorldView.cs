@@ -522,12 +522,10 @@ public partial class WorldView : Node3D {
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking, World.Data);
             if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
-            // At a mine the worker faces the rock past the entrance, not the cart out front.
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down
-                : assignment is { Kind: ThingKind.Mine, MineStage: MineStage.Marked } marked ? Mines.DigFace(marked, worker.Pos)
-                : assignment is { Kind: ThingKind.Mine } mine ? Mines.Door(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
+                : assignment is { Kind: ThingKind.Mine } mine ? Mines.Facing(mine, worker.Pos) : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
             Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
@@ -1585,7 +1583,7 @@ public partial class WorldView : Node3D {
         bool valid = World.Construction.PlacementBlock(kind, at) == null;
         if (shown.Tint != valid) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid; }
         shown.Root.Position = To3(at);
-        if (kind == ThingKind.Mine) shown.Body.Rotation = MineModel.Yaw(at);
+        if (kind == ThingKind.Mine) shown.Body.Rotation = MineModel.Yaw(Cliff.Nearest(at).Face);
         placeTile.Position = To3(at, .02f);
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
     }

@@ -388,8 +388,7 @@ public sealed partial class World {
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
     public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind switch {
         ThingKind.Water => Terrain.WaterPoint(from),
-        // A marked mine's entrance is dug at the rock face beside its cave mouth.
-        ThingKind.Mine => t.MineStage == MineStage.Marked ? Mines.DigFace(t, from) : Mines.Door(t),
+        ThingKind.Mine => Mines.WorkSpot(t, from),
         _ => t.Pos
     };
     /// <summary>How far, in metres, the player reaches to move items in and out of storage and stations.</summary>
@@ -549,7 +548,7 @@ public sealed partial class World {
         }
         for (int placed = 0, tried = 0; placed < count && tried < tries; tried++) {
             var p = new Vector2(rng.Next(3, Terrain.Size - 3), rng.Next(3, Terrain.Size - 3));
-            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliff.All.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || Mines.InRock(p, 2.5f) || WolfPatrols.InRock(p, 2.5f) || WolfPatrols.NearDen(p, 5)) continue;
+            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliff.All.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InRock(p, 2.5f) || WolfPatrols.NearDen(p, 5)) continue;
             if (rng.NextDouble() > chance(p) || Crowded(p)) continue;
             var t = Add(kind, p, remaining); placed++;
             if (!near.TryGetValue(Cell(p), out var cellList)) near[Cell(p)] = cellList = new();
@@ -574,8 +573,10 @@ public sealed partial class World {
     internal static bool Open(Vector2 p) {
         if (!Terrain.Open(p)) return false;
         foreach (var c in Cliff.All) if (c.DistanceTo(p) < Cliff.Depth) return false;
-        return !Mines.InRock(p) && !WolfPatrols.InRock(p);
+        return !InRock(p);
     }
+    /// <summary>Whether a point lies within the solid rock of a cliff's or a den's outcrop.</summary>
+    private static bool InRock(Vector2 p, float margin = 0) => Mines.InRock(p, margin) || WolfPatrols.InRock(p, margin);
     /// <summary>The kinds that are not resources: buildings, yards and what is left on the ground, such as graves.</summary>
     public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null);
     /// <summary>The kinds that stand in the way; resources, yards, campfires, graves, signposts and mines are walked past.</summary>
@@ -598,7 +599,7 @@ public sealed partial class World {
         ThingKind.Stump => "dig up the stump",
         ThingKind.Bush => "dig up the bush",
         _ when t.IsLoose => Phrase("pick up ", Lower(Data.Name(t.Kind))),
-        ThingKind.Mine => t.MineStage == MineStage.Marked ? "dig the mine" : t.MineStage == MineStage.Supplied ? "fit the mine frame" : Phrase("mine ", Cliff.Nearest(t.Pos).Ore.Id()),
+        ThingKind.Mine => Mines.Task(t),
         _ => Phrase("mine ", t.Kind.Id())
     };
     // Status lines are made of a few phrases, names and small numbers, so each line is built once and reused rather than on every tick.

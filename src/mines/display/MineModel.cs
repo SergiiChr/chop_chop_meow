@@ -6,11 +6,8 @@ namespace ChopChopMeow;
 
 /// <summary>Builds a mine's model and the rock spur every cliff has for a mine's tunnel to run into.</summary>
 internal static class MineModel {
-    /// <summary>Turns a mine's local +Z along its rails, out of the cliff's end.</summary>
-    public static Vector3 Yaw(Vector2 p) {
-        var way = Cliff.Nearest(p).Face;
-        return new Vector3(0, MathF.Atan2(way.X, way.Y), 0);
-    }
+    /// <summary>Turns a mine's local +Z along its rails, out along its cliff's <paramref name="face"/>.</summary>
+    public static Vector3 Yaw(Vector2 face) => new(0, MathF.Atan2(face.X, face.Y), 0);
 
     /// <summary>Ore color in a mine cart: rusty iron, black coal, and pale grey for anything else.</summary>
     private static string OreColor(ThingKind ore) => ore switch { ThingKind.Iron => "a35a2e", ThingKind.Coal => "26282b", _ => "b9bbb4" };
@@ -27,7 +24,7 @@ internal static class MineModel {
     public static void Spur(Node3D parent, Cliff cliff, string[] rock) {
         var spot = cliff.MineSpot;
         var spur = Pivot(parent, new Vector3(spot.X, 0, spot.Y));
-        spur.Rotation = Yaw(spot);
+        spur.Rotation = Yaw(cliff.Face);
         Add(spur, MineRockShape.Mesh(cliff, rock), MineRockShape.Rock, Vector3.Zero);
     }
 

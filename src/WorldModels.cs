@@ -328,7 +328,7 @@ public static class WorldModels {
         prop.Kind = t.Kind; prop.Hits = Hits(t);
         var body = prop.Body;
         if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Turn(t.Id) : 0, 0);
-        if (t.Kind == ThingKind.Mine) body.Rotation = MineModel.Yaw(t.Pos);
+        if (t.Kind == ThingKind.Mine) body.Rotation = MineModel.Yaw(Cliff.Nearest(t.Pos).Face);
         if (prop is DugProp dug) { dug.Yaw = body.RotationDegrees.Y; dug.Middle = Bounds(body).GetCenter(); }
         if (prop is LooseProp loose) (loose.Rest, loose.Middle) = (body.Basis, body.Basis * Bounds(body).GetCenter() with { Y = 0 });
         return prop;

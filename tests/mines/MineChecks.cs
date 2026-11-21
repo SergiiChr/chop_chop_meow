@@ -31,7 +31,7 @@ public static class MineChecks {
             var marking = FundedWorld(data); marking.Player = cliff.MineSpot + cliff.Face * 3;
             Require(marking.Construction.Build(ThingKind.Mine, cliff.MineSpot + cliff.Along + cliff.Face)?.Pos == cliff.MineSpot, "every aligned site must remain markable and snap correctly");
             var outward = cliff.Face;
-            var basis = Basis.FromEuler(MineModel.Yaw(cliff.MineSpot));
+            var basis = Basis.FromEuler(MineModel.Yaw(cliff.Face));
             var renderedOut = basis * Vector3.Back;
             var renderedHeader = basis * Vector3.Right;
             Require(outward.Dot(cliff.Face) > .999f && Math.Abs(outward.Dot(cliff.Along)) < .001f,
