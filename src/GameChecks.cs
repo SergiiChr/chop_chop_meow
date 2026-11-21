@@ -481,35 +481,6 @@ public partial class Game {
         await Until(() => view.PlayerAnimation == ActorAction.Pack && sounds.Heard("rustle", soundsBefore), "the idle player packing at the station beside it, rustling through the goods", 4);
         RemoveThings(Hosted, t => t == packer); Drop(Hosted, "berries"); await CloseWithEsc();
     }
-    /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
-    private async Task CheckMineIsMarkedByClickAndEndGoalsShowInPauseMenu() {
-        var home = world.Player;
-        foreach (var ore in Cliff.Ores) {
-            var cliff = Cliff.Of(ore);
-            var spot = cliff.MineSpot;
-            Warp(Hosted, spot + cliff.Face * 3); await Frames(4);
-            await KeyStroke(Key.B);
-            await DoubleClick(Named("build_mine")!);
-            Require(player.Mode.Placing == ThingKind.Mine, "A double click on the mine plan must enter placement mode.");
-            // Off the exact spot, so the click shows the plan snapping to the cliff.
-            await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
-            var mine = world.Things.LastOrDefault(t => t.Kind == ThingKind.Mine);
-            Require(mine != null, $"A click near the {ore} cliff must create a mine.");
-            Require(mine.Pos == spot, $"A click near the {ore} cliff must mark the mine on the cliff's spot.");
-            Require(panel.Visible && view.Selection.Thing == mine.Id, $"A click near the {ore} cliff must select the new mine.");
-            Require(player.Mode.Placing == null, $"A click near the {ore} cliff must end placement mode.");
-            Require(new[] { "Stage 1 · Dig the entrance", "Stage 2 · Shore it up", "Stage 3 · Fit the frame and rails" }.Select((title, i) => panel.FindChild($"stage_{i + 1}", true, false) is Control node && node.TooltipText.StartsWith(title)).All(found => found),
-                "The mine panel must show its three stages.");
-        }
-        Warp(Hosted, home); await CloseWithEsc();
-        await KeyStroke(Key.Escape);
-        Require(HasLabel(menu, "END GOALS"), "The pause menu must have an end goals heading.");
-        Require(HasLabel(menu, "A working iron mine"), "The pause menu must list the iron mine goal.");
-        Require(HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"),
-            "The pause menu must list the daily profit goal.");
-        await KeyStroke(Key.Escape);
-    }
-
     private async Task CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings() {
         var home = Hosted.Player;
         await CloseWithEsc(); Drop(Hosted, "stone_chisel"); Give(Hosted, "stone", 2); Give(Hosted, "wood", 3);
@@ -1676,13 +1647,21 @@ public partial class Game {
         RemoveThings(Hosted, t => t.Kind == ThingKind.Grave); await CloseWithEsc();
         Warp(Hosted, home); await Frames(4);
     }
-    /// <summary>The starter goals alone do not end the game; mines and the profit goal show the ending, and keep playing closes it for good.</summary>
-    private async Task CheckEndGoalsShowEndingOnceAndKeepPlaying() {
+    /// <summary>
+    /// The starter goals alone do not end the game; the pause menu lists the end goals, mines and the profit goal show the
+    /// ending, and keep playing closes it for good.
+    /// </summary>
+    private async Task CheckEndGoalsShowInThePauseMenuAndTheEndingOnce() {
         Achieve(Hosted, new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" });
         await Frames(3);
         Require(!ending.Visible && !view.Paused, "The starter goal chain alone must not end the game.");
-        await CheckMineIsMarkedByClickAndEndGoalsShowInPauseMenu();
-        foreach (var mine in Hosted.Things.Where(t => t.Kind == ThingKind.Mine)) OpenMine(mine);
+        await KeyStroke(Key.Escape);
+        Require(HasLabel(menu, "END GOALS"), "The pause menu must have an end goals heading.");
+        Require(HasLabel(menu, "A working iron mine"), "The pause menu must list the iron mine goal.");
+        Require(HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"),
+            "The pause menu must list the daily profit goal.");
+        await KeyStroke(Key.Escape);
+        foreach (var ore in Cliff.Ores) OpenMine(Hosted.Add(ThingKind.Mine, Cliff.Of(ore).MineSpot));
         Achieve(Hosted, "profit_week");
         await Frames(3);
         Require(ending.Visible && view.Paused, "Reaching the end goals must show the ending and pause the world.");
@@ -2130,7 +2109,7 @@ public partial class Game {
             await TestClean(CheckPileFilterNamesOneResource);
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await TestClean(CheckPackingStationListsGoodsAndTakesBackpackClicks);
-            await TestClean(CheckEndGoalsShowEndingOnceAndKeepPlaying);
+            await TestClean(CheckEndGoalsShowInThePauseMenuAndTheEndingOnce);
             await TestClean(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
             await TestClean(CheckRecipeBoardsMarkAndQueueWithModifiers);
             await TestClean(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);

@@ -549,7 +549,7 @@ public sealed partial class World {
         }
         for (int placed = 0, tried = 0; placed < count && tried < tries; tried++) {
             var p = new Vector2(rng.Next(3, Terrain.Size - 3), rng.Next(3, Terrain.Size - 3));
-            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliff.All.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || Mines.InRock(p, 2.5f) || WolfPatrols.NearDen(p, 5)) continue;
+            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliff.All.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || Mines.InRock(p, 2.5f) || WolfPatrols.InRock(p, 2.5f) || WolfPatrols.NearDen(p, 5)) continue;
             if (rng.NextDouble() > chance(p) || Crowded(p)) continue;
             var t = Add(kind, p, remaining); placed++;
             if (!near.TryGetValue(Cell(p), out var cellList)) near[Cell(p)] = cellList = new();
@@ -574,7 +574,7 @@ public sealed partial class World {
     internal static bool Open(Vector2 p) {
         if (!Terrain.Open(p)) return false;
         foreach (var c in Cliff.All) if (c.DistanceTo(p) < Cliff.Depth) return false;
-        return !Mines.InRock(p);
+        return !Mines.InRock(p) && !WolfPatrols.InRock(p);
     }
     /// <summary>The kinds that are not resources: buildings, yards and what is left on the ground, such as graves.</summary>
     public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null);

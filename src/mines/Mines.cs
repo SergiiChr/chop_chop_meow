@@ -26,23 +26,30 @@ public sealed class Mines(World world) {
     /// <summary>The materials a dug site takes before its frame goes in, as messages name them.</summary>
     private string Materials => materials ??= world.Goods(world.Data.Mine.Materials);
 
-    /// <summary>Whether a point lies within the solid rock skin; the tunnel approach at depth -1.4 stays open.</summary>
+    /// <summary>
+    /// The outcrop's half width at depths behind a mine's spot, from the rock face back into the mountain, narrowing
+    /// evenly between them; the rock drawn and the rock that blocks walking both follow it.
+    /// </summary>
+    internal static readonly (float Depth, float HalfWidth)[] Outcrop = { (-RockFace, 2.55f), (-4.2f, 2.8f), (-6, 3.35f), (-32, 4.6f) };
+
+    /// <summary>Whether a point lies within a cliff's solid rock outcrop; the tunnel approach at depth -1.4 stays open.</summary>
     public static bool InRock(Vector2 p, float margin = 0) {
         foreach (var c in Cliff.All) if (InOutcrop(p - c.MineSpot, c.Face, margin)) return true;
-        // A den is the same outcrop at a smaller size.
-        foreach (var den in WolfPatrols.Dens) if (InOutcrop((p - den.Spot) / Den.Scale, den.Face, margin / Den.Scale)) return true;
         return false;
     }
     /// <summary>Whether a point <paramref name="offset"/> from a mine's spot lies within its outcrop, which faces <paramref name="face"/>.</summary>
-    private static bool InOutcrop(Vector2 offset, Vector2 face, float margin) {
+    internal static bool InOutcrop(Vector2 offset, Vector2 face, float margin) {
         float depth = offset.Dot(face);
         // The margin reaches twice as far out in front, so scattered trees and rocks also stay off the rails and cart.
         if (depth > -RockFace + margin * 2) return false;
         float across = Math.Abs(offset.Dot(new Vector2(-face.Y, face.X)));
-        float width = depth >= -4.2f ? 2.55f + (depth + RockFace) * (2.8f - 2.55f) / (-4.2f + RockFace)
-            : depth >= -6 ? 2.8f + (depth + 4.2f) * (3.35f - 2.8f) / (-6 + 4.2f)
-            : depth >= -32 ? 3.35f + (depth + 6) * (4.6f - 3.35f) / (-32 + 6)
-            : 4.6f;
+        float width = Outcrop[^1].HalfWidth;
+        for (int i = 1; i < Outcrop.Length; i++) {
+            if (depth < Outcrop[i].Depth) continue;
+            var ((near, nearWidth), (far, farWidth)) = (Outcrop[i - 1], Outcrop[i]);
+            width = nearWidth + (depth - near) * (farWidth - nearWidth) / (far - near);
+            break;
+        }
         return across < width + margin;
     }
 

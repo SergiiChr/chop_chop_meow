@@ -19,6 +19,7 @@ public static class MineChecks {
         CheckPlayerDeliversOnlyWhatAMineStillNeeds(data);
         CheckMinersBringOreOutAndStopWhenOutputIsFull(data);
         CheckOnlyAvailableMinersUnload(data);
+        CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(data);
         CheckFullMineUnloadsIntoAPackingStationPackingItsOre(data);
         CheckMiningIsSlowerThanDeposits(data);
         CheckEndGoalsWantAWorkingMineOnEveryOre(data);
@@ -190,6 +191,17 @@ public static class MineChecks {
         var carrier = crew.First(w => w.Bag.Count > 0);
         world.Fire(carrier);
         Require(world.Things.Any(t => t.Kind == ThingKind.Grave && t.Inventory["stone"] == 12), "dismissing a miner must not lose the load they carry");
+    }
+
+    private static void CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(GameData data) {
+        var world = FundedWorld(data);
+        var mine = MarkMine(world); OpenMine(mine);
+        mine.Output!.Add(Mines.Ore(mine), mine.Output.StackSize);
+        var rack = world.Add(ThingKind.Toolstation, mine.Pos + Cliff.Nearest(mine.Pos).Face * 4);
+        rack.Inventory.Add("steel_pick", 1);
+        var miner = Staff(world, mine, JobKind.Mine);
+        Work(world, 20);
+        Require(rack.Inventory["steel_pick"] == 1 && miner.Tool == "", "a miner should not fetch a pickaxe for a full mine with nowhere to unload");
     }
 
     private static void CheckFullMineUnloadsIntoAPackingStationPackingItsOre(GameData data) {

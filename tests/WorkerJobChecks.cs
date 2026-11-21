@@ -29,7 +29,6 @@ public static class WorkerJobChecks {
         CheckALoadOfCoalForSteelIsSharedBetweenInputAndFuel(data);
         CheckSpareSeedWithNoStorageStacksInThePlot(data);
         CheckACrafterLowerInTheListGivesWayAfterOneBatch(data);
-        CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(data);
         CheckAWorkerBesideAStationWalksRoundItToWorkIt(data);
         CheckAWorkerWhoseWorkSpotIsBlockedWorksFromAsNearAsTheyGet(data);
         CheckASaveKeepsTheJobOrderGroupsAndTool(data);
@@ -435,17 +434,6 @@ public static class WorkerJobChecks {
         FirstCarry(world, worker);
         Require(worker.Bag["wood"] > 0 && second.Inventory["planks"] == 4 && !second.Processing,
             $"the worker should finish the batch under way, one round, then haul for the first table: {second.Inventory["planks"]} planks made");
-    }
-
-    private static void CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(GameData data) {
-        var world = FundedWorld(data);
-        var mine = MarkMine(world); OpenMine(mine);
-        mine.Output!.Add(Mines.Ore(mine), mine.Output.StackSize);
-        var rack = world.Add(ThingKind.Toolstation, mine.Pos + Cliff.Nearest(mine.Pos).Face * 4);
-        rack.Inventory.Add("steel_pick", 1);
-        var miner = Staff(world, mine, JobKind.Mine);
-        Work(world, 20);
-        Require(rack.Inventory["steel_pick"] == 1 && miner.Tool == "", "a miner should not fetch a pickaxe for a full mine with nowhere to unload");
     }
 
     /// <summary>

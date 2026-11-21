@@ -16,9 +16,9 @@ internal static class MineModel {
     private static string OreColor(ThingKind ore) => ore switch { ThingKind.Iron => "a35a2e", ThingKind.Coal => "26282b", _ => "b9bbb4" };
 
     /// <summary>The portal, this far behind a mine's spot along its rails; the cart stands at the spot (see <see cref="Cliff.MineSpot"/>).</summary>
-    public const float Door = -2.2f;
+    public const float PortalDepth = -2.2f;
     /// <summary>How far the tunnel runs into the spur before it is black.</summary>
-    public const float Depth = 3;
+    public const float TunnelLength = 3;
 
     /// <summary>
     /// The rock site beside a cliff, built in that cliff's face-aligned mine frame: rock to both sides of and over a cave mouth, so a mine's tunnel can run into it.
@@ -42,7 +42,7 @@ internal static class MineModel {
         prop.Outline = outline;
         // The dug tunnel: unlit floor, walls and roof that darken step by step to black, so the light never reaches its end.
         // It deepens from the portal as the entrance is dug; a spoil patch lies in front.
-        var hole = Pivot(body, new Vector3(0, 0, Door));
+        var hole = Pivot(body, new Vector3(0, 0, PortalDepth));
         Add(hole, MineShape.Tunnel, MineShape.Unlit, Vector3.Zero);
         Add(hole, MineShape.Pad, MineShape.Timber, Vector3.Zero);
         prop.Hole = hole;
@@ -53,7 +53,7 @@ internal static class MineModel {
         for (int i = 0; i < 3; i++) Box(supplies, new Vector3(.12f, .06f, .5f), new Vector3(-1.3f, .03f + i * .06f, -1f), Metal("c2c9c9", .4f, .6f), new Vector3(0, i * 12, 0));
         prop.Supplies = supplies;
         // Rough timber sets: a weathered portal with a plank hood and a warning board, then sets down the tunnel fading into the dark.
-        var frame = Pivot(body, new Vector3(0, 0, Door));
+        var frame = Pivot(body, new Vector3(0, 0, PortalDepth));
         Add(frame, MineShape.Portal, MineShape.Timber, Vector3.Zero);
         Add(frame, MineShape.Supports, MineShape.Unlit, Vector3.Zero);
         // A lantern hangs from the header on a hook; its flame and light burn only while someone works.
@@ -83,7 +83,7 @@ internal static class MineModel {
         prop.Load = load;
         prop.Cart = cart;
         // Lamplight deep inside while someone works underground: a faint warm haze at the dark end.
-        prop.Glow = Box(body, new Vector3(1.4f, 1.7f, .02f), new Vector3(0, .86f, Door - 2.5f), Flat(new Color(1, .55f, .2f, .25f)));
+        prop.Glow = Box(body, new Vector3(1.4f, 1.7f, .02f), new Vector3(0, .86f, PortalDepth - 2.5f), Flat(new Color(1, .55f, .2f, .25f)));
         return prop;
     }
 }

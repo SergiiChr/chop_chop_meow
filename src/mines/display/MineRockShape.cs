@@ -18,9 +18,10 @@ internal static class MineRockShape {
         Vector2 WorldPoint(float x, float z) => spot + (across * x + outwards * z) * scale;
         float Ground(float x, float z) => MountainShape.Surface(WorldPoint(x, z)) / scale;
         float root = -7;
-        while (root > -32 && (Terrain.FromMountains(WorldPoint(-4.6f, root)) > -6 || Terrain.FromMountains(WorldPoint(0, root)) > -6 || Terrain.FromMountains(WorldPoint(4.6f, root)) > -6)) root -= 1;
-        float[] depth = { -Mines.RockFace, -4.2f, -6, root };
-        float[] width = { 2.55f, 2.8f, 3.35f, 4.6f };
+        var (deepest, widest) = Mines.Outcrop[^1];
+        while (root > deepest && (Terrain.FromMountains(WorldPoint(-widest, root)) > -6 || Terrain.FromMountains(WorldPoint(0, root)) > -6 || Terrain.FromMountains(WorldPoint(widest, root)) > -6)) root -= 1;
+        float[] depth = Array.ConvertAll(Mines.Outcrop, station => station.Depth); depth[^1] = root;
+        float[] width = Array.ConvertAll(Mines.Outcrop, station => station.HalfWidth);
         float[] crown = { 3.05f, 3.6f, 4.3f, 0 };
         // More angular stations break up the long straight shoulders while retaining a broad, clear adit.
         Vector2[] section = {

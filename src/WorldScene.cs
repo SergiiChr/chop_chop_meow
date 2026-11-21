@@ -32,7 +32,7 @@ public partial class WorldView {
         var cave = Pivot(parent, new Vector3(den.Spot.X, 0, den.Spot.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(den.Face.X, den.Face.Y)), 0));
         cave.Scale = Vector3.One * Den.Scale;
         Add(cave, MineRockShape.Mesh(rock, new[] { "5b5a52", "66645a", "4f4f48" }, Den.Scale), MineRockShape.Rock, Vector3.Zero);
-        Add(Pivot(cave, new Vector3(0, 0, MineModel.Door)), MineShape.Tunnel, MineShape.Unlit, Vector3.Zero);
+        Add(Pivot(cave, new Vector3(0, 0, MineModel.PortalDepth)), MineShape.Tunnel, MineShape.Unlit, Vector3.Zero);
     }
 
     /// <summary>A jagged wall of faceted columns with ore seams on the face and scree at its foot.</summary>

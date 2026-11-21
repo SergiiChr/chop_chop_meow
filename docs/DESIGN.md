@@ -510,7 +510,7 @@ In multiplayer it is available only when everyone is downed; a living player pre
 
 The end goals:
 
-- a working mine on every ore in `Cliff.All`;
+- a working mine on every ore in `Cliff.Ores`;
 - `Goals.ProfitDays` consecutive days of at least `Goals.DailyProfit` profit.
 
 `SaveState.DayRevenue` collects returned sale coins.
@@ -585,7 +585,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 `Travel` swerves round anything a route's straight leg clips instead of walking through it, and after a search finds no way it waits `RouteRetrySeconds` before the next.
 
 - **Dens.** `WolfPatrols.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
-  The outcrop is solid like a mine's (`Mines.InRock`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
+  The outcrop is solid like a mine's (`WolfPatrols.InRock`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
   From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
   After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`).
 - **Strength.** A wolf's health, bite and pace are `GameData.WolfHealth`, `WolfBite` and `WolfTrot`, the same every night: it stands two blows of a steel axe and falls to the third or fourth, and its fourth bite brings a healthy player to half health.

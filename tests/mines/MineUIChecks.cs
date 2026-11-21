@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
@@ -7,10 +8,34 @@ using static SetupSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>The UI checks of mines: digging a marked mine's entrance by hand and its page through the stages.</summary>
+    /// <summary>The UI checks of mines: marking one at every ore, digging a marked mine's entrance by hand and its page through the stages.</summary>
     private async Task RunMineUIChecks() {
+        await TestClean(CheckAMineIsMarkedAtEveryOresCliffByAClick);
         await TestClean(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
         await TestClean(CheckMinePageFollowsTheMineThroughItsStages);
+    }
+
+    /// <summary>Marks a mine on every ore through the build plan and a ground click, which snaps it to the cliff and opens its page on its three stages.</summary>
+    private async Task CheckAMineIsMarkedAtEveryOresCliffByAClick() {
+        var home = Hosted.Player;
+        foreach (var ore in Cliff.Ores) {
+            var cliff = Cliff.Of(ore);
+            var spot = cliff.MineSpot;
+            Warp(Hosted, spot + cliff.Face * 3); await Frames(4);
+            await KeyStroke(Key.B);
+            await DoubleClick(Named("build_mine")!);
+            Require(player.Mode.Placing == ThingKind.Mine, "A double click on the mine plan must enter placement mode.");
+            // Off the exact spot, so the click shows the plan snapping to the cliff.
+            await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
+            var mine = world.Things.LastOrDefault(t => t.Kind == ThingKind.Mine);
+            Require(mine != null, $"A click near the {ore} cliff must create a mine.");
+            Require(mine.Pos == spot, $"A click near the {ore} cliff must mark the mine on the cliff's spot.");
+            Require(panel.Visible && view.Selection.Thing == mine.Id, $"A click near the {ore} cliff must select the new mine.");
+            Require(player.Mode.Placing == null, $"A click near the {ore} cliff must end placement mode.");
+            Require(new[] { "Stage 1 · Dig the entrance", "Stage 2 · Shore it up", "Stage 3 · Fit the frame and rails" }.Select((title, i) => panel.FindChild($"stage_{i + 1}", true, false) is Control node && node.TooltipText.StartsWith(title)).All(found => found),
+                "The mine panel must show its three stages.");
+        }
+        RemoveThings(Hosted, t => t.Kind == ThingKind.Mine); Warp(Hosted, home); await CloseWithEsc(); await Frames(4);
     }
 
     /// <summary>
