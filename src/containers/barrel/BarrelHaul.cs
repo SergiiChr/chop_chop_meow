@@ -3,8 +3,15 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A water haul carries liquid in the worker's tool slot throughout the trip.</summary>
-internal sealed class BarrelJobs(World world, Barrels barrels) {
+/// <summary>
+/// A placed barrel's or a cabin's roof barrel's part of the Haul job: the water comes in the worker's tool slot throughout
+/// the trip, from the lake or a full barrel, rather than as a carry in hand.
+/// </summary>
+internal sealed class BarrelHaul : PlaceHaul {
+    private readonly Barrels barrels;
+
+    public BarrelHaul(World world, Barrels barrels) : base(world) => this.barrels = barrels;
+
     public static readonly Vector2 LadderApproach = new(1.94f, .77f);
     public static readonly Vector2 SpoutApproach = new(0, .6f);
     public const float ClimbSeconds = 3.3f, PourSeconds = 2, FillSeconds = 1.35f;
@@ -14,8 +21,15 @@ internal sealed class BarrelJobs(World world, Barrels barrels) {
     public static bool OnLadderOrRoof(Worker w, Thing target) => target.Kind == ThingKind.Hut && w.WaterTarget == target.Id
         && w.WaterAction is WorkerWaterAction.ClimbUp or WorkerWaterAction.Pour or WorkerWaterAction.ClimbDown;
 
+    /// <summary>Water is no carry in hand: <see cref="Haul"/> brings it once no other place of the job has a carry.</summary>
+    public override void Carries(Worker w, Thing place, ref Carry best) { }
+
+    public override string Wait(Thing place) => place.Kind == ThingKind.Hut && Barrel.In(place.Inventory) == null ? "Needs a steel barrel in the cabin"
+        : Barrels.Room(place) == 0 ? "The barrel is full" : base.Wait(place);
+
+    /// <summary>Fills the barrels of a haul job with water, carrying on a walk already started.</summary>
     internal bool Haul(Worker w, JobEntry job, float dt) {
-        if (w.WaterWalk is { } walk && Vessel(w.Tool) && World.Covers(job, walk.Target) && world.Find(walk.Target.Id) == walk.Target
+        if (w.WaterWalk is { } walk && Vessel(w.Tool) && Hauling.Covers(job, walk.Target) && world.Find(walk.Target.Id) == walk.Target
             && Barrels.Room(walk.Target) > 0 && ValidWalk(w, walk.Source)) {
             return Follow(w, walk.Target, walk.Source, walk.Stand, dt);
         }

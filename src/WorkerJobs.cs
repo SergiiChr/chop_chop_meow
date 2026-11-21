@@ -42,7 +42,7 @@ public sealed partial class World {
 
     /// <summary>Does one of a worker's jobs, or a haul group, for a tick and tells whether there was anything to do; with nothing, the status says what the job lacks.</summary>
     private bool Do(Worker w, JobEntry entry, float dt) {
-        if (entry is HaulGroup group) return Haul(w, group, dt);
+        if (entry is HaulGroup group) return hauling.Haul(w, group, dt);
         var duty = (Duty)entry;
         var place = Find(duty.Thing);
         // Only a gatherer goes on without their place: on to the next spot of the same kind.
@@ -63,7 +63,7 @@ public sealed partial class World {
     /// <summary>Whether one of a worker's jobs uses a kind of tool: building or working a mine, or gathering what needs it or goes faster with it.</summary>
     private bool JobUses(Worker w, string kind) {
         foreach (var d in w.Duties) {
-            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind is ThingKind.Hut or ThingKind.Barrel && BarrelJobs.Vessel(w.Tool)) return true;
+            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind is ThingKind.Hut or ThingKind.Barrel && BarrelHaul.Vessel(w.Tool)) return true;
             if (Array.IndexOf(Def(d.Job).Tools, kind) >= 0) return true;
             // A woodcutter's job covers trees and stumps, so the spot it is on now counts as well as the kind it was given.
             if (d.Job == JobKind.Gather && (Uses(d.Kind) || Uses(Find(d.Thing)?.Kind))) return true;
@@ -112,7 +112,7 @@ public sealed partial class World {
     /// A vessel's room is the liters its liquid has room for.
     /// </summary>
     /// <param name="fueling">The load was fetched for the fuel slot, so it goes there even when the recipe also takes the item as an input.</param>
-    private (Inventory Box, int Room)? Intake(Thing dest, string item, bool fueling) {
+    internal (Inventory Box, int Room)? Intake(Thing dest, string item, bool fueling) {
         int room;
         if (IsStation(dest.Kind)) {
             if (!fueling && (room = InputRoom(dest, item)) > 0) return (dest.Inventory, room);
@@ -160,7 +160,7 @@ public sealed partial class World {
     /// Whether a worker's hands are clear of a tool the job in hand has no use for.
     /// They walk it back to a tool station first; with no station to take it they keep it and carry on.
     /// </summary>
-    private bool HandsFree(Worker w, float dt) {
+    internal bool HandsFree(Worker w, float dt) {
         w.Missing = "";
         return w.Tool == "" || ReturnTool(w, dt);
     }
@@ -180,88 +180,11 @@ public sealed partial class World {
     }
 
     /// <summary>How many pieces one gather cycle yields, for the player and a worker alike.</summary>
-    private static int GatherYield(ThingKind kind) => kind == ThingKind.WolfCorpse ? 2 : 4;
-
-    /// <summary>
-    /// Gathers at a spot at the player's pace until the worker's hands are full, going on to the next known spot of the job when one runs out.
-    /// Full hands, or no spot left, send the load off.
-    /// </summary>
-    private bool Gather(Worker w, Duty duty, Thing? spot, float dt) {
-        if (spot == null || spot.Remaining <= 0) {
-            if (duty.Kind is not ThingKind gone || !NextSpot(w, duty.Thing, gone, spot?.Pos ?? w.Pos)) return false;
-            spot = Find(duty.Thing)!;
-        }
-        string? blocked = GatherBlock(spot, true);
-        if (blocked != null) { w.Status = blocked; return false; }
-        string item = ResourceItem(spot);
-        if (DepositFor(item, spot.Pos) == null) { w.Status = "Needs an accepting storage chest"; return false; }
-        // A gatherer also fetches a tool that only speeds the work up, such as a rake, while a tool station has one.
-        var rule = GatherRules.Of(spot.Kind);
-        string? need = rule?.Needs ?? (rule?.Helps is string helping && HasTool(w, helping) ? helping : null);
-        if (need == null) { if (!HandsFree(w, dt)) return true; } else
-            switch (Equip(w, need, spot, dt)) {
-                case Kit.Busy: return true;
-                // With no tool to be had, the nearest spot of the job that needs none, or one that is to be had, is worked instead.
-                // A wrong tool with no room to go back to stays in hand, and the job waits at its spot.
-                case Kit.Lacking: return w.Tool == "" && OtherSpot(w, spot);
-            }
-        w.Status = Phrase("Gathering ", Data.Name(item));
-        if (!Walk(w, spot.Pos, dt)) return true;
-        w.WorkState = WorkerWorkState.Gathering; w.Exhausted = null;
-        string? tool = w.Tool == "" ? null : w.Tool;
-        if (spot.IsDug) {
-            // What is dug up comes out whole; what does not fit in hand waits in the hole for the next load.
-            spot.Progress += dt * Speed(tool);
-            if (!DugOut(spot)) return true;
-            Unearth(spot, w.Bag);
-        } else {
-            w.Timer += dt;
-            if (!spot.IsLoose && w.Timer < GatherTime(spot.Kind, tool)) return true;
-            w.Timer = 0;
-            int took = w.Bag.Add(item, spot.IsLoose ? spot.Remaining : Math.Min(spot.Remaining, GatherYield(spot.Kind))); spot.Remaining -= took;
-            if (took > 0) Got(item);
-            Chip(spot, tool);
-        }
-        w.Loading = w.Bag.Room(item) > 0;
-        if (spot.Remaining > 0) return true;
-        // Whoever fells a tree digs its stump up next while a shovel is to be had, and otherwise goes on to the next tree.
-        if (spot.Kind == ThingKind.Tree) {
-            var stump = Fell(spot, w.Pos);
-            if (CanWork(w, stump.Kind)) { MoveTo(w, spot.Id, stump); return true; }
-        }
-        if (spot.IsLoose) S.Things.Remove(spot);
-        if (!NextSpot(w, spot.Id, spot.Kind, spot.Pos)) w.Loading = false;
-        return true;
-    }
-
-    /// <summary>A crafter works a station that someone has to stand at, while it holds a batch or is on one.</summary>
-    private bool Craft(Worker w, Thing station, float dt) {
-        if (!Data.Recipes.TryGetValue(station.Recipe, out var recipe)) { w.Status = "Nothing queued or marked to make"; return false; }
-        if (!Worked(station)) { w.Status = "Waiting for the next load"; return false; }
-        if (station.Tools != null && recipe.Tool != "" && BenchTool(station, recipe.Tool, recipe.Tier) == null) {
-            w.Status = Phrase("Needs ", A(Data.ToolName(recipe.Tool, recipe.Tier)), " in the ", Lower(Data.Name(station.Kind)));
-            return false;
-        }
-        if (Stalled(station, recipe)) { w.Status = "Output slot is full"; return false; }
-        if (!station.Processing && !Stocked(station)) {
-            w.Status = Lacks(station, recipe) is string lack ? Phrase("Needs ", Lower(Data.Name(lack)), " at the ", Lower(Data.Name(station.Kind))) : "Waiting for the next load";
-            return false;
-        }
-        if (!HandsFree(w, dt)) return true;
-        w.Status = "Working at station";
-        if (Walk(w, station.Pos, dt)) w.WorkState = WorkerWorkState.Hammering;
-        return true;
-    }
+    internal static int GatherYield(ThingKind kind) => kind == ThingKind.WolfCorpse ? 2 : 4;
 
     /// <summary>Whether a station's finished batch waits for room in its output slot, so working it does nothing.</summary>
-    private static bool Stalled(Thing station, RecipeDef recipe) =>
+    internal static bool Stalled(Thing station, RecipeDef recipe) =>
         station.Processing && station.Progress >= recipe.Seconds && station.Inventory.SlotRoom(recipe.Output) < recipe.Amount;
-
-    /// <summary>The first input a station is short of for a batch, or the fuel it lacks, named for a status; null when something else keeps it from starting.</summary>
-    private string? Lacks(Thing station, RecipeDef recipe) {
-        foreach (var (input, needed) in recipe.Inputs) if (station.Inventory[input] < needed) return input;
-        return recipe.Fuels.Count > 0 && FuelOf(station) == null ? recipe.Fuels[0] : null;
-    }
 
     /// <summary>
     /// One worker pumps a reinforced furnace's bellows while it smelts or holds a batch to smelt.

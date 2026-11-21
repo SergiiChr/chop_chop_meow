@@ -88,14 +88,18 @@ Simulation and data:
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/Packing.cs` | Packing stations |
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
-| `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the gather, craft, bellows and fire jobs |
-| `src/Hauling.cs` | The four haul rules, what each kind of place offers a hauler, and the carry in hand |
+| `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the bellows and fire jobs |
+| `src/jobs/hauling/Hauling.cs`, `src/jobs/hauling/Carry.cs` | The Haul job: the best carry across a haul job's places, the carry in hand and what a hauler says |
+| `src/jobs/hauling/PlaceHaul.cs` | The part of the Haul job each kind of place extends, and the four haul rules its carries come under |
+| `src/stations/StationHaul.cs`, `src/farm/FarmHaul.cs`, `src/mines/MineHaul.cs`, `src/packing/PackerHaul.cs`, `src/storage/StoreHaul.cs` | What a crafting station, a farm plot, a mine site, a packing station, and a chest or placed crate offer a hauler |
+| `src/jobs/gathering/Gathering.cs`, `src/water/WaterGathering.cs` | The Gather job at resource spots, and the lake's version of it, which fills bottles |
+| `src/jobs/crafting/Crafting.cs`, `src/packing/PackCraft.cs` | The Craft job at a station, and the packing station's version of it, which packs crates |
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
 | `src/containers/ContainerItem.cs` | The base item shared by every fill of a steel bucket or barrel |
 | `src/containers/barrel/Barrels.cs`, `src/containers/barrel/model/Barrel.cs` | Portable and placed steel barrels, with a fill encoded in each portable barrel |
-| `src/containers/barrel/model/Bucket.cs`, `src/containers/barrel/BarrelJobs.cs` | Steel buckets and worker water hauling |
+| `src/containers/barrel/model/Bucket.cs`, `src/containers/barrel/BarrelHaul.cs` | Steel buckets, and a barrel's part of the Haul job: water carried in the worker's tool slot |
 | `src/containers/barrel/model/WorkerWaterAction.cs` | The haul actions sent to the window for rendering |
 | `src/containers/barrel/BedtimeWater.cs` | Cabin water at bedtime and its effect on dawn's needs |
 | `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
@@ -516,7 +520,7 @@ a vessel put into a station whose recipe takes its liquid pours every liter it h
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
 Loading a station by hand and a worker's delivery pass it what the input slot has left (`Inventory.SlotRoom`).
-Station haulers fetch a liquid input in the fullest bottles storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
+Station haulers fetch a liquid input in the fullest bottles storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`StationHaul.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
 No hand recipe takes a liquid, which `GameData` checks.
 
 #### Steel barrels and buckets
@@ -1065,7 +1069,7 @@ Its inventory takes only that good and empty crates; `Thing.Output` holds the cr
 While worked like an anvil, it moves one item every `PackSeconds` into that crate, opening an empty crate for the first.
 A full crate, or one of another good after the choice changes, waits in the output.
 
-- Haul carries that crate to `DepositFor` and the station's leftovers to storage, and brings the good and empty crates up to a stack of each (`World.PackerCarries`); a batch is one crate.
+- Haul carries that crate to `DepositFor` and the station's leftovers to storage, and brings the good and empty crates up to a stack of each (`PackerHaul`); a batch is one crate.
 - `DepositFor` counts the station as storage for its good, ranked with explicit filters, while a stack's delivery still leaves a slot for empty crates (`World.PackerTakes`).
 - A crate packed full is a round of the Craft job.
 
@@ -1086,6 +1090,8 @@ Workers are tracked individually.
 
 The kinds of work are `JobKind`, each with an id in saves and commands (`JobKinds.Id`), and one table holds each job's title, hint, whether a round of it is a unit of the place's work, the tools it takes and what it does (`World.Def`, `JobDef`).
 A place offers some of them (`World.Jobs`), such as Craft and Haul at a crafting bench.
+A job that several kinds of place offer is a class in `src/jobs/` that `World` holds: `Hauling`, `Gathering` and `Crafting`.
+A place with its own way of doing it extends it in its feature's folder: every place that offers Haul has a `PlaceHaul`, the lake gathers through `WaterGathering` and a packing station is worked through `PackCraft`.
 
 - Haul at a chest or placed crate carries out and fills it by its filters ([hauling](#hauling)).
 - Stock brings tools from storage to a tool station.
@@ -1116,8 +1122,8 @@ On a worker's page `JobList` draws the list and turns a row dragged by its `JobG
 
 #### Hauling
 
-A haul job carries one load at a time (`World.Haul`).
-Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, `FarmCarries`, `MineCarries`, `StoreCarries`), and the best is the hauler's plan (`Worker.Plan`, a `Carry`) until the load is picked up:
+A haul job carries one load at a time (`Hauling.Haul`).
+Each kind of place offers its carries through its own `PlaceHaul` (`StationHaul`, `PackerHaul`, `FarmHaul`, `MineHaul`, `StoreHaul`, and `BarrelHaul`, which offers none), and the best is the hauler's plan (`Worker.Plan`, a `Carry`) until the load is picked up:
 
 1. an input or the fuel slot holding less than one batch, and fuel the recipe does not burn, which leaves the slot;
 2. an output that is full, or anything another recipe left in the slots;
@@ -1128,7 +1134,7 @@ Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold
 A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
 Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
 
-A chest's or placed crate's hauler carries out what its output filter lets go to the nearest place asking for it (`World.AskerFor`), then fills it with what its input filter names (`World.FillSource`); every such carry comes under the first rule.
+A chest's or placed crate's hauler carries out what its output filter lets go to the nearest place asking for it (`World.AskerFor`), then fills it with what its input filter names (`StoreHaul.FillSource`); every such carry comes under the first rule.
 Storage that asks for an item never passes it to other storage asking for it, nor takes it from one, so two never trade it back and forth.
 
 #### Gathering and the bellows
@@ -1243,7 +1249,7 @@ The player harvests through `World.Gather` and assigned workers through `World.R
 The yield goes into the plot's `Thing.Output`; nothing moves seed back into the plot's input slots on its own.
 
 - A worker on Farm harvests.
-- A worker on Haul keeps the input slots at one sowing, from the plot's own output first and then from storage, and carries out the rest (`World.FarmCarries`).
+- A worker on Haul keeps the input slots at one sowing, from the plot's own output first and then from storage, and carries out the rest (`FarmHaul`).
 
 ## Intro film
 

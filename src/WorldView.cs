@@ -541,7 +541,7 @@ public partial class WorldView : Node3D {
             bool sameAction = state.Action == work;
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
-            string? vessel = BarrelJobs.Vessel(worker.Tool) ? worker.Tool : null;
+            string? vessel = BarrelHaul.Vessel(worker.Tool) ? worker.Tool : null;
             var waterTarget = worker.WaterAction != WorkerWaterAction.None ? World.Find(worker.WaterTarget) : null;
             if (waterTarget != null && vessel != null) {
                 var point = waterTarget.Kind switch {

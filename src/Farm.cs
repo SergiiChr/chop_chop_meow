@@ -43,7 +43,7 @@ public sealed partial class World {
     }
 
     /// <summary>How many more of an item a plot's input slots take: what one sowing still lacks.</summary>
-    private int SowRoom(Thing farm, string item) => Data.Farm.Sow.TryGetValue(item, out int sowing) ? Math.Max(0, sowing - farm.Inventory[item]) : 0;
+    internal int SowRoom(Thing farm, string item) => Data.Farm.Sow.TryGetValue(item, out int sowing) ? Math.Max(0, sowing - farm.Inventory[item]) : 0;
 
     /// <summary>Whether a plot has room for a whole harvest.</summary>
     private bool YieldFits(Thing farm) {

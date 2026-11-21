@@ -317,7 +317,8 @@ public sealed partial class World {
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
-        barrels = new Barrels(this); barrelJobs = new BarrelJobs(this, barrels); bedtimeWater = new BedtimeWater(this);
+        barrels = new Barrels(this); barrelHaul = new BarrelHaul(this, barrels); bedtimeWater = new BedtimeWater(this);
+        hauling = new Hauling(this, barrelHaul); gathering = new Gathering(this); waterGathering = new WaterGathering(this); crafting = new Crafting(this); packCraft = new PackCraft(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
     }
@@ -328,7 +329,11 @@ public sealed partial class World {
     /// <summary>Putting buildings, yards and crates up and taking buildings down.</summary>
     public Construction Construction { get; }
     private readonly Barrels barrels;
-    private readonly BarrelJobs barrelJobs;
+    private readonly BarrelHaul barrelHaul;
+    // The jobs several kinds of place offer, and the places' own versions of them: the lake's gathering and the packing station's crafting.
+    private readonly Hauling hauling;
+    private readonly Gathering gathering, waterGathering;
+    private readonly Crafting crafting, packCraft;
     private readonly BedtimeWater bedtimeWater;
     /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
     public GravelPaths GravelPaths { get; }
@@ -681,7 +686,7 @@ public sealed partial class World {
     public static string ResourceItem(Thing t) => ResourceItem(t.Kind);
     public static string ResourceItem(ThingKind kind) => GatherRules.Of(kind)?.Item ?? kind.Id();
     /// <summary>Seconds to gather one piece of a kind with a tool, or by hand with none.</summary>
-    private float GatherTime(ThingKind kind, string? tool) => Data.GatherSeconds / Speed(tool) * (tool == null ? GatherRules.Of(kind)?.ByHand ?? 1 : 1);
+    internal float GatherTime(ThingKind kind, string? tool) => Data.GatherSeconds / Speed(tool) * (tool == null ? GatherRules.Of(kind)?.ByHand ?? 1 : 1);
     public void Gather(Thing t, float dt) {
         // A loose piece is a single pick-up; anything else the host works on for as long as the player holds on to it.
         if (Busy()) { ResetGather(); return; }
@@ -951,7 +956,7 @@ public sealed partial class World {
         return cost;
     }
     /// <summary>Whether the recipe a station is on or the one it keeps to takes an item as an input.</summary>
-    private bool Pending(Thing t, string item) => BatchCost(Selected(t)).ContainsKey(item) || BatchCost(t.Keep).ContainsKey(item);
+    internal bool Pending(Thing t, string item) => BatchCost(Selected(t)).ContainsKey(item) || BatchCost(t.Keep).ContainsKey(item);
     /// <summary>
     /// Whether a station's slots hold something left by another recipe: neither an input of the recipe it is on or keeps to, nor what its recipe makes.
     /// It starts no batch until a hauler or a player takes that out.
@@ -964,7 +969,7 @@ public sealed partial class World {
     /// <summary>Whether a station takes an item from the player: an input of the recipe it is on or keeps to, a vessel holding a liquid input, or a fuel it burns.</summary>
     public bool Takes(Thing t, string item) => Pending(t, item) || PoursInto(t, t.Inventory, item) != null || t.Burner != null && FuelFits(t, item);
     /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it, with nothing left by another recipe in its slots.</summary>
-    private bool Stocked(Thing t) => !HeldAt(t) && t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null) && !(Data.Recipes.TryGetValue(t.Recipe, out var r) && Blocked(t, r));
+    internal bool Stocked(Thing t) => !HeldAt(t) && t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null) && !(Data.Recipes.TryGetValue(t.Recipe, out var r) && Blocked(t, r));
     /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
     public void LoadBatch(Thing t, int batches = 1) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
@@ -1232,7 +1237,7 @@ public sealed partial class World {
         box == t.Output ? "Things only come out of here." :
         box == t.Inventory ? HoldBlock(t, item) : null;
     /// <summary>Whether a fuel slot takes an item now: a fuel that fits, and the same kind as what it holds.</summary>
-    private bool FuelTakes(Thing t, string item) => FuelFits(t, item) && (t.Burner?.First() is not string held || held == item);
+    internal bool FuelTakes(Thing t, string item) => FuelFits(t, item) && (t.Burner?.First() is not string held || held == item);
     /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
     public string? FuelBlock(Thing t, string item) =>
         !FuelFits(t, item) ? (Data.Recipes.TryGetValue(t.Recipe, out var r) ? $"{r.Name} burns {FuelWords(r.Fuels)}." : "The fuel slot only takes fuel.") :
@@ -1704,7 +1709,7 @@ public sealed partial class World {
         pile.Inventory.Add("fertilizer", 1); Got("fertilizer");
     }
     // Only chests, piles and placed crates take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
-    private static readonly ThingKind[] Stores = { ThingKind.Chest, ThingKind.Pile, ThingKind.Crate };
+    internal static readonly ThingKind[] Stores = { ThingKind.Chest, ThingKind.Pile, ThingKind.Crate };
     // Trading posts also take deliveries, of the crates they ask for, and packing stations of the good they pack.
     private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Crate, ThingKind.Signpost, ThingKind.Packer };
     /// <summary>Where a load of an item goes: the nearest place asking for it, else the nearest storage with no filter, and compost last for food.</summary>
@@ -1713,7 +1718,7 @@ public sealed partial class World {
     /// The nearest place asking for an item that a chest's or crate's hauler carries out to, or null.
     /// Storage with no filter does not count, and other storage only while this one does not ask for the item too, so two that ask never pass it back and forth.
     /// </summary>
-    private Thing? AskerFor(string item, Thing store) => Deposit(item, store.Pos, store.Id, store);
+    internal Thing? AskerFor(string item, Thing store) => Deposit(item, store.Pos, store.Id, store);
     /// <param name="outOf">The storage a chest's or crate's hauler carries the item out of, for <see cref="AskerFor"/>; null for any other load.</param>
     private Thing? Deposit(string item, Vector2 origin, int exclude, Thing? outOf) {
         Thing? best = null; int bestRank = 0; float bestDistance = 0;
@@ -1746,7 +1751,7 @@ public sealed partial class World {
     /// <summary>
     /// Whether a packing station takes a delivery of an item: only the good it packs, and only while a delivery of up to a stack still leaves a slot for empty crates.
     /// </summary>
-    private static bool PackerTakes(Thing packer, string item) =>
+    internal static bool PackerTakes(Thing packer, string item) =>
         item == packer.Packs && packer.Inventory[item] <= (packer.Inventory.Slots - 2) * packer.Inventory.StackOf(item);
     /// <summary>The nearest chest, pile or placed crate that gives out an item, or station holding it as a finished good, or null.</summary>
     public Thing? SourceFor(string item, Vector2 origin, int exclude = 0) {
@@ -1909,7 +1914,7 @@ public sealed partial class World {
     }
     private void WorkerTick(Worker w, float dt) {
         w.WorkState = WorkerWorkState.Idle;
-        if (barrelJobs.FinishAction(w, dt)) return;
+        if (barrelHaul.FinishAction(w, dt)) return;
         if (w.Away > 0) {
             w.Away = Math.Max(0, w.Away - dt); w.Status = Phrase("Fetching village prices · back in ", Number(w.Away), "s");
             // Like a cart, the runner walks a little way down the valley and fades from view rather than pathing around the woods.
@@ -2001,7 +2006,7 @@ public sealed partial class World {
     /// Moves a gatherer whose spot is spent or gone to the nearest spot of the same job that any player has seen, even one now under fog, and tells whether there was one.
     /// With none known they say so once, and their status says it.
     /// </summary>
-    private bool NextSpot(Worker w, int spent, ThingKind kind, Vector2 from) {
+    internal bool NextSpot(Worker w, int spent, ThingKind kind, Vector2 from) {
         if (NearestSpot(w, kind, from) is Thing next) { MoveTo(w, spent, next); return true; }
         if (w.Exhausted != kind) { w.Exhausted = kind; Say($"{w.Name} knows no other {Lower(Data.Name(kind))} to gather."); }
         w.Status = Phrase("No other known ", Lower(Data.Name(kind)));
@@ -2025,9 +2030,9 @@ public sealed partial class World {
         return next ?? loose;
     }
     /// <summary>Whether a worker can gather a kind of resource: it needs no tool, or one they have in hand or can take from a tool station.</summary>
-    private bool CanWork(Worker w, ThingKind kind) => GatherRules.Of(kind)?.Needs is not string tool || HasTool(w, tool);
+    internal bool CanWork(Worker w, ThingKind kind) => GatherRules.Of(kind)?.Needs is not string tool || HasTool(w, tool);
     /// <summary>Moves a worker's duties on a spent spot to the next one.</summary>
-    private static void MoveTo(Worker w, int spent, Thing next) {
+    internal static void MoveTo(Worker w, int spent, Thing next) {
         foreach (var duty in w.Duties) if (duty.Thing == spent) duty.Thing = next.Id;
         w.Assignment = next.Id; w.Timer = 0; w.Exhausted = null;
     }
@@ -2053,10 +2058,10 @@ public sealed partial class World {
     /// <summary>The rack's best free tool of a kind when its filter lets it out, or null.</summary>
     private string? ToolGivenOut(Thing station, string kind) {
         var items = station.Inventory;
-        if (kind != BarrelJobs.WaterTool) return BestTool(kind, items, tier: 0, requireFree: true) is string best && items.AllowsWithdrawal(best) ? best : null;
+        if (kind != BarrelHaul.WaterTool) return BestTool(kind, items, tier: 0, requireFree: true) is string best && items.AllowsWithdrawal(best) ? best : null;
         string? bottle = null;
         foreach (var (item, _) in items.Items) {
-            if (!BarrelJobs.Vessel(item) || !items.AllowsWithdrawal(item) || items.Free(item) == 0) continue;
+            if (!BarrelHaul.Vessel(item) || !items.AllowsWithdrawal(item) || items.Free(item) == 0) continue;
             if (Bucket.Is(item)) return item;
             bottle ??= item;
         }
@@ -2068,7 +2073,7 @@ public sealed partial class World {
             stationTools.Clear();
             foreach (var t in S.Things.Of(ThingKind.Toolstation))
                 foreach (var (item, _) in t.Inventory.Items) {
-                    string role = BarrelJobs.Vessel(item) ? BarrelJobs.WaterTool : ToolKind(item);
+                    string role = BarrelHaul.Vessel(item) ? BarrelHaul.WaterTool : ToolKind(item);
                     if (role != "" && !stationTools.Contains(role) && ToolGivenOut(t, role) != null) stationTools.Add(role);
                 }
             toolsChanged = false;
@@ -2091,7 +2096,7 @@ public sealed partial class World {
             return;
         }
         w.Missing = "";
-        string tool = kind == BarrelJobs.WaterTool ? Lower(Data.Name(item)) : kind;
+        string tool = kind == BarrelHaul.WaterTool ? Lower(Data.Name(item)) : kind;
         w.Status = Phrase("Fetching ", A(tool), " from the tool station");
         if (!Walk(w, station.Pos, dt)) return;
         station.Inventory.TransferTo(w.ToolSlot, item, 1, true);

@@ -482,7 +482,7 @@ public partial class WorldView {
             review.AddChild(cabin.Root);
             cabin.RoofBarrel.Show();
         }
-        const float climb = BarrelJobs.ClimbSeconds, pour = BarrelJobs.PourSeconds, cycle = climb * 2 + pour + .5f;
+        const float climb = BarrelHaul.ClimbSeconds, pour = BarrelHaul.PourSeconds, cycle = climb * 2 + pour + .5f;
         float time = Elapsed % cycle;
         var action = time < climb ? WorkerWaterAction.ClimbUp : time < climb + pour ? WorkerWaterAction.Pour : WorkerWaterAction.ClimbDown;
         float progress = action switch {

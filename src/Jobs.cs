@@ -92,10 +92,10 @@ public static class JobKinds {
 public sealed partial class World {
     private static readonly JobDef[] JobDefs = ByKind(
         new(JobKind.Gather, "Gather", "Gathers and carries to storage.", false, [],
-            static (world, w, d, place, dt) => place?.Kind == ThingKind.Water ? world.WaterWork(w, place, dt) : world.Gather(w, d, place, dt)),
-        new(JobKind.Haul, "Haul", "Brings ingredients and fuel and carries what is made to storage.", false, [], static (world, w, d, _, dt) => world.Haul(w, d, dt)),
+            static (world, w, d, place, dt) => (place?.Kind == ThingKind.Water ? world.waterGathering : world.gathering).Work(w, d, place, dt)),
+        new(JobKind.Haul, "Haul", "Brings ingredients and fuel and carries what is made to storage.", false, [], static (world, w, d, _, dt) => world.hauling.Haul(w, d, dt)),
         new(JobKind.Craft, "Craft", "Works the station; it only makes progress while someone works it.", true, [],
-            static (world, w, _, place, dt) => place!.Kind == ThingKind.Packer ? world.PackWork(w, place, dt) : world.Craft(w, place, dt)),
+            static (world, w, _, place, dt) => (place!.Kind == ThingKind.Packer ? world.packCraft : world.crafting).Work(w, place, dt)),
         new(JobKind.Bellows, "Bellows", "Keeps the fire hot. Only one worker pumps at a time.", true, [], static (world, w, _, place, dt) => world.Pump(w, place!, dt)),
         new(JobKind.Farm, "Farm", "Harvests the ripe wheat.", true, [], static (world, w, _, place, dt) => world.Reap(w, place!, dt)),
         new(JobKind.Build, "Build", "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.", true, ["pickaxe", "hammer"], static (world, w, _, place, dt) => world.Mines.Build(w, place!, dt)),

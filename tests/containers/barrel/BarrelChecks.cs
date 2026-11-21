@@ -344,7 +344,7 @@ internal static class BarrelChecks {
         rack.Inventory.Add("steel_axe", 1);
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = Bucket.AtFill(10);
-        Require(world.CanStand(barrel.Pos + cliff.Face * .5f) && !world.CanStand(barrel.Pos + BarrelJobs.SpoutApproach),
+        Require(world.CanStand(barrel.Pos + cliff.Face * .5f) && !world.CanStand(barrel.Pos + BarrelHaul.SpoutApproach),
             "the barrel is on open ground with its pour point against the cliff");
         world.SetDuty(worker, barrel, JobKind.Haul, true);
         world.SetDuty(worker, tree, JobKind.Gather, true);
@@ -358,7 +358,7 @@ internal static class BarrelChecks {
         world.Add(ThingKind.Chest, new Vector2(74.98f, 124.44f));
         var worker = AddWorker(world, new Vector2(80.91f, 126.81f));
         worker.Tool = Bucket.AtFill(10);
-        Require(world.CanStand(barrel.Pos + BarrelJobs.SpoutApproach), "the chest leaves the barrel's spout on open ground");
+        Require(world.CanStand(barrel.Pos + BarrelHaul.SpoutApproach), "the chest leaves the barrel's spout on open ground");
         world.SetDuty(worker, barrel, JobKind.Haul, true);
         for (int i = 0; i < 300 && barrel.Inventory[Water.Liquid] == 0 && worker.Status != World.BlockedPath; i++)
             SafeTick(world, .05f);

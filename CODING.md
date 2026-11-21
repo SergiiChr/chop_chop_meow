@@ -33,6 +33,7 @@ Project rules on top of the global coding and testing guides.
 
 - Simulation lives in `World.cs` and never touches menus or rendering, so headless checks can run gameplay.
 - Inventory rules belong in `Inventory.cs`, not in individual worker jobs.
+- A job that more than one kind of place offers, such as Haul, is a class in `src/jobs/<job>/`; a place with its own way of doing it extends or overrides that class in the place's feature folder.
 - Keep parameters, tuning values and configuration in C# as constants, enums and static tables, so code references them directly and the compiler checks them.
   A data file such as JSON is only for what has to be saved, like saves and settings, or read by another program or language.
 
