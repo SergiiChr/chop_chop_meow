@@ -40,14 +40,16 @@ public sealed class Farms(World world) {
         }
         if (farm.FarmStage != FarmStage.Growing) return;
         while (dt > 0) {
-            float untilRipe = GrowSeconds - Growth(farm);
-            if (farm.FarmWaterLeft == 0) {
+            float untilRipe = GrowSeconds - farm.Progress;
+            // Subtract the whole liter first so a nearly ripe crop never rounds up to needing one more.
+            if (farm.FarmWaterLeft > 0) untilRipe = untilRipe - SecondsPerLiter + farm.FarmWaterLeft;
+            else if (untilRipe > 0) {
                 if (farm.Inventory.Remove(Water.Liquid, 1) == 0) return;
                 farm.FarmWaterLeft = SecondsPerLiter;
             }
-            float grown = Math.Min(untilRipe, Math.Min(dt, farm.FarmWaterLeft));
+            float grown = Math.Clamp(untilRipe, 0, Math.Min(dt, farm.FarmWaterLeft));
             farm.FarmWaterLeft -= grown;
-            if (grown == untilRipe) { farm.FarmStage = FarmStage.Ripe; farm.Progress = 0; return; }
+            if (grown >= untilRipe) { farm.FarmStage = FarmStage.Ripe; farm.Progress = 0; return; }
             // Add one complete liter at a time so rounding each tick cannot shorten a day's growth.
             if (farm.FarmWaterLeft == 0) farm.Progress += SecondsPerLiter;
             dt -= grown;

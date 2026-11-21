@@ -18,6 +18,7 @@ public static class FarmChecks {
         Test(CheckSownWheatGrowsToRipeInItsDays, data);
         Test(CheckPlotHarvestedAloneKeepsSeedInItsOutput, data);
         Test(CheckRipeWheatKeepsStoredWater, data);
+        Test(CheckTheLastLiterRipensWheatAtServerTickRate, data);
         Test(CheckWorkerFinishesHarvestHaulsCropAndSowsAgain, data);
         Test(CheckPlotHoldsTenLitersAndKeepsWaterOnLoad, data);
         Test(CheckHaulerPoursABucketAtFourCorners, data);
@@ -104,6 +105,18 @@ public static class FarmChecks {
         Work(world, data.DaySeconds);
         Require(farm.FarmStage == FarmStage.Ripe && world.Farms.WaterLevel(farm) == 4,
             "ripe wheat should keep its water for the next crop");
+    }
+
+    private static void CheckTheLastLiterRipensWheatAtServerTickRate(GameData data) {
+        var world = EmptyWorld(data);
+        var farm = world.Add(ThingKind.Farm, new Vector2(20, 14));
+        float lastLiter = data.DaySeconds / 10;
+        farm.FarmStage = FarmStage.Growing;
+        farm.Progress = world.Farms.GrowSeconds - lastLiter;
+        farm.Inventory.Add(Water.Liquid, 1);
+        for (int tick = 0; tick < lastLiter * 30 + 2; tick++) world.Tick(1f / 30);
+        Require(farm.FarmStage == FarmStage.Ripe && world.Farms.Dry(farm),
+            "the last liter must ripen wheat at 30 ticks a second");
     }
 
     private static void CheckWorkerFinishesHarvestHaulsCropAndSowsAgain(GameData data) {
