@@ -25,6 +25,11 @@ public sealed class ActorRig {
     private readonly Node3D hips, torso, chest, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     /// <summary>The right fist's grip, which turns a held tool about its own length (<see cref="Pose.Grip"/>).</summary>
     private readonly Node3D wrist;
+    private readonly Node3D? barrel, bucket, bucketBail, bucketWater, bottle, stream;
+    private int bottleLiters;
+    private const float BottleScale = .43f;
+    internal static readonly Vector3 BottleGrip = new Vector3(-.18f, .30f, 0) * BottleScale;
+    internal static readonly Vector3 BottleMouth = new Vector3(0, .76f, 0) * BottleScale;
     private float grip;
     /// <summary>What each tool puts in the hands, by its name: one piece, or two for a tool that fills both.</summary>
     private readonly List<(string Name, Node3D Node)> tools = new();
@@ -62,6 +67,30 @@ public sealed class ActorRig {
 
     /// <param name="shirtColor">Tells players apart; each skin has its own otherwise.</param>
     public ActorRig(ActorSkin skin, string? shirtColor = null) : this(Dressed(skin, shirtColor), HumanShape.Standard) {
+        if (skin is ActorSkin.Player or ActorSkin.Worker) {
+            barrel = VesselShape.AddBarrel(torso, new Vector3(0, -.02f, .36f)).Vessel;
+            barrel.Name = "CarriedBarrel";
+            barrel.RotationDegrees = new Vector3(-8, 0, 0);
+            barrel.Hide();
+        }
+        if (skin == ActorSkin.Worker) {
+            bucket = VesselShape.AddBucket(Root, Vector3.Zero);
+            bucketBail = bucket.GetChild<Node3D>(1);
+            bucketWater = Cylinder(bucket, .135f, .135f, .012f, new Vector3(0, .21f, 0), Mat("5a9eb8", .34f), sides: 14);
+            bottle = BottleShape.Create(0, capped: false, adjustable: true);
+            bottle.Name = "CarriedBottle";
+            for (int index = 0; index < bottle.GetChildCount(); index++) {
+                var part = bottle.GetChild<Node3D>(index);
+                part.Position *= BottleScale;
+                part.Scale *= BottleScale;
+            }
+            Root.AddChild(bottle);
+            stream = Cylinder(Root, .016f, .021f, 1, Vector3.Zero, Mat("67b8d1", .24f), sides: 6);
+            bucket.Hide();
+            bottle.Hide();
+            stream.Name = "WaterStream";
+            stream.Hide();
+        }
         var worn = outfit;
         switch (skin) {
             case ActorSkin.Player:
@@ -480,7 +509,75 @@ public sealed class ActorRig {
         // A shovel is only ever dug with, held in both fists.
         if (shovel.Visible) LayShovel();
         crate.Visible = carrying;
+        if (barrel?.Visible == true) torch.Transform = new Transform3D(Basis.Identity, new Vector3(0, -build.Forearm, Palm));
+        barrel?.Hide();
+        bucket?.Hide();
+        bottle?.Hide();
+        stream?.Hide();
         torch.Visible = lit;
+    }
+
+    /// <summary>Reaches around the two sides of the barrel, resting its back against the trunk.</summary>
+    public void HugBarrel(Pose pose, bool lit = false) {
+        if (barrel == null) return;
+        pose = pose with { Lean = -5, Twist = 0, Head = 2 };
+        // Hold the front half of the lower band with both exposed palms.
+        var left = barrel.Transform * new Vector3(.147f, .24f, .125f);
+        var right = barrel.Transform * new Vector3(-.147f, .24f, .125f);
+        (pose, float leftRoll) = ArmReach.WithHandAt(pose, true, left, new Vector3(1, -1, -.25f));
+        (pose, float rightRoll) = ArmReach.WithHandAt(pose, false, right, new Vector3(-1, -1, -.25f));
+        Show(pose, null, false, lit: lit);
+        RollArm(true, leftRoll);
+        RollArm(false, rightRoll);
+        if (lit) {
+            var arm = (torso.Basis * chest.Basis * shoulderL.Basis * elbowL.Basis).Inverse();
+            // Keep the torch upright just outside the left palm, clear of the barrel wall.
+            torch.Transform = new Transform3D(arm * new Basis(Vector3.Right, -Mathf.Pi / 2),
+                new Vector3(0, -build.Forearm, Palm) + arm * Vector3.Right * .04f);
+        }
+        barrel.Show();
+    }
+
+    /// <summary>Places the vessel in the right fist and reaches for a rung or its opposite side with the left.</summary>
+    internal Vector3 HoldWater(Pose pose, string item, Transform3D held, Vector3 right, Vector3? left = null,
+        Basis? bail = null) {
+        bool isBucket = Bucket.Is(item);
+        var vessel = isBucket ? bucket : bottle;
+        var identity = Transform3D.Identity;
+        (pose, float r) = ArmReach.Reaching(pose, right, identity, elbowToward: new Vector3(-1, -1, -.3f));
+        float l = 0;
+        if (left is Vector3 support) (pose, l) = ArmReach.Reaching(pose, support, identity, left: true, elbowToward: new Vector3(1, -1, -.3f));
+        Show(pose, null, false);
+        RollArm(false, r);
+        RollArm(true, l);
+        if (vessel == null) return Vector3.Zero;
+        // When the arm is nearly straight, keep the vessel attached to the hand at its actual reach.
+        var correction = Fist(false) - right;
+        held.Origin += correction;
+        vessel.Transform = held;
+        vessel.Show();
+        if (isBucket && bucketWater != null && bucketBail != null) {
+            var turn = bail ?? Basis.Identity;
+            bucketBail.Transform = new Transform3D(turn, VesselShape.BucketHinge - turn * VesselShape.BucketHinge);
+            bucketWater.Visible = Bucket.Liters(item) > 0 && held.Basis.Y.Y > .85f;
+        } else {
+            int liters = Water.BottleLiters(item);
+            if (liters != bottleLiters) {
+                BottleShape.SetGauge(vessel, liters);
+                bottleLiters = liters;
+            }
+        }
+        return correction;
+    }
+
+    /// <summary>Draws the short falling stream between the vessel's lip and the receiving opening.</summary>
+    internal void WaterStream(Vector3 from, Vector3 into) {
+        if (stream == null) return;
+        var direction = from - into;
+        stream.Transform = new Transform3D(
+            new Basis(new Quaternion(Vector3.Up, direction.Normalized())) * Basis.FromScale(new Vector3(1, direction.Length(), 1)),
+            (from + into) / 2);
+        stream.Show();
     }
 
     /// <summary>Tips the leg sideways, turns the thigh outward, swings it forward, then rolls it about its own length; the left side turns toward +X.</summary>

@@ -76,6 +76,8 @@ public sealed partial class GameData {
         ["meat_stew"] = new() { Name = "Meat stew", Color = "8f5a33", Food = true, Hunger = 60, Thirst = 15 },
         ["canned_jam"] = new() { Name = "Canned jam", Color = "9b2f4f", Food = true, Hunger = 30 },
         ["canned_meat_stew"] = new() { Name = "Canned meat stew", Color = "a8643a", Food = true, Hunger = 60, Thirst = 15 },
+        [Barrel.Item] = new() { Name = "Steel barrel", Color = "657e92" },
+        [Bucket.Item] = new() { Name = "Steel bucket", Color = "8a9ca5", Tool = Bucket.Item },
         ["crate"] = new() { Name = "Wood crate", Color = "c9a46e" },
         ["coins"] = new() { Name = "Coins", Color = "e3b94a" },
     };
@@ -90,7 +92,11 @@ public sealed partial class GameData {
         [ThingKind.Mine] = new() { Name = "Mine", Description = "Marking is free and snaps to an ore cliff, one mine per cliff. It is built in stages, then miners with pickaxes bring out ore and rocks for good." },
         [ThingKind.Pile] = new() { Name = "Pile", Cost = new() { ["wood"] = 8 }, Description = "A 3\u00d73 yard holding 14 stacks of one resource, named by its filter or by the first one in; it stays when emptied. Snaps edge to edge with other piles. Tick Compost on an empty pile with no filter to turn leaves, grass and food into fertilizer." },
         [ThingKind.Farm] = new() { Name = "Farm plot", Cost = new() { ["wood"] = 8 }, Description = "A 3\u00d73 field that snaps edge to edge with piles and other plots. Wheat seeds and fertilizer sow it; the wheat grows for 3 days and is harvested by hand, by you or a worker, for wheat, more seeds and grass." },
-        [ThingKind.Toolstation] = new() { Name = "Tool station", Cost = new() { ["planks"] = 8, ["stone"] = 4 }, Description = "A rack for tools. Workers take an axe, pickaxe, shovel or rake from it when their job needs one and put it back when they finish or go home." },
+        [ThingKind.Toolstation] = new() {
+            Name = "Tool station",
+            Cost = new() { ["planks"] = 8, ["stone"] = 4 },
+            Description = "Holds tools, buckets and bottles that workers can borrow and return.",
+        },
         [ThingKind.Cooktable] = new() { Name = "Cooking table", Cost = new() { ["steel_bar"] = 2, ["stone"] = 6, ["planks"] = 8 }, Description = "A steel grill over a firebox, with a mortar slot. Crushing berries and grinding wheat need the mortar and someone working it, and so does kneading dough, with no fire; jam and stew cook on their own over wood, coal or charcoal." },
         [ThingKind.Cannery] = new() { Name = "Canning station", Cost = new() { ["steel_bar"] = 2, ["planks"] = 8 }, Description = "Seals meat stew or jam into tin cans over a wood, coal or charcoal fire. Canned goods keep and sell for the most." },
         [ThingKind.Packer] = new() { Name = "Packing station", Cost = new() { ["planks"] = 8, ["wood"] = 4 }, Description = "Packs one chosen good into crates, one item at a time while someone works it. A full crate waits to be carried out." },
@@ -115,6 +121,7 @@ public sealed partial class GameData {
     };
     public List<VesselDef> Vessels { get; } = new() {
         new() { States = new(Water.BottleItems), Liquid = Water.Liquid },
+        new() { States = new(Bucket.Fills), Liquid = Water.Liquid },
     };
     public List<MapRowDef> MapRows { get; } = new() {
         new() { Title = "Wood", Roots = new() { "wood" } },
@@ -138,6 +145,8 @@ public sealed partial class GameData {
         ["wood_parts"] = new() { Name = "Wood parts", Group = RecipeGroup.Materials, Station = ThingKind.Bench, Hand = true, Tool = "chisel", Inputs = new() { ["wood"] = 1 }, Output = "wood_parts", Amount = 2, Seconds = 10 },
         ["wood_hammer"] = new() { Name = "Wooden mallet", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = true, Tool = "chisel", Inputs = new() { ["wood_parts"] = 1 }, Output = "wood_hammer", Amount = 1, Seconds = 10 },
         ["crate"] = new() { Name = "Wood crate", Group = RecipeGroup.Containers, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["planks"] = 6 }, Output = "crate", Amount = 1, Seconds = 10 },
+        [Barrel.Item] = new() { Name = "Steel barrel", Group = RecipeGroup.Containers, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Tier = 2, Inputs = new() { ["steel_bar"] = 5 }, Output = Barrel.Item, Amount = 1, Seconds = 30 },
+        [Bucket.Item] = new() { Name = "Steel bucket", Group = RecipeGroup.Containers, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Tier = 2, Inputs = new() { ["steel_bar"] = 3 }, Output = Bucket.Item, Amount = 1, Seconds = 10 },
         ["steel_axe"] = new() { Name = "Steel axe", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 2, ["wood_parts"] = 1 }, Output = "steel_axe", Amount = 1, Seconds = 10 },
         ["steel_pick"] = new() { Name = "Steel pickaxe", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 2, ["wood_parts"] = 1 }, Output = "steel_pick", Amount = 1, Seconds = 10 },
         ["steel_shovel"] = new() { Name = "Steel shovel", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 2, ["wood_parts"] = 1 }, Output = "steel_shovel", Amount = 1, Seconds = 10 },

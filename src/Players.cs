@@ -139,6 +139,11 @@ public sealed partial class World {
             case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Construction.Build(kind, c.At); break;
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At)); break;
+            case Verb.PlaceBarrel: Preferring(S.Backpack, c.Count, () => PlaceBarrel(c.Item, c.At)); break;
+            case Verb.MoveInBarrel:
+                if ((uint)c.Target <= Barrel.Capacity)
+                    Preferring(S.Backpack, (int)c.At.X, () => MoveInBarrel(Barrel.AtFill(c.Target), c.Item, c.Count, c.Other != 0, (int)c.At.Y));
+                break;
             case Verb.MoveInCrate: MoveInCrate(c.Target, c.Item, c.Count, c.Other != 0); break;
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
             case Verb.Torch: UseTorch(c.At); break;
@@ -192,6 +197,7 @@ public sealed partial class World {
             case Verb.AutoSell: SetAutoSell(t, c.Count != 0); break;
             case Verb.SetPacking: SetPacking(t, c.Item); break;
             case Verb.Buy: Buy(t, c.Item, Math.Min(c.Count, 5)); break;
+            case Verb.PickUpBarrel: PickUpBarrel(t); break;
             case Verb.PickUpCrate: PickUpCrate(t); break;
             case Verb.Dismantle: Construction.Dismantle(t); break;
             case Verb.SlotTool: SlotTool(t, c.Item); break;
@@ -237,8 +243,12 @@ public sealed partial class World {
 
     /// <summary>Why an item cannot go into a box by hand, by the box's number from <see cref="Locate"/>, or null.</summary>
     private string? BoxBlock(int at, Inventory to, string item) =>
-        at <= 0 ? null : Find(at / BoxCodes) is Thing t ? BoxBlock(t, to, item)
-        : Carrier(at) is Worker w && to == w.ToolSlot && !(Data.Items.TryGetValue(item, out var def) && def.Tool != "") ? "A worker's tool slot only takes tools." : null;
+        at == 0 ? CarryBarrelBlock(to, item)
+        : at <= CrateCode && Barrel.Is(item) ? "Barrel does not fit in wood crate."
+        : at <= 0 ? null : Find(at / BoxCodes) is Thing t ? BoxBlock(t, to, item)
+        : Carrier(at) is Worker w && to == w.ToolSlot && !FitsWorkerToolSlot(item) ? "A worker's tool slot only takes tools." : null;
+
+    internal bool FitsWorkerToolSlot(string item) => ToolKind(item) != "";
 
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {
@@ -246,8 +256,10 @@ public sealed partial class World {
         if (a < 0 || b < 0 || Busy() || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
         if (!InReach(a) || !InReach(b)) { Say("Walk closer first."); return 0; }
         if (BoxBlock(b, to, item) is string refused) { Say(refused); return 0; }
-        if (FillBlock(from, to, item) is string dry) { Say(dry); return 0; }
-        int moved = Carry(from, to, b > 0 ? Find(b / BoxCodes) : null, item, quantity);
+        var into = b > 0 ? Find(b / BoxCodes) : null;
+        if (FillBlock(from, to, item, into) is string dry) { Say(dry); return 0; }
+        int moved = Carry(from, to, into, item, quantity);
+        if (moved > 0 && into?.Kind == ThingKind.Barrel) PileFilters(into);
         if (moved < quantity) SayHeldBehind(from, item);
         return moved;
     }
@@ -285,10 +297,10 @@ public sealed partial class World {
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
         if (from.Layout[sourceSlot].HeldByOther(S.Actor.Id) || to.Layout[targetSlot].HeldByOther(S.Actor.Id)) { Say(HeldByAnother); return 0; }
         if (from != to && BoxBlock(b, to, item) is string refused) { Say(refused); return 0; }
-        if (from != to && FillBlock(from, to, item) is string dry) { Say(dry); return 0; }
+        var into = b > 0 ? Find(b / BoxCodes) : null;
+        if (from != to && FillBlock(from, to, item, into) is string dry) { Say(dry); return 0; }
         // A drop on another item's cell in another inventory still stores the stack wherever it fits, and so does a liquid or a vessel that pours.
         int moved;
-        var into = b > 0 ? Find(b / BoxCodes) : null;
         if (from != to && (Data.VesselFor(item) != null || PoursInto(into, to, item) != null)) {
             from.PreferredSlot = sourceSlot;
             try { moved = Carry(from, to, into, item, quantity); } finally { from.PreferredSlot = -1; }
@@ -296,20 +308,22 @@ public sealed partial class World {
             from.PreferredSlot = sourceSlot;
             try { moved = from.TransferTo(to, item, quantity); } finally { from.PreferredSlot = -1; }
         } else moved = from.MoveSlotTo(sourceSlot, to, targetSlot, quantity);
+        if (moved > 0 && into?.Kind == ThingKind.Barrel) PileFilters(into);
         return moved;
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
-        bool pile = IsPlainPile(chest);
+        bool pile = IsSingleResourceStore(chest);
+        if (chest.Kind == ThingKind.Barrel && item != Water.Liquid) return;
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate)) return;
         if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Busy() || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
-        if (pile && allowed) SetPileFilter(chest.Inventory, PileEntry(item));
+        if (pile && allowed) SetPileFilter(chest, PileEntry(item));
         else if (pile) chest.Inventory.ClearFilters();
         else chest.Inventory.Filter(item, output, allowed);
     }
     /// <summary>Whether a plain pile's filter may change: only while it is empty, saying so to the player otherwise, and to a new resource only once the one it names is taken off.</summary>
     private bool PileFilterChanges(Thing pile, bool adding) {
-        if (pile.Inventory.First() != null) { Say("Can't change filter on a non-empty pile."); return false; }
+        if (pile.Inventory.First() != null) { Say($"Can't change filter on a non-empty {Lower(Data.Name(pile.Kind))}."); return false; }
         return !adding || pile.Inventory.InputFilter.Count == 0;
     }
 
@@ -320,7 +334,7 @@ public sealed partial class World {
     }
 
     public void ClearFilters(Thing chest) {
-        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || IsPlainPile(chest) && !PileFilterChanges(chest, false) || Busy() || Forwarded(Verb.ClearFilters, chest.Id)) return;
+        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || IsSingleResourceStore(chest) && !PileFilterChanges(chest, false) || Busy() || Forwarded(Verb.ClearFilters, chest.Id)) return;
         chest.Inventory.ClearFilters();
     }
 

@@ -124,7 +124,8 @@ public sealed partial class World {
     public JobKind[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {
         ThingKind.Reinforced => BellowsJobs,
         ThingKind.Bench or ThingKind.Anvil or ThingKind.Cooktable or ThingKind.Packer => CraftJobs,
-        ThingKind.Furnace or ThingKind.Cannery => HaulJobs,
+        ThingKind.Furnace or ThingKind.Cannery or ThingKind.Barrel => HaulJobs,
+        ThingKind.Hut when Barrel.In(t.Inventory) != null => HaulJobs,
         ThingKind.Signpost => DeliveryJobs,
         ThingKind.Campfire => FireJobs,
         ThingKind.Farm => FarmJobs,
@@ -162,7 +163,7 @@ public sealed partial class World {
 
     /// <summary>Gives a worker one job at a place, at the end of their list, or takes it away wherever it is, keeping their other jobs.</summary>
     public void SetDuty(Worker w, Thing target, JobKind job, bool on) {
-        if (on == HasDuty(w, target.Id, job) || Array.IndexOf(Jobs(target), job) < 0) return;
+        if (on == HasDuty(w, target.Id, job) || on && Array.IndexOf(Jobs(target), job) < 0) return;
         if (on && NoRoomAt(w, target)) return;
         if (Busy() || Forwarded(Verb.Duty, target.Id, w.Id, job.Id(), on ? 1 : 0)) return;
         if (on) w.Jobs.Add(NewDuty(target, job));

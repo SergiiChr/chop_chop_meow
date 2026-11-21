@@ -39,7 +39,10 @@ public enum ActorAction {
     FallBack,
     /// <summary>An axe swept sideways in the air, from behind the left shoulder round the front to the right at chest height; it takes turns with the overhead swing.</summary>
     AxeSweep,
-    SteelAxeSweep
+    SteelAxeSweep,
+    ClimbLadder,
+    PourWater,
+    FillVessel
 }
 
 /// <summary>
@@ -1136,6 +1139,7 @@ public static class ActorAnimation {
         bool sprinting = false,
         bool crafting = false,
         bool fitting = false) {
+        if (moving && Barrel.FilledIn(backpack) != null) return ActorAction.Walk;
         if (moving) return sprinting ? ActorAction.Run : ActorAction.Jog;
         if (!gathering || resourceKind == null) return crafting ? ActorAction.Craft : ActorAction.Idle;
 
@@ -1159,6 +1163,11 @@ public static class ActorAnimation {
     };
 
     public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving, GameData data) {
+        switch (worker.WaterAction) {
+            case WorkerWaterAction.Fill: return ActorAction.FillVessel;
+            case WorkerWaterAction.ClimbUp or WorkerWaterAction.ClimbDown: return ActorAction.ClimbLadder;
+            case WorkerWaterAction.Pour: return ActorAction.PourWater;
+        }
         // The sign hides any load in the worker's bag, which stays there until the strike ends.
         if (worker.WageDebt > 0 && !moving) return ActorAction.Protest;
         // Every other worker sits on a rock rather than the ground.

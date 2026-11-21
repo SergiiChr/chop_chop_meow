@@ -14,7 +14,24 @@ internal static class RackShape {
     /// <summary>The hanging shape of every tool kind a peg can show; a kind without one, such as the mortar, hangs nothing.</summary>
     public static readonly (string Kind, Mesh Mesh)[] Tools = [("axe", Axe), ("pickaxe", Pick), ("rake", Rake), ("shovel", BuildTool("shovel")), ("hammer", BuildTool("hammer")), ("chisel", BuildTool("chisel"))];
     /// <summary>Where a slot's peg sits across the board.</summary>
-    public static float PegX(int slot) => -.36f + slot * .24f;
+    public static float PegX(int slot) => (slot - (World.ToolSlots - 1) / 2f) * .33f;
+
+    /// <summary>The bucket hangs by the middle of its bail, just clear of the planks.</summary>
+    public static Vector3 BucketSeat(int slot) => new Vector3(PegX(slot), 1.349f, .174f) - VesselShape.BucketGrip;
+
+    /// <summary>A metal clip holds the bottle by its neck just below the peg.</summary>
+    public static Node3D AddBottle(Node3D rack, int slot) {
+        var hook = ModelKit.Pivot(rack, new Vector3(PegX(slot), 1.32f, .14f));
+        var bottle = BottleShape.Create(0, adjustable: true);
+        bottle.Position = Vector3.Down * .366f;
+        bottle.Scale = Vector3.One * .48f;
+        hook.AddChild(bottle);
+        var metal = ModelKit.Metal("637878", .45f, .55f);
+        ModelKit.Torus(hook, .041f, .052f, new Vector3(0, -.025f, 0), metal);
+        for (int side = -1; side <= 1; side += 2)
+            ModelKit.Box(hook, new Vector3(.012f, .031f, .012f), new Vector3(side * .016f, -.011f, -.041f), metal);
+        return hook;
+    }
     public static readonly StandardMaterial3D Concrete = ModelKit.Vertex(Surface.Stone, .95f);
     public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .85f);
     public static readonly StandardMaterial3D Tool = ModelKit.Vertex(Surface.Metal, .65f, .15f);
@@ -22,22 +39,22 @@ internal static class RackShape {
 
     private static ArrayMesh BuildFeet() {
         var s = Begin();
-        foreach (float x in new[] { -.43f, .43f })
+        foreach (float x in new[] { -.57f, .57f })
             Bevel(s, new(.26f, .22f, .36f), new(x, .11f, 0), .012f, "9a9d99");
         return s.Commit();
     }
 
     private static ArrayMesh BuildFrame() {
         var s = Begin();
-        foreach (float x in new[] { -.48f, .48f })
+        foreach (float x in new[] { -.62f, .62f })
             Box(s, new(.1f, 1.31f, .1f), new(x, .855f, -.04f), "8a6a48");
         for (int row = 0; row < 4; row++)
-            Bevel(s, new(1.05f, .218f, .045f), new(0, .6625f + row * .225f, -.025f), .004f, row % 2 == 0 ? "d2a26a" : "c69862");
-        Bevel(s, new(1.15f, .06f, .2f), new(0, 1.5f, -.025f), .009f, "99734d");
-        Box(s, new(.98f, .07f, .06f), new(0, .48f, -.04f), "8a6a48");
+            Bevel(s, new(1.33f, .218f, .045f), new(0, .6625f + row * .225f, -.025f), .004f, row % 2 == 0 ? "d2a26a" : "c69862");
+        Bevel(s, new(1.43f, .06f, .2f), new(0, 1.5f, -.025f), .009f, "99734d");
+        Box(s, new(1.26f, .07f, .06f), new(0, .48f, -.04f), "8a6a48");
         // The protruding peg ends remain when tools are taken from their slots.
         for (int slot = 0; slot < World.ToolSlots; slot++)
-            Box(s, new(.025f, .025f, .115f), new(PegX(slot), 1.32f, .05f), "8a6a48");
+            Box(s, new(.025f, .025f, .195f), new(PegX(slot), 1.32f, .095f), "8a6a48");
         return s.Commit();
     }
 

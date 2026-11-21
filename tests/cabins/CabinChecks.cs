@@ -38,7 +38,25 @@ public static class CabinChecks {
         Test(CheckSleepHealsOnlyWhileFed, data);
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
         Test(CheckSleepWaitsForEveryone, data);
+        Test(CheckCabinOnlyAcceptsNewHaulDutiesWithABarrelMounted, data);
         Test(CheckBootsStandOnACabinsStepsAndTheBodyClimbsThemWithoutJumps);
+    }
+
+    private static void CheckCabinOnlyAcceptsNewHaulDutiesWithABarrelMounted(GameData data) {
+        var world = EmptyWorld(data);
+        var cabin = world.Add(ThingKind.Hut, world.Player + Vector2.Down * 4);
+        var worker = AddWorker(world, world.Player);
+        world.SetDuty(worker, cabin, JobKind.Haul, true);
+        Require(!World.HasDuty(worker, cabin.Id, JobKind.Haul), "a cabin with no roof barrel cannot take a new hauling duty");
+
+        Give(world, Barrel.Item);
+        Require(world.Transfer(world.Backpack, cabin.Inventory, Barrel.Item, 1) == 1, "the player mounts a barrel on the roof");
+        world.SetDuty(worker, cabin, JobKind.Haul, true);
+        Require(World.HasDuty(worker, cabin.Id, JobKind.Haul), "an empty barrel on the roof is enough to assign a hauling duty");
+
+        Require(world.Transfer(cabin.Inventory, world.Backpack, Barrel.Item, 1) == 1, "the player takes the barrel back");
+        world.SetDuty(worker, cabin, JobKind.Haul, false);
+        Require(!World.HasDuty(worker, cabin.Id, JobKind.Haul), "the worker can give up an existing duty even after the barrel comes off");
     }
 
     private static void CheckPlayerBehindACabinWalksRoundItToTheDoor(GameData data) {
