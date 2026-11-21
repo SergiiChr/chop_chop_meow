@@ -169,7 +169,7 @@ UI and input:
 | `src/PilePanel.cs` | A pile or compost heap |
 | `src/ToolRackPanel.cs` | A tool station |
 | `src/containers/barrel/display/BarrelPanel.cs`, `src/containers/barrel/display/CarriedBarrelPanel.cs` | Water and hauling on a placed barrel and the water slot in a backpack barrel |
-| `src/CratePanel.cs` | A placed crate, and a packed crate opened from the backpack |
+| `src/CratePanel.cs` | A placed crate with its filters and Haul job, and a packed crate opened from the backpack |
 | `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |

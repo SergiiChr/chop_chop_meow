@@ -435,6 +435,8 @@ public static class HaulingChecks {
             sawHauling |= hauler.Destination == furnace.Id || hauler.Bag.Count > 0;
         }
 
+        Require(bellowsWorker.Assignment == furnace.Id && furnace.Heat > 0,
+                "the first of two reinforced-furnace workers should stay at the bellows while the second hauls");
         Require(sawHauling && furnace.Inventory["steel_bar"] + chest.Inventory["steel_bar"] > 0,
                 "the second furnace worker should haul recipe inputs, collect actual steel, and return it to storage");
         Require(chest.Inventory["iron_bar"] < 4 && chest.Inventory["coal"] < 6,

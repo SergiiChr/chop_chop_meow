@@ -254,7 +254,7 @@ public static class WorkerJobChecks {
         Require(world.PickUpCrate(crate), "a nearby crate should be picked up");
         string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         var placed = world.PlaceCrate(packed, world.Player + new Vector2(2, 0))!;
-        Require(placed.Inventory.InputFilter.SetEquals(new[] { "wood" }) && placed.Inventory.OutputFilter.SetEquals(new[] { "stone" }),
+        Require(placed.Inventory.InputFilter.SequenceEqual(new[] { "wood" }) && placed.Inventory.OutputFilter.SequenceEqual(new[] { "stone" }),
             "a crate of goods put down again should keep the filters it had");
         world.Transfer(placed.Inventory, world.Backpack, "wood", 3);
         Require(world.PickUpCrate(placed), "the emptied crate should be picked up");

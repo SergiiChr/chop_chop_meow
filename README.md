@@ -269,7 +269,7 @@ Their page then says "Carrying a barrel" or "Carrying a packed crate" above thei
   A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A held stack put on storage clicked in the world, such as a chest, goes into it. An item only selected on the hotbar never does.
-- Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
+- Chests, placed crates, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
   A pile's funnel opens one row naming its one resource.
 
 ### Station panels
@@ -701,7 +701,7 @@ Its hauler first carries out what its output filter lets go, to the nearest plac
 Then they bring what its input filter names, from storage or from a station's finished goods.
 Two storages that both ask for an item never pass it to each other.
 So a chest asking for crates of bread sends them on to a trading post asking for them, but not to another chest asking for them.
-In a haul group, every carry for a chest or crate comes first, as an input short of a batch does.
+In a haul group, every carry for a chest or crate ranks with an input short of a batch, before full outputs and topping up.
 
 ### Tool station
 

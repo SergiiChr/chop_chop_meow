@@ -35,7 +35,7 @@ public partial class Game {
         Require(Named("pick_wood") != null && Named("pick_crate") == null && Named($"pick_{World.CrateOf("berries")}") == null,
             "A placed crate's filter must offer goods but no crate.");
         await Click(Named("pick_wood")!);
-        await Until(() => Shown(crate).Inventory.InputFilter.SetEquals(new[] { "wood" }), "picking wood adding it to the placed crate's filter", 2);
+        await Until(() => Shown(crate).Inventory.InputFilter.SequenceEqual(new[] { "wood" }), "picking wood adding it to the placed crate's filter", 2);
         await Click(Named("filters_close")!);
         RemoveThings(Hosted, t => t == chest || t == crate);
         await CloseWithEsc();
