@@ -15,7 +15,7 @@ public sealed class PlayerState {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Health { get; set; } = 100;
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Hunger { get; set; } = 100;
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Thirst { get; set; } = 100;
-    public Inventory Backpack { get; set; } = new() { Slots = 24 };
+    public Inventory Backpack { get; set; } = new() { Slots = 24, CarriedBy = Inventory.Carrier.Player };
     public List<string> HotbarSlots { get; set; } = new() { "steel_axe", "steel_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", Water.Full };
     public int ActiveHotbar { get; set; }
     /// <summary>A tool selected in hand from the backpack without a hotbar slot, or empty; while one is, no hotbar slot is selected.</summary>
@@ -36,6 +36,7 @@ public sealed class PlayerState {
     public bool Mauled { get; set; }
     /// <summary>Id of the cabin the player is inside, or zero; inside, wolves back off and the player is hidden.</summary>
     public int Sheltered { get; set; }
+    public int CabinEntry { get; set; }
     /// <summary>What the player is doing at a cabin's door, which <see cref="DoorCabin"/> names.</summary>
     public Doorway Door { get; set; }
     public int DoorCabin { get; set; }

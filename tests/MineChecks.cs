@@ -15,6 +15,7 @@ public static class MineChecks {
         CheckMineSitesAlignWithCliffs(data);
         CheckMinesAreMarkedAtCliffsOnceEach(data);
         CheckWorkersDigAndFrameMineWithTheirTools(data);
+        CheckWorkerTakesTheFreeHammerFromTheRack(data);
         CheckPlayerDigsAndFitsAMineWithTheirTools(data);
         CheckPlayerDeliversOnlyWhatAMineStillNeeds(data);
         CheckMinersBringOreOutAndStopWhenOutputIsFull(data);
@@ -102,6 +103,24 @@ public static class MineChecks {
         started = world.Time;
         Work(world, data.DaySeconds * 3, () => mine.MineStage == MineStage.Open);
         Require(mine.MineStage == MineStage.Open && world.Time - started >= world.MineStageSeconds, "a worker with a hammer must fit the frame in about one working day");
+    }
+
+    private static void CheckWorkerTakesTheFreeHammerFromTheRack(GameData data) {
+        var world = EmptyWorld(data);
+        var cliff = World.CliffOf(ThingKind.Iron);
+        var mine = world.Add(ThingKind.Mine, World.MineSpot(cliff));
+        mine.MineStage = MineStage.Supplied;
+        var rack = world.Add(ThingKind.Toolstation, mine.Pos + cliff.Face * 2);
+        rack.Inventory.Add("steel_hammer", 1);
+        rack.Inventory.Add("wood_hammer", 1);
+        world.Player = rack.Pos + cliff.Along;
+        world.Hold(rack.Inventory, SlotOf(rack.Inventory, "steel_hammer"), 1);
+        Require(world.Held is { Item: "steel_hammer" }, "the player is holding the steel hammer from the rack");
+        var worker = AddWorker(world, world.Player);
+        world.SetDuty(worker, mine, JobKind.Build, true);
+        Work(world, 10, () => mine.Progress > 0);
+        Require(worker.Tool == "wood_hammer" && mine.Progress > 0 && world.Held is { Item: "steel_hammer" },
+            "the worker takes the free wooden mallet and fits the frame while the player still holds the steel hammer");
     }
 
     private static void CheckPlayerDigsAndFitsAMineWithTheirTools(GameData data) {

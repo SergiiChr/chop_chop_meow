@@ -32,8 +32,8 @@ public sealed class Construction(World world) {
     /// Why a building, or a crate from the backpack when <paramref name="item"/> names one, cannot go here.
     /// </summary>
     public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null) {
-        bool crate = kind == ThingKind.Crate;
-        if (!crate && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
+        bool portable = kind is ThingKind.Crate or ThingKind.Barrel;
+        if (!portable && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
         if (world.Occupied) return "You are busy.";
         if (world.S.Sheltered != 0) return "Leave the cabin first.";
         if (WolfPatrols.NearDen(p, Den.Clearance)) return "Leave the wolf den's mouth clear.";
@@ -49,10 +49,15 @@ public sealed class Construction(World world) {
             var door = Doorways.DoorPoint(new Thing { Pos = p });
             if (!world.CanStand(door) || Terrain.InLake(door, .8f) || world.S.Things.Any(t => !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
                 return "Leave open ground in front of the door.";
+            if (!world.CanStand(p + BarrelJobs.LadderApproach)) return "Leave dry, open ground at the cabin's ladder.";
         }
-        foreach (var hut in world.S.Things.Of(ThingKind.Hut)) if (Doorways.DoorPoint(hut).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
-        if (!crate) return Unaffordable(kind);
-        return item != null && (world.MarkedSource ?? world.S.Backpack)[item] == 0 ? "That crate is no longer in your backpack." : null;
+        foreach (var hut in world.S.Things.Of(ThingKind.Hut)) {
+            if (Doorways.DoorPoint(hut).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
+            if ((hut.Pos + BarrelJobs.LadderApproach).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's ladder clear.";
+        }
+        if (!portable) return Unaffordable(kind);
+        if (item == null || (world.MarkedSource ?? world.S.Backpack)[item] > 0) return null;
+        return kind == ThingKind.Crate ? "That crate is no longer in your backpack." : "That barrel is no longer available.";
     }
     /// <summary>
     /// What refuses a building the acting player's backpack does not hold the cost of, or null when it does.
@@ -88,6 +93,7 @@ public sealed class Construction(World world) {
     /// it returns null as a refusal does.
     /// </summary>
     public Thing? Build(ThingKind kind, Vector2 p) {
+        if (!world.Data.Buildings.ContainsKey(kind)) return null;
         p = Snap(kind, p);
         var blocked = PlacementBlock(kind, p);
         if (blocked != null) { world.Say(blocked); return null; }
@@ -104,6 +110,7 @@ public sealed class Construction(World world) {
     /// Why a building cannot come down now, or null: someone shelters in it, or a cart is out from it.
     /// </summary>
     private string? DismantleBlock(Thing t) {
+        foreach (var w in world.Workers) if (BarrelJobs.OnLadderOrRoof(w, t)) return "Wait for the worker to come down the ladder.";
         foreach (var p in world.S.Players) if (p.Sheltered == t.Id || p.Door != Doorway.None && p.DoorCabin == t.Id) return "Someone is inside. It can come down once they step out.";
         foreach (var order in world.S.Orders) if (order.Signpost == t.Id) return "A cart is out from this trading post. Wait for it to come back.";
         return null;

@@ -32,6 +32,7 @@ public static class AnimationChecks {
         CheckAHandReachesItsPointWithTheElbowTheWayAsked();
         CheckABlowLandsItsToolOnItsMarkSmoothlyWithinReach();
         CheckAHandReachesItsPointOnTheSlimBuild();
+        BarrelAnimationChecks.Run();
         CheckPosingAllocatesNothing();
     }
 
@@ -398,6 +399,7 @@ public static class AnimationChecks {
 
     private static void CheckEveryActionMovesThroughDistinctPoses() {
         foreach (var action in Enum.GetValues<ActorAction>()) {
+            if (action is ActorAction.ClimbLadder or ActorAction.PourWater or ActorAction.FillVessel) continue;
             var poses = new HashSet<Pose>();
             for (int step = 0; step < 8; step++)
                 poses.Add(ActorAnimation.PoseAt(action, ActorAnimation.Duration(action) * step / 8, action == ActorAction.Carry));

@@ -58,7 +58,7 @@ public partial class CarriedCratePanel(PageTools tools, int crate) : PagePanel(t
         // Goods put on an empty crate's cells pack into it wherever they fit.
         Well(new VBoxContainer()).AddChild(NewInventoryGrid(() => Contents, null, id => world.MoveInCrate(crate, id, ItemMoves.Amount(Contents, id), false),
             $"{StationSlots.SlotHint}", held => held.Stack is { Box: 0 } stack && !World.IsCrate(stack.Item), put: (_, item, units) => world.MoveInCrate(crate, item, units, true)));
-        AddButton("Put it down", () => panel.Player.PlaceCrate(world.CarriedCrate(crate) ?? "crate"));
+        AddButton("Put it down", () => panel.Player.PlaceContainer(world.CarriedCrate(crate) ?? "crate"));
         BagGrid(id => world.MoveInCrate(crate, id, ItemMoves.Amount(world.S.Backpack, id), true), $"{BagHint}\nShift: pack a stack · Ctrl: all of it",
             put: (slot, item, units) => { if (world.HeldBox == Contents) world.MoveInCrate(crate, item, units, false); else moves.Store(world.S.Backpack, slot)(item, units); });
         if (crate == 0) FollowPacked();
