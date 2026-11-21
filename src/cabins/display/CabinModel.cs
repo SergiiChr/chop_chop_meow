@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>Builds a cabin's model, with its door on a hinge, its front window and its lamp.</summary>
 internal static class CabinModel {
-    /// <summary>Small OSB cabin on block piers with a corrugated shed roof, solar panel and rain barrel.</summary>
+    /// <summary>Small OSB cabin on block piers with a corrugated shed roof, solar panel, ladder and optional roof barrel.</summary>
     public static HutProp Build() {
         var prop = new HutProp();
         var body = prop.Body;
@@ -27,7 +27,7 @@ internal static class CabinModel {
             Box(body, new Vector3(.015f, height, .025f), new Vector3(1.205f, .42f + height / 2, z), Wood("b08c55"));
         }
         // Shed roof pitched toward the back, overhanging the door.
-        var roof = Pivot(body, new Vector3(0, 2.68f, -.05f), new Vector3(-9, 0, 0));
+        var roof = Pivot(body, CabinShape.RoofCenter, new Vector3(CabinShape.RoofPitchDegrees, 0, 0));
         Add(roof, CabinShape.Roof, Metal("6f7a80", .45f, .6f), Vector3.Zero);
         Box(roof, new Vector3(1.1f, .05f, .8f), new Vector3(.55f, .085f, -.4f), Mat("1f2c44", .25f, .4f));
         Box(roof, new Vector3(1.14f, .03f, .84f), new Vector3(.55f, .065f, -.4f), Metal("c9ced2", .4f, .7f));
@@ -49,12 +49,9 @@ internal static class CabinModel {
         prop.Window = Box(body, new Vector3(.6f, .5f, .07f), new Vector3(.55f, 1.65f, 1.0f), glass);
         Box(body, new Vector3(.06f, .7f, .9f), new Vector3(1.2f, 1.6f, 0), trim);
         Box(body, new Vector3(.07f, .6f, .8f), new Vector3(1.2f, 1.6f, 0), glass);
-        var barrel = Pivot(body, new Vector3(1.5f, 0, .6f));
-        var blue = new Color("2c5f9e"); var rim = new Color("244f85");
-        ActorShape.Add(barrel, new[] {
-            new ActorShape.Ring(.8f, .23f, .23f, rim), new ActorShape.Ring(.77f, .27f, .27f, rim),
-            new ActorShape.Ring(.73f, .28f, .28f, blue), new ActorShape.Ring(.16f, .28f, .28f, blue),
-            new ActorShape.Ring(.03f, .255f, .255f, blue), new ActorShape.Ring(0, .23f, .23f, blue) });
+        CabinWaterModel.AddLadder(body);
+        prop.RoofBarrel = CabinWaterModel.AddMountedBarrel(body);
+        prop.RoofBarrel.Visible = false;
         prop.Light = WorldModels.Light(body, new Vector3(.55f, 1.65f, 1.4f), 2.5f);
         return prop;
     }

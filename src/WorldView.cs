@@ -80,12 +80,13 @@ public partial class WorldView : Node3D {
     }
     // The host keeps the original teal; each guest keeps the first one free when it joined.
     internal static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
-    private readonly Dictionary<int, (ActorRig Rig, ActorState State, (MeshInstance3D Mesh, Material Material)[] Parts)> crew = new();
+    private readonly Dictionary<int, (ActorRig Rig, ActorState State, LocalClock WaterClock, (MeshInstance3D Mesh, Material Material)[] Parts)> crew = new();
     private readonly Dictionary<Wolf, WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
     /// <summary>The village's carts no order holds, built while loading and reused for every trip.</summary>
     private readonly Stack<WorldModels.CartModel> idleCarts = new();
     private readonly Dictionary<int, float> pumping = new();
+    private readonly Dictionary<int, float> openBungs = new();
     /// <summary>The cooking tables whose mortar is in someone's hands this frame, so it is off the counter.</summary>
     private readonly HashSet<int> grinding = new();
     /// <summary>Build-mode ghosts by building kind, made hidden while loading; mines have one per cliff ore instead.</summary>
@@ -285,10 +286,12 @@ public partial class WorldView : Node3D {
     /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
     private void SyncCamera() {
         var size = GetViewport().GetVisibleRect().Size;
-        camera.Size = (AnimationReview ? (ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : 11) / ReviewZoom : BaseSize) / Zoom;
+        camera.Size = (AnimationReview ? (ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : WaterReview != null ? 3.4f : 11) / ReviewZoom : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(AnimationReview ? ReviewPitch : CameraPitch ?? Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
-        var back = new Vector3(across, MathF.Sin(pitch), across).Rotated(Vector3.Up, Mathf.DegToRad(CameraTurn));
-        var target = AnimationReview ? ReviewCenter + To3(reviewActor.Position) : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : CameraOn ?? World.Player);
+        float turn = AnimationReview && WaterReview != null ? CameraTurn - ReviewTurn : CameraTurn;
+        var back = new Vector3(across, MathF.Sin(pitch), across).Rotated(Vector3.Up, Mathf.DegToRad(turn));
+        var target = AnimationReview ? ReviewCenter + To3(reviewActor.Position, WaterReview != null ? reviewActor.Lift : 0)
+            : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : CameraOn ?? World.Player);
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
         camera.Position = target + back * (EnvironmentReview ? EnvironmentCameraDistance : 60);
         if (EnvironmentReview && EnvironmentCameraDistance > 60) sun.DirectionalShadowMaxDistance = EnvironmentCameraDistance + 40;
@@ -378,10 +381,18 @@ public partial class WorldView : Node3D {
         SyncCamera();
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
         Worker? best = null; float nearest = float.MaxValue;
-        foreach (var w in World.Workers)
-            if (World.Sees(w) && RayHits(origin, direction, w.Pos, PersonHit, out float d) && d < nearest) { nearest = d; best = w; }
+        foreach (var w in World.Workers) {
+            if (!World.Sees(w)) continue;
+            var feet = WorkerFeet(w);
+            if (RayHits(origin - Vector3.Up * feet.Y, direction, new Vector2(feet.X, feet.Z), PersonHit, out float d) && d < nearest) {
+                nearest = d; best = w;
+            }
+        }
         return best;
     }
+
+    private Vector3 WorkerFeet(Worker worker) =>
+        crew.TryGetValue(worker.Id, out var entry) ? entry.Rig.Root.Position : To3(worker.Pos);
 
     // The camera is orthogonal, so where a point shows on screen is a straight-line function of where it is in the world.
     // Read once a frame, it places every tree, building and head on screen without asking the camera for each.
@@ -471,7 +482,7 @@ public partial class WorldView : Node3D {
     };
 
     private void UpdateActors(float dt) {
-        pumping.Clear(); grinding.Clear();
+        pumping.Clear(); grinding.Clear(); openBungs.Clear();
         if (ShirtOf(World.Me) != playerShirt) {
             playerShirt = ShirtOf(World.Me); playerRig.Root.QueueFree();
             playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
@@ -505,7 +516,8 @@ public partial class WorldView : Node3D {
         bool torch = World.Torch > 0 && !World.Dead;
         // A downed player is posed by the fall alone.
         if (downedFor > 0) FallBackView.FallBack(playerRig, player, downedFor, torch, World.Dead ? null : HoldingOff(World.Me.Id));
-        else Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door, dt);
+        else Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door, dt,
+            barrel: HugsBarrel(action, World.S.Backpack));
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject, playerRig);
@@ -514,7 +526,7 @@ public partial class WorldView : Node3D {
             if (!crew.TryGetValue(worker.Id, out var entry)) {
                 var rig = new ActorRig(ActorSkin.Worker);
                 // Gathered and warmed now, so the first walk home at dusk makes no faded materials.
-                entry = (rig, new ActorState { Position = worker.Pos }, FadeParts(rig.Root));
+                entry = (rig, new ActorState { Position = worker.Pos }, new LocalClock(.25f), FadeParts(rig.Root));
                 scene.AddChild(entry.Rig.Root); crew.Add(worker.Id, entry);
             }
             var state = entry.State;
@@ -526,12 +538,33 @@ public partial class WorldView : Node3D {
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down
                 : assignment is { Kind: ThingKind.Mine } mine ? Mines.Facing(mine, worker.Pos) : assignment?.Pos ?? worker.Pos;
+            bool sameAction = state.Action == work;
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
-            Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
+            string? vessel = BarrelJobs.Vessel(worker.Tool) ? worker.Tool : null;
+            var waterTarget = worker.WaterAction != WorkerWaterAction.None ? World.Find(worker.WaterTarget) : null;
+            if (waterTarget != null && vessel != null) {
+                var point = waterTarget.Kind switch {
+                    ThingKind.Barrel when worker.WaterAction == WorkerWaterAction.Fill => To3(waterTarget.Pos) + VesselShape.BarrelSpout,
+                    ThingKind.Barrel => To3(waterTarget.Pos) + VesselShape.BarrelFillOpening,
+                    ThingKind.Water => To3(Terrain.WaterPoint(worker.Pos) - (worker.Pos - Terrain.Lake).Normalized() * .45f),
+                    _ => To3(waterTarget.Pos)
+                };
+                float progress = Math.Clamp(Clocked(entry.WaterClock, worker.WaterProgress, sameAction, dt), 0, 1);
+                WorkerWaterView.Show(entry.Rig, worker.Pos, point, worker.WaterAction, waterTarget.Kind == ThingKind.Hut, progress, vessel);
+                if (waterTarget.Kind == ThingKind.Barrel && worker.WaterAction == WorkerWaterAction.Pour) {
+                    float opening = Mathf.SmoothStep(0, .28f, progress) * (1 - Mathf.SmoothStep(.73f, 1, progress));
+                    openBungs[waterTarget.Id] = Math.Max(openBungs.GetValueOrDefault(waterTarget.Id), opening);
+                }
+            } else {
+                Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools),
+                    barrel: work == ActorAction.Carry && Barrel.In(worker.Bag) != null,
+                    vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null);
+            }
             entry.Rig.Root.Visible = World.Sees(worker);
             Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
-            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest ? null : assignment, entry.Rig);
+            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest
+                or ActorAction.ClimbLadder or ActorAction.PourWater or ActorAction.FillVessel ? null : assignment, entry.Rig);
         }
         // Removing while walking a dictionary is allowed, so no copy of its keys is needed.
         foreach (var (id, entry) in crew) {
@@ -539,6 +572,9 @@ public partial class WorldView : Node3D {
             fades.Remove(entry.Rig.Root); entry.Rig.Root.QueueFree(); crew.Remove(id);
         }
     }
+
+    private static bool HugsBarrel(ActorAction action, Inventory backpack) =>
+        action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake && Barrel.In(backpack) != null;
 
     /// <summary>
     /// Whether a player shows the tool they have selected: standing or moving about, once their arms have come down from an
@@ -620,7 +656,8 @@ public partial class WorldView : Node3D {
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             if (other.DownedFor > 0) FallBackView.FallBack(other.Rig, state, other.DownedFor, torch, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
-            else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door, dt);
+            else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door, dt,
+                barrel: HugsBarrel(action, p.Backpack));
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, subject, other.Rig);
@@ -644,8 +681,9 @@ public partial class WorldView : Node3D {
         return null;
     }
 
-    /// <summary>Poses an actor's rig; one at the steps of the cabin door at <paramref name="door"/> stands on them, climbing over the <paramref name="dt"/> seconds since the last frame.</summary>
-    private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null, float dt = 0) {
+    /// <summary>Poses the actor and settles its feet onto the cabin steps while it is at the door.</summary>
+    private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null,
+        float dt = 0, bool barrel = false, string? vessel = null) {
         rig.Root.Position = To3(state.Position);
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
@@ -660,7 +698,9 @@ public partial class WorldView : Node3D {
         state.HipHeight = pose.HipHeight;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
-        rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
+        if (barrel) rig.HugBarrel(pose, torch);
+        else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel);
+        else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
         if (jamb is Vector3 frame) DoorwayView.HandOnFrame(rig, pose, frame, door!.Value.Grip, tool, torch);
         if (state.Turning.Look != 0) rig.Head.Rotation += new Vector3(0, state.Turning.Look, 0);
     }
@@ -868,7 +908,7 @@ public partial class WorldView : Node3D {
         if (props.TryGetValue(t.Id, out var prop) && prop.Kind == t.Kind) return prop;
         // A building or crate put down in front of the player lands with a puff of dust; a kind changing in place, such as a dug mine, does not.
         bool appeared = Watched(t.Pos);
-        if (prop == null && appeared && (t.Kind == ThingKind.Crate || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
+        if (prop == null && appeared && (t.Kind is ThingKind.Crate or ThingKind.Barrel || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
         if (prop != null) prop.Root.QueueFree();
         prop = WorldModels.Build(t);
         scene.AddChild(prop.Root);
@@ -1103,8 +1143,14 @@ public partial class WorldView : Node3D {
                 var layout = t.Inventory.Layout;
                 for (int slot = 0; slot < rack.Pegs.Length; slot++) {
                     string held = slot < layout.Count ? layout[slot].Item : "";
-                    string kind = held != "" && World.Data.Items.TryGetValue(held, out var def) ? def.Tool : "";
+                    string kind = World.ToolKind(held);
                     foreach (var (tool, hook) in rack.Pegs[slot]) hook.Visible = tool == kind;
+                    if (kind == Water.BottleTool) {
+                        int liters = Water.BottleLiters(held);
+                        if (liters == rack.BottleLiters[slot]) continue;
+                        BottleShape.SetGauge(rack.Pegs[slot][kind].GetChild<Node3D>(0), liters);
+                        rack.BottleLiters[slot] = liters;
+                    }
                 }
                 break;
             case BoxProp box:
@@ -1135,7 +1181,16 @@ public partial class WorldView : Node3D {
                     prop.Body.RotationDegrees = new Vector3(rocking * 9 * MathF.Sin(Elapsed * 18), 0, rocking * 6 * MathF.Cos(Elapsed * 15));
                 }
                 break;
+            case BarrelProp barrel:
+                if (live) {
+                    barrel.SetBungOpen(openBungs.GetValueOrDefault(t.Id));
+                    float barrelLift = t.Id == Lifting ? Ease(LiftProgress) : 0;
+                    prop.Body.Position = Vector3.Up * (.22f * barrelLift);
+                    prop.Body.RotationDegrees = new Vector3(-8 * barrelLift, 0, 3 * MathF.Sin(Elapsed * 12) * barrelLift);
+                }
+                break;
             case HutProp hut:
+                if (live) hut.RoofBarrel.Visible = Barrel.In(t.Inventory) != null;
                 // The door stands open while someone steps in or out, and shuts behind them: swung shut after a walk, slammed after a run.
                 // A wolf forcing the door holds it as far open as its body has pushed it.
                 if (live && World.DoorCheck.AtDoor(t.Id) is { DoorCheck: <= DoorCheckStage.Launching } caller) DoorwayView.PushDoor(hut, DoorCheckView.DoorDegrees(DoorCheckClock(caller)));
@@ -1566,7 +1621,7 @@ public partial class WorldView : Node3D {
         Worker? worker = null;
         foreach (var w in World.Workers) if (w.Id == Selection.Worker) worker = w;
         workerRing.Visible = worker != null && World.Sees(worker);
-        if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
+        if (worker != null) { workerRing.Position = WorkerFeet(worker) + Vector3.Up * .02f; workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
         removalMark.Update(World, Removal);
@@ -1588,7 +1643,7 @@ public partial class WorldView : Node3D {
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
     }
 
-    /// <summary>Builds a hidden, faded ghost of every building and of a crate, so picking one in build mode compiles nothing mid-game.</summary>
+    /// <summary>Builds a hidden, faded ghost of every building, crate and barrel, so picking one in build mode compiles nothing mid-game.</summary>
     private void BuildGhosts() {
         Prop Ghost(ThingKind kind, Vector2 at) {
             var built = WorldModels.Build(new Thing { Kind = kind, Pos = at });
@@ -1600,6 +1655,7 @@ public partial class WorldView : Node3D {
         }
         foreach (var kind in World.Data.Buildings.Keys) if (kind != ThingKind.Mine) ghosts[kind] = Ghost(kind, Vector2.Zero);
         ghosts[ThingKind.Crate] = Ghost(ThingKind.Crate, Vector2.Zero);
+        ghosts[ThingKind.Barrel] = Ghost(ThingKind.Barrel, Vector2.Zero);
         foreach (var ore in Cliff.Ores) mineGhosts[ore] = Ghost(ThingKind.Mine, Cliff.Of(ore).MineSpot);
     }
 
@@ -1701,8 +1757,11 @@ public partial class WorldView : Node3D {
             foreach (var hit in HitsOf(hovered)) top = Math.Max(top, hit.Top);
             Tag(Screen(hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(GetViewport().GetMousePosition())) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
         }
-        foreach (var w in World.Workers)
-            if (World.Sees(w) && (w.Id == HoverWorker || w.Id == Selection.Worker)) Tag(Screen(w.Pos, 2.05f), w.Name);
+        foreach (var w in World.Workers) {
+            if (!World.Sees(w) || w.Id != HoverWorker && w.Id != Selection.Worker) continue;
+            var feet = WorkerFeet(w);
+            Tag(Screen(new Vector2(feet.X, feet.Z), feet.Y + 2.05f), w.Name);
+        }
     }
 }
 

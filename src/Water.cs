@@ -6,6 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>The refillable three-liter bottle, and a liter drunk straight from a water source.</summary>
 public static class Water {
+    public const string BottleTool = "bottle";
     /// <summary>The bottle's item ids, full to empty, and the water a full one pours into a station.</summary>
     public const string Full = "water", TwoLiters = "water_2", OneLiter = "water_1", Empty = "empty_bottle", Liquid = "fresh_water";
     public const float LiterThirst = 100f / 3f;
@@ -33,13 +34,26 @@ public static class Water {
         if (source.Kind != ThingKind.Water) return WaterCollectResult.NoChange;
         Inventory backpack = world.S.Backpack;
         string? bottle = FindBottle(backpack);
-        if (bottle == Full) return WaterCollectResult.NoChange;
-        if (bottle != null) {
+        if (bottle != null && bottle != Full) {
             Replace(backpack, bottle, Full);
             return WaterCollectResult.RefilledBottle;
         }
+        if (FillBucket(backpack)) return WaterCollectResult.RefilledBottle;
+        if (bottle == Full) return WaterCollectResult.NoChange;
         world.S.Thirst = System.Math.Min(100, world.Thirst + LiterThirst);
         return WaterCollectResult.SourceLiter;
+    }
+
+    internal static bool HasBucketRoom(Inventory backpack) {
+        foreach (var (item, _) in backpack.Items)
+            if (Bucket.Liters(item) is >= 0 and < Bucket.Capacity && backpack.CanReplaceOne(item, Bucket.AtFill(Bucket.Capacity))) return true;
+        return false;
+    }
+
+    private static bool FillBucket(Inventory backpack) {
+        for (int liters = Bucket.Capacity - 1; liters >= 0; liters--)
+            if (backpack.ReplaceOne(Bucket.AtFill(liters), Bucket.AtFill(Bucket.Capacity))) return true;
+        return false;
     }
 
     /// <summary>Drinks one liter and preserves the same individual bottle in its next state.</summary>

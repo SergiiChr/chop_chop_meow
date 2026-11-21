@@ -123,12 +123,15 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
         var slots = new HBoxContainer(); slots.AddThemeConstantOverride("separation", 14); well.AddChild(slots);
         var toolColumn = new VBoxContainer { Name = "tool" }; toolColumn.AddThemeConstantOverride("separation", 6); slots.AddChild(toolColumn);
         toolColumn.AddChild(Style.WellLabel("Tool"));
-        toolColumn.AddChild(NewInventoryGrid(() => w.ToolSlot, null, id => moves.Stack(w.ToolSlot, world.S.Backpack, id), $"{StationSlots.SlotHint}\nPut a tool here to give it to them",
-            held => held.Stack is HeldStack stack && world.Data.Items.TryGetValue(stack.Item, out var def) && def.Tool != "", columns: 1, size: 46));
+        toolColumn.AddChild(NewInventoryGrid(() => w.ToolSlot, null, id => moves.Stack(w.ToolSlot, world.S.Backpack, id), $"{StationSlots.SlotHint}\nPut a tool, bucket or bottle here",
+            held => held.Stack is HeldStack stack && world.FitsWorkerToolSlot(stack.Item), columns: 1, size: 46));
         slots.AddChild(new VSeparator());
         var hands = new VBoxContainer { Name = "hands", SizeFlagsHorizontal = SizeFlags.ExpandFill }; hands.AddThemeConstantOverride("separation", 6); slots.AddChild(hands);
         var carrying = Style.WellLabel(""); hands.AddChild(carrying);
-        live.Bind(carrying, text => text.Append("Carrying ").Append(w.Bag.Count).Append(" of ").Append(Worker.BagStack));
+        live.Bind(carrying, text => {
+            if (Barrel.In(w.Bag) != null) text.Append("Carrying a barrel");
+            else text.Append("Carrying ").Append(w.Bag.Count).Append(" of ").Append(Worker.BagStack);
+        });
         hands.AddChild(NewInventoryGrid(() => w.Bag, null, id => moves.Stack(w.Bag, world.S.Backpack, id), $"{StationSlots.SlotHint}\nPut a stack here and they carry it to where it goes", columns: 6, size: 46));
         var status = Style.Text("", 15, Style.Ink, wrap: true); well.AddChild(status);
         var owed = Style.Text("", 13, Style.Brick, Style.Bold); well.AddChild(owed);

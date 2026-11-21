@@ -36,8 +36,12 @@ public sealed partial class World {
     /// <summary>A haul job, alone or a haul group: carries the best load across its places, one at a time.</summary>
     private bool Haul(Worker w, JobEntry job, float dt) {
         if (w.Plan.Place is not Thing planned || !Covers(job, planned) || !Stands(w.Plan)) w.Plan = NextCarry(w, job);
-        if (w.Plan.Place is not Thing place) { w.Status = HaulWait(job); return false; }
+        if (w.Plan.Place is not Thing place) {
+            w.Status = HaulWait(job);
+            return barrelJobs.Haul(w, job, dt);
+        }
         // The job in hand is the haul at the place the carry is for, also when a haul group picked it.
+        w.WaterWalk = null;
         w.Assignment = place.Id; w.Doing = JobKind.Haul;
         if (!HandsFree(w, dt)) return true;
         var c = w.Plan;
@@ -63,7 +67,7 @@ public sealed partial class World {
     }
 
     /// <summary>Whether a haul job still holds a place: its own, or one of a haul group's.</summary>
-    private static bool Covers(JobEntry job, Thing place) {
+    internal static bool Covers(JobEntry job, Thing place) {
         if (job is Duty duty) return duty.Thing == place.Id;
         foreach (var haul in ((HaulGroup)job).Hauls) if (haul.Thing == place.Id) return true;
         return false;
@@ -85,6 +89,8 @@ public sealed partial class World {
 
     private string HaulWait(Thing place) => place.Kind switch {
         ThingKind.Mine when place.MineStage == MineStage.Dug => Mines.Wants(place),
+        ThingKind.Hut when Barrel.In(place.Inventory) == null => "Needs a steel barrel in the cabin",
+        ThingKind.Hut or ThingKind.Barrel when Barrels.Room(place) == 0 => "The barrel is full",
         ThingKind.Packer when place.Packs == "" => "Choose what to pack",
         ThingKind.Packer => "Waiting for goods and crates",
         ThingKind.Farm when Short(place.Inventory, Data.Farm.Sow) is string seed => Phrase("Needs ", Data.Name(seed), " in output-enabled storage"),
@@ -109,6 +115,7 @@ public sealed partial class World {
 
     private void Carries(Worker w, Thing place, ref Carry best) {
         switch (place.Kind) {
+            case ThingKind.Barrel or ThingKind.Hut: break;
             case ThingKind.Mine: MineCarries(w, place, ref best); break;
             case ThingKind.Farm: FarmCarries(w, place, ref best); break;
             case ThingKind.Packer: PackerCarries(w, place, ref best); break;

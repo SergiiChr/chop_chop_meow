@@ -17,13 +17,15 @@ public sealed class PageMemory {
     public bool Hiring, SheetOpen = true;
     /// <summary>The number of the packed crate opened from the backpack, or 0 for an empty crate.</summary>
     public int CarriedCrate;
+    /// <summary>The backpack cell of the open steel barrel.</summary>
+    public int CarriedBarrelSlot = -1;
 }
 
 /// <summary>What every page is built with.</summary>
 public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory, HeldCursor Cursor);
 
 /// <summary>The pages of the side panel.</summary>
-public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, Crate }
+public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, Crate, Barrel }
 
 /// <summary>What the side panel inspects: a thing, a worker or nothing, never both.</summary>
 public readonly record struct Selection {
@@ -53,6 +55,7 @@ public partial class SidePanel : MovableWindow {
         ("Crafting", (tools, _) => new CraftPanel(tools)),
         ("Inspect", InspectPage.For),
         ("Wood crate", (tools, _) => new CarriedCratePanel(tools, tools.Memory.CarriedCrate)),
+        ("Steel barrel", (tools, _) => new CarriedBarrelPanel(tools, tools.Memory.CarriedBarrelSlot)),
     };
     private readonly World world;
     private readonly UiKit kit;
@@ -214,6 +217,13 @@ public partial class SidePanel : MovableWindow {
         if (tools.Memory.CarriedCrate != crate) Page = Page.None;
         tools.Memory.CarriedCrate = crate;
         Open(Page.Crate);
+    }
+
+    /// <summary>Opens the barrel in the given backpack cell.</summary>
+    public void OpenBarrel(int slot) {
+        if (tools.Memory.CarriedBarrelSlot != slot) Page = Page.None;
+        tools.Memory.CarriedBarrelSlot = slot;
+        Open(Page.Barrel);
     }
 
     /// <summary>Opens the page where a recipe is made, a station's or with none the crafting menu, with the recipe's group open.</summary>

@@ -41,7 +41,32 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Value("--wolf-scene") is string wolves) view.AddChild(new WolfReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = wolves });
     }
 
+    private void VesselReview() {
+        var at = Terrain.Spawn;
+        foreach (var t in world.Things.Where(t => t.Pos.DistanceTo(at) < 9).ToArray()) world.S.Things.Remove(t);
+        var cabin = world.Add(ThingKind.Hut, at);
+        cabin.Inventory.Add(Barrel.AtFill(20), 1);
+        var rack = world.Add(ThingKind.Toolstation, at + new Vector2(3.1f, -.8f));
+        rack.Inventory.Add(Bucket.Item, 2);
+        rack.Inventory.Add("steel_axe", 1);
+        rack.Inventory.Add(Water.Full, 1);
+        var barrel = world.Add(ThingKind.Barrel, at + new Vector2(.8f, 2.35f));
+        barrel.Inventory.Add(Water.Liquid, 25);
+        var pile = world.Add(ThingKind.Pile, at + new Vector2(-2.7f, 1.8f));
+        pile.Inventory.Add(Barrel.Item, pile.Inventory.Slots * pile.Inventory.StackOf(Barrel.Item));
+        world.Player = at + new Vector2(-2f, -2f);
+        world.S.Time = world.Data.DaySeconds * .2f;
+        world.Tick(0);
+        view.CameraOn = at + new Vector2(-.48f, -.86f);
+        view.CameraTurn = Launch.Number("--camera-turn", 0);
+        view.CameraPitch = Launch.Number("--camera-pitch", 30);
+        view.Zoom = 2.15f;
+        panel.Close();
+        ui.Visible = false;
+    }
+
     private void Place() {
+        if (Launch.Has("--steel-vessels")) { VesselReview(); return; }
         if (Launch.Has("--environment-review")) {
             string location = Launch.Value("--environment-review") ?? "forest";
             float coastAcross = Terrain.Across(Terrain.Spawn);
@@ -182,7 +207,8 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // --goods-pile N looks at the Nth pile, counting from 0.
             const int perRow = 8;
             var at = Terrain.Spawn + new Vector2(-3, 9);
-            string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins).ToArray();
+            string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins
+                && ContainerItem.Base(item) == item).ToArray();
             float share = Launch.Number("--goods-share", .6f); int look = (int)Launch.Number("--goods-pile", 0);
             Vector2 Spot(int pile) => at + new Vector2(pile % perRow * 3.2f, pile / perRow * 3.2f);
             world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + perRow * 3.2f + 4 && t.Pos.Y > at.Y - 4 && t.Pos.Y < at.Y + (goods.Length / perRow + 1) * 3.2f + 4);
