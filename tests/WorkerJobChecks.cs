@@ -440,8 +440,8 @@ public static class WorkerJobChecks {
     private static void CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(GameData data) {
         var world = FundedWorld(data);
         var mine = MarkMine(world); OpenMine(mine);
-        mine.Output!.Add(World.MineOre(mine), mine.Output.StackSize);
-        var rack = world.Add(ThingKind.Toolstation, mine.Pos + World.CliffAt(mine.Pos).Face * 4);
+        mine.Output!.Add(Mines.Ore(mine), mine.Output.StackSize);
+        var rack = world.Add(ThingKind.Toolstation, mine.Pos + Cliff.Nearest(mine.Pos).Face * 4);
         rack.Inventory.Add("steel_pick", 1);
         var miner = Staff(world, mine, JobKind.Mine);
         Work(world, 20);

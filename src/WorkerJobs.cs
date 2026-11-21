@@ -117,7 +117,7 @@ public sealed partial class World {
             return dest.Burner is Inventory burner && Fuels(dest).Contains(item) && FuelTakes(dest, item) && (room = burner.Room(item)) > 0 ? (burner, room) : null;
         }
         room = dest.Kind switch {
-            ThingKind.Mine => MineNeed(dest, item),
+            ThingKind.Mine => Mines.Need(dest, item),
             ThingKind.Farm => SowRoom(dest, item),
             // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
             ThingKind.Signpost when !dest.Inventory.Wants(item) => 0,
@@ -162,10 +162,10 @@ public sealed partial class World {
         return w.Tool == "" || ReturnTool(w, dt);
     }
 
-    private enum Kit { Ready, Busy, Lacking }
+    internal enum Kit { Ready, Busy, Lacking }
 
     /// <summary>Gets a worker the tool a job needs: puts back one of another kind, then takes the best from a tool station; tells whether they hold it, are on the way, or have none to take.</summary>
-    private Kit Equip(Worker w, string need, Thing target, float dt) {
+    internal Kit Equip(Worker w, string need, Thing target, float dt) {
         if (w.Tool != "" && Data.Items[w.Tool].Tool != need) {
             if (!ReturnTool(w, dt)) return Kit.Busy;
             // With no room in a tool station the tool stays in hand, and a job that needs another kind waits for room.

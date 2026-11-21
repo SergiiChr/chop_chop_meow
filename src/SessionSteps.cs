@@ -33,8 +33,8 @@ public partial class Game {
 
     /// <summary>Puts the player in front of the first iron cliff, where a mine is marked, and gives the cliff.</summary>
     private async Task<Cliff> StandAtIronCliff() {
-        var cliff = World.CliffOf(ThingKind.Iron);
-        SetupSteps.Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        var cliff = Cliff.Of(ThingKind.Iron);
+        SetupSteps.Warp(Hosted, cliff.MineSpot + cliff.Face * 3); await Frames(4);
         return cliff;
     }
 

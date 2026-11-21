@@ -59,7 +59,7 @@ public sealed partial class World {
         // Every packed crate has a name of its own, so the status names none.
         if (c.From == place) return c.Item.StartsWith(PackedPrefix) ? "Carrying out a packed crate" : Phrase("Carrying out ", Data.Name(c.Item));
         if (c.Fuel) return Phrase("Fetching ", Data.Name(c.Item), " for the fire");
-        return place.Kind == ThingKind.Mine ? Phrase("Fetching ", Data.Name(c.Item), " for the ", MineName(place)) : Phrase("Fetching ", Data.Name(c.Item));
+        return place.Kind == ThingKind.Mine ? Phrase("Fetching ", Data.Name(c.Item), " for the ", Mines.Name(place)) : Phrase("Fetching ", Data.Name(c.Item));
     }
 
     /// <summary>Whether a haul job still holds a place: its own, or one of a haul group's.</summary>
@@ -84,7 +84,7 @@ public sealed partial class World {
     }
 
     private string HaulWait(Thing place) => place.Kind switch {
-        ThingKind.Mine when place.MineStage == MineStage.Dug => MineWants(place),
+        ThingKind.Mine when place.MineStage == MineStage.Dug => Mines.Wants(place),
         ThingKind.Packer when place.Packs == "" => "Choose what to pack",
         ThingKind.Packer => "Waiting for goods and crates",
         ThingKind.Farm when Short(place.Inventory, Data.Farm.Sow) is string seed => Phrase("Needs ", Data.Name(seed), " in output-enabled storage"),
@@ -212,7 +212,7 @@ public sealed partial class World {
     private void MineCarries(Worker w, Thing mine, ref Carry best) {
         if (mine.MineStage != MineStage.Dug) return;
         foreach (var (item, wanted) in Data.Mine.Materials) {
-            int need = MineNeed(mine, item);
+            int need = Mines.Need(mine, item);
             if (need > 0 && SourceFor(item, w.Pos, mine.Id) is Thing source) Offer(ref best, Bring(mine, source, item, need, wanted - need, wanted));
         }
     }

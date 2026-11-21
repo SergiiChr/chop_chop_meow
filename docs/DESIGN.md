@@ -80,7 +80,8 @@ Simulation and data:
 | `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
 | `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
 | `src/Farm.cs` | Farm plots |
-| `src/Mine.cs` | Mines |
+| `src/mines/Mines.cs` | Mines: where one is marked and stands at its cliff, its three building stages, supplying it, working it underground and the end goal's working mines |
+| `src/mines/model/Cliff.cs`, `src/mines/model/MineStage.cs` | `Cliff`, the valley's ore cliffs and the mine spot at each, and `MineStage`, how far a mine is built |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
@@ -111,7 +112,7 @@ UI and input:
 | `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
-| `src/MinePanel.cs` | The mine's building steps, miners and outputs |
+| `src/mines/display/MinePanel.cs` | The mine's building steps, miners and outputs |
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream slots, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
 | `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what outlasts a page |
 | `src/BackpackDrawer.cs` | The backpack drawer above the hotbar |
@@ -206,6 +207,7 @@ Rendering and sound:
 | `src/actors/player/display/FallBackView.cs` | A player knocked or tugged off their feet falling onto their back, their throat as they go over and their hands at the wolf |
 | `src/cabins/display/DoorwayView.cs`, `src/cabins/model/DoorShown.cs` | Players at cabin doors: stepping in and out, following, knocking, standing aside and squeezing past with a palm on the frame |
 | `src/cabins/display/CabinModel.cs`, `src/cabins/display/CabinShape.cs`, `src/cabins/display/HutProp.cs` | Builds the cabin's model, its wall shell, roof and interior, and the cabin as drawn: its door, window and lamp |
+| `src/mines/display/MineModel.cs`, `src/mines/display/MineShape.cs`, `src/mines/display/MineRockShape.cs`, `src/mines/display/MineProp.cs` | Builds a mine's model and the rock spur at every cliff, and the mine as drawn stage by stage |
 | `src/cabins/display/StairSteps.cs` | The cabin's steps, how high they stand at a spot, and a pose's boots fitted onto them |
 | `src/cabins/display/DoorKeyView.cs` | The round lock of a cabin's door with its key in it, drawn into a picture for the cabin's page |
 | `src/cabins/display/InsideDoorPOV.cs` | What a player inside sees of a wolf forcing the door: a dark cabin with copies of the wolves and the player taken out, in a window that shows it as an old tape ([assets/environment/vhs](../assets/environment/vhs/README.md)) |
@@ -219,7 +221,7 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | Every check of a feature whose code has a folder, beside its steps: `*Checks.cs` its rules through `World`, `*UIChecks.cs` what the player does and sees, `*NetChecks.cs` its scene in the network session. So far `tests/paths/`, `tests/cabins/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/<feature>/` | Every check of a feature whose code has a folder, beside its steps: `*Checks.cs` its rules through `World`, `*UIChecks.cs` what the player does and sees, `*NetChecks.cs` its scene in the network session. So far `tests/paths/`, `tests/cabins/`, `tests/mines/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
 | `tests/*Checks.cs` | Simulation checks of the features whose code is still flat, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
@@ -417,7 +419,7 @@ Each striking work action has an impact moment that shakes its target and spawns
 The axe, pick and hammer land there (`ActorAnimation.ChopStrike`, `MineStrike`, `HammerStrike`), speeding up all the way into the blow; a punch draws the fist back first.
 A dig strikes at `ActorAnimation.DigStrike` and throws its soil off the blade (`ActorRig.ShovelTip`) at `DigToss`.
 
-A blow lands its tool's working end on what is worked, wherever within reach the worker stands (`StrikePoints`, `ActorState.Mark`): the axe's head on the trunk's side, the pick's point where its swing first meets the rock or on the cliff's rock face beside a marked mine's cave mouth (`World.MineDigFace`), the hammer's face on the anvil's or bench's work top, and the shovel's blade in the ground at a stump's or bush's foot.
+A blow lands its tool's working end on what is worked, wherever within reach the worker stands (`StrikePoints`, `ActorState.Mark`): the axe's head on the trunk's side, the pick's point where its swing first meets the rock or on the cliff's rock face beside a marked mine's cave mouth (`Mines.DigFace`), the hammer's face on the anvil's or bench's work top, and the shovel's blade in the ground at a stump's or bush's foot.
 Chips and soil fly from there.
 Where the blow's own swing meets what is worked, the swing is cut short there (`ActorAnimation.Swing`).
 Where it passes it by, the right arm is solved to reach it with the tool held in line with the forearm (`ArmReach.ArmTo`), the trunk turning to face it and leaning in or back as far as the arm needs; an arm that would have to swing behind the trunk or fold its elbow tight stops where its swing passes nearest instead.
@@ -508,7 +510,7 @@ In multiplayer it is available only when everyone is downed; a living player pre
 
 The end goals:
 
-- a working mine on every ore in `World.Cliffs`;
+- a working mine on every ore in `Cliff.All`;
 - `Goals.ProfitDays` consecutive days of at least `Goals.DailyProfit` profit.
 
 `SaveState.DayRevenue` collects returned sale coins.
@@ -583,7 +585,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 `Travel` swerves round anything a route's straight leg clips instead of walking through it, and after a search finds no way it waits `RouteRetrySeconds` before the next.
 
 - **Dens.** `WolfPatrols.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
-  The outcrop is solid like a mine's (`World.InSpur`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
+  The outcrop is solid like a mine's (`Mines.InRock`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
   From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
   After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`).
 - **Strength.** A wolf's health, bite and pace are `GameData.WolfHealth`, `WolfBite` and `WolfTrot`, the same every night: it stands two blows of a steel axe and falls to the third or fourth, and its fourth bite brings a healthy player to half health.
@@ -1150,9 +1152,9 @@ Trades always use the live price, so the sheet can be out of date.
 
 ### Mines
 
-A mine (`src/Mine.cs`, `Mine` in `GameTables`) is marked free and snaps to `World.MineSpot`, in front of the middle of an ore cliff's face between its two deposits, one per cliff.
+A mine (`src/mines/`, `Mine` in `GameTables`) is marked free and snaps to `Cliff.MineSpot`, in front of the middle of an ore cliff's face between its two deposits, one per cliff.
 Each portal follows its own cliff face, its tunnel runs into the rock, and its rails point outward toward the valley.
-A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`World.InSpur`), and holds the tunnel, which `WorldModels.Mine` darkens step by step to black.
+A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`Mines.InRock`), and holds the tunnel, which `MineModel.Build` darkens step by step to black.
 
 `Thing.MineStage` counts finished stages from `MineStage.Marked`:
 
@@ -1163,13 +1165,13 @@ A continuous outcrop extends from the mountain foot, blocks walking with a match
 | Fitted | a worker with a hammer | `MineStage.Open` |
 
 The two worker stages take `StageWorkdays` of `GameData.WorkdaySeconds`.
-The player holding a gather on the mine (`World.Gather`, standing at `World.MineDoor`) adds to the same progress with a pickaxe or hammer carried (`World.BuildMine`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
+The player holding a gather on the mine (`World.Gather`, standing at `Mines.Door`) adds to the same progress with a pickaxe or hammer carried (`Mines.Work`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
 
 Up to `Mine.Workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).
 Each adds one ore and one stone to the mine's two-slot `Thing.Output` every `Mine.Seconds`.
 Mining stops while either slot holds a full stack.
-A miner then carries a load of it to the nearest place that takes it (`World.Dig`), and with none the mine reports once that it is full and the mine job has nothing to do.
+A miner then carries a load of it to the nearest place that takes it (`Mines.Mine`), and with none the mine reports once that it is full and the mine job has nothing to do.
 
 ### Farming
 

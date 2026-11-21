@@ -6,6 +6,9 @@ using Godot;
 using static Checks;
 using static WorldSteps;
 using static EconomySteps;
+using static PlayerSteps;
+using static SetupSteps;
+using static WorkerSteps;
 
 /// <summary>
 /// Checks the economy rules in docs/ECONOMY.md against the game tables.
@@ -17,6 +20,7 @@ public static class EconomyChecks {
         CheckEveryCrateSellsForMoreThanItsWholeChainCosts(data, chain);
         CheckHiredWorkersEarnMoreThanTheirPay(data, chain);
         CheckBasketIsSustainable(data);
+        CheckDailyProfitIsSalesMinusWagesAndAWeekOfItMeetsTheProfitGoal(data);
     }
 
     /// <summary>A worker-day's cost: the lowest daily wage among the hire offers, leaving out what is paid up front.</summary>
@@ -94,4 +98,28 @@ public static class EconomyChecks {
         }
     }
 
+    private static void CheckDailyProfitIsSalesMinusWagesAndAWeekOfItMeetsTheProfitGoal(GameData data) {
+        var world = FundedWorld(data);
+        var worker = AddWorker(world, new Vector2(30, 30));
+        worker.Wage = 26;
+        var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
+        world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("berries", 12)), 1);
+        Require(world.Sell(sign), "a crate of berries should go to the village");
+        Work(world, data.TradeSeconds + .5f);
+        int revenue = sign.Wages![Inventory.Coins] + sign.Output![Inventory.Coins];
+        Require(revenue > 0 && world.DayRevenue == revenue, "coins from a returned sale must count as the day's revenue");
+
+        RunUntilDawn(world);
+        Require(world.Profits.SequenceEqual(new[] { revenue - 26 }) && world.DayRevenue == 0, "a day's profit must be its sales minus the wages charged at dawn");
+
+        int goal = data.Goals.DailyProfit;
+        for (int day = 0; day < data.Goals.ProfitDays - 1; day++) { SetDayRevenue(world, goal + 26); RunUntilDawn(world); }
+        Require(world.ProfitStreak == data.Goals.ProfitDays - 1 && !world.ProfitGoalMet, "a streak one day short must not meet the profit goal");
+        SetDayRevenue(world, goal + 25); RunUntilDawn(world);
+        Require(world.ProfitStreak == 0, "a day below the target must break the streak");
+        for (int day = 0; day < data.Goals.ProfitDays; day++) { SetDayRevenue(world, goal + 26); RunUntilDawn(world); }
+        Require(world.ProfitGoalMet, "enough days in a row at the target must meet the profit goal");
+        RunUntilDawn(world);
+        Require(world.ProfitGoalMet && world.ProfitStreak == 0, "the profit goal must stay met after a later slow day");
+    }
 }

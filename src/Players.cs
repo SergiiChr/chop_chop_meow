@@ -181,7 +181,7 @@ public sealed partial class World {
             case Verb.ClearFilters: ClearFilters(t); break;
             case Verb.SetCompost: SetCompost(t, c.Count != 0); break;
             case Verb.SkipFood: SetSkipFood(t, c.Count != 0); break;
-            case Verb.SupplyMine: SupplyMine(t, c.Item, c.Count); break;
+            case Verb.SupplyMine: Mines.Supply(t, c.Item, c.Count); break;
             case Verb.LoadBatch: LoadBatch(t, Math.Clamp(c.Count, 1, 5)); break;
             case Verb.LoadInput: LoadInput(t, c.Item, c.Count); break;
             case Verb.LoadFuel: LoadFuel(t, c.Item, c.Count); break;

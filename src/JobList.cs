@@ -55,7 +55,7 @@ public partial class JobList(UiKit kit, LiveUpdates live, Worker w) : VBoxContai
     /// and for a resource, whose icon is already what it yields.
     /// </summary>
     public static string? Made(World world, Thing at) => at.Kind switch {
-        ThingKind.Mine => World.MineOre(at),
+        ThingKind.Mine => Mines.Ore(at),
         ThingKind.Packer => at.Packs == "" ? null : at.Packs,
         ThingKind.Farm => world.Crop,
         _ => world.Data.Recipes.TryGetValue(at.Recipe, out var recipe) ? recipe.Output : null
