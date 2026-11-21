@@ -470,7 +470,7 @@ public partial class WorldView {
         if (reviewRigs.Count == 0) return;
         reviewPerson.Update(Vector2.Zero, person, track, dt);
         Pose(reviewRigs[0], reviewPerson, null);
-        if (downed > 0) FallBackView.FallBack(reviewRigs[0], reviewPerson, downed, false, clip == "wolf leap" ? wolf : null);
+        if (downed > 0) FallBackView.FallBack(reviewRigs[0], reviewPerson, reviewPerson.Pose, downed, false, clip == "wolf leap" ? wolf : null);
     }
 
     private void UpdateWaterReview(string vessel) {

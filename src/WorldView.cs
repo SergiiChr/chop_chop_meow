@@ -37,6 +37,8 @@ public partial class WorldView : Node3D {
     /// <summary>A fixed daylight landscape view with the lake and sea waves held at one moment, for <c>--environment-review</c>; set before the view enters the tree.</summary>
     public bool EnvironmentReview;
     public bool EnvironmentReviewFog;
+    /// <summary>Whether to hide the world markers with the interface in a showcase.</summary>
+    public bool HideMarkers { get; init; }
     public Vector2? EnvironmentCenter;
     public float EnvironmentCameraDistance = 60;
     public float Elapsed;
@@ -60,6 +62,7 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<int, Prop> props = new();
     private readonly StrikePoints strikes = new();
     private readonly ActorState player = new();
+    private (float PullL, float PullR) playerArmPull;
     private ActorRig playerRig = null!;
     private string playerShirt = "";
     /// <summary>The other players in the game, keyed by their id.</summary>
@@ -259,6 +262,7 @@ public partial class WorldView : Node3D {
         public readonly ActorRig Rig = rig;
         public readonly string Shirt = shirt;
         public readonly ActorState State = new();
+        public (float PullL, float PullR) ArmPull;
         public ActorAction Pulse;
         public Vector2 PulseTarget;
         public float PulseRemaining;
@@ -514,10 +518,7 @@ public partial class WorldView : Node3D {
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
-        // A downed player is posed by the fall alone.
-        if (downedFor > 0) FallBackView.FallBack(playerRig, player, downedFor, torch, World.Dead ? null : HoldingOff(World.Me.Id));
-        else Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch, door, dt,
-            barrel: HugsBarrel(action, World.S.Backpack));
+        PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, SelectedTool, World.S.Backpack), torch, door, dt);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject, playerRig);
@@ -655,9 +656,8 @@ public partial class WorldView : Node3D {
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
-            if (other.DownedFor > 0) FallBackView.FallBack(other.Rig, state, other.DownedFor, torch, p.RespawnIn > 0 ? null : HoldingOff(p.Id));
-            else Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), torch, door, dt,
-                barrel: HugsBarrel(action, p.Backpack));
+            string? tool = ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null);
+            PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, p.Selected, p.Backpack), torch, door, dt);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, subject, other.Rig);
@@ -681,14 +681,30 @@ public partial class WorldView : Node3D {
         return null;
     }
 
-    /// <summary>Poses the actor and settles its feet onto the cabin steps while it is at the door.</summary>
+    /// <summary>A player's arms follow the wolves holding them and ease free as the player stands or falls.</summary>
+    private void PosePlayer(ActorRig rig, ActorState state, PlayerState who, ref (float PullL, float PullR) pull,
+        float downed, string? tool, bool torch, DoorShown? door, float dt) {
+        var pose = tugs.PulledArms(downed > 0 ? state.Pose : StandingPose(rig, state), who, ref pull, dt);
+        if (downed > 0) FallBackView.FallBack(rig, state, pose, downed, torch, who.RespawnIn > 0 ? null : HoldingOff(who.Id));
+        else ShowStanding(rig, state, pose, tool, torch, door, dt, HugsBarrel(state.Action, who.Backpack), null);
+    }
+
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null,
-        float dt = 0, bool barrel = false, string? vessel = null) {
+        float dt = 0, bool barrel = false, string? vessel = null) =>
+        ShowStanding(rig, state, StandingPose(rig, state), tool, torch, door, dt, barrel, vessel);
+
+    /// <summary>Places the upright rig so the pose can aim at the actor's mark in its own frame.</summary>
+    private static Pose StandingPose(ActorRig rig, ActorState state) {
         rig.Root.Position = To3(state.Position);
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
         state.MarkInRig = state.Mark is Vector3 mark ? rig.Root.Transform.AffineInverse() * mark : null;
-        var pose = state.Pose;
+        return state.Pose;
+    }
+
+    /// <summary>Draws the actor in its standing pose, settling its feet onto the steps while at a cabin door.</summary>
+    private static void ShowStanding(ActorRig rig, ActorState state, Pose pose, string? tool, bool torch,
+        DoorShown? door, float dt, bool barrel, string? vessel) {
         Vector3? jamb = null;
         if (door is DoorShown at) {
             (pose, jamb) = DoorwayView.StandAt(pose, state, at, state.OnSteps ? dt : StairSteps.Settle);
@@ -1501,9 +1517,9 @@ public partial class WorldView : Node3D {
     /// A player in a cabin's doorway is leapt at by the <paramref name="waist"/>, where the wolf takes hold to tug them back out.
     /// </summary>
     private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted, float flight, float seconds, Vector3? waist = null) {
-        if (model.Pinned > ActorAnimation.FallBackSeconds) return model.Held;
+        if (model.Pinned > ActorAnimation.FallBackSeconds) return model.Root.Position;
         var held = (waist ?? FallBackView.Throat(hunted, model.Toward, model.Pinned)) - model.Root.Basis * model.Bite;
-        if (model.Pinned > 0) return model.Held = held with { Y = 0 };
+        if (model.Pinned > 0) return held with { Y = 0 };
         return WolfModel.LeapPath(model.StepFrom, held with { Y = 0 }, flight, seconds);
     }
 
@@ -1609,7 +1625,7 @@ public partial class WorldView : Node3D {
     }
 
     private void UpdateMarkers() {
-        if (EnvironmentReview) {
+        if (EnvironmentReview || HideMarkers) {
             selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = placeTile.Visible = false;
             return;
         }

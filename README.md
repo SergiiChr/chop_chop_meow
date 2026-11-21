@@ -992,7 +992,7 @@ The wolf scratches at the door for 3.6 seconds, which you hear from inside.
   It squeezes in between the door and its frame over 2.5 seconds, stands in the doorway growling at you with its fangs bared for 2 seconds and launches itself at you.
 - It bites and takes you out by the waist, as a wolf tugging you out of the doorway does: at more than half health it lets go and leaves you standing outside.
 - With two players inside it takes the one who came in last.
-- Other wolves that come to the same door wait a few metres behind it and go for you once you are out, one taking each of your arms while the first tugs.
+- Other wolves that come to the same door wait a few metres behind it and go for you once you are out, one catching each forearm and drawing it out to the side while the first wolf tugs.
 - While a wolf is at the door, Step outside does nothing.
 - A wolf at the door turns to a player out in the open within its sight until its snout is in the door, and a hit knocks it off the door.
 

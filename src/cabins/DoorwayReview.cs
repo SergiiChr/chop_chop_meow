@@ -33,13 +33,20 @@ public sealed partial class DoorwayReview : Node {
         Stage(World, View, Cabin, Scene is not ("queue" or "occupied"));
         host = World.Me; guest = World.Arrive("neighbor", 2);
         var door = Doorways.DoorPoint(Cabin);
-        World.Player = door + new Vector2(-2.5f, 1.5f);
+        // Start the three-wolf scenes at the foot of the steps before the first frame is drawn.
+        bool packAtDoor = Scene is "takedown" or "sides";
+        World.Player = packAtDoor ? door : door + new Vector2(-2.5f, 1.5f);
+        if (packAtDoor) View.CameraOn = door + Doorways.OutOfDoor * .4f;
         // The neighbor comes from behind the cabin, so they walk round it to the door.
         World.As(guest, () => World.Player = Cabin.Pos + new Vector2(1, -3.5f));
         void HostInside() { World.Player = door; World.S.Sheltered = Cabin.Id; }
         void GuestAway() => World.As(guest, () => World.Player = door + new Vector2(60, 0));
         // One close behind the host and one out to each side of them.
-        void ThreeWolves() { foreach (var from in new[] { new Vector2(-.5f, 1.6f), new Vector2(-3, 2), new Vector2(3, 2.5f) }) World.S.Wolves.Add(new Wolf { Pos = door + from, Target = host.Id }); }
+        void ThreeWolves() {
+            foreach (var from in new[] { new Vector2(-.4f, 2.1f), new Vector2(-6.3f, 2), new Vector2(8.2f, 2.4f) })
+                World.S.Wolves.Add(new Wolf { Pos = door + from, Target = host.Id });
+            World.NumberWolvesAndOrders();
+        }
         script = Scene switch {
             // Both walk up; the host gets there first and steps in, the neighbor follows, finds the door shut and knocks on it.
             "queue" => new (float, Action)[] { (0, () => walking.Add(host)), (.4f, () => walking.Add(guest)) },
@@ -79,15 +86,11 @@ public sealed partial class DoorwayReview : Node {
             },
             // The host steps in at a walk with three wolves after them: one tugs them out and one more takes each of their arms.
             "sides" => new (float, Action)[] {
-                (0, () => { World.Player = door; GuestAway(); }),
-                (0, () => World.Doorways.Enter(Cabin, false)),
-                (.15f, ThreeWolves),
+                (0, GuestAway), (0, ThreeWolves), (0, () => World.Doorways.Enter(Cabin, false)),
             },
             // The same with the host hurt enough to go down once all three have bitten: the wolf that tugged pins them and the others feed.
             "takedown" => new (float, Action)[] {
-                (0, () => { World.Player = door; World.S.Health = 80; GuestAway(); }),
-                (0, () => World.Doorways.Enter(Cabin, false)),
-                (.15f, ThreeWolves),
+                (0, () => { World.S.Health = 80; GuestAway(); }), (0, ThreeWolves), (0, () => World.Doorways.Enter(Cabin, false)),
             },
             // A badly hurt host is tugged out of the doorway and pinned.
             _ => new (float, Action)[] {
