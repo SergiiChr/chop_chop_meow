@@ -79,7 +79,14 @@ public partial class ModeLabel : Label {
     public void Refresh() {
         if (player.Mode == shown) return;
         shown = player.Mode;
-        Text = shown is ClickMode.Assign ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : shown is ClickMode.Remove ? "REMOVE · Left click a building or gravel path to take it down. Esc or right click ends." : shown.Placing is ThingKind kind ? $"PLACE {world.Data.Name(kind).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
+        Text = shown switch {
+            ClickMode.Assign => "WORK ORDER · Click a resource to assign this villager. Esc cancels.",
+            ClickMode.Remove { Underground: true } => "REMOVE · Underground · Right click for surface · Esc to finish",
+            ClickMode.Remove => "REMOVE · Surface · Right click for underground · Esc to finish",
+            { Placing: ThingKind.Mine } => "PLACE MINE · Left click ground · Esc to cancel",
+            { Placing: ThingKind kind } => $"PLACE {world.Data.Name(kind).ToUpperInvariant()} · Left click ground · C / V to turn · Esc to cancel",
+            _ => ""
+        };
     }
 }
 

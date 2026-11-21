@@ -3,11 +3,39 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
+using static Checks;
 
 namespace ChopChopMeow;
 
 /// <summary>Finds controls on screen and opens pages for the UI and network checks.</summary>
 public partial class Game {
+    /// <summary>Measures repeated refreshes of already open pages while the world they show stands still.</summary>
+    private async Task MeasurePanelRefreshAllocations((string Name, Action Open)[] pages) {
+        // Opening the pause menu would intercept these pages, so hold the world and open each page directly.
+        bool held = true; kit.HoldWhile(() => held);
+        await Frames();
+        foreach (var (name, open) in pages) {
+            open(); await Frames();
+            // .NET first runs new code unoptimized, which boxes numbers written into text, and recompiles it optimized once it has been
+            // called often, as it does a few seconds after a panel opens. So the page is refreshed in rounds until one allocates nothing;
+            // garbage the code itself makes never gets there.
+            long bytes = 0; int rounds = 0;
+            while (rounds++ < 10) {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                // Direct on purpose: this measures the refresh itself, which waiting for the game's own refresh cannot time.
+                for (int i = 0; i < 50; i++) RefreshLive();
+                bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+                if (bytes == 0) break;
+                await Seconds(.2);
+            }
+            string report = $"panel: {name}: {bytes} B over 50 refreshes after {rounds} rounds (budget 0 B)";
+            GD.Print(report);
+            Require(bytes == 0, $"Allocation budget exceeded: {report}");
+        }
+        await CloseWithEsc();
+        held = false;
+    }
+
     private Button? FindButton(Node parent, string text) {
         foreach (var child in parent.GetChildren()) {
             if (child is Button b && b.Text == text) return b;

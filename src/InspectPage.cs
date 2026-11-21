@@ -8,6 +8,7 @@ namespace ChopChopMeow;
 public static class InspectPage {
     public static PagePanel For(PageTools tools, Selection selection) {
         var world = tools.Kit.World;
+        if (selection.Pipe is Vector2I tile) return new PipePanel(tools, tile);
         if (selection.Worker > 0) return new WorkerPanel(tools, world.Workers.FirstOrDefault(w => w.Id == selection.Worker));
         return world.Find(selection.Thing) switch {
             null => new NothingSelectedPage(tools),
@@ -17,6 +18,7 @@ public static class InspectPage {
             { Kind: ThingKind.Mine } t => new MinePanel(tools, t),
             { Kind: ThingKind.Farm } t => new FarmPanel(tools, t),
             { Kind: ThingKind.Campfire } t => new CampfirePanel(tools, t),
+            { Kind: ThingKind.Pump } t => new WaterPumpPanel(tools, t),
             { Kind: ThingKind.Packer } t => new PackerPanel(tools, t),
             { Kind: ThingKind.Crate } t => new CratePanel(tools, t),
             { Kind: ThingKind.Barrel } t => new BarrelPanel(tools, t),
@@ -55,6 +57,23 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         Headline();
         Reach();
         Body();
+        if (thing.PlumbingSlot is Inventory plumbing) {
+            var window = panel.ShowAside(190);
+            window.AddChild(Style.Heading("Plumbing", 19));
+            var row = new HBoxContainer();
+            row.AddThemeConstantOverride("separation", 8);
+            window.AddChild(Style.InWell(row));
+            var slot = stationSlots.Slot(plumbing, "steel_pipe", true,
+                count => $"Plumbing · {count}/{Plumbing.InstallCost} steel pipes\n{StationSlots.SlotHint}",
+                takes: held => held.Stack?.Item == "steel_pipe");
+            slot.Name = "plumbing_slot";
+            row.AddChild(slot);
+            var label = Style.Text("", 13, Style.Ink, wrap: true);
+            label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+            row.AddChild(label);
+            live.Watch(() => plumbing["steel_pipe"], count => label.Text =
+                count == Plumbing.InstallCost ? "Installed" : $"{count}/{Plumbing.InstallCost} pipes");
+        }
         RedrawOnChange(() => (thing.Packs, world.Selected(thing), thing.Compost, FilterCode()));
     }
 
@@ -93,7 +112,16 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
 
     /// <summary>The backpack drawer, where Shift and Ctrl store into this thing.</summary>
     protected void StoreBagGrid(Func<string, bool>? wanted = null) =>
-        BagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), $"{BagHint}\nShift: store a stack · Ctrl: all of it", wanted: wanted);
+        EquipmentBagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), $"{BagHint}\nShift: store a stack · Ctrl: all of it", wanted);
+
+    /// <summary>Moves pipes to the building's plumbing slot when a player Shift-clicks or Ctrl-clicks a stack.</summary>
+    protected void EquipmentBagGrid(Action<string> move, string hint, Func<string, bool>? wanted) {
+        if (thing.PlumbingSlot is not Inventory pipes) { BagGrid(move, hint, wanted: wanted); return; }
+        BagGrid(item => {
+            if (item == "steel_pipe") moves.Stack(world.S.Backpack, pipes, item, thing);
+            else move(item);
+        }, hint, wanted: item => item == "steel_pipe" ? pipes.Room(item) > 0 : wanted?.Invoke(item) == true);
+    }
 
     /// <summary>The backpack drawer, where Shift and Ctrl load this station.</summary>
     protected void LoadBagGrid(Func<string, bool> wanted) =>

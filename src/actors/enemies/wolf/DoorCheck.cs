@@ -113,7 +113,7 @@ public sealed class DoorCheck(World world) {
     }
 
     /// <summary>Where a wolf waits behind the one at a cabin's door: out from the door, each next one further to a side.</summary>
-    private Vector2 WaitSpot(Wolf wolf, Wolf lead, Vector2 door) {
+    private Vector2 WaitSpot(Wolf wolf, Wolf lead, Vector2 door, Vector2 outward) {
         int before = 0;
         foreach (var w in world.S.Wolves) {
             if (w == wolf) break;
@@ -121,7 +121,7 @@ public sealed class DoorCheck(World world) {
         }
         // Seen facing the door, the first waits to the left, the next to the right, the next further left, and so on.
         float aside = ((before + 1) / 2 + .5f) * WaitApart;
-        return door + Doorways.OutOfDoor * WaitBehind + BodySide.Out(-Doorways.OutOfDoor, before % 2 == 0 ? BodySide.Left : BodySide.Right) * aside;
+        return door + outward * WaitBehind + BodySide.Out(-outward, before % 2 == 0 ? BodySide.Left : BodySide.Right) * aside;
     }
 
     /// <summary>Moves a wolf's door check at a cabin on by <paramref name="dt"/> seconds.</summary>
@@ -134,16 +134,18 @@ public sealed class DoorCheck(World world) {
         switch (wolf.DoorCheck) {
             case DoorCheckStage.Coming:
                 var lead = Lead(cabin.Id, door);
+                var outward = Doorways.OutOfDoor.Rotated(cabin.Rotation);
                 if (lead == wolf) {
                     // It comes round to face the door, then walks straight up to it, so it gets there facing it and at a walk.
-                    var scratch = door + Doorways.AsideWay * ScratchAside;
-                    float aside = (wolf.Pos - scratch).Dot(Doorways.AsideWay), outFrom = (wolf.Pos - scratch).Dot(Doorways.OutOfDoor);
+                    var asideWay = Doorways.AsideWay.Rotated(cabin.Rotation);
+                    var scratch = door + asideWay * ScratchAside;
+                    float aside = (wolf.Pos - scratch).Dot(asideWay), outFrom = (wolf.Pos - scratch).Dot(outward);
                     // With no way to the door it gives up on the cabin.
                     if (Math.Abs(aside) < ApproachLane && outFrom > 0 && outFrom < ApproachFrom + ApproachLane) {
                         if (!world.Travel(wolf, scratch, step * ApproachPace, step * ApproachPace)) GiveUp(wolf, cabin);
                         else if (wolf.Pos.DistanceTo(scratch) < AtDoorSpot) Stage(wolf, DoorCheckStage.Scratching);
-                    } else if (!world.Travel(wolf, scratch + Doorways.OutOfDoor * ApproachFrom, step, step)) GiveUp(wolf, cabin);
-                } else if (lead != null && WaitSpot(wolf, lead, door) is var spot && wolf.Pos.DistanceTo(spot) >= AtSpot && world.CanStand(spot)) world.Travel(wolf, spot, step, step);
+                    } else if (!world.Travel(wolf, scratch + outward * ApproachFrom, step, step)) GiveUp(wolf, cabin);
+                } else if (lead != null && WaitSpot(wolf, lead, door, outward) is var spot && wolf.Pos.DistanceTo(spot) >= AtSpot && world.CanStand(spot)) world.Travel(wolf, spot, step, step);
                 break;
             case DoorCheckStage.Scratching:
                 if (before == 0) world.Play("door_scratch", door);
@@ -185,7 +187,7 @@ public sealed class DoorCheck(World world) {
     /// <summary>A wolf gives up on a cabin's door and walks on away from it; it leaves that cabin alone until it has been out of smell range of it.</summary>
     private static void GiveUp(Wolf wolf, Thing cabin) {
         var away = wolf.Pos - cabin.Pos;
-        WolfPatrols.Patrol(wolf, (away == Vector2.Zero ? Doorways.OutOfDoor : away).Angle());
+        WolfPatrols.Patrol(wolf, (away == Vector2.Zero ? Doorways.OutOfDoor.Rotated(cabin.Rotation) : away).Angle());
         if (!wolf.Tried.Contains(cabin.Id)) wolf.Tried.Add(cabin.Id);
     }
 

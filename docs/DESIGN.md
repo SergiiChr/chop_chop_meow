@@ -16,6 +16,9 @@ These came from the user; change them only after asking.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
+- **Plumbing:** Pumps draw from the freshwater shallows. Each connected pipe holds one liter, including standing water
+  after the pressure falls. Buildings with ten pipes in their plumbing slot share the water according to demand.
+- **Building orientation:** Plans turn in quarter turns during placement. A mine faces the cliff it fits.
 - **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, shovel for stumps and bushes, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they go to another spot of the job that they can work, loose pieces last, or wait and say so once.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
 - **Gravel paths:** a steel hammer at the bench crushes 1 stone into 1 gravel in 10 base seconds, and a path tile, one
@@ -27,7 +30,7 @@ These came from the user; change them only after asking.
   wolf carcass.
   A tile cannot be clicked in normal play.
 - **Taking down:** the red cross in the building plans gives the remove selector: a building or path tile in reach
-  turns red under the mouse and one click takes it down, with no question; it stays on until Esc or a right click.
+  turns red under the mouse and one click takes it down, with no question. Right-click switches layers and Esc exits.
   Building pages have no take-down button.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
@@ -76,9 +79,17 @@ Simulation and data:
 | `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
-| `src/buildings/model/Removal.cs` | `Removal`, what the remove selector points at: a building or a gravel path tile |
+| `src/buildings/model/Removal.cs` | `Removal`, what the remove selector points at: a building, gravel path tile or steel pipe tile |
 | `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
 | `src/paths/WalkSearch.cs` | Finds routes around water and building footprints |
+| `src/pipes/SteelPipes.cs` | Steel pipe tiles beneath the surface, their shapes, rotations and shared connections |
+| `src/pipes/model/PipeShape.cs`, `src/pipes/model/PipeTile.cs` | The straight, tee and cross pipes and each laid pipe's rotation |
+| `src/pipes/Plumbing.cs` | Connected groups of pipe tiles, the water left in them and the buildings sharing their supply |
+| `src/pipes/WaterPumps.cs` | Pump strokes, pressure loss and liters supplied during a simulation tick |
+| `src/pipes/display/PipeLayerView.cs`, `src/pipes/display/PipePanel.cs` | The underground view, placement preview and inspection of a pipe’s water and pressure |
+| `src/pipes/display/WaterPumpPanel.cs`, `src/pipes/display/WaterPumpProp.cs` | Operating a pump, assigning a worker and moving the handle in the world |
+| `src/pipes/display/SteelPipeShape.cs`, `src/pipes/display/WaterPumpShape.cs` | The pipe fittings, hand pump and its moving lever |
+| `src/pipes/display/InstalledPlumbingShape.cs`, `src/pipes/display/FarmSpray.cs` | Installed cabin, cooking table and farm fittings, and water from working sprinklers |
 | `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
 | `src/farms/Farms.cs` | Farm plots, from sowing and watered growth to harvest |
 | `src/farms/model/FarmStage.cs` | Whether a plot is fallow, growing or ripe |
@@ -324,7 +335,7 @@ Shared rules:
 #### Network updates
 
 An update holds only what changed since the last one the guest confirmed.
-The host keeps the world of each recent update as one JSON entry per thing, worker, wolf, trade cart and player, plus four shared entries, and sends changed fields of changed entries.
+The host keeps the world of each recent update as one JSON entry per thing, worker, wolf, trade cart and player, plus shared entries for the rest of the state, worker jobs, gravel paths, steel pipes and packed crates.
 Entries leave out fields at their type's default and write a fresh inventory as `{}` (`UpdateJson`).
 A field whose new object starts elsewhere is marked to be always written, which `MultiplayerChecks` enforces.
 A changed entry whose set of fields changed is sent whole.
@@ -966,7 +977,7 @@ The building plans' last cell (`PlansPanel`, named `remove`) sets `ClickMode.Rem
 tile whose gravel the mouse is on (`GravelPaths.TileUnder`).
 While that is in reach (`Construction.InReach`, the reach `Dismantle` and `GravelPaths.TakeUp` ask for),
 `RemovalMark.Update` lays a red material over the building's model, or a red pad on the tile.
-A click runs `Construction.Remove` at once and the selector stays; Esc or a right click sets `ClickMode.Normal`.
+A click runs `Construction.Remove` at once. Right-click switches between the surface and underground. Esc exits.
 
 ### Gravel paths
 
@@ -1008,6 +1019,37 @@ The terrain shader draws the gravel photoscan where the map passes a half, with 
 little further, and the plants' shader shrinks plants there to nothing.
 The scan is the models' `Scan.Gravel` at the same size, so the gravel heap, the plan's ghost (`GravelPathShape`) and the
 ground match.
+
+### Steel pipes
+
+`World.SteelPipes` keeps the underground pipe tiles apart from things on the ground and gravel paths.
+`SaveState.SteelPipes` records each occupied tile's place in the map's rows, pipe shape and rotation in radians.
+The tiles have a network update entry of their own (`EntryKey.Pipes`), so the guest receives them on joining and when
+they change.
+`SteelPipes.ConnectionMask` marks neighboring tiles whose pipes open toward each other, clockwise from east.
+A straight opens along its ends and their corners.
+A tee opens along three sides and the corners shared by those sides.
+A cross opens along all four sides and corners.
+Each quarter-turn rotates the available openings.
+The underground view shows the pipes and their placement preview through the translucent surface.
+A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.
+The building's equipment slot accepts ten steel pipes to install its plumbing.
+A pump stroke holds pressure while the handle moves. Once it stops, pressure falls by ten percentage points per second.
+The simulation integrates flow over each tick, including the moment pressure reaches zero.
+`Plumbing` finds connected groups whenever the pipe layout changes.
+Pump output first fills connected pipes up to one liter per tile.
+Water beyond that is shared among connected buildings with room, with any excess split among those still able to take it.
+When pumps stop supplying water, consumers can still draw the water left in the pipes.
+Each pipe's water is saved and sent to guests separately from its shape and rotation.
+Taking out a pipe spills the water it held, while the two sides of the line keep theirs.
+`World.PipeReading` reports a tile's standing water and the highest pressure of the pumps connected to it.
+A receiver keeps any fraction below a liter in `Thing.PipedWaterRemainder` until it receives enough to add a whole
+liter.
+`Thing.ReceivingWater` tells the window a receiver is taking water and still has room.
+`Construction` snaps the steel piping plan to tile centers and lays it in the pipe layer.
+In the underground view the remove selector points at a steel pipe tile and takes it up within reach
+(`Verb.TakeUpPipe`).
+The plan's materials return to the backpack or go in a recovery box through `Construction.GiveBack`.
 
 ### Storage, filters and automation
 

@@ -210,13 +210,29 @@ public sealed partial class World {
         if (!forge.Processing && !Stocked(forge) || Data.Recipes.TryGetValue(forge.Recipe, out var recipe) && Stalled(forge, recipe)) { w.Status = "Nothing to smelt"; return false; }
         if (!HandsFree(w, dt)) return true;
         w.Status = "Operating bellows";
-        if (Walk(w, forge.Pos + BellowsStand, dt, .1f)) { w.WorkState = WorkerWorkState.Pumping; forge.Heat = Math.Min(100, forge.Heat + dt * 18); }
+        if (Walk(w, forge.ToWorld(BellowsStand), dt, .1f)) { w.WorkState = WorkerWorkState.Pumping; forge.Heat = Math.Min(100, forge.Heat + dt * 18); }
         return true;
     }
 
     /// <summary>Whether a worker has a furnace's bellows in hand, on duty and with nothing to carry off first.</summary>
     private bool AtBellows(Worker w, Thing forge) =>
         w.Assignment == forge.Id && w.Doing == JobKind.Bellows && w.Bag.Count == 0 && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w);
+
+    /// <summary>A single operator works the handle from the pump's bank side.</summary>
+    private bool PumpWater(Worker w, Thing pump, float dt) {
+        foreach (var other in S.Workers)
+            if (other != w && other.Assignment == pump.Id && other.WorkState == WorkerWorkState.Pumping) {
+                w.Status = "The pump is in use";
+                return false;
+            }
+        if (!HandsFree(w, dt)) return true;
+        w.Status = "Pumping water";
+        if (Walk(w, pump.ToWorld(BellowsStand), dt, .1f, exact: true)) {
+            w.WorkState = WorkerWorkState.Pumping;
+            if (pump.PumpStrokeLeft <= .0001f) WaterPumps.Stroke(pump);
+        }
+        return true;
+    }
 
     /// <summary>A campfire's keeper brings wood from storage once the fire runs low.</summary>
     private bool TendFire(Worker w, Thing fire, float dt) {

@@ -150,7 +150,7 @@ public sealed class WolfHunt(World world) {
     /// <summary>Pins the acting player under a wolf, standing over them, or lunging onto their throat from <paramref name="lungeFrom"/> of it once it has tugged them back out of a doorway.</summary>
     internal void Pin(Wolf wolf, Vector2 lungeFrom = default) {
         wolf.Leap = 0; wolf.LungeFrom = lungeFrom; wolf.Feeding = wolf.Pinning = true; world.S.Mauled = true;
-        wolf.Pos = lungeFrom == Vector2.Zero ? world.Player + AwayFromPlayer(wolf) * World.PinDistance : world.Player + Doorways.OutOfDoor * DoorTug.FallenThroat + lungeFrom * DoorTug.AsideReach;
+        wolf.Pos = lungeFrom == Vector2.Zero ? world.Player + AwayFromPlayer(wolf) * World.PinDistance : world.Player + world.Doorways.OutOfDoorAt(world.S.Actor.DoorCabin) * DoorTug.FallenThroat + lungeFrom * DoorTug.AsideReach;
         world.Say("You are pinned and can't move."); world.Play("wolf_bite", world.Player); world.Play("takedown_scream", world.Player);
     }
     /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>

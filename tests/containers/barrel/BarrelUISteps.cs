@@ -18,8 +18,9 @@ public partial class Game {
     }
 
     /// <summary>Uses the portable barrel page's placement button and clicks a spot in reach.</summary>
-    private async Task<Vector2> PutDownBackpackBarrel(string item, Func<Vector2, bool>? spotFits = null) {
+    private async Task<Vector2> PutDownBackpackBarrel(string item, Func<Vector2, bool>? spotFits = null, Key? turn = null) {
         await Click(FindButton(panel, "Put it down")!);
+        if (turn is Key key) await KeyStroke(key);
         var spot = SpotsNearby().First(p => world.Construction.PlacementBlock(ThingKind.Barrel, p, item) == null &&
             Uncovered(view.Screen(p)) && (spotFits == null || spotFits(p)));
         await Click(view.Screen(spot));

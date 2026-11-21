@@ -175,11 +175,11 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
-| C | Open the crafting menu |
+| C / V | Turn a building, crate, barrel or pipe by 90° while placing it. Mines face their cliff. Outside placement, C opens crafting. |
 | H | Open the crew overview |
 | I | Open or close the field guide |
 | 1–9 or click a hotbar slot | Select that slot, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
-| Space | Swing an axe, or a fist without one, the way you last walked, or pump the selected nearby reinforced furnace |
+| Space | Swing an axe, or a fist without one, the way you last walked, or pump the selected nearby reinforced furnace or water pump |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
@@ -350,6 +350,7 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 | Crafting bench, anvil, cooking table, packing station | Craft, Haul |
 | Stone furnace, canning station | Haul |
 | Reinforced furnace | Bellows, Haul |
+| Water pump | Pump |
 | Mine | Build, Haul, Mine |
 | Farm plot | Farm, Haul |
 | Trading post | Manage deliveries |
@@ -378,7 +379,7 @@ A plan held on the cursor is let go of by that click.
 With it, the building under the mouse turns red when it is within reach, 15 metres, and a click takes it down at once,
 without asking.
 A gravel path tile turns red and comes up the same way, when the mouse is on gravel with no building over it.
-The selector stays for the next one until Esc or a right click.
+Right-click switches between the surface and underground. Press Esc to put the selector away.
 A building's cost and everything in it go to your backpack, and what does not fit waits in a recovery box where it stood; a mine also gives back the timber, iron and stone delivered to it.
 A cabin someone is in, or a trading post with a cart out, stays up until they come out or the cart is back.
 
@@ -738,6 +739,37 @@ A worker on the station's Stock job brings tools from other storage to the rack.
 
 Oaks drop a patch of leaves beside the trunk.
 Gather them by hand, or three times as fast with a rake, and they fall again every day.
+
+## Steel piping and water pumps
+
+Place a water pump in the freshwater lake’s shallows with its handle facing dry ground.
+It costs 4 steel bars, 10 stone and 4 wood parts.
+Select it and click **Pump** or press **Space** from the bank, or assign a worker the **Pump** job.
+Each stroke adds 10 percentage points of pressure. Ten consecutive strokes reach 5 L/s.
+After the last stroke finishes, pressure falls to zero over 10 seconds from full.
+
+At an anvil, use a steel hammer to form one steel bar into one stackable steel pipe in 10 base seconds.
+Put the hammer in the anvil’s hammer slot for a worker to use.
+In building plans, pick **Steel piping**. The surface becomes see-through while you lay the line.
+Each tile costs one pipe. Use the shape button for a straight pipe, T-junction or cross, and C/V for quarter turns.
+Neighboring ends join along the grid or diagonally when both tiles face the join.
+
+Run the line through the gold outline under the center of the pump and each building it serves.
+Put 10 steel pipes in a building’s **Plumbing** slot to fit it out. You can add them in batches.
+Taking pipes out disables the fittings. Taking down the building or picking up a barrel gives the fitted pipes back.
+
+| Building | What piped water supplies |
+| --- | --- |
+| Placed steel barrel | Fills its 50 L tank. |
+| Cabin | A riser through the roof fills its mounted barrel. A cabin without a roof barrel can still connect. |
+| Cooking table | A tap fills the water input for the current recipe. |
+| Farm plot | Overhead sprinklers water growing wheat up to the plot’s 10 L reserve. |
+
+The pump first fills the line, which holds 1 L per tile. Buildings that need water share the available flow evenly.
+A closed tap can have a full pipe at its inlet. When pressure falls to zero, water stays in the pipes for the next
+building that needs it. Cutting a line leaves the water in each surviving section.
+While placing pipes or removing things underground, point at a pipe and press **E** to inspect its water and pressure.
+Right-click in the remove tool to switch layers, then left-click to take up just the selected pipe or surface object.
 
 ## Gravel paths
 

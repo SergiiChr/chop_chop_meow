@@ -18,6 +18,11 @@ public partial class WorldView : Node3D {
     public int HoverWorker;
     /// <summary>The building being placed, or a packed crate, or null when not placing.</summary>
     public ThingKind? Placing;
+    public float PlacingRotation;
+    public PipeShape PlacingPipeShape;
+    public bool Underground;
+    public Vector2I? PointedPipe;
+    private PipeLayerView pipeLayer = null!;
     /// <summary>The crate the player is lifting with a held right click, and how far along the lift is from 0 to 1.</summary>
     public int Lifting;
     public float LiftProgress;
@@ -236,6 +241,7 @@ public partial class WorldView : Node3D {
         removalMark = new RemovalMark(scene, id => props.GetValueOrDefault(id)?.Root);
         RemovalMark.Warm(warmStage);
         player.Position = World.Player;
+        pipeLayer = new PipeLayerView(GhostValid, GhostBlocked); AddChild(pipeLayer);
         overlay = new Overlay { Paint = PaintOverlay }; AddChild(overlay);
         World.PlayerActed += PlayerActed;
     }
@@ -508,6 +514,8 @@ public partial class WorldView : Node3D {
         worldReplaced = false;
         UpdateEffects(dt);
         UpdateMarkers();
+        pipeLayer.Update(World, camera, Underground, Placing == ThingKind.SteelPiping ? Terrain.TileAt(ToWorld(Mouse)) : null,
+            PlacingRotation, PlacingPipeShape, removalMark.Shown.Pipe);
         // The sun and the light move every frame by the window's own clock, which each server update corrects.
         UpdateLighting(Clocked(dayClock, World.Time, true, dt));
         UpdateLook(dt);
@@ -551,7 +559,7 @@ public partial class WorldView : Node3D {
             mauledFrom = (knockingDown ?? PinningWolf(World.Me.Id))?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
             // Facing the wolf, the player goes over backwards with it on top; one yanked out of a doorway falls back still facing the door.
             action = World.Dead ? ActorAction.Devoured : downedFor < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled;
-            target = fallsBack ? World.Player - Doorways.OutOfDoor : mauledFrom; subject = null;
+            target = fallsBack ? World.Player - World.Doorways.OutOfDoorAt(World.Me.DoorCabin) : mauledFrom; subject = null;
             downedFor += dt;
         } else downedFor = 0;
         var at = World.Player;
@@ -584,7 +592,7 @@ public partial class WorldView : Node3D {
             if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
-                : work is ActorAction.Sit or ActorAction.Perch ? worker.Pos + Vector2.FromAngle(worker.LunchHeading) : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down
+                : work is ActorAction.Sit or ActorAction.Perch ? worker.Pos + Vector2.FromAngle(worker.LunchHeading) : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down.Rotated(assignment.Rotation)
                 : assignment is { Kind: ThingKind.Mine } mine ? Mines.Facing(mine, worker.Pos) : assignment?.Pos ?? worker.Pos;
             bool sameAction = state.Action == work;
             state.Update(worker.Pos, work, facing, dt);
@@ -593,8 +601,8 @@ public partial class WorldView : Node3D {
             var waterTarget = worker.WaterAction is WorkerWaterAction.None or WorkerWaterAction.WalkFarm ? null : World.Find(worker.WaterTarget);
             if (waterTarget != null && vessel != null) {
                 var point = waterTarget.Kind switch {
-                    ThingKind.Barrel when worker.WaterAction == WorkerWaterAction.Fill => To3(waterTarget.Pos) + VesselShape.BarrelSpout,
-                    ThingKind.Barrel => To3(waterTarget.Pos) + VesselShape.BarrelFillOpening,
+                    ThingKind.Barrel when worker.WaterAction == WorkerWaterAction.Fill => To3(waterTarget.Pos) + VesselShape.BarrelSpout.Rotated(Vector3.Up, -waterTarget.Rotation),
+                    ThingKind.Barrel => To3(waterTarget.Pos) + VesselShape.BarrelFillOpening.Rotated(Vector3.Up, -waterTarget.Rotation),
                     ThingKind.Farm => To3(BarrelHaul.FarmPourPoint(waterTarget, worker.FarmWaterStop)) + Vector3.Up * .03f,
                     ThingKind.Water => To3(Terrain.WaterPoint(worker.Pos) - (worker.Pos - Terrain.Lake).Normalized() * .45f),
                     _ => To3(waterTarget.Pos)
@@ -602,7 +610,7 @@ public partial class WorldView : Node3D {
                 float progress = Math.Clamp(Clocked(entry.WaterClock, worker.WaterProgress, sameAction, dt), 0, 1);
                 bool watering = waterTarget.Kind == ThingKind.Farm;
                 WorkerWaterView.Show(entry.Rig, worker.Pos, point, worker.WaterAction, waterTarget.Kind == ThingKind.Hut, progress, vessel,
-                    ground: watering, facing: watering ? state.Yaw : null);
+                    ground: watering, facing: watering ? state.Yaw : null, rotation: waterTarget.Rotation);
                 if (waterTarget.Kind == ThingKind.Barrel && worker.WaterAction == WorkerWaterAction.Pour) {
                     float opening = Mathf.SmoothStep(0, .28f, progress) * (1 - Mathf.SmoothStep(.73f, 1, progress));
                     openBungs[waterTarget.Id] = Math.Max(openBungs.GetValueOrDefault(waterTarget.Id), opening);
@@ -720,7 +728,7 @@ public partial class WorldView : Node3D {
             if (p.Mauled || knockingDown != null) {
                 bool fallsBack = FallsBack(p.Id);
                 action = p.RespawnIn > 0 ? ActorAction.Devoured : other.DownedFor < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled;
-                facing = fallsBack ? p.Pos - Doorways.OutOfDoor : (knockingDown ?? PinningWolf(p.Id))?.Pos ?? p.Pos + Vector2.Down;
+                facing = fallsBack ? p.Pos - World.Doorways.OutOfDoorAt(p.DoorCabin) : (knockingDown ?? PinningWolf(p.Id))?.Pos ?? p.Pos + Vector2.Down;
                 other.DownedFor += dt;
             } else other.DownedFor = 0;
             var at = p.Pos;
@@ -1082,6 +1090,10 @@ public partial class WorldView : Node3D {
     /// </summary>
     private void Animate(Prop prop, Thing t, float dt, bool live, bool watched) {
         bool first = !prop.Seen, shaking = prop.Shake > 0;
+        if (prop.Plumbing is { } plumbing) {
+            if (live) plumbing.Show(t.PlumbingInstalled);
+            plumbing.Water(live && t.PlumbingInstalled && t.ReceivingWater, Elapsed);
+        }
         // Most things in sight stand still: one that is neither shaking nor holding more or less than when last drawn needs no writing to.
         bool still = !first && !shaking && prop.Look.Remaining == t.Remaining;
         prop.Seen = true;
@@ -1167,6 +1179,9 @@ public partial class WorldView : Node3D {
                 stove.Light.LightEnergy = cooking * (.9f + flicker * .25f) * (.5f + night);
                 if (stove.Mortar != null && live) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null && !grinding.Contains(t.Id);
                 Smoke(stove, t, cooking > 0, dt, FurnaceSmoke);
+                break;
+            case WaterPumpProp pump:
+                pump.Pump.SetPress(pumping.GetValueOrDefault(t.Id));
                 break;
             case ForgeProp forge:
                 float heat = Clocked(forge.Heat, t.Heat, live, dt) / 100;
@@ -1568,7 +1583,7 @@ public partial class WorldView : Node3D {
         if (World.Sheltered != 0 && World.DoorCheck.AtDoor(World.Sheltered) is { DoorCheck: >= DoorCheckStage.Prying } caller && props.TryGetValue(World.Sheltered, out var prop) && prop is HutProp hut) {
             var taken = caller.DoorCheck == DoorCheckStage.TakingOut ? World.PlayerById(caller.Target) : null;
             if (caller.DoorCheck != DoorCheckStage.TakingOut || taken is { Door: Doorway.Tugged, DoorTime: < TakenOutSeconds }) {
-                InsideDoorPOV.Show(hut.Look.Pos, hut.Door);
+                InsideDoorPOV.Show(hut);
                 if (wolves.TryGetValue(caller, out var lead)) InsideDoorPOV.Add(lead);
                 foreach (var wolf in World.Wolves)
                     if (wolf != caller && (wolf.DoorCheckCabin == World.Sheltered || taken != null && wolf.Target == taken.Id) && wolves.TryGetValue(wolf, out var model)) InsideDoorPOV.Add(model);
@@ -1711,20 +1726,21 @@ public partial class WorldView : Node3D {
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
         removalMark.Update(World, Removal);
-        placeTile.Visible = Placing != null;
+        placeTile.Visible = Placing != null && !Underground;
         var kind = Placing.GetValueOrDefault();
         var at = Placing == null ? Vector2.Zero : World.Construction.Snap(kind, ToWorld(Mouse).Round());
-        var shown = Placing == null ? null : kind == ThingKind.Mine ? mineGhosts[Cliff.Nearest(at).Ore] : ghosts[kind];
+        var shown = Placing == null || Underground ? null : kind == ThingKind.Mine ? mineGhosts[Cliff.Nearest(at).Ore] : ghosts[kind];
         if (shown != ghost) {
             if (ghost != null) ghost.Root.Visible = false;
             if (shown != null) shown.Root.Visible = true;
             ghost = shown;
         }
         if (shown == null) return;
-        bool valid = World.Construction.PlacementBlock(kind, at) == null;
+        bool valid = World.Construction.PlacementBlock(kind, at, rotation: PlacingRotation) == null;
         if (shown.Tint != valid) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid; }
         shown.Root.Position = To3(at);
         if (kind == ThingKind.Mine) shown.Body.Rotation = MineModel.Yaw(Cliff.Nearest(at).Face);
+        else shown.Root.Rotation = new Vector3(0, -PlacingRotation, 0);
         placeTile.Position = To3(at, .02f);
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
     }
@@ -1747,6 +1763,8 @@ public partial class WorldView : Node3D {
 
     /// <summary>What the remove selector has turned red: the building or gravel path tile it points at, while that is in reach.</summary>
     public Removal RemovalShown => removalMark.Shown;
+    /// <summary>The visible placement preview's model, while a plan or container is being placed.</summary>
+    internal Node3D? PlacementGhost => ghost?.Root;
 
     private void Mark(MeshInstance3D ring, Thing? t, float lift) {
         ring.Visible = t != null;
@@ -1819,6 +1837,21 @@ public partial class WorldView : Node3D {
 
     private void PaintOverlay() {
         if (EnvironmentReview) return;
+        if (Underground) {
+            // Outline the center tile where a pipe can meet each building, even before it is fitted out.
+            foreach (var building in known) {
+                if (building.Kind != ThingKind.Pump && !Plumbing.HasPlumbing(building.Kind)) continue;
+                var center = OnScreen(Terrain.TileAt(building.Pos));
+                var a = (screenX + screenZ) * .42f;
+                var b = (screenX - screenZ) * .42f;
+                overlay.DrawLine(center + a, center + b, BarFill, 2, true);
+                overlay.DrawLine(center + b, center - a, BarFill, 2, true);
+                overlay.DrawLine(center - a, center - b, BarFill, 2, true);
+                overlay.DrawLine(center - b, center + a, BarFill, 2, true);
+            }
+            if (PointedPipe is Vector2I tile) Tag(Screen(tile, .28f), "Steel pipe · E to inspect");
+            return;
+        }
         if (World == null) return;
         if (AnimationReview) { PaintReview(); return; }
         foreach (var kind in World.StationKinds)

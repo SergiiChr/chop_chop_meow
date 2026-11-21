@@ -95,11 +95,11 @@ public partial class InsideDoorPOV : TextureRect {
         foreach (var rig in rigs) rig.Root.Visible = false;
     }
 
-    /// <summary>Asks for the picture this frame, of the cabin at <paramref name="at"/> with its door <paramref name="door"/> as the world draws it.</summary>
-    public void Show(Vector2 at, Node3D door) {
+    /// <summary>Asks for the picture of the cabin and its door as the world draws them this frame.</summary>
+    public void Show(HutProp hut) {
         Showing = true;
-        stage.Position = -WorldView.To3(at);
-        cabin.Door.Rotation = door.Rotation;
+        stage.Transform = hut.Root.Transform.AffineInverse();
+        cabin.Door.Rotation = hut.Door.Rotation;
     }
 
     /// <summary>Adds a copy of a wolf as the world draws it, while there is one to spare.</summary>

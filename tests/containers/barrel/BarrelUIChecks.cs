@@ -89,9 +89,10 @@ public partial class Game {
 
         await Click(Named("barrel_water")!);
         await Until(() => Named("barrel_water")?.TooltipText.Contains("2/50 L") == true && world.Backpack[Water.OneLiter] == 1, "taking one liter of water from the barrel into the bottle", 2);
-        var spot = await PutDownBackpackBarrel(Barrel.AtFill(2));
+        var spot = await PutDownBackpackBarrel(Barrel.AtFill(2), turn: Key.C);
         await Until(() => Hosted.Things.Any(t => t.Kind == ThingKind.Barrel && t.Pos == spot), "putting the barrel down", 2);
         var barrel = Hosted.Things.Single(t => t.Kind == ThingKind.Barrel && t.Pos == spot);
+        Require(barrel.Rotation == 3 * Mathf.Pi / 2, "Putting the filled barrel down should turn its spout as chosen.");
         await ClickOn(barrel);
         await Until(() => Named("barrel_water")?.TooltipText.Contains("2/50 L") == true, "the placed barrel showing its two liters", 2);
         Require(Named("job_haul") != null, "A placed barrel must offer a hauling job.");

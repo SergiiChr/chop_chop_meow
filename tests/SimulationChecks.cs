@@ -15,6 +15,10 @@ using static WorkerSteps;
 /// <summary>Deterministic checks for the playable simulation, independent of the rendered scene.</summary>
 public static class SimulationChecks {
     public static void Run(GameData data) {
+        SteelPipeChecks.Run(data);
+        PlumbingChecks.Run(data);
+        Test(WaterPumpChecks.Run, data);
+        Test(PlumbingFixtureChecks.Run, data);
         Test(InventoryLayoutChecks.Run, data);
         Test(HeldStackChecks.Run, data);
         Test(HotbarStackChecks.Run, data);

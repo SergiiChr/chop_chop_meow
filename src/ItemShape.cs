@@ -42,6 +42,10 @@ internal static class ItemShape {
         ["steel_parts"] = new(SteelParts, Steel, .5f, Lay.Loose),
         ["steel_sheet"] = new(f => Sheets(f, "a8d2ec", "6f9fc0"), Steel, .5f),
         ["tin_sheet"] = new(f => Sheets(f, TinBright, "b9c0bd"), Tin, .5f),
+        ["steel_pipe"] = new(
+            f => Copy(f, SteelPipeShape.Loose, Transform3D.Identity, Colors.White),
+            SteelPipeShape.Finish, Lay: Lay.Rows, Rise: .74f,
+            Piece: f => Copy(f, SteelPipeShape.Heap, Transform3D.Identity, Colors.White)),
         // Cans heap as six-packs of plain cans.
         ["tin_can"] = new(f => OpenCan(f, true), Tin, .42f, Piece: f => SixPack(f, one => OpenCan(one, false))),
         ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "b83a5c", null, false))),

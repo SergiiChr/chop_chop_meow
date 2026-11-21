@@ -26,6 +26,7 @@ public partial class Game : Node, IGameFlow {
     private NeedsPlate needsPlate = null!;
     private DamageEdges damageEdges = null!;
     private ModeLabel modeLabel = null!;
+    private Button pipeShapeButton = null!;
     private DeathLabel deathLabel = null!;
     private UiKit kit = null!;
     private SidePanel panel = null!;
@@ -150,6 +151,15 @@ public partial class Game : Node, IGameFlow {
         ui.AddChild(view.InsideDoorPOV);
         corner = new Corner(world); ui.AddChild(corner);
         modeLabel = new ModeLabel(kit, player); ui.AddChild(modeLabel);
+        pipeShapeButton = kit.Button("Straight pipe", player.CyclePipeShape);
+        cursor.PlanButton = pipeShapeButton;
+        pipeShapeButton.Name = "pipe_shape";
+        pipeShapeButton.TooltipText = "Change pipe shape";
+        pipeShapeButton.AnchorLeft = pipeShapeButton.AnchorRight = .5f;
+        pipeShapeButton.OffsetLeft = -74; pipeShapeButton.OffsetRight = 74; pipeShapeButton.OffsetTop = 49;
+        pipeShapeButton.Visible = false;
+        Style.SkinPill(pipeShapeButton, Style.Sage);
+        ui.AddChild(pipeShapeButton);
         ui.AddChild(hotbar);
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
@@ -363,7 +373,10 @@ public partial class Game : Node, IGameFlow {
                 case Key.B: panel.Open(Page.Build); break;
                 case Key.I: panel.Toggle(Page.Guide); break;
                 case Key.H: panel.Toggle(Page.Crew); break;
-                case Key.C: panel.Toggle(Page.Craft); break;
+                case Key.C:
+                    if (!player.RotatePlacement(-1, GetViewport().GuiGetHoveredControl() != null)) panel.Toggle(Page.Craft);
+                    break;
+                case Key.V: player.RotatePlacement(1, GetViewport().GuiGetHoveredControl() != null); break;
                 case Key.Tab: panel.Toggle(Page.Backpack); break;
                 case Key.F5: saves.QuickSave(startMenu); break;
                 case Key.F9: saves.QuickLoad(startMenu); break;
@@ -381,7 +394,7 @@ public partial class Game : Node, IGameFlow {
         if (framesLeft > 0 && --framesLeft == 0) { LeaveServer(); sounds.StopAll(); GetTree().Quit(); }
         float dt = Math.Min((float)delta, .1f); runTime += dt;
         bool overInterface = GetViewport().GuiGetHoveredControl() != null;
-        player.Update(dt, overInterface); panel.ShowAwaited();
+        player.Update(dt, overInterface && GetViewport().GuiGetHoveredControl() != pipeShapeButton); panel.ShowAwaited();
         if (session is Session.Launching launching) AwaitServer(launching);
         // The server holds the world still while every player has a menu open, which in a game alone is whenever this one does.
         if (kit.Paused != holding) { holding = kit.Paused; net.Hold(holding); }
@@ -393,12 +406,27 @@ public partial class Game : Node, IGameFlow {
             ending.ShowOnce();
             needsPlate.DamageFlash(health - world.Health, runTime); shownHealth = world.Health;
         }
-        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection; view.Placing = player.Mode.Placing;
+        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection; view.Placing = player.Mode.Placing; view.PlacingRotation = player.Mode.Rotation;
+        view.Underground = player.Mode is ClickMode.Remove { Underground: true } || view.Placing == ThingKind.SteelPiping;
+        bool choosingPipe = player.Mode is ClickMode.Build { Kind: ThingKind.SteelPiping };
+        if (pipeShapeButton.Visible != choosingPipe) pipeShapeButton.Visible = choosingPipe;
+        if (choosingPipe) {
+            var shape = ((ClickMode.Build)player.Mode).Shape;
+            if (view.PlacingPipeShape != shape) {
+                pipeShapeButton.Text = shape switch { PipeShape.Tee => "T-junction", PipeShape.Cross => "Cross junction", _ => "Straight pipe" };
+                view.PlacingPipeShape = shape;
+            }
+        }
         view.Mouse = GetViewport().GetMousePosition();
         // A recording leaves the pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
         bool recording = Engine.GetWriteMoviePath() != "";
         var hover = recording ? null : view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = recording ? 0 : view.PickWorker(view.Mouse)?.Id ?? 0;
         view.Removal = overInterface ? Removal.None : player.RemovalAt(hover, view.Mouse);
+        view.PointedPipe = null;
+        if (view.Underground && !overInterface) {
+            var tile = Terrain.TileAt(view.ToWorld(view.Mouse));
+            if (world.SteelPipes.Laid(tile) && world.Explored(tile)) view.PointedPipe = tile;
+        }
         uiClock += dt;
         if (uiClock > .2f || net.AwaitingAnswer && net.ShownUpdate != refreshedUpdate) {
             uiClock = 0; refreshedUpdate = net.ShownUpdate; RefreshLive();

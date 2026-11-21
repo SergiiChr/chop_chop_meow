@@ -32,7 +32,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         if (thing.Kind == ThingKind.Reinforced) Bellows();
         // A tool of a slot's kind goes to that slot, which says why when it does not take it; only a tool it takes lights up.
         bool SlotKind(string id) => world.Data.Items.GetValueOrDefault(id) is ItemDef def && Array.Exists(slotted, slot => slot.Tool == def.Tool);
-        BagGrid(id => {
+        EquipmentBagGrid(id => {
             if (SlotKind(id)) world.SlotTool(thing, id);
             else world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id));
         }, slotted.Length > 0 ? $"{BagHint}\nShift: slot a tool, or load a stack · Ctrl: all of it" : $"{BagHint}\nShift: load a stack · Ctrl: all of it",

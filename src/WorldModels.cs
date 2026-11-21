@@ -13,6 +13,7 @@ public readonly record struct Hit(float Radius, float Bottom, float Top);
 public class Prop {
     public readonly Node3D Root = new();
     public readonly Node3D Body;
+    internal InstalledPlumbingShape? Plumbing;
     public Hit[] Hits = Array.Empty<Hit>();
     public ThingKind Kind;
     public float Shake;
@@ -211,6 +212,7 @@ public static class WorldModels {
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
+                if (prop.Plumbing is { } plumbing) { plumbing.Show(true); plumbing.Water(true, 0); }
                 if (prop is RackProp rack) {
                     rack.Pegs[0][Bucket.Item].Visible = true;
                     rack.Pegs[1][Water.BottleTool].Visible = true;
@@ -287,7 +289,8 @@ public static class WorldModels {
         ThingKind.Toolstation => new[] { new Hit(.55f, 0, 1.5f) },
         ThingKind.Pile => new[] { new Hit(1.5f, 0, .5f) },
         ThingKind.Farm => new[] { new Hit(Farms.HalfSize, 0, .5f) },
-        ThingKind.GravelPath => Array.Empty<Hit>(),
+        ThingKind.Pump => [new Hit(.52f, 0, 1.15f)],
+        ThingKind.SteelPiping or ThingKind.GravelPath => Array.Empty<Hit>(),
         ThingKind.Leaves => new[] { new Hit(.6f, 0, .15f) },
         ThingKind.Grave => new[] { new Hit(.65f, 0, 1.5f) },
         ThingKind.Anvil => new[] { new Hit(.45f, 0, .85f) },
@@ -319,6 +322,8 @@ public static class WorldModels {
             case ThingKind.Water: prop = new Prop(); break;
             case ThingKind.Furnace: prop = BlockFurnace(); break;
             case ThingKind.Reinforced: prop = DrumForge(); break;
+            case ThingKind.Pump: prop = new WaterPumpProp(); break;
+            case ThingKind.SteelPiping: prop = new Prop(); SteelPipeShape.Build(prop.Body); break;
             case ThingKind.Hut: prop = CabinModel.Build(); break;
             case ThingKind.Barrel: prop = new BarrelProp(); break;
             case ThingKind.Chest: prop = Chest(); break;
@@ -339,7 +344,10 @@ public static class WorldModels {
             default: throw new ArgumentOutOfRangeException(nameof(t), t.Kind, "No model for this kind.");
         }
         prop.Kind = t.Kind; prop.Hits = Hits(t);
+        if (t.Rotation != 0) prop.Root.Rotation = new Vector3(0, -t.Rotation, 0);
         var body = prop.Body;
+        prop.Plumbing = InstalledPlumbingShape.Build(t.Kind, body);
+        prop.Plumbing?.Show(t.PlumbingInstalled);
         if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Turn(t.Id) : 0, 0);
         if (t.Kind == ThingKind.Mine) body.Rotation = MineModel.Yaw(Cliff.Nearest(t.Pos).Face);
         if (prop is DugProp dug) { dug.Yaw = body.RotationDegrees.Y; dug.Middle = Bounds(body).GetCenter(); }

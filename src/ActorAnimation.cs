@@ -119,6 +119,7 @@ public static class ActorAnimation {
         ActorAction.Mauled => .5f,
         ActorAction.Devoured => 1.4f,
         ActorAction.Protest => 1.6f,
+        ActorAction.Pump => WaterPumps.StrokeSeconds,
         ActorAction.PickUp => .9f,
         ActorAction.Pack => 2.4f,
         ActorAction.Craft => 2.4f,
