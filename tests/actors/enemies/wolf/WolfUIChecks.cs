@@ -44,6 +44,8 @@ public partial class Game {
         foreach (var wolf in world.Wolves.Where(w => w.Side != 0)) {
             var model = view.ModelOf(wolf)!;
             bool left = wolf.Side == BodySide.Left;
+            float elbowOut = rig.Elbow(left).X * wolf.Side;
+            Require(elbowOut > .30f, $"A latched wolf must draw the player's elbow out to its side, only {elbowOut:0.00} m from the centre.");
             float east = model.Root.GlobalPosition.X - rig.Root.GlobalPosition.X;
             Require(left ? east < -.3f : east > .3f, $"A wolf holding a player's {(left ? "left" : "right")} arm must be drawn on that side of them, not {east:0.00} m to their east.");
             Vector3 jaws = model.Root.GlobalTransform * model.Bite;
