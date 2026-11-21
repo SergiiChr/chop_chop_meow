@@ -884,9 +884,9 @@ public partial class WorldView : Node3D {
             case ThingKind.WolfCorpse: Burst(side + Vector3.Up * .3f, Mat("7a1414", .6f), 5, 1.4f, .45f, 8, .04f); break;
             case ThingKind.Berries: Burst(To3(subject.Pos, .7f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f); break;
             case ThingKind.Water: Burst(side + Vector3.Up * .05f, Splash, 6, 1.6f, .45f, 7, .045f); break;
-            case ThingKind.Anvil when prop is AnvilProp anvil: Burst(To3(subject.Pos) + anvil.Vent, Sparks, 10, 3, .35f, 5, .025f); break;
+            case ThingKind.Anvil when prop is AnvilProp anvil: Burst(anvil.Body.ToGlobal(anvil.Vent), Sparks, 10, 3, .35f, 5, .025f); break;
             case ThingKind.Reinforced:
-                if (subject.Heat > 10) Burst(To3(subject.Pos, .9f) + new Vector3(0, 0, .5f), Embers, 6, 1.4f, .6f, -1, .03f);
+                if (subject.Heat > 10) Burst(prop.Body.ToGlobal(new Vector3(0, .9f, .5f)), Embers, 6, 1.4f, .6f, -1, .03f);
                 break;
         }
     }
@@ -1170,7 +1170,7 @@ public partial class WorldView : Node3D {
                 float smelting = furnace.Burning(t.Processing, dt);
                 ShowGlow(furnace.Glow, smelting);
                 furnace.Light.LightEnergy = smelting * (1.1f + flicker * .25f) * (.5f + night);
-                Smoke(furnace, t, smelting > 0, dt, FurnaceSmoke);
+                Smoke(furnace, smelting > 0, dt, FurnaceSmoke);
                 break;
             case StoveProp stove:
                 // The fire only burns for recipes that take fuel; the mortar's work and kneading dough are cold.
@@ -1178,7 +1178,7 @@ public partial class WorldView : Node3D {
                 ShowGlow(stove.Glow, cooking);
                 stove.Light.LightEnergy = cooking * (.9f + flicker * .25f) * (.5f + night);
                 if (stove.Mortar != null && live) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null && !grinding.Contains(t.Id);
-                Smoke(stove, t, cooking > 0, dt, FurnaceSmoke);
+                Smoke(stove, cooking > 0, dt, FurnaceSmoke);
                 break;
             case WaterPumpProp pump:
                 pump.Pump.SetPress(pumping.GetValueOrDefault(t.Id));
@@ -1196,7 +1196,7 @@ public partial class WorldView : Node3D {
                 float lift = 18 * (1 - forge.Press * (1 - Mathf.SmoothStep(0, 1, forge.Released / ActorAnimation.BlendSeconds)));
                 forge.Lever.RotationDegrees = new Vector3(0, 0, lift);
                 for (int i = 0; i < forge.Pleats.Length; i++) forge.Pleats[i].RotationDegrees = new Vector3(0, 0, lift * (i + 1) / (forge.Pleats.Length + 1));
-                Smoke(forge, t, forging > 0 || heat > .3f, dt, ForgeSmoke);
+                Smoke(forge, forging > 0 || heat > .3f, dt, ForgeSmoke);
                 break;
             case CampfireProp campfire:
                 bool burning = t.Burn > 0;
@@ -1207,7 +1207,7 @@ public partial class WorldView : Node3D {
                 campfire.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
                 campfire.Light.LightEnergy = flames * (1.2f + flicker * .3f) * (.35f + night * 1.4f);
                 if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Cinders, 1, .5f, 1.1f, -1.4f, .025f);
-                Smoke(campfire, t, flames > 0, dt, CampfireSmoke);
+                Smoke(campfire, flames > 0, dt, CampfireSmoke);
                 break;
             case AnvilProp anvil:
                 if (live) anvil.Hammer.Show(swung.Contains(t.Id) ? null : World.BenchTool(t, "hammer"));
@@ -1408,13 +1408,13 @@ public partial class WorldView : Node3D {
     private static readonly SmokeStyle FurnaceSmoke = new(.3f, new Color(.58f, .58f, .56f, .42f), .14f, 2.4f);
     private static readonly SmokeStyle ForgeSmoke = new(.16f, new Color(.36f, .36f, .36f, .55f), .2f, 2.8f);
 
-    private void Smoke(HearthProp prop, Thing t, bool active, float dt, SmokeStyle smoke) {
+    private void Smoke(HearthProp prop, bool active, float dt, SmokeStyle smoke) {
         // Seen from the ground by the film's camera, the puffs are flat discs.
         if (!active || dt <= 0 || filming) return;
         prop.Smoke -= dt;
         if (prop.Smoke > 0) return;
         prop.Smoke = smoke.Every;
-        Burst(To3(t.Pos) + prop.Vent, Flat(smoke.Color), 1, .25f, 2.4f, -.45f, smoke.Size, smoke.Grow);
+        Burst(prop.Body.ToGlobal(prop.Vent), Flat(smoke.Color), 1, .25f, 2.4f, -.45f, smoke.Size, smoke.Grow);
     }
 
     private readonly List<Thing> structures = new();

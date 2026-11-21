@@ -5,8 +5,9 @@ using static Checks;
 
 /// <summary>Checks of how a wolf at a cabin's door is drawn: its paws on the ground and the step, and the door it pushes open.</summary>
 public static class DoorCheckViewChecks {
-    public static void Run() {
+    public static void Run(GameData data) {
         Test(CheckAWolfAtADoorKeepsItsPawsOnTheGroundAndTheStep);
+        Test(CheckAWolfTuggingFromATurnedCabinStandsOnTheSameTreads, data);
         Test(CheckTheDoorOpensGraduallyRattlesAtEachPryAndNeverStandsInTheWolf);
     }
 
@@ -39,6 +40,15 @@ public static class DoorCheckViewChecks {
         Require(paws.Deepest > -.01f, $"no paw of a wolf at a door should sink into the ground or the step: paw {paws.DeepestLeg} is {-paws.Deepest:0.000} m in, {paws.DeepestAt:0.00} s into the door check");
         Require(paws.Slide < .03f, $"a paw of a wolf at a door that is down should stay where it landed: paw {paws.SlideLeg} has slid {paws.Slide:0.000} m, {paws.SlideAt:0.00} s into the door check");
         Require(paws.PastRange < .6f, $"no joint of a wolf at a door should bend past a dog's range: the {paws.PastJoint} by {paws.PastRange:0.0} degrees");
+    }
+    private static void CheckAWolfTuggingFromATurnedCabinStandsOnTheSameTreads(GameData data) {
+        var straight = WolfModelSteps.PawsDuringTugFromCabin(data, 0);
+        var turned = WolfModelSteps.PawsDuringTugFromCabin(data, Mathf.Pi / 2);
+        Require(straight[0].Y - straight[2].Y > .15f && straight[1].Y - straight[3].Y > .15f,
+            "the tug fixture should put the forepaws on higher treads than the hind paws");
+        for (int leg = 0; leg < 4; leg++)
+            Require(straight[leg].DistanceTo(turned[leg]) < .01f,
+                $"paw {leg} should stay on the same tread when the cabin is turned, at {turned[leg].Y:0.00} m instead of {straight[leg].Y:0.00} m");
     }
     /// <summary>Seconds a wolf at a door takes to blend into its stand from where it arrived.</summary>
     private const float SettleSeconds = .15f;

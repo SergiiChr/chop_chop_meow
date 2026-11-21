@@ -52,6 +52,25 @@ internal sealed class PawWatch(Func<Vector2, float>? groundAt = null) {
 
 /// <summary>Steps that move and place a wolf model as the world view does.</summary>
 internal static class WolfModelSteps {
+    /// <summary>Poses a wolf taking a player out of a cabin and returns the four paw positions in the wolf's frame.</summary>
+    public static Vector3[] PawsDuringTugFromCabin(GameData data, float rotation) {
+        var world = WorldSteps.EmptyWorld(data);
+        var cabin = world.Add(ThingKind.Hut, new Vector2(24, 24), rotation: rotation);
+        var door = Doorways.DoorPoint(cabin);
+        world.Player = door;
+        var held = new ActorState { Position = door + new Vector2(0, -1.35f).Rotated(rotation), Yaw = Mathf.Pi - rotation, HipHeight = .9f, Lift = .42f };
+        Doorways.Stage(world.Me, Doorway.Tugged, cabin.Id);
+        world.Me.DoorTime = .3f;
+        var wolf = new Wolf { Target = world.Me.Id, DoorCheckCabin = cabin.Id, DoorCheck = DoorCheckStage.TakingOut, Pos = door };
+        var view = new TugView(() => world, _ => held);
+        var model = new WolfModel { Yaw = held.Yaw };
+        model.Root.Position = WorldView.To3(door + new Vector2(0, -.45f).Rotated(rotation));
+        for (int frame = 0; frame < 12; frame++) view.ShowTugging(wolf, model, .3f, 1f / 60);
+        Vector3[] paws = [model.Paw(0), model.Paw(1), model.Paw(2), model.Paw(3)];
+        model.Root.Free();
+        return paws;
+    }
+
     /// <summary>Moves a wolf model on along +Z for one frame at <paramref name="speed"/>, places it there and sets its paws down; returns how far it has come.</summary>
     public static float RunOn(WolfModel wolf, float travelled, float speed, bool chasing, float dt) {
         if (speed < .05f) wolf.Stand(0, dt, false); else wolf.Move(speed * dt, dt, chasing, false);

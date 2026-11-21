@@ -1542,6 +1542,7 @@ public partial class Game {
             await TestClean(CheckPlumbingPagesRefreshWithoutAllocating);
             await TestClean(CheckWaterPumpControlsShowPressureAndFlow);
             await RunSteelPipeUIChecks();
+            await TestClean(CheckQuarterTurnedForgeEmitsFromItsFlueAndMouth);
             await TestClean(CheckIntroFilmCoversTheStartMenuUntilEsc);
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }

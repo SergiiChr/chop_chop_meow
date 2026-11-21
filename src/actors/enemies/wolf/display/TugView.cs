@@ -76,7 +76,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         model.StandPlaced(wolf.Stagger);
         model.Root.Visible = world().Sees(wolf.Pos);
         // A wolf taking a player out of their cabin starts in its doorway, with its paws on the step and the floor.
-        model.Steps = wolf.DoorCheck == DoorCheckStage.TakingOut && world().Find(wolf.DoorCheckCabin) is Thing cabin ? Doorways.DoorPoint(cabin) : null;
+        model.Steps = wolf.DoorCheck == DoorCheckStage.TakingOut && world().Find(wolf.DoorCheckCabin) is Thing cabin ? (Doorways.DoorPoint(cabin), cabin.Rotation) : null;
         var waist = Waist(held);
         model.Tug(through, elapsed, dt, waist.Y);
         var grip = waist - model.Root.Basis * model.Bite;
@@ -110,7 +110,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         model.Pinned = 0;
         model.StandPlaced(wolf.Stagger);
         model.Root.Visible = world().Sees(wolf.Pos);
-        model.Steps = world().PlayerById(wolf.Target) is { DoorCabin: not 0 } p && world().Find(p.DoorCabin) is Thing cabin ? Doorways.DoorPoint(cabin) : null;
+        model.Steps = world().PlayerById(wolf.Target) is { DoorCabin: not 0 } p && world().Find(p.DoorCabin) is Thing cabin ? (Doorways.DoorPoint(cabin), cabin.Rotation) : null;
         var body = WolfModel.Rearing(arm.Y, elapsed + wolf.Id % 7);
         var grip = arm - model.Root.Basis * WolfModel.BiteOf(body);
         model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);

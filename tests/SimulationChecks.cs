@@ -81,7 +81,7 @@ public static class SimulationChecks {
         Test(CheckPressingTheOppositeWayBrakesBeforeRunningBack, data);
         DoorTugChecks.Run(data);
         DoorCheckChecks.Run(data);
-        DoorCheckViewChecks.Run();
+        DoorCheckViewChecks.Run(data);
         CatgirlDanceChecks.Run();
         Test(CheckOnlyCoinsUseTheLargerStack, data);
         Test(CheckSaveFromAnotherVersionIsRefused, data);

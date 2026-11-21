@@ -85,8 +85,8 @@ public sealed class WolfModel {
     public float Settled;
     /// <summary>Seconds into its door check at a cabin the wolf is drawn at, which runs on between the world's updates.</summary>
     public float DoorCheckClock;
-    /// <summary>The door point of the cabin whose step the wolf stands at, when it does: its paws are set on the treads and the floor past the door, and its body lifted and tipped to stand on them.</summary>
-    public Vector2? Steps;
+    /// <summary>The position and turn of the door whose steps or floor the wolf stands on.</summary>
+    public (Vector2 Door, float Rotation)? Steps;
     /// <summary>Seconds a wolf has fed at its spot at a fallen player, easing it there from where it stood.</summary>
     public float Fed;
     /// <summary>The spot a feeding wolf holds at a fallen player: how far along the body, in WorldView's steps, and from which side; zero side for none yet.</summary>
@@ -835,14 +835,15 @@ public sealed class WolfModel {
     }
 
     /// <summary>A pose stood on the step of the cabin whose door point is <paramref name="door"/>, each paw on the tread or floor under it.</summary>
-    private WolfPose OnSteps(WolfPose pose, Vector2 door) {
+    private WolfPose OnSteps(WolfPose pose, Vector2 door, float rotation) {
         Span<float> ground = stackalloc float[4];
         var root = Root.Transform;
         Transform3D chest = Frame(pose, false), pelvis = Frame(pose, true);
         for (int leg = 0; leg < 4; leg++) {
             var paw = PawFrame(leg >= 2 ? pelvis : chest, pose.Leg(leg), leg).Origin;
             var at = root * paw;
-            ground[leg] = StairSteps.HeightAt(new Vector2(at.X, at.Z) - door, paw.Y - WolfShape.Sole > .01f);
+            var fromDoor = (new Vector2(at.X, at.Z) - door).Rotated(-rotation);
+            ground[leg] = StairSteps.HeightAt(fromDoor, paw.Y - WolfShape.Sole > .01f);
         }
         return Stood(pose, ground);
     }
@@ -884,7 +885,7 @@ public sealed class WolfModel {
     /// or turns <paramref name="wary"/> or calm. Only a wolf in sight has its skeleton posed.
     /// </summary>
     private void Show(WolfMotion next, WolfPose target, float dt, bool wary = false) {
-        if (Steps is Vector2 door) target = OnSteps(target, door);
+        if (Steps is { } steps) target = OnSteps(target, steps.Door, steps.Rotation);
         // The head turns ahead of the body, the neck taking most of the turn, and the spine and tail curl after it.
         if (Turning.Look != 0) {
             float look = Mathf.RadToDeg(Turning.Look);
