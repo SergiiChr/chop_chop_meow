@@ -92,6 +92,8 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<int, float> openBungs = new();
     /// <summary>The cooking tables whose mortar is in someone's hands this frame, so it is off the counter.</summary>
     private readonly HashSet<int> grinding = new();
+    /// <summary>The stations whose slotted hammer is in someone's hands this frame, so it is off the station's top.</summary>
+    private readonly HashSet<int> swung = new();
     /// <summary>Build-mode ghosts by building kind, made hidden while loading; mines have one per cliff ore instead.</summary>
     private readonly Dictionary<ThingKind, Prop> ghosts = new(), mineGhosts = new();
     private Prop? ghost;
@@ -527,7 +529,7 @@ public partial class WorldView : Node3D {
     };
 
     private void UpdateActors(float dt) {
-        pumping.Clear(); grinding.Clear(); openBungs.Clear();
+        pumping.Clear(); grinding.Clear(); swung.Clear(); openBungs.Clear();
         if (ShirtOf(World.Me) != playerShirt) {
             playerShirt = ShirtOf(World.Me); playerRig.Root.QueueFree();
             playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
@@ -561,6 +563,7 @@ public partial class WorldView : Node3D {
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
         PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, StationHammer(tool, worked, World.Me) ?? SelectedTool, World.S.Backpack), torch, door, dt);
+        if (SwingsSlottedHammer(tool, worked, World.Me)) swung.Add(worked!.Id);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject, playerRig);
@@ -606,6 +609,9 @@ public partial class WorldView : Node3D {
                 Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools),
                     barrel: work == ActorAction.Carry && Barrel.In(worker.Bag) != null,
                     vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null);
+                // A worker swings the station's slotted hammer unless they hold one of their own.
+                if (ActorAnimation.Tool(work) == "hammer" && assignment != null && World.BenchTool(assignment, "hammer") != null
+                    && !(World.Data.Items.TryGetValue(worker.Tool, out var held) && held.Tool == "hammer")) swung.Add(assignment.Id);
             }
             entry.Rig.Root.Visible = World.Sees(worker);
             Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
@@ -651,6 +657,13 @@ public partial class WorldView : Node3D {
         if (tool != "hammer" || station?.Tools == null) return null;
         using var acting = World.ActAs(p);
         return World.ToolInUse(station, "hammer", 0);
+    }
+
+    /// <summary>Whether a player swinging <paramref name="tool"/> at a station swings the hammer slotted there.</summary>
+    private bool SwingsSlottedHammer(string? tool, Thing? station, PlayerState p) {
+        if (tool != "hammer" || station?.Tools == null) return false;
+        using var acting = World.ActAs(p);
+        return World.WorksWithSlotted(station, "hammer");
     }
 
     /// <summary>Whether the acting player has the tool a station's recipe needs: slotted, carried or none.</summary>
@@ -718,6 +731,7 @@ public partial class WorldView : Node3D {
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             string? tool = ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null);
             PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, StationHammer(tool, worked, p) ?? p.Selected, p.Backpack), torch, door, dt);
+            if (SwingsSlottedHammer(tool, worked, p)) swung.Add(worked!.Id);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, subject, other.Rig);
@@ -1179,13 +1193,13 @@ public partial class WorldView : Node3D {
                 Smoke(campfire, t, flames > 0, dt, CampfireSmoke);
                 break;
             case AnvilProp anvil:
-                if (live) anvil.Hammer.Show(World.BenchTool(t, "hammer"));
+                if (live) anvil.Hammer.Show(swung.Contains(t.Id) ? null : World.BenchTool(t, "hammer"));
                 break;
             case BenchProp bench:
-                // Slotted tools lie on the bench top.
+                // Slotted tools lie on the bench top, but for a hammer in someone's hands.
                 if (!live) break;
                 bench.Chisel.Show(World.BenchTool(t, "chisel"));
-                bench.Hammer.Show(World.BenchTool(t, "hammer"));
+                bench.Hammer.Show(swung.Contains(t.Id) ? null : World.BenchTool(t, "hammer"));
                 prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
                 break;
             case PileProp pile:

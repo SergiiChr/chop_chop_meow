@@ -853,6 +853,11 @@ public sealed partial class World {
     /// </summary>
     public bool HasToolFor(Thing? station, RecipeDef r) => r.Tool == "" || ToolInUse(station, r.Tool, r.Tier) != null;
     /// <summary>
+    /// Whether the acting player works a station with the tool of a kind slotted there rather than one they carry: one
+    /// is slotted, and they carry none faster.
+    /// </summary>
+    public bool WorksWithSlotted(Thing station, string tool) => BenchTool(station, tool) is string slotted && Faster(slotted, BestTool(tool, null, 0)) == slotted;
+    /// <summary>
     /// The tool a station's recipe is worked with: the fastest of the one slotted and those carried by players working at the station.
     /// A worker brings none, so a station worked only by its crew works with the slotted tool and waits when there is none.
     /// </summary>
@@ -1632,7 +1637,6 @@ public sealed partial class World {
         // Reassigning calls off a price errand, so the worker never freezes on the road.
         w.Assignment = target?.Id ?? 0; w.Away = 0; w.WorkState = WorkerWorkState.Idle;
         w.Destination = 0; w.Timer = 0; w.Status = target == null ? "Available" : "Starting work";
-        if (target != null && target.Kind != ThingKind.Signpost) S.Milestones.Add("assigned");
     }
     public void Fire(Worker w) {
         if (Busy() || Forwarded(Verb.Fire, other: w.Id)) return;

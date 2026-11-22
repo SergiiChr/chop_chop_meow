@@ -20,7 +20,8 @@ public partial class Game {
         await TestClean(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
         await TestClean(CheckStrikerBesideAStationLeavesThePlayerHammering);
         await TestClean(CheckAnvilWithoutAHammerLeavesThePlayerIdle);
-        await TestClean(CheckIdlePlayerAtAnAnvilSwingsItsSlottedSteelHammer);
+        await TestClean(CheckIdlePlayerAtAnAnvilSwingsItsSlottedSteelHammerOffTheStand);
+        await TestClean(CheckSmithSwingsTheAnvilsSlottedHammerOffTheStand);
         await TestClean(CheckEveryHammerBlowLandsOnTheStationsWorkTop);
         await TestClean(CheckPackingStationListsGoodsAndTakesBackpackClicks);
         await TestClean(CheckCraftingMenuMakesChiselAndTorchByHand);
@@ -67,14 +68,22 @@ public partial class Game {
         RemoveThings(Hosted, t => t == table);
     }
 
-    /// <summary>A player standing idle beside a bench that is making a crate hammers it with the bench's own knock.</summary>
+    /// <summary>
+    /// A player with no hammer of their own, standing idle beside a bench that is making a crate, hammers it with the
+    /// bench's own knock, swinging its slotted hammer off the bench top.
+    /// </summary>
     private async Task CheckIdlePlayerBesideABenchKnocksWithItsHammer() {
+        // With no hammer of their own, the player swings the bench's.
+        int steel = Drop(Hosted, "steel_hammer"), wood = Drop(Hosted, "wood_hammer");
         // The server's position, since the window's copy may not have caught up with the last check's warp.
         int soundsBefore = sounds.Played;
         var bench = Hosted.Add(ThingKind.Bench, Hosted.Player + new Vector2(1.2f, 0));
         bench.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 6);
         await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Heard("bench_work", soundsBefore), "the idle player hammering at the bench beside it with its knock", 4);
+        Require(view.PropOf(bench.Id) is BenchProp { Hammer.Shown: null }, "The bench's slotted hammer must be off its top while the player swings it.");
         RemoveThings(Hosted, t => t == bench);
+        if (steel > 0) Give(Hosted, "steel_hammer", steel);
+        if (wood > 0) Give(Hosted, "wood_hammer", wood);
     }
 
     /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
@@ -100,15 +109,31 @@ public partial class Game {
         if (carried > 0) Give(Hosted, "steel_hammer", carried);
     }
 
-    /// <summary>A player carrying only a wooden mallet, idle beside an anvil with a steel hammer slotted, swings the steel hammer.</summary>
-    private async Task CheckIdlePlayerAtAnAnvilSwingsItsSlottedSteelHammer() {
+    /// <summary>
+    /// A player carrying only a wooden mallet, idle beside an anvil with a steel hammer slotted, swings the steel hammer,
+    /// which is off the stand while they do and back on it once the batch is done.
+    /// </summary>
+    private async Task CheckIdlePlayerAtAnAnvilSwingsItsSlottedSteelHammerOffTheStand() {
         int carried = Drop(Hosted, "steel_hammer");
         Give(Hosted, "wood_hammer", 1);
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 2); SlotPlainestTools(Hosted, anvil);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 1); SlotPlainestTools(Hosted, anvil);
         await Until(() => view.PlayerAnimation == ActorAction.Hammer && view.PlayerRig.ToolShown == "steel_hammer",
             "the idle player swinging the anvil's slotted steel hammer", 3);
+        Require(view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null }, "The anvil's slotted hammer must be off the stand while the player swings it.");
+        await Until(() => !anvil.Processing && view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: "steel_hammer" }, "the steel hammer back on the stand once the batch is done", 10);
         RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "wood_hammer", 1);
         if (carried > 0) Give(Hosted, "steel_hammer", carried);
+    }
+
+    /// <summary>A smith hammering at an anvil swings its slotted steel hammer, which is off the stand while they do.</summary>
+    private async Task CheckSmithSwingsTheAnvilsSlottedHammerOffTheStand() {
+        // Out of the player's reach, so only the smith works it.
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(6, 0)); anvil.Inventory.Add("steel_bar", 4); SlotPlainestTools(Hosted, anvil);
+        var smith = AddWorker(Hosted, anvil.Pos + new Vector2(0, 1.2f)); Hosted.Assign(smith, anvil);
+        await Until(() => smith.WorkState == WorkerWorkState.Hammering && view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null },
+            "the smith hammering with the anvil's slotted hammer, off the stand", 3);
+        Hosted.Fire(smith);
+        RemoveThings(Hosted, t => t == anvil);
     }
 
     /// <summary>A new packing station opens its list of goods; picking one sets what it packs, Shift on a backpack stack loads it, and the idle player beside it packs.</summary>
@@ -416,10 +441,9 @@ public partial class Game {
     }
 
     /// <summary>
-    /// A new anvil's page shows steel bars in, steel parts out and, beside it, an empty steel hammer slot; Ctrl on a
-    /// backpack bar loads them.
-    /// Shift on a wooden mallet leaves it in the backpack with nothing said, and Shift on a steel hammer slots it onto
-    /// the stand.
+    /// A new anvil's page shows steel bars in, steel parts out and, beside it, an empty steel hammer slot.
+    /// Shift on a wooden mallet leaves it in the backpack with nothing said, Shift on a steel hammer slots it onto the
+    /// stand, and Ctrl on a backpack bar loads them.
     /// </summary>
     private async Task CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack() {
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
@@ -432,16 +456,16 @@ public partial class Game {
         Require(panel.Aside.Visible && slot != null && slot.TooltipText == "Steel hammer slot.",
             $"A new anvil must show an empty slot beside its page named \"Steel hammer slot.\", not \"{slot?.TooltipText}\".");
         Require(view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null }, "A new anvil must have no hammer lying on its stand.");
-        await Holding(Key.Ctrl, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel bar"))));
-        await Until(() => world.Backpack["steel_bar"] == 0, "Ctrl on steel bars in the backpack loading them into the anvil", 2);
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Wooden mallet"))));
         await Frames(3);
         Require(world.BenchTool(anvil, "hammer") == null && world.Backpack["wood_hammer"] == mallets, "The anvil's hammer slot must refuse a wooden mallet.");
         Require(!messages.Shown.ToArray().Any(text => text.Contains("mallet", StringComparison.OrdinalIgnoreCase) || text.Contains("hammer", StringComparison.OrdinalIgnoreCase)),
             $"Shift on a wooden mallet at the anvil must say nothing, not \"{string.Join(" / ", messages.Shown.ToArray())}\".");
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel hammer"))));
-        await Until(() => world.BenchTool(anvil, "hammer") == "steel_hammer", "Shift on a steel hammer in the backpack slotting it into the anvil", 2);
-        await Until(() => view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: "steel_hammer" }, "the slotted steel hammer lying on the anvil's stand", 2);
+        await Until(() => world.BenchTool(anvil, "hammer") == "steel_hammer" && view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: "steel_hammer" },
+            "Shift on a steel hammer in the backpack slotting it into the anvil, where it lies on the stand", 2);
+        await Holding(Key.Ctrl, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel bar"))));
+        await Until(() => world.Backpack["steel_bar"] == 0, "Ctrl on steel bars in the backpack loading them into the anvil", 2);
         RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "steel_bar"); Drop(Hosted, "wood_hammer", 1); await CloseWithEsc();
     }
 

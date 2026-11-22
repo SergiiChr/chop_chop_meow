@@ -14,8 +14,8 @@ Buildings are DIY:
 - an OSB cabin on block piers with a corrugated shed roof, solar panel and fixed steel ladder
 - a plywood storage box
 - a dropped canvas backpack
-- an anvil on a welded stand, with its slotted steel hammer lying on the stand in front of it
-- a crafting bench with its slotted chisel and hammer
+- an anvil on a welded stand, with its slotted steel hammer lying on the stand in front of it while nobody swings it
+- a crafting bench with its slotted chisel and hammer, the hammer gone from its top while someone swings it
 - slatted wood crates
 - a market post with a mailbox
 - a fieldstone campfire

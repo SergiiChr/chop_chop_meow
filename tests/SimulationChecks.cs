@@ -49,7 +49,7 @@ public static class SimulationChecks {
         Test(CheckCartDeliversAfterFullTrip, data);
         Test(CheckLooseGoodsNeverSellOrSendACart, data);
         Test(CheckSaleLowersDemandAndNewsTravels, data);
-        Test(CheckHiredRunnerFetchesCurrentPrices, data);
+        HiringChecks.Run(data);
         Test(CheckUnpaidWorkerStrikes, data);
         Test(CheckBoughtToolsArriveOneByOneAndSellBackInCrate, data);
         Test(RecoveryChecks.Run, data);
@@ -105,6 +105,7 @@ public static class SimulationChecks {
         Test(CheckFoodsFeedAndWaterByTheirDataWithoutHealing, data);
         Test(CheckMarketTakesCratesAndDonations, data);
         TradeChecks.Run(data);
+        GoalChecks.Run(data);
         Test(CheckTorchLightsAndBurnsOut, data);
         Test(CheckALitTorchMovedOutOfTheBackpackGoesOut, data);
         Test(CheckEachToolTakesItsOwnSlot, data);
@@ -456,40 +457,6 @@ public static class SimulationChecks {
         Require(world.Demand("steel_axe") < 1, "market demand should still be below normal");
         Require(world.KnownPrice("steel_axe") < world.UnitPrice("steel_axe", false),
             "the price sheet should stay stale while demand recovers");
-    }
-
-    private static void CheckHiredRunnerFetchesCurrentPrices(GameData data) {
-        var world = EmptyWorld(data);
-        var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
-        world.Player = sign.Pos;
-        SkipClock(world, data.DaySeconds * 2);
-        Require(world.PriceAge == 2, "the price sheet should have aged before the errand");
-        // Past the skipped dawn, so its wages fall due before the runner is hired.
-        SafeTick(world, 90);
-        Require(world.FetchBlock(sign) == "No worker assigned." && !world.FetchPrices(sign), "fetching prices needs a worker assigned to the signpost");
-        var cheap = data.HireOffers.OrderBy(o => o.Upfront).First(); var dear = data.HireOffers.OrderBy(o => o.Upfront).Last();
-        Require(cheap.Wage > dear.Wage, "a smaller payment up front must come with a higher wage");
-        SetCoins(world, (int)dear.Upfront);
-        var runner = world.Hire(sign, dear);
-        Require(runner != null, "a hiring offer should bring a worker");
-        Require(runner.Wage == dear.Wage, "a hiring offer should fix the worker's wage");
-        Require(world.Coins == 0, "a hiring offer should charge its payment up front");
-        SetCoins(world, (int)dear.Upfront + 5);
-        world.Transfer(world.Backpack, sign.Wages!, Inventory.Coins, (int)dear.Upfront - 2);
-        Require(world.Hire(sign, dear) != null && sign.Wages![Inventory.Coins] == 0 && world.Coins == 5,
-            "hiring should be paid from the bank first and the backpack for the rest");
-        world.Assign(runner!, sign);
-        Require(!world.Reached("assigned"), "minding the signpost is not the first automation goal");
-        Require(world.FetchPrices(sign), "the assigned worker should agree to fetch prices");
-        Require(runner!.Away > 0, "the assigned worker should set off for fresh prices");
-        Require(world.FetchBlock(sign) != null, "the assigned worker should set off only once");
-        SafeTick(world, data.TradeSeconds / 2);
-        Require(runner!.Pos.DistanceTo(sign.Pos + Vector2.One + Terrain.Seaward * World.TripDistance) < 1, "the runner should be furthest down the valley halfway through the errand");
-        SafeTick(world, data.TradeSeconds / 2 + .1f);
-        Require(runner.Away == 0, "the runner should be back from the village");
-        Require(world.PriceAge == 0, "the runner should return with current prices");
-        Require(Math.Abs(world.KnownPrice("berries") - world.UnitPrice("berries", false)) < .01f, "the runner should return with prices matching the market");
-        Require(world.FetchBlock(sign) == null, "the runner's return should let prices be fetched again");
     }
 
     /// <summary>A worker the player cannot pay at dawn strikes for that one wage until the debt is paid in full.</summary>
