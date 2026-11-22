@@ -17,8 +17,21 @@ internal sealed class InstalledPlumbingShape {
         CapTop = false,
         CapBottom = false,
     };
-    private const float NozzleHeight = 1.135f, BedHalf = Farms.HalfSize - .15f;
-    private static readonly Vector3[] Nozzles = [new(-BedHalf / 2, NozzleHeight, 0), new(BedHalf / 2, NozzleHeight, 0)];
+    private const float NozzleHeight = .25f, Quarter = (Farms.HalfSize - .15f) / 2;
+    private static readonly Vector3[] Nozzles = [
+        new(-Quarter, NozzleHeight, -Quarter), new(Quarter, NozzleHeight, -Quarter),
+        new(-Quarter, NozzleHeight, Quarter), new(Quarter, NozzleHeight, Quarter),
+    ];
+    private static readonly Material NozzleCase = Metal("3e4545", .68f, .35f);
+    private static readonly Material NozzleCap = Metal("616b68", .58f, .45f);
+    private static readonly CylinderMesh SprinklerLid = new() {
+        BottomRadius = .085f,
+        TopRadius = .068f,
+        Height = .035f,
+        RadialSegments = 6,
+        Rings = 0,
+        CapBottom = false,
+    };
     private readonly Node3D root;
     private readonly MeshInstance3D? spray;
 
@@ -102,14 +115,11 @@ internal sealed class InstalledPlumbingShape {
     }
 
     private static MeshInstance3D Farm(Node3D root) {
-        const float barHeight = NozzleHeight - .10f;
-        var top = Vector3.Up * barHeight;
-        Pipe(root, Vector3.Zero, top, .046f, Steel);
-        Pipe(root, Nozzles[0] with { Y = barHeight }, Nozzles[1] with { Y = barHeight }, .038f, Steel);
-        Box(root, new Vector3(.22f, .05f, .22f), Vector3.Up * .092f, Steel);
-        foreach (var nozzle in Nozzles)
-            Post(root, .064f, .044f, NozzleHeight - barHeight, nozzle with { Y = barHeight }, Brass, 6);
-        return FarmSpray.Build(root, Nozzles, BedHalf);
+        foreach (var nozzle in Nozzles) {
+            Add(root, Tube, NozzleCase, nozzle with { Y = .125f }).Scale = new Vector3(.067f, .18f, .067f);
+            Add(root, SprinklerLid, NozzleCap, nozzle - Vector3.Up * (SprinklerLid.Height / 2));
+        }
+        return FarmSpray.Build(root, Nozzles, Quarter);
     }
 
     private static void Pipe(Node3D parent, Vector3 from, Vector3 to, float radius, Material metal) {

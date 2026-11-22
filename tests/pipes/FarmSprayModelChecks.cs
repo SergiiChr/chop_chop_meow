@@ -1,5 +1,4 @@
-using System;
-using System.Collections.Generic;
+using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -21,26 +20,34 @@ public static class FarmSprayModelChecks {
 
         var arrays = spray.Mesh!.SurfaceGetArrays(0);
         var vertices = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-        var ribbon = arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
-        var outlets = new HashSet<int>();
-        for (int i = 0; i < vertices.Length; i++) {
-            if (ribbon[i].X != 0) continue;
-            var origin = vertices[i];
-            Require(Mathf.Abs(origin.Z) < .02f && Mathf.Abs(origin.X) is > 1.3f and < 1.5f && origin.Y > 1,
-                "The water should start at each end of the T above the crops.");
-            outlets.Add(Math.Sign(origin.X));
+        var fittings = ModelSteps.AllMeshes(spray.GetParent()).Where(mesh => mesh != spray)
+            .Select(mesh => mesh.Transform * mesh.Mesh!.GetAabb()).ToArray();
+        foreach (float x in new[] { -1.425f, 1.425f }) {
+            foreach (float z in new[] { -1.425f, 1.425f }) {
+                var center = new Vector3(x, 0, z);
+                var head = fittings.Where(bounds => (bounds.GetCenter() with { Y = 0 }).DistanceTo(center) < .12f).ToArray();
+                Require(head.Length > 0, "Each quarter of the farm should have a sprinkler in its center.");
+                float top = head.Max(bounds => bounds.End.Y);
+                Require(top is > .12f and < .32f, "Each sprinkler should stick just above the tilled soil.");
+                Require(vertices.Any(v => v.DistanceTo(center with { Y = top }) < .015f),
+                    "Spray should start at the top of each sprinkler.");
+            }
         }
-        Require(outlets.Count == 2, "Both ends of the T should spray.");
-        Require(spray.CustomAabb.Size.X > 5.5f && spray.CustomAabb.Size.Z > 5.5f && spray.CustomAabb.End.Y > 1.4f,
-            "The sprinkler should cover the planted rows and keep the arcs above the heads visible.");
-
-        foreach (var mesh in ModelSteps.AllMeshes(spray.GetParent())) {
-            var bounds = mesh.Transform * (mesh == spray ? spray.CustomAabb : mesh.Mesh!.GetAabb());
-            if (mesh != spray)
-                Require(bounds.Position.Z > -.16f && bounds.End.Z < .16f, "The central T should leave both sides of the plot free of framing.");
-            Require(bounds.Position.X >= -3 && bounds.Position.Z >= -3 && bounds.End.X <= 3 && bounds.End.Z <= 3,
-                "The sprinkler and its spray should fit inside the farm's six-meter square.");
+        foreach (var bounds in fittings)
+            Require(Mathf.Abs(Mathf.Abs(bounds.GetCenter().X) - 1.425f) < .12f
+                && Mathf.Abs(Mathf.Abs(bounds.GetCenter().Z) - 1.425f) < .12f
+                && bounds.Size.X < .25f && bounds.Size.Z < .25f,
+                "Only the four short sprinkler heads should be visible above the bed.");
+        var surfaceOnSoil = spray.Mesh.GetFaces().Chunk(3).Any(face =>
+            face.All(v => v.Y is >= .02f and < .12f) && face[0].DistanceTo(face[1]) > .7f);
+        Require(!surfaceOnSoil, "The watering effect should leave the tilled soil clear of surface ripples.");
+        foreach (var vertex in vertices) {
+            var fromNearestHead = new Vector2(Mathf.Abs(vertex.X) - 1.425f, Mathf.Abs(vertex.Z) - 1.425f);
+            Require(fromNearestHead.Length() <= 1.44f, "Each sprinkler fan should fit its circular reach.");
         }
+        var sheet = spray.CustomAabb.HasVolume() ? spray.CustomAabb : spray.Mesh.GetAabb();
+        Require(sheet.Size.X is > 5.4f and <= 6 && sheet.Size.Z is > 5.4f and <= 6 && sheet.End.Y > .6f,
+            "The water should fan up from the heads and reach the outer rows of the plot.");
         plumbing.Water(false, .6f);
         Require(!spray.Visible, "The sprinklers should stop when flow stops.");
         farm.Root.Free();
