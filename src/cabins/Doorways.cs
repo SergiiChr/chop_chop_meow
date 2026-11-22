@@ -160,29 +160,6 @@ public sealed class Doorways(World world) {
     /// <summary>How far to the side of a cabin's door point the first player standing aside stands, and how far apart the next ones stand.</summary>
     public const float AsideStep = .7f, AsideGap = .6f;
 
-    /// <summary>A step of <paramref name="move"/> for the acting player walking to a cabin's door, cut short to stop on the door rather than past it.</summary>
-    public Vector2 StepToDoor(Thing cabin, Vector2 move) => move.LimitLength(world.Player.DistanceTo(DoorPoint(cabin)));
-
-    /// <summary>
-    /// The way to walk from <paramref name="from"/> to a cabin's door: straight there when the cabin is not in the way, else
-    /// to the edge of the cabin's walls and round them on the shorter side; zero once at the door.
-    /// </summary>
-    public static Vector2 TowardDoor(Thing cabin, Vector2 from) {
-        var door = DoorPoint(cabin);
-        if (from.DistanceTo(door) < .15f) return Vector2.Zero;
-        // The circle a walk round the cabin keeps to, a little outside what blocks a walker.
-        float round = World.Footprint(ThingKind.Hut) + .3f;
-        var centre = cabin.Pos;
-        var line = door - from;
-        float along = Math.Clamp((centre - from).Dot(line) / line.LengthSquared(), 0, 1);
-        if ((from + line * along).DistanceTo(centre) >= round) return line.Normalized();
-        var outward = from - centre;
-        float distance = outward.Length(), side = Mathf.AngleDifference(outward.Angle(), (door - centre).Angle()) >= 0 ? 1 : -1;
-        // Out past the circle, head for where a line from here touches it on the door's side; on it, walk along it, held at its radius.
-        if (distance > round + .1f) return (centre + outward.Rotated(side * MathF.Acos(round / distance)) / distance * round - from).Normalized();
-        return (outward.Rotated(side * MathF.PI / 2) / distance + outward / distance * (round - distance)).Normalized();
-    }
-
     /// <summary>The nearest cabin with a place left for the acting player, locked or not, or null.</summary>
     public Thing? NearestFreeCabin(Vector2 from) {
         Thing? best = null;

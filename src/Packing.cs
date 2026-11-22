@@ -7,6 +7,14 @@ public sealed partial class World {
     /// <summary>Whether a packing station can be set to pack an item: anything a crate holds, other than crates and coins.</summary>
     public bool Packable(string item) => Data.Items.ContainsKey(item) && item is not ("crate" or Inventory.Coins) && !Barrel.Is(item);
 
+    /// <summary>Room in one packing input, keeping space for an empty crate when there is none.</summary>
+    internal static int PackingRoom(Thing station, string item) {
+        var box = station.Inventory;
+        int room = box.SlotRoom(item);
+        if (item != "crate" && box["crate"] == 0) room = Math.Min(room, box.Room(item) - box.StackOf(item));
+        return Math.Max(0, room);
+    }
+
     public void SetPacking(Thing t, string item) {
         if (t.Kind != ThingKind.Packer || !Packable(item) || item == t.Packs || Busy() || Forwarded(Verb.SetPacking, t.Id, item: item)) return;
         t.Packs = item; t.Progress = 0;

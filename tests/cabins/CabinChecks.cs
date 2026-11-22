@@ -65,15 +65,17 @@ public static class CabinChecks {
         // The door faces +Y, so this is straight behind the cabin.
         world.Player = hut.Pos + new Vector2(0, -3);
         float widest = 0;
-        for (int i = 0; i < 600 && Doorways.TowardDoor(hut, world.Player) is var way && way != Vector2.Zero; i++) {
+        var approach = new CabinApproach(world);
+        approach.Start(hut);
+        for (int i = 0; i < 600 && approach.Direction() != Vector2.Zero; i++) {
             var before = world.Player;
-            world.MovePlayer(way * data.MoveSpeed(false) / 60);
+            approach.Move(data.MoveSpeed(false) / 60);
             Require(world.Player != before, $"the walk to the door should never stall against the cabin, at {world.Player}");
             widest = Math.Max(widest, Math.Abs(world.Player.X - hut.Pos.X));
         }
         Require(world.Player.DistanceTo(Doorways.DoorPoint(hut)) < .2f, $"the walk should end at the cabin's door, not at {world.Player}");
         Require(widest > 1.5f, "the walk should go round the side of the cabin");
-        Require(world.Doorways.Enter(hut, false) && world.Door == Doorway.Entering, "a player at the door should step in");
+        Require(world.Door == Doorway.Entering, "a player at the door should step in");
     }
     private static void CheckSteppingInTakesLongerAtAWalkThanAtASprint(GameData data) {
         var world = EmptyWorld(data);

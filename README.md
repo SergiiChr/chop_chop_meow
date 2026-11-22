@@ -171,7 +171,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Walk or sprint on a gravel path | Move 1.2× as fast |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
-| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you round to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
+| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you around obstacles to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
@@ -181,7 +181,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | 1–9 or click a hotbar slot | Select that slot, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
 | Space | Swing an axe, or a fist without one, the way you last walked, or pump the selected nearby reinforced furnace |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
-| Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
+| Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
 | LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
@@ -627,7 +627,8 @@ They climb the outside ladder to fill a roof barrel and then climb down.
 
 The packing station (8 planks, 4 wood) packs one good into crates.
 Click the slot at the top to choose the good from everything a crate holds.
-It keeps a stack of that good and a stack of empty crates, and packs one item every 1.5 seconds while you or an assigned worker work it.
+Its two input slots each hold up to one stack of 64, one for the chosen good and one for empty crates.
+It packs one item every 1.5 seconds while you or an assigned worker work it.
 The crate being packed shows on the right with how full it is; a full crate waits there until someone takes it.
 
 - Craft: works the station.
@@ -873,7 +874,8 @@ The crew overview shows each worker's jobs as numbered chips in that order, with
 
 ### Daily routine
 
-- Workers break for an hour of lunch at noon, sitting around the campfire closest to the crew.
+- Workers break for an hour of lunch at noon. They take the closest open campfire seats, up to six workers per fire.
+  Workers without a fire seat sit on the ground facing each other in groups of up to three.
 - As dusk falls they walk to the nearest trading post and head off down the valley like a trade cart, fading from view, then walk back in the same way at dawn.
 - Assignments and anything they carry stay as they were.
 - While they are away a forge cools and an anvil stops.
@@ -973,8 +975,9 @@ A torch that lands on a wolf burns it and sends it running for a moment.
 
 ### Cabins
 
-Click a cabin, or press Enter in its panel, and you walk round it to its door and step in; the door shuts behind you.
-Once you set off you cannot walk away, and the keys do nothing until you are in.
+Click a cabin, or press Enter in its panel, and you walk around buildings and other obstacles to its door.
+Enter is highlighted during the walk. Click it again or press Escape to cancel and move freely.
+If there is no clear path, the walk stops. At the door you step in and it shuts behind you.
 Stepping in takes about 1.3 seconds at a walk, hurrying up the second tread, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
 For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and tugs you a metre back out in three tugs over 1.5 seconds, less where water or a building is in the way, you bent over, reaching for the door and screaming.
 It then lets go and leaves you standing there, free to move: click the cabin to go for its door again.

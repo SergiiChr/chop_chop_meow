@@ -299,6 +299,7 @@ public sealed partial class World {
         if (from != to && BoxBlock(b, to, item) is string refused) { Say(refused); return 0; }
         var into = b > 0 ? Find(b / BoxCodes) : null;
         if (from != to && FillBlock(from, to, item, into) is string dry) { Say(dry); return 0; }
+        if (from != to && into?.Kind == ThingKind.Packer && to == into.Inventory) quantity = Math.Min(quantity, PackingRoom(into, item));
         // A drop on another item's cell in another inventory still stores the stack wherever it fits, and so does a liquid or a vessel that pours.
         int moved;
         if (from != to && (Data.VesselFor(item) != null || PoursInto(into, to, item) != null || into?.Kind == ThingKind.Farm)) {
@@ -404,7 +405,7 @@ public sealed partial class World {
     /// <summary>A guest takes the host's whole world as its copy.</summary>
     public void Mirror(SaveState state, List<PlayerState> players, int localId) {
         state.Players = players; LocalId = localId; S = state; S.Actor = Me;
-        UpdateLunchFire(); ExploredRevision++;
+        ExploredRevision++;
         Replaced?.Invoke();
     }
 }

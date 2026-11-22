@@ -18,6 +18,48 @@ public partial class Game {
     private async Task RunCabinUIChecks() {
         await TestClean(CheckAClickTakesAPlayerIntoACabinWhereTheyLockUpAndStepOutAgain);
         await TestClean(CheckCabinHasABarrelWindowAndOffersHaulWhileABarrelIsMounted);
+        await TestClean(CheckEnterWalksAroundAStationAndCanBeCancelled);
+        await TestClean(CheckUnreachableCabinDoorLeavesThePlayerFreeToWalk);
+    }
+
+    private async Task CheckEnterWalksAroundAStationAndCanBeCancelled() {
+        var home = Hosted.Player;
+        var cabin = Hosted.Add(ThingKind.Hut, home + new Vector2(0, -4));
+        var bench = Hosted.Add(ThingKind.Bench, Doorways.DoorPoint(cabin) + Vector2.Down * 2);
+        Warp(Hosted, Doorways.DoorPoint(cabin) + Vector2.Down * 6);
+        await Frames(4);
+        await ClickOn(cabin);
+        var enter = FindButton(panel, "Enter")!;
+        await Until(() => enter.GetThemeStylebox("normal") == Style.Pill(Style.Mustard).Item1, "highlighted Enter while walking to the cabin", 2);
+        await Click(enter);
+        Require(enter.GetThemeStylebox("normal") == Style.Pill(Style.Sage).Item1, "cancelling should clear the highlight");
+        var stopped = world.Player;
+        await Seconds(.3);
+        Require(world.Player == stopped && world.Sheltered == 0, "clicking Enter again should stop the automatic walk");
+        await Click(enter);
+        await Until(() => world.Sheltered == cabin.Id && world.Door == Doorway.None, "walking around the bench and stepping inside", 7);
+        await Click(FindButton(panel, "Step outside")!);
+        await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "stepping out of the cabin", 4);
+        RemoveThings(Hosted, thing => thing == cabin || thing == bench);
+        await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
+    }
+
+    private async Task CheckUnreachableCabinDoorLeavesThePlayerFreeToWalk() {
+        var home = Hosted.Player;
+        var cabin = Hosted.Add(ThingKind.Hut, home + new Vector2(0, -4));
+        // An old layout can have a building on the door spot that new construction keeps clear.
+        var bench = Hosted.Add(ThingKind.Bench, Doorways.DoorPoint(cabin));
+        await ClickOn(cabin);
+        await Until(() => messages.Last == "No clear path to the cabin door.", "the blocked-door message", 2);
+        var enter = FindButton(panel, "Enter")!;
+        Require(enter.GetThemeStylebox("normal") == Style.Pill(Style.Sage).Item1, "an unreachable door should clear the highlight");
+        var stopped = world.Player;
+        await Holding(Key.D, () => Seconds(.2));
+        Require(world.Player.DistanceTo(stopped) > .2f && world.Sheltered == 0, "the player can walk away from an unreachable door");
+        RemoveThings(Hosted, thing => thing == cabin || thing == bench);
+        await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
     }
 
     private async Task CheckCabinHasABarrelWindowAndOffersHaulWhileABarrelIsMounted() {

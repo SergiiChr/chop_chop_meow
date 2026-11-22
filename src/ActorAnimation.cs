@@ -1175,8 +1175,8 @@ public static class ActorAnimation {
         }
         // The sign hides any load in the worker's bag, which stays there until the strike ends.
         if (worker.WageDebt > 0 && !moving) return ActorAction.Protest;
-        // Every other worker sits on a rock rather than the ground.
-        if (worker.WorkState == WorkerWorkState.Resting && !moving) return worker.Id % 2 == 0 ? ActorAction.Perch : ActorAction.Sit;
+        if (!moving && worker.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching)
+            return worker.WorkState == WorkerWorkState.Perching ? ActorAction.Perch : ActorAction.Sit;
         // A gatherer filling their hands goes on working with what they already hold.
         if (!moving && worker.WorkState == WorkerWorkState.Gathering && (assignment?.IsResource == true || assignment?.Kind == ThingKind.Farm)) {
             return assignment.Kind switch {

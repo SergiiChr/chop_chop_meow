@@ -108,7 +108,7 @@ public sealed partial class World {
     /// <summary>
     /// Which box of a place takes a carried item now, and how many of it, or null when none does:
     /// a station's input slot up to a stack, or its fuel slot; what a mine site or a farm plot is short of;
-    /// storage that holds the item, as far as it has room: a trading post only crates its filter asks for, a packing station its good only while a slot stays left for crates,
+    /// storage that holds the item, as far as it has room: a trading post only crates its filter asks for, a packing station one stack per input,
     /// compost set to skip food no food, and a placed crate no crate.
     /// A vessel's room is the liters its liquid has room for.
     /// </summary>
@@ -124,7 +124,7 @@ public sealed partial class World {
             ThingKind.Farm => Farms.SowRoom(dest, item),
             // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
             ThingKind.Signpost when !dest.Inventory.Wants(item) => 0,
-            ThingKind.Packer when item == dest.Packs && !PackerTakes(dest, item) => 0,
+            ThingKind.Packer => dest.Inventory.Accepts(item) && Holds(dest, item) ? PackingRoom(dest, item) : 0,
             _ when dest.Compost && dest.SkipFood && Data.IsFood(item) => 0,
             _ when Nests(dest, item) => 0,
             _ => dest.Inventory.Accepts(item) && Holds(dest, item) ? dest.Inventory.Room(item) : 0

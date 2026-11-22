@@ -358,7 +358,7 @@ public partial class Game : Node, IGameFlow {
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
                 case Key.Escape:
-                    if (!cursor.Empty) cursor.Release(); else if (player.Mode is not ClickMode.Normal) player.Mode = new ClickMode.Normal(); else if (panel.Visible || bag.Visible) panel.Close(); else menu.Open();
+                    if (!cursor.Empty) cursor.Release(); else if (player.Mode is not ClickMode.Normal) player.Mode = new ClickMode.Normal(); else if (!player.CancelEntry()) { if (panel.Visible || bag.Visible) panel.Close(); else menu.Open(); }
                     RefreshLive(); break;
                 case Key.B: panel.Open(Page.Build); break;
                 case Key.I: panel.Toggle(Page.Guide); break;

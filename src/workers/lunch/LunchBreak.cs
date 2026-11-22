@@ -1,0 +1,125 @@
+using System;
+using System.Collections.Generic;
+using Godot;
+
+namespace ChopChopMeow;
+
+/// <summary>Reserves a seat for each worker at lunch, around a campfire or in a small circle on open ground.</summary>
+internal sealed class LunchBreak(World world) {
+    internal const int FireSeats = 6;
+    private const int GroupSeats = 3;
+    private const float FireRadius = 1.4f, GroupRadius = .8f, SeatGap = .9f;
+    private const int GroundSearch = 8;
+
+    private readonly record struct Seat(Vector2 Position, Vector2 Center, Thing? Fire = null);
+    private readonly Dictionary<int, Seat> reserved = new();
+    private readonly List<Worker> waiting = new();
+    private readonly List<Seat> fires = new();
+    private int fireCount;
+    private bool replan;
+
+    public void Reset() => reserved.Clear();
+
+    private static bool OnBreak(Worker w) => !w.Home && w.Away <= 0 && w.Commute == 0 && w.WageDebt <= 0;
+
+    /// <summary>Keeps seats fixed while workers walk to them and as long as the same crew and fires are available.</summary>
+    public void Prepare() {
+        if (!world.Lunch) { Reset(); return; }
+        var campfires = world.ThingsOf(ThingKind.Campfire);
+        int count = 0;
+        foreach (var w in world.Workers) {
+            if (!OnBreak(w)) continue;
+            count++;
+            replan |= !reserved.TryGetValue(w.Id, out var seat) || seat.Fire is Thing fire && world.Find(fire.Id) != fire;
+        }
+        if (!replan && count == reserved.Count && fireCount == campfires.Count) return;
+        Reset();
+        fireCount = campfires.Count;
+        replan = false;
+        waiting.Clear();
+        foreach (var w in world.Workers) if (OnBreak(w)) waiting.Add(w);
+        if (waiting.Count == 0) return;
+        fires.Clear();
+        foreach (var fire in campfires) {
+            for (int i = 0; i < FireSeats; i++) {
+                var position = Around(fire.Pos, FireRadius, i, FireSeats);
+                if (world.CanStand(position)) fires.Add(new Seat(position, fire.Pos, fire));
+            }
+        }
+        ReserveFires();
+        while (waiting.Count > 0) ReserveGroup();
+    }
+
+    private void ReserveFires() {
+        while (waiting.Count > 0 && fires.Count > 0) {
+            int worker = 0, seat = 0;
+            float nearestFire = float.MaxValue, nearestSeat = float.MaxValue;
+            for (int i = 0; i < waiting.Count; i++) {
+                var from = waiting[i].Pos;
+                for (int j = 0; j < fires.Count; j++) {
+                    var option = fires[j];
+                    float fireDistance = from.DistanceSquaredTo(option.Center), seatDistance = from.DistanceSquaredTo(option.Position);
+                    if (fireDistance > nearestFire || fireDistance == nearestFire && seatDistance >= nearestSeat) continue;
+                    worker = i; seat = j; nearestFire = fireDistance; nearestSeat = seatDistance;
+                }
+            }
+            var chosen = fires[seat];
+            Reserve(worker, chosen);
+            for (int j = fires.Count - 1; j >= 0; j--)
+                if (fires[j].Position.DistanceSquaredTo(chosen.Position) < SeatGap * SeatGap) fires.RemoveAt(j);
+        }
+    }
+
+    private void ReserveGroup() {
+        var anchor = waiting[0].Pos;
+        int count = Math.Min(GroupSeats, waiting.Count);
+        for (int radius = 0; radius <= GroundSearch; radius++) {
+            for (int y = -radius; y <= radius; y++) {
+                for (int x = -radius; x <= radius; x++) {
+                    if (Math.Max(Math.Abs(x), Math.Abs(y)) != radius) continue;
+                    var center = anchor + new Vector2(x, y);
+                    if (!RoomForGroup(center, count)) continue;
+                    Reserve(0, new Seat(Around(center, GroupRadius, 0, count), center));
+                    for (int i = 1; i < count; i++) {
+                        int nearest = 0;
+                        for (int j = 1; j < waiting.Count; j++)
+                            if (waiting[j].Pos.DistanceSquaredTo(anchor) < waiting[nearest].Pos.DistanceSquaredTo(anchor)) nearest = j;
+                        Reserve(nearest, new Seat(Around(center, GroupRadius, i, count), center));
+                    }
+                    return;
+                }
+            }
+        }
+        Reserve(0, new Seat(anchor, anchor));
+    }
+
+    private bool RoomForGroup(Vector2 center, int count) {
+        if (!world.CanStand(center)) return false;
+        foreach (var fire in world.ThingsOf(ThingKind.Campfire))
+            if (center.DistanceSquaredTo(fire.Pos) < 2.8f * 2.8f) return false;
+        for (int i = 0; i < count; i++) {
+            var p = Around(center, GroupRadius, i, count);
+            if (!world.CanStand(p)) return false;
+            foreach (var seat in reserved.Values)
+                if (p.DistanceSquaredTo(seat.Position) < SeatGap * SeatGap) return false;
+        }
+        return true;
+    }
+
+    private static Vector2 Around(Vector2 center, float radius, int i, int count) =>
+        center + Vector2.FromAngle(i * Mathf.Tau / count) * radius;
+
+    private void Reserve(int index, Seat seat) {
+        reserved.Add(waiting[index].Id, seat);
+        waiting.RemoveAt(index);
+    }
+
+    public void Sit(Worker w, float dt) {
+        if (!reserved.TryGetValue(w.Id, out var seat)) return;
+        if (seat.Center != seat.Position && !world.CanStand(seat.Position)) { replan = true; return; }
+        w.Status = seat.Fire != null ? "Lunch break by the campfire" : "Lunch break";
+        if (!world.Walk(w, seat.Position, dt, .08f, exact: true)) return;
+        w.LunchHeading = (seat.Center - seat.Position).Angle();
+        w.WorkState = seat.Fire != null && w.Id % 2 == 0 ? WorkerWorkState.Perching : WorkerWorkState.Resting;
+    }
+}

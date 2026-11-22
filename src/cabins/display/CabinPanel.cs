@@ -19,7 +19,7 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         var dawn = NeedColumn.All();
         foreach (var need in dawn) vials.AddChild(need);
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == thing.Id) world.Doorways.Leave(); else panel.Player.WalkInto(thing); });
+        var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == thing.Id) world.Doorways.Leave(); else panel.Player.ToggleEntry(thing); });
         var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(thing)); sleep.Name = "sleep"; sleep.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
         // The door's key sits under its button, for a player inside to turn.
         var doorSide = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; doorSide.AddThemeConstantOverride("separation", 8);
@@ -31,6 +31,10 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         buttons.AddChild(doorSide); buttons.AddChild(sleep);
         panel.DoorKey.Rest(thing.Locked);
         live.Watch(() => thing.Locked, locked => { panel.DoorKey.Turn(locked); key.TooltipText = locked ? "Unlock the door" : "Lock the door · keeps wolves out"; });
+        live.Watch(() => panel.Player.Entering(thing), entering => {
+            Style.SkinPill(door, entering ? Style.Mustard : Style.Sage);
+            door.TooltipText = entering ? "Cancel walk to the cabin" : "";
+        });
         live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), world.Data.GameMinutes(world.SecondsToDawn), Barrel.In(thing.Inventory)), now => {
             var (inside, blocked, _, _) = now;
             tag.Text = inside ? "inside" : "outside";
