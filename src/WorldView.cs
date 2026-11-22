@@ -22,6 +22,7 @@ public partial class WorldView : Node3D {
     public PipeShape PlacingPipeShape;
     public bool Underground;
     public Vector2I? PointedPipe;
+    public Vector2I? PipePreviewTile;
     private PipeLayerView pipeLayer = null!;
     /// <summary>The crate the player is lifting with a held right click, and how far along the lift is from 0 to 1.</summary>
     public int Lifting;
@@ -94,6 +95,7 @@ public partial class WorldView : Node3D {
     /// <summary>The village's carts no order holds, built while loading and reused for every trip.</summary>
     private readonly Stack<WorldModels.CartModel> idleCarts = new();
     private readonly Dictionary<int, float> pumping = new();
+    private readonly List<(ActorRig Rig, ActorState Actor, Thing Pump)> pumpOperators = new();
     private readonly Dictionary<int, float> openBungs = new();
     /// <summary>The cooking tables whose mortar is in someone's hands this frame, so it is off the counter.</summary>
     private readonly HashSet<int> grinding = new();
@@ -241,7 +243,7 @@ public partial class WorldView : Node3D {
         removalMark = new RemovalMark(scene, id => props.GetValueOrDefault(id)?.Root);
         RemovalMark.Warm(warmStage);
         player.Position = World.Player;
-        pipeLayer = new PipeLayerView(GhostValid, GhostBlocked); AddChild(pipeLayer);
+        pipeLayer = new PipeLayerView(); AddChild(pipeLayer);
         overlay = new Overlay { Paint = PaintOverlay }; AddChild(overlay);
         World.PlayerActed += PlayerActed;
     }
@@ -338,11 +340,11 @@ public partial class WorldView : Node3D {
     public Vector2 Screen(Vector2 p) => Screen(p, 0);
     public Vector2 Screen(Vector2 p, float height) { SyncCamera(); return camera.UnprojectPosition(To3(p, height)); }
 
-    public Vector2 ToWorld(Vector2 screen) {
+    public Vector2 ToWorld(Vector2 screen, float height = 0) {
         SyncCamera();
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
         if (Math.Abs(direction.Y) < 1e-5f) return World.Player;
-        var hit = origin + direction * (-origin.Y / direction.Y);
+        var hit = origin + direction * ((height - origin.Y) / direction.Y);
         return new Vector2(hit.X, hit.Z);
     }
 
@@ -514,7 +516,7 @@ public partial class WorldView : Node3D {
         worldReplaced = false;
         UpdateEffects(dt);
         UpdateMarkers();
-        pipeLayer.Update(World, camera, Underground, Placing == ThingKind.SteelPiping ? Terrain.TileAt(ToWorld(Mouse)) : null,
+        pipeLayer.Update(World, known, camera, Underground, PipePreviewTile,
             PlacingRotation, PlacingPipeShape, removalMark.Shown.Pipe);
         // The sun and the light move every frame by the window's own clock, which each server update corrects.
         UpdateLighting(Clocked(dayClock, World.Time, true, dt));
@@ -539,7 +541,7 @@ public partial class WorldView : Node3D {
     };
 
     private void UpdateActors(float dt) {
-        pumping.Clear(); grinding.Clear(); swung.Clear(); openBungs.Clear();
+        pumping.Clear(); pumpOperators.Clear(); grinding.Clear(); swung.Clear(); openBungs.Clear();
         if (ShirtOf(World.Me) != playerShirt) {
             playerShirt = ShirtOf(World.Me); playerRig.Root.QueueFree();
             playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
@@ -627,6 +629,13 @@ public partial class WorldView : Node3D {
             Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest
                 or ActorAction.ClimbLadder or ActorAction.PourWater or ActorAction.FillVessel ? null : assignment, entry.Rig);
+        }
+        foreach (var (rig, actor, pump) in pumpOperators) {
+            float pressed = pumping[pump.Id];
+            var origin = To3(pump.Pos);
+            var turn = new Basis(Vector3.Up, -pump.Rotation);
+            rig.HoldPumpHandle(actor.Pose, origin + turn * WaterPumpShape.GripAt(pressed, true),
+                origin + turn * WaterPumpShape.GripAt(pressed, false), Ease(actor.Blend));
         }
         // Removing while walking a dictionary is allowed, so no copy of its keys is needed.
         foreach (var (id, entry) in crew) {
@@ -823,9 +832,11 @@ public partial class WorldView : Node3D {
     private void Work(ActorState actor, Thing? subject, ActorRig rig) {
         if (subject == null) return;
         var action = actor.Action;
-        // The bellows board follows the lean of the person pressing it.
-        if (action == ActorAction.Pump)
+        // Both the bellows board and pump lever follow the operator's stroke.
+        if (action == ActorAction.Pump) {
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
+            if (subject.Kind == ThingKind.Pump) pumpOperators.Add((rig, actor, subject));
+        }
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
         // Hands close on what they gather twice a loop; packing digs into the heap of goods as each loop starts, grinding plays one clip a loop, and a dig throws its soil aside once.
         string? handSound = action switch {
@@ -1182,6 +1193,7 @@ public partial class WorldView : Node3D {
                 break;
             case WaterPumpProp pump:
                 pump.Pump.SetPress(pumping.GetValueOrDefault(t.Id));
+                if (live) pump.Pump.SetPressure(t.Pressure / 100);
                 break;
             case ForgeProp forge:
                 float heat = Clocked(forge.Heat, t.Heat, live, dt) / 100;
@@ -1725,6 +1737,7 @@ public partial class WorldView : Node3D {
         if (worker != null) { workerRing.Position = WorkerFeet(worker) + Vector3.Up * .02f; workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
+        if (Underground) selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = false;
         removalMark.Update(World, Removal);
         placeTile.Visible = Placing != null && !Underground;
         var kind = Placing.GetValueOrDefault();
@@ -1841,15 +1854,20 @@ public partial class WorldView : Node3D {
             // Outline the center tile where a pipe can meet each building, even before it is fitted out.
             foreach (var building in known) {
                 if (building.Kind != ThingKind.Pump && !Plumbing.HasPlumbing(building.Kind)) continue;
-                var center = OnScreen(Terrain.TileAt(building.Pos));
+                var tileCenter = Terrain.TileAt(building.Pos);
+                var top = OnScreen(tileCenter);
+                var center = OnScreen(tileCenter, PipeGround.FloorY);
+                if ((building.Kind != ThingKind.Pump && !building.PlumbingInstalled) || !World.SteelPipes.Laid(tileCenter))
+                    overlay.DrawDashedLine(top, center, new Color("8dd4edb0"), 1.5f, 4, true);
                 var a = (screenX + screenZ) * .42f;
                 var b = (screenX - screenZ) * .42f;
-                overlay.DrawLine(center + a, center + b, BarFill, 2, true);
-                overlay.DrawLine(center + b, center - a, BarFill, 2, true);
-                overlay.DrawLine(center - a, center - b, BarFill, 2, true);
-                overlay.DrawLine(center - b, center + a, BarFill, 2, true);
+                var inlet = new Color("9edfef");
+                overlay.DrawLine(center + a, center + b, inlet, 1.5f, true);
+                overlay.DrawLine(center + b, center - a, inlet, 1.5f, true);
+                overlay.DrawLine(center - a, center - b, inlet, 1.5f, true);
+                overlay.DrawLine(center - b, center + a, inlet, 1.5f, true);
             }
-            if (PointedPipe is Vector2I tile) Tag(Screen(tile, .28f), "Steel pipe · E to inspect");
+            if (PointedPipe is Vector2I tile) Tag(Screen(tile, PipeGround.FloorY + .28f), "Steel pipe · E to inspect");
             return;
         }
         if (World == null) return;

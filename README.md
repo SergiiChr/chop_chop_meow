@@ -750,20 +750,20 @@ After the last stroke finishes, pressure falls to zero over 10 seconds from full
 
 At an anvil, use a steel hammer to form one steel bar into one stackable steel pipe in 10 base seconds.
 Put the hammer in the anvil’s hammer slot for a worker to use.
-In building plans, pick **Steel piping**. The surface becomes see-through while you lay the line.
+In building plans, pick **Steel piping**. The surface darkens and a cutaway shows the pipes on blue-lit soil below it.
 Each tile costs one pipe. Use the shape button for a straight pipe, T-junction or cross, and C/V for quarter turns.
-Neighboring ends join along the grid or diagonally when both tiles face the join.
+Pipes join across a shared tile side when both openings face each other.
 
-Run the line through the gold outline under the center of the pump and each building it serves.
+Run the line through the blue outlined tile under the pump and each building it serves. A vertical pipe joins each fitted building to the line. A dotted guide marks an open connection.
 Put 10 steel pipes in a building’s **Plumbing** slot to fit it out. You can add them in batches.
 Taking pipes out disables the fittings. Taking down the building or picking up a barrel gives the fitted pipes back.
 
 | Building | What piped water supplies |
 | --- | --- |
 | Placed steel barrel | Fills its 50 L tank. |
-| Cabin | A riser through the roof fills its mounted barrel. A cabin without a roof barrel can still connect. |
-| Cooking table | A tap fills the water input for the current recipe. |
-| Farm plot | Overhead sprinklers water growing wheat up to the plot’s 10 L reserve. |
+| Cabin | A pipe runs up the outside wall to fill the roof barrel. A cabin without a roof barrel can still connect. |
+| Cooking table | A brass tap over a splash plate fills the water input for the current recipe. |
+| Farm plot | Four overhead sprinklers each water a quarter of the plot, up to its 10 L reserve. |
 
 The pump first fills the line, which holds 1 L per tile. Buildings that need water share the available flow evenly.
 A closed tap can have a full pipe at its inlet. When pressure falls to zero, water stays in the pipes for the next

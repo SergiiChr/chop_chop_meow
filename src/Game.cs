@@ -422,9 +422,11 @@ public partial class Game : Node, IGameFlow {
         bool recording = Engine.GetWriteMoviePath() != "";
         var hover = recording ? null : view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = recording ? 0 : view.PickWorker(view.Mouse)?.Id ?? 0;
         view.Removal = overInterface ? Removal.None : player.RemovalAt(hover, view.Mouse);
+        view.PipePreviewTile = null;
         view.PointedPipe = null;
         if (view.Underground && !overInterface) {
-            var tile = Terrain.TileAt(view.ToWorld(view.Mouse));
+            var tile = Terrain.TileAt(view.ToWorld(view.Mouse, PipeGround.FloorY));
+            if (choosingPipe) view.PipePreviewTile = tile;
             if (world.SteelPipes.Laid(tile) && world.Explored(tile)) view.PointedPipe = tile;
         }
         uiClock += dt;

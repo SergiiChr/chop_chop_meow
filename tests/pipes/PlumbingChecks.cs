@@ -4,10 +4,12 @@ using static Checks;
 using static PlumbingSteps;
 using static SetupSteps;
 using static SteelPipeSteps;
+using static WorldSteps;
 
 public static class PlumbingChecks {
     public static void Run(GameData data) {
         Test(CheckBranchesShareByReceiver, data);
+        Test(CheckWaterNeedsConnectedSidesToTurnACorner, data);
         Test(CheckDisconnectingAPipeStopsDeliveryAndItsSpray, data);
         Test(CheckAnUnmountedCabinDoesNotTakeAShare, data);
         Test(CheckTwoPumpsReachOneTankWithoutMultiplyingTheirWater, data);
@@ -26,6 +28,30 @@ public static class PlumbingChecks {
         Require(barrel.Inventory[Water.Liquid] == 2 && second.Inventory[Water.Liquid] == 2,
             "Ten liters must fill six pipe tiles and give two liters to each connected barrel.");
         Require(barrel.ReceivingWater && second.ReceivingWater, "Both barrels should show active delivery.");
+    }
+
+    private static void CheckWaterNeedsConnectedSidesToTurnACorner(GameData data) {
+        var world = EmptyWorld(data);
+        var pumpTile = new Vector2I(80, 80);
+        var barrelTile = pumpTile + new Vector2I(2, 1);
+        var pump = world.Add(ThingKind.Pump, pumpTile);
+        var barrel = world.Add(ThingKind.Barrel, barrelTile);
+        InstallPlumbing(world, barrel);
+        LayPipe(world, pumpTile, shape: PipeShape.Cross);
+        LayPipe(world, barrelTile + Vector2I.Left);
+        LayPipe(world, barrelTile);
+
+        PumpFully(world, pump);
+        world.Tick(1);
+        Require(world.PipeReading(pumpTile) == (1, 100), "The source pipe should hold pressurized water.");
+        Require(world.PipeReading(barrelTile) == (0, 0) && barrel.Inventory[Water.Liquid] == 0,
+            "Water and pressure should stop where the two lines meet only at a corner.");
+
+        LayPipe(world, pumpTile + Vector2I.Down, Mathf.Pi, PipeShape.Tee);
+        PumpFully(world, pump);
+        world.Tick(1);
+        Require(world.PipeReading(barrelTile) == (1, 100) && barrel.Inventory[Water.Liquid] == 2,
+            "A turn with matching side openings should carry water and pressure to the barrel.");
     }
 
     private static void CheckDisconnectingAPipeStopsDeliveryAndItsSpray(GameData data) {

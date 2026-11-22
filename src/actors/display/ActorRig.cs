@@ -521,6 +521,29 @@ public sealed class ActorRig {
         torch.Visible = lit;
     }
 
+    /// <summary>Fits both fists to the live pump grip while keeping the shared pumping pose under them.</summary>
+    internal void HoldPumpHandle(Pose pose, Vector3 leftGrip, Vector3 rightGrip, float weight) {
+        var fromWorld = Root.Transform.AffineInverse();
+        var fromBody = ArmReach.TrunkBasis(pose).Inverse();
+        var hipsAt = Vector3.Up * pose.HipHeightFor(build.Shin);
+        Reach(true, fromWorld * leftGrip, shoulderL, elbowL);
+        Reach(false, fromWorld * rightGrip, shoulderR, elbowR);
+        foreach (var (skeleton, joint) in limbs)
+            skeleton.SetBonePoseRotation(1, joint.Quaternion);
+
+        void Reach(bool left, Vector3 at, Node3D shoulder, Node3D elbow) {
+            if (at.Z < .05f) return;
+            var local = fromBody * (Fist(left).Lerp(at, weight) - hipsAt);
+            var buildShoulder = build.Shoulder(left);
+            var elbowToward = new Vector3(left ? .3f : -.3f, -1, -.25f);
+            var (raise, outward, bend, roll) =
+                ArmReach.ArmTo(local, left, elbowToward, Palm, buildShoulder, build.UpperArm, build.Forearm);
+            shoulder.RotationDegrees = new Vector3(-raise, 0, left ? outward : -outward);
+            elbow.RotationDegrees = new Vector3(-bend, 0, 0);
+            RollArm(left, roll);
+        }
+    }
+
     /// <summary>Reaches around the two sides of the barrel, resting its back against the trunk.</summary>
     public void HugBarrel(Pose pose, bool lit = false) {
         if (barrel == null) return;

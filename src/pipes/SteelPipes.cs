@@ -7,11 +7,14 @@ namespace ChopChopMeow;
 /// <summary>Steel pipe tiles in their own layer under the ground, buildings and paths.</summary>
 public sealed class SteelPipes(World world) {
     public const double Capacity = 1;
-    /// <summary>One step to a neighboring tile, clockwise from east in ground coordinates.</summary>
-    private static readonly Vector2I[] Directions = [
-        new(1, 0), new(1, 1), new(0, 1), new(-1, 1),
-        new(-1, 0), new(-1, -1), new(0, -1), new(1, -1)
+    private const int East = 1 << 0, South = 1 << 2, West = 1 << 4, North = 1 << 6;
+    private static readonly (Vector2I Offset, int Port, int Opposite)[] SideDirections = [
+        (Vector2I.Right, East, West), (Vector2I.Down, South, North),
+        (Vector2I.Left, West, East), (Vector2I.Up, North, South)
     ];
+
+    /// <summary>Adjacent tiles and their reciprocal ports, clockwise from east.</summary>
+    internal static ReadOnlySpan<(Vector2I Offset, int Port, int Opposite)> Sides => SideDirections;
     private Dictionary<int, PipeTile>? seen;
     private int revision;
 
@@ -39,12 +42,12 @@ public sealed class SteelPipes(World world) {
     /// <summary>The shape of the pipe on this tile, or null if there is none.</summary>
     public PipeShape? ShapeAt(Vector2I tile) => PipeAt(tile)?.Shape;
 
-    /// <summary>Directions in which the pipe can connect, as bits clockwise from east.</summary>
+    /// <summary>Open pipe ends on the east, south, west and north, at bits 0, 2, 4 and 6.</summary>
     public static int PortMask(float rotation, PipeShape shape) {
         int ports = shape switch {
-            PipeShape.Tee => 0b0001_1111,
-            PipeShape.Cross => 0b1111_1111,
-            _ => 0b1011_1011
+            PipeShape.Tee => East | South | West,
+            PipeShape.Cross => East | South | West | North,
+            _ => East | West
         };
         int shift = 2 * Mathf.RoundToInt(rotation / (Mathf.Pi / 2));
         return ((ports << shift) | (ports >> (8 - shift))) & 0xff;
@@ -58,14 +61,12 @@ public sealed class SteelPipes(World world) {
     public int PreviewMask(Vector2I tile, float rotation, PipeShape shape) {
         if (!Terrain.OnMap(tile)) return 0;
         int ports = PortMask(rotation, shape), links = 0;
-        for (int i = 0; i < Directions.Length; i++) {
-            if ((ports & (1 << i)) == 0 || PipeAt(tile + Directions[i]) is not PipeTile other) continue;
-            if ((PortMask(other.Rotation, other.Shape) & (1 << ((i + 4) % 8))) != 0) links |= 1 << i;
+        foreach (var (offset, port, opposite) in Sides) {
+            if ((ports & port) == 0 || PipeAt(tile + offset) is not PipeTile other) continue;
+            if ((PortMask(other.Rotation, other.Shape) & opposite) != 0) links |= port;
         }
         return links;
     }
-
-    internal static Vector2I Offset(int direction) => Directions[direction];
 
     /// <summary>Lays a pipe under a tile that construction has accepted.</summary>
     internal void Lay(Vector2I tile, float rotation, PipeShape shape) {

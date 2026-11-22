@@ -9,9 +9,10 @@ public static class SteelPipeChecks {
     public static void Run(GameData data) {
         Test(CheckPipesAndSurfaceObjectsShareATile, data);
         Test(CheckRemovingAPipeReturnsItsMaterialsAndNeedsReach, data);
-        Test(CheckStraightPipesJoinOnlyAtMatchingEndsAndCorners, data);
+        Test(CheckStraightPipesJoinOnlyAtMatchingEnds, data);
         Test(CheckTurningATeeRotatesItsOpenings, data);
         Test(CheckPipeTilesAndTheirRotationComeBackFromASave, data);
+        Test(FarmSprayModelChecks.Run);
     }
 
     private static void CheckPipesAndSurfaceObjectsShareATile(GameData data) {
@@ -55,7 +56,7 @@ public static class SteelPipeChecks {
         Require(world.Backpack["steel_pipe"] == 2, "Taking up the tile must return one steel pipe.");
     }
 
-    private static void CheckStraightPipesJoinOnlyAtMatchingEndsAndCorners(GameData data) {
+    private static void CheckStraightPipesJoinOnlyAtMatchingEnds(GameData data) {
         var world = EmptyWorld(data);
         var tile = new Vector2I(80, 80);
         var east = new Vector2I(81, 80);
@@ -65,16 +66,17 @@ public static class SteelPipeChecks {
         LayPipe(world, southeast);
         LayPipe(world, new Vector2I(78, 80));
 
-        Require(world.SteelPipes.ConnectionMask(tile) == 0b0000_0011,
-            "A straight pipe should join at the east end and southeast corner.");
-        Require(world.SteelPipes.ConnectionMask(southeast) == 0b0010_0000,
-            "The corner connection must work both ways, and pipes lying side by side must stay separate.");
+        Require(world.SteelPipes.ConnectionMask(tile) == 0b0000_0001
+            && world.SteelPipes.ConnectionMask(east) == 0b0001_0000,
+            "The two east–west pipes should connect at their matching ends.");
+        Require(world.SteelPipes.ConnectionMask(southeast) == 0,
+            "The southeast pipe should stay separate from pipes at its corner and side.");
 
         Require(world.Construction.Remove(Removal.OfPipe(east)), "The east pipe should come out.");
-        Require(world.SteelPipes.ConnectionMask(tile) == 0b0000_0010,
-            "Taking out the east pipeline should leave the corner connection.");
+        Require(world.SteelPipes.ConnectionMask(tile) == 0,
+            "Removing the east pipe should leave no connection to the southeast pipe.");
         LayPipe(world, east, Mathf.Pi / 2);
-        Require(world.SteelPipes.ConnectionMask(tile) == 0b0000_0010,
+        Require(world.SteelPipes.ConnectionMask(tile) == 0 && world.SteelPipes.ConnectionMask(east) == 0,
             "An east-facing end should not join the side of a north–south pipe.");
     }
 
@@ -84,19 +86,20 @@ public static class SteelPipeChecks {
         LayPipe(world, tile + Vector2I.Up, Mathf.Pi / 2);
         LayPipe(world, tile + Vector2I.Down, Mathf.Pi / 2);
         LayPipe(world, tile + Vector2I.Right);
+        LayPipe(world, tile + Vector2I.Left);
         LayPipe(world, tile + new Vector2I(1, -1));
         LayPipe(world, tile, shape: PipeShape.Tee);
-        Require(world.SteelPipes.ConnectionMask(tile) == 0b0000_0101,
-            "The tee should join east and south but close its north side and northeast corner.");
+        Require(world.SteelPipes.ConnectionMask(tile) == 0b0001_0101,
+            "The tee should join east, south and west.");
 
         Require(world.Construction.Remove(Removal.OfPipe(tile)), "The tee should come out before replacing it.");
         LayPipe(world, tile, Mathf.Pi, PipeShape.Tee);
-        Require(world.SteelPipes.ConnectionMask(tile) == 0b1100_0001,
-            "A half-turn should close the south side and open the north side and northeast corner.");
+        Require(world.SteelPipes.ConnectionMask(tile) == 0b0101_0001,
+            "A half-turn should open the north side in place of the south side.");
 
         Require(world.Construction.Remove(Removal.OfPipe(tile)), "The tee should come out before replacing it with a cross.");
         LayPipe(world, tile, shape: PipeShape.Cross);
-        Require(world.SteelPipes.ConnectionMask(tile) == 0b1100_0101,
+        Require(world.SteelPipes.ConnectionMask(tile) == 0b0101_0101,
             "The cross should keep all four connected directions open.");
     }
 

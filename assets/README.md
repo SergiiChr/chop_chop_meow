@@ -152,14 +152,17 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 - `MineRockShape` — a continuous single-mesh outcrop at the cave mouth. Its rear is embedded beneath the mountain triangles sampled by `MountainShape`. The middle cliff columns are removed, and the mountain triangles are clipped around the tunnel to leave its interior clear.
 - `CrateShape` — shared hollow shipping-crate body and lid meshes: chamfered slats with real gaps, end handholds, fitted corner battens, nail heads, floor planks and two low runners. Each crate has its own rear lid hinge and lifting body transform.
 - `SignpostShape` — the market post's shared fitted signboard, mounted blackboard, pallet, rounded sheet-metal mailbox and separate order flag. Two decorative storage crates reuse `CrateShape`. The chalkboard uses a static generic price label, without live market values. The mailbox flag animates with the order state. The picking volume covers the board and storage.
-- `SteelPipeShape` — the loose steel pipe with two hollow couplings, shared by both pipe icons and the placement ghost.
-  Straight, tee and cross fittings show only their open sides and extend to the joints they connect to.
-  Storage piles show lighter pipes in stacked rows.
-- `WaterPumpShape` — the shore pump's housing and outlet, with a rocking handle and connecting rod.
-  The grip follows the same swing as the forge bellows.
-- `InstalledPlumbingShape` — the cabin's riser through the roof into its barrel, the cooking table's brass tap, and
-  the farm's raised pair of sprinklers. Each supply comes up through the middle of the building's base.
-  `FarmSpray` draws arcing drops while the sprinklers receive water.
+- `SteelPipeShape` — a slim hollow steel tube, shared by the item and plan icons and the placement ghost.
+  Straight, tee and cross pieces meet side to side at the tile edge, with matching walls and bore.
+  Storage piles show lighter tubes in stacked rows. [Plumbing design reference](../docs/art/plumbing-reference.webp).
+- `WaterPumpShape` — a bolted steel pressure chamber with a sliding piston, a straight hand lever, and a pivoting link.
+  Its enclosed elbow meets the underground pipe beneath the center of the tile, and its needle reads pressure.
+  [Pressure pump reference](../docs/art/pressure-pump-reference.webp).
+- `InstalledPlumbingShape` — the cabin's wall riser into its roof barrel, the placed barrel's low feed and valve,
+  and the cooking table's brass tap over a steel splash plate.
+  The farm's raised square frame holds one sprinkler over each quarter of the soil.
+  Each supply comes up through the middle of the building's base.
+  `FarmSpray` sweeps drops across all four quarters while the sprinklers receive water.
 - `FirePitShape` — the campfire's shared ring of eleven irregular faceted fieldstones, ash bed and fitted split logs with charred ends. A separate shared flame mesh has the flicker pivot, smoke vent and day/night light handles.
 
 ### Carried and dropped goods

@@ -16,6 +16,8 @@ using static WorkerSteps;
 public static class SimulationChecks {
     public static void Run(GameData data) {
         SteelPipeChecks.Run(data);
+        SteelPipeModelChecks.Run();
+        WaterPumpModelChecks.Run();
         PlumbingChecks.Run(data);
         Test(WaterPumpChecks.Run, data);
         Test(PlumbingFixtureChecks.Run, data);

@@ -95,9 +95,9 @@ public sealed class Plumbing(World world) {
                 int at = Terrain.TileIndex(tile);
                 network.AddTile(at, pipes.WaterAt(at));
                 int links = pipes.ConnectionMask(tile);
-                for (int direction = 0; direction < 8; direction++) {
-                    if ((links & (1 << direction)) == 0) continue;
-                    var next = tile + SteelPipes.Offset(direction);
+                foreach (var (offset, port, _) in SteelPipes.Sides) {
+                    if ((links & port) == 0) continue;
+                    var next = tile + offset;
                     if (networks.TryAdd(Terrain.TileIndex(next), network)) open.Enqueue(next);
                 }
             }

@@ -240,10 +240,10 @@ public sealed class PlayerControl {
                 kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return;
             }
             PlaceHeld(false);
-            if (Mode.Placing != null) Place(view.ToWorld(at).Round()); else cursor.Release();
+            if (Mode.Placing != null) Place(at); else cursor.Release();
             return;
         }
-        if (Mode.Placing != null) { Place(view.ToWorld(at).Round()); return; }
+        if (Mode.Placing != null) { Place(at); return; }
         if (Mode is ClickMode.Remove) { world.Construction.Remove(RemovalAt(t, at)); return; }
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
         var w = view.PickWorker(at);
@@ -254,7 +254,7 @@ public sealed class PlayerControl {
     }
 
     /// <summary>What the remove selector points at with <paramref name="picked"/> under the mouse at a screen point, or nothing while the selector is away.</summary>
-    public Removal RemovalAt(Thing? picked, Vector2 at) => Mode is ClickMode.Remove remove ? world.Construction.RemovalAt(picked, view.ToWorld(at), remove.Underground) : Removal.None;
+    public Removal RemovalAt(Thing? picked, Vector2 at) => Mode is ClickMode.Remove remove ? world.Construction.RemovalAt(picked, view.ToWorld(at, remove.Underground ? PipeGround.FloorY : 0), remove.Underground) : Removal.None;
 
     private void AssignGather(ClickMode.Assign assign, Thing? t) {
         var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);
@@ -273,7 +273,8 @@ public sealed class PlayerControl {
     /// A mine opens its panel instead, since each cliff takes only one.
     /// The backpack still holds what a placement just sent will cost, and the mine's panel opens when the server names it.
     /// </summary>
-    private void Place(Vector2 at) {
+    private void Place(Vector2 screen) {
+        var at = view.ToWorld(screen, Mode.Placing == ThingKind.SteelPiping ? PipeGround.FloorY : 0).Round();
         if (Mode is ClickMode.Container { BackpackSlot: >= 0 } selected && ContainerCount(selected) == 0) {
             Mode = new ClickMode.Normal();
             return;

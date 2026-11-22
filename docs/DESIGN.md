@@ -86,7 +86,7 @@ Simulation and data:
 | `src/pipes/model/PipeShape.cs`, `src/pipes/model/PipeTile.cs` | The straight, tee and cross pipes and each laid pipe's rotation |
 | `src/pipes/Plumbing.cs` | Connected groups of pipe tiles, the water left in them and the buildings sharing their supply |
 | `src/pipes/WaterPumps.cs` | Pump strokes, pressure loss and liters supplied during a simulation tick |
-| `src/pipes/display/PipeLayerView.cs`, `src/pipes/display/PipePanel.cs` | The underground view, placement preview and inspection of a pipe’s water and pressure |
+| `src/pipes/display/PipeLayerView.cs`, `src/pipes/display/PipeGround.cs`, `src/pipes/display/PipePanel.cs` | The underground view, placement preview and inspection of a pipe’s water and pressure |
 | `src/pipes/display/WaterPumpPanel.cs`, `src/pipes/display/WaterPumpProp.cs` | Operating a pump, assigning a worker and moving the handle in the world |
 | `src/pipes/display/SteelPipeShape.cs`, `src/pipes/display/WaterPumpShape.cs` | The pipe fittings, hand pump and its moving lever |
 | `src/pipes/display/InstalledPlumbingShape.cs`, `src/pipes/display/FarmSpray.cs` | Installed cabin, cooking table and farm fittings, and water from working sprinklers |
@@ -1027,12 +1027,12 @@ ground match.
 `SaveState.SteelPipes` records each occupied tile's place in the map's rows, pipe shape and rotation in radians.
 The tiles have a network update entry of their own (`EntryKey.Pipes`), so the guest receives them on joining and when
 they change.
-`SteelPipes.ConnectionMask` marks neighboring tiles whose pipes open toward each other, clockwise from east.
-A straight opens along its ends and their corners.
-A tee opens along three sides and the corners shared by those sides.
-A cross opens along all four sides and corners.
+`SteelPipes.ConnectionMask` marks tiles that share a side and have pipe ends pointing toward each other.
+A straight has two opposite openings, a tee has three, and a cross has one on all four sides.
+Pipes that only touch at a corner are separate.
 Each quarter-turn rotates the available openings.
-The underground view shows the pipes and their placement preview through the translucent surface.
+The underground view darkens the surface and exposes a blue-lit soil bed 0.9 m below grade, with cut banks along its edges.
+Placement, inspection and removal project the pointer onto the bed. A vertical pipe joins each fitted building to its inlet tile. A dotted guide marks a connection still to be made.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.
 The building's equipment slot accepts ten steel pipes to install its plumbing.
 A worker finishes a round at the end of each pump stroke, then checks whether a higher-priority job is ready.

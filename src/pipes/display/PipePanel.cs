@@ -13,7 +13,7 @@ public partial class PipePanel(PageTools tools, Vector2I tile) : PagePanel(tools
         headingIcon.Visible = true;
         var water = Style.Heading("", 20);
         water.Name = "pipe_water";
-        var pressure = Style.Text("", 16, Style.Ink);
+        var pressure = Style.Text("", 16, Style.Rim);
         pressure.Name = "pipe_pressure";
         AddChild(water);
         AddChild(pressure);
