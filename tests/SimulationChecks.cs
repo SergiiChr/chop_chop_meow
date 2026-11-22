@@ -79,7 +79,7 @@ public static class SimulationChecks {
         CatgirlDanceChecks.Run();
         Test(CheckOnlyCoinsUseTheLargerStack, data);
         Test(CheckSaveFromAnotherVersionIsRefused, data);
-        Test(CheckSaveWithUnknownItemRefused, data);
+        SaveChecks.Run(data);
         Test(CheckCrewKeepsForgeHot, data);
         Test(CheckCrewLunchesAtTheNearestFireAndGoesBackToWork, data);
         Test(CheckCrewSignsOutAtDuskKeepingLoadsAndJobs, data);
@@ -104,7 +104,7 @@ public static class SimulationChecks {
         Test(FarmChecks.Run, data);
         Test(CheckFoodsFeedAndWaterByTheirDataWithoutHealing, data);
         Test(CheckMarketTakesCratesAndDonations, data);
-        Test(CheckDonationIsNoSale, data);
+        TradeChecks.Run(data);
         Test(CheckTorchLightsAndBurnsOut, data);
         Test(CheckALitTorchMovedOutOfTheBackpackGoesOut, data);
         Test(CheckEachToolTakesItsOwnSlot, data);
@@ -1113,17 +1113,6 @@ public static class SimulationChecks {
         Require(!data.IsFood("tin_can"), "cans should not be food");
     }
 
-    private static void CheckDonationIsNoSale(GameData data) {
-        var world = EmptyWorld(data);
-        var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
-        world.Player = sign.Pos;
-        // A steel chisel is a steel tool, so only the village not buying it keeps this from counting as selling steel.
-        world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("steel_chisel", 1)), 1);
-        Require(world.Sell(sign), "a cart should take a crate of goods the village does not buy");
-        SafeTick(world, data.TradeSeconds + .1f);
-        Require(world.Orders.Count == 0 && !world.Reached("sold"), "a donation should not count as a sale");
-    }
-
     private static void CheckMarketTakesCratesAndDonations(GameData data) {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
@@ -1246,23 +1235,6 @@ public static class SimulationChecks {
         SetCoins(world, 0);
         world.PayWages();
         Require(worker.WageDebt == worker.Wage && sign.Output![Inventory.Coins] == 7, "wages should not be taken from the market output");
-    }
-
-    /// <summary>A save naming an item the game does not know, in the backpack or as a worker's tool, is refused with a clear reason instead of failing mid-game.</summary>
-    private static void CheckSaveWithUnknownItemRefused(GameData data) {
-        var world = EmptyWorld(data);
-        Give(world, "tin_can", 2);
-        var worker = AddWorker(world, new Vector2(12, 12));
-        worker.Tool = "steel_hammer"; worker.Bag.Add("wood", 2);
-        // An anvil makes steel parts only; pickaxes are made at the bench.
-        world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        string json = world.Serialize();
-        EmptyWorld(data).Deserialize(json);
-        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"steel_hammer\": 1", "\"unobtainium\": 1"), ("\"wood\": 2", "\"unobtainium\": 2"), ("\"Keep\": \"steel_parts\"", "\"Keep\": \"steel_pick\""), ("\"Goal\": 0", "\"Goal\": -1") }) {
-            bool refused = false;
-            try { EmptyWorld(data).Deserialize(Patch(json, edit)); } catch (InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
-            Require(refused, $"a save with {edit.Item2} in place of {edit.Item1} should be refused with a clear reason");
-        }
     }
 
     /// <summary>A save from another version of the game is refused with a clear reason, never converted.</summary>

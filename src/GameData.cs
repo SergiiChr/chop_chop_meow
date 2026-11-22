@@ -248,8 +248,8 @@ public sealed partial class GameData {
             // A station with tool slots has one for each tool its recipes need, taking the plainest tool any of them asks for.
             var slots = building.Value.ToolSlots;
             var needs = Recipes.Values.Where(r => r.Station == building.Key && r.Tool != "").ToList();
-            if (slots.Length > 0 && (slots.DistinctBy(s => s.Tool).Count() != slots.Length || needs.Any(r => !slots.Any(s => s.Tool == r.Tool))
-                || slots.Any(s => !needs.Any(r => r.Tool == s.Tool) || needs.Where(r => r.Tool == s.Tool).Min(r => r.Tier) != s.Tier)))
+            if (slots.DistinctBy(s => s.Tool).Count() != slots.Length || needs.Any(r => !slots.Any(s => s.Tool == r.Tool))
+                || slots.Any(s => !needs.Any(r => r.Tool == s.Tool) || needs.Where(r => r.Tool == s.Tool).Min(r => r.Tier) != s.Tier))
                 throw new InvalidOperationException($"Invalid tool slots for {building.Key}: one a tool its recipes need, at the lowest tier they ask for.");
         }
         foreach (var recipe in Recipes) {

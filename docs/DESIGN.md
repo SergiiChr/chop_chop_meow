@@ -238,7 +238,7 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps: `tests/hauling/`, `tests/gathering/`, `tests/crafting/`, `tests/progression/`, `tests/goals/`, `tests/water/`, `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps: `tests/hauling/`, `tests/gathering/`, `tests/crafting/`, `tests/progression/`, `tests/goals/`, `tests/water/`, `tests/trade/`, `tests/saves/`, `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
 | `tests/*Checks.cs` | Simulation checks of the features that have no folder yet, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
@@ -815,7 +815,8 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - Stumps and bushes never block building (`World.BuiltOver`): a new building, yard or crate clears away those on the ground it keeps clear of other resources (`World.ClearGround`).
 - A berry bush holds `World.BushBerries` at the start and each time it fruits again, which is `BerryRegrowHours` after the first berry was picked from it, picked clean or not.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
-- Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
+- Tin ore smelts into tin bars at the stone furnace, the anvil hammers a tin bar into 2 tin sheets, and a tin sheet
+  makes 4 cans at the bench.
 - The stone furnace burns 2 wood into 1 charcoal.
 
 ### Tools

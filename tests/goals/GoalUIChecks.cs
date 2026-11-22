@@ -13,8 +13,8 @@ public partial class Game {
     }
 
     /// <summary>
-    /// The starter goals alone do not end the game; the pause menu lists the end goals, mines and the profit goal show the
-    /// ending, and keep playing closes it for good.
+    /// The starter goals alone do not end the game, and the pause menu then shows no closing words under them; it lists
+    /// the end goals, mines and the profit goal show the ending, and keep playing closes it for good.
     /// </summary>
     private async Task CheckEndGoalsShowInThePauseMenuAndTheEndingOnce() {
         Achieve(Hosted, new[] { "campfire", "hut", "bench", "sold", "furnace", "steel_bar", "steel_parts", "assigned" });
@@ -23,6 +23,7 @@ public partial class Game {
         Require(!ending.Visible && !view.Paused, "The starter goal chain alone must not end the game.");
         await KeyStroke(Key.Escape);
         Require(HasLabel(menu, "END GOALS"), "The pause menu must have an end goals heading.");
+        Require(!HasLabel(menu, "starter goals are done"), "The pause menu must show no closing text once the starter goals are done.");
         Require(HasLabel(menu, "A working iron mine"), "The pause menu must list the iron mine goal.");
         Require(HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"),
             "The pause menu must list the daily profit goal.");
