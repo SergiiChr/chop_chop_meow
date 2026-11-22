@@ -13,7 +13,7 @@ public partial class WaterPumpPanel(PageTools tools, Thing subject) : ThingPage(
             reading.Text = FormattableString.Invariant($"Pressure {value.Item1}% · {value.Item2 / 10f:0.0} L/s");
         });
         var row = Row();
-        var handle = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before pumping."); else world.Pump(thing); });
+        var handle = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before pumping."); else panel.Player.UseWaterPump(thing); });
         handle.Name = "pump"; handle.TooltipText = "Pump the handle · Space";
         Style.SkinPill(handle, Style.Sage);
         row.AddChild(handle);

@@ -1541,6 +1541,7 @@ public partial class Game {
             await TestClean(CheckRestartBuildsFreshModelsForReusedIds);
             await TestClean(CheckPlumbingPagesRefreshWithoutAllocating);
             await TestClean(CheckVisiblePumpGripAndPistonCanBePicked);
+            await TestClean(CheckRepeatedWaterPumpInputKeepsTheHandleMoving);
             await TestClean(CheckWaterPumpControlsShowPressureAndFlow);
             await RunSteelPipeUIChecks();
             await TestClean(CheckQuarterTurnedForgeEmitsFromItsFlueAndMouth);

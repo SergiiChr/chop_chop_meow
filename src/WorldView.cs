@@ -276,7 +276,21 @@ public partial class WorldView : Node3D {
 
     /// <summary>Plays a swing, pump or kindling on the player who made it, here or at another machine.</summary>
     public void Acted(int id, ActorAction action, Vector2 target) {
-        if (id == World.Me.Id) { pulseAction = action; pulseTarget = target; pulseRemaining = ActorAnimation.Duration(action); player.Time = 0; } else if (others.TryGetValue(id, out var other)) { other.Pulse = action; other.PulseTarget = target; other.PulseRemaining = ActorAnimation.Duration(action); other.State.Time = 0; }
+        if (id == World.Me.Id) StartPulse(player, action, target, ref pulseAction, ref pulseTarget, ref pulseRemaining);
+        else if (others.TryGetValue(id, out var other))
+            StartPulse(other.State, action, target, ref other.Pulse, ref other.PulseTarget, ref other.PulseRemaining);
+    }
+
+    private static void StartPulse(ActorState actor, ActorAction action, Vector2 target,
+        ref ActorAction pulse, ref Vector2 pulseAt, ref float remaining) {
+        float duration = ActorAnimation.Duration(action);
+        if (remaining > 0 && action == ActorAction.Pump && pulse == action && pulseAt == target && actor.Action == ActorAction.PumpWater) {
+            // Queue one more visible stroke without rewinding the current one or building up a backlog.
+            remaining = Math.Max(remaining, duration * (2 - ActorAnimation.Phase(actor.Action, actor.Time)));
+            return;
+        }
+        (pulse, pulseAt, remaining) = (action, target, duration);
+        actor.Time = 0;
     }
 
     private sealed class Avatar(ActorRig rig, string shirt) {

@@ -41,6 +41,8 @@ public sealed class PlayerControl {
     private ClickMode? heldPlacement;
     private Thing? gathering;
     private readonly CabinApproach cabinApproach;
+    /// <summary>The pump whose handle the player is walking to press.</summary>
+    private Thing? pumpApproach;
     private Momentum momentum;
     /// <summary>The way the player last walked, which is the way Space swings.</summary>
     private Vector2 walked;
@@ -57,15 +59,24 @@ public sealed class PlayerControl {
         world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; Mode = new ClickMode.Normal(); };
     }
 
-    /// <summary>Drops a gather, a container lift and a walk into a cabin, whose targets belong to a world that went away.</summary>
-    private void Stop() { gathering = null; lifting = null; cabinApproach.Cancel(); }
+    /// <summary>Drops actions whose targets belong to the previous world.</summary>
+    private void Stop() { gathering = null; lifting = null; pumpApproach = null; cabinApproach.Cancel(); }
 
     public bool Entering(Thing cabin) => cabinApproach.GoesTo(cabin);
     public bool CancelEntry() => cabinApproach.Cancel();
 
     /// <summary>Starts or cancels the walk to this cabin's door from its Enter button.</summary>
     public void ToggleEntry(Thing cabin) {
+        pumpApproach = null;
         if (Entering(cabin)) CancelEntry(); else cabinApproach.Start(cabin);
+    }
+
+    /// <summary>Steps up to the water pump's handle and presses it once.</summary>
+    internal void UseWaterPump(Thing pump) {
+        if (!world.AtStation(pump)) { kit.Notify("Walk closer to the pump."); return; }
+        cabinApproach.Cancel();
+        if (world.Player.IsEqualApprox(pump.ToWorld(World.BellowsStand))) world.Pump(pump);
+        else pumpApproach = pump;
     }
 
     /// <summary>Enters placement for a container from the backpack.</summary>
@@ -81,7 +92,7 @@ public sealed class PlayerControl {
         // The recipe map covers the world, so nothing held over it walks or gathers.
         if (kit.Paused || panel.Map.Visible) { world.Me.Sprinting = false; return; }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
-        var direction = cabinApproach.Active ? cabinApproach.Direction() : world.Door == Doorway.None ? HeldDirection() : Vector2.Zero;
+        var direction = cabinApproach.Active ? cabinApproach.Direction() : TowardPump(HeldDirection());
         direction = Gather(direction, right, dt);
         direction = Lift(direction, right, dt);
         Walk(direction, right, dt);
@@ -139,11 +150,26 @@ public sealed class PlayerControl {
     /// <summary>The ground direction for right <paramref name="x"/> and down <paramref name="y"/> on screen, each -1, 0 or 1 as movement keys give them.</summary>
     public static Vector2 KeyDirection(float x, float y) => new Vector2(x + y * 2, y * 2 - x).Normalized();
 
+    /// <summary>Walks to the bank-side handle and presses it on arrival.</summary>
+    private Vector2 TowardPump(Vector2 direction) {
+        if (world.Downed || pumpApproach != null && world.Find(pumpApproach.Id) == null) pumpApproach = null;
+        if (pumpApproach == null) return world.Door == Doorway.None ? direction : Vector2.Zero;
+        if (direction != Vector2.Zero || world.Occupied || panel.Selection.Thing != pumpApproach.Id) {
+            pumpApproach = null;
+            return direction;
+        }
+        var stand = pumpApproach.ToWorld(World.BellowsStand);
+        if (!world.Player.IsEqualApprox(stand)) return world.Player.DirectionTo(stand);
+        world.Pump(pumpApproach);
+        pumpApproach = null;
+        return Vector2.Zero;
+    }
+
     /// <summary>Carries on a gather; a loose piece needs only one click: the player keeps walking to it after the button is released.</summary>
     private Vector2 Gather(Vector2 direction, bool right, float dt) {
         // What was being worked on can go: a tree falls and leaves its stump, and a stump or a bush comes out of the ground.
         if (gathering != null && world.Find(gathering.Id) == null) { panel.Deselect(gathering.Id); gathering = null; }
-        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || cabinApproach.Active) {
+        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || cabinApproach.Active || pumpApproach != null) {
             world.ResetGather();
             if (!right || gathering?.IsLoose == true) gathering = null;
             return direction;
@@ -167,7 +193,7 @@ public sealed class PlayerControl {
 
     /// <summary>A held right click walks to a container and lifts it once the button has been held long enough.</summary>
     private Vector2 Lift(Vector2 direction, bool right, float dt) {
-        if (lifting != null && right && direction == Vector2.Zero && !cabinApproach.Active && world.Find(lifting.Id) != null) {
+        if (lifting != null && right && direction == Vector2.Zero && !cabinApproach.Active && pumpApproach == null && world.Find(lifting.Id) != null) {
             if (!world.Near(lifting, 1.5f)) direction = (lifting.Pos - world.Player).Normalized();
             else if ((liftClock += dt) >= LiftSeconds) {
                 var container = lifting; lifting = null;
@@ -188,7 +214,16 @@ public sealed class PlayerControl {
         if (step != Vector2.Zero) walked = step.Normalized();
         world.Me.Braking = momentum.Braking;
         var move = step * dt * world.PlayerSpeed;
-        if (cabinApproach.Active) cabinApproach.Move(move.Length()); else world.MovePlayer(move);
+        if (cabinApproach.Active) cabinApproach.Move(move.Length());
+        else {
+            var from = world.Player;
+            if (pumpApproach != null) move = move.LimitLength(from.DistanceTo(pumpApproach.ToWorld(World.BellowsStand)));
+            world.MovePlayer(move);
+            if (pumpApproach != null && move != Vector2.Zero && world.Player == from) {
+                pumpApproach = null;
+                kit.Notify("Walk around to the pump handle on the bank.");
+            }
+        }
         view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
         // A tool in hand that has left the backpack leaves the hand empty.
@@ -208,10 +243,12 @@ public sealed class PlayerControl {
         if (t != null) panel.Select(t);
     }
 
-    /// <summary>Space: pumps a selected reinforced furnace in reach, else swings an axe or a fist the way the player last walked.</summary>
+    /// <summary>Space operates a selected pump or bellows in reach. Elsewhere it swings in the last walking direction.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
-        if (station != null && station.Kind is (ThingKind.Reinforced or ThingKind.Pump) && world.AtStation(station)) world.Pump(station); else world.Attack(walked);
+        if (station?.Kind == ThingKind.Pump && world.AtStation(station)) UseWaterPump(station);
+        else if (station?.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station);
+        else world.Attack(walked);
     }
 
     /// <summary>A mouse button over the world; <paramref name="overPanel"/> tells that the pointer is on a panel, which passes the wheel on when it has nothing to scroll, but must not zoom the world behind.</summary>
@@ -264,7 +301,7 @@ public sealed class PlayerControl {
     }
 
     private void ClickThing(Thing t) {
-        if (t.Kind == ThingKind.Hut) cabinApproach.Start(t);
+        if (t.Kind == ThingKind.Hut) { pumpApproach = null; cabinApproach.Start(t); }
         panel.Select(t);
     }
 

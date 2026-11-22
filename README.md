@@ -744,7 +744,8 @@ Gather them by hand, or three times as fast with a rake, and they fall again eve
 
 Place a water pump in the freshwater lake’s shallows with its handle facing dry ground.
 It costs 4 steel bars, 10 stone and 4 wood parts.
-Select it and click **Pump** or press **Space** from the bank, or assign a worker the **Pump** job.
+From the bank, select it and click **Pump** or press **Space**. Your character steps up to the handle before pressing it.
+You can also assign a worker the **Pump** job.
 Each stroke adds 10 percentage points of pressure. Ten consecutive strokes reach 5 L/s.
 After the last stroke finishes, pressure falls to zero over 10 seconds from full.
 

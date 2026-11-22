@@ -20,6 +20,33 @@ public partial class Game {
         await Frames();
     }
 
+    private async Task CheckRepeatedWaterPumpInputKeepsTheHandleMoving() {
+        var home = world.Player;
+        var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
+        var pump = Hosted.Add(ThingKind.Pump, Terrain.TileAt(bank + Vector2.Down * 1.1f));
+        Warp(Hosted, pump.ToWorld(World.BellowsStand));
+        await ClickOn(pump);
+        var prop = (WaterPumpProp)view.PropOf(pump.Id)!;
+        await Click(Named("pump")!);
+        await Until(() => LeverAngle() < -16, "the first pump stroke moving down", 2);
+
+        await KeyStroke(Key.Space);
+        await Until(() => pump.Pressure == 20, "repeated input raising pressure a second time", 2);
+        Require(LeverAngle() < -12, "Repeated pump input must keep the handle moving down.");
+        await Until(() => LeverAngle() < -37, "the first stroke reaching the bottom", 2);
+        await Until(() => LeverAngle() > -3, "the first stroke returning to the top", 2);
+        await Until(() => LeverAngle() < -37, "the next stroke reaching the bottom without more input", 2);
+        await Until(() => view.PlayerAnimation != ActorAction.PumpWater, "the last stroke finishing on its own", 2);
+        Require(LeverAngle() > -3, "The last pump stroke must finish with the handle raised.");
+
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == pump);
+        Warp(Hosted, home);
+        await Frames(4);
+
+        float LeverAngle() => prop.Pump.Lever.RotationDegrees.Z;
+    }
+
     private async Task CheckVisiblePumpGripAndPistonCanBePicked() {
         var home = world.Player;
         var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
@@ -54,12 +81,15 @@ public partial class Game {
         var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
         var intake = Terrain.TileAt(bank + Vector2.Down * 1.1f);
         var pump = Hosted.Add(ThingKind.Pump, intake);
-        Warp(Hosted, pump.ToWorld(World.BellowsStand));
+        var stand = pump.ToWorld(World.BellowsStand);
+        Warp(Hosted, stand + new Vector2(.5f, -.65f));
         await ClickOn(pump);
         Require(Named("job_pump") != null, "A pump should offer the Pump job.");
         await Click(Named("pump")!);
         await Until(() => pump.Pressure == 10 && view.PlayerAnimation == ActorAction.PumpWater,
             "clicking the handle raising pressure and moving the player's arms", 2);
+        Require(world.Player.DistanceTo(stand) < .02f && Hosted.Player.DistanceTo(stand) < .02f,
+            "Using the pump from beside its handle should step the player into reach before both hands press down.");
         await KeyStroke(Key.Space);
         await Until(() => (panel.FindChild("pump_reading", true, false) as Label)?.Text == "Pressure 20% · 1.0 L/s",
             "the second stroke raising the gauge and flow readout on the open pump", 2);
