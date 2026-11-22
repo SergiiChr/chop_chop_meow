@@ -1540,6 +1540,7 @@ public partial class Game {
             RemoveCheckFiles();
             await TestClean(CheckRestartBuildsFreshModelsForReusedIds);
             await TestClean(CheckPlumbingPagesRefreshWithoutAllocating);
+            await TestClean(CheckVisiblePumpGripAndPistonCanBePicked);
             await TestClean(CheckWaterPumpControlsShowPressureAndFlow);
             await RunSteelPipeUIChecks();
             await TestClean(CheckQuarterTurnedForgeEmitsFromItsFlueAndMouth);

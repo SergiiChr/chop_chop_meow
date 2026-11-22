@@ -24,11 +24,21 @@ internal sealed class InstalledPlumbingShape {
         new(-QuadrantHalf, NozzleHeight, QuadrantHalf), new(QuadrantHalf, NozzleHeight, QuadrantHalf)
     ];
     private static readonly CylinderMesh FrameTube = new() {
-        BottomRadius = 1, TopRadius = 1, Height = 1, RadialSegments = 4, Rings = 0, CapTop = false, CapBottom = false
+        BottomRadius = 1,
+        TopRadius = 1,
+        Height = 1,
+        RadialSegments = 4,
+        Rings = 0,
+        CapTop = false,
+        CapBottom = false
     };
     private static readonly CylinderMesh SprinklerHead = new() {
-        BottomRadius = .079f, TopRadius = .034f, Height = FrameHeight - NozzleHeight,
-        RadialSegments = 4, Rings = 0, CapTop = false
+        BottomRadius = .079f,
+        TopRadius = .034f,
+        Height = FrameHeight - NozzleHeight,
+        RadialSegments = 4,
+        Rings = 0,
+        CapTop = false
     };
     private static readonly PlaneMesh FrameFoot = new() { Size = new Vector2(.23f, .23f) };
     private readonly Node3D root;

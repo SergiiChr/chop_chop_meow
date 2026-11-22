@@ -19,7 +19,9 @@ public sealed class Thing {
     public int Remaining { get; set; }
     public Inventory Inventory { get; set; } = new();
     /// <summary>A station's recipe now: the batch in progress, else <see cref="Asked"/> while batches of it wait, else <see cref="Keep"/>; empty when it has nothing to make.</summary>
-    [JsonIgnore] public string Recipe => Making != "" ? Making : Batches > 0 ? Asked : Keep;
+    [JsonIgnore] public string Recipe => Making != "" ? Making : NextRecipe;
+    /// <summary>The next batch whose ingredients can still be supplied.</summary>
+    internal string NextRecipe => Batches > 0 ? Asked : Keep;
     /// <summary>The recipe of a station's batch in progress, or empty between batches.</summary>
     [JsonIgnore] public string Making { get => making ?? ""; set => making = value == "" ? null : value; }
     /// <summary>The recipe workers keep a station making once the batches asked of it are done, or empty. A marked station is on its marked recipe: asking for batches marks their recipe.</summary>
@@ -70,6 +72,9 @@ public sealed class Thing {
         set;
     }
     [JsonIgnore] public bool PlumbingInstalled => PlumbingSlot?["steel_pipe"] == Plumbing.InstallCost;
+    /// <summary>Fittings last seen on an explored building, without remembering its inventory or live flow.</summary>
+    [JsonInclude, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] internal bool RememberedPlumbing { get; set; }
+    internal bool ShowsPlumbing => RememberedPlumbing || PlumbingInstalled;
     /// <summary>A cabin's door locked from inside with its key, which keeps out players and wolves; only a cabin with someone inside is locked.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Locked { get; set; }
     /// <summary>How far a mine is built.</summary>
@@ -370,7 +375,7 @@ public sealed partial class World {
         return t.Kind switch {
             ThingKind.Hut or ThingKind.Barrel => Barrels.Room(t),
             ThingKind.Farm when t.FarmStage == FarmStage.Growing => Math.Min(Farms.WaterRoom(t), t.Inventory.Room(Water.Liquid)),
-            ThingKind.Cooktable when Data.Recipes.TryGetValue(t.Recipe, out var recipe) =>
+            ThingKind.Cooktable when Data.Recipes.TryGetValue(t.NextRecipe, out var recipe) =>
                 Math.Clamp(recipe.Inputs.GetValueOrDefault(Water.Liquid) - t.Inventory[Water.Liquid], 0, t.Inventory.Room(Water.Liquid)),
             _ => 0
         };
@@ -2342,6 +2347,7 @@ public sealed partial class World {
         foreach (var t in S.Things) {
             if (!Sees(t.Pos)) continue;
             if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id, Kind = t.Kind, Rotation = t.Rotation };
+            memory.RememberedPlumbing = t.PlumbingInstalled;
             memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Keep = t.Keep; memory.Progress = t.Progress; memory.MineStage = t.MineStage; memory.FarmStage = t.FarmStage; memory.OfTree = t.OfTree;
         }
     }

@@ -354,7 +354,8 @@ public partial class WorldView : Node3D {
         distance = float.MaxValue;
         float r2 = hit.Radius * hit.Radius;
         if (Math.Abs(direction.Y) > 1e-5f) {
-            float cap = (hit.Top - origin.Y) / direction.Y;
+            float face = direction.Y < 0 ? hit.Top : hit.Bottom;
+            float cap = (face - origin.Y) / direction.Y;
             var p = origin + direction * cap;
             if (cap > 0 && (p.X - center.X) * (p.X - center.X) + (p.Z - center.Y) * (p.Z - center.Y) <= r2) distance = cap;
         }
@@ -383,12 +384,33 @@ public partial class WorldView : Node3D {
         return distance < float.MaxValue;
     }
 
-    /// <summary>Finds the nearest point of a ray through a square pad or the crops above it.</summary>
-    private static bool RayBox(Vector3 origin, Vector3 direction, float half, float height, out float distance) {
+    /// <summary>Tests the pump's drawn parts in their own frames, following both the building turn and the stroke.</summary>
+    private static bool RayPump(Vector3 origin, Vector3 direction, WaterPumpShape pump, out float distance) {
+        distance = float.MaxValue;
+        foreach (var piece in pump.Picking) {
+            var into = piece.GlobalTransform.AffineInverse();
+            var from = into * origin;
+            var along = into.Basis * direction;
+            var bounds = piece.Mesh.GetAabb();
+            bool hit = piece.Mesh is CylinderMesh cylinder
+                ? RayCylinder(from, along, Vector2.Zero,
+                    new Hit(Math.Max(cylinder.TopRadius, cylinder.BottomRadius), bounds.Position.Y, bounds.End.Y), out float d)
+                : RayBox(from, along, bounds, out d);
+            if (hit) distance = Math.Min(distance, d);
+        }
+        return distance < float.MaxValue;
+    }
+
+    private static bool RayBox(Vector3 origin, Vector3 direction, float half, float height, out float distance) =>
+        RayBox(origin, direction, new Aabb(new Vector3(-half, 0, -half), new Vector3(2 * half, height, 2 * half)), out distance);
+
+    /// <summary>Finds the point where a ray enters a box in its own frame.</summary>
+    private static bool RayBox(Vector3 origin, Vector3 direction, Aabb bounds, out float distance) {
+        var low = bounds.Position; var high = bounds.End;
         float enter = 0, exit = float.MaxValue;
-        bool hit = Clip(origin.X, direction.X, -half, half, ref enter, ref exit) &&
-            Clip(origin.Z, direction.Z, -half, half, ref enter, ref exit) &&
-            Clip(origin.Y, direction.Y, 0, height, ref enter, ref exit);
+        bool hit = Clip(origin.X, direction.X, low.X, high.X, ref enter, ref exit) &&
+            Clip(origin.Z, direction.Z, low.Z, high.Z, ref enter, ref exit) &&
+            Clip(origin.Y, direction.Y, low.Y, high.Y, ref enter, ref exit);
         distance = hit ? enter : float.MaxValue;
         return hit;
 
@@ -420,7 +442,9 @@ public partial class WorldView : Node3D {
                 continue;
             }
             bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, drawn, out float d)
-                : RayHits(origin, direction, t.Pos, hits, out d);
+                : t.Kind == ThingKind.Pump && PropOf(drawn.Id) is WaterPumpProp pump
+                    ? RayPump(origin, direction, pump.Pump, out d)
+                    : RayHits(origin, direction, t.Pos, hits, out d);
             if (hit && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
@@ -1102,7 +1126,7 @@ public partial class WorldView : Node3D {
     private void Animate(Prop prop, Thing t, float dt, bool live, bool watched) {
         bool first = !prop.Seen, shaking = prop.Shake > 0;
         if (prop.Plumbing is { } plumbing) {
-            if (live) plumbing.Show(t.PlumbingInstalled);
+            plumbing.Show(t.ShowsPlumbing);
             plumbing.Water(live && t.PlumbingInstalled && t.ReceivingWater, Elapsed);
         }
         // Most things in sight stand still: one that is neither shaking nor holding more or less than when last drawn needs no writing to.
@@ -1857,7 +1881,7 @@ public partial class WorldView : Node3D {
                 var tileCenter = Terrain.TileAt(building.Pos);
                 var top = OnScreen(tileCenter);
                 var center = OnScreen(tileCenter, PipeGround.FloorY);
-                if ((building.Kind != ThingKind.Pump && !building.PlumbingInstalled) || !World.SteelPipes.Laid(tileCenter))
+                if ((building.Kind != ThingKind.Pump && !building.ShowsPlumbing) || !World.SteelPipes.Laid(tileCenter))
                     overlay.DrawDashedLine(top, center, new Color("8dd4edb0"), 1.5f, 4, true);
                 var a = (screenX + screenZ) * .42f;
                 var b = (screenX - screenZ) * .42f;

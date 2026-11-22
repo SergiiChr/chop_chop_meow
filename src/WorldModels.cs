@@ -347,7 +347,7 @@ public static class WorldModels {
         if (t.Rotation != 0) prop.Root.Rotation = new Vector3(0, -t.Rotation, 0);
         var body = prop.Body;
         prop.Plumbing = InstalledPlumbingShape.Build(t.Kind, body);
-        prop.Plumbing?.Show(t.PlumbingInstalled);
+        prop.Plumbing?.Show(t.ShowsPlumbing);
         if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Turn(t.Id) : 0, 0);
         if (t.Kind == ThingKind.Mine) body.Rotation = MineModel.Yaw(Cliff.Nearest(t.Pos).Face);
         if (prop is DugProp dug) { dug.Yaw = body.RotationDegrees.Y; dug.Middle = Bounds(body).GetCenter(); }

@@ -1,3 +1,4 @@
+using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -9,6 +10,8 @@ public static class PlumbingFixtureChecks {
     public static void Run(GameData data) {
         Test(CheckTheAnvilMakesStackablePipesWithASteelHammer, data);
         Test(CheckAPlumbedTableFillsOnlyTheCurrentRecipesWater, data);
+        Test(CheckTheLastDoughBatchDoesNotDrawMoreWater, data);
+        Test(CheckExploredBuildingsRememberTheirFittings, data);
         Test(CheckOnlyGrowingCropsUseTheSprinklers, data);
         Test(CheckPlumbingComesBackWithBarrelsAndDismantledBuildings, data);
     }
@@ -44,6 +47,35 @@ public static class PlumbingFixtureChecks {
         PumpFully(world, pump);
         SafeTick(world, 3);
         Require(table.Inventory[Water.Liquid] == 3, "The dough recipe should draw its three liters, then shut the tap.");
+    }
+
+    private static void CheckTheLastDoughBatchDoesNotDrawMoreWater(GameData data) {
+        var (world, pump, _) = PumpAndBarrel(data);
+        var table = ExtendSouth(world, ThingKind.Cooktable);
+        world.Player = table.Pos + Vector2.Down;
+        Give(world, "flour"); Give(world, Water.Full);
+        world.QueueBatch(table, "dough");
+        world.Tick(.1f);
+        Require(table.Processing && table.Batches == 0 && table.Inventory[Water.Liquid] == 0, "The last dough batch should have spent its ingredients.");
+        world.SetRecipe(table, "");
+        PumpFully(world, pump); SafeTick(world, 3);
+        Require(table.Inventory[Water.Liquid] == 0 && !table.ReceivingWater, "A final batch already kneading should leave all incoming water for other buildings.");
+    }
+
+    private static void CheckExploredBuildingsRememberTheirFittings(GameData data) {
+        var world = EmptyWorld(data);
+        var barrel = world.Add(ThingKind.Barrel, world.Player + Vector2.Right);
+        InstallPlumbing(world, barrel); world.Look();
+        world.Player = barrel.Pos + Vector2.Right * (data.SightRadius + 3);
+        world.Look();
+        var loaded = EmptyWorld(data); loaded.Deserialize(world.Serialize());
+        var memory = Known(loaded).Single(t => t.Id == barrel.Id);
+        Require(memory.ShowsPlumbing && !memory.PlumbingInstalled, "An explored barrel should remember its feed without retaining equipped inventory.");
+        var live = loaded.Find(barrel.Id)!;
+        loaded.Player = live.Pos + Vector2.Down;
+        loaded.Transfer(live.PlumbingSlot!, loaded.Backpack, "steel_pipe", 10); loaded.Look();
+        loaded.Player = world.Player; loaded.Look();
+        Require(!Known(loaded).Single(t => t.Id == live.Id).ShowsPlumbing, "Seeing the bare barrel again should clear its remembered fittings.");
     }
 
     private static void CheckOnlyGrowingCropsUseTheSprinklers(GameData data) {

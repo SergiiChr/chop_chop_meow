@@ -39,8 +39,12 @@ internal partial class PipeLayerView : Node3D {
             }
         });
         picture.AddChild(new DirectionalLight3D {
-            LightColor = new Color("d2ecff"), LightEnergy = 1.5f, RotationDegrees = new Vector3(-48, -32, 0),
-            ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, ShadowBias = .015f
+            LightColor = new Color("d2ecff"),
+            LightEnergy = 1.5f,
+            RotationDegrees = new Vector3(-48, -32, 0),
+            ShadowEnabled = true,
+            DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal,
+            ShadowBias = .015f
         });
         ghost = SteelPipeShape.Build(pipes);
         ghost.Name = "PipePreview";
@@ -49,8 +53,10 @@ internal partial class PipeLayerView : Node3D {
         var blend = new ShaderMaterial { Shader = new Shader { Code = CutawayShader }, RenderPriority = (int)Material.RenderPriorityMax - 1 };
         blend.SetShaderParameter("buried", picture.GetTexture());
         composite = new MeshInstance3D {
-            MaterialOverride = blend, Mesh = new QuadMesh { Size = new Vector2(2, 2) },
-            ExtraCullMargin = 16384, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+            MaterialOverride = blend,
+            Mesh = new QuadMesh { Size = new Vector2(2, 2) },
+            ExtraCullMargin = 16384,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
         };
         AddChild(composite);
     }
@@ -99,12 +105,20 @@ internal partial class PipeLayerView : Node3D {
     private void UpdateRisers(World world, List<Thing> known) {
         connected.Clear();
         foreach (var thing in known) {
-            if (thing.Kind != ThingKind.Pump && !thing.PlumbingInstalled) continue;
+            if (thing.Kind != ThingKind.Pump && !thing.ShowsPlumbing) continue;
             var at = Terrain.TileAt(thing.Pos);
-            if (!world.SteelPipes.Laid(at) || !connected.Add(at) || risers.ContainsKey(at)) continue;
-            const float bottom = PipeGround.FloorY + SteelPipeShape.CenterHeight;
-            risers[at] = ModelKit.Post(pipes, SteelPipeShape.OuterRadius, SteelPipeShape.OuterRadius, -bottom,
-                WorldView.To3(at, SteelPipeShape.CenterHeight), ModelKit.Metal("93a6af", .55f, .38f), 8);
+            if (!world.SteelPipes.Laid(at) || !connected.Add(at)) continue;
+            if (!risers.TryGetValue(at, out var riser)) {
+                riser = ModelKit.Cylinder(pipes, SteelPipeShape.OuterRadius, SteelPipeShape.OuterRadius, 1,
+                    Vector3.Zero, ModelKit.Metal("93a6af", .55f, .38f), sides: 8);
+                risers.Add(at, riser);
+            }
+            // Expose the foot of the pump's discharge through stones at the waterline.
+            float top = thing.Kind == ThingKind.Pump ? .17f : 0;
+            float height = top - PipeGround.FloorY - SteelPipeShape.CenterHeight;
+            if (Mathf.IsEqualApprox(riser.Scale.Y, height)) continue;
+            riser.Scale = new Vector3(1, height, 1);
+            riser.Position = WorldView.To3(at, SteelPipeShape.CenterHeight + height * .5f);
         }
         disconnected.Clear();
         foreach (var at in risers.Keys) if (!connected.Contains(at)) disconnected.Add(at);

@@ -1034,7 +1034,7 @@ Each quarter-turn rotates the available openings.
 The underground view darkens the surface and exposes a blue-lit soil bed 0.9 m below grade, with cut banks along its edges.
 Placement, inspection and removal project the pointer onto the bed. A vertical pipe joins each fitted building to its inlet tile. A dotted guide marks a connection still to be made.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.
-The building's equipment slot accepts ten steel pipes to install its plumbing.
+The building's equipment slot accepts ten steel pipes to install its plumbing. Explored ground remembers the visible fittings when the building leaves sight.
 A worker finishes a round at the end of each pump stroke, then checks whether a higher-priority job is ready.
 A pump stroke holds pressure while the handle moves. Once it stops, pressure falls by ten percentage points per second.
 The simulation integrates flow over each tick, including the moment pressure reaches zero.
@@ -1047,6 +1047,7 @@ Taking out a pipe spills the water it held, while the two sides of the line keep
 `World.PipeReading` reports a tile's standing water and the highest pressure of the pumps connected to it.
 A receiver keeps any fraction below a liter in `Thing.PipedWaterRemainder` until it receives enough to add a whole
 liter.
+A cooking table requests water for the next queued or marked batch. A batch already being worked has spent its water.
 `Thing.ReceivingWater` tells the window a receiver is taking water and still has room.
 `Construction` snaps the steel piping plan to tile centers and lays it in the pipe layer.
 In the underground view the remove selector points at a steel pipe tile and takes it up within reach

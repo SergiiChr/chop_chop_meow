@@ -157,6 +157,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   Storage piles show lighter tubes in stacked rows. [Plumbing design reference](../docs/art/plumbing-reference.webp).
 - `WaterPumpShape` — a bolted steel pressure chamber with a sliding piston, a straight hand lever, and a pivoting link.
   Its enclosed elbow meets the underground pipe beneath the center of the tile, and its needle reads pressure.
+  The handle and piston are selectable as they move through the stroke.
   [Pressure pump reference](../docs/art/pressure-pump-reference.webp).
 - `InstalledPlumbingShape` — the cabin's wall riser into its roof barrel, the placed barrel's low feed and valve,
   and the cooking table's brass tap over a steel splash plate.
