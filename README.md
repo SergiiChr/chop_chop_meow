@@ -777,7 +777,7 @@ Taking pipes out disables the fittings. Taking down the building or picking up a
 | Placed steel barrel | Fills its 50 L tank. |
 | Cabin | A pipe runs up the outside wall to fill the roof barrel. A cabin without a roof barrel can still connect. |
 | Cooking table | A brass tap over a splash plate fills the water input for the current recipe. |
-| Farm plot | Four sprinkler heads sit just above the soil, one in each quarter of the plot. They water the growing crop from its 10 L reserve. The pipe tops it up as room opens. |
+| Farm plot | Four low sprinkler heads spray whenever pipe water arrives, even on fallow or ripe plots. The soil holds up to 10 L for the crop. A full plot keeps spraying its share until the pipe supply runs out. |
 
 The pump first fills the line, which holds 1 L per tile. Buildings that need water share the available flow evenly.
 A closed tap can have a full pipe at its inlet. When pressure falls to zero, water stays in the pipes for the next

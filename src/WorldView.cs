@@ -1286,10 +1286,7 @@ public partial class WorldView : Node3D {
                 WorldModels.SyncPile(pile, t, World.Data);
                 break;
             case FarmProp farm:
-                // The line tops up the reserve. The nozzles keep watering until the crop or its water runs out.
-                bool irrigating = live && t.PlumbingInstalled && t.FarmStage == FarmStage.Growing
-                    && (t.ReceivingWater || !World.Farms.Dry(t));
-                farm.Plumbing!.Water(irrigating, Elapsed);
+                farm.Plumbing!.Water(live && t.PlumbingInstalled && t.ReceivingWater, Elapsed);
                 if (!live) break;
                 int look = World.Farms.CropLook(t);
                 farm.Soil.Show(World.Farms.WaterLevel(t), look > 0);

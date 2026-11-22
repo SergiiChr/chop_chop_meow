@@ -56,7 +56,7 @@ public sealed class Plumbing(World world) {
                 receiver.ReceivingWater = false;
                 if (NetworkAt(Terrain.TileAt(receiver.Pos)) is not Network network
                     || (network.Pumped <= 0 && network.Stored <= 0)
-                    || world.PlumbingRoom(receiver) <= 0) continue;
+                    || Demand(receiver) <= 0) continue;
                 Activate(network);
                 network.Receivers.Add(receiver);
             }
@@ -140,7 +140,12 @@ public sealed class Plumbing(World world) {
         if (network.LastWet < 0) network.Stored = 0;
     }
 
-    /// <summary>Splits the water among consumers with room and returns any water they cannot take.</summary>
+    /// <summary>Sprinklers can discharge their entire share even when the soil is full.</summary>
+    private double Demand(Thing receiver) =>
+        receiver.Kind == ThingKind.Farm && receiver.PlumbingInstalled ? double.PositiveInfinity
+        : world.PlumbingRoom(receiver) - (double)receiver.PipedWaterRemainder;
+
+    /// <summary>Splits the water among open fixtures and returns any water they cannot take.</summary>
     private double Share(Network network, double water) {
         var receivers = network.Receivers;
         while (receivers.Count > 0 && water > 0) {
@@ -148,10 +153,10 @@ public sealed class Plumbing(World world) {
             double share = water / count;
             for (int i = count - 1; i >= 0; i--) {
                 var receiver = receivers[i];
-                double room = world.PlumbingRoom(receiver) - (double)receiver.PipedWaterRemainder;
-                if (room > share) continue;
-                Deliver(receiver, room);
-                water -= room;
+                double demand = Demand(receiver);
+                if (demand > share) continue;
+                Deliver(receiver, demand);
+                water -= demand;
                 receivers[i] = receivers[^1];
                 receivers.RemoveAt(receivers.Count - 1);
             }
@@ -163,11 +168,11 @@ public sealed class Plumbing(World world) {
     }
 
     private void Deliver(Thing receiver, double share) {
-        double liters = receiver.PipedWaterRemainder + share;
+        double liters = Math.Min(world.PlumbingRoom(receiver), receiver.PipedWaterRemainder + share);
         int whole = (int)liters;
         int received = whole == 0 ? 0 : world.SupplyPlumbing(receiver, whole);
         receiver.PipedWaterRemainder = received == whole ? Math.Min(MathF.BitDecrement(1), (float)(liters - whole)) : 0;
-        receiver.ReceivingWater = share > 0 && world.PlumbingRoom(receiver) > 0;
+        receiver.ReceivingWater = share > 0 && Demand(receiver) > 0;
     }
 
     internal static bool ValidReceiver(Thing thing) =>

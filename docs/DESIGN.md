@@ -1045,17 +1045,16 @@ The simulation integrates flow over each tick, including the moment pressure rea
 The pressure dial reads the pump’s flow in liters per second, with numbered marks from zero to five and half-liter ticks.
 `Plumbing` finds connected groups whenever the pipe layout changes.
 Pump output first fills connected pipes up to one liter per tile.
-Water beyond that is shared among connected buildings with room, with any excess split among those still able to take it.
+Connected buildings share the remaining water evenly. When a tank or recipe fills, its excess goes to the other open fixtures.
 When pumps stop supplying water, consumers can still draw the water left in the pipes.
 Each pipe's water is saved and sent to guests separately from its shape and rotation.
 Taking out a pipe spills the water it held, while the two sides of the line keep theirs.
 `World.PipeReading` reports a tile's standing water and the highest pressure of the pumps connected to it.
-A receiver keeps any fraction below a liter in `Thing.PipedWaterRemainder` until it receives enough to add a whole
-liter.
+A receiver with room keeps any fraction below a liter in `Thing.PipedWaterRemainder` until it can store a whole liter.
 A cooking table requests water for the next queued or marked batch. A batch already being worked has spent its water.
-`Thing.ReceivingWater` tells the window a receiver is taking water and still has room.
-A fitted farm sprays as water arrives and while the growing crop draws on the reserve, including between top-ups.
-Dry plots, fallow plots and ripe wheat have no spray.
+A fitted farm takes its share in every crop stage. The sprinklers top up the 10 L soil reserve and spend any excess.
+`Thing.ReceivingWater` switches the spray on for each tick that delivers water, including the last water standing in the pipes.
+The spray stops as soon as delivery stops. Growing crops continue to draw on the soil reserve.
 `Construction` snaps the steel piping plan to tile centers and lays it in the pipe layer.
 In pipe placement, R turns the plan a quarter turn and T cycles its shape.
 Left-click lays the pipe. Right-click takes up the pipe under the pointer, even after the backpack runs out of pipes.

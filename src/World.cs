@@ -369,12 +369,12 @@ public sealed partial class World {
     public Farms Farms { get; }
     private readonly Barrels barrels;
 
-    /// <summary>Whole liters the installed fixtures can accept for this building's current work or tank.</summary>
+    /// <summary>Whole liters the building can store from its plumbing.</summary>
     internal int PlumbingRoom(Thing t) {
         if (!t.PlumbingInstalled) return 0;
         return t.Kind switch {
             ThingKind.Hut or ThingKind.Barrel => Barrels.Room(t),
-            ThingKind.Farm when t.FarmStage == FarmStage.Growing => Math.Min(Farms.WaterRoom(t), t.Inventory.Room(Water.Liquid)),
+            ThingKind.Farm => Math.Min(Farms.WaterRoom(t), t.Inventory.Room(Water.Liquid)),
             ThingKind.Cooktable when Data.Recipes.TryGetValue(t.NextRecipe, out var recipe) =>
                 Math.Clamp(recipe.Inputs.GetValueOrDefault(Water.Liquid) - t.Inventory[Water.Liquid], 0, t.Inventory.Room(Water.Liquid)),
             _ => 0

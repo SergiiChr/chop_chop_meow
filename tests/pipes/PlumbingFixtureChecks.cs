@@ -12,7 +12,7 @@ public static class PlumbingFixtureChecks {
         Test(CheckAPlumbedTableFillsOnlyTheCurrentRecipesWater, data);
         Test(CheckTheLastDoughBatchDoesNotDrawMoreWater, data);
         Test(CheckExploredBuildingsRememberTheirFittings, data);
-        Test(CheckOnlyGrowingCropsUseTheSprinklers, data);
+        Test(CheckFullPlotsSpendTheirShareInEveryCropStage, data);
         Test(CheckPlumbingComesBackWithBarrelsAndDismantledBuildings, data);
     }
 
@@ -78,16 +78,30 @@ public static class PlumbingFixtureChecks {
         Require(!Known(loaded).Single(t => t.Id == live.Id).ShowsPlumbing, "Seeing the bare barrel again should clear its remembered fittings.");
     }
 
-    private static void CheckOnlyGrowingCropsUseTheSprinklers(GameData data) {
-        var (world, pump, barrel) = PumpAndBarrel(data);
-        barrel.Inventory.Add(Water.Liquid, 50);
-        var farm = ExtendSouth(world, ThingKind.Farm);
-        PumpFully(world, pump); SafeTick(world, 3);
-        Require(farm.Inventory[Water.Liquid] == 0, "An unsown field should take no water.");
-        farm.Inventory.Add("wheat_seeds", 1); farm.Inventory.Add("fertilizer", 1);
-        PumpFully(world, pump); SafeTick(world, 4);
-        Require(farm.FarmStage == FarmStage.Growing && world.Farms.WaterLevel(farm) > 9 && world.Farms.WaterLevel(farm) <= 10,
-            "Sprinklers should fill the growing field's ten-liter reserve and water its wheat.");
+    private static void CheckFullPlotsSpendTheirShareInEveryCropStage(GameData data) {
+        foreach (var stage in new[] { FarmStage.Fallow, FarmStage.Growing, FarmStage.Ripe }) {
+            var (world, pump, barrel) = PumpAndBarrel(data);
+            var farm = ExtendSouth(world, ThingKind.Farm);
+            farm.FarmStage = stage;
+            farm.Inventory.Add(Water.Liquid, Farms.LitersPerDay - 1);
+
+            PumpFully(world, pump); world.Tick(1);
+            Require(!farm.ReceivingWater, $"The {stage} plot should wait while the pump fills the line.");
+            PumpFully(world, pump); world.Tick(1);
+            Require(farm.ReceivingWater && world.Farms.WaterRoom(farm) == 0 && barrel.Inventory[Water.Liquid] == 2,
+                $"Of four delivered liters, the {stage} plot should spray two, keep its last liter of reserve and leave two for the barrel.");
+
+            PumpFully(world, pump); world.Tick(.25f);
+            Require(farm.ReceivingWater && farm.PipedWaterRemainder == 0 && barrel.PipedWaterRemainder == .625f,
+                $"The full {stage} plot should spend its half of the flow, even for a fraction of a liter.");
+            world.Construction.TakeUpPipe(JunctionTile + Vector2I.Down);
+            world.Tick(.1f);
+            Require(farm.ReceivingWater && world.PipeReading(SouthTankTile).Liters == 0,
+                $"The full {stage} plot should spray the last liter standing in its inlet.");
+            world.Tick(.1f);
+            Require(!farm.ReceivingWater && world.Farms.WaterLevel(farm) is > 9 and <= 10 && farm.FarmStage == stage,
+                $"The {stage} sprinklers should stop when the inlet runs dry, with the soil still wet.");
+        }
     }
 
     private static void CheckPlumbingComesBackWithBarrelsAndDismantledBuildings(GameData data) {
