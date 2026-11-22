@@ -209,6 +209,12 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // The camera turns and tilts by the flags.
             world.S.Things.RemoveAll(t => t.Kind is ThingKind.Tree or ThingKind.Bush or ThingKind.Berries && t.Pos.DistanceTo(anvil.Pos) < 10);
             world.Player = anvil.Pos + new Vector2(-1, 1.2f); panel.Select(anvil);
+            // --anvil-work loads it with steel bars and stands the player within reach with nothing crafting by hand, so
+            // they hammer with its slotted hammer.
+            if (Launch.Has("--anvil-work")) {
+                anvil.Inventory.Add("steel_bar", 20); world.Player = anvil.Pos + new Vector2(-.6f, .9f);
+                world.S.Making = ""; world.S.Crafting.Clear(); world.S.CraftTime = 0;
+            }
             AimAt(anvil.Pos);
         }
         if (Launch.Has("--neighbor")) { world.As(world.Arrive("neighbor", 2), () => world.Player = bench.Pos + Vector2.One); world.Player = bench.Pos + new Vector2(-2, 4); panel.Close(); view.Zoom = 1.6f; }
