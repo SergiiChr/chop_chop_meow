@@ -1,18 +1,26 @@
-using System;
 using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The pump's pressure and flow, its handle and the workers assigned to it.</summary>
+/// <summary>The pump's pressure gauge, its handle and the workers assigned to it.</summary>
 public partial class WaterPumpPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        var reading = Style.Heading("", 20);
-        reading.Name = "pump_reading";
-        AddChild(reading);
-        live.Watch(() => (Mathf.RoundToInt(thing.Pressure), Mathf.RoundToInt(thing.FlowRate * 10)), value => {
-            reading.Text = FormattableString.Invariant($"Pressure {value.Item1}% · {value.Item2 / 10f:0.0} L/s");
-        });
-        var row = Row();
+        var controls = Row();
+        controls.AddThemeConstantOverride("separation", 16);
+        var dial = new PressureGauge {
+            Name = "pump_pressure",
+            CustomMinimumSize = new Vector2(96, 96),
+            MouseFilter = MouseFilterEnum.Ignore,
+            AccessibilityName = "Pressure"
+        };
+        controls.AddChild(dial);
+        live.Watch(() => thing.Pressure, pressure => { dial.Value = pressure; dial.QueueRedraw(); });
+        var column = new VBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkCenter };
+        column.AddThemeConstantOverride("separation", 6);
+        controls.AddChild(column);
+        column.AddChild(Style.Heading("Pressure", 20));
+        var row = new HBoxContainer();
+        column.AddChild(row);
         var handle = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before pumping."); else panel.Player.UseWaterPump(thing); });
         handle.Name = "pump"; handle.TooltipText = "Pump the handle · Space";
         Style.SkinPill(handle, Style.Sage);

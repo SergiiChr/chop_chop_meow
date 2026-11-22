@@ -16,8 +16,6 @@ public partial class HeldCursor : Control {
 
     /// <summary>The building plan on the cursor, or null.</summary>
     public string? Plan { get; private set; }
-    /// <summary>A button that edits the held plan without putting it down.</summary>
-    internal Control? PlanButton { get; set; }
     /// <summary>The held stack, or null.</summary>
     public HeldStack? Stack => world.Held;
     public bool Empty => Plan == null && Stack == null;
@@ -63,14 +61,15 @@ public partial class HeldCursor : Control {
 
     /// <summary>A click on the interface anywhere but an item slot lets go of what the cursor holds; the click still does what it does there.</summary>
     public override void _Input(InputEvent ev) {
-        if (Empty || ev is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left or MouseButton.Right } press) return;
+        if (Empty || ev is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left or MouseButton.Right }) return;
         if (GetViewport().GuiGetHoveredControl() is not Control over || over is ItemSlot { Controls: not null }) return;
-        if (Plan != null && press.ButtonIndex == MouseButton.Left && over == PlanButton) return;
         Release();
     }
 
     public override void _Process(double delta) {
-        (string? Item, int Count) now = (Item, Plan != null ? 0 : Stack?.Count ?? 0);
+        // Over the ground the buried pipe preview already shows the held plan at the placement tile.
+        string? item = Plan == "steel_piping" && GetViewport().GuiGetHoveredControl() == null ? null : Item;
+        (string? Item, int Count) now = (item, Plan != null ? 0 : Stack?.Count ?? 0);
         if (now != shown) {
             shown = now;
             Visible = now.Item != null;

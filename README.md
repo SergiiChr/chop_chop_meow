@@ -176,9 +176,11 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
 | C / V | Turn a building, crate, barrel or pipe by 90° while placing it. Mines face their cliff. Outside placement, C opens crafting. |
+| LMB / RMB while placing steel piping | Lay a pipe / take up the pipe under the pointer |
+| R / T while placing steel piping | Turn 90° / cycle the pipe type |
 | H | Open the crew overview |
 | I | Open or close the field guide |
-| 1–9 or click a hotbar slot | Select that slot, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
+| 1–9 or click a hotbar slot | Select that slot, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); pipe placement stays active for removal; defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
 | Space | Swing an axe, or a fist without one, the way you last walked, or pump the selected nearby reinforced furnace or water pump |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
@@ -191,6 +193,9 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
 
 ## Interface
+
+Point at a building, resource or worker to see its name. At the lake’s edge the label reads “Collect water”.
+Click a target to open its panel.
 
 ### Status bar
 
@@ -415,6 +420,7 @@ Food and drink restore hunger and thirst but no health: health comes back only i
 From 10 pm you can sleep until dawn, but only if your food and water will last until morning; otherwise the sleep button explains why.
 Sleep heals while hunger and thirst both stay above 45%, about a third of your health over a full night.
 The cabin's page shows, under "Stats after sleep", the health, hunger and thirst you would wake with, each as a capsule over its icon, as in the corner.
+The note beneath them explains that the water tank supplies the refill.
 
 ### Death and recovery
 
@@ -460,6 +466,7 @@ The opening progression prioritizes water, shelter and fire, then hand gathering
 
 ### Buildings
 
+The placement preview stays visible over the shoreline, water and existing buildings.
 A building, yard or crate goes up over stumps and plain bushes and clears them away, giving nothing for them.
 A cabin needs dry, open ground at its door and at the foot of its ladder.
 Those spots stay clear of other buildings.
@@ -745,15 +752,18 @@ Gather them by hand, or three times as fast with a rake, and they fall again eve
 Place a water pump in the freshwater lake’s shallows with its handle facing dry ground.
 It costs 4 steel bars, 10 stone and 4 wood parts.
 From the bank, select it and click **Pump** or press **Space**. Your character steps up to the handle before pressing it.
+Aim at the pump to select it, including its thin lever and piston. Aim beside it to collect water.
 You can also assign a worker the **Pump** job.
-Each stroke adds 10 percentage points of pressure. Ten consecutive strokes reach 5 L/s.
+Each stroke moves the pressure gauge up one division. Ten consecutive strokes reach full pressure at 5 L/s.
 After the last stroke finishes, pressure falls to zero over 10 seconds from full.
 
 At an anvil, use a steel hammer to form one steel bar into one stackable steel pipe in 10 base seconds.
 Put the hammer in the anvil’s hammer slot for a worker to use.
 In building plans, pick **Steel piping** to open the cutaway and dim the surface.
 Thin blue outlines mark the pipes, trench edges and building inlets against the exposed earth.
-Each tile costs one pipe. Use the shape button for a straight pipe, T-junction or cross, and C/V for quarter turns.
+Left-click to lay a pipe for one steel pipe. Right-click to take one back up.
+Press R for a quarter turn and T to cycle through straight, T-junction and cross.
+The pipe plan stays active after the last pipe so you can still take pipes up. Press Esc to finish.
 Pipes join across a shared tile side when both openings face each other.
 
 Run the line through the blue outlined tile under the pump and each building it serves. A vertical pipe joins each fitted building to the line. A dotted guide marks an open connection.

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 using static ChopChopMeow.ModelKit;
 
@@ -13,11 +14,11 @@ internal sealed class WaterPumpShape {
     private static readonly Vector3 Axle = new(90, 0, 0);
     private static Mesh? outlet;
     private readonly Node3D needle, piston, linkage;
-    private readonly MeshInstance3D[] picking;
+    private readonly (MeshInstance3D Part, Aabb Bounds)[] picking;
     private readonly record struct Stroke(Vector3 PistonPin, Vector3 RockerPin, Vector3 Grip, float Tilt);
 
     public Node3D Lever { get; }
-    public ReadOnlySpan<MeshInstance3D> Picking => picking;
+    public ReadOnlySpan<(MeshInstance3D Part, Aabb Bounds)> Picking => picking;
 
     public WaterPumpShape(Node3D parent) {
         var chamber = Metal("798083", .63f, .48f);
@@ -29,8 +30,8 @@ internal sealed class WaterPumpShape {
         // The chamber's skirt extends below the lake surface to meet the shallow bed.
         var baseAt = new Vector3(0, -.13f, ChamberZ);
         Post(parent, .280f, .280f, .05f, baseAt, dark, 14);
-        var shell = Post(parent, .261f, .261f, .397f, baseAt + Vector3.Up * .031f, chamber, 14);
-        var lid = Post(parent, .284f, .278f, .054f, new Vector3(0, .280f, ChamberZ), steel, 14);
+        Post(parent, .261f, .261f, .397f, baseAt + Vector3.Up * .031f, chamber, 14);
+        Post(parent, .284f, .278f, .054f, new Vector3(0, .280f, ChamberZ), steel, 14);
         for (int i = 0; i < 7; i++) {
             float a = i * Mathf.Tau / 7;
             var bolt = new Vector3(.225f * MathF.Sin(a), .334f, ChamberZ + .225f * MathF.Cos(a));
@@ -39,13 +40,13 @@ internal sealed class WaterPumpShape {
 
         Post(parent, .113f, .108f, .042f, new Vector3(0, .332f, ChamberZ), dark, 10);
         Post(parent, .077f, .077f, .213f, new Vector3(0, .366f, ChamberZ), chamber, 10);
-        var seal = Post(parent, .099f, .099f, .098f, new Vector3(0, .504f, ChamberZ), steel, 10);
+        Post(parent, .099f, .099f, .098f, new Vector3(0, .504f, ChamberZ), steel, 10);
         Post(parent, .055f, .055f, .017f, new Vector3(0, SealHeight - .016f, ChamberZ), dark, 8);
 
         // The pressure outlet bends down onto the middle of the tile and joins the buried riser.
-        var elbow = Add(parent, outlet ??= Outlet(), steel, Vector3.Zero);
+        Add(parent, outlet ??= Outlet(), steel, Vector3.Zero);
         Cylinder(parent, .075f, .075f, .075f, new Vector3(0, .442f, .285f), dark, Axle, 10);
-        needle = Gauge(parent, brass, steel, dark, out var dial);
+        needle = Gauge(parent, brass, steel, dark);
 
         // The linkage is worked in a vertical plane toward the operator (-Z).
         var rig = Pivot(parent, Vector3.Zero, new Vector3(0, 90, 0));
@@ -55,19 +56,20 @@ internal sealed class WaterPumpShape {
 
         piston = Pivot(rig, Vector3.Zero);
         piston.Name = "Piston";
-        var shaft = Post(piston, .030f, .030f, RodLength, Vector3.Down * RodLength, polished, 8);
+        Post(piston, .030f, .030f, RodLength, Vector3.Down * RodLength, polished, 8);
         Pin(piston, Vector3.Zero, .051f, .093f, steel);
 
         linkage = Pivot(rig, FixedPin);
         linkage.Name = "Rocker";
-        var link = Box(linkage, new Vector3(LinkLength, .059f, .043f), Vector3.Right * (LinkLength / 2), dark);
+        Box(linkage, new Vector3(LinkLength, .059f, .043f), Vector3.Right * (LinkLength / 2), dark);
         Pin(linkage, Vector3.Right * LinkLength, .044f, .128f, steel).Name = "RockerPin";
 
         Lever = Pivot(rig, Vector3.Zero);
-        var bar = Box(Lever, new Vector3(LeverLength, .078f, .054f), Vector3.Right * (LeverLength / 2), steel);
+        Box(Lever, new Vector3(LeverLength, .078f, .054f), Vector3.Right * (LeverLength / 2), steel);
         var handle = Cylinder(Lever, .034f, .034f, .338f, Vector3.Right * LeverLength, Wood("997450"), Axle, 8);
         handle.Name = "PumpHandle";
-        picking = [shell, lid, seal, elbow, dial, shaft, link, bar, handle];
+        picking = parent.FindChildren("*", nameof(MeshInstance3D), true, false).OfType<MeshInstance3D>()
+            .Select(part => (part, part.GetAabb())).ToArray();
         SetPress(0);
         SetPressure(0);
     }
@@ -108,11 +110,11 @@ internal sealed class WaterPumpShape {
     private static MeshInstance3D Pin(Node3D at, Vector3 where, float radius, float width, Material metal) =>
         Cylinder(at, radius, radius, width, where, metal, Axle, 8);
 
-    private static Node3D Gauge(Node3D parent, Material brass, Material steel, Material dark, out MeshInstance3D dial) {
+    private static Node3D Gauge(Node3D parent, Material brass, Material steel, Material dark) {
         Cylinder(parent, .046f, .046f, .16f, new Vector3(.122f, .448f, ChamberZ), steel, new Vector3(0, 0, 90), 8);
         Post(parent, .044f, .035f, .144f, new Vector3(.195f, .430f, ChamberZ), brass, 8);
         var gauge = Pivot(parent, new Vector3(.195f, .639f, ChamberZ), new Vector3(-36, 43, 0));
-        dial = Cylinder(gauge, .107f, .107f, .035f, Vector3.Zero, dark, Axle, 12);
+        Cylinder(gauge, .107f, .107f, .035f, Vector3.Zero, dark, Axle, 12);
         Cylinder(gauge, .094f, .094f, .006f, Vector3.Back * .018f, Mat("efe5ca", .76f), Axle, 12);
         for (int step = 0; step <= 8; step++) {
             float angle = WorldModels.Gauge(step / 8f);

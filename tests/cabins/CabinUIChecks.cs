@@ -126,6 +126,7 @@ public partial class Game {
             "the cabin page showing the health a fed night's sleep would leave", 2);
         Require(HasLabel(panel, "Stats after sleep") && panel.FindChildren("*", "", true, false).OfType<NeedGauge>().Count() == 3,
             "The cabin page must title its needs \"Stats after sleep\" and show a heart, a stomach and a droplet under them.");
+        Require(HasLabel(panel, "Water is refilled from the water tank."), "The sleep forecast should explain where its water comes from.");
         SetNeeds(Hosted, hunger: 5);
         RunUntilMorning(Hosted);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true });

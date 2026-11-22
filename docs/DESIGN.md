@@ -87,7 +87,7 @@ Simulation and data:
 | `src/pipes/Plumbing.cs` | Connected groups of pipe tiles, the water left in them and the buildings sharing their supply |
 | `src/pipes/WaterPumps.cs` | Pump strokes, pressure loss and liters supplied during a simulation tick |
 | `src/pipes/display/PipeLayerView.cs`, `src/pipes/display/PipeGround.cs`, `src/pipes/display/PipePanel.cs` | The underground view, placement preview and inspection of a pipe’s water and pressure |
-| `src/pipes/display/WaterPumpPanel.cs`, `src/pipes/display/WaterPumpProp.cs` | Operating a pump, assigning a worker and moving the handle in the world |
+| `src/pipes/display/WaterPumpPanel.cs`, `src/pipes/display/PressureGauge.cs`, `src/pipes/display/WaterPumpProp.cs` | Operating the pump, reading its pressure dial, assigning a worker and moving the handle in the world |
 | `src/pipes/display/SteelPipeShape.cs`, `src/pipes/display/WaterPumpShape.cs` | The pipe fittings, hand pump and its moving lever |
 | `src/pipes/display/InstalledPlumbingShape.cs`, `src/pipes/display/FarmSpray.cs` | Installed cabin, cooking table and farm fittings, and water from working sprinklers |
 | `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
@@ -371,7 +371,8 @@ The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
 The sun and moon share one shadow map across this view.
 Its small shadow offset keeps the shade attached to feet, trunks and low props, while ambient occlusion shades creases.
 
-Picking, the hover ring and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`), so selection matches what is drawn.
+Picking and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`).
+Hover labels name buildings, resources and workers in the world. The shore label reads “Collect water”.
 A tree crown only wins a click when nothing else is under the cursor, so objects behind a canopy stay selectable.
 Trees use three variants chosen by object id, so saves need no new fields.
 A tree's height comes from its id too (`WorldModels.TreeTall`): its model and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
@@ -1052,8 +1053,9 @@ liter.
 A cooking table requests water for the next queued or marked batch. A batch already being worked has spent its water.
 `Thing.ReceivingWater` tells the window a receiver is taking water and still has room.
 `Construction` snaps the steel piping plan to tile centers and lays it in the pipe layer.
-In the underground view the remove selector points at a steel pipe tile and takes it up within reach
-(`Verb.TakeUpPipe`).
+In pipe placement, R turns the plan a quarter turn and T cycles its shape.
+Left-click lays the pipe. Right-click takes up the pipe under the pointer, even after the backpack runs out of pipes.
+The underground remove selector also takes up a pipe within reach (`Verb.TakeUpPipe`).
 The plan's materials return to the backpack or go in a recovery box through `Construction.GiveBack`.
 
 ### Storage, filters and automation

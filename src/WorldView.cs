@@ -105,7 +105,7 @@ public partial class WorldView : Node3D {
     /// <summary>Build-mode ghosts by building kind, made hidden while loading; mines have one per cliff ore instead.</summary>
     private readonly Dictionary<ThingKind, Prop> ghosts = new(), mineGhosts = new();
     private Prop? ghost;
-    private MeshInstance3D selectRing = null!, hoverRing = null!, workerRing = null!, playerRing = null!, placeTile = null!;
+    private MeshInstance3D playerRing = null!, placeTile = null!;
     /// <summary>The red on what the remove selector points at.</summary>
     private RemovalMark removalMark = null!;
     private float pulseRemaining;
@@ -115,8 +115,8 @@ public partial class WorldView : Node3D {
     private float downedFor;
     private Vector2 mauledFrom;
     private readonly Font font = ThemeDB.FallbackFont;
-    private static readonly StandardMaterial3D GhostValid = Flat(new Color(.55f, .95f, .45f, .45f));
-    private static readonly StandardMaterial3D GhostBlocked = Flat(new Color(1, .35f, .3f, .5f));
+    private static readonly StandardMaterial3D GhostValid = PlacementTint(new Color(.55f, .95f, .45f, .45f));
+    private static readonly StandardMaterial3D GhostBlocked = PlacementTint(new Color(1, .35f, .3f, .5f));
     private static readonly StandardMaterial3D NightGlass = Mat("ffd58a", .3f, 0, 1.6f);
     private static readonly StandardMaterial3D Sparks = Flat(new Color("ffd27a"));
     private static readonly StandardMaterial3D GatherDust = Flat(new Color(.8f, .78f, .7f, .45f));
@@ -132,11 +132,11 @@ public partial class WorldView : Node3D {
     private static readonly Color HeatReady = new Color("f0a03c");
     private static readonly Color HeatLow = new Color("8a5a46");
     private static readonly Color HeatTick = new Color("f2e8cf");
-    private readonly ShaderMaterial fog = new() { Shader = new Shader { Code = FogShader }, RenderPriority = (int)Material.RenderPriorityMax };
+    private readonly ShaderMaterial fog = new() { Shader = new Shader { Code = FogShader }, RenderPriority = (int)Material.RenderPriorityMax - 1 };
     private Image explored = null!;
     private ImageTexture exploredTexture = null!;
     private int exploredRevision = -1;
-    // Drawn once over the whole screen after everything else: black where never explored, a grey wash over remembered ground, clear inside the sight circle.
+    // Covers the world beneath placement previews: black where never explored, a grey wash over remembered ground, clear inside the sight circle.
     // Each pixel's place comes from the depth buffer, so swaying leaves and grass and cut-out leaf cards are covered exactly as drawn.
     // Texel centres sit on whole tiles, matching where the simulation measures sight.
     private const string FogShader = """
@@ -235,11 +235,12 @@ public partial class WorldView : Node3D {
         BuildGhosts();
         for (int i = 0; i < World.Carts; i++) idleCarts.Push(NewCart());
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
-        selectRing = Ring(new Color(.95f, .82f, .4f, .85f));
-        hoverRing = Ring(new Color(1, .95f, .75f, .55f));
-        workerRing = Ring(new Color(1, .8f, .3f, .8f));
-        playerRing = Ring(new Color(.95f, .88f, .57f, .6f));
+        playerRing = Torus(scene, .9f, 1, Vector3.Zero, Flat(new Color(.95f, .88f, .57f, .6f)));
+        playerRing.Scale = new Vector3(.42f, 1, .42f);
+        playerRing.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        playerRing.Visible = false;
         placeTile = Add(scene, new PlaneMesh { Size = new Vector2(1.4f, 1.4f) }, GhostValid, Vector3.Zero);
+        placeTile.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         placeTile.Visible = false;
         removalMark = new RemovalMark(scene, id => props.GetValueOrDefault(id)?.Root);
         RemovalMark.Warm(warmStage);
@@ -247,13 +248,6 @@ public partial class WorldView : Node3D {
         pipeLayer = new PipeLayerView(); AddChild(pipeLayer);
         overlay = new Overlay { Paint = PaintOverlay }; AddChild(overlay);
         World.PlayerActed += PlayerActed;
-    }
-
-    private MeshInstance3D Ring(Color color) {
-        var ring = Torus(scene, .9f, 1, Vector3.Zero, Flat(color));
-        ring.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-        ring.Visible = false;
-        return ring;
     }
 
     public override void _ExitTree() => World.PlayerActed -= PlayerActed;
@@ -399,19 +393,16 @@ public partial class WorldView : Node3D {
         return distance < float.MaxValue;
     }
 
-    /// <summary>Tests the pump's drawn parts in their own frames, following both the building turn and the stroke.</summary>
-    private static bool RayPump(Vector3 origin, Vector3 direction, WaterPumpShape pump, out float distance) {
+    /// <summary>Picks the moving hardware with three pixels of clearance around narrow rods and pins.</summary>
+    private bool RayPump(Vector3 origin, Vector3 direction, Thing pump, WaterPumpShape model, out float distance) {
         distance = float.MaxValue;
-        foreach (var piece in pump.Picking) {
-            var into = piece.GlobalTransform.AffineInverse();
-            var from = into * origin;
-            var along = into.Basis * direction;
-            var bounds = piece.Mesh.GetAabb();
-            bool hit = piece.Mesh is CylinderMesh cylinder
-                ? RayCylinder(from, along, Vector2.Zero,
-                    new Hit(Math.Max(cylinder.TopRadius, cylinder.BottomRadius), bounds.Position.Y, bounds.End.Y), out float d)
-                : RayBox(from, along, bounds, out d);
-            if (hit) distance = Math.Min(distance, d);
+        // A pump and its fully extended lever fit inside this cylinder at every turn and stroke.
+        if (!RayCylinder(origin, direction, pump.Pos, new Hit(2.5f, -.3f, 2.1f), out _)) return false;
+        float clearance = 3 / PixelsPerUnit;
+        foreach (var (part, bounds) in model.Picking) {
+            var into = part.GlobalTransform.AffineInverse();
+            if (RayBox(into * origin, into.Basis * direction, bounds.Grow(clearance), out float hit))
+                distance = Math.Min(distance, hit);
         }
         return distance < float.MaxValue;
     }
@@ -450,6 +441,8 @@ public partial class WorldView : Node3D {
         World.CollectKnown(picking);
         foreach (var drawn in picking) {
             if (drawn.Remaining <= 0 && drawn.IsResource && drawn.Kind != ThingKind.Berries || World.Find(drawn.Id) is not Thing t) continue;
+            // The lake has no raised model. Its shore is picked behind the objects standing there.
+            if (t.Kind == ThingKind.Water) continue;
             var hits = HitsOf(drawn);
             // Only the foot of a tree's trunk, its first hit, picks the tree, so a click among the crowns of a forest reaches the ground and swings.
             if (t.Kind == ThingKind.Tree) {
@@ -458,7 +451,7 @@ public partial class WorldView : Node3D {
             }
             bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, drawn, out float d)
                 : t.Kind == ThingKind.Pump && PropOf(drawn.Id) is WaterPumpProp pump
-                    ? RayPump(origin, direction, pump.Pump, out d)
+                    ? RayPump(origin, direction, drawn, pump.Pump, out d)
                     : RayHits(origin, direction, t.Pos, hits, out d);
             if (hit && d < nearest) { nearest = d; best = t; }
         }
@@ -1782,21 +1775,11 @@ public partial class WorldView : Node3D {
 
     private void UpdateMarkers() {
         if (EnvironmentReview || HideMarkers) {
-            selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = placeTile.Visible = false;
+            playerRing.Visible = placeTile.Visible = false;
             return;
         }
-        // The lake is one thing all along its shore, so its selection ring shows only while the player collects water there.
-        var selected = World.Find(Selection.Thing);
-        if (selected?.Kind == ThingKind.Water && !(Gathering && GatheringTarget?.Kind == ThingKind.Water)) selected = null;
-        Mark(selectRing, selected, 0);
-        Mark(hoverRing, Hover != (selected?.Id ?? 0) ? World.Find(Hover) : null, .004f);
-        Worker? worker = null;
-        foreach (var w in World.Workers) if (w.Id == Selection.Worker) worker = w;
-        workerRing.Visible = worker != null && World.Sees(worker);
-        if (worker != null) { workerRing.Position = WorkerFeet(worker) + Vector3.Up * .02f; workerRing.Scale = new Vector3(.5f, 1, .5f); }
-        playerRing.Visible = !World.Dead;
-        playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
-        if (Underground) selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = false;
+        playerRing.Visible = !World.Dead && !Underground;
+        playerRing.Position = To3(World.Player, .015f);
         removalMark.Update(World, Removal);
         placeTile.Visible = Placing != null && !Underground;
         var kind = Placing.GetValueOrDefault();
@@ -1837,16 +1820,6 @@ public partial class WorldView : Node3D {
     public Removal RemovalShown => removalMark.Shown;
     /// <summary>The visible placement preview's model, while a plan or container is being placed.</summary>
     internal Node3D? PlacementGhost => ghost?.Root;
-
-    private void Mark(MeshInstance3D ring, Thing? t, float lift) {
-        ring.Visible = t != null;
-        if (t == null) return;
-        float smallest = float.MaxValue;
-        foreach (var hit in HitsOf(t)) smallest = Math.Min(smallest, hit.Radius);
-        float radius = Math.Min(1.7f, smallest + .25f);
-        ring.Position = To3(t.Kind == ThingKind.Water ? Terrain.WaterPoint(ring == hoverRing ? ToWorld(GetViewport().GetMousePosition()) : World.Player) : t.Pos, .02f + lift);
-        ring.Scale = new Vector3(radius, 1, radius);
-    }
 
     // Strong sun against weak ambient light keeps shaded sides and shadows dark enough to show shapes.
     private const float DaySun = 1, DayAmbientEnergy = .22f;
@@ -1926,7 +1899,7 @@ public partial class WorldView : Node3D {
                 overlay.DrawLine(center - a, center - b, inlet, 1.5f, true);
                 overlay.DrawLine(center - b, center + a, inlet, 1.5f, true);
             }
-            if (PointedPipe is Vector2I tile) Tag(Screen(tile, PipeGround.FloorY + .28f), "Steel pipe · E to inspect");
+            if (PipePreviewTile == null && PointedPipe is Vector2I tile) Tag(Screen(tile, PipeGround.FloorY + .28f), "Steel pipe · E to inspect");
             return;
         }
         if (World == null) return;
@@ -1946,6 +1919,7 @@ public partial class WorldView : Node3D {
             overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? HeatReady : HeatLow);
             overlay.DrawLine(p + new Vector2(56 * World.SteelHeat / 100, -2), p + new Vector2(56 * World.SteelHeat / 100, 7), HeatTick, 2);
         }
+        if (Placing != null) return;
         // Only the hovered object is named; the side panel already names the selection.
         var hovered = World.Find(Hover);
         if (hovered != null) {

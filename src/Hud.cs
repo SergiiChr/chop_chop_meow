@@ -64,22 +64,32 @@ public partial class FrameRate : Label {
 }
 
 /// <summary>Says what the next click in the world does while a placement or a work order is under way.</summary>
-public partial class ModeLabel : Label {
+public partial class ModeLabel : VBoxContainer {
     private readonly World world;
     private readonly PlayerControl player;
+    private readonly Label title = Style.Outlined(new Label { HorizontalAlignment = HorizontalAlignment.Center, MouseFilter = MouseFilterEnum.Ignore });
+    private readonly GridContainer pipeKeys = new() { Columns = 2, SizeFlagsHorizontal = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore, Visible = false };
     private ClickMode shown = new ClickMode.Normal();
 
     public ModeLabel(UiKit kit, PlayerControl player) {
         world = kit.World; this.player = player;
-        AddThemeFontSizeOverride("font_size", 17); Style.Outlined(this);
-        AnchorLeft = .5f; AnchorRight = .5f; OffsetTop = 18; GrowHorizontal = GrowDirection.Both; HorizontalAlignment = HorizontalAlignment.Center;
-        AutowrapMode = TextServer.AutowrapMode.Off; MouseFilter = MouseFilterEnum.Ignore;
+        AnchorRight = 1; OffsetTop = 18; MouseFilter = MouseFilterEnum.Ignore;
+        title.AddThemeFontSizeOverride("font_size", 17); AddChild(title);
+        pipeKeys.AddThemeConstantOverride("h_separation", 5);
+        pipeKeys.AddThemeConstantOverride("v_separation", 2);
+        foreach (var (key, action) in new[] { ("LMB", "- build"), ("RMB", "- remove"), ("R", "- rotate"), ("T", "- change type") }) {
+            pipeKeys.AddChild(Style.Pill(key, Style.KeyPill, Style.Line, 13));
+            pipeKeys.AddChild(Style.Outlined(Style.Text(action, 15, Style.Rim)));
+        }
+        AddChild(pipeKeys);
     }
 
     public void Refresh() {
         if (player.Mode == shown) return;
         shown = player.Mode;
-        Text = shown switch {
+        pipeKeys.Visible = shown.Placing == ThingKind.SteelPiping;
+        title.Text = shown switch {
+            { Placing: ThingKind.SteelPiping } => "Place steel piping",
             ClickMode.Assign => "WORK ORDER · Click a resource to assign this villager. Esc cancels.",
             ClickMode.Remove { Underground: true } => "REMOVE · Underground · Right click for surface · Esc to finish",
             ClickMode.Remove => "REMOVE · Surface · Right click for underground · Esc to finish",

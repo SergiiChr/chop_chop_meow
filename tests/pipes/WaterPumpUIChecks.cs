@@ -76,7 +76,37 @@ public partial class Game {
         await Frames(4);
     }
 
-    private async Task CheckWaterPumpControlsShowPressureAndFlow() {
+    private async Task CheckPumpAtTheWaterlineCanBeInspected() {
+        var home = world.Player;
+        var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
+        var intake = Terrain.TileAt(bank + Vector2.Down);
+        var pump = Hosted.Add(ThingKind.Pump, intake);
+        // Place the lake's source point directly in front of the chamber, where its old pick shape hid the steel.
+        var water = Hosted.Add(ThingKind.Water, (Vector2)intake + new Vector2(.25f, .6f), 9999);
+        Warp(Hosted, intake + Vector2.Up * 2);
+        await Frames(4);
+        var shore = Terrain.WaterPoint(bank + Vector2.Right * 3);
+        await Click(view.Screen(shore));
+        Require(world.Find(panel.Selection.Thing)?.Kind == ThingKind.Water, "Open water beside the pump should still select the lake.");
+
+        var chamber = (Vector2)intake + Vector2.Down * .38f;
+        await Hover(view.Screen(chamber, .25f));
+        Require(view.Hover == pump.Id, "The chamber in front of the water should show the pump's hover label.");
+        await KeyStroke(Key.E);
+        Require(panel.Selection.Thing == pump.Id, "E over the pump should inspect it even when the lake was selected.");
+        await Click(view.Screen(shore));
+        var shaft = view.Screen(chamber, .89f) + Vector2.Right * 3;
+        await Hover(shaft);
+        Require(view.Hover == pump.Id, "Aiming at the thin shaft should show the pump's label.");
+        await Click(shaft);
+        Require(panel.Selection.Thing == pump.Id, "Clicking the shaft should open the pump controls.");
+
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == pump || t == water);
+        Warp(Hosted, home); await Frames(4);
+    }
+
+    private async Task CheckWaterPumpControlsMoveThePressureGauge() {
         var home = world.Player;
         var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
         var intake = Terrain.TileAt(bank + Vector2.Down * 1.1f);
@@ -85,14 +115,18 @@ public partial class Game {
         Warp(Hosted, stand + new Vector2(.5f, -.65f));
         await ClickOn(pump);
         Require(Named("job_pump") != null, "A pump should offer the Pump job.");
+        var gauge = OnPage("pump_pressure") as Godot.Range;
+        Require(gauge is { Value: 0 } && gauge.IsVisibleInTree() && HasLabel(panel, "Pressure")
+            && !HasLabel(panel, "%") && !HasLabel(panel, "L/s"), "The idle pump should show an empty pressure gauge with only its label.");
         await Click(Named("pump")!);
         await Until(() => pump.Pressure == 10 && view.PlayerAnimation == ActorAction.PumpWater,
             "clicking the handle raising pressure and moving the player's arms", 2);
         Require(world.Player.DistanceTo(stand) < .02f && Hosted.Player.DistanceTo(stand) < .02f,
             "Using the pump from beside its handle should step the player into reach before both hands press down.");
         await KeyStroke(Key.Space);
-        await Until(() => (panel.FindChild("pump_reading", true, false) as Label)?.Text == "Pressure 20% · 1.0 L/s",
-            "the second stroke raising the gauge and flow readout on the open pump", 2);
+        await Until(() => gauge!.Value == 20, "the second stroke raising the pressure gauge to its second division", 2);
+        Hosted.Tick(WaterPumps.StrokeSeconds + 2);
+        await Until(() => gauge!.Value == 0, "the needle returning to zero as pressure falls", 2);
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == pump);
         Warp(Hosted, home); await Frames(4);

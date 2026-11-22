@@ -11,6 +11,7 @@ namespace ChopChopMeow;
 public partial class Game {
     private async Task RunSteelPipeUIChecks() {
         await TestClean(CheckHeldPipePlanTurnsAndCyclesShapes);
+        await TestClean(CheckHotbarPipePlanRemovesAndReusesALaidPipe);
         await TestClean(CheckRemoveSelectorKeepsTheOtherLayer);
         await TestClean(CheckInspectReadsWaterAndPressureWhileUnderground);
         await TestClean(CheckPuttingPipesInThePlumbingSlotInstallsAndRefundsThem);
@@ -33,30 +34,51 @@ public partial class Game {
             "The exposed soil should extend from below the pipes to the original ground level.");
         Require(ghost!.GlobalPosition.DistanceTo(WorldView.To3(tiles[0], PipeGround.FloorY)) < .05f,
             "The preview should sit on the buried tile under the pointer.");
-        await KeyStroke(Key.V);
-        Require(ghost!.Visible && Mathf.Abs(ghost.Basis.X.Z) > .999f, "V should turn the straight pipe preview a quarter turn.");
-
-        await Hover(pipeShapeButton);
-        Require(!ghost.Visible, "The pipe shape button should keep the placement tool active and hide its preview over the interface.");
-        await Click(pipeShapeButton);
-        Require(cursor.Plan == "steel_piping" && pipeShapeButton.Text == "T-junction", "The shape button should turn the held plan into a T-junction.");
-        await Click(pipeShapeButton);
-        Require(pipeShapeButton.Text == "Cross junction", "The T-junction should give way to a cross junction.");
-        await Click(pipeShapeButton);
-        Require(pipeShapeButton.Text == "Straight pipe", "The cross junction should give way to a straight pipe.");
-        await Click(pipeShapeButton);
-
+        Require(!cursor.Visible, "Only the buried preview should show while aiming the held pipe plan.");
+        await Until(() => HasLabel(modeLabel, "Place steel piping"), "the pipe placement prompts appearing", 2);
+        var prompts = modeLabel.FindChildren("*", "Label", true, false).Cast<Label>().Where(l => l.IsVisibleInTree()).Select(l => l.Text);
+        Require(prompts.SequenceEqual(new[] { "Place steel piping", "LMB", "- build", "RMB", "- remove", "R", "- rotate", "T", "- change type" }),
+            "Pipe placement should show its four inputs in order under the title.");
+        await KeyStroke(Key.R);
+        Require(ghost!.Visible && Mathf.Abs(ghost.Basis.X.Z) > .999f, "R should turn the straight pipe preview a quarter turn.");
+        await Hover(hotbar.Buttons[0]);
+        Require(cursor.Visible && !ghost.IsVisibleInTree(), "Over a hotbar slot the held pipe plan should appear on the cursor.");
+        await Hover(view.Screen(tiles[0], PipeGround.FloorY));
+        await KeyStroke(Key.T);
         await Click(view.Screen(tiles[0], PipeGround.FloorY));
         await Until(() => world.SteelPipes.ShapeAt(tiles[0]) == PipeShape.Tee, "the selected T-junction going underground", 2);
         Require(world.SteelPipes.RotationAt(tiles[0]) == Mathf.Pi / 2, "The placed T-junction should keep the quarter turn.");
-        await Click(pipeShapeButton);
+        await KeyStroke(Key.T);
         await Click(view.Screen(tiles[1], PipeGround.FloorY));
         await Until(() => world.SteelPipes.ShapeAt(tiles[1]) == PipeShape.Cross, "the next pipe going underground as a cross junction", 2);
         Require(world.SteelPipes.RotationAt(tiles[1]) == Mathf.Pi / 2, "The next pipe should keep the quarter turn.");
-
-        foreach (var tile in tiles) Hosted.Construction.TakeUpPipe(tile);
+        await RightClick(tiles[1], PipeGround.FloorY);
+        await Until(() => !world.SteelPipes.Laid(tiles[1]) && world.Backpack["steel_pipe"] == 1,
+            "right-click returning the last pipe built to the backpack", 2);
+        await KeyStroke(Key.T);
+        await Click(view.Screen(tiles[1], PipeGround.FloorY));
+        await Until(() => world.SteelPipes.ShapeAt(tiles[1]) == PipeShape.Straight, "cycling back to straight and laying the refunded pipe", 2);
+        foreach (var tile in tiles) await RightClick(tile, PipeGround.FloorY);
+        await Until(() => world.Backpack["steel_pipe"] == 2, "both pipes returning while still in placement", 2);
         Drop(Hosted, "steel_pipe", 2);
         await CloseWithEsc(); await Frames();
+    }
+
+    private async Task CheckHotbarPipePlanRemovesAndReusesALaidPipe() {
+        int active = world.ActiveHotbar;
+        string saved = world.HotbarItem(8);
+        var tile = SpotsNearby().Select(Terrain.TileAt).First(t => world.Reaches(t) && Uncovered(view.Screen(t, PipeGround.FloorY)));
+        LayPipe(Hosted, tile); world.SetHotbar(8, "steel_piping"); await Frames();
+        await KeyStroke(Key.Key9);
+        await RightClick(tile, PipeGround.FloorY);
+        await Until(() => !world.SteelPipes.Laid(tile) && world.Backpack["steel_pipe"] == 1,
+            "taking up a pipe with the hotbar plan", 2);
+        await KeyStroke(Key.R); await KeyStroke(Key.T);
+        await Click(view.Screen(tile, PipeGround.FloorY));
+        await Until(() => world.SteelPipes.ShapeAt(tile) == PipeShape.Tee && world.SteelPipes.RotationAt(tile) == Mathf.Pi / 2,
+            "building the turned tee with the refunded pipe from the hotbar", 2);
+        await RightClick(tile, PipeGround.FloorY); await CloseWithEsc();
+        Drop(Hosted, "steel_pipe"); world.SetHotbar(8, saved); world.SelectHotbar(active); await Frames();
     }
 
     private async Task CheckRemoveSelectorKeepsTheOtherLayer() {

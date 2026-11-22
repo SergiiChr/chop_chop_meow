@@ -123,6 +123,16 @@ public static class ModelKit {
         return material;
     }
 
+    /// <summary>Draws a placement preview through terrain, water and buildings, above the fog and pipe cutaway.</summary>
+    public static StandardMaterial3D PlacementTint(Color tint) => new() {
+        AlbedoColor = tint,
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        NoDepthTest = true,
+        DisableFog = true,
+        RenderPriority = (int)Material.RenderPriorityMax
+    };
+
     private static Mesh Cached(string key, System.Func<Mesh> create) {
         if (!meshes.TryGetValue(key, out var mesh)) meshes[key] = mesh = create();
         return mesh;

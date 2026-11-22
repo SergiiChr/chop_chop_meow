@@ -35,7 +35,7 @@ public partial class Game {
             await Frames(2);
         }
     }
-    /// <summary>A real source-ring pick and a held right mouse button refill the starter bottle.</summary>
+    /// <summary>Holding the right mouse button at the shoreline refills the starter bottle.</summary>
     private async Task CheckHoldingRightMouseOnShoreRefillsRetainedBottle() {
         RemoveThings(Hosted, t => t.Kind == ThingKind.Water);
         Hosted.Add(ThingKind.Water, world.Player + Vector2.Right * 20, 9999);
@@ -47,7 +47,9 @@ public partial class Game {
         Warp(Hosted, shore + (shore - Terrain.Lake).Normalized() * 1.8f);
         await Frames(4);
         var shorePoint = view.Screen(shore, .8f);
-        Require(view.Pick(shorePoint)?.Kind == ThingKind.Water, "The visible shoreline ring must pick the water source.");
+        await Hover(shorePoint);
+        Require(world.Find(view.Hover)?.Kind == ThingKind.Water, "Pointing at the shoreline should show the water target.");
+        await SurvivalReviewShot("water-source");
         var windowPoint = GetViewport().GetFinalTransform() * shorePoint;
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
         await Until(() => world.Backpack["water"] == 1 && world.Backpack["empty_bottle"] == 0, "holding right mouse on the shoreline filling the retained bottle", world.Data.GatherSeconds + 3);

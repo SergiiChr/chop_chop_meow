@@ -127,7 +127,11 @@ public sealed class PlayerControl {
         return true;
     }
 
-    public void CyclePipeShape() {
+    /// <summary>Whether the current placement or the plan held over a panel is steel piping.</summary>
+    internal bool PlacingPipe => cursor.Plan is string plan ? plan == ThingKind.SteelPiping.Id() : Mode.Placing == ThingKind.SteelPiping;
+
+    public void CyclePipeShape(bool overPanel) {
+        PlaceHeld(overPanel);
         if ((heldPlacement ?? Mode) is not ClickMode.Build { Kind: ThingKind.SteelPiping } build) return;
         var next = build with {
             Shape = build.Shape switch {
@@ -231,13 +235,15 @@ public sealed class PlayerControl {
         world.Me.Selected = hotbar.ActiveItem() ?? "";
     }
 
-    /// <summary>E: inspects the selected thing if it is in reach, else what is nearest.</summary>
+    /// <summary>E inspects the nearby selection or the nearest thing. A pump under the pointer takes priority over the lake.</summary>
     public void InspectNearest() {
         if (view.Underground) { if (view.PointedPipe is Vector2I tile) panel.SelectPipe(tile); return; }
         var half = Vector2.One * Farms.HalfSize;
         Vector2 FarmEdge(Thing t) => world.Player.Clamp(t.Pos - half, t.Pos + half);
         bool CanInspect(Thing t) => world.Near(t, at: t.Kind == ThingKind.Farm ? FarmEdge(t) : null);
         var t = world.Find(panel.Selection.Thing);
+        if ((t == null || t.Kind == ThingKind.Water || !CanInspect(t)) && view.GetViewport().GuiGetHoveredControl() == null
+            && world.Find(view.Hover) is { Kind: ThingKind.Pump } pump && CanInspect(pump)) t = pump;
         if (t == null || !CanInspect(t))
             t = world.Things.Where(CanInspect).OrderBy(t => world.Player.DistanceSquaredTo(t.Kind == ThingKind.Farm ? FarmEdge(t) : t.Pos)).FirstOrDefault();
         if (t != null) panel.Select(t);
@@ -255,11 +261,15 @@ public sealed class PlayerControl {
     public void Click(InputEventMouseButton mouse, bool overPanel) {
         if (mouse.ButtonIndex == MouseButton.WheelUp && mouse.Pressed && !overPanel) view.Zoom = Math.Min(1.6f, view.Zoom + .1f);
         if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed && !overPanel) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
-        if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed) RightPress(mouse.Position);
+        if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed && !overPanel) RightPress(mouse.Position);
         if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) LeftPress(mouse.Position);
     }
 
     private void RightPress(Vector2 at) {
+        if (PlacingPipe) {
+            world.Construction.Remove(world.Construction.RemovalAt(null, view.ToWorld(at, PipeGround.FloorY), underground: true));
+            return;
+        }
         if (Mode is ClickMode.Remove remove) { Mode = new ClickMode.Remove(!remove.Underground); return; }
         // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
@@ -319,7 +329,8 @@ public sealed class PlayerControl {
         bool sent = Sent(at);
         if (Mode is ClickMode.Container container) PlaceContainerAt(container, at);
         else if (Mode is ClickMode.Build build) world.Construction.Build(build.Kind, at, build.Rotation, build.Shape);
-        if (!sent || Mode.Placing != ThingKind.Mine && CanPlaceAgain()) return;
+        // Pipe placement also takes up laid pipes, even with no materials left in the backpack.
+        if (!sent || Mode.Placing == ThingKind.SteelPiping || Mode.Placing != ThingKind.Mine && CanPlaceAgain()) return;
         Mode = new ClickMode.Normal();
         // A plan on the cursor goes once nothing more can be paid for; a held container stack runs out by itself.
         if (placingHeld && cursor.Plan != null) cursor.Release();

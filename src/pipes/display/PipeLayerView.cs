@@ -20,8 +20,8 @@ internal partial class PipeLayerView : Node3D {
     private readonly HashSet<Vector2I> connected = new();
     private readonly List<Vector2I> disconnected = new();
     private readonly MeshInstance3D ghost;
-    private static readonly Material PreviewTint = ModelKit.Flat(new Color("81beff"));
-    private static readonly Material Blocked = ModelKit.Flat(new Color("ff7467"));
+    private static readonly Material PreviewTint = ModelKit.PlacementTint(new Color("81beff"));
+    private static readonly Material Blocked = ModelKit.PlacementTint(new Color("ff7467"));
     private static readonly Material RemovalTint = ModelKit.Flat(new Color("f25043"));
     private int revision = -1, explored = -1;
     private int? marked;
@@ -50,11 +50,12 @@ internal partial class PipeLayerView : Node3D {
             DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal,
             ShadowBias = .015f
         });
-        ghost = SteelPipeShape.Build(pipes);
+        ghost = SteelPipeShape.Build(this);
+        ghost.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         ghost.Name = "PipePreview";
         ghost.Visible = false;
         // Draw after the surface and before the fog of war. Its depth keeps the player and buildings legible.
-        blend = new ShaderMaterial { Shader = new Shader { Code = CutawayShader }, RenderPriority = (int)Material.RenderPriorityMax - 1 };
+        blend = new ShaderMaterial { Shader = new Shader { Code = CutawayShader }, RenderPriority = (int)Material.RenderPriorityMax - 2 };
         blend.SetShaderParameter("buried", picture.GetTexture());
         composite = new MeshInstance3D {
             MaterialOverride = blend,
@@ -103,7 +104,7 @@ internal partial class PipeLayerView : Node3D {
             ghost.MaterialOverride = state.Ready ? PreviewTint : Blocked;
             preview = state;
         }
-        ghost.Position = WorldView.To3(at, .015f);
+        ghost.Position = WorldView.To3(at, PipeGround.FloorY + .015f);
     }
 
     private void UpdateFooting(List<Vector3> people) {
