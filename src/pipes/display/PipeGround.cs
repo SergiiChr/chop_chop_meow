@@ -3,7 +3,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The blue-lit soil under the work area, with exposed earth between its floor and the surface.</summary>
+/// <summary>The soil and survey marks under the work area, with exposed earth between its floor and the surface.</summary>
 internal partial class PipeGround : MeshInstance3D {
     public const float FloorY = -.9f;
     private readonly HashSet<Vector2I> tiles = new(), sockets = new(), nextSockets = new();
@@ -99,9 +99,9 @@ internal partial class PipeGround : MeshInstance3D {
         uniform sampler2D openings : repeat_disable, filter_nearest;
         uniform sampler2D stone : repeat_enable, filter_linear_mipmap_anisotropic;
         uniform sampler2D soil_height : repeat_enable, filter_linear_mipmap_anisotropic;
-        uniform vec4 slate : source_color = vec4(0.14, 0.25, 0.35, 1.0);
-        uniform vec4 subsoil : source_color = vec4(0.11, 0.20, 0.28, 1.0);
-        uniform vec4 seam : source_color = vec4(0.29, 0.47, 0.56, 1.0);
+        uniform vec4 earth : source_color = vec4(0.32, 0.28, 0.23, 1.0);
+        uniform vec4 subsoil : source_color = vec4(0.21, 0.16, 0.12, 1.0);
+        uniform vec4 ink : source_color = vec4(0.28, 0.60, 0.99, 1.0);
         varying vec3 pos;
         varying vec3 face;
 
@@ -123,20 +123,31 @@ internal partial class PipeGround : MeshInstance3D {
             float grit = texture(soil_height, uv / 1.65).r;
             float coarse = texture(soil_height, uv / 6.7).r;
             float rock = texture(stone, uv / 6.5).g;
+            float stroke;
             if (floor_face) {
-                vec2 distance_to_edge = abs(fract(pos.xz) - 0.5);
-                vec2 grid = 1.0 - smoothstep(vec2(0.0), max(fwidth(pos.xz), vec2(0.015)), distance_to_edge);
-                ALBEDO = mix(slate.rgb, seam.rgb, 0.10 * max(grid.x, grid.y));
+                vec2 tile = floor(pos.xz + 0.5);
+                vec2 local = pos.xz - tile;
+                vec2 gap = 0.5 - abs(local);
+                vec2 grid = 1.0 - smoothstep(vec2(0.0), max(1.3 * fwidth(pos.xz), vec2(0.01)), gap);
+                vec2 side = gap.x < gap.y ? vec2(sign(local.x), 0.0) : vec2(0.0, sign(local.y));
+                float neighbor = texture(openings, (tile + side + 0.5) / vec2(textureSize(openings, 0))).r;
+                float ticks = max(grid.x * (1.0 - smoothstep(0.04, 0.12, gap.y)),
+                                  grid.y * (1.0 - smoothstep(0.04, 0.12, gap.x)));
+                stroke = max(0.66 * ticks, (1.0 - neighbor) * max(grid.x, grid.y));
+                ALBEDO = earth.rgb;
                 ALPHA = 0.64;
             } else {
                 float depth = -pos.y;
                 float band = depth + (coarse - 0.29) * 1.3 + (rock - 0.5) * 0.17;
                 vec3 dirt = mix(vec3(0.043, 0.034, 0.023), subsoil.rgb, smoothstep(0.01, 0.35, band));
-                ALBEDO = mix(dirt, slate.rgb, smoothstep(0.28, 0.88, band));
+                ALBEDO = mix(dirt, earth.rgb, smoothstep(0.28, 0.88, band));
+                stroke = 1.0 - smoothstep(0.0, max(1.3 * fwidth(pos.y), 0.008), depth);
                 ALBEDO *= 1.0 - 0.40 * (1.0 - smoothstep(0.0, 0.035, abs(band - 0.45)));
                 ALPHA = 0.83;
             }
             ALBEDO *= 0.35 + 1.33 * rock * rock + 1.03 * grit + 0.5 * coarse;
+            ALBEDO = mix(ALBEDO, ink.rgb, stroke);
+            EMISSION = 0.18 * ink.rgb * stroke;
             ROUGHNESS = 1.0;
         }
         """;

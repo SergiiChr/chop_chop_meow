@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 internal sealed class WaterPumpShape {
     private const float ChamberZ = .38f, SealHeight = .606f;
     private const float LeverLength = 2.03f, ToLink = .53f, LinkLength = .995f;
-    private const float RaisedAngle = 14, PressedAngle = 26, HalfGrip = .104f;
+    private const float RaisedAngle = 2, PressedAngle = 39, HalfGrip = .104f, RodLength = 1.42f;
     private static readonly Vector3 FixedPin = new(.105f, .596f, 0);
     private static readonly Vector3 Axle = new(90, 0, 0);
     private static Mesh? outlet;
@@ -55,7 +55,7 @@ internal sealed class WaterPumpShape {
 
         piston = Pivot(rig, Vector3.Zero);
         piston.Name = "Piston";
-        var shaft = Post(piston, .030f, .030f, 1.25f, Vector3.Down * 1.25f, polished, 8);
+        var shaft = Post(piston, .030f, .030f, RodLength, Vector3.Down * RodLength, polished, 8);
         Pin(piston, Vector3.Zero, .051f, .093f, steel);
 
         linkage = Pivot(rig, FixedPin);

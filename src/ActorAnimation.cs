@@ -42,7 +42,8 @@ public enum ActorAction {
     SteelAxeSweep,
     ClimbLadder,
     PourWater,
-    FillVessel
+    FillVessel,
+    PumpWater
 }
 
 /// <summary>
@@ -62,6 +63,9 @@ public readonly record struct Pose(
     float RaiseR = 6, float OutR = 7, float ElbowR = 12,
     float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0,
     float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Hips = 0, float Sway = 0, float FootL = 0, float FootR = 0, float SplayL = 0, float SplayR = 0, float Grip = 0) {
+    /// <summary>How far the hips move forward over the feet, in metres.</summary>
+    public float HipShift { get; init; }
+
     /// <summary>Blends two poses; set hips blend by how far they sit above or below a standing foot, so a foot on or above the ground in both poses stays there.</summary>
     public static Pose Lerp(Pose a, Pose b, float t) {
         if (t <= 0) return a;
@@ -71,7 +75,7 @@ public readonly record struct Pose(
             Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
             Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t),
             Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), 0, Mathf.Lerp(a.Sway, b.Sway, t),
-            Mathf.Lerp(a.FootL, b.FootL, t), Mathf.Lerp(a.FootR, b.FootR, t), Mathf.Lerp(a.SplayL, b.SplayL, t), Mathf.Lerp(a.SplayR, b.SplayR, t), Mathf.Lerp(a.Grip, b.Grip, t));
+            Mathf.Lerp(a.FootL, b.FootL, t), Mathf.Lerp(a.FootR, b.FootR, t), Mathf.Lerp(a.SplayL, b.SplayL, t), Mathf.Lerp(a.SplayR, b.SplayR, t), Mathf.Lerp(a.Grip, b.Grip, t)) { HipShift = Mathf.Lerp(a.HipShift, b.HipShift, t) };
         return a.Hips == 0 && b.Hips == 0 ? blend : blend with { Hips = blend.Standing + Mathf.Lerp(a.Hips > 0 ? a.Hips - a.Standing : 0, b.Hips > 0 ? b.Hips - b.Standing : 0, t) };
     }
 
@@ -119,7 +123,7 @@ public static class ActorAnimation {
         ActorAction.Mauled => .5f,
         ActorAction.Devoured => 1.4f,
         ActorAction.Protest => 1.6f,
-        ActorAction.Pump => WaterPumps.StrokeSeconds,
+        ActorAction.Pump or ActorAction.PumpWater => WaterPumps.StrokeSeconds,
         ActorAction.PickUp => .9f,
         ActorAction.Pack => 2.4f,
         ActorAction.Craft => 2.4f,
@@ -248,6 +252,23 @@ public static class ActorAnimation {
     private static readonly Pose PumpLever = Stance with { Lean = 16, RaiseL = 78, OutL = -12, ElbowL = 42, RaiseR = 78, OutR = -12, ElbowR = 42 };
     private static readonly Pose PumpPressed = PumpLever with { Lean = 32, RaiseL = 44, ElbowL = 6, RaiseR = 44, ElbowR = 6, Hips = .787f };
     private static readonly (float At, Pose Pose)[] PumpKeys = { (0, PumpLever), (.35f, PumpPressed), (.5f, PumpPressed with { Lean = 30, Hips = .792f }) };
+    // The operator braces before the lever moves, drives it down with their weight, then straightens as it comes back.
+    internal const float WaterPumpBottom = .38f;
+    internal static float WaterPumpPress(float time) {
+        float phase = Phase(ActorAction.PumpWater, time);
+        return Mathf.SmoothStep(.105f, WaterPumpBottom, phase) * (1 - Mathf.SmoothStep(.48f, .96f, phase));
+    }
+
+    private static Pose PumpWater(float phase) {
+        float drop = Mathf.SmoothStep(.067f, WaterPumpBottom, phase) * (1 - Mathf.SmoothStep(.44f, .94f, phase));
+        float brace = Mathf.SmoothStep(0, .11f, phase) * (1 - Mathf.SmoothStep(.13f, .28f, phase));
+        float look = Mathf.SmoothStep(.05f, .23f, phase) * (1 - Mathf.SmoothStep(.55f, .91f, phase));
+        return new Pose(Lean: 9 + 43 * drop + 3 * brace, Twist: -3 * drop, Head: 4 + 11 * look - 4 * drop,
+            RaiseL: 80 - 46 * drop, OutL: -9 + 13 * drop, ElbowL: 55 - 32 * drop,
+            RaiseR: 80 - 46 * drop, OutR: -9 + 13 * drop, ElbowR: 55 - 32 * drop,
+            Hips: .788f - .146f * drop - .016f * brace, Sway: 4 * drop) { HipShift = .155f * drop - .012f * brace };
+    }
+
     private static readonly Pose HammerHold = Stance with { Lean = 15, RaiseL = 48, OutL = -16, ElbowL = 52, RaiseR = 70, OutR = -8, ElbowR = 50 };
     private static readonly (float At, Pose Pose)[] HammerKeys = {
         (0, HammerHold),
@@ -499,6 +520,8 @@ public static class ActorAnimation {
                 return Keys(p, PickUpKeys);
             case ActorAction.Pump:
                 return Keys(p, PumpKeys);
+            case ActorAction.PumpWater:
+                return PumpWater(p);
             case ActorAction.Pack:
                 return Keys(p, PackKeys);
             case ActorAction.Grind: {
@@ -699,7 +722,7 @@ public static class ActorAnimation {
     /// <summary>Where an action done in place stands its boots, or null for one that moves its legs itself.</summary>
     private static Footing? FeetOf(ActorAction action) => action switch {
         ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep
-            or ActorAction.Mine or ActorAction.SteelMine or ActorAction.Pump or ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind
+            or ActorAction.Mine or ActorAction.SteelMine or ActorAction.Pump or ActorAction.PumpWater or ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind
             or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock => StanceFeet,
         ActorAction.Gather => SquatFeet,
         ActorAction.Craft => CraftFeet,
@@ -740,7 +763,7 @@ public static class ActorAnimation {
     /// <summary>A pose with both legs bent to stand its boots on the ground where <paramref name="feet"/> has them, under hips at the pose's height.</summary>
     private static Pose OnFeet(Pose pose, Footing feet) {
         float hips = pose.HipHeight;
-        return pose.WithLegs(Stood(feet.Left, hips), Stood(feet.Right, hips)) with { Hips = hips };
+        return pose.WithLegs(Stood(feet.Left - pose.HipShift, hips), Stood(feet.Right - pose.HipShift, hips)) with { Hips = hips };
     }
 
     // A runner braking: the hips this high, the left heel dug in this far ahead of them with the toes up this many degrees,
@@ -1191,7 +1214,7 @@ public static class ActorAnimation {
         if (moving) return ActorAction.Walk;
 
         return worker.WorkState switch {
-            WorkerWorkState.Pumping => ActorAction.Pump,
+            WorkerWorkState.Pumping => assignment?.Kind == ThingKind.Pump ? ActorAction.PumpWater : ActorAction.Pump,
             WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == ThingKind.Mine) => StationAction(assignment, data),
             WorkerWorkState.Digging => ActorAction.Mine,
             _ => ActorAction.Idle

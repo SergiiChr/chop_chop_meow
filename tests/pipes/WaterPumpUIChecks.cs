@@ -58,7 +58,7 @@ public partial class Game {
         await ClickOn(pump);
         Require(Named("job_pump") != null, "A pump should offer the Pump job.");
         await Click(Named("pump")!);
-        await Until(() => pump.Pressure == 10 && view.PlayerAnimation == ActorAction.Pump,
+        await Until(() => pump.Pressure == 10 && view.PlayerAnimation == ActorAction.PumpWater,
             "clicking the handle raising pressure and moving the player's arms", 2);
         await KeyStroke(Key.Space);
         await Until(() => (panel.FindChild("pump_reading", true, false) as Label)?.Text == "Pressure 20% · 1.0 L/s",

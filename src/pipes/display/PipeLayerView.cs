@@ -6,6 +6,10 @@ namespace ChopChopMeow;
 /// <summary>The buried pipes seen through the surface. Its camera shares the world's framing and zoom.</summary>
 internal partial class PipeLayerView : Node3D {
     private readonly MeshInstance3D composite;
+    private readonly ShaderMaterial blend;
+    private readonly Vector3[] feet = new Vector3[World.MaxWorkers + Net.MaxPlayers];
+    private static readonly StringName Feet = "feet", FootCount = "foot_count";
+    private int footCount;
     private readonly SubViewport picture = new() { OwnWorld3D = true, TransparentBg = true, Msaa3D = Viewport.Msaa.Msaa2X, RenderTargetUpdateMode = SubViewport.UpdateMode.Disabled };
     private readonly Camera3D camera = new() { Projection = Camera3D.ProjectionType.Orthogonal, Near = 1, Far = 200, Current = true };
     private readonly PipeGround ground = new();
@@ -16,7 +20,7 @@ internal partial class PipeLayerView : Node3D {
     private readonly HashSet<Vector2I> connected = new();
     private readonly List<Vector2I> disconnected = new();
     private readonly MeshInstance3D ghost;
-    private static readonly Material PreviewTint = ModelKit.Flat(new Color("87edff"));
+    private static readonly Material PreviewTint = ModelKit.Flat(new Color("81beff"));
     private static readonly Material Blocked = ModelKit.Flat(new Color("ff7467"));
     private static readonly Material RemovalTint = ModelKit.Flat(new Color("f25043"));
     private int revision = -1, explored = -1;
@@ -34,12 +38,12 @@ internal partial class PipeLayerView : Node3D {
                 BackgroundMode = Godot.Environment.BGMode.Color,
                 BackgroundColor = Colors.Black,
                 AmbientLightSource = Godot.Environment.AmbientSource.Color,
-                AmbientLightColor = new Color("a9d5fa"),
+                AmbientLightColor = new Color("e1ded7"),
                 AmbientLightEnergy = .8f
             }
         });
         picture.AddChild(new DirectionalLight3D {
-            LightColor = new Color("d2ecff"),
+            LightColor = new Color("fff7e9"),
             LightEnergy = 1.5f,
             RotationDegrees = new Vector3(-48, -32, 0),
             ShadowEnabled = true,
@@ -50,7 +54,7 @@ internal partial class PipeLayerView : Node3D {
         ghost.Name = "PipePreview";
         ghost.Visible = false;
         // Draw after the surface and before the fog of war. Its depth keeps the player and buildings legible.
-        var blend = new ShaderMaterial { Shader = new Shader { Code = CutawayShader }, RenderPriority = (int)Material.RenderPriorityMax - 1 };
+        blend = new ShaderMaterial { Shader = new Shader { Code = CutawayShader }, RenderPriority = (int)Material.RenderPriorityMax - 1 };
         blend.SetShaderParameter("buried", picture.GetTexture());
         composite = new MeshInstance3D {
             MaterialOverride = blend,
@@ -61,13 +65,14 @@ internal partial class PipeLayerView : Node3D {
         AddChild(composite);
     }
 
-    public void Update(World world, List<Thing> known, Camera3D surface, bool active, Vector2I? placing, float rotation,
+    public void Update(World world, List<Thing> known, List<Vector3> people, Camera3D surface, bool active, Vector2I? placing, float rotation,
         PipeShape shape, Vector2I? removing) {
         if (active != Visible) {
             Visible = active;
             picture.RenderTargetUpdateMode = active ? SubViewport.UpdateMode.Always : SubViewport.UpdateMode.Disabled;
         }
         if (!active) return;
+        UpdateFooting(people);
         var size = (Vector2I)GetViewport().GetVisibleRect().Size;
         composite.Transform = surface.GlobalTransform.TranslatedLocal(Vector3.Forward * 2);
         if (picture.Size != size) picture.Size = size;
@@ -101,6 +106,18 @@ internal partial class PipeLayerView : Node3D {
         ghost.Position = WorldView.To3(at, .015f);
     }
 
+    private void UpdateFooting(List<Vector3> people) {
+        bool changed = footCount != people.Count;
+        for (int i = 0; i < people.Count; i++) {
+            if (feet[i] == people[i]) continue;
+            feet[i] = people[i]; changed = true;
+        }
+        if (!changed) return;
+        footCount = people.Count;
+        blend.SetShaderParameter(Feet, feet);
+        blend.SetShaderParameter(FootCount, footCount);
+    }
+
     /// <summary>Join each installed fixture to the pipe immediately under its base.</summary>
     private void UpdateRisers(World world, List<Thing> known) {
         connected.Clear();
@@ -125,11 +142,14 @@ internal partial class PipeLayerView : Node3D {
         foreach (var at in disconnected) { risers[at].QueueFree(); risers.Remove(at); }
     }
 
-    private const string CutawayShader = """
+    private static readonly string CutawayShader = $$"""
         shader_type spatial;
         render_mode unshaded, depth_draw_never, depth_test_disabled, cull_disabled, shadows_disabled, fog_disabled;
         uniform sampler2D depth : hint_depth_texture, filter_nearest;
         uniform sampler2D buried : source_color, filter_nearest, repeat_disable;
+        uniform vec4 ink : source_color = vec4(0.28, 0.60, 0.99, 1.0);
+        uniform vec3 feet[{{World.MaxWorkers + Net.MaxPlayers}}];
+        uniform int foot_count;
 
         void vertex() { POSITION = vec4(VERTEX.xy, 1.0, 1.0); }
 
@@ -141,12 +161,28 @@ internal partial class PipeLayerView : Node3D {
             vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, d);
             #endif
             vec4 view = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
-            float height = (INV_VIEW_MATRIX * vec4(view.xyz / view.w, 1.0)).y;
-            float above_ground = smoothstep(0.06, 0.29, height);
+            vec3 surface = (INV_VIEW_MATRIX * vec4(view.xyz / view.w, 1.0)).xyz;
+            float above_ground = smoothstep(0.025, 0.18, surface.y);
             vec4 trench = texture(buried, SCREEN_UV);
             // Steel is opaque in the trench viewport. Earth is translucent so a wall above it can show through.
-            float steel = smoothstep(0.87, 0.99, trench.a);
+            float steel = smoothstep(0.96, 0.995, trench.a);
             float show = trench.a * mix(1.0 - 0.88 * above_ground, 1.0, steel);
+            if (steel > 0.01 && trench.r <= 1.45 * trench.g) {
+                vec2 px = 1.0 / vec2(textureSize(buried, 0));
+                float sides = min(texture(buried, SCREEN_UV + vec2(px.x, 0)).a, texture(buried, SCREEN_UV - vec2(px.x, 0)).a);
+                float ends = min(texture(buried, SCREEN_UV + vec2(0, px.y)).a, texture(buried, SCREEN_UV - vec2(0, px.y)).a);
+                float outline = smoothstep(0.025, 0.15, trench.a - min(sides, ends));
+                trench.rgb = mix(trench.rgb, ink.rgb * trench.a, steel * outline);
+            }
+            // A boot and the ground it stands on have the same depth at contact.
+            // Leave a little of the real surface around each person in front of the cutaway.
+            if (show > 0.0) {
+                for (int i = 0; i < foot_count; i++) {
+                    vec3 offset = surface - feet[i];
+                    if (offset.y >= -0.22 && offset.y <= 2.2)
+                        show *= smoothstep(0.20, 0.54, dot(offset.xz, offset.xz));
+                }
+            }
             float opacity = mix(0.64, 1.0, show);
             ALBEDO = (trench.rgb / max(0.01, trench.a)) * show / opacity;
             ALPHA = opacity;

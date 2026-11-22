@@ -505,7 +505,7 @@ public sealed class ActorRig {
             skeleton.SetBonePoseRotation(1, joint.Quaternion);
         footL.SetBonePoseRotation(2, new Quaternion(Vector3.Right, Mathf.DegToRad(pose.FootL)));
         footR.SetBonePoseRotation(2, new Quaternion(Vector3.Right, Mathf.DegToRad(pose.FootR)));
-        hips.Position = new Vector3(0, pose.HipHeightFor(build.Shin), 0);
+        hips.Position = new Vector3(0, pose.HipHeightFor(build.Shin), pose.HipShift);
         rock.Visible = onRock;
         if (pose.Grip != grip) { grip = pose.Grip; wrist.RotationDegrees = new Vector3(0, grip, 0); }
         foreach (var (name, node) in tools) node.Visible = name == tool;
@@ -521,19 +521,30 @@ public sealed class ActorRig {
         torch.Visible = lit;
     }
 
-    /// <summary>Fits both fists to the live pump grip while keeping the shared pumping pose under them.</summary>
+    private (Vector3 Left, Vector3 Right)? lastPumpGrip;
+
+    /// <summary>Fits both fists to the live pump grip while keeping the operator's weight shift.</summary>
     internal void HoldPumpHandle(Pose pose, Vector3 leftGrip, Vector3 rightGrip, float weight) {
         var fromWorld = Root.Transform.AffineInverse();
+        ReachPumpGrip(pose, fromWorld * leftGrip, fromWorld * rightGrip, weight);
+        lastPumpGrip = (Fist(true), Fist(false));
+    }
+
+    /// <summary>Lowers the hands from where they last held the pump into the next action's arm pose.</summary>
+    internal void ReleasePumpHandle(Pose pose, float weight) {
+        if (lastPumpGrip is { } grip) ReachPumpGrip(pose, grip.Left, grip.Right, weight);
+    }
+
+    private void ReachPumpGrip(Pose pose, Vector3 leftGrip, Vector3 rightGrip, float weight) {
         var fromBody = ArmReach.TrunkBasis(pose).Inverse();
-        var hipsAt = Vector3.Up * pose.HipHeightFor(build.Shin);
-        Reach(true, fromWorld * leftGrip, shoulderL, elbowL);
-        Reach(false, fromWorld * rightGrip, shoulderR, elbowR);
+        Reach(true, leftGrip, shoulderL, elbowL);
+        Reach(false, rightGrip, shoulderR, elbowR);
         foreach (var (skeleton, joint) in limbs)
             skeleton.SetBonePoseRotation(1, joint.Quaternion);
 
         void Reach(bool left, Vector3 at, Node3D shoulder, Node3D elbow) {
             if (at.Z < .05f) return;
-            var local = fromBody * (Fist(left).Lerp(at, weight) - hipsAt);
+            var local = fromBody * (Fist(left).Lerp(at, weight) - hips.Position);
             var buildShoulder = build.Shoulder(left);
             var elbowToward = new Vector3(left ? .3f : -.3f, -1, -.25f);
             var (raise, outward, bend, roll) =

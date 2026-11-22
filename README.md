@@ -750,7 +750,8 @@ After the last stroke finishes, pressure falls to zero over 10 seconds from full
 
 At an anvil, use a steel hammer to form one steel bar into one stackable steel pipe in 10 base seconds.
 Put the hammer in the anvil’s hammer slot for a worker to use.
-In building plans, pick **Steel piping**. The surface darkens and a cutaway shows the pipes on blue-lit soil below it.
+In building plans, pick **Steel piping** to open the cutaway and dim the surface.
+Thin blue outlines mark the pipes, trench edges and building inlets against the exposed earth.
 Each tile costs one pipe. Use the shape button for a straight pipe, T-junction or cross, and C/V for quarter turns.
 Pipes join across a shared tile side when both openings face each other.
 

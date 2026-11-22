@@ -24,6 +24,7 @@ public partial class WorldView : Node3D {
     public Vector2I? PointedPipe;
     public Vector2I? PipePreviewTile;
     private PipeLayerView pipeLayer = null!;
+    private readonly List<Vector3> surfacePeople = new();
     /// <summary>The crate the player is lifting with a held right click, and how far along the lift is from 0 to 1.</summary>
     public int Lifting;
     public float LiftProgress;
@@ -540,7 +541,13 @@ public partial class WorldView : Node3D {
         worldReplaced = false;
         UpdateEffects(dt);
         UpdateMarkers();
-        pipeLayer.Update(World, known, camera, Underground, PipePreviewTile,
+        if (Underground) {
+            surfacePeople.Clear();
+            AddFooting(playerRig);
+            foreach (var entry in crew.Values) AddFooting(entry.Rig);
+            foreach (var other in others.Values) AddFooting(other.Rig);
+        }
+        pipeLayer.Update(World, known, surfacePeople, camera, Underground, PipePreviewTile,
             PlacingRotation, PlacingPipeShape, removalMark.Shown.Pipe);
         // The sun and the light move every frame by the window's own clock, which each server update corrects.
         UpdateLighting(Clocked(dayClock, World.Time, true, dt));
@@ -563,6 +570,10 @@ public partial class WorldView : Node3D {
         "wood_hammer" or "steel_hammer" when backpack[selected] > 0 => selected,
         _ => null
     };
+
+    private void AddFooting(ActorRig rig) {
+        if (rig.Root.Visible) surfacePeople.Add(rig.Root.GlobalPosition);
+    }
 
     private void UpdateActors(float dt) {
         pumping.Clear(); pumpOperators.Clear(); grinding.Clear(); swung.Clear(); openBungs.Clear();
@@ -591,6 +602,7 @@ public partial class WorldView : Node3D {
         var at = World.Player;
         var door = doorways.AtDoor(World.Me, player, dt);
         if (door is DoorShown shown) { at = shown.At; target = shown.Facing; action = shown.Action; subject = null; }
+        action = WorkPose(action, subject);
         player.Update(at, action, target, dt, door?.Backing ?? false);
         player.Mark = Mark(subject, player, action);
         // A foot lands at each extreme of the stride.
@@ -659,7 +671,7 @@ public partial class WorldView : Node3D {
             var origin = To3(pump.Pos);
             var turn = new Basis(Vector3.Up, -pump.Rotation);
             rig.HoldPumpHandle(actor.Pose, origin + turn * WaterPumpShape.GripAt(pressed, true),
-                origin + turn * WaterPumpShape.GripAt(pressed, false), Ease(actor.Blend));
+                origin + turn * WaterPumpShape.GripAt(pressed, false), Mathf.SmoothStep(0, .1f, actor.Time));
         }
         // Removing while walking a dictionary is allowed, so no copy of its keys is needed.
         foreach (var (id, entry) in crew) {
@@ -767,6 +779,7 @@ public partial class WorldView : Node3D {
             var at = p.Pos;
             var door = doorways.AtDoor(p, state, dt);
             if (door is DoorShown shown) { at = shown.At; facing = shown.Facing; action = shown.Action; subject = null; }
+            action = WorkPose(action, subject);
             state.Update(at, action, facing, dt, door?.Backing ?? false);
             state.Mark = Mark(subject, state, action);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
@@ -792,6 +805,10 @@ public partial class WorldView : Node3D {
         foreach (var p in World.Players) if (p.Id == id) return true;
         return false;
     }
+
+    /// <summary>The shared pump event keeps its network action, while the water pump has its own pose.</summary>
+    private static ActorAction WorkPose(ActorAction action, Thing? subject) =>
+        action == ActorAction.Pump && subject?.Kind == ThingKind.Pump ? ActorAction.PumpWater : action;
 
     private Thing? ThingAt(Vector2 at) {
         foreach (var t in World.Things) if (t.Pos == at) return t;
@@ -834,6 +851,8 @@ public partial class WorldView : Node3D {
         if (barrel) rig.HugBarrel(pose, torch);
         else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel);
         else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
+        if (state.From == ActorAction.PumpWater && state.Action == ActorAction.Idle && state.Blend < 1 && !barrel && vessel == null)
+            rig.ReleasePumpHandle(pose, 1 - Ease(state.Blend));
         if (jamb is Vector3 frame) DoorwayView.HandOnFrame(rig, pose, frame, door!.Value.Grip, tool, torch);
         if (state.Turning.Look != 0) rig.Head.Rotation += new Vector3(0, state.Turning.Look, 0);
     }
@@ -856,10 +875,11 @@ public partial class WorldView : Node3D {
     private void Work(ActorState actor, Thing? subject, ActorRig rig) {
         if (subject == null) return;
         var action = actor.Action;
-        // Both the bellows board and pump lever follow the operator's stroke.
-        if (action == ActorAction.Pump) {
+        if (action == ActorAction.PumpWater) {
+            pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), ActorAnimation.WaterPumpPress(actor.Time));
+            pumpOperators.Add((rig, actor, subject));
+        } else if (action == ActorAction.Pump) {
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
-            if (subject.Kind == ThingKind.Pump) pumpOperators.Add((rig, actor, subject));
         }
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
         // Hands close on what they gather twice a loop; packing digs into the heap of goods as each loop starts, grinding plays one clip a loop, and a dig throws its soil aside once.
@@ -875,6 +895,7 @@ public partial class WorldView : Node3D {
         if (handSound == "dig_toss" && World.Sees(actor.Position)) Burst(rig.Root.Transform * rig.ShovelTip, Soil, 5, 1.6f, .5f, 9, .06f);
         float impact = ActorAnimation.StrikeShare(action) ?? action switch {
             ActorAction.Pump => .35f,
+            ActorAction.PumpWater => ActorAnimation.WaterPumpBottom,
             ActorAction.Gather => .1f,
             _ => -1
         };
@@ -886,7 +907,7 @@ public partial class WorldView : Node3D {
         // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.
         string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
             : action == ActorAction.Dig ? "dig_earth"
-            : action == ActorAction.Pump ? "bellows_pump"
+            : action is ActorAction.Pump or ActorAction.PumpWater ? "bellows_pump"
             : World.Data.Recipes.GetValueOrDefault(subject.Making)?.Sound is { Length: > 0 } made ? made
             : subject.Kind == ThingKind.Anvil ? "anvil_work"
             : subject.Kind is ThingKind.Bench or ThingKind.Mine ? "bench_work"
@@ -1216,7 +1237,7 @@ public partial class WorldView : Node3D {
                 Smoke(stove, cooking > 0, dt, FurnaceSmoke);
                 break;
             case WaterPumpProp pump:
-                pump.Pump.SetPress(pumping.GetValueOrDefault(t.Id));
+                pump.ShowStroke(pumping.TryGetValue(t.Id, out float stroke) ? stroke : null, dt);
                 if (live) pump.Pump.SetPressure(t.Pressure / 100);
                 break;
             case ForgeProp forge:
@@ -1882,10 +1903,10 @@ public partial class WorldView : Node3D {
                 var top = OnScreen(tileCenter);
                 var center = OnScreen(tileCenter, PipeGround.FloorY);
                 if ((building.Kind != ThingKind.Pump && !building.ShowsPlumbing) || !World.SteelPipes.Laid(tileCenter))
-                    overlay.DrawDashedLine(top, center, new Color("8dd4edb0"), 1.5f, 4, true);
+                    overlay.DrawDashedLine(top, center, new Color("75b5ffb0"), 1.5f, 4, true);
                 var a = (screenX + screenZ) * .42f;
                 var b = (screenX - screenZ) * .42f;
-                var inlet = new Color("9edfef");
+                var inlet = new Color("78b6ff");
                 overlay.DrawLine(center + a, center + b, inlet, 1.5f, true);
                 overlay.DrawLine(center + b, center - a, inlet, 1.5f, true);
                 overlay.DrawLine(center - a, center - b, inlet, 1.5f, true);

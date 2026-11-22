@@ -1031,7 +1031,9 @@ they change.
 A straight has two opposite openings, a tee has three, and a cross has one on all four sides.
 Pipes that only touch at a corner are separate.
 Each quarter-turn rotates the available openings.
-The underground view darkens the surface and exposes a blue-lit soil bed 0.9 m below grade, with cut banks along its edges.
+The underground view darkens the surface and exposes an earth bed 0.9 m below grade.
+Blueprint-blue lines mark the trench edges, pipes and inlets.
+Ground remains visible under people standing over the trench.
 Placement, inspection and removal project the pointer onto the bed. A vertical pipe joins each fitted building to its inlet tile. A dotted guide marks a connection still to be made.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.
 The building's equipment slot accepts ten steel pipes to install its plumbing. Explored ground remembers the visible fittings when the building leaves sight.
