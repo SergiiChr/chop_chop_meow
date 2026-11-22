@@ -61,13 +61,15 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         string tool = slot.Tool;
         var (cell, _) = ItemSlot.Create($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        string plainest = world.Data.PlainestTool(tool, slot.Tier), wanted = world.SlotWants(slot);
+        string plainest = world.Data.PlainestTool(tool, slot.Tier);
+        // A slot that asks for a better tool than the plainest of its kind names it.
+        string empty = slot.Tier > 0 ? $"{world.Data.Name(plainest)} slot." : $"Empty {tool} slot\nPut a {tool} here from your backpack";
         moves.TakeCell(cell, thing.Tools!, () => world.BenchTool(thing, tool), thing,
             held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item) is ItemDef def && slot.Takes(def), (item, _) => world.SlotTool(thing, item));
         live.Watch(() => world.BenchTool(thing, tool), held => {
             cell.Icon = Icons.Of(held ?? plainest);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held != null ? Colors.White : Style.Ghost);
-            cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\n{StationSlots.SlotHint}" : $"Empty {tool} slot\nPut {wanted} here from your backpack";
+            cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\n{StationSlots.SlotHint}" : empty;
         });
         return cell;
     }

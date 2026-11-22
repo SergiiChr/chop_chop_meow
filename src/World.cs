@@ -1560,24 +1560,24 @@ public sealed partial class World {
     /// <summary>The tool of a kind slotted in a station, or null when its slot is empty or holds a tool below <paramref name="tier"/>.</summary>
     public string? BenchTool(Thing bench, string tool, int tier = 0) => bench.Tools == null ? null : BestTool(tool, bench.Tools, tier);
     /// <summary>
-    /// Why a station's tool slots will not take an item: no slot for its kind, a slot that takes only a better tool, or
-    /// a slot already holding one; null when it goes in.
+    /// Why a station's tool slots will not take an item: no slot takes it, or the slot that does already holds a tool;
+    /// null when it goes in.
     /// </summary>
     public string? SlotBlock(Thing station, string item) {
-        string name = Lower(Data.Name(station.Kind));
         var def = Data.Items.GetValueOrDefault(item);
         var slots = SlotRules(station.Kind);
-        int at = Array.FindIndex(slots, slot => slot.Tool == def?.Tool);
-        if (at < 0) return $"The {name} has {(slots.Length == 1 ? "a slot" : "slots")} for {Listed(slots.Select(SlotWants).ToList(), "and")}.";
+        int at = def == null ? -1 : Array.FindIndex(slots, slot => slot.Takes(def));
+        if (at < 0) return $"The {Lower(Data.Name(station.Kind))} has slots for {Listed(slots.Select(slot => A(Data.ToolName(slot.Tool, slot.Tier))).ToList(), "and")}.";
         string tool = slots[at].Tool;
-        if (!slots[at].Takes(def!)) return $"The {name}'s {tool} slot takes only {SlotWants(slots[at])}.";
         return BenchTool(station, tool) != null ? $"The {tool} slot is taken. Take that {tool} out first." : null;
     }
-    /// <summary>What a tool slot asks for, such as "a chisel" or "a steel hammer".</summary>
-    public string SlotWants(ToolSlotRule slot) => A(Data.ToolName(slot.Tool, slot.Tier));
-    /// <summary>Puts a tool from the backpack into the station's empty slot for its kind, when <see cref="SlotBlock"/> allows it.</summary>
+    /// <summary>
+    /// Puts a tool from the backpack into the station's empty slot for its kind, when <see cref="SlotBlock"/> allows it.
+    /// A tool too plain for its kind's slot just stays in the backpack, with nothing said.
+    /// </summary>
     public bool SlotTool(Thing bench, string item) {
         if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {Lower(Data.Name(bench.Kind))}."); return false; }
+        if (Data.Items.GetValueOrDefault(item) is ItemDef def && Array.Exists(SlotRules(bench.Kind), slot => slot.Tool == def.Tool && !slot.Takes(def))) return false;
         if (SlotBlock(bench, item) is string block) { Say(block); return false; }
         if (Busy() || Forwarded(Verb.SlotTool, bench.Id, item: item)) return false;
         return S.Backpack.TransferTo(bench.Tools, item, 1) == 1;

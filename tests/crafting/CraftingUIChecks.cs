@@ -416,9 +416,10 @@ public partial class Game {
     }
 
     /// <summary>
-    /// A new anvil's page shows steel bars in, steel parts out and, beside it, an empty hammer slot that asks for a
-    /// steel hammer; Ctrl on a backpack bar loads them.
-    /// Shift on a wooden mallet is refused with the reason, and Shift on a steel hammer slots it onto the stand.
+    /// A new anvil's page shows steel bars in, steel parts out and, beside it, an empty steel hammer slot; Ctrl on a
+    /// backpack bar loads them.
+    /// Shift on a wooden mallet leaves it in the backpack with nothing said, and Shift on a steel hammer slots it onto
+    /// the stand.
     /// </summary>
     private async Task CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack() {
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
@@ -428,14 +429,16 @@ public partial class Game {
         Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
         Require(Named("output_steel_parts") != null, "A new anvil must show a slot for steel parts.");
         var slot = panel.Aside.FindChild("tool_hammer", true, false) as ItemSlot;
-        Require(panel.Aside.Visible && slot != null && slot.TooltipText.StartsWith("Empty hammer slot\nPut a steel hammer here"),
-            $"A new anvil must show an empty hammer slot beside its page that asks for a steel hammer, not \"{slot?.TooltipText}\".");
+        Require(panel.Aside.Visible && slot != null && slot.TooltipText == "Steel hammer slot.",
+            $"A new anvil must show an empty slot beside its page named \"Steel hammer slot.\", not \"{slot?.TooltipText}\".");
         Require(view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null }, "A new anvil must have no hammer lying on its stand.");
         await Holding(Key.Ctrl, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel bar"))));
         await Until(() => world.Backpack["steel_bar"] == 0, "Ctrl on steel bars in the backpack loading them into the anvil", 2);
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Wooden mallet"))));
-        await Until(() => messages.Shown.Contains("The anvil's hammer slot takes only a steel hammer."), "Shift on a wooden mallet saying the anvil's slot takes only a steel hammer", 2);
+        await Frames(3);
         Require(world.BenchTool(anvil, "hammer") == null && world.Backpack["wood_hammer"] == mallets, "The anvil's hammer slot must refuse a wooden mallet.");
+        Require(!messages.Shown.ToArray().Any(text => text.Contains("mallet", StringComparison.OrdinalIgnoreCase) || text.Contains("hammer", StringComparison.OrdinalIgnoreCase)),
+            $"Shift on a wooden mallet at the anvil must say nothing, not \"{string.Join(" / ", messages.Shown.ToArray())}\".");
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel hammer"))));
         await Until(() => world.BenchTool(anvil, "hammer") == "steel_hammer", "Shift on a steel hammer in the backpack slotting it into the anvil", 2);
         await Until(() => view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: "steel_hammer" }, "the slotted steel hammer lying on the anvil's stand", 2);
