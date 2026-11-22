@@ -537,7 +537,8 @@ public partial class WorldView : Node3D {
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
-        if (action == ActorAction.Idle && StationToHammer(World.Me) is Thing station) { action = ActorAnimation.StationAction(station, World.Data); target = station.Pos; subject = station; }
+        Thing? worked = action == ActorAction.Idle ? StationToHammer(World.Me) : null;
+        if (worked != null) { action = ActorAnimation.StationAction(worked, World.Data); target = worked.Pos; subject = worked; }
         if (World.Me.Braking && moving) action = ActorAction.Brake;
         // A leaping wolf knocks the player over as its jaws reach them, before it lands; a pinned player stays down.
         var knockingDown = KnockingDown(World.Me);
@@ -559,7 +560,7 @@ public partial class WorldView : Node3D {
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
-        PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, SelectedTool, World.S.Backpack), torch, door, dt);
+        PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, StationHammer(worked, World.Me) ?? SelectedTool, World.S.Backpack), torch, door, dt);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject, playerRig);
@@ -642,6 +643,16 @@ public partial class WorldView : Node3D {
         return null;
     }
 
+    /// <summary>
+    /// The hammer a player works a station with tool slots with: the faster of the one slotted there and the one they
+    /// carry; null away from such a station, or with no hammer at hand.
+    /// </summary>
+    private string? StationHammer(Thing? station, PlayerState p) {
+        if (station?.Tools == null) return null;
+        using var acting = World.ActAs(p);
+        return World.ToolInUse(station, "hammer", 0);
+    }
+
     /// <summary>Whether the acting player has the tool a station's recipe needs: slotted, carried or none.</summary>
     private bool Tooled(Thing t) =>
         t.Tools == null || !World.Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Tool == "" || World.ToolInUse(t, r.Tool, r.Tier) != null;
@@ -688,7 +699,8 @@ public partial class WorldView : Node3D {
             var subject = gathering ? target : null;
             var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
             if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; subject = ThingAt(other.PulseTarget); }
-            if (action == ActorAction.Idle && StationToHammer(p) is Thing station) { action = ActorAnimation.StationAction(station, World.Data); facing = station.Pos; subject = station; }
+            Thing? worked = action == ActorAction.Idle ? StationToHammer(p) : null;
+            if (worked != null) { action = ActorAnimation.StationAction(worked, World.Data); facing = worked.Pos; subject = worked; }
             if (p.Braking && moving) action = ActorAction.Brake;
             var knockingDown = KnockingDown(p);
             if (p.Mauled || knockingDown != null) {
@@ -706,7 +718,7 @@ public partial class WorldView : Node3D {
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             string? tool = ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null);
-            PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, p.Selected, p.Backpack), torch, door, dt);
+            PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, StationHammer(worked, p) ?? p.Selected, p.Backpack), torch, door, dt);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, subject, other.Rig);

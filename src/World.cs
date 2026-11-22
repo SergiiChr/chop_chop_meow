@@ -1235,13 +1235,14 @@ public sealed partial class World {
         return false;
     }
     private static Inventory NewWageSlot() => new() { Slots = 1, CoinStack = Inventory.UnlimitedCoins, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
-    /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins.</summary>
+    /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins, and a tool slot only the tools its rules take.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
         Barrel.Is(item) && box != t.Inventory && BoxIndex(t, box) >= 0 ? $"Barrel does not fit in {Lower(Data.Name(t.Kind))}." :
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
         box == t.Output ? "Things only come out of here." :
-        box == t.Inventory ? HoldBlock(t, item) : null;
+        box == t.Inventory ? HoldBlock(t, item) :
+        box == t.Tools ? SlotBlock(t, item) : null;
     /// <summary>Whether a fuel slot takes an item now: a fuel that fits, and the same kind as what it holds.</summary>
     internal bool FuelTakes(Thing t, string item) => FuelFits(t, item) && (t.Burner?.First() is not string held || held == item);
     /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
@@ -1562,19 +1563,24 @@ public sealed partial class World {
     /// <summary>The tool of a kind slotted in a station, or null when its slot is empty or holds a tool below <paramref name="tier"/>.</summary>
     public string? BenchTool(Thing bench, string tool, int tier = 0) => bench.Tools == null ? null : BestTool(tool, bench.Tools, tier);
     /// <summary>
-    /// Puts a tool from the backpack into the station's empty slot for its kind, when it is good enough for that slot.
+    /// Why a station's tool slots will not take an item: no slot for its kind, a slot that takes only a better tool, or
+    /// a slot already holding one; null when it goes in.
     /// </summary>
-    public bool SlotTool(Thing bench, string item) {
-        string name = Data.Name(bench.Kind).ToLowerInvariant();
-        if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {name}."); return false; }
+    public string? SlotBlock(Thing station, string item) {
+        string name = Data.Name(station.Kind).ToLowerInvariant();
         var def = Data.Items.GetValueOrDefault(item);
-        var slots = SlotRules(bench.Kind);
+        var slots = SlotRules(station.Kind);
         string Wanted(ToolSlotRule slot) => A(Data.ToolName(slot.Tool, slot.Tier));
         int at = Array.FindIndex(slots, slot => slot.Tool == def?.Tool);
-        if (at < 0) { Say($"The {name} has {(slots.Length == 1 ? $"a slot for {Wanted(slots[0])}" : $"slots for {Wanted(slots[0])} and {Wanted(slots[1])}")}."); return false; }
+        if (at < 0) return $"The {name} has {(slots.Length == 1 ? $"a slot for {Wanted(slots[0])}" : $"slots for {Wanted(slots[0])} and {Wanted(slots[1])}")}.";
         string tool = slots[at].Tool;
-        if (!slots[at].Takes(def!)) { Say($"The {name}'s {tool} slot takes only {Wanted(slots[at])}."); return false; }
-        if (BenchTool(bench, tool) != null) { Say($"The {tool} slot is taken. Take that {tool} out first."); return false; }
+        if (!slots[at].Takes(def!)) return $"The {name}'s {tool} slot takes only {Wanted(slots[at])}.";
+        return BenchTool(station, tool) != null ? $"The {tool} slot is taken. Take that {tool} out first." : null;
+    }
+    /// <summary>Puts a tool from the backpack into the station's empty slot for its kind, when <see cref="SlotBlock"/> allows it.</summary>
+    public bool SlotTool(Thing bench, string item) {
+        if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {Data.Name(bench.Kind).ToLowerInvariant()}."); return false; }
+        if (SlotBlock(bench, item) is string block) { Say(block); return false; }
         if (Busy() || Forwarded(Verb.SlotTool, bench.Id, item: item)) return false;
         return S.Backpack.TransferTo(bench.Tools, item, 1) == 1;
     }

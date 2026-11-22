@@ -20,6 +20,8 @@ public partial class Game {
         await TestClean(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
         await TestClean(CheckStrikerBesideAStationLeavesThePlayerHammering);
         await TestClean(CheckAnvilWithoutAHammerLeavesThePlayerIdle);
+        await TestClean(CheckIdlePlayerAtAnAnvilSwingsItsSlottedSteelHammer);
+        await TestClean(CheckEveryHammerBlowLandsOnTheStationsWorkTop);
         await TestClean(CheckPackingStationListsGoodsAndTakesBackpackClicks);
         await TestClean(CheckCraftingMenuMakesChiselAndTorchByHand);
         await TestClean(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
@@ -95,6 +97,17 @@ public partial class Game {
         await Until(() => view.PlayerAnimation != ActorAction.Hammer, "the player stopping once the anvil has no hammer", 2);
         Require(anvil.Processing, "The anvil must still be on its batch, waiting for a hammer.");
         RemoveThings(Hosted, t => t == anvil);
+        if (carried > 0) Give(Hosted, "steel_hammer", carried);
+    }
+
+    /// <summary>A player carrying only a wooden mallet, idle beside an anvil with a steel hammer slotted, swings the steel hammer.</summary>
+    private async Task CheckIdlePlayerAtAnAnvilSwingsItsSlottedSteelHammer() {
+        int carried = Drop(Hosted, "steel_hammer");
+        Give(Hosted, "wood_hammer", 1);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 2); anvil.Tools!.Add("steel_hammer", 1);
+        await Until(() => view.PlayerAnimation == ActorAction.Hammer && view.PlayerRig.ToolShown == "steel_hammer",
+            "the idle player swinging the anvil's slotted steel hammer", 3);
+        RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "wood_hammer", 1);
         if (carried > 0) Give(Hosted, "steel_hammer", carried);
     }
 
@@ -427,5 +440,30 @@ public partial class Game {
         await Until(() => world.BenchTool(anvil, "hammer") == "steel_hammer", "Shift on a steel hammer in the backpack slotting it into the anvil", 2);
         await Until(() => view.PropOf(anvil.Id) is AnvilProp { Hammer.Visible: true }, "the slotted steel hammer lying on the anvil's stand", 2);
         RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "steel_bar"); Drop(Hosted, "wood_hammer", 1); await CloseWithEsc();
+    }
+
+    /// <summary>
+    /// A hammer blow at a station lands the hammer's face on its work top as it is heard, wherever the player stands to
+    /// work it: the anvil's face and the bench's top stand between 0.75 m and 0.97 m up.
+    /// </summary>
+    private async Task CheckEveryHammerBlowLandsOnTheStationsWorkTop() {
+        var start = Hosted.Player;
+        var rig = view.PlayerRig;
+        foreach (var (kind, offset) in new[] { (ThingKind.Anvil, new Vector2(-.5f, -1.2f)), (ThingKind.Bench, new Vector2(1.2f, 0)) }) {
+            Warp(Hosted, start); await Frames(3);
+            var thing = Hosted.Add(kind, start + offset);
+            if (kind == ThingKind.Anvil) { thing.Inventory.Add("steel_bar", 1); thing.Tools!.Add("steel_hammer", 1); }
+            if (kind == ThingKind.Bench) { thing.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(thing, "crate"); thing.Inventory.Add("planks", 6); }
+            string sound = kind == ThingKind.Anvil ? "anvil_work" : "bench_work";
+            await Frames(2);
+            int soundsBefore = sounds.Played;
+            await Until(() => sounds.Heard(sound, soundsBefore) && view.PlayerMark != null, $"the player working a {kind} {offset} away and its blow heard", 8);
+            var end = rig.Root.Transform * rig.Holds(ActorRig.HammerFace);
+            float gap = SurfaceGap(view.PropOf(thing.Id)!.Body, end);
+            Require(gap < .04f && end.Y is > .73f and < .99f, $"A hammer's face must land on the {kind}'s work top, not {gap:0.00} m off the model at {end.Y:0.00} m up.");
+            await Frames(2);
+            RemoveThings(Hosted, t => t == thing);
+        }
+        Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
 }

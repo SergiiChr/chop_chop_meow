@@ -66,7 +66,8 @@ Each good is judged by a full crate of it, making and packing the crate included
 ### Measured output
 
 The `Economy:` lines in `build/test.log` list each job's output per worker-day and each product's coins per worker-day for a crew sized so no one waits.
-A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced furnace, anvil and bench) is held back by the reinforced furnace, and still earns several times its pay.
+A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced furnace, anvil and bench) is held back
+by the reinforced furnace, and still earns several times its pay.
 
 ## 3. Demand
 

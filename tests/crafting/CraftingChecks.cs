@@ -25,6 +25,7 @@ public static class CraftingChecks {
         Test(CheckAnvilNeedsHammering, data);
         Test(CheckAnvilHammersOnlyWithASteelHammer, data);
         Test(CheckAnvilHammersABarIntoTwoSheets, data);
+        Test(CheckGuestStandingAtAnAnvilHammersIt, data);
         Test(CheckFinishedBatchWaitsForOutputRoom, data);
         Test(CheckStationBatchesAndMarkSurviveALoad, data);
         Test(CheckStationLoadsMidBatchAndFinishesIt, data);
@@ -335,6 +336,8 @@ public static class CraftingChecks {
         Require(!anvil.Processing, "an anvil should not start without a hammer");
         Give(world, "wood_hammer", 1);
         Require(!world.SlotTool(anvil, "wood_hammer") && world.Backpack["wood_hammer"] == 1, "the anvil's hammer slot should refuse a wooden mallet");
+        Require(world.Transfer(world.Backpack, anvil.Tools!, "wood_hammer", 1) == 0 && world.Backpack["wood_hammer"] == 1,
+            "a move by hand should not put a wooden mallet into the anvil's hammer slot either");
         SafeTick(world, 2);
         Require(!anvil.Processing, "an anvil should not start with only a wooden mallet carried");
         Give(world, "steel_hammer", 1);
@@ -370,6 +373,19 @@ public static class CraftingChecks {
         world.Collect(anvil);
         Require(world.Backpack["steel_sheet"] == 2 && world.Backpack["tin_sheet"] == 2 && world.Backpack["steel_bar"] == 0 && world.Backpack["tin_bar"] == 0,
             "the anvil should hammer each bar into two sheets of its metal");
+    }
+
+    /// <summary>An anvil nobody stands at does not start, and a guest standing at it hammers it.</summary>
+    private static void CheckGuestStandingAtAnAnvilHammersIt(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(-6, 0));
+        anvil.Inventory.Add("steel_bar", 1); anvil.Tools!.Add("steel_hammer", 1);
+        world.Player = Terrain.Spawn + new Vector2(20, 0);
+        FedPlayersTick(world, 1);
+        Require(!anvil.Processing, "an anvil nobody stands at should not start");
+        world.As(guest, () => world.MoveTo(anvil.Pos + new Vector2(1, 0)));
+        FedPlayersTick(world, data.Recipes["steel_parts"].Seconds + 1);
+        Require(anvil.Inventory["steel_parts"] == 1, "a guest standing at an anvil should hammer it");
     }
 
     private static void CheckFinishedBatchWaitsForOutputRoom(GameData data) {

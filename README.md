@@ -544,7 +544,8 @@ The stone chisel itself is only knapped by hand.
 
 The anvil turns one steel bar into one steel part or two steel sheets, and one tin bar into two tin sheets.
 Anvils only work while someone stands at them hammering, with a steel hammer.
-The anvil's hammer slot takes only a steel hammer; you can also work it with one from your backpack, while a worker needs it slotted.
+The anvil's hammer slot takes only a steel hammer.
+You can also work the anvil with one from your backpack, while a worker needs it slotted.
 The steel hammer's speed multiplies the anvil's rate, as a tool's does at the bench.
 Making a steel hammer takes steel parts, so the first one is bought at a trading post.
 A small steel tool such as a hammer takes 1 steel part and a big one such as an axe, pickaxe or shovel 2, plus 1 wood part for the handle.
@@ -597,7 +598,8 @@ Putting a crate inside a crate asks first; saying yes ends the game.
 
 ### Steel barrels and buckets
 
-A crafting bench with a steel hammer makes a barrel from five steel sheets and two steel parts, and a bucket from three steel sheets, a steel part and a wood part.
+A crafting bench with a steel hammer makes a barrel from five steel sheets and two steel parts.
+It makes a bucket from three steel sheets, a steel part and a wood part.
 The barrel recipe takes 30 seconds of base work before the bench and hammer speed bonuses.
 Barrels stack in the bench output.
 A pile can store barrels at every fill level together.

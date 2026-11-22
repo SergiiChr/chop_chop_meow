@@ -23,7 +23,6 @@ public static class MultiplayerChecks {
     public static void Run(GameData data) {
         CheckGuestActsThroughCommands(data);
         CheckGuestCopyForwardsActions(data);
-        CheckGuestGathersAndHammers(data);
         CheckGuestComesBackFromSaveWithTheirPackAndSpot(data);
         CheckEveryPlayerSurvivesLoadingAndSavingAgain(data);
         CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole();
@@ -315,27 +314,6 @@ public static class MultiplayerChecks {
         Require(guest.Backpack["wood"] == 9, "the host should take the guest's wood for the building and the transfer");
         Require(hostChest.Inventory["wood"] == 5 && hostChest.Inventory.InputFilter.Contains("wood"), "the guest's transfer and filter should land in the host's chest");
         Require(host.Backpack["berries"] == 0 && host.Hunger == 100, "the host's own player should be untouched by a guest's actions");
-    }
-
-    private static void CheckGuestGathersAndHammers(GameData data) {
-        var (world, guest, _) = Hosted(data);
-        var tree = world.Add(ThingKind.Tree, Terrain.Spawn + new Vector2(4, 0), 40);
-        world.As(guest, () => world.MoveTo(tree.Pos + new Vector2(.8f, 0)));
-        guest.GatherTarget = tree.Id;
-        FedPlayersTick(world, data.GatherSeconds * 2 + .5f);
-        Require(guest.Backpack["wood"] >= 4, "a guest holding on to a tree should chop wood into their own backpack");
-        Require(world.Backpack["wood"] == 0, "a guest holding on to a tree should put nothing in the host's backpack");
-        Require(tree.Remaining < 40, "a guest holding on to a tree should cut the tree down");
-        guest.GatherTarget = 0;
-
-        var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(-6, 0));
-        anvil.Inventory.Add("steel_bar", 1); anvil.Tools!.Add("steel_hammer", 1);
-        world.Player = Terrain.Spawn + new Vector2(20, 0);
-        FedPlayersTick(world, 1);
-        Require(!anvil.Processing, "an anvil nobody stands at should not start");
-        world.As(guest, () => world.MoveTo(anvil.Pos + new Vector2(1, 0)));
-        FedPlayersTick(world, data.Recipes["steel_parts"].Seconds + 1);
-        Require(anvil.Inventory["steel_parts"] == 1, "a guest standing at an anvil should hammer it");
     }
 
     private static void CheckGuestComesBackFromSaveWithTheirPackAndSpot(GameData data) {
