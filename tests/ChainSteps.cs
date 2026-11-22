@@ -81,7 +81,9 @@ internal sealed class ChainSite(World world) {
         var crates = Place(ThingKind.Bench, "crate"); crates.Tools!.Add("steel_hammer", 1); Employ(crates, JobKind.Craft, JobKind.Haul);
     }
 
-    /// <summary>Canned meat stew: stew from meat and water, cans from tin sheets hammered at an anvil, sealed over a wood fire.</summary>
+    /// <summary>
+    /// Canned meat stew: stew from meat and water, cans from tin sheets hammered at an anvil, sealed over a wood fire.
+    /// </summary>
     public void AddCannedStewChain() {
         Employ(Place(ThingKind.Cooktable, "meat_stew"), JobKind.Haul);
         Employ(Place(ThingKind.Furnace, "tin_bar"), JobKind.Haul);

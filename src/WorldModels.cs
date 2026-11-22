@@ -805,7 +805,10 @@ public static class WorldModels {
         Add(body, LeafShape.For(id), NatureShape.Natural, Vector3.Zero);
     }
 
-    /// <summary>Anvil bolted to a welded square-tube stand; a slotted steel hammer lies on the stand's top plate in front of it.</summary>
+    /// <summary>
+    /// Anvil bolted to a welded square-tube stand; a slotted steel hammer lies on the stand's top plate in front of it.
+    /// The hammer starts hidden, so a placement preview, the icon and an anvil not yet seen show none.
+    /// </summary>
     private static AnvilProp Anvil() {
         var prop = new AnvilProp();
         var body = prop.Body;
@@ -816,7 +819,7 @@ public static class WorldModels {
         Add(body, AnvilShape.Casting, AnvilShape.Iron, Vector3.Zero);
         prop.Vent = new Vector3(0, .86f, 0);
         prop.Hammer = ActorRig.Tool("steel_hammer");
-        prop.Hammer.Position = new Vector3(-.06f, .529f, .165f); prop.Hammer.RotationDegrees = new Vector3(0, 0, 90);
+        prop.Hammer.Position = new Vector3(-.06f, .529f, .165f); prop.Hammer.RotationDegrees = new Vector3(0, 0, 90); prop.Hammer.Visible = false;
         body.AddChild(prop.Hammer);
         return prop;
     }

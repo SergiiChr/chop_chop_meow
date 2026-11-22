@@ -789,12 +789,13 @@ public static class SimulationChecks {
         Require(world.GatherBlock(stone)?.Contains("pickaxe") == true, "a boulder should wait for a pickaxe the player does not start with");
         // A chisel and the trading post that sells the first pickaxe take 6 stone, picked up loose.
         for (int i = 0; i < 6; i++) PickUp(world, world.Add(ThingKind.LooseStone, Site(4 + i, 4), 1));
-        // Four crates of berries buy the first pickaxe, two more the steel hammer, and a seventh goes with the first steel tool sold.
+        // Four crates of berries buy the first pickaxe and two more the steel hammer.
+        // A seventh goes with the first steel tool sold.
         GatherUntil(world, bush, "berries", 84);
 
         CraftByHand(world, "stone_chisel", 1);
         CraftByHand(world, "planks", 6);
-        // Two more for the second crate of the first steel tool sale, which carries the fifth crate of berries.
+        // Two more for the second crate of the first steel tool sale, which carries the seventh crate of berries.
         CraftByHand(world, "planks", 7);
         // Three more for the two crates of berries that buy the steel hammer.
         CraftByHand(world, "planks", 3);
@@ -832,7 +833,10 @@ public static class SimulationChecks {
         return sign;
     }
 
-    /// <summary>Two more crates of berries buy the steel hammer the anvil needs, which only the village sells before there are steel parts.</summary>
+    /// <summary>
+    /// Two more crates of berries buy the steel hammer the anvil needs, which only the village sells before there are
+    /// steel parts.
+    /// </summary>
     private static void CheckBerryCratesBuySteelHammer(World world, Thing sign) {
         var data = world.Data;
         for (int i = 0; i < 2; i++) LoadCrate(world, sign, "berries", data.CrateCapacity);
@@ -850,7 +854,8 @@ public static class SimulationChecks {
         GatherUntil(world, stone, "stone", 52);
         GatherUntil(world, iron, "iron_ore", 22);
         GatherUntil(world, coal, "coal", 17);
-        // Smelting and the first steel sale run on into the night, so the furnaces, the anvil and the trading post stand in the light of two campfires, stocked to burn through it.
+        // Smelting and the first steel sale run on into the night.
+        // So the furnaces, the anvil and the trading post stand by two campfires, stocked to burn through it.
         foreach (var site in new[] { Site(25, 26.5f), Site(31, 28) }) {
             var fire = BuildAt(world, ThingKind.Campfire, site);
             Require(world.Transfer(world.Backpack, fire.Inventory, "wood", 3) == 3, "a campfire should take wood to burn through the night");
@@ -907,7 +912,7 @@ public static class SimulationChecks {
         float beforeReturn = world.Coins;
         SafeTick(world, data.TradeSeconds - .1f);
         Require(world.Coins == beforeReturn && world.Orders.Count == 1,
-                $"steel-tool payment should remain in transit until the trade delay elapses");
+                "steel-tool payment should remain in transit until the trade delay elapses");
         SafeTick(world, .2f);
         world.Transfer(sign.Wages!, world.Backpack, Inventory.Coins, sign.Wages![Inventory.Coins]);
         var offer = data.HireOffers[1];

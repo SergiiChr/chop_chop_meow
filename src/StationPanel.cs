@@ -28,10 +28,12 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         // The side slots are the leftovers the station held when the page was drawn.
         RedrawOnChange(stationSlots.SideCode);
         if (thing.Kind == ThingKind.Reinforced) Bellows();
-        // A tool whose slot is empty goes into it.
-        bool FreeToolSlot(string id) => world.Data.Items.GetValueOrDefault(id) is ItemDef def && Array.Exists(slotted, slot => slot.Takes(def)) && world.BenchTool(thing, def.Tool) == null;
+        // A tool of an empty slot's kind goes to that slot, which says why when it is below the slot's tier.
+        // Only a tool good enough for the slot lights up.
+        bool EmptySlotKind(string id) => world.Data.Items.GetValueOrDefault(id) is ItemDef def && Array.Exists(slotted, slot => slot.Tool == def.Tool) && world.BenchTool(thing, def.Tool) == null;
+        bool FreeToolSlot(string id) => EmptySlotKind(id) && Array.Exists(slotted, slot => slot.Takes(world.Data.Items[id]));
         BagGrid(id => {
-            if (FreeToolSlot(id)) world.SlotTool(thing, id);
+            if (EmptySlotKind(id)) world.SlotTool(thing, id);
             else world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id));
         }, slotted.Length > 0 ? $"{BagHint}\nShift: slot a tool, or load a stack · Ctrl: all of it" : $"{BagHint}\nShift: load a stack · Ctrl: all of it",
             wanted: id => world.Takes(thing, id) || FreeToolSlot(id));
@@ -54,7 +56,9 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         }
     }
 
-    /// <summary>A station's slot for one tool kind; while empty it shows a faint picture of the plainest tool it takes.</summary>
+    /// <summary>
+    /// A station's slot for one tool kind; while empty it shows a faint picture of the plainest tool it takes.
+    /// </summary>
     private ItemSlot ToolSlot(ToolSlotRule slot) {
         string tool = slot.Tool;
         var (cell, _) = ItemSlot.Create($"tool_{tool}");

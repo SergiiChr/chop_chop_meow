@@ -323,8 +323,8 @@ public static class CraftingChecks {
     }
 
     /// <summary>
-    /// The anvil's recipes need a steel hammer, slotted or carried by the player working it, and it hammers at the
-    /// steel hammer's 1.8 times; its slot refuses a wooden mallet, and a smith with no hammer slotted says what is missing.
+    /// The anvil's recipes need a steel hammer, slotted or carried by the player working it, and run at its 1.8 times.
+    /// Its slot refuses a wooden mallet, and a smith with no hammer slotted says what is missing.
     /// </summary>
     private static void CheckAnvilHammersOnlyWithASteelHammer(GameData data) {
         var world = EmptyWorld(data);

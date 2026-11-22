@@ -1482,8 +1482,9 @@ public partial class Game {
     /// ending, and keep playing closes it for good.
     /// </summary>
     private async Task CheckEndGoalsShowInThePauseMenuAndTheEndingOnce() {
-        Achieve(Hosted, new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" });
+        Achieve(Hosted, new[] { "campfire", "hut", "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_parts", "steel_tool", "sold_steel", "hired", "assigned" });
         await Frames(3);
+        Require(world.GoalComplete, $"The starter goal chain must be complete before the check that it alone does not end the game, not on goal {world.Goal}.");
         Require(!ending.Visible && !view.Paused, "The starter goal chain alone must not end the game.");
         await KeyStroke(Key.Escape);
         Require(HasLabel(menu, "END GOALS"), "The pause menu must have an end goals heading.");

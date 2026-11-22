@@ -511,7 +511,10 @@ public partial class WorldView : Node3D {
         overlay.QueueRedraw();
     }
 
-    /// <summary>The hammer model for a hammering action: the grade in hand, carried or slotted in the worked station, and steel for someone with none.</summary>
+    /// <summary>
+    /// The hammer model for a hammering action: the grade in hand, carried or slotted in the worked station, and steel
+    /// for someone with none.
+    /// </summary>
     private static string? Grade(string? tool, string? held, Inventory? carried) =>
         tool != "hammer" ? tool
         : held is "wood_hammer" or "steel_hammer" ? held
@@ -629,14 +632,19 @@ public partial class WorldView : Node3D {
     /// <summary>
     /// A worked station near a player that is processing with nobody of the crew working it, for an idle player to work at.
     /// A player holding on to a gather target is busy with that, even with a pose that shows no gathering.
+    /// A station whose recipe waits for a tool that is neither slotted nor carried by the player is not worked.
     /// </summary>
     private Thing? StationToHammer(PlayerState p) {
         if (p.GatherTarget != 0) return null;
         using var acting = World.ActAs(p);
         foreach (var kind in World.WorkedKinds)
-            foreach (var t in World.ThingsOf(kind)) if (World.Worked(t) && t.Processing && World.AtStation(t) && !World.CrewHammers(t)) return t;
+            foreach (var t in World.ThingsOf(kind)) if (World.Worked(t) && t.Processing && World.AtStation(t) && !World.CrewHammers(t) && Tooled(t)) return t;
         return null;
     }
+
+    /// <summary>Whether the acting player has the tool a station's recipe needs: slotted, carried or none.</summary>
+    private bool Tooled(Thing t) =>
+        t.Tools == null || !World.Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Tool == "" || World.ToolInUse(t, r.Tool, r.Tier) != null;
 
     /// <summary>How high a flame leaps at <paramref name="phase"/>, from 0 to 1 and back twice a turn, smoothly at both ends.</summary>
     private static float Rising(float phase) => MathF.Sin(phase) * MathF.Sin(phase);

@@ -1561,7 +1561,9 @@ public sealed partial class World {
     private static Inventory NewToolSlots(ThingKind kind) => new() { Slots = SlotRules(kind).Length, StackSize = 1 };
     /// <summary>The tool of a kind slotted in a station, or null when its slot is empty or holds a tool below <paramref name="tier"/>.</summary>
     public string? BenchTool(Thing bench, string tool, int tier = 0) => bench.Tools == null ? null : BestTool(tool, bench.Tools, tier);
-    /// <summary>Puts a tool from the backpack into the station's empty slot for its kind, when it is good enough for that slot.</summary>
+    /// <summary>
+    /// Puts a tool from the backpack into the station's empty slot for its kind, when it is good enough for that slot.
+    /// </summary>
     public bool SlotTool(Thing bench, string item) {
         string name = Data.Name(bench.Kind).ToLowerInvariant();
         if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {name}."); return false; }
@@ -2389,7 +2391,7 @@ public sealed partial class World {
     public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
     public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch {
         0 => ("Light in the dark", "Build and light a campfire. Fire keeps wolves away."),
-        1 => ("Safe place", "Build a cabin for a peace of mind."),
+        1 => ("Safe place", "Build a cabin for peace of mind."),
         2 => ("A start", "Build a crafting bench."),
         3 => ("Road to riches", "Build a trading post and sell a crate of goods."),
         4 => ("Stone and embers", "Build a stone furnace."),

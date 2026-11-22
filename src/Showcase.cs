@@ -200,7 +200,8 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--market")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); }
         if (Launch.Has("--bench")) { world.Player = bench.Pos + Vector2.One; panel.Select(bench); }
         if (Launch.Has("--anvil")) {
-            // The anvil's page with the anvil in the open: the trees and bushes beside it are cleared, and the camera turns and tilts by the flags.
+            // The anvil's page with the anvil in the open: the trees and bushes beside it are cleared.
+            // The camera turns and tilts by the flags.
             world.S.Things.RemoveAll(t => t.Kind is ThingKind.Tree or ThingKind.Bush or ThingKind.Berries && t.Pos.DistanceTo(anvil.Pos) < 10);
             world.Player = anvil.Pos + new Vector2(-1, 1.2f); panel.Select(anvil);
             view.CameraOn = anvil.Pos;
