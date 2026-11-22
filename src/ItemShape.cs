@@ -40,6 +40,8 @@ internal static class ItemShape {
     private static readonly Dictionary<string, Look> looks = new() {
         ["wood_parts"] = new(f => WoodParts(f, 8), Wooden, .55f, Lay.Loose, Piece: f => WoodParts(f, 5)),
         ["steel_parts"] = new(SteelParts, Steel, .5f, Lay.Loose),
+        ["steel_sheet"] = new(f => Sheets(f, "a8d2ec", "6f9fc0"), Steel, .5f),
+        ["tin_sheet"] = new(f => Sheets(f, TinBright, "b9c0bd"), Tin, .5f),
         // Cans heap as six-packs of plain cans.
         ["tin_can"] = new(f => OpenCan(f, true), Tin, .42f, Piece: f => SixPack(f, one => OpenCan(one, false))),
         ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "b83a5c", null, false))),
@@ -349,6 +351,38 @@ internal static class ItemShape {
         // The collar is six-sided, like a nut.
         Lathe(faces, new Transform3D(Basis.Identity, new Vector3(-.15f, 0, .24f)),
             new Ring[] { (.085f, 0, "7fb4d6"), (.085f, .07f, "7fb4d6"), (.054f, .07f, "a8d2ec"), (.054f, .004f, "2c3e4c") }, 6);
+    }
+
+    /// <summary>
+    /// Three thin sheets of metal in a loose stack, each turned a little off the one below, in the sheet's colour with
+    /// darker cut edges; the top one has its near left corner bent up toward the sun.
+    /// </summary>
+    private static void Sheets(List<Face> faces, string sheet, string edge) {
+        const float width = .5f, depth = .36f, thick = .012f, corner = .11f;
+        var (face, cut) = (new Color(sheet), new Color(edge));
+        // A sheet's outline from above, lifted by its thickness; the game camera never sees its underside.
+        void Slab(Transform3D at, Vector3[] outline) {
+            var up = at.Basis * new Vector3(0, thick, 0);
+            var middle = Vector3.Zero;
+            foreach (var point in outline) middle += point / outline.Length;
+            for (int i = 1; i < outline.Length - 1; i++) Tri(faces, at * outline[0] + up, at * outline[i] + up, at * outline[i + 1] + up, up, face);
+            for (int i = 0; i < outline.Length; i++) {
+                Vector3 a = outline[i], b = outline[(i + 1) % outline.Length];
+                Quad(faces, at * a, at * b, at * b + up, at * a + up, at.Basis * ((a + b) / 2 - middle), cut);
+            }
+        }
+        float x = width / 2, z = depth / 2;
+        Vector3[] whole = { new(-x, 0, -z), new(x, 0, -z), new(x, 0, z), new(-x, 0, z) };
+        (float Turn, float X, float Z)[] stack = { (0, 0, 0), (.09f, .015f, -.012f), (-.05f, -.01f, .008f) };
+        for (int i = 0; i < stack.Length; i++) {
+            var at = new Transform3D(new Basis(Vector3.Up, stack[i].Turn), new Vector3(stack[i].X, i * thick, stack[i].Z));
+            if (i < stack.Length - 1) { Slab(at, whole); continue; }
+            Vector3 hingeFront = new(-x + corner, 0, z), hingeSide = new(-x, 0, z - corner);
+            Slab(at, new[] { new Vector3(-x, 0, -z), new(x, 0, -z), new(x, 0, z), hingeFront, hingeSide });
+            // The corner turns up about the line it was bent along.
+            var bend = new Basis((hingeSide - hingeFront).Normalized(), Mathf.DegToRad(40));
+            Slab(at * new Transform3D(bend, hingeFront - bend * hingeFront), new[] { hingeFront, hingeSide, new Vector3(-x, 0, z) });
+        }
     }
 
     private const float CanRadius = .06f, CanHeight = .13f;

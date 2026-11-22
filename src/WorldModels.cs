@@ -158,6 +158,8 @@ public sealed class ForgeProp : HearthProp {
 public sealed class AnvilProp : Prop {
     /// <summary>Where sparks fly from a hammer blow.</summary>
     public Vector3 Vent;
+    /// <summary>The steel hammer lying on the stand, shown while one is slotted.</summary>
+    public Node3D Hammer = null!;
 }
 
 public sealed class BenchProp : Prop {
@@ -803,7 +805,7 @@ public static class WorldModels {
         Add(body, LeafShape.For(id), NatureShape.Natural, Vector3.Zero);
     }
 
-    /// <summary>Anvil bolted to a welded square-tube stand.</summary>
+    /// <summary>Anvil bolted to a welded square-tube stand; a slotted steel hammer lies on the stand's top plate in front of it.</summary>
     private static AnvilProp Anvil() {
         var prop = new AnvilProp();
         var body = prop.Body;
@@ -813,6 +815,9 @@ public static class WorldModels {
         Box(body, new Vector3(.5f, .04f, .05f), new Vector3(0, .12f, .17f), tube);
         Add(body, AnvilShape.Casting, AnvilShape.Iron, Vector3.Zero);
         prop.Vent = new Vector3(0, .86f, 0);
+        prop.Hammer = ActorRig.Tool("steel_hammer");
+        prop.Hammer.Position = new Vector3(-.06f, .529f, .165f); prop.Hammer.RotationDegrees = new Vector3(0, 0, 90);
+        body.AddChild(prop.Hammer);
         return prop;
     }
 

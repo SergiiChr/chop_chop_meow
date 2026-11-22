@@ -168,7 +168,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var f = world.Add(ThingKind.Furnace, Terrain.Spawn + new Vector2(4, -2)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);
         var bellows = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
         var chest = world.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 3)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
-        world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(4, 4)); var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(-1, 4));
+        var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(4, 4)); anvil.Tools!.Add("steel_hammer", 1); var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(-1, 4));
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add(Water.Full, 4); world.S.Backpack.Add("steel_pick", 1);
         var bench = world.Add(ThingKind.Bench, Terrain.Spawn + new Vector2(-4, 1.5f)); world.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
         var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1); rack.Inventory.Add("steel_shovel", 1);
@@ -199,6 +199,14 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--hide-ui")) ui.Visible = false;
         if (Launch.Has("--market")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); }
         if (Launch.Has("--bench")) { world.Player = bench.Pos + Vector2.One; panel.Select(bench); }
+        if (Launch.Has("--anvil")) {
+            // The anvil's page with the anvil in the open: the trees and bushes beside it are cleared, and the camera turns and tilts by the flags.
+            world.S.Things.RemoveAll(t => t.Kind is ThingKind.Tree or ThingKind.Bush or ThingKind.Berries && t.Pos.DistanceTo(anvil.Pos) < 10);
+            world.Player = anvil.Pos + new Vector2(-1, 1.2f); panel.Select(anvil);
+            view.CameraOn = anvil.Pos;
+            view.CameraTurn = Launch.Number("--camera-turn", view.CameraTurn);
+            view.CameraPitch = Launch.Number("--camera-pitch", view.CameraPitch ?? 30);
+        }
         if (Launch.Has("--neighbor")) { world.As(world.Arrive("neighbor", 2), () => world.Player = bench.Pos + Vector2.One); world.Player = bench.Pos + new Vector2(-2, 4); panel.Close(); view.Zoom = 1.6f; }
         if (Launch.Has("--craft")) panel.Open(Page.Craft);
         // --map-item also clicks an item's slot, to show its details.
@@ -207,7 +215,6 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--worker")) {
             // Worker review: jobs at three stations in order, their hauls in one group, a load in hand and a tool.
             var hand = world.Workers[0];
-            var anvil = world.Things.First(t => t.Kind == ThingKind.Anvil);
             world.Assign(hand, anvil); world.SetDuty(hand, bench, JobKind.Craft, true); world.SetDuty(hand, bench, JobKind.Haul, true); world.SetDuty(hand, bellows, JobKind.Haul, true);
             world.AddHaulGroup(hand);
             foreach (var place in new[] { bellows, anvil, bench }) {

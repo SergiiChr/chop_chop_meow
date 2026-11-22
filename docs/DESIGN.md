@@ -94,6 +94,7 @@ Simulation and data:
 | `src/jobs/hauling/PlaceHaul.cs` | The part of the Haul job each kind of place extends, and the four haul rules its carries come under |
 | `src/stations/StationHaul.cs`, `src/farms/FarmHaul.cs`, `src/mines/MineHaul.cs`, `src/packing/PackerHaul.cs`, `src/storage/StoreHaul.cs` | What a crafting station, a farm plot, a mine site, a packing station, and a chest or placed crate offer a hauler |
 | `src/jobs/gathering/Gathering.cs`, `src/water/WaterGathering.cs` | The Gather job at resource spots, and the lake's version of it, which fills bottles |
+| `src/stations/model/ToolSlotRule.cs` | What one of a station's tool slots takes: a kind of tool at a tier or better |
 | `src/jobs/crafting/Crafting.cs`, `src/packing/PackCraft.cs` | The Craft job at a station, and the packing station's version of it, which packs crates |
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
@@ -507,7 +508,7 @@ The intended fresh-start loop starts by securing water, shelter and fire, then u
 5. Build a trading post and sell crates of berries for a steel pickaxe.
 6. Mine iron and coal, and smelt iron in a stone furnace.
 7. Build and operate a reinforced furnace (`reinforced`) to make steel.
-8. Hammer steel into steel parts at the anvil and make steel tools.
+8. Buy a steel hammer with more crates of berries, slot it in the anvil, hammer steel into steel parts there and make steel tools.
 9. Pack a steel tool into a crate, sell it with another crate of berries through the trading post and use the proceeds to hire and assign a worker, with enough left for their first wage.
 
 There are no iron tools; iron bars only go into buildings and steel.
@@ -828,7 +829,7 @@ Tier 1 is unused, since there are no iron tools.
 
 `World.BestTool` picks the fastest carried tool at or above a tier.
 Recipes name the tool they need, the lowest `Tier` that will do, and whether they can be made by hand (`Hand`).
-So a steel chisel does everything a stone chisel does, faster, while tin cans and gravel need a steel hammer and the mortar a steel chisel.
+So a steel chisel does everything a stone chisel does, faster, while the anvil, tin cans and gravel need a steel hammer and the mortar a steel chisel.
 
 `GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for boulders and deposits, a shovel for stumps and bushes), one that only speeds gathering up (a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
 A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf patches.
@@ -898,7 +899,8 @@ A save written before `Obtained` existed loads with it empty, so a raw resource 
 
 #### Tool slots
 
-`World.SlotKinds` names the tool slots a station has (`Thing.Tools`): a chisel and a hammer at the bench, a mortar at the cooking table (`cooktable`).
+`World.SlotRules` names the tool slots a station has (`Thing.Tools`), each with the tool it takes (`ToolSlotRule`): a chisel and a hammer at the bench, a mortar at the cooking table (`cooktable`) and a steel hammer at the anvil.
+`World.SlotTool` refuses a tool of the slot's kind below its tier.
 A recipe that needs a tool at such a station runs at the speed of the fastest of the slotted tool and those carried by players working there (`World.StationTool`).
 Worked only by its crew, it runs with the slotted tool and waits when there is none.
 At the cooking table it runs only while someone works it (`World.Worked(Thing)`).
@@ -918,6 +920,8 @@ The canning station (`cannery`) seals meat stew or jam and a `tin_can` into a ca
 #### Anvil
 
 An anvil only progresses while someone hammers it: a player standing within `World.WorkReach` (1 m) of its edge without walking or gathering (`World.AtStation`), or a paid assigned worker hammering at the station.
+Its recipes need a steel hammer, slotted or carried by a player working it, and run at its speed.
+It hammers a steel bar into a steel part or two steel sheets, and a tin bar into two tin sheets; the containers are made of sheets.
 A smith stays with a running batch and fetches the next load once it is done.
 
 #### Furnaces and steel

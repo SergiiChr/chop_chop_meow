@@ -1172,7 +1172,7 @@ public partial class Game {
             Warp(Hosted, start); await Frames(3);
             var thing = Hosted.Add(kind, start + offset, kind == ThingKind.Stone ? World.StonePile : 40);
             string sound = kind switch { ThingKind.Tree => "chop_tree", ThingKind.Stone => "mine_ore", ThingKind.Stump => "dig_earth", ThingKind.Anvil => "anvil_work", _ => "bench_work" };
-            if (kind == ThingKind.Anvil) thing.Inventory.Add("steel_bar", 1);
+            if (kind == ThingKind.Anvil) { thing.Inventory.Add("steel_bar", 1); thing.Tools!.Add("steel_hammer", 1); }
             if (kind == ThingKind.Bench) { thing.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(thing, "crate"); thing.Inventory.Add("planks", 6); }
             await Frames(2);
             int soundsBefore = sounds.Played;

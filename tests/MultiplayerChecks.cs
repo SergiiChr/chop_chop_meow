@@ -329,7 +329,7 @@ public static class MultiplayerChecks {
         guest.GatherTarget = 0;
 
         var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(-6, 0));
-        anvil.Inventory.Add("steel_bar", 1);
+        anvil.Inventory.Add("steel_bar", 1); anvil.Tools!.Add("steel_hammer", 1);
         world.Player = Terrain.Spawn + new Vector2(20, 0);
         FedPlayersTick(world, 1);
         Require(!anvil.Processing, "an anvil nobody stands at should not start");

@@ -45,7 +45,7 @@ internal static class BarrelChecks {
         var world = new World(data, false);
         var bench = world.Add(ThingKind.Bench, world.Player + Vector2.Right);
         Require(Give(world, "wood_hammer") == 1 && world.SlotTool(bench, "wood_hammer"), "bench should accept a wooden mallet");
-        Give(world, "steel_bar", 13);
+        Give(world, "steel_sheet", 13); Give(world, "steel_parts", 5); Give(world, "wood_parts", 1);
         world.QueueBatch(bench, Barrel.Item, 2);
         Work(world, 12);
         Require(bench.Inventory[Barrel.Item] == 0 && !bench.Processing, "the barrel recipe should wait for the steel hammer");
@@ -55,13 +55,13 @@ internal static class BarrelChecks {
         Work(world, 5);
         Require(bench.Inventory[Barrel.Item] == 0 && bench.Processing, "a steel hammer should still be working on the first barrel after five seconds");
         CompleteBatches(world, bench, Barrel.Item, 2);
-        Require(bench.Inventory.UsedSlots == 1 && world.Backpack["steel_bar"] == 3, "two barrels stack and cost ten steel bars");
+        Require(bench.Inventory.UsedSlots == 1 && world.Backpack["steel_sheet"] == 3 && world.Backpack["steel_parts"] == 1, "two barrels stack and cost ten steel sheets and four steel parts");
         Require(world.Transfer(bench.Inventory, world.Backpack, Barrel.Item, 2) == 2, "both empty barrels go into the backpack");
         var pile = world.Add(ThingKind.Pile, world.Player + Vector2.Down * 3);
         Require(world.Transfer(world.Backpack, pile.Inventory, Barrel.Item, 2) == 2, "the backpack can move the stack into a pile");
         world.QueueBatch(bench, Bucket.Item);
         CompleteBatches(world, bench, Bucket.Item, 1);
-        Require(world.Backpack["steel_bar"] == 0, "one bucket costs three steel bars");
+        Require(world.Backpack["steel_sheet"] == 0 && world.Backpack["steel_parts"] == 0 && world.Backpack["wood_parts"] == 0, "one bucket costs three steel sheets, a steel part and a wood part");
     }
 
     private static void CheckPileStacksEmptyBarrelsAndKeepsFullBarrelsSeparate(GameData data) {

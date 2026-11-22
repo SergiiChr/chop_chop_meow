@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
@@ -16,7 +17,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
 
     protected override void Body() {
         // A station's own tool slots sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
-        var slotted = World.SlotKinds(thing.Kind);
+        var slotted = World.SlotRules(thing.Kind);
         if (slotted.Length > 0) ToolWindow(slotted);
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool, or of the one you carry while you work it. Someone has to work it.";
         string? openOn = opened ? null : world.Selected(thing);
@@ -28,7 +29,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         RedrawOnChange(stationSlots.SideCode);
         if (thing.Kind == ThingKind.Reinforced) Bellows();
         // A tool whose slot is empty goes into it.
-        bool FreeToolSlot(string id) => slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(thing, world.Data.Items[id].Tool) == null;
+        bool FreeToolSlot(string id) => world.Data.Items.GetValueOrDefault(id) is ItemDef def && Array.Exists(slotted, slot => slot.Takes(def)) && world.BenchTool(thing, def.Tool) == null;
         BagGrid(id => {
             if (FreeToolSlot(id)) world.SlotTool(thing, id);
             else world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id));
@@ -38,13 +39,14 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
     }
 
     /// <summary>The window left of the page with the station's tool slots, each named with the tool it holds.</summary>
-    private void ToolWindow(string[] kinds) {
+    private void ToolWindow(ToolSlotRule[] slots) {
         var window = panel.ShowAside(190);
         window.AddChild(Style.Heading("Available tools", 19));
-        var slots = new VBoxContainer(); slots.AddThemeConstantOverride("separation", 10); window.AddChild(Style.InWell(slots));
-        foreach (string tool in kinds) {
-            var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 8); slots.AddChild(row);
-            row.AddChild(ToolSlot(tool));
+        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); window.AddChild(Style.InWell(column));
+        foreach (var slot in slots) {
+            string tool = slot.Tool;
+            var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 8); column.AddChild(row);
+            row.AddChild(ToolSlot(slot));
             var words = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center }; words.AddThemeConstantOverride("separation", 0); row.AddChild(words);
             words.AddChild(Style.Text($"{char.ToUpperInvariant(tool[0])}{tool[1..]} slot", 12, Style.Tan));
             var held = Style.Text("", 13, Style.Ink, wrap: true); held.Name = $"tool_name_{tool}"; words.AddChild(held);
@@ -52,17 +54,18 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         }
     }
 
-    /// <summary>A station's slot for one tool kind; while empty it shows a faint picture of the tool it wants.</summary>
-    private ItemSlot ToolSlot(string tool) {
+    /// <summary>A station's slot for one tool kind; while empty it shows a faint picture of the plainest tool it takes.</summary>
+    private ItemSlot ToolSlot(ToolSlotRule slot) {
+        string tool = slot.Tool;
         var (cell, _) = ItemSlot.Create($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        string plainest = world.Data.PlainestTool(tool);
+        string plainest = world.Data.PlainestTool(tool, slot.Tier), wanted = world.A(world.Data.ToolName(tool, slot.Tier));
         moves.TakeCell(cell, thing.Tools!, () => world.BenchTool(thing, tool), thing,
-            held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item)?.Tool == tool, (item, _) => world.SlotTool(thing, item));
+            held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item) is ItemDef def && slot.Takes(def), (item, _) => world.SlotTool(thing, item));
         live.Watch(() => world.BenchTool(thing, tool), held => {
             cell.Icon = Icons.Of(held ?? plainest);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held != null ? Colors.White : Style.Ghost);
-            cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\n{StationSlots.SlotHint}" : $"Empty {tool} slot\nPut a {tool} here from your backpack";
+            cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\n{StationSlots.SlotHint}" : $"Empty {tool} slot\nPut {wanted} here from your backpack";
         });
         return cell;
     }

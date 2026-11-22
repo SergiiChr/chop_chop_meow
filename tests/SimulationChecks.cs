@@ -768,12 +768,13 @@ public static class SimulationChecks {
 
         var tree = world.Add(ThingKind.Tree, Site(8, 8), 300);
         var stone = world.Add(ThingKind.Stone, Site(8, 14), 300);
-        var bush = world.Add(ThingKind.Berries, Site(14, 8), 60);
+        var bush = world.Add(ThingKind.Berries, Site(14, 8), 90);
         var iron = world.Add(ThingKind.Iron, Site(12, 14), 120);
         var coal = world.Add(ThingKind.Coal, Site(16, 8), 120);
         Require(world.GatherBlock(iron)?.Contains("pickaxe") == true && world.GatherBlock(coal)?.Contains("pickaxe") == true, "deposits should wait for a pickaxe the player does not start with");
         var bench = CheckGatheredMaterialsMakeCrates(world, tree, stone, bush);
         var sign = CheckBerryCratesBuyFirstPickaxe(world, iron);
+        CheckBerryCratesBuySteelHammer(world, sign);
         CheckMinedOreBecomesSteelTools(world, stone, iron, coal, bench);
         var offer = CheckSoldSteelToolFundsHire(world, sign);
         CheckHiredWorkerSuppliesOpeningCamp(world, sign, offer, tree, stone);
@@ -784,29 +785,31 @@ public static class SimulationChecks {
 
     /// <summary>A stone chisel from loose stones opens wood crafting by hand, which leads to the bench, its mallet and crates.</summary>
     private static Thing CheckGatheredMaterialsMakeCrates(World world, Thing tree, Thing stone, Thing bush) {
-        GatherUntil(world, tree, "wood", 64);
+        GatherUntil(world, tree, "wood", 76);
         Require(world.GatherBlock(stone)?.Contains("pickaxe") == true, "a boulder should wait for a pickaxe the player does not start with");
         // A chisel and the trading post that sells the first pickaxe take 6 stone, picked up loose.
         for (int i = 0; i < 6; i++) PickUp(world, world.Add(ThingKind.LooseStone, Site(4 + i, 4), 1));
-        // Four crates of berries buy the first pickaxe, and a fifth goes with the first steel tool sold.
-        GatherUntil(world, bush, "berries", 60);
+        // Four crates of berries buy the first pickaxe, two more the steel hammer, and a seventh goes with the first steel tool sold.
+        GatherUntil(world, bush, "berries", 84);
 
         CraftByHand(world, "stone_chisel", 1);
         CraftByHand(world, "planks", 6);
         // Two more for the second crate of the first steel tool sale, which carries the fifth crate of berries.
         CraftByHand(world, "planks", 7);
+        // Three more for the two crates of berries that buy the steel hammer.
+        CraftByHand(world, "planks", 3);
         CraftByHand(world, "wood_parts", 2);
         CraftByHand(world, "wood_hammer", 1);
-        Require(world.Backpack["planks"] == 52, "hand crafting should turn wood into planks");
+        Require(world.Backpack["planks"] == 64, "hand crafting should turn wood into planks");
         Require(world.Backpack["wood_parts"] == 3, "hand crafting should turn wood into parts");
         Require(world.Backpack["wood_hammer"] == 1, "hand crafting should turn wood into a mallet");
         var bench = BuildAt(world, ThingKind.Bench, Site(28, 28));
         Require(world.SlotTool(bench, "wood_hammer") && world.BenchTool(bench, "hammer") == "wood_hammer", "the mallet should go into the bench's hammer slot");
         world.SetRecipe(bench, "crate");
-        world.LoadBatch(bench, 4);
-        CompleteBatches(world, bench, "crate", 4);
+        world.LoadBatch(bench, 6);
+        CompleteBatches(world, bench, "crate", 6);
         world.Collect(bench);
-        Require(world.Backpack["crate"] == 4 && world.Reached("crate"), "the bench should make crates from planks with the mallet slotted");
+        Require(world.Backpack["crate"] == 6 && world.Reached("crate"), "the bench should make crates from planks with the mallet slotted");
         return bench;
     }
 
@@ -829,10 +832,29 @@ public static class SimulationChecks {
         return sign;
     }
 
+    /// <summary>Two more crates of berries buy the steel hammer the anvil needs, which only the village sells before there are steel parts.</summary>
+    private static void CheckBerryCratesBuySteelHammer(World world, Thing sign) {
+        var data = world.Data;
+        for (int i = 0; i < 2; i++) LoadCrate(world, sign, "berries", data.CrateCapacity);
+        Require(world.Sell(sign), "signpost should dispatch two more crates of berries");
+        SafeTick(world, data.TradeSeconds + .2f);
+        world.Transfer(sign.Wages!, world.Backpack, Inventory.Coins, sign.Wages![Inventory.Coins]);
+        world.Transfer(sign.Output!, world.Backpack, Inventory.Coins, sign.Output![Inventory.Coins]);
+        Require(world.Coins >= world.LotPrice("steel_hammer"), $"two more crates of berries should pay for a steel hammer: coins={world.Coins}");
+        Require(world.Buy(sign, "steel_hammer", 1), "the village should sell a steel hammer");
+        SafeTick(world, data.TradeSeconds + .2f);
+        Require(world.Transfer(sign.Output, world.Backpack, "steel_hammer", 1) == 1, "the bought steel hammer should arrive at the signpost");
+    }
+
     private static void CheckMinedOreBecomesSteelTools(World world, Thing stone, Thing iron, Thing coal, Thing bench) {
         GatherUntil(world, stone, "stone", 52);
         GatherUntil(world, iron, "iron_ore", 22);
         GatherUntil(world, coal, "coal", 17);
+        // Smelting and the first steel sale run on into the night, so the furnaces, the anvil and the trading post stand in the light of two campfires, stocked to burn through it.
+        foreach (var site in new[] { Site(25, 26.5f), Site(31, 28) }) {
+            var fire = BuildAt(world, ThingKind.Campfire, site);
+            Require(world.Transfer(world.Backpack, fire.Inventory, "wood", 3) == 3, "a campfire should take wood to burn through the night");
+        }
         var furnace = BuildAt(world, ThingKind.Furnace, Site(25, 25));
         world.LoadBatch(furnace, 11);
         Require(furnace.Inventory["iron_ore"] == 22 && furnace.Burner!["coal"] == 11,
@@ -840,10 +862,9 @@ public static class SimulationChecks {
         CompleteBatches(world, furnace, "iron_bar", 11);
         world.Player = furnace.Pos;
         world.Collect(furnace);
-        Require(world.Backpack["iron_bar"] == 11, "player should collect bars actually smelted by the furnace from mined ore");
+        Require(world.Backpack["iron_bar"] == 11, $"player should collect bars actually smelted by the furnace from mined ore: {string.Join(", ", world.Backpack.Items.Select(p => $"{p.Key}={p.Value}"))}");
 
         var reinforced = BuildAt(world, ThingKind.Reinforced, Site(31, 25));
-        BuildAt(world, ThingKind.Campfire, Site(31, 28));
         world.Player = reinforced.Pos;
         int bars = world.Backpack["iron_bar"];
         world.LoadBatch(reinforced, 1);
@@ -858,6 +879,7 @@ public static class SimulationChecks {
 
         var anvil = BuildAt(world, ThingKind.Anvil, Site(28, 25));
         world.Player = anvil.Pos + Vector2.One;
+        Require(world.SlotTool(anvil, "steel_hammer"), "the bought steel hammer should go into the anvil's hammer slot");
         world.LoadBatch(anvil, 2);
         CompleteBatches(world, anvil, "steel_parts", 2);
         world.Collect(anvil);
@@ -877,7 +899,7 @@ public static class SimulationChecks {
 
     private static HireOffer CheckSoldSteelToolFundsHire(World world, Thing sign) {
         var data = world.Data;
-        // The fifth crate of berries goes along, so the sale covers the hire and the worker's first wage.
+        // The seventh crate of berries goes along, so the sale covers the hire and the worker's first wage.
         LoadCrate(world, sign, "berries", data.CrateCapacity);
         LoadCrate(world, sign, "steel_pick", 1);
         Require(world.Backpack["crate"] == 0, "both crates the bench made should be on the cart");
@@ -885,7 +907,7 @@ public static class SimulationChecks {
         float beforeReturn = world.Coins;
         SafeTick(world, data.TradeSeconds - .1f);
         Require(world.Coins == beforeReturn && world.Orders.Count == 1,
-                "steel-tool payment should remain in transit until the trade delay elapses");
+                $"steel-tool payment should remain in transit until the trade delay elapses");
         SafeTick(world, .2f);
         world.Transfer(sign.Wages!, world.Backpack, Inventory.Coins, sign.Wages![Inventory.Coins]);
         var offer = data.HireOffers[1];
@@ -1366,7 +1388,7 @@ public static class SimulationChecks {
             // Seeds are bought with berry money to start the first plot.
             if (built.Contains(ThingKind.Farm) && data.Farm.Sow.Keys.All(id => have.Contains(id) || data.Market.Buys.ContainsKey(id))) foreach (var item in data.Farm.Yield.Keys) grew |= have.Add(item);
             foreach (var r in data.Recipes.Values) {
-                bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool, r.Tier)) || r.Station is ThingKind station && built.Contains(station) && (World.SlotKinds(station).Length == 0 || r.Tool == "" || HasTool(r.Tool, r.Tier));
+                bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool, r.Tier)) || r.Station is ThingKind station && built.Contains(station) && (World.SlotRules(station).Length == 0 || r.Tool == "" || HasTool(r.Tool, r.Tier));
                 if (where && r.Inputs.Keys.All(have.Contains)) grew |= have.Add(r.Output);
             }
         }
@@ -1378,6 +1400,7 @@ public static class SimulationChecks {
         Require(data.Market.Sells.ContainsKey("berries"), "berries must be sellable");
         Require(data.Market.Buys.ContainsKey("steel_axe"), "an axe must be buyable");
         Require(data.Market.Buys.ContainsKey("steel_pick"), "a pickaxe must be buyable");
+        Require(data.Market.Buys.ContainsKey("steel_hammer"), "a steel hammer must be buyable: the anvil needs one to make the steel parts it is made of");
         Require(fresh.LotPrice("steel_pick") <= 4 * CrateSells(data, "berries"), "four crates of berries should pay for the first pickaxe");
     }
 

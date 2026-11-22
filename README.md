@@ -396,7 +396,7 @@ Taking down a cabin returns its barrel with its water.
 Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one liter, taking the same gathering time.
 Filling a bottle takes the same time as one gather action.
 Empty or filled replacements can be bought individually.
-Craft an empty bottle at a bench from one tin bar and one wood part, with the same steel hammer used for tin cans.
+Craft an empty bottle at a bench from one tin sheet and one wood part, with the same steel hammer used for tin cans.
 A recipe that uses water, such as meat stew or dough, takes liters of it poured out.
 Drag a bottle to the station's water input or Shift-click or Ctrl-click it to pour while the bottle stays in your backpack.
 Ctrl-click also pours from vessels bound to the hotbar.
@@ -532,18 +532,21 @@ It makes what the menu's chisel makes (planks, wood parts, the mallet, torches a
 
 Some recipes need a better tool:
 
-- Tin cans (1 tin bar → 4) need a steel hammer.
+- Tin cans (1 tin sheet → 4) need a steel hammer.
 - Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
-- A tin water bottle (1 tin bar + 1 wood part) needs a steel hammer.
+- A tin water bottle (1 tin sheet + 1 wood part) needs a steel hammer.
 
 A better tool always does a plainer tool's work; the steel chisel works twice as fast as the stone one.
 The stone chisel itself is only knapped by hand.
 
 ### Steel tools
 
-The anvil turns one steel bar into one steel part.
-Anvils only work while someone stands at them hammering.
+The anvil turns one steel bar into one steel part or two steel sheets, and one tin bar into two tin sheets.
+Anvils only work while someone stands at them hammering, with a steel hammer.
+The anvil's hammer slot takes only a steel hammer; you can also work it with one from your backpack, while a worker needs it slotted.
+The steel hammer's speed multiplies the anvil's rate, as a tool's does at the bench.
+Making a steel hammer takes steel parts, so the first one is bought at a trading post.
 A small steel tool such as a hammer takes 1 steel part and a big one such as an axe, pickaxe or shovel 2, plus 1 wood part for the handle.
 
 ## Furnaces and steel
@@ -594,7 +597,7 @@ Putting a crate inside a crate asks first; saying yes ends the game.
 
 ### Steel barrels and buckets
 
-A crafting bench with a steel hammer makes a barrel from five steel bars and a bucket from three.
+A crafting bench with a steel hammer makes a barrel from five steel sheets and two steel parts, and a bucket from three steel sheets, a steel part and a wood part.
 The barrel recipe takes 30 seconds of base work before the bench and hammer speed bonuses.
 Barrels stack in the bench output.
 A pile can store barrels at every fill level together.

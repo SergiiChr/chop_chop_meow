@@ -89,7 +89,6 @@ public partial class PauseMenu : PanelContainer {
             goals.AddChild(GoalRow(title, false, false));
         }
         met.Visible = met.GetChildCount() > 0;
-        if (world.GoalComplete) { var hint = Style.Text(world.Objective.Hint, 13, Style.Tan, wrap: true); goals.AddChild(hint); }
         goals.AddChild(new HSeparator());
         goals.AddChild(Style.WellLabel("End goals"));
         foreach (var ore in Cliff.Ores) goals.AddChild(GoalRow($"A working {ore.Id()} mine", world.Mines.Working(ore), false, Icons.Of(World.ResourceItem(ore))));

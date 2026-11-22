@@ -42,7 +42,7 @@ public partial class Game {
         var start = world.Player;
         var farm = Hosted.Add(ThingKind.Farm, start + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
         Warp(Hosted, farm.Pos + new Vector2(.9f, -.9f)); await Frames();
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -1.2f)); anvil.Inventory.Add("steel_bar", 1);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -1.2f)); anvil.Inventory.Add("steel_bar", 1); anvil.Tools!.Add("steel_hammer", 1);
         await Until(() => view.PlayerAnimation == ActorAction.Hammer, "the idle player hammering at the anvil beside it", 3);
         var point = RightPress(farm.Pos);
         await Until(() => farm.Progress > 0, "holding RMB on a ripe farm plot beside the anvil harvesting by hand", 3);
@@ -76,7 +76,7 @@ public partial class Game {
 
     /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
     private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 4);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 4); anvil.Tools!.Add("steel_hammer", 1);
         var smith = AddWorker(Hosted, anvil.Pos + new Vector2(0, 1.2f)); Hosted.Assign(smith, anvil);
         await Until(() => anvil.Processing && smith.WorkState == WorkerWorkState.Hammering, "the smith hammering a batch at the anvil", 3);
         smith.WageDebt = 1;
@@ -389,15 +389,23 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    /// <summary>A new anvil's page shows steel bars in, steel parts out, and Ctrl on a backpack bar loads them.</summary>
+    /// <summary>
+    /// A new anvil's page shows steel bars in, steel parts out and, beside it, an empty hammer slot that asks for a steel
+    /// hammer; Ctrl on a backpack bar loads them, and Shift on a steel hammer slots it.
+    /// </summary>
     private async Task CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack() {
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
-        Give(Hosted, "steel_bar", 2);
+        Give(Hosted, "steel_bar", 2); Give(Hosted, "steel_hammer", 1);
         await ClickOn(anvil);
         Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
         Require(Named("output_steel_parts") != null, "A new anvil must show a slot for steel parts.");
+        var slot = panel.Aside.FindChild("tool_hammer", true, false) as ItemSlot;
+        Require(panel.Aside.Visible && slot != null && slot.TooltipText.StartsWith("Empty hammer slot\nPut a steel hammer here"),
+            $"A new anvil must show an empty hammer slot beside its page that asks for a steel hammer, not \"{slot?.TooltipText}\".");
         await Holding(Key.Ctrl, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel bar"))));
         await Until(() => world.Backpack["steel_bar"] == 0, "Ctrl on steel bars in the backpack loading them into the anvil", 2);
+        await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel hammer"))));
+        await Until(() => world.BenchTool(anvil, "hammer") == "steel_hammer", "Shift on a steel hammer in the backpack slotting it into the anvil", 2);
         RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "steel_bar"); await CloseWithEsc();
     }
 }

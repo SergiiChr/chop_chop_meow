@@ -34,8 +34,8 @@ Measured, at 18 coins a worker-day, a crate of 12 and full price:
 | Bread | 0.42 | 8 | 0.8 | 8 | 30 | 22 | 3 days | 3.4 days |
 | Berry jam | 1.41 | 25 | 0 | 25 | 70 | 45 | | 1.4 days |
 | Canned jam | 1.62 | 29 | 0 | 29 | 143 | 114 | | 1.6 days |
-| Steel axe, pickaxe, shovel | 1.22 | 22 | 0 | 22 | 471 | 449 | | 1.2 days |
-| Steel hammer | 0.76 | 14 | 0 | 14 | 243 | 229 | | 0.8 days |
+| Steel axe, pickaxe, shovel | 1.11 | 20 | 0 | 20 | 471 | 451 | | 1.1 days |
+| Steel hammer | 0.71 | 13 | 0 | 13 | 243 | 230 | | 0.7 days |
 
 Not costed: raw meat, burnt steak, meat stew and canned meat stew.
 The `Economy:` lines print this table on every run.
@@ -66,7 +66,7 @@ Each good is judged by a full crate of it, making and packing the crate included
 ### Measured output
 
 The `Economy:` lines in `build/test.log` list each job's output per worker-day and each product's coins per worker-day for a crew sized so no one waits.
-A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced furnace, anvil and bench) is held back by the anvil, and still earns several times its pay.
+A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced furnace, anvil and bench) is held back by the reinforced furnace, and still earns several times its pay.
 
 ## 3. Demand
 

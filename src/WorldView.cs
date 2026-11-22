@@ -511,7 +511,7 @@ public partial class WorldView : Node3D {
         overlay.QueueRedraw();
     }
 
-    /// <summary>The hammer model for a hammering action: the grade in hand, carried or slotted in the worked bench, and steel for someone with none, such as an anvil worker.</summary>
+    /// <summary>The hammer model for a hammering action: the grade in hand, carried or slotted in the worked station, and steel for someone with none.</summary>
     private static string? Grade(string? tool, string? held, Inventory? carried) =>
         tool != "hammer" ? tool
         : held is "wood_hammer" or "steel_hammer" ? held
@@ -1167,6 +1167,9 @@ public partial class WorldView : Node3D {
                 campfire.Light.LightEnergy = flames * (1.2f + flicker * .3f) * (.35f + night * 1.4f);
                 if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Cinders, 1, .5f, 1.1f, -1.4f, .025f);
                 Smoke(campfire, t, flames > 0, dt, CampfireSmoke);
+                break;
+            case AnvilProp anvil:
+                if (live) anvil.Hammer.Visible = World.BenchTool(t, "hammer") != null;
                 break;
             case BenchProp bench:
                 // Slotted tools lie on the bench top.

@@ -218,7 +218,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 15;
+    public int Version { get; set; } = 16;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -493,7 +493,7 @@ public sealed partial class World {
     public Thing Add(ThingKind kind, Vector2 pos, int remaining = 0) {
         var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining, Keep = StartingRecipe(kind) };
         if (kind == ThingKind.Signpost) { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; t.Wages = NewWageSlot(); }
-        if (SlotKinds(kind).Length > 0) t.Tools = NewToolSlots(kind);
+        if (SlotRules(kind).Length > 0) t.Tools = NewToolSlots(kind);
         if (Burns(kind)) t.Burner = NewBurner();
         if (kind == ThingKind.Crate) t.Inventory = NewCrate();
         if (kind == ThingKind.Barrel) t.Inventory = Barrels.NewTank();
@@ -1555,18 +1555,23 @@ public sealed partial class World {
         if (Data.Items[output].Tool == "pickaxe") S.Milestones.Add("pick");
         if (output.StartsWith("steel_") && Data.Items[output].Tool != "") S.Milestones.Add("steel_tool");
     }
-    /// <summary>The tool kinds a station has slots for.</summary>
-    public static string[] SlotKinds(ThingKind kind) => kind switch { ThingKind.Bench => new[] { "chisel", "hammer" }, ThingKind.Cooktable => new[] { "mortar" }, _ => Array.Empty<string>() };
-    private static Inventory NewToolSlots(ThingKind kind) => new() { Slots = SlotKinds(kind).Length, StackSize = 1 };
+    private static readonly ToolSlotRule[] BenchSlots = [new("chisel"), new("hammer")], CooktableSlots = [new("mortar")], AnvilSlots = [new("hammer", 2)];
+    /// <summary>The tool slots a station has, each with the tool it takes.</summary>
+    public static ToolSlotRule[] SlotRules(ThingKind kind) => kind switch { ThingKind.Bench => BenchSlots, ThingKind.Cooktable => CooktableSlots, ThingKind.Anvil => AnvilSlots, _ => [] };
+    private static Inventory NewToolSlots(ThingKind kind) => new() { Slots = SlotRules(kind).Length, StackSize = 1 };
     /// <summary>The tool of a kind slotted in a station, or null when its slot is empty or holds a tool below <paramref name="tier"/>.</summary>
     public string? BenchTool(Thing bench, string tool, int tier = 0) => bench.Tools == null ? null : BestTool(tool, bench.Tools, tier);
-    /// <summary>Puts a tool from the backpack into the station's empty slot for its kind.</summary>
+    /// <summary>Puts a tool from the backpack into the station's empty slot for its kind, when it is good enough for that slot.</summary>
     public bool SlotTool(Thing bench, string item) {
         string name = Data.Name(bench.Kind).ToLowerInvariant();
         if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {name}."); return false; }
-        string tool = Data.Items.TryGetValue(item, out var def) ? def.Tool : "";
-        var kinds = SlotKinds(bench.Kind);
-        if (!kinds.Contains(tool)) { Say($"The {name} has slots for {(kinds.Length == 1 ? A(kinds[0]) : $"a {kinds[0]} and a {kinds[1]}")}."); return false; }
+        var def = Data.Items.GetValueOrDefault(item);
+        var slots = SlotRules(bench.Kind);
+        string Wanted(ToolSlotRule slot) => A(Data.ToolName(slot.Tool, slot.Tier));
+        int at = Array.FindIndex(slots, slot => slot.Tool == def?.Tool);
+        if (at < 0) { Say($"The {name} has {(slots.Length == 1 ? $"a slot for {Wanted(slots[0])}" : $"slots for {Wanted(slots[0])} and {Wanted(slots[1])}")}."); return false; }
+        string tool = slots[at].Tool;
+        if (!slots[at].Takes(def!)) { Say($"The {name}'s {tool} slot takes only {Wanted(slots[at])}."); return false; }
         if (BenchTool(bench, tool) != null) { Say($"The {tool} slot is taken. Take that {tool} out first."); return false; }
         if (Busy() || Forwarded(Verb.SlotTool, bench.Id, item: item)) return false;
         return S.Backpack.TransferTo(bench.Tools, item, 1) == 1;
@@ -2374,35 +2379,24 @@ public sealed partial class World {
         }
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size && S.Explored[(int)p.Y * Terrain.Size + (int)p.X] != 0;
-    private static readonly string[] Milestones = {
-        "water", "hut", "campfire", "gather", "bench", "crate", "sold", "pick",
-        "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned"
-    };
+    private static readonly string[] Milestones = { "campfire", "hut", "bench", "sold", "furnace", "steel_bar", "steel_parts", "assigned" };
     public bool GoalComplete => S.Goal >= Milestones.Length;
     private void UpdateGoal() {
         while (!GoalComplete && S.Milestones.Contains(Milestones[S.Goal])) S.Goal++;
     }
     public static int GoalCount => Milestones.Length;
+    /// <summary>The current starter goal's title and hint, while one is left.</summary>
     public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
     public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch {
-        0 => ("Carry fresh water", "Collect water around the lake shore. It holds three liters and stays with you when empty; without a bottle, drink at the source."),
-        1 => ("A safe place", "Gather wood and stone, then build a cabin before dusk. Step inside to shelter from wolves."),
-        2 => ("Keep the fire lit", "Build and light a campfire. Firelight keeps wolves away; feed it wood to keep it burning."),
-        3 => ("Gather by hand", "You start with a steel axe. Hold right mouse on trees to fell them; gather stone and berries by hand."),
-        4 => ("A workbench", "Press C to craft. Knap a stone chisel from 2 stone, carve planks, then build a crafting bench: 10 planks."),
-        5 => ("Something to carry", "Carve a wooden mallet by hand and slot it in the bench beside the chisel. Craft a crate there: 6 planks."),
-        6 => ("The road to Bramblewick", "Build a trading post: 10 wood + 4 stone. Put berries in a crate and load it at the market. Sell, then collect the coins."),
-        7 => ("Beneath the surface", "Buy your first steel pickaxe from the trading post price sheet. The cart delivers it to the trading post."),
-        8 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. It smelts iron ore over coal or charcoal, and burns wood into charcoal."),
-        9 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore and fuel; collect iron bars."),
-        10 => ("Hotter than fire", "Explore for a dark cliff and mine coal. Build a reinforced furnace: 20 stone, 5 iron bars, 8 wood."),
-        11 => ("Make steel", "Load iron and coal into the reinforced furnace and coal into its fuel slot. Pump the bellows: steel requires 1450+ °C."),
-        12 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. It hammers steel bars into steel parts."),
-        13 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),
-        14 => ("Steel for sale", "Pack steel tools into a crate and sell it at the trading post, then collect the coins."),
-        15 => ("Many hands", "At the trading post pick a hiring offer: more coins up front means a lower daily wage. Keep coins in the trading post wage slot for each dawn."),
-        16 => ("Your first automation", "Build storage and a tool station with a spare axe or pickaxe. Assign a worker to Gather from their panel or use a building's job buttons."),
-        _ => ("A settlement of your own", "The starter goals are done. Work toward the end goals: a working mine on every ore and a week of steady profit.")
+        0 => ("Light in the dark", "Build and light a campfire. Fire keeps wolves away."),
+        1 => ("Safe place", "Build a cabin for a peace of mind."),
+        2 => ("A start", "Build a crafting bench."),
+        3 => ("Road to riches", "Build a trading post and sell a crate of goods."),
+        4 => ("Stone and embers", "Build a stone furnace."),
+        5 => ("Hotter than fire", "Build a reinforced furnace and produce your first steel bar."),
+        6 => ("Too soft", "Build an anvil and produce your first steel parts."),
+        7 => ("More hands on deck", "Hire a worker at the trading post and assign a job."),
+        _ => throw new ArgumentOutOfRangeException(nameof(goal), goal, "There is no starter goal with this number.")
     };
     // ---------- End goals ----------
     /// <summary>Finished days in a row, up to today, whose profit reached the goal.</summary>
@@ -2466,7 +2460,7 @@ public sealed partial class World {
             if (t.Kind == ThingKind.Hut && (t.Inventory.Slots != 1 || t.Inventory.StackSize != 1 || t.Inventory.Count > 1
                 || t.Inventory.Count == 1 && Barrel.In(t.Inventory) == null)) return false;
             // A building has the boxes its kind is made with.
-            if (SlotKinds(t.Kind).Length > 0 && t.Tools == null || Burns(t.Kind) && t.Burner == null || t.Kind == ThingKind.Signpost && t.Wages == null
+            if (SlotRules(t.Kind).Length > 0 && t.Tools == null || Burns(t.Kind) && t.Burner == null || t.Kind == ThingKind.Signpost && t.Wages == null
                 || t.Kind is ThingKind.Signpost or ThingKind.Farm or ThingKind.Packer or ThingKind.Mine && t.Output == null) return false;
             if (t.Keep != "" && !Makes(t, t.Keep) || t.Making != "" && !Makes(t, t.Making)) return false;
             // Batches wait only for the recipe asked for, which is the one in progress when there is one, and the marked one on a station with a mark.
