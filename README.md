@@ -779,7 +779,7 @@ Taking pipes out disables the fittings. Taking down the building or picking up a
 | Cooking table | A brass tap over a splash plate fills the water input for the current recipe. |
 | Farm plot | Four low sprinkler heads spray whenever pipe water arrives, even on fallow or ripe plots. The soil holds up to 10 L for the crop. A full plot keeps spraying its share until the pipe supply runs out. |
 
-The pump first fills the line, which holds 1 L per tile. Buildings that need water share the available flow evenly.
+Water fills the line outward from each running pump, up to 1 L per tile. Buildings that need water share the available flow evenly.
 A closed tap can have a full pipe at its inlet. When pressure falls to zero, water stays in the pipes for the next
 building that needs it. Cutting a line leaves the water in each surviving section.
 While placing pipes or removing things underground, point at a pipe and press **E** to inspect its water and pressure.

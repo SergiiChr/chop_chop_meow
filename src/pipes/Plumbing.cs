@@ -13,23 +13,23 @@ public sealed class Plumbing(World world) {
     public static bool HasPlumbing(ThingKind kind) =>
         kind is ThingKind.Barrel or ThingKind.Hut or ThingKind.Cooktable or ThingKind.Farm;
 
-    private sealed class Network {
-        public bool Active;
-        public double Pumped, Stored;
-        public int NextToFill, LastWet = -1;
+    private sealed class FillRoute {
         public readonly List<int> Tiles = [];
-        public readonly List<Thing> Receivers = [];
+        public int Next;
+    }
 
-        public void AddTile(int index, double liters) {
-            if (liters >= SteelPipes.Capacity && NextToFill == Tiles.Count) NextToFill++;
-            if (liters > 0) LastWet = Tiles.Count;
-            Tiles.Add(index);
-            Stored += liters;
-        }
+    private sealed class Network {
+        public bool Active, PumpRunning;
+        public double Output, Stored;
+        public int Unfilled;
+        public readonly Stack<int> Wet = new();
+        public readonly Dictionary<int, FillRoute> Routes = new();
+        public readonly List<Thing> Receivers = [];
     }
 
     private readonly Dictionary<int, Network> networks = new();
-    private readonly Queue<Vector2I> open = new();
+    private readonly HashSet<int> visited = [];
+    private readonly List<int> component = [];
     private readonly List<Network> active = [];
     private int revision = -1;
 
@@ -46,25 +46,28 @@ public sealed class Plumbing(World world) {
         RefreshNetworks();
         foreach (var pump in world.ThingsOf(ThingKind.Pump)) {
             float liters = WaterPumps.Advance(pump, dt);
-            if (liters <= 0 || NetworkAt(Terrain.TileAt(pump.Pos)) is not Network network) continue;
+            var inlet = Terrain.TileAt(pump.Pos);
+            if (liters <= 0 || NetworkAt(inlet) is not Network network) continue;
             Activate(network);
-            network.Pumped += liters;
+            network.PumpRunning = true;
+            network.Output += Fill(network, Terrain.TileIndex(inlet), liters);
         }
 
         foreach (var kind in Consumers)
             foreach (var receiver in world.ThingsOf(kind)) {
                 receiver.ReceivingWater = false;
                 if (NetworkAt(Terrain.TileAt(receiver.Pos)) is not Network network
-                    || (network.Pumped <= 0 && network.Stored <= 0)
+                    || (network.PumpRunning ? network.Output <= 0 : network.Stored <= 0)
                     || Demand(receiver) <= 0) continue;
                 Activate(network);
                 network.Receivers.Add(receiver);
             }
 
         foreach (var network in active) {
-            if (network.Pumped > 0) Share(network, Fill(network, network.Pumped));
+            if (network.PumpRunning) Share(network, network.Output);
             else Drain(network, network.Stored - Share(network, network.Stored));
-            network.Pumped = 0;
+            network.Output = 0;
+            network.PumpRunning = false;
             network.Receivers.Clear();
             network.Active = false;
         }
@@ -89,55 +92,72 @@ public sealed class Plumbing(World world) {
         foreach (int index in pipes.Tiles) {
             if (networks.ContainsKey(index)) continue;
             var network = new Network();
-            networks.Add(index, network);
-            open.Enqueue(new Vector2I(index % Terrain.Size, index / Terrain.Size));
-            while (open.TryDequeue(out var tile)) {
-                int at = Terrain.TileIndex(tile);
-                network.AddTile(at, pipes.WaterAt(at));
-                int links = pipes.ConnectionMask(tile);
-                foreach (var (offset, port, _) in SteelPipes.Sides) {
-                    if ((links & port) == 0) continue;
-                    var next = tile + offset;
-                    if (networks.TryAdd(Terrain.TileIndex(next), network)) open.Enqueue(next);
-                }
+            ConnectedTiles(index, component);
+            foreach (int tile in component) {
+                networks.Add(tile, network);
+                double stored = pipes.WaterAt(tile);
+                network.Stored += stored;
+                if (stored > 0) network.Wet.Push(tile);
+                if (stored < SteelPipes.Capacity) network.Unfilled++;
             }
         }
     }
 
-    /// <summary>Fills the pipe tiles and returns the pump output left for consumers.</summary>
-    private double Fill(Network network, double water) {
+    /// <summary>Lists connected pipes in order of distance along the line from the starting tile.</summary>
+    private void ConnectedTiles(int start, List<int> tiles) {
+        tiles.Clear(); tiles.Add(start);
+        visited.Clear(); visited.Add(start);
+        for (int i = 0; i < tiles.Count; i++) {
+            var tile = new Vector2I(tiles[i] % Terrain.Size, tiles[i] / Terrain.Size);
+            int links = world.SteelPipes.ConnectionMask(tile);
+            foreach (var (offset, port, _) in SteelPipes.Sides) {
+                if ((links & port) == 0) continue;
+                int next = Terrain.TileIndex(tile + offset);
+                if (visited.Add(next)) tiles.Add(next);
+            }
+        }
+    }
+
+    /// <summary>Fills pipes outward from this pump and returns the output left for consumers.</summary>
+    private double Fill(Network network, int inlet, double water) {
+        if (network.Unfilled == 0) return water;
+        if (!network.Routes.TryGetValue(inlet, out var route)) {
+            network.Routes.Add(inlet, route = new FillRoute());
+            ConnectedTiles(inlet, route.Tiles);
+        }
         var pipes = world.SteelPipes;
-        while (network.NextToFill < network.Tiles.Count && water > 0) {
-            int index = network.Tiles[network.NextToFill];
+        while (route.Next < route.Tiles.Count && water > 0) {
+            int index = route.Tiles[route.Next];
             double current = pipes.WaterAt(index), put = Math.Min(water, SteelPipes.Capacity - current);
             if (put > 0) {
+                if (current == 0) network.Wet.Push(index);
                 pipes.StoreWater(index, current + put);
                 network.Stored += put;
-                network.LastWet = Math.Max(network.LastWet, network.NextToFill);
                 water -= put;
+                if (current + put < SteelPipes.Capacity) break;
+                network.Unfilled--;
             }
-            if (current + put < SteelPipes.Capacity) break;
-            network.NextToFill++;
+            route.Next++;
         }
         return water;
     }
 
     /// <summary>Takes the amount used by consumers out of the tiles that still hold standing water.</summary>
     private void Drain(Network network, double used) {
+        if (used <= 0) return;
+        foreach (var route in network.Routes.Values) route.Next = 0;
         var pipes = world.SteelPipes;
-        while (network.LastWet >= 0 && used > 0) {
-            int index = network.Tiles[network.LastWet];
+        while (used > 0 && network.Wet.TryPeek(out int index)) {
             double current = pipes.WaterAt(index), take = Math.Min(current, used);
-            if (take > 0) {
-                pipes.StoreWater(index, current - take);
-                network.Stored -= take;
-                network.NextToFill = Math.Min(network.NextToFill, network.LastWet);
-                used -= take;
-            }
-            if (current > take) break;
-            network.LastWet--;
+            double left = current - take;
+            if (current == SteelPipes.Capacity && left < current) network.Unfilled++;
+            pipes.StoreWater(index, left);
+            network.Stored -= take;
+            used -= take;
+            if (left > 0) break;
+            network.Wet.Pop();
         }
-        if (network.LastWet < 0) network.Stored = 0;
+        if (network.Wet.Count == 0) network.Stored = 0;
     }
 
     /// <summary>Sprinklers can discharge their entire share even when the soil is full.</summary>

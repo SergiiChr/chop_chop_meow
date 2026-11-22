@@ -8,6 +8,7 @@ using static WorldSteps;
 
 public static class PlumbingChecks {
     public static void Run(GameData data) {
+        Test(CheckEachPumpFillsFromItsOwnInlet, data);
         Test(CheckBranchesShareByReceiver, data);
         Test(CheckWaterNeedsConnectedSidesToTurnACorner, data);
         Test(CheckDisconnectingAPipeStopsDeliveryAndItsSpray, data);
@@ -16,6 +17,23 @@ public static class PlumbingChecks {
         Test(CheckFractionalDeliverySurvivesLoading, data);
         Test(CheckClosedPlumbingStaysPressurizedAndFull, data);
         Test(CheckSeparatedPipesKeepTheirWaterThroughLoading, data);
+    }
+
+    private static void CheckEachPumpFillsFromItsOwnInlet(GameData data) {
+        var world = EmptyWorld(data);
+        var east = world.Add(ThingKind.Pump, EastTankTile);
+        var west = world.Add(ThingKind.Pump, PumpTile);
+        for (int x = EastTankTile.X; x >= PumpTile.X; x--) LayPipe(world, new Vector2I(x, PumpTile.Y));
+        PumpFully(world, west);
+        world.Tick(.125f);
+        Require(world.PipeReading(PumpTile).Liters == .625f && world.PipeReading(EastTankTile).Liters == 0,
+            "The first water should enter at the running pump, even if its pipe was laid last.");
+
+        PumpFully(world, east);
+        world.Tick(.125f);
+        Require(world.PipeReading(PumpTile).Liters == 1 && world.PipeReading(JunctionTile).Liters == .25f
+            && world.PipeReading(EastTankTile).Liters == .625f && world.PipeReading(EastTankTile + Vector2I.Left).Liters == 0,
+            "Each pump should spend its own output filling outward from its end of the line.");
     }
 
     private static void CheckBranchesShareByReceiver(GameData data) {

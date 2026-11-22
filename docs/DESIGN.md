@@ -1044,7 +1044,7 @@ A pump stroke holds pressure while the handle moves. Once it stops, pressure fal
 The simulation integrates flow over each tick, including the moment pressure reaches zero.
 The pressure dial reads the pump’s flow in liters per second, with numbered marks from zero to five and half-liter ticks.
 `Plumbing` finds connected groups whenever the pipe layout changes.
-Pump output first fills connected pipes up to one liter per tile.
+Each running pump fills its own pipe first, then the connected pipes outward from it, up to one liter per tile.
 Connected buildings share the remaining water evenly. When a tank or recipe fills, its excess goes to the other open fixtures.
 When pumps stop supplying water, consumers can still draw the water left in the pipes.
 Each pipe's water is saved and sent to guests separately from its shape and rotation.
