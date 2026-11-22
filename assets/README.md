@@ -148,6 +148,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   as a path in the gravel photoscan, for the plan's icon and its ghost while placing. Laid tiles are drawn by the
   ground, joined to their neighbours ([DESIGN](../docs/DESIGN.md#gravel-paths)).
 - `FarmShape` — caches the farm's ten shaped soil rows and three seeded variants of sprouts, green plants and ripe wheat. Leaves are tapered and two-sided, stems are triangular and grain heads are shaped. One crop mesh is shown per growth stage under the `Crops` handles.
+  `FarmSoil` darkens irregular patches on the pad or rows as the plot fills with water, retaining the soil scan.
 - `MineShape` — caches the mine's plan outline, inward-facing tunnel shell, spoil pad, fitted portal and sloped board hood, inner supports and rail runs. The cart has a continuous flared tub, inner lining and rim, and axles and wheels seated on the rail tops. Its load reuses loose-ore geometry. Construction pivots, cart/load visibility, lantern fire/light and tunnel glow are independent. Each cave site rotates with its own cliff face, projecting from the mountain foot with a matching blocked rock footprint. Grass is cleared only inside the cave/rail approaches.
 - `MineRockShape` — a continuous single-mesh outcrop at the cave mouth. Its rear is embedded beneath the mountain triangles sampled by `MountainShape`. The middle cliff columns are removed, and the mountain triangles are clipped around the tunnel to leave its interior clear.
 - `CrateShape` — shared hollow shipping-crate body and lid meshes: chamfered slats with real gaps, end handholds, fitted corner battens, nail heads, floor planks and two low runners. Each crate has its own rear lid hinge and lifting body transform.
@@ -162,9 +163,9 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   [Pressure pump reference](../docs/art/pressure-pump-reference.webp).
 - `InstalledPlumbingShape` — the cabin's wall riser into its roof barrel, the placed barrel's low feed and valve,
   and the cooking table's brass tap over a steel splash plate.
-  The farm's raised square frame holds one sprinkler over each quarter of the soil.
+  The farm's central steel riser carries a T-shaped bar with a brass nozzle at either end.
   Each supply comes up through the middle of the building's base.
-  `FarmSpray` sweeps drops across all four quarters while the sprinklers receive water.
+  `FarmSpray` draws moving arcs that break into drops as each nozzle sweeps its half of the bed.
 - `FirePitShape` — the campfire's shared ring of eleven irregular faceted fieldstones, ash bed and fitted split logs with charred ends. A separate shared flame mesh has the flicker pivot, smoke vent and day/night light handles.
 
 ### Carried and dropped goods

@@ -116,17 +116,21 @@ public partial class Game {
         await ClickOn(pump);
         Require(Named("job_pump") != null, "A pump should offer the Pump job.");
         var gauge = OnPage("pump_pressure") as Godot.Range;
-        Require(gauge is { Value: 0 } && gauge.IsVisibleInTree() && HasLabel(panel, "Pressure")
-            && !HasLabel(panel, "%") && !HasLabel(panel, "L/s"), "The idle pump should show an empty pressure gauge with only its label.");
+        Require(gauge is { Value: 0, MaxValue: 5 } && gauge.IsVisibleInTree() && HasLabel(panel, "Pressure"),
+            "The idle pressure gauge should start at zero on a five-liter scale.");
+        foreach (string marking in new[] { "0", "1", "2", "3", "4", "5", "L/s" })
+            Require(HasLabel(gauge, marking), $"The pump dial should show its {marking} marking.");
         await Click(Named("pump")!);
-        await Until(() => pump.Pressure == 10 && view.PlayerAnimation == ActorAction.PumpWater,
+        await Until(() => pump.Pressure == 10 && gauge.Value == .5 && view.PlayerAnimation == ActorAction.PumpWater,
             "clicking the handle raising pressure and moving the player's arms", 2);
         Require(world.Player.DistanceTo(stand) < .02f && Hosted.Player.DistanceTo(stand) < .02f,
             "Using the pump from beside its handle should step the player into reach before both hands press down.");
         await KeyStroke(Key.Space);
-        await Until(() => gauge!.Value == 20, "the second stroke raising the pressure gauge to its second division", 2);
-        Hosted.Tick(WaterPumps.StrokeSeconds + 2);
-        await Until(() => gauge!.Value == 0, "the needle returning to zero as pressure falls", 2);
+        await Until(() => gauge.Value == 1, "the second stroke reaching the first whole liter per second", 2);
+        for (int stroke = 2; stroke < 10; stroke++) await KeyStroke(Key.Space);
+        await Until(() => gauge.Value == 5 && pump.FlowRate == 5, "the dial reaching 5 L/s at full pressure", 2);
+        Hosted.Tick(WaterPumps.StrokeSeconds + 10);
+        await Until(() => gauge.Value == 0, "the needle returning to zero as pressure falls", 2);
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == pump);
         Warp(Hosted, home); await Frames(4);

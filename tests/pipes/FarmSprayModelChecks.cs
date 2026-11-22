@@ -21,20 +21,25 @@ public static class FarmSprayModelChecks {
 
         var arrays = spray.Mesh!.SurfaceGetArrays(0);
         var vertices = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-        var offsets = arrays[(int)Mesh.ArrayType.TexUV2].AsVector2Array();
-        var quadrants = new HashSet<Vector2I>();
+        var ribbon = arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
+        var outlets = new HashSet<int>();
         for (int i = 0; i < vertices.Length; i++) {
-            var origin = new Vector2(vertices[i].X - offsets[i].X, vertices[i].Z);
-            Require(Mathf.IsEqualApprox(Mathf.Abs(origin.X), 1.425f) && Mathf.IsEqualApprox(Mathf.Abs(origin.Y), 1.425f),
-                "The spray should start in the center of each cropped quadrant.");
-            quadrants.Add(new Vector2I(Math.Sign(origin.X), Math.Sign(origin.Y)));
+            if (ribbon[i].X != 0) continue;
+            var origin = vertices[i];
+            Require(Mathf.Abs(origin.Z) < .02f && Mathf.Abs(origin.X) is > 1.3f and < 1.5f && origin.Y > 1,
+                "The water should start at each end of the T above the crops.");
+            outlets.Add(Math.Sign(origin.X));
         }
-        Require(quadrants.Count == 4, "The farm needs one head in each quadrant.");
+        Require(outlets.Count == 2, "Both ends of the T should spray.");
+        Require(spray.CustomAabb.Size.X > 5.5f && spray.CustomAabb.Size.Z > 5.5f && spray.CustomAabb.End.Y > 1.4f,
+            "The sprinkler should cover the planted rows and keep the arcs above the heads visible.");
 
         foreach (var mesh in ModelSteps.AllMeshes(spray.GetParent())) {
             var bounds = mesh.Transform * (mesh == spray ? spray.CustomAabb : mesh.Mesh!.GetAabb());
+            if (mesh != spray)
+                Require(bounds.Position.Z > -.16f && bounds.End.Z < .16f, "The central T should leave both sides of the plot free of framing.");
             Require(bounds.Position.X >= -3 && bounds.Position.Z >= -3 && bounds.End.X <= 3 && bounds.End.Z <= 3,
-                "The equipped sprinkler frame and spray should fit inside the farm's six-meter square.");
+                "The sprinkler and its spray should fit inside the farm's six-meter square.");
         }
         plumbing.Water(false, .6f);
         Require(!spray.Visible, "The sprinklers should stop when flow stops.");

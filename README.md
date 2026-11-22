@@ -754,7 +754,8 @@ It costs 4 steel bars, 10 stone and 4 wood parts.
 From the bank, select it and click **Pump** or press **Space**. Your character steps up to the handle before pressing it.
 Aim at the pump to select it, including its thin lever and piston. Aim beside it to collect water.
 You can also assign a worker the **Pump** job.
-Each stroke moves the pressure gauge up one division. Ten consecutive strokes reach full pressure at 5 L/s.
+The pressure gauge reads from 0 to 5 L/s. Each short tick is half a liter per second, the gain from one stroke.
+Ten consecutive strokes reach full pressure.
 After the last stroke finishes, pressure falls to zero over 10 seconds from full.
 
 At an anvil, use a steel hammer to form one steel bar into one stackable steel pipe in 10 base seconds.
@@ -775,7 +776,7 @@ Taking pipes out disables the fittings. Taking down the building or picking up a
 | Placed steel barrel | Fills its 50 L tank. |
 | Cabin | A pipe runs up the outside wall to fill the roof barrel. A cabin without a roof barrel can still connect. |
 | Cooking table | A brass tap over a splash plate fills the water input for the current recipe. |
-| Farm plot | Four overhead sprinklers each water a quarter of the plot, up to its 10 L reserve. |
+| Farm plot | Two heads on a T-shaped sprinkler water the growing crop from its 10 L reserve. The pipe tops it up as room opens. |
 
 The pump first fills the line, which holds 1 L per tile. Buildings that need water share the available flow evenly.
 A closed tap can have a full pipe at its inlet. When pressure falls to zero, water stays in the pipes for the next
@@ -817,7 +818,8 @@ The soil darkens, and over 3 days of watered growth small green straws come up, 
 Wheat uses 10 liters of water per day of growth and pauses when the plot runs dry.
 The plot holds up to 10 liters.
 Pour from a filled bucket or bottle into the water droplet slot, just like at the cooking table.
-The blue bar under fertilizer shows how much water is left.
+The blue bar under fertilizer shows how much water is left. Dark patches spread across the soil as the bar fills
+and shrink as the crop uses water.
 When the wheat ripens, the water slot and fill bar hide until the harvest is done.
 
 Hold right mouse on a ripe plot to harvest it by hand, no tool needed.

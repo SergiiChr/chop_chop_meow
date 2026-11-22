@@ -48,8 +48,13 @@ public partial class Game {
         Require(wheat.Size.X == wheat.Size.Y && wheat.Size == returnedSeed.Size && returnedSeed.Size == grass.Size,
             "every harvest output should have the same square slot size");
         Require(water.Icon == Icons.Of(Water.Liquid) && level.Value == 0, "the farm starts with an empty water bar and droplet slot");
+        var earth = view.PropOf(farm.Id)!.Root.FindChild("TilledSoil", true, false) as MeshInstance3D;
+        Require(earth != null && earth.MaterialOverride.NextPass == null, "The dry tilled rows should show their original earth.");
         await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(bucket))), water);
         await Until(() => level.Value > 4.9 && world.Backpack[Bucket.Item] > 0, "pouring the bucket into the plot fills its water bar", 2);
+        await Until(() => earth!.MaterialOverride.NextPass is ShaderMaterial wet
+            && Mathf.IsEqualApprox(wet.GetShaderParameter("water_fraction").AsSingle(), .5f),
+            "five liters spreading wet soil patches across half the plot", 2);
         Drop(Hosted, Bucket.Item, 1);
         await Until(() => HasLabel(panel, "Growing, 2 days until ripe"), "a growing plot's page saying it ripens in 2 days", 2);
         Require(!HasLabel(panel, "harvest"), "A growing plot's page must not mention harvesting.");

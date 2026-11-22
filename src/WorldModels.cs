@@ -173,6 +173,7 @@ public sealed class PileProp : Prop {
 }
 
 public sealed class FarmProp : Prop {
+    internal FarmSoil Soil = null!;
     /// <summary>The plot's looks by <see cref="Farms.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
     public Node3D[] Crops = Array.Empty<Node3D>();
 }
@@ -212,6 +213,10 @@ public static class WorldModels {
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
+                if (prop is FarmProp farm) {
+                    farm.Crops[0].Visible = id != 0;
+                    farm.Soil.Show(5, farm.Crops[0].Visible);
+                }
                 if (prop.Plumbing is { } plumbing) { plumbing.Show(true); plumbing.Water(true, 0); }
                 if (prop is RackProp rack) {
                     rack.Pegs[0][Bucket.Item].Visible = true;
@@ -783,11 +788,13 @@ public static class WorldModels {
         const float scale = Farms.HalfSize * 2 / Construction.ZoneSize;
         var yard = Pivot(body, Vector3.Zero);
         yard.Scale = new Vector3(scale, 1, scale);
-        Add(yard, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
+        var pad = Add(yard, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
         Add(body, PileShape.FarmFrame, PileShape.Timber, new Vector3(0, .01f, 0));
         int variant = id % 3;
         var soil = Pivot(body, Vector3.Zero);
-        Add(soil, FarmShape.Soil, FarmShape.Earth, Vector3.Zero);
+        var rows = Add(soil, FarmShape.Soil, FarmShape.Earth, Vector3.Zero);
+        rows.Name = "TilledSoil";
+        prop.Soil = new FarmSoil(pad, rows);
         Node3D Field(int stage) {
             var field = Pivot(body, Vector3.Zero);
             Add(field, FarmShape.Crop(stage, variant), FarmShape.Foliage, Vector3.Zero);

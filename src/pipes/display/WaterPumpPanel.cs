@@ -7,14 +7,9 @@ public partial class WaterPumpPanel(PageTools tools, Thing subject) : ThingPage(
     protected override void Body() {
         var controls = Row();
         controls.AddThemeConstantOverride("separation", 16);
-        var dial = new PressureGauge {
-            Name = "pump_pressure",
-            CustomMinimumSize = new Vector2(96, 96),
-            MouseFilter = MouseFilterEnum.Ignore,
-            AccessibilityName = "Pressure"
-        };
+        var dial = new PressureGauge { Name = "pump_pressure" };
         controls.AddChild(dial);
-        live.Watch(() => thing.Pressure, pressure => { dial.Value = pressure; dial.QueueRedraw(); });
+        live.Watch(() => thing.FlowRate, flow => { dial.Value = flow; dial.QueueRedraw(); });
         var column = new VBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkCenter };
         column.AddThemeConstantOverride("separation", 6);
         controls.AddChild(column);

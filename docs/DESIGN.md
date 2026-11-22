@@ -239,7 +239,7 @@ Rendering and sound:
 | `src/cabins/display/StairSteps.cs` | The cabin's steps, how high they stand at a spot, and a pose's boots fitted onto them |
 | `src/cabins/display/DoorKeyView.cs` | The round lock of a cabin's door with its key in it, drawn into a picture for the cabin's page |
 | `src/cabins/display/InsideDoorPOV.cs` | What a player inside sees of a wolf forcing the door: a dark cabin with copies of the wolves and the player taken out, in a window that shows it as an old tape ([assets/environment/vhs](../assets/environment/vhs/README.md)) |
-| `src/farms/display/FarmShape.cs` | Tilled soil and the shapes of wheat at each growth stage |
+| `src/farms/display/FarmShape.cs`, `src/farms/display/FarmSoil.cs` | Tilled soil, wet patches and the shapes of wheat at each growth stage |
 | `src/mines/display/MineModel.cs`, `src/mines/display/MineShape.cs`, `src/mines/display/MineRockShape.cs`, `src/mines/display/MineProp.cs` | Builds a mine's model and the outcrop at every cliff, and the mine as drawn stage by stage |
 | `src/actors/enemies/wolf/display/DoorCheckView.cs` | A wolf at a cabin's door: its stands, scratching paw, prying snout, steps, launch, and how far it has levered and pushed the door open |
 | `src/actors/enemies/wolf/display/TugView.cs` | A wolf tugging a player out of a doorway, wolves reared up onto the player's arms, and the lunge onto them as they fall |
@@ -1041,6 +1041,7 @@ The building's equipment slot accepts ten steel pipes to install its plumbing. E
 A worker finishes a round at the end of each pump stroke, then checks whether a higher-priority job is ready.
 A pump stroke holds pressure while the handle moves. Once it stops, pressure falls by ten percentage points per second.
 The simulation integrates flow over each tick, including the moment pressure reaches zero.
+The pressure dial reads the pump’s flow in liters per second, with numbered marks from zero to five and half-liter ticks.
 `Plumbing` finds connected groups whenever the pipe layout changes.
 Pump output first fills connected pipes up to one liter per tile.
 Water beyond that is shared among connected buildings with room, with any excess split among those still able to take it.
@@ -1052,6 +1053,8 @@ A receiver keeps any fraction below a liter in `Thing.PipedWaterRemainder` until
 liter.
 A cooking table requests water for the next queued or marked batch. A batch already being worked has spent its water.
 `Thing.ReceivingWater` tells the window a receiver is taking water and still has room.
+A fitted farm sprays as water arrives and while the growing crop draws on the reserve, including between top-ups.
+Dry plots, fallow plots and ripe wheat have no spray.
 `Construction` snaps the steel piping plan to tile centers and lays it in the pipe layer.
 In pipe placement, R turns the plan a quarter turn and T cycles its shape.
 Left-click lays the pipe. Right-click takes up the pipe under the pointer, even after the backpack runs out of pipes.
@@ -1344,6 +1347,7 @@ The ground dressing clears meadow plants across the square, and E measures reach
 A fallow plot sows itself from its own inventory.
 The water slot stores up to 10 liters, which supply one day of growth.
 A ripe plot keeps any water left for the next crop, and its panel hides the water slot and fill bar.
+The area of dark soil on the bare plot or its tilled rows follows the water level, including the liter in use.
 Each liter in use grants a tenth of a day of growth and counts toward capacity until spent.
 `Thing.FarmWaterLeft` counts the growth seconds still covered by that liter.
 `Thing.Progress` counts completed growth from whole liters, then harvest work.

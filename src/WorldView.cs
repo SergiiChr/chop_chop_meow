@@ -1153,10 +1153,7 @@ public partial class WorldView : Node3D {
     /// </summary>
     private void Animate(Prop prop, Thing t, float dt, bool live, bool watched) {
         bool first = !prop.Seen, shaking = prop.Shake > 0;
-        if (prop.Plumbing is { } plumbing) {
-            plumbing.Show(t.ShowsPlumbing);
-            plumbing.Water(live && t.PlumbingInstalled && t.ReceivingWater, Elapsed);
-        }
+        prop.Plumbing?.Show(t.ShowsPlumbing);
         // Most things in sight stand still: one that is neither shaking nor holding more or less than when last drawn needs no writing to.
         bool still = !first && !shaking && prop.Look.Remaining == t.Remaining;
         prop.Seen = true;
@@ -1289,8 +1286,13 @@ public partial class WorldView : Node3D {
                 WorldModels.SyncPile(pile, t, World.Data);
                 break;
             case FarmProp farm:
+                // The line tops up the reserve. The nozzles keep watering until the crop or its water runs out.
+                bool irrigating = live && t.PlumbingInstalled && t.FarmStage == FarmStage.Growing
+                    && (t.ReceivingWater || !World.Farms.Dry(t));
+                farm.Plumbing!.Water(irrigating, Elapsed);
                 if (!live) break;
                 int look = World.Farms.CropLook(t);
+                farm.Soil.Show(World.Farms.WaterLevel(t), look > 0);
                 farm.Crops[0].Visible = look > 0;
                 for (int i = 1; i < farm.Crops.Length; i++) farm.Crops[i].Visible = look == i + 1;
                 break;

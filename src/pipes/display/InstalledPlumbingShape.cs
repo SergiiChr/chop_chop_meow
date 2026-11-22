@@ -17,30 +17,8 @@ internal sealed class InstalledPlumbingShape {
         CapTop = false,
         CapBottom = false,
     };
-    private const float FrameHalf = Farms.HalfSize - .30f, FrameHeight = 1.31f, NozzleHeight = 1.16f;
-    private const float QuadrantHalf = (Farms.HalfSize - .15f) / 2;
-    private static readonly Vector3[] Nozzles = [
-        new(-QuadrantHalf, NozzleHeight, -QuadrantHalf), new(QuadrantHalf, NozzleHeight, -QuadrantHalf),
-        new(-QuadrantHalf, NozzleHeight, QuadrantHalf), new(QuadrantHalf, NozzleHeight, QuadrantHalf)
-    ];
-    private static readonly CylinderMesh FrameTube = new() {
-        BottomRadius = 1,
-        TopRadius = 1,
-        Height = 1,
-        RadialSegments = 4,
-        Rings = 0,
-        CapTop = false,
-        CapBottom = false
-    };
-    private static readonly CylinderMesh SprinklerHead = new() {
-        BottomRadius = .079f,
-        TopRadius = .034f,
-        Height = FrameHeight - NozzleHeight,
-        RadialSegments = 4,
-        Rings = 0,
-        CapTop = false
-    };
-    private static readonly PlaneMesh FrameFoot = new() { Size = new Vector2(.23f, .23f) };
+    private const float NozzleHeight = 1.135f, BedHalf = Farms.HalfSize - .15f;
+    private static readonly Vector3[] Nozzles = [new(-BedHalf / 2, NozzleHeight, 0), new(BedHalf / 2, NozzleHeight, 0)];
     private readonly Node3D root;
     private readonly MeshInstance3D? spray;
 
@@ -124,31 +102,20 @@ internal sealed class InstalledPlumbingShape {
     }
 
     private static MeshInstance3D Farm(Node3D root) {
-        Vector3 Top(float x, float z) => new(x, FrameHeight, z);
-        void Beam(Vector3 from, Vector3 to, float radius = .042f) => Pipe(root, from, to, radius, Steel, FrameTube);
-        void PostAt(float x, float z) {
-            Beam(new Vector3(x, 0, z), Top(x, z), .051f);
-            Add(root, FrameFoot, Steel, new Vector3(x, .089f, z));
-        }
-        foreach (float side in new[] { -FrameHalf, FrameHalf }) {
-            Beam(Top(-FrameHalf, side), Top(FrameHalf, side));
-            Beam(Top(side, -FrameHalf), Top(side, FrameHalf));
-            PostAt(side, -FrameHalf);
-            PostAt(side, FrameHalf);
-        }
-        Beam(Top(-FrameHalf, -QuadrantHalf), Top(FrameHalf, -QuadrantHalf), .035f);
-        Beam(Top(-FrameHalf, QuadrantHalf), Top(FrameHalf, QuadrantHalf), .035f);
-        Beam(Top(0, -QuadrantHalf), Top(0, QuadrantHalf), .035f);
-        PostAt(0, 0);
+        const float barHeight = NozzleHeight - .10f;
+        var top = Vector3.Up * barHeight;
+        Pipe(root, Vector3.Zero, top, .046f, Steel);
+        Pipe(root, Nozzles[0] with { Y = barHeight }, Nozzles[1] with { Y = barHeight }, .038f, Steel);
+        Box(root, new Vector3(.22f, .05f, .22f), Vector3.Up * .092f, Steel);
         foreach (var nozzle in Nozzles)
-            Add(root, SprinklerHead, Steel, nozzle + Vector3.Up * ((FrameHeight - NozzleHeight) / 2));
-        return FarmSpray.Build(root, Nozzles, QuadrantHalf);
+            Post(root, .064f, .044f, NozzleHeight - barHeight, nozzle with { Y = barHeight }, Brass, 6);
+        return FarmSpray.Build(root, Nozzles, BedHalf);
     }
 
-    private static void Pipe(Node3D parent, Vector3 from, Vector3 to, float radius, Material metal, Mesh? profile = null) {
+    private static void Pipe(Node3D parent, Vector3 from, Vector3 to, float radius, Material metal) {
         var span = to - from;
         var aim = new Basis(new Quaternion(Vector3.Up, span.Normalized()));
-        var mesh = Add(parent, profile ?? Tube, metal, (from + to) / 2);
+        var mesh = Add(parent, Tube, metal, (from + to) / 2);
         mesh.Transform = new Transform3D(
             aim * Basis.FromScale(new Vector3(radius, span.Length() + radius * 1.25f, radius)), mesh.Position);
     }

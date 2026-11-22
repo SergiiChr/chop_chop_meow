@@ -15,6 +15,7 @@ public partial class Game {
         await TestClean(CheckRemoveSelectorKeepsTheOtherLayer);
         await TestClean(CheckInspectReadsWaterAndPressureWhileUnderground);
         await TestClean(CheckPuttingPipesInThePlumbingSlotInstallsAndRefundsThem);
+        await TestClean(CheckGrowingCropsShowWaterFromTheSprinkler);
     }
 
     private async Task CheckHeldPipePlanTurnsAndCyclesShapes() {
@@ -148,6 +149,28 @@ public partial class Game {
         Drop(Hosted, "steel_pipe");
         RemoveThings(Hosted, t => t == pump);
         Warp(Hosted, home); await Frames(4);
+    }
+
+    private async Task CheckGrowingCropsShowWaterFromTheSprinkler() {
+        var home = world.Player;
+        var tile = Terrain.TileAt(home);
+        var farm = Hosted.Add(ThingKind.Farm, tile);
+        farm.FarmStage = FarmStage.Growing;
+        PlumbingSteps.InstallPlumbing(Hosted, farm);
+        Warp(Hosted, home); await Frames(4);
+        var spray = (MeshInstance3D)view.PropOf(farm.Id)!.Body.FindChild("FarmSpray", true, false)!;
+        Require(!spray.IsVisibleInTree(), "A dry sprinkler must be off.");
+
+        farm.Inventory.Add(Water.Liquid, Farms.LitersPerDay);
+        Hosted.Tick(.1f);
+        await Until(() => spray.IsVisibleInTree(), "a growing crop using water from its full reserve through the sprinkler", 2);
+        var shown = world.Find(farm.Id)!;
+        Require(!shown.ReceivingWater && world.Farms.WaterLevel(shown) > 9,
+            "The spray should remain visible between top-ups while the reserve waters the crop.");
+        farm.FarmStage = FarmStage.Ripe;
+        await Until(() => !spray.IsVisibleInTree(), "the spray stopping when the crop ripens with water left", 2);
+        RemoveThings(Hosted, t => t == farm);
+        Warp(Hosted, home); await Frames();
     }
 
     private async Task CheckPuttingPipesInThePlumbingSlotInstallsAndRefundsThem() {
