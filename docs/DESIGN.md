@@ -1034,6 +1034,7 @@ Pipes that only touch at a corner are separate.
 Each quarter-turn rotates the available openings.
 The underground view darkens the surface and exposes an earth bed 0.9 m below grade.
 Blueprint-blue lines mark the trench edges, pipes and inlets.
+A pipe and its vertical inlet turn dark blue while the tile holds any water, even at zero pressure.
 Ground remains visible under people standing over the trench.
 Placement, inspection and removal project the pointer onto the bed. A vertical pipe joins each fitted building to its inlet tile. A dotted guide marks a connection still to be made.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.

@@ -23,7 +23,9 @@ internal partial class PipeLayerView : Node3D {
     private static readonly Material PreviewTint = ModelKit.PlacementTint(new Color("81beff"));
     private static readonly Material Blocked = ModelKit.PlacementTint(new Color("ff7467"));
     private static readonly Material RemovalTint = ModelKit.Flat(new Color("f25043"));
-    private int revision = -1, explored = -1;
+    private static readonly Material WetSteel = ModelKit.Vertex(Surface.Metal, .52f, .47f, "356fc6");
+    private static readonly Material RiserSteel = ModelKit.Metal("93a6af", .55f, .38f);
+    private int revision = -1, explored = -1, waterRevision = -1;
     private int? marked;
     private (int Ports, int Links, bool Ready)? preview;
 
@@ -88,7 +90,14 @@ internal partial class PipeLayerView : Node3D {
             revision = world.SteelPipes.Revision;
             explored = world.ExploredRevision;
         }
-        UpdateRisers(world, known);
+        int water = world.SteelPipes.WaterRevision;
+        bool recolor = changed || water != waterRevision;
+        if (recolor) {
+            foreach (var (index, pipe) in meshes)
+                ShowWater(pipe, world.SteelPipes.WaterAt(index), SteelPipeShape.Finish);
+            waterRevision = water;
+        }
+        UpdateRisers(world, known, recolor);
         int? next = removing is Vector2I tile ? Terrain.TileIndex(tile) : null;
         if (next != marked) {
             if (marked is int was && meshes.TryGetValue(was, out var old)) old.MaterialOverlay = null;
@@ -119,18 +128,26 @@ internal partial class PipeLayerView : Node3D {
         blend.SetShaderParameter(FootCount, footCount);
     }
 
+    private static void ShowWater(MeshInstance3D pipe, double liters, Material empty) {
+        var finish = liters > 0 ? WetSteel : empty;
+        if (pipe.MaterialOverride != finish) pipe.MaterialOverride = finish;
+    }
+
     /// <summary>Join each installed fixture to the pipe immediately under its base.</summary>
-    private void UpdateRisers(World world, List<Thing> known) {
+    private void UpdateRisers(World world, List<Thing> known, bool recolor) {
         connected.Clear();
         foreach (var thing in known) {
             if (thing.Kind != ThingKind.Pump && !thing.ShowsPlumbing) continue;
             var at = Terrain.TileAt(thing.Pos);
             if (!world.SteelPipes.Laid(at) || !connected.Add(at)) continue;
+            bool updateFinish = recolor;
             if (!risers.TryGetValue(at, out var riser)) {
                 riser = ModelKit.Cylinder(pipes, SteelPipeShape.OuterRadius, SteelPipeShape.OuterRadius, 1,
-                    Vector3.Zero, ModelKit.Metal("93a6af", .55f, .38f), sides: 8);
+                    Vector3.Zero, RiserSteel, sides: 8);
                 risers.Add(at, riser);
+                updateFinish = true;
             }
+            if (updateFinish) ShowWater(riser, world.SteelPipes.WaterAt(Terrain.TileIndex(at)), RiserSteel);
             // Expose the foot of the pump's discharge through stones at the waterline.
             float top = thing.Kind == ThingKind.Pump ? .17f : 0;
             float height = top - PipeGround.FloorY - SteelPipeShape.CenterHeight;

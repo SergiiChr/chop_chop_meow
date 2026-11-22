@@ -16,7 +16,8 @@ public sealed class SteelPipes(World world) {
     /// <summary>Adjacent tiles and their reciprocal ports, clockwise from east.</summary>
     internal static ReadOnlySpan<(Vector2I Offset, int Port, int Opposite)> Sides => SideDirections;
     private Dictionary<int, PipeTile>? seen;
-    private int revision;
+    private Dictionary<int, double>? seenWater;
+    private int revision, waterRevision;
 
     /// <summary>A number that changes when pipes are laid or removed or the pipe layer is loaded.</summary>
     public int Revision {
@@ -24,6 +25,15 @@ public sealed class SteelPipes(World world) {
             var pipes = world.S.SteelPipes;
             if (!ReferenceEquals(seen, pipes)) { seen = pipes; revision++; }
             return revision;
+        }
+    }
+
+    /// <summary>Changes when a tile fills or empties, or a save or network update replaces the stored water.</summary>
+    internal int WaterRevision {
+        get {
+            var water = world.S.PipeWater;
+            if (!ReferenceEquals(seenWater, water)) { seenWater = water; waterRevision++; }
+            return waterRevision;
         }
     }
 
@@ -78,7 +88,7 @@ public sealed class SteelPipes(World world) {
     internal void Remove(Vector2I tile) {
         int index = Terrain.TileIndex(tile);
         if (!world.S.SteelPipes.Remove(index)) return;
-        world.S.PipeWater.Remove(index);
+        StoreWater(index, 0);
         revision++;
     }
 
@@ -86,8 +96,11 @@ public sealed class SteelPipes(World world) {
     internal double WaterAt(int index) => world.S.PipeWater.GetValueOrDefault(index);
 
     internal void StoreWater(int index, double liters) {
-        if (liters > 0) world.S.PipeWater[index] = liters;
-        else world.S.PipeWater.Remove(index);
+        var water = world.S.PipeWater;
+        int before = water.Count;
+        if (liters > 0) water[index] = liters;
+        else water.Remove(index);
+        if (water.Count != before) waterRevision++;
     }
 
     /// <summary>Whether stored water is in laid pipes within their capacity.</summary>

@@ -127,7 +127,10 @@ public partial class Game {
         var tile = Terrain.TileAt(bank + Vector2.Down * 1.1f);
         var pump = Hosted.Add(ThingKind.Pump, tile);
         Warp(Hosted, pump.ToWorld(World.BellowsStand)); await Frames(4);
-        LayPipe(Hosted, tile); await Frames();
+        var tankTile = tile + Vector2I.Up * 2;
+        var tank = Hosted.Add(ThingKind.Barrel, tankTile);
+        LayPipe(Hosted, tile, Mathf.Pi / 2);
+        await Frames();
         await KeyStroke(Key.B);
         await Click(Named("remove")!);
         await RightClick(tile);
@@ -136,18 +139,36 @@ public partial class Game {
         Require(view.Underground && ShownPage() == "Steel pipe", "E over a pipe should inspect it and keep the underground layer visible.");
         Require(HasLabel(panel, "Empty · 0/1 L") && HasLabel(panel, "Pressure 0%"), "A dry pipe should show no water and no pressure.");
 
+        var pipe = ModelSteps.AllMeshes(view.FindChild("Underground", true, false)!)
+            .Single(mesh => mesh.Position == WorldView.To3(tile));
+        var empty = (StandardMaterial3D)pipe.MaterialOverride;
+        Hosted.Pump(pump);
+        Hosted.Tick(.1f);
+        await Until(() => world.PipeReading(tile).Liters is > 0 and < 1 && pipe.MaterialOverride != empty,
+            "the one pipe taking its first water and changing color", 2);
+        var wet = (StandardMaterial3D)pipe.MaterialOverride;
+        Require(wet.AlbedoColor.B > wet.AlbedoColor.G && wet.AlbedoColor.Luminance < empty.AlbedoColor.Luminance * .8f,
+            $"A partly filled pipe should turn visibly darker blue, went from {empty.AlbedoColor} to {wet.AlbedoColor}.");
+        LayPipe(Hosted, tile + Vector2I.Up, Mathf.Pi / 2);
+        LayPipe(Hosted, tankTile, Mathf.Pi / 2);
         for (int i = 0; i < 10; i++) Hosted.Pump(pump);
-        Hosted.Tick(.3f);
+        Hosted.Tick(.65f);
         await Until(() => HasLabel(panel, "Full · 1/1 L") && HasLabel(panel, "Pressure 100%"),
             "the inspected pipe filling and displaying pump pressure", 2);
         Hosted.Tick(11);
         await Until(() => HasLabel(panel, "Full · 1/1 L") && HasLabel(panel, "Pressure 0%"),
             "the inspected pipe retaining its water as pressure falls", 2);
 
+        Require(pipe.MaterialOverride == wet, "Standing water should keep its blue color after pressure falls to zero.");
+        PlumbingSteps.InstallPlumbing(Hosted, tank);
+        Hosted.Tick(.1f);
+        await Until(() => HasLabel(panel, "Empty · 0/1 L") && pipe.MaterialOverride == empty,
+            "a drained pipe returning to its empty finish", 2);
+
         await KeyStroke(Key.Escape); await CloseWithEsc();
-        Hosted.Construction.TakeUpPipe(tile);
-        Drop(Hosted, "steel_pipe");
-        RemoveThings(Hosted, t => t == pump);
+        foreach (var cell in new[] { tile, tile + Vector2I.Up, tankTile }) Hosted.Construction.TakeUpPipe(cell);
+        Drop(Hosted, "steel_pipe", 3);
+        RemoveThings(Hosted, t => t == pump || t == tank);
         Warp(Hosted, home); await Frames(4);
     }
 

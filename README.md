@@ -762,6 +762,7 @@ At an anvil, use a steel hammer to form one steel bar into one stackable steel p
 Put the hammer in the anvil’s hammer slot for a worker to use.
 In building plans, pick **Steel piping** to open the cutaway and dim the surface.
 Thin blue outlines mark the pipes, trench edges and building inlets against the exposed earth.
+Empty pipes show bare steel. Any water in a tile turns its pipe and inlet dark blue, even at zero pressure.
 Left-click to lay a pipe for one steel pipe. Right-click to take one back up.
 Press R for a quarter turn and T to cycle through straight, T-junction and cross.
 The pipe plan stays active after the last pipe so you can still take pipes up. Press Esc to finish.
