@@ -42,13 +42,4 @@ public sealed partial class World {
         var box = NewCrate(); box.Add(t.Packs, 1);
         t.Output.Add(Pack(box), 1);
     }
-
-    /// <summary>A packer works the station while it has its good and a crate to pack it into; each crate filled is a round.</summary>
-    private bool PackWork(Worker w, Thing t, float dt) {
-        if (!CanPack(t)) { w.Status = t.Packs == "" ? "Choose what to pack" : "Waiting for goods and crates"; return false; }
-        if (!HandsFree(w, dt)) return true;
-        w.Status = "Packing crates";
-        if (Walk(w, t.Pos + PackStand, dt, .1f)) w.WorkState = WorkerWorkState.Hammering;
-        return true;
-    }
 }

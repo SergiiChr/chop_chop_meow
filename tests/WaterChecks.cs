@@ -15,7 +15,6 @@ public static class WaterChecks {
         CheckBottlesPourTheLitersTheyHold(data);
         CheckBottleStatesAreDefinedInData(data);
         CheckBottleGivesThreeLiters(data);
-        CheckBottlesRefillFromWaterAndCanBeDrunkDirectly(data);
         CheckBottleKeepsPartialStateAcrossSave(data);
         CheckBottleRecipeMakesEmptyBottleFromTinAndWood(data);
         CheckRecipesReturnReusableBottles(data);
@@ -27,8 +26,6 @@ public static class WaterChecks {
         CheckFullBottleQueuedForOneLiterKeepsTheRest(data);
         CheckSwitchingRecipeTakesWaterIntoBottles(data);
         CheckStationTakesBottlesForItsWater(data);
-        CheckHaulerPoursWaterAndStoresTheEmptyBottle(data);
-        CheckHaulerTakesLeftoverWaterOutInBottles(data);
         CheckDismantledStationFillsBottles(data);
     }
 
@@ -89,33 +86,6 @@ public static class WaterChecks {
         Require(world.Thirst > 99.99f && world.Thirst <= 100, "three liters should restore a full thirst gauge");
         Require(!Water.DrinkLiter(world, "empty_bottle") && world.Backpack["empty_bottle"] == 1, "an empty bottle should not produce a free liter");
         Require(world.Backpack.UsedSlots == 1, "each liter should preserve one physical bottle slot");
-    }
-
-    private static void CheckBottlesRefillFromWaterAndCanBeDrunkDirectly(GameData data) {
-        var world = new World(data, false);
-        var lake = new Thing { Kind = ThingKind.Water };
-        SetBackpackSlots(world, 1);
-        Give(world, "empty_bottle", 1);
-        Require(Water.CollectWater(world, lake) == WaterCollectResult.RefilledBottle, "gathering with an empty bottle should refill it");
-        Require(world.Backpack["water"] == 1, "refilling should give one full bottle");
-        Require(world.Backpack.Count == 1, "refilling should not create bottles");
-        Require(world.Backpack.UsedSlots == 1, "refilling should reuse its slot");
-        Require(Water.CollectWater(world, lake) == WaterCollectResult.NoChange, "a full bottle should not refill into an extra bottle");
-
-        var priority = new World(data, false);
-        Give(priority, "water_1", 1);
-        Give(priority, "empty_bottle", 1);
-        Water.CollectWater(priority, lake);
-        Require(priority.Backpack["water"] == 1, "an empty bottle should refill first");
-        Require(priority.Backpack["water_1"] == 1, "the partial bottle should stay partial");
-        Require(priority.Backpack["empty_bottle"] == 0, "no empty bottle should remain after the refill");
-
-        Drop(world, "water", 1);
-        SetNeeds(world, thirst: 25);
-        Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceLiter, "gathering without a bottle should drink directly from the source");
-        Require(world.Thirst > 58.32f, "a direct source liter should restore at least one third thirst");
-        Require(world.Thirst < 58.34f, "a direct source liter should restore no more than one third thirst");
-        Require(world.Backpack.Count == 0, "a direct source liter should not create a bottle");
     }
 
     private static void CheckBottleKeepsPartialStateAcrossSave(GameData data) {
@@ -182,34 +152,6 @@ public static class WaterChecks {
         Require(world.Transfer(table.Inventory, world.Backpack, Water.Liquid, 10) == 3 && world.Backpack[Water.Full] == 3 && table.Inventory[Water.Liquid] == 1,
             "taking more must fill bottles while they have room, and leave the rest on the table");
         Require(world.Backpack[Water.Liquid] == 0, "water must never lie loose in the backpack");
-    }
-
-    private static void CheckHaulerPoursWaterAndStoresTheEmptyBottle(GameData data) {
-        var world = new World(data, false);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
-        chest.Inventory.Add(Water.Full, 1); chest.Inventory.Add("flour", 4);
-        var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
-        world.SetRecipe(table, "dough");
-        var hauler = AddWorker(world, new Vector2(24, 21));
-        world.SetDuty(hauler, table, JobKind.Haul, true); world.SetDuty(hauler, table, JobKind.Craft, true);
-        SafeTick(world, 40);
-        Require(chest.Inventory["dough"] == 3 && table.Inventory[Water.Full] + table.Inventory[Water.Empty] == 0,
-            "a hauler must pour a full bottle into the table for its dough, leaving no bottle there");
-        Require(chest.Inventory[Water.Empty] == 1 && hauler.Bag.Count == 0, "a hauler must store the emptied bottle again");
-    }
-
-    private static void CheckHaulerTakesLeftoverWaterOutInBottles(GameData data) {
-        var world = new World(data, false);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
-        chest.Inventory.Add(Water.Empty, 1);
-        var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
-        world.SetRecipe(table, "berry_jam"); table.Inventory.Add(Water.Liquid, 1);
-        var hauler = AddWorker(world, new Vector2(24, 21));
-        world.SetDuty(hauler, table, JobKind.Haul, true);
-        SafeTick(world, 40);
-        Require(table.Inventory[Water.Liquid] == 0, "a hauler must clear water the table's recipe no longer takes");
-        Require(chest.Inventory[Water.OneLiter] == 1 && chest.Inventory[Water.Empty] == 0 && hauler.Bag.Count == 0,
-            "the leftover liter must go back to storage in the empty bottle the hauler fetched");
     }
 
     private static void CheckDismantledStationFillsBottles(GameData data) {

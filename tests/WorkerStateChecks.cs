@@ -10,118 +10,12 @@ using static WorkerSteps;
 /// <summary>Simulation checks for worker animation state transitions.</summary>
 public static class WorkerStateChecks {
     public static void Run(GameData data) {
-        CheckWorkerStateFollowsGatheringAndReassignment(data);
-        CheckWorkerGoesToNextKnownTreeThenWaitsUntilOneIsSeen(data);
-        CheckPickerGoesToNextKnownLooseCoalThenWaits(data);
-        CheckMinerWorksDepositsBeforePickingUpChips(data);
-        CheckGathererWithoutAToolPicksUpLoosePieces(data);
         CheckWaitingWorkerTakesAToolOnceOneIsHung(data);
         CheckWorkerOutOfPatchesMovesToTheirOtherJob(data);
         CheckWorkerWhoseBuildingGoesSaysTheyHaveNoJob(data);
         CheckStrikeResetsWorkState(data);
         CheckWorkerWithoutRouteIsBlocked(data);
-        CheckOnlyFirstFurnaceWorkerPumpsBellows(data);
         CheckSavedWorkerRestartsWithDefaultWorkState(data);
-    }
-
-    private static void CheckWorkerStateFollowsGatheringAndReassignment(GameData data) {
-        var world = EmptyWorld(data);
-        var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
-        world.Add(ThingKind.Chest, new Vector2(12, 10));
-        var worker = AddWorker(world, tree.Pos);
-        worker.Tool = "steel_axe";
-        world.Assign(worker, tree);
-
-        world.Tick(.25f);
-        Require(worker.WorkState == WorkerWorkState.Gathering,
-                "a worker at its resource should enter gathering state through World.Tick");
-
-        world.Assign(worker, null);
-        Require(worker.WorkState == WorkerWorkState.Idle,
-                "reassigning a working worker to idle should clear its transient work state");
-        world.Tick(.25f);
-        Require(worker.WorkState == WorkerWorkState.Idle,
-                "an available worker should remain idle after its next simulation tick");
-    }
-
-    private static void CheckWorkerGoesToNextKnownTreeThenWaitsUntilOneIsSeen(GameData data) {
-        var (world, said, post) = KnownSpots(data);
-        var at = Terrain.Spawn;
-        var spent = world.Things.Single(t => t.Kind == ThingKind.Tree && t.Pos == at + new Vector2(1, 0));
-        var seen = world.Things.Single(t => t.Kind == ThingKind.Tree && t.Pos == at + new Vector2(6, 0));
-        var unseen = world.Things.Single(t => t.Kind == ThingKind.Tree && t.Pos == at + new Vector2(3, 0));
-        var worker = AddWorker(world, spent.Pos);
-        worker.Tool = "steel_axe";
-        world.Assign(worker, spent);
-        for (int i = 0; i < 600 && worker.Assignment != seen.Id; i++) world.Tick(.1f);
-        Require(worker.Assignment == seen.Id, "a worker whose tree is felled should move to the nearest tree a player has seen");
-        Require(worker.Jobs.Count == 1, "the worker should keep one duty");
-        Require(((Duty)worker.Jobs[0]).Thing == seen.Id, "the worker's duty should be the seen tree");
-        Require(unseen.Remaining == 5, "the worker should not go to a closer tree under black fog");
-        Require(world.Remembered(seen.Id) != null && !world.Sees(seen.Pos), "the next tree should be one known from memory, now out of sight");
-
-        for (int i = 0; i < 600 && worker.Status.IndexOf("waiting at the trading post", StringComparison.Ordinal) < 0; i++) world.Tick(.1f);
-        for (int i = 0; i < 100; i++) world.Tick(.1f);
-        Require(seen.Remaining == 0, "the tree the worker knows should be gone");
-        Require(worker.Assignment == seen.Id, "the worker should keep the assignment");
-        Require(worker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f,
-            "a worker who knows no other tree should wait at the trading post");
-        Require(said.Count(m => m.Contains("knows no other tree", StringComparison.Ordinal)) == 1, "a worker who knows no other tree should say so once");
-
-        // The look comes at the end of a tick, so the worker acts on it the tick after.
-        world.Player = at; world.Tick(.1f); world.Tick(.1f);
-        Require(worker.Assignment == unseen.Id, "once a player sees another tree, the waiting worker should go to it");
-    }
-
-    private static void CheckPickerGoesToNextKnownLooseCoalThenWaits(GameData data) {
-        var (world, _, post) = KnownSpots(data);
-        var at = Terrain.Spawn;
-        var coal = world.Things.Single(t => t.Kind == ThingKind.LooseCoal && t.Pos == at + new Vector2(0, 3));
-        var moreCoal = world.Things.Single(t => t.Kind == ThingKind.LooseCoal && t.Pos == at + new Vector2(4, 4));
-        var picker = AddWorker(world, coal.Pos);
-        world.Assign(picker, coal);
-        for (int i = 0; i < 20 && world.Find(coal.Id) != null; i++) world.Tick(.1f);
-        Require(world.Find(coal.Id) == null && picker.Assignment == moreCoal.Id, "a worker who picks up the last of a loose coal should go to the next known one, not a closer one under black fog");
-        for (int i = 0; i < 300 && world.Find(moreCoal.Id) != null; i++) world.Tick(.1f);
-        for (int i = 0; i < 100; i++) world.Tick(.1f);
-        Require(world.Find(moreCoal.Id) == null, "a worker who picked up the last known loose coal should have it gone");
-        Require(picker.Jobs.Count == 1, "the worker should keep one duty");
-        Require(((Duty)picker.Jobs[0]).Kind == ThingKind.LooseCoal, "the worker should keep the loose coal duty");
-        Require(picker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f, "the worker should wait at the trading post");
-    }
-
-    /// <summary>A miner moves on to the next known deposit of the same ore, and picks up its loose chips only once no deposit is left.</summary>
-    private static void CheckMinerWorksDepositsBeforePickingUpChips(GameData data) {
-        var world = EmptyWorld(data);
-        var at = Terrain.Spawn;
-        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 2));
-        world.Add(ThingKind.Toolstation, at + new Vector2(-2, 2)).Inventory.Add("steel_pick", 1);
-        var near = world.Add(ThingKind.Iron, at + new Vector2(1, 0), 4);
-        var chip = world.Add(ThingKind.IronChip, at + new Vector2(2, -1.5f), 1);
-        var far = world.Add(ThingKind.Iron, at + new Vector2(6, 0), 4);
-        world.Player = at; world.Look();
-        var miner = AddWorker(world, near.Pos);
-        world.Assign(miner, near);
-        bool chipFirst = false;
-        for (int i = 0; i < 1200 && world.Find(chip.Id) != null; i++) { world.Tick(.1f); chipFirst |= world.Find(chip.Id) == null && far.Remaining > 0; }
-        Require(!chipFirst, "a miner should work the next known deposit before picking up chips");
-        Require(far.Remaining == 0 && world.Find(chip.Id) == null, "a miner out of deposits should pick up the known chips");
-        for (int i = 0; i < 300 && miner.Bag.Count > 0; i++) world.Tick(.1f);
-        Require(chest.Inventory["iron_ore"] >= 9, $"the ore and the chip should end up in storage: {chest.Inventory["iron_ore"]}");
-    }
-
-    /// <summary>A miner with no pickaxe to be had picks up known loose ore instead of waiting at the deposit.</summary>
-    private static void CheckGathererWithoutAToolPicksUpLoosePieces(GameData data) {
-        var world = EmptyWorld(data);
-        var at = Terrain.Spawn;
-        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 2));
-        var deposit = world.Add(ThingKind.Iron, at + new Vector2(1, 0), 40);
-        var chip = world.Add(ThingKind.IronChip, at + new Vector2(-2, -1.5f), 1);
-        world.Player = at; world.Look();
-        var miner = AddWorker(world, deposit.Pos);
-        world.Assign(miner, deposit);
-        for (int i = 0; i < 300 && chest.Inventory["iron_ore"] == 0; i++) world.Tick(.1f);
-        Require(world.Find(chip.Id) == null && chest.Inventory["iron_ore"] == 1 && deposit.Remaining == 40, "a miner without a pickaxe should pick up the loose ore and leave the deposit");
     }
 
     /// <summary>A worker waiting for a tool takes one as soon as it hangs in a tool station that gives it out, and not while its filter keeps it in.</summary>
@@ -201,32 +95,6 @@ public static class WorkerStateChecks {
         for (int i = 0; i < 80 && worker.WorkState != WorkerWorkState.Blocked; i++) world.Tick(.25f);
         Require(worker.WorkState == WorkerWorkState.Blocked,
                 "a worker with no valid route to its destination should enter blocked state through Walk");
-    }
-
-    private static void CheckOnlyFirstFurnaceWorkerPumpsBellows(GameData data) {
-        var world = EmptyWorld(data);
-        var furnace = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
-        // Bellows are pumped only while there is something to smelt.
-        furnace.Inventory.Add("iron_bar", 20); furnace.Inventory.Add("coal", 20); furnace.Burner!.Add("coal", 10);
-        var bellowsWorker = AddWorker(world, furnace.Pos + World.BellowsStand);
-        var secondWorker = AddWorker(world, furnace.Pos);
-        world.Assign(bellowsWorker, furnace);
-        world.Assign(secondWorker, furnace);
-
-        world.Tick(.25f);
-        Require(bellowsWorker.WorkState == WorkerWorkState.Pumping,
-                "the assigned furnace bellows operator should enter pumping state through World.Tick");
-
-        // Only the bellows operator pumps: extra crew with nothing to fetch never joins.
-        var thirdWorker = AddWorker(world, furnace.Pos);
-        world.Assign(thirdWorker, furnace);
-        for (int i = 0; i < 40; i++) {
-            world.Tick(.25f);
-            Require(world.Workers.Count(w => w.WorkState == WorkerWorkState.Pumping) <= 1,
-                    "at most one worker should pump the bellows at a time");
-        }
-        Require(bellowsWorker.WorkState == WorkerWorkState.Pumping,
-                "the first assigned worker should keep operating the bellows with extra crew assigned");
     }
 
     private static void CheckSavedWorkerRestartsWithDefaultWorkState(GameData data) {

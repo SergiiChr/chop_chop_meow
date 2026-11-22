@@ -44,6 +44,17 @@ public static class AllocationChecks {
         // A woodcutter's first tree falls during the measured runs and leaves a stump, a new thing: those rare events are what this budget allows (measured 6.2).
         Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 7, warmup: 1200);
 
+        // A chest's hauler with nothing to carry looks on every tick for a place asking for what the chest holds, and for storage or a station giving out what its filter names.
+        var storing = new World(data);
+        var store = storing.Add(ThingKind.Chest, storing.Player + new Vector2(3, 0));
+        store.Inventory.Add("wood", 10);
+        storing.SetFilter(store, "stone", false, true);
+        storing.Add(ThingKind.Chest, storing.Player + new Vector2(-3, 0)).Inventory.Add("planks", 10);
+        WorkerSteps.Bench(storing, storing.Player + new Vector2(0, 4), "crate");
+        var storeHauler = WorkerSteps.Staff(storing, store, JobKind.Haul);
+        Check("tick: chest hauler with nothing to carry", () => { storing.Tick(1 / 60f); Fed(storing); });
+        Require(storeHauler.Bag.Count == 0 && store.Inventory["wood"] == 10, "the chest's hauler should have had nothing to carry through the ticks");
+
         // The host sends an update thirty times a second, against one the guest confirmed a few updates back, as over a long connection, and the guest merges it.
         // Only entries that changed are new arrays, on the host and again in the guest's merge: about seven worker and station entries an update in a working settlement (measured 10.5 KB an update).
         var hosting = Settlement(data);

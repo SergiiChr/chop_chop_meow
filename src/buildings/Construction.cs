@@ -61,11 +61,11 @@ public sealed class Construction(World world) {
             var door = Doorways.DoorPoint(new Thing { Pos = p });
             if (!world.CanStand(door) || Terrain.InLake(door, .8f) || world.S.Things.Any(t => !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
                 return "Leave open ground in front of the door.";
-            if (!world.CanStand(p + BarrelJobs.LadderApproach)) return "Leave dry, open ground at the cabin's ladder.";
+            if (!world.CanStand(p + BarrelHaul.LadderApproach)) return "Leave dry, open ground at the cabin's ladder.";
         }
         foreach (var hut in world.S.Things.Of(ThingKind.Hut)) {
             if (Doorways.DoorPoint(hut).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
-            if ((hut.Pos + BarrelJobs.LadderApproach).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's ladder clear.";
+            if ((hut.Pos + BarrelHaul.LadderApproach).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's ladder clear.";
         }
         if (!portable) return Unaffordable(kind);
         if (item == null || (world.MarkedSource ?? world.S.Backpack)[item] > 0) return null;
@@ -130,7 +130,7 @@ public sealed class Construction(World world) {
     /// Why a building cannot come down now, or null: someone shelters in it, or a cart is out from it.
     /// </summary>
     private string? DismantleBlock(Thing t) {
-        foreach (var w in world.Workers) if (BarrelJobs.OnLadderOrRoof(w, t)) return "Wait for the worker to come down the ladder.";
+        foreach (var w in world.Workers) if (BarrelHaul.OnLadderOrRoof(w, t)) return "Wait for the worker to come down the ladder.";
         foreach (var p in world.S.Players) if (p.Sheltered == t.Id || p.Door != Doorway.None && p.DoorCabin == t.Id) return "Someone is inside. It can come down once they step out.";
         foreach (var order in world.S.Orders) if (order.Signpost == t.Id) return "A cart is out from this trading post. Wait for it to come back.";
         return null;

@@ -78,7 +78,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.Player = sign.Pos;
         world.S.Backpack.Add(Inventory.Coins, 100);
         if (world.Hire(sign, world.Data.HireOffers[1]) is Worker worker) {
-            worker.Pos = barrel.Pos + BarrelJobs.SpoutApproach;
+            worker.Pos = barrel.Pos + BarrelHaul.SpoutApproach;
             worker.Tool = Bucket.Item;
             world.SetDuty(worker, farm, JobKind.Haul, true);
         }

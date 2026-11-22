@@ -89,14 +89,18 @@ Simulation and data:
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/Packing.cs` | Packing stations |
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
-| `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the gather, craft, bellows and fire jobs |
-| `src/Hauling.cs` | The four haul rules, what each kind of place offers a hauler, and the carry in hand |
+| `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the bellows and fire jobs |
+| `src/jobs/hauling/Hauling.cs`, `src/jobs/hauling/Carry.cs` | The Haul job: the best carry across a haul job's places, the carry in hand and what a hauler says |
+| `src/jobs/hauling/PlaceHaul.cs` | The part of the Haul job each kind of place extends, and the four haul rules its carries come under |
+| `src/stations/StationHaul.cs`, `src/farms/FarmHaul.cs`, `src/mines/MineHaul.cs`, `src/packing/PackerHaul.cs`, `src/storage/StoreHaul.cs` | What a crafting station, a farm plot, a mine site, a packing station, and a chest or placed crate offer a hauler |
+| `src/jobs/gathering/Gathering.cs`, `src/water/WaterGathering.cs` | The Gather job at resource spots, and the lake's version of it, which fills bottles |
+| `src/jobs/crafting/Crafting.cs`, `src/packing/PackCraft.cs` | The Craft job at a station, and the packing station's version of it, which packs crates |
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
 | `src/containers/ContainerItem.cs` | The base item shared by every fill of a steel bucket or barrel |
 | `src/containers/barrel/Barrels.cs`, `src/containers/barrel/model/Barrel.cs` | Portable and placed steel barrels, with a fill encoded in each portable barrel |
-| `src/containers/barrel/model/Bucket.cs`, `src/containers/barrel/BarrelJobs.cs` | Steel buckets and worker water hauling |
+| `src/containers/barrel/model/Bucket.cs`, `src/containers/barrel/BarrelHaul.cs` | Steel buckets, and the Haul job's water work: barrels filled and dry farm plots watered from the worker's tool slot |
 | `src/containers/barrel/model/WorkerWaterAction.cs` | The haul actions sent to the window for rendering |
 | `src/containers/barrel/BedtimeWater.cs` | Cabin water at bedtime and its effect on dawn's needs |
 | `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
@@ -166,7 +170,7 @@ UI and input:
 | `src/PilePanel.cs` | A pile or compost heap |
 | `src/ToolRackPanel.cs` | A tool station |
 | `src/containers/barrel/display/BarrelPanel.cs`, `src/containers/barrel/display/CarriedBarrelPanel.cs` | Water and hauling on a placed barrel and the water slot in a backpack barrel |
-| `src/CratePanel.cs` | A placed crate, and a packed crate opened from the backpack |
+| `src/CratePanel.cs` | A placed crate with its filters and Haul job, and a packed crate opened from the backpack |
 | `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |
@@ -232,12 +236,12 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | A feature's rules, UI and network checks beside its steps, including `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
-| `tests/*Checks.cs` | Simulation checks of the features whose code is still flat, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
+| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps: `tests/hauling/`, `tests/gathering/`, `tests/crafting/`, `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/*Checks.cs` | Simulation checks of the features that have no folder yet, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
-| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events for the features whose code is still flat, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
-| `src/RecipeReadyChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
+| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events for the features that have no folder yet, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
+| `tests/crafting/RecipeReadyUIChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
 | `src/NetChecks.cs` | The host and guest network session (`NET-HOST PASS`, `NET-GUEST PASS`): joining, leaving and reconnecting, with each feature's `NetScene` played in between (`Game.NetScenes`) |
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps several features' UI and network checks share, and `Game.TestClean`, which fails a UI check that leaves a mess |
@@ -263,10 +267,10 @@ Checks and review tools:
 Keep balance and recipe values in `GameData` and `GameTables`, apart from the rules in the simulation code.
 Keep rendering and input separate from state transitions, so headless checks can exercise gameplay rules without relying on screenshots.
 
-- `tests/SimulationChecks.cs` covers filters, worker routing, furnace work, trade, wages, recovery after death, saves and a material-driven progression run.
+- `tests/SimulationChecks.cs` covers filters, worker routing, trade, wages, recovery after death, saves and a material-driven progression run.
 - `tests/EconomyChecks.cs` measures real workers through a day and checks the economy rules.
 - `tests/AllocationChecks.cs` holds ticks to their allocation budgets.
-- `tests/ProductionChainChecks.cs` covers the packing station, the trading post's filter and auto-sell, and workers alone running the berry, bread, canned stew and steel pickaxe chains to a sale.
+- `tests/ProductionChainChecks.cs` covers the trading post's filter and auto-sell, and workers alone running the berry, bread, canned stew and steel pickaxe chains to a sale.
 
 ### HUD and backpack
 
@@ -520,7 +524,7 @@ a vessel put into a station whose recipe takes its liquid pours every liter it h
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
 Loading a station by hand and a worker's delivery pass it what the input slot has left (`Inventory.SlotRoom`).
-Station haulers fetch a liquid input in the fullest bottles storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
+Station haulers fetch a liquid input in the fullest bottles storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`StationHaul.RoomySource`), and a dismantled station fills the backpack's vessels and spills the rest.
 No hand recipe takes a liquid, which `GameData` checks.
 
 #### Steel barrels and buckets
@@ -1021,6 +1025,7 @@ The server keeps only the slot each player's held stack lies in (`PlayerState.He
 It lets go of the stack when the player is down, walks out of reach of the building it lies in, or leaves, and when its crate is put down or sold; a load starts with nothing held.
 
 A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (12) items in all, one stack or up to twelve kinds, for every load.
+A barrel or a packed crate fills them alone, one at a time (`Inventory.CarriedBy`).
 The one tool a worker holds lies in `Worker.ToolSlot`, which `Worker.Tool` names.
 Both are boxes a player in reach of the worker (`World.Reaches`) picks up from and puts into as with a building's slots: anything goes into the hands, only a tool into the tool slot.
 
@@ -1028,7 +1033,7 @@ Both are boxes a player in reach of the worker (`World.Reaches`) picks up from a
 
 Chests have separate item allowlists for input and output, and empty lists allow all items.
 Automated deposits go to the nearest place that asks for the item, then to the nearest unrestricted storage (`World.DepositFor`).
-Asking for it are a chest, pile or trading post whose input filter names it, a packing station packing it, a station whose recipe takes it as an input or burns it, a farm plot short of it for a sowing and a mine site short of it.
+Asking for it are a chest, pile, placed crate or trading post whose input filter names it, a packing station packing it, a station whose recipe takes it as an input or burns it, a farm plot short of it for a sowing and a mine site short of it.
 `World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
 Manual transfers ignore those filters.
@@ -1068,7 +1073,8 @@ Those contents have an update entry of their own (`EntryKey.Crates`), sent only 
 A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
 `World.PackedKind` gives `World.MixedCrate` for a crate of mixed goods, which only a pile's filter can name.
 A pile of crates holds crates of one good, or crates of mixed goods.
-Placed crates are manual storage only.
+A placed crate takes part in automation like a chest, and its filters stay with its contents while it is packed.
+No worker carries a crate into one, and its filters name none (`World.Nests`).
 
 #### Packing station
 
@@ -1077,7 +1083,7 @@ Its inventory takes only that good and empty crates; `Thing.Output` holds the cr
 While worked like an anvil, it moves one item every `PackSeconds` into that crate, opening an empty crate for the first.
 A full crate, or one of another good after the choice changes, waits in the output.
 
-- Haul carries that crate to `DepositFor` and the station's leftovers to storage, and brings the good and empty crates up to a stack of each (`World.PackerCarries`); a batch is one crate.
+- Haul carries that crate to `DepositFor` and the station's leftovers to storage, and brings the good and empty crates up to a stack of each (`PackerHaul`); a batch is one crate.
 - `DepositFor` counts the station as storage for its good, ranked with explicit filters, while a stack's delivery still leaves a slot for empty crates (`World.PackerTakes`).
 - A crate packed full is a round of the Craft job.
 
@@ -1098,7 +1104,10 @@ Workers are tracked individually.
 
 The kinds of work are `JobKind`, each with an id in saves and commands (`JobKinds.Id`), and one table holds each job's title, hint, whether a round of it is a unit of the place's work, the tools it takes and what it does (`World.Def`, `JobDef`).
 A place offers some of them (`World.Jobs`), such as Craft and Haul at a crafting bench.
+A job that several kinds of place offer is a class in `src/jobs/` that `World` holds: `Hauling`, `Gathering` and `Crafting`.
+A place with its own way of doing it extends it in its feature's folder: every place that offers Haul has a `PlaceHaul`, the lake gathers through `WaterGathering` and a packing station is worked through `PackCraft`.
 
+- Haul at a chest or placed crate carries out and fills it by its filters ([hauling](#hauling)).
 - Stock brings tools from storage to a tool station.
 - Tend fetches what a compost pile's filters take from storage and carries its fertilizer out.
 - Deliveries runs price errands and carries the trading post's mail, other than coins, to storage.
@@ -1127,8 +1136,8 @@ On a worker's page `JobList` draws the list and turns a row dragged by its `JobG
 
 #### Hauling
 
-A haul job carries one load at a time (`World.Haul`).
-Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, `FarmCarries`, `MineCarries`), and the best is the hauler's plan (`Worker.Plan`, a `Carry`) until the load is picked up:
+A haul job carries one load at a time (`Hauling.Haul`).
+Each kind of place offers its carries through its own `PlaceHaul` (`StationHaul`, `PackerHaul`, `FarmHaul`, `MineHaul`, `StoreHaul`, and `BarrelHaul`, which offers none), and the best is the hauler's plan (`Worker.Plan`, a `Carry`) until the load is picked up:
 
 1. an input or the fuel slot holding less than one batch, and fuel the recipe does not burn, which leaves the slot;
 2. an output that is full, or anything another recipe left in the slots;
@@ -1138,6 +1147,9 @@ Each kind of place offers its carries (`World.StationCarries`, `PackerCarries`, 
 Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold one sowing (`Farms.SowRoom`) and a mine site what it lacks.
 A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
 Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
+
+A chest's or placed crate's hauler carries out what its output filter lets go to the nearest place asking for it (`World.AskerFor`), then fills it with what its input filter names (`StoreHaul.FillSource`); every such carry comes under the first rule.
+Storage that asks for an item never passes it to other storage asking for it, nor takes it from one, so two never trade it back and forth.
 
 #### Gathering and the bellows
 
@@ -1257,8 +1269,8 @@ The player harvests through `World.Gather` and assigned workers through `World.R
 The yield goes into the plot's `Thing.Output`; nothing moves seed back into the plot's input slots on its own.
 
 - A worker on Farm harvests.
-- A worker on Haul keeps the input slots at one sowing, from the plot's own output first and then from storage, and carries out the rest (`World.FarmCarries`).
-- `BarrelJobs` sends the hauler to fill a bucket when the growing plot is dry.
+- A worker on Haul keeps the input slots at one sowing, from the plot's own output first and then from storage, and carries out the rest (`FarmHaul`).
+- `BarrelHaul` sends the hauler to fill a bucket when the growing plot is dry.
   The worker walks between four places on the plot, stops to tip part of the bucket at each and keeps the empty bucket.
 
 ## Intro film

@@ -17,71 +17,10 @@ public static class ProductionChainChecks {
     private static readonly string[] Products = { "canned_meat_stew", "bread", "steel_pick", "berries" };
 
     public static void Run(GameData data) {
-        CheckPackingStationTakesOnlyItsGoodAndPacksCrates(data);
-        CheckHaulerStocksPackerAndCarriesCratesToStorageAskingForThem(data);
         CheckPileOfPackedCratesTakesOnlyTheSameGood(data);
         CheckPileOfMixedCratesTakesAnyMixedCrate(data);
         CheckPostsTakeOnlyAskedForCratesAndSendTheCartWhenFull(data);
-        CheckBenchKeepsMakingToolsWithNowhereElseToPutThem(data);
-        CheckHaulerFetchesInputsFromTheStationThatMadeThem(data);
         CheckWorkersRunEveryChain(data);
-    }
-
-    /// <summary>A packing station packs only while worked, one item at a time, names the crate after its good, and holds a full crate until it is carried out.</summary>
-    private static void CheckPackingStationTakesOnlyItsGoodAndPacksCrates(GameData data) {
-        var world = EmptyWorld(data);
-        var packer = world.Add(ThingKind.Packer, new Vector2(20, 20));
-        world.Player = packer.Pos + new Vector2(1, 0);
-        world.SetPacking(packer, "bread");
-        Require(packer.Packs == "bread", "a packing station should be set to pack bread");
-        Require(world.Holds(packer, "bread"), "a packing station should take its own good");
-        Require(world.Holds(packer, "crate"), "a packing station should take empty crates");
-        Require(!world.Holds(packer, "berries"), "a packing station should refuse another good");
-        packer.Inventory.Add("bread", 13); packer.Inventory.Add("crate", 2);
-        world.Player = new Vector2(40, 40);
-        SafeTick(world, 10);
-        Require(packer.Output!.Count == 0 && packer.Inventory["bread"] == 13, "a packing station should not pack while nobody works it");
-        world.Player = packer.Pos + new Vector2(1, 0);
-        SafeTick(world, data.PackSeconds * data.CrateCapacity + 1);
-        string crate = packer.Output.First()!;
-        Require(crate.StartsWith(World.CrateOf("bread") + "_"), $"the player working it should name the crate after its good: {crate}");
-        Require(world.Packed(crate)!["bread"] == data.CrateCapacity, $"the player working it should pack a crate of twelve bread: {crate}");
-        Require(packer.Inventory["bread"] == 1, $"the packing station should use up one bread: {crate}");
-        Require(packer.Inventory["crate"] == 1, $"the packing station should use up one empty crate: {crate}");
-        SafeTick(world, 10);
-        Require(packer.Output.Count == 1 && packer.Inventory["bread"] == 1, "a full crate should wait in the output and stop packing until it is carried out");
-    }
-
-    /// <summary>A hauler stocks goods and crates from storage, carries the full crate to the nearest storage asking for crates of that good, and clears out the old good when the station changes.</summary>
-    private static void CheckHaulerStocksPackerAndCarriesCratesToStorageAskingForThem(GameData data) {
-        var world = EmptyWorld(data);
-        var packer = world.Add(ThingKind.Packer, new Vector2(20, 20));
-        world.Player = packer.Pos + new Vector2(1, 0);
-        world.SetPacking(packer, "bread");
-        packer.Inventory.Add("bread", 13); packer.Inventory.Add("crate", 2);
-        SafeTick(world, data.PackSeconds * data.CrateCapacity + 1);
-        string crate = packer.Output!.First()!;
-        world.Player = new Vector2(40, 40);
-        var general = world.Add(ThingKind.Chest, packer.Pos + new Vector2(2, 0));
-        var crates = world.Add(ThingKind.Chest, packer.Pos + new Vector2(6, 0));
-        crates.Inventory.InputFilter.Add(World.CrateOf("bread"));
-        general.Inventory.Add("bread", 30); general.Inventory.Add("crate", 4);
-        var worker = AddWorker(world, packer.Pos + new Vector2(0, 1));
-        worker.Wage = 18;
-        world.Assign(worker, packer);
-        for (float waited = 0; waited < 40 && crates.Inventory[crate] == 0; waited += .1f) world.Tick(.1f);
-        Require(crates.Inventory[crate] == 1 && general.Inventory[crate] == 0, "the hauler should carry the full crate past general storage to the chest asking for crates of bread");
-        bool Packing() => packer.Output.Count == 1 && world.Packed(packer.Output.First()!)!["bread"] > 1;
-        for (float waited = 0; waited < 40 && !Packing(); waited += .1f) world.Tick(.1f);
-        Require(Packing(), "the worker should restock bread and pack the next crate");
-        // A worker who packs and hauls keeps packing while there is something to pack, so empty crates come once the crate in hand is full.
-        for (float waited = 0; waited < 60 && packer.Inventory["crate"] == 0; waited += .1f) world.Tick(.1f);
-        Require(packer.Inventory["crate"] >= 1, "the worker should restock empty crates once the crate in hand is packed");
-
-        // Changing the good leaves the old goods for the hauler to carry out.
-        world.SetPacking(packer, "berries");
-        SafeTick(world, 20);
-        Require(packer.Inventory["bread"] == 0, "after switching to berries, the hauler should carry the leftover bread out");
     }
 
     /// <summary>A pile of packed crates takes more crates of the same good, but no crate of another good.</summary>
@@ -141,40 +80,6 @@ public static class ProductionChainChecks {
         Require(world.Orders.Count == 1, "a full post set to sell on its own should send one cart");
         Require(world.Orders[0].Crates == World.MarketSlots, "the cart should carry every crate of the full post");
         Require(sign.Inventory.Count == 0, "the post should be empty once the cart leaves");
-    }
-
-    /// <summary>
-    /// A settlement by the lake, run only by workers, sells each end product by cart within a few days.
-    /// Workers mine, chop, rake, pick and fetch water; they smelt, forge, hammer, grind, bake, cook and can; and they make crates, pack them and stock the post.
-    /// </summary>
-    /// <summary>With no storage taking pickaxes, the bench keeps its finished pickaxes and its worker goes on making more.</summary>
-    private static void CheckBenchKeepsMakingToolsWithNowhereElseToPutThem(GameData data) {
-        var world = EmptyWorld(data);
-        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
-        world.SetRecipe(bench, "steel_pick");
-        bench.Tools!.Add("steel_hammer", 1);
-        // Piles take only the one resource they hold, so nothing takes a pickaxe.
-        world.Add(ThingKind.Pile, bench.Pos + new Vector2(4, 0)).Inventory.Add("steel_parts", 20);
-        world.Add(ThingKind.Pile, bench.Pos + new Vector2(8, 0)).Inventory.Add("wood_parts", 10);
-        var worker = AddWorker(world, bench.Pos + new Vector2(0, 1));
-        worker.Wage = 18;
-        world.SetDuty(worker, bench, JobKind.Craft, true); world.SetDuty(worker, bench, JobKind.Haul, true);
-        Work(world, 180, () => bench.Inventory["steel_pick"] >= 3);
-        Require(bench.Inventory["steel_pick"] >= 3, $"the bench should keep making pickaxes it has nowhere else to put: {bench.Inventory["steel_pick"]} made");
-    }
-
-    /// <summary>A bench's hauler takes steel parts straight from the anvil that hammered them.</summary>
-    private static void CheckHaulerFetchesInputsFromTheStationThatMadeThem(GameData data) {
-        var world = EmptyWorld(data);
-        var anvil = world.Add(ThingKind.Anvil, new Vector2(20, 20));
-        anvil.Inventory.Add("steel_parts", 6);
-        var bench = world.Add(ThingKind.Bench, new Vector2(26, 20));
-        world.SetRecipe(bench, "steel_hammer");
-        var worker = AddWorker(world, bench.Pos + new Vector2(0, 1));
-        worker.Wage = 18;
-        world.SetDuty(worker, bench, JobKind.Haul, true);
-        Work(world, 30, () => bench.Inventory["steel_parts"] > 0);
-        Require(bench.Inventory["steel_parts"] == 6 && anvil.Inventory["steel_parts"] == 0, "the bench's hauler should fetch the steel parts from the anvil's finished goods");
     }
 
     private static void CheckWorkersRunEveryChain(GameData data) {

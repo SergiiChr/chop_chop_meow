@@ -7,10 +7,10 @@ namespace ChopChopMeow;
 /// <summary>Fits the fixed ladder and mounted barrel to the cabin, with contact points for the worker.</summary>
 internal static class CabinWaterModel {
     public const float LadderX = 1.58f, LadderWidth = .48f;
-    public static readonly float LadderZ = BarrelJobs.LadderApproach.Y;
+    public static readonly float LadderZ = BarrelHaul.LadderApproach.Y;
     public const float FirstRung = .24f, RungSpacing = .28f;
     public const int RungCount = 10;
-    public static readonly Vector3 LadderApproach = new(BarrelJobs.LadderApproach.X, 0, LadderZ);
+    public static readonly Vector3 LadderApproach = new(BarrelHaul.LadderApproach.X, 0, LadderZ);
     public static readonly Vector3 RoofEntry = new(1.18f, CabinShape.RoofSurface(LadderZ), LadderZ);
     public static readonly Vector3 PourStand = new(.25f, CabinShape.RoofSurface(.62f), .62f);
     public static readonly Vector3 FillOpening = new(-.31f, 3.30f, .62f);

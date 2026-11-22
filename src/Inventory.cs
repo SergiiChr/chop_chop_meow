@@ -10,25 +10,39 @@ namespace ChopChopMeow;
 public sealed class Inventory {
     public enum Carrier { None, Player, Worker }
 
-    /// <summary>A player's empty barrels stack beside one filled barrel, and a worker with a barrel carries nothing else in their hands.</summary>
+    /// <summary>A player's empty barrels stack beside one filled barrel, and a worker with a barrel or a packed crate carries nothing else in their hands.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public Carrier CarriedBy { get; set; }
+
+    /// <summary>Whether a worker carries an item in both arms, one at a time and with nothing beside it: a barrel or a packed crate.</summary>
+    private static bool BothArms(string item) => Barrel.Is(item) || World.IsPacked(item);
+
+    /// <summary>Whether a worker's hands hold a barrel or a packed crate, which leaves room for nothing else.</summary>
+    public bool ArmsFull {
+        get {
+            // Such an item is always the only one in hand.
+            if (CarriedBy != Carrier.Worker || Count != 1) return false;
+            foreach (string item in items.Keys) if (BothArms(item)) return true;
+            return false;
+        }
+    }
 
     private int CarryRoom(string item) {
         if (CarriedBy == Carrier.Player && Barrel.IsFilled(item)) return Barrel.FilledIn(this) == null ? 1 : 0;
         if (CarriedBy != Carrier.Worker) return int.MaxValue;
-        if (Barrel.Is(item)) return Count == 0 ? 1 : 0;
-        return Barrel.In(this) == null ? int.MaxValue : 0;
+        if (BothArms(item)) return Count == 0 ? 1 : 0;
+        return ArmsFull ? 0 : int.MaxValue;
     }
 
-    private bool CountsTowardBarrelLimit(string item) => CarriedBy == Carrier.Player ? Barrel.IsFilled(item) : CarriedBy == Carrier.Worker && Barrel.Is(item);
-    private bool WithinBarrelLimit(int barrels, int incoming) =>
-        barrels <= 1 && (CarriedBy != Carrier.Worker || barrels == 0 || incoming == 1);
+    /// <summary>Whether an item counts toward the one a carrier may hold: a player's filled barrel, or a worker's barrel or packed crate.</summary>
+    private bool CountsTowardCarryLimit(string item) => CarriedBy == Carrier.Player ? Barrel.IsFilled(item) : CarriedBy == Carrier.Worker && BothArms(item);
+    private bool WithinCarryLimit(int limited, int incoming) =>
+        limited <= 1 && (CarriedBy != Carrier.Worker || limited == 0 || incoming == 1);
 
     internal bool ValidFor(Carrier carrier) {
         if (CarriedBy != carrier) return false;
-        int barrels = 0;
-        foreach (var (item, count) in items) if (CountsTowardBarrelLimit(item)) barrels += count;
-        return WithinBarrelLimit(barrels, Count);
+        int limited = 0;
+        foreach (var (item, count) in items) if (CountsTowardCarryLimit(item)) limited += count;
+        return WithinCarryLimit(limited, Count);
     }
     /// <summary>
     /// A persisted stack in a particular inventory cell.
@@ -170,9 +184,15 @@ public sealed class Inventory {
             for (int i = 0; i < limit; i++) if (Layout[i].Item == item) spare += stack - Layout[i].Count;
             empty -= (Math.Max(0, count - spare) + stack - 1) / stack;
         }
-        int barrels = CarriedBy == Carrier.None ? 0 : goods.Where(pair => CountsTowardBarrelLimit(pair.Key)).Sum(pair => pair.Value);
+        int limited = CarriedBy == Carrier.None ? 0 : goods.Where(pair => CountsTowardCarryLimit(pair.Key)).Sum(pair => pair.Value);
         int incoming = goods.Values.Sum();
-        return WithinBarrelLimit(barrels, incoming) && empty >= 0 && (Capacity == 0 || Count + incoming <= Capacity);
+        return WithinCarryLimit(limited, incoming) && empty >= 0 && (Capacity == 0 || Count + incoming <= Capacity);
+    }
+
+    /// <summary>The first item this box holds less of than one batch takes, or null.</summary>
+    public string? Short(Dictionary<string, int> batch) {
+        foreach (var (item, needed) in batch) if (this[item] < needed) return item;
+        return null;
     }
 
     /// <summary>Slots to show: every stack, plus one single-item slot per unit of capacity left.</summary>
@@ -181,7 +201,7 @@ public sealed class Inventory {
             if (Capacity <= 0) return Slots;
             int last = 0;
             for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item != "") last = i + 1;
-            int left = CarriedBy == Carrier.Worker && Barrel.In(this) != null ? 0 : Math.Max(0, Capacity - Count);
+            int left = ArmsFull ? 0 : Math.Max(0, Capacity - Count);
             return Math.Min(Slots, Math.Max(last, UsedSlots + left));
         }
     }

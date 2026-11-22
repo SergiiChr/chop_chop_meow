@@ -4,15 +4,17 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A crate: its fill out of twelve, whether the village would buy it packed, and how to pick it up.</summary>
+/// <summary>A placed crate: its fill out of twelve, whether the village would buy it packed, how to pick it up, its filters and its haul job.</summary>
 public partial class CratePanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
         var sells = Style.Pill("✓", Style.TagPill, Style.Rim, 13); sells.MouseFilter = Control.MouseFilterEnum.Pass; sells.TooltipText = "The village buys this crate packed";
         panel.AddToHeader(sells);
+        FilterButton();
         AddChild(Meter(world, live, () => thing.Inventory, sells));
         Well(new VBoxContainer()).AddChild(StorageGrid());
         var hint = Row(); hint.AddThemeConstantOverride("separation", 8);
         hint.AddChild(Style.Text("Hold", 14, Style.Beige)); hint.AddChild(Style.Glyph("line_mouse", 24, Style.Rim)); hint.AddChild(Style.Text("to pick up", 14, Style.Beige));
+        JobButtons();
         StoreBagGrid();
     }
 

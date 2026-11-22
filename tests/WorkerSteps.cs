@@ -45,29 +45,6 @@ internal static class WorkerSteps {
         return sign;
     }
 
-    /// <summary>
-    /// A clearing with a trading post, a chest, a spent tree and a loose coal beside it, more of each further off that a player has seen, and a closer tree and coal under black fog.
-    /// The player has walked away, so everything known is out of sight.
-    /// </summary>
-    public static (World World, List<string> Said, Thing Post) KnownSpots(GameData data) {
-        var world = EmptyWorld(data);
-        var said = new List<string>();
-        world.Notify += said.Add;
-        var at = Terrain.Spawn;
-        var post = world.Add(ThingKind.Signpost, at + new Vector2(-3, 2));
-        world.Add(ThingKind.Chest, at + new Vector2(2, 2));
-        world.Add(ThingKind.Tree, at + new Vector2(1, 0), 1);
-        world.Add(ThingKind.Tree, at + new Vector2(6, 0), 2);
-        world.Add(ThingKind.LooseCoal, at + new Vector2(0, 3), 1);
-        world.Add(ThingKind.LooseCoal, at + new Vector2(4, 4), 1);
-        world.Player = at; world.Look();
-        // Out of every player's sight, so these stay under black fog.
-        world.Player = at + new Vector2(0, 40); world.Look();
-        world.Add(ThingKind.Tree, at + new Vector2(3, 0), 5);
-        world.Add(ThingKind.LooseCoal, at + new Vector2(1, 4), 1);
-        return (world, said, post);
-    }
-
     /// <summary>A tree and a berry bush worked from a chest and a tool station, with the player at the station.</summary>
     public static (World World, Thing Tree, Thing Bush, Thing Station) ToolYard(GameData data) {
         var world = EmptyWorld(data);
@@ -91,17 +68,6 @@ internal static class WorkerSteps {
         var cutter = AddWorker(world, tree.Pos + new Vector2(1, 1));
         world.Assign(cutter, tree);
         return new Woodlot(world, next, chest, rack, cutter);
-    }
-
-    /// <summary>A bush with an oak's leaf patch beside it, a chest and an empty tool station, all in the player's sight.</summary>
-    public static (World World, Thing Bush, Thing Leaves, Thing Chest, Thing Rack) Thicket(GameData data) {
-        var world = EmptyWorld(data);
-        var bush = world.Add(ThingKind.Bush, new Vector2(10, 10), World.BushLeaves);
-        var leaves = world.Add(ThingKind.Leaves, new Vector2(11, 11), World.LeafPatch);
-        var chest = world.Add(ThingKind.Chest, new Vector2(12, 13));
-        var rack = world.Add(ThingKind.Toolstation, new Vector2(12, 8));
-        world.Player = new Vector2(14, 12); world.Look();
-        return (world, bush, leaves, chest, rack);
     }
 
     public static void Hire(World world, Thing target) => world.Assign(AddWorker(world, target.Pos + new Vector2(1, 1)), target);

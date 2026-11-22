@@ -17,6 +17,7 @@ public sealed class FilterState {
 /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
 /// A plain pile has only the row of what workers bring, naming one resource, which also sets what they take.
 /// A barrel has the same single row and names water.
+/// A placed crate's filters name no crate.
 /// Water in a full or partly filled vessel is one entry.
 /// </summary>
 /// <param name="redraw">Draws the page again after a change to this window; the page does so itself when the filters change.</param>
@@ -70,9 +71,9 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             var list = new ScrollContainer { Name = "item_list", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
             list.AddChild(picker); AddChild(Style.InWell(list));
             scrolls(list, picker);
-            var crates = world.Data.ListOrder.Where(world.Data.Market.Sells.ContainsKey).Select(World.CrateOf).Where(id => post || world.Holds(t, id));
+            var crates = world.Data.ListOrder.Where(world.Data.Market.Sells.ContainsKey).Select(World.CrateOf).Where(id => post || Holds(id));
             if (pile) crates = crates.Append(World.MixedCrate);
-            var items = world.Data.ListOrder.Where(id => world.Holds(t, id));
+            var items = world.Data.ListOrder.Where(Holds);
             if (pile) items = items.Select(world.PileEntry).Distinct();
             var choices = barrel ? new[] { Water.Liquid } : post ? crates : items.Concat(crates);
             foreach (var id in choices) {
@@ -83,8 +84,12 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
         }
         var clear = kit.Button("Clear", () => world.ClearFilters(t)); clear.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; AddChild(clear);
 
+        // A placed crate's filters name no crate, since a crate never goes into one.
+        bool Holds(string item) => world.Holds(t, item) && !World.Nests(t, item);
+
         bool CanName(string item) {
             if (barrel) return Barrels.CanPour(world.Data, item);
+            if (World.Nests(t, item)) return false;
             var kind = World.PackedKind(item);
             return !kind.IsEmpty && (pile || !kind.SequenceEqual(World.MixedCrate)) || !post && world.Data.Items.ContainsKey(item);
         }

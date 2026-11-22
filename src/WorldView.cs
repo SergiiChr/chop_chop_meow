@@ -580,13 +580,13 @@ public partial class WorldView : Node3D {
             bool sameAction = state.Action == work;
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
-            string? vessel = BarrelJobs.Vessel(worker.Tool) ? worker.Tool : null;
+            string? vessel = BarrelHaul.Vessel(worker.Tool) ? worker.Tool : null;
             var waterTarget = worker.WaterAction is WorkerWaterAction.None or WorkerWaterAction.WalkFarm ? null : World.Find(worker.WaterTarget);
             if (waterTarget != null && vessel != null) {
                 var point = waterTarget.Kind switch {
                     ThingKind.Barrel when worker.WaterAction == WorkerWaterAction.Fill => To3(waterTarget.Pos) + VesselShape.BarrelSpout,
                     ThingKind.Barrel => To3(waterTarget.Pos) + VesselShape.BarrelFillOpening,
-                    ThingKind.Farm => To3(BarrelJobs.FarmPourPoint(waterTarget, worker.FarmWaterStop)) + Vector3.Up * .03f,
+                    ThingKind.Farm => To3(BarrelHaul.FarmPourPoint(waterTarget, worker.FarmWaterStop)) + Vector3.Up * .03f,
                     ThingKind.Water => To3(Terrain.WaterPoint(worker.Pos) - (worker.Pos - Terrain.Lake).Normalized() * .45f),
                     _ => To3(waterTarget.Pos)
                 };

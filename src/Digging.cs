@@ -33,10 +33,10 @@ public partial class World {
     }
 
     /// <summary>Whether enough digging has gone into a stump or a bush to bring it out of the ground.</summary>
-    private static bool DugOut(Thing t) => t.Progress >= GatherRules.DigSeconds;
+    internal static bool DugOut(Thing t) => t.Progress >= GatherRules.DigSeconds;
 
     /// <summary>Lifts a dug out stump or bush into an inventory and takes it out of the world; false while that has no room for all of it.</summary>
-    private bool Unearth(Thing t, Inventory into) {
+    internal bool Unearth(Thing t, Inventory into) {
         string item = ResourceItem(t);
         int taken = into.Add(item, t.Remaining); t.Remaining -= taken;
         if (taken > 0) Got(item);
