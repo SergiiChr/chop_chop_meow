@@ -94,7 +94,7 @@ internal static class EconomySteps {
         var r = data.Recipes[recipe];
         var station = world.Add(r.Station!.Value, new Vector2(20, 20));
         world.SetRecipe(station, recipe);
-        foreach (var slot in World.SlotRules(station.Kind)) station.Tools!.Add(slot.Tool switch { "chisel" => "stone_chisel", "hammer" => "steel_hammer", _ => slot.Tool }, 1);
+        foreach (var slot in world.SlotRules(station.Kind)) station.Tools!.Add(slot.Tool switch { "chisel" => "stone_chisel", "hammer" => "steel_hammer", _ => slot.Tool }, 1);
         var supply = world.Add(ThingKind.Chest, new Vector2(23, 20));
         supply.Inventory.Slots = 300;
         foreach (var item in BatchCost(world, recipe).Keys) {

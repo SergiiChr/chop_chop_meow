@@ -275,7 +275,7 @@ public static class CraftingChecks {
     private static void CheckPlayerWorksAStationOnlyWithinAMetreOfItsEdge(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Inventory.Add("steel_bar", 3); anvil.Tools!.Add("steel_hammer", 1);
+        anvil.Inventory.Add("steel_bar", 3); SlotPlainestTools(world, anvil);
         world.Player = anvil.Pos + new Vector2(1.6f, 0);
         for (int i = 0; i < 4; i++) world.Tick(.25f);
         Require(!anvil.Processing, "a player standing 1.15 m from the anvil's edge must not hammer it");
@@ -295,7 +295,7 @@ public static class CraftingChecks {
     private static void CheckAnvilNeedsHammering(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Inventory.Add("steel_bar", 3); anvil.Tools!.Add("steel_hammer", 1);
+        anvil.Inventory.Add("steel_bar", 3); SlotPlainestTools(world, anvil);
         world.Player = anvil.Pos + new Vector2(1.2f, 0);
         for (int i = 0; i < 8; i++) { world.MovePlayer(new Vector2(i % 2 == 0 ? .1f : -.1f, 0)); world.Tick(.25f); }
         Require(!anvil.Processing && anvil.Inventory["steel_bar"] == 3, "an anvil must not start while the player only walks past it");
@@ -362,7 +362,7 @@ public static class CraftingChecks {
     private static void CheckAnvilHammersABarIntoTwoSheets(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Tools!.Add("steel_hammer", 1);
+        SlotPlainestTools(world, anvil);
         world.Player = anvil.Pos + new Vector2(1.2f, 0);
         Give(world, "steel_bar", 1); Give(world, "tin_bar", 1);
         world.QueueBatch(anvil, "steel_sheet");
@@ -379,7 +379,7 @@ public static class CraftingChecks {
     private static void CheckGuestStandingAtAnAnvilHammersIt(GameData data) {
         var (world, guest, _) = Hosted(data);
         var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(-6, 0));
-        anvil.Inventory.Add("steel_bar", 1); anvil.Tools!.Add("steel_hammer", 1);
+        anvil.Inventory.Add("steel_bar", 1); SlotPlainestTools(world, anvil);
         world.Player = Terrain.Spawn + new Vector2(20, 0);
         FedPlayersTick(world, 1);
         Require(!anvil.Processing, "an anvil nobody stands at should not start");

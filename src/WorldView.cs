@@ -560,7 +560,7 @@ public partial class WorldView : Node3D {
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
-        PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, StationHammer(worked, World.Me) ?? SelectedTool, World.S.Backpack), torch, door, dt);
+        PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, StationHammer(tool, worked, World.Me) ?? SelectedTool, World.S.Backpack), torch, door, dt);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject, playerRig);
@@ -644,18 +644,17 @@ public partial class WorldView : Node3D {
     }
 
     /// <summary>
-    /// The hammer a player works a station with tool slots with: the faster of the one slotted there and the one they
-    /// carry; null away from such a station, or with no hammer at hand.
+    /// The hammer a player swinging <paramref name="tool"/> works a station with tool slots with: the faster of the one
+    /// slotted there and the one they carry; null for another tool, away from such a station, or with no hammer at hand.
     /// </summary>
-    private string? StationHammer(Thing? station, PlayerState p) {
-        if (station?.Tools == null) return null;
+    private string? StationHammer(string? tool, Thing? station, PlayerState p) {
+        if (tool != "hammer" || station?.Tools == null) return null;
         using var acting = World.ActAs(p);
         return World.ToolInUse(station, "hammer", 0);
     }
 
     /// <summary>Whether the acting player has the tool a station's recipe needs: slotted, carried or none.</summary>
-    private bool Tooled(Thing t) =>
-        t.Tools == null || !World.Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Tool == "" || World.ToolInUse(t, r.Tool, r.Tier) != null;
+    private bool Tooled(Thing t) => t.Tools == null || !World.Data.Recipes.TryGetValue(t.Recipe, out var r) || World.HasToolFor(t, r);
 
     /// <summary>How high a flame leaps at <paramref name="phase"/>, from 0 to 1 and back twice a turn, smoothly at both ends.</summary>
     private static float Rising(float phase) => MathF.Sin(phase) * MathF.Sin(phase);
@@ -718,7 +717,7 @@ public partial class WorldView : Node3D {
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             string? tool = ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null);
-            PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, StationHammer(worked, p) ?? p.Selected, p.Backpack), torch, door, dt);
+            PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, StationHammer(tool, worked, p) ?? p.Selected, p.Backpack), torch, door, dt);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, subject, other.Rig);
@@ -780,15 +779,6 @@ public partial class WorldView : Node3D {
         else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
         if (jamb is Vector3 frame) DoorwayView.HandOnFrame(rig, pose, frame, door!.Value.Grip, tool, torch);
         if (state.Turning.Look != 0) rig.Head.Rotation += new Vector3(0, state.Turning.Look, 0);
-    }
-
-    /// <summary>Shows a bench slot's model of the slotted tool's grade: the first child for the lower grade, the second for steel.</summary>
-    private static void ShowSlotted(Node3D slot, string? tool) {
-        slot.Visible = tool != null;
-        if (tool == null) return;
-        bool steel = tool.StartsWith("steel");
-        slot.GetChild<Node3D>(0).Visible = !steel;
-        slot.GetChild<Node3D>(1).Visible = steel;
     }
 
     /// <summary>The sound of hands closing on a gathered thing: plants rustle and a carcass tears, while stone and water make none.</summary>
@@ -1189,13 +1179,13 @@ public partial class WorldView : Node3D {
                 Smoke(campfire, t, flames > 0, dt, CampfireSmoke);
                 break;
             case AnvilProp anvil:
-                if (live) anvil.Hammer.Visible = World.BenchTool(t, "hammer") != null;
+                if (live) anvil.Hammer.Show(World.BenchTool(t, "hammer"));
                 break;
             case BenchProp bench:
                 // Slotted tools lie on the bench top.
                 if (!live) break;
-                ShowSlotted(bench.Chisel, World.BenchTool(t, "chisel"));
-                ShowSlotted(bench.Hammer, World.BenchTool(t, "hammer"));
+                bench.Chisel.Show(World.BenchTool(t, "chisel"));
+                bench.Hammer.Show(World.BenchTool(t, "hammer"));
                 prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
                 break;
             case PileProp pile:

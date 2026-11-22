@@ -8,6 +8,7 @@ using static SetupSteps;
 using static WorldSteps;
 using static EconomySteps;
 using static PlayerSteps;
+using static ProgressionSteps;
 
 /// <summary>
 /// Checks of the way from a fresh start to the first hired worker: that everything can be reached, and a playthrough
@@ -46,7 +47,7 @@ public static class ProgressionChecks {
             // Seeds are bought with berry money to start the first plot.
             if (built.Contains(ThingKind.Farm) && data.Farm.Sow.Keys.All(id => have.Contains(id) || data.Market.Buys.ContainsKey(id))) foreach (var item in data.Farm.Yield.Keys) grew |= have.Add(item);
             foreach (var r in data.Recipes.Values) {
-                bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool, r.Tier)) || r.Station is ThingKind station && built.Contains(station) && (World.SlotRules(station).Length == 0 || r.Tool == "" || HasTool(r.Tool, r.Tier));
+                bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool, r.Tier)) || r.Station is ThingKind station && built.Contains(station) && (data.Buildings[station].ToolSlots.Length == 0 || r.Tool == "" || HasTool(r.Tool, r.Tier));
                 if (where && r.Inputs.Keys.All(have.Contains)) grew |= have.Add(r.Output);
             }
         }
@@ -120,19 +121,10 @@ public static class ProgressionChecks {
 
     /// <summary>The first pickaxe is bought with berry money: four crates of berries pay for it.</summary>
     private static Thing CheckBerryCratesBuyFirstPickaxe(World world, Thing iron) {
-        var data = world.Data;
         var sign = BuildAt(world, ThingKind.Signpost, Site(34, 25));
-        for (int i = 0; i < 4; i++) LoadCrate(world, sign, "berries", data.CrateCapacity);
-        Require(world.Sell(sign), "signpost should dispatch crates of berries");
-        SafeTick(world, data.TradeSeconds + .2f);
-        world.Transfer(sign.Wages!, world.Backpack, Inventory.Coins, sign.Wages![Inventory.Coins]);
-        world.Transfer(sign.Output!, world.Backpack, Inventory.Coins, sign.Output![Inventory.Coins]);
-        Require(world.Reached("sold") && world.Coins >= world.LotPrice("steel_pick"), $"four crates of berries should pay for a steel pickaxe: coins={world.Coins}");
-        Require(world.Buy(sign, "steel_pick", 1), "the village should sell a steel pickaxe");
-        SafeTick(world, data.TradeSeconds + .2f);
-        Require(world.Transfer(sign.Output, world.Backpack, "steel_pick", 1) == 1,
-            "the bought pickaxe should arrive at the signpost");
-        Require(world.Reached("pick"), "the bought pickaxe should meet the pick milestone");
+        SellCrates(world, sign, "berries", 4);
+        Require(world.Reached("sold"), "selling crates of berries should meet the sold milestone");
+        BuyOne(world, sign, "steel_pick");
         Require(world.GatherBlock(iron) == null, "the bought pickaxe should unlock mining deposits");
         return sign;
     }
@@ -142,16 +134,8 @@ public static class ProgressionChecks {
     /// steel parts.
     /// </summary>
     private static void CheckBerryCratesBuySteelHammer(World world, Thing sign) {
-        var data = world.Data;
-        for (int i = 0; i < 2; i++) LoadCrate(world, sign, "berries", data.CrateCapacity);
-        Require(world.Sell(sign), "signpost should dispatch two more crates of berries");
-        SafeTick(world, data.TradeSeconds + .2f);
-        world.Transfer(sign.Wages!, world.Backpack, Inventory.Coins, sign.Wages![Inventory.Coins]);
-        world.Transfer(sign.Output!, world.Backpack, Inventory.Coins, sign.Output![Inventory.Coins]);
-        Require(world.Coins >= world.LotPrice("steel_hammer"), $"two more crates of berries should pay for a steel hammer: coins={world.Coins}");
-        Require(world.Buy(sign, "steel_hammer", 1), "the village should sell a steel hammer");
-        SafeTick(world, data.TradeSeconds + .2f);
-        Require(world.Transfer(sign.Output, world.Backpack, "steel_hammer", 1) == 1, "the bought steel hammer should arrive at the signpost");
+        SellCrates(world, sign, "berries", 2);
+        BuyOne(world, sign, "steel_hammer");
     }
 
     private static void CheckMinedOreBecomesSteelTools(World world, Thing stone, Thing iron, Thing coal, Thing bench) {
@@ -203,7 +187,6 @@ public static class ProgressionChecks {
         world.Collect(bench);
         Require(world.Backpack["steel_pick"] == 2, "the bench should craft a steel pickaxe from steel parts");
         Require(world.Backpack["crate"] == 2, "the bench should craft crates from planks");
-        Require(world.Reached("steel_tool"), "the steel tool milestone should be reached");
     }
 
     private static HireOffer CheckSoldSteelToolFundsHire(World world, Thing sign) {
@@ -218,10 +201,10 @@ public static class ProgressionChecks {
         Require(world.Coins == beforeReturn && world.Orders.Count == 1,
                 "steel-tool payment should remain in transit until the trade delay elapses");
         SafeTick(world, .2f);
-        world.Transfer(sign.Wages!, world.Backpack, Inventory.Coins, sign.Wages![Inventory.Coins]);
+        CollectCoins(world, sign);
         var offer = data.HireOffers[1];
-        Require(world.Coins >= offer.Upfront && world.Reached("sold_steel"),
-                $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, upfront={offer.Upfront:0.0}, soldSteel={world.Reached("sold_steel")}, health={world.Health:0.0}, time={world.Time:0.0}, backpackSteel={world.Backpack["steel_pick"]}");
+        Require(world.Coins >= offer.Upfront,
+                $"returned cart should fund hire: coins={world.Coins:0.0}, upfront={offer.Upfront:0.0}, health={world.Health:0.0}, time={world.Time:0.0}, backpackSteel={world.Backpack["steel_pick"]}");
         return offer;
     }
 

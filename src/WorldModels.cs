@@ -158,12 +158,12 @@ public sealed class ForgeProp : HearthProp {
 public sealed class AnvilProp : Prop {
     /// <summary>Where sparks fly from a hammer blow.</summary>
     public Vector3 Vent;
-    /// <summary>The steel hammer lying on the stand, shown while one is slotted.</summary>
-    public Node3D Hammer = null!;
+    /// <summary>The steel hammer lying on the stand while one is slotted.</summary>
+    public SlottedTool Hammer = null!;
 }
 
 public sealed class BenchProp : Prop {
-    public Node3D Chisel = null!, Hammer = null!;
+    public SlottedTool Chisel = null!, Hammer = null!;
 }
 
 public sealed class PileProp : Prop {
@@ -654,18 +654,8 @@ public static class WorldModels {
         Add(body, BenchShape.Vise, BenchShape.Steel, Vector3.Zero);
         Cylinder(body, .014f, .014f, .19f, new Vector3(.35f, .86f, .37f), steel, new Vector3(90, 0, 0), 10);
         Cylinder(body, .012f, .012f, .15f, new Vector3(.35f, .86f, .46f), steel, sides: 10);
-        // Each slot holds both grades of its tool turned onto its side, the lower grade first; the view shows the one slotted.
-        Node3D Slot(Vector3 at, float yaw, params (string Tool, float Lift)[] grades) {
-            var slot = Pivot(body, at, new Vector3(0, yaw, 0));
-            foreach (var (tool, lift) in grades) {
-                var model = ActorRig.Tool(tool);
-                model.Position = new Vector3(0, lift, 0); model.RotationDegrees = new Vector3(0, 0, 90);
-                slot.AddChild(model);
-            }
-            return slot;
-        }
-        prop.Chisel = Slot(new Vector3(-.3f, .815f, .05f), 30, ("stone_chisel", .02f), ("steel_chisel", .02f));
-        prop.Hammer = Slot(new Vector3(.05f, .815f, -.1f), -20, ("wood_hammer", .052f), ("steel_hammer", .034f));
+        prop.Chisel = new SlottedTool(body, new Vector3(-.3f, .815f, .05f), 30, ("stone_chisel", .02f), ("steel_chisel", .02f));
+        prop.Hammer = new SlottedTool(body, new Vector3(.05f, .815f, -.1f), -20, ("wood_hammer", .052f), ("steel_hammer", .034f));
         return prop;
     }
 
@@ -818,9 +808,8 @@ public static class WorldModels {
         Box(body, new Vector3(.5f, .04f, .05f), new Vector3(0, .12f, .17f), tube);
         Add(body, AnvilShape.Casting, AnvilShape.Iron, Vector3.Zero);
         prop.Vent = new Vector3(0, .86f, 0);
-        prop.Hammer = ActorRig.Tool("steel_hammer");
-        prop.Hammer.Position = new Vector3(-.06f, .529f, .165f); prop.Hammer.RotationDegrees = new Vector3(0, 0, 90); prop.Hammer.Visible = false;
-        body.AddChild(prop.Hammer);
+        prop.Hammer = new SlottedTool(body, new Vector3(-.06f, .495f, .165f), 0, ("steel_hammer", .034f));
+        prop.Hammer.Show(null);
         return prop;
     }
 

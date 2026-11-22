@@ -1121,7 +1121,7 @@ public static class SimulationChecks {
         world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("steel_chisel", 1)), 1);
         Require(world.Sell(sign), "a cart should take a crate of goods the village does not buy");
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(world.Orders.Count == 0 && !world.Reached("sold") && !world.Reached("sold_steel"), "a donation should not count as a sale");
+        Require(world.Orders.Count == 0 && !world.Reached("sold"), "a donation should not count as a sale");
     }
 
     private static void CheckMarketTakesCratesAndDonations(GameData data) {

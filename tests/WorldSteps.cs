@@ -17,6 +17,11 @@ internal static class WorldSteps {
     /// <summary>The id a guest has in the checks that host one.</summary>
     public const int GuestId = 7;
 
+    /// <summary>Puts in each of a station's tool slots the plainest tool that slot takes.</summary>
+    public static void SlotPlainestTools(World world, Thing station) {
+        foreach (var slot in world.SlotRules(station.Kind)) station.Tools!.Add(world.Data.PlainestTool(slot.Tool, slot.Tier), 1);
+    }
+
     /// <summary>A world without its starting map, with a fed and healthy player on the first morning.</summary>
     public static World EmptyWorld(GameData data) => new(data, false);
 

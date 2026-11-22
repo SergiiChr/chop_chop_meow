@@ -135,7 +135,7 @@ public static class GatheringChecks {
     private static void CheckToolsGateMiningAndFelling(GameData data) {
         var world = EmptyWorld(data);
         var iron = world.Add(ThingKind.Iron, new Vector2(10, 10), 20);
-        Achieve(world, "pick");
+        Achieve(world, "steel_pick");
         Require(world.GatherBlock(iron)?.Contains("pickaxe") == true,
                 "the player must still carry a usable pickaxe to mine after previously forging one");
         Require(world.GatherBlock(iron, true) == null,

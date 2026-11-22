@@ -95,6 +95,7 @@ Simulation and data:
 | `src/stations/StationHaul.cs`, `src/farms/FarmHaul.cs`, `src/mines/MineHaul.cs`, `src/packing/PackerHaul.cs`, `src/storage/StoreHaul.cs` | What a crafting station, a farm plot, a mine site, a packing station, and a chest or placed crate offer a hauler |
 | `src/jobs/gathering/Gathering.cs`, `src/water/WaterGathering.cs` | The Gather job at resource spots, and the lake's version of it, which fills bottles |
 | `src/stations/model/ToolSlotRule.cs` | What one of a station's tool slots takes: a kind of tool at a tier or better |
+| `src/stations/display/SlottedTool.cs` | A tool lying in a station's slot, at the bench and the anvil, showing the grade slotted |
 | `src/jobs/crafting/Crafting.cs`, `src/packing/PackCraft.cs` | The Craft job at a station, and the packing station's version of it, which packs crates |
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
@@ -901,8 +902,10 @@ A save written before `Obtained` existed loads with it empty, so a raw resource 
 
 #### Tool slots
 
-`World.SlotRules` names the tool slots a station has (`Thing.Tools`), each with the tool it takes (`ToolSlotRule`): a
-chisel and a hammer at the bench, a mortar at the cooking table (`cooktable`) and a steel hammer at the anvil.
+`BuildingDef.ToolSlots` names the tool slots a station has (`Thing.Tools`), each with the tool it takes
+(`ToolSlotRule`): a chisel and a hammer at the bench, a mortar at the cooking table (`cooktable`) and a steel hammer at
+the anvil.
+`GameData` checks that a station has a slot for each tool its recipes need, taking the plainest one any of them asks for.
 `World.SlotBlock` refuses a tool of the slot's kind below its tier, both for `World.SlotTool` and for a move by hand.
 A recipe that needs a tool at such a station runs at the speed of the fastest of the slotted tool and those carried by players working there (`World.StationTool`).
 Worked only by its crew, it runs with the slotted tool and waits when there is none.

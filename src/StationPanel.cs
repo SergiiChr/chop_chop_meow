@@ -17,7 +17,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
 
     protected override void Body() {
         // A station's own tool slots sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
-        var slotted = World.SlotRules(thing.Kind);
+        var slotted = world.SlotRules(thing.Kind);
         if (slotted.Length > 0) ToolWindow(slotted);
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool, or of the one you carry while you work it. Someone has to work it.";
         string? openOn = opened ? null : world.Selected(thing);
@@ -28,15 +28,13 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         // The side slots are the leftovers the station held when the page was drawn.
         RedrawOnChange(stationSlots.SideCode);
         if (thing.Kind == ThingKind.Reinforced) Bellows();
-        // A tool of an empty slot's kind goes to that slot, which says why when it is below the slot's tier.
-        // Only a tool good enough for the slot lights up.
-        bool EmptySlotKind(string id) => world.Data.Items.GetValueOrDefault(id) is ItemDef def && Array.Exists(slotted, slot => slot.Tool == def.Tool) && world.BenchTool(thing, def.Tool) == null;
-        bool FreeToolSlot(string id) => EmptySlotKind(id) && Array.Exists(slotted, slot => slot.Takes(world.Data.Items[id]));
+        // A tool of a slot's kind goes to that slot, which says why when it does not take it; only a tool it takes lights up.
+        bool SlotKind(string id) => world.Data.Items.GetValueOrDefault(id) is ItemDef def && Array.Exists(slotted, slot => slot.Tool == def.Tool);
         BagGrid(id => {
-            if (EmptySlotKind(id)) world.SlotTool(thing, id);
+            if (SlotKind(id)) world.SlotTool(thing, id);
             else world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id));
         }, slotted.Length > 0 ? $"{BagHint}\nShift: slot a tool, or load a stack · Ctrl: all of it" : $"{BagHint}\nShift: load a stack · Ctrl: all of it",
-            wanted: id => world.Takes(thing, id) || FreeToolSlot(id));
+            wanted: id => world.Takes(thing, id) || world.SlotBlock(thing, id) == null);
         JobButtons();
     }
 
@@ -63,7 +61,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         string tool = slot.Tool;
         var (cell, _) = ItemSlot.Create($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        string plainest = world.Data.PlainestTool(tool, slot.Tier), wanted = world.A(world.Data.ToolName(tool, slot.Tier));
+        string plainest = world.Data.PlainestTool(tool, slot.Tier), wanted = world.SlotWants(slot);
         moves.TakeCell(cell, thing.Tools!, () => world.BenchTool(thing, tool), thing,
             held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item) is ItemDef def && slot.Takes(def), (item, _) => world.SlotTool(thing, item));
         live.Watch(() => world.BenchTool(thing, tool), held => {

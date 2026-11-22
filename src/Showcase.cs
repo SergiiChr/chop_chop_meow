@@ -84,12 +84,17 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         }
         world.Player = at + new Vector2(4.8f, 3);
         world.Tick(0);
-        view.CameraOn = at;
-        view.CameraTurn = Launch.Number("--camera-turn", view.CameraTurn);
-        view.CameraPitch = Launch.Number("--camera-pitch", view.CameraPitch ?? 30);
+        AimAt(at);
         view.Zoom = 1.3f;
         if (Launch.Has("--panel")) panel.Select(farm); else panel.Close();
         if (Launch.Has("--hide-ui")) ui.Visible = false;
+    }
+
+    /// <summary>Keeps the camera on a spot, turned and tilted as --camera-turn and --camera-pitch say.</summary>
+    private void AimAt(Vector2 at) {
+        view.CameraOn = at;
+        view.CameraTurn = Launch.Number("--camera-turn", view.CameraTurn);
+        view.CameraPitch = Launch.Number("--camera-pitch", view.CameraPitch ?? 30);
     }
 
     private void Place() {
@@ -175,7 +180,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.Add(ThingKind.Leaves, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
         var crate = world.Add(ThingKind.Crate, Terrain.Spawn + new Vector2(1.5f, 1.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
         foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1), ("torch", 2) }) world.S.Backpack.Add(item, count);
-        world.S.Milestones.UnionWith(new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool" });
+        world.S.Milestones.UnionWith(new[] { "bench", "crate", "sold", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil" });
         // The review fixture is deliberately separate from a fresh playable game.
         world.Player = sign.Pos + Vector2.One; var offer = world.Data.HireOffers[1];
         var w1 = world.Hire(sign, offer); var w2 = world.Hire(sign, offer); var w3 = world.Hire(sign, offer);
@@ -204,9 +209,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // The camera turns and tilts by the flags.
             world.S.Things.RemoveAll(t => t.Kind is ThingKind.Tree or ThingKind.Bush or ThingKind.Berries && t.Pos.DistanceTo(anvil.Pos) < 10);
             world.Player = anvil.Pos + new Vector2(-1, 1.2f); panel.Select(anvil);
-            view.CameraOn = anvil.Pos;
-            view.CameraTurn = Launch.Number("--camera-turn", view.CameraTurn);
-            view.CameraPitch = Launch.Number("--camera-pitch", view.CameraPitch ?? 30);
+            AimAt(anvil.Pos);
         }
         if (Launch.Has("--neighbor")) { world.As(world.Arrive("neighbor", 2), () => world.Player = bench.Pos + Vector2.One); world.Player = bench.Pos + new Vector2(-2, 4); panel.Close(); view.Zoom = 1.6f; }
         if (Launch.Has("--craft")) panel.Open(Page.Craft);

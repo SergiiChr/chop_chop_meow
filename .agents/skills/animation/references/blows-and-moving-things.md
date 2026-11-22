@@ -10,8 +10,8 @@ stump or chip, a door, a cart, a crate or a fire.
   `StrikePoints` finds the spot, and `ActorAnimation` cuts the swing short there or reaches the arm out to it.
 - Measure the tool's end, not the fist: `ActorRig.Holds` with `ActorRig.AxeHeadPoint`, `PickPoint` or `HammerFace`, and
   `ActorRig.ShovelTip`.
-  `CheckEveryGatheringBlowLandsItsToolOnWhatItWorks` and `CheckEveryHammerBlowLandsOnTheStationsWorkTop` do it in the
-  real view.
+  `CheckAnAxeBlowBitesTheTrunksSide`, `CheckAPickBlowLandsOnTheRocksFace`, `CheckAShovelBlowDigsInAtTheStumpsFoot` and
+  `CheckEveryHammerBlowLandsOnTheStationsWorkTop` do it in the real view.
 - Review a blow against its target with `--animation-target` (`tools/animation_review.py --target`): the close-up builds
   the real tree, rock, anvil or stump that far away.
 - A blow speeds up all the way into its contact and stops there; a swing in the air eases out.

@@ -45,7 +45,7 @@ public partial class Game {
         var start = world.Player;
         var farm = Hosted.Add(ThingKind.Farm, start + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
         Warp(Hosted, farm.Pos + new Vector2(.9f, -.9f)); await Frames();
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -1.2f)); anvil.Inventory.Add("steel_bar", 1); anvil.Tools!.Add("steel_hammer", 1);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -1.2f)); anvil.Inventory.Add("steel_bar", 1); SlotPlainestTools(Hosted, anvil);
         await Until(() => view.PlayerAnimation == ActorAction.Hammer, "the idle player hammering at the anvil beside it", 3);
         var point = RightPress(farm.Pos);
         await Until(() => farm.Progress > 0, "holding RMB on a ripe farm plot beside the anvil harvesting by hand", 3);
@@ -79,7 +79,7 @@ public partial class Game {
 
     /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
     private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 4); anvil.Tools!.Add("steel_hammer", 1);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 4); SlotPlainestTools(Hosted, anvil);
         var smith = AddWorker(Hosted, anvil.Pos + new Vector2(0, 1.2f)); Hosted.Assign(smith, anvil);
         await Until(() => anvil.Processing && smith.WorkState == WorkerWorkState.Hammering, "the smith hammering a batch at the anvil", 3);
         smith.WageDebt = 1;
@@ -91,9 +91,9 @@ public partial class Game {
     /// <summary>An anvil whose hammer is taken off mid-batch waits for one, so the player beside it with none stops hammering.</summary>
     private async Task CheckAnvilWithoutAHammerLeavesThePlayerIdle() {
         int carried = Drop(Hosted, "steel_hammer");
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 2); anvil.Tools!.Add("steel_hammer", 1);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 2); SlotPlainestTools(Hosted, anvil);
         await Until(() => anvil.Processing && view.PlayerAnimation == ActorAction.Hammer, "the idle player hammering a batch at the anvil beside it", 3);
-        anvil.Tools.Remove("steel_hammer", 1);
+        anvil.Tools!.Remove("steel_hammer", 1);
         await Until(() => view.PlayerAnimation != ActorAction.Hammer, "the player stopping once the anvil has no hammer", 2);
         Require(anvil.Processing, "The anvil must still be on its batch, waiting for a hammer.");
         RemoveThings(Hosted, t => t == anvil);
@@ -104,7 +104,7 @@ public partial class Game {
     private async Task CheckIdlePlayerAtAnAnvilSwingsItsSlottedSteelHammer() {
         int carried = Drop(Hosted, "steel_hammer");
         Give(Hosted, "wood_hammer", 1);
-        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 2); anvil.Tools!.Add("steel_hammer", 1);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1.4f, 0)); anvil.Inventory.Add("steel_bar", 2); SlotPlainestTools(Hosted, anvil);
         await Until(() => view.PlayerAnimation == ActorAction.Hammer && view.PlayerRig.ToolShown == "steel_hammer",
             "the idle player swinging the anvil's slotted steel hammer", 3);
         RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "wood_hammer", 1);
@@ -430,7 +430,7 @@ public partial class Game {
         var slot = panel.Aside.FindChild("tool_hammer", true, false) as ItemSlot;
         Require(panel.Aside.Visible && slot != null && slot.TooltipText.StartsWith("Empty hammer slot\nPut a steel hammer here"),
             $"A new anvil must show an empty hammer slot beside its page that asks for a steel hammer, not \"{slot?.TooltipText}\".");
-        Require(view.PropOf(anvil.Id) is AnvilProp { Hammer.Visible: false }, "A new anvil must have no hammer lying on its stand.");
+        Require(view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null }, "A new anvil must have no hammer lying on its stand.");
         await Holding(Key.Ctrl, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel bar"))));
         await Until(() => world.Backpack["steel_bar"] == 0, "Ctrl on steel bars in the backpack loading them into the anvil", 2);
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Wooden mallet"))));
@@ -438,7 +438,7 @@ public partial class Game {
         Require(world.BenchTool(anvil, "hammer") == null && world.Backpack["wood_hammer"] == mallets, "The anvil's hammer slot must refuse a wooden mallet.");
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel hammer"))));
         await Until(() => world.BenchTool(anvil, "hammer") == "steel_hammer", "Shift on a steel hammer in the backpack slotting it into the anvil", 2);
-        await Until(() => view.PropOf(anvil.Id) is AnvilProp { Hammer.Visible: true }, "the slotted steel hammer lying on the anvil's stand", 2);
+        await Until(() => view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: "steel_hammer" }, "the slotted steel hammer lying on the anvil's stand", 2);
         RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "steel_bar"); Drop(Hosted, "wood_hammer", 1); await CloseWithEsc();
     }
 
@@ -452,7 +452,7 @@ public partial class Game {
         foreach (var (kind, offset) in new[] { (ThingKind.Anvil, new Vector2(-.5f, -1.2f)), (ThingKind.Bench, new Vector2(1.2f, 0)) }) {
             Warp(Hosted, start); await Frames(3);
             var thing = Hosted.Add(kind, start + offset);
-            if (kind == ThingKind.Anvil) { thing.Inventory.Add("steel_bar", 1); thing.Tools!.Add("steel_hammer", 1); }
+            if (kind == ThingKind.Anvil) { thing.Inventory.Add("steel_bar", 1); SlotPlainestTools(Hosted, thing); }
             if (kind == ThingKind.Bench) { thing.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(thing, "crate"); thing.Inventory.Add("planks", 6); }
             string sound = kind == ThingKind.Anvil ? "anvil_work" : "bench_work";
             await Frames(2);
