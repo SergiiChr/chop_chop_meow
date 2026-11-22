@@ -1181,6 +1181,7 @@ A dismissed worker's tool goes into their recovery box.
 
 At the `LunchHour` in `GameData` workers break for one in-game hour.
 `LunchBreak` reserves the nearest available campfire seats, with up to six seats per fire.
+A blocked walk releases the seat so the worker can try another.
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
 
 As dusk begins (`GameData.DuskStarts`, a tenth of a day before night) they walk to the nearest trading post, or the clearing without one.

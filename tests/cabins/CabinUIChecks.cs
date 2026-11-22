@@ -38,6 +38,7 @@ public partial class Game {
         Require(world.Player == stopped && world.Sheltered == 0, "clicking Enter again should stop the automatic walk");
         await Click(enter);
         await Until(() => world.Sheltered == cabin.Id && world.Door == Doorway.None, "walking around the bench and stepping inside", 7);
+        await Until(() => FindButton(panel, "Step outside") != null, "the cabin panel showing Step outside", 2);
         await Click(FindButton(panel, "Step outside")!);
         await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "stepping out of the cabin", 4);
         RemoveThings(Hosted, thing => thing == cabin || thing == bench);
@@ -52,8 +53,8 @@ public partial class Game {
         var bench = Hosted.Add(ThingKind.Bench, Doorways.DoorPoint(cabin));
         await ClickOn(cabin);
         await Until(() => messages.Last == "No clear path to the cabin door.", "the blocked-door message", 2);
-        var enter = FindButton(panel, "Enter")!;
-        Require(enter.GetThemeStylebox("normal") == Style.Pill(Style.Sage).Item1, "an unreachable door should clear the highlight");
+        await Until(() => FindButton(panel, "Enter")?.GetThemeStylebox("normal") == Style.Pill(Style.Sage).Item1,
+            "the cabin panel clearing Enter's highlight after an unreachable door", 2);
         var stopped = world.Player;
         await Holding(Key.D, () => Seconds(.2));
         Require(world.Player.DistanceTo(stopped) > .2f && world.Sheltered == 0, "the player can walk away from an unreachable door");

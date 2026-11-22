@@ -15,10 +15,10 @@ internal sealed class LunchBreak(World world) {
     private readonly Dictionary<int, Seat> reserved = new();
     private readonly List<Worker> waiting = new();
     private readonly List<Seat> fires = new();
+    private readonly HashSet<(int Worker, Vector2 Seat)> unreachable = new();
     private int fireCount;
-    private bool replan;
 
-    public void Reset() => reserved.Clear();
+    public void Reset() { reserved.Clear(); unreachable.Clear(); }
 
     private static bool OnBreak(Worker w) => !w.Home && w.Away <= 0 && w.Commute == 0 && w.WageDebt <= 0;
 
@@ -26,24 +26,29 @@ internal sealed class LunchBreak(World world) {
     public void Prepare() {
         if (!world.Lunch) { Reset(); return; }
         var campfires = world.ThingsOf(ThingKind.Campfire);
-        int count = 0;
+        int count = 0, assigned = 0;
+        bool firesChanged = fireCount != campfires.Count;
         foreach (var w in world.Workers) {
             if (!OnBreak(w)) continue;
             count++;
-            replan |= !reserved.TryGetValue(w.Id, out var seat) || seat.Fire is Thing fire && world.Find(fire.Id) != fire;
+            if (!reserved.TryGetValue(w.Id, out var seat)) continue;
+            assigned++;
+            firesChanged |= seat.Fire is Thing fire && world.Find(fire.Id) != fire;
         }
-        if (!replan && count == reserved.Count && fireCount == campfires.Count) return;
-        Reset();
-        fireCount = campfires.Count;
-        replan = false;
+        if (firesChanged || assigned != reserved.Count) {
+            Reset();
+            fireCount = campfires.Count;
+            assigned = 0;
+        }
+        if (assigned == count) return;
         waiting.Clear();
-        foreach (var w in world.Workers) if (OnBreak(w)) waiting.Add(w);
+        foreach (var w in world.Workers) if (OnBreak(w) && !reserved.ContainsKey(w.Id)) waiting.Add(w);
         if (waiting.Count == 0) return;
         fires.Clear();
         foreach (var fire in campfires) {
             for (int i = 0; i < FireSeats; i++) {
                 var position = Around(fire.Pos, FireRadius, i, FireSeats);
-                if (world.CanStand(position)) fires.Add(new Seat(position, fire.Pos, fire));
+                if (RoomForSeat(position)) fires.Add(new Seat(position, fire.Pos, fire));
             }
         }
         ReserveFires();
@@ -52,17 +57,19 @@ internal sealed class LunchBreak(World world) {
 
     private void ReserveFires() {
         while (waiting.Count > 0 && fires.Count > 0) {
-            int worker = 0, seat = 0;
+            int worker = -1, seat = 0;
             float nearestFire = float.MaxValue, nearestSeat = float.MaxValue;
             for (int i = 0; i < waiting.Count; i++) {
                 var from = waiting[i].Pos;
                 for (int j = 0; j < fires.Count; j++) {
                     var option = fires[j];
+                    if (unreachable.Contains((waiting[i].Id, option.Position))) continue;
                     float fireDistance = from.DistanceSquaredTo(option.Center), seatDistance = from.DistanceSquaredTo(option.Position);
                     if (fireDistance > nearestFire || fireDistance == nearestFire && seatDistance >= nearestSeat) continue;
                     worker = i; seat = j; nearestFire = fireDistance; nearestSeat = seatDistance;
                 }
             }
+            if (worker < 0) return;
             var chosen = fires[seat];
             Reserve(worker, chosen);
             for (int j = fires.Count - 1; j >= 0; j--)
@@ -97,12 +104,14 @@ internal sealed class LunchBreak(World world) {
         if (!world.CanStand(center)) return false;
         foreach (var fire in world.ThingsOf(ThingKind.Campfire))
             if (center.DistanceSquaredTo(fire.Pos) < 2.8f * 2.8f) return false;
-        for (int i = 0; i < count; i++) {
-            var p = Around(center, GroupRadius, i, count);
-            if (!world.CanStand(p)) return false;
-            foreach (var seat in reserved.Values)
-                if (p.DistanceSquaredTo(seat.Position) < SeatGap * SeatGap) return false;
-        }
+        for (int i = 0; i < count; i++) if (!RoomForSeat(Around(center, GroupRadius, i, count))) return false;
+        return true;
+    }
+
+    private bool RoomForSeat(Vector2 position) {
+        if (!world.CanStand(position)) return false;
+        foreach (var seat in reserved.Values)
+            if (position.DistanceSquaredTo(seat.Position) < SeatGap * SeatGap) return false;
         return true;
     }
 
@@ -116,9 +125,20 @@ internal sealed class LunchBreak(World world) {
 
     public void Sit(Worker w, float dt) {
         if (!reserved.TryGetValue(w.Id, out var seat)) return;
-        if (seat.Center != seat.Position && !world.CanStand(seat.Position)) { replan = true; return; }
+        if (seat.Center != seat.Position && !world.CanStand(seat.Position)) { reserved.Remove(w.Id); return; }
         w.Status = seat.Fire != null ? "Lunch break by the campfire" : "Lunch break";
-        if (!world.Walk(w, seat.Position, dt, .08f, exact: true)) return;
+        if (!world.Walk(w, seat.Position, dt, .08f, exact: true)) {
+            if (w.WorkState != WorkerWorkState.Blocked) return;
+            if (seat.Fire != null) {
+                unreachable.Add((w.Id, seat.Position));
+                reserved.Remove(w.Id);
+                return;
+            }
+            // A worker cut off from their group can still sit on the ground where they stopped.
+            seat = new Seat(w.Pos, w.Pos);
+            reserved[w.Id] = seat;
+            w.Status = "Lunch break";
+        }
         w.LunchHeading = (seat.Center - seat.Position).Angle();
         w.WorkState = seat.Fire != null && w.Id % 2 == 0 ? WorkerWorkState.Perching : WorkerWorkState.Resting;
     }

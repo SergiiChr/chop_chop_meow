@@ -11,6 +11,7 @@ internal static class LunchChecks {
     public static void Run(GameData data) {
         Test(CheckCrewLunchesAtTheNearestFireAndGoesBackToWork, data);
         Test(CheckLunchUsesBothFiresBeforeWorkersSitInGroupsOnTheGround, data);
+        Test(CheckWorkerUsesTheNextFireWhenTheNearestIsUnreachable, data);
     }
 
     private static void CheckCrewLunchesAtTheNearestFireAndGoesBackToWork(GameData data) {
@@ -30,6 +31,21 @@ internal static class LunchChecks {
         // Both forge workers hold the bellows and the haul job: whichever gets to the bellows first pumps.
         Require(cutter.WorkState == WorkerWorkState.Gathering && new[] { pumper, hauler }.Count(w => w.WorkState == WorkerWorkState.Pumping) == 1,
                 "after lunch workers should walk back to their jobs");
+    }
+
+    private static void CheckWorkerUsesTheNextFireWhenTheNearestIsUnreachable(GameData data) {
+        var world = FundedWorld(data);
+        RunUntil(world, (data.LunchHour - 6) / 24 * data.DaySeconds);
+        var at = Terrain.Spawn;
+        // A closed ring of walls separates the worker from the nearer fire, even though the seats there are open.
+        for (int i = 0; i < 12; i++)
+            world.Add(ThingKind.Hut, at + Vector2.FromAngle(i * Mathf.Tau / 12) * 5);
+        world.Add(ThingKind.Campfire, at + Vector2.Up * 6.6f);
+        var reachable = world.Add(ThingKind.Campfire, at + Vector2.Down * 1.5f);
+        var worker = AddWorker(world, at + Vector2.Up * 3);
+        Work(world, 15);
+        Require(worker.Pos.DistanceTo(reachable.Pos) < 1.6f && worker.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching,
+            "a worker whose nearer fire is across a wall should sit at the reachable one");
     }
 
     private static void CheckLunchUsesBothFiresBeforeWorkersSitInGroupsOnTheGround(GameData data) {

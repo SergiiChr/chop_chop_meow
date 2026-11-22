@@ -874,7 +874,7 @@ The crew overview shows each worker's jobs as numbered chips in that order, with
 
 ### Daily routine
 
-- Workers break for an hour of lunch at noon. They take the closest open campfire seats, up to six workers per fire.
+- Workers break for an hour of lunch at noon. They take the closest open campfire seats they can reach, up to six workers per fire.
   Workers without a fire seat sit on the ground facing each other in groups of up to three.
 - As dusk falls they walk to the nearest trading post and head off down the valley like a trade cart, fading from view, then walk back in the same way at dawn.
 - Assignments and anything they carry stay as they were.
