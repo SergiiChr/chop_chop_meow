@@ -7,6 +7,14 @@ using static SteelPipeSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
+    private async Task RunWaterPumpUIChecks() {
+        await TestClean(CheckPlumbingPagesRefreshWithoutAllocating);
+        await TestClean(CheckVisiblePumpGripAndPistonCanBePicked);
+        await TestClean(CheckPumpAtTheWaterlineCanBeInspected);
+        await TestClean(CheckRepeatedWaterPumpInputKeepsTheHandleMoving);
+        await TestClean(CheckWaterPumpControlsMoveThePressureGauge);
+    }
+
     private async Task CheckPlumbingPagesRefreshWithoutAllocating() {
         var tile = Terrain.TileAt(world.Player + Vector2.Right * 2);
         var pump = Hosted.Add(ThingKind.Pump, tile);

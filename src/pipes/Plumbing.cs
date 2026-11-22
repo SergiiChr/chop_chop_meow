@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Moves water from pumps to consumers over connected steel pipe tiles.</summary>
-public sealed class Plumbing(World world) {
+public sealed class Plumbing(World world, Barrels barrels) {
     public const int InstallCost = 10;
     private static readonly ThingKind[] Consumers = Array.FindAll(Kinds.All, HasPlumbing);
 
@@ -160,12 +160,24 @@ public sealed class Plumbing(World world) {
         if (network.Wet.Count == 0) network.Stored = 0;
     }
 
+    /// <summary>Whole liters the building can store from its plumbing.</summary>
+    private int StorageRoom(Thing receiver) {
+        if (!receiver.PlumbingInstalled) return 0;
+        return receiver.Kind switch {
+            ThingKind.Hut or ThingKind.Barrel => Barrels.Room(receiver),
+            ThingKind.Farm => Math.Min(world.Farms.WaterRoom(receiver), receiver.Inventory.Room(Water.Liquid)),
+            ThingKind.Cooktable when world.Data.Recipes.TryGetValue(receiver.NextRecipe, out var recipe) =>
+                Math.Clamp(recipe.Inputs.GetValueOrDefault(Water.Liquid) - receiver.Inventory[Water.Liquid], 0, receiver.Inventory.Room(Water.Liquid)),
+            _ => 0
+        };
+    }
+
     /// <summary>Sprinklers can discharge their entire share even when the soil is full.</summary>
     private double Demand(Thing receiver) =>
         receiver.Kind == ThingKind.Farm && receiver.PlumbingInstalled ? double.PositiveInfinity
-        : world.PlumbingRoom(receiver) - (double)receiver.PipedWaterRemainder;
+        : StorageRoom(receiver) - (double)receiver.PipedWaterRemainder;
 
-    /// <summary>Splits the water among open fixtures and returns any water they cannot take.</summary>
+    /// <summary>Splits the water among buildings that are drawing it and returns any water they cannot take.</summary>
     private double Share(Network network, double water) {
         var receivers = network.Receivers;
         while (receivers.Count > 0 && water > 0) {
@@ -188,12 +200,15 @@ public sealed class Plumbing(World world) {
     }
 
     private void Deliver(Thing receiver, double share) {
-        double liters = Math.Min(world.PlumbingRoom(receiver), receiver.PipedWaterRemainder + share);
+        double liters = Math.Min(StorageRoom(receiver), receiver.PipedWaterRemainder + share);
         int whole = (int)liters;
-        int received = whole == 0 ? 0 : world.SupplyPlumbing(receiver, whole);
+        int received = whole == 0 ? 0 : StoreWater(receiver, whole);
         receiver.PipedWaterRemainder = received == whole ? Math.Min(MathF.BitDecrement(1), (float)(liters - whole)) : 0;
         receiver.ReceivingWater = share > 0 && Demand(receiver) > 0;
     }
+
+    private int StoreWater(Thing receiver, int liters) => receiver.Kind is ThingKind.Hut or ThingKind.Barrel
+        ? barrels.AddWater(receiver, liters) : receiver.Inventory.Add(Water.Liquid, liters);
 
     internal static bool ValidReceiver(Thing thing) =>
         thing.PipedWaterRemainder is >= 0 and < 1

@@ -97,7 +97,7 @@ public sealed partial class World {
         new(JobKind.Craft, "Craft", "Works the station; it only makes progress while someone works it.", true, [],
             static (world, w, _, place, dt) => (place!.Kind == ThingKind.Packer ? world.packCraft : world.crafting).Work(w, place, dt)),
         new(JobKind.Bellows, "Bellows", "Keeps the fire hot. Only one worker pumps at a time.", true, [], static (world, w, _, place, dt) => world.Pump(w, place!, dt)),
-        new(JobKind.Pump, "Pump", "Works the handle to keep water flowing.", true, [], static (world, w, _, place, dt) => world.PumpWater(w, place!, dt)),
+        new(JobKind.Pump, "Pump", "Works the handle to keep water flowing.", true, [], static (world, w, _, place, dt) => WaterPumps.Work(world, w, place!, dt)),
         new(JobKind.Farm, "Farm", "Harvests the ripe wheat.", true, [], static (world, w, _, place, dt) => world.Reap(w, place!, dt)),
         new(JobKind.Build, "Build", "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.", true, ["pickaxe", "hammer"], static (world, w, _, place, dt) => world.Mines.Build(w, place!, dt)),
         new(JobKind.Mine, "Mine", "Mines ore and stone underground with a pickaxe.", true, ["pickaxe"], static (world, w, _, place, dt) => world.Mines.Mine(w, place!, dt)),

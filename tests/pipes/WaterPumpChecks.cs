@@ -49,6 +49,7 @@ public static class WaterPumpChecks {
         var shore = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
         var pump = world.Add(ThingKind.Pump, Terrain.TileAt(shore + Vector2.Down * 1.1f));
         var anvil = world.Add(ThingKind.Anvil, pump.ToWorld(World.BellowsStand) + Vector2.Up * 3);
+        SlotPlainestTools(world, anvil);
         world.SetRecipe(anvil, "steel_parts");
         var operatorAtBank = AddWorker(world, pump.ToWorld(World.BellowsStand));
         world.SetDuty(operatorAtBank, anvil, JobKind.Craft, true);

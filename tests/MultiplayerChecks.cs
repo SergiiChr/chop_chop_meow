@@ -22,7 +22,7 @@ using static WorldSteps;
 public static class MultiplayerChecks {
     public static void Run(GameData data) {
         CheckGuestActsThroughCommands(data);
-        CheckGuestCopyForwardsActions(data);
+        GuestCommandChecks.CheckGuestCopyForwardsActions(data);
         CheckGuestComesBackFromSaveWithTheirPackAndSpot(data);
         CheckEveryPlayerSurvivesLoadingAndSavingAgain(data);
         CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole();
@@ -38,7 +38,7 @@ public static class MultiplayerChecks {
         CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(data);
         CheckUpdateFieldsLeftOutStartAsNewObjectsDo();
         CheckUpdateEntriesReadBackAsTheyWere(data);
-        CheckPipeWaterUpdatesKeepTheHostsFieldsAndOrder();
+        PipeWaterUpdateChecks.CheckPipeWaterUpdatesKeepTheHostsFieldsAndOrder();
         CheckATreeUpdateCarriesNoStationFields(data);
         CheckAChangedInventoryFieldIsNeverFresh();
         CheckStateReadKeepsNothingFromTheOneBefore();
@@ -87,32 +87,6 @@ public static class MultiplayerChecks {
         var packed = world.Things.SelectMany(t => t.Inventory.Items.Keys).Where(item => World.PackedId(item) != 0).OrderBy(World.PackedId).ToDictionary(World.PackedId, item => world.Packed(item)!);
         Require(packed.Count == 5, $"the five stored crates should be packed in the chests, not {packed.Count}");
         RequireReadsBackAs(entries, new EntryKey(EntryKey.Crates, 0), packed);
-    }
-
-    private static void CheckPipeWaterUpdatesKeepTheHostsFieldsAndOrder() {
-        var key = new EntryKey(EntryKey.PipeWater, 0);
-        var host = new WorldUpdates();
-        var guest = new WorldUpdates();
-        var before = new Snapshot { [key] = """{"100":1,"101":1,"102":1}"""u8.ToArray() };
-        var copy = guest.Merge(null, host.Delta(before, null));
-        foreach (var (state, change) in new[] {
-            ("""{"100":1,"101":0.75,"102":1}"""u8.ToArray(), "when the water level in one tile changes"),
-            ("""{"101":0.75,"102":1}"""u8.ToArray(), "when a wet tile is removed"),
-            ("""{"101":0.75,"102":1,"103":1}"""u8.ToArray(), "when a wet tile is added"),
-            ("""{"103":1,"102":1,"101":0.75}"""u8.ToArray(), "when wet tiles are written in a different order")
-        }) {
-            var current = new Snapshot { [key] = state };
-            copy = guest.Merge(copy, host.Delta(current, before));
-            Require(Snapshot.Same(copy[key], state), $"The guest's pipe water must match the host's {change}.");
-            before = current;
-        }
-
-        var unordered = WorldUpdates.Pack(new Dictionary<string, Dictionary<int, double>> {
-            ["~v:0"] = new() { [101] = .5, [103] = .25 }
-        });
-        var patched = guest.Merge(copy, unordered);
-        Require(Snapshot.Same(patched[key], """{"103":0.25,"102":1,"101":0.5}"""u8),
-            "A patch with fields in a different order should still replace both values within the baseline's order.");
     }
 
     /// <summary>An inventory counted as fresh is written as {}, so every field it saves must end that, including one added later: a field type this check does not know fails it.</summary>
@@ -310,37 +284,6 @@ public static class MultiplayerChecks {
 
         world.Depart(GuestId);
         Require(world.Players.Count == 1 && heard.Contains("A neighbor left the settlement."), "a leaving guest should leave the world");
-    }
-
-    private static void CheckGuestCopyForwardsActions(GameData data) {
-        var (host, guest, _) = Hosted(data);
-        var copy = new World(data, false);
-        var sent = new List<Command>();
-        copy.Host = sent.Add;
-        foreach (var world in new[] { host, copy }) world.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 2));
-        foreach (var p in new[] { copy.Players[0], guest }) { Give(p, "berries", 3); Give(p, "wood", 20); Give(p, "stone", 4); SetNeeds(p, hunger: 50); }
-        var chest = copy.Things.Single(t => t.Kind == ThingKind.Chest);
-
-        copy.Consume("berries");
-        Require(copy.Construction.Build(ThingKind.Campfire, Terrain.Spawn + new Vector2(30, 0)) == null && sent.Count == 1, "the copy should refuse a building out of reach itself");
-        copy.Construction.Build(ThingKind.Campfire, Terrain.Spawn + new Vector2(-2, 2), Mathf.Pi / 2);
-        copy.Transfer(copy.Backpack, chest.Inventory, "wood", 5);
-        copy.SetFilter(chest, "wood", false, true);
-        Require(copy.Backpack["berries"] == 3, "a guest's copy should keep its own backpack berries");
-        Require(copy.Hunger == 50, "a guest's copy should keep its own hunger");
-        Require(copy.Things.All(t => t.Kind != ThingKind.Campfire), "a guest's copy should not add a campfire to its world");
-        Require(chest.Inventory.Count == 0, "a guest's copy should not put anything in the host's chest");
-        Require(chest.Inventory.InputFilter.Count == 0, "a guest's copy should not set a filter on the host's chest");
-        Require(sent.Select(c => c.Verb).SequenceEqual(new[] { Verb.Consume, Verb.Build, Verb.Transfer, Verb.SetFilter }), $"the copy should send each action once, in order: {string.Join(", ", sent.Select(c => c.Verb))}");
-
-        foreach (var command in sent) host.Run(guest, command);
-        var hostChest = host.Find(chest.Id)!;
-        Require(guest.Backpack["berries"] == 2, "the host should run the guest's eating on the guest's berries");
-        Require(guest.Hunger > 50, "the host should run the guest's eating on the guest's hunger");
-        Require(host.Things.Any(t => t.Kind == ThingKind.Campfire && t.Rotation == Mathf.Pi / 2), "the host should put up the guest's building at the angle the guest chose");
-        Require(guest.Backpack["wood"] == 9, "the host should take the guest's wood for the building and the transfer");
-        Require(hostChest.Inventory["wood"] == 5 && hostChest.Inventory.InputFilter.Contains("wood"), "the guest's transfer and filter should land in the host's chest");
-        Require(host.Backpack["berries"] == 0 && host.Hunger == 100, "the host's own player should be untouched by a guest's actions");
     }
 
     private static void CheckGuestComesBackFromSaveWithTheirPackAndSpot(GameData data) {

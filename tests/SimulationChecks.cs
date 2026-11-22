@@ -20,7 +20,7 @@ public static class SimulationChecks {
         WaterPumpModelChecks.Run();
         PlumbingChecks.Run(data);
         Test(WaterPumpChecks.Run, data);
-        Test(PlumbingFixtureChecks.Run, data);
+        Test(BuildingPlumbingChecks.Run, data);
         Test(InventoryLayoutChecks.Run, data);
         Test(HeldStackChecks.Run, data);
         Test(HotbarStackChecks.Run, data);

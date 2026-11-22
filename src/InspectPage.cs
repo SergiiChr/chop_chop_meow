@@ -57,13 +57,13 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         Headline();
         Reach();
         Body();
-        if (thing.PlumbingSlot is Inventory plumbing) {
+        if (thing.PlumbingSlot is Inventory plumbingSlot) {
             var window = panel.ShowAside(190);
             window.AddChild(Style.Heading("Plumbing", 19));
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 8);
             window.AddChild(Style.InWell(row));
-            var slot = stationSlots.Slot(plumbing, "steel_pipe", true,
+            var slot = stationSlots.Slot(plumbingSlot, "steel_pipe", true,
                 count => $"Plumbing · {count}/{Plumbing.InstallCost} steel pipes\n{StationSlots.SlotHint}",
                 takes: held => held.Stack?.Item == "steel_pipe");
             slot.Name = "plumbing_slot";
@@ -71,7 +71,7 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
             var label = Style.Text("", 13, Style.Ink, wrap: true);
             label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             row.AddChild(label);
-            live.Watch(() => plumbing["steel_pipe"], count => label.Text =
+            live.Watch(() => plumbingSlot["steel_pipe"], count => label.Text =
                 count == Plumbing.InstallCost ? "Installed" : $"{count}/{Plumbing.InstallCost} pipes");
         }
         RedrawOnChange(() => (thing.Packs, world.Selected(thing), thing.Compost, FilterCode()));
@@ -112,15 +112,15 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
 
     /// <summary>The backpack drawer, where Shift and Ctrl store into this thing.</summary>
     protected void StoreBagGrid(Func<string, bool>? wanted = null) =>
-        EquipmentBagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), $"{BagHint}\nShift: store a stack · Ctrl: all of it", wanted);
+        BagGridWithPlumbingSlot(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), $"{BagHint}\nShift: store a stack · Ctrl: all of it", wanted);
 
-    /// <summary>Moves pipes to the building's plumbing slot when a player Shift-clicks or Ctrl-clicks a stack.</summary>
-    protected void EquipmentBagGrid(Action<string> move, string hint, Func<string, bool>? wanted) {
-        if (thing.PlumbingSlot is not Inventory pipes) { BagGrid(move, hint, wanted: wanted); return; }
+    /// <summary>Moves steel pipes to the building's Plumbing slot when a player Shift-clicks or Ctrl-clicks a stack.</summary>
+    protected void BagGridWithPlumbingSlot(Action<string> move, string hint, Func<string, bool>? wanted) {
+        if (thing.PlumbingSlot is not Inventory plumbingSlot) { BagGrid(move, hint, wanted: wanted); return; }
         BagGrid(item => {
-            if (item == "steel_pipe") moves.Stack(world.S.Backpack, pipes, item, thing);
+            if (item == "steel_pipe") moves.Stack(world.S.Backpack, plumbingSlot, item, thing);
             else move(item);
-        }, hint, wanted: item => item == "steel_pipe" ? pipes.Room(item) > 0 : wanted?.Invoke(item) == true);
+        }, hint, wanted: item => item == "steel_pipe" ? plumbingSlot.Room(item) > 0 : wanted?.Invoke(item) == true);
     }
 
     /// <summary>The backpack drawer, where Shift and Ctrl load this station.</summary>

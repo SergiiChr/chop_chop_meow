@@ -10,9 +10,9 @@ public static class FarmSprayModelChecks {
         farm.Crops[1].Free(); farm.Crops[2].Free();
         var plumbing = farm.Plumbing!;
         plumbing.Show(true);
-        Require(farm.Body.FindChild("FarmSpray", true, false) is MeshInstance3D, "An equipped farm should have a spray mesh.");
+        Require(farm.Body.FindChild("FarmSpray", true, false) is MeshInstance3D, "A plumbed farm should have a spray mesh.");
         var spray = (MeshInstance3D)farm.Body.FindChild("FarmSpray", true, false)!;
-        Require(!spray.Visible, "An equipped farm should start with its spray off.");
+        Require(!spray.Visible, "A plumbed farm should start with its spray off.");
         plumbing.Water(true, .5f);
         Require(spray.Visible, "A receiving farm should show its spray.");
         int triangles = ModelSteps.Triangles(farm.Root);
@@ -20,12 +20,12 @@ public static class FarmSprayModelChecks {
 
         var arrays = spray.Mesh!.SurfaceGetArrays(0);
         var vertices = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-        var fittings = ModelSteps.AllMeshes(spray.GetParent()).Where(mesh => mesh != spray)
+        var sprinklerMeshes = ModelSteps.AllMeshes(spray.GetParent()).Where(mesh => mesh != spray)
             .Select(mesh => mesh.Transform * mesh.Mesh!.GetAabb()).ToArray();
         foreach (float x in new[] { -1.425f, 1.425f }) {
             foreach (float z in new[] { -1.425f, 1.425f }) {
                 var center = new Vector3(x, 0, z);
-                var head = fittings.Where(bounds => (bounds.GetCenter() with { Y = 0 }).DistanceTo(center) < .12f).ToArray();
+                var head = sprinklerMeshes.Where(bounds => (bounds.GetCenter() with { Y = 0 }).DistanceTo(center) < .12f).ToArray();
                 Require(head.Length > 0, "Each quarter of the farm should have a sprinkler in its center.");
                 float top = head.Max(bounds => bounds.End.Y);
                 Require(top is > .12f and < .32f, "Each sprinkler should stick just above the tilled soil.");
@@ -33,7 +33,7 @@ public static class FarmSprayModelChecks {
                     "Spray should start at the top of each sprinkler.");
             }
         }
-        foreach (var bounds in fittings)
+        foreach (var bounds in sprinklerMeshes)
             Require(Mathf.Abs(Mathf.Abs(bounds.GetCenter().X) - 1.425f) < .12f
                 && Mathf.Abs(Mathf.Abs(bounds.GetCenter().Z) - 1.425f) < .12f
                 && bounds.Size.X < .25f && bounds.Size.Z < .25f,

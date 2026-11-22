@@ -218,22 +218,6 @@ public sealed partial class World {
     private bool AtBellows(Worker w, Thing forge) =>
         w.Assignment == forge.Id && w.Doing == JobKind.Bellows && w.Bag.Count == 0 && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w);
 
-    /// <summary>A single operator works the handle from the pump's bank side.</summary>
-    private bool PumpWater(Worker w, Thing pump, float dt) {
-        foreach (var other in S.Workers)
-            if (other != w && other.Assignment == pump.Id && other.WorkState == WorkerWorkState.Pumping) {
-                w.Status = "The pump is in use";
-                return false;
-            }
-        if (!HandsFree(w, dt)) return true;
-        w.Status = "Pumping water";
-        if (Walk(w, pump.ToWorld(BellowsStand), dt, .1f, exact: true)) {
-            w.WorkState = WorkerWorkState.Pumping;
-            if (pump.PumpStrokeLeft == 0) WaterPumps.Stroke(pump);
-        }
-        return true;
-    }
-
     /// <summary>A campfire's keeper brings wood from storage once the fire runs low.</summary>
     private bool TendFire(Worker w, Thing fire, float dt) {
         if (fire.Burn > 120 || fire.Inventory["wood"] > 0) { w.Status = "Tending fire"; return false; }

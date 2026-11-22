@@ -7,6 +7,8 @@ using static SetupSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
+    private Task RunBuildingEffectsUIChecks() => TestClean(CheckQuarterTurnedForgeEmitsFromItsFlueAndMouth);
+
     private async Task CheckQuarterTurnedForgeEmitsFromItsFlueAndMouth() {
         var home = world.Player;
         var at = SpotsNearby().First(p => world.CanStand(p) && Uncovered(view.Screen(p, .5f)) && view.Pick(view.Screen(p, .5f)) == null);

@@ -64,7 +64,7 @@ public sealed class Thing {
     /// <summary>A fuel-burning station's one stack of fuel, apart from what it smelts or cooks; what it holds is what it burns.</summary>
     public Inventory? Burner { get; set; }
     /// <summary>Tools fitted to a workstation, such as the anvil’s hammer or the cooking table’s mortar.</summary>
-    public Inventory? Tools { get => Kind == ThingKind.Anvil ? field ??= new Inventory { Slots = 1, StackSize = 1 } : field; set; }
+    public Inventory? Tools { get; set; }
     /// <summary>The pipes fitted to a building that takes water from underground.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Inventory? PlumbingSlot {
@@ -72,7 +72,7 @@ public sealed class Thing {
         set;
     }
     [JsonIgnore] public bool PlumbingInstalled => PlumbingSlot?["steel_pipe"] == Plumbing.InstallCost;
-    /// <summary>Fittings last seen on an explored building, without remembering its inventory or live flow.</summary>
+    /// <summary>Installed plumbing last seen on an explored building, without remembering its inventory or live flow.</summary>
     [JsonInclude, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] internal bool RememberedPlumbing { get; set; }
     internal bool ShowsPlumbing => RememberedPlumbing || PlumbingInstalled;
     /// <summary>A cabin's door locked from inside with its key, which keeps out players and wolves; only a cabin with someone inside is locked.</summary>
@@ -352,10 +352,11 @@ public sealed partial class World {
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
-        Farms = new Farms(this); SteelPipes = new SteelPipes(this); plumbing = new Plumbing(this);
+        Farms = new Farms(this); SteelPipes = new SteelPipes(this);
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
         walkSearch = new WalkSearch(this);
-        barrels = new Barrels(this); barrelHaul = new BarrelHaul(this, barrels); bedtimeWater = new BedtimeWater(this);
+        barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
+        barrelHaul = new BarrelHaul(this, barrels); bedtimeWater = new BedtimeWater(this);
         hauling = new Hauling(this, barrelHaul); gathering = new Gathering(this); waterGathering = new WaterGathering(this); crafting = new Crafting(this); packCraft = new PackCraft(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
@@ -368,23 +369,6 @@ public sealed partial class World {
     public Construction Construction { get; }
     public Farms Farms { get; }
     private readonly Barrels barrels;
-
-    /// <summary>Whole liters the building can store from its plumbing.</summary>
-    internal int PlumbingRoom(Thing t) {
-        if (!t.PlumbingInstalled) return 0;
-        return t.Kind switch {
-            ThingKind.Hut or ThingKind.Barrel => Barrels.Room(t),
-            ThingKind.Farm => Math.Min(Farms.WaterRoom(t), t.Inventory.Room(Water.Liquid)),
-            ThingKind.Cooktable when Data.Recipes.TryGetValue(t.NextRecipe, out var recipe) =>
-                Math.Clamp(recipe.Inputs.GetValueOrDefault(Water.Liquid) - t.Inventory[Water.Liquid], 0, t.Inventory.Room(Water.Liquid)),
-            _ => 0
-        };
-    }
-
-    internal int SupplyPlumbing(Thing t, int liters) {
-        int put = Math.Min(liters, PlumbingRoom(t));
-        return t.Kind is ThingKind.Hut or ThingKind.Barrel ? barrels.AddWater(t, put) : t.Inventory.Add(Water.Liquid, put);
-    }
 
     private readonly BarrelHaul barrelHaul;
     // The jobs several kinds of place offer, and the places' own versions of them: the lake's gathering and the packing station's crafting.
@@ -1307,7 +1291,7 @@ public sealed partial class World {
     private static Inventory NewWageSlot() => new() { Slots = 1, CoinStack = Inventory.UnlimitedCoins, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins, and a tool slot only the tools its rules take.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
-        box == t.PlumbingSlot ? (item == "steel_pipe" ? null : "The plumbing slot only takes steel pipes.") :
+        box == t.PlumbingSlot ? (item == "steel_pipe" ? null : "The Plumbing slot only takes steel pipes.") :
         Barrel.Is(item) && box != t.Inventory && BoxIndex(t, box) >= 0 ? $"Barrel does not fit in {Lower(Data.Name(t.Kind))}." :
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
@@ -1529,8 +1513,8 @@ public sealed partial class World {
         if (Busy() || Forwarded(Verb.PickUpBarrel, barrel.Id)) return true;
         if (HeldByOthers(barrel)) return false;
         S.Backpack.Add(item, 1);
-        if (barrel.PlumbingSlot is Inventory fittings && fittings.Count > 0)
-            Construction.GiveBack(new Dictionary<string, int> { ["steel_pipe"] = fittings["steel_pipe"] }, barrel.Pos);
+        if (barrel.PlumbingSlot is Inventory plumbingSlot && plumbingSlot.Count > 0)
+            Construction.GiveBack(new Dictionary<string, int> { ["steel_pipe"] = plumbingSlot["steel_pipe"] }, barrel.Pos);
         S.Things.Remove(barrel);
         Play("wood_rocks_inventory", barrel.Pos);
         PlayerActed?.Invoke(ActorAction.PickUp, barrel.Pos);
@@ -2429,9 +2413,9 @@ public sealed partial class World {
             if (t.Kind == ThingKind.Barrel && (t.Inventory.Slots != 1 || t.Inventory.StackSize != Barrel.Capacity
                 || t.Inventory.Capacity != Barrel.Capacity || t.Inventory.Count != t.Inventory[Water.Liquid]
                 || t.Inventory.Count > Barrel.Capacity)) return false;
-            if (t.PlumbingSlot is Inventory fixture && (!Plumbing.HasPlumbing(t.Kind) || fixture.Slots != 1
-                || fixture.Capacity != Plumbing.InstallCost || fixture.StackSize != Plumbing.InstallCost
-                || fixture.Count > Plumbing.InstallCost || fixture.Count != fixture["steel_pipe"])) return false;
+            if (t.PlumbingSlot is Inventory plumbingSlot && (!Plumbing.HasPlumbing(t.Kind) || plumbingSlot.Slots != 1
+                || plumbingSlot.Capacity != Plumbing.InstallCost || plumbingSlot.StackSize != Plumbing.InstallCost
+                || plumbingSlot.Count > Plumbing.InstallCost || plumbingSlot.Count != plumbingSlot["steel_pipe"])) return false;
             if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t)) return false;
             if (!(t.Pressure >= 0 && t.Pressure <= 100 && t.PumpStrokeLeft >= 0 && t.PumpStrokeLeft <= WaterPumps.StrokeSeconds)
                 || t.Kind != ThingKind.Pump && (t.Pressure != 0 || t.PumpStrokeLeft != 0)) return false;

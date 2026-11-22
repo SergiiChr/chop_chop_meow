@@ -133,7 +133,7 @@ internal partial class PipeLayerView : Node3D {
         if (pipe.MaterialOverride != finish) pipe.MaterialOverride = finish;
     }
 
-    /// <summary>Join each installed fixture to the pipe immediately under its base.</summary>
+    /// <summary>Join each building with plumbing to the pipe immediately under its base.</summary>
     private void UpdateRisers(World world, List<Thing> known, bool recolor) {
         connected.Clear();
         foreach (var thing in known) {

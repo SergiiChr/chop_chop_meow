@@ -6,12 +6,12 @@ using static PlumbingSteps;
 using static SetupSteps;
 using static WorldSteps;
 
-public static class PlumbingFixtureChecks {
+public static class BuildingPlumbingChecks {
     public static void Run(GameData data) {
         Test(CheckTheAnvilMakesStackablePipesWithASteelHammer, data);
-        Test(CheckAPlumbedTableFillsOnlyTheCurrentRecipesWater, data);
+        Test(CheckACookingTableDrawsWaterForItsNextBatch, data);
         Test(CheckTheLastDoughBatchDoesNotDrawMoreWater, data);
-        Test(CheckExploredBuildingsRememberTheirFittings, data);
+        Test(CheckExploredBuildingsRememberInstalledPlumbing, data);
         Test(CheckFullPlotsSpendTheirShareInEveryCropStage, data);
         Test(CheckPlumbingComesBackWithBarrelsAndDismantledBuildings, data);
     }
@@ -31,7 +31,7 @@ public static class PlumbingFixtureChecks {
             "Two steel bars should make two pipes in one output stack.");
     }
 
-    private static void CheckAPlumbedTableFillsOnlyTheCurrentRecipesWater(GameData data) {
+    private static void CheckACookingTableDrawsWaterForItsNextBatch(GameData data) {
         var (world, pump, barrel) = PumpAndBarrel(data);
         barrel.Inventory.Add(Water.Liquid, 50);
         var table = ExtendSouth(world, ThingKind.Cooktable);
@@ -62,7 +62,7 @@ public static class PlumbingFixtureChecks {
         Require(table.Inventory[Water.Liquid] == 0 && !table.ReceivingWater, "A final batch already kneading should leave all incoming water for other buildings.");
     }
 
-    private static void CheckExploredBuildingsRememberTheirFittings(GameData data) {
+    private static void CheckExploredBuildingsRememberInstalledPlumbing(GameData data) {
         var world = EmptyWorld(data);
         var barrel = world.Add(ThingKind.Barrel, world.Player + Vector2.Right);
         InstallPlumbing(world, barrel); world.Look();
@@ -70,12 +70,12 @@ public static class PlumbingFixtureChecks {
         world.Look();
         var loaded = EmptyWorld(data); loaded.Deserialize(world.Serialize());
         var memory = Known(loaded).Single(t => t.Id == barrel.Id);
-        Require(memory.ShowsPlumbing && !memory.PlumbingInstalled, "An explored barrel should remember its feed without retaining equipped inventory.");
+        Require(memory.ShowsPlumbing && !memory.PlumbingInstalled, "An explored barrel should remember its feed without retaining its Plumbing slot inventory.");
         var live = loaded.Find(barrel.Id)!;
         loaded.Player = live.Pos + Vector2.Down;
         loaded.Transfer(live.PlumbingSlot!, loaded.Backpack, "steel_pipe", 10); loaded.Look();
         loaded.Player = world.Player; loaded.Look();
-        Require(!Known(loaded).Single(t => t.Id == live.Id).ShowsPlumbing, "Seeing the bare barrel again should clear its remembered fittings.");
+        Require(!Known(loaded).Single(t => t.Id == live.Id).ShowsPlumbing, "Seeing the bare barrel again should clear its remembered plumbing.");
     }
 
     private static void CheckFullPlotsSpendTheirShareInEveryCropStage(GameData data) {

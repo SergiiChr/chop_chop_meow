@@ -166,7 +166,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   Each quarter of a plumbed farm has a short dark metal sprinkler head just above the soil.
   Each supply comes up through the middle of the building's base.
   `FarmSpray` draws a low crown at each head and loose drops that fall onto the tilled rows.
-  The splash takes its shape from the Water / Splash effect in [Patch Pixel Effects](https://patch.gg/patch/pixel-effects).
+  The spray follows the Water / Splash effect in [Patch Pixel Effects](https://patch.gg/patch/pixel-effects).
 - `FirePitShape` — the campfire's shared ring of eleven irregular faceted fieldstones, ash bed and fitted split logs with charred ends. A separate shared flame mesh has the flicker pivot, smoke vent and day/night light handles.
 
 ### Carried and dropped goods

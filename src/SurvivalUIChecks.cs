@@ -35,29 +35,6 @@ public partial class Game {
             await Frames(2);
         }
     }
-    /// <summary>Holding the right mouse button at the shoreline refills the starter bottle.</summary>
-    private async Task CheckHoldingRightMouseOnShoreRefillsRetainedBottle() {
-        RemoveThings(Hosted, t => t.Kind == ThingKind.Water);
-        Hosted.Add(ThingKind.Water, world.Player + Vector2.Right * 20, 9999);
-        Drop(Hosted, "water");
-        Drop(Hosted, "water_1");
-        Drop(Hosted, "water_2");
-        Give(Hosted, "empty_bottle", 1);
-        var shore = Terrain.WaterPoint(world.Player);
-        Warp(Hosted, shore + (shore - Terrain.Lake).Normalized() * 1.8f);
-        await Frames(4);
-        var shorePoint = view.Screen(shore, .8f);
-        await Hover(shorePoint);
-        Require(world.Find(view.Hover)?.Kind == ThingKind.Water, "Pointing at the shoreline should show the water target.");
-        await SurvivalReviewShot("water-source");
-        var windowPoint = GetViewport().GetFinalTransform() * shorePoint;
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-        await Until(() => world.Backpack["water"] == 1 && world.Backpack["empty_bottle"] == 0, "holding right mouse on the shoreline filling the retained bottle", world.Data.GatherSeconds + 3);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
-        await Frames(3);
-
-        await KeyStroke(Key.Tab); await Frames(3); await SurvivalReviewShot("filled-bottle"); await CloseWithEsc();
-    }
     /// <summary>Drinking through hotbar slot nine consumes one liter at a time and keeps the empty bottle.</summary>
     private async Task CheckHotbarDrinkTakesOneLiterAndKeepsEmptyBottle() {
         for (int expected = 3; expected >= 1; expected--) {

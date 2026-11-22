@@ -3,7 +3,7 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-/// <summary>Surface fittings on buildings connected to pipework beneath the center of their base.</summary>
+/// <summary>Visible plumbing on buildings connected to pipework beneath the center of their base.</summary>
 internal sealed class InstalledPlumbingShape {
     private static readonly Material Steel = Metal("8e9fa8", .55f, .42f);
     private static readonly Material Brass = Metal("b08c51", .5f, .50f);

@@ -15,36 +15,6 @@ using static WorkerSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>
-    /// Every panel page, refreshed again and again while what it shows stays the same, allocates nothing:
-    /// the panel refreshes several times a second while it is open.
-    /// </summary>
-    private async Task CheckPanelPagesRefreshWithoutAllocating() {
-        var at = world.Player;
-        var chest = Hosted.Add(ThingKind.Chest, at + new Vector2(2, 0)); chest.Inventory.Add("wood", 40); chest.Inventory.Add("coal", 12);
-        var pile = Hosted.Add(ThingKind.Pile, at + new Vector2(-4, 2)); pile.Inventory.Add("stone", 9);
-        var forge = Hosted.Add(ThingKind.Reinforced, at + new Vector2(-2, 0)); forge.Inventory.Add("iron_bar", 4); forge.Inventory.Add("coal", 6); forge.Heat = 85; forge.Processing = true; forge.Progress = 2;
-        var furnace = Hosted.Add(ThingKind.Furnace, at + new Vector2(0, 2)); furnace.Inventory.Add("iron_ore", 4);
-        var fire = Hosted.Add(ThingKind.Campfire, at + new Vector2(0, -2)); fire.Burn = 120;
-        var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(4, -3));
-        var sign = Hosted.Add(ThingKind.Signpost, at + new Vector2(-4, -3));
-        var farm = Hosted.Add(ThingKind.Farm, at + new Vector2(5, 3));
-        var packer = Hosted.Add(ThingKind.Packer, at + new Vector2(-5, 4)); Hosted.SetPacking(packer, "berries"); packer.Inventory.Add("berries", 6); packer.Inventory.Add("crate", 2);
-        var tree = world.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(at))!;
-        var worker = AddWorker(Hosted, at + Vector2.One); worker.Name = "Panel Check"; worker.Wage = 5;
-        Hosted.Assign(worker, forge); worker.Bag.Add("coal", 2);
-        var pages = new (string Name, Action Open)[] {
-            ("inventory", () => panel.Open(Page.Backpack)), ("craft", () => panel.Open(Page.Craft)), ("workers", () => panel.Open(Page.Crew)),
-            ("chest", () => panel.Select(Shown(chest))), ("pile", () => panel.Select(Shown(pile))), ("bellows furnace", () => panel.Select(Shown(forge))), ("furnace", () => panel.Select(Shown(furnace))),
-            ("campfire", () => panel.Select(Shown(fire))), ("cabin", () => panel.Select(Shown(hut))), ("signpost", () => panel.Select(Shown(sign))), ("farm", () => panel.Select(Shown(farm))), ("packing station", () => panel.Select(Shown(packer))),
-            ("tree", () => panel.Select(tree)), ("worker", () => panel.Select(world.Workers.First(w => w.Id == worker.Id))),
-        };
-        await MeasurePanelRefreshAllocations(pages);
-        Hosted.Fire(worker);
-        var placed = new[] { chest, pile, forge, furnace, fire, hut, sign, farm, packer };
-        RemoveThings(Hosted, t => placed.Contains(t) || t.Kind == ThingKind.Grave);
-        await Frames();
-    }
     /// <summary>The intro film covers the start menu and takes every click and key until Esc skips it and nothing else.</summary>
     private async Task CheckIntroFilmCoversTheStartMenuUntilEsc() {
         ShowStart(); await Frames();
@@ -916,39 +886,6 @@ public partial class Game {
         Require(slow.Seconds > quick.Seconds, $"A tall tree must take longer to come down than a short one: {slow.Seconds:0.00} s against {quick.Seconds:0.00}.");
         Warp(Hosted, start); await Frames(4);
     }
-    /// <summary>The red cross in the building plans hands over the remove selector, which turns a building in reach red and takes it down on one click, then stays for the next; a building's page has no take-down button.</summary>
-    private async Task CheckRemoveSelectorTakesBuildingsDownAtOnce() {
-        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("coal", 5);
-        var other = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(-2, 2));
-        int wood = world.Backpack["wood"], coal = world.Backpack["coal"];
-        await ClickOn(chest);
-        Require(panel.Selection.Thing == chest.Id && Named("dismantle") == null, "A building's page must have no take-down button.");
-        await CloseWithEsc();
-        await KeyStroke(Key.B);
-        await Click(Named("remove")!);
-        Require(player.Mode is ClickMode.Remove && !panel.Visible, "A click on the red cross must close the building plans and hand over the remove selector.");
-        await Hover(view.Screen(chest.Pos, .3f));
-        Require(view.RemovalShown.Building == chest.Id, "A building in reach under the remove selector must turn red.");
-        await ClickOn(chest);
-        await Until(() => world.Find(chest.Id) == null, "one click with the remove selector taking the chest down", 2);
-        Require(world.Backpack["wood"] == wood + 8 && world.Backpack["coal"] == coal + 5, "Taking the chest down must give back its 8 wood and the coal in it.");
-        Require(player.Mode is ClickMode.Remove && !panel.Visible, "The remove selector must stay on after taking a building down, and open no page.");
-        await RightClick(world.Player + new Vector2(3, 0));
-        await ClickOn(other);
-        Require(player.Mode is ClickMode.Remove && !panel.Visible && world.Find(other.Id) != null && view.RemovalShown == Removal.None,
-            "Switching underground must keep the selector active and leave the surface chest untouched.");
-        await RightClick(world.Player + new Vector2(3, 0));
-        await ClickOn(other);
-        await Until(() => world.Find(other.Id) == null, "switching back to the surface and taking the next chest down", 2);
-        await KeyStroke(Key.Escape);
-        Require(player.Mode is ClickMode.Normal, "Esc must put the remove selector away.");
-        await KeyStroke(Key.B);
-        await PickUp(Named("build_chest")!);
-        await Click(Named("remove")!);
-        Require(player.Mode is ClickMode.Remove && cursor.Empty && !panel.Visible, "A click on the red cross with a plan held must let go of the plan and hand over the remove selector.");
-        await KeyStroke(Key.Escape);
-        Drop(Hosted, "wood", 16); Drop(Hosted, "coal", 5); await Frames();
-    }
     /// <summary>A double click on a packed crate in the backpack opens it, and its contents move to the backpack and back by Shift-click.</summary>
     private async Task CheckPackedCrateOpensFromTheBackpack() {
         // Berries already carried would join the five taken out in one stack, which Shift would move back whole.
@@ -1110,29 +1047,6 @@ public partial class Game {
         await KeyStroke(Key.Escape); await CloseWithEsc();
         Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
     }
-    /// <summary>A held plan keeps its turn over the panel and uses it when placed on open ground.</summary>
-    private async Task CheckHeldPlanPlacesOnOpenGround() {
-        await CloseWithEsc();
-        Give(Hosted, world.Data.Buildings[ThingKind.Chest].Cost);
-        await KeyStroke(Key.B);
-        await PickUp(Named("build_chest")!);
-        Require(cursor.Plan == "chest", "A click on a plan must pick it up.");
-        int chests = world.Things.Count(t => t.Kind == ThingKind.Chest);
-        var spot = SpotsNearby()
-            .First(p => world.Construction.PlacementBlock(ThingKind.Chest, world.Construction.Snap(ThingKind.Chest, p)) == null && Uncovered(view.Screen(p)));
-        await Hover(view.Screen(spot)); await KeyStroke(Key.V);
-        await Hover(Named("build_chest")!);
-        await KeyStroke(Key.V); await KeyStroke(Key.C);
-        Require(cursor.Plan == "chest" && panel.Page == Page.Build, "C and V should turn a held plan even while it is over the building plans.");
-        await Hover(view.Screen(spot));
-        Require(view.PlacementGhost is { Visible: true } ghost && ghost.Basis.Z.X < -.999f, "The preview should face toward the turned chest's front.");
-        await Click(view.Screen(spot));
-        await Until(() => world.Things.Count(t => t.Kind == ThingKind.Chest) == chests + 1, "a click on open ground placing the held plan", 2);
-        var chest = world.Things.Single(t => t.Kind == ThingKind.Chest && t.Pos == spot);
-        Require(chest.Rotation == Mathf.Pi / 2, "The held plan should keep its quarter turn across the panel.");
-        Require(view.PropOf(chest.Id)?.Root.Basis.Z.X < -.999f, "The placed chest should face the way its preview did.");
-        RemoveThings(Hosted, t => t.Kind == ThingKind.Chest && t.Pos == world.Construction.Snap(ThingKind.Chest, spot)); await CloseWithEsc();
-    }
     /// <summary>At a trading post a click on the bank picks up all its coins, and coins put on it pay in.</summary>
     private async Task CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown() {
         await CloseWithEsc();
@@ -1194,34 +1108,6 @@ public partial class Game {
         Require(world.Backpack["water"] == 0 && world.Thirst > 20, "A left click on open ground must drink the selected water.");
         foreach (var (bottle, count) in bottles) Give(Hosted, bottle, count);
         await Frames();
-    }
-    /// <summary>The build page shows plan details and a ground click places a chest. Returns the chest.</summary>
-    private async Task<Thing> CheckBuildPlanPlacesChest() {
-        await KeyStroke(Key.B); Require(ShownPage() == "Building plans", "B must open the building plans.");
-        var plan = Named("build_chest"); Require(plan != null, "Building plans must expose storage construction.");
-        await Hover(plan!);
-        Require(HasLabel(panel, "Needs: Wood") && HasLabel(panel, "5 slots"), "Hovering a plan must show its description and required resources.");
-        await DoubleClick(plan!);
-        Require(player.Mode.Placing == ThingKind.Chest && !panel.Visible, "A double click on a plan must enter placement mode.");
-        await KeyStroke(Key.C);
-        Vector2 place = Vector2.Zero;
-        for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) {
-            var candidate = world.Player.Round() + new Vector2(x, y);
-            if (world.Player.DistanceTo(candidate) <= 3 && world.Construction.PlacementBlock(ThingKind.Chest, candidate) == null) place = candidate;
-        }
-        Require(place != Vector2.Zero, "A fresh clearing must offer space for construction.");
-        var point = view.Screen(place);
-        var windowPoint = GetViewport().GetFinalTransform() * point;
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = windowPoint, Pressed = false });
-        await Frames();
-        var chest = world.Things.LastOrDefault(t => t.Kind == ThingKind.Chest);
-        Require(chest != null && chest.Rotation == 3 * Mathf.Pi / 2, "A ground click must construct the chest turned the other way by C.");
-        Require(player.Mode.Placing == (world.Backpack.Has(world.Data.Buildings[ThingKind.Chest].Cost) ? ThingKind.Chest : null), "A ground click must stay in placement while another chest can be afforded and leave it otherwise.");
-        Require(view.Selection.Thing != chest.Id, "A ground click must not select the new chest.");
-        Require(!panel.Visible, "A ground click must not open a panel.");
-        return chest!;
     }
     /// <summary>Chest stacks move by deposit, carrying and halving, filter rows take and release items, and the backpack drawer closes on its own.</summary>
     private async Task CheckChestMovesSplitsAndFiltersStacks(Thing chest) {
@@ -1472,13 +1358,13 @@ public partial class Game {
             await TestClean(CheckPauseMenuAsksBeforeNewGameAndQuit);
             await TestClean(CheckWasdJogsAndShiftSprintsUnlessTooThirsty);
             await TestClean(CheckMessagesStackFadeAndKeepClearOfHud);
-            await TestClean(CheckPanelPagesRefreshWithoutAllocating);
+            await RunPanelUIChecks();
             await TestClean(CheckLowFoodGlowsScreenEdges);
             await TestClean(CheckSoundsRotateAndMusicCrossfades);
             await TestClean(CheckSoundsFadeWithDistanceFromThePlayerAtAnyZoom);
             await RunGatheringUIChecks();
             await RunFarmUIChecks();
-            await TestClean(CheckRemoveSelectorTakesBuildingsDownAtOnce);
+            await RunBuildingRemovalUIChecks();
             await RunGravelPathUIChecks();
             await TestClean(CheckPageClosesWhenWhatItShowsIsGone);
             await TestClean(CheckPackedCrateOpensFromTheBackpack);
@@ -1491,11 +1377,11 @@ public partial class Game {
             await TestClean(CheckAPressLetGoOverAnotherSlotDoesNothing);
             await TestClean(CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround);
             await TestClean(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
-            await TestClean(CheckHeldPlanPlacesOnOpenGround);
+            await RunHeldPlanUIChecks();
             await TestClean(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
             await RunMineUIChecks();
             await TestClean(CheckHudAndHotbarEatAndDrinkSelected);
-            var chest = await Test(CheckBuildPlanPlacesChest);
+            var chest = await RunBuildingPlacementUIChecks();
             await Test(() => CheckChestMovesSplitsAndFiltersStacks(chest));
             await Test(() => CheckQuickSaveAndLoadRestorePlayerAndChest(chest));
             await TestClean(CheckLoadEndsClickModeAndSelection);
@@ -1539,13 +1425,9 @@ public partial class Game {
             await TestClean(CheckCratePutIntoCrateStopsAtWarning);
             RemoveCheckFiles();
             await TestClean(CheckRestartBuildsFreshModelsForReusedIds);
-            await TestClean(CheckPlumbingPagesRefreshWithoutAllocating);
-            await TestClean(CheckVisiblePumpGripAndPistonCanBePicked);
-            await TestClean(CheckPumpAtTheWaterlineCanBeInspected);
-            await TestClean(CheckRepeatedWaterPumpInputKeepsTheHandleMoving);
-            await TestClean(CheckWaterPumpControlsMoveThePressureGauge);
+            await RunWaterPumpUIChecks();
             await RunSteelPipeUIChecks();
-            await TestClean(CheckQuarterTurnedForgeEmitsFromItsFlueAndMouth);
+            await RunBuildingEffectsUIChecks();
             await TestClean(CheckIntroFilmCoversTheStartMenuUntilEsc);
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }

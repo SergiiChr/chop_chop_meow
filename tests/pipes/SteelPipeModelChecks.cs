@@ -43,7 +43,7 @@ public static class SteelPipeModelChecks {
                 "The cross must show all four arms and the tee must leave its closed north side bare.");
             Require(teeBounds.Size.Y < .1f && crossBounds.Size.Y < .1f
                 && SteelPipeShape.Loose.GetAabb().Size.Y < .1f && SteelPipeShape.Heap.GetAabb().Size.Y < .1f,
-                "The pipe walls must stay slim through fittings, ends, and stockpiles.");
+                "The pipe walls must stay slim through junctions, ends, and stockpiles.");
         } finally { parent.Free(); }
     }
 }

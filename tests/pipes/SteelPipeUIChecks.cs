@@ -207,7 +207,7 @@ public partial class Game {
         Give(Hosted, "steel_pipe", 12);
         await ClickOn(table);
         var slot = panel.Aside.FindChild("plumbing_slot", true, false) as ItemSlot;
-        Require(slot is { Visible: true }, "The cooking table should show a plumbing slot beside its page.");
+        Require(slot is { Visible: true }, "The cooking table should show a Plumbing slot beside its page.");
 
         await Carry(BagCellOf("steel_pipe"), slot!);
         await Until(() => world.Find(table.Id)?.PlumbingInstalled == true && world.Backpack["steel_pipe"] == 2,

@@ -234,9 +234,10 @@ public partial class SidePanel : MovableWindow {
         if (station != null) Select(station); else Open(Page.Craft);
     }
 
-    /// <summary>Selects a worker and shows them.</summary>
+    /// <summary>Opens the inspection page for the underground pipe at this tile.</summary>
     public void SelectPipe(Vector2I tile) { Selection = Selection.OfPipe(tile); Open(Page.Inspect); }
 
+    /// <summary>Selects a worker and shows them.</summary>
     public void Select(Worker w) { Selection = Selection.Of(w); Open(Page.Inspect); }
 
     /// <summary>Opens a thing or worker the server made for this player, as soon as an update brings it.</summary>
