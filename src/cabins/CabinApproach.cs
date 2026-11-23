@@ -6,9 +6,11 @@ namespace ChopChopMeow;
 /// <summary>The player's cancellable walk from open ground to the start of a cabin's doorway animation.</summary>
 internal sealed class CabinApproach(World world) {
     private const float Arrival = .035f;
+    private const int TilesPerFrame = 256;
+    private readonly WalkSearch search = new(world);
     private readonly List<Vector2> route = new();
     private int cabin, next, warp;
-    private bool retriedBlockedStep;
+    private bool searching, retriedBlockedStep;
 
     public bool Active => cabin != 0;
     public bool GoesTo(Thing hut) => cabin == hut.Id;
@@ -18,7 +20,7 @@ internal sealed class CabinApproach(World world) {
         cabin = hut.Id;
         warp = world.Me.Warp;
         route.Clear();
-        retriedBlockedStep = false;
+        searching = retriedBlockedStep = false;
     }
 
     public bool Cancel() {
@@ -36,10 +38,12 @@ internal sealed class CabinApproach(World world) {
         if (world.Door != Doorway.None) return Vector2.Zero;
         if (route.Count == 0) {
             next = 0;
-            if (!world.PlanExactWalk(world.Player, Doorways.DoorPoint(hut), route)) {
-                NoPath();
-                return Vector2.Zero;
-            }
+            var result = searching ? WalkSearch.Result.Searching
+                : search.Begin(world.Player, Doorways.DoorPoint(hut), route, exact: true, wholeWalk: true);
+            if (result == WalkSearch.Result.Searching) result = search.Continue(route, TilesPerFrame);
+            searching = result == WalkSearch.Result.Searching;
+            if (searching) return Vector2.Zero;
+            if (result == WalkSearch.Result.Blocked) { NoPath(); return Vector2.Zero; }
         }
         while (next < route.Count && world.Player.DistanceSquaredTo(route[next]) < Arrival * Arrival) next++;
         if (next < route.Count) return world.Player.DirectionTo(route[next]);

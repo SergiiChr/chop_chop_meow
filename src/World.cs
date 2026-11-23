@@ -324,6 +324,7 @@ public sealed partial class World {
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
         Farms = new Farms(this);
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
+        walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); barrelHaul = new BarrelHaul(this, barrels); bedtimeWater = new BedtimeWater(this);
         hauling = new Hauling(this, barrelHaul); gathering = new Gathering(this); waterGathering = new WaterGathering(this); crafting = new Crafting(this); packCraft = new PackCraft(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
@@ -606,6 +607,7 @@ public sealed partial class World {
     public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null);
     /// <summary>The kinds that stand in the way; resources, yards, campfires, graves, signposts and mines are walked past.</summary>
     private static readonly ThingKind[] Blockers = Array.FindAll(Structures, kind => !Construction.IsZone(kind) && kind is not (ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine));
+    internal static ReadOnlySpan<ThingKind> WalkBlockers => Blockers;
     /// <summary>Whether a thing of one of the <see cref="Blockers"/> kinds stands on a spot.</summary>
     private static bool Blocks(Thing t, Vector2 p) => t.Pos.DistanceTo(p) < Footprint(t.Kind);
     public const int PileStacks = 14;
@@ -1007,9 +1009,11 @@ public sealed partial class World {
         if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
         if (Busy() || Forwarded(Verb.LoadInput, t.Id, item: item, count: quantity)) return 0;
         int moved = Load(t, item, quantity);
-        if (moved == 0) Say(Carried(item) == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(lands)} slot is full.");
+        if (moved == 0) Say(Carried(item) == 0 ? $"No {Data.Name(item)} in your backpack." : FullInput(lands));
         return moved;
     }
+    private string FullInput(string item) => $"The {Data.Name(item)} slot is full.";
+
     /// <summary>
     /// Loads units of a station input from the backpack while its input slot has room, and says nothing.
     /// A vessel pours what it holds, and a liquid asked for by name, as when a batch is queued, pours from the backpack's vessels.
@@ -1785,18 +1789,8 @@ public sealed partial class World {
             }
         return best;
     }
-    // A search on the large map can visit thousands of tiles, so its buffers are kept: tiles are marked with the search's number rather than cleared.
-    private int[]? routeSeen, routeFrom;
-    private readonly Queue<Vector2I> routeQueue = new();
-    private readonly List<Thing> routeBlockers = new();
-    private int routeSearch;
-    private static readonly Vector2I[] RouteSteps = { new(1, 0), new(-1, 0), new(0, 1), new(0, -1), new(1, 1), new(1, -1), new(-1, 1), new(-1, -1) };
-    private bool RouteOpen(Vector2 p) {
-        if (!Open(p)) return false;
-        foreach (var t in routeBlockers) if (Blocks(t, p)) return false;
-        return true;
-    }
-    private const float RouteRetrySeconds = 1, RouteAtWaypoint = .06f;
+    private readonly WalkSearch walkSearch;
+    private const float RouteRetrySeconds = 1;
     private static readonly float[] Swerves = { 0, MathF.PI / 4, -MathF.PI / 4, MathF.PI / 2, -MathF.PI / 2 };
     /// <summary>
     /// A step toward <paramref name="to"/> on ground a player can stand on.
@@ -1810,88 +1804,8 @@ public sealed partial class World {
         foreach (float swerve in Swerves) if (CanStand(from + heading.Rotated(swerve))) return from + heading.Rotated(swerve);
         return from;
     }
-    private void CollectRouteBlockers() {
-        routeBlockers.Clear();
-        foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) routeBlockers.Add(t);
-    }
-
-    /// <summary>Plans a walk that ends at a particular spot, using a straight walk when the ground is clear.</summary>
-    internal bool PlanExactWalk(Vector2 from, Vector2 destination, List<Vector2> route) {
-        CollectRouteBlockers();
-        if (!RouteOpen(from) || !RouteOpen(destination)) return false;
-        if (!OpenRouteSegment(from, destination)) {
-            FindRoute(from, destination, route, exact: true);
-            if (route.Count == 0) return false;
-        }
-        route.Add(destination);
-        return true;
-    }
-
-    /// <summary>Appends waypoints to <paramref name="route"/> when the destination can be reached.</summary>
-    private void FindRoute(Vector2 from, Vector2 destination, List<Vector2> route, bool exact) {
-        if (exact && !RouteOpen(destination)) return;
-        routeSeen ??= new int[Terrain.Size * Terrain.Size]; routeFrom ??= new int[Terrain.Size * Terrain.Size];
-        int search = ++routeSearch;
-        var start = Terrain.TileAt(from);
-        if (!Terrain.OnMap(start)) return;
-        routeQueue.Clear();
-        // An exact walk can meet the grid at any adjacent tile it has a clear step to.
-        if (exact && RouteOpen(from)) {
-            if (OpenRouteSegment(from, start)) Seed(start);
-            foreach (var step in RouteSteps) {
-                var tile = start + step;
-                if (Terrain.OnMap(tile) && OpenRouteSegment(from, tile)) Seed(tile);
-            }
-        } else Seed(start);
-        int end = -1;
-        // A walker beside a building, with the building between them and where they go, may stand on a square near enough to it while they are not:
-        // that square then never ends the search, and they step round. One already as near as a walk's usual reach finds no route and counts as there.
-        bool near = from.DistanceTo(destination) < WalkReach;
-        float endRange = exact ? 1.5f : 1.15f;
-        while (routeQueue.Count > 0) {
-            var current = routeQueue.Dequeue();
-            if ((near || exact || current != start) && ((Vector2)current).DistanceSquaredTo(destination) <= endRange * endRange
-                && (!exact || RouteOpen(current) && OpenRouteSegment(current, destination))) { end = Terrain.TileIndex(current); break; }
-            foreach (var step in RouteSteps) {
-                var next = current + step;
-                if (!Terrain.OnMap(next) || routeSeen[Terrain.TileIndex(next)] == search || !RouteOpen(next)) continue;
-                if (exact) {
-                    if (RouteOpen(current) && !OpenRouteSegment(current, next)) continue;
-                } else if (step.X != 0 && step.Y != 0 && (!RouteOpen(current + new Vector2I(step.X, 0)) || !RouteOpen(current + new Vector2I(0, step.Y)))) continue;
-                routeSeen[Terrain.TileIndex(next)] = search; routeFrom[Terrain.TileIndex(next)] = Terrain.TileIndex(current); routeQueue.Enqueue(next);
-            }
-        }
-        if (end < 0) return;
-        int first = route.Count, node = end;
-        for (; routeFrom[node] >= 0; node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
-        var firstTile = new Vector2(node % Terrain.Size, node / Terrain.Size);
-        if (exact && RouteOpen(firstTile) && from.DistanceSquaredTo(firstTile) > RouteAtWaypoint * RouteAtWaypoint) route.Add(firstTile);
-        route.Reverse(first, route.Count - first);
-
-        void Seed(Vector2I tile) {
-            int index = Terrain.TileIndex(tile);
-            routeSeen[index] = search;
-            routeFrom[index] = -1;
-            routeQueue.Enqueue(tile);
-        }
-    }
-
-    /// <summary>Whether a straight leg is clear of buildings and stays on walkable ground.</summary>
-    private bool OpenRouteSegment(Vector2 from, Vector2 destination) {
-        var segment = destination - from;
-        float length = segment.Length();
-        if (length == 0) return RouteOpen(destination);
-        if (!Open(destination)) return false;
-        var heading = segment / length;
-        foreach (var building in routeBlockers) {
-            float along = Math.Clamp((building.Pos - from).Dot(heading), 0, length);
-            if (Blocks(building, from + heading * along)) return false;
-        }
-        for (float d = .1f; d < length; d += .1f) if (!Open(from + heading * d)) return false;
-        return true;
-    }
     /// <summary>How near a worker counts as at a place: the reach of a walk, and how near a closer spot they cannot get to counts as there.</summary>
-    private const float WalkReach = 1.2f;
+    internal const float WalkReach = 1.2f;
     internal const string BlockedPath = "Path blocked · clear a route";
     /// <summary>
     /// Moves a worker toward a destination and reports arrival within <paramref name="reach"/>.
@@ -1919,18 +1833,18 @@ public sealed partial class World {
         if (walker.Route.Count > 0 && !CanStand(walker.Route[0])) walker.Route.Clear();
         // A search covers the whole map when no way leads there, so a failed one waits a while before the next.
         if (walker.Route.Count == 0 && S.Time >= walker.RouteRetry) {
-            CollectRouteBlockers();
-            FindRoute(walker.Pos, destination, walker.Route, exact);
+            if (walkSearch.Begin(walker.Pos, destination, walker.Route, exact) == WalkSearch.Result.Searching)
+                walkSearch.Continue(walker.Route, int.MaxValue);
             if (walker.Route.Count == 0) walker.RouteRetry = S.Time + RouteRetrySeconds;
         }
         if (walker.Route.Count == 0) return false;
         var along = StepAround(walker.Pos, walker.Route[0], step);
-        if (exact && along == walker.Pos && step > 0 && walker.Pos.DistanceSquaredTo(walker.Route[0]) >= RouteAtWaypoint * RouteAtWaypoint) {
+        if (exact && along == walker.Pos && step > 0 && walker.Pos.DistanceSquaredTo(walker.Route[0]) >= WalkSearch.WaypointReach * WalkSearch.WaypointReach) {
             walker.Route.Clear(); walker.RouteRetry = S.Time + RouteRetrySeconds;
             return false;
         }
         walker.Pos = along;
-        if (walker.Pos.DistanceTo(walker.Route[0]) < RouteAtWaypoint) walker.Route.RemoveAt(0);
+        if (walker.Pos.DistanceTo(walker.Route[0]) < WalkSearch.WaypointReach) walker.Route.RemoveAt(0);
         return true;
     }
     private void WorkerTick(Worker w, float dt) {

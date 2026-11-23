@@ -1,3 +1,4 @@
+using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -8,6 +9,7 @@ internal static class PackingChecks {
     public static void Run(GameData data) {
         Test(CheckPackingInputsEachHoldOneStackByHand, data);
         Test(CheckChestHaulerStopsDeliveringWhenPackingInputsFill, data);
+        Test(CheckMovingAStackToAFullPackingInputReportsWhy, data);
     }
 
     private static void CheckPackingInputsEachHoldOneStackByHand(GameData data) {
@@ -22,6 +24,23 @@ internal static class PackingChecks {
             "the empty crate input should have its own one-stack limit");
         Require(world.LoadInput(station, "crate", 1) == 0 && world.Backpack["crate"] >= 26,
             "another crate should stay with the player while the crate input is full");
+    }
+
+    private static void CheckMovingAStackToAFullPackingInputReportsWhy(GameData data) {
+        var world = EmptyWorld(data);
+        var packer = world.Add(ThingKind.Packer, world.Player + Vector2.Down * 2);
+        Give(world, "crate", 65);
+        Require(world.LoadInput(packer, "crate", 64) == 64, "the crate slot should start full");
+        var messages = new System.Collections.Generic.List<string>();
+        world.Notify = messages.Add;
+        Require(world.Transfer(world.Backpack, packer.Inventory, "crate", 1) == 0
+            && messages.Count == 1 && messages[0] == "The Wood crate slot is full.", "a bulk move should report the full crate slot");
+        int from = Enumerable.Range(0, world.Backpack.Layout.Count)
+            .First(i => world.Backpack.Layout[i].Item == "crate");
+        messages.Clear();
+        Require(world.TransferSlot(world.Backpack, packer.Inventory, from, 0, "crate", 1) == 0
+            && messages.Count == 1 && messages[0] == "The Wood crate slot is full.", "a cell move should report the full crate slot");
+        Require(world.Backpack["crate"] == 1 && packer.Inventory["crate"] == 64, "the rejected crate should stay in the backpack");
     }
 
     private static void CheckChestHaulerStopsDeliveringWhenPackingInputsFill(GameData data) {

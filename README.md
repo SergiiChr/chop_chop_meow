@@ -635,7 +635,7 @@ The crate being packed shows on the right with how full it is; a full crate wait
 - Craft: works the station.
 - Haul: carries out the full crate, and anything it no longer packs, to storage; brings the good and empty crates, up to a stack of each ([hauling](#hauling)).
 
-Workers deliver the good it packs straight to it, as they do to storage asking for it, as long as a slot stays free for empty crates.
+Workers deliver the good straight to the station while its input has room.
 
 A crate of one good is a kind of item that filters can name: "Crate of bread" in a chest's filter, or in the trading post's.
 A full crate goes to the nearest storage whose filter asks for that crate, otherwise to the nearest open storage.
@@ -875,8 +875,10 @@ The crew overview shows each worker's jobs as numbered chips in that order, with
 
 ### Daily routine
 
-- Workers break for an hour of lunch at noon. They take the closest open campfire seats they can reach, up to six workers per fire.
+- Workers break for an hour of lunch at noon.
+  They take the closest open campfire seats they can reach, up to six workers per fire.
   Workers without a fire seat sit on the ground facing each other in groups of up to three.
+  When the crew changes, a worker keeps their ground seat unless they take an open seat by a fire.
 - As dusk falls they walk to the nearest trading post and head off down the valley like a trade cart, fading from view, then walk back in the same way at dawn.
 - Assignments and anything they carry stay as they were.
 - While they are away a forge cools and an anvil stops.
@@ -977,8 +979,10 @@ A torch that lands on a wolf burns it and sends it running for a moment.
 ### Cabins
 
 Click a cabin, or press Enter in its panel, and you walk around buildings and other obstacles to its door.
-Enter is highlighted during the walk. Click it again or press Escape to cancel and move freely.
-If there is no clear path, the walk stops. At the door you step in and it shuts behind you.
+Enter is highlighted while the game finds a path and while you walk.
+Click it again or press Escape to cancel and move freely.
+If there is no clear path, the walk stops.
+At the door you step in and it shuts behind you.
 Stepping in takes about 1.3 seconds at a walk, hurrying up the second tread, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
 For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and tugs you a metre back out in three tugs over 1.5 seconds, less where water or a building is in the way, you bent over, reaching for the door and screaming.
 It then lets go and leaves you standing there, free to move: click the cabin to go for its door again.

@@ -17,6 +17,7 @@ public static class CabinChecks {
     public static void Run(GameData data) {
         Test(CheckPlayerBehindACabinWalksRoundItToTheDoor, data);
         Test(CheckPlayerWalksAroundABenchThatOnlyClipsTheWayToTheCabin, data);
+        Test(CheckASealedCabinSearchCanBeCancelledWhileItIsRunning, data);
         Test(CheckSteppingInTakesLongerAtAWalkThanAtASprint, data);
         Test(CheckWolvesCannotReachAPlayerHalfWayIn, data);
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
@@ -89,6 +90,25 @@ public static class CabinChecks {
         approach.Start(cabin);
         for (int i = 0; i < 240 && approach.Direction() != Vector2.Zero; i++) approach.Move(.07f);
         Require(world.Door == Doorway.Entering, "the player should detour around the edge of the bench and enter the cabin");
+    }
+
+    private static void CheckASealedCabinSearchCanBeCancelledWhileItIsRunning(GameData data) {
+        var world = EmptyWorld(data);
+        var at = Terrain.Spawn;
+        var center = at + Vector2.Up * 12;
+        var cabin = world.Add(ThingKind.Hut, center);
+        for (int i = 0; i < 12; i++) world.Add(ThingKind.Hut, center + Vector2.FromAngle(i * Mathf.Tau / 12) * 5);
+        for (int y = 3; y <= 23; y += 2)
+            for (int x = -15; x <= 15; x += 2) world.Add(ThingKind.Bench, at + new Vector2(x, y));
+        Require(world.CanStand(Doorways.DoorPoint(cabin)), "inside the ring, the door itself should be open");
+        var approach = new CabinApproach(world);
+        approach.Start(cabin);
+        Require(approach.Direction() == Vector2.Zero && approach.Active, "a wide search should yield with cabin entry active");
+        Require(approach.Cancel(), "cancel should stop an in-progress route search");
+        approach.Start(cabin);
+        for (int frame = 0; frame < 200 && approach.Active; frame++)
+            Require(approach.Direction() == Vector2.Zero, "no route should cross the walls around the cabin");
+        Require(!approach.Active && world.Player == at, "the full search should release the player with the door unreachable");
     }
 
     private static void CheckSteppingInTakesLongerAtAWalkThanAtASprint(GameData data) {

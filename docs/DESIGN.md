@@ -78,6 +78,7 @@ Simulation and data:
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
 | `src/buildings/model/Removal.cs` | `Removal`, what the remove selector points at: a building or a gravel path tile |
 | `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
+| `src/paths/WalkSearch.cs` | Finds routes around water and building footprints |
 | `src/paths/GravelOutline.cs` | The outline gravel is drawn with and walked by, from the tiles laid |
 | `src/farms/Farms.cs` | Farm plots, from sowing and watered growth to harvest |
 | `src/farms/model/FarmStage.cs` | Whether a plot is fallow, growing or ripe |
@@ -87,7 +88,7 @@ Simulation and data:
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
-| `src/Packing.cs` | Packing stations |
+| `src/packing/Packing.cs` | Packing stations |
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
 | `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the bellows and fire jobs |
 | `src/jobs/hauling/Hauling.cs`, `src/jobs/hauling/Carry.cs` | The Haul job: the best carry across a haul job's places, the carry in hand and what a hauler says |
@@ -676,7 +677,9 @@ Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters
 
 `Doorways` (`src/cabins/Doorways.cs`) runs a cabin's door, which lets one player through at a time into a cabin that holds `Doorways.Places`, and `DoorTug` (`src/actors/enemies/wolf/DoorTug.cs`) a wolf tugging a player out of it; `World` holds one of each (`World.Doorways`, `World.DoorTug`) and ticks the doorway with the acting player.
 A click on a cabin starts a `CabinApproach` to `Doorways.DoorPoint`, using the same grid routes workers use to avoid obstacles.
-The panel highlights Enter while the player walks. A second press or Escape cancels the walk, or an unreachable door ends it.
+`WalkSearch` checks nearby building footprints and spreads long searches across frames.
+The panel highlights Enter while finding a path and during the walk.
+A second press or Escape cancels the approach, and an unreachable door ends it.
 On arrival, `Doorways.Enter` starts the doorway animation.
 What a player does at a door is a `Doorway` stage on `PlayerState.Door`, timed by `PlayerState.DoorTime`; while it lasts they are occupied (`World.Occupied`), as when downed, and any action they try is refused with "You are busy." (`World.Busy`); inside a cabin they are not.
 Picking a hotbar slot, putting a held stack back, marking the ending seen and skipping to morning are not refused.
@@ -1081,16 +1084,19 @@ No worker carries a crate into one, and its filters name none (`World.Nests`).
 
 #### Packing station
 
-A packing station (`packer`, `src/Packing.cs`) packs the good in `Thing.Packs` into crates, anything a crate holds but crates and coins.
+A packing station (`packer`, `src/packing/Packing.cs`) packs the good in `Thing.Packs` into crates, anything a crate holds but crates and coins.
 Its inventory applies the usual station limit to each input, the chosen good and empty crates.
 Tools each take their own storage slot, with room for up to `CrateCapacity` tools.
 `Thing.Output` holds the crate being packed.
-Player transfers and worker deliveries use the same input limit. Any excess already in a save can still be used or removed.
+Player transfers and worker deliveries use the same input limit.
+Any excess already in a save can still be used or removed.
 While worked like an anvil, it moves one item every `PackSeconds` into that crate, opening an empty crate for the first.
 A full crate, or one of another good after the choice changes, waits in the output.
 
-- Haul carries that crate to `DepositFor` and the station's leftovers to storage, and brings the good and empty crates up to a stack of each (`PackerHaul`); a batch is one crate.
-- `DepositFor` counts the station as storage for its good, ranked with explicit filters, while a stack's delivery still leaves a slot for empty crates (`World.PackingRoom`).
+- Haul carries the crate to `DepositFor` and takes the station's leftovers to storage.
+  It brings the chosen good and empty crates up to their input limits (`PackerHaul`).
+  A batch is one crate.
+- `DepositFor` counts the station as storage for its good, ranked with explicit filters, and accepts deliveries until the chosen good reaches its input limit (`World.PackingRoom`).
 - A crate packed full is a round of the Craft job.
 
 Putting a packed crate into a placed crate asks for confirmation.
@@ -1183,8 +1189,10 @@ A dismissed worker's tool goes into their recovery box.
 
 At the `LunchHour` in `GameData` workers break for one in-game hour.
 `LunchBreak` reserves the nearest available campfire seats, with up to six seats per fire.
-A blocked walk releases its seat so that worker can try another and workers on the ground can take the vacancy.
+A blocked walk releases its seat, and the worker remembers seats they could not reach until lunch ends.
+Workers on the ground keep their seats when the crew changes, unless they take a vacancy by a fire.
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
+When a worker cannot reach a group, they sit near where they stopped if there is room, or wait standing.
 
 As dusk begins (`GameData.DuskStarts`, a tenth of a day before night) they walk to the nearest trading post, or the clearing without one.
 Then they walk a cart's trip down the valley at walking pace while fading out, wait out of view for the rest of half a trade trip (`Worker.Commute`, `World.WalkLeg`), and sign out (`Worker.Home`).
