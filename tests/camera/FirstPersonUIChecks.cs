@@ -53,17 +53,7 @@ public partial class Game {
         Require(Shows(bench), "A first-person click must select the bench in front of the worker.");
         Hosted.Fire(worker);
         await CloseWithEsc();
-        var aim = Vector2.Zero;
-        void RecordSwing(ActorAction action, Vector2 target) => aim = target - Hosted.Player;
-        Hosted.PlayerActed += RecordSwing;
-        try {
-            await KeyStroke(Key.Space);
-            await Until(() => aim != Vector2.Zero, "a first-person swing", 2);
-            Require(aim.X > .5f && aim.Y < -.5f, $"Space should swing toward the bench, but swung along {aim}.");
-        } finally { Hosted.PlayerActed -= RecordSwing; }
-        await Holding(Key.W, () => Until(() => world.Player.DistanceTo(home) >= .4f, "walking forward in first person", 2));
-        var step = world.Player - home;
-        Require(step.X > .2f && step.Y < -.2f, $"W should walk toward the bench, but walked along {step}.");
+        await SwingWhileWalkingForward(home);
         await ToggleFirstPersonInPauseMenu();
         Require(camera.Projection == Camera3D.ProjectionType.Orthogonal, "Switching off the preview must restore the overhead camera.");
         RemoveThings(Hosted, t => t == bench);

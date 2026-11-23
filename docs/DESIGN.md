@@ -649,7 +649,7 @@ Fog of war is simulation state.
 `World.Look` runs every tick: it marks tiles within `SightRadius` of the player in `SaveState.Explored` and replaces `SaveState.Remembered` entries in sight with snapshots of the live things there.
 
 `World.CollectKnown` gives what the overhead view draws and picks: live things in sight, snapshots elsewhere, nothing never seen.
-The first-person view draws and picks live things across the valley.
+The first-person view draws live things across the valley.
 Snapshots are updated in place and keep only the look: no inventory, fire, heat or work in progress.
 The view picks against what it draws but only returns things that still exist.
 

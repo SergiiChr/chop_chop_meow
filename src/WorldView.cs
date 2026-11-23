@@ -92,7 +92,7 @@ public partial class WorldView : Node3D {
 
     public WorldView() {
         doorways = new DoorwayView(() => World, StateOf);
-        tugs = new TugView(() => World, StateOf);
+        tugs = new TugView(() => World, StateOf, DrawsAt);
         feeding = new FeedingSpots(wolves);
     }
     // The host keeps the original teal; each guest keeps the first one free when it joined.
@@ -118,6 +118,7 @@ public partial class WorldView : Node3D {
     private float pulseRemaining;
     private ActorAction pulseAction;
     private Vector2 pulseTarget;
+    private float pulseYaw;
     private float night;
     private float downedFor;
     private Vector2 mauledFrom;
@@ -288,8 +289,10 @@ public partial class WorldView : Node3D {
 
     /// <summary>Plays a swing, pump or kindling on the player who made it, here or at another machine.</summary>
     public void Acted(int id, ActorAction action, Vector2 target) {
-        if (id == World.Me.Id) StartPulse(player, action, target, ref pulseAction, ref pulseTarget, ref pulseRemaining);
-        else if (others.TryGetValue(id, out var other))
+        if (id == World.Me.Id) {
+            if (ActorAnimation.SwingsOnTheMove(action)) pulseYaw = ActorAnimation.Yaw(FirstPersonForward, player.Yaw);
+            StartPulse(player, action, target, ref pulseAction, ref pulseTarget, ref pulseRemaining);
+        } else if (others.TryGetValue(id, out var other))
             StartPulse(other.State, action, target, ref other.Pulse, ref other.PulseTarget, ref other.PulseRemaining);
     }
 
@@ -499,7 +502,7 @@ public partial class WorldView : Node3D {
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
         Thing? best = null; nearest = float.MaxValue;
         // Hits follow what is drawn, including memories, but only things that still exist can be picked.
-        CollectDrawnThings(picking, FirstPerson);
+        World.CollectKnown(picking);
         foreach (var drawn in picking) {
             if (drawn.Remaining <= 0 && drawn.IsResource && drawn.Kind != ThingKind.Berries || World.Find(drawn.Id) is not Thing t) continue;
             // The lake has no raised model. Its shore is picked behind the objects standing there.
@@ -535,7 +538,7 @@ public partial class WorldView : Node3D {
         // Overhead clicks prefer workers. From eye level the object in front takes the click.
         Worker? best = null; float nearest = FirstPerson ? thingDistance : float.MaxValue;
         foreach (var w in World.Workers) {
-            if (!DrawsWorker(w)) continue;
+            if (!World.Sees(w)) continue;
             var feet = WorkerFeet(w);
             if (RayHits(origin - Vector3.Up * feet.Y, direction, new Vector2(feet.X, feet.Z), PersonHit, out float d) && d < nearest) {
                 nearest = d; best = w;
@@ -679,10 +682,10 @@ public partial class WorldView : Node3D {
         action = WorkPose(action, subject);
         player.Update(at, action, target, dt, door?.Backing ?? false);
         if (FirstPerson && door == null) {
-            // Travel can be sideways or backward. The body faces the view while moving freely and the aim during a swing.
-            bool swing = ActorAnimation.Contact(action) > 0;
+            // Travel can be sideways or backward. Face the camera's direction, held at the start of each swing.
+            bool swing = ActorAnimation.SwingsOnTheMove(action);
             if (swing || action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake) {
-                player.Yaw = ActorAnimation.Yaw(swing ? target - at : FirstPersonForward, player.Yaw);
+                player.Yaw = swing ? pulseYaw : ActorAnimation.Yaw(FirstPersonForward, player.Yaw);
                 player.Turning.Hold(player.Yaw);
             }
         }
@@ -2026,7 +2029,7 @@ public partial class WorldView : Node3D {
             Tag(Screen(hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(Mouse)) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
         }
         foreach (var w in World.Workers) {
-            if (!DrawsWorker(w) || w.Id != HoverWorker && w.Id != Selection.Worker) continue;
+            if (!World.Sees(w) || w.Id != HoverWorker && w.Id != Selection.Worker) continue;
             var feet = WorkerFeet(w);
             var at = new Vector2(feet.X, feet.Z);
             if (!BehindCamera(at, feet.Y + 2.05f)) Tag(Screen(at, feet.Y + 2.05f), w.Name);
