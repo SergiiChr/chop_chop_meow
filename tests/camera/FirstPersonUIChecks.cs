@@ -19,12 +19,17 @@ public partial class Game {
         var center = GetViewport().GetVisibleRect().GetCenter();
         var window = GetViewport().GetFinalTransform();
         Input.ParseInputEvent(new InputEventMouseMotion {
-            Position = window * center, GlobalPosition = window * center,
+            Position = window * center,
+            GlobalPosition = window * center,
             Relative = window.BasisXform(new Vector2(628, 0))
         });
         await Frames();
+        var worker = AddWorker(Hosted, home + new Vector2(3.5f, -3.5f));
+        await Frames();
+        Require(view.PickWorker(center)?.Id == worker.Id, "The worker must be lined up behind the bench for this check.");
         await Click(center);
-        Require(Shows(bench), "A click in the first-person view must select the bench in the centre.");
+        Require(Shows(bench), "A first-person click must select the bench in front of the worker.");
+        Hosted.Fire(worker);
         await CloseWithEsc();
         var aim = Vector2.Zero;
         void RecordSwing(ActorAction action, Vector2 target) => aim = target - Hosted.Player;

@@ -279,7 +279,7 @@ public sealed class PlayerControl {
     }
 
     private void LeftPress(Vector2 at) {
-        var t = view.Pick(at);
+        var t = view.Pick(at, out float thingDistance);
         // A held stack goes into storage clicked in the world; a held container or plan places on open ground, even before a frame has seen the mouse there;
         // and a click anywhere else lets go of the stack, back to its cell.
         if (!cursor.Empty) {
@@ -293,7 +293,7 @@ public sealed class PlayerControl {
         if (Mode.Placing != null) { Place(at); return; }
         if (Mode is ClickMode.Remove) { world.Construction.Remove(RemovalAt(t, at)); return; }
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
-        var w = view.PickWorker(at);
+        var w = view.PickWorker(at, thingDistance);
         if (w != null) panel.Select(w);
         else if (t != null) ClickThing(t);
         else if (hotbar.ActiveItem() is string selected && hotbar.HasUse(selected)) hotbar.UseSelected(view.ToWorld(at));

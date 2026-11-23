@@ -491,11 +491,13 @@ public partial class WorldView : Node3D {
     private readonly List<Thing> picking = new();
     private const float StumpHeight = 1.3f;
     /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit shapes.</summary>
-    public Thing? Pick(Vector2 screen) {
+    public Thing? Pick(Vector2 screen) => Pick(screen, out _);
+
+    internal Thing? Pick(Vector2 screen, out float nearest) {
         SyncCamera();
         // One ray for the whole pick: asking the camera again for every thing is most of what a pick costs.
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
-        Thing? best = null; float nearest = float.MaxValue;
+        Thing? best = null; nearest = float.MaxValue;
         // Hits follow what is drawn, including memories, but only things that still exist can be picked.
         World.CollectKnown(picking);
         foreach (var drawn in picking) {
@@ -517,16 +519,21 @@ public partial class WorldView : Node3D {
             if (hit && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
-        if (GroundPoint(origin, direction, 0, out var point) && Terrain.WaterRing(point) && World.Sees(point))
-            foreach (var thing in World.ThingsOf(ThingKind.Water)) return thing;
+        if (GroundPoint(origin, direction, 0, out var point) && Terrain.WaterRing(point) && World.Sees(point)) {
+            foreach (var thing in World.ThingsOf(ThingKind.Water)) {
+                nearest = origin.DistanceTo(To3(point));
+                return thing;
+            }
+        }
         return null;
     }
 
     private static readonly Hit[] PersonHit = { new(.38f, 0, 1.75f) };
-    public Worker? PickWorker(Vector2 screen) {
+    public Worker? PickWorker(Vector2 screen, float thingDistance = float.MaxValue) {
         SyncCamera();
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
-        Worker? best = null; float nearest = float.MaxValue;
+        // Overhead clicks prefer workers. From eye level the object in front takes the click.
+        Worker? best = null; float nearest = FirstPerson ? thingDistance : float.MaxValue;
         foreach (var w in World.Workers) {
             if (!World.Sees(w)) continue;
             var feet = WorkerFeet(w);

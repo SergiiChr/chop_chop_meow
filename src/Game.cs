@@ -425,8 +425,11 @@ public partial class Game : Node, IGameFlow {
         // A recording leaves the pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
         bool recording = Engine.GetWriteMoviePath() != "";
         bool pointing = !recording && (!view.FirstPerson || looking || !overInterface && !kit.Paused);
-        var hover = pointing ? view.Pick(view.Mouse) : null;
-        view.Hover = hover?.Id ?? 0; view.HoverWorker = pointing ? view.PickWorker(view.Mouse)?.Id ?? 0 : 0;
+        float thingDistance = float.MaxValue;
+        var hover = pointing ? view.Pick(view.Mouse, out thingDistance) : null;
+        var worker = pointing ? view.PickWorker(view.Mouse, thingDistance) : null;
+        view.Hover = worker != null && view.FirstPerson ? 0 : hover?.Id ?? 0;
+        view.HoverWorker = worker?.Id ?? 0;
         view.Removal = overInterface ? Removal.None : player.RemovalAt(hover, view.Mouse);
         view.PipePreviewTile = null;
         view.PointedPipe = null;

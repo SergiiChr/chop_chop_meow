@@ -187,7 +187,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Space otherwise | Swing an axe or fist in the direction you last walked |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
-| Mouse wheel | Zoom |
+| Mouse wheel | Zoom in the overhead view |
 | LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
