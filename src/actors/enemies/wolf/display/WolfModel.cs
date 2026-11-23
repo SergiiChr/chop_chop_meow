@@ -836,16 +836,27 @@ public sealed class WolfModel {
     /// <summary>How high off the ground, in metres, a paw starts to count as held up rather than stepping, and counts as held up.</summary>
     private const float HeldFrom = .12f, HeldBy = .3f;
 
+    /// <summary>Holds the same footholds when steps tip the rear up or down and the jaws have to come back to the arm.</summary>
+    private static WolfPose RearToGrip(WolfPose pose, float height) {
+        var reared = RearedTo(pose, height, ShallowestRear);
+        reared = reared with { Lift = reared.Lift + height - BiteOf(reared).Y };
+        var before = new Halves(pose);
+        var after = new Halves(reared);
+        for (int leg = 0; leg < 4; leg++) {
+            var (lower, paw) = Slant(before.Of(leg), pose.Leg(leg));
+            var at = PawFrame(before.Of(leg).At, pose.Leg(leg), leg).Origin;
+            reared = reared.WithLeg(leg, ReachTo(after, leg, at, lower, paw));
+        }
+        return reared;
+    }
+
     /// <summary>
     /// Shows <paramref name="target"/> for <paramref name="next"/>, blending into it from the pose shown when the motion changes
     /// or turns <paramref name="wary"/> or calm. Only a wolf in sight has its skeleton posed.
     /// </summary>
     private void Show(WolfMotion next, WolfPose target, float dt, bool wary = false, float? jawsUp = null) {
         if (Steps is { } steps) target = OnSteps(target, steps.Door, steps.Rotation);
-        // The steps can raise or tip the body after its rear has been aimed at an arm.
-        if (jawsUp is float gripHeight)
-            for (int pass = 0; pass < 4; pass++)
-                target = target with { Neck = Math.Clamp(target.Neck + (BiteOf(target).Y - gripHeight) / NeckRise, -55, 55) };
+        if (jawsUp is float gripHeight) target = RearToGrip(target, gripHeight);
         // The head turns ahead of the body, the neck taking most of the turn, and the spine and tail curl after it.
         if (Turning.Look != 0) {
             float look = Mathf.RadToDeg(Turning.Look);
