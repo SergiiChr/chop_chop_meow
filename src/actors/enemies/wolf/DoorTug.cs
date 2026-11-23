@@ -113,7 +113,7 @@ public sealed class DoorTug(World world) {
     /// <summary>A wolf takes the acting player by the waist on a tugged doorway stage at a cabin, and they scream through the whole tug.</summary>
     internal void Begin(Wolf wolf, Doorway stage, int cabin) {
         Doorways.Stage(world.S.Actor, stage, cabin);
-        wolf.Tugging = true; wolf.Leap = 0;
+        wolf.Tugging = true; wolf.Leap = wolf.Snap = wolf.Recover = 0;
         world.Play("tug_scream", world.Player);
     }
 

@@ -39,15 +39,21 @@ public sealed class WolfHunt(World world) {
         // Behind a torch only a wolf that stood its ground leaps.
         if (!world.Downed && world.S.Health <= World.TakedownHealth && !lit && !world.DoorTug.Tugged && !AnyLeaping(hunters)) {
             Wolf? hunter = null;
-            foreach (var w in hunters)
-                if (!Held(w, wary) && w.Follow != FollowStage.Routed && !world.Protected(w.Pos) && w.Howl <= 0 && w.HowlIn <= 0 && w.Flee <= 0 && w.Stagger <= 0 && w.Pos.DistanceTo(world.Player) < World.LeapRange && (hunter == null || w.Pos.DistanceTo(world.Player) < hunter.Pos.DistanceTo(world.Player))) hunter = w;
-            if (hunter != null) { hunter.Leap = World.LeapSeconds; world.Say("A wolf leaps for your throat!"); }
+            float closest = World.LeapRange * World.LeapRange;
+            foreach (var wolf in hunters) {
+                float distance = wolf.Pos.DistanceSquaredTo(world.Player);
+                if (distance >= closest || WolfSnap.Active(wolf) || wolf.Attack > 0 || Held(wolf, wary) ||
+                    wolf.Follow == FollowStage.Routed || world.Protected(wolf.Pos) ||
+                    wolf.Howl > 0 || wolf.HowlIn > 0 || wolf.Flee > 0 || wolf.Stagger > 0) continue;
+                hunter = wolf; closest = distance;
+            }
+            if (hunter != null) { world.WolfSnap.Commit(hunter, true); world.Say("A wolf gathers to leap for your throat!"); }
         }
         // A chase always outpaces a walk but not a sprint.
         float speed = world.Data.WolfTrot, chase = world.Data.WalkSpeed * world.Data.WolfChase;
         foreach (var wolf in hunters) {
             var from = wolf.Pos;
-            wolf.Attack -= dt;
+            wolf.Attack = Math.Max(0, wolf.Attack - dt);
             bool held = Held(wolf, wary);
             Hunt(wolf, dt, lit, held, speed, chase);
             Face(wolf, from, dt, held && wolf.Following);
@@ -74,26 +80,18 @@ public sealed class WolfHunt(World world) {
             return;
         }
         if (wolf.Howl > 0) { wolf.Howl = Math.Max(0, wolf.Howl - dt); return; }
-        // A leap for the throat, or a player already down, ends a snap the wolf had begun.
-        if (wolf.Leap > 0 || world.S.Mauled) wolf.Snap = 0;
-        if (wolf.Leap > 0) {
-            // Closing the remaining gap evenly makes every leap last LeapSeconds.
-            var landing = world.Player + (wolf.Pos - world.Player).Normalized() * World.PinDistance;
-            wolf.Pos = wolf.Pos.MoveToward(landing, wolf.Pos.DistanceTo(landing) * Math.Min(1, dt / wolf.Leap));
-            wolf.Leap = Math.Max(0, wolf.Leap - dt);
-            // A player in a doorway is tugged back out of it first, and pinned once out.
-            if (wolf.Leap == 0 && !world.DoorTug.TugOut(wolf)) Pin(wolf);
-        } else if (world.S.Mauled) {
+        if (world.S.Mauled) {
+            wolf.Snap = wolf.Leap = wolf.Recover = 0;
             if (wolf.Feeding) return;
             var seat = world.Player + (wolf.Pos - world.Player).Normalized() * FeastSeat;
             wolf.Pos = wolf.Pos.MoveToward(seat, dt * FeastSpeed);
             wolf.Feeding = wolf.Pos.DistanceTo(seat) < .05f;
         } else if (wolf.Stagger > 0) {
             wolf.Stagger = Math.Max(0, wolf.Stagger - dt); wolf.Chase = 0;
-        } else if (wolf.Snap > 0) {
-            // Gathering itself, a wolf still keeps on its player; in the air it goes where it leapt for.
-            if (WolfSnap.Winding(wolf)) Close(wolf, dt * (held ? speed * CreepPace : chase), dt);
+        } else if (WolfSnap.Active(wolf)) {
             world.WolfSnap.Tick(wolf, dt);
+        } else if (wolf.Recover > 0) {
+            wolf.Recover = Math.Max(0, wolf.Recover - dt);
         } else if (wolf.Flee > 0) {
             // A burnt wolf trots off for a moment; one routed gallops until the player has lost sight of it.
             wolf.Flee -= dt; wolf.Chase = 0;
@@ -139,7 +137,7 @@ public sealed class WolfHunt(World world) {
     /// <paramref name="following"/> tells that it is in follow mode: scared, with a torch holding it back.
     /// </summary>
     private void Face(Wolf wolf, Vector2 from, float dt, bool following) {
-        if (wolf.Stagger > 0 || WolfSnap.InAir(wolf)) return;
+        if (wolf.Stagger > 0 || WolfSnap.Active(wolf) || wolf.Recover > 0 || wolf.Pinning) return;
         var went = wolf.Pos - from;
         // A following wolf walks round its player, slower than that, and still faces its way.
         float pace = following ? FollowsItsWayFrom : FacesItsWayFrom;
@@ -149,8 +147,9 @@ public sealed class WolfHunt(World world) {
 
     /// <summary>Pins the acting player under a wolf, standing over them, or lunging onto their throat from <paramref name="lungeFrom"/> of it once it has tugged them back out of a doorway.</summary>
     internal void Pin(Wolf wolf, Vector2 lungeFrom = default) {
-        wolf.Leap = 0; wolf.LungeFrom = lungeFrom; wolf.Feeding = wolf.Pinning = true; world.S.Mauled = true;
-        wolf.Pos = lungeFrom == Vector2.Zero ? world.Player + AwayFromPlayer(wolf) * World.PinDistance : world.Player + world.Doorways.OutOfDoorAt(world.S.Actor.DoorCabin) * DoorTug.FallenThroat + lungeFrom * DoorTug.AsideReach;
+        wolf.Leap = wolf.Snap = wolf.Recover = 0; wolf.LungeFrom = lungeFrom; wolf.Feeding = wolf.Pinning = true; world.S.Mauled = true;
+        if (lungeFrom != Vector2.Zero)
+            wolf.Pos = world.Player + world.Doorways.OutOfDoorAt(world.S.Actor.DoorCabin) * DoorTug.FallenThroat + lungeFrom * DoorTug.AsideReach;
         world.Say("You are pinned and can't move."); world.Play("wolf_bite", world.Player); world.Play("takedown_scream", world.Player);
     }
     /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>

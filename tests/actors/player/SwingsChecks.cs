@@ -64,8 +64,8 @@ public static class SwingsChecks {
         world.Attack(Vector2.Right);
         world.Tick(.2f);
         // A wolf leaping from the left: half way through its leap as the sweep crosses the front, 0.4 seconds into the swing.
-        var leaper = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2.6f, 0).Rotated(Mathf.DegToRad(-60)), Leap = World.LeapSeconds });
-        var behind = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2.6f, 0).Rotated(Mathf.DegToRad(120)), Leap = World.LeapSeconds });
+        var leaper = AirborneWolf(world, -60);
+        var behind = AirborneWolf(world, 120);
         SnapTick(world, .25f);
         Require(swung.SequenceEqual(new[] { ActorAction.SteelAxeSwing, ActorAction.SteelAxeSweep }), $"axe swings should take turns, overhead then sideways: {string.Join(", ", swung)}");
         Require(ahead.Health == after && left.Health == data.WolfHealth, "the sideways sweep, at chest height, should pass over wolves on the ground");
@@ -113,9 +113,9 @@ public static class SwingsChecks {
     /// <summary>A blow throws a wolf half a metre back from the player, and it stands reeling there for 0.45 seconds.</summary>
     private static void CheckABlowThrowsAWolfBackAndLeavesItReeling(GameData data) {
         var world = AxeNight(data);
-        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0) });
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0), Attack = .2f });
         world.Attack(Vector2.Right);
-        // The wolf snaps first; the axe comes down 0.4 seconds in.
+        // The axe comes down while the wolf is planted in its windup.
         SnapTick(world, .38f);
         float before = wolf.Pos.DistanceTo(world.Player);
         SnapTick(world, .04f);

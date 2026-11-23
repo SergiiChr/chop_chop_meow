@@ -203,7 +203,7 @@ public static class CabinChecks {
         Require(world.Health == 100 && wolf.Target == 0, "a wolf should not reach a player in the first half of stepping out");
         world.Tick(.3f);
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
-        WolfSteps.SnapTick(world, .5f);
+        WolfSteps.SnapTick(world, .64f);
         Require(world.Health < 100 && world.Door == Doorway.Leaving, "a wolf should bite a player in the second half of stepping out, who walks on out");
     }
     private static void CheckACabinHoldsTwoPlayersAndTheThirdKnocksOnTheDoor(GameData data) {

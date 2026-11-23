@@ -62,7 +62,7 @@ public sealed class WolfFollow(World world) {
                 // Every wave sends it back out to its circle, one already following too.
                 wolf.Follow = FollowStage.BackingOff; wolf.Watched = world.Player;
                 // The fire stops a wolf still gathering itself to snap; one already in the air lands.
-                if (WolfSnap.Winding(wolf)) wolf.Snap = 0;
+                if (wolf.Snap > 0 && WolfSnap.Winding(wolf)) wolf.Snap = 0;
             }
     }
 

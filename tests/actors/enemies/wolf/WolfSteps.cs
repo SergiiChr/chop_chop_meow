@@ -21,6 +21,17 @@ internal static class WolfSteps {
     public static Wolf StillWolf(World world, Vector2 from) =>
         PlaceWolf(world, new Wolf { Pos = world.Player + from, Heading = (-from).Angle(), Howl = 5, HowlLength = 5 });
 
+    /// <summary>Places a wolf already in flight toward the player from the given bearing.</summary>
+    public static Wolf AirborneWolf(World world, float degrees) {
+        var from = Vector2.FromAngle(Mathf.DegToRad(degrees));
+        return PlaceWolf(world, new Wolf {
+            Pos = world.Player + from * 2.6f,
+            Heading = (-from).Angle(),
+            SnapTo = world.Player + from * .59f,
+            Leap = World.LeapSeconds
+        });
+    }
+
     /// <summary>The health one swing of a steel axe along <paramref name="aim"/> takes off a wolf standing still <paramref name="wolfAt"/> from the player.</summary>
     public static float TakenByAnAxe(GameData data, Vector2 wolfAt, Vector2 aim) {
         var world = AxeNight(data);
@@ -30,27 +41,19 @@ internal static class WolfSteps {
         return data.WolfHealth - wolf.Health;
     }
 
-    /// <summary>Ticks a night in steps short enough to follow a snap, 0.08 seconds of which is in the air.</summary>
+    /// <summary>Ticks a night in steps short enough to follow a snap and a throat leap.</summary>
     public static void SnapTick(World world, float seconds) {
         for (float t = 0; t < seconds - 1e-4f; t += SnapStep) { Nourished(world); world.Tick(SnapStep); }
     }
     private const float SnapStep = .02f;
 
-    /// <summary>
-    /// The player's health after one snap of a wolf running beside them: they walk or sprint east with the wolf at biting
-    /// distance behind, and with <paramref name="turns"/> turn north as it leaves the ground.
-    /// </summary>
-    public static float HealthAfterASnap(GameData data, bool sprinting, bool turns) {
-        var world = NightWorld(data);
-        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-1.05f, 0) });
-        var way = Vector2.Right;
-        world.Me.Sprinting = sprinting;
-        for (float t = 0; t < 1 && (t == 0 || wolf.Snap > 0); t += SnapStep) {
-            if (turns && WolfSnap.InAir(wolf)) way = Vector2.Up;
-            Nourished(world); world.MovePlayer(way * SnapStep * data.MoveSpeed(sprinting)); world.Tick(SnapStep);
+    /// <summary>Walks in <paramref name="way"/> for the given seconds while the wolf has time to attack.</summary>
+    public static void WalkThroughSnap(World world, Vector2 way, float seconds) {
+        for (float t = 0; t < seconds - 1e-4f; t += SnapStep) {
+            Nourished(world);
+            world.MovePlayer(way * SnapStep * world.PlayerSpeed);
+            world.Tick(SnapStep);
         }
-        Checks.Require(wolf.Snap == 0 && wolf.Attack > 0, "the wolf should have snapped once within a second");
-        return world.Health;
     }
 
     /// <summary>A torch night with wolves in follow mode, settled on their circle; returns one of them.</summary>

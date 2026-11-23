@@ -42,17 +42,19 @@ public static class DoorTugChecks {
     }
 
     /// <summary>
-    /// With water half a metre in front of the door, the wolf has no ground behind the player and stays at the side it
+    /// With a bench half a metre in front of the door, the wolf has no ground behind the player and stays at the side it
     /// came from. The player faces the door, up the map, so east is to their right and west to their left.
     /// </summary>
     private static void CheckAWolfWithNoRoomBehindAPlayerItTuggedOutPinsThemFromTheSideItStandsOn(GameData data) {
         foreach (int east in new[] { 1, -1 }) {
             var world = NightWorld(data);
-            var hut = world.Add(ThingKind.Hut, ShoreForACabin(world, .5f));
+            var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
             world.Player = Doorways.DoorPoint(hut);
+            world.Add(ThingKind.Bench, world.Player + Doorways.OutOfDoor * 1.08f);
             SetNeeds(world, health: 45);
-            Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
             var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(east * .8f, 0) });
+            SnapTick(world, .16f);
+            Require(world.Doorways.Enter(hut, false), "a player at the door should step in during the wolf's windup");
             for (float time = 0; time < DoorTug.TugSeconds + .7f && !world.Mauled; time += .05f) world.Tick(.05f);
             Require(world.Mauled && wolf.Pinning, "a wounded player tugged out should be pinned by the wolf that tugged them");
             Require(wolf.LungeFrom.X * east > .9f, $"a wolf standing to the {(east > 0 ? "east" : "west")} of the player it tugged should pin them from that side, not from {wolf.LungeFrom}");
@@ -154,9 +156,10 @@ public static class DoorTugChecks {
         world.Player = Doorways.DoorPoint(hut);
         SetNeeds(world, health: 45);
         var heard = Listen(world);
-        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2, 0) });
-        for (float time = 0; time < .7f && world.Door == Doorway.Entering; time += .05f) world.Tick(.05f);
+        SnapTick(world, .16f);
+        Require(world.Doorways.Enter(hut, false), "a player at the door should step in during the wolf's windup");
+        UntilTugged(world);
         Require(world.Door == Doorway.Tugged && !world.Mauled, $"a wolf leaping at a wounded player stepping in should first tug them out, not {world.Door}");
         world.Tick(1.15f);
         Require(world.Door == Doorway.Tugged && !world.Mauled, "a wounded player should be tugged out through all three tugs before being pinned");
@@ -204,9 +207,10 @@ public static class DoorTugChecks {
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
         world.Player = Doorways.DoorPoint(hut);
         SetNeeds(world, health: 45);
-        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
         var tugger = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2, 0) });
-        for (float time = 0; time < .6f && world.Door == Doorway.Entering; time += .05f) world.Tick(.05f);
+        SnapTick(world, .16f);
+        Require(world.Doorways.Enter(hut, false), "a player at the door should step in during the wolf's windup");
+        UntilTugged(world);
         Require(world.Door == Doorway.Tugged && tugger.Tugging, $"a wolf should tug the wounded player out of the doorway, not {world.Door}");
         world.Tick(.4f);
         Give(guest, "steel_axe", 1);

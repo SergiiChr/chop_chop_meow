@@ -246,7 +246,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 16;
+    public int Version { get; set; } = 17;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -330,11 +330,6 @@ public sealed partial class World {
     /// <summary>How far down the valley a worker is, from 0 at the signpost to 1 out of view: running off for prices, or walking home or back over half a trade trip.</summary>
     public float TripLeg(Worker w) => w.Away > 0 ? WalkLeg(Data.TradeSeconds - w.Away, w.Away) : WalkLeg(w.Commute, Data.TradeSeconds / 2);
     public const float LeapSeconds = .4f;
-    /// <summary>
-    /// A wolf leaps from within LeapRange and lands this far short of the player's tile, standing over them once they are knocked onto their back.
-    /// Landing short, rather than across the tile, keeps the leap on one bearing from start to finish.
-    /// </summary>
-    public const float PinDistance = .1f;
     internal const float LeapRange = 3.5f;
     /// <summary>Minimum reinforced furnace heat: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
@@ -1194,7 +1189,7 @@ public sealed partial class World {
     private Vector2 StartSwing(ActorAction action, Vector2 aim) {
         attackClock = Swings.Cooldown;
         Vector2 direction = aim == Vector2.Zero ? Vector2.Down : aim.Normalized();
-        PlayerActed?.Invoke(action, Player + direction); Play("tool_air_swing", Player);
+        PlayerActed?.Invoke(action, direction); Play("tool_air_swing", Player);
         return direction;
     }
     public const float StaggerSeconds = .45f;
@@ -1206,7 +1201,7 @@ public sealed partial class World {
         if (wolf.Health <= 0) KillWolf(wolf);
     }
     /// <summary>Throws a wolf back from the acting player and leaves it reeling, which stops a snap it had begun.</summary>
-    private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, WolfHunt.AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; wolf.Snap = 0; }
+    private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, WolfHunt.AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; wolf.Snap = wolf.Leap = wolf.Recover = 0; }
     /// <summary>Leaves a carcass where a struck wolf fell.</summary>
     private void KillWolf(Wolf wolf) {
         S.Wolves.Remove(wolf); Add(ThingKind.WolfCorpse, wolf.Pos, WolfMeat);

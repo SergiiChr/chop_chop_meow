@@ -6,13 +6,13 @@ using static SetupSteps;
 using static WolfSteps;
 using static WorldSteps;
 
-/// <summary>Checks for a wolf's bite: gathering itself, leaping to where the player is heading and snapping, and how a player gets out of it.</summary>
+/// <summary>Checks for a wolf's bite: the windup, leap, bite, and the player's chance to get out of the way.</summary>
 public static class WolfSnapChecks {
     public static void Run(GameData data) {
         Test(CheckAWolfGathersItselfBeforeItBites, data);
-        Test(CheckAPlayerWhoKeepsTheirWayIsBitten, data);
-        Test(CheckASprintingPlayerWhoTurnsAsTheWolfLeapsIsMissed, data);
-        Test(CheckAWalkingPlayerWhoTurnsIsStillBitten, data);
+        Test(CheckAWalkingPlayerCanEvadeAndCounter, data);
+        Test(CheckAWoundedPlayerCanEvadeAThroatLeap, data);
+        Test(CheckALeapStopsAtABuilding, data);
         Test(CheckABlowThatLandsFirstStopsTheBite, data);
     }
 
@@ -22,24 +22,59 @@ public static class WolfSnapChecks {
         var heard = Listen(world);
         SnapTick(world, .25f);
         Require(world.Health == 100 && WolfSnap.Winding(wolf), "a wolf at biting distance should gather itself for 0.3 seconds before it bites");
-        SnapTick(world, .2f);
-        Require(world.Health == 100 - data.WolfBite && heard.Contains("wolf_bite"), $"a wolf should bite a player who stands still as it lands, 0.38 seconds in: health {world.Health}");
+        SnapTick(world, .35f);
+        Require(world.Health == 100 - data.WolfBite && heard.Contains("wolf_bite"), $"a wolf should bite a player who stands still as it lands, about 0.55 seconds in: health {world.Health}");
         SnapTick(world, .5f);
         Require(world.Health == 100 - data.WolfBite, "a wolf should wait 0.6 seconds after a snap before it starts the next");
-        SnapTick(world, .6f);
-        Require(world.Health == 100 - 2 * data.WolfBite, "a wolf should bite again about a second after its last bite");
+        SnapTick(world, .7f);
+        Require(world.Health == 100 - 2 * data.WolfBite, "a wolf should bite again about 1.15 seconds after its last bite");
     }
 
-    private static void CheckAPlayerWhoKeepsTheirWayIsBitten(GameData data) {
-        foreach (bool sprinting in new[] { false, true })
-            Require(HealthAfterASnap(data, sprinting, turns: false) == 100 - data.WolfBite, $"a wolf should leap to where a player {(sprinting ? "sprinting" : "walking")} straight on is heading and bite them");
+    private static void CheckAWalkingPlayerCanEvadeAndCounter(GameData data) {
+        var world = AxeNight(data);
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.3f, 0) });
+        var heard = Listen(world);
+        SnapTick(world, .06f);
+        Require(WolfSnap.Winding(wolf), "a wolf should telegraph its snap as it comes into range");
+        var planted = wolf.Pos;
+        float aim = wolf.Heading;
+        WalkThroughSnap(world, Vector2.Up, .24f);
+        Require(wolf.Pos == planted && wolf.Heading == aim, "a wolf should plant its paws and lock its aim through the windup");
+        SnapTick(world, .28f);
+        Require(world.Health == 100 && !heard.Contains("wolf_bite"), "walking sideways through the snap should evade its jaws");
+        Require(wolf.Pos.X < planted.X - .12f && MathF.Abs(wolf.Pos.Y - planted.Y) < .01f,
+            "the snap should leap forward along its committed line");
+
+        var landing = wolf.Pos;
+        SnapTick(world, .1f);
+        Require(wolf.Pos == landing && wolf.Heading == aim, "after missing the wolf should stay planted where it landed");
+        world.Attack(wolf.Pos - world.Player);
+        SnapTick(world, .42f);
+        Require(wolf.Health < data.WolfHealth && world.Health == 100, "a player can counter an exposed wolf after evading");
     }
 
-    private static void CheckASprintingPlayerWhoTurnsAsTheWolfLeapsIsMissed(GameData data) =>
-        Require(HealthAfterASnap(data, sprinting: true, turns: true) == 100, "a sprinting player who turns aside as the wolf leaps should be missed");
+    private static void CheckAWoundedPlayerCanEvadeAThroatLeap(GameData data) {
+        var world = NightWorld(data);
+        SetNeeds(world, health: 49);
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(3, 0) });
+        SnapTick(world, .06f);
+        Require(wolf.Leap > 0, "a nearby wolf should commit to a throat leap at half health");
+        WalkThroughSnap(world, Vector2.Up, .74f);
+        Require(!world.Mauled && world.Health == 49, "a throat leap that misses should leave the wounded player standing");
+        var after = world.Player;
+        WalkThroughSnap(world, Vector2.Right, .1f);
+        Require(world.Player.X > after.X + .3f, "an avoided takedown should leave the player in control");
+    }
 
-    private static void CheckAWalkingPlayerWhoTurnsIsStillBitten(GameData data) =>
-        Require(HealthAfterASnap(data, sprinting: false, turns: true) == 100 - data.WolfBite, "a walking player who turns aside as the wolf leaps should still be within reach of its jaws");
+    private static void CheckALeapStopsAtABuilding(GameData data) {
+        var world = NightWorld(data);
+        SetNeeds(world, health: 49);
+        var wall = world.Add(ThingKind.Chest, world.Player + new Vector2(1.3f, 0));
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(3, 0) });
+        SnapTick(world, .78f);
+        Require(world.Health == 49 && !world.Mauled && wolf.Pos.X > wall.X + .4f && world.CanStand(wolf.Pos),
+            "a throat leap should stop on its side of a solid object and miss the player behind it");
+    }
 
     /// <summary>A blow knocks a wolf back and leaves it reeling, so one timed to land while the wolf gathers itself costs it the bite.</summary>
     private static void CheckABlowThatLandsFirstStopsTheBite(GameData data) {

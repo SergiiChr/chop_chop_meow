@@ -25,11 +25,15 @@ public sealed class WolfBodies(World world) {
     /// How tall a wolf's body stands on the ground, how much higher a leap for the throat carries it, and how tall it
     /// stands reared up with a player's arm in its jaws, in metres.
     /// </summary>
-    public const float StandingTop = .87f, LeapRise = .55f, RearedTop = 1.16f;
+    public const float StandingTop = .87f, LeapRise = .5f, RearedTop = 1.16f;
 
     /// <summary>How high off the ground the top of a wolf's body is: it rises through the first part of a leap for the throat, and stands taller reared up.</summary>
-    public static float Top(Wolf wolf) =>
-        wolf.Leap > 0 ? StandingTop + LeapRise * Mathf.SmoothStep(.125f, .625f, 1 - wolf.Leap / World.LeapSeconds) : wolf.Side != 0 ? RearedTop : StandingTop;
+    public static float Top(Wolf wolf) {
+        if (wolf.Leap <= 0 || !WolfSnap.InAir(wolf)) return wolf.Side != 0 ? RearedTop : StandingTop;
+        float flown = World.LeapSeconds - wolf.Leap;
+        return StandingTop + LeapRise * Mathf.SmoothStep(.05f, .875f, flown / World.LeapSeconds) +
+            Movement.Rise(flown, World.LeapSeconds);
+    }
 
     /// <summary>Where a wolf's body runs from the root of its tail to its nose, the way it faces (<see cref="Wolf.Heading"/>).</summary>
     public static (Vector2 Tail, Vector2 Nose) Body(Wolf wolf) => Along(wolf, Vector2.Right.Rotated(wolf.Heading));
@@ -68,10 +72,10 @@ public sealed class WolfBodies(World world) {
     /// Where the body of a wolf at a player runs: toward them for one closing in, and along its own way for one that
     /// follows them round, so two going opposite ways pass side by side.
     /// </summary>
-    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Following ? Body(wolf) : Body(wolf, player);
+    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Following || Holds(wolf) ? Body(wolf) : Body(wolf, player);
 
     /// <summary>Whether a wolf holds its place at the player: tugging them, pinning them or in the air.</summary>
-    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Leap > 0;
+    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Stagger > 0 || WolfSnap.Active(wolf) || wolf.Recover > 0;
 
     /// <summary>The nearest points to each other on two line segments, from <paramref name="a0"/> to <paramref name="a1"/> and <paramref name="b0"/> to <paramref name="b1"/>.</summary>
     private static (Vector2 OnA, Vector2 OnB) Closest(Vector2 a0, Vector2 a1, Vector2 b0, Vector2 b1) {

@@ -19,11 +19,11 @@ public sealed class Wolf : IWalker {
     /// lands; zero while it is not snapping.
     /// </summary>
     public float Snap { get; set; }
-    /// <summary>Where the player stood as the snap began, which tells the wolf how they move.</summary>
-    public Vector2 SnapSeen { get; set; }
-    /// <summary>Where a snapping wolf's leap lands, set as it leaves the ground.</summary>
+    /// <summary>Seconds a wolf keeps its paws planted and faces along its leap after it lands.</summary>
+    public float Recover { get; set; }
+    /// <summary>Where the leap is headed, set when the wolf gathers itself.</summary>
     public Vector2 SnapTo { get; set; }
-    /// <summary>Seconds left in a throat leap; zero while the wolf runs on the ground.</summary>
+    /// <summary>Seconds left gathering itself for a throat leap and flying through it, or zero.</summary>
     public float Leap { get; set; }
     /// <summary>True once the wolf has reached the downed player and is feeding.</summary>
     public bool Feeding { get; set; }

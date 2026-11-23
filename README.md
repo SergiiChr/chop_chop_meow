@@ -183,7 +183,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | I | Open or close the field guide |
 | 1–9 or click a hotbar slot | Select and outline that slot, and start placement if it holds a plan or crate |
 | Space at a selected nearby reinforced furnace or water pump | Pump |
-| Space otherwise | Swing an axe or fist in the direction you last walked |
+| Space otherwise | Swing an axe or fist along the held movement keys, or in the last direction you walked |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
@@ -1004,8 +1004,11 @@ A wolf that reaches you stops at biting distance, about a metre off, and waits t
 
 ### Fighting
 
-A swing goes the way you aim it: toward the pointer for a click with an axe, pickaxe, hammer or torch selected, and the way you last walked for Space.
-It lands when the blade comes down, 0.4 seconds in for a steel axe, on every wolf it touches there, and misses one that has moved out of its way.
+A swing keeps the direction you gave it at the start.
+Click with an axe, pickaxe, hammer or torch selected to aim at the pointer, or use Space to aim with the movement keys.
+From a stand, Space uses the last direction you walked.
+You can move during the swing, and near a hunting wolf the movement keys reverse you immediately.
+A steel axe lands 0.4 seconds into its swing and hits every wolf the blade reaches.
 Axe swings take turns:
 
 - the overhead chop comes down on a strip straight ahead, out to 1.35 metres;
@@ -1016,10 +1019,10 @@ A steel axe takes 2.2 to 3.2 of a wolf's 8 health a blow, a torch 0.8 to 1.2 and
 A torch and a fist reach only a wolf at biting distance: the flame 1 metre, swung low with you bent over, and the fist 0.7 metres and a little to your right.
 A blow knocks a wolf back and leaves it reeling for a moment.
 
-A wolf at biting distance does not bite at once.
-It gathers itself for 0.3 seconds, then leaps and snaps at where you will be if you keep going the way you were.
-Standing or walking, you are bitten; sprinting, a turn aside as it leaps takes you out of its jaws.
-A blow that lands on it before its jaws shut stops the bite, and after a snap it waits 0.6 seconds before the next.
+A wolf at biting distance plants its paws and crouches for 0.3 seconds, then makes a short leap along that line.
+Its jaws close as it lands. Step sideways during the crouch or leap to get clear.
+A blow that lands before the jaws close interrupts the bite.
+A wolf that misses lands hard and stands for about half a second before it chases again, giving you time to counter.
 In a cabin's doorway the same snap is how a wolf takes hold of you: only a bite that lands starts a tug.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
@@ -1110,8 +1113,8 @@ A player left inside goes on seeing the other one dragged out for a moment befor
 
 ### Wolf kills
 
-At half health or less, away from fire and shelter, a nearby wolf leaps for your throat.
-You are pinned and cannot move or fight, the rest of the pack runs in to feed, and you die within seconds.
+At half health or less, away from fire and shelter, a nearby wolf crouches for a longer leap at your throat.
+You can step clear of this leap too. If it catches you, the wolf pins you, the pack rushes in to feed and you die within seconds.
 A wolf kill, by a pin or a bite, destroys all food in the recovery box; after a pin the pack keeps feeding until you respawn.
 
 A slain wolf falls over and leaves a carcass that lasts until it is butchered: hold right mouse on it for 4 raw meat.

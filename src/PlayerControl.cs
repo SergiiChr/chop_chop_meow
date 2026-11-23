@@ -213,8 +213,13 @@ public sealed class PlayerControl {
         // A carried barrel prevents sprinting.
         // Under 15% food or drink the player is too weak to sprint.
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
-        if (cabinApproach.Active) momentum = default;
-        var step = cabinApproach.Active ? direction : momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
+        var wanted = world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero;
+        Vector2 step;
+        if (cabinApproach.Active) {
+            momentum = default; step = direction;
+        } else if (WolfWithinFightingDistance()) {
+            momentum = new Momentum { Heading = wanted, Pace = 1 }; step = wanted;
+        } else step = momentum.Step(wanted, dt);
         if (step != Vector2.Zero) walked = step.Normalized();
         world.Me.Braking = momentum.Braking;
         var move = step * dt * world.PlayerSpeed;
@@ -235,6 +240,15 @@ public sealed class PlayerControl {
         world.Me.Selected = hotbar.ActiveItem() ?? "";
     }
 
+    private bool WolfWithinFightingDistance() {
+        const float fightingDistance = 6;
+        int target = world.Me.Id;
+        var at = world.Player;
+        foreach (var wolf in world.Wolves)
+            if (wolf.Target == target && wolf.Pos.DistanceSquaredTo(at) < fightingDistance * fightingDistance) return true;
+        return false;
+    }
+
     /// <summary>E inspects the nearby selection or the nearest thing. A pump under the pointer takes priority over the lake.</summary>
     public void InspectNearest() {
         if (view.Underground) { if (view.PointedPipe is Vector2I tile) panel.SelectPipe(tile); return; }
@@ -249,12 +263,15 @@ public sealed class PlayerControl {
         if (t != null) panel.Select(t);
     }
 
-    /// <summary>Space operates a selected pump or bellows in reach. Elsewhere it swings in the last walking direction.</summary>
+    /// <summary>Space operates a selected pump or bellows in reach. Elsewhere it swings along the held movement keys, or the last walking direction from a stand.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
         if (station?.Kind == ThingKind.Pump && world.AtStation(station)) UseWaterPump(station);
         else if (station?.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station);
-        else world.Attack(walked);
+        else {
+            var aim = HeldDirection();
+            world.Attack(aim == Vector2.Zero ? walked : aim);
+        }
     }
 
     /// <summary>A mouse button over the world; <paramref name="overPanel"/> tells that the pointer is on a panel, which passes the wheel on when it has nothing to scroll, but must not zoom the world behind.</summary>
