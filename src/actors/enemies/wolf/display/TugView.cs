@@ -113,7 +113,10 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         var toModel = model.Root.Transform.AffineInverse();
         var torso = rig.Torso.GlobalTransform;
         Vector3 low = toModel * (torso * (LowPaw with { X = LowPaw.X * wolf.Side })), high = toModel * (torso * (HighPaw with { X = HighPaw.X * wolf.Side }));
-        model.Rear(body, WolfModel.Uncrossed(low, high), dt);
+        model.Glance = 0;
+        model.Rear(body, WolfModel.Uncrossed(low, high), dt, arm.Y);
+        grip = arm - model.Root.Basis * model.Bite;
+        model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);
         model.Plant();
         model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
         return true;

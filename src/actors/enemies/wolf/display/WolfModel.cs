@@ -580,7 +580,7 @@ public sealed class WolfModel {
     /// Shows a wolf reared up as <paramref name="body"/> has it, from <see cref="Rearing"/>: standing on its hind paws with
     /// its forepaws on what it holds, at <paramref name="paws"/> in the model.
     /// </summary>
-    public void Rear(WolfPose body, (Vector3 Left, Vector3 Right) paws, float dt) {
+    public void Rear(WolfPose body, (Vector3 Left, Vector3 Right) paws, float dt, float jawsUp) {
         var halves = new Halves(body);
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
@@ -588,7 +588,7 @@ public sealed class WolfModel {
             var at = hind ? new Vector3(WolfShape.Pivot(leg).X * 1.5f, WolfShape.Sole, Home(leg) - .06f) : leg == 0 ? paws.Left : paws.Right;
             body = body.WithLeg(leg, hind ? ReachTo(halves, leg, at, -8, 0) : Reach(halves, leg, at, 55, 30));
         }
-        Show(WolfMotion.Rear, body, dt);
+        Show(WolfMotion.Rear, body, dt, jawsUp: jawsUp);
     }
 
     /// <summary>
@@ -840,8 +840,12 @@ public sealed class WolfModel {
     /// Shows <paramref name="target"/> for <paramref name="next"/>, blending into it from the pose shown when the motion changes
     /// or turns <paramref name="wary"/> or calm. Only a wolf in sight has its skeleton posed.
     /// </summary>
-    private void Show(WolfMotion next, WolfPose target, float dt, bool wary = false) {
+    private void Show(WolfMotion next, WolfPose target, float dt, bool wary = false, float? jawsUp = null) {
         if (Steps is { } steps) target = OnSteps(target, steps.Door, steps.Rotation);
+        // The steps can raise or tip the body after its rear has been aimed at an arm.
+        if (jawsUp is float gripHeight)
+            for (int pass = 0; pass < 4; pass++)
+                target = target with { Neck = Math.Clamp(target.Neck + (BiteOf(target).Y - gripHeight) / NeckRise, -55, 55) };
         // The head turns ahead of the body, the neck taking most of the turn, and the spine and tail curl after it.
         if (Turning.Look != 0) {
             float look = Mathf.RadToDeg(Turning.Look);

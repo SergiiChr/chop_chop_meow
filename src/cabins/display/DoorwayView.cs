@@ -20,17 +20,20 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
         if (p.Door == Doorway.None && state.SteppingDown <= 0 || world().Find(p.DoorCabin) is not Thing cabin) return null;
         var door = Doorways.DoorPoint(cabin);
         var inside = door + DoorwayPath.IntoCabin.Rotated(cabin.Rotation);
-        // A player a wolf takes out of the cabin they were in starts from where they stood inside it.
-        if (p.Door == Doorway.Tugged && state.StageBefore == Doorway.None) state.StageFrom = inside;
         if (p.Door == Doorway.None && state.SteppingDown > 0) {
             // Done knocking, the player steps back down off the step to where they stand, still facing the door.
             state.SteppingDown = Math.Max(0, state.SteppingDown - dt);
             var down = state.StageFrom.Lerp(p.Pos, Mathf.SmoothStep(0, 1, 1 - state.SteppingDown / DoorwayPath.StepUpSeconds));
             return new DoorShown(down, inside, ActorAction.Walk, door, true, 0, 0, 0, cabin.Rotation);
         }
+        if (p.Door is Doorway.Tugged or Doorway.TuggedOff) {
+            // The wolf and the player face the door as it holds the player's waist and the pack takes their sides.
+            state.Yaw = ActorAnimation.Yaw(inside - door, state.Yaw);
+            state.Turning.Hold(state.Yaw);
+        }
         var shown = DoorwayPath.UsesBody(p.Door)
             ? FacingAt(p.Door, p.DoorBody, door, inside, p.DoorFrom, p.DoorTime, p.DoorRush, cabin.Rotation)
-            : DoorStep(p.Door, door, p.Pos, state.StageFrom, p.DoorTime, Doorways.DoorSeconds(p), p.DoorRush,
+            : DoorStep(p.Door, door, p.Pos, p.DoorFrom, p.DoorTime, Doorways.DoorSeconds(p), p.DoorRush,
                 world().DoorTug.TugDistanceFrom(p.Pos, Doorways.OutOfDoor.Rotated(cabin.Rotation)), cabin.Rotation);
         float twist = 0, grip = 0;
         // Waiting aside, the right hand starts up toward the door frame as the one coming out nears the doorway; squeezing in
@@ -71,7 +74,7 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
                 DoorwayPath.KnockStep(time) > 0 ? ActorAction.Walk : ActorAction.Idle, false),
             Doorway.Following => (at, inside, ActorAction.Walk, false),
             Doorway.Aside => (at, inside, time < DoorwayPath.AsideSeconds ? ActorAction.Walk : ActorAction.Idle, true),
-            _ => (at, inside, ActorAction.Tugged, true),
+            _ => (at, at + inside - door, ActorAction.Tugged, true),
         };
 
     /// <summary>
