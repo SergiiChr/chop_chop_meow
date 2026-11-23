@@ -63,7 +63,10 @@ internal static class SetupSteps {
     public static void NourishEveryone(World world) { foreach (var p in world.Players) SetNeeds(p, 100, 100); }
 
     /// <summary>Moves the player on a server's world as a respawn does: a window walks its own player, and only takes a move the server counts as one.</summary>
-    public static void Warp(World world, Vector2 at) { world.Me.Pos = at; world.Me.Warp++; }
+    public static void Warp(World world, Vector2 at) => Warp(world.Me, at);
+
+    /// <summary>Moves a named player on the server, so that player's window takes the new position.</summary>
+    public static void Warp(PlayerState player, Vector2 at) { player.Pos = at; player.Warp++; }
 
     /// <summary>Puts a wolf where the check needs it: real ones come out of the dens. One placed without a target hunts the local player, as if it had smelled them.</summary>
     public static Wolf PlaceWolf(World world, Wolf wolf) { if (wolf.Target == 0) wolf.Target = world.Me.Id; world.S.Wolves.Add(wolf); return wolf; }

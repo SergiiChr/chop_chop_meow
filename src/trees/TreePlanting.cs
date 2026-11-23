@@ -42,12 +42,15 @@ public sealed class TreePlanting(World world) {
             if (tree.NextTreeStageAt > 0) growing.Enqueue(tree, tree.NextTreeStageAt);
     }
 
-    internal static bool Valid(Thing thing) {
-        if (thing.TreeStage == 0) return thing.NextTreeStageAt == 0;
-        if (thing.Kind == ThingKind.Stump)
-            return thing.TreeStage is >= 2 and <= GrowDays && thing.NextTreeStageAt == 0;
-        return thing.Kind == ThingKind.Tree && thing.TreeStage is >= 1 and <= GrowDays
-            && thing.Remaining >= 0 && thing.Remaining <= WoodAt(DaysGrown(thing))
+    internal static bool ValidStage(Thing thing) => thing.TreeStage == 0 || thing.Kind switch {
+        ThingKind.Tree => thing.TreeStage is >= 1 and <= GrowDays,
+        ThingKind.Stump => thing.TreeStage is >= 2 and <= GrowDays,
+        _ => false
+    };
+
+    internal static bool ValidGrowth(Thing thing) {
+        if (thing.TreeStage == 0 || thing.Kind == ThingKind.Stump) return thing.NextTreeStageAt == 0;
+        return thing.Remaining >= 0 && thing.Remaining <= WoodAt(DaysGrown(thing))
             && float.IsFinite(thing.NextTreeStageAt) && thing.NextTreeStageAt >= 0
             && (thing.NextTreeStageAt > 0 || thing.TreeStage == 1)
             && thing.Inventory.Slots == 1 && thing.Inventory.StackSize == WaterNeeded && thing.Inventory.Capacity == WaterNeeded

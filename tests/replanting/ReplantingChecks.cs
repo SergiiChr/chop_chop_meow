@@ -1,4 +1,6 @@
+using System;
 using System.Linq;
+using System.Text.Json.Nodes;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -12,6 +14,7 @@ public static class ReplantingChecks {
         Test(CheckMarkingIsFreeAndPlantingUsesOneAcornAndAShovel, data);
         Test(CheckPlantedAcornNeedsFiveLitersThenGrowsThroughTenStages, data);
         Test(CheckAGrowingTreeKeepsItsAgeOnLoadAndCanBeFelledEarly, data);
+        Test(CheckSaveRefusesAnInvalidRememberedTreeStage, data);
     }
 
     private static void CheckAxeHitsDropAcornsLikePickaxeHitsDropChips(GameData data) {
@@ -89,5 +92,20 @@ public static class ReplantingChecks {
         RunUntil(world, watered + data.DaySeconds * 10);
         Require(world.ThingsOf(ThingKind.Tree).Count == 0 && world.ThingsOf(ThingKind.Stump).Count == 1,
             "a young tree felled for its wood should stay felled");
+    }
+
+    private static void CheckSaveRefusesAnInvalidRememberedTreeStage(GameData data) {
+        var world = EmptyWorld(data);
+        var tree = FinishPlanting(world, MarkPlantingGround(world));
+        world.Look();
+        world.Player = tree.Pos + Vector2.Right * (data.SightRadius + 2);
+        world.Look();
+        var saved = JsonNode.Parse(world.Serialize())!;
+        var memory = saved["Remembered"]?[tree.Id.ToString()];
+        Require(memory != null && (int?)memory["TreeStage"] == 1, "the save should keep the last seen tree as a nub");
+        memory!["TreeStage"] = -1;
+        bool refused = false;
+        try { world.Deserialize(saved.ToJsonString()); } catch (InvalidOperationException error) { refused = error.Message.Contains("Unsupported"); }
+        Require(refused, "the save should refuse an invalid remembered growth stage");
     }
 }
