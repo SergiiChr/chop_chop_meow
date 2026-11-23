@@ -1,12 +1,34 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static ModelSteps;
 using static SetupSteps;
 
 namespace ChopChopMeow;
 
 public partial class Game {
-    private async Task RunFirstPersonUIChecks() => await TestClean(CheckFirstPersonTurnsWalksSwingsAndSelects);
+    private async Task RunFirstPersonUIChecks() {
+        await TestClean(CheckFirstPersonDrawsDistantThingsAndTheLocalBody);
+        await TestClean(CheckFirstPersonTurnsWalksSwingsAndSelects);
+    }
+
+    /// <summary>The preview draws objects outside the explored area and shows the player's body from eye level.</summary>
+    private async Task CheckFirstPersonDrawsDistantThingsAndTheLocalBody() {
+        var distant = Hosted.Add(ThingKind.Chest, world.Player - new Vector2(25, 25));
+        await Frames();
+        Require(!world.Explored(distant.Pos), "The distant chest must be outside explored ground.");
+        Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() != true, "Unexplored chests should be hidden in the overhead view.");
+        await ToggleFirstPersonInPauseMenu();
+        Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() == true, "First person should show the distant chest.");
+        var camera = GetViewport().GetCamera3D();
+        Require(AllMeshes(view.PlayerRig.Torso).Any(part => part.IsVisibleInTree() && (part.Layers & camera.CullMask) != 0),
+            "The player's body must be visible from the first-person camera.");
+        await ToggleFirstPersonInPauseMenu();
+        Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() != true, "Returning overhead should hide unexplored objects again.");
+        RemoveThings(Hosted, t => t == distant);
+        await Frames();
+    }
 
     /// <summary>Mouse look steers the player and their swings and points clicks at a station.</summary>
     private async Task CheckFirstPersonTurnsWalksSwingsAndSelects() {

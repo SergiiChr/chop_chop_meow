@@ -206,6 +206,7 @@ Switch on **First-person preview** in the main menu or pause menu's **Options**.
 Move with WASD or the arrow keys relative to where you look. Move the mouse to look around.
 Left and right click act on what the centre dot points at. Space swings where you look and still pumps a selected machine in reach.
 Opening a panel or menu frees the pointer so you can click its controls. Close it to look around again.
+The valley is visible out to the horizon. Look down to see your body, and swing to see your arms and weapon move.
 Cabins, being downed and underground pipe work use the overhead view.
 
 ## Interface
@@ -454,7 +455,7 @@ In multiplayer, every player must be downed before skipping.
 
 ### Fog of war
 
-Fog of war covers the map.
+Fog of war covers the map in the overhead view.
 Ground you have never seen is black.
 You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
 This circle is your line of sight: it ends where the grey fog starts.

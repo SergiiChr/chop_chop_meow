@@ -4,8 +4,10 @@ namespace ChopChopMeow;
 
 /// <summary>The eye-level view and the ground directions controlled by mouse look.</summary>
 internal sealed class FirstPersonCamera {
-    public const uint BodyLayer = 1u << 18;
-    private const float EyeHeight = 1.63f, FieldOfView = 65, Near = .05f;
+    public const uint HeadLayer = 1u << 18;
+    private const float EyeHeight = 1.63f, EyeForward = .13f, FieldOfView = 65, Near = .05f;
+    // Includes the padded terrain beyond the playable valley, even looking across it diagonally.
+    private const float Far = 1024;
     private const float Sensitivity = .0025f, PitchLimit = 1.45f;
     private float yaw = Mathf.Pi / 4, pitch = -.25f;
 
@@ -20,16 +22,16 @@ internal sealed class FirstPersonCamera {
     public void Frame(Camera3D camera, Vector2 player) {
         if (camera.Projection != Camera3D.ProjectionType.Perspective) {
             camera.HOffset = camera.VOffset = 0;
-            camera.SetPerspective(FieldOfView, Near, camera.Far);
-            camera.CullMask &= ~BodyLayer;
+            camera.SetPerspective(FieldOfView, Near, Far);
+            camera.CullMask &= ~HeadLayer;
         }
         camera.Rotation = new Vector3(pitch, yaw, 0);
-        camera.Position = WorldView.To3(player, EyeHeight);
+        camera.Position = WorldView.To3(player + Forward * EyeForward, EyeHeight);
     }
 
-    /// <summary>Hides the local body from this camera while leaving its torch light and animations active.</summary>
-    public static void SetBodyLayer(Node root) {
-        if (root is GeometryInstance3D part) part.Layers = BodyLayer;
-        for (int i = 0; i < root.GetChildCount(); i++) SetBodyLayer(root.GetChild(i));
+    /// <summary>Hides the meshes around the camera at the player's eyes.</summary>
+    public static void SetHeadLayer(Node root) {
+        if (root is GeometryInstance3D part) part.Layers = HeadLayer;
+        for (int i = 0; i < root.GetChildCount(); i++) SetHeadLayer(root.GetChild(i));
     }
 }
