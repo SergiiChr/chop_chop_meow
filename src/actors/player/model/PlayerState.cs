@@ -42,6 +42,9 @@ public sealed class PlayerState {
     public int DoorCabin { get; set; }
     /// <summary>Seconds into <see cref="Door"/>.</summary>
     public float DoorTime { get; set; }
+    /// <summary>Where the body began its current doorway step, and where it is along that step now.</summary>
+    public Vector2 DoorFrom { get; set; }
+    public Vector2 DoorBody { get; set; }
     /// <summary>The player sprinted to the door, so they step in at a run and slam it.</summary>
     public bool DoorRush { get; set; }
     /// <summary>When the player came to the door, numbered by <see cref="SaveState.DoorArrivals"/>, which sets who of those tugged back out goes in first.</summary>

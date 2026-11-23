@@ -22,6 +22,8 @@ public static class DoorTugChecks {
         Test(CheckAWolfLetsGoOfAPlayerWhoLeavesTheGameWhileItTugsThem, data);
         Test(CheckHittingAWolfThatTugsAPlayerOutKnocksItBack, data);
         Test(CheckAWolfTugsAPlayerStandingAsideAtACabinDoorOffIt, data);
+        Test(CheckAWolfCanBiteAPlayerOnTheKnockingStep, data);
+        Test(CheckAFollowerStepsIntoTheCabinFromWhereTheyWaitedAside, data);
         Test(CheckAWolfTugsAPlayerOutOnlyAsFarAsOpenGroundGoes, data);
         Test(CheckASecondWolfTakesATuggedPlayersSideBitesOnceAndHoldsUntilTheTugEnds, data);
         Test(CheckOnlyOneWolfTakesEachSideOfATuggedPlayer, data);
@@ -208,14 +210,57 @@ public static class DoorTugChecks {
         var guest = world.Arrive("guest", 2);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
         StepInside(world, hut);
+        var other = world.Arrive("other", 3);
+        StepInside(world, hut, other);
         world.Doorways.TurnKey();
         world.As(guest, () => { world.Player = Doorways.DoorPoint(hut); Require(world.Doorways.Enter(hut, false) && guest.Door == Doorway.Knocking, "the guest should knock on the locked cabin's door"); });
         world.Doorways.Leave();
         Require(guest.Door == Doorway.Aside, "the guest should stand aside for the host stepping out");
+        SnapTick(world, .46f);
+        world.As(other, () => world.Doorways.Leave());
         var wolf = PlaceWolf(world, new Wolf { Pos = guest.Pos + new Vector2(.8f, 0), Target = guest.Id });
         UntilTugged(world, guest);
         Require(guest.Door == Doorway.TuggedOff && wolf.Tugging, $"a wolf should tug a player standing aside at the door off it, not leave them {guest.Door}");
     }
+    private static void CheckAWolfCanBiteAPlayerOnTheKnockingStep(GameData data) {
+        var world = NightWorld(data);
+        var guest = world.Arrive("guest", 2);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        StepInside(world, hut);
+        world.Doorways.TurnKey();
+        var door = Doorways.DoorPoint(hut);
+        world.As(guest, () => {
+            world.Player = door;
+            Require(world.Doorways.Enter(hut, false) && guest.Door == Doorway.Knocking, "the guest should knock at the locked door");
+        });
+        SnapTick(world, .52f);
+        var wolf = PlaceWolf(world, new Wolf { Pos = door + Doorways.OutOfDoor * .87f, Target = guest.Id });
+        UntilTugged(world, guest);
+        Require(guest.Door == Doorway.TuggedOff && guest.Health < 100 && wolf.Tugging,
+            "a bite should catch the exposed guest standing on the doorstep");
+    }
+
+    private static void CheckAFollowerStepsIntoTheCabinFromWhereTheyWaitedAside(GameData data) {
+        var world = NightWorld(data);
+        var guest = world.Arrive("guest", 2);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        var door = Doorways.DoorPoint(hut);
+        world.Player = door;
+        StepIntoBite(world, hut, Vector2.Right * .8f);
+        world.As(guest, () => {
+            world.Player = door + Vector2.Left * .12f;
+            Require(world.Doorways.Enter(hut, false) && guest.Door == Doorway.Following, "the guest should follow the host");
+        });
+        UntilTugged(world);
+        SnapTick(world, .65f);
+        Require(guest.Door == Doorway.Following && Math.Abs(guest.DoorBody.X - door.X) > .6f,
+            "the guest should wait off the path of a tugged player");
+        var waited = guest.DoorBody;
+        for (int i = 0; i < 24 && guest.Door == Doorway.Following; i++) world.Tick(.05f);
+        Require(guest.Door == Doorway.Entering && guest.DoorFrom.DistanceTo(waited) < .1f,
+            "the guest should step in from the side where they were waiting");
+    }
+
     private static void CheckAWolfTugsAPlayerOutOnlyAsFarAsOpenGroundGoes(GameData data) {
         var world = NightWorld(data);
         // Water starts half a metre in front of the door.

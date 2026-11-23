@@ -44,14 +44,15 @@ public sealed class WolfBodies(World world) {
     /// How far a wolf closing in on the acting player goes straight at them this tick, up to <paramref name="step"/>: on to
     /// <see cref="StandOff"/>, where its jaws reach them, or back to it at a walk when they come closer.
     /// </summary>
-    public float Closing(Wolf wolf, float step, float dt) => Math.Clamp(wolf.Pos.DistanceTo(world.DoorTug.TuggedTo) - StandOff, -Math.Min(step, dt * BackOffSpeed), step);
+    public static float Closing(Wolf wolf, Vector2 at, float step, float dt) =>
+        Math.Clamp(wolf.Pos.DistanceTo(at) - StandOff, -Math.Min(step, dt * BackOffSpeed), step);
 
     /// <summary>
     /// Wolves at the acting player crowd round them without their bodies running into each other: one that overlaps another
     /// steps aside, unless it holds the player, by the jaws or in the air.
     /// </summary>
     public void KeepApart(List<Wolf> hunters, float dt) {
-        var at = world.DoorTug.TuggedTo;
+        var at = world.DoorTug.Tugged ? world.DoorTug.TuggedTo : world.WolfSnap.BitePosition();
         for (int i = 0; i < hunters.Count; i++) for (int j = i + 1; j < hunters.Count; j++) {
             var a = hunters[i]; var b = hunters[j];
             bool holdsA = Holds(a), holdsB = Holds(b);

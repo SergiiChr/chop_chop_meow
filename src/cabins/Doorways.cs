@@ -116,6 +116,7 @@ public sealed class Doorways(World world) {
         if (cabin.Locked) { cabin.Locked = false; world.Play("door_lock", DoorPoint(cabin)); }
         s.Sheltered = 0; world.Player = Doorstep(cabin); s.Actor.Warp++;
         Stage(s.Actor, Doorway.Leaving, cabin.Id);
+        s.Actor.DoorBody = DoorPoint(cabin) + DoorwayPath.IntoCabin.Rotated(cabin.Rotation);
         // Whoever knocks on the door steps aside to let them out, keeping the order they came in,
         // and the one stepping out keeps to the other side of the door, to pass them as they squeeze in.
         foreach (var other in s.Players.Where(o => o != s.Actor && Waiting(o, cabin)).OrderBy(o => o.DoorQueued).ToList()) {
@@ -201,6 +202,7 @@ public sealed class Doorways(World world) {
 
     /// <summary>Starts a player on a doorway stage at a cabin.</summary>
     public static void Stage(PlayerState p, Doorway door, int cabin, bool rush = false) {
+        p.DoorFrom = p.DoorBody = DoorwayPath.UsesBody(p.Door) ? p.DoorBody : p.Pos;
         p.Door = door; p.DoorCabin = cabin; p.DoorTime = 0; p.DoorRush = rush;
     }
 
@@ -217,9 +219,12 @@ public sealed class Doorways(World world) {
     public void Tick(float dt) {
         var p = world.S.Actor;
         if (p.Door == Doorway.None) return;
-        if (world.Downed || world.Find(p.DoorCabin)?.Kind != ThingKind.Hut) { p.Door = Doorway.None; return; }
+        if (world.Downed || world.Find(p.DoorCabin) is not { Kind: ThingKind.Hut } cabin) { p.Door = Doorway.None; return; }
         float before = p.DoorTime;
         p.DoorTime += dt;
+        if (DoorwayPath.UsesBody(p.Door))
+            p.DoorBody = p.Door == Doorway.Following ? DoorwayPath.Follow(p, world.Players, cabin, dt) :
+                DoorwayPath.At(p.Door, DoorPoint(cabin), p.Pos, p.DoorFrom, p.DoorTime, DoorSeconds(p), p.DoorRush, cabin.Rotation);
         bool done = p.DoorTime >= DoorSeconds(p);
         switch (p.Door) {
             case Doorway.Entering when done:

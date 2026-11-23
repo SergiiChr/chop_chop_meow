@@ -65,12 +65,13 @@ public sealed class WolfSnap(World world) {
     }
 
     /// <summary>Checks the line in short steps, as a leap stays on its bearing even when it meets a wall.</summary>
-    private Vector2 ClearTo(Vector2 from, Vector2 to) {
+    private Vector2 ClearTo(Vector2 from, Vector2 to, Thing? cabin = null) {
         int steps = Math.Max(1, (int)MathF.Ceiling(from.DistanceTo(to) / GroundStep));
         var last = from;
         for (int i = 1; i <= steps; i++) {
             var at = i == steps ? to : from.Lerp(to, (float)i / steps);
-            if (!world.CanStand(at)) break;
+            var except = cabin != null && DoorwayPath.OnSteps(cabin, at) ? cabin : null;
+            if (!world.CanStand(at, except)) break;
             last = at;
         }
         return last;
@@ -79,17 +80,16 @@ public sealed class WolfSnap(World world) {
     /// <summary>Where the acting player stands on screen, including while stepping onto a cabin's threshold.</summary>
     internal Vector2 BitePosition() {
         var p = world.S.Actor;
-        if (p.Door is not (Doorway.Entering or Doorway.Leaving or Doorway.Knocking) ||
-            world.Find(p.DoorCabin) is not Thing cabin) return p.Pos;
-        return DoorwayPath.At(p.Door, Doorways.DoorPoint(cabin), p.Pos, p.DoorTime, Doorways.DoorSeconds(p), p.DoorRush, cabin.Rotation);
+        return DoorwayPath.UsesBody(p.Door) ? p.DoorBody : p.Pos;
     }
 
     private void Land(Wolf wolf, bool throat) {
         wolf.Attack = Rest;
         var mark = BitePosition();
         var jaws = wolf.Pos + Vector2.FromAngle(wolf.Heading) * (throat ? ThroatJawsAhead : JawsAhead);
+        var steps = DoorwayPath.UsesBody(world.S.Actor.Door) ? world.Find(world.S.Actor.DoorCabin) : null;
         bool hit = !world.Downed && !world.DoorTug.Tugged && jaws.DistanceSquaredTo(mark) <= Reach * Reach &&
-            ClearTo(wolf.Pos, mark) == mark;
+            ClearTo(wolf.Pos, mark, steps) == mark;
         wolf.Recover = hit ? HitRecovery : MissRecovery;
         if (!hit) return;
         bool pins = throat && !world.Protected(world.Player);

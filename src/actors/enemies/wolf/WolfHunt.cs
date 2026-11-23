@@ -125,7 +125,10 @@ public sealed class WolfHunt(World world) {
     private static bool Held(Wolf wolf, bool wary) => wary && wolf.Follow != FollowStage.Bold;
 
     /// <summary>Takes a wolf up to <paramref name="step"/> metres toward biting distance of the acting player, round what is in its way.</summary>
-    private void Close(Wolf wolf, float step, float dt) => world.Travel(wolf, world.DoorTug.TuggedTo, world.WolfBodies.Closing(wolf, step, dt), step, RouteSlack);
+    private void Close(Wolf wolf, float step, float dt) {
+        var at = world.DoorTug.Tugged ? world.DoorTug.TuggedTo : world.WolfSnap.BitePosition();
+        world.Travel(wolf, at, WolfBodies.Closing(wolf, at, step, dt), step, RouteSlack);
+    }
 
     /// <summary>A wolf closing in growls once as it comes near.</summary>
     private void Growl(Wolf wolf) {

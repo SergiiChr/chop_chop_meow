@@ -697,7 +697,8 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 - **Bite.** Within `WolfSnap.Trigger` the wolf plants its paws and fixes its bearing and destination (`Wolf.Heading`,
   `Wolf.SnapTo`). After `WolfSnap.Windup` it leaps for `WolfSnap.Flight` along that line.
   Solid ground and buildings can stop the leap. At landing it hits only if its jaws reach the player's body and the way
-  between them is clear (`WolfSnap.JawsAhead`, `WolfSnap.Reach`). Players on cabin steps use the view's path (`DoorwayPath`).
+  between them is clear (`WolfSnap.JawsAhead`, `WolfSnap.Reach`). Wolves approach the body
+  on the doorway path (`DoorwayPath`), and their jaws can reach onto the exposed step.
   The wolf stays facing the same way during `WolfSnap.MissRecovery` or `WolfSnap.HitRecovery`, and waits
   `WolfSnap.Rest` before starting another attack.
   A blow that lands first interrupts either leap, and a torch waved at a wolf gathering for a normal snap scares it off.
@@ -743,7 +744,7 @@ Building keeps `Construction.DoorRoom` clear round every cabin's door spot, and 
 - `Leaving` puts the player on the doorstep and takes `Doorways.LeaveSeconds`.
   Anyone knocking on that door goes `Aside` to `Doorways.AsideSpot`, a step along `Doorways.AsideWay`, and steps in once the leaver is through the doorway, in the order they came, while the leaver keeps `Doorways.MakeWay` to the other side; a player just standing at the door stays put, and the leaver ends `Doorways.ClearOf` beside them.
   The view walks them in from there up the side of the step (`DoorwayPath.Inward`), the two turning chest to chest with their arms hanging as they pass (`DoorwayView.SqueezePast`), the one going in with the right palm on the door frame (`ArmReach.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
-- A follower waits aside, out of the way, while the one ahead is tugged back out (`DoorwayView.Behind`).
+- A follower waits aside, out of the way, while the one ahead is tugged back out (`DoorwayPath.Follow`).
 
 The view walks the player through the doorway over the stage (`DoorwayView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, lifting or lowering its neck to their waist as drawn, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
 On the two treads of the step and the floor (`StairSteps.StepEdges`) the body heads for the tread of the boot that bears its weight, rising onto the other boot's tread as one lifts off behind, and lowering ahead of a boot about to step down (`StairSteps.OnSteps`).

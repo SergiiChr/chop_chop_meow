@@ -621,9 +621,11 @@ public sealed partial class World {
         return p;
     }
     /// <summary>Whether a player, worker or wolf can stand on a spot: walkable ground with nothing built in the way.</summary>
-    public bool CanStand(Vector2 p) {
+    public bool CanStand(Vector2 p) => CanStand(p, null);
+
+    internal bool CanStand(Vector2 p, Thing? except) {
         if (!Open(p)) return false;
-        foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) if (Blocks(t, p)) return false;
+        foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) if (t != except && Blocks(t, p)) return false;
         return true;
     }
     /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their outcrops.</summary>

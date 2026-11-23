@@ -28,9 +28,10 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
             var down = state.StageFrom.Lerp(p.Pos, Mathf.SmoothStep(0, 1, 1 - state.SteppingDown / DoorwayPath.StepUpSeconds));
             return new DoorShown(down, inside, ActorAction.Walk, door, true, 0, 0, 0, cabin.Rotation);
         }
-        (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) shown = p.Door == Doorway.Following ? (Behind(p, state, door, cabin.Rotation, dt), inside, ActorAction.Walk, false)
-            : p.Door == Doorway.Aside ? StandAside(state.StageFrom, p.Pos, inside, p.DoorTime)
-            : DoorStep(p.Door, door, p.Pos, state.StageFrom, p.DoorTime, Doorways.DoorSeconds(p), p.DoorRush, p.Door is Doorway.Tugged or Doorway.TuggedOff ? world().DoorTug.TugDistanceFrom(p.Pos, Doorways.OutOfDoor.Rotated(cabin.Rotation)) : 0, cabin.Rotation);
+        var shown = DoorwayPath.UsesBody(p.Door)
+            ? FacingAt(p.Door, p.DoorBody, door, inside, p.DoorFrom, p.DoorTime, p.DoorRush, cabin.Rotation)
+            : DoorStep(p.Door, door, p.Pos, state.StageFrom, p.DoorTime, Doorways.DoorSeconds(p), p.DoorRush,
+                world().DoorTug.TugDistanceFrom(p.Pos, Doorways.OutOfDoor.Rotated(cabin.Rotation)), cabin.Rotation);
         float twist = 0, grip = 0;
         // Waiting aside, the right hand starts up toward the door frame as the one coming out nears the doorway; squeezing in
         // past them, it goes on to the frame.
@@ -52,30 +53,27 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
         return new DoorShown(shown.At, shown.Facing, shown.Action, door, shown.Backing, twist, grip, tuck, cabin.Rotation);
     }
 
-    /// <summary>
-    /// Where a player <paramref name="time"/> seconds into a doorway stage of <paramref name="seconds"/> other than following stands, what
-    /// they face and do, and whether they move backward: <paramref name="from"/> is where the world has them and <paramref name="start"/>
-    /// where they were drawn as the stage began; a tugged player goes <paramref name="reach"/> metres out.
-    /// </summary>
-    public static (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) DoorStep(Doorway stage, Vector2 door, Vector2 from, Vector2 start, float time, float seconds, bool rush, float reach, float rotation = 0) {
+    /// <summary>Places a doorway pose at its time for the close-up review and along a tug out of the cabin.</summary>
+    public static (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) DoorStep(Doorway stage, Vector2 door,
+        Vector2 from, Vector2 start, float time, float seconds, bool rush, float reach, float rotation = 0) {
         var inward = DoorwayPath.IntoCabin.Rotated(rotation);
-        var inside = door + inward;
-        var at = DoorwayPath.At(stage, door, from, time, seconds, rush, rotation);
-        return stage switch {
-            // From beside the step the player sidesteps into the doorway still facing it.
-            Doorway.Entering => (at, inside, rush ? ActorAction.Jog : ActorAction.Walk, DoorwayPath.FromTheSide(from, door, rotation)),
-            Doorway.Leaving => (at, door - inward, ActorAction.Walk, false),
-            Doorway.Knocking => (at, inside, time >= Doorways.KnockLead ? ActorAction.Knock : DoorwayPath.KnockStep(time) > 0 ? ActorAction.Walk : ActorAction.Idle, false),
-            _ => (start.Lerp(from - inward.Normalized() * reach, DoorTug.TugProgress(time / DoorTug.TugSeconds)), inside, ActorAction.Tugged, true),
-        };
+        var at = stage is Doorway.Tugged or Doorway.TuggedOff
+            ? start.Lerp(from - inward.Normalized() * reach, DoorTug.TugProgress(time / DoorTug.TugSeconds))
+            : DoorwayPath.At(stage, door, from, start, time, seconds, rush, rotation);
+        return FacingAt(stage, at, door, door + inward, start, time, rush, rotation);
     }
 
-    /// <summary>A player standing aside at a cabin's door: stepping over to <paramref name="spot"/> from <paramref name="start"/>, then waiting there, facing the door.</summary>
-    private static (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) StandAside(Vector2 start, Vector2 spot, Vector2 inside, float time) =>
-        (start.Lerp(spot, Mathf.SmoothStep(0, 1, time / AsideSeconds)), inside, time < AsideSeconds ? ActorAction.Walk : ActorAction.Idle, true);
+    private static (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) FacingAt(Doorway stage, Vector2 at,
+        Vector2 door, Vector2 inside, Vector2 start, float time, bool rush, float rotation) => stage switch {
+        Doorway.Entering => (at, inside, rush ? ActorAction.Jog : ActorAction.Walk, DoorwayPath.FromTheSide(start, door, rotation)),
+        Doorway.Leaving => (at, 2 * door - inside, ActorAction.Walk, false),
+        Doorway.Knocking => (at, inside, time >= Doorways.KnockLead ? ActorAction.Knock :
+            DoorwayPath.KnockStep(time) > 0 ? ActorAction.Walk : ActorAction.Idle, false),
+        Doorway.Following => (at, inside, ActorAction.Walk, false),
+        Doorway.Aside => (at, inside, time < DoorwayPath.AsideSeconds ? ActorAction.Walk : ActorAction.Idle, true),
+        _ => (at, inside, ActorAction.Tugged, true),
+    };
 
-    /// <summary>Seconds a player takes to step aside at a cabin's door.</summary>
-    private const float AsideSeconds = .5f;
     /// <summary>
     /// Where a hand flat on the right door jamb's inner face is from a cabin's door point, to the side, in and up, as the
     /// cabin model builds the jamb.
@@ -130,29 +128,6 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
     private const float SqueezeTurn = 30, SqueezeTwist = 45, EnterTwist = 20;
     /// <summary>The arms of a player passing someone in a doorway: hanging at the sides, the forearms a little forward so a tool in hand clears the ground.</summary>
     private const float TuckRaise = 0, TuckOut = 3, TuckElbow = 35;
-    /// <summary>
-    /// Where a player following someone into a cabin stands, stepping there from where they were drawn: up toward the door no
-    /// closer than a stride behind the one ahead, or, while a wolf tugs that one back out, aside from the doorway and out of their way.
-    /// </summary>
-    private Vector2 Behind(PlayerState follower, ActorState state, Vector2 door, float rotation, float dt) {
-        var spot = door;
-        foreach (var p in world().Players)
-            if (p != follower && p.DoorCabin == follower.DoorCabin && p.Door is Doorway.Entering or Doorway.Tugged) {
-                if (p.Door == Doorway.Tugged) {
-                    var aside = Doorways.AsideWay.Rotated(rotation);
-                    float side = (state.Position - door).Dot(aside) < 0 ? -1 : 1;
-                    spot = door + aside * (side * Doorways.AsideStep);
-                    break;
-                }
-                if (stateOf(p.Id) is not ActorState drawn) continue;
-                var ahead = drawn.Position;
-                spot = door + (door - ahead).Normalized() * Math.Max(0, .7f - ahead.DistanceTo(door));
-            }
-        return state.Position.MoveToward(spot, dt * FollowSpeed);
-    }
-
-    /// <summary>Metres a second a player following someone into a cabin steps along.</summary>
-    private const float FollowSpeed = 1.4f;
     /// <summary>The player stepping in or out through a cabin's door, or null.</summary>
     public PlayerState? Passing(int cabin) {
         foreach (var p in world().Players) if (p.DoorCabin == cabin && p.Door is Doorway.Entering or Doorway.Tugged or Doorway.Leaving) return p;
