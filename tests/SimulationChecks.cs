@@ -35,6 +35,8 @@ public static class SimulationChecks {
         HaulingChecks.Run(data);
         GatheringChecks.Run(data);
         CraftingChecks.Run(data);
+        PackingChecks.Run(data);
+        LunchChecks.Run(data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
         Test(CheckFilterNamesEachEntryOnceInTheOrderNamed);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
@@ -81,7 +83,6 @@ public static class SimulationChecks {
         Test(CheckSaveFromAnotherVersionIsRefused, data);
         SaveChecks.Run(data);
         Test(CheckCrewKeepsForgeHot, data);
-        Test(CheckCrewLunchesAtTheNearestFireAndGoesBackToWork, data);
         Test(CheckCrewSignsOutAtDuskKeepingLoadsAndJobs, data);
         Test(CheckWorkersWalkOffDownTheValleyAtWalkingPace, data);
         Test(CheckCrewWalksBackAtDawnPaidAndKeepsItsJobs, data);
@@ -1239,26 +1240,6 @@ public static class SimulationChecks {
         SafeTick(world, data.TradeSeconds / 4);
         world.Assign(runner, null);
         Require(runner.Away == 0, "reassigning a runner should call off the errand rather than freeze them on the road");
-    }
-
-    private static void CheckCrewLunchesAtTheNearestFireAndGoesBackToWork(GameData data) {
-        var (world, tree, _, near, forge, cutter, pumper, hauler) = StartDayCrew(data);
-        float At(float hour) => (hour - 6) / 24 * data.DaySeconds;
-        RunUntil(world, At(data.LunchHour) - 5);
-        forge.Heat = 100;
-        SafeTick(world, 25);
-        Require(world.Lunch, "the clock should be at lunch hour");
-        Require(world.LunchFire == near, "at lunch the crew's fire should be the one closest to them");
-        Require(world.Workers.All(w => w.WorkState == WorkerWorkState.Resting && w.Pos.DistanceTo(near.Pos) < 2),
-            "at lunch the whole crew should sit around the campfire");
-        Require(cutter.Assignment == tree.Id, "lunch should keep the cutter's assignment");
-        Require(pumper.Assignment == forge.Id, "lunch should keep the pumper's assignment");
-        Require(hauler.Assignment == forge.Id, "lunch should keep the hauler's assignment");
-        Require(forge.Heat < World.SteelHeat, "with the crew at lunch the forge should cool below the clear bar");
-        SafeTick(world, At(data.LunchHour + 1) - world.Time + 10);
-        // Both forge workers hold the bellows and the haul job: whichever gets to the bellows first pumps.
-        Require(cutter.WorkState == WorkerWorkState.Gathering && new[] { pumper, hauler }.Count(w => w.WorkState == WorkerWorkState.Pumping) == 1,
-                "after lunch workers should walk back to their jobs");
     }
 
     private static void CheckCrewSignsOutAtDuskKeepingLoadsAndJobs(GameData data) {

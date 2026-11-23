@@ -73,6 +73,7 @@ public sealed partial class World {
     private int Carry(Inventory from, Inventory to, Thing? into, string item, int quantity, int room = int.MaxValue) {
         if (into?.Kind == ThingKind.Farm && to == into.Inventory)
             room = Math.Min(room, Barrels.CanPour(Data, item) ? Farms.WaterRoom(into) : to.SlotRoom(item));
+        if (into?.Kind == ThingKind.Packer && to == into.Inventory) room = Math.Min(room, PackingRoom(into, item));
         if (Data.VesselFor(item) != null) {
             bool takes = into != null && to == into.Inventory && TakesLiquid(into, item);
             if (takes && from[item] > 0) return from.TransferTo(to, item, Math.Min(quantity, room));

@@ -22,7 +22,6 @@ public static class AnimationChecks {
         CheckStationWorkFollowsWorkStateNotItsWording();
         CheckStrikingWorkerProtestsUntilWalking();
         CheckGatheringWorkerSwingsTheToolOfItsTarget();
-        CheckWorkerAtLunchSitsOnceThere();
         CheckEveryActionMovesThroughDistinctPoses();
         CheckCraftingSquatsOnlyWhileStandingStill();
         CheckChangingActionBlendsBetweenPoses();
@@ -381,20 +380,6 @@ public static class AnimationChecks {
         worker.WorkState = WorkerWorkState.Idle;
         Require(ActorAnimation.WorkerAction(worker, null, false, data) == ActorAction.Idle,
             "available workers should remain idle");
-    }
-
-    private static void CheckWorkerAtLunchSitsOnceThere() {
-        var worker = new Worker();
-        worker.WorkState = WorkerWorkState.Resting;
-        worker.Bag.Add("wood", 2);
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false, data) == ActorAction.Perch,
-            "a worker at lunch should sit, even holding a load");
-        worker.Id = 1;
-        Require(ActorAnimation.WorkerAction(worker, null, false, data) == ActorAction.Sit,
-            "every other worker should sit cross-legged on the ground rather than on a rock");
-        worker.Id = 0;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true, data) == ActorAction.Carry,
-            "a worker still walking to lunch should not sit");
     }
 
     private static void CheckEveryActionMovesThroughDistinctPoses() {

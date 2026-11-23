@@ -13,9 +13,9 @@ internal sealed class PackerHaul : PlaceHaul {
         }
         if (t.Packs == "") return;
         // A batch is one crate: a crate's worth of the good and one empty crate.
-        if (t.Inventory.SlotRoom(t.Packs) is > 0 and int room && World.PackerTakes(t, t.Packs) && world.SourceFor(t.Packs, w.Pos, t.Id) is Thing goods)
+        if (World.PackingRoom(t, t.Packs) is > 0 and int room && world.SourceFor(t.Packs, w.Pos, t.Id) is Thing goods)
             Offer(ref best, Bring(t, goods, t.Packs, room, t.Inventory[t.Packs], world.Data.CrateCapacity));
-        if (t.Inventory.SlotRoom("crate") is > 0 and int crates && world.SourceFor("crate", w.Pos, t.Id) is Thing stack)
+        if (World.PackingRoom(t, "crate") is > 0 and int crates && world.SourceFor("crate", w.Pos, t.Id) is Thing stack)
             Offer(ref best, Bring(t, stack, "crate", crates, t.Inventory["crate"], 1));
     }
 

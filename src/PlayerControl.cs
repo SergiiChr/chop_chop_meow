@@ -34,8 +34,7 @@ public sealed class PlayerControl {
     /// <summary>Whether <see cref="Mode"/> places the container or plan on the cursor, which it does only while the mouse is over open ground.</summary>
     private bool placingHeld;
     private Thing? gathering;
-    /// <summary>A cabin the player is walking to after clicking it; they step inside on arrival.</summary>
-    private Thing? entering;
+    private readonly CabinApproach cabinApproach;
     private Momentum momentum;
     /// <summary>The way the player last walked, which is the way Space swings.</summary>
     private Vector2 walked;
@@ -48,14 +47,20 @@ public sealed class PlayerControl {
 
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
+        cabinApproach = new CabinApproach(world);
         world.Replaced += () => { Stop(); Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops a gather, a container lift and a walk into a cabin, whose targets belong to a world that went away.</summary>
-    private void Stop() { gathering = null; lifting = null; entering = null; }
+    private void Stop() { gathering = null; lifting = null; cabinApproach.Cancel(); }
 
-    /// <summary>Walks the player to a cabin's door and inside.</summary>
-    public void WalkInto(Thing cabin) => entering = cabin;
+    public bool Entering(Thing cabin) => cabinApproach.GoesTo(cabin);
+    public bool CancelEntry() => cabinApproach.Cancel();
+
+    /// <summary>Starts or cancels the walk to this cabin's door from its Enter button.</summary>
+    public void ToggleEntry(Thing cabin) {
+        if (Entering(cabin)) CancelEntry(); else cabinApproach.Start(cabin);
+    }
 
     /// <summary>Enters placement for a container from the backpack.</summary>
     public void PlaceContainer(string item, int backpackSlot = -1) {
@@ -70,7 +75,7 @@ public sealed class PlayerControl {
         // The recipe map covers the world, so nothing held over it walks or gathers.
         if (kit.Paused || panel.Map.Visible) { world.Me.Sprinting = false; return; }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
-        var direction = TowardCabin(HeldDirection());
+        var direction = cabinApproach.Active ? cabinApproach.Direction() : world.Door == Doorway.None ? HeldDirection() : Vector2.Zero;
         direction = Gather(direction, right, dt);
         direction = Lift(direction, right, dt);
         Walk(direction, right, dt);
@@ -97,23 +102,11 @@ public sealed class PlayerControl {
     /// <summary>The ground direction for right <paramref name="x"/> and down <paramref name="y"/> on screen, each -1, 0 or 1 as movement keys give them.</summary>
     public static Vector2 KeyDirection(float x, float y) => new Vector2(x + y * 2, y * 2 - x).Normalized();
 
-    /// <summary>
-    /// A clicked cabin draws the player round it to its door and in, whatever keys are held; a sprint there, with Shift
-    /// held, steps in at a run.
-    /// </summary>
-    private Vector2 TowardCabin(Vector2 direction) {
-        if (world.Downed || entering != null && world.Find(entering.Id) == null) entering = null;
-        if (entering == null) return world.Door == Doorway.None ? direction : Vector2.Zero;
-        var toward = Doorways.TowardDoor(entering, world.Player);
-        if (toward == Vector2.Zero && world.Doorways.Enter(entering, world.Me.Sprinting)) { entering = null; return Vector2.Zero; }
-        return toward;
-    }
-
     /// <summary>Carries on a gather; a loose piece needs only one click: the player keeps walking to it after the button is released.</summary>
     private Vector2 Gather(Vector2 direction, bool right, float dt) {
         // What was being worked on can go: a tree falls and leaves its stump, and a stump or a bush comes out of the ground.
         if (gathering != null && world.Find(gathering.Id) == null) { panel.Deselect(gathering.Id); gathering = null; }
-        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || entering != null) {
+        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || cabinApproach.Active) {
             world.ResetGather();
             if (!right || gathering?.IsLoose == true) gathering = null;
             return direction;
@@ -137,7 +130,7 @@ public sealed class PlayerControl {
 
     /// <summary>A held right click walks to a container and lifts it once the button has been held long enough.</summary>
     private Vector2 Lift(Vector2 direction, bool right, float dt) {
-        if (lifting != null && right && direction == Vector2.Zero && entering == null && world.Find(lifting.Id) != null) {
+        if (lifting != null && right && direction == Vector2.Zero && !cabinApproach.Active && world.Find(lifting.Id) != null) {
             if (!world.Near(lifting, 1.5f)) direction = (lifting.Pos - world.Player).Normalized();
             else if ((liftClock += dt) >= LiftSeconds) {
                 var container = lifting; lifting = null;
@@ -153,13 +146,13 @@ public sealed class PlayerControl {
         // A carried barrel prevents sprinting.
         // Under 15% food or drink the player is too weak to sprint.
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
-        var step = momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
+        if (cabinApproach.Active) momentum = default;
+        var step = cabinApproach.Active ? direction : momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
         if (step != Vector2.Zero) walked = step.Normalized();
         world.Me.Braking = momentum.Braking;
         var move = step * dt * world.PlayerSpeed;
-        // Walking to a cabin's door, the last step stops on it rather than past it, however long the frame.
-        if (entering != null) move = world.Doorways.StepToDoor(entering, move);
-        world.MovePlayer(move); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
+        if (cabinApproach.Active) cabinApproach.Move(move.Length()); else world.MovePlayer(move);
+        view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
         // A tool in hand that has left the backpack leaves the hand empty.
         if (world.InHand != "" && world.Backpack[world.InHand] == 0) world.SelectInHand("");
@@ -234,7 +227,7 @@ public sealed class PlayerControl {
     }
 
     private void ClickThing(Thing t) {
-        if (t.Kind == ThingKind.Hut && world.Sheltered == 0) entering = t;
+        if (t.Kind == ThingKind.Hut) cabinApproach.Start(t);
         panel.Select(t);
     }
 

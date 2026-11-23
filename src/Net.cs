@@ -578,7 +578,6 @@ public partial class Net : Node {
         foreach (var o in gone) goals.Remove(o);
         s.Actor = me;
         Work();
-        World.UpdateLunchFire();
     }
 
     /// <summary>The entry when it differs from what the copy shows now, or null.</summary>
