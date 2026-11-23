@@ -86,7 +86,7 @@ public partial class WorldView {
 
     private const int MaxParticles = 400;
     private void BuildEffects(Node3D parent) {
-        effects = new Node3D(); parent.AddChild(effects);
+        effects = new Node3D { Name = "Effects" }; parent.AddChild(effects);
         // The whole pool and the dust's faded copies are made while loading, so a burst instantiates nothing mid-game.
         WarmFades(plopDust);
         for (int i = 0; i < MaxParticles; i++) {

@@ -38,6 +38,8 @@ public static class AllocationChecks {
         Check("tick: worker walking a gravel path", () => { paved.Tick(1 / 60f); Fed(paved); });
         Require(walker.Pos.X > pathStart.X + 25 && paved.GravelPaths.Covers(walker.Pos), "the worker should have walked the path through the ticks and still be on it");
 
+        PlumbingAllocationChecks.CheckPumpingIntoTwoBarrelsStaysWithinAllocationBudget(data);
+
         var settlement = Settlement(data);
         // Twenty seconds first, so every worker has been through its trips once and the status and cost caches hold what they will show.
         // A store taking an item it has not held before grows its table once (measured 0.2 to 0.5 bytes a tick).

@@ -10,10 +10,11 @@ internal static class WorkerWaterView {
     private static readonly Basis TowardRoof = new(Vector3.Up, -Mathf.Pi / 2);
     private static readonly Vector3 TravelGrip = new(-.34f, .80f, .13f);
 
-    public static void Show(ActorRig rig, Vector2 at, Vector3 target, WorkerWaterAction action, bool roof, float progress, string vessel, bool ground = false, float? facing = null) {
+    public static void Show(ActorRig rig, Vector2 at, Vector3 target, WorkerWaterAction action, bool roof, float progress, string vessel, bool ground = false, float? facing = null, float rotation = 0) {
         var origin = new Vector3(at.X, 0, at.Y);
         if (roof) {
-            ShowOnCabin(rig, target, action, progress, vessel);
+            ShowOnCabin(rig, action, progress, vessel);
+            rig.Root.Transform = new Transform3D(new Basis(Vector3.Up, -rotation), target) * rig.Root.Transform;
             return;
         }
         var toward = target - origin;
@@ -26,9 +27,9 @@ internal static class WorkerWaterView {
     public static void Carry(ActorRig rig, Pose pose, string vessel) =>
         rig.HoldWater(pose, vessel, VesselAtGrip(vessel, TravelGrip), TravelGrip);
 
-    private static void ShowOnCabin(ActorRig rig, Vector3 cabin, WorkerWaterAction action, float progress, string vessel) {
+    private static void ShowOnCabin(ActorRig rig, WorkerWaterAction action, float progress, string vessel) {
         if (action == WorkerWaterAction.Pour) {
-            rig.Root.Transform = new Transform3D(TowardRoof, cabin + CabinWaterModel.PourStand);
+            rig.Root.Transform = new Transform3D(TowardRoof, CabinWaterModel.PourStand);
             var opening = TowardRoof.Inverse() * (CabinWaterModel.FillOpening - CabinWaterModel.PourStand);
             WorkAtOpening(rig, vessel, opening, progress, fill: false, roof: true);
             return;
@@ -43,7 +44,7 @@ internal static class WorkerWaterView {
             var stand = CabinWaterModel.PourStand;
             var onRoof = entry.Lerp(stand, across);
             onRoof.Y = CabinShape.RoofSurface(onRoof.Z);
-            rig.Root.Transform = new Transform3D(TowardRoof, cabin + onRoof);
+            rig.Root.Transform = new Transform3D(TowardRoof, onRoof);
             float walk = across * ActorAnimation.Duration(ActorAction.Walk);
             var pose = ActorAnimation.PoseAt(ActorAction.Walk, walk, true);
             float ease = Math.Min(Mathf.SmoothStep(0, .15f, across), 1 - Mathf.SmoothStep(.85f, 1, across));
@@ -58,7 +59,7 @@ internal static class WorkerWaterView {
             float top = Rung(CabinWaterModel.RungCount - 1);
             var entry = CabinWaterModel.RoofEntry;
             var atEdge = new Vector3(foot.X, top - .20f, foot.Z).Lerp(entry, move);
-            rig.Root.Transform = new Transform3D(TowardRoof, cabin + atEdge);
+            rig.Root.Transform = new Transform3D(TowardRoof, atEdge);
             float lead = Mathf.SmoothStep(0, .63f, step), follow = Mathf.SmoothStep(.48f, 1, step);
             float toeL = atEdge.X - Mathf.Lerp(CabinWaterModel.LadderX, entry.X - .15f, lead);
             float toeR = atEdge.X - Mathf.Lerp(CabinWaterModel.LadderX, entry.X - .15f, follow);
@@ -79,7 +80,7 @@ internal static class WorkerWaterView {
         float swinging = Mathf.Lerp(Rung(stepIndex - 2), nextRung, shift) + .10f * MathF.Sin(Mathf.Pi * phase);
         float nearRoof = Mathf.SmoothStep(CabinWaterModel.RungCount - 2, CabinWaterModel.RungCount, rungs);
         float height = Math.Max(0, Mathf.Lerp(fixedRung, nextRung, phase) - .10f - .10f * nearRoof);
-        rig.Root.Transform = new Transform3D(TowardRoof, cabin + foot + Vector3.Up * height);
+        rig.Root.Transform = new Transform3D(TowardRoof, foot + Vector3.Up * height);
         float footAhead = foot.X - CabinWaterModel.LadderX;
         bool leftSteps = stepIndex % 2 == 0;
         float raised = swinging - height, planted = fixedRung - height;

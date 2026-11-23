@@ -47,7 +47,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 19;
+    private const int Protocol = 20;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -423,7 +423,7 @@ public partial class Net : Node {
 
     /// <summary>Sends an action with where this player stands, so the host checks its reach from there rather than from a position still gliding in.</summary>
     private void Send(Command c) {
-        RpcId(ServerId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At, c.Held, c.Spares);
+        RpcId(ServerId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At, c.Held, c.Spares, c.Rotation, (int)c.PipeShape);
         answerLeft = AnswerSeconds;
     }
 
@@ -441,14 +441,14 @@ public partial class Net : Node {
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Do(int order, Vector2 standing, int warp, int verb, int target, int other, string item, int count, Vector2 at, bool held, bool spares) {
+    private void Do(int order, Vector2 standing, int warp, int verb, int target, int other, string item, int count, Vector2 at, bool held, bool spares, float rotation, int pipeShape) {
         if (!Hosting || Guest() is not PlayerState p) return;
         heard[p.Id] = Math.Max(order, heard.GetValueOrDefault(p.Id));
         // The action happened where the guest stood, so it goes there at once.
         if (Stand(p, standing, warp)) using (World.ActAs(p)) World.MoveTo(standing);
         var before = new Dictionary<string, int>(p.Backpack.Items);
         int made = echoes;
-        World.Run(p, new Command((Verb)verb, target, other, item, count, at, held, spares));
+        World.Run(p, new Command((Verb)verb, target, other, item, count, at, held, spares, rotation, (PipeShape)pipeShape));
         // Only moving items by hand sounds like them: not what placing things spends, or picking them up off the ground gives.
         bool placing = (Verb)verb is Verb.Build or Verb.PlaceCrate or Verb.PickUp or Verb.PickUpCrate or Verb.PlaceBarrel or Verb.PickUpBarrel;
         if (!placing && echoes == made && MostMoved(before, p.Backpack) is string moved) RpcId(p.Id, MethodName.Hear, Sounds.ForItem(moved), p.Pos);
@@ -563,6 +563,14 @@ public partial class Net : Node {
         Sync(s.Orders, EntryKey.Order, static o => o.Id, entries, false, null);
         if (Changed(entries, new EntryKey(EntryKey.Work, 0)) is byte[] working) work = WorldUpdates.Read<Dictionary<int, WorkerWorkState>>(working);
         if (Changed(entries, new EntryKey(EntryKey.Paths, 0)) is byte[] paths) s.GravelPaths = WorldUpdates.Read<List<int>>(paths);
+        var pipes = Changed(entries, new EntryKey(EntryKey.Pipes, 0));
+        var wet = Changed(entries, new EntryKey(EntryKey.PipeWater, 0));
+        if (pipes != null || wet != null) {
+            var layout = pipes == null ? s.SteelPipes : WorldUpdates.Read<Dictionary<int, PipeTile>>(pipes);
+            var stored = wet == null ? s.PipeWater : WorldUpdates.Read<Dictionary<int, double>>(wet);
+            if (pipes != null && !SteelPipes.ValidLayout(layout) || !SteelPipes.ValidWater(stored, layout)) throw new JsonException("Invalid steel pipe layout or water.");
+            s.SteelPipes = layout; s.PipeWater = stored;
+        }
         if (Changed(entries, new EntryKey(EntryKey.Crates, 0)) is byte[] crates) s.Crates = WorldUpdates.Read<Dictionary<int, Inventory>>(crates);
         var me = World.Me;
         // This machine walks its own player and keeps its selection; only a move the simulation made, such as a respawn, comes back.

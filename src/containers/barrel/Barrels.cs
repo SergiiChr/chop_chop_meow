@@ -10,12 +10,12 @@ public sealed class Barrels(World world) {
     internal static bool CanPour(GameData data, string item) =>
         item == Water.Liquid || data.VesselOf(item) is VesselDef v && v.LitersIn(item) > 0;
 
-    internal Thing? Place(string item, Vector2 at, Inventory source) {
+    internal Thing? Place(string item, Vector2 at, Inventory source, float rotation) {
         if (source.PreferredSlot is >= 0 and int preferred &&
             ((uint)preferred >= (uint)source.Layout.Count || source.Layout[preferred] is not { Free: > 0 } cell ||
                 cell.Item != item || source.SparesOnly && cell.Hotbar != 0)) return null;
         if (source.Remove(item, 1) != 1) return null;
-        var barrel = world.Add(ThingKind.Barrel, at);
+        var barrel = world.Add(ThingKind.Barrel, at, rotation: rotation);
         barrel.Inventory.Add(Water.Liquid, Barrel.Liters(item));
         world.PileFilters(barrel);
         world.ClearGround(barrel);

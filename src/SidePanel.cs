@@ -31,6 +31,8 @@ public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, 
 public readonly record struct Selection {
     public int Thing { get; private init; }
     public int Worker { get; private init; }
+    public Vector2I? Pipe { get; private init; }
+    public static Selection OfPipe(Vector2I tile) => new() { Pipe = tile };
     public static Selection Of(Thing t) => new() { Thing = t.Id };
     public static Selection Of(Worker w) => new() { Worker = w.Id };
 }
@@ -231,6 +233,9 @@ public partial class SidePanel : MovableWindow {
         tools.Memory.ClosedGroups.Remove(world.Data.Recipes[recipe].Group);
         if (station != null) Select(station); else Open(Page.Craft);
     }
+
+    /// <summary>Opens the inspection page for the underground pipe at this tile.</summary>
+    public void SelectPipe(Vector2I tile) { Selection = Selection.OfPipe(tile); Open(Page.Inspect); }
 
     /// <summary>Selects a worker and shows them.</summary>
     public void Select(Worker w) { Selection = Selection.Of(w); Open(Page.Inspect); }

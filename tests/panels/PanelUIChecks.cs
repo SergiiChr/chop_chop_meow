@@ -1,0 +1,42 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Godot;
+using static SetupSteps;
+
+namespace ChopChopMeow;
+
+public partial class Game {
+    private Task RunPanelUIChecks() => TestClean(CheckPanelPagesRefreshWithoutAllocating);
+
+    /// <summary>
+    /// Every panel page, refreshed again and again while what it shows stays the same, allocates nothing:
+    /// the panel refreshes several times a second while it is open.
+    /// </summary>
+    private async Task CheckPanelPagesRefreshWithoutAllocating() {
+        var at = world.Player;
+        var chest = Hosted.Add(ThingKind.Chest, at + new Vector2(2, 0)); chest.Inventory.Add("wood", 40); chest.Inventory.Add("coal", 12);
+        var pile = Hosted.Add(ThingKind.Pile, at + new Vector2(-4, 2)); pile.Inventory.Add("stone", 9);
+        var forge = Hosted.Add(ThingKind.Reinforced, at + new Vector2(-2, 0)); forge.Inventory.Add("iron_bar", 4); forge.Inventory.Add("coal", 6); forge.Heat = 85; forge.Processing = true; forge.Progress = 2;
+        var furnace = Hosted.Add(ThingKind.Furnace, at + new Vector2(0, 2)); furnace.Inventory.Add("iron_ore", 4);
+        var fire = Hosted.Add(ThingKind.Campfire, at + new Vector2(0, -2)); fire.Burn = 120;
+        var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(4, -3));
+        var sign = Hosted.Add(ThingKind.Signpost, at + new Vector2(-4, -3));
+        var farm = Hosted.Add(ThingKind.Farm, at + new Vector2(5, 3));
+        var packer = Hosted.Add(ThingKind.Packer, at + new Vector2(-5, 4)); Hosted.SetPacking(packer, "berries"); packer.Inventory.Add("berries", 6); packer.Inventory.Add("crate", 2);
+        var tree = world.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(at))!;
+        var worker = AddWorker(Hosted, at + Vector2.One); worker.Name = "Panel Check"; worker.Wage = 5;
+        Hosted.Assign(worker, forge); worker.Bag.Add("coal", 2);
+        var pages = new (string Name, Action Open)[] {
+            ("inventory", () => panel.Open(Page.Backpack)), ("craft", () => panel.Open(Page.Craft)), ("workers", () => panel.Open(Page.Crew)),
+            ("chest", () => panel.Select(Shown(chest))), ("pile", () => panel.Select(Shown(pile))), ("bellows furnace", () => panel.Select(Shown(forge))), ("furnace", () => panel.Select(Shown(furnace))),
+            ("campfire", () => panel.Select(Shown(fire))), ("cabin", () => panel.Select(Shown(hut))), ("signpost", () => panel.Select(Shown(sign))), ("farm", () => panel.Select(Shown(farm))), ("packing station", () => panel.Select(Shown(packer))),
+            ("tree", () => panel.Select(tree)), ("worker", () => panel.Select(world.Workers.First(w => w.Id == worker.Id))),
+        };
+        await MeasurePanelRefreshAllocations(pages);
+        Hosted.Fire(worker);
+        var placed = new[] { chest, pile, forge, furnace, fire, hut, sign, farm, packer };
+        RemoveThings(Hosted, t => placed.Contains(t) || t.Kind == ThingKind.Grave);
+        await Frames();
+    }
+}

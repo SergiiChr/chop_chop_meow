@@ -5,6 +5,11 @@ Prices, wages and demand live in `src/GameTables.cs`.
 
 To tune: change the data, run the tests, and read those lines before and after.
 
+One steel bar makes one stackable steel pipe at the anvil with a steel hammer in 10 base seconds.
+A pipe tile costs one steel pipe.
+A building takes ten steel pipes in its Plumbing slot.
+The pump costs four steel bars, ten stone and four wood parts.
+
 ## 1. Prices and whole chains
 
 Prices live only in the market: each good the village trades has its `Price` in `Market.Goods`, and the crate has `Market.CratePrice`, so nothing else can have one.

@@ -14,10 +14,14 @@ public sealed class Thing {
     public ThingKind Kind { get; init; }
     public float X { get; set; }
     public float Y { get; set; }
+    /// <summary>A building's turn in radians from its original direction, positive from X toward Y on the ground.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Rotation { get; init; }
     public int Remaining { get; set; }
     public Inventory Inventory { get; set; } = new();
     /// <summary>A station's recipe now: the batch in progress, else <see cref="Asked"/> while batches of it wait, else <see cref="Keep"/>; empty when it has nothing to make.</summary>
-    [JsonIgnore] public string Recipe => Making != "" ? Making : Batches > 0 ? Asked : Keep;
+    [JsonIgnore] public string Recipe => Making != "" ? Making : NextRecipe;
+    /// <summary>The next batch whose ingredients can still be supplied.</summary>
+    internal string NextRecipe => Batches > 0 ? Asked : Keep;
     /// <summary>The recipe of a station's batch in progress, or empty between batches.</summary>
     [JsonIgnore] public string Making { get => making ?? ""; set => making = value == "" ? null : value; }
     /// <summary>The recipe workers keep a station making once the batches asked of it are done, or empty. A marked station is on its marked recipe: asking for batches marks their recipe.</summary>
@@ -36,6 +40,16 @@ public sealed class Thing {
     /// <summary>Units of work finished here since the world loaded: batches made, pieces mined, harvests and building stages; a worker reads their job list again after each.</summary>
     [JsonIgnore] public int Rounds { get; set; }
     public float Heat { get; set; }
+    /// <summary>Pressure built up at a water pump, from empty at zero to full at 100.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Pressure { get; set; }
+    /// <summary>Water the pump can supply at its current pressure, in liters per second.</summary>
+    [JsonIgnore] public float FlowRate => Pressure * .05f;
+    /// <summary>Seconds remaining in the stroke before the handle stops and pressure begins to drop.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float PumpStrokeLeft { get; set; }
+    /// <summary>Whether the plumbing network is supplying water to this thing.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool ReceivingWater { get; set; }
+    /// <summary>Liters supplied through connected plumbing below one whole liter, carried until the next delivery.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float PipedWaterRemainder { get; set; }
     public float Burn { get; set; }
     /// <summary>When a picked berry bush fruits again, on the world's clock, or zero while it is full.</summary>
     public float Regrow { get; set; }
@@ -49,8 +63,18 @@ public sealed class Thing {
     public Inventory? Wages { get; set; }
     /// <summary>A fuel-burning station's one stack of fuel, apart from what it smelts or cooks; what it holds is what it burns.</summary>
     public Inventory? Burner { get; set; }
-    /// <summary>A crafting bench's chisel and hammer slots; automation never touches them.</summary>
+    /// <summary>Tools fitted to a workstation, such as the anvil’s hammer or the cooking table’s mortar.</summary>
     public Inventory? Tools { get; set; }
+    /// <summary>The pipes fitted to a building that takes water from underground.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Inventory? PlumbingSlot {
+        get => Plumbing.HasPlumbing(Kind) ? field ??= new Inventory { Slots = 1, StackSize = Plumbing.InstallCost, Capacity = Plumbing.InstallCost } : field;
+        set;
+    }
+    [JsonIgnore] public bool PlumbingInstalled => PlumbingSlot?["steel_pipe"] == Plumbing.InstallCost;
+    /// <summary>Installed plumbing last seen on an explored building, without remembering its inventory or live flow.</summary>
+    [JsonInclude, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] internal bool RememberedPlumbing { get; set; }
+    internal bool ShowsPlumbing => RememberedPlumbing || PlumbingInstalled;
     /// <summary>A cabin's door locked from inside with its key, which keeps out players and wolves; only a cabin with someone inside is locked.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Locked { get; set; }
     /// <summary>How far a mine is built.</summary>
@@ -68,6 +92,8 @@ public sealed class Thing {
     /// <summary>A trading post that sends the cart by itself once every market slot holds a crate.</summary>
     public bool AutoSell { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
+    /// <summary>Where a point measured from the middle of this thing lies on the ground.</summary>
+    public Vector2 ToWorld(Vector2 offset) => Pos + offset.Rotated(Rotation);
     [JsonIgnore] public bool IsResource => GatherRules.Of(Kind) != null;
     /// <summary>Ore at the foot of a cliff, mined with a pickaxe.</summary>
     [JsonIgnore] public bool IsDeposit => GatherRules.Of(Kind)?.Shape == GatherShape.Deposit;
@@ -276,6 +302,10 @@ public sealed class SaveState {
     public Dictionary<int, Thing> Remembered { get; set; } = new();
     /// <summary>Every tile with a gravel path laid on it, as its place in the map's rows, <c>y * Terrain.Size + x</c>.</summary>
     public List<int> GravelPaths { get; set; } = new();
+    /// <summary>The shape and rotation of each steel pipe, keyed by the tile's place in the map's rows.</summary>
+    public Dictionary<int, PipeTile> SteelPipes { get; set; } = new();
+    /// <summary>Liters in each wet steel pipe, keyed by its index in the map's rows.</summary>
+    public Dictionary<int, double> PipeWater { get; set; } = new();
 }
 
 /// <summary>Authoritative simulation, independent of rendering and UI; the host runs it for every player.</summary>
@@ -322,10 +352,11 @@ public sealed partial class World {
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
-        Farms = new Farms(this);
+        Farms = new Farms(this); SteelPipes = new SteelPipes(this);
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
         walkSearch = new WalkSearch(this);
-        barrels = new Barrels(this); barrelHaul = new BarrelHaul(this, barrels); bedtimeWater = new BedtimeWater(this);
+        barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
+        barrelHaul = new BarrelHaul(this, barrels); bedtimeWater = new BedtimeWater(this);
         hauling = new Hauling(this, barrelHaul); gathering = new Gathering(this); waterGathering = new WaterGathering(this); crafting = new Crafting(this); packCraft = new PackCraft(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         if (generate) NewGame();
@@ -338,6 +369,7 @@ public sealed partial class World {
     public Construction Construction { get; }
     public Farms Farms { get; }
     private readonly Barrels barrels;
+
     private readonly BarrelHaul barrelHaul;
     // The jobs several kinds of place offer, and the places' own versions of them: the lake's gathering and the packing station's crafting.
     private readonly Hauling hauling;
@@ -347,6 +379,10 @@ public sealed partial class World {
     private readonly LunchBreak lunchBreak;
     /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
     public GravelPaths GravelPaths { get; }
+    public SteelPipes SteelPipes { get; }
+    private readonly Plumbing plumbing;
+    /// <summary>Standing liters in a pipe and pressure from the pumps attached to its connected pipes.</summary>
+    public (float Liters, float Pressure) PipeReading(Vector2I tile) => plumbing.Reading(tile);
     /// <summary>Mines: marking one at a cliff, building it in stages and working it underground.</summary>
     public Mines Mines { get; }
     /// <summary>Cabin doors: stepping in and out, the queue at the door and knocking.</summary>
@@ -493,8 +529,8 @@ public sealed partial class World {
     internal void Play(string sound, Vector2 at) { if (!asleep) Sound?.Invoke(sound, at); }
     /// <summary>The recipe game data names for a station placed or loaded without one, or empty.</summary>
     private string StartingRecipe(ThingKind kind) => Data.Buildings.TryGetValue(kind, out var building) ? building.Recipe : "";
-    public Thing Add(ThingKind kind, Vector2 pos, int remaining = 0) {
-        var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining, Keep = StartingRecipe(kind) };
+    public Thing Add(ThingKind kind, Vector2 pos, int remaining = 0, float rotation = 0) {
+        var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Rotation = rotation, Remaining = remaining, Keep = StartingRecipe(kind) };
         if (kind == ThingKind.Signpost) { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; t.Wages = NewWageSlot(); }
         if (SlotRules(kind).Length > 0) t.Tools = new() { Slots = SlotRules(kind).Length, StackSize = 1 };
         if (Burns(kind)) t.Burner = NewBurner();
@@ -748,7 +784,8 @@ public sealed partial class World {
     /// <summary>How far, in metres from a station's edge, the player stands to work it: hammering, crafting or packing at it, or pumping its bellows.</summary>
     public const float WorkReach = 1;
     /// <summary>Whether the player stands within <see cref="WorkReach"/> of a station's edge.</summary>
-    public bool AtStation(Thing t) => Near(t, Footprint(t.Kind) + WorkReach);
+    public bool AtStation(Thing t) => Near(t, Footprint(t.Kind) + WorkReach)
+        || t.Kind == ThingKind.Pump && Near(t, WorkReach, t.ToWorld(BellowsStand));
     /// <summary>Stations that can need someone working at them.</summary>
     public static bool Worked(ThingKind kind) => kind is ThingKind.Anvil or ThingKind.Bench or ThingKind.Cooktable or ThingKind.Packer;
     public static readonly ThingKind[] WorkedKinds = Array.FindAll(Kinds.All, Worked);
@@ -776,9 +813,11 @@ public sealed partial class World {
         if (def.Food) Play("eat_berry", Player);
     }
     public void Pump(Thing t) {
-        if (!AtStation(t) || t.Kind != ThingKind.Reinforced || Busy() || Forwarded(Verb.Pump, t.Id)) return;
+        if (t.Kind is not (ThingKind.Reinforced or ThingKind.Pump) || !AtStation(t) || Busy() || Forwarded(Verb.Pump, t.Id)) return;
         playerBusy = true;
-        t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos);
+        if (t.Kind == ThingKind.Pump) WaterPumps.Stroke(t);
+        else t.Heat = Math.Min(100, t.Heat + 24);
+        PlayerActed?.Invoke(ActorAction.Pump, t.Pos);
     }
     public void FuelFire(Thing t) {
         if (!Reaches(t) || Busy() || Forwarded(Verb.FuelFire, t.Id)) return;
@@ -1252,6 +1291,7 @@ public sealed partial class World {
     private static Inventory NewWageSlot() => new() { Slots = 1, CoinStack = Inventory.UnlimitedCoins, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins, and a tool slot only the tools its rules take.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
+        box == t.PlumbingSlot ? (item == "steel_pipe" ? null : "The Plumbing slot only takes steel pipes.") :
         Barrel.Is(item) && box != t.Inventory && BoxIndex(t, box) >= 0 ? $"Barrel does not fit in {Lower(Data.Name(t.Kind))}." :
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
@@ -1432,13 +1472,13 @@ public sealed partial class World {
         return 0;
     }
     /// <summary>Puts a crate from the backpack, or the held crate, down, still holding whatever it was packed with.</summary>
-    public Thing? PlaceCrate(string item, Vector2 p) {
+    public Thing? PlaceCrate(string item, Vector2 p, float rotation = 0) {
         if (!IsCrate(item)) return null;
-        if (Construction.PlacementBlock(ThingKind.Crate, p, item) is string blocked) { Say(blocked); return null; }
-        if (Busy() || Forwarded(Verb.PlaceCrate, item: item, count: S.Backpack.PreferredSlot, at: p)) return null;
+        if (Construction.PlacementBlock(ThingKind.Crate, p, item, rotation) is string blocked) { Say(blocked); return null; }
+        if (Busy() || Forwarded(Verb.PlaceCrate, item: item, count: S.Backpack.PreferredSlot, at: p, rotation: rotation)) return null;
         // A crate put down from the held stack comes from wherever it is held, such as a chest; any other from the backpack.
         (MarkedSource ?? S.Backpack).Remove(item, 1);
-        var crate = Add(ThingKind.Crate, p); ClearGround(crate);
+        var crate = Add(ThingKind.Crate, p, rotation: rotation); ClearGround(crate);
         if (Packed(item) is Inventory contents) { ReleaseIn(contents); crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
         Play("close_chest", p); return crate;
     }
@@ -1455,11 +1495,11 @@ public sealed partial class World {
     // ---------- Crafting ----------
     /// <summary>Hand recipes for the personal crafting menu.</summary>
     public IEnumerable<string> HandRecipes => Data.Recipes.Where(p => p.Value.Hand).Select(p => p.Key);
-    public Thing? PlaceBarrel(string item, Vector2 at) {
+    public Thing? PlaceBarrel(string item, Vector2 at, float rotation = 0) {
         if (!Barrel.Is(item)) return null;
-        if (Construction.PlacementBlock(ThingKind.Barrel, at, item) is string blocked) { Say(blocked); return null; }
-        if (Busy() || Forwarded(Verb.PlaceBarrel, item: item, count: S.Backpack.PreferredSlot, at: at)) return null;
-        return barrels.Place(item, at, MarkedSource ?? S.Backpack);
+        if (Construction.PlacementBlock(ThingKind.Barrel, at, item, rotation) is string blocked) { Say(blocked); return null; }
+        if (Busy() || Forwarded(Verb.PlaceBarrel, item: item, count: S.Backpack.PreferredSlot, at: at, rotation: rotation)) return null;
+        return barrels.Place(item, at, MarkedSource ?? S.Backpack, rotation);
     }
 
     private static string? CarryBarrelBlock(Inventory backpack, string item) =>
@@ -1473,6 +1513,8 @@ public sealed partial class World {
         if (Busy() || Forwarded(Verb.PickUpBarrel, barrel.Id)) return true;
         if (HeldByOthers(barrel)) return false;
         S.Backpack.Add(item, 1);
+        if (barrel.PlumbingSlot is Inventory plumbingSlot && plumbingSlot.Count > 0)
+            Construction.GiveBack(new Dictionary<string, int> { ["steel_pipe"] = plumbingSlot["steel_pipe"] }, barrel.Pos);
         S.Things.Remove(barrel);
         Play("wood_rocks_inventory", barrel.Pos);
         PlayerActed?.Invoke(ActorAction.PickUp, barrel.Pos);
@@ -2146,6 +2188,7 @@ public sealed partial class World {
         foreach (var t in Ticking(ThingKind.Pile)) { PileFilters(t); if (t.Compost) CompostTick(t, dt); }
         foreach (var t in Ticking(ThingKind.Farm)) Farms.Tick(t, dt);
         foreach (var t in Ticking(ThingKind.Packer)) PackTick(t, dt);
+        plumbing.Tick(dt);
         foreach (var t in Ticking(ThingKind.Signpost)) AutoSell(t);
         // A bush fruits again its hours after the first berry was picked, whether or not it was picked clean.
         // The moment is set once, so a bush waiting to fruit changes nothing from tick to tick and sends no updates.
@@ -2287,7 +2330,8 @@ public sealed partial class World {
         // Only the look is remembered: no inventory, and no fire, heat or work, so nothing out of sight smokes or glows.
         foreach (var t in S.Things) {
             if (!Sees(t.Pos)) continue;
-            if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id, Kind = t.Kind };
+            if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id, Kind = t.Kind, Rotation = t.Rotation };
+            memory.RememberedPlumbing = t.PlumbingInstalled;
             memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Keep = t.Keep; memory.Progress = t.Progress; memory.MineStage = t.MineStage; memory.FarmStage = t.FarmStage; memory.OfTree = t.OfTree;
         }
     }
@@ -2369,7 +2413,13 @@ public sealed partial class World {
             if (t.Kind == ThingKind.Barrel && (t.Inventory.Slots != 1 || t.Inventory.StackSize != Barrel.Capacity
                 || t.Inventory.Capacity != Barrel.Capacity || t.Inventory.Count != t.Inventory[Water.Liquid]
                 || t.Inventory.Count > Barrel.Capacity)) return false;
+            if (t.PlumbingSlot is Inventory plumbingSlot && (!Plumbing.HasPlumbing(t.Kind) || plumbingSlot.Slots != 1
+                || plumbingSlot.Capacity != Plumbing.InstallCost || plumbingSlot.StackSize != Plumbing.InstallCost
+                || plumbingSlot.Count > Plumbing.InstallCost || plumbingSlot.Count != plumbingSlot["steel_pipe"])) return false;
             if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t)) return false;
+            if (!(t.Pressure >= 0 && t.Pressure <= 100 && t.PumpStrokeLeft >= 0 && t.PumpStrokeLeft <= WaterPumps.StrokeSeconds)
+                || t.Kind != ThingKind.Pump && (t.Pressure != 0 || t.PumpStrokeLeft != 0)) return false;
+            if (!Plumbing.ValidReceiver(t)) return false;
             if (t.Kind == ThingKind.Hut && (t.Inventory.Slots != 1 || t.Inventory.StackSize != 1 || t.Inventory.Count > 1
                 || t.Inventory.Count == 1 && Barrel.In(t.Inventory) == null)) return false;
             // A building has the boxes its kind is made with.
@@ -2416,13 +2466,13 @@ public sealed partial class World {
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
         if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Obtained == null || loaded.Prices == null
-            || loaded.Remembered == null || loaded.GravelPaths == null || loaded.GravelPaths.Exists(tile => (uint)tile >= Terrain.Size * Terrain.Size) || loaded.GravelPaths.Distinct().Count() != loaded.GravelPaths.Count || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
+            || loaded.Remembered == null || loaded.GravelPaths == null || loaded.GravelPaths.Exists(tile => (uint)tile >= Terrain.Size * Terrain.Size) || loaded.GravelPaths.Distinct().Count() != loaded.GravelPaths.Count || !SteelPipes.ValidLayout(loaded.SteelPipes) || !SteelPipes.ValidWater(loaded.PipeWater, loaded.SteelPipes) || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
             throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Players = new();
         // Until its machines join, the save's world runs as the player no machine has claimed, else the first.
         loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.First();
         RebuildAllStacks(loaded);
-        if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage) || t.Rotation != 0 && (t.Kind is not (ThingKind.Crate or ThingKind.Barrel) && !Data.Buildings.ContainsKey(t.Kind) || !Construction.ValidRotation(t.Kind, t.Rotation)))) throw new InvalidOperationException("Unsupported or incomplete save.");
         if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded) || loaded.Goal < 0) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.

@@ -25,6 +25,8 @@ public partial class Game {
             await KeyStroke(Key.B);
             await DoubleClick(Named("build_mine")!);
             Require(player.Mode.Placing == ThingKind.Mine, "A double click on the mine plan must enter placement mode.");
+            await KeyStroke(Key.C); await KeyStroke(Key.V); await KeyStroke(Key.V);
+            Require(player.Mode.Placing == ThingKind.Mine && player.Mode.Rotation == 0, "C and V must leave a mine lined up with its cliff.");
             // Off the exact spot, so the click shows the plan snapping to the cliff.
             await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
             var mine = world.Things.LastOrDefault(t => t.Kind == ThingKind.Mine);

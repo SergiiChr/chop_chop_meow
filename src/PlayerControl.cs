@@ -9,13 +9,17 @@ public abstract record ClickMode {
     /// <summary>A click selects or uses what is under it.</summary>
     public sealed record Normal : ClickMode;
     /// <summary>A click places a building of this kind.</summary>
-    public sealed record Build(ThingKind Kind) : ClickMode;
+    public sealed record Build(ThingKind Kind, PipeShape Shape = PipeShape.Straight) : ClickMode;
     /// <summary>A click places a crate or barrel, from a specific backpack cell when one is named.</summary>
     public sealed record Container(string Item, int BackpackSlot = -1) : ClickMode;
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
-    /// <summary>The remove selector: a click takes down the building or gravel path tile under it, and the next click the next one.</summary>
-    public sealed record Remove : ClickMode;
+    /// <summary>The remove selector takes down what the player clicks on the selected layer.</summary>
+    public sealed record Remove(bool Underground = false) : ClickMode;
+
+    internal int QuarterTurns { get; init; }
+    /// <summary>The turn of the plan or container awaiting placement, in radians.</summary>
+    public float Rotation => QuarterTurns * Mathf.Pi / 2;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
     public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, _ => null };
@@ -33,8 +37,12 @@ public sealed class PlayerControl {
     private readonly World world;
     /// <summary>Whether <see cref="Mode"/> places the container or plan on the cursor, which it does only while the mouse is over open ground.</summary>
     private bool placingHeld;
+    /// <summary>The placement on the cursor, with a turn that stays set while the pointer crosses the interface.</summary>
+    private ClickMode? heldPlacement;
     private Thing? gathering;
     private readonly CabinApproach cabinApproach;
+    /// <summary>The pump whose handle the player is walking to press.</summary>
+    private Thing? pumpApproach;
     private Momentum momentum;
     /// <summary>The way the player last walked, which is the way Space swings.</summary>
     private Vector2 walked;
@@ -48,18 +56,27 @@ public sealed class PlayerControl {
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
         cabinApproach = new CabinApproach(world);
-        world.Replaced += () => { Stop(); Mode = new ClickMode.Normal(); };
+        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; Mode = new ClickMode.Normal(); };
     }
 
-    /// <summary>Drops a gather, a container lift and a walk into a cabin, whose targets belong to a world that went away.</summary>
-    private void Stop() { gathering = null; lifting = null; cabinApproach.Cancel(); }
+    /// <summary>Drops actions whose targets belong to the previous world.</summary>
+    private void Stop() { gathering = null; lifting = null; pumpApproach = null; cabinApproach.Cancel(); }
 
     public bool Entering(Thing cabin) => cabinApproach.GoesTo(cabin);
     public bool CancelEntry() => cabinApproach.Cancel();
 
     /// <summary>Starts or cancels the walk to this cabin's door from its Enter button.</summary>
     public void ToggleEntry(Thing cabin) {
+        pumpApproach = null;
         if (Entering(cabin)) CancelEntry(); else cabinApproach.Start(cabin);
+    }
+
+    /// <summary>Steps up to the water pump's handle and presses it once.</summary>
+    internal void UseWaterPump(Thing pump) {
+        if (!world.AtStation(pump)) { kit.Notify("Walk closer to the pump."); return; }
+        cabinApproach.Cancel();
+        if (world.Player.IsEqualApprox(pump.ToWorld(World.BellowsStand))) world.Pump(pump);
+        else pumpApproach = pump;
     }
 
     /// <summary>Enters placement for a container from the backpack.</summary>
@@ -75,7 +92,7 @@ public sealed class PlayerControl {
         // The recipe map covers the world, so nothing held over it walks or gathers.
         if (kit.Paused || panel.Map.Visible) { world.Me.Sprinting = false; return; }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
-        var direction = cabinApproach.Active ? cabinApproach.Direction() : world.Door == Doorway.None ? HeldDirection() : Vector2.Zero;
+        var direction = cabinApproach.Active ? cabinApproach.Direction() : TowardPump(HeldDirection());
         direction = Gather(direction, right, dt);
         direction = Lift(direction, right, dt);
         Walk(direction, right, dt);
@@ -85,12 +102,47 @@ public sealed class PlayerControl {
     private void PlaceHeld(bool overPanel) {
         var plan = cursor.Plan is string id ? Kinds.Parse(id) : null;
         string? container = cursor.Stack is HeldStack held && (World.IsCrate(held.Item) || Barrel.Is(held.Item)) ? held.Item : null;
-        if ((plan != null || container != null) && !overPanel) {
-            // Built only when it changes, as this runs every frame.
-            if (plan is ThingKind kind && !(Mode is ClickMode.Build build && build.Kind == kind)) Mode = new ClickMode.Build(kind);
-            if (container != null && !(Mode is ClickMode.Container { BackpackSlot: -1 } placing && placing.Item == container)) Mode = new ClickMode.Container(container);
-            placingHeld = true;
-        } else if (placingHeld) { placingHeld = false; Mode = new ClickMode.Normal(); }
+        var previous = heldPlacement;
+        // Built only when it changes, as this runs every frame.
+        if (plan is ThingKind kind) {
+            if (heldPlacement is not ClickMode.Build build || build.Kind != kind) heldPlacement = new ClickMode.Build(kind);
+        } else if (container != null) {
+            if (heldPlacement is not ClickMode.Container placing || placing.Item != container) heldPlacement = new ClickMode.Container(container);
+        } else heldPlacement = null;
+        bool showing = heldPlacement != null && !overPanel;
+        if (showing) Mode = heldPlacement!;
+        else if (placingHeld && ReferenceEquals(Mode, previous)) Mode = new ClickMode.Normal();
+        placingHeld = showing;
+    }
+
+    /// <summary>Turns a plan or container by a quarter turn and reports whether placement took the key.</summary>
+    public bool RotatePlacement(int quarters, bool overPanel) {
+        PlaceHeld(overPanel);
+        var placement = heldPlacement ?? Mode;
+        if (placement.Placing is not ThingKind kind) return false;
+        if (kind == ThingKind.Mine) return true;
+        var turned = placement with { QuarterTurns = (placement.QuarterTurns + quarters + 4) % 4 };
+        if (heldPlacement != null) heldPlacement = turned;
+        if (placingHeld || heldPlacement == null) Mode = turned;
+        return true;
+    }
+
+    /// <summary>Whether the current placement or the plan held over a panel is steel piping.</summary>
+    internal bool PlacingPipe => cursor.Plan is string plan ? plan == ThingKind.SteelPiping.Id() : Mode.Placing == ThingKind.SteelPiping;
+
+    public void CyclePipeShape(bool overPanel) {
+        PlaceHeld(overPanel);
+        if ((heldPlacement ?? Mode) is not ClickMode.Build { Kind: ThingKind.SteelPiping } build) return;
+        var next = build with {
+            Shape = build.Shape switch {
+                PipeShape.Straight => PipeShape.Tee,
+                PipeShape.Tee => PipeShape.Cross,
+                _ => PipeShape.Straight
+            }
+        };
+        if (heldPlacement != null) heldPlacement = next;
+        if (placingHeld || heldPlacement == null) Mode = next;
+        kit.Refresh();
     }
 
     private static Vector2 HeldDirection() {
@@ -102,11 +154,26 @@ public sealed class PlayerControl {
     /// <summary>The ground direction for right <paramref name="x"/> and down <paramref name="y"/> on screen, each -1, 0 or 1 as movement keys give them.</summary>
     public static Vector2 KeyDirection(float x, float y) => new Vector2(x + y * 2, y * 2 - x).Normalized();
 
+    /// <summary>Walks to the bank-side handle and presses it on arrival.</summary>
+    private Vector2 TowardPump(Vector2 direction) {
+        if (world.Downed || pumpApproach != null && world.Find(pumpApproach.Id) == null) pumpApproach = null;
+        if (pumpApproach == null) return world.Door == Doorway.None ? direction : Vector2.Zero;
+        if (direction != Vector2.Zero || world.Occupied || panel.Selection.Thing != pumpApproach.Id) {
+            pumpApproach = null;
+            return direction;
+        }
+        var stand = pumpApproach.ToWorld(World.BellowsStand);
+        if (!world.Player.IsEqualApprox(stand)) return world.Player.DirectionTo(stand);
+        world.Pump(pumpApproach);
+        pumpApproach = null;
+        return Vector2.Zero;
+    }
+
     /// <summary>Carries on a gather; a loose piece needs only one click: the player keeps walking to it after the button is released.</summary>
     private Vector2 Gather(Vector2 direction, bool right, float dt) {
         // What was being worked on can go: a tree falls and leaves its stump, and a stump or a bush comes out of the ground.
         if (gathering != null && world.Find(gathering.Id) == null) { panel.Deselect(gathering.Id); gathering = null; }
-        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || cabinApproach.Active) {
+        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || cabinApproach.Active || pumpApproach != null) {
             world.ResetGather();
             if (!right || gathering?.IsLoose == true) gathering = null;
             return direction;
@@ -130,7 +197,7 @@ public sealed class PlayerControl {
 
     /// <summary>A held right click walks to a container and lifts it once the button has been held long enough.</summary>
     private Vector2 Lift(Vector2 direction, bool right, float dt) {
-        if (lifting != null && right && direction == Vector2.Zero && !cabinApproach.Active && world.Find(lifting.Id) != null) {
+        if (lifting != null && right && direction == Vector2.Zero && !cabinApproach.Active && pumpApproach == null && world.Find(lifting.Id) != null) {
             if (!world.Near(lifting, 1.5f)) direction = (lifting.Pos - world.Player).Normalized();
             else if ((liftClock += dt) >= LiftSeconds) {
                 var container = lifting; lifting = null;
@@ -151,7 +218,16 @@ public sealed class PlayerControl {
         if (step != Vector2.Zero) walked = step.Normalized();
         world.Me.Braking = momentum.Braking;
         var move = step * dt * world.PlayerSpeed;
-        if (cabinApproach.Active) cabinApproach.Move(move.Length()); else world.MovePlayer(move);
+        if (cabinApproach.Active) cabinApproach.Move(move.Length());
+        else {
+            var from = world.Player;
+            if (pumpApproach != null) move = move.LimitLength(from.DistanceTo(pumpApproach.ToWorld(World.BellowsStand)));
+            world.MovePlayer(move);
+            if (pumpApproach != null && move != Vector2.Zero && world.Player == from) {
+                pumpApproach = null;
+                kit.Notify("Walk around to the pump handle on the bank.");
+            }
+        }
         view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
         // A tool in hand that has left the backpack leaves the hand empty.
@@ -159,34 +235,42 @@ public sealed class PlayerControl {
         world.Me.Selected = hotbar.ActiveItem() ?? "";
     }
 
-    /// <summary>E: inspects the selected thing if it is in reach, else what is nearest.</summary>
+    /// <summary>E inspects the nearby selection or the nearest thing. A pump under the pointer takes priority over the lake.</summary>
     public void InspectNearest() {
+        if (view.Underground) { if (view.PointedPipe is Vector2I tile) panel.SelectPipe(tile); return; }
         var half = Vector2.One * Farms.HalfSize;
         Vector2 FarmEdge(Thing t) => world.Player.Clamp(t.Pos - half, t.Pos + half);
         bool CanInspect(Thing t) => world.Near(t, at: t.Kind == ThingKind.Farm ? FarmEdge(t) : null);
         var t = world.Find(panel.Selection.Thing);
+        if ((t == null || t.Kind == ThingKind.Water || !CanInspect(t)) && view.GetViewport().GuiGetHoveredControl() == null
+            && world.Find(view.Hover) is { Kind: ThingKind.Pump } pump && CanInspect(pump)) t = pump;
         if (t == null || !CanInspect(t))
             t = world.Things.Where(CanInspect).OrderBy(t => world.Player.DistanceSquaredTo(t.Kind == ThingKind.Farm ? FarmEdge(t) : t.Pos)).FirstOrDefault();
         if (t != null) panel.Select(t);
     }
 
-    /// <summary>Space: pumps a selected reinforced furnace in reach, else swings an axe or a fist the way the player last walked.</summary>
+    /// <summary>Space operates a selected pump or bellows in reach. Elsewhere it swings in the last walking direction.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
-        if (station != null && station.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station); else world.Attack(walked);
+        if (station?.Kind == ThingKind.Pump && world.AtStation(station)) UseWaterPump(station);
+        else if (station?.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station);
+        else world.Attack(walked);
     }
 
     /// <summary>A mouse button over the world; <paramref name="overPanel"/> tells that the pointer is on a panel, which passes the wheel on when it has nothing to scroll, but must not zoom the world behind.</summary>
     public void Click(InputEventMouseButton mouse, bool overPanel) {
         if (mouse.ButtonIndex == MouseButton.WheelUp && mouse.Pressed && !overPanel) view.Zoom = Math.Min(1.6f, view.Zoom + .1f);
         if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed && !overPanel) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
-        if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed) RightPress(mouse.Position);
+        if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed && !overPanel) RightPress(mouse.Position);
         if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) LeftPress(mouse.Position);
     }
 
     private void RightPress(Vector2 at) {
-        // A right click puts the remove selector away.
-        if (Mode is ClickMode.Remove) { Mode = new ClickMode.Normal(); return; }
+        if (PlacingPipe) {
+            world.Construction.Remove(world.Construction.RemovalAt(null, view.ToWorld(at, PipeGround.FloorY), underground: true));
+            return;
+        }
+        if (Mode is ClickMode.Remove remove) { Mode = new ClickMode.Remove(!remove.Underground); return; }
         // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         var t = view.Pick(at);
@@ -203,10 +287,10 @@ public sealed class PlayerControl {
                 kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return;
             }
             PlaceHeld(false);
-            if (Mode.Placing != null) Place(view.ToWorld(at).Round()); else cursor.Release();
+            if (Mode.Placing != null) Place(at); else cursor.Release();
             return;
         }
-        if (Mode.Placing != null) { Place(view.ToWorld(at).Round()); return; }
+        if (Mode.Placing != null) { Place(at); return; }
         if (Mode is ClickMode.Remove) { world.Construction.Remove(RemovalAt(t, at)); return; }
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
         var w = view.PickWorker(at);
@@ -217,7 +301,7 @@ public sealed class PlayerControl {
     }
 
     /// <summary>What the remove selector points at with <paramref name="picked"/> under the mouse at a screen point, or nothing while the selector is away.</summary>
-    public Removal RemovalAt(Thing? picked, Vector2 at) => Mode is ClickMode.Remove ? world.Construction.RemovalAt(picked, view.ToWorld(at)) : Removal.None;
+    public Removal RemovalAt(Thing? picked, Vector2 at) => Mode is ClickMode.Remove remove ? world.Construction.RemovalAt(picked, view.ToWorld(at, remove.Underground ? PipeGround.FloorY : 0), remove.Underground) : Removal.None;
 
     private void AssignGather(ClickMode.Assign assign, Thing? t) {
         var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);
@@ -227,7 +311,7 @@ public sealed class PlayerControl {
     }
 
     private void ClickThing(Thing t) {
-        if (t.Kind == ThingKind.Hut) cabinApproach.Start(t);
+        if (t.Kind == ThingKind.Hut) { pumpApproach = null; cabinApproach.Start(t); }
         panel.Select(t);
     }
 
@@ -236,15 +320,17 @@ public sealed class PlayerControl {
     /// A mine opens its panel instead, since each cliff takes only one.
     /// The backpack still holds what a placement just sent will cost, and the mine's panel opens when the server names it.
     /// </summary>
-    private void Place(Vector2 at) {
+    private void Place(Vector2 screen) {
+        var at = view.ToWorld(screen, Mode.Placing == ThingKind.SteelPiping ? PipeGround.FloorY : 0).Round();
         if (Mode is ClickMode.Container { BackpackSlot: >= 0 } selected && ContainerCount(selected) == 0) {
             Mode = new ClickMode.Normal();
             return;
         }
         bool sent = Sent(at);
         if (Mode is ClickMode.Container container) PlaceContainerAt(container, at);
-        else world.Construction.Build(Mode.Placing!.Value, at);
-        if (!sent || Mode.Placing != ThingKind.Mine && CanPlaceAgain()) return;
+        else if (Mode is ClickMode.Build build) world.Construction.Build(build.Kind, at, build.Rotation, build.Shape);
+        // Pipe placement also takes up laid pipes, even with no materials left in the backpack.
+        if (!sent || Mode.Placing == ThingKind.SteelPiping || Mode.Placing != ThingKind.Mine && CanPlaceAgain()) return;
         Mode = new ClickMode.Normal();
         // A plan on the cursor goes once nothing more can be paid for; a held container stack runs out by itself.
         if (placingHeld && cursor.Plan != null) cursor.Release();
@@ -254,7 +340,7 @@ public sealed class PlayerControl {
     private void PlaceContainerAt(ClickMode.Container container, Vector2 at) {
         string item = container.Item;
         void Put() {
-            if (Barrel.Is(item)) world.PlaceBarrel(item, at); else world.PlaceCrate(item, at);
+            if (Barrel.Is(item)) world.PlaceBarrel(item, at, container.Rotation); else world.PlaceCrate(item, at, container.Rotation);
         }
         if (placingHeld && cursor.Stack?.Item == item) world.FromHeldStack(Put);
         else if (container.BackpackSlot >= 0) hotbar.FromStack(container.BackpackSlot, Put);
@@ -265,8 +351,8 @@ public sealed class PlayerControl {
     /// <summary>Whether a placement at <paramref name="at"/> goes to the server, which it does when nothing here blocks it.</summary>
     private bool Sent(Vector2 at) {
         var kind = Mode.Placing!.Value;
-        return (Mode is ClickMode.Container container ? world.Construction.PlacementBlock(kind, at, container.Item)
-            : world.Construction.PlacementBlock(kind, world.Construction.Snap(kind, at))) == null;
+        return (Mode is ClickMode.Container container ? world.Construction.PlacementBlock(kind, at, container.Item, container.Rotation)
+            : world.Construction.PlacementBlock(kind, world.Construction.Snap(kind, at), rotation: Mode.Rotation, pipeShape: ((ClickMode.Build)Mode).Shape)) == null;
     }
 
     /// <summary>Whether another can be paid for, on top of the one just sent.</summary>

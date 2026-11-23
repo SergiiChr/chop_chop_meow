@@ -62,11 +62,14 @@ public partial class HeldCursor : Control {
     /// <summary>A click on the interface anywhere but an item slot lets go of what the cursor holds; the click still does what it does there.</summary>
     public override void _Input(InputEvent ev) {
         if (Empty || ev is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left or MouseButton.Right }) return;
-        if (GetViewport().GuiGetHoveredControl() is Control over && over is not ItemSlot { Controls: not null }) Release();
+        if (GetViewport().GuiGetHoveredControl() is not Control over || over is ItemSlot { Controls: not null }) return;
+        Release();
     }
 
     public override void _Process(double delta) {
-        (string? Item, int Count) now = (Item, Plan != null ? 0 : Stack?.Count ?? 0);
+        // Over the ground the buried pipe preview already shows the held plan at the placement tile.
+        string? item = Plan == "steel_piping" && GetViewport().GuiGetHoveredControl() == null ? null : Item;
+        (string? Item, int Count) now = (item, Plan != null ? 0 : Stack?.Count ?? 0);
         if (now != shown) {
             shown = now;
             Visible = now.Item != null;

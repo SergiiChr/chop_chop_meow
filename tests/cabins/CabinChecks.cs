@@ -19,6 +19,8 @@ public static class CabinChecks {
         Test(CheckPlayerWalksAroundABenchThatOnlyClipsTheWayToTheCabin, data);
         Test(CheckASealedCabinSearchCanBeCancelledWhileItIsRunning, data);
         Test(CheckRemovingAWallWhileTheCabinSearchRunsOpensTheWayIn, data);
+        Test(CheckARotatedCabinHasItsDoorOnTheTurnedSide, data);
+        Test(CheckARotatedCabinKeepsItsDoorAndLadderClear, data);
         Test(CheckSteppingInTakesLongerAtAWalkThanAtASprint, data);
         Test(CheckWolvesCannotReachAPlayerHalfWayIn, data);
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
@@ -126,6 +128,38 @@ public static class CabinChecks {
         for (int frame = 0; frame < 500 && approach.Active; frame++)
             if (approach.Direction() != Vector2.Zero) approach.Move(.1f);
         Require(world.Door == Doorway.Entering, "the pending approach should take the opening where the wall was removed");
+    }
+
+    private static void CheckARotatedCabinHasItsDoorOnTheTurnedSide(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(24, 20);
+        Give(world, data.Buildings[ThingKind.Hut].Cost);
+        var hut = world.Construction.Build(ThingKind.Hut, new Vector2(20, 20), Mathf.Pi / 2);
+        Require(hut != null, "a quarter-turned cabin should go up on open ground");
+        var doorstep = new Vector2(18, 19.66f);
+        world.Player = doorstep;
+        Require(world.Doorways.Enter(hut!, false), "a player by the rotated door should step in");
+        world.Tick(Doorways.EnterSeconds + .05f);
+        world.Doorways.Leave();
+        world.Tick(Doorways.LeaveSeconds + .05f);
+        Require(world.Sheltered == 0 && world.Player.DistanceTo(doorstep) < .01f, "the player should step out through the rotated door");
+        var save = world.Serialize();
+        Require(world.Construction.Dismantle(hut!), "the cabin should come down after the player steps outside");
+        world.Deserialize(save);
+        world.Player = doorstep;
+        Require(world.Find(hut!.Id) is Thing loaded && world.Doorways.Enter(loaded, false), "loading should put the door back on the same side");
+    }
+
+    private static void CheckARotatedCabinKeepsItsDoorAndLadderClear(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(23, 22);
+        Give(world, data.Buildings[ThingKind.Hut].Cost);
+        Give(world, data.Buildings[ThingKind.Bench].Cost);
+        Require(world.Construction.Build(ThingKind.Hut, new Vector2(20, 20), Mathf.Pi / 2) != null, "the rotated cabin should go up");
+        world.Player = new Vector2(16, 22);
+        Require(world.Construction.PlacementBlock(ThingKind.Bench, new Vector2(17.2f, 19.66f)) == "Leave the cabin's door clear.", "a bench should leave room in front of the rotated door");
+        Require(world.Construction.PlacementBlock(ThingKind.Bench, new Vector2(18.9f, 22.7f)) == "Leave the cabin's ladder clear.", "a bench should leave room at the rotated ladder");
+        Require(world.Construction.PlacementBlock(ThingKind.Bench, new Vector2(19.66f, 23)) == null, "the ground in front of the unrotated door should be free");
     }
 
     private static void CheckSteppingInTakesLongerAtAWalkThanAtASprint(GameData data) {

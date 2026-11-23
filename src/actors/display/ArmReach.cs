@@ -93,10 +93,10 @@ public static class ArmReach {
 
     /// <summary>A point given from the rig's root, measured instead from the hips in a pose's trunk frame.</summary>
     public static Vector3 ToTrunk(Pose pose, Vector3 point) =>
-        TrunkBasis(pose).Inverse() * (point - Vector3.Up * pose.HipHeight);
+        TrunkBasis(pose).Inverse() * (point - new Vector3(0, pose.HipHeight, pose.HipShift));
 
     /// <summary>A point given from the hips in a pose's trunk frame, measured instead from the rig's root.</summary>
-    public static Vector3 FromTrunk(Pose pose, Vector3 point) => Vector3.Up * pose.HipHeight + TrunkBasis(pose) * point;
+    public static Vector3 FromTrunk(Pose pose, Vector3 point) => new Vector3(0, pose.HipHeight, pose.HipShift) + TrunkBasis(pose) * point;
 
     /// <summary>How a pose turns an arm at the shoulder and how far that arm's elbow folds, as <see cref="ActorRig.Show"/> applies them, from the trunk's frame.</summary>
     private static (Basis Shoulder, Basis Forearm) ArmBases(Pose pose, bool left) {
@@ -130,7 +130,7 @@ public static class ArmReach {
         var (shoulder, forearm) = ArmBases(pose, false);
         var trunk = TrunkBasis(pose);
         var grip = new Basis(Vector3.Up, Mathf.DegToRad(pose.Grip));
-        return Vector3.Up * pose.HipHeight + trunk * FistInTrunk(shoulder, forearm, false)
+        return new Vector3(0, pose.HipHeight, pose.HipShift) + trunk * FistInTrunk(shoulder, forearm, false)
             + trunk * (forearm * (grip * held));
     }
 

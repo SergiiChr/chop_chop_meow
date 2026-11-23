@@ -82,12 +82,14 @@ public partial class Game {
             "the cabin offering Haul as soon as the barrel goes in", 3);
         Require(HasLabel(panel.Aside, "Steel barrel") && HasLabel(panel.Aside, "20/50 L"),
             "The barrel window must name the mounted barrel and show its fill.");
+        Require(HasLabel(panel, "Water is refilled from the roof barrel."), "The sleep forecast should name its mounted roof barrel.");
         Require(OnPage("thirst")?.TooltipText == "Thirst at dawn 100%",
             "A cabin barrel with plenty of water must show a full thirst gauge at dawn.");
 
         await Holding(Key.Shift, () => Click((ItemSlot)panel.Aside.FindChild("cabin_barrel", true, false)!));
         await Until(() => world.Backpack[item] == 1 && Named("job_haul") == null && HasLabel(panel.Aside, "Empty"),
             "taking back the barrel, hiding Haul and leaving the slot empty", 3);
+        Require(!HasLabel(panel, "Water is refilled"), "Removing the roof barrel should also remove the sleep refill note.");
         Drop(Hosted, item);
         await Click(FindButton(panel, "Step outside")!);
         await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "stepping out of the cabin", 4);
@@ -126,6 +128,7 @@ public partial class Game {
             "the cabin page showing the health a fed night's sleep would leave", 2);
         Require(HasLabel(panel, "Stats after sleep") && panel.FindChildren("*", "", true, false).OfType<NeedGauge>().Count() == 3,
             "The cabin page must title its needs \"Stats after sleep\" and show a heart, a stomach and a droplet under them.");
+        Require(!HasLabel(panel, "Water is refilled"), "A cabin without a roof barrel should omit the sleep refill note.");
         SetNeeds(Hosted, hunger: 5);
         RunUntilMorning(Hosted);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true });

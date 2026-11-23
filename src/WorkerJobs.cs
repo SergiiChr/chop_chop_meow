@@ -210,7 +210,7 @@ public sealed partial class World {
         if (!forge.Processing && !Stocked(forge) || Data.Recipes.TryGetValue(forge.Recipe, out var recipe) && Stalled(forge, recipe)) { w.Status = "Nothing to smelt"; return false; }
         if (!HandsFree(w, dt)) return true;
         w.Status = "Operating bellows";
-        if (Walk(w, forge.Pos + BellowsStand, dt, .1f)) { w.WorkState = WorkerWorkState.Pumping; forge.Heat = Math.Min(100, forge.Heat + dt * 18); }
+        if (Walk(w, forge.ToWorld(BellowsStand), dt, .1f)) { w.WorkState = WorkerWorkState.Pumping; forge.Heat = Math.Min(100, forge.Heat + dt * 18); }
         return true;
     }
 

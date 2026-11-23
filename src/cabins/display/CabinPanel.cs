@@ -18,6 +18,12 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         var vials = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; vials.AddThemeConstantOverride("separation", 36); well.AddChild(vials);
         var dawn = NeedColumn.All();
         foreach (var need in dawn) vials.AddChild(need);
+        if (Barrel.In(thing.Inventory) != null) {
+            var waterNote = Style.Text("Water is refilled from the roof barrel.", 14, Style.Ink);
+            waterNote.HorizontalAlignment = HorizontalAlignment.Center;
+            waterNote.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            well.AddChild(waterNote);
+        }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
         var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == thing.Id) world.Doorways.Leave(); else panel.Player.ToggleEntry(thing); });
         var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(thing)); sleep.Name = "sleep"; sleep.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
@@ -53,7 +59,7 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         BarrelWindow();
         StoreBagGrid(Barrel.Is);
         JobButtons();
-        RedrawOnChange(() => world.Jobs(thing).Length);
+        RedrawOnChange(() => Barrel.In(thing.Inventory) != null);
 
         void Show(int i, string need, float after) {
             var vial = dawn[i].Vial;

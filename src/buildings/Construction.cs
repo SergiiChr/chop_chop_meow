@@ -14,13 +14,15 @@ public sealed class Construction(World world) {
     public static bool IsZone(ThingKind kind) => kind is ThingKind.Pile or ThingKind.Farm;
     private static readonly ThingKind[] Zones = { ThingKind.Pile, ThingKind.Farm };
     public const float ZoneSize = 3;
+    internal static bool IsQuarterTurn(float rotation) => rotation is 0 or Mathf.Pi / 2 or Mathf.Pi or 3 * Mathf.Pi / 2;
+    internal static bool ValidRotation(ThingKind kind, float rotation) => rotation == 0 ||
+        kind != ThingKind.Mine && IsQuarterTurn(rotation);
     /// <summary>
-    /// Snaps a mine to its cliff, a yard to the grid of the nearest yard close enough to touch it and a gravel path to
-    /// the middle of its tile.
+    /// Snaps a mine to its cliff, a yard to a neighboring yard's grid, and gravel paths and pipes to tile centers.
     /// </summary>
     public Vector2 Snap(ThingKind kind, Vector2 p) {
         if (kind == ThingKind.Mine) return Mines.Snap(p);
-        if (kind == ThingKind.GravelPath) return Terrain.TileAt(p);
+        if (kind is ThingKind.GravelPath or ThingKind.SteelPiping) return Terrain.TileAt(p);
         if (!IsZone(kind) || world.Nearest(Zones, p) is not Thing near) return p;
         float half = World.Footprint(kind), other = World.Footprint(near.Kind);
         float touch = half + other;
@@ -42,31 +44,45 @@ public sealed class Construction(World world) {
     /// <summary>
     /// Why a building, or a crate from the backpack when <paramref name="item"/> names one, cannot go here.
     /// </summary>
-    public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null) {
+    public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null, float rotation = 0, PipeShape pipeShape = PipeShape.Straight) {
         bool portable = kind is ThingKind.Crate or ThingKind.Barrel;
         if (!portable && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
+        if (!ValidRotation(kind, rotation)) return "That building cannot go up at this angle.";
         if (world.Occupied) return "You are busy.";
         if (world.S.Sheltered != 0) return "Leave the cabin first.";
+        if (kind == ThingKind.SteelPiping) {
+            if (!Enum.IsDefined(pipeShape)) return "Choose a pipe shape.";
+            var tile = Terrain.TileAt(p);
+            if (!Terrain.OnMap(tile)) return "Choose a tile on the map.";
+            if (TooFar(tile) is string pipeFar) return pipeFar;
+            if (world.SteelPipes.Laid(tile)) return "A steel pipe is already laid here.";
+            return Unaffordable(kind);
+        }
         if (WolfPatrols.NearDen(p, Den.Clearance)) return "Leave the wolf den's mouth clear.";
         if (kind == ThingKind.Mine) return world.Mines.Block(p);
         if (kind == ThingKind.GravelPath) return world.GravelPaths.Block(Terrain.TileAt(p));
         if (IsZone(kind)) return ZoneBlock(kind, p);
         if (TooFar(p) is string far) return far;
         if (world.Player.DistanceTo(p) < 1.2f || Terrain.Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
-        if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
+        if (kind == ThingKind.Pump) {
+            if (!Terrain.InLake(p)) return "Place the intake in the freshwater lake’s shallows.";
+            if (!world.CanStand(p + World.BellowsStand.Rotated(rotation))) return "Turn the handle toward open ground on the bank.";
+        } else if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         foreach (var t in world.S.Things)
             if (!World.BuiltOver(t.Kind) && (t.Remaining > 0 || !t.IsResource) && TooClose(t, kind, p))
                 return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
-            var door = Doorways.DoorPoint(new Thing { Pos = p });
+            var door = p + Doorways.DoorOffset.Rotated(rotation);
             if (!world.CanStand(door) || Terrain.InLake(door, .8f) || world.S.Things.Any(t => !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
                 return "Leave open ground in front of the door.";
-            if (!world.CanStand(p + BarrelHaul.LadderApproach)) return "Leave dry, open ground at the cabin's ladder.";
+            if (!world.CanStand(p + BarrelHaul.LadderApproach.Rotated(rotation))) return "Leave dry, open ground at the cabin's ladder.";
         }
         foreach (var hut in world.S.Things.Of(ThingKind.Hut)) {
             if (Doorways.DoorPoint(hut).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
-            if ((hut.Pos + BarrelHaul.LadderApproach).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's ladder clear.";
+            if (hut.ToWorld(BarrelHaul.LadderApproach).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's ladder clear.";
         }
+        foreach (var pump in world.ThingsOf(ThingKind.Pump))
+            if (pump.ToWorld(World.BellowsStand).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the pump handle clear.";
         if (!portable) return Unaffordable(kind);
         if (item == null || (world.MarkedSource ?? world.S.Backpack)[item] > 0) return null;
         return kind == ThingKind.Crate ? "That crate is no longer in your backpack." : "That barrel is no longer available.";
@@ -109,19 +125,20 @@ public sealed class Construction(World world) {
         return Unaffordable(kind);
     }
     /// <summary>
-    /// Builds what <see cref="PlacementBlock"/> allows and returns it; a gravel path tile is laid and is no thing, so
-    /// it returns null as a refusal does.
+    /// Builds what <see cref="PlacementBlock"/> allows.
+    /// Returns a new building, or null after laying a gravel path or steel pipe tile or refusing placement.
     /// </summary>
-    public Thing? Build(ThingKind kind, Vector2 p) {
+    public Thing? Build(ThingKind kind, Vector2 p, float rotation = 0, PipeShape pipeShape = PipeShape.Straight) {
         if (!world.Data.Buildings.ContainsKey(kind)) return null;
         p = Snap(kind, p);
-        var blocked = PlacementBlock(kind, p);
+        var blocked = PlacementBlock(kind, p, rotation: rotation, pipeShape: pipeShape);
         if (blocked != null) { world.Say(blocked); return null; }
-        if (world.Busy() || world.Forwarded(Verb.Build, item: kind.Id(), at: p)) return null;
+        if (world.Busy() || world.Forwarded(Verb.Build, item: kind.Id(), at: p, rotation: rotation, pipeShape: pipeShape)) return null;
         world.S.Backpack.Spend(world.Data.Buildings[kind].Cost);
         world.S.Milestones.Add(kind.Id());
         if (kind == ThingKind.GravelPath) { world.GravelPaths.Lay(Terrain.TileAt(p)); world.Play("place_building", p); return null; }
-        var t = world.Add(kind, p); world.ClearGround(t); world.Play("place_building", p);
+        if (kind == ThingKind.SteelPiping) { world.SteelPipes.Lay(Terrain.TileAt(p), rotation, pipeShape); world.Play("place_building", p); return null; }
+        var t = world.Add(kind, p, rotation: rotation); world.ClearGround(t); world.Play("place_building", p);
         if (kind == ThingKind.Campfire) { t.Burn = world.Data.CampfireSeconds; world.Play("start_fire", p); }
         if (kind == ThingKind.Mine) { world.Say($"Marked the {Mines.Name(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); world.Made?.Invoke(world.S.Actor.Id, t.Id); }
         return t;
@@ -157,23 +174,45 @@ public sealed class Construction(World world) {
         return true;
     }
     /// <summary>
-    /// What the remove selector points at on the ground at <paramref name="at"/> with <paramref name="picked"/> under
-    /// the
-    /// pointer: that thing when it is a building, else the gravel path tile whose gravel the point is on.
+    /// What the remove selector points at: a visible pipe in the underground view, or a building or gravel path on
+    /// the surface.
     /// </summary>
-    public Removal RemovalAt(Thing? picked, Vector2 at) {
+    public Removal RemovalAt(Thing? picked, Vector2 at, bool underground = false) {
+        if (underground) {
+            var pipe = Terrain.TileAt(at);
+            return world.Sees(pipe) && world.SteelPipes.Laid(pipe) ? Removal.OfPipe(pipe) : Removal.None;
+        }
         if (picked is { } building && world.Data.Buildings.ContainsKey(building.Kind)) return Removal.Of(building);
         return world.GravelPaths.TileUnder(at) is Vector2I tile ? Removal.Of(tile) : Removal.None;
     }
     /// <summary>Whether what the remove selector points at is within the acting player's reach.</summary>
-    public bool InReach(Removal removal) =>
-        world.Find(removal.Building) is Thing building ? world.Reaches(building) : removal.Tile is Vector2I tile && world.GravelPaths.TakeUpBlock(tile) == null;
-    /// <summary>
-    /// Takes down what the remove selector points at, at once: a building as <see cref="Dismantle"/> does, a gravel
-    /// path tile as <see cref="GravelPaths.TakeUp"/>.
-    /// </summary>
-    public bool Remove(Removal removal) =>
-        world.Find(removal.Building) is Thing building ? Dismantle(building) : removal.Tile is Vector2I tile && world.GravelPaths.TakeUp(tile);
+    public bool InReach(Removal removal) {
+        if (removal.Pipe is Vector2I pipe) return PipeRemovalBlock(pipe) == null;
+        if (world.Find(removal.Building) is Thing building) return world.Reaches(building);
+        return removal.Tile is Vector2I tile && world.GravelPaths.TakeUpBlock(tile) == null;
+    }
+    /// <summary>Takes down the building, gravel path or steel pipe the remove selector points at.</summary>
+    public bool Remove(Removal removal) {
+        if (removal.Pipe is Vector2I pipe) return TakeUpPipe(pipe);
+        if (world.Find(removal.Building) is Thing building) return Dismantle(building);
+        return removal.Tile is Vector2I tile && world.GravelPaths.TakeUp(tile);
+    }
+
+    private string? PipeRemovalBlock(Vector2I tile) {
+        if (!world.SteelPipes.Laid(tile)) return "No steel pipe here.";
+        return world.Reaches(tile) ? null : "Walk closer first.";
+    }
+
+    /// <summary>Takes up a steel pipe in reach and returns its materials to the player or a recovery box.</summary>
+    internal bool TakeUpPipe(Vector2I tile) {
+        if (PipeRemovalBlock(tile) is string refused) { world.Say(refused); return false; }
+        if (!world.Data.Buildings.TryGetValue(ThingKind.SteelPiping, out var plan)) return false;
+        if (world.Busy() || world.Forwarded(Verb.TakeUpPipe, at: tile)) return true;
+        world.SteelPipes.Remove(tile);
+        world.Play("take_down_building", tile);
+        if (!GiveBack(plan.Cost, tile)) world.Say("The steel pipe did not fit in your backpack. It is in a box where it lay.");
+        return true;
+    }
     /// <summary>
     /// Puts items into the acting player's backpack and what does not fit into a recovery box at <paramref name="at"/>;
     /// true when all of it fitted.

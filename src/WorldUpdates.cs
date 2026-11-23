@@ -11,9 +11,9 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace ChopChopMeow;
 
-/// <summary>Names one entry of a world update: a thing, worker, wolf, trade order or player by its id, or one of the four shared entries.</summary>
+/// <summary>Names one entry of a world update: a thing, worker, wolf, trade order or player by its id, or one entry shared by all players.</summary>
 public readonly record struct EntryKey(byte Prefix, int Id) {
-    public const byte Thing = (byte)'t', Worker = (byte)'w', Wolf = (byte)'f', Order = (byte)'o', Player = (byte)'p', State = (byte)'s', Work = (byte)'k', Paths = (byte)'g', Crates = (byte)'c';
+    public const byte Thing = (byte)'t', Worker = (byte)'w', Wolf = (byte)'f', Order = (byte)'o', Player = (byte)'p', State = (byte)'s', Work = (byte)'k', Paths = (byte)'g', Pipes = (byte)'u', PipeWater = (byte)'v', Crates = (byte)'c';
     /// <summary>A changed entry that carries only its changed fields is named with this in front.</summary>
     public const byte Patched = (byte)'~';
     /// <summary>Longest name: a patch mark, a prefix, a colon and an int.</summary>
@@ -50,9 +50,9 @@ public sealed class Snapshot : Dictionary<EntryKey, byte[]> {
 /// </summary>
 public sealed class WorldUpdates {
     private static readonly JsonSerializerOptions Compact = new(GameData.Json) { WriteIndented = false };
-    // Lists merged by identity, the fog each machine keeps itself, every player of the save and whose it is, and the gravel path tiles and packed crates, which have entries of their own.
-    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered), nameof(SaveState.Party), nameof(SaveState.Owner), nameof(SaveState.GravelPaths), nameof(SaveState.Crates) }.ToHashSet();
-    // The world's own fields, without the lists, players, path tiles and crates that have entries of their own, or the fog, which each machine works out from where everyone stands.
+    // Lists merged by identity, fog, players, and the path tiles, pipe tiles and packed crates with their own entries.
+    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered), nameof(SaveState.Party), nameof(SaveState.Owner), nameof(SaveState.GravelPaths), nameof(SaveState.SteelPipes), nameof(SaveState.PipeWater), nameof(SaveState.Crates) }.ToHashSet();
+    // The state entry carries every field except those sent separately and the fog, which each machine works out.
     private static readonly JsonSerializerOptions Rest = new(Compact) {
         TypeInfoResolver = new DefaultJsonTypeInfoResolver {
             Modifiers = {
@@ -91,7 +91,7 @@ public sealed class WorldUpdates {
 
     public Snapshot Empty() => spare.Count > 0 ? spare.Pop() : new Snapshot();
 
-    /// <summary>The world as entries: each thing, worker, wolf, trade order and player under its id, the rest of the world, what each worker is doing, the gravel path tiles and the packed crates' contents.</summary>
+    /// <summary>The world as entries: each thing, worker, wolf, trade order and player under its id, the rest of the world, what each worker is doing, the gravel paths, steel pipes and packed crates.</summary>
     public Snapshot Capture(World world) {
         var s = world.S;
         world.NumberWolvesAndOrders();
@@ -113,6 +113,8 @@ public sealed class WorldUpdates {
         foreach (int tile in s.GravelPaths) entryWriter.WriteNumberValue(tile);
         entryWriter.WriteEndArray();
         Keep(snapshot, new EntryKey(EntryKey.Paths, 0));
+        Write(snapshot, new EntryKey(EntryKey.Pipes, 0), s.SteelPipes, UpdateJson.Default.DictionaryInt32PipeTile);
+        Write(snapshot, new EntryKey(EntryKey.PipeWater, 0), s.PipeWater, UpdateJson.Default.DictionaryInt32Double);
         Write(snapshot, new EntryKey(EntryKey.Crates, 0), s.Crates, UpdateJson.Default.DictionaryInt32Inventory);
         foreach (var t in s.Things) Write(snapshot, new EntryKey(EntryKey.Thing, t.Id), t, UpdateJson.Default.Thing);
         foreach (var w in s.Workers) Write(snapshot, new EntryKey(EntryKey.Worker, w.Id), w, UpdateJson.Default.Worker);
@@ -179,26 +181,28 @@ public sealed class WorldUpdates {
         return output.AsSpan(0, length);
     }
 
-    /// <summary>Reads the fields of two entries, and says whether both are objects with the same fields.</summary>
-    private bool SameFields(ReadOnlySpan<byte> now, ReadOnlySpan<byte> then) {
+    /// <summary>Reads the fields of two entries and checks that both objects have the same names in the same order.</summary>
+    private bool SameOrderedFields(ReadOnlySpan<byte> now, ReadOnlySpan<byte> then) {
         if (!Fields(now, nowFields) || !Fields(then, thenFields) || nowFields.Count != thenFields.Count) return false;
-        foreach (var field in thenFields) if (Find(now, nowFields, Name(then, field)) < 0) return false;
+        for (int i = 0; i < nowFields.Count; i++)
+            if (!Name(now, nowFields[i]).SequenceEqual(Name(then, thenFields[i]))) return false;
         return true;
     }
 
     /// <summary>
-    /// Writes only the changed fields of an object entry, unless it is not an object or its fields are not the ones it had.
-    /// Entries leave out fields at their default, so a field coming or going sends the whole entry, which keeps the guest's copy in the host's field order.
+    /// Writes only the changed values when an object keeps its field names and order.
+    /// Sending the whole entry when fields come, go or move keeps the guest's copy in the host's field order.
     /// </summary>
     private bool WritePatch(EntryKey key, byte[] now, byte[] then) {
-        if (!SameFields(now, then)) return false;
+        if (!SameOrderedFields(now, then)) return false;
         Span<byte> name = stackalloc byte[EntryKey.MaxName];
         updateWriter.WriteStartObject(name[..key.Format(name, true)]);
-        foreach (var field in nowFields) {
-            var fieldName = Name(now, field);
-            if (Value(then, thenFields[Find(then, thenFields, fieldName)]).SequenceEqual(Value(now, field))) continue;
-            updateWriter.WritePropertyName(fieldName);
-            updateWriter.WriteRawValue(Value(now, field), skipInputValidation: true);
+        for (int i = 0; i < nowFields.Count; i++) {
+            var field = nowFields[i];
+            var value = Value(now, field);
+            if (Value(then, thenFields[i]).SequenceEqual(value)) continue;
+            updateWriter.WritePropertyName(Name(now, field));
+            updateWriter.WriteRawValue(value, skipInputValidation: true);
         }
         updateWriter.WriteEndObject();
         return true;
@@ -220,7 +224,7 @@ public sealed class WorldUpdates {
             int start = (int)reader.TokenStartIndex;
             bool gone = reader.TokenType == JsonTokenType.Null;
             reader.Skip();
-            var value = json[start..(int)reader.BytesConsumed];
+            var value = unpacked.AsMemory(start, (int)reader.BytesConsumed - start);
             if (gone) snapshot.Remove(key);
             else if (!patched) snapshot[key] = value.ToArray();
             else snapshot[key] = snapshot.TryGetValue(key, out var entry) ? Patch(entry, value) : throw new JsonException("A patch names an entry the update builds on does not have.");
@@ -229,19 +233,56 @@ public sealed class WorldUpdates {
     }
 
     /// <summary>An object entry with the fields of <paramref name="changes"/> replaced.</summary>
-    private byte[] Patch(byte[] entry, ReadOnlySpan<byte> change) {
+    private byte[] Patch(byte[] entry, ReadOnlyMemory<byte> changes) {
+        var change = changes.Span;
         if (!Fields(entry, thenFields) || !Fields(change, patchFields)) throw new JsonException("A patch must change an object entry.");
-        merged.ResetWrittenCount(); mergedWriter.Reset(merged);
-        mergedWriter.WriteStartObject();
+        BeginMerge();
+        int next = 0;
         foreach (var field in thenFields) {
             var fieldName = Name(entry, field);
-            int now = Find(change, patchFields, fieldName);
+            var value = Value(entry, field);
+            if (next < patchFields.Count && fieldName.SequenceEqual(Name(change, patchFields[next])))
+                value = Value(change, patchFields[next++]);
             mergedWriter.WritePropertyName(fieldName);
-            mergedWriter.WriteRawValue(now >= 0 ? Value(change, patchFields[now]) : Value(entry, field), skipInputValidation: true);
+            mergedWriter.WriteRawValue(value, skipInputValidation: true);
         }
+        if (next < patchFields.Count) MergeUnorderedFields(entry, changes);
         mergedWriter.WriteEndObject();
         mergedWriter.Flush();
         return merged.WrittenSpan.ToArray();
+    }
+
+    private void BeginMerge() {
+        merged.ResetWrittenCount(); mergedWriter.Reset(merged);
+        mergedWriter.WriteStartObject();
+    }
+
+    private readonly Dictionary<ReadOnlyMemory<byte>, Range> patchByName = new(new FieldNameComparer());
+
+    /// <summary>Merges a patch written in a different field order while keeping the baseline's order.</summary>
+    private void MergeUnorderedFields(byte[] entry, ReadOnlyMemory<byte> changes) {
+        try {
+            foreach (var field in patchFields) patchByName.TryAdd(changes.Slice(field.NameStart, field.NameLength), field);
+            BeginMerge();
+            foreach (var field in thenFields) {
+                var name = entry.AsMemory(field.NameStart, field.NameLength);
+                var value = patchByName.TryGetValue(name, out var replacement) ? Value(changes.Span, replacement) : Value(entry, field);
+                mergedWriter.WritePropertyName(name.Span);
+                mergedWriter.WriteRawValue(value, skipInputValidation: true);
+            }
+        } finally {
+            patchByName.Clear();
+        }
+    }
+
+    private sealed class FieldNameComparer : IEqualityComparer<ReadOnlyMemory<byte>> {
+        public bool Equals(ReadOnlyMemory<byte> a, ReadOnlyMemory<byte> b) => a.Span.SequenceEqual(b.Span);
+
+        public int GetHashCode(ReadOnlyMemory<byte> name) {
+            var hash = new HashCode();
+            hash.AddBytes(name.Span);
+            return hash.ToHashCode();
+        }
     }
 
     private readonly List<(Range Field, int Number)> changedNumbers = new();
@@ -266,11 +307,6 @@ public sealed class WorldUpdates {
     private static ReadOnlySpan<byte> Name(ReadOnlySpan<byte> json, Range field) => json.Slice(field.NameStart, field.NameLength);
     private static ReadOnlySpan<byte> Value(ReadOnlySpan<byte> json, Range field) => json.Slice(field.ValueStart, field.ValueLength);
 
-    private static int Find(ReadOnlySpan<byte> json, List<Range> fields, ReadOnlySpan<byte> name) {
-        for (int i = 0; i < fields.Count; i++) if (Name(json, fields[i]).SequenceEqual(name)) return i;
-        return -1;
-    }
-
     /// <summary>The number properties of a type, which an update can set without reading a new object.</summary>
     private static class Numbers<T> where T : class {
         public delegate void Setter(T target, ref Utf8JsonReader value);
@@ -292,14 +328,15 @@ public sealed class WorldUpdates {
     }
 
     /// <summary>
-    /// Brings <paramref name="target"/> from entry <paramref name="then"/> to <paramref name="now"/> in place, without allocating, when the same fields are there and only numbers differ.
-    /// Entries leave out fields at their default, so a number reaching or leaving its default, or any other change, returns false and changes nothing: the entry must be read whole.
+    /// Applies changed numbers in place when the two entries have the same field names in the same order.
+    /// If the field names or order change, or a changed value is not a number, leaves the target for the full entry to replace.
     /// </summary>
     public bool SetNumbers<T>(T target, byte[] then, byte[] now) where T : class {
-        if (!SameFields(now, then)) return false;
+        if (!SameOrderedFields(now, then)) return false;
         changedNumbers.Clear();
-        foreach (var field in nowFields) {
-            if (Value(then, thenFields[Find(then, thenFields, Name(now, field))]).SequenceEqual(Value(now, field))) continue;
+        for (int i = 0; i < nowFields.Count; i++) {
+            var field = nowFields[i];
+            if (Value(then, thenFields[i]).SequenceEqual(Value(now, field))) continue;
             int number = Numbers<T>.Of(Name(now, field));
             if (number < 0) return false;
             changedNumbers.Add((field, number));

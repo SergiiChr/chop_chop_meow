@@ -28,7 +28,7 @@ public partial class PlansPanel(PageTools tools) : PagePanel(tools) {
         void StartRemoving() { panel.Player.Mode = new ClickMode.Remove(); panel.Close(); kit.Refresh(); }
         // A click with a plan held on the cursor lets go of the plan first.
         remove.Controls = new SlotInput(cursor) { Click = StartRemoving, Takes = held => held.Plan != null, Put = (held, _) => { held.Release(); StartRemoving(); } };
-        remove.MouseEntered += () => details.Text = "Remove\nClick a building or a gravel path tile within reach to take it down at once. Its cost and everything it holds come back to your backpack.";
+        remove.MouseEntered += () => details.Text = "Remove\nLeft click to take down a building or tile within reach. Right click switches between the surface and underground. Esc puts the selector away.";
         grid.AddChild(remove);
         AddChild(details);
     }

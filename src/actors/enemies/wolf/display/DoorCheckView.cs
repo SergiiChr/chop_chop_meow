@@ -326,9 +326,9 @@ public static class DoorCheckView {
     private const float PawUpFrom = .12f;
 
     /// <summary>Where a wolf's model stands this far into a door check at the cabin whose door point is <paramref name="door"/>, and the way it faces.</summary>
-    public static (Vector3 At, float Yaw) Placement(Vector2 door, float clock) {
+    public static (Vector3 At, float Yaw) Placement(Vector2 door, float clock, float rotation = 0) {
         var stand = StandAt(clock);
-        return (WorldView.To3(door + stand.At), MathF.Atan2(stand.Ahead.X, stand.Ahead.Y));
+        return (WorldView.To3(door + stand.At.Rotated(rotation)), MathF.Atan2(stand.Ahead.X, stand.Ahead.Y) - rotation);
     }
 
     /// <summary>
@@ -360,7 +360,7 @@ public static class DoorCheckView {
         // A world on a server moves the door check on only with each update, so the model runs on between them, kept close to the world's clock.
         float clock = model.DoorCheckClock = Math.Clamp(model.DoorCheckClock + dt, world - ClockSlack, world + ClockSlack);
         model.Settled = Math.Min(1, model.Settled + dt / SettleSeconds);
-        var (at, yaw) = Placement(door, clock);
+        var (at, yaw) = Placement(door, clock, cabin.Rotation);
         float settle = WorldView.Ease(model.Settled);
         model.Yaw = Mathf.LerpAngle(model.FromYaw, yaw, settle);
         model.Pinned = 0;

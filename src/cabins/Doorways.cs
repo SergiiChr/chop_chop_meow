@@ -30,7 +30,10 @@ public sealed class Doorways(World world) {
     internal static readonly Vector2 DoorOffset = new(-.34f, 2f);
 
     /// <summary>The spot just outside a cabin's door where a player steps in and out.</summary>
-    public static Vector2 DoorPoint(Thing cabin) => cabin.Pos + DoorOffset;
+    public static Vector2 DoorPoint(Thing cabin) => cabin.ToWorld(DoorOffset);
+
+    /// <summary>The way out through the door of that cabin, or the usual way when it is gone.</summary>
+    public Vector2 OutOfDoorAt(int cabin) => OutOfDoor.Rotated(world.Find(cabin)?.Rotation ?? 0);
 
     /// <summary>
     /// Where a player stepping out of or waking in a cabin stands: at its door, or, with that blocked, as in a cabin from an
@@ -39,7 +42,7 @@ public sealed class Doorways(World world) {
     public Vector2 Doorstep(Thing cabin) {
         if (world.CanStand(DoorPoint(cabin))) return DoorPoint(cabin);
         for (int i = 0; i < 8; i++) {
-            var p = cabin.Pos + Vector2.Down.Rotated(i * MathF.PI / 4) * (World.Footprint(ThingKind.Hut) + .6f);
+            var p = cabin.ToWorld(Vector2.Down.Rotated(i * MathF.PI / 4) * (World.Footprint(ThingKind.Hut) + .6f));
             if (world.CanStand(p)) return p;
         }
         return DoorPoint(cabin);
@@ -119,12 +122,13 @@ public sealed class Doorways(World world) {
             Stage(other, Doorway.Aside, cabin.Id); other.DoorQueued = ++s.DoorArrivals;
             other.Pos = AsideSpot(other, cabin); other.Warp++;
         }
-        if (s.Players.Any(o => o.Door == Doorway.Aside && o.DoorCabin == cabin.Id)) world.Player = DoorPoint(cabin) - AsideWay * MakeWay;
+        var aside = AsideWay.Rotated(cabin.Rotation);
+        if (s.Players.Any(o => o.Door == Doorway.Aside && o.DoorCabin == cabin.Id)) world.Player = DoorPoint(cabin) - aside * MakeWay;
         // Someone just standing at the door stays where they are, and the one stepping out ends beside them instead.
         foreach (var other in s.Players)
             if (other != s.Actor && other.Sheltered == 0 && other.Door == Doorway.None && other.Pos.DistanceTo(world.Player) < ClearOf) {
-                float side = (other.Pos - DoorPoint(cabin)).Dot(AsideWay) > 0 ? -1 : 1;
-                world.Player = other.Pos + AsideWay * (side * ClearOf);
+                float side = (other.Pos - DoorPoint(cabin)).Dot(aside) > 0 ? -1 : 1;
+                world.Player = other.Pos + aside * (side * ClearOf);
             }
     }
     /// <summary>How far apart, in metres, someone stepping out of a cabin keeps from a player standing at its door.</summary>
@@ -153,7 +157,7 @@ public sealed class Doorways(World world) {
     /// </summary>
     private Vector2 AsideSpot(PlayerState p, Thing cabin) {
         int before = world.S.Players.Count(o => o != p && o.Door == Doorway.Aside && o.DoorCabin == cabin.Id && o.DoorQueued < p.DoorQueued);
-        return DoorPoint(cabin) + AsideWay * (AsideStep + AsideGap * before);
+        return DoorPoint(cabin) + AsideWay.Rotated(cabin.Rotation) * (AsideStep + AsideGap * before);
     }
     /// <summary>The way players at a cabin's door step aside: to their right as they face the door.</summary>
     public static readonly Vector2 AsideWay = OutOfDoor.Orthogonal();

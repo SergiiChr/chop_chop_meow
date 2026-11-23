@@ -56,7 +56,9 @@ public sealed class DoorTug(World world) {
     public Vector2 TuggedTo {
         get {
             var p = world.S.Actor;
-            return p.Door is Doorway.Tugged or Doorway.TuggedOff ? world.Player + Doorways.OutOfDoor * (TugDistanceFrom(world.Player) * TugProgress(p.DoorTime / TugSeconds)) : world.Player;
+            if (p.Door is not (Doorway.Tugged or Doorway.TuggedOff)) return world.Player;
+            var outward = world.Doorways.OutOfDoorAt(p.DoorCabin);
+            return world.Player + outward * (TugDistanceFrom(world.Player, outward) * TugProgress(p.DoorTime / TugSeconds));
         }
     }
 
@@ -64,10 +66,10 @@ public sealed class DoorTug(World world) {
     /// How far a wolf tugs a player standing at <paramref name="from"/> straight out of a doorway: <see cref="TugDistance"/>, cut
     /// short where open ground ends, leaving room on it for the wolf behind them where there is any.
     /// </summary>
-    public float TugDistanceFrom(Vector2 from) {
-        if (from != measured.From || Math.Abs(world.Time - measured.At) > TugSeconds) {
-            float both = OpenOut(from, TugDistance + TugReach) - TugReach;
-            measured = (from, world.Time, both >= 0 ? both : OpenOut(from, TugDistance));
+    public float TugDistanceFrom(Vector2 from, Vector2 outward) {
+        if (from != measured.From || outward != measured.Outward || Math.Abs(world.Time - measured.At) > TugSeconds) {
+            float both = OpenOut(from, outward, TugDistance + TugReach) - TugReach;
+            measured = (from, outward, world.Time, both >= 0 ? both : OpenOut(from, outward, TugDistance));
         }
         return measured.Distance;
     }
@@ -75,19 +77,19 @@ public sealed class DoorTug(World world) {
     /// The distance last measured, from where and when: every wolf at a tug reads it several times a tick, and open
     /// ground does not change in the second and a half a tug lasts.
     /// </summary>
-    private (Vector2 From, float At, float Distance) measured = (new Vector2(float.NaN, float.NaN), 0, 0);
+    private (Vector2 From, Vector2 Outward, float At, float Distance) measured = (new Vector2(float.NaN, float.NaN), default, 0, 0);
 
     /// <summary>How far open ground runs from <paramref name="from"/> straight out of a doorway, up to <paramref name="most"/> metres.</summary>
-    private float OpenOut(Vector2 from, float most) {
+    private float OpenOut(Vector2 from, Vector2 outward, float most) {
         float open = 0;
-        while (open < most && world.CanStand(from + Doorways.OutOfDoor * Math.Min(open + OpenStep, most))) open = Math.Min(open + OpenStep, most);
+        while (open < most && world.CanStand(from + outward * Math.Min(open + OpenStep, most))) open = Math.Min(open + OpenStep, most);
         return open;
     }
     private const float OpenStep = .05f;
 
     /// <summary>Puts a wolf tugging the acting player behind them, where it holds on; with no open ground there, it stays where it stands.</summary>
     private void StandBehind(Wolf wolf) {
-        var spot = TuggedTo + Doorways.OutOfDoor * TugReach;
+        var spot = TuggedTo + world.Doorways.OutOfDoorAt(world.S.Actor.DoorCabin) * TugReach;
         if (world.CanStand(spot)) wolf.Pos = spot;
     }
 
@@ -134,7 +136,7 @@ public sealed class DoorTug(World world) {
     }
 
     /// <summary>The way a tugged player faces: into the cabin they are tugged out of.</summary>
-    private static readonly Vector2 Facing = -Doorways.OutOfDoor;
+    private Vector2 Facing => -world.Doorways.OutOfDoorAt(world.S.Actor.DoorCabin);
 
     /// <summary>Where a wolf holding the acting player's arm on a <see cref="BodySide"/> stands.</summary>
     private Vector2 SideSpot(int side) => TuggedTo + BodySide.Out(Facing, side) * SideReach;

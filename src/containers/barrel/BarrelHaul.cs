@@ -21,7 +21,7 @@ internal sealed class BarrelHaul : PlaceHaul {
     };
     internal static int FarmStops => FarmStands.Length;
     internal static Vector2 FarmPourPoint(Thing farm, int stop) =>
-        farm.Pos + FarmStands[stop] - FarmStands[stop].Normalized() * .55f;
+        farm.ToWorld(FarmStands[stop] - FarmStands[stop].Normalized() * .55f);
 
     public static bool Vessel(string item) => Bucket.Is(item) || Water.IsBottle(item);
 
@@ -59,7 +59,7 @@ internal sealed class BarrelHaul : PlaceHaul {
 
     private bool HaulFor(Worker w, Duty duty, float dt) {
         if (world.Find(duty.Thing) is not { Kind: ThingKind.Barrel or ThingKind.Hut or ThingKind.Farm } target || !NeedsWater(target)) return false;
-        var stand = target.Pos + (target.Kind == ThingKind.Farm ? FarmStands[0] : target.Kind == ThingKind.Hut ? LadderApproach : SpoutApproach);
+        var stand = target.ToWorld(target.Kind == ThingKind.Farm ? FarmStands[0] : target.Kind == ThingKind.Hut ? LadderApproach : SpoutApproach);
         if (!world.CanStand(stand)) return Blocked(w);
         if (!ToolFits(target, w.Tool)) {
             string need = target.Kind == ThingKind.Farm ? Bucket.Item : WaterTool;
@@ -118,7 +118,7 @@ internal sealed class BarrelHaul : PlaceHaul {
         if (shore == null) source = null;
         foreach (var t in world.ThingsOf(ThingKind.Barrel)) {
             if (t == target || !GivesWater(t)) continue;
-            var spout = t.Pos + SpoutApproach;
+            var spout = t.ToWorld(SpoutApproach);
             float d = t.Pos.DistanceSquaredTo(w.Pos);
             if (d < distance && world.CanStand(spout)) { source = t; at = spout; distance = d; }
         }
@@ -183,7 +183,7 @@ internal sealed class BarrelHaul : PlaceHaul {
         if (w.ToolSlot.Free(w.Tool) == 0) { w.Status = "Waiting for the player to let go"; return true; }
         w.Status = "Watering the farm plot";
         if (w.WaterAction == WorkerWaterAction.WalkFarm) {
-            if (world.Walk(w, farm.Pos + FarmStands[w.FarmWaterStop], dt, .08f, exact: true))
+            if (world.Walk(w, farm.ToWorld(FarmStands[w.FarmWaterStop]), dt, .08f, exact: true))
                 StartWater(w, WorkerWaterAction.Pour, farm);
             if (w.WorkState == WorkerWorkState.Blocked) return FinishFarm(w);
             return true;

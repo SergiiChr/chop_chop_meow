@@ -59,8 +59,8 @@ public sealed partial class World {
         return true;
     }
 
-    internal bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
-        var c = new Command(verb, target, other, item, count, at, fromHeld, fromSpares);
+    internal bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default, float rotation = 0, PipeShape pipeShape = PipeShape.Straight) {
+        var c = new Command(verb, target, other, item, count, at, fromHeld, fromSpares, rotation, pipeShape);
         if (Host != null) { Host(c); return true; }
         if (!(c.Held || c.Spares) || runningMarked) return false;
         RunMarked(c);
@@ -136,10 +136,11 @@ public sealed partial class World {
         var t = Find(c.Target);
         var w = S.Workers.Find(w => w.Id == c.Other);
         switch (c.Verb) {
-            case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Construction.Build(kind, c.At); break;
+            case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Construction.Build(kind, c.At, c.Rotation, c.PipeShape); break;
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
-            case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At)); break;
-            case Verb.PlaceBarrel: Preferring(S.Backpack, c.Count, () => PlaceBarrel(c.Item, c.At)); break;
+            case Verb.TakeUpPipe: Construction.TakeUpPipe(Terrain.TileAt(c.At)); break;
+            case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At, c.Rotation)); break;
+            case Verb.PlaceBarrel: Preferring(S.Backpack, c.Count, () => PlaceBarrel(c.Item, c.At, c.Rotation)); break;
             case Verb.MoveInBarrel:
                 if ((uint)c.Target <= Barrel.Capacity)
                     Preferring(S.Backpack, (int)c.At.X, () => MoveInBarrel(Barrel.AtFill(c.Target), c.Item, c.Count, c.Other != 0, (int)c.At.Y));
@@ -218,12 +219,12 @@ public sealed partial class World {
         return -1;
     }
 
-    public const int BoxCodes = 6;
+    public const int BoxCodes = 7;
     /// <summary>What <see cref="Locate"/> takes the number of a packed crate in the backpack from, to name its contents.</summary>
     private const int CrateCode = -2;
-    internal static Inventory?[] Boxes(Thing t) => [t.Inventory, t.Output, t.Tools, t.Wages, t.Burner];
+    internal static Inventory?[] Boxes(Thing t) => [t.Inventory, t.Output, t.Tools, t.Wages, t.Burner, t.PlumbingSlot];
     /// <summary>One of a thing's boxes in the order of <see cref="Boxes"/>, looked up without building the array, as ticks do.</summary>
-    private static Inventory? Box(Thing t, int index) => index switch { 0 => t.Inventory, 1 => t.Output, 2 => t.Tools, 3 => t.Wages, 4 => t.Burner, _ => null };
+    private static Inventory? Box(Thing t, int index) => index switch { 0 => t.Inventory, 1 => t.Output, 2 => t.Tools, 3 => t.Wages, 4 => t.Burner, 5 => t.PlumbingSlot, _ => null };
     /// <summary>Which of a thing's boxes an inventory is, or -1.</summary>
     private static int BoxIndex(Thing t, Inventory inventory) {
         for (int i = 0; i < BoxCodes - 1; i++) if (Box(t, i) == inventory) return i;

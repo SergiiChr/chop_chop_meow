@@ -175,11 +175,15 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
-| C | Open the crafting menu |
+| C / V during placement | Turn a building, crate, barrel or pipe 90° |
+| C outside placement | Open crafting |
+| LMB / RMB while placing steel pipes | Lay a pipe / take up the pipe under the pointer |
+| R / T while placing steel pipes | Turn 90° / cycle the pipe type |
 | H | Open the crew overview |
 | I | Open or close the field guide |
-| 1–9 or click a hotbar slot | Select that slot, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
-| Space | Swing an axe, or a fist without one, the way you last walked, or pump the selected nearby reinforced furnace |
+| 1–9 or click a hotbar slot | Select and outline that slot, and start placement if it holds a plan or crate |
+| Space at a selected nearby reinforced furnace or water pump | Pump |
+| Space otherwise | Swing an axe or fist in the direction you last walked |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
@@ -190,7 +194,16 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | RMB on a hotbar slot | Empty the slot |
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
 
+Mines face their cliff and open their panel as soon as you place them.
+Other plans and crates stay active until you press Esc or run out of materials or crates.
+Steel pipe placement stays active for removal when you run out of pipes.
+The hotbar starts with an axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries and water.
+
 ## Interface
+
+Point at a building, resource or worker to see its name.
+At the lake's edge the label reads “Collect water”.
+Click a target to open its panel.
 
 ### Status bar
 
@@ -350,6 +363,7 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 | Crafting bench, anvil, cooking table, packing station | Craft, Haul |
 | Stone furnace, canning station | Haul |
 | Reinforced furnace | Bellows, Haul |
+| Water pump | Pump |
 | Mine | Build, Haul, Mine |
 | Farm plot | Farm, Haul |
 | Trading post | Manage deliveries |
@@ -378,7 +392,8 @@ A plan held on the cursor is let go of by that click.
 With it, the building under the mouse turns red when it is within reach, 15 metres, and a click takes it down at once,
 without asking.
 A gravel path tile turns red and comes up the same way, when the mouse is on gravel with no building over it.
-The selector stays for the next one until Esc or a right click.
+Right-click switches between the surface and underground.
+Press Esc to put the selector away.
 A building's cost and everything in it go to your backpack, and what does not fit waits in a recovery box where it stood; a mine also gives back the timber, iron and stone delivered to it.
 A cabin someone is in, or a trading post with a cart out, stays up until they come out or the cart is back.
 
@@ -413,7 +428,11 @@ These rules cover any refillable vessel the game adds (`GameData.Vessels`).
 Food and drink restore hunger and thirst but no health: health comes back only in sleep.
 From 10 pm you can sleep until dawn, but only if your food and water will last until morning; otherwise the sleep button explains why.
 Sleep heals while hunger and thirst both stay above 45%, about a third of your health over a full night.
-The cabin's page shows, under "Stats after sleep", the health, hunger and thirst you would wake with, each as a capsule over its icon, as in the corner.
+The cabin's page shows the health, hunger and thirst you would wake with under “Stats after sleep”.
+Each appears as a capsule over its icon, as in the corner.
+When a roof barrel is mounted, a note beneath the forecast says water is refilled from the roof barrel.
+The note still appears when the mounted barrel is empty.
+The forecast uses the water available in the barrel.
 
 ### Death and recovery
 
@@ -459,6 +478,7 @@ The opening progression prioritizes water, shelter and fire, then hand gathering
 
 ### Buildings
 
+The placement preview stays visible over the shoreline, water and existing buildings.
 A building, yard or crate goes up over stumps and plain bushes and clears them away, giving nothing for them.
 A cabin needs dry, open ground at its door and at the foot of its ladder.
 Those spots stay clear of other buildings.
@@ -739,6 +759,58 @@ A worker on the station's Stock job brings tools from other storage to the rack.
 Oaks drop a patch of leaves beside the trunk.
 Gather them by hand, or three times as fast with a rake, and they fall again every day.
 
+## Steel piping and water pumps
+
+Place a water pump in the freshwater lake’s shallows with its handle facing dry ground.
+It costs 4 steel bars, 10 stone and 4 wood parts.
+From the bank, select it and click **Pump** or press **Space**.
+Your character steps up to the handle before pressing it.
+Aim at the pump to select it, including its thin lever and piston.
+Aim beside it to collect water.
+You can also assign a worker the **Pump** job.
+The pressure gauge reads from 0 to 5 L/s.
+Each short tick is half a liter per second, the gain from one stroke.
+Ten consecutive strokes reach full pressure.
+After the last stroke finishes, pressure falls to zero over 10 seconds from full.
+
+At an anvil, use a steel hammer to form one steel bar into one stackable steel pipe in 10 base seconds.
+Put the hammer in the anvil’s hammer slot for a worker to use.
+In building plans, pick **Steel piping** to open the cutaway and dim the surface.
+Thin blue outlines mark the pipes, trench edges and building inlets against the exposed earth.
+Empty pipes show bare steel.
+Any water in a tile turns its pipe and inlet dark blue, even at zero pressure.
+Left-click to lay a steel pipe.
+Right-click to take one back up.
+Press R for a quarter turn and T to cycle through straight, T-junction and cross.
+The pipe plan stays active after the last pipe so you can still take pipes up.
+Press Esc to finish.
+Pipes join across a shared tile side when both openings face each other.
+
+Run the line through the tile outlined in blue under the pump and each building it serves.
+A vertical pipe joins each building with plumbing to the line.
+A dotted guide marks an open connection.
+Put 10 steel pipes in a building's **Plumbing** slot to install its plumbing.
+You can add them in batches.
+Removing steel pipes from the slot disables the building's plumbing.
+Taking down the building or picking up a barrel gives the installed steel pipes back.
+
+| Building | What piped water supplies |
+| --- | --- |
+| Placed steel barrel | Fills its 50 L tank |
+| Cabin | Fills a mounted roof barrel through a pipe up the outside wall |
+| Cooking table | A brass tap over a splash plate fills the water input for the next queued or marked batch |
+| Farm plot | Four low sprinkler heads top up the soil's 10 L reserve |
+
+A cabin can connect to the line before a roof barrel is mounted.
+Farm sprinklers spray whenever water arrives, even on fallow or ripe plots and when the soil reserve is full.
+Water fills the line outward from each running pump, up to 1 L per tile.
+Buildings that need water share the available flow evenly.
+A closed tap can have a full pipe at its inlet.
+When pressure falls to zero, water stays in the pipes for the next building that needs it.
+Cutting a line leaves the water in each surviving section.
+While placing pipes or removing things underground, point at a pipe and press **E** to inspect its water and pressure.
+Right-click in the remove tool to switch layers, then left-click to take up just the selected pipe or surface object.
+
 ## Gravel paths
 
 Crush rocks at a bench with a steel hammer: each stone gives one gravel.
@@ -774,6 +846,7 @@ Wheat uses 10 liters of water per day of growth and pauses when the plot runs dr
 The plot holds up to 10 liters.
 Pour from a filled bucket or bottle into the water droplet slot, just like at the cooking table.
 The blue bar under fertilizer shows how much water is left.
+Dark patches spread across the soil as the bar fills and shrink as the crop uses water.
 When the wheat ripens, the water slot and fill bar hide until the harvest is done.
 
 Hold right mouse on a ripe plot to harvest it by hand, no tool needed.

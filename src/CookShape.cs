@@ -35,9 +35,15 @@ internal static class CookShape {
         for (int row = 0; row < 3; row++) {
             float y = .15f + row * .18f;
             foreach (float x in new[] { -.575f, -.085f })
-                for (int block = 0; block < 2; block++)
-                    Bevel(s, new(.13f, .174f, .302f), new(x, y, (block == 0 ? -.155f : .155f) + (row == 1 ? .004f : 0)), .008f, (row + block) % 2 == 0 ? "9b9c98" : "92958f");
-            Bevel(s, new(.35f, .174f, .12f), new(-.33f, y, -.25f), .008f, "8b8e88");
+                for (int block = 0; block < 2; block++) {
+                    var size = new Vector3(.13f, .174f, .302f);
+                    var center = new Vector3(x, y, (block == 0 ? -.155f : .155f) + (row == 1 ? .004f : 0));
+                    string tint = (row + block) % 2 == 0 ? "9b9c98" : "92958f";
+                    if (block == 0 && row < 2) Box(s, size, center, tint);
+                    else Bevel(s, size, center, .008f, tint);
+                }
+            // The firebox's rear blocks sit against its lining and don't need rounded edges.
+            Box(s, new(.35f, .174f, .12f), new(-.33f, y, -.25f), "8b8e88");
         }
         Bevel(s, new(.36f, .14f, .13f), new(-.33f, .53f, .245f), .009f, "a3a49d");
         Box(s, new(.35f, .02f, .43f), new(-.33f, .081f, .03f), "302b26");
