@@ -77,19 +77,18 @@ public partial class PauseMenu : PanelContainer {
         // Goals already met shrink to a row of ticks, named on hover; the current goal sits in a framed box with its hint.
         var met = new HFlowContainer(); met.AddThemeConstantOverride("h_separation", 4); met.AddThemeConstantOverride("v_separation", 4); goals.AddChild(met);
         for (int i = 0; i < World.GoalCount; i++) {
-            var (title, _) = World.ObjectiveFor(i);
+            var (title, hint) = World.ObjectiveFor(i);
             if (i < world.Goal) { var tick = GoalMark(true, false); tick.TooltipText = title; tick.MouseFilter = Control.MouseFilterEnum.Pass; met.AddChild(tick); continue; }
             if (i == world.Goal) {
                 var current = new PanelContainer(); current.AddThemeStyleboxOverride("panel", Style.Dropdown); goals.AddChild(current);
                 var inner = new VBoxContainer(); inner.AddThemeConstantOverride("separation", 4); current.AddChild(inner);
                 inner.AddChild(GoalRow(title, false, true));
-                var hint = Style.Text(world.Objective.Hint, 13, Style.Tan, wrap: true); inner.AddChild(hint);
+                inner.AddChild(Style.Text(hint, 13, Style.Tan, wrap: true));
                 continue;
             }
             goals.AddChild(GoalRow(title, false, false));
         }
         met.Visible = met.GetChildCount() > 0;
-        if (world.GoalComplete) { var hint = Style.Text(world.Objective.Hint, 13, Style.Tan, wrap: true); goals.AddChild(hint); }
         goals.AddChild(new HSeparator());
         goals.AddChild(Style.WellLabel("End goals"));
         foreach (var ore in Cliff.Ores) goals.AddChild(GoalRow($"A working {ore.Id()} mine", world.Mines.Working(ore), false, Icons.Of(World.ResourceItem(ore))));

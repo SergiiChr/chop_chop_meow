@@ -29,7 +29,8 @@ public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, s
         foreach (var input in inputs) left.AddChild(input);
         var middle = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; middle.AddThemeConstantOverride("separation", 8); row.AddChild(middle);
         var clock = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; clock.AddThemeConstantOverride("separation", 4); middle.AddChild(clock);
-        clock.AddChild(Style.Glyph("line_clock", 16, Style.Ink)); clock.AddChild(Style.Text(time, 14, Style.Ink));
+        var timeLabel = Style.Text(time, 14, Style.Ink); timeLabel.Name = "batch_time";
+        clock.AddChild(Style.Glyph("line_clock", 16, Style.Ink)); clock.AddChild(timeLabel);
         var bar = new ProgressBar { MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(60, 14), Name = "progress" };
         middle.AddChild(bar);
         // Redrawn only when the bar moves a pixel's worth.

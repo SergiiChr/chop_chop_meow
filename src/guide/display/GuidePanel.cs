@@ -34,8 +34,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
             ("iron_ore", "Mine iron and coal at the foot of the cliffs with a pickaxe; loose coal needs no tool."),
             ("iron_bar", "Stone furnace: 2 ore make an iron bar over coal or charcoal; wood only cooks food and burns 2 wood into charcoal."),
             ("steel_bar", "Reinforced furnace: 2 iron bars and 2 coal make 2 steel bars, with coal in its fuel slot."),
-            ("line_flame", "Pump the bellows: steel requires 1450+ °C."),
-            ("steel_parts", "The anvil hammers steel bars into steel parts while someone works it.")
+            ("line_flame", "Pump the bellows: steel requires 1450+ °C.")
         },
         ["craft"] = new[] {
             ("stone_chisel", "Press C to craft on the go. Knap a stone chisel from 2 stone first."),

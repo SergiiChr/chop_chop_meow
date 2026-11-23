@@ -146,6 +146,14 @@ public sealed partial class World {
 
     private static Duty NewDuty(Thing place, JobKind job) => new() { Thing = place.Id, Job = job, Kind = job == JobKind.Gather ? place.Kind : null };
 
+    /// <summary>
+    /// Adds a job at a place to the end of a worker's list; a worker given any job meets the starter goal of assigning one.
+    /// </summary>
+    private void GiveDuty(Worker w, Thing place, JobKind job) {
+        w.Jobs.Add(NewDuty(place, job));
+        S.Milestones.Add("assigned");
+    }
+
     /// <summary>The place of a worker's first job, or zero with none.</summary>
     private static int FirstPlace(Worker w) {
         foreach (var d in w.Duties) return d.Thing;
@@ -157,7 +165,7 @@ public sealed partial class World {
         if (target != null && NoRoomAt(w, target)) return;
         if (Busy() || Forwarded(Verb.Assign, target?.Id ?? 0, w.Id)) return;
         w.Jobs.Clear(); ListChanged(w);
-        if (target != null) foreach (var job in Jobs(target)) w.Jobs.Add(NewDuty(target, job));
+        if (target != null) foreach (var job in Jobs(target)) GiveDuty(w, target, job);
         Started(w, target);
     }
 
@@ -166,7 +174,7 @@ public sealed partial class World {
         if (on == HasDuty(w, target.Id, job) || on && Array.IndexOf(Jobs(target), job) < 0) return;
         if (on && NoRoomAt(w, target)) return;
         if (Busy() || Forwarded(Verb.Duty, target.Id, w.Id, job.Id(), on ? 1 : 0)) return;
-        if (on) w.Jobs.Add(NewDuty(target, job));
+        if (on) GiveDuty(w, target, job);
         else {
             w.Jobs.RemoveAll(e => e is Duty d && d.Thing == target.Id && d.Job == job);
             foreach (var e in w.Jobs) if (e is HaulGroup group) group.Hauls.RemoveAll(d => d.Thing == target.Id && d.Job == job);

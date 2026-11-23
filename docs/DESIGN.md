@@ -94,6 +94,8 @@ Simulation and data:
 | `src/jobs/hauling/PlaceHaul.cs` | The part of the Haul job each kind of place extends, and the four haul rules its carries come under |
 | `src/stations/StationHaul.cs`, `src/farms/FarmHaul.cs`, `src/mines/MineHaul.cs`, `src/packing/PackerHaul.cs`, `src/storage/StoreHaul.cs` | What a crafting station, a farm plot, a mine site, a packing station, and a chest or placed crate offer a hauler |
 | `src/jobs/gathering/Gathering.cs`, `src/water/WaterGathering.cs` | The Gather job at resource spots, and the lake's version of it, which fills bottles |
+| `src/stations/model/ToolSlotRule.cs` | What one of a station's tool slots takes: a kind of tool at a tier or better |
+| `src/stations/display/SlottedTool.cs` | A tool lying in a station's slot, at the bench and the anvil, showing the grade slotted |
 | `src/jobs/crafting/Crafting.cs`, `src/packing/PackCraft.cs` | The Craft job at a station, and the packing station's version of it, which packs crates |
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
@@ -137,10 +139,10 @@ UI and input:
 | `src/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse, and `SlotInput`, what each click does on an item slot |
 | `src/HotbarStacks.cs` | `World`'s hotbar slots bound to backpack stacks: binding, waiting slots and reading what a slot shows |
 | `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
-| `src/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
+| `src/stations/display/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
 | `src/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
 | `src/CraftPanel.cs` | The crafting menu |
-| `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
+| `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
@@ -175,7 +177,7 @@ UI and input:
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
-| `src/GuidePanel.cs` | The field guide topics |
+| `src/guide/display/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
@@ -236,7 +238,7 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps: `tests/hauling/`, `tests/gathering/`, `tests/crafting/`, `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
+| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps: `tests/hauling/`, `tests/gathering/`, `tests/crafting/`, `tests/progression/`, `tests/goals/`, `tests/water/`, `tests/trade/`, `tests/saves/`, `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
 | `tests/*Checks.cs` | Simulation checks of the features that have no folder yet, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
@@ -430,6 +432,9 @@ The left fist holds the bowl out in front, and the right takes the pestle twice 
 Both arms are solved from where the hands have to be (`ArmReach.ArmTo`), so the pestle stays over the bowl.
 `ActorRig` turns the bowl and pestle against their forearms in the resting pose (`ActorAnimation.GrindRest`), which keeps the bowl level and the pestle leaning toward its hand.
 While someone grinds, the table's own mortar is off the counter (`WorldView.grinding`).
+Likewise a bench's or an anvil's slotted hammer is off its top while someone swings it (`WorldView.swung`): a worker,
+who works a station only with its slotted tool and is drawn with it, or a player who carries no hammer as fast
+(`World.WorksWithSlotted`).
 
 Felling a tree (`Chop`, `SteelChop`) is a stroke from the side: the axe is wound round to the left at shoulder height and swung across, almost level, into the trunk's flank.
 The shoulders turn through the stroke, the grip turns the blade to cut sideways (`Pose.Grip`, which `ActorRig` applies at the right fist), and the left fist is put on the handle just past the right (`ActorAnimation.TwoHanded`).
@@ -507,7 +512,8 @@ The intended fresh-start loop starts by securing water, shelter and fire, then u
 5. Build a trading post and sell crates of berries for a steel pickaxe.
 6. Mine iron and coal, and smelt iron in a stone furnace.
 7. Build and operate a reinforced furnace (`reinforced`) to make steel.
-8. Hammer steel into steel parts at the anvil and make steel tools.
+8. Buy a steel hammer with more crates of berries, slot it in the anvil, hammer steel into steel parts there and make
+   steel tools.
 9. Pack a steel tool into a crate, sell it with another crate of berries through the trading post and use the proceeds to hire and assign a worker, with enough left for their first wage.
 
 There are no iron tools; iron bars only go into buildings and steel.
@@ -563,6 +569,10 @@ It advances normal simulation through dawn, including needs, trades, production 
 In multiplayer it is available only when everyone is downed; a living player prevents a shared time skip.
 
 ### Goals
+
+The starter goals are met in order (`World.StarterGoals`): buildings built, the first sale and the first steel bar, a
+steel hammer and a steel pickaxe the settlement has had (bought or made), the first steel parts, and a worker given any
+job, the trading post's deliveries included.
 
 The end goals:
 
@@ -812,7 +822,8 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - Stumps and bushes never block building (`World.BuiltOver`): a new building, yard or crate clears away those on the ground it keeps clear of other resources (`World.ClearGround`).
 - A berry bush holds `World.BushBerries` at the start and each time it fruits again, which is `BerryRegrowHours` after the first berry was picked from it, picked clean or not.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
-- Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
+- Tin ore smelts into tin bars at the stone furnace, the anvil hammers a tin bar into 2 tin sheets, and a tin sheet
+  makes 4 cans at the bench.
 - The stone furnace burns 2 wood into 1 charcoal.
 
 ### Tools
@@ -828,7 +839,8 @@ Tier 1 is unused, since there are no iron tools.
 
 `World.BestTool` picks the fastest carried tool at or above a tier.
 Recipes name the tool they need, the lowest `Tier` that will do, and whether they can be made by hand (`Hand`).
-So a steel chisel does everything a stone chisel does, faster, while tin cans and gravel need a steel hammer and the mortar a steel chisel.
+So a steel chisel does everything a stone chisel does, faster, while the anvil, tin cans and gravel need a steel hammer
+and the mortar a steel chisel.
 
 `GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for boulders and deposits, a shovel for stumps and bushes), one that only speeds gathering up (a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
 A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf patches.
@@ -898,7 +910,11 @@ A save written before `Obtained` existed loads with it empty, so a raw resource 
 
 #### Tool slots
 
-`World.SlotKinds` names the tool slots a station has (`Thing.Tools`): a chisel and a hammer at the bench, a mortar at the cooking table (`cooktable`).
+`BuildingDef.ToolSlots` names the tool slots a station has (`Thing.Tools`), each with the tool it takes
+(`ToolSlotRule`): a chisel and a hammer at the bench, a mortar at the cooking table (`cooktable`) and a steel hammer at
+the anvil.
+`GameData` checks that a station has a slot for each tool its recipes need, taking the plainest one any of them asks for.
+`World.SlotBlock` refuses a tool of the slot's kind below its tier, both for `World.SlotTool` and for a move by hand.
 A recipe that needs a tool at such a station runs at the speed of the fastest of the slotted tool and those carried by players working there (`World.StationTool`).
 Worked only by its crew, it runs with the slotted tool and waits when there is none.
 At the cooking table it runs only while someone works it (`World.Worked(Thing)`).
@@ -918,6 +934,9 @@ The canning station (`cannery`) seals meat stew or jam and a `tin_can` into a ca
 #### Anvil
 
 An anvil only progresses while someone hammers it: a player standing within `World.WorkReach` (1 m) of its edge without walking or gathering (`World.AtStation`), or a paid assigned worker hammering at the station.
+Its recipes need a steel hammer, slotted or carried by a player working it, and run at its speed.
+It hammers a steel bar into a steel part or two steel sheets, and a tin bar into two tin sheets.
+The containers are made of sheets.
 A smith stays with a running batch and fetches the next load once it is done.
 
 #### Furnaces and steel

@@ -22,9 +22,11 @@ internal sealed class ChainSite(World world) {
         return p;
     }
 
-    public Thing Place(ThingKind kind, string recipe = "") {
+    /// <summary>A building of a kind at the next free spot, on a recipe and with a tool slotted where they are given.</summary>
+    public Thing Place(ThingKind kind, string recipe = "", string tool = "") {
         var t = world.Add(kind, Spot());
         if (recipe != "") world.SetRecipe(t, recipe);
+        if (tool != "") t.Tools!.Add(tool, 1);
         return t;
     }
 
@@ -53,7 +55,7 @@ internal sealed class ChainSite(World world) {
         spare.Inventory.Add("steel_pick", 1); spare.Inventory.Add("rake", 1); spare.Inventory.Add(Bucket.Item, 2);
         Place(ThingKind.Campfire);
 
-        foreach (string item in new[] { "planks", "crate", "iron_bar", "tin_bar", "steel_bar", "steel_parts", "wood_parts", "tin_can",
+        foreach (string item in new[] { "planks", "crate", "iron_bar", "tin_bar", "tin_sheet", "steel_bar", "steel_parts", "wood_parts", "tin_can",
                      "raw_meat", "meat_stew", "canned_meat_stew", "wheat", "wheat_seeds", "grass", "fertilizer", "flour", "dough", "bread", "steel_pick" }) Store(item);
         var empties = Place(ThingKind.Pile); empties.Inventory.Add("empty_bottle", 8);
         Place(ThingKind.Pile); Place(ThingKind.Pile); Place(ThingKind.Pile);
@@ -77,15 +79,18 @@ internal sealed class ChainSite(World world) {
 
     /// <summary>Crates from wood.</summary>
     public void AddCrateBenches() {
-        var planks = Place(ThingKind.Bench, "planks"); planks.Tools!.Add("steel_chisel", 1); Employ(planks, JobKind.Craft, JobKind.Haul);
-        var crates = Place(ThingKind.Bench, "crate"); crates.Tools!.Add("steel_hammer", 1); Employ(crates, JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Bench, "planks", "steel_chisel"), JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Bench, "crate", "steel_hammer"), JobKind.Craft, JobKind.Haul);
     }
 
-    /// <summary>Canned meat stew: stew from meat and water, cans from tin, sealed over a wood fire.</summary>
+    /// <summary>
+    /// Canned meat stew: stew from meat and water, cans from tin sheets hammered at an anvil, sealed over a wood fire.
+    /// </summary>
     public void AddCannedStewChain() {
         Employ(Place(ThingKind.Cooktable, "meat_stew"), JobKind.Haul);
         Employ(Place(ThingKind.Furnace, "tin_bar"), JobKind.Haul);
-        var cans = Place(ThingKind.Bench, "tin_can"); cans.Tools!.Add("steel_hammer", 1); Employ(cans, JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Anvil, "tin_sheet", "steel_hammer"), JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Bench, "tin_can", "steel_hammer"), JobKind.Craft, JobKind.Haul);
         Employ(Place(ThingKind.Cannery, "canned_meat_stew"), JobKind.Haul);
     }
 
@@ -99,7 +104,7 @@ internal sealed class ChainSite(World world) {
             farm.Inventory.Add(Water.Liquid, 10);
             Employ(farm, JobKind.Farm, JobKind.Haul);
         }
-        var flour = Place(ThingKind.Cooktable, "flour"); flour.Tools!.Add("mortar", 1); Employ(flour, JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Cooktable, "flour", "mortar"), JobKind.Craft, JobKind.Haul);
         Employ(Place(ThingKind.Cooktable, "dough"), JobKind.Craft, JobKind.Haul);
         Employ(Place(ThingKind.Furnace, "bread"), JobKind.Haul);
         return farms;
@@ -110,9 +115,9 @@ internal sealed class ChainSite(World world) {
         Employ(Place(ThingKind.Furnace, "iron_bar"), JobKind.Haul);
         var forge = Place(ThingKind.Reinforced);
         Employ(forge, JobKind.Bellows); Employ(forge, JobKind.Haul);
-        Employ(Place(ThingKind.Anvil), JobKind.Craft, JobKind.Haul);
-        var handles = Place(ThingKind.Bench, "wood_parts"); handles.Tools!.Add("steel_chisel", 1); Employ(handles, JobKind.Craft, JobKind.Haul);
-        var picks = Place(ThingKind.Bench, "steel_pick"); picks.Tools!.Add("steel_hammer", 1); Employ(picks, JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Anvil, tool: "steel_hammer"), JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Bench, "wood_parts", "steel_chisel"), JobKind.Craft, JobKind.Haul);
+        Employ(Place(ThingKind.Bench, "steel_pick", "steel_hammer"), JobKind.Craft, JobKind.Haul);
     }
 
     /// <summary>One packing station for each product.</summary>

@@ -26,6 +26,8 @@ public sealed class BuildingDef {
     public string Description { get; set; } = "";
     /// <summary>The recipe a station starts on, or empty for one that waits for the player's choice.</summary>
     public string Recipe { get; set; } = "";
+    /// <summary>The station's tool slots, each with the tool it takes; empty for a building with none.</summary>
+    public ToolSlotRule[] ToolSlots { get; set; } = [];
 }
 /// <summary>What a recipe's product is for; the recipe boards list recipes under these, in this order.</summary>
 public enum RecipeGroup { Tools, Materials, Containers, Food }
@@ -243,6 +245,12 @@ public sealed partial class GameData {
                 throw new InvalidOperationException($"Invalid starting recipe for {building.Key}: {building.Value.Recipe}.");
             if (building.Value.Recipe == "" && Recipes.Values.Count(r => r.Station == building.Key) == 1)
                 throw new InvalidOperationException($"{building.Key} has one recipe, so it must start on it.");
+            // A station with tool slots has one for each tool its recipes need, taking the plainest tool any of them asks for.
+            var slots = building.Value.ToolSlots;
+            var needs = Recipes.Values.Where(r => r.Station == building.Key && r.Tool != "").ToList();
+            if (slots.DistinctBy(s => s.Tool).Count() != slots.Length || needs.Any(r => !slots.Any(s => s.Tool == r.Tool))
+                || slots.Any(s => !needs.Any(r => r.Tool == s.Tool) || needs.Where(r => r.Tool == s.Tool).Min(r => r.Tier) != s.Tier))
+                throw new InvalidOperationException($"Invalid tool slots for {building.Key}: one a tool its recipes need, at the lowest tier they ask for.");
         }
         foreach (var recipe in Recipes) {
             bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool && i.Tier >= recipe.Value.Tier);

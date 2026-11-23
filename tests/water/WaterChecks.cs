@@ -102,8 +102,8 @@ public static class WaterChecks {
         Require(recipe.Amount == 1, "the bottle recipe should create one bottle");
         Require(recipe.Tool == "hammer", "the bottle recipe should need the hammer");
         Require(recipe.Tier == 2, "the bottle recipe should need the tin-can hammer tier");
-        Require(recipe.Inputs.TryGetValue("tin_bar", out int tin), "the bottle recipe should use tin bar");
-        Require(tin == 1, "the bottle recipe should use one tin bar");
+        Require(recipe.Inputs.TryGetValue("tin_sheet", out int tin), "the bottle recipe should use tin sheet");
+        Require(tin == 1, "the bottle recipe should use one tin sheet");
         Require(recipe.Inputs.TryGetValue("wood_parts", out int parts), "the bottle recipe should use wood parts");
         Require(parts == 1, "the bottle recipe should use one wood part");
         Require(data.Market.Buys.ContainsKey("water"), "full bottles should remain purchasable");
@@ -113,7 +113,7 @@ public static class WaterChecks {
         var world = new World(data, false);
         var bench = world.Add(ThingKind.Bench, world.Player + Vector2.Right * 1.4f);
         bench.Tools!.Add("steel_hammer", 1); world.SetRecipe(bench, "water_bottle");
-        bench.Inventory.Add("tin_bar", 1); bench.Inventory.Add("wood_parts", 1);
+        bench.Inventory.Add("tin_sheet", 1); bench.Inventory.Add("wood_parts", 1);
         for (int i = 0; i < 100; i++) world.Tick(.25f, true);
         Require(bench.Inventory["empty_bottle"] == 1 && bench.Inventory["water"] == 0,
             "the actual bench recipe must make exactly one empty bottle without creating water");

@@ -43,6 +43,7 @@ public static class GatheringChecks {
         Test(CheckBushDiggerGoesToTheNextBushNotToLeaves, data);
         Test(CheckLeafRakerLeavesBushesAlone, data);
         Test(CheckBottlesRefillFromWaterAndCanBeDrunkDirectly, data);
+        Test(CheckGuestHoldingOnToATreeChopsIntoTheirOwnBackpack, data);
     }
 
     /// <summary>A steel axe makes a cycle 2 s / 1.8, and a cycle yields 4 pieces as it does for the player.</summary>
@@ -134,7 +135,7 @@ public static class GatheringChecks {
     private static void CheckToolsGateMiningAndFelling(GameData data) {
         var world = EmptyWorld(data);
         var iron = world.Add(ThingKind.Iron, new Vector2(10, 10), 20);
-        Achieve(world, "pick");
+        Achieve(world, "steel_pick");
         Require(world.GatherBlock(iron)?.Contains("pickaxe") == true,
                 "the player must still carry a usable pickaxe to mine after previously forging one");
         Require(world.GatherBlock(iron, true) == null,
@@ -535,5 +536,17 @@ public static class GatheringChecks {
         Require(world.Thirst > 58.32f, "a direct source liter should restore at least one third thirst");
         Require(world.Thirst < 58.34f, "a direct source liter should restore no more than one third thirst");
         Require(world.Backpack.Count == 0, "a direct source liter should not create a bottle");
+    }
+
+    /// <summary>A guest holding on to a tree chops its wood into their own backpack and leaves the host's alone.</summary>
+    private static void CheckGuestHoldingOnToATreeChopsIntoTheirOwnBackpack(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var tree = world.Add(ThingKind.Tree, Terrain.Spawn + new Vector2(4, 0), 40);
+        world.As(guest, () => world.MoveTo(tree.Pos + new Vector2(.8f, 0)));
+        guest.GatherTarget = tree.Id;
+        FedPlayersTick(world, data.GatherSeconds * 2 + .5f);
+        Require(guest.Backpack["wood"] >= 4, "a guest holding on to a tree should chop wood into their own backpack");
+        Require(world.Backpack["wood"] == 0, "a guest holding on to a tree should put nothing in the host's backpack");
+        Require(tree.Remaining < 40, "a guest holding on to a tree should cut the tree down");
     }
 }

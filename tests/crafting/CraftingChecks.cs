@@ -23,6 +23,9 @@ public static class CraftingChecks {
         Test(CheckFurnacesBurnOneFuelAndWaitForSteelHeat, data);
         Test(CheckPlayerWorksAStationOnlyWithinAMetreOfItsEdge, data);
         Test(CheckAnvilNeedsHammering, data);
+        Test(CheckAnvilHammersOnlyWithASteelHammer, data);
+        Test(CheckAnvilHammersABarIntoTwoSheets, data);
+        Test(CheckGuestStandingAtAnAnvilHammersIt, data);
         Test(CheckFinishedBatchWaitsForOutputRoom, data);
         Test(CheckStationBatchesAndMarkSurviveALoad, data);
         Test(CheckStationLoadsMidBatchAndFinishesIt, data);
@@ -272,7 +275,7 @@ public static class CraftingChecks {
     private static void CheckPlayerWorksAStationOnlyWithinAMetreOfItsEdge(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Inventory.Add("steel_bar", 3);
+        anvil.Inventory.Add("steel_bar", 3); SlotPlainestTools(world, anvil);
         world.Player = anvil.Pos + new Vector2(1.6f, 0);
         for (int i = 0; i < 4; i++) world.Tick(.25f);
         Require(!anvil.Processing, "a player standing 1.15 m from the anvil's edge must not hammer it");
@@ -292,7 +295,7 @@ public static class CraftingChecks {
     private static void CheckAnvilNeedsHammering(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Inventory.Add("steel_bar", 3);
+        anvil.Inventory.Add("steel_bar", 3); SlotPlainestTools(world, anvil);
         world.Player = anvil.Pos + new Vector2(1.2f, 0);
         for (int i = 0; i < 8; i++) { world.MovePlayer(new Vector2(i % 2 == 0 ? .1f : -.1f, 0)); world.Tick(.25f); }
         Require(!anvil.Processing && anvil.Inventory["steel_bar"] == 3, "an anvil must not start while the player only walks past it");
@@ -318,6 +321,71 @@ public static class CraftingChecks {
         // The smith hammers what the anvil holds, brings the bars left in the chest, hammers those, and only then has parts to carry out.
         Work(world, 120, () => chest.Inventory["steel_parts"] >= 1);
         Require(chest.Inventory["steel_parts"] >= 1, "a worker hammering at the anvil should finish the batches and store the parts");
+    }
+
+    /// <summary>
+    /// The anvil's recipes need a steel hammer, slotted or carried by the player working it, and run at its 1.8 times.
+    /// Its slot refuses a wooden mallet, and a smith with no hammer slotted says what is missing.
+    /// </summary>
+    private static void CheckAnvilHammersOnlyWithASteelHammer(GameData data) {
+        var world = EmptyWorld(data);
+        var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
+        anvil.Inventory.Add("steel_bar", 2);
+        world.Player = anvil.Pos + new Vector2(1.2f, 0);
+        SafeTick(world, 2);
+        Require(!anvil.Processing, "an anvil should not start without a hammer");
+        Give(world, "wood_hammer", 1);
+        Require(!world.SlotTool(anvil, "wood_hammer") && world.Backpack["wood_hammer"] == 1, "the anvil's hammer slot should refuse a wooden mallet");
+        Require(world.Transfer(world.Backpack, anvil.Tools!, "wood_hammer", 1) == 0 && world.Backpack["wood_hammer"] == 1,
+            "a move by hand should not put a wooden mallet into the anvil's hammer slot either");
+        SafeTick(world, 2);
+        Require(!anvil.Processing, "an anvil should not start with only a wooden mallet carried");
+        Give(world, "steel_hammer", 1);
+        SafeTick(world, 1);
+        Require(anvil.Processing && MathF.Abs(anvil.Progress - 1.8f) < .1f, $"a player carrying a steel hammer should hammer at 1.8 times: progress={anvil.Progress:0.00} after a second");
+
+        var worker = AddWorker(world, anvil.Pos + Vector2.One);
+        world.Assign(worker, anvil);
+        world.Player = new Vector2(30, 30);
+        float progress = anvil.Progress;
+        SafeTick(world, 1);
+        Require(anvil.Progress == progress && worker.Status == "Needs a steel hammer in the anvil", $"a smith with no hammer slotted should wait and say so: status={worker.Status}");
+        world.Player = anvil.Pos + new Vector2(1.2f, 0);
+        Require(world.SlotTool(anvil, "steel_hammer"), "a steel hammer should fit the anvil's hammer slot");
+        world.Player = new Vector2(30, 30);
+        Work(world, 10, () => worker.WorkState == WorkerWorkState.Hammering && anvil.Progress > progress);
+        Require(worker.WorkState == WorkerWorkState.Hammering && anvil.Progress > progress,
+            $"a smith should hammer with the slotted steel hammer: status={worker.Status}, state={worker.WorkState}, progress={anvil.Progress:0.00}, processing={anvil.Processing}");
+    }
+
+    /// <summary>The anvil hammers one steel bar into two steel sheets and one tin bar into two tin sheets.</summary>
+    private static void CheckAnvilHammersABarIntoTwoSheets(GameData data) {
+        var world = EmptyWorld(data);
+        var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
+        SlotPlainestTools(world, anvil);
+        world.Player = anvil.Pos + new Vector2(1.2f, 0);
+        Give(world, "steel_bar", 1); Give(world, "tin_bar", 1);
+        world.QueueBatch(anvil, "steel_sheet");
+        CompleteBatches(world, anvil, "steel_sheet", 2);
+        world.Collect(anvil);
+        world.QueueBatch(anvil, "tin_sheet");
+        CompleteBatches(world, anvil, "tin_sheet", 2);
+        world.Collect(anvil);
+        Require(world.Backpack["steel_sheet"] == 2 && world.Backpack["tin_sheet"] == 2 && world.Backpack["steel_bar"] == 0 && world.Backpack["tin_bar"] == 0,
+            "the anvil should hammer each bar into two sheets of its metal");
+    }
+
+    /// <summary>An anvil nobody stands at does not start, and a guest standing at it hammers it.</summary>
+    private static void CheckGuestStandingAtAnAnvilHammersIt(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(-6, 0));
+        anvil.Inventory.Add("steel_bar", 1); SlotPlainestTools(world, anvil);
+        world.Player = Terrain.Spawn + new Vector2(20, 0);
+        FedPlayersTick(world, 1);
+        Require(!anvil.Processing, "an anvil nobody stands at should not start");
+        world.As(guest, () => world.MoveTo(anvil.Pos + new Vector2(1, 0)));
+        FedPlayersTick(world, data.Recipes["steel_parts"].Seconds + 1);
+        Require(anvil.Inventory["steel_parts"] == 1, "a guest standing at an anvil should hammer it");
     }
 
     private static void CheckFinishedBatchWaitsForOutputRoom(GameData data) {
@@ -494,7 +562,7 @@ public static class CraftingChecks {
 
     private static void CheckTinCansNeedASteelHammer(GameData data) {
         var world = EmptyWorld(data);
-        Give(world, "tin_bar", 2);
+        Give(world, "tin_sheet", 2);
         var bench = BenchLeftWithAMallet(world, "tin_can");
         Require(!bench.Processing, "tin cans should wait while only a wooden mallet is slotted");
         Require(bench.Inventory["tin_can"] == 0, "tin cans should not be made with a wooden mallet");
@@ -502,7 +570,7 @@ public static class CraftingChecks {
             "a wooden mallet should not count as a hammer for tin cans");
         SwapMalletForSteelHammer(world, bench);
         SafeTick(world, data.Recipes["tin_can"].Seconds / data.BenchSpeed / data.Items["steel_hammer"].Speed + 1);
-        Require(bench.Inventory["tin_can"] == 4, "a steel hammer should turn one tin bar into four cans");
+        Require(bench.Inventory["tin_can"] == 4, "a steel hammer should turn one tin sheet into four cans");
     }
 
     private static void CheckSteelChiselCarvesAMortarAndWorksTwiceAsFast(GameData data) {

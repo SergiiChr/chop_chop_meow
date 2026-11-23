@@ -14,8 +14,8 @@ Buildings are DIY:
 - an OSB cabin on block piers with a corrugated shed roof, solar panel and fixed steel ladder
 - a plywood storage box
 - a dropped canvas backpack
-- an anvil on a welded stand
-- a crafting bench with its slotted chisel and hammer
+- an anvil on a welded stand, with its slotted steel hammer lying on the stand in front of it while nobody swings it
+- a crafting bench with its slotted chisel and hammer, the hammer gone from its top while someone swings it
 - slatted wood crates
 - a market post with a mailbox
 - a fieldstone campfire
@@ -81,7 +81,11 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons, and by heaps as six-packs. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
 - `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
   The icon shows the model as built, and a heap is made of pieces of it.
-  - Built in code: wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a six-sided collar, none with a handle), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a ribbon, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
+  - Built in code: wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a
+    six-sided collar, none with a handle), steel and tin sheets (three in a loose stack, the top one with its near
+    corner bent up), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the
+    jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a
+    ribbon, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
   - Baked from Kenney's Food Kit and recoloured to the game's palette: bread (the round loaf), raw meat (the ham on the bone), burnt steak (the cooked steak, charred) and the bowls of meat stew and crushed berries (the bowl of soup). `tools/food_models.py` bakes them into `models/food/`; see [food/README.md](models/food/README.md).
   - Light copies of models the world already shows, for heaps alone, since their icons come from those models: the hand tools and the torch with their cylinders redrawn on six sides, the rake, the mortar turned on fewer sides, the cargo crate, the bottle lying on its back, a single berry, a log, a board, one boulder of the world's stones, one lump of its loose ore and coal, one charcoal briquette, and six cast bars stacked three across three.
   - Each good says how its heap is laid (`Lay`): neat grids for boxes, sacks, jars and six-packs; rows for logs, boards, tools and bottles, which lie the same way; loose and turned any way for stone, ore, coal, charcoal, berries, bread, meat and parts; and one mound that swells for leaves, gravel and compost.

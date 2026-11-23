@@ -486,6 +486,9 @@ public sealed class ActorRig {
         return sign;
     }
 
+    /// <summary>The tool the rig shows in hand, or null for none.</summary>
+    public string? ToolShown { get; private set; }
+
     public void Show(Pose pose, string? tool, bool carrying, bool onRock = false, bool lit = false) {
         torso.RotationDegrees = new Vector3(pose.Lean, pose.Twist, pose.Sway);
         // The head stays nearer upright than the body under it.
@@ -506,6 +509,7 @@ public sealed class ActorRig {
         rock.Visible = onRock;
         if (pose.Grip != grip) { grip = pose.Grip; wrist.RotationDegrees = new Vector3(0, grip, 0); }
         foreach (var (name, node) in tools) node.Visible = name == tool;
+        ToolShown = tool;
         // A shovel is only ever dug with, held in both fists.
         if (shovel.Visible) LayShovel();
         crate.Visible = carrying;

@@ -103,9 +103,8 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             live.Watch(() => world.Carried(item) < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
         var lacks = Style.Text(r.Tool == "" ? "" : $"No {world.Data.ToolName(r.Tool, r.Tier)}", 12, Style.Brick); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
-        bool NoTool() => r.Tool != "" && world.ToolInUse(station, r.Tool, r.Tier) == null;
         // One look for the tool a refresh: the card names a missing tool in place of its inputs, and its picture fades while the recipe cannot be made from the backpack now.
-        live.Watch(() => { bool missing = NoTool(); return (Missing: missing, Ready: !missing && (station != null ? world.CarriesBatch(r.Inputs) : world.CanCraft(id))); }, state => {
+        live.Watch(() => { bool missing = !world.HasToolFor(station, r); return (Missing: missing, Ready: !missing && (station != null ? world.CarriesBatch(r.Inputs) : world.CanCraft(id))); }, state => {
             lacks.Visible = state.Missing; inputs.Visible = !state.Missing;
             product.Modulate = state.Ready ? Colors.White : Style.Faded;
         });

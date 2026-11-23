@@ -1156,78 +1156,6 @@ public partial class Game {
         await Until(() => sign.Wages![Inventory.Coins] == 0 && world.Backpack[Inventory.Coins] == 40, "the bank's coins going into the backpack", 2);
         RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 40); Give(Hosted, Inventory.Coins, coins); await CloseWithEsc();
     }
-    /// <summary>
-    /// Every blow at work lands its tool on what is worked as it is heard, wherever the player stands to work it: the axe's head on
-    /// the trunk's side, the pick's point on the rock, the hammer's face on the anvil's and the bench's work tops, and the shovel's
-    /// blade in the ground at a stump's foot. A rock mined of its last piece crumbles away.
-    /// </summary>
-    private async Task CheckEveryBlowLandsItsToolOnWhatItWorks() {
-        var start = Hosted.Player;
-        var (wood, stone) = (world.Backpack["wood"], world.Backpack["stone"]);
-        Give(Hosted, "steel_pick", 1); Give(Hosted, "steel_shovel", 1);
-        var rig = view.PlayerRig;
-        foreach (var (kind, offset) in new[] {
-            (ThingKind.Tree, new Vector2(2, 1)), (ThingKind.Tree, new Vector2(-1.6f, 1.9f)), (ThingKind.Stone, new Vector2(2, -1)), (ThingKind.Stone, new Vector2(-2.1f, .4f)),
-            (ThingKind.Stump, new Vector2(1.5f, 1.5f)), (ThingKind.Stump, new Vector2(-2, -.6f)), (ThingKind.Anvil, new Vector2(-.5f, -1.2f)), (ThingKind.Bench, new Vector2(1.2f, 0)) }) {
-            Warp(Hosted, start); await Frames(3);
-            var thing = Hosted.Add(kind, start + offset, kind == ThingKind.Stone ? World.StonePile : 40);
-            string sound = kind switch { ThingKind.Tree => "chop_tree", ThingKind.Stone => "mine_ore", ThingKind.Stump => "dig_earth", ThingKind.Anvil => "anvil_work", _ => "bench_work" };
-            if (kind == ThingKind.Anvil) thing.Inventory.Add("steel_bar", 1);
-            if (kind == ThingKind.Bench) { thing.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(thing, "crate"); thing.Inventory.Add("planks", 6); }
-            await Frames(2);
-            int soundsBefore = sounds.Played;
-            Vector2? point = kind is ThingKind.Anvil or ThingKind.Bench ? null : RightPress(thing.Pos);
-            await Until(() => sounds.Heard(sound, soundsBefore) && view.PlayerMark != null, $"the player working a {kind} {offset} away and its blow heard", 8);
-            var root = rig.Root.Transform;
-            var end = root * (kind switch { ThingKind.Tree => rig.Holds(ActorRig.AxeHeadPoint), ThingKind.Stone => rig.Holds(ActorRig.PickPoint), ThingKind.Stump => rig.ShovelTip, _ => rig.Holds(ActorRig.HammerFace) });
-            var flat = new Vector2(end.X, end.Z);
-            switch (kind) {
-                case ThingKind.Tree: {
-                        var (seat, radius) = WorldModels.Trunk(thing.Id);
-                        float gap = flat.DistanceTo(thing.Pos + new Vector2(seat.X, seat.Z)) - radius;
-                        Require(gap is > -.08f and < .04f, $"An axe's head must bite the side of the trunk {offset} away as the chop is heard, not {gap:0.00} m off it.");
-                        break;
-                    }
-                case ThingKind.Stump: {
-                        var (seat, radius) = WorldModels.Trunk(thing.OfTree != 0 ? thing.OfTree : thing.Id);
-                        float gap = flat.DistanceTo(thing.Pos + new Vector2(seat.X, seat.Z)) - radius;
-                        Require(gap is > -.02f and < .12f && end.Y < 0, $"A shovel's blade must go into the ground at the foot of the stump {offset} away, not {gap:0.00} m out from it and {end.Y:0.00} m up.");
-                        break;
-                    }
-                case ThingKind.Stone: {
-                        float gap = SurfaceGap(view.PropOf(thing.Id)!.Body, end);
-                        Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away, not {gap:0.00} m off it.");
-                        // Mined down to its last stones, the rock shrinks, and the pick follows its face in.
-                        // Ten stones, at two a blow, leave the shrunken rock blows enough for its swing to come round.
-                        thing.Remaining = 10;
-                        soundsBefore = sounds.Played;
-                        await Until(() => sounds.Heard(sound, soundsBefore), $"the player mining a shrunken rock {offset} away and its blow heard", 8);
-                        end = rig.Root.Transform * rig.Holds(ActorRig.PickPoint);
-                        gap = SurfaceGap(view.PropOf(thing.Id)!.Body, end);
-                        Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away once it has shrunk, not {gap:0.00} m off it.");
-                        // Its last piece mined, the rock breaks apart and crumbles away.
-                        thing.Remaining = 1;
-                        await Until(() => view.PropOf(thing.Id) is { Crumbled: >= 0, Body.Visible: true }, $"the rock {offset} away mined of its last piece and crumbling", 8);
-                        if (point is Vector2 mined) { RightRelease(mined); point = null; }
-                        await Until(() => view.PropOf(thing.Id) is { Body.Visible: false }, $"the crumbled rock {offset} away gone", 2);
-                        break;
-                    }
-                default: {
-                        // The anvil's face and the bench's top stand between 0.75 m and 0.97 m up.
-                        float gap = SurfaceGap(view.PropOf(thing.Id)!.Body, end);
-                        Require(gap < .04f && end.Y is > .73f and < .99f, $"A hammer's face must land on the {kind}'s work top, not {gap:0.00} m off the model at {end.Y:0.00} m up.");
-                        break;
-                    }
-            }
-            if (point is Vector2 held) RightRelease(held);
-            await Frames(2);
-            // A rock sheds chips as it is mined, which land round it.
-            RemoveThings(Hosted, t => t == thing || t.Kind == ThingKind.Stump && t.Pos == thing.Pos || t.IsLoose && t.Pos.DistanceTo(thing.Pos) < 4);
-            Drop(Hosted, "wood", world.Backpack["wood"] - wood); Drop(Hosted, "stone", world.Backpack["stone"] - stone);
-        }
-        Drop(Hosted, "steel_pick", 1); Drop(Hosted, "steel_shovel", 1);
-        Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
-    }
     /// <summary>A page about a thing closes when the thing goes, as a recovery box does once it is emptied.</summary>
     private async Task CheckPageClosesWhenWhatItShowsIsGone() {
         await CloseWithEsc();
@@ -1477,33 +1405,6 @@ public partial class Game {
         RemoveThings(Hosted, t => t.Kind == ThingKind.Grave); await CloseWithEsc();
         Warp(Hosted, home); await Frames(4);
     }
-    /// <summary>
-    /// The starter goals alone do not end the game; the pause menu lists the end goals, mines and the profit goal show the
-    /// ending, and keep playing closes it for good.
-    /// </summary>
-    private async Task CheckEndGoalsShowInThePauseMenuAndTheEndingOnce() {
-        Achieve(Hosted, new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" });
-        await Frames(3);
-        Require(!ending.Visible && !view.Paused, "The starter goal chain alone must not end the game.");
-        await KeyStroke(Key.Escape);
-        Require(HasLabel(menu, "END GOALS"), "The pause menu must have an end goals heading.");
-        Require(HasLabel(menu, "A working iron mine"), "The pause menu must list the iron mine goal.");
-        Require(HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"),
-            "The pause menu must list the daily profit goal.");
-        await KeyStroke(Key.Escape);
-        foreach (var ore in Cliff.Ores) OpenMine(Hosted.Add(ThingKind.Mine, Cliff.Of(ore).MineSpot));
-        Achieve(Hosted, "profit_week");
-        await Frames(3);
-        Require(ending.Visible && view.Paused, "Reaching the end goals must show the ending and pause the world.");
-        await Click((Button)ending.FindChild("keep_playing", true, false)); await Frames(3);
-        Require(!ending.Visible, "Keep playing must close the ending.");
-        Require(!view.Paused, "Keep playing must resume the game.");
-        Require(world.EndingShown, "Keep playing must remember that the ending was shown.");
-        await Frames(3);
-        Require(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
-        RemoveThings(Hosted, t => t.Kind == ThingKind.Mine);
-    }
-
     /// <summary>The steel furnace shows one slot per input and output, loads held stacks put on its input slots, and Space pumps its bellows. Returns the furnace.</summary>
     private async Task<Thing> CheckSteelFurnaceSlotsLoadHeldStacksThenPump() {
         var furnace = Hosted.Add(ThingKind.Reinforced, world.Player + new Vector2(1, 0));
@@ -1598,7 +1499,6 @@ public partial class Game {
             await TestClean(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
             await TestClean(CheckHeldPlanPlacesOnOpenGround);
             await TestClean(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
-            await TestClean(CheckEveryBlowLandsItsToolOnWhatItWorks);
             await RunMineUIChecks();
             await TestClean(CheckHudAndHotbarEatAndDrinkSelected);
             var chest = await Test(CheckBuildPlanPlacesChest);
@@ -1617,7 +1517,7 @@ public partial class Game {
             await TestClean(CheckItemListRunsByGroupSimplestFirst);
             await TestClean(CheckFilterRowKeepsTheOrderAdded);
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
-            await TestClean(CheckEndGoalsShowInThePauseMenuAndTheEndingOnce);
+            await RunGoalUIChecks();
             await RunCraftingUIChecks();
             var furnace = await Test(CheckSteelFurnaceSlotsLoadHeldStacksThenPump);
             await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));

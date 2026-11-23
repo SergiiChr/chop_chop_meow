@@ -15,6 +15,9 @@ namespace ChopChopMeow;
 public partial class Game {
     /// <summary>The UI checks of gathering: right-click gathering, loose pieces, berry bushes, and felling and digging up stumps.</summary>
     private async Task RunGatheringUIChecks() {
+        await TestClean(CheckAnAxeBlowBitesTheTrunksSide);
+        await TestClean(CheckAPickBlowLandsOnTheRocksFace);
+        await TestClean(CheckAShovelBlowDigsInAtTheStumpsFoot);
         await TestClean(CheckRightClickGathersTreeAndHarvestsFarm);
         await TestClean(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
         await TestClean(CheckOneRightClickWalksOverAndPicksUpAWholeLoosePiece);
@@ -170,5 +173,65 @@ public partial class Game {
         Require(chest != null && world.Find(stump.Id) == null, "A chest must go up over a stump and clear it away.");
         Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump built over must just go, not be thrown up through the building.");
         RemoveThings(Hosted, t => t == chest); await Frames(2);
+    }
+
+    /// <summary>An axe's head bites the side of the trunk as the chop is heard, wherever the player stands to fell it.</summary>
+    private async Task CheckAnAxeBlowBitesTheTrunksSide() {
+        var start = Hosted.Player;
+        var (wood, stone) = (world.Backpack["wood"], world.Backpack["stone"]);
+        foreach (var offset in new[] { new Vector2(2, 1), new Vector2(-1.6f, 1.9f) }) {
+            var (tree, press, end) = await WorkUntilBlowHeard(start, ThingKind.Tree, offset, "chop_tree", rig => rig.Holds(ActorRig.AxeHeadPoint));
+            var (seat, radius) = WorldModels.Trunk(tree.Id);
+            float gap = new Vector2(end.X, end.Z).DistanceTo(tree.Pos + new Vector2(seat.X, seat.Z)) - radius;
+            Require(gap is > -.08f and < .04f, $"An axe's head must bite the side of the trunk {offset} away as the chop is heard, not {gap:0.00} m off it.");
+            await ClearWorked(tree, press, wood, stone);
+        }
+        Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
+
+    /// <summary>
+    /// A pick's point lands on the face of the rock as the blow is heard, wherever the player stands, also once the rock
+    /// has shrunk; a rock mined of its last piece crumbles away.
+    /// </summary>
+    private async Task CheckAPickBlowLandsOnTheRocksFace() {
+        var start = Hosted.Player;
+        var (wood, stone) = (world.Backpack["wood"], world.Backpack["stone"]);
+        Give(Hosted, "steel_pick", 1);
+        foreach (var offset in new[] { new Vector2(2, -1), new Vector2(-2.1f, .4f) }) {
+            var (rock, press, end) = await WorkUntilBlowHeard(start, ThingKind.Stone, offset, "mine_ore", rig => rig.Holds(ActorRig.PickPoint));
+            float gap = SurfaceGap(view.PropOf(rock.Id)!.Body, end);
+            Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away, not {gap:0.00} m off it.");
+            // Mined down to its last stones, the rock shrinks, and the pick follows its face in.
+            // Ten stones, at two a blow, leave the shrunken rock blows enough for its swing to come round.
+            rock.Remaining = 10;
+            int soundsBefore = sounds.Played;
+            await Until(() => sounds.Heard("mine_ore", soundsBefore), $"the player mining a shrunken rock {offset} away and its blow heard", 8);
+            gap = SurfaceGap(view.PropOf(rock.Id)!.Body, view.PlayerRig.Root.Transform * view.PlayerRig.Holds(ActorRig.PickPoint));
+            Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away once it has shrunk, not {gap:0.00} m off it.");
+            // Its last piece mined, the rock breaks apart and crumbles away.
+            rock.Remaining = 1;
+            await Until(() => view.PropOf(rock.Id) is { Crumbled: >= 0, Body.Visible: true }, $"the rock {offset} away mined of its last piece and crumbling", 8);
+            RightRelease(press);
+            await Until(() => view.PropOf(rock.Id) is { Body.Visible: false }, $"the crumbled rock {offset} away gone", 2);
+            await ClearWorked(rock, null, wood, stone);
+        }
+        Drop(Hosted, "steel_pick", 1);
+        Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
+
+    /// <summary>A shovel's blade goes into the ground at the foot of the stump as the dig is heard, wherever the player stands.</summary>
+    private async Task CheckAShovelBlowDigsInAtTheStumpsFoot() {
+        var start = Hosted.Player;
+        var (wood, stone) = (world.Backpack["wood"], world.Backpack["stone"]);
+        Give(Hosted, "steel_shovel", 1);
+        foreach (var offset in new[] { new Vector2(1.5f, 1.5f), new Vector2(-2, -.6f) }) {
+            var (stump, press, end) = await WorkUntilBlowHeard(start, ThingKind.Stump, offset, "dig_earth", rig => rig.ShovelTip);
+            var (seat, radius) = WorldModels.Trunk(stump.OfTree != 0 ? stump.OfTree : stump.Id);
+            float gap = new Vector2(end.X, end.Z).DistanceTo(stump.Pos + new Vector2(seat.X, seat.Z)) - radius;
+            Require(gap is > -.02f and < .12f && end.Y < 0, $"A shovel's blade must go into the ground at the foot of the stump {offset} away, not {gap:0.00} m out from it and {end.Y:0.00} m up.");
+            await ClearWorked(stump, press, wood, stone);
+        }
+        Drop(Hosted, "steel_shovel", 1);
+        Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
 }
