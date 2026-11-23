@@ -18,6 +18,7 @@ internal sealed class WalkSearch(World world) {
     private readonly Queue<Vector2I> queue = new();
     private readonly Dictionary<Vector2I, List<Obstacle>> obstacles = new();
     private readonly Stack<List<Obstacle>> spare = new();
+    private readonly List<(int Id, Vector2 Center)> layout = new();
     private int[] seen = [], previous = [];
     private int search;
     private Vector2 from, destination;
@@ -30,7 +31,7 @@ internal sealed class WalkSearch(World world) {
         this.destination = destination;
         this.exact = exact;
         this.wholeWalk = wholeWalk;
-        ReadObstacles();
+        ReadObstacles(rememberLayout: wholeWalk);
         if (exact && !Open(destination)) return Result.Blocked;
         bool canStart = Open(from);
         if (wholeWalk) {
@@ -99,13 +100,25 @@ internal sealed class WalkSearch(World world) {
 
     private static Vector2I Cell(Vector2 point) => new(Mathf.FloorToInt(point.X / CellWidth), Mathf.FloorToInt(point.Y / CellWidth));
 
-    private void ReadObstacles() {
+    /// <summary>Whether the solid things have changed since the cabin began its walk search.</summary>
+    public bool LayoutChanged() {
+        int i = 0;
+        foreach (var kind in World.WalkBlockers)
+            foreach (var thing in world.ThingsOf(kind)) {
+                if (i >= layout.Count || layout[i++] != (thing.Id, thing.Pos)) return true;
+            }
+        return i != layout.Count;
+    }
+
+    private void ReadObstacles(bool rememberLayout) {
+        layout.Clear();
         foreach (var list in obstacles.Values) { list.Clear(); spare.Push(list); }
         obstacles.Clear();
         foreach (var kind in World.WalkBlockers) {
             float radius = World.Footprint(kind);
             foreach (var thing in world.ThingsOf(kind)) {
                 var center = thing.Pos;
+                if (rememberLayout) layout.Add((thing.Id, center));
                 var min = Cell(center - Vector2.One * radius);
                 var max = Cell(center + Vector2.One * radius);
                 for (int y = min.Y; y <= max.Y; y++)

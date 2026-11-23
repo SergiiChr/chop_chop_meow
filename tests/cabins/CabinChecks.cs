@@ -18,6 +18,7 @@ public static class CabinChecks {
         Test(CheckPlayerBehindACabinWalksRoundItToTheDoor, data);
         Test(CheckPlayerWalksAroundABenchThatOnlyClipsTheWayToTheCabin, data);
         Test(CheckASealedCabinSearchCanBeCancelledWhileItIsRunning, data);
+        Test(CheckRemovingAWallWhileTheCabinSearchRunsOpensTheWayIn, data);
         Test(CheckSteppingInTakesLongerAtAWalkThanAtASprint, data);
         Test(CheckWolvesCannotReachAPlayerHalfWayIn, data);
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
@@ -109,6 +110,22 @@ public static class CabinChecks {
         for (int frame = 0; frame < 200 && approach.Active; frame++)
             Require(approach.Direction() == Vector2.Zero, "no route should cross the walls around the cabin");
         Require(!approach.Active && world.Player == at, "the full search should release the player with the door unreachable");
+    }
+
+    private static void CheckRemovingAWallWhileTheCabinSearchRunsOpensTheWayIn(GameData data) {
+        var world = EmptyWorld(data);
+        var center = Terrain.Spawn + Vector2.Up * 12;
+        var cabin = world.Add(ThingKind.Hut, center);
+        var wall = world.Add(ThingKind.Hut, center + Vector2.Down * 5);
+        for (int i = 0; i < 12; i++)
+            if (i != 3) world.Add(ThingKind.Hut, center + Vector2.FromAngle(i * Mathf.Tau / 12) * 5);
+        var approach = new CabinApproach(world);
+        approach.Start(cabin);
+        Require(approach.Direction() == Vector2.Zero && approach.Active, "the cabin search should be in progress when the wall comes down");
+        RemoveThings(world, t => t == wall);
+        for (int frame = 0; frame < 500 && approach.Active; frame++)
+            if (approach.Direction() != Vector2.Zero) approach.Move(.1f);
+        Require(world.Door == Doorway.Entering, "the pending approach should take the opening where the wall was removed");
     }
 
     private static void CheckSteppingInTakesLongerAtAWalkThanAtASprint(GameData data) {

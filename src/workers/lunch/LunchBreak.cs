@@ -49,7 +49,7 @@ internal sealed class LunchBreak(World world) {
         foreach (var fire in campfires) {
             for (int i = 0; i < FireSeats; i++) {
                 var position = Around(fire.Pos, FireRadius, i, FireSeats);
-                if (RoomForSeat(position)) fires.Add(new Seat(position, fire.Pos, fire));
+                if (world.CanStand(position)) fires.Add(new Seat(position, fire.Pos, fire));
             }
         }
         if (fires.Count > 0) {
@@ -73,12 +73,14 @@ internal sealed class LunchBreak(World world) {
         while (waiting.Count > 0 && fires.Count > 0) {
             int worker = -1, seat = 0;
             float nearestFire = float.MaxValue, nearestSeat = float.MaxValue;
-            for (int i = 0; i < waiting.Count; i++) {
-                var from = waiting[i].Pos;
-                for (int j = 0; j < fires.Count; j++) {
-                    var option = fires[j];
-                    if (unreachable.Contains((waiting[i].Id, option.Position))) continue;
-                    float fireDistance = from.DistanceSquaredTo(option.Center), seatDistance = from.DistanceSquaredTo(option.Position);
+            for (int j = 0; j < fires.Count; j++) {
+                var option = fires[j];
+                if (!AvailableFireSeat(option, out var only)) continue;
+                for (int i = 0; i < waiting.Count; i++) {
+                    var candidate = waiting[i];
+                    if (only != null && candidate != only || unreachable.Contains((candidate.Id, option.Position))) continue;
+                    float fireDistance = candidate.Pos.DistanceSquaredTo(option.Center);
+                    float seatDistance = candidate.Pos.DistanceSquaredTo(option.Position);
                     if (fireDistance > nearestFire || fireDistance == nearestFire && seatDistance >= nearestSeat) continue;
                     worker = i; seat = j; nearestFire = fireDistance; nearestSeat = seatDistance;
                 }
@@ -89,6 +91,18 @@ internal sealed class LunchBreak(World world) {
             for (int j = fires.Count - 1; j >= 0; j--)
                 if (fires[j].Position.DistanceSquaredTo(chosen.Position) < SeatGap * SeatGap) fires.RemoveAt(j);
         }
+    }
+
+    // A ground worker can take a fire seat that overlaps only their own seat.
+    // Their old spot is freed as soon as the new reservation replaces it.
+    private bool AvailableFireSeat(Seat candidate, out Worker? only) {
+        only = null;
+        foreach (var (worker, seat) in reserved) {
+            if (seat.Position.DistanceSquaredTo(candidate.Position) >= SeatGap * SeatGap) continue;
+            if (seat.Fire != null || only != null) return false;
+            only = worker;
+        }
+        return true;
     }
 
     private void ReserveGroup() {
@@ -162,15 +176,27 @@ internal sealed class LunchBreak(World world) {
         w.WorkState = seat.Fire != null && w.Id % 2 == 0 ? WorkerWorkState.Perching : WorkerWorkState.Resting;
     }
 
-    // A worker waiting on their feet can move away from an occupied seat without moving the worker in it.
+    // Step only where there is more room, so a trapped worker does not sway between two seats.
     private void WaitForSpace(Worker w, float dt) {
         w.Status = "Lunch break";
-        foreach (var seat in reserved.Values) {
-            var away = w.Pos - seat.Position;
-            if (away.LengthSquared() >= SeatGap * SeatGap) continue;
-            var heading = away == Vector2.Zero ? Vector2.Right : away.Normalized();
-            w.Pos = world.Slide(w.Pos, heading * Math.Min(dt, .08f));
-            return;
+        float best = Clearance(w.Pos);
+        if (best >= SeatGap * SeatGap || dt <= 0) return;
+        var next = w.Pos;
+        float step = Math.Min(dt, .08f);
+        for (int i = 0; i < 8; i++) {
+            var option = Around(w.Pos, step, i, 8);
+            if (!world.CanStand(option)) continue;
+            float room = Clearance(option);
+            if (room <= best) continue;
+            best = room;
+            next = option;
         }
+        w.Pos = next;
+    }
+
+    private float Clearance(Vector2 position) {
+        float nearest = float.MaxValue;
+        foreach (var seat in reserved.Values) nearest = Math.Min(nearest, position.DistanceSquaredTo(seat.Position));
+        return nearest;
     }
 }

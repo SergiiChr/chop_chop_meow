@@ -38,12 +38,16 @@ internal sealed class CabinApproach(World world) {
         if (world.Door != Doorway.None) return Vector2.Zero;
         if (route.Count == 0) {
             next = 0;
-            var result = searching ? WalkSearch.Result.Searching
+            bool resumed = searching;
+            var result = resumed ? WalkSearch.Result.Searching
                 : search.Begin(world.Player, Doorways.DoorPoint(hut), route, exact: true, wholeWalk: true);
             if (result == WalkSearch.Result.Searching) result = search.Continue(route, TilesPerFrame);
             searching = result == WalkSearch.Result.Searching;
             if (searching) return Vector2.Zero;
-            if (result == WalkSearch.Result.Blocked) { NoPath(); return Vector2.Zero; }
+            if (result == WalkSearch.Result.Blocked) {
+                if (!resumed || !search.LayoutChanged()) NoPath();
+                return Vector2.Zero;
+            }
         }
         while (next < route.Count && world.Player.DistanceSquaredTo(route[next]) < Arrival * Arrival) next++;
         if (next < route.Count) return world.Player.DirectionTo(route[next]);

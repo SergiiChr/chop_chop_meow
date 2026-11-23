@@ -678,6 +678,7 @@ Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters
 `Doorways` (`src/cabins/Doorways.cs`) runs a cabin's door, which lets one player through at a time into a cabin that holds `Doorways.Places`, and `DoorTug` (`src/actors/enemies/wolf/DoorTug.cs`) a wolf tugging a player out of it; `World` holds one of each (`World.Doorways`, `World.DoorTug`) and ticks the doorway with the acting player.
 A click on a cabin starts a `CabinApproach` to `Doorways.DoorPoint`, using the same grid routes workers use to avoid obstacles.
 `WalkSearch` checks nearby building footprints and spreads long searches across frames.
+If a failed search saw a layout that has changed, the approach tries again with the current buildings.
 The panel highlights Enter while finding a path and during the walk.
 A second press or Escape cancels the approach, and an unreachable door ends it.
 On arrival, `Doorways.Enter` starts the doorway animation.

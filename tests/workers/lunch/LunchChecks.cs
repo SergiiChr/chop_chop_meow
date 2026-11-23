@@ -18,6 +18,7 @@ internal static class LunchChecks {
         Test(CheckFiringAWorkerDoesNotMakeOthersRetryBlockedFireSeats, data);
         Test(CheckWorkersCutOffFromTheirGroupDoNotSitOnOneAnother, data);
         Test(CheckTwoWorkersCannotClaimTheSameLastPatchOfGround, data);
+        Test(CheckANewFireFillsSeatsReleasedByWorkersMovingOffTheGround, data);
     }
 
     private static void CheckCrewLunchesAtTheNearestFireAndGoesBackToWork(GameData data) {
@@ -98,6 +99,8 @@ internal static class LunchChecks {
         var at = Terrain.Spawn;
         for (int i = 0; i < 8; i++)
             world.Add(ThingKind.Bench, at + Vector2.FromAngle(i * Mathf.Tau / 8) * 1.05f);
+        // The first step east is blocked even though the workers have some room in the other directions.
+        world.Add(ThingKind.Bench, at + Vector2.Right * .61f);
         var first = AddWorker(world, at);
         var second = AddWorker(world, at);
         Work(world, 5);
@@ -118,6 +121,19 @@ internal static class LunchChecks {
         Work(world, 3);
         Require(world.Workers.Count(w => w.WorkState == WorkerWorkState.Resting) == 1,
             "only one worker should sit when there is only one patch of ground with room");
+    }
+
+    private static void CheckANewFireFillsSeatsReleasedByWorkersMovingOffTheGround(GameData data) {
+        var world = WorldAtLunch(data);
+        var nearest = AddWorker(world, Terrain.Spawn);
+        for (int i = 0; i < 2; i++) AddWorker(world, Terrain.Spawn);
+        for (int i = 0; i < 5; i++) AddWorker(world, Terrain.Spawn + Vector2.Left * 8);
+        Work(world, 5);
+        var fire = world.Add(ThingKind.Campfire, nearest.Pos + Vector2.Right * 1.4f);
+        Work(world, 12);
+        Require(world.Workers.Count(w => w.Pos.DistanceTo(fire.Pos) < 1.6f
+            && w.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching) == 6,
+            "a new campfire should fill all six seats, including the spot freed by a ground worker moving to the fire");
     }
 
     private static void CheckLunchUsesBothFiresBeforeWorkersSitInGroupsOnTheGround(GameData data) {
