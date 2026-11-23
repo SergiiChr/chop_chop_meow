@@ -1876,12 +1876,18 @@ public sealed partial class World {
         }
     }
 
-    /// <summary>Whether the way between a route tile and a walker's exact start or destination is clear.</summary>
+    /// <summary>Whether a straight leg is clear of buildings and stays on walkable ground.</summary>
     private bool OpenRouteSegment(Vector2 from, Vector2 destination) {
-        if (!RouteOpen(destination)) return false;
-        var heading = (destination - from).Normalized();
-        float length = from.DistanceTo(destination);
-        for (float d = .1f; d < length; d += .1f) if (!RouteOpen(from + heading * d)) return false;
+        var segment = destination - from;
+        float length = segment.Length();
+        if (length == 0) return RouteOpen(destination);
+        if (!Open(destination)) return false;
+        var heading = segment / length;
+        foreach (var building in routeBlockers) {
+            float along = Math.Clamp((building.Pos - from).Dot(heading), 0, length);
+            if (Blocks(building, from + heading * along)) return false;
+        }
+        for (float d = .1f; d < length; d += .1f) if (!Open(from + heading * d)) return false;
         return true;
     }
     /// <summary>How near a worker counts as at a place: the reach of a walk, and how near a closer spot they cannot get to counts as there.</summary>

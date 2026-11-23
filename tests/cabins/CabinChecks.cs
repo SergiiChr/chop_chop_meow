@@ -16,6 +16,7 @@ using static CabinSteps;
 public static class CabinChecks {
     public static void Run(GameData data) {
         Test(CheckPlayerBehindACabinWalksRoundItToTheDoor, data);
+        Test(CheckPlayerWalksAroundABenchThatOnlyClipsTheWayToTheCabin, data);
         Test(CheckSteppingInTakesLongerAtAWalkThanAtASprint, data);
         Test(CheckWolvesCannotReachAPlayerHalfWayIn, data);
         Test(CheckSteppingOutIsSafeOnlyInTheDoorway, data);
@@ -77,6 +78,19 @@ public static class CabinChecks {
         Require(widest > 1.5f, "the walk should go round the side of the cabin");
         Require(world.Door == Doorway.Entering, "a player at the door should step in");
     }
+    private static void CheckPlayerWalksAroundABenchThatOnlyClipsTheWayToTheCabin(GameData data) {
+        var world = EmptyWorld(data);
+        var at = Terrain.Spawn;
+        world.Add(ThingKind.Bench, at);
+        var cabin = world.Add(ThingKind.Hut, at + new Vector2(1, -7));
+        // The line to the door crosses a thin sliver of the bench's round footprint.
+        world.Player = at + new Vector2(.5982241f, .0672975f);
+        var approach = new CabinApproach(world);
+        approach.Start(cabin);
+        for (int i = 0; i < 240 && approach.Direction() != Vector2.Zero; i++) approach.Move(.07f);
+        Require(world.Door == Doorway.Entering, "the player should detour around the edge of the bench and enter the cabin");
+    }
+
     private static void CheckSteppingInTakesLongerAtAWalkThanAtASprint(GameData data) {
         var world = EmptyWorld(data);
         var hut = world.Add(ThingKind.Hut, new Vector2(20, 20));

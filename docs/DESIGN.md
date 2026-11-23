@@ -1082,7 +1082,9 @@ No worker carries a crate into one, and its filters name none (`World.Nests`).
 #### Packing station
 
 A packing station (`packer`, `src/Packing.cs`) packs the good in `Thing.Packs` into crates, anything a crate holds but crates and coins.
-Its inventory takes one input stack each of the chosen good and empty crates. `Thing.Output` holds the crate being packed.
+Its inventory applies the usual station limit to each input, the chosen good and empty crates.
+Tools each take their own storage slot, with room for up to `CrateCapacity` tools.
+`Thing.Output` holds the crate being packed.
 Player transfers and worker deliveries use the same input limit. Any excess already in a save can still be used or removed.
 While worked like an anvil, it moves one item every `PackSeconds` into that crate, opening an empty crate for the first.
 A full crate, or one of another good after the choice changes, waits in the output.
@@ -1181,7 +1183,7 @@ A dismissed worker's tool goes into their recovery box.
 
 At the `LunchHour` in `GameData` workers break for one in-game hour.
 `LunchBreak` reserves the nearest available campfire seats, with up to six seats per fire.
-A blocked walk releases the seat so the worker can try another.
+A blocked walk releases its seat so that worker can try another and workers on the ground can take the vacancy.
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
 
 As dusk begins (`GameData.DuskStarts`, a tenth of a day before night) they walk to the nearest trading post, or the clearing without one.

@@ -8,6 +8,7 @@ internal sealed class CabinApproach(World world) {
     private const float Arrival = .035f;
     private readonly List<Vector2> route = new();
     private int cabin, next, warp;
+    private bool retriedBlockedStep;
 
     public bool Active => cabin != 0;
     public bool GoesTo(Thing hut) => cabin == hut.Id;
@@ -17,6 +18,7 @@ internal sealed class CabinApproach(World world) {
         cabin = hut.Id;
         warp = world.Me.Warp;
         route.Clear();
+        retriedBlockedStep = false;
     }
 
     public bool Cancel() {
@@ -35,8 +37,7 @@ internal sealed class CabinApproach(World world) {
         if (route.Count == 0) {
             next = 0;
             if (!world.PlanExactWalk(world.Player, Doorways.DoorPoint(hut), route)) {
-                Cancel();
-                world.Say("No clear path to the cabin door.");
+                NoPath();
                 return Vector2.Zero;
             }
         }
@@ -50,7 +51,15 @@ internal sealed class CabinApproach(World world) {
     public void Move(float distance) {
         if (distance <= 0) return;
         var position = world.Player.MoveToward(route[next], distance);
-        if (world.CanStand(position)) world.MovePlayer(position - world.Player);
-        else route.Clear();
+        if (world.CanStand(position)) {
+            world.MovePlayer(position - world.Player);
+            retriedBlockedStep = false;
+        } else if (retriedBlockedStep) NoPath();
+        else {
+            route.Clear();
+            retriedBlockedStep = true;
+        }
     }
+
+    private void NoPath() { Cancel(); world.Say("No clear path to the cabin door."); }
 }

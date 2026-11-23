@@ -3,6 +3,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static LunchSteps;
 using static SetupSteps;
 using static WorldSteps;
 using static WorkerSteps;
@@ -12,6 +13,7 @@ internal static class LunchChecks {
         Test(CheckCrewLunchesAtTheNearestFireAndGoesBackToWork, data);
         Test(CheckLunchUsesBothFiresBeforeWorkersSitInGroupsOnTheGround, data);
         Test(CheckWorkerUsesTheNextFireWhenTheNearestIsUnreachable, data);
+        Test(CheckWorkerOnTheGroundTakesAFireSeatOthersCannotReach, data);
     }
 
     private static void CheckCrewLunchesAtTheNearestFireAndGoesBackToWork(GameData data) {
@@ -34,12 +36,9 @@ internal static class LunchChecks {
     }
 
     private static void CheckWorkerUsesTheNextFireWhenTheNearestIsUnreachable(GameData data) {
-        var world = FundedWorld(data);
-        RunUntil(world, (data.LunchHour - 6) / 24 * data.DaySeconds);
+        var world = WorldAtLunch(data);
         var at = Terrain.Spawn;
-        // A closed ring of walls separates the worker from the nearer fire, even though the seats there are open.
-        for (int i = 0; i < 12; i++)
-            world.Add(ThingKind.Hut, at + Vector2.FromAngle(i * Mathf.Tau / 12) * 5);
+        EncloseLunchCrew(world, at);
         world.Add(ThingKind.Campfire, at + Vector2.Up * 6.6f);
         var reachable = world.Add(ThingKind.Campfire, at + Vector2.Down * 1.5f);
         var worker = AddWorker(world, at + Vector2.Up * 3);
@@ -48,9 +47,20 @@ internal static class LunchChecks {
             "a worker whose nearer fire is across a wall should sit at the reachable one");
     }
 
+    private static void CheckWorkerOnTheGroundTakesAFireSeatOthersCannotReach(GameData data) {
+        var world = WorldAtLunch(data);
+        var at = Terrain.Spawn;
+        EncloseLunchCrew(world, at);
+        var fire = world.Add(ThingKind.Campfire, at + Vector2.Up * 8);
+        for (int i = 0; i < 6; i++) AddWorker(world, at + Vector2.Up * 3);
+        var outside = AddWorker(world, fire.Pos + Vector2.Up * 7);
+        Work(world, 15);
+        Require(outside.Pos.DistanceTo(fire.Pos) < 1.6f && outside.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching,
+            "a worker on the ground should take a fire seat released by a worker who cannot reach it");
+    }
+
     private static void CheckLunchUsesBothFiresBeforeWorkersSitInGroupsOnTheGround(GameData data) {
-        var world = FundedWorld(data);
-        RunUntil(world, (data.LunchHour - 6) / 24 * data.DaySeconds);
+        var world = WorldAtLunch(data);
         var at = Terrain.Spawn;
         var near = world.Add(ThingKind.Campfire, at);
         var far = world.Add(ThingKind.Campfire, at + Vector2.Right * 9);

@@ -627,7 +627,8 @@ They climb the outside ladder to fill a roof barrel and then climb down.
 
 The packing station (8 planks, 4 wood) packs one good into crates.
 Click the slot at the top to choose the good from everything a crate holds.
-Its two input slots each hold up to one stack of 64, one for the chosen good and one for empty crates.
+Its two inputs each have a limit of 64, one for the chosen good and one for empty crates.
+Tools take individual spaces, with room for up to a crate's worth.
 It packs one item every 1.5 seconds while you or an assigned worker work it.
 The crate being packed shows on the right with how full it is; a full crate waits there until someone takes it.
 

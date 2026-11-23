@@ -108,7 +108,7 @@ public sealed partial class World {
     /// <summary>
     /// Which box of a place takes a carried item now, and how many of it, or null when none does:
     /// a station's input slot up to a stack, or its fuel slot; what a mine site or a farm plot is short of;
-    /// storage that holds the item, as far as it has room: a trading post only crates its filter asks for, a packing station one stack per input,
+    /// storage that holds the item, as far as it has room: a trading post only crates its filter asks for, a packing station its chosen good and empty crates up to the input limit,
     /// compost set to skip food no food, and a placed crate no crate.
     /// A vessel's room is the liters its liquid has room for.
     /// </summary>

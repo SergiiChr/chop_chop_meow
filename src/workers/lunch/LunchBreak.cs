@@ -42,8 +42,12 @@ internal sealed class LunchBreak(World world) {
         }
         if (assigned == count) return;
         waiting.Clear();
-        foreach (var w in world.Workers) if (OnBreak(w) && !reserved.ContainsKey(w.Id)) waiting.Add(w);
-        if (waiting.Count == 0) return;
+        // A newly free fire seat is also available to the crew on the ground.
+        foreach (var w in world.Workers) {
+            if (!OnBreak(w) || reserved.TryGetValue(w.Id, out var seat) && seat.Fire != null) continue;
+            reserved.Remove(w.Id);
+            waiting.Add(w);
+        }
         fires.Clear();
         foreach (var fire in campfires) {
             for (int i = 0; i < FireSeats; i++) {
