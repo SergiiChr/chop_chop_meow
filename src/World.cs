@@ -2386,23 +2386,25 @@ public sealed partial class World {
         }
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size && S.Explored[(int)p.Y * Terrain.Size + (int)p.X] != 0;
-    private static readonly string[] Milestones = { "campfire", "hut", "bench", "sold", "furnace", "steel_bar", "steel_parts", "assigned" };
-    public bool GoalComplete => S.Goal >= Milestones.Length;
-    private void UpdateGoal() {
-        while (!GoalComplete && S.Milestones.Contains(Milestones[S.Goal])) S.Goal++;
-    }
-    public static int GoalCount => Milestones.Length;
-    public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch {
-        0 => ("Light in the dark", "Build and light a campfire. Fire keeps wolves away."),
-        1 => ("Safe place", "Build a cabin for peace of mind."),
-        2 => ("A start", "Build a crafting bench."),
-        3 => ("Road to riches", "Build a trading post and sell a crate of goods."),
-        4 => ("Stone and embers", "Build a stone furnace."),
-        5 => ("Hotter than fire", "Build a reinforced furnace and produce your first steel bar."),
-        6 => ("Too soft", "Build an anvil and produce your first steel parts."),
-        7 => ("More hands on deck", "Hire a worker at the trading post and assign a job."),
-        _ => throw new ArgumentOutOfRangeException(nameof(goal), goal, "There is no starter goal with this number.")
+    /// <summary>The starter goals in order: each one's title, the hint under it in the pause menu, and when it is met.</summary>
+    private static readonly (string Title, string Hint, Func<World, bool> Met)[] StarterGoals = {
+        ("Light in the dark", "Build and light a campfire. Fire keeps wolves away.", w => w.Reached("campfire")),
+        ("Safe place", "Build a cabin for a peace of mind.", w => w.Reached("hut")),
+        ("A start", "Build a crafting bench.", w => w.Reached("bench")),
+        ("Road to riches", "Build a trading post and sell a crate of goods.", w => w.Reached("sold")),
+        ("Stone and embers", "Build a stone furnace.", w => w.Reached("furnace")),
+        ("Hotter than fire", "Build a reinforced furnace and produce your first steel bar.", w => w.Reached("steel_bar")),
+        // Met by a steel hammer and a steel pickaxe the settlement has had, bought or made.
+        ("Steel tools", "Purchase a hammer and a pickaxe from the trading post.", w => w.HadItself("steel_hammer") && w.HadItself("steel_pick")),
+        ("Too soft", "Build an anvil and produce your first steel parts.", w => w.Reached("steel_parts")),
+        ("More hands on deck", "Hire a worker at the trading post and assign a job.", w => w.Reached("assigned")),
     };
+    public bool GoalComplete => S.Goal >= StarterGoals.Length;
+    private void UpdateGoal() {
+        while (!GoalComplete && StarterGoals[S.Goal].Met(this)) S.Goal++;
+    }
+    public static int GoalCount => StarterGoals.Length;
+    public static (string Title, string Hint) ObjectiveFor(int goal) => (StarterGoals[goal].Title, StarterGoals[goal].Hint);
     // ---------- End goals ----------
     /// <summary>Finished days in a row, up to today, whose profit reached the goal.</summary>
     public int ProfitStreak => S.Profits.AsEnumerable().Reverse().TakeWhile(p => p >= Data.Goals.DailyProfit).Count();

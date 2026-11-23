@@ -17,7 +17,7 @@ public partial class Game {
     /// the end goals, mines and the profit goal show the ending, and keep playing closes it for good.
     /// </summary>
     private async Task CheckEndGoalsShowInThePauseMenuAndTheEndingOnce() {
-        Achieve(Hosted, new[] { "campfire", "hut", "bench", "sold", "furnace", "steel_bar", "steel_parts", "assigned" });
+        Achieve(Hosted, new[] { "campfire", "hut", "bench", "sold", "furnace", "steel_bar", "steel_hammer", "steel_pick", "steel_parts", "assigned" });
         await Frames(3);
         Require(world.GoalComplete, $"The starter goal chain must be complete before the check that it alone does not end the game, not on goal {world.Goal}.");
         Require(!ending.Visible && !view.Paused, "The starter goal chain alone must not end the game.");

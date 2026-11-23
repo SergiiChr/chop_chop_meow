@@ -125,15 +125,19 @@ public partial class Game {
         if (carried > 0) Give(Hosted, "steel_hammer", carried);
     }
 
-    /// <summary>A smith hammering at an anvil swings its slotted steel hammer, which is off the stand while they do.</summary>
+    /// <summary>
+    /// A smith hammering at an anvil swings its slotted steel hammer, which is off the stand while they do, even with a
+    /// wooden mallet of their own in their tool slot.
+    /// </summary>
     private async Task CheckSmithSwingsTheAnvilsSlottedHammerOffTheStand() {
         // Out of the player's reach, so only the smith works it.
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(6, 0)); anvil.Inventory.Add("steel_bar", 4); SlotPlainestTools(Hosted, anvil);
-        var smith = AddWorker(Hosted, anvil.Pos + new Vector2(0, 1.2f)); Hosted.Assign(smith, anvil);
-        await Until(() => smith.WorkState == WorkerWorkState.Hammering && view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null },
-            "the smith hammering with the anvil's slotted hammer, off the stand", 3);
+        var smith = AddWorker(Hosted, anvil.Pos + new Vector2(0, 1.2f)); smith.Tool = "wood_hammer"; Hosted.Assign(smith, anvil);
+        await Until(() => smith.WorkState == WorkerWorkState.Hammering && view.WorkerTool(smith.Id) == "steel_hammer" && view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null },
+            "the smith hammering with the anvil's slotted steel hammer, not their mallet, and it off the stand", 3);
+        // Let go, the smith leaves their mallet in a box where they stood.
         Hosted.Fire(smith);
-        RemoveThings(Hosted, t => t == anvil);
+        RemoveThings(Hosted, t => t == anvil || t.Kind == ThingKind.Grave && t.Pos.DistanceTo(anvil.Pos) < 3);
     }
 
     /// <summary>A new packing station opens its list of goods; picking one sets what it packs, Shift on a backpack stack loads it, and the idle player beside it packs.</summary>
@@ -443,11 +447,13 @@ public partial class Game {
     /// <summary>
     /// A new anvil's page shows steel bars in, steel parts out and, beside it, an empty steel hammer slot.
     /// Shift on a wooden mallet leaves it in the backpack with nothing said, Shift on a steel hammer slots it onto the
-    /// stand, and Ctrl on a backpack bar loads them.
+    /// stand, and Ctrl on a backpack bar loads them; the batch time drops from 5 s to 3 s as soon as a steel hammer comes
+    /// into the backpack with the page open.
     /// </summary>
     private async Task CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack() {
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
-        Give(Hosted, "steel_bar", 2); Give(Hosted, "steel_hammer", 1); Give(Hosted, "wood_hammer", 1);
+        int steelHammers = Drop(Hosted, "steel_hammer");
+        Give(Hosted, "steel_bar", 2); Give(Hosted, "wood_hammer", 1);
         await ClickOn(anvil);
         int mallets = world.Backpack["wood_hammer"];
         Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
@@ -461,12 +467,18 @@ public partial class Game {
         Require(world.BenchTool(anvil, "hammer") == null && world.Backpack["wood_hammer"] == mallets, "The anvil's hammer slot must refuse a wooden mallet.");
         Require(!messages.Shown.ToArray().Any(text => text.Contains("mallet", StringComparison.OrdinalIgnoreCase) || text.Contains("hammer", StringComparison.OrdinalIgnoreCase)),
             $"Shift on a wooden mallet at the anvil must say nothing, not \"{string.Join(" / ", messages.Shown.ToArray())}\".");
+        Require((panel.FindChild("batch_time", true, false) as Label)?.Text == "5 s", $"An anvil with no steel hammer at hand must show its 5 s batch time, not {(panel.FindChild("batch_time", true, false) as Label)?.Text}.");
+        // A steel hammer coming into the backpack while the page is open speeds the batch up for the player.
+        // The steel hammer works 1.8 times as fast: 5 s / 1.8 is 2.8 s, shown as 3 s.
+        Give(Hosted, "steel_hammer", 1);
+        await Until(() => (panel.FindChild("batch_time", true, false) as Label)?.Text == "3 s", "the open anvil page showing the steel hammer's 3 s batch time", 2);
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel hammer"))));
         await Until(() => world.BenchTool(anvil, "hammer") == "steel_hammer" && view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: "steel_hammer" },
             "Shift on a steel hammer in the backpack slotting it into the anvil, where it lies on the stand", 2);
         await Holding(Key.Ctrl, () => Click(BagCell(c => c.TooltipText.StartsWith("Steel bar"))));
         await Until(() => world.Backpack["steel_bar"] == 0, "Ctrl on steel bars in the backpack loading them into the anvil", 2);
         RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "steel_bar"); Drop(Hosted, "wood_hammer", 1); await CloseWithEsc();
+        if (steelHammers > 0) Give(Hosted, "steel_hammer", steelHammers);
     }
 
     /// <summary>

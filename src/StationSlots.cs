@@ -38,8 +38,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     /// <summary>A station's work: what one batch takes, how long it runs, what it burns and what it makes.</summary>
     public ProcessRow Machine() {
         var recipe = world.Data.Recipes[world.Selected(t)];
-        float rate = world.WorkRate(t.Kind, world.ToolInUse(t, recipe.Tool, recipe.Tier));
-        float seconds = recipe.Seconds / Math.Max(.01f, rate);
+        float seconds = recipe.Seconds / Math.Max(.01f, Rate(recipe));
         var inputs = recipe.Inputs.Select(p => (Control)StationSlot(p.Key, true, $"×{p.Value}"));
         // Leftovers and inputs loaded for the kept recipe stay reachable as side outputs.
         var side = t.Inventory.Items.Keys.Where(item => Leftover(recipe, item)).Select(item => (Control)StationSlot(item, false, "", 44));
@@ -47,6 +46,12 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
             recipe.Burns && t.Burner != null ? FuelSlot(recipe, seconds) : null,
             StationSlot(recipe.Output, false, recipe.Amount > 1 ? $"×{recipe.Amount}" : "×1", 64), side.ToArray());
     }
+
+    /// <summary>How fast the station works a recipe with the tool the acting player would work it with.</summary>
+    private float Rate(RecipeDef recipe) => world.WorkRate(t.Kind, world.ToolInUse(t, recipe.Tool, recipe.Tier));
+
+    /// <summary>The station's rate for the recipe it is on in hundredths, which changes with the tool slotted or carried.</summary>
+    public int RateCode() => world.Data.Recipes.TryGetValue(world.Selected(t), out var recipe) ? (int)MathF.Round(Rate(recipe) * 100) : 0;
 
     /// <summary>Whether an item a station holds is neither an input nor the product of a recipe.</summary>
     private static bool Leftover(RecipeDef recipe, string item) => !recipe.Inputs.ContainsKey(item) && item != recipe.Output;

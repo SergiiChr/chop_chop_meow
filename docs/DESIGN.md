@@ -432,8 +432,9 @@ The left fist holds the bowl out in front, and the right takes the pestle twice 
 Both arms are solved from where the hands have to be (`ArmReach.ArmTo`), so the pestle stays over the bowl.
 `ActorRig` turns the bowl and pestle against their forearms in the resting pose (`ActorAnimation.GrindRest`), which keeps the bowl level and the pestle leaning toward its hand.
 While someone grinds, the table's own mortar is off the counter (`WorldView.grinding`).
-Likewise a bench's or an anvil's slotted hammer is off its top while someone swings it (`WorldView.swung`): a worker
-with no hammer of their own, or a player who carries none as fast (`World.WorksWithSlotted`).
+Likewise a bench's or an anvil's slotted hammer is off its top while someone swings it (`WorldView.swung`): a worker,
+who works a station only with its slotted tool and is drawn with it, or a player who carries no hammer as fast
+(`World.WorksWithSlotted`).
 
 Felling a tree (`Chop`, `SteelChop`) is a stroke from the side: the axe is wound round to the left at shoulder height and swung across, almost level, into the trunk's flank.
 The shoulders turn through the stroke, the grip turns the blade to cut sideways (`Pose.Grip`, which `ActorRig` applies at the right fist), and the left fist is put on the handle just past the right (`ActorAnimation.TwoHanded`).
@@ -569,8 +570,9 @@ In multiplayer it is available only when everyone is downed; a living player pre
 
 ### Goals
 
-The starter goals are met in order by milestones in `SaveState.Milestones`: buildings built, the first sale, the first
-steel bar and steel parts made, and a worker given any job, the trading post's deliveries included.
+The starter goals are met in order (`World.StarterGoals`): buildings built, the first sale and the first steel bar, a
+steel hammer and a steel pickaxe the settlement has had (bought or made), the first steel parts, and a worker given any
+job, the trading post's deliveries included.
 
 The end goals:
 

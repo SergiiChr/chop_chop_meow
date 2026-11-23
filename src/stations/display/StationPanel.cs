@@ -27,6 +27,8 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         AddChild(work = stationSlots.Machine());
         // The side slots are the leftovers the station held when the page was drawn.
         RedrawOnChange(stationSlots.SideCode);
+        // The batch time and how long the fuel lasts follow the tool the station is worked with.
+        RedrawOnChange(stationSlots.RateCode);
         if (thing.Kind == ThingKind.Reinforced) Bellows();
         // A tool of a slot's kind goes to that slot, which says why when it does not take it; only a tool it takes lights up.
         bool SlotKind(string id) => world.Data.Items.GetValueOrDefault(id) is ItemDef def && Array.Exists(slotted, slot => slot.Tool == def.Tool);

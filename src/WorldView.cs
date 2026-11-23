@@ -294,6 +294,8 @@ public partial class WorldView : Node3D {
     public Vector3? PlayerMark => player.Mark;
     public ActorAction OtherAnimation(int id) => others.TryGetValue(id, out var other) ? other.State.Action : ActorAction.Idle;
     public ActorAction WorkerAnimation(int id) => crew.TryGetValue(id, out var entry) ? entry.State.Action : ActorAction.Idle;
+    /// <summary>The tool a worker's figure shows in hand, or null for none.</summary>
+    public string? WorkerTool(int id) => crew.TryGetValue(id, out var entry) ? entry.Rig.ToolShown : null;
 
     // ---------- Camera and picking ----------
 
@@ -606,12 +608,12 @@ public partial class WorldView : Node3D {
                     openBungs[waterTarget.Id] = Math.Max(openBungs.GetValueOrDefault(waterTarget.Id), opening);
                 }
             } else {
-                Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools),
+                // A worker works a station with the hammer slotted there, never one of their own, so that is the one they swing.
+                string? slotted = ActorAnimation.Tool(work) == "hammer" && assignment?.Tools != null ? World.BenchTool(assignment, "hammer") : null;
+                Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), slotted ?? worker.Tool, assignment?.Tools),
                     barrel: work == ActorAction.Carry && Barrel.In(worker.Bag) != null,
                     vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null);
-                // A worker swings the station's slotted hammer unless they hold one of their own.
-                if (ActorAnimation.Tool(work) == "hammer" && assignment != null && World.BenchTool(assignment, "hammer") != null
-                    && !(World.Data.Items.TryGetValue(worker.Tool, out var held) && held.Tool == "hammer")) swung.Add(assignment.Id);
+                if (slotted != null) swung.Add(assignment!.Id);
             }
             entry.Rig.Root.Visible = World.Sees(worker);
             Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
