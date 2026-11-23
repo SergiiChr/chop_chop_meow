@@ -1350,14 +1350,14 @@ public partial class Game {
     private async void RunUIChecks() {
         try {
             await TestClean(CheckLaunchOpensTheStartMenuWithNoSaveToContinue);
-            await TestClean(CheckStartMenuPutsCameraSwitchInOptions);
+            await RunFirstPersonUIChecks(inGame: false);
             await TestClean(CheckOptionsApplyAndKeepTheirChoices);
             await TestClean(CheckAntiAliasingChoicesNameTheSizeTheWorldIsDrawnAt);
             await TestClean(CheckPaintFilterSwitchDrawsTheFilter);
             await TestClean(CheckInterfaceTextIsDrawnAtTheSizeItShows);
             await TestClean(CheckNewGameStartsTheWelcomePage);
             await TestClean(CheckPauseMenuAsksBeforeNewGameAndQuit);
-            await RunFirstPersonUIChecks();
+            await RunFirstPersonUIChecks(inGame: true);
             await TestClean(CheckWasdJogsAndShiftSprintsUnlessTooThirsty);
             await TestClean(CheckMessagesStackFadeAndKeepClearOfHud);
             await RunPanelUIChecks();

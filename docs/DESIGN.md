@@ -134,7 +134,7 @@ UI and input:
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
-| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
+| `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
@@ -196,9 +196,9 @@ UI and input:
 | `src/guide/display/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
-| `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
+| `src/menus/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
-| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things, E and Space, and `ClickMode`, what the next click does |
+| `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things, E and Space, and `ClickMode`, what the next click does |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:

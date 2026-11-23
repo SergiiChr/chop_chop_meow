@@ -5,10 +5,13 @@ using static Checks;
 namespace ChopChopMeow;
 
 public partial class Game {
-    private async Task ToggleFirstPersonInPauseMenu() {
+    private CheckButton? FirstPersonPreviewOption() =>
+        startMenu.Screen.FindChild("first_person_preview", recursive: true, owned: false) as CheckButton;
+
+    private async Task ToggleFirstPersonPreviewInPauseMenu() {
         await KeyStroke(Key.Escape);
         await Click(FindButton(menu, "Options")!);
-        await Click((CheckButton)startMenu.Screen.FindChild("first_person", recursive: true, owned: false));
+        await Click(FirstPersonPreviewOption()!);
         await Click(FindButton(startMenu.Screen, "Back · Esc")!);
         await Click(FindButton(menu, "Resume · Esc")!);
     }
