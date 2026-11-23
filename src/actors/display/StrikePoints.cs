@@ -55,7 +55,7 @@ public sealed class StrikePoints {
     public Vector3? At(Thing? subject, Vector2 from, ActorAction action, Prop? prop) {
         if (subject == null || prop == null || !ActorAnimation.Works(action).Contains(subject.Kind)) return null;
         var key = (subject.Id, (int)MathF.Round(from.X / Cell), (int)MathF.Round(from.Y / Cell), action);
-        float size = prop.Body.Scale.X;
+        float size = prop is TreeProp tree ? tree.GrowthScale : prop.Body.Scale.X;
         if (known.TryGetValue(key, out var was) && was.Prop == prop && Math.Abs(was.Size - size) < Resized) return was.Spot;
         if (!known.ContainsKey(key)) {
             if (added.Count == Kept) known.Remove(added.Dequeue());
@@ -74,6 +74,7 @@ public sealed class StrikePoints {
 
     /// <summary>Where the blow's own swing first meets what it works, or null where the swing passes it by.</summary>
     private static Vector3? OnTheSwing(Thing subject, Transform3D rig, ActorAction action, ReadOnlySpan<Part> meshes) {
+        if (subject.Kind == ThingKind.Tree && subject.TreeStage != 0) return null;
         var trunk = subject.Kind == ThingKind.Tree ? WorldModels.Trunk(subject.Id) : default;
         var axis = WorldView.To3(subject.Pos) + trunk.Seat;
         var last = rig * ActorAnimation.Swing(action, 0)!.Value;
@@ -109,9 +110,11 @@ public sealed class StrikePoints {
         var spot = WorldView.To3(subject.Pos);
         switch (subject.Kind) {
             case ThingKind.Tree: {
-                    var (seat, radius) = WorldModels.Trunk(subject.Id);
+                    var (seat, radius) = WorldModels.Trunk(subject.Id, subject.TreeStage);
                     var trunk = new Vector2(spot.X + seat.X, spot.Z + seat.Z);
-                    return WorldView.To3(trunk + (from - trunk).Normalized() * radius, ActorAnimation.Swing(action, 1)?.Y ?? 1);
+                    float height = ActorAnimation.Swing(action, 1)?.Y ?? 1;
+                    if (prop is TreeProp tree) height *= tree.GrowthScale;
+                    return WorldView.To3(trunk + (from - trunk).Normalized() * radius, height);
                 }
             case ThingKind.Anvil or ThingKind.Bench: {
                     var box = prop.Body.GlobalTransform * WorldModels.Bounds(prop.Body);
@@ -147,6 +150,7 @@ public sealed class StrikePoints {
     /// <summary>Where a shovel goes into the ground: just out from the foot of a stump or bush, on the side facing the digger.</summary>
     private static Vector3? AtTheFoot(Thing subject, Vector2 from, Prop prop, ReadOnlySpan<Part> meshes) {
         var spot = WorldView.To3(subject.Pos);
+        if (subject.Kind == ThingKind.PlantingSpot) return spot;
         var centre = prop is DugProp dug ? new Vector2(spot.X + dug.Seat.X, spot.Z + dug.Seat.Z) : subject.Pos;
         var toward = (from - centre).Normalized();
         return Out(meshes, new Vector3(centre.X, Foot, centre.Y), new Vector3(toward.X, 0, toward.Y)) is float reach

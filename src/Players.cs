@@ -137,6 +137,7 @@ public sealed partial class World {
         var w = S.Workers.Find(w => w.Id == c.Other);
         switch (c.Verb) {
             case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Construction.Build(kind, c.At, c.Rotation, c.PipeShape); break;
+            case Verb.MarkTree: Trees.Mark(c.At); break;
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
             case Verb.TakeUpPipe: Construction.TakeUpPipe(Terrain.TileAt(c.At)); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At, c.Rotation)); break;
@@ -240,7 +241,7 @@ public sealed partial class World {
     }
 
     /// <summary>Whether the acting player reaches the holder of a box, by its number from <see cref="Locate"/>: a building, a worker, or their own backpack and the crates in it.</summary>
-    private bool InReach(int at) => at <= 0 || (Find(at / BoxCodes) is Thing t ? Reaches(t) : Carrier(at) is Worker w && Reaches(w));
+    internal bool InReach(int at) => at <= 0 || (Find(at / BoxCodes) is Thing t ? Reaches(t) : Carrier(at) is Worker w && Reaches(w));
 
     /// <summary>Why an item cannot go into a box by hand, by the box's number from <see cref="Locate"/>, or null.</summary>
     private string? BoxBlock(int at, Inventory to, string item) =>
@@ -262,7 +263,7 @@ public sealed partial class World {
         if (quantity > 0 && from != to && from[item] > 0 && into?.Kind == ThingKind.Packer
             && to == into.Inventory && PackingRoom(into, item) == 0) { Say(FullInput(item)); return 0; }
         int moved = Carry(from, to, into, item, quantity);
-        if (moved > 0 && into?.Kind == ThingKind.Barrel) PileFilters(into);
+        if (moved > 0 && into != null) AfterTransfer(into, to);
         if (moved < quantity) SayHeldBehind(from, item);
         return moved;
     }
@@ -316,8 +317,15 @@ public sealed partial class World {
             from.PreferredSlot = sourceSlot;
             try { moved = from.TransferTo(to, item, quantity); } finally { from.PreferredSlot = -1; }
         } else moved = from.MoveSlotTo(sourceSlot, to, targetSlot, quantity);
-        if (moved > 0 && into?.Kind == ThingKind.Barrel) PileFilters(into);
+        if (moved > 0 && into != null) AfterTransfer(into, to);
         return moved;
+    }
+
+    private void AfterTransfer(Thing into, Inventory to) {
+        if (into.Kind == ThingKind.Barrel) PileFilters(into);
+        if (to != into.Inventory || !TreePlanting.NeedsWater(into) || to[Water.Liquid] < TreePlanting.WaterNeeded) return;
+        ReleaseIn(to);
+        Trees.BeginGrowth(into);
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {

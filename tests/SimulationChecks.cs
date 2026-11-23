@@ -40,6 +40,7 @@ public static class SimulationChecks {
         Test(WorkerJobChecks.Run, data);
         HaulingChecks.Run(data);
         GatheringChecks.Run(data);
+        ReplantingChecks.Run(data);
         CraftingChecks.Run(data);
         PackingChecks.Run(data);
         LunchChecks.Run(data);

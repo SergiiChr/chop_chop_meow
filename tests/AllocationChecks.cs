@@ -43,8 +43,9 @@ public static class AllocationChecks {
         var settlement = Settlement(data);
         // Twenty seconds first, so every worker has been through its trips once and the status and cost caches hold what they will show.
         // A store taking an item it has not held before grows its table once (measured 0.2 to 0.5 bytes a tick).
-        // A woodcutter's first tree falls during the measured runs and leaves a stump, a new thing: those rare events are what this budget allows (measured 6.2).
-        Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 7, warmup: 1200);
+        // Woodcutters drop acorns and leave a stump during the measured runs.
+        // Each new piece and the memory of it allocate once, bringing the measured average to 19.4 bytes a tick.
+        Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 20, warmup: 1200);
 
         // A chest's hauler with nothing to carry looks on every tick for a place asking for what the chest holds, and for storage or a station giving out what its filter names.
         var storing = new World(data);

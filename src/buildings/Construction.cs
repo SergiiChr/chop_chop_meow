@@ -46,7 +46,8 @@ public sealed class Construction(World world) {
     /// </summary>
     public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null, float rotation = 0, PipeShape pipeShape = PipeShape.Straight) {
         bool portable = kind is ThingKind.Crate or ThingKind.Barrel;
-        if (!portable && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
+        bool planting = kind == ThingKind.PlantingSpot;
+        if (!portable && !planting && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
         if (!ValidRotation(kind, rotation)) return "That building cannot go up at this angle.";
         if (world.Occupied) return "You are busy.";
         if (world.S.Sheltered != 0) return "Leave the cabin first.";
@@ -68,8 +69,9 @@ public sealed class Construction(World world) {
             if (!Terrain.InLake(p)) return "Place the intake in the freshwater lake’s shallows.";
             if (!world.CanStand(p + World.BellowsStand.Rotated(rotation))) return "Turn the handle toward open ground on the bank.";
         } else if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
+        if (planting && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
-            if (!World.BuiltOver(t.Kind) && (t.Remaining > 0 || !t.IsResource) && TooClose(t, kind, p))
+            if ((!World.BuiltOver(t.Kind) || planting) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
                 return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
             var door = p + Doorways.DoorOffset.Rotated(rotation);
@@ -83,6 +85,7 @@ public sealed class Construction(World world) {
         }
         foreach (var pump in world.ThingsOf(ThingKind.Pump))
             if (pump.ToWorld(World.BellowsStand).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the pump handle clear.";
+        if (planting) return null;
         if (!portable) return Unaffordable(kind);
         if (item == null || (world.MarkedSource ?? world.S.Backpack)[item] > 0) return null;
         return kind == ThingKind.Crate ? "That crate is no longer in your backpack." : "That barrel is no longer available.";
@@ -118,7 +121,7 @@ public sealed class Construction(World world) {
             }
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in world.S.Things) {
-            if (!IsZone(t.Kind) && t.IsResource && t.Remaining <= 0 || World.BuiltOver(t.Kind)) continue;
+            if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind)) continue;
             float margin = IsZone(t.Kind) ? World.Footprint(t.Kind) - .05f : t.IsResource ? YardResourceRoom : World.Footprint(t.Kind) + .2f;
             if (Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin) return "Leave room around resources and buildings.";
         }
@@ -157,6 +160,11 @@ public sealed class Construction(World world) {
     /// and what does not fit waits in a recovery box where it stood.
     /// </summary>
     public bool Dismantle(Thing t) {
+        if (t.Kind == ThingKind.PlantingSpot) {
+            if (!world.Reaches(t)) { world.Say("Walk closer first."); return false; }
+            if (world.Busy() || world.Forwarded(Verb.Dismantle, t.Id)) return true;
+            return world.S.Things.Remove(t);
+        }
         if (!world.Data.Buildings.TryGetValue(t.Kind, out var def)) return false;
         if (!world.Reaches(t)) { world.Say("Walk closer first."); return false; }
         if (DismantleBlock(t) is string refused) { world.Say(refused); return false; }
@@ -182,7 +190,7 @@ public sealed class Construction(World world) {
             var pipe = Terrain.TileAt(at);
             return world.Sees(pipe) && world.SteelPipes.Laid(pipe) ? Removal.OfPipe(pipe) : Removal.None;
         }
-        if (picked is { } building && world.Data.Buildings.ContainsKey(building.Kind)) return Removal.Of(building);
+        if (picked is { } building && (building.Kind == ThingKind.PlantingSpot || world.Data.Buildings.ContainsKey(building.Kind))) return Removal.Of(building);
         return world.GravelPaths.TileUnder(at) is Vector2I tile ? Removal.Of(tile) : Removal.None;
     }
     /// <summary>Whether what the remove selector points at is within the acting player's reach.</summary>

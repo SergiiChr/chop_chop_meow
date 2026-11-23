@@ -511,7 +511,7 @@ public partial class WorldView : Node3D {
         World.CollectKnown(picking);
         bool firstPerson = FirstPerson;
         foreach (var drawn in picking) {
-            if (drawn.Remaining <= 0 && drawn.IsResource && drawn.Kind != ThingKind.Berries || World.Find(drawn.Id) is not Thing t) continue;
+            if (drawn.Remaining <= 0 && drawn.IsResource && drawn.Kind is not (ThingKind.Berries or ThingKind.Tree) || World.Find(drawn.Id) is not Thing t) continue;
             // The first-person view shows the valley, but its pointer works on nearby live objects.
             if (firstPerson && drawn != t) continue;
             // The lake has no raised model. Its shore is picked behind the objects standing there.
@@ -1018,14 +1018,14 @@ public partial class WorldView : Node3D {
         switch (subject.Kind) {
             case ThingKind.Tree:
                 Burst(Hit(1.1f), Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
-                Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id)), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
+                Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id) * ((TreeProp)prop).GrowthScale), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
             case ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Mine:
                 Burst(Hit(.5f), Mat(RockColor(subject.Kind)), 6, 2.4f, .5f, 9, .07f);
                 Burst(Hit(.4f), GatherDust, 3, .5f, .9f, -.3f, .16f, 1.5f);
                 if (action == ActorAction.SteelMine) Burst(Hit(.5f), Sparks, 5, 3.2f, .3f, 4, .025f);
                 break;
-            case ThingKind.Stump or ThingKind.Bush:
+            case ThingKind.Stump or ThingKind.Bush or ThingKind.PlantingSpot:
                 // The blade goes in at the foot of it and throws up soil, and a bush sheds leaves as it is rocked.
                 Burst(Hit(.08f), Soil, 6, 2, .5f, 9, .06f);
                 Burst(Hit(.1f), GatherDust, 2, .4f, .8f, -.3f, .14f, 1.5f);
@@ -1116,7 +1116,7 @@ public partial class WorldView : Node3D {
             // so such a thing is settled once and then left alone: only what is in sight is drawn every frame.
             bool live = everything || World.Sees(t.Pos);
             // What a thing drawn as last seen can show: what a memory keeps of it (World.LookAround) that its kind draws, and night in a cabin's windows.
-            var look = (t.Pos, t.Remaining, t.Kind is ThingKind.Mine or ThingKind.WolfCorpse || t.IsDug ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
+            var look = (t.Pos, t.Remaining, t.Kind == ThingKind.Tree ? t.TreeStage : t.Kind is ThingKind.Mine or ThingKind.WolfCorpse || t.IsDug ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
             if (!live && prop.Seen && prop.Look == look) continue;
             Show(prop, true);
             if (prop.Look.Pos != t.Pos) prop.Root.Position = To3(t.Pos);
@@ -1219,7 +1219,7 @@ public partial class WorldView : Node3D {
                 } else if (tree.Lying >= 0) tree.Lying += dt;
                 // The last blow's shake carries on as it goes over.
                 prop.Shake = Math.Max(0, prop.Shake - dt * ShakeFades);
-                tree.Sway.Transform = fall.Turn * new Transform3D(TreeShake(prop.Shake).Scaled(Vector3.One * WorldModels.TreeScale(tree.Id)), Vector3.Zero);
+                tree.Sway.Transform = fall.Turn * new Transform3D(TreeShake(prop.Shake).Scaled(Vector3.One * WorldModels.TreeScale(tree.Id) * tree.GrowthScale), Vector3.Zero);
                 SetFade(tree.SwayParts, Math.Clamp((tree.Lying - TreeLiesSeconds) / TreeFadeSeconds, 0, 1));
                 return tree.Lying < TreeLiesSeconds + TreeFadeSeconds;
             case DugProp dug:
@@ -1238,11 +1238,13 @@ public partial class WorldView : Node3D {
         }
     }
 
-    /// <summary>The rock or ore deposit a newly appeared chip came off, or null when none is close enough.</summary>
+    /// <summary>What a newly appeared loose piece came off, or null when no source is close enough.</summary>
     private Thing? ChippedFrom(Thing chip) {
         Thing? rock = null; float nearest = (GatherRules.ChipReach + .5f) * (GatherRules.ChipReach + .5f);
-        foreach (var t in World.Things)
-            if (GatherRules.Of(t.Kind)?.Chip == chip.Kind && t.Pos.DistanceSquaredTo(chip.Pos) <= nearest) { rock = t; nearest = t.Pos.DistanceSquaredTo(chip.Pos); }
+        foreach (var t in World.Things) {
+            bool source = GatherRules.Of(t.Kind)?.Chip == chip.Kind || chip.Kind == ThingKind.Acorn && t.Kind == ThingKind.Stump && t.OfTree != 0;
+            if (source && t.Pos.DistanceSquaredTo(chip.Pos) <= nearest) { rock = t; nearest = t.Pos.DistanceSquaredTo(chip.Pos); }
+        }
         return rock;
     }
 
@@ -1262,7 +1264,10 @@ public partial class WorldView : Node3D {
         float flicker = MathF.Sin(Elapsed * 13 + t.Id) * .5f + MathF.Sin(Elapsed * 7.3f + t.Id * 3) * .5f;
         switch (prop) {
             case TreeProp tree:
-                if (first || shaking) tree.Sway.Basis = TreeShake(prop.Shake).Scaled(Vector3.One * WorldModels.TreeScale(tree.Id));
+                bool grew = tree.Stage != t.TreeStage;
+                if (grew) WorldModels.ShowTreeStage(tree, t.TreeStage);
+                if (first || shaking || grew)
+                    tree.Sway.Basis = TreeShake(prop.Shake).Scaled(Vector3.One * WorldModels.TreeScale(tree.Id) * tree.GrowthScale);
                 break;
             case DugProp dug:
                 float worked = Clocked(dug.Worked, t.Progress, live, dt);
@@ -1882,8 +1887,8 @@ public partial class WorldView : Node3D {
         removalMark.Update(World, Removal);
         var ground = Vector2.Zero;
         bool canPoint = Placing != null && !Underground && TryGroundPoint(Mouse, out ground);
-        placeTile.Visible = canPoint;
         var kind = Placing.GetValueOrDefault();
+        placeTile.Visible = canPoint && kind != ThingKind.PlantingSpot;
         var at = canPoint ? World.Construction.Snap(kind, ground.Round()) : Vector2.Zero;
         var shown = !canPoint ? null : kind == ThingKind.Mine ? mineGhosts[Cliff.Nearest(at).Ore] : ghosts[kind];
         if (shown != ghost) {
@@ -1914,6 +1919,7 @@ public partial class WorldView : Node3D {
         foreach (var kind in World.Data.Buildings.Keys) if (kind != ThingKind.Mine) ghosts[kind] = Ghost(kind, Vector2.Zero);
         ghosts[ThingKind.Crate] = Ghost(ThingKind.Crate, Vector2.Zero);
         ghosts[ThingKind.Barrel] = Ghost(ThingKind.Barrel, Vector2.Zero);
+        ghosts[ThingKind.PlantingSpot] = Ghost(ThingKind.PlantingSpot, Vector2.Zero);
         foreach (var ore in Cliff.Ores) mineGhosts[ore] = Ghost(ThingKind.Mine, Cliff.Of(ore).MineSpot);
     }
 

@@ -54,6 +54,7 @@ internal static class ItemShape {
         ["grass"] = new(f => Sheaf(f, 20, .5f, .24f, false, "8fae55", "7c9c46", "a3bf63"), Plain, .32f, Rise: .7f),
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
         ["wheat_seeds"] = new(Seeds, Sacking, .36f, Rise: .8f),
+        ["acorn"] = new(Acorn, Plain, .25f, Lay.Loose),
         ["fertilizer"] = new(f => Sack(f, "b89b66", "9a8052", null, ("4a3524", "6b5233")), Sacking, .36f, Rise: .8f),
         ["flour"] = new(f => Sack(f, "f2ece0", "d6cdbb", "8fa3b8", null), Sacking, .36f, Rise: .8f),
         ["dough"] = new(Dough, Plain, .36f, Lay.Loose, .8f),
@@ -504,6 +505,15 @@ internal static class ItemShape {
             Quad(faces, knot - narrow, knot + narrow, shoulder + wide, shoulder - wide, Front + Vector3.Up, new Color(Ribbon));
             Quad(faces, shoulder - wide, shoulder + wide, end + wide, end - wide, Front, new Color(Ribbon).Darkened(.15f));
         }
+    }
+
+    /// <summary>A tapered brown nut with a ridged, darker cap and a short stalk.</summary>
+    private static void Acorn(List<Face> faces) {
+        Lathe(faces, Transform3D.Identity, [
+            (0, 0, "8d552c"), (.055f, .025f, "946033"), (.105f, .09f, "ac703b"), (.115f, .17f, "ad773f"),
+            (.105f, .205f, "a26c36"), (.125f, .19f, "725032"), (.12f, .23f, "87603d"), (.093f, .257f, "765233"),
+            (.026f, .274f, "67462b"), (.022f, .307f, "66462e"), (0, .318f, "855e3a")
+        ], 10);
     }
 
     /// <summary>A small open bag of wheat seeds with a few spilt in front of it.</summary>

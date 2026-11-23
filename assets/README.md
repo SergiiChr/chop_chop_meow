@@ -46,6 +46,8 @@ Detail past these does not show at the game's camera distance and costs frame ti
 Models are assembled from code-built Godot meshes, with baked meshes for trees, berry bushes and four foods.
 
 - `src/WorldModels.cs` — world objects, wolf carcass and trade cart.
+- `src/trees/display/TreePlantingShape.cs` — the planting outline and a soil nub.
+  The oak appears after the first full day of growth and scales a little larger at each stage.
 - `src/actors/display/ActorRig.cs` — player, worker, courier and the intro film's boss and catgirls, and the tools
   they hold: the steel shovel is a spade with a bar across the top of its handle and a pointed blade, laid through both
   fists while digging.
@@ -81,7 +83,7 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons, and by heaps as six-packs. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
 - `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
   The icon shows the model as built, and a heap is made of pieces of it.
-  - Built in code: wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a
+  - Built in code: the acorn with its brown cap, wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a
     six-sided collar, none with a handle), steel and tin sheets (three in a loose stack, the top one with its near
     corner bent up), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the
     jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a

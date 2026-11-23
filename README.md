@@ -172,6 +172,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Walk or sprint on a gravel path | Move 1.2× as fast |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
+| Hold right mouse button on a planting outline | Walk over and plant an acorn with a shovel |
 | Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you around obstacles to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans, and the remove selector that takes buildings down |
@@ -285,7 +286,7 @@ Their page then says "Carrying a barrel" or "Carrying a packed crate" above thei
 - A stack put down that does not all fit fills the slot, and the rest stays held until you put it down elsewhere.
 - A slot that does not take the held stack, such as an input slot for another item or an output slot, shakes, and the stack stays held.
 - Esc, a click on open ground or on the interface anywhere but an item slot, closing the side panel or walking out of reach of the building it came from lets go of the held stack, which is then back in its slot.
-- Click over open ground to place a held crate, barrel or building plan.
+- Click over open ground to place a held crate, barrel or building plan, or mark where a held acorn will go.
   Moving back over the interface returns it to the cursor.
 - A press on one slot let go of anywhere else, such as over another slot, does nothing.
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
@@ -474,14 +475,28 @@ Impassable mountain ranges close in from the left and right toward the valley's 
 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
 A berry bush holds 24 berries and is full again a day after the first one is picked from it, whether or not it was picked clean.
-A felled tree leaves a stump, and a couple of hundred plain bushes grow about the plains.
+A felled tree leaves a stump. Trees grow again from planted acorns. A couple of hundred plain bushes grow about the plains.
 Hold right mouse on a stump or a plain bush with a shovel in your backpack to dig it up: a stump gives 3 wood and a bush 36 leaves, three times what lies under an oak.
 It comes out whole after a few seconds of digging and is gone for good, so the backpack needs room for all of it.
 Iron and coal deposits sit at the foot of rock faces at the base of both ranges and need a pickaxe.
 Loose coal is scattered below the nearer coal face and is picked up whole with one right-click, with no tool.
 Loose stones and sticks lie about the plains: each picks up the same way as 1 stone or 1 wood, and is gone once picked.
 A pickaxe hit on a rock or an ore deposit knocks a loose piece of it off one time in twenty; it flies off and lands within 2 tiles, ready to pick up.
-A pale grey cliff further inland holds tin: mine it with a pickaxe.
+A pale grey cliff further inland holds tin. Mine it with a pickaxe.
+
+### Replanting trees
+
+An axe hit has the same one-in-twenty chance to drop an acorn as a pickaxe hit has to drop a chip.
+Right-click the acorn to pick it up.
+Pick up its stack in your backpack and move the cursor over open ground, as you would with a crate.
+Left-click to leave an outline and return the stack to your backpack.
+You can clear an outline with the remove selector.
+
+Hold right mouse on the outline while carrying a shovel.
+Once the digging finishes, one acorn goes into the ground and a small nub marks the spot.
+Click the nub and pour a total of 5 L from bottles or buckets into its water slot.
+After watering, the oak grows in daily stages. It holds 4 wood after one day, 21 after five, and 42 after ten.
+You can chop it from the first day it produces wood.
 
 ## Progression
 

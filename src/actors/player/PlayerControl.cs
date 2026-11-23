@@ -12,6 +12,8 @@ public abstract record ClickMode {
     public sealed record Build(ThingKind Kind, PipeShape Shape = PipeShape.Straight) : ClickMode;
     /// <summary>A click places a crate or barrel, from a specific backpack cell when one is named.</summary>
     public sealed record Container(string Item, int BackpackSlot = -1) : ClickMode;
+    /// <summary>A click marks the ground for the held acorn.</summary>
+    public sealed record Plant : ClickMode;
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
     /// <summary>The remove selector takes down what the player clicks on the selected layer.</summary>
@@ -22,7 +24,7 @@ public abstract record ClickMode {
     public float Rotation => QuarterTurns * Mathf.Pi / 2;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
-    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, _ => null };
+    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, Plant => ThingKind.PlantingSpot, _ => null };
 }
 
 /// <summary>The player in the world: walking, gathering, lifting containers, placing buildings, taking them down and clicking things.</summary>
@@ -108,6 +110,8 @@ public sealed class PlayerControl {
             if (heldPlacement is not ClickMode.Build build || build.Kind != kind) heldPlacement = new ClickMode.Build(kind);
         } else if (container != null) {
             if (heldPlacement is not ClickMode.Container placing || placing.Item != container) heldPlacement = new ClickMode.Container(container);
+        } else if (cursor.Stack?.Item == TreePlanting.Acorn) {
+            if (heldPlacement is not ClickMode.Plant) heldPlacement = new ClickMode.Plant();
         } else heldPlacement = null;
         bool showing = heldPlacement != null && !overPanel;
         if (showing) Mode = heldPlacement!;
@@ -120,7 +124,7 @@ public sealed class PlayerControl {
         PlaceHeld(overPanel);
         var placement = heldPlacement ?? Mode;
         if (placement.Placing is not ThingKind kind) return false;
-        if (kind == ThingKind.Mine) return true;
+        if (kind is ThingKind.Mine or ThingKind.PlantingSpot) return true;
         var turned = placement with { QuarterTurns = (placement.QuarterTurns + quarters + 4) % 4 };
         if (heldPlacement != null) heldPlacement = turned;
         if (placingHeld || heldPlacement == null) Mode = turned;
@@ -274,7 +278,7 @@ public sealed class PlayerControl {
         // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         var t = view.Pick(at);
-        if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
+        if (t?.IsResource == true || t?.Kind is ThingKind.Farm or ThingKind.PlantingSpot || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
     }
 
@@ -328,6 +332,13 @@ public sealed class PlayerControl {
     private void Place(Vector2 screen) {
         if (!view.TryGroundPoint(screen, out var ground, Mode.Placing == ThingKind.SteelPiping ? PipeGround.FloorY : 0)) return;
         var at = ground.Round();
+        if (Mode is ClickMode.Plant) {
+            if (world.Trees.Mark(at)) {
+                cursor.Release();
+                Mode = new ClickMode.Normal();
+            }
+            return;
+        }
         if (Mode is ClickMode.Container { BackpackSlot: >= 0 } selected && ContainerCount(selected) == 0) {
             Mode = new ClickMode.Normal();
             return;

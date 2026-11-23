@@ -101,6 +101,7 @@ Simulation and data:
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
+| `src/trees/TreePlanting.cs`, `src/trees/display/TreePlantingShape.cs`, `src/trees/display/TreePlantingPanel.cs` | Marking, planting, watering and growing trees, with the planting outline, nub and inspection page |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/packing/Packing.cs` | Packing stations |
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
@@ -849,9 +850,10 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 
 ### Resources
 
-- Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
+- The valley starts with a patch of leaves beside each oak where ground allows it (`World.LeafPatch`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
-- `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `GatherRules.ChipReach` of a boulder or deposit on `GatherRules.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
+- `World.Chip` drops a loose piece within `GatherRules.ChipReach` of the target on `GatherRules.ChipChance` of
+  successful player or worker hits. A pickaxe chips rock and ore. An axe drops an acorn from a tree.
 - A felled tree is taken out of the world and its stump (`stump`, `World.StumpWood`) put in its place by `World.Fell`, as a thing of its own with a new id that keeps the tree's id in `Thing.OfTree`.
 - Plain bushes (`bush`, `World.BushLeaves`) grow on the scenery spots `Scenery.Bush` picks (`World.GrowBushes`), away from the clearing and the mountain feet.
 - A stump or a bush is dug up whole (`GatherShape.Dug`, `Thing.IsDug`): digging adds to `Thing.Progress` at the shovel's speed until `GatherRules.DigSeconds`, then `World.Unearth` moves all it holds to the digger and removes it with a `dig_up` sound. The player's backpack must have room for all of it (`World.GatherBlock`), and a worker's hands are sized for it.
@@ -861,6 +863,20 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - Tin ore smelts into tin bars at the stone furnace, the anvil hammers a tin bar into 2 tin sheets, and a tin sheet
   makes 4 cans at the bench.
 - The stone furnace burns 2 wood into 1 charcoal.
+
+### Replanting trees
+
+`TreePlanting.Mark` places a `PlantingSpot` outline on a click while an acorn is on the cursor.
+The outline costs nothing and can be cleared by the remove selector, a building or a gravel tile.
+Holding right mouse on it with a shovel adds digging work; finishing it spends one acorn from the backpack.
+A planted acorn is a selectable nub and its water slot accepts up to five liters from bottles or buckets.
+
+The full five liters start growth and are used up.
+`Thing.NextTreeStageAt` holds the next date on the world clock and `TreePlanting` checks only trees ready to grow.
+`Thing.TreeStage` records the completed days through saves, network updates and fog memories.
+The oak grows one stage after each full day, with whole wood units rounded down from its share of `World.TreeWood`.
+Each stage adds just the increase since the last, so it preserves wood already chopped.
+Chopping out all its current wood fells the tree and leaves its stump.
 
 ### Tools
 

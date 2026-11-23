@@ -409,6 +409,7 @@ public sealed partial class GameData {
     public string Name(ThingKind kind) => Items.TryGetValue(kind.Id(), out var i) ? i.Name : Buildings.TryGetValue(kind, out var b) ? b.Name : kind switch {
         ThingKind.Barrel => Items[Barrel.Item].Name,
         ThingKind.Tree => "Tree",
+        ThingKind.PlantingSpot => "Tree planting spot",
         ThingKind.Stump => "Stump",
         ThingKind.Bush => "Bush",
         ThingKind.Iron => "Iron deposit",

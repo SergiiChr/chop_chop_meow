@@ -12,6 +12,8 @@ public static class InspectPage {
         if (selection.Worker > 0) return new WorkerPanel(tools, world.Workers.FirstOrDefault(w => w.Id == selection.Worker));
         return world.Find(selection.Thing) switch {
             null => new NothingSelectedPage(tools),
+            { Kind: ThingKind.PlantingSpot } t => new TreePlantingPanel(tools, t),
+            { Kind: ThingKind.Tree, TreeStage: > 0 } t => new TreePlantingPanel(tools, t),
             { IsResource: true } t => new ResourcePanel(tools, t),
             { Kind: ThingKind.Hut } t => new CabinPanel(tools, t),
             { Kind: ThingKind.Signpost } t => new MarketPanel(tools, t),
