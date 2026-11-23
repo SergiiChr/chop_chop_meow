@@ -217,7 +217,7 @@ public sealed class PlayerControl {
         Vector2 step;
         if (cabinApproach.Active) {
             momentum = default; step = direction;
-        } else if (WolfWithinFightingDistance()) {
+        } else if (world.WolfNearby(world.Player)) {
             momentum = new Momentum { Heading = wanted, Pace = 1 }; step = wanted;
         } else step = momentum.Step(wanted, dt);
         if (step != Vector2.Zero) walked = step.Normalized();
@@ -238,15 +238,6 @@ public sealed class PlayerControl {
         // A tool in hand that has left the backpack leaves the hand empty.
         if (world.InHand != "" && world.Backpack[world.InHand] == 0) world.SelectInHand("");
         world.Me.Selected = hotbar.ActiveItem() ?? "";
-    }
-
-    private bool WolfWithinFightingDistance() {
-        const float fightingDistance = 6;
-        int target = world.Me.Id;
-        var at = world.Player;
-        foreach (var wolf in world.Wolves)
-            if (wolf.Target == target && wolf.Pos.DistanceSquaredTo(at) < fightingDistance * fightingDistance) return true;
-        return false;
     }
 
     /// <summary>E inspects the nearby selection or the nearest thing. A pump under the pointer takes priority over the lake.</summary>

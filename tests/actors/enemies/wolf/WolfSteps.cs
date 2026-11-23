@@ -78,13 +78,24 @@ internal static class WolfSteps {
     /// <summary>Puts the player a given distance from a wolf, on the line between them, as if they had walked at it.</summary>
     public static void WalkTo(World world, Wolf wolf, float distance) => world.Player = wolf.Pos + (world.Player - wolf.Pos).Normalized() * distance;
 
-    /// <summary>A night with the player starting to step, at a walk, into a cabin four metres up from where they stood.</summary>
-    public static (World World, Thing Hut) SteppingInAtNight(GameData data) {
+    /// <summary>Starts entering just as a wolf is about to bite at the doorstep.</summary>
+    public static Wolf StepIntoBite(World world, Thing hut, Vector2 from, PlayerState? who = null) {
+        who ??= world.Me;
+        var wolf = PlaceWolf(world, new Wolf { Pos = who.Pos + from, Target = who.Id });
+        SnapTick(world, who.Health <= World.TakedownHealth ? .64f : .5f);
+        Require(WolfSnap.InAir(wolf), "a wolf should be in flight as the player starts entering");
+        world.As(who, () => Require(world.Doorways.Enter(hut, false), "the player should step into the cabin during the leap"));
+        return wolf;
+    }
+
+    /// <summary>A night with the player caught while stepping into a cabin.</summary>
+    public static (World World, Thing Hut, Wolf Wolf) TuggedAtNight(GameData data) {
         var world = NightWorld(data);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
         world.Player = Doorways.DoorPoint(hut);
-        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
-        return (world, hut);
+        var wolf = StepIntoBite(world, hut, Vector2.Right * .8f);
+        UntilTugged(world);
+        return (world, hut, wolf);
     }
 
     /// <summary>

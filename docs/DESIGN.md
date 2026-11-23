@@ -425,7 +425,7 @@ Players and workers turn as people do (`Turning`): the head turns toward a new h
 The body leans about the feet toward the inside of the turn, by the angle that balances turning at its speed against gravity, up to `Turning.MaxBank` (8°) in a sprint and `Turning.MaxJogBank` (1°) at a walk or jog.
 A half turn swings round the way the body already turns, or the way the head looks.
 
-The window moves its own player through `Momentum`: a key for about the opposite way brakes the run to a stop over `Momentum.BrakeSeconds`, stands `Momentum.TurnSeconds` to turn round and builds back up to full pace over `Momentum.StartSeconds`; any other change of keys turns at once, and letting go stops at once.
+Away from hunting wolves, the window moves its own player through `Momentum`: a key for about the opposite way brakes the run to a stop over `Momentum.BrakeSeconds`, stands `Momentum.TurnSeconds` to turn round and builds back up to full pace over `Momentum.StartSeconds`; any other change of keys turns at once, and letting go stops at once.
 While it brakes, `PlayerState.Braking` is set and carried to other machines, and the view shows the `Brake` lunge: front heel planted ahead, the weight sunk onto the bent back leg, leaning back with the arms forward.
 
 Digging (`ActorAction.Dig`) holds the shovel in both hands: the right on top of the handle and the left `ActorAnimation.ShovelGrip` down the shaft.
@@ -697,7 +697,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 - **Bite.** Within `WolfSnap.Trigger` the wolf plants its paws and fixes its bearing and destination (`Wolf.Heading`,
   `Wolf.SnapTo`). After `WolfSnap.Windup` it leaps for `WolfSnap.Flight` along that line.
   Solid ground and buildings can stop the leap. At landing it hits only if its jaws reach the player's body and the way
-  between them is clear (`WolfSnap.JawsAhead`, `WolfSnap.Reach`).
+  between them is clear (`WolfSnap.JawsAhead`, `WolfSnap.Reach`). Players on cabin steps use the view's path (`DoorwayPath`).
   The wolf stays facing the same way during `WolfSnap.MissRecovery` or `WolfSnap.HitRecovery`, and waits
   `WolfSnap.Rest` before starting another attack.
   A blow that lands first interrupts either leap, and a torch waved at a wolf gathering for a normal snap scares it off.
@@ -742,7 +742,7 @@ Building keeps `Construction.DoorRoom` clear round every cabin's door spot, and 
   Each captured arm opens out at the elbow as the wolf takes its weight. With both arms held, the chest comes up.
 - `Leaving` puts the player on the doorstep and takes `Doorways.LeaveSeconds`.
   Anyone knocking on that door goes `Aside` to `Doorways.AsideSpot`, a step along `Doorways.AsideWay`, and steps in once the leaver is through the doorway, in the order they came, while the leaver keeps `Doorways.MakeWay` to the other side; a player just standing at the door stays put, and the leaver ends `Doorways.ClearOf` beside them.
-  The view walks them in from there up the side of the step (`DoorwayView.Inward`), the two turning chest to chest with their arms hanging as they pass (`DoorwayView.SqueezePast`), the one going in with the right palm on the door frame (`ArmReach.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
+  The view walks them in from there up the side of the step (`DoorwayPath.Inward`), the two turning chest to chest with their arms hanging as they pass (`DoorwayView.SqueezePast`), the one going in with the right palm on the door frame (`ArmReach.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
 - A follower waits aside, out of the way, while the one ahead is tugged back out (`DoorwayView.Behind`).
 
 The view walks the player through the doorway over the stage (`DoorwayView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, lifting or lowering its neck to their waist as drawn, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
@@ -777,7 +777,7 @@ A paw stands on the highest tread under any part of its sole, from the heel to t
 Springing in, it starts from the height and tip it stands at in the doorway (`DoorCheckView.DoorwayLift`, `DoorCheckView.DoorwayPitch`); each paw stays where it stands as the body springs on until it lifts, the forepaws lifting flat before they fold and tucking under the shoulders clear of the floor (`DoorCheckView.TuckBelow`).
 The door stands as far open as the wolf has levered and pushed it (`DoorCheckView.DoorDegrees`, `DoorwayView.PushDoor`): a table made once of the least opening that clears the hooked snout and every part of the wolf behind the door that is as high as the door's lower edge, which only grows and swings no faster than `DoorCheckView.SwingRate` until the launch.
 On top of it the door rattles: at each pry it jumps a few degrees out off the snout in quick knocks that die away (`DoorCheckView.Rattle`), with `door_rattle` played `DoorCheck.RattleFrom` into each of the `DoorCheck.Pries` pries.
-A player the wolf takes out is drawn from where they stood inside (`DoorwayView.IntoCabin`).
+A player the wolf takes out is drawn from where they stood inside (`DoorwayPath.IntoCabin`).
 
 A player inside the cabin sees the door from in there in `InsideDoorPOV`, a window three tenths of the screen wide and 72% of it tall in its left third, from `Prying` until the wolf has them; one left inside sees the other taken out for `WorldView.TakenOutSeconds` more.
 Its picture is a cabin of its own in a viewport with its own world, lit only by dim moonlight through the door, where `WorldView.SyncInsideDoorPOV` copies the poses of the wolves at the door and of the player taken out as the world draws them (`ModelKit.CopyPose`).

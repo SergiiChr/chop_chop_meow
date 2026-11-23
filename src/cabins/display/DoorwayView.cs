@@ -9,29 +9,23 @@ namespace ChopChopMeow;
 /// player is drawn, or null for one not drawn yet.
 /// </summary>
 public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateOf) {
-    /// <summary>How far in from a cabin's door point a player stepping in walks, out of sight behind the walls.</summary>
-    public static readonly Vector2 IntoCabin = new(0, -1.8f);
-    /// <summary>Where a player knocking on a cabin's door stands, from its door point: on the lower tread of the step, close enough to reach the boards.</summary>
-    private static readonly Vector2 KnockSpot = new(0, -.5f);
-    /// <summary>Seconds a player left outside a shut door takes to step up to it, ending as the first knock lands, and to step back down after knocking.</summary>
-    private const float StepUpSeconds = .3f;
     /// <summary>
     /// A player at a cabin's door as their doorway stage shows them, null when they are at no door.
     /// </summary>
     public DoorShown? AtDoor(PlayerState p, ActorState state, float dt) {
         if (state.Stage != p.Door) {
-            if (state.Stage == Doorway.Knocking && p.Door == Doorway.None) state.SteppingDown = StepUpSeconds;
+            if (state.Stage == Doorway.Knocking && p.Door == Doorway.None) state.SteppingDown = DoorwayPath.StepUpSeconds;
             state.StageBefore = state.Stage; state.Stage = p.Door; state.StageFrom = state.Position;
         }
         if (p.Door == Doorway.None && state.SteppingDown <= 0 || world().Find(p.DoorCabin) is not Thing cabin) return null;
         var door = Doorways.DoorPoint(cabin);
-        var inside = door + IntoCabin.Rotated(cabin.Rotation);
+        var inside = door + DoorwayPath.IntoCabin.Rotated(cabin.Rotation);
         // A player a wolf takes out of the cabin they were in starts from where they stood inside it.
         if (p.Door == Doorway.Tugged && state.StageBefore == Doorway.None) state.StageFrom = inside;
         if (p.Door == Doorway.None && state.SteppingDown > 0) {
             // Done knocking, the player steps back down off the step to where they stand, still facing the door.
             state.SteppingDown = Math.Max(0, state.SteppingDown - dt);
-            var down = state.StageFrom.Lerp(p.Pos, Mathf.SmoothStep(0, 1, 1 - state.SteppingDown / StepUpSeconds));
+            var down = state.StageFrom.Lerp(p.Pos, Mathf.SmoothStep(0, 1, 1 - state.SteppingDown / DoorwayPath.StepUpSeconds));
             return new DoorShown(down, inside, ActorAction.Walk, door, true, 0, 0, 0, cabin.Rotation);
         }
         (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) shown = p.Door == Doorway.Following ? (Behind(p, state, door, cabin.Rotation, dt), inside, ActorAction.Walk, false)
@@ -64,17 +58,14 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
     /// where they were drawn as the stage began; a tugged player goes <paramref name="reach"/> metres out.
     /// </summary>
     public static (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) DoorStep(Doorway stage, Vector2 door, Vector2 from, Vector2 start, float time, float seconds, bool rush, float reach, float rotation = 0) {
-        var inward = IntoCabin.Rotated(rotation);
-        var aside = Doorways.AsideWay.Rotated(rotation);
+        var inward = DoorwayPath.IntoCabin.Rotated(rotation);
         var inside = door + inward;
-        float done = Math.Clamp(time / Math.Max(seconds, .01f), 0, 1);
-        // Left outside, a player waits for the door to swing shut, then steps up to it and knocks.
-        float up = Mathf.SmoothStep(0, 1, Math.Clamp((time - Doorways.KnockLead + StepUpSeconds) / StepUpSeconds, 0, 1));
+        var at = DoorwayPath.At(stage, door, from, time, seconds, rush, rotation);
         return stage switch {
             // From beside the step the player sidesteps into the doorway still facing it.
-            Doorway.Entering => (Inward(start, door, inward, aside, rush ? done : WalkedIn(time)), inside, rush ? ActorAction.Jog : ActorAction.Walk, Math.Abs((start - door).Dot(aside)) > SideLane),
-            Doorway.Leaving => (Outward(door, from, inward, aside, done), door - inward, ActorAction.Walk, false),
-            Doorway.Knocking => (start.Lerp(door + KnockSpot.Rotated(rotation), up), inside, time >= Doorways.KnockLead ? ActorAction.Knock : up > 0 ? ActorAction.Walk : ActorAction.Idle, false),
+            Doorway.Entering => (at, inside, rush ? ActorAction.Jog : ActorAction.Walk, DoorwayPath.FromTheSide(from, door, rotation)),
+            Doorway.Leaving => (at, door - inward, ActorAction.Walk, false),
+            Doorway.Knocking => (at, inside, time >= Doorways.KnockLead ? ActorAction.Knock : DoorwayPath.KnockStep(time) > 0 ? ActorAction.Walk : ActorAction.Idle, false),
             _ => (start.Lerp(from - inward.Normalized() * reach, DoorTug.TugProgress(time / DoorTug.TugSeconds)), inside, ActorAction.Tugged, true),
         };
     }
@@ -85,26 +76,6 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
 
     /// <summary>Seconds a player takes to step aside at a cabin's door.</summary>
     private const float AsideSeconds = .5f;
-    /// <summary>
-    /// Where a player stepping into a cabin from <paramref name="start"/> is, <paramref name="done"/> of the way: straight in,
-    /// or from beside the step, back in front of it and up it along its side, so they pass whoever comes down the middle and
-    /// never walk into the step's side or the door frame.
-    /// </summary>
-    private static Vector2 Inward(Vector2 start, Vector2 door, Vector2 inward, Vector2 aside, float done) {
-        var inside = door + inward;
-        float across = (start - door).Dot(aside);
-        if (Math.Abs(across) <= SideLane) return start.Lerp(inside, done);
-        var side = aside * (Math.Sign(across) * SideLane);
-        var front = door + side + inward.Normalized() * .25f;
-        var tread = door + side + inward.Normalized() * StairSteps.StepEdges[1];
-        float first = start.DistanceTo(front), second = front.DistanceTo(tread), last = tread.DistanceTo(inside), along = done * (first + second + last);
-        return along < first ? start.Lerp(front, along / first)
-            : along < first + second ? front.Lerp(tread, (along - first) / second)
-            : tread.Lerp(inside, Math.Min(1, (along - first - second) / last));
-    }
-
-    /// <summary>How far to the side of the door point a player stepping in past someone walks up the step, which is a metre wide, keeping their boots on it.</summary>
-    private const float SideLane = .22f;
     /// <summary>
     /// Where a hand flat on the right door jamb's inner face is from a cabin's door point, to the side, in and up, as the
     /// cabin model builds the jamb.
@@ -126,20 +97,6 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
     private const float ReachableFrom = .05f, ReachableAt = .17f;
     /// <summary>How far above the shoulder a hand reaching for the door frame goes at most.</summary>
     private const float AboveShoulder = .1f;
-    /// <summary>
-    /// Where a player stepping out of a cabin to <paramref name="end"/> is, <paramref name="done"/> of the way: straight out,
-    /// or, ending to one side of the door point, down that side of the step and across.
-    /// </summary>
-    private static Vector2 Outward(Vector2 door, Vector2 end, Vector2 inward, Vector2 aside, float done) {
-        var inside = door + inward;
-        float offside = (end - door).Dot(aside);
-        if (Math.Abs(offside) <= .05f) return inside.Lerp(end, done);
-        // Down the step inside its width, then across to where they stop.
-        var side = door + aside * Math.Clamp(offside, -SideLane, SideLane) + inward.Normalized() * StairSteps.StepEdges[1];
-        float first = inside.DistanceTo(side), along = done * (first + side.DistanceTo(end));
-        return along < first ? inside.Lerp(side, along / first) : side.Lerp(end, (along - first) / side.DistanceTo(end));
-    }
-
     /// <summary>Seconds until someone stepping out of the cabin a player stands aside at is through its doorway, or null with nobody stepping out.</summary>
     private float? LeftToGo(PlayerState aside) {
         foreach (var p in world().Players)
@@ -173,18 +130,6 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
     private const float SqueezeTurn = 30, SqueezeTwist = 45, EnterTwist = 20;
     /// <summary>The arms of a player passing someone in a doorway: hanging at the sides, the forearms a little forward so a tool in hand clears the ground.</summary>
     private const float TuckRaise = 0, TuckOut = 3, TuckElbow = 35;
-    /// <summary>
-    /// How far through a walk into a cabin a player is <paramref name="time"/> seconds in, 0 to 1: at the pace of a 1.5 s
-    /// walk until they are up the first tread, then speeding up over <see cref="HurrySeconds"/> to hurry the rest in the
-    /// time <see cref="Doorways.EnterSeconds"/> leaves.
-    /// </summary>
-    private static float WalkedIn(float time) {
-        float fast = (1 - StepInPace * (HurryFrom + HurrySeconds / 2)) / (Doorways.EnterSeconds - HurryFrom - HurrySeconds / 2);
-        float ramp = Math.Clamp(time - HurryFrom, 0, HurrySeconds);
-        float walked = StepInPace * Math.Min(time, HurryFrom) + StepInPace * ramp + (fast - StepInPace) * ramp * ramp / (2 * HurrySeconds);
-        return Math.Min(1, walked + fast * Math.Max(0, time - HurryFrom - HurrySeconds));
-    }
-    private const float StepInPace = 1 / 1.5f, HurryFrom = .45f, HurrySeconds = .15f;
     /// <summary>
     /// Where a player following someone into a cabin stands, stepping there from where they were drawn: up toward the door no
     /// closer than a stride behind the one ahead, or, while a wolf tugs that one back out, aside from the doorway and out of their way.
@@ -266,7 +211,7 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
         // Passing someone in a doorway, the arms hang at the sides, a tool held low and pointing ahead, instead of swinging out.
         if (at.Tuck > 0) pose = ArmReach.WithArm(ArmReach.WithArm(pose, true, TuckRaise, TuckOut, TuckElbow, at.Tuck), false, TuckRaise, TuckOut, TuckElbow, at.Tuck);
         // The way up the steps, in the body's frame: X toward its left and Y ahead.
-        var inward = IntoCabin.Normalized().Rotated(at.Rotation);
+        var inward = DoorwayPath.IntoCabin.Normalized().Rotated(at.Rotation);
         var up = inward.Rotated(state.Yaw);
         float depth = (state.Position - at.Door).Dot(inward);
         pose = StairSteps.OnSteps(pose, depth, up, at.Backing, StairSteps.StepEdges, StairSteps.StepRise, ref state.Lift, ref state.LiftSpeed, dt);

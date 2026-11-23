@@ -31,14 +31,15 @@ public sealed class WolfSnap(World world) {
     /// </summary>
     internal void Start(Wolf wolf) {
         if (world.DoorTug.TakeSide(wolf) || world.DoorTug.Tugged || world.Downed || wolf.Attack > 0) return;
-        float gap = wolf.Pos.DistanceTo(world.Player);
+        var mark = BitePosition();
+        float gap = wolf.Pos.DistanceTo(mark);
         // Up against the player it first backs up far enough to leap.
         if (gap >= Trigger || gap < JawsAhead + ShortestHop - Reach * .6f) return;
-        Commit(wolf, false);
+        Commit(wolf, mark, throat: false);
     }
 
-    internal void Commit(Wolf wolf, bool throat) {
-        var toward = world.Player - wolf.Pos;
+    internal void Commit(Wolf wolf, Vector2 mark, bool throat) {
+        var toward = mark - wolf.Pos;
         if (toward.LengthSquared() > 1e-6f) wolf.Heading = toward.Angle();
         float jawsAhead = throat ? ThroatJawsAhead : JawsAhead;
         float longHop = throat ? World.LeapRange - jawsAhead : LongestHop;
@@ -75,17 +76,25 @@ public sealed class WolfSnap(World world) {
         return last;
     }
 
+    /// <summary>Where the acting player stands on screen, including while stepping onto a cabin's threshold.</summary>
+    internal Vector2 BitePosition() {
+        var p = world.S.Actor;
+        if (p.Door is not (Doorway.Entering or Doorway.Leaving or Doorway.Knocking) ||
+            world.Find(p.DoorCabin) is not Thing cabin) return p.Pos;
+        return DoorwayPath.At(p.Door, Doorways.DoorPoint(cabin), p.Pos, p.DoorTime, Doorways.DoorSeconds(p), p.DoorRush, cabin.Rotation);
+    }
+
     private void Land(Wolf wolf, bool throat) {
-        if (world.DoorTug.TakeSide(wolf)) return;
         wolf.Attack = Rest;
+        var mark = BitePosition();
         var jaws = wolf.Pos + Vector2.FromAngle(wolf.Heading) * (throat ? ThroatJawsAhead : JawsAhead);
-        bool hit = !world.Downed && !world.DoorTug.Tugged && jaws.DistanceSquaredTo(world.Player) <= Reach * Reach &&
-            ClearTo(wolf.Pos, world.Player) == world.Player;
+        bool hit = !world.Downed && !world.DoorTug.Tugged && jaws.DistanceSquaredTo(mark) <= Reach * Reach &&
+            ClearTo(wolf.Pos, mark) == mark;
         wolf.Recover = hit ? HitRecovery : MissRecovery;
         if (!hit) return;
         bool pins = throat && !world.Protected(world.Player);
         if (!pins) world.S.Health -= world.Data.WolfBite;
-        if (world.DoorTug.TugOut(wolf) || !pins) world.Play("wolf_bite", world.Player);
+        if (world.DoorTug.TugOut(wolf) || !pins) world.Play("wolf_bite", mark);
         else world.WolfHunt.Pin(wolf);
     }
 }

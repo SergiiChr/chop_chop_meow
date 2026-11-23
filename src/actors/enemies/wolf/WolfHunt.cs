@@ -39,15 +39,16 @@ public sealed class WolfHunt(World world) {
         // Behind a torch only a wolf that stood its ground leaps.
         if (!world.Downed && world.S.Health <= World.TakedownHealth && !lit && !world.DoorTug.Tugged && !AnyLeaping(hunters)) {
             Wolf? hunter = null;
+            var mark = world.WolfSnap.BitePosition();
             float closest = World.LeapRange * World.LeapRange;
             foreach (var wolf in hunters) {
-                float distance = wolf.Pos.DistanceSquaredTo(world.Player);
+                float distance = wolf.Pos.DistanceSquaredTo(mark);
                 if (distance >= closest || WolfSnap.Active(wolf) || wolf.Attack > 0 || Held(wolf, wary) ||
                     wolf.Follow == FollowStage.Routed || world.Protected(wolf.Pos) ||
                     wolf.Howl > 0 || wolf.HowlIn > 0 || wolf.Flee > 0 || wolf.Stagger > 0) continue;
                 hunter = wolf; closest = distance;
             }
-            if (hunter != null) { world.WolfSnap.Commit(hunter, true); world.Say("A wolf gathers to leap for your throat!"); }
+            if (hunter != null) { world.WolfSnap.Commit(hunter, mark, throat: true); world.Say("A wolf gathers to leap for your throat!"); }
         }
         // A chase always outpaces a walk but not a sprint.
         float speed = world.Data.WolfTrot, chase = world.Data.WalkSpeed * world.Data.WolfChase;

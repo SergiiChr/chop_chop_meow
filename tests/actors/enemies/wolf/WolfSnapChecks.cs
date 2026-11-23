@@ -13,6 +13,7 @@ public static class WolfSnapChecks {
         Test(CheckAWalkingPlayerCanEvadeAndCounter, data);
         Test(CheckAWoundedPlayerCanEvadeAThroatLeap, data);
         Test(CheckALeapStopsAtABuilding, data);
+        Test(CheckSteppingIntoTheDoorwayCanEvadeABite, data);
         Test(CheckABlowThatLandsFirstStopsTheBite, data);
     }
 
@@ -74,6 +75,18 @@ public static class WolfSnapChecks {
         SnapTick(world, .78f);
         Require(world.Health == 49 && !world.Mauled && wolf.Pos.X > wall.X + .4f && world.CanStand(wolf.Pos),
             "a throat leap should stop on its side of a solid object and miss the player behind it");
+    }
+
+    private static void CheckSteppingIntoTheDoorwayCanEvadeABite(GameData data) {
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
+        world.Player = Doorways.DoorPoint(hut);
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.3f, 0) });
+        SnapTick(world, .06f);
+        Require(world.Doorways.Enter(hut, false), "the player should start entering during the wolf's windup");
+        SnapTick(world, .54f);
+        Require(world.Door == Doorway.Entering && world.Health == 100 && wolf.Recover > 0,
+            "the player should step beyond the jaws before the bite lands on the empty doorstep");
     }
 
     /// <summary>A blow knocks a wolf back and leaves it reeling, so one timed to land while the wolf gathers itself costs it the bite.</summary>

@@ -322,8 +322,8 @@ public partial class WorldView {
         (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) shown;
         if (now == Doorway.None) {
             float walked = Math.Clamp((time - start) / 1.6f, 0, 1);
-            var from = door - DoorwayView.IntoCabin * 2;
-            shown = (from.Lerp(door, walked), door + DoorwayView.IntoCabin, walked < 1 ? ActorAction.Jog : ActorAction.Idle, false);
+            var from = door - DoorwayPath.IntoCabin * 2;
+            shown = (from.Lerp(door, walked), door + DoorwayPath.IntoCabin, walked < 1 ? ActorAction.Jog : ActorAction.Idle, false);
         } else if (now == Doorway.Tugged) {
             // Half way into a run in, the player is tugged back out a metre, then runs in from there as one who goes for the cabin again.
             float run = time - start, tugged = run - Doorways.RushSeconds / 2;

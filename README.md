@@ -166,7 +166,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 
 | Input | Action |
 | --- | --- |
-| WASD or arrow keys | Move in screen directions; pressing about the opposite way while running brakes to a stop in a lunge, turns round and runs back |
+| WASD or arrow keys | Move in screen directions. Away from hunting wolves, reversing a run brakes, turns and runs back |
 | Shift while moving | Sprint 1.6× as fast; food and drink drain 1.7× as fast; not under 15% food or drink |
 | Walk or sprint on a gravel path | Move 1.2× as fast |
 | Hold right mouse button on a resource | Approach and gather while held |

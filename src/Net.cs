@@ -404,7 +404,8 @@ public partial class Net : Node {
         float dt = Math.Min((float)delta, .1f);
         foreach (var (owner, goal) in goals) Place(owner, Glide(Position(owner), goal, dt));
         foreach (var p in World.Players)
-            if (walks.TryGetValue(p.Id, out var walk) && walk.Warp == p.Warp) using (World.ActAs(p)) World.MoveTo(Glide(p.Pos, walk.At, dt));
+            if (walks.TryGetValue(p.Id, out var walk) && walk.Warp == p.Warp) using (World.ActAs(p))
+                World.MoveTo(World.WolfNearby(walk.At) ? walk.At : Glide(p.Pos, walk.At, dt));
         if (World.Remote) World.Look();
         sendClock += dt;
         if (Hosting && sendClock >= SnapshotInterval) {
@@ -606,12 +607,18 @@ public partial class Net : Node {
             if (at < 0) { list.Add(WorldUpdates.Read<T>(json)); continue; }
             var old = list[at];
             var from = Position(old);
+            bool wasAttacking = old is Wolf before && ShowsWolfAttack(before);
             // Setting numbers leaves those that did not change, so a glider starts from the last update's position, not from how far it has glided.
             if (glide && goals.TryGetValue(old, out var goal)) Place(old, goal);
             if (!SetInPlace(old, key, json)) CopyExcept(old, WorldUpdates.Read<T>(json), null);
-            if (glide && old != except) { goals[old] = Position(old); Place(old, from); }
+            // A bite uses the same snapshot for the wolf's place and its attack clock.
+            if (old is Wolf wolf && (wasAttacking || ShowsWolfAttack(wolf))) goals.Remove(old);
+            else if (glide && old != except) { goals[old] = Position(old); Place(old, from); }
         }
     }
+
+    private static bool ShowsWolfAttack(Wolf wolf) =>
+        WolfSnap.Active(wolf) || wolf.Recover > 0 || wolf.Stagger > 0 || wolf.Tugging || wolf.Pinning;
 
     /// <summary>Sets the numbers that differ from the entry this copy shows, or says the new entry must be read whole.</summary>
     private bool SetInPlace<T>(T target, EntryKey key, byte[] json) where T : class => applied.TryGetValue(key, out var before) && updates.SetNumbers(target, before, json);

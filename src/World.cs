@@ -2102,6 +2102,14 @@ public sealed partial class World {
         if (!PayWage((int)w.WageDebt)) { Say("Not enough coins in the wage slot or your backpack to settle wages."); return; }
         w.WageDebt = 0;
     }
+    /// <summary>Whether a wolf is fighting or hunting within six metres, including one hunting another player.</summary>
+    internal bool WolfNearby(Vector2 at) {
+        const float distance = 6;
+        foreach (var wolf in S.Wolves)
+            if (wolf.Target != 0 && wolf.Pos.DistanceSquaredTo(at) < distance * distance) return true;
+        return false;
+    }
+
     /// <summary>The wolves hunting the acting player.</summary>
     internal IEnumerable<Wolf> Hunters => S.Wolves.Where(w => w.Target == S.Actor.Id);
     // Reused copies of lists the tick walks while it may change them, so ticking allocates nothing.

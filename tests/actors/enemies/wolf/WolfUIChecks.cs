@@ -36,8 +36,11 @@ public partial class Game {
         var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(0, -4));
         Warp(Hosted, Doorways.DoorPoint(hut));
         await Frames();
-        Require(Hosted.Doorways.Enter(hut, false), "A player at a cabin's door must step in.");
-        var pack = new[] { new Vector2(.8f, 0), new Vector2(-1, .2f), new Vector2(1, .2f) }.Select(from => PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + from })).ToList();
+        var tugger = WolfSteps.StepIntoBite(Hosted, hut, Vector2.Right * .8f);
+        await Until(() => world.Door == Doorway.Tugged, "the first wolf tugging the player out of the doorway", 3);
+        var pack = new[] { new Vector2(-1, .2f), new Vector2(1, .2f) }
+            .Select(from => PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + from })).ToList();
+        pack.Add(tugger);
         await Until(() => world.Door == Doorway.Tugged && world.Wolves.Count(w => w.Side != 0 && view.ModelOf(w) is { Motion: WolfMotion.Rear, Settled: >= 1 }) == 2,
             "a wolf taking each arm of a player another wolf tugs out of a doorway", 3);
         var rig = view.RigOf(world.Me.Id)!;
