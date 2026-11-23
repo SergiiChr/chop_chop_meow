@@ -293,7 +293,7 @@ public partial class WorldView : Node3D {
     /// <summary>Plays a swing, pump or kindling on the player who made it, here or at another machine.</summary>
     public void Acted(int id, ActorAction action, Vector2 target) {
         if (id == World.Me.Id) {
-            if (ActorAnimation.SwingsOnTheMove(action)) pulseYaw = ActorAnimation.Yaw(FirstPersonForward, player.Yaw);
+            if (FirstPerson && ActorAnimation.SwingsOnTheMove(action)) pulseYaw = ActorAnimation.Yaw(target - World.Player, player.Yaw);
             StartPulse(player, action, target, ref pulseAction, ref pulseTarget, ref pulseRemaining);
         } else if (others.TryGetValue(id, out var other))
             StartPulse(other.State, action, target, ref other.Pulse, ref other.PulseTarget, ref other.PulseRemaining);
@@ -509,15 +509,18 @@ public partial class WorldView : Node3D {
         Thing? best = null; nearest = float.MaxValue;
         // Hits follow what is drawn, including memories, but only things that still exist can be picked.
         World.CollectKnown(picking);
+        bool firstPerson = FirstPerson;
         foreach (var drawn in picking) {
             if (drawn.Remaining <= 0 && drawn.IsResource && drawn.Kind != ThingKind.Berries || World.Find(drawn.Id) is not Thing t) continue;
+            // The first-person view shows the valley, but its pointer works on nearby live objects.
+            if (firstPerson && drawn != t) continue;
             // The lake has no raised model. Its shore is picked behind the objects standing there.
             if (t.Kind == ThingKind.Water) continue;
             var hits = HitsOf(drawn);
             // Only the foot of a tree's trunk, its first hit, picks the tree, so a click among the crowns of a forest reaches the ground and swings.
             if (t.Kind == ThingKind.Tree) {
                 if (hits.Length == 0) continue;
-                var trunk = FirstPerson ? hits[0] : hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) };
+                var trunk = firstPerson ? hits[0] : hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) };
                 if (RayCylinder(origin, direction, t.Pos, trunk, out float s) && s < nearest) { nearest = s; best = t; }
                 continue;
             }
@@ -688,7 +691,7 @@ public partial class WorldView : Node3D {
         action = WorkPose(action, subject);
         player.Update(at, action, target, dt, door?.Backing ?? false);
         if (FirstPerson && door == null) {
-            // Travel can be sideways or backward. Face the camera's direction, held at the start of each swing.
+            // Travel can be sideways or backward. Face the view while walking, and hold the heading of a swing until it ends.
             bool swing = ActorAnimation.SwingsOnTheMove(action);
             if (swing || action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake) {
                 player.Yaw = swing ? pulseYaw : ActorAnimation.Yaw(FirstPersonForward, player.Yaw);
@@ -1101,7 +1104,8 @@ public partial class WorldView : Node3D {
             foreach (var t in World.Things) Show(PropFor(t), false);
         }
         seen.Clear();
-        bool everything = FirstPerson || filming || EnvironmentReview && EnvironmentCenter.HasValue;
+        bool firstPerson = FirstPerson;
+        bool everything = firstPerson || filming || EnvironmentReview && EnvironmentCenter.HasValue;
         CollectDrawnThings(known, everything);
         bool dark = Dark;
         foreach (var t in known) {
@@ -1118,7 +1122,9 @@ public partial class WorldView : Node3D {
             if (prop.Look.Pos != t.Pos) prop.Root.Position = To3(t.Pos);
             // A change plays out only where the player was already watching, not on a thing first seen or seen again this frame.
             bool watched = live && prop.Seen && prop.Look.Live;
-            Animate(prop, t, live ? dt : SettleSeconds, live, watched);
+            // Preview distant shapes and positions without replacing the small details the overhead view remembers.
+            bool closeDetails = live && (!firstPerson || World.Sees(t.Pos));
+            Animate(prop, t, live ? dt : SettleSeconds, closeDetails, watched && closeDetails);
             prop.Look = look;
         }
         sawFrom = World.Player;

@@ -18,6 +18,7 @@ public partial class Game {
 
     private async Task RunFirstPersonUIChecks() {
         await TestClean(CheckFirstPersonDrawsDistantThingsAndTheLocalBody);
+        await TestClean(CheckFirstPersonKeepsTheOverheadCabinMemory);
         await TestClean(CheckFirstPersonTurnsWalksSwingsAndSelects);
     }
 
@@ -42,6 +43,25 @@ public partial class Game {
         Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() != true, "Returning overhead should hide unexplored objects again.");
         RemoveThings(Hosted, t => t == distant);
         await Frames();
+    }
+
+    /// <summary>A barrel added to a distant cabin does not appear in the player's earlier overhead memory.</summary>
+    private async Task CheckFirstPersonKeepsTheOverheadCabinMemory() {
+        var home = world.Player;
+        var cabin = Hosted.Add(ThingKind.Hut, home + Vector2.Down * 3);
+        await Frames();
+        Require(view.PropOf(cabin.Id) is HutProp { RoofBarrel.Visible: false }, "The cabin should start without a roof barrel.");
+        var distant = home + new Vector2(-25, 25);
+        Warp(Hosted, distant);
+        await Until(() => world.Player.DistanceTo(distant) < .1f, "moving beyond the cabin's sight circle", 2);
+        cabin.Inventory.Add(Barrel.Item, 1);
+        await ToggleFirstPersonInPauseMenu();
+        await ToggleFirstPersonInPauseMenu();
+        Require(view.PropOf(cabin.Id) is HutProp { RoofBarrel.Visible: false },
+            "The overhead cabin memory should not show the barrel that was added out of sight.");
+        RemoveThings(Hosted, t => t == cabin);
+        Warp(Hosted, home);
+        await Frames(4);
     }
 
     /// <summary>Mouse look steers the player and their swings and points clicks at a station.</summary>

@@ -204,7 +204,8 @@ The hotbar starts with an axe, pickaxe, chest, campfire, furnace, anvil, craftin
 
 Open **Options** from the start or pause menu and switch on **First-person preview**. Each launch starts overhead.
 Move with WASD or the arrow keys relative to where you look. Move the mouse to look around.
-Left and right click act on what the centre dot points at. Space swings where you look and still pumps a selected machine in reach.
+Left and right click act on nearby things under the centre dot. Space swings where you look and still pumps a
+selected machine in reach.
 Opening a panel or menu frees the pointer so you can click its controls. Close it to look around again.
 The valley is visible out to the horizon. Look down to see your body, and swing to see your arms and weapon move.
 Cabins, being downed and underground pipe work use the overhead view.
