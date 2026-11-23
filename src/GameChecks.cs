@@ -1350,6 +1350,7 @@ public partial class Game {
     private async void RunUIChecks() {
         try {
             await TestClean(CheckLaunchOpensTheStartMenuWithNoSaveToContinue);
+            await TestClean(CheckStartMenuPutsCameraSwitchInOptions);
             await TestClean(CheckOptionsApplyAndKeepTheirChoices);
             await TestClean(CheckAntiAliasingChoicesNameTheSizeTheWorldIsDrawnAt);
             await TestClean(CheckPaintFilterSwitchDrawsTheFilter);

@@ -379,6 +379,8 @@ The first-person preview switches the same camera to a perspective at eye level.
 `FirstPersonCamera` turns the camera from mouse motion and rotates walking directions to match.
 `WorldView` casts the same picking rays from the eye, and shows the sky, distant terrain and live objects without fog.
 The first-person camera hides the local player's head so its view from the eyes can show the body, hands and tools.
+`FirstPersonSky` is created when the preview first opens and draws a sun or moon following the world light's arc.
+Overhead view uses its own ambient sky resource and a solid background.
 Cabins, downed players and underground pipe work keep the overhead view.
 The sun and moon share one shadow map across this view.
 Its small shadow offset keeps the shade attached to feet, trunks and low props, while ambient occlusion shades creases.

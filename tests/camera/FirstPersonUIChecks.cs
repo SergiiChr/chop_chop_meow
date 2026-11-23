@@ -8,6 +8,14 @@ using static SetupSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
+    private async Task CheckStartMenuPutsCameraSwitchInOptions() {
+        Require(startMenu.Screen.FindChild("first_person", true, false) == null, "The main menu should not show the camera switch.");
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        Require(startMenu.Screen.FindChild("first_person", true, false) is CheckButton { ButtonPressed: false },
+            "The first-person preview should be offered in Options and start switched off.");
+        await Click(FindButton(startMenu.Screen, "Back · Esc")!);
+    }
+
     private async Task RunFirstPersonUIChecks() {
         await TestClean(CheckFirstPersonDrawsDistantThingsAndTheLocalBody);
         await TestClean(CheckFirstPersonTurnsWalksSwingsAndSelects);
@@ -19,12 +27,18 @@ public partial class Game {
         await Frames();
         Require(!world.Explored(distant.Pos), "The distant chest must be outside explored ground.");
         Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() != true, "Unexplored chests should be hidden in the overhead view.");
+        var environment = view.GetWorld3D().Environment;
+        var overheadSky = environment.Sky;
         await ToggleFirstPersonInPauseMenu();
+        Require(environment.BackgroundMode == Environment.BGMode.Sky && environment.Sky != overheadSky,
+            "First person should draw its own sky.");
         Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() == true, "First person should show the distant chest.");
         var camera = GetViewport().GetCamera3D();
         Require(AllMeshes(view.PlayerRig.Torso).Any(part => part.IsVisibleInTree() && (part.Layers & camera.CullMask) != 0),
             "The player's body must be visible from the first-person camera.");
         await ToggleFirstPersonInPauseMenu();
+        Require(environment.BackgroundMode == Environment.BGMode.Color && environment.Sky == overheadSky,
+            "Overhead view should restore its original lighting and switch off the visible sky.");
         Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() != true, "Returning overhead should hide unexplored objects again.");
         RemoveThings(Hosted, t => t == distant);
         await Frames();

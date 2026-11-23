@@ -60,7 +60,6 @@ public partial class StartMenu : ColorRect {
         AddButton("New game", flow.Restart);
         AddButton("Load game", () => ShowSlots(false, ShowStart));
         AddButton("Join game", () => ShowJoin(ShowStart, false));
-        CameraSwitch();
         AddButton("Options", () => ShowOptions(ShowStart));
         AddButton("Quit", flow.Quit);
     }
@@ -117,15 +116,12 @@ public partial class StartMenu : ColorRect {
             Settings.ApplyAntiAliasing(GetViewport(), AntiAliasings[index]);
         };
         smoothingRow.AddChild(smoothing);
-        CameraSwitch();
+        Toggle("First-person preview", "first_person", flow.FirstPersonPreview, on => flow.FirstPersonPreview = on);
         Toggle("Paint filter", "paint_filter", Settings.PaintFilter, on => { Settings.Store("display", "paint_filter", on); flow.ApplyPaintFilter(on); });
         Toggle("Fullscreen", "fullscreen", Settings.Fullscreen, on => { Settings.Store("display", "fullscreen", on); flow.ApplyFullscreen(on); });
         Toggle("Frame rate counter", "fps", Settings.FrameRate, on => { Settings.Store("display", "fps", on); flow.ShowFrameRate(on); });
         AddButton("Back · Esc", back);
     }
-
-    private void CameraSwitch() =>
-        Toggle("First-person preview", "first_person", flow.FirstPersonPreview, on => flow.FirstPersonPreview = on);
 
     /// <summary>Names each anti-aliasing choice, with the size the FSR ones draw the world at for the current render size.</summary>
     private void NameAntiAliasings(OptionButton smoothing) {

@@ -71,6 +71,8 @@ public partial class WorldView : Node3D {
     private Godot.Environment environment = null!;
     /// <summary>Never drawn: its light from above and bounce from below is the ambient light, so a roof and a wall differ in shade.</summary>
     private ProceduralSkyMaterial skylight = null!;
+    private Sky overheadSky = null!;
+    private FirstPersonSky? previewSky;
     private Node3D scene = null!;
     private Overlay overlay = null!;
     private readonly Dictionary<int, Prop> props = new();
@@ -185,13 +187,14 @@ public partial class WorldView : Node3D {
         AddChild(camera);
         // Half energy puts the sky's light at DayAmbientEnergy.
         skylight = new ProceduralSkyMaterial { SkyEnergyMultiplier = .5f, GroundEnergyMultiplier = .5f };
+        // Two flat colours need no detail in the sky's light map.
+        overheadSky = new Sky { SkyMaterial = skylight, RadianceSize = Sky.RadianceSizeEnum.Size64 };
         environment = new Godot.Environment {
             BackgroundMode = Godot.Environment.BGMode.Color,
             BackgroundColor = new Color("879c69"),
             AmbientLightSource = Godot.Environment.AmbientSource.Sky,
             ReflectedLightSource = Godot.Environment.ReflectionSource.Sky,
-            // Two flat colours need no detail in the sky's light map, and a small one is cheap to rebuild as the day changes.
-            Sky = new Sky { SkyMaterial = skylight, RadianceSize = Sky.RadianceSizeEnum.Size64 },
+            Sky = overheadSky,
             AmbientLightEnergy = DayAmbientEnergy,
             // Light bounced from what is on screen, such as firelight off the ground onto nearby walls.
             SsilEnabled = true,
@@ -373,6 +376,9 @@ public partial class WorldView : Node3D {
     }
 
     private void SetFirstPersonBackground(bool show) {
+        if (show) previewSky ??= new FirstPersonSky(this);
+        previewSky?.Show(show);
+        environment.Sky = show ? previewSky!.Background : overheadSky;
         environment.BackgroundMode = show ? Godot.Environment.BGMode.Sky : Godot.Environment.BGMode.Color;
         fogCover.Visible = !show;
     }
@@ -1923,9 +1929,7 @@ public partial class WorldView : Node3D {
     private const float NewMoonAmbient = .1f;
 
     /// <summary>The sky light last written.</summary>
-    private Color skyAmbient, skyTop, skyHorizon;
-    private static readonly Color DaySky = new("5487be"), DayHorizon = new("aac0c8"), DuskHorizon = new("d99469");
-    private static readonly Color NightSky = new("130e26"), NightHorizon = new("333958");
+    private Color skyAmbient;
 
     /// <summary>The world's time of day as the sun and light show it; a sleep that skips the night jumps it.</summary>
     private readonly LocalClock dayClock = new(1);
@@ -1943,24 +1947,25 @@ public partial class WorldView : Node3D {
         // The light turns a little every frame; the engine redraws the sun's shadows every frame anyway.
         float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, arc)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 40, height));
         var heading = NoonHeading.Rotated(swing);
-        sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
+        var lightDirection = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
+        sun.Basis = lightDirection;
         // The moon waxes and wanes over the month: a full moon lights the night sky, a new moon leaves only firelight to see by.
         float moonlight = World.MoonlightAt(time);
         sun.LightEnergy = (moon ? MoonEnergy * moonlight : Mathf.Lerp(DaySun, .08f, night)) * Mathf.SmoothStep(0, .25f, height);
         // A low sun gives warm light at sunrise and sunset.
         float low = moon ? 0 : 1 - Mathf.SmoothStep(.1f, .45f, height);
-        sun.LightColor = NoonLight.Lerp(LowSunLight, low).Lerp(MoonLight, night);
+        var lightColor = NoonLight.Lerp(LowSunLight, low).Lerp(MoonLight, night);
+        sun.LightColor = lightColor;
         var ambient = DayAmbient.Lerp(LowSunAmbient, low * .6f).Lerp(NightAmbient, night);
         // Sky light from above, and below it that light bounced off the grass; each write rebuilds the sky's light, so a steady sky gets none.
         if (ambient != skyAmbient) {
             skyAmbient = ambient;
             var bounce = ambient * DayGround;
+            skylight.SkyTopColor = ambient; skylight.SkyHorizonColor = ambient;
             skylight.GroundHorizonColor = bounce; skylight.GroundBottomColor = bounce;
         }
-        var top = FirstPerson ? DaySky.Lerp(NightSky, night) : ambient;
-        var horizon = FirstPerson ? DayHorizon.Lerp(DuskHorizon, low * .65f).Lerp(NightHorizon, night) : ambient;
-        if (top != skyTop) skylight.SkyTopColor = skyTop = top;
-        if (horizon != skyHorizon) skylight.SkyHorizonColor = skyHorizon = horizon;
+        if (previewSky != null && FirstPerson)
+            previewSky.Update(lightDirection, ambient * DayGround, lightColor, night, low, height, moon, moonlight);
         environment.AmbientLightEnergy = Mathf.Lerp(DayAmbientEnergy, Mathf.Lerp(NewMoonAmbient, .3f, moonlight), night);
         environment.BackgroundColor = DayGround.Lerp(NightGround, night);
     }
