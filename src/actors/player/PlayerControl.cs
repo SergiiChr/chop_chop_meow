@@ -145,10 +145,10 @@ public sealed class PlayerControl {
         kit.Refresh();
     }
 
-    private static Vector2 HeldDirection() {
+    private Vector2 HeldDirection() {
         float x = (Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left) ? 1 : 0);
         float y = (Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up) ? 1 : 0);
-        return KeyDirection(x, y);
+        return view.FirstPerson ? view.FirstPersonMove(new Vector2(x, y)) : KeyDirection(x, y);
     }
 
     /// <summary>The ground direction for right <paramref name="x"/> and down <paramref name="y"/> on screen, each -1, 0 or 1 as movement keys give them.</summary>
@@ -242,27 +242,27 @@ public sealed class PlayerControl {
         Vector2 FarmEdge(Thing t) => world.Player.Clamp(t.Pos - half, t.Pos + half);
         bool CanInspect(Thing t) => world.Near(t, at: t.Kind == ThingKind.Farm ? FarmEdge(t) : null);
         var t = world.Find(panel.Selection.Thing);
-        if ((t == null || t.Kind == ThingKind.Water || !CanInspect(t)) && view.GetViewport().GuiGetHoveredControl() == null
+        if ((t == null || t.Kind == ThingKind.Water || !CanInspect(t)) && (view.MouseLook || view.GetViewport().GuiGetHoveredControl() == null)
             && world.Find(view.Hover) is { Kind: ThingKind.Pump } pump && CanInspect(pump)) t = pump;
         if (t == null || !CanInspect(t))
             t = world.Things.Where(CanInspect).OrderBy(t => world.Player.DistanceSquaredTo(t.Kind == ThingKind.Farm ? FarmEdge(t) : t.Pos)).FirstOrDefault();
         if (t != null) panel.Select(t);
     }
 
-    /// <summary>Space operates a selected pump or bellows in reach. Elsewhere it swings in the last walking direction.</summary>
+    /// <summary>Space pumps in reach, or swings along the first-person view or in the last walking direction.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
         if (station?.Kind == ThingKind.Pump && world.AtStation(station)) UseWaterPump(station);
         else if (station?.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station);
-        else world.Attack(walked);
+        else world.Attack(view.FirstPerson ? view.FirstPersonForward : walked);
     }
 
     /// <summary>A mouse button over the world; <paramref name="overPanel"/> tells that the pointer is on a panel, which passes the wheel on when it has nothing to scroll, but must not zoom the world behind.</summary>
-    public void Click(InputEventMouseButton mouse, bool overPanel) {
-        if (mouse.ButtonIndex == MouseButton.WheelUp && mouse.Pressed && !overPanel) view.Zoom = Math.Min(1.6f, view.Zoom + .1f);
-        if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed && !overPanel) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
-        if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed && !overPanel) RightPress(mouse.Position);
-        if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) LeftPress(mouse.Position);
+    public void Click(InputEventMouseButton mouse, Vector2 at, bool overPanel) {
+        if (mouse.ButtonIndex == MouseButton.WheelUp && mouse.Pressed && !overPanel && !view.FirstPerson) view.Zoom = Math.Min(1.6f, view.Zoom + .1f);
+        if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed && !overPanel && !view.FirstPerson) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
+        if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed && !overPanel) RightPress(at);
+        if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) LeftPress(at);
     }
 
     private void RightPress(Vector2 at) {
@@ -279,7 +279,7 @@ public sealed class PlayerControl {
     }
 
     private void LeftPress(Vector2 at) {
-        var t = view.Pick(at);
+        var t = view.Pick(at, out float thingDistance);
         // A held stack goes into storage clicked in the world; a held container or plan places on open ground, even before a frame has seen the mouse there;
         // and a click anywhere else lets go of the stack, back to its cell.
         if (!cursor.Empty) {
@@ -293,7 +293,7 @@ public sealed class PlayerControl {
         if (Mode.Placing != null) { Place(at); return; }
         if (Mode is ClickMode.Remove) { world.Construction.Remove(RemovalAt(t, at)); return; }
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
-        var w = view.PickWorker(at);
+        var w = view.PickWorker(at, thingDistance);
         if (w != null) panel.Select(w);
         else if (t != null) ClickThing(t);
         else if (hotbar.ActiveItem() is string selected && hotbar.HasUse(selected)) hotbar.UseSelected(view.ToWorld(at));
@@ -301,7 +301,12 @@ public sealed class PlayerControl {
     }
 
     /// <summary>What the remove selector points at with <paramref name="picked"/> under the mouse at a screen point, or nothing while the selector is away.</summary>
-    public Removal RemovalAt(Thing? picked, Vector2 at) => Mode is ClickMode.Remove remove ? world.Construction.RemovalAt(picked, view.ToWorld(at, remove.Underground ? PipeGround.FloorY : 0), remove.Underground) : Removal.None;
+    public Removal RemovalAt(Thing? picked, Vector2 at) {
+        if (Mode is not ClickMode.Remove remove) return Removal.None;
+        return view.TryGroundPoint(at, out var ground, remove.Underground ? PipeGround.FloorY : 0)
+            ? world.Construction.RemovalAt(picked, ground, remove.Underground)
+            : picked == null ? Removal.None : world.Construction.RemovalAt(picked, picked.Pos);
+    }
 
     private void AssignGather(ClickMode.Assign assign, Thing? t) {
         var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);
@@ -321,7 +326,8 @@ public sealed class PlayerControl {
     /// The backpack still holds what a placement just sent will cost, and the mine's panel opens when the server names it.
     /// </summary>
     private void Place(Vector2 screen) {
-        var at = view.ToWorld(screen, Mode.Placing == ThingKind.SteelPiping ? PipeGround.FloorY : 0).Round();
+        if (!view.TryGroundPoint(screen, out var ground, Mode.Placing == ThingKind.SteelPiping ? PipeGround.FloorY : 0)) return;
+        var at = ground.Round();
         if (Mode is ClickMode.Container { BackpackSlot: >= 0 } selected && ContainerCount(selected) == 0) {
             Mode = new ClickMode.Normal();
             return;

@@ -153,7 +153,8 @@ Wind sways grass, bushes and tree foliage, drifting between calm spells and gust
 Footpaths wear in where the player and workers walk, not where they stand, and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
 meet (SSAO), and world sounds pan with their place on screen.
-Ambient light comes from a sky that is never drawn: light from above and grass-coloured bounce from below, so roofs and walls differ in shade.
+The sky lights roofs and walls from above, with grass-coloured bounce from below.
+In the first-person preview, the visible sky changes colour with the time of day and shows the sun or moon.
 The picture is tonemapped with AgX, which keeps colours as light brightens.
 A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
 The ground has grain and bump from grass and rock photoscans under its own colours: meadow over the valley with soft
@@ -186,7 +187,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Space otherwise | Swing an axe or fist in the direction you last walked |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
-| Mouse wheel | Zoom |
+| Mouse wheel | Zoom in the overhead view |
 | LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
@@ -198,6 +199,16 @@ Mines face their cliff and open their panel as soon as you place them.
 Other plans and crates stay active until you press Esc or run out of materials or crates.
 Steel pipe placement stays active for removal when you run out of pipes.
 The hotbar starts with an axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries and water.
+
+### First-person preview
+
+Open **Options** from the start or pause menu and switch on **First-person preview**. Each launch starts overhead.
+Move with WASD or the arrow keys relative to where you look. Move the mouse to look around.
+Left and right click act on nearby things under the centre dot. Space swings where you look and still pumps a
+selected machine in reach.
+Opening a panel or menu frees the pointer so you can click its controls. Close it to look around again.
+The valley is visible out to the horizon. Look down to see your body, and swing to see your arms and weapon move.
+Cabins, being downed and underground pipe work use the overhead view.
 
 ## Interface
 
@@ -445,7 +456,7 @@ In multiplayer, every player must be downed before skipping.
 
 ### Fog of war
 
-Fog of war covers the map.
+Fog of war covers the map in the overhead view.
 Ground you have never seen is black.
 You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
 This circle is your line of sight: it ends where the grey fog starts.

@@ -5,9 +5,10 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// Draws wolves tugging players out of cabin doorways, and the takedown that can end it. <paramref name="world"/> gives the
-/// world drawn, and <paramref name="stateOf"/> how a player is drawn, or null for one not drawn yet.
+/// world drawn, <paramref name="stateOf"/> how a player is drawn, or null for one not drawn yet,
+/// and <paramref name="drawsAt"/> whether to show a wolf at that spot.
 /// </summary>
-public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
+public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf, Func<Vector2, bool> drawsAt) {
     /// <summary>How far behind a player's hips a tugging wolf's jaws hold them.</summary>
     private const float WaistBehind = .12f;
     /// <summary>The back of the waist of the player a wolf hunts as drawn, while they are out in the open in a cabin's doorway, or null.</summary>
@@ -74,7 +75,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         model.Yaw = Mathf.LerpAngle(model.FromYaw, held.Yaw + Mathf.DegToRad(SplayTugger) * ApartFrom(wolf, held), lunge);
         model.Pinned = 0;
         model.StandPlaced(wolf.Stagger);
-        model.Root.Visible = world().Sees(wolf.Pos);
+        model.Root.Visible = drawsAt(wolf.Pos);
         // A wolf taking a player out of their cabin starts in its doorway, with its paws on the step and the floor.
         model.Steps = wolf.DoorCheck == DoorCheckStage.TakingOut && world().Find(wolf.DoorCheckCabin) is Thing cabin ? (Doorways.DoorPoint(cabin), cabin.Rotation) : null;
         var waist = Waist(held);
@@ -109,7 +110,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         model.Yaw = Mathf.LerpAngle(model.FromYaw, ActorAnimation.Yaw(toward, model.Yaw), lunge);
         model.Pinned = 0;
         model.StandPlaced(wolf.Stagger);
-        model.Root.Visible = world().Sees(wolf.Pos);
+        model.Root.Visible = drawsAt(wolf.Pos);
         model.Steps = world().PlayerById(wolf.Target) is { DoorCabin: not 0 } p && world().Find(p.DoorCabin) is Thing cabin ? (Doorways.DoorPoint(cabin), cabin.Rotation) : null;
         var body = WolfModel.Rearing(arm.Y, elapsed + wolf.Id % 7);
         var grip = arm - model.Root.Basis * WolfModel.BiteOf(body);
@@ -134,7 +135,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf) {
         var wait = (throat + WorldView.To3(wolf.LungeFrom) * WaitAside) with { Y = 0 };
         model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(-wolf.LungeFrom, model.Yaw), Math.Min(1, dt * 8));
         model.StandPlaced(wolf.Stagger);
-        model.Root.Visible = world().Sees(wolf.Pos);
+        model.Root.Visible = drawsAt(wolf.Pos);
         if (fell < LungeStart) {
             // It springs back off the yanked body at once, then slows as it comes round.
             float off = fell / LungeStart;

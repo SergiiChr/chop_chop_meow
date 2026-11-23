@@ -62,7 +62,7 @@ internal static class WolfModelSteps {
         Doorways.Stage(world.Me, Doorway.Tugged, cabin.Id);
         world.Me.DoorTime = .3f;
         var wolf = new Wolf { Target = world.Me.Id, DoorCheckCabin = cabin.Id, DoorCheck = DoorCheckStage.TakingOut, Pos = door };
-        var view = new TugView(() => world, _ => held);
+        var view = new TugView(() => world, _ => held, world.Sees);
         var model = new WolfModel { Yaw = held.Yaw };
         model.Root.Position = WorldView.To3(door + new Vector2(0, -.45f).Rotated(rotation));
         for (int frame = 0; frame < 12; frame++) view.ShowTugging(wolf, model, .3f, 1f / 60);

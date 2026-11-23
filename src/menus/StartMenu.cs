@@ -116,6 +116,7 @@ public partial class StartMenu : ColorRect {
             Settings.ApplyAntiAliasing(GetViewport(), AntiAliasings[index]);
         };
         smoothingRow.AddChild(smoothing);
+        Toggle("First-person preview", "first_person_preview", flow.FirstPersonPreview, on => flow.FirstPersonPreview = on);
         Toggle("Paint filter", "paint_filter", Settings.PaintFilter, on => { Settings.Store("display", "paint_filter", on); flow.ApplyPaintFilter(on); });
         Toggle("Fullscreen", "fullscreen", Settings.Fullscreen, on => { Settings.Store("display", "fullscreen", on); flow.ApplyFullscreen(on); });
         Toggle("Frame rate counter", "fps", Settings.FrameRate, on => { Settings.Store("display", "fps", on); flow.ShowFrameRate(on); });
@@ -133,7 +134,7 @@ public partial class StartMenu : ColorRect {
         });
     }
 
-    /// <summary>A labelled switch on its own row, which stores and applies its setting as it is toggled.</summary>
+    /// <summary>A labelled switch on its own row, which applies its setting as it is toggled.</summary>
     private void Toggle(string text, string name, bool on, Action<bool> change) {
         var row = new HBoxContainer(); Screen.AddChild(row);
         var label = Style.Wrapped(text); label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(label);
