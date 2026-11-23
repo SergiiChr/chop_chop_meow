@@ -65,14 +65,14 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
 
     private static (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) FacingAt(Doorway stage, Vector2 at,
         Vector2 door, Vector2 inside, Vector2 start, float time, bool rush, float rotation) => stage switch {
-        Doorway.Entering => (at, inside, rush ? ActorAction.Jog : ActorAction.Walk, DoorwayPath.FromTheSide(start, door, rotation)),
-        Doorway.Leaving => (at, 2 * door - inside, ActorAction.Walk, false),
-        Doorway.Knocking => (at, inside, time >= Doorways.KnockLead ? ActorAction.Knock :
-            DoorwayPath.KnockStep(time) > 0 ? ActorAction.Walk : ActorAction.Idle, false),
-        Doorway.Following => (at, inside, ActorAction.Walk, false),
-        Doorway.Aside => (at, inside, time < DoorwayPath.AsideSeconds ? ActorAction.Walk : ActorAction.Idle, true),
-        _ => (at, inside, ActorAction.Tugged, true),
-    };
+            Doorway.Entering => (at, inside, rush ? ActorAction.Jog : ActorAction.Walk, DoorwayPath.FromTheSide(start, door, rotation)),
+            Doorway.Leaving => (at, 2 * door - inside, ActorAction.Walk, false),
+            Doorway.Knocking => (at, inside, time >= Doorways.KnockLead ? ActorAction.Knock :
+                DoorwayPath.KnockStep(time) > 0 ? ActorAction.Walk : ActorAction.Idle, false),
+            Doorway.Following => (at, inside, ActorAction.Walk, false),
+            Doorway.Aside => (at, inside, time < DoorwayPath.AsideSeconds ? ActorAction.Walk : ActorAction.Idle, true),
+            _ => (at, inside, ActorAction.Tugged, true),
+        };
 
     /// <summary>
     /// Where a hand flat on the right door jamb's inner face is from a cabin's door point, to the side, in and up, as the
