@@ -246,6 +246,7 @@ public partial class Game : Node, IGameFlow {
     public void ApplyFullscreen(bool on) { fullscreen = on; ApplyResolution(GetWindow().ContentScaleSize); }
     public void ShowFrameRate(bool on) => corner.FrameRate.Visible = on;
     public void ApplyPaintFilter(bool on) => paintFilter.Visible = on;
+    public bool FirstPersonPreview { get => view.FirstPersonPreview; set => view.FirstPersonPreview = value; }
 
     /// <summary>How large the interface is drawn against the size it is laid out for.</summary>
     public const float InterfaceScale = .8f;
@@ -350,6 +351,18 @@ public partial class Game : Node, IGameFlow {
         GetTree().SetMultiplayer(null, branch.GetPath());
         branch.QueueFree();
     }
+    private bool OverInterface => !view.MouseLook && GetViewport().GuiGetHoveredControl() != null;
+    private bool Looking => view.FirstPerson && !kit.Paused && !panel.Visible && !bag.Visible && !recipeMap.Visible;
+
+    public override void _Input(InputEvent ev) {
+        if (view == null || !view.MouseLook || !Looking) return;
+        // Captured input belongs to the world even if a HUD control lies under the centre point.
+        if (ev is InputEventMouseMotion motion) view.Look(motion.Relative);
+        else if (ev is InputEventMouseButton mouse) player.Click(mouse, GetViewport().GetVisibleRect().GetCenter(), false);
+        else return;
+        GetViewport().SetInputAsHandled();
+    }
+
     public override void _UnhandledInput(InputEvent ev) {
         if (view?.EnvironmentReview == true) return;
         if (world == null || view == null || ending.Visible) return;
@@ -366,11 +379,11 @@ public partial class Game : Node, IGameFlow {
                 case Key.I: panel.Toggle(Page.Guide); break;
                 case Key.H: panel.Toggle(Page.Crew); break;
                 case Key.C:
-                    if (!player.RotatePlacement(-1, GetViewport().GuiGetHoveredControl() != null)) panel.Toggle(Page.Craft);
+                    if (!player.RotatePlacement(-1, OverInterface)) panel.Toggle(Page.Craft);
                     break;
                 case Key.R when player.PlacingPipe:
-                case Key.V: player.RotatePlacement(1, GetViewport().GuiGetHoveredControl() != null); break;
-                case Key.T: player.CyclePipeShape(GetViewport().GuiGetHoveredControl() != null); break;
+                case Key.V: player.RotatePlacement(1, OverInterface); break;
+                case Key.T: player.CyclePipeShape(OverInterface); break;
                 case Key.Tab: panel.Toggle(Page.Backpack); break;
                 case Key.F5: saves.QuickSave(startMenu); break;
                 case Key.F9: saves.QuickLoad(startMenu); break;
@@ -379,7 +392,7 @@ public partial class Game : Node, IGameFlow {
                 case Key.Space: player.Swing(); break;
             }
         }
-        if (ev is InputEventMouseButton mouse) player.Click(mouse, GetViewport().GuiGetHoveredControl() != null);
+        if (ev is InputEventMouseButton mouse) player.Click(mouse, mouse.Position, OverInterface);
     }
     public override void _Process(double delta) {
         // Drawing the intro film takes no input and runs no game under it.
@@ -387,7 +400,12 @@ public partial class Game : Node, IGameFlow {
         // A recording ends on its last frame, with no sound left playing to hold its stream at exit.
         if (framesLeft > 0 && --framesLeft == 0) { LeaveServer(); sounds.StopAll(); GetTree().Quit(); }
         float dt = Math.Min((float)delta, .1f); runTime += dt;
-        bool overInterface = GetViewport().GuiGetHoveredControl() != null;
+        bool looking = Looking;
+        if (looking != view.MouseLook) {
+            view.MouseLook = looking;
+            Input.MouseMode = looking ? Input.MouseModeEnum.Captured : Input.MouseModeEnum.Visible;
+        }
+        bool overInterface = OverInterface;
         player.Update(dt, overInterface); panel.ShowAwaited();
         if (session is Session.Launching launching) AwaitServer(launching);
         // The server holds the world still while every player has a menu open, which in a game alone is whenever this one does.
@@ -403,10 +421,12 @@ public partial class Game : Node, IGameFlow {
         view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection; view.Placing = player.Mode.Placing; view.PlacingRotation = player.Mode.Rotation;
         view.Underground = player.Mode is ClickMode.Remove { Underground: true } || view.Placing == ThingKind.SteelPiping;
         if (player.Mode is ClickMode.Build { Kind: ThingKind.SteelPiping } pipe) view.PlacingPipeShape = pipe.Shape;
-        view.Mouse = GetViewport().GetMousePosition();
+        view.Mouse = looking ? GetViewport().GetVisibleRect().GetCenter() : GetViewport().GetMousePosition();
         // A recording leaves the pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
         bool recording = Engine.GetWriteMoviePath() != "";
-        var hover = recording ? null : view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = recording ? 0 : view.PickWorker(view.Mouse)?.Id ?? 0;
+        bool pointing = !recording && (!view.FirstPerson || looking || !overInterface && !kit.Paused);
+        var hover = pointing ? view.Pick(view.Mouse) : null;
+        view.Hover = hover?.Id ?? 0; view.HoverWorker = pointing ? view.PickWorker(view.Mouse)?.Id ?? 0 : 0;
         view.Removal = overInterface ? Removal.None : player.RemovalAt(hover, view.Mouse);
         view.PipePreviewTile = null;
         view.PointedPipe = null;

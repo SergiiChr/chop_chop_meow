@@ -59,6 +59,13 @@ public partial class WorldView : Node3D {
     public Vector2? CameraOn;
     public float? CameraPitch;
     private Camera3D camera = null!;
+    private readonly FirstPersonCamera firstPerson = new();
+    public bool FirstPersonPreview, MouseLook;
+    /// <summary>Cabin scenes, downed players and underground pipe work keep the overhead camera.</summary>
+    public bool FirstPerson => FirstPersonPreview && !Warming && !Underground && !World.Downed && World.Sheltered == 0;
+    public Vector2 FirstPersonForward => firstPerson.Forward;
+    public Vector2 FirstPersonMove(Vector2 keys) => firstPerson.GroundDirection(keys);
+    public void Look(Vector2 motion) => firstPerson.Look(motion);
     private DirectionalLight3D sun = null!;
     private TerrainView terrainView = null!;
     private Godot.Environment environment = null!;
@@ -148,11 +155,14 @@ public partial class WorldView : Node3D {
         uniform float radius;
         uniform float map_size;
         uniform vec3 memory : source_color;
+        uniform bool sky_visible;
+        uniform vec3 sky_horizon : source_color;
         void vertex() {
             POSITION = vec4(VERTEX.xy, 1.0, 1.0);
         }
         void fragment() {
             float depth_at = texture(depth, SCREEN_UV).r;
+            if (sky_visible && depth_at <= 0.0) discard;
             // OpenGL's depth runs from -1 to 1 like its screen coordinates; Vulkan's runs from 0 to 1.
             #if CURRENT_RENDERER == RENDERER_COMPATIBILITY
             vec3 ndc = vec3(SCREEN_UV, depth_at) * 2.0 - 1.0;
@@ -163,7 +173,7 @@ public partial class WorldView : Node3D {
             vec2 at = (INV_VIEW_MATRIX * vec4(view.xyz / view.w, 1.0)).xz;
             float seen = texture(explored, (at + 0.5) / map_size).r;
             float live = 1.0 - smoothstep(radius - 1.5, radius, distance(at, player));
-            ALBEDO = memory * seen;
+            ALBEDO = sky_visible ? mix(sky_horizon, memory, seen * 0.35) : memory * seen;
             ALPHA = (1.0 - live) * mix(1.0, 0.62, seen);
         }
         """;
@@ -234,7 +244,8 @@ public partial class WorldView : Node3D {
         warmStage = new Node3D(); WorldModels.Warm(warmStage); PileShape.Stage(warmStage, World.Data); LakeDressing.Warm(warmStage); scene.AddChild(warmStage);
         BuildGhosts();
         for (int i = 0; i < World.Carts; i++) idleCarts.Push(NewCart());
-        playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
+        playerShirt = Shirts[0];
+        playerRig = MakePlayerRig();
         playerRing = Torus(scene, .9f, 1, Vector3.Zero, Flat(new Color(.95f, .88f, .57f, .6f)));
         playerRing.Scale = new Vector3(.42f, 1, .42f);
         playerRing.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
@@ -250,10 +261,17 @@ public partial class WorldView : Node3D {
         World.PlayerActed += PlayerActed;
     }
 
+    private ActorRig MakePlayerRig() {
+        var rig = new ActorRig(ActorSkin.Player, playerShirt);
+        FirstPersonCamera.SetBodyLayer(rig.Root);
+        scene.AddChild(rig.Root);
+        return rig;
+    }
+
     public override void _ExitTree() => World.PlayerActed -= PlayerActed;
 
     // Made once: passing a plain string converts it to a new StringName on every call.
-    private static readonly StringName FogPlayer = "player", FogRadius = "radius", FogMemory = "memory";
+    private static readonly StringName FogPlayer = "player", FogRadius = "radius", FogMemory = "memory", FogSkyVisible = "sky_visible", FogSkyHorizon = "sky_horizon";
 
     private void UpdateFog() {
         bool clearReview = AnimationReview || filming || EnvironmentReview && !EnvironmentReviewFog;
@@ -320,6 +338,22 @@ public partial class WorldView : Node3D {
 
     /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
     private void SyncCamera() {
+        if (FirstPerson) {
+            if (camera.Projection != Camera3D.ProjectionType.Perspective) {
+                ShowSky(true);
+                foreach (var prop in props.Values) {
+                    if (prop is not TreeProp tree || tree.Fade == 0) continue;
+                    tree.Fade = 0; SetFade(tree.SwayParts, 0);
+                }
+            }
+            firstPerson.Frame(camera, World.Player);
+            return;
+        }
+        if (camera.Projection != Camera3D.ProjectionType.Orthogonal) {
+            camera.SetOrthogonal(BaseSize, 1, camera.Far);
+            camera.CullMask |= FirstPersonCamera.BodyLayer;
+            ShowSky(false);
+        }
         var size = GetViewport().GetVisibleRect().Size;
         camera.Size = (AnimationReview ? (ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : WaterReview != null ? 3.4f : 11) / ReviewZoom : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(AnimationReview ? ReviewPitch : CameraPitch ?? Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
@@ -333,6 +367,11 @@ public partial class WorldView : Node3D {
         float unitsPerPixel = camera.Size / Math.Max(1, size.Y);
         camera.HOffset = (.5f - Center.X / Math.Max(1, size.X)) * size.X * unitsPerPixel;
         camera.VOffset = (Center.Y / Math.Max(1, size.Y) - .5f) * size.Y * unitsPerPixel;
+    }
+
+    private void ShowSky(bool show) {
+        environment.BackgroundMode = show ? Godot.Environment.BGMode.Sky : Godot.Environment.BGMode.Color;
+        fog.SetShaderParameter(FogSkyVisible, show);
     }
 
     /// <summary>Whether the models drawn while loading are still in the scene.</summary>
@@ -350,11 +389,26 @@ public partial class WorldView : Node3D {
     public Vector2 Screen(Vector2 p, float height) { SyncCamera(); return camera.UnprojectPosition(To3(p, height)); }
 
     public Vector2 ToWorld(Vector2 screen, float height = 0) {
+        TryGroundPoint(screen, out var at, height);
+        return at;
+    }
+
+    /// <summary>Where the ray meets the ground. Aiming up still gives tools a direction to swing, but no ground to click.</summary>
+    public bool TryGroundPoint(Vector2 screen, out Vector2 at, float height = 0) {
         SyncCamera();
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
-        if (Math.Abs(direction.Y) < 1e-5f) return World.Player;
-        var hit = origin + direction * ((height - origin.Y) / direction.Y);
-        return new Vector2(hit.X, hit.Z);
+        return GroundPoint(origin, direction, height, out at);
+    }
+
+    private bool GroundPoint(Vector3 origin, Vector3 direction, float height, out Vector2 at) {
+        if (Math.Abs(direction.Y) >= 1e-5f) {
+            float distance = (height - origin.Y) / direction.Y;
+            var hit = origin + direction * distance;
+            at = new Vector2(hit.X, hit.Z);
+            if (!FirstPerson || distance > 0 && World.Sees(at)) return true;
+        }
+        at = FirstPerson ? World.Player + new Vector2(direction.X, direction.Z).Normalized() * World.Data.SightRadius : World.Player;
+        return !FirstPerson;
     }
 
     private Hit[] HitsOf(Thing t) => props.TryGetValue(t.Id, out var prop) && prop.Kind == t.Kind ? prop.Hits : WorldModels.Hits(t);
@@ -398,7 +452,12 @@ public partial class WorldView : Node3D {
         distance = float.MaxValue;
         // A pump and its fully extended lever fit inside this cylinder at every turn and stroke.
         if (!RayCylinder(origin, direction, pump.Pos, new Hit(2.5f, -.3f, 2.1f), out _)) return false;
-        float clearance = 3 / PixelsPerUnit;
+        float ppu = PixelsPerUnit;
+        if (FirstPerson) {
+            float halfDepth = Mathf.Tan(Mathf.DegToRad(camera.Fov / 2)) * Mathf.Max(camera.Near, origin.DistanceTo(To3(pump.Pos)));
+            ppu = GetViewport().GetVisibleRect().Size.Y / (2 * halfDepth);
+        }
+        float clearance = 3 / ppu;
         foreach (var (part, bounds) in model.Picking) {
             var into = part.GlobalTransform.AffineInverse();
             if (RayBox(into * origin, into.Basis * direction, bounds.Grow(clearance), out float hit))
@@ -446,7 +505,9 @@ public partial class WorldView : Node3D {
             var hits = HitsOf(drawn);
             // Only the foot of a tree's trunk, its first hit, picks the tree, so a click among the crowns of a forest reaches the ground and swings.
             if (t.Kind == ThingKind.Tree) {
-                if (hits.Length > 0 && RayHits(origin, direction, t.Pos, [hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) }], out float s) && s < nearest) { nearest = s; best = t; }
+                if (hits.Length == 0) continue;
+                var trunk = FirstPerson ? hits[0] : hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) };
+                if (RayCylinder(origin, direction, t.Pos, trunk, out float s) && s < nearest) { nearest = s; best = t; }
                 continue;
             }
             bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, drawn, out float d)
@@ -456,8 +517,7 @@ public partial class WorldView : Node3D {
             if (hit && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
-        var point = ToWorld(screen);
-        if (Terrain.WaterRing(point) && World.Sees(point))
+        if (GroundPoint(origin, direction, 0, out var point) && Terrain.WaterRing(point) && World.Sees(point))
             foreach (var thing in World.ThingsOf(ThingKind.Water)) return thing;
         return null;
     }
@@ -586,7 +646,7 @@ public partial class WorldView : Node3D {
         pumping.Clear(); pumpOperators.Clear(); grinding.Clear(); swung.Clear(); openBungs.Clear();
         if (ShirtOf(World.Me) != playerShirt) {
             playerShirt = ShirtOf(World.Me); playerRig.Root.QueueFree();
-            playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
+            playerRig = MakePlayerRig();
         }
         bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
         ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting, World.CraftRate > 0, Fitting(GatheringTarget));
@@ -1484,7 +1544,7 @@ public partial class WorldView : Node3D {
     /// <summary>Trees in front of the player, a worker or a structure turn see-through instead of hiding them.</summary>
     private void FadeCanopies(float dt) {
         // The film's camera stands among the trees, where nothing needs seeing through.
-        if (filming) return;
+        if (filming || FirstPerson) return;
         var screen = GetViewport().GetVisibleRect();
         var bounds = screen.Grow(300);
         float ppu = screen.Size.Y / camera.Size;
@@ -1777,13 +1837,15 @@ public partial class WorldView : Node3D {
             playerRing.Visible = placeTile.Visible = false;
             return;
         }
-        playerRing.Visible = !World.Dead && !Underground;
+        playerRing.Visible = !World.Dead && !Underground && !FirstPerson;
         playerRing.Position = To3(World.Player, .015f);
         removalMark.Update(World, Removal);
-        placeTile.Visible = Placing != null && !Underground;
+        var ground = Vector2.Zero;
+        bool canPoint = Placing != null && !Underground && TryGroundPoint(Mouse, out ground);
+        placeTile.Visible = canPoint;
         var kind = Placing.GetValueOrDefault();
-        var at = Placing == null ? Vector2.Zero : World.Construction.Snap(kind, ToWorld(Mouse).Round());
-        var shown = Placing == null || Underground ? null : kind == ThingKind.Mine ? mineGhosts[Cliff.Nearest(at).Ore] : ghosts[kind];
+        var at = canPoint ? World.Construction.Snap(kind, ground.Round()) : Vector2.Zero;
+        var shown = !canPoint ? null : kind == ThingKind.Mine ? mineGhosts[Cliff.Nearest(at).Ore] : ghosts[kind];
         if (shown != ghost) {
             if (ghost != null) ghost.Root.Visible = false;
             if (shown != null) shown.Root.Visible = true;
@@ -1833,7 +1895,9 @@ public partial class WorldView : Node3D {
     private const float NewMoonAmbient = .1f;
 
     /// <summary>The sky light last written.</summary>
-    private Color skyAmbient;
+    private Color skyAmbient, skyTop, skyHorizon;
+    private static readonly Color DaySky = new("5487be"), DayHorizon = new("aac0c8"), DuskHorizon = new("d99469");
+    private static readonly Color NightSky = new("130e26"), NightHorizon = new("333958");
 
     /// <summary>The world's time of day as the sun and light show it; a sleep that skips the night jumps it.</summary>
     private readonly LocalClock dayClock = new(1);
@@ -1863,8 +1927,14 @@ public partial class WorldView : Node3D {
         if (ambient != skyAmbient) {
             skyAmbient = ambient;
             var bounce = ambient * DayGround;
-            skylight.SkyTopColor = ambient; skylight.SkyHorizonColor = ambient;
             skylight.GroundHorizonColor = bounce; skylight.GroundBottomColor = bounce;
+        }
+        var top = FirstPerson ? DaySky.Lerp(NightSky, night) : ambient;
+        var horizon = FirstPerson ? DayHorizon.Lerp(DuskHorizon, low * .65f).Lerp(NightHorizon, night) : ambient;
+        if (top != skyTop) skylight.SkyTopColor = skyTop = top;
+        if (horizon != skyHorizon) {
+            skylight.SkyHorizonColor = skyHorizon = horizon;
+            if (FirstPerson) fog.SetShaderParameter(FogSkyHorizon, horizon);
         }
         environment.AmbientLightEnergy = Mathf.Lerp(DayAmbientEnergy, Mathf.Lerp(NewMoonAmbient, .3f, moonlight), night);
         environment.BackgroundColor = DayGround.Lerp(NightGround, night);
@@ -1879,8 +1949,15 @@ public partial class WorldView : Node3D {
         overlay.DrawString(font, at - new Vector2(size.X / 2, 0), text, HorizontalAlignment.Left, -1, 14, TagText);
     }
 
+    private bool BehindCamera(Vector2 at, float height = 0) => FirstPerson && camera.IsPositionBehind(To3(at, height));
+
     private void PaintOverlay() {
         if (EnvironmentReview) return;
+        if (FirstPerson && MouseLook) {
+            var center = GetViewport().GetVisibleRect().GetCenter();
+            overlay.DrawCircle(center, 4, new Color(.12f, .18f, .15f, .9f), antialiased: true);
+            overlay.DrawCircle(center, 2, TagText, antialiased: true);
+        }
         if (Underground) {
             // Outline the center tile where a pipe can meet each building, even before it is fitted out.
             foreach (var building in known) {
@@ -1905,14 +1982,14 @@ public partial class WorldView : Node3D {
         if (AnimationReview) { PaintReview(); return; }
         foreach (var kind in World.StationKinds)
             foreach (var t in World.ThingsOf(kind)) {
-                if (!t.Processing || !World.Sees(t.Pos) || !World.Data.Recipes.TryGetValue(t.Recipe, out var r)) continue;
+                if (!t.Processing || !World.Sees(t.Pos) || BehindCamera(t.Pos) || !World.Data.Recipes.TryGetValue(t.Recipe, out var r)) continue;
                 var p = Screen(t.Pos);
                 overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), BarTrack);
                 overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), BarFill);
             }
         // Forge heat under each reinforced furnace, with a tick at the clear bar steel needs.
         foreach (var t in World.ThingsOf(ThingKind.Reinforced)) {
-            if (!World.Sees(t.Pos)) continue;
+            if (!World.Sees(t.Pos) || BehindCamera(t.Pos)) continue;
             var p = Screen(t.Pos) + new Vector2(-28, 18);
             overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), BarTrack);
             overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? HeatReady : HeatLow);
@@ -1924,12 +2001,13 @@ public partial class WorldView : Node3D {
         if (hovered != null) {
             float top = 0;
             foreach (var hit in HitsOf(hovered)) top = Math.Max(top, hit.Top);
-            Tag(Screen(hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(GetViewport().GetMousePosition())) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
+            Tag(Screen(hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(Mouse)) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
         }
         foreach (var w in World.Workers) {
             if (!World.Sees(w) || w.Id != HoverWorker && w.Id != Selection.Worker) continue;
             var feet = WorkerFeet(w);
-            Tag(Screen(new Vector2(feet.X, feet.Z), feet.Y + 2.05f), w.Name);
+            var at = new Vector2(feet.X, feet.Z);
+            if (!BehindCamera(at, feet.Y + 2.05f)) Tag(Screen(at, feet.Y + 2.05f), w.Name);
         }
     }
 }

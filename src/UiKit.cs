@@ -21,6 +21,7 @@ public interface IGameFlow {
     void ShowFrameRate(bool on);
     /// <summary>Draws the paint filter over the world, or turns it off.</summary>
     void ApplyPaintFilter(bool on);
+    bool FirstPersonPreview { get; set; }
     /// <summary>The server says this window's player owns the game, so it saves, loads and opens it to others.</summary>
     bool Owns { get; }
     /// <summary>The player is joining another game from their own: its server waits a while in case that fails.</summary>

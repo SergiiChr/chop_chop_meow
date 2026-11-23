@@ -374,7 +374,11 @@ Every world object is a low-poly model assembled from Godot primitive meshes in 
 Meshes and materials are cached by parameters, so repeated objects share resources.
 `WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, and `WorldView` draws them behind the ground for its first frames, so a building, crate, carcass or wolf that first appears mid-game builds no mesh, material, shader or pipeline; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
-The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
+The default camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
+The first-person preview switches the same camera to a perspective at eye level.
+`FirstPersonCamera` turns the camera from mouse motion and rotates walking directions to match.
+`WorldView` casts the same picking rays from the eye and draws the sky behind the fog of war.
+Cabins, downed players and underground pipe work keep the overhead view.
 The sun and moon share one shadow map across this view.
 Its small shadow offset keeps the shade attached to feet, trunks and low props, while ambient occlusion shades creases.
 

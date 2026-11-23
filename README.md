@@ -153,7 +153,8 @@ Wind sways grass, bushes and tree foliage, drifting between calm spells and gust
 Footpaths wear in where the player and workers walk, not where they stand, and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
 meet (SSAO), and world sounds pan with their place on screen.
-Ambient light comes from a sky that is never drawn: light from above and grass-coloured bounce from below, so roofs and walls differ in shade.
+The sky lights roofs and walls from above, with grass-coloured bounce from below.
+It is visible in the first-person preview and changes colour with the time of day.
 The picture is tonemapped with AgX, which keeps colours as light brightens.
 A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
 The ground has grain and bump from grass and rock photoscans under its own colours: meadow over the valley with soft
@@ -198,6 +199,14 @@ Mines face their cliff and open their panel as soon as you place them.
 Other plans and crates stay active until you press Esc or run out of materials or crates.
 Steel pipe placement stays active for removal when you run out of pipes.
 The hotbar starts with an axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries and water.
+
+### First-person preview
+
+Switch on **First-person preview** in the main menu or pause menu's **Options**.
+Move with WASD or the arrow keys relative to where you look. Move the mouse to look around.
+Left and right click act on what the centre dot points at. Space swings where you look and still pumps a selected machine in reach.
+Opening a panel or menu frees the pointer so you can click its controls. Close it to look around again.
+Cabins, being downed and underground pipe work use the overhead view.
 
 ## Interface
 

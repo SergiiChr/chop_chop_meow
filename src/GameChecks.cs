@@ -1356,6 +1356,7 @@ public partial class Game {
             await TestClean(CheckInterfaceTextIsDrawnAtTheSizeItShows);
             await TestClean(CheckNewGameStartsTheWelcomePage);
             await TestClean(CheckPauseMenuAsksBeforeNewGameAndQuit);
+            await RunFirstPersonUIChecks();
             await TestClean(CheckWasdJogsAndShiftSprintsUnlessTooThirsty);
             await TestClean(CheckMessagesStackFadeAndKeepClearOfHud);
             await RunPanelUIChecks();
