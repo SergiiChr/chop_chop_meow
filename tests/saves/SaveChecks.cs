@@ -12,6 +12,7 @@ public static class SaveChecks {
     public static void Run(GameData data) {
         Test(CheckSaveWithUnknownItemRefused, data);
         Test(CheckSaveFromAnotherVersionIsRefused, data);
+        Test(CheckSaveWithInvalidCombatMovementRefused, data);
     }
 
     /// <summary>A save naming an item the game does not know, in the backpack or as a worker's tool, is refused with a clear reason instead of failing mid-game.</summary>
@@ -39,5 +40,25 @@ public static class SaveChecks {
         bool refused = false;
         try { EmptyWorld(data).Deserialize(older.ToJsonString()); } catch (InvalidOperationException error) { refused = error.Message.Contains("another version"); }
         Require(refused, "a save from another version should be refused with a clear reason");
+    }
+
+    private static void CheckSaveWithInvalidCombatMovementRefused(GameData data) {
+        var world = EmptyWorld(data);
+        PlaceWolf(world, new Wolf { Pos = world.Player + Vector2.Right * 2 });
+        string json = world.Serialize();
+        EmptyWorld(data).Deserialize(json);
+
+        foreach (var (field, invalid) in new[] {
+            ("Recover", "1"), ("Threaten", "-1"), ("Circle", "1e50"),
+            ("DoorTime", "-1"), ("DoorFromY", "1e50"), ("DoorBodyX", "1e50")
+        }) {
+            bool refused = false;
+            try {
+                EmptyWorld(data).Deserialize(Patch(json, ($"\"{field}\": 0", $"\"{field}\": {invalid}")));
+            } catch (InvalidOperationException error) {
+                refused = error.Message.Contains("invalid wolf movement") || error.Message.Contains("out of range");
+            }
+            Require(refused, $"a save should reject invalid {field} before play");
+        }
     }
 }

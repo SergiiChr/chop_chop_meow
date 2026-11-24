@@ -22,6 +22,7 @@ public partial class Game {
         await TestClean(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
         await TestClean(CheckOneRightClickWalksOverAndPicksUpAWholeLoosePiece);
         await TestClean(CheckBerryBushHidesOnlyItsFruitWhenPicked);
+        await TestClean(CheckLeavesAreRakedWithACarriedRake);
         await TestClean(CheckATreeCrownKeepsALoosePieceBehindItClickable);
         await TestClean(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
         await TestClean(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
@@ -121,6 +122,52 @@ public partial class Game {
         berryBush.Remaining = 4; await Frames(2);
         Require(bushProp.Fruit.Visible, "A replenished bush must show its fruit again.");
         RemoveThings(Hosted, t => t == berryBush);
+        Warp(Hosted, home); await Frames(4);
+    }
+
+    private async Task CheckLeavesAreRakedWithACarriedRake() {
+        var home = Hosted.Player;
+        var start = Terrain.Spawn - new Vector2(30, 30);
+        RemoveThings(Hosted, t => t.Pos.DistanceTo(start) < 12);
+        Warp(Hosted, start);
+        var leaves = Hosted.Add(ThingKind.Leaves, start + Vector2.Down * 1.25f, World.LeafPatch);
+        int before = Hosted.Backpack["leaves"];
+        await Frames(2);
+        var point = RightPress(leaves.Pos);
+        await Until(() => view.PlayerAnimation == ActorAction.Gather, "gathering leaves by hand", 2);
+        Require(view.PlayerRig.ToolShown == null, "Without a rake, the player must gather leaves with empty hands.");
+        RightRelease(point);
+        await Frames(2);
+
+        Give(Hosted, "rake", 1);
+        await Frames(2);
+        int soundsBefore = sounds.Played;
+        point = RightPress(leaves.Pos);
+        await Until(() => view.PlayerAnimation == ActorAction.Rake && sounds.Heard("rake_leaves", soundsBefore),
+            "a two-handed rake stroke with its leaf rustle", 2);
+        Require(view.PlayerRig.ToolShown == "rake", "Gathering leaves with a rake must show it in the player's hands.");
+        var teeth = view.PlayerRig.Root.Transform * view.PlayerRig.RakeTines;
+        Require(Mathf.Abs(teeth.Y - WorldView.To3(leaves.Pos).Y) < .06f
+            && new Vector2(teeth.X, teeth.Z).DistanceTo(leaves.Pos) < .35f,
+            $"The rake must brush the leaf patch when it rustles. Teeth at {teeth}, patch at {leaves.Pos}.");
+        await Until(() => world.Backpack["leaves"] > before, "raking leaves into the backpack", 3);
+        RightRelease(point);
+        await Frames(2);
+
+        Warp(Hosted, leaves.Pos); await Frames(2);
+        soundsBefore = sounds.Played;
+        point = RightPress(leaves.Pos);
+        await Until(() => sounds.Heard("rake_leaves", soundsBefore), "raking leaves underfoot", 2);
+        teeth = view.PlayerRig.Root.Transform * view.PlayerRig.RakeTines;
+        Require(Mathf.Abs(teeth.Y - WorldView.To3(leaves.Pos).Y) < .06f
+            && new Vector2(teeth.X, teeth.Z).DistanceTo(leaves.Pos) < .48f,
+            $"Raking a patch underfoot must brush the near leaves. Teeth at {teeth}, patch at {leaves.Pos}.");
+        RightRelease(point);
+        await Frames(2);
+
+        RemoveThings(Hosted, t => t == leaves);
+        Drop(Hosted, "leaves", Hosted.Backpack["leaves"] - before);
+        Drop(Hosted, "rake", 1);
         Warp(Hosted, home); await Frames(4);
     }
 

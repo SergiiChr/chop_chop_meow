@@ -31,7 +31,7 @@ Use these notes for wolf motion and scenes at a cabin's door.
   `WolfModel` poses its spine, neck, head, jaw, ears, tail and legs from a `WolfPose`.
   `WolfModel.Reach` solves the leg angles from where each paw stands.
   `WolfModel.Paw` and `WolfModel.Bite` give where a paw and the jaws are in the pose shown.
-  `SyncWolves` in `src/WorldView.cs` times the wolf against the player.
+  `SyncWolves` in `src/world/display/WorldView.cs` times the wolf against the player.
 
 ## Recording
 

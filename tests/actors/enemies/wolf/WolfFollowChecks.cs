@@ -27,9 +27,10 @@ public static class WolfFollowChecks {
     /// <summary>A wave at wolves nearer than the 2 m where they would run or stand their ground sends them back to their circles first, one or several.</summary>
     private static void CheckWolvesWavedAtUpCloseWalkBackOutToTheirCircles(GameData data) {
         foreach (int count in new[] { 1, 2 }) {
-            var (world, wolves) = WavedAtUpClose(data, count, 1.5f);
+            var (world, wolves) = WavedAtUpClose(data, count, 1.95f);
             WolfTick(world, 8, wolves);
-            Require(wolves.All(w => w.Follow == FollowStage.Circling), $"{count} wolves waved at 1.5 m off should back off and circle, not be {string.Join(", ", wolves.Select(w => w.Follow))}");
+            Require(wolves.All(w => w.Health == data.WolfHealth), "a wave should leave the wolves just beyond the flame unharmed");
+            Require(wolves.All(w => w.Follow == FollowStage.Circling), $"{count} wolves waved at just under 2 m off should back off and circle, not be {string.Join(", ", wolves.Select(w => w.Follow))}");
             Require(wolves.All(w => Math.Abs(w.Pos.DistanceTo(world.Player) - World.StalkDistance) <= WolfFollow.Wander + .2f),
                 $"wolves waved at up close should walk back out to about {World.StalkDistance} m, not {string.Join(", ", wolves.Select(w => $"{w.Pos.DistanceTo(world.Player):0.0}"))} m");
             Require(world.Health == 100, "wolves backing off should not bite");

@@ -44,7 +44,7 @@ public sealed partial class DoorwayReview : Node {
         void GuestAway() => World.As(guest, () => World.Player = door + new Vector2(60, 0));
         // One close behind the host and one out to each side of them.
         void ThreeWolves() {
-            foreach (var from in new[] { new Vector2(-.4f, 2.1f), new Vector2(-6.3f, 2), new Vector2(8.2f, 2.4f) })
+            foreach (var from in new[] { new Vector2(-1f, .4f), new Vector2(-6.3f, 2), new Vector2(8.2f, 2.4f) })
                 World.S.Wolves.Add(new Wolf { Pos = door + from, Target = host.Id });
             World.NumberWolvesAndOrders();
         }
@@ -58,8 +58,9 @@ public sealed partial class DoorwayReview : Node {
             // The host steps in at a walk with a wolf close by and the neighbor at the door behind them; a second wolf comes for the neighbor while they wait.
             "wolf" => new (float, Action)[] {
                 (0, () => { World.Player = door; World.As(guest, () => World.Player = door + new Vector2(.4f, 0)); }),
-                (0, () => World.Doorways.Enter(Cabin, false)), (.1f, () => World.As(guest, () => World.Doorways.Enter(Cabin, false))),
-                (.15f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1.6f, 1.2f), Target = host.Id })),
+                (0, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-1f, .4f), Target = host.Id })),
+                (.49f, () => World.Doorways.Enter(Cabin, false)),
+                (.52f, () => World.As(guest, () => World.Doorways.Enter(Cabin, false))),
                 (.9f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(2.2f, 1.4f), Target = guest.Id })),
             },
             // The host is inside behind a locked door; a wolf comes, scratches at it and goes away.
@@ -87,17 +88,18 @@ public sealed partial class DoorwayReview : Node {
             },
             // The host steps in at a walk with three wolves after them: one tugs them out and one more takes each of their arms.
             "sides" => new (float, Action)[] {
-                (0, GuestAway), (0, ThreeWolves), (0, () => World.Doorways.Enter(Cabin, false)),
+                (0, GuestAway), (0, ThreeWolves), (.49f, () => World.Doorways.Enter(Cabin, false)),
             },
             // The same with the host hurt enough to go down once all three have bitten: the wolf that tugged pins them and the others feed.
             "takedown" => new (float, Action)[] {
-                (0, () => { World.S.Health = 80; GuestAway(); }), (0, ThreeWolves), (0, () => World.Doorways.Enter(Cabin, false)),
+                (0, () => { World.S.Health = 80; GuestAway(); }), (0, ThreeWolves), (.49f, () =>
+                    World.Doorways.Enter(Cabin, false)),
             },
             // A badly hurt host is tugged out of the doorway and pinned.
             _ => new (float, Action)[] {
                 (0, () => { World.Player = door; World.S.Health = 45; World.As(guest, () => World.Player = door + new Vector2(2.5f, 2)); }),
-                (0, () => World.Doorways.Enter(Cabin, false)),
-                (.1f, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-2.5f, 1.5f), Target = host.Id })),
+                (0, () => World.S.Wolves.Add(new Wolf { Pos = door + new Vector2(-2.5f, 1.5f), Target = host.Id })),
+                (.64f, () => World.Doorways.Enter(Cabin, false)),
             },
         };
     }

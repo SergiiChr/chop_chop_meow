@@ -120,7 +120,6 @@ public partial class WorldView : Node3D {
     private float pulseRemaining;
     private ActorAction pulseAction;
     private Vector2 pulseTarget;
-    private float pulseYaw;
     private float night;
     private float downedFor;
     private Vector2 mauledFrom;
@@ -182,7 +181,7 @@ public partial class WorldView : Node3D {
     internal static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
 
     public override void _Ready() {
-        World.Replaced += () => { worldReplaced = true; Footpaths.Clear(); };
+        World.Replaced += () => { worldReplaced = true; Footpaths.Clear(); counterHits.Clear(); };
         camera = new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = BaseSize, Near = 1, Far = OverheadFar, Current = true };
         AddChild(camera);
         // Half energy puts the sky's light at DayAmbientEnergy.
@@ -290,12 +289,14 @@ public partial class WorldView : Node3D {
 
     private void PlayerActed(ActorAction action, Vector2 target) => Acted(World.S.Actor.Id, action, target);
 
-    /// <summary>Plays a swing, pump or kindling on the player who made it, here or at another machine.</summary>
+    /// <summary>
+    /// Plays an action on the player who made it, here or at another machine.
+    /// A swing carries its fixed aim, and other actions carry a position.
+    /// </summary>
     public void Acted(int id, ActorAction action, Vector2 target) {
-        if (id == World.Me.Id) {
-            if (FirstPerson && ActorAnimation.SwingsOnTheMove(action)) pulseYaw = ActorAnimation.Yaw(target - World.Player, player.Yaw);
+        if (id == World.Me.Id)
             StartPulse(player, action, target, ref pulseAction, ref pulseTarget, ref pulseRemaining);
-        } else if (others.TryGetValue(id, out var other))
+        else if (others.TryGetValue(id, out var other))
             StartPulse(other.State, action, target, ref other.Pulse, ref other.PulseTarget, ref other.PulseRemaining);
     }
 
@@ -625,6 +626,7 @@ public partial class WorldView : Node3D {
         if (moved) { SyncWolves(dt); SyncCarts(dt); }
         SyncInsideDoorPOV();
         worldReplaced = false;
+        UpdateCounterHits(dt);
         UpdateEffects(dt);
         UpdateMarkers();
         if (Underground) {
@@ -671,32 +673,35 @@ public partial class WorldView : Node3D {
         ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting, World.CraftRate > 0, Fitting(GatheringTarget));
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
-        if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
+        if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) {
+            action = pulseAction; target = pulseTarget;
+            subject = ActorAnimation.SwingsOnTheMove(action) ? null : ThingAt(target);
+        }
         Thing? worked = action == ActorAction.Idle ? StationToHammer(World.Me) : null;
         if (worked != null) { action = ActorAnimation.StationAction(worked, World.Data); target = worked.Pos; subject = worked; }
-        if (World.Me.Braking && moving) action = ActorAction.Brake;
-        // A leaping wolf knocks the player over as its jaws reach them, before it lands; a pinned player stays down.
-        var knockingDown = KnockingDown(World.Me);
-        if (World.Mauled || knockingDown != null) {
+        if (World.Me.Braking && moving && !ActorAnimation.SwingsOnTheMove(action)) action = ActorAction.Brake;
+        if (World.Mauled) {
             bool fallsBack = FallsBack(World.Me.Id);
-            mauledFrom = (knockingDown ?? PinningWolf(World.Me.Id))?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
+            mauledFrom = PinningWolf(World.Me.Id)?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
             // Facing the wolf, the player goes over backwards with it on top; one yanked out of a doorway falls back still facing the door.
             action = World.Dead ? ActorAction.Devoured : downedFor < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled;
             target = fallsBack ? World.Player - World.Doorways.OutOfDoorAt(World.Me.DoorCabin) : mauledFrom; subject = null;
             downedFor += dt;
         } else downedFor = 0;
         var at = World.Player;
-        var door = doorways.AtDoor(World.Me, player, dt);
-        if (door is DoorShown shown) { at = shown.At; target = shown.Facing; action = shown.Action; subject = null; }
+        var door = doorways.AtDoor(World.Me, player, dt, ActorAnimation.SwingsOnTheMove(action));
+        if (door is DoorShown shown) {
+            at = shown.At; target = shown.Facing; action = shown.Action; subject = null;
+            if (ActorAnimation.SwingsOnTheMove(pulseAction)) pulseRemaining = 0;
+        }
         action = WorkPose(action, subject);
-        player.Update(at, action, target, dt, door?.Backing ?? false);
-        if (FirstPerson && door == null) {
-            // Travel can be sideways or backward. Face the view while walking, and hold the heading of a swing until it ends.
-            bool swing = ActorAnimation.SwingsOnTheMove(action);
-            if (swing || action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake) {
-                player.Yaw = swing ? pulseYaw : ActorAnimation.Yaw(FirstPersonForward, player.Yaw);
-                player.Turning.Hold(player.Yaw);
-            }
+        player.Update(at, action, target, dt, door?.Backing ?? false,
+            ActorAnimation.SwingsOnTheMove(action) ? target : null);
+        if (FirstPerson && door == null &&
+            action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake) {
+            // In first person the body faces the view, including while walking sideways or backward.
+            player.Yaw = ActorAnimation.Yaw(FirstPersonForward, player.Yaw);
+            player.Turning.Hold(player.Yaw);
         }
         player.Mark = Mark(subject, player, action);
         // A foot lands at each extreme of the stride.
@@ -859,22 +864,29 @@ public partial class WorldView : Node3D {
             var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting, p.Making != "" || p.Crafting.Count > 0, Fitting(target));
             var subject = gathering ? target : null;
             var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
-            if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; subject = ThingAt(other.PulseTarget); }
+            if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) {
+                action = other.Pulse; facing = other.PulseTarget;
+                subject = ActorAnimation.SwingsOnTheMove(action) ? null : ThingAt(facing);
+            }
             Thing? worked = action == ActorAction.Idle ? StationToHammer(p) : null;
             if (worked != null) { action = ActorAnimation.StationAction(worked, World.Data); facing = worked.Pos; subject = worked; }
-            if (p.Braking && moving) action = ActorAction.Brake;
-            var knockingDown = KnockingDown(p);
-            if (p.Mauled || knockingDown != null) {
+            if (p.Braking && moving && !ActorAnimation.SwingsOnTheMove(action)) action = ActorAction.Brake;
+            if (p.Mauled) {
                 bool fallsBack = FallsBack(p.Id);
                 action = p.RespawnIn > 0 ? ActorAction.Devoured : other.DownedFor < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled;
-                facing = fallsBack ? p.Pos - World.Doorways.OutOfDoorAt(p.DoorCabin) : (knockingDown ?? PinningWolf(p.Id))?.Pos ?? p.Pos + Vector2.Down;
+                facing = fallsBack ? p.Pos - World.Doorways.OutOfDoorAt(p.DoorCabin)
+                    : PinningWolf(p.Id)?.Pos ?? p.Pos + Vector2.Down;
                 other.DownedFor += dt;
             } else other.DownedFor = 0;
             var at = p.Pos;
-            var door = doorways.AtDoor(p, state, dt);
-            if (door is DoorShown shown) { at = shown.At; facing = shown.Facing; action = shown.Action; subject = null; }
+            var door = doorways.AtDoor(p, state, dt, ActorAnimation.SwingsOnTheMove(action));
+            if (door is DoorShown shown) {
+                at = shown.At; facing = shown.Facing; action = shown.Action; subject = null;
+                if (ActorAnimation.SwingsOnTheMove(other.Pulse)) other.PulseRemaining = 0;
+            }
             action = WorkPose(action, subject);
-            state.Update(at, action, facing, dt, door?.Backing ?? false);
+            state.Update(at, action, facing, dt, door?.Backing ?? false,
+                ActorAnimation.SwingsOnTheMove(action) ? facing : null);
             state.Mark = Mark(subject, state, action);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
@@ -961,9 +973,11 @@ public partial class WorldView : Node3D {
     /// <summary>Whether working on a thing hammers in a mine's frame and rails rather than digging.</summary>
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
 
-    /// <summary>Where a blow of <paramref name="action"/> lands on <paramref name="subject"/> for an actor standing as <paramref name="state"/> has them, or null when it lands on nothing.</summary>
+    /// <summary>The point that work aims at, either the centre of a leaf patch or where a blow lands on its subject.</summary>
     private Vector3? Mark(Thing? subject, ActorState state, ActorAction action) =>
-        subject != null && props.TryGetValue(subject.Id, out var prop) ? strikes.At(subject, state.Position, action, prop) : null;
+        subject == null ? null
+        : action == ActorAction.Rake ? To3(subject.Pos)
+        : props.TryGetValue(subject.Id, out var prop) ? strikes.At(subject, state.Position, action, prop) : null;
 
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
     private void Work(ActorState actor, Thing? subject, ActorRig rig) {
@@ -976,15 +990,17 @@ public partial class WorldView : Node3D {
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
         }
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
-        // Hands close on what they gather twice a loop; packing digs into the heap of goods as each loop starts, grinding plays one clip a loop, and a dig throws its soil aside once.
+        // Hands close on what they gather twice a loop, and a rake rustles the leaves as it starts its pull.
+        // Packing digs into the heap, grinding plays once a loop and a dig throws its soil aside once.
         string? handSound = action switch {
             ActorAction.Gather when actor.Struck(.22f) || actor.Struck(.72f) => GrabSound(subject.Kind),
             ActorAction.Pack when actor.Struck(.04f) => "rustle",
             ActorAction.Grind when actor.Struck(.03f) => "grind_mortar",
             ActorAction.Dig when actor.Struck(ActorAnimation.DigToss) => "dig_toss",
+            ActorAction.Rake when actor.Struck(RakeStroke.Contact) => "rake_leaves",
             _ => null
         };
-        if (handSound != null) Sounds?.Play(handSound, subject.Pos);
+        if (handSound != null) Sounds?.Play(handSound, AnimationReview ? null : subject.Pos);
         // The soil a dig throws aside flies off the blade.
         if (handSound == "dig_toss" && World.Sees(actor.Position)) Burst(rig.Root.Transform * rig.ShovelTip, Soil, 5, 1.6f, .5f, 9, .06f);
         float impact = ActorAnimation.StrikeShare(action) ?? action switch {
@@ -1535,11 +1551,6 @@ public partial class WorldView : Node3D {
         foreach (var w in World.Wolves) if (w.Pinning && w.Target == player) return w;
         return null;
     }
-    /// <summary>A wolf in the air at <paramref name="p"/> whose jaws have reached them, knocking them down.</summary>
-    private Wolf? KnockingDown(PlayerState p) {
-        foreach (var w in World.Wolves) if (w.Leap > 0 && w.Target == p.Id && w.Pos.DistanceTo(p.Pos) <= WolfModel.ContactReach) return w;
-        return null;
-    }
     private Vector2 Hunted(Wolf wolf) {
         foreach (var p in World.Players) if (p.Id == wolf.Target) return p.Pos;
         return World.Player;
@@ -1609,6 +1620,23 @@ public partial class WorldView : Node3D {
         return false;
     }
 
+    private readonly List<(Vector2 At, float In)> counterHits = new(4);
+
+    /// <summary>
+    /// Shows a first-hit reaction at the local swing's contact, even if the wolf's wince update was lost.
+    /// </summary>
+    internal void WolfCounterHit(Vector2 at) => counterHits.Add((at, SwingLands(at).In));
+
+    private void UpdateCounterHits(float dt) {
+        for (int i = counterHits.Count - 1; i >= 0; i--) {
+            var (at, left) = counterHits[i];
+            if (left > dt) { counterHits[i] = (at, left - dt); continue; }
+            counterHits.RemoveAt(i);
+            if (DrawsAt(at)) FurAndEmbers(To3(at, .6f));
+            Sounds?.Play("wolf_hit", at);
+        }
+    }
+
     private void SyncWolves(float dt) {
         feeding.Remember(World.Wolves);
         foreach (var wolf in World.Wolves) {
@@ -1626,13 +1654,15 @@ public partial class WorldView : Node3D {
             if (wolf.Tugging && tugs.ShowTugging(wolf, model, Elapsed, dt)) continue;
             if (wolf.Side != 0 && tugs.ShowHolding(wolf, model, RigOf(wolf.Target), Elapsed, dt)) continue;
             model.Steps = null;
+            if (WolfCounter.Active(wolf)) { ShowWolfCounter(wolf, model, hunted, moved, dt); continue; }
+            model.CounterStage = WolfCounterStage.None; model.CounterHitIn = 0;
             if (wolf.Pinning && wolf.LungeFrom != Vector2.Zero && tugs.ShowLunging(wolf, model, Elapsed, dt)) continue;
             // A blow lands in the world as the swing comes down and throws the wolf back there at once; the model hops back from where it stood.
             // The blow can reach this machine a moment before the swing it shows comes down: the model stands until it does.
             if (wolf.Stagger > model.Stagger) {
                 model.KnockBack -= moved; moved = Vector2.Zero;
                 (model.HitIn, model.Striker) = SwingLands(wolf.Pos + model.KnockBack);
-                model.Struck = true; model.Recoiling = 0; model.SnapHeld = 0;
+                model.Struck = true; model.Recoiling = 0;
             }
             model.Stagger = wolf.Stagger;
             if (model.Struck) {
@@ -1651,76 +1681,84 @@ public partial class WorldView : Node3D {
             bool glances = wolf.Follow == FollowStage.Circling && wolf.Flee <= 0 && (Elapsed + wolf.Id * WolfModel.GlanceApart) % WolfModel.GlanceEvery < WolfModel.GlanceSeconds;
             float glance = glances ? Math.Clamp(Mathf.AngleDifference(model.Yaw, ActorAnimation.Yaw(hunted - wolf.Pos, model.Yaw)), -WolfModel.MaxGlance, WolfModel.MaxGlance) : 0;
             model.Glance = Mathf.MoveToward(model.Glance, glance, dt * WolfModel.GlanceRate);
-            // A snap is shown through to the jaws shutting, a moment after the wolf lands.
-            // One stopped while the wolf still gathered itself has nothing to show.
-            model.SnapHeld = WolfSnap.InAir(wolf) ? WolfModel.SnapHold : wolf.Snap > 0 ? 0 : Math.Max(0, model.SnapHeld - dt);
+            if (wolf.Recover > model.Recover) {
+                model.LandedFor = 0;
+                Sounds?.Play(Footsteps.Sound(World, wolf.Pos), wolf.Pos, pitch: .78f);
+                if (World.Sees(wolf.Pos)) Burst(To3(wolf.Pos, .08f), FallDust, 3, .4f, .8f, -.25f, .14f, 1.4f);
+            } else model.LandedFor += dt;
+            model.Recover = wolf.Recover;
+            bool committed = WolfSnap.Active(wolf) || wolf.Recover > 0 || wolf.Pinning;
             bool struck = model.Struck || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;
             // No faster than a wolf backs off.
             bool slow = moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
             // Easing back from its player to biting distance, a wolf steps backward still facing them.
-            bool backing = running && wolf.Flee <= 0 && !wolf.Following && moved.Dot(hunted - wolf.Pos) < 0 && slow;
+            bool backing = running && !wolf.Aggressive && wolf.Flee <= 0 && !wolf.Following
+                && moved.Dot(hunted - wolf.Pos) < 0 && slow;
             // A scared or galloping wolf turns fast. At a walk or a trot, one that sets off far from the way it faces turns
             // round where it stands first, and only then goes after its place in the world.
-            bool fast = wolf.Chase > 0 || wolf.Flee > 0;
+            bool fast = wolf.Aggressive || wolf.Chase > 0 || wolf.Flee > 0;
+            bool threatening = wolf.Threaten > 0;
             bool turnsRound = running && !backing && !fast && moved.Normalized().Dot(ActorAnimation.Forward(model.Yaw)) < WolfModel.SetsOffWithin;
             // Where it is drawn away from its place in the world, after turning round or letting go of a player it tugged,
             // closes up only as it walks, so it never slides.
             var drifted = model.Drift;
-            model.Drift = turnsRound ? model.Drift - moved : model.Drift.MoveToward(Vector2.Zero, WolfModel.CatchingUp(moved.Length(), dt));
+            model.Drift = committed || threatening ? Vector2.Zero
+                : turnsRound ? model.Drift - moved
+                : model.Drift.MoveToward(Vector2.Zero, WolfModel.CatchingUp(moved.Length(), dt));
             float walked = (moved + model.Drift - drifted).Length(), faced = model.Yaw;
             // A struck wolf keeps facing whoever hit it; a running one turns into its path.
-            var facing = struck ? model.Striker - wolf.Pos - model.KnockBack : running && !backing ? moved : hunted - wolf.Pos;
+            var facing = threatening ? Vector2.FromAngle(wolf.Heading) :
+                struck ? model.Striker - wolf.Pos - model.KnockBack : running && !backing ? moved : hunted - wolf.Pos;
             // A struck wolf snaps round to whoever hit it; otherwise the head turns first and the body follows, leaning in.
             // Reversing, its body still faces the old way for a moment: it brakes rather than running backward.
             bool braking = false;
             if (struck) {
                 model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(facing, model.Yaw), Math.Min(1, dt * 16)); model.Turning.Hold(model.Yaw);
                 model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+            } else if (committed || threatening) {
+                model.Yaw = ActorAnimation.Yaw(Vector2.FromAngle(wolf.Heading), model.Yaw);
+                model.Turning.Hold(model.Yaw); model.Glance = 0;
+                model.Root.Rotation = new Vector3(0, model.Yaw, 0);
             } else braking = model.TurnToward(facing, moved, dt, running, fast, backing);
             // Turning where it stands, it comes round about its hips, its forepaws stepping round them.
             float turned = Mathf.AngleDifference(faced, model.Yaw);
             // A howling wolf has turned already and keeps its paws planted.
-            bool stepsRound = !struck && !fast && wolf.Howl <= 0 && (turnsRound || !running) && dt > 0 && Math.Abs(turned) > WolfModel.StepsRoundFrom * dt;
+            bool stepsRound = !committed && !struck && !fast && wolf.Howl <= 0 && (turnsRound || !running) && dt > 0
+                && Math.Abs(turned) > WolfModel.StepsRoundFrom * dt;
             if (stepsRound) model.Drift += (ActorAnimation.Forward(model.Yaw) - ActorAnimation.Forward(faced)) * WolfModel.HipsBehind;
             model.Root.Visible = DrawsAt(wolf.Pos);
             bool wary = wolf.Following || HuntedTorchLit(wolf);
-            float flight = 0;
-            // Gathering itself for a snap while it still runs with its player, it keeps running; standing, it sinks back first.
-            bool gathers = WolfSnap.Winding(wolf) && slow;
+            bool gathers = WolfSnap.Winding(wolf);
+            float flight = WolfSnap.FlightOf(wolf), left = WolfSnap.Remaining(wolf);
+            float wind = gathers ? 1 - (left - flight) / WolfSnap.Windup : 1;
+            float drive = gathers ? 0 : 1 - left / flight;
+            float rise = 0;
+            if (!wolf.Pinning) model.Pinned = 0;
             if (model.Struck) model.Stand(Elapsed + wolf.Id % 7, dt, true);
-            else if (model.Recoiling > 0) model.Recoil(1 - model.Recoiling / WolfModel.RecoilSeconds, dt);
-            else if (wolf.Leap > 0) {
-                // The world closes the leap's gap evenly, so the start, and the point where the jaws reach the throat, follow from how far it has come.
-                float progress = 1 - wolf.Leap / World.LeapSeconds, gap = wolf.Pos.DistanceTo(hunted);
-                float start = progress < 1 ? (gap - World.PinDistance * progress) / (1 - progress) : gap;
-                float contact = start <= WolfModel.ContactReach ? 0 : (start - WolfModel.ContactReach) / (start - World.PinDistance);
-                model.Pinned = gap <= WolfModel.ContactReach ? model.Pinned + dt : 0;
-                var chest = FeedingSpots.PawsOnChest(model, RigOf(wolf.Target));
-                if (model.Motion != WolfMotion.Leap && model.Pinned == 0) model.StepFrom = model.Root.Position;
-                if (model.Pinned > 0) PinAt(model, hunted, chest, Elapsed, dt);
-                else { model.Leap(progress, contact, dt, chest, (tugs.InTheDoorway(wolf) ?? FallBackView.Throat(hunted, Vector2.Up, 0)).Y); flight = contact > 0 ? progress / contact : 1; }
-                if (model.Pinned == 0) model.Toward = (wolf.Pos - hunted).Normalized();
+            else if (model.Recoiling > 0) model.Recoil(1 - model.Recoiling / WolfModel.RecoilSeconds, dt, threatening);
+            else if (threatening && !wolf.Feeding) model.Threaten(Elapsed + wolf.Id % 7, dt);
+            else if (wolf.Leap > 0 && !gathers) {
+                model.Leap(drive, dt, jawsUp: FallBackView.Throat(Vector2.Zero, Vector2.Up, 0).Y);
+                rise = Movement.Rise(drive * flight, flight);
             } else if (wolf.Feeding) {
                 if (wolf.Pinning) {
+                    if (model.Pinned == 0) model.Toward = -Vector2.FromAngle(wolf.Heading);
                     model.Pinned += dt;
                     PinAt(model, hunted, FeedingSpots.PawsOnChest(model, RigOf(wolf.Target)), Elapsed + wolf.Id % 7, dt);
                 } else model.Feed(Elapsed + wolf.Id % 7, dt, false);
-            } else if (gathers || model.SnapHeld > 0) {
-                float wind = gathers ? 1 - (wolf.Snap - WolfSnap.Flight) / WolfSnap.Windup : 1;
-                var bitten = StateOf(wolf.Target);
-                model.Snap(wind, gathers ? 0 : 1 - wolf.Snap / WolfSnap.Flight, wolf.Snap > 0 ? 0 : 1 - model.SnapHeld / WolfModel.SnapHold, dt,
-                    WolfModel.SnapReach(wolf.Pos + model.KnockBack + model.Drift, bitten?.Position ?? hunted, bitten?.Yaw ?? model.Yaw + Mathf.Pi));
+            } else if (committed) {
+                float settle = wolf.Recover > 0 ? model.LandedFor / WolfModel.SettleSeconds : 0;
+                model.Snap(wind, drive, settle, dt);
             } else if (stepsRound) model.Move(Math.Abs(turned) * WolfModel.TurnStep, dt, false, wary);
             else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (braking) model.Brake(moved.Length(), dt);
-            else if (running) model.Move(backing ? -walked : walked, dt, (wolf.Chase > 0 || wolf.Follow == FollowStage.Routed) && !backing, wary);
+            else if (running) model.Move(backing ? -walked : walked, dt, (wolf.Aggressive || wolf.Chase > 0
+                || wolf.Follow == FollowStage.Routed) && !backing, wary);
             else if (wolf.Follow == FollowStage.Braced) model.Brace(Elapsed + wolf.Id % 7, dt);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
-            var place = To3(wolf.Pos + model.KnockBack + model.Drift);
-            if (wolf.Leap > 0 || wolf.Pinning) {
-                if (model.Toward == Vector2.Zero) model.Toward = (wolf.Pos - hunted).Normalized();
-                place = AtTheThroat(model, hunted, flight, (1 - wolf.Leap / World.LeapSeconds) * World.LeapSeconds / Math.Max(flight, 1e-3f), tugs.InTheDoorway(wolf));
-            } else model.Toward = Vector2.Zero;
+            var place = To3(wolf.Pos + model.KnockBack + model.Drift, rise);
+            if (wolf.Pinning) place = AtTheThroat(model, hunted);
+            else model.Toward = Vector2.Zero;
             if (wolf.Feeding && !wolf.Pinning && Fallen(wolf) is var (lying, lyingRig)) place = feeding.Place(wolf, model, lying, lyingRig, dt);
             else { model.Fed = 0; model.FeedSide = 0; }
             model.Root.Position = place;
@@ -1729,6 +1767,51 @@ public partial class WorldView : Node3D {
         }
         foreach (var (wolf, model) in wolves)
             if (!World.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
+    }
+
+    /// <summary>Shows the two hops and puts the dust at the paws that touch or slide.</summary>
+    private void ShowWolfCounter(Wolf wolf, WolfModel model, Vector2 hunted, Vector2 moved, float dt) {
+        var (stage, progress) = WolfCounter.Pose(wolf);
+        if (model.CounterStage == WolfCounterStage.None && stage == WolfCounterStage.Wince)
+            model.CounterHitIn = SwingLands(wolf.Pos).In;
+        bool changed = model.CounterStage != stage;
+        int previousDust = (int)(model.CounterProgress * 4);
+        model.CounterStage = stage; model.CounterProgress = progress;
+        model.KnockBack = model.Drift = Vector2.Zero;
+        model.Struck = false; model.Recoiling = model.Recover = 0; model.Stagger = wolf.Stagger;
+        model.Root.Visible = DrawsAt(wolf.Pos);
+        model.Root.Position = To3(wolf.Pos, WolfCounter.Height(wolf));
+        model.Yaw = ActorAnimation.Yaw(Vector2.FromAngle(wolf.Heading), model.Yaw);
+        model.Turning.Hold(model.Yaw); model.Glance = 0;
+        model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+
+        // A snapshot can reach a guest before the blow in the swing they are drawing lands.
+        model.CounterHitIn = Math.Max(0, model.CounterHitIn - dt);
+        if (model.CounterHitIn > 0 && stage == WolfCounterStage.Wince) {
+            model.Stand(Elapsed + wolf.Id % 7, dt, true);
+            if (model.Root.Visible) model.Plant();
+            return;
+        }
+        if (stage == WolfCounterStage.Run) model.Move(moved.Length(), dt, true, false);
+        else if (stage == WolfCounterStage.Face) model.Threaten(Elapsed + wolf.Id % 7, dt);
+        else WolfCounterPoses.Show(model, wolf, hunted, stage, progress, dt);
+        if (!model.Root.Visible) return;
+        model.Plant();
+        if (changed && stage is WolfCounterStage.Slide or WolfCounterStage.Pivot)
+            Sounds?.Play(Footsteps.Sound(World, wolf.Pos), wolf.Pos, pitch: .76f);
+        if (stage == WolfCounterStage.Slide && (changed || (int)(progress * 4) > previousDust))
+            CounterDust(model, 0, 1);
+        else if (stage == WolfCounterStage.Pivot) {
+            if (changed) CounterDust(model, 0, 1);
+            else if (progress > .36f && (int)(progress * 4) > previousDust) CounterDust(model, 2, 3);
+        }
+    }
+
+    private void CounterDust(WolfModel model, int left, int right) {
+        Burst((model.Root.Transform * model.SolePoint(left, 4)) with { Y = .05f }, FallDust, 2, .65f, .65f, -.25f,
+            .095f, 1.4f);
+        Burst((model.Root.Transform * model.SolePoint(right, 4)) with { Y = .05f }, FallDust, 2, .65f, .65f, -.25f,
+            .095f, 1.4f);
     }
 
     /// <summary>Seconds into its door check at a cabin a wolf is drawn at, or as the world has it for one not drawn at the door yet.</summary>
@@ -1756,19 +1839,11 @@ public partial class WorldView : Node3D {
         InsideDoorPOV.Finish();
     }
 
-    /// <summary>
-    /// Where a leaping or pinning wolf stands so its jaws are at the hunted player's throat.
-    /// The flight pushes off from where the leap began and flies under gravity onto the throat by the moment of contact,
-    /// <paramref name="seconds"/> after it set off, coming down on its hind paws reared up to it; the jaws then ride the throat
-    /// down as the player goes over, the wolf rearing on its hind legs rather than leaving the ground, and it holds that spot
-    /// once they are down.
-    /// A player in a cabin's doorway is leapt at by the <paramref name="waist"/>, where the wolf takes hold to tug them back out.
-    /// </summary>
-    private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted, float flight, float seconds, Vector3? waist = null) {
+    /// <summary>Places the wolf at the player's throat as they fall, then holds its paws where they landed.</summary>
+    private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted) {
         if (model.Pinned > ActorAnimation.FallBackSeconds) return model.Root.Position;
-        var held = (waist ?? FallBackView.Throat(hunted, model.Toward, model.Pinned)) - model.Root.Basis * model.Bite;
-        if (model.Pinned > 0) return held with { Y = 0 };
-        return WolfModel.LeapPath(model.StepFrom, held with { Y = 0 }, flight, seconds);
+        var held = FallBackView.Throat(hunted, model.Toward, model.Pinned) - model.Root.Basis * model.Bite;
+        return held with { Y = 0 };
     }
 
     /// <summary>
@@ -1784,7 +1859,7 @@ public partial class WorldView : Node3D {
     /// <summary>The wolf a downed player pushes at: the one knocking them down or pinning them, as drawn, or null.</summary>
     private WolfModel? HoldingOff(int player) {
         foreach (var w in World.Wolves)
-            if (w.Target == player && (w.Leap > 0 || w.Pinning) && wolves.TryGetValue(w, out var model)) return model;
+            if (w.Target == player && w.Pinning && wolves.TryGetValue(w, out var model)) return model;
         return null;
     }
 
