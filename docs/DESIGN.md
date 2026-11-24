@@ -194,12 +194,12 @@ UI and input:
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
-| `src/guide/display/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
-| `src/menus/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
+| `src/menus/StartMenu.cs` | The main menu and its save, load, options, join and Controls screens |
+| `src/menus/ControlsList.cs` | Key caps and actions on the main menu's Controls screen |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
-| `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things, E and Space, and `ClickMode`, what the next click does |
+| `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things and using Space, and `ClickMode`, what the next click does |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
@@ -1082,7 +1082,7 @@ The underground view darkens the surface and exposes an earth bed 0.9 m below gr
 Blueprint-blue lines mark the trench edges, pipes and inlets.
 A pipe and its vertical inlet turn dark blue while the tile holds any water, even at zero pressure.
 Ground remains visible under people standing over the trench.
-The Layer button below the bank switches the view between the surface and underground.
+The Layer button below the left side of the status bar switches the view between the surface and underground.
 In the underground view, a click opens the laid pipe's page (`PipePanel`).
 Placement and removal project the pointer onto the bed.
 Inspection picks the visible pipe body or riser.

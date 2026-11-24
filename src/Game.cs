@@ -166,7 +166,10 @@ public partial class Game : Node, IGameFlow {
         layerButton.ToggleMode = true;
         Style.Skin(layerButton, Style.TabRound.Normal, Style.TabRound.Hover, Style.TabActive.Normal);
         needsPlate = new NeedsPlate(kit, moves, damageEdges, cursor);
-        needsPlate.ItemRectChanged += () => layerButton.Position = needsPlate.GetRect().End + new Vector2(-48, 8);
+        needsPlate.ItemRectChanged += () => {
+            var status = needsPlate.GetRect();
+            layerButton.Position = new Vector2(status.Position.X + 12, status.End.Y + 8);
+        };
         ui.AddChild(needsPlate); ui.AddChild(layerButton); ui.AddChild(damageEdges);
         recipeMap = new RecipeMap(kit, panel); panel.Map = recipeMap; ui.AddChild(recipeMap);
         ending = new EndingScreen(kit, panel.Close, this); ui.AddChild(ending);
@@ -278,10 +281,8 @@ public partial class Game : Node, IGameFlow {
     /// <summary>Opens a game this window started: a new one on the welcome page, a loaded one on the backpack.</summary>
     private void Begin(int slot) {
         saves.Slot = Math.Max(slot, 0);
-        if (slot < 0) {
-            panel.Open(Page.Welcome);
-            Notify("Welcome. Press I to see the guide.");
-        } else { panel.Open(Page.Backpack); Notify("Settlement loaded."); }
+        if (slot < 0) panel.Open(Page.Welcome);
+        else { panel.Open(Page.Backpack); Notify("Settlement loaded."); }
     }
 
     public void ShowStart() { LeaveServer(); session = new Session.None(); world.NewGame(); startMenu.ShowStart(); }
@@ -388,7 +389,6 @@ public partial class Game : Node, IGameFlow {
                     if (!cursor.Empty) cursor.Release(); else if (player.Mode is not ClickMode.Normal) player.Mode = new ClickMode.Normal(); else if (!player.CancelEntry()) { if (panel.Visible || bag.Visible) panel.Close(); else menu.Open(); }
                     RefreshLive(); break;
                 case Key.B: panel.Open(Page.Build); break;
-                case Key.I: panel.Toggle(Page.Guide); break;
                 case Key.H: panel.Toggle(Page.Crew); break;
                 case Key.C:
                     if (!player.RotatePlacement(-1, OverInterface)) panel.Toggle(Page.Craft);

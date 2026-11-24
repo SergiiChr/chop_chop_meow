@@ -129,7 +129,8 @@ Sources and licenses of the environment assets are in [assets/README.md](assets/
 ## Start menu and options
 
 The game opens with the intro film, which Esc skips, and then on a start menu with Continue (the most recent save), New
-game, Load game, Join game, Options and Quit.
+game, Load game, Join game, Options, Controls and Quit.
+Controls lists the mouse and keyboard shortcuts.
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
 
@@ -181,7 +182,6 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | LMB / RMB while placing steel pipes | Lay a pipe / take up the pipe under the pointer |
 | R / T while placing steel pipes | Turn 90° / cycle the pipe type |
 | H | Open the crew overview |
-| I | Open or close the field guide |
 | 1–9 or click a hotbar slot | Select and outline that slot, and start placement if it holds a plan or crate |
 | Space at a selected nearby reinforced furnace or water pump | Pump |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |
@@ -193,7 +193,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
 | Shift-click / Ctrl-click an item slot | Move the stack clicked / all of that item to the other storage open; this applies across inventory and station panels. Ctrl from the backpack, and Store all, leave stacks bound to the hotbar |
 | RMB or double LMB on a hotbar slot | Use its item |
-| Layer button below the bank | Switch between the surface and underground |
+| Layer button below the status bar | Switch between the surface and underground |
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
 
 Mines face their cliff and open their panel as soon as you place them.
@@ -237,7 +237,7 @@ With a side panel open they keep to the space left of it.
 
 ### Bottom bar and hotbar
 
-The bottom bar holds round badges for building, the backpack, crafting, the crew and the field guide, each with its key, next to the hotbar.
+The bottom bar holds round badges for building, the backpack, crafting and the crew, each with its key, next to the hotbar.
 
 Put a held stack or a plan from the building plans on a hotbar slot to assign it.
 A stack put on a slot binds that exact backpack stack to it, which then has the selected hotbar slot's rim in the backpack.
@@ -823,7 +823,7 @@ Buildings that need water share the available flow evenly.
 A closed tap can have a full pipe at its inlet.
 When pressure falls to zero, water stays in the pipes for the next building that needs it.
 Cutting a line leaves the water in each surviving section.
-Click the round Layer button below the bank to switch between the surface and underground.
+Click the round Layer button below the left side of the status bar to switch between the surface and underground.
 Click a laid pipe underground to see how much water it holds and its current pressure.
 The remove tool still switches layers with right-click and takes up a pipe or a surface object with left-click.
 

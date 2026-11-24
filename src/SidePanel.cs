@@ -9,8 +9,6 @@ namespace ChopChopMeow;
 public sealed class PageMemory {
     /// <summary>Whether a packing station shows its good picker.</summary>
     public bool PackPicking;
-    /// <summary>The field guide topic shown.</summary>
-    public string GuideTab = "controls";
     /// <summary>The recipe groups the player has closed, on every recipe board.</summary>
     public readonly HashSet<RecipeGroup> ClosedGroups = new();
     /// <summary>Whether the trading post shows hiring rather than shipping, and whether its price sheet is open.</summary>
@@ -25,7 +23,7 @@ public sealed class PageMemory {
 public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory, HeldCursor Cursor);
 
 /// <summary>The pages of the side panel.</summary>
-public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, Crate, Barrel }
+public enum Page { None, Welcome, Build, Backpack, Crew, Craft, Inspect, Crate, Barrel }
 
 /// <summary>What the side panel inspects: a thing, a worker, a pipe or nothing.</summary>
 public readonly record struct Selection {
@@ -52,7 +50,6 @@ public partial class SidePanel : MovableWindow {
         ("A new beginning", (tools, _) => new WelcomePage(tools)),
         ("Building plans", (tools, _) => new PlansPanel(tools)),
         ("Backpack", (tools, _) => new BackpackPage(tools)),
-        ("Field guide", (tools, _) => new GuidePanel(tools)),
         ("Your crew", (tools, _) => new CrewPanel(tools)),
         ("Crafting", (tools, _) => new CraftPanel(tools)),
         ("Inspect", InspectPage.For),

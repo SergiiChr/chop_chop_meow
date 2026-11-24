@@ -23,7 +23,7 @@ public partial class Hotbar : PanelContainer {
         AddThemeStyleboxOverride("panel", Style.Plate);
         var slots = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; slots.AddThemeConstantOverride("separation", 10); AddChild(slots);
         slots.AddChild(MenuIcon("build", "Build", () => panel.Open(Page.Build), "B", Style.Brick)); slots.AddChild(MenuIcon("bag", "Backpack", () => panel.Open(Page.Backpack), "Tab", Style.Sage));
-        slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open(Page.Craft), "C", new Color("b08a45"))); slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open(Page.Crew), "H", new Color("5f8aa6"))); slots.AddChild(MenuIcon("guide", "Field guide", () => panel.Open(Page.Guide), "I", new Color("7d6488")));
+        slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open(Page.Craft), "C", new Color("b08a45"))); slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open(Page.Crew), "H", new Color("5f8aa6")));
         var divider = new ColorRect { Color = new Color(Style.Beige, .6f), CustomMinimumSize = new Vector2(3, 46), SizeFlagsVertical = SizeFlags.ShrinkCenter }; slots.AddChild(divider);
         for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
     }

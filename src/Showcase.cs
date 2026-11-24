@@ -235,7 +235,6 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Player = hand.Pos + Vector2.One;
             if (Launch.Has("--crew")) panel.Open(Page.Crew); else panel.Select(hand);
         }
-        if (Launch.Has("--guide")) panel.Open(Page.Guide);
         if (Launch.Has("--menu")) { panel.Close(); menu.Open(); }
         if (Launch.Has("--furnace")) { world.Player = bellows.Pos + Vector2.One; panel.Select(bellows); }
         if (Launch.Has("--piles")) {
