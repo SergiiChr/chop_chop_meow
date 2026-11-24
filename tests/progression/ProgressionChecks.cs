@@ -84,7 +84,9 @@ public static class ProgressionChecks {
         var offer = SellSteelToolForTheFirstHire(world, sign);
         SupplyOpeningCampWithHiredWorker(world, sign, offer, tree, stone);
         world.Tick(.01f, true);
-        Require(world.GoalComplete, "objective chain should reach the first automation milestone");
+        foreach (var quest in Quests.Entries)
+            if (quest.Id is not (QuestId.Profit or QuestId.Mines))
+                Require(world.Quests.Status(quest.Id) == QuestStatus.Completed, $"progression to first automation should complete {quest.Title}");
         GD.Print($"Progression simulation elapsed: {world.Time - startTime:0} seconds.");
     }
 }

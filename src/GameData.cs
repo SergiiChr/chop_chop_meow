@@ -299,7 +299,7 @@ public sealed partial class GameData {
     private static readonly RecipeGroup[] ListedGroups = [RecipeGroup.Materials, RecipeGroup.Tools, RecipeGroup.Containers, RecipeGroup.Food];
     private static readonly List<string> Nothing = new();
     /// <summary>Items the recipe map leaves out: coins, and the part-drunk bottles that stand with the full one.</summary>
-    public static bool OffTheMap(string item) => item == Inventory.Coins || Barrel.Liters(item) > 0 || Bucket.Liters(item) > 0 || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
+    public static bool OffTheMap(string item) => Barrel.Liters(item) > 0 || Bucket.Liters(item) > 0 || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
     /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
     public string? RecipeIdOf(string item) => recipeIdOf.GetValueOrDefault(item);
     /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>

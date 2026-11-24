@@ -186,7 +186,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Space at a selected nearby reinforced furnace or water pump | Pump |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
-| Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
+| Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with the Quest Log, save, load, options, new game and quit |
 | Mouse wheel | Zoom in the overhead view |
 | LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
@@ -512,15 +512,19 @@ Those spots stay clear of other buildings.
 | Canning station | 2 steel bars, 8 planks |
 | Mine | free to mark; its second stage takes 50 wood, 10 iron bars and 50 stone |
 
-### Goals
+### Quest Log
 
-The starter goal chain in the pause menu (Esc) is a tutorial.
-Below it are the end goals:
+Press Esc to open the Quest Log. Click a quest name for its details, or expand **Completed** to revisit finished quests.
+Hover over an item icon to see its name. Click it to open the recipe map with that item highlighted.
+Close the map to return to the quest.
 
-- a working mine on every ore found in the cliffs;
-- 1300 coins profit a day for 7 days in a row, where profit is the coins from sales that came back that day minus the wages charged at the next dawn.
+You can start on the campfire, cabin, crafting bench, stone furnace, hiring and profit quests right away.
+The bench reveals **Road to riches**, the stone furnace reveals **Hotter than fire**, and spotting a mineable deposit
+reveals **Steel tools**. Getting a steel bar reveals **Too soft**. Completing it reveals **Infinite power**.
 
-Reaching both shows an ending screen with Restart and Keep playing.
+**Infinite power** requires an open iron, coal and tin mine. **NEET** requires at least 1,300 coins in profit a day
+for seven days in a row. Profit is the sale coins that came back that day minus wages charged at the next dawn.
+The mines and profit target together show the ending screen with Restart and Keep playing.
 
 ## Crafting
 
@@ -538,9 +542,9 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 
 The map button in the crafting menu's header opens the recipe map over the whole screen.
 Esc or its close button closes it.
-The game goes on under it, with your character standing where they were, and an item first made meanwhile turns to made before.
+Opening it from the crafting menu lets the game run underneath. Opening it from a quest keeps the pause menu open underneath.
 
-- The map has a row for each category: wood, stone and coal, iron and steel, tin, food and farm. In a row each item hangs off the one it is made out of, raw material first.
+- The map has a row for each category: wood, stone and coal, iron and steel, tin, food, farm and trade. In a row each item hangs off the one it is made out of, raw material first.
 - Every item is on the map, with where it is made or come by under its name.
 - An item the settlement has made, gathered, bought or started with has a filled slot, and so has everything that item is made of; any other has a dashed outline. The stations along the top, with their costs, are outlined until first built.
 - Chips beside an item's slot show the tool its recipe requires (yellow rim) and each additional resource it takes (dark rim). A click on a chip scrolls to that item and lights it up for a moment.
