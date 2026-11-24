@@ -133,7 +133,7 @@ UI and input:
 | File | Owns |
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
-| `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
+| `src/menus/PauseMenu.cs` | The pause menu with the goal chain, access to Controls, and hosting |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
@@ -197,7 +197,7 @@ UI and input:
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/menus/StartMenu.cs` | The main menu and its save, load, options, join and Controls screens |
-| `src/menus/ControlsList.cs` | Key caps and actions on the main menu's Controls screen |
+| `src/menus/ControlsList.cs` | Key caps and actions on the shared Controls screen |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
 | `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things and using Space, and `ClickMode`, what the next click does |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |

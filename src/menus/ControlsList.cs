@@ -2,7 +2,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Key caps and actions shown on the main menu's Controls screen.</summary>
+/// <summary>Key caps and actions shown on the Controls screen.</summary>
 public partial class ControlsList : PanelContainer {
     private static readonly (string? Key, string Action)[] Bindings = {
         ("WASD", "Move."),

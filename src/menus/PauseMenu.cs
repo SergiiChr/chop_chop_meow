@@ -40,6 +40,7 @@ public partial class PauseMenu : PanelContainer {
         SaveButton = MenuButton("Save", Style.Enamel, () => startMenu.ShowSlots(true, BackToPause)); SaveButton.Name = "save"; side.AddChild(SaveButton);
         loadButton = MenuButton("Load", Style.Enamel, () => startMenu.ShowSlots(false, BackToPause)); loadButton.Name = "load"; side.AddChild(loadButton);
         var options = MenuButton("Options", Style.Enamel, () => startMenu.ShowOptions(BackToPause)); options.Name = "options"; side.AddChild(options);
+        side.AddChild(MenuButton("Controls", Style.Enamel, () => startMenu.ShowControls(BackToPause)));
         newGameButton = MenuButton("New game", Style.Enamel, () => ConfirmLeave("NEW GAME", "Start a new game", flow.Restart)); newGameButton.Name = "new_game"; side.AddChild(newGameButton);
         var quitButton = MenuButton("Quit", Style.Enamel, () => ConfirmLeave("QUIT", "Quit to desktop", flow.Quit)); quitButton.Name = "quit"; side.AddChild(quitButton);
         side.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });

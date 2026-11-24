@@ -130,7 +130,7 @@ Sources and licenses of the environment assets are in [assets/README.md](assets/
 
 The game opens with the intro film, which Esc skips, and then on a start menu with Continue (the most recent save), New
 game, Load game, Join game, Options, Controls and Quit.
-Controls lists the mouse and keyboard shortcuts.
+Choose Controls from the start or pause menu to see the mouse and keyboard shortcuts.
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
 
@@ -186,7 +186,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Space at a selected nearby reinforced furnace or water pump | Pump |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
-| Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
+| Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, controls, new game and quit |
 | Mouse wheel | Zoom in the overhead view |
 | LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
