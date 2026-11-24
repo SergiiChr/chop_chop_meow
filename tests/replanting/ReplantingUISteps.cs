@@ -6,20 +6,31 @@ using static Checks;
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>Marks the ground with the selected shovel and holds right mouse until an empty hole appears.</summary>
+    /// <summary>Holds right mouse on open ground with the shovel selected until a hole appears.</summary>
     private async Task<Thing> DigHole(Vector2 at) {
         var screen = view.Screen(at);
         await Hover(screen);
-        Require(view.PlacementGhost != null, "the selected shovel should show a placement outline");
-        await Click(screen);
-        await Until(() => world.ThingsOf(ThingKind.PlantingSpot).Any(t => t.Pos == at), "the dig outline appearing");
+        Require(view.PlacementGhost != null && HasLabel(modeLabel, "Hold RMB to dig."),
+            "the selected shovel should show the dig outline and hint");
         var point = RightPress(at, .025f);
         try {
-            await Until(() => view.PlayerAnimation == ActorAction.Dig, "the shovel digging at the outline", 6);
-            await Until(() => world.ThingsOf(ThingKind.Hole).Any(t => t.Pos == at), "the outline turning into an empty hole", 10);
+            await Until(() => view.PlayerAnimation == ActorAction.Dig && view.PlayerMark?.IsEqualApprox(WorldView.To3(at)) == true,
+                "the shovel digging at the outlined spot", 6);
+            await Until(() => world.ThingsOf(ThingKind.Hole).Any(t => t.Pos == at), "the dig finishing and leaving an empty hole", 10);
         } finally { RightRelease(point); }
         await Frames();
         return world.ThingsOf(ThingKind.Hole).First(t => t.Pos == at);
+    }
+
+    /// <summary>Lets go during a dig and checks that nothing was left on the ground.</summary>
+    private async Task StopBeforeFinishingTheHole(Vector2 at) {
+        var point = RightPress(at, .025f);
+        try {
+            await Until(() => view.PlayerAnimation == ActorAction.Dig, "the shovel starting to dig", 6);
+        } finally { RightRelease(point); }
+        await Until(() => view.PlayerAnimation != ActorAction.Dig, "the shovel stopping when released", 3);
+        Require(world.ThingsOf(ThingKind.PlantingSpot).Count == 0 && world.ThingsOf(ThingKind.Hole).All(t => t.Pos != at),
+            "releasing early should leave no outline or hole on the ground");
     }
 
     /// <summary>Puts one acorn in a dug hole and pours a bucket into the resulting tree.</summary>

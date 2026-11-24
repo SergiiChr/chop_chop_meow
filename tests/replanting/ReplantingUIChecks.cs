@@ -23,6 +23,9 @@ public partial class Game {
         var at = SpotsNearby().First(p => world.Construction.PlacementBlock(ThingKind.PlantingSpot, p) == null
             && Uncovered(view.Screen(p)));
         await DoubleClick(BagCell(c => c.TooltipText.StartsWith("Steel shovel")));
+        await Click(view.Screen(at));
+        Require(world.ThingsOf(ThingKind.PlantingSpot).Count == 0, "left-clicking open ground should leave no marker");
+        await StopBeforeFinishingTheHole(at);
         var hole = await DigHole(at);
         Require(world.Backpack["acorn"] == 0 && hole.Inventory.Count == 0, "digging should leave an empty hole without any acorn");
         Give(Hosted, "acorn");

@@ -32,6 +32,7 @@ public partial class WorldView : Node3D {
     public float Zoom = 1;
     public bool Gathering;
     public Thing? GatheringTarget;
+    public Vector2? DiggingAt;
     public string? SelectedTool;
     public bool Paused;
     private bool worldReplaced;
@@ -867,7 +868,7 @@ public partial class WorldView : Node3D {
             }
             var state = other.State;
             bool moving = p.Pos.DistanceSquaredTo(state.Position) > .000001f;
-            var target = World.Find(p.GatherTarget);
+            var target = World.Find(p.GatherTarget) ?? GroundHoles.AnimationTarget(p);
             bool gathering = target != null && p.Pos.DistanceTo(World.GatherAt(target, p.Pos)) < 2.5f;
             var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting, p.Making != "" || p.Crafting.Count > 0, Fitting(target));
             var subject = gathering ? target : null;
@@ -975,8 +976,11 @@ public partial class WorldView : Node3D {
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
 
     /// <summary>Where a blow of <paramref name="action"/> lands on <paramref name="subject"/> for an actor standing as <paramref name="state"/> has them, or null when it lands on nothing.</summary>
-    private Vector3? Mark(Thing? subject, ActorState state, ActorAction action) =>
-        subject != null && props.TryGetValue(subject.Id, out var prop) ? strikes.At(subject, state.Position, action, prop) : null;
+    private Vector3? Mark(Thing? subject, ActorState state, ActorAction action) {
+        if (subject == null) return null;
+        if (subject.Kind == ThingKind.PlantingSpot && action == ActorAction.Dig) return To3(subject.Pos);
+        return props.TryGetValue(subject.Id, out var prop) ? strikes.At(subject, state.Position, action, prop) : null;
+    }
 
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
     private void Work(ActorState actor, Thing? subject, ActorRig rig) {
@@ -1006,10 +1010,12 @@ public partial class WorldView : Node3D {
             ActorAction.Gather => .1f,
             _ => -1
         };
-        if (impact < 0 || !actor.Struck(impact) || !props.TryGetValue(subject.Id, out var prop)) return;
+        if (impact < 0 || !actor.Struck(impact)) return;
+        props.TryGetValue(subject.Id, out var prop);
+        if (prop == null && subject.Kind != ThingKind.PlantingSpot) return;
         // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips.
         bool inSight = World.Sees(subject.Pos);
-        if (inSight) prop.Shake = 1;
+        if (inSight && prop != null) prop.Shake = 1;
         // A recipe with a sound of its own is heard in place of its station's.
         // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.
         string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
@@ -1029,9 +1035,9 @@ public partial class WorldView : Node3D {
         // Chips and soil fly from where the blow lands, or from the side of what is worked toward the worker where no blow is aimed.
         Vector3 Hit(float height) => actor.Mark is Vector3 mark ? mark + Vector3.Up * (height < .2f ? height : 0) : side + Vector3.Up * height;
         switch (subject.Kind) {
-            case ThingKind.Tree:
+            case ThingKind.Tree when prop is TreeProp tree:
                 Burst(Hit(1.1f), Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
-                Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id) * ((TreeProp)prop).GrowthScale), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
+                Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id) * tree.GrowthScale), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
             case ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Mine:
                 Burst(Hit(.5f), Mat(RockColor(subject.Kind)), 6, 2.4f, .5f, 9, .07f);
@@ -1048,7 +1054,7 @@ public partial class WorldView : Node3D {
             case ThingKind.Berries: Burst(To3(subject.Pos, .7f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f); break;
             case ThingKind.Water: Burst(side + Vector3.Up * .05f, Splash, 6, 1.6f, .45f, 7, .045f); break;
             case ThingKind.Anvil when prop is AnvilProp anvil: Burst(anvil.Body.ToGlobal(anvil.Vent), Sparks, 10, 3, .35f, 5, .025f); break;
-            case ThingKind.Reinforced:
+            case ThingKind.Reinforced when prop != null:
                 if (subject.Heat > 10) Burst(prop.Body.ToGlobal(new Vector3(0, .9f, .5f)), Embers, 6, 1.4f, .6f, -1, .03f);
                 break;
         }
@@ -1898,8 +1904,8 @@ public partial class WorldView : Node3D {
         playerRing.Visible = !World.Dead && !Underground && !FirstPerson;
         playerRing.Position = To3(World.Player, .015f);
         removalMark.Update(World, Removal);
-        var ground = Vector2.Zero;
-        bool canPoint = Placing != null && !Underground && TryGroundPoint(Mouse, out ground);
+        var ground = DiggingAt.GetValueOrDefault();
+        bool canPoint = Placing != null && !Underground && (DiggingAt.HasValue || TryGroundPoint(Mouse, out ground));
         var kind = Placing.GetValueOrDefault();
         placeTile.Visible = canPoint && kind != ThingKind.PlantingSpot;
         var at = canPoint ? World.Construction.Snap(kind, ground.Round()) : Vector2.Zero;

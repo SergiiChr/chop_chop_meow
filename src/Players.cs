@@ -137,7 +137,9 @@ public sealed partial class World {
         var w = S.Workers.Find(w => w.Id == c.Other);
         switch (c.Verb) {
             case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Construction.Build(kind, c.At, c.Rotation, c.PipeShape); break;
-            case Verb.MarkDig: Holes.Mark(c.At); break;
+            case Verb.BeginDig: Holes.Begin(c.At, c.Count); break;
+            case Verb.CancelDig: Holes.Cancel(c.Count); break;
+            case Verb.FinishDig: Holes.Finish(c.Count); break;
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
             case Verb.TakeUpPipe: Construction.TakeUpPipe(Terrain.TileAt(c.At)); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At, c.Rotation)); break;
@@ -383,6 +385,7 @@ public sealed partial class World {
         if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
         Forget(p);
         p.Mauled = false; p.GatherTarget = 0; p.Selected = ""; p.Sprinting = p.Braking = false; p.TorchKindling = 0;
+        GroundHoles.Clear(p);
         S.Players.Add(p);
         // A packed crate's own name is no item, so it leaves no mark.
         foreach (var pair in p.Backpack.Items) if (Data.Items.ContainsKey(pair.Key)) Got(pair.Key);
@@ -401,6 +404,7 @@ public sealed partial class World {
     public void Depart(int id) {
         if (PlayerById(id) is not PlayerState p) return;
         ReleaseFor(p);
+        GroundHoles.Clear(p);
         S.Players.Remove(p); S.Absent[p.Key] = p;
         Doorways.UnlockEmpty(p.Sheltered);
         if (S.Actor == p) S.Actor = S.Players.FirstOrDefault() ?? new PlayerState();

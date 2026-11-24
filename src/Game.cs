@@ -421,6 +421,7 @@ public partial class Game : Node, IGameFlow {
         view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection;
         view.Placing = overInterface && player.Mode is ClickMode.Dig ? null : player.Mode.Placing;
         view.PlacingRotation = player.Mode.Rotation;
+        view.DiggingAt = player.DiggingAt;
         view.Underground = player.Mode is ClickMode.Remove { Underground: true } || view.Placing == ThingKind.SteelPiping;
         if (player.Mode is ClickMode.Build { Kind: ThingKind.SteelPiping } pipe) view.PlacingPipeShape = pipe.Shape;
         view.Mouse = looking ? GetViewport().GetVisibleRect().GetCenter() : GetViewport().GetMousePosition();

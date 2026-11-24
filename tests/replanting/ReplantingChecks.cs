@@ -12,6 +12,7 @@ public static class ReplantingChecks {
     public static void Run(GameData data) {
         Test(CheckAxeHitsDropAcornsLikePickaxeHitsDropChips, data);
         Test(CheckAShovelDigsAHoleBeforePlantingAnAcorn, data);
+        Test(CheckReleasingTheShovelRestartsTheDig, data);
         Test(CheckEmptyHoleLastsUntilDawnAcrossASave, data);
         Test(CheckWateredTreeKeepsGrowingAfterBecomingAnAdult, data);
         Test(CheckValleyTreesKeepGrowing, data);
@@ -46,19 +47,11 @@ public static class ReplantingChecks {
 
     private static void CheckAShovelDigsAHoleBeforePlantingAnAcorn(GameData data) {
         var world = EmptyWorld(data);
-        world.Player = PlantingGround + Vector2.Right * 2;
-        Give(world, "acorn", 2);
-        Require(!world.Holes.Mark(PlantingGround), "an acorn alone should not mark a dig site");
-        var marker = MarkDigSite(world);
-        Require(world.Transfer(world.Backpack, marker.Inventory, "acorn", 1) == 0, "an undug marker should refuse an acorn");
-        Drop(world, "steel_shovel");
-        world.Gather(marker, 10);
-        Require(marker.Progress == 0 && world.Find(marker.Id) == marker, "digging should need a shovel");
-        Give(world, "steel_shovel");
+        world.Player = PlantingGround + Vector2.Right;
+        Give(world, "acorn");
+        Require(!world.Holes.Begin(PlantingGround, 1), "digging should require a selected shovel");
         Drop(world, "acorn");
-        world.Gather(marker, 1);
-        Require(world.Find(marker.Id) == marker, "a short press should leave the outline");
-        var hole = DigHole(world, marker);
+        var hole = DigHole(world);
         Require(hole.Inventory.Count == 0 && world.ThingsOf(ThingKind.Tree).Count == 0,
             "digging without acorns should leave an empty hole");
         Give(world, "wood");
@@ -75,9 +68,27 @@ public static class ReplantingChecks {
             "an old reference to the hole should not plant a second acorn");
     }
 
+    private static void CheckReleasingTheShovelRestartsTheDig(GameData data) {
+        var world = EmptyWorld(data);
+        EquipShovel(world);
+        Require(world.Holes.Begin(PlantingGround, 1), "the selected shovel should start digging");
+        world.Tick(2);
+        Require(!world.Holes.Finish(1), "two seconds should not be enough shovel work");
+        world.Holes.Cancel(1);
+        Require(!world.ThingsOf(ThingKind.PlantingSpot).Any() && !world.ThingsOf(ThingKind.Hole).Any(),
+            "letting go should leave the ground as it was");
+        Require(world.Holes.Begin(PlantingGround, 2), "another hold should start a fresh dig");
+        world.Tick(2);
+        Require(!world.Holes.Finish(2), "the second hold should start again from zero");
+        world.Tick(4);
+        Require(world.Holes.Ready(2) && world.ThingsOf(ThingKind.Hole).Count == 0,
+            "a finished dig should wait for the player's confirmation before creating a hole");
+        Require(!world.Holes.Finish(1) && world.Holes.Finish(2), "only the current hold can finish the hole");
+    }
+
     private static void CheckEmptyHoleLastsUntilDawnAcrossASave(GameData data) {
         var world = EmptyWorld(data);
-        var hole = DigHole(world, MarkDigSite(world));
+        var hole = DigHole(world);
         RunUntil(world, data.DaySeconds - 1);
         Require(world.Find(hole.Id) == hole, "an empty hole should still be there just before dawn");
         string saved = world.Serialize();

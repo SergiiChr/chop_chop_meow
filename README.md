@@ -172,7 +172,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Walk or sprint on a gravel path | Move 1.2× as fast |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
-| Hold right mouse button on a dig outline | Walk over and dig a hole with a shovel |
+| Hold right mouse button on open ground with a shovel selected | Walk over and dig a hole |
 | Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you around obstacles to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans, and the remove selector that takes buildings down |
@@ -491,7 +491,8 @@ A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 An axe hit has the same one-in-twenty chance to drop an acorn as a pickaxe hit has to drop a chip.
 Right-click the acorn to pick it up.
 Double-click a shovel in your backpack, or select it on the hotbar, to see an outline over open ground.
-Left-click to mark the spot, then hold RMB on the outline with the shovel to dig a hole.
+Hold RMB over the spot to walk over and dig a hole.
+Releasing RMB before the dig finishes cancels it.
 Open the hole and place one acorn in its empty slot to plant it. A small nub marks the planted acorn.
 An unused hole disappears at dawn.
 Click the nub to see its status and a read-only item slot with the wood count.

@@ -7,24 +7,22 @@ using static SetupSteps;
 internal static class ReplantingSteps {
     public static readonly Vector2 PlantingGround = new(20, 20);
 
-    public static Thing MarkDigSite(World world) {
+    public static void EquipShovel(World world) {
         if (world.Backpack["steel_shovel"] == 0) Give(world, "steel_shovel", 1);
-        world.Player = PlantingGround + Vector2.Right * 2;
-        Require(world.Holes.Mark(PlantingGround), "a carried shovel should mark the open ground for digging");
+        world.SelectInHand("steel_shovel");
         world.Player = PlantingGround + Vector2.Right;
-        return world.ThingsOf(ThingKind.PlantingSpot)[0];
     }
 
-    public static Thing DigHole(World world, Thing marker) {
-        world.Gather(marker, 4);
-        var holes = world.ThingsOf(ThingKind.Hole);
-        Require(world.Find(marker.Id) == null && holes.Count == 1 && holes[0].Pos == marker.Pos,
-            "digging should replace the outline with a hole");
-        return holes[0];
+    public static Thing DigHole(World world) {
+        EquipShovel(world);
+        Require(world.Holes.Begin(PlantingGround, 1), "the selected shovel should begin digging open ground in reach");
+        world.Tick(6);
+        Require(world.Holes.Finish(1), "holding the dig to completion should leave a hole");
+        return world.ThingsOf(ThingKind.Hole).Single();
     }
 
     public static Thing PlantAnAcorn(World world) {
-        var hole = DigHole(world, MarkDigSite(world));
+        var hole = DigHole(world);
         Give(world, "acorn");
         Require(world.Transfer(world.Backpack, hole.Inventory, "acorn", 1) == 1, "putting an acorn in the hole should plant it");
         return world.ThingsOf(ThingKind.Tree).Single();

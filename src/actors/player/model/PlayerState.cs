@@ -48,6 +48,12 @@ public sealed class PlayerState {
     public int DoorQueued { get; set; }
     /// <summary>The resource the player is working on, so other machines can show it.</summary>
     public int GatherTarget { get; set; }
+    /// <summary>The held dig, numbered by the window that started it, or zero when idle.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int DigAttempt { get; set; }
+    /// <summary>The tile being dug, one plus its index in the map's rows.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int DiggingTile { get; set; }
+    /// <summary>Whether the server has recorded enough shovel work for the window to finish the dig.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool DigReady { get; set; }
     /// <summary>The item selected on the hotbar, which shows in the player's hand, so other machines can show it.</summary>
     public string Selected { get; set; } = "";
     /// <summary>The stack this player holds on the cursor, or null, for their own window to show; the server builds it from <see cref="HeldSlot"/> each time it sends the player.</summary>
@@ -64,7 +70,8 @@ public sealed class PlayerState {
     public int Shirt { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(PlayerX, PlayerY); set { PlayerX = value.X; PlayerY = value.Y; } }
     // Only the host's simulation uses these.
-    internal float GatherClock, AttackClock;
+    internal float GatherClock, AttackClock, DigWork;
+    internal Thing? DigSubject;
     /// <summary>Seconds since the player last moved or gathered; hand crafting only goes on while they stand still.</summary>
     internal float Still;
     internal bool Busy, PackAttack;

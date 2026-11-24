@@ -150,7 +150,6 @@ public sealed class StrikePoints {
     /// <summary>Where a shovel goes into the ground: just out from the foot of a stump or bush, on the side facing the digger.</summary>
     private static Vector3? AtTheFoot(Thing subject, Vector2 from, Prop prop, ReadOnlySpan<Part> meshes) {
         var spot = WorldView.To3(subject.Pos);
-        if (subject.Kind == ThingKind.PlantingSpot) return spot;
         var centre = prop is DugProp dug ? new Vector2(spot.X + dug.Seat.X, spot.Z + dug.Seat.Z) : subject.Pos;
         var toward = (from - centre).Normalized();
         return Out(meshes, new Vector3(centre.X, Foot, centre.Y), new Vector3(toward.X, 0, toward.Y)) is float reach

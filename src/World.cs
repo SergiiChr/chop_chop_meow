@@ -359,7 +359,7 @@ public sealed partial class World {
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
         Farms = new Farms(this); SteelPipes = new SteelPipes(this);
-        Holes = new GroundHoles(this);
+        Holes = new GroundHoles(this); Replaced += Holes.Reset;
         Trees = new TreePlanting(this); Replaced += Trees.Reset;
         LeafSpots = new LeafLitter(this); Replaced += LeafSpots.Reset;
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
@@ -727,7 +727,6 @@ public sealed partial class World {
         if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == Water.Full && !Water.HasBucketRoom(S.Backpack)) return "Your bottles are filled.";
         if (t.Kind == ThingKind.Mine) return Mines.BuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
-        if (t.Kind == ThingKind.PlantingSpot && !worker) return Holes.DigBlock();
         if (t.Kind == ThingKind.Tree && t.TreeStage == 1)
             return TreePlanting.NeedsWater(t) ? "Water the planted acorn first." : "Wait for the first day of growth.";
         if (!t.IsResource) return "Select a natural resource.";
@@ -759,7 +758,6 @@ public sealed partial class World {
         var blocked = GatherBlock(t);
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
-        if (t.Kind == ThingKind.PlantingSpot) { Holes.Dig(t, dt); return; }
         if (t.Kind == ThingKind.Mine) { Mines.Work(t, dt); return; }
         if (t.Kind == ThingKind.Farm) { Farms.Harvest(t, dt); if (t.FarmStage == FarmStage.Fallow) Say("Harvested. Take the wheat, seeds and grass from the plot, and put seeds back in to sow again."); return; }
         gatherClock += dt;
@@ -2324,6 +2322,7 @@ public sealed partial class World {
         attackClock = Math.Max(0, attackClock - dt);
         Swings.Tick(dt);
         if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
+        Holes.Work(dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
             float drain = !asleep && S.Actor.Sprinting && CanSprint ? Data.SprintDrain : 1, fed = S.Hunger;
             S.Hunger = Math.Max(0, S.Hunger - dt * drain * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * drain * Data.ThirstPerSecond);

@@ -64,7 +64,8 @@ public sealed class Construction(World world) {
         if (kind == ThingKind.GravelPath) return world.GravelPaths.Block(Terrain.TileAt(p));
         if (IsZone(kind)) return ZoneBlock(kind, p);
         if (TooFar(p) is string far) return far;
-        if (world.Player.DistanceTo(p) < 1.2f || Terrain.Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
+        if (Terrain.Spawn.DistanceTo(p) < 1.2f || !planting && world.Player.DistanceTo(p) < 1.2f)
+            return "Leave your feet and the arrival point clear.";
         if (kind == ThingKind.Pump) {
             if (!Terrain.InLake(p)) return "Place the intake in the freshwater lake’s shallows.";
             if (!world.CanStand(p + World.BellowsStand.Rotated(rotation))) return "Turn the handle toward open ground on the bank.";
@@ -160,7 +161,7 @@ public sealed class Construction(World world) {
     /// and what does not fit waits in a recovery box where it stood.
     /// </summary>
     public bool Dismantle(Thing t) {
-        if (t.Kind is ThingKind.PlantingSpot or ThingKind.Hole) {
+        if (t.Kind == ThingKind.Hole) {
             if (!world.Reaches(t)) { world.Say("Walk closer first."); return false; }
             if (world.Busy() || world.Forwarded(Verb.Dismantle, t.Id)) return true;
             return world.S.Things.Remove(t);
@@ -190,7 +191,7 @@ public sealed class Construction(World world) {
             var pipe = Terrain.TileAt(at);
             return world.Sees(pipe) && world.SteelPipes.Laid(pipe) ? Removal.OfPipe(pipe) : Removal.None;
         }
-        if (picked is { } building && (building.Kind is ThingKind.PlantingSpot or ThingKind.Hole || world.Data.Buildings.ContainsKey(building.Kind))) return Removal.Of(building);
+        if (picked is { } building && (building.Kind == ThingKind.Hole || world.Data.Buildings.ContainsKey(building.Kind))) return Removal.Of(building);
         return world.GravelPaths.TileUnder(at) is Vector2I tile ? Removal.Of(tile) : Removal.None;
     }
     /// <summary>Whether what the remove selector points at is within the acting player's reach.</summary>
