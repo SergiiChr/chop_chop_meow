@@ -5,14 +5,14 @@ using System.Text.Json.Serialization;
 
 namespace ChopChopMeow;
 
-/// <summary>What a world object is. Saves and network updates name each kind by its id, the member name in snake case, such as "wolf_corpse".</summary>
+/// <summary>What a world object is. Saves and network updates name each kind by its id.</summary>
 [JsonConverter(typeof(KindConverter))]
 public enum ThingKind {
     Tree,
     Stone,
     Berries,
     Water,
-    Leaves,
+    LeafSpot,
     WolfCorpse,
     Iron,
     Coal,
@@ -45,6 +45,8 @@ public enum ThingKind {
     Barrel,
     SteelPiping,
     Pump,
+    Acorn,
+    Hole,
 }
 
 /// <summary>Converts kinds to and from the ids that hotbar slots, icons and sounds use.</summary>

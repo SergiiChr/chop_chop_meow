@@ -70,7 +70,7 @@ internal sealed class ChainSite(World world) {
         Store("wood");
         Employ(world.Add(ThingKind.Tree, Spot(), 9999), JobKind.Gather);
         Employ(world.Add(ThingKind.Tree, Spot(), 9999), JobKind.Gather);
-        foreach (var (item, kind) in new[] { ("iron_ore", ThingKind.Iron), ("coal", ThingKind.Coal), ("tin_ore", ThingKind.Tin), ("berries", ThingKind.Berries), ("leaves", ThingKind.Leaves) }) {
+        foreach (var (item, kind) in new[] { ("iron_ore", ThingKind.Iron), ("coal", ThingKind.Coal), ("tin_ore", ThingKind.Tin), ("berries", ThingKind.Berries), ("leaves", ThingKind.LeafSpot) }) {
             Store(item);
             Employ(world.Add(kind, Spot(), 9999), JobKind.Gather);
         }

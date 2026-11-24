@@ -172,6 +172,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Walk or sprint on a gravel path | Move 1.2× as fast |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
+| Hold right mouse button on open ground with a shovel selected | Walk over and dig a hole |
 | Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you around obstacles to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans, and the remove selector that takes buildings down |
@@ -473,15 +474,42 @@ It opens onto the sea at the bottom of the screen, which cannot be drunk and is 
 Impassable mountain ranges close in from the left and right toward the valley's inland end, and a lake lies in the middle.
 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
+Click a resource to see what it yields in read-only item slots with a count for each item.
+The lake shows a water droplet in an unnumbered slot.
 A berry bush holds 24 berries and is full again a day after the first one is picked from it, whether or not it was picked clean.
-A felled tree leaves a stump, and a couple of hundred plain bushes grow about the plains.
+A felled tree leaves a stump. Trees grow again from planted acorns. A couple of hundred plain bushes grow about the plains.
 Hold right mouse on a stump or a plain bush with a shovel in your backpack to dig it up: a stump gives 3 wood and a bush 36 leaves, three times what lies under an oak.
 It comes out whole after a few seconds of digging and is gone for good, so the backpack needs room for all of it.
 Iron and coal deposits sit at the foot of rock faces at the base of both ranges and need a pickaxe.
 Loose coal is scattered below the nearer coal face and is picked up whole with one right-click, with no tool.
 Loose stones and sticks lie about the plains: each picks up the same way as 1 stone or 1 wood, and is gone once picked.
 A pickaxe hit on a rock or an ore deposit knocks a loose piece of it off one time in twenty; it flies off and lands within 2 tiles, ready to pick up.
-A pale grey cliff further inland holds tin: mine it with a pickaxe.
+A pale grey cliff further inland holds tin. Mine it with a pickaxe.
+
+### Replanting trees
+
+An axe hit has the same one-in-twenty chance to drop an acorn as a pickaxe hit has to drop a chip.
+Use right mouse to pick up the acorn.
+Double-click a shovel in your backpack, or select it on the hotbar, to see an outline over open ground.
+Esc leaves the outline active while the shovel is selected on the hotbar.
+Hold right mouse over open ground to walk there and dig a hole when you get close enough.
+Releasing right mouse before the dig finishes cancels it.
+Open the hole and place one acorn in its empty slot to plant it. A small nub marks the planted acorn.
+An unused hole disappears at dawn.
+Click the nub to see its status and a read-only item slot with the wood count.
+A tree shows **Planted** until you pour a total of 5 L from bottles or buckets into its water slot, then **Growing**.
+After watering, the oak grows daily. It holds 4 wood after one day, 21 after five, and 42 when it becomes an **Adult tree**
+after ten. You can chop it from the first day it produces wood.
+All standing trees keep growing. After adulthood, size and wood grow logarithmically, adding less as each tree ages.
+A tree that has never been chopped holds 71 wood at age 20 days and 100 at age 40 days.
+Starting trees are already 10 days old.
+A growing trunk destroys any building it reaches.
+Players in a crushed cabin move outside, and stored items go into a recovery box where the building stood.
+
+When a replanted oak becomes an adult it makes a spot of leaves near its trunk.
+The leaf spot grows wider as the tree grows and keeps that size after the tree is felled.
+Gathering leaves from any such spot also picks up the acorns there.
+A leaf spot holds one or two acorns and replaces one every ten in-game days until full.
 
 ## Progression
 
@@ -758,6 +786,7 @@ They put it back when the job in hand has no use for it or when heading home at 
 If there is none, the worker goes to the nearest known spot of the same job that they can work, one that needs no tool or one whose tool is to be had, and to loose pieces only after those; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
 A gatherer whose spot runs out goes on to the next known spot of the same resource, and to loose pieces of it only once no other spot is left.
 
+Woodcutters skip trees that have yet to become adults.
 Stumps are part of gathering wood.
 A woodcutter who fells a tree digs up its stump next while a tool station has a shovel, and counts any other known stump as a spot like a tree, going to whichever is nearer.
 With no shovel to be had they leave stumps and go on chopping.
@@ -842,7 +871,7 @@ Tiles join into paths three quarters of a metre wide with round ends:
 
 A tile goes on any dry open ground within 5 tiles of you, also under your feet and under buildings and yards already
 there; a building or yard goes up over tiles and leaves them under it.
-It does not go on a tile where a tree, boulder, ore deposit, berry bush or leaf patch stands, picked clean or not.
+It does not go on a tile where a tree, boulder, ore deposit, berry bush or leaf spot stands, picked clean or not.
 It clears a stump or plain bush away.
 Nothing grows through gravel.
 A click on a path does what a click on open ground does.

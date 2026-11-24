@@ -122,7 +122,7 @@ public sealed partial class World {
     }
 
     /// <summary>The jobs a place offers workers, in the order the panel shows them.</summary>
-    public JobKind[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {
+    public JobKind[] Jobs(Thing t) => t.IsResource ? (TreePlanting.IsYoung(t) ? NoJobs : GatherJobs) : t.Kind switch {
         ThingKind.Reinforced => BellowsJobs,
         ThingKind.Pump => PumpJobs,
         ThingKind.Bench or ThingKind.Anvil or ThingKind.Cooktable or ThingKind.Packer => CraftJobs,
@@ -164,7 +164,7 @@ public sealed partial class World {
 
     /// <summary>Puts a worker on every job at one place, instead of whatever they did before, or takes all their jobs away.</summary>
     public void Assign(Worker w, Thing? target) {
-        if (target != null && NoRoomAt(w, target)) return;
+        if (target != null && (TreePlanting.IsYoung(target) || NoRoomAt(w, target))) return;
         if (Busy() || Forwarded(Verb.Assign, target?.Id ?? 0, w.Id)) return;
         w.Jobs.Clear(); ListChanged(w);
         if (target != null) foreach (var job in Jobs(target)) GiveDuty(w, target, job);

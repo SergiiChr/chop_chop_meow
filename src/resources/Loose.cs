@@ -4,7 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Loose pieces: the stones and sticks lying about the valley, and the chips a pickaxe knocks off rock and ore.</summary>
+/// <summary>Loose pieces: the stones and sticks lying about the valley, and the pieces tools knock off trees, rock and ore.</summary>
 public partial class World {
     private readonly Random chipping = new(9127);
 
@@ -21,12 +21,13 @@ public partial class World {
     /// <summary>Whether a scenery spot is free for a thing to lie or grow on: ground that scenery may stand on, away from where players start and clear of what is already there.</summary>
     private bool FreeSpot(Vector2 p) => Scenery.Dressable(p) && p.DistanceTo(Terrain.Spawn) >= 4.5f && !S.Things.Any(t => t.Pos.DistanceTo(p) < (t.Kind == ThingKind.Tree ? .95f : t.IsResource ? 1.3f : 2.7f));
 
-    /// <summary>After a hit with a pickaxe on rock or ore, now and then drops a loose piece of it on open ground nearby.</summary>
-    internal void Chip(Thing rock, string? tool) {
-        if (tool == null || Data.Items[tool].Tool != "pickaxe" || GatherRules.Of(rock.Kind)?.Chip is not ThingKind kind || chipping.NextDouble() >= GatherRules.ChipChance) return;
+    /// <summary>Now and then a hit with the tool a resource needs drops a loose piece on open ground nearby.</summary>
+    internal void Chip(Thing source, string? tool) {
+        if (tool == null || GatherRules.Of(source.Kind) is not { Chip: ThingKind kind } rule
+            || Data.Items[tool].Tool != rule.Needs || chipping.NextDouble() >= GatherRules.ChipChance) return;
         for (int tries = 0; tries < 8; tries++) {
             float angle = (float)(chipping.NextDouble() * Math.Tau), distance = GatherRules.ChipReach * (.55f + .45f * (float)chipping.NextDouble());
-            var p = rock.Pos + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * distance;
+            var p = source.Pos + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * distance;
             if (!CanStand(p)) continue;
             Add(kind, p, 1); Play("wood_rocks_inventory", p);
             return;
