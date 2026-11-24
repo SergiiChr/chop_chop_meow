@@ -47,7 +47,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 20;
+    private const int Protocol = 24;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -122,6 +122,7 @@ public partial class Net : Node {
     // Reused while a guest merges an update into its copy.
     private readonly List<EntryKey> differing = new();
     private readonly List<object> gone = new();
+    private readonly HashSet<int> biteTargets = new();
 
     public Net() { applied = updates.Empty(); }
 
@@ -192,6 +193,7 @@ public partial class Net : Node {
         Log($"Server: listening on UDP port {port} on every address, owner key {Short(ownerKey)}.");
         Multiplayer.MultiplayerPeer = peer; Hosting = true; owner = ownerKey;
         World.Relay = Tell; World.Made = (player, id) => RpcId(player, MethodName.MadeForYou, id);
+        World.PlaceBiteTarget = PlaceBiteTarget;
         return Error.Ok;
     }
 
@@ -242,6 +244,7 @@ public partial class Net : Node {
         if (Online) { Log(Hosting ? "Server: closed." : "Closed the line to the server."); Multiplayer.MultiplayerPeer.Close(); }
         Multiplayer.MultiplayerPeer = new OfflineMultiplayerPeer(); Hosting = false;
         World.Host = null; World.Relay = null; World.Made = null; World.LocalId = 1;
+        World.PlaceBiteTarget = null;
         welcomed = farewell = open = false; Owning = Opened = false; owner = ""; ownerId = 0; connectTimer = null; stamp = 0; goals.Clear(); walks.Clear(); heard.Clear(); holding.Clear(); windows.Clear();
         sequence = 0; acked.Clear(); appliedSequence = 0; work = new();
         foreach (var snapshot in sent.Values) updates.Release(snapshot);
@@ -404,7 +407,8 @@ public partial class Net : Node {
         float dt = Math.Min((float)delta, .1f);
         foreach (var (owner, goal) in goals) Place(owner, Glide(Position(owner), goal, dt));
         foreach (var p in World.Players)
-            if (walks.TryGetValue(p.Id, out var walk) && walk.Warp == p.Warp) using (World.ActAs(p)) World.MoveTo(Glide(p.Pos, walk.At, dt));
+            if (walks.TryGetValue(p.Id, out var walk) && walk.Warp == p.Warp) using (World.ActAs(p))
+                World.MoveTo(Glide(p.Pos, walk.At, dt));
         if (World.Remote) World.Look();
         sendClock += dt;
         if (Hosting && sendClock >= SnapshotInterval) {
@@ -468,6 +472,11 @@ public partial class Net : Node {
         return true;
     }
 
+    /// <summary>The bite uses the newest report while the rest of the player's walk glides.</summary>
+    private void PlaceBiteTarget(PlayerState player) {
+        if (walks.TryGetValue(player.Id, out var walk) && walk.Warp == player.Warp) World.MoveTo(walk.At);
+    }
+
     /// <summary>Host: passes a message on to one guest, or all of them.</summary>
     private void Tell(PlayerState? to, string message) {
         foreach (var p in World.Players) if (to == null || p == to) RpcId(p.Id, MethodName.Told, message);
@@ -478,11 +487,18 @@ public partial class Net : Node {
 
     /// <summary>Host: lets the guests hear a sound of the world.</summary>
     public void Echo(string sound, Vector2 at) {
-        if (Hosting) { echoes++; Rpc(MethodName.Hear, sound, at); }
+        if (!Hosting) return;
+        echoes++;
+        // A first hit can finish its brief wince between snapshots.
+        if (sound == "wolf_hit") Rpc(MethodName.HearReliably, sound, at);
+        else Rpc(MethodName.Hear, sound, at);
     }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable, TransferChannel = StreamChannel)]
     private void Hear(string sound, Vector2 at) { if (welcomed) Heard?.Invoke(sound, at); }
+
+    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void HearReliably(string sound, Vector2 at) => Hear(sound, at);
 
     /// <summary>Host: lets the guests see a player swing, pump or light a torch.</summary>
     public void Echo(int player, ActorAction action, Vector2 at) {
@@ -559,6 +575,7 @@ public partial class Net : Node {
         if (Changed(entries, stateKey) is byte[] state && !SetInPlace(s, stateKey, state)) CopyExcept(s, WorldUpdates.ReadState(state), WorldUpdates.Shared);
         Sync(s.Things, EntryKey.Thing, static t => t.Id, entries, false, null);
         Sync(s.Workers, EntryKey.Worker, static w => w.Id, entries, true, null);
+        biteTargets.Clear();
         Sync(s.Wolves, EntryKey.Wolf, static w => w.Id, entries, true, null);
         Sync(s.Orders, EntryKey.Order, static o => o.Id, entries, false, null);
         if (Changed(entries, new EntryKey(EntryKey.Work, 0)) is byte[] working) work = WorldUpdates.Read<Dictionary<int, WorkerWorkState>>(working);
@@ -579,6 +596,9 @@ public partial class Net : Node {
         bool joining = applied.Count == 0;
         var own = (me.Pos, me.Warp, me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting, me.Braking);
         Sync(s.Players, EntryKey.Player, static p => p.Id, entries, true, me);
+        foreach (int id in biteTargets)
+            if (World.PlayerById(id) is PlayerState target && target != me && goals.Remove(target, out var at))
+                Place(target, at);
         if (!joining && me.Warp == own.Warp) me.Pos = own.Pos;
         if (!joining) (me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting, me.Braking) = (own.ActiveHotbar, own.InHand, own.GatherTarget, own.Selected, own.Sprinting, own.Braking);
         gone.Clear();
@@ -606,10 +626,17 @@ public partial class Net : Node {
             if (at < 0) { list.Add(WorldUpdates.Read<T>(json)); continue; }
             var old = list[at];
             var from = Position(old);
+            var (recovery, tugging, pinning) = old is Wolf before
+                ? (before.Recover, before.Tugging, before.Pinning) : default;
             // Setting numbers leaves those that did not change, so a glider starts from the last update's position, not from how far it has glided.
             if (glide && goals.TryGetValue(old, out var goal)) Place(old, goal);
             if (!SetInPlace(old, key, json)) CopyExcept(old, WorldUpdates.Read<T>(json), null);
-            if (glide && old != except) { goals[old] = Position(old); Place(old, from); }
+            if (!glide || old == except) continue;
+            // At landing, use one snapshot for the wolf's place and the target's feet.
+            if (old is Wolf wolf && (wolf.Recover > recovery || wolf.Tugging && !tugging || wolf.Pinning && !pinning)) {
+                goals.Remove(old);
+                biteTargets.Add(wolf.Target);
+            } else { goals[old] = Position(old); Place(old, from); }
         }
     }
 

@@ -19,11 +19,11 @@ public sealed class Wolf : IWalker {
     /// lands; zero while it is not snapping.
     /// </summary>
     public float Snap { get; set; }
-    /// <summary>Where the player stood as the snap began, which tells the wolf how they move.</summary>
-    public Vector2 SnapSeen { get; set; }
-    /// <summary>Where a snapping wolf's leap lands, set as it leaves the ground.</summary>
+    /// <summary>Seconds a wolf keeps its paws planted and faces along its leap after it lands.</summary>
+    public float Recover { get; set; }
+    /// <summary>Where the leap is headed, set when the wolf gathers itself.</summary>
     public Vector2 SnapTo { get; set; }
-    /// <summary>Seconds left in a throat leap; zero while the wolf runs on the ground.</summary>
+    /// <summary>Seconds left gathering itself for a throat leap and flying through it, or zero.</summary>
     public float Leap { get; set; }
     /// <summary>True once the wolf has reached the downed player and is feeding.</summary>
     public bool Feeding { get; set; }
@@ -76,6 +76,21 @@ public sealed class Wolf : IWalker {
     public float Flee { get; set; }
     /// <summary>Seconds left reeling from a hit, knocked back and holding still before it runs or attacks again.</summary>
     public float Stagger { get; set; }
+    /// <summary>Whether a player has landed a blow and the wolf now runs whenever it moves in the open.</summary>
+    public bool Aggressive { get; set; }
+    /// <summary>The locked path after the first weapon hit: zero side means no repositioning is active.</summary>
+    public int CounterSide { get; set; }
+    public float CounterTime { get; set; }
+    public float CounterMarkX { get; set; }
+    public float CounterMarkY { get; set; }
+    public float CounterBearing { get; set; }
+    public float CounterRadius { get; set; }
+    /// <summary>Seconds spent standing its ground after the first hit, after the stagger.</summary>
+    public float Threaten { get; set; }
+    /// <summary>
+    /// Seconds left circling after a miss; the sign gives the direction, and zero means it has finished.
+    /// </summary>
+    public float Circle { get; set; }
     /// <summary>Id of the player this wolf hunts, or zero while it patrols, answers a howl or heads home.</summary>
     public int Target { get; set; }
     public WolfMode Mode { get; set; }

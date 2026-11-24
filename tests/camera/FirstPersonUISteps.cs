@@ -16,13 +16,13 @@ public partial class Game {
         await Click(FindButton(menu, "Resume · Esc")!);
     }
 
-    /// <summary>Walks toward the bench and checks the visible swing still faces it after passing the swing's start marker.</summary>
+    /// <summary>Walks toward the bench and checks that the swing keeps its direction while moving.</summary>
     private async Task SwingWhileWalkingForward(Vector2 home) {
         var aim = Vector2.Zero;
         var started = home;
-        void RecordSwing(ActorAction action, Vector2 target) {
+        void RecordSwing(ActorAction action, Vector2 direction) {
             started = Hosted.Player;
-            aim = target - started;
+            aim = direction;
         }
         Hosted.PlayerActed += RecordSwing;
         try {

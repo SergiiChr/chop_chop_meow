@@ -177,7 +177,8 @@ UI and input:
 | `src/actors/player/model/PlayerState.cs`, `src/actors/player/model/HeldStack.cs`, `src/actors/player/model/Command.cs` | One player's saved body and belongings, a held stack, and the commands a guest sends its host |
 | `src/actors/enemies/wolf/WolfPatrols.cs` | Wolf dens, the wolves they let out, patrols, smell, howls and the way home |
 | `src/actors/enemies/wolf/WolfHunt.cs` | The pack hunting a player: howling, closing in, leaping, pinning and backing off from firelight |
-| `src/actors/enemies/wolf/WolfSnap.cs` | A wolf's bite: gathering itself, leaping to where its player is heading and snapping |
+| `src/actors/enemies/wolf/WolfSnap.cs` | A wolf's bite: planting its paws, leaping on a fixed line and closing its jaws |
+| `src/actors/enemies/wolf/WolfCounter.cs` | A struck wolf's sideways hop, skid, run, bound behind the attacker and pivot |
 | `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: wolves a torch scared off circling a player, bracing when walked at, running or standing their ground |
 | `src/actors/player/Swings.cs`, `src/actors/player/model/Swing.cs`, `src/actors/player/model/SwingShape.cs` | Players' swings at wolves: when a swing lands, the ground its blade, flame or fist passes over, and the wolves it touches |
 | `src/actors/enemies/wolf/model/Wolf.cs` | `Wolf`, a wolf as the world saves it |
@@ -229,6 +230,7 @@ Rendering and sound:
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
 | `src/actors/model/BodySide.cs` | Which side of a body is its left and which its right, and which side a spot is on |
 | `src/actors/enemies/wolf/display/WolfModel.cs`, `src/actors/enemies/wolf/display/WolfShape.cs` | Builds the wolf and poses it: its gaits, leap, howl, tug, recoil and fall |
+| `src/actors/enemies/wolf/display/WolfCounterPoses.cs` | Poses the wolf's sideways hop, sliding paws and forepaw landing |
 | `src/actors/display/Turning.cs` | How an actor's head, then body, turn toward where it heads, with inertia |
 | `src/actors/display/ActorState.cs` | How a player or worker is drawn: where, facing which way, doing what, and at which doorway stage |
 | `src/actors/display/ArmReach.cs` | Putting a hand on a point: the arm's joint angles for it, and a pose with the arm moved there |
@@ -351,6 +353,9 @@ When the field order matches, the host and guest step through the fields once to
 The welcome is a guest's first update, with the fog uncovered so far.
 
 - Updates go unreliably on their own channel, so a lost one never delays the next.
+  Other players and wolves glide between updates. On a bite's landing the host uses the target's latest movement report.
+  Observers align the landing wolf and its target to the same update. The target keeps their own movement input.
+  A reliable sound message carries the first-hit effect even when the update showing the wince is lost.
 - The whole world after a long stall, or a change too large for one packet, goes reliably on a third channel, so messages and actions never wait behind it.
 - Guests merge entries into their copy in place, so panels and the view keep their objects, and touch only entries that differ from what they show. A change to numbers alone is set directly (`WorldUpdates.SetNumbers`); anything else reads the entry whole.
 - The server writes every entry for each update and compares the bytes. With 876 things that costs 0.7 ms of its own process; marking what changed would save most of it, and one mutation missed would leave a guest's copy wrong without a sound.
@@ -432,7 +437,7 @@ Players and workers turn as people do (`Turning`): the head turns toward a new h
 The body leans about the feet toward the inside of the turn, by the angle that balances turning at its speed against gravity, up to `Turning.MaxBank` (8°) in a sprint and `Turning.MaxJogBank` (1°) at a walk or jog.
 A half turn swings round the way the body already turns, or the way the head looks.
 
-The window moves its own player through `Momentum`: a key for about the opposite way brakes the run to a stop over `Momentum.BrakeSeconds`, stands `Momentum.TurnSeconds` to turn round and builds back up to full pace over `Momentum.StartSeconds`; any other change of keys turns at once, and letting go stops at once.
+Away from hunting wolves, the window moves its own player through `Momentum`: a key for about the opposite way brakes the run to a stop over `Momentum.BrakeSeconds`, stands `Momentum.TurnSeconds` to turn round and builds back up to full pace over `Momentum.StartSeconds`; any other change of keys turns at once, and letting go stops at once.
 While it brakes, `PlayerState.Braking` is set and carried to other machines, and the view shows the `Brake` lunge: front heel planted ahead, the weight sunk onto the bent back leg, leaning back with the arms forward.
 
 Digging (`ActorAction.Dig`) holds the shovel in both hands: the right on top of the handle and the left `ActorAnimation.ShovelGrip` down the shaft.
@@ -471,7 +476,9 @@ The shoulders turn through the stroke, the grip turns the blade to cut sideways 
 An axe swung in the air with Space or a click takes turns between two strokes.
 The first (`AxeSwing`, `SteelAxeSwing`) goes up overhead and comes straight down in front; the second (`AxeSweep`, `SteelAxeSweep`, `ActorAnimation.SweepKeys`) is wound far round behind the left shoulder and swept wide across the front at chest height and on round to the right, in one stroke.
 A torch is swung bent over at the waist with the knees giving (`ActorAnimation.TorchSwingKeys`), so its flame passes low enough to reach a wolf.
-The player turns to face the way they aim: toward the pointer for a click, the way they last walked for Space (`PlayerControl.Swing`).
+The swing keeps the heading set by the pointer or the movement keys as it begins (`PlayerControl.Swing`).
+Space uses the last walking direction while standing still.
+Near a hunting wolf a player can reverse immediately, including through the swing.
 
 Manual bellows pumping, the unarmed punch and the axe swing trigger one loop of their action.
 Each striking work action has an impact moment that shakes its target and spawns chips, leaves, soil, splashes or sparks; packing and grinding strike nothing.
@@ -519,9 +526,12 @@ The path is the simulation's, unchanged: the brake is only drawn.
 
 `WorldView` times the wolf against the player:
 
-- a leap pushes off from where the wolf stood, speeding up from a stand on its planted hind legs, then flies at an even pace under gravity and comes down on its hind paws reared up with its jaws on the throat (`WolfModel.LeapPath`, `FallBackView.Throat`); contact at `WolfModel.ContactReach` knocks the player onto their back facing the wolf, and the wolf rears on its hind legs to keep its jaws on the throat as they go over, then leans to keep them there once they lie, so it ends standing over them;
-- a wolf a swing lands on (`Wolf.Stagger` rising) hops back `World.KnockBackDistance`, moving only while in the air, at an even pace and rising and falling under gravity (`WolfModel.HopSeconds`), and ducks low once it has landed before rising wary; where the blow reaches a machine a moment before the swing it shows comes down (`ActorAnimation.Contact`), the wolf stands until it does (`WolfModel.Struck`);
-- a snapping wolf (`Wolf.Snap`) that stands sinks back onto its haunches while it gathers itself, and one still running with its player keeps running; then it throws chest, neck and wide jaws out ahead and shuts them on the near side of the player's hips and thighs as drawn (`WolfModel.Snap`, `WolfModel.SnapReach`) a moment after it lands (`WolfModel.SnapHold`);
+- a throat leap fixes its direction before it springs.
+  The wolf rises under gravity and its jaws can catch the player at landing.
+  On a hit the wolf keeps its jaws on the player's throat as they fall and while they lie on the ground (`FallBackView.Throat`);
+- a wolf that recoils from a swing (`Wolf.Stagger` rising) hops back `World.KnockBackDistance`, moving only while in the air, at an even pace and rising and falling under gravity (`WolfModel.HopSeconds`), and ducks low once it has landed before rising wary; where the blow reaches a machine a moment before the swing it shows comes down (`ActorAnimation.Contact`), the wolf stands until it does (`WolfModel.Struck`);
+- a snapping wolf (`Wolf.Snap`) sinks onto its haunches, springs out with its jaws open and shuts them as it lands.
+  The forelegs absorb the landing as the wolf holds its place (`WolfModel.Snap`);
 - a following wolf its player has walked up to (`FollowStage.Braced`) stands braced, low over forepaws set wide, ears flat and lips drawn back (`WolfModel.Brace`);
 - a following wolf walking round its player turns its head to them for `GlanceSeconds` in every `GlanceEvery`, each wolf at its own moments by its id (`WolfModel.Glance`, up to `WolfModel.MaxGlance` from its body);
 - a killing blow throws the wolf off its feet onto its side from the pose it was killed in (`WolfModel.FallFrom`), covering the knockback in the air at an even pace and dropping under gravity with its paws clear of the ground, and it lands with a bounce and lies limp.
@@ -697,16 +707,25 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   Within sight it closes in only to `WolfBodies.StandOff`, within biting reach, and backs off to it at a walk (`WolfBodies.BackOffSpeed`) from a player another wolf tugs toward it (`DoorTug.TuggedTo`).
   Wolves at a player keep their bodies apart (`WolfBodies.Body`, `WolfBodies.WolfHalfWidth`): one in another's way steps aside at `WolfBodies.SideStepSpeed`, unless it holds the player.
   A hunting wolf's body faces the way it runs, or its player while it stands, creeps or backs off (`Wolf.Heading`, `WolfHunt.Face`).
-- **Bite.** `WolfSnap` runs a wolf's bite at a player out in the open.
-  Within `WolfSnap.Trigger` of them, with its last snap `WolfSnap.Rest` behind it, a wolf starts one (`Wolf.Snap`): it gathers itself for `WolfSnap.Windup`, still keeping on its player, then leaps for `WolfSnap.Flight`.
-  As it leaves the ground it aims its jaws at where the player will be when it lands if they keep going the way they went while it gathered itself (`Wolf.SnapSeen`), `WolfSnap.JawsShort` short of their middle, and from there it does not follow them (`Wolf.SnapTo`); a leap carries it `WolfSnap.Range` at most.
-  It bites only a player within `WolfSnap.Reach` of its jaws as it lands, so a walking player is bitten whatever they do and a sprinting one who turns aside as it leaps is missed.
-  A blow that lands on it first, or a torch waved at it while it gathers itself, stops the snap.
-  A bite that lands on a player in the open part of a doorway is how every tug out of it starts (`DoorTug.TugOut`); a player let go above half health is left standing free outside.
-  A wolf leaping at a player in a cabin's doorway lands at their waist (`TugView.InTheDoorway`), and one taking hold of a player lunges in to the waist rather than appearing there.
+- **Bite.** Within `WolfSnap.Trigger` the wolf plants its paws and fixes its bearing and destination (`Wolf.Heading`,
+  `Wolf.SnapTo`). After `WolfSnap.Windup` it leaps for `WolfSnap.Flight` along that line.
+  Solid ground and buildings can stop the leap. At landing it hits only if its jaws reach the player's body and the way
+  between them is clear (`WolfSnap.JawsAhead`, `WolfSnap.Reach`). Wolves approach the body
+  on the doorway path (`DoorwayPath`), and their jaws can reach onto the exposed step.
+  The wolf stays facing the same way during `WolfSnap.MissRecovery` or `WolfSnap.HitRecovery`, and waits
+  `WolfSnap.Rest` before starting another attack.
+  A blow that lands first interrupts either leap. A torch wave can interrupt a normal snap's windup while the wolf is still wary.
+  A bite that lands on a player in the open part of a doorway starts a tug (`DoorTug.TugOut`).
+- **First hit.** A wolf that survives a weapon blow in the open winces, hops sideways, and slides on its forepaws.
+  It takes a wide running arc into a second hop behind the line of the blow (`WolfCounter`). It lands on its forepaws first,
+  slides its rear paws round them, and stands facing the player before it can start a bite.
+  The wolf tries the other side if the first route is blocked. With no room, it uses its usual recoil and growl.
+  Fire, shelter, and bodies that enter the route can cut the move short. A torch burn sends the wolf running off as soon as the recoil ends.
+  A struck wolf runs thereafter (`Wolf.Aggressive`) and torch waves cease to scare it.
+  After a missed bite it holds for the usual recovery, then runs out and around the player (`Wolf.Circle`, `WolfHunt.CircleOnMiss`).
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
   A player a wolf had pinned goes free as it leaves.
-  Patrolling, going home or losing its player (who sheltered or left the game) clears everything a wolf was doing to them (`WolfPatrols.Calm`).
+  Patrolling, going home or losing its player (who sheltered or left the game) clears the wolf’s current attack, stance and repositioning (`WolfPatrols.Calm`). It still runs if it has been hit.
 
 Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
 A wolf already chasing the player still follows into the light for a few seconds.
@@ -744,10 +763,16 @@ Building keeps `Construction.DoorRoom` clear round every cabin's door spot, and 
   Each captured arm opens out at the elbow as the wolf takes its weight. With both arms held, the chest comes up.
 - `Leaving` puts the player on the doorstep and takes `Doorways.LeaveSeconds`.
   Anyone knocking on that door goes `Aside` to `Doorways.AsideSpot`, a step along `Doorways.AsideWay`, and steps in once the leaver is through the doorway, in the order they came, while the leaver keeps `Doorways.MakeWay` to the other side; a player just standing at the door stays put, and the leaver ends `Doorways.ClearOf` beside them.
-  The view walks them in from there up the side of the step (`DoorwayView.Inward`), the two turning chest to chest with their arms hanging as they pass (`DoorwayView.SqueezePast`), the one going in with the right palm on the door frame (`ArmReach.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
-- A follower waits aside, out of the way, while the one ahead is tugged back out (`DoorwayView.Behind`).
+  The simulation moves them in along the side of the step (`DoorwayPath.Inward`).
+  The view draws the two turning chest to chest as they pass (`DoorwayView.SqueezePast`).
+  The one going in starts raising their right hand while they wait aside and keeps their elbow below the palm on the
+  door frame (`ArmReach.Reaching`).
+- A follower waits aside, out of the way, while the one ahead is tugged back out (`DoorwayPath.Follow`).
 
-The view walks the player through the doorway over the stage (`DoorwayView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, lifting or lowering its neck to their waist as drawn, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
+The simulation moves the player through each doorway stage (`DoorwayPath.At`), hurrying from the second tread.
+The host sends the path's starting point and the current body position, and `DoorwayView.AtDoor` draws that position.
+A tugged player faces the door, bends over and steps back with each tug (`ActorAction.Tugged`).
+The wolf braces its forelegs and throws its weight back with its jaws on the player's waist (`WolfModel.Tug`).
 On the two treads of the step and the floor (`StairSteps.StepEdges`) the body heads for the tread of the boot that bears its weight, rising onto the other boot's tread as one lifts off behind, and lowering ahead of a boot about to step down (`StairSteps.OnSteps`).
 It gets there over several frames, carried from frame to frame in `ActorState.Lift`, never higher than a boot on the ground reaches down to its tread toe first, never lower than a leg bearing the weight alone bends, and never dropping faster than falling.
 A knee bends to put a boot on a higher tread, so no boot sinks into the step; a boot a tug drags off a tread's edge hangs over the lower one while the body falls onto it.
@@ -761,7 +786,7 @@ A player knocking on the door stands on the lower tread, with the front boot on 
 `DoorCheck` (`src/actors/enemies/wolf/DoorCheck.cs`, `World.DoorCheck`) runs a wolf's door check at a cabin with someone inside, a `DoorCheckStage` stage on `Wolf.DoorCheck` at `Wolf.DoorCheckCabin`, timed by `Wolf.DoorCheckTime`.
 A wolf whose player got inside goes there (`DoorCheck.Follow`), and so does a patrolling or called wolf within `SmellRadius` of such a cabin (`DoorCheck.Smell`), without a howl; a campfire lighting the door keeps both off it.
 
-- `Coming`: the wolf nearest the door comes round to face it and walks straight up, at a walk, to `DoorCheck.ScratchAside` toward the free edge from `Doorways.DoorPoint`; the others wait `DoorCheck.WaitBehind` out from it, `DoorCheck.WaitApart` apart.
+- `Coming`: the wolf nearest the door comes round to face it and goes straight up to `DoorCheck.ScratchAside` toward the free edge from `Doorways.DoorPoint`; the others wait `DoorCheck.WaitBehind` out from it, `DoorCheck.WaitApart` apart.
 - `Scratching` lasts `DoorCheck.ScratchSeconds` with `door_scratch`.
   From a locked door every wolf there goes away, and a wolf with no way to a door gives up on it (`DoorCheck.GiveUp`); it leaves alone every cabin it gave up on (`Wolf.Tried`) until it has been out of smell range of that one.
   Until its snout is in the door a wolf turns to a player out in the open within `WolfSightRange`.
@@ -779,7 +804,7 @@ A paw stands on the highest tread under any part of its sole, from the heel to t
 Springing in, it starts from the height and tip it stands at in the doorway (`DoorCheckView.DoorwayLift`, `DoorCheckView.DoorwayPitch`); each paw stays where it stands as the body springs on until it lifts, the forepaws lifting flat before they fold and tucking under the shoulders clear of the floor (`DoorCheckView.TuckBelow`).
 The door stands as far open as the wolf has levered and pushed it (`DoorCheckView.DoorDegrees`, `DoorwayView.PushDoor`): a table made once of the least opening that clears the hooked snout and every part of the wolf behind the door that is as high as the door's lower edge, which only grows and swings no faster than `DoorCheckView.SwingRate` until the launch.
 On top of it the door rattles: at each pry it jumps a few degrees out off the snout in quick knocks that die away (`DoorCheckView.Rattle`), with `door_rattle` played `DoorCheck.RattleFrom` into each of the `DoorCheck.Pries` pries.
-A player the wolf takes out is drawn from where they stood inside (`DoorwayView.IntoCabin`).
+A player the wolf takes out is drawn from where they stood inside (`DoorwayPath.IntoCabin`).
 
 A player inside the cabin sees the door from in there in `InsideDoorPOV`, a window three tenths of the screen wide and 72% of it tall in its left third, from `Prying` until the wolf has them; one left inside sees the other taken out for `WorldView.TakenOutSeconds` more.
 Its picture is a cabin of its own in a viewport with its own world, lit only by dim moonlight through the door, where `WorldView.SyncInsideDoorPOV` copies the poses of the wolves at the door and of the player taken out as the world draws them (`ModelKit.CopyPose`).
@@ -841,7 +866,10 @@ A torch that lands on a wolf sets `Wolf.Flee`; it leaves alone one in the air or
 
 #### Mauling and wolf meat
 
-At half health or less, an unprotected player can be pinned by a leaping wolf, which knocks them onto their back and stands over them.
+At half health or less, an unprotected player can be pinned by a wolf that lands a throat leap.
+The windup and fixed bearing work as in a snap. This leap can start further away (`World.LeapRange`) and stays in the
+air for `World.LeapSeconds`.
+A miss leaves the wolf recovering on the ground. Contact knocks the player onto their back and the wolf stands over them.
 The pinned state (`SaveState.Mauled`) blocks movement and actions and drains health while the pack feeds.
 The death that follows strips food from the recovery box, as does a death with a hunting wolf within `LeapRange`, such as one bitten down behind a torch.
 

@@ -21,6 +21,17 @@ internal static class WolfSteps {
     public static Wolf StillWolf(World world, Vector2 from) =>
         PlaceWolf(world, new Wolf { Pos = world.Player + from, Heading = (-from).Angle(), Howl = 5, HowlLength = 5 });
 
+    /// <summary>Places a wolf already in flight toward the player from the given bearing.</summary>
+    public static Wolf AirborneWolf(World world, float degrees) {
+        var from = Vector2.FromAngle(Mathf.DegToRad(degrees));
+        return PlaceWolf(world, new Wolf {
+            Pos = world.Player + from * 2.6f,
+            Heading = (-from).Angle(),
+            SnapTo = world.Player + from * .59f,
+            Leap = World.LeapSeconds
+        });
+    }
+
     /// <summary>The health one swing of a steel axe along <paramref name="aim"/> takes off a wolf standing still <paramref name="wolfAt"/> from the player.</summary>
     public static float TakenByAnAxe(GameData data, Vector2 wolfAt, Vector2 aim) {
         var world = AxeNight(data);
@@ -30,27 +41,19 @@ internal static class WolfSteps {
         return data.WolfHealth - wolf.Health;
     }
 
-    /// <summary>Ticks a night in steps short enough to follow a snap, 0.08 seconds of which is in the air.</summary>
+    /// <summary>Ticks a night in steps short enough to follow a snap and a throat leap.</summary>
     public static void SnapTick(World world, float seconds) {
         for (float t = 0; t < seconds - 1e-4f; t += SnapStep) { Nourished(world); world.Tick(SnapStep); }
     }
     private const float SnapStep = .02f;
 
-    /// <summary>
-    /// The player's health after one snap of a wolf running beside them: they walk or sprint east with the wolf at biting
-    /// distance behind, and with <paramref name="turns"/> turn north as it leaves the ground.
-    /// </summary>
-    public static float HealthAfterASnap(GameData data, bool sprinting, bool turns) {
-        var world = NightWorld(data);
-        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-1.05f, 0) });
-        var way = Vector2.Right;
-        world.Me.Sprinting = sprinting;
-        for (float t = 0; t < 1 && (t == 0 || wolf.Snap > 0); t += SnapStep) {
-            if (turns && WolfSnap.InAir(wolf)) way = Vector2.Up;
-            Nourished(world); world.MovePlayer(way * SnapStep * data.MoveSpeed(sprinting)); world.Tick(SnapStep);
+    /// <summary>Walks in <paramref name="way"/> for the given seconds while the wolf has time to attack.</summary>
+    public static void WalkThroughSnap(World world, Vector2 way, float seconds) {
+        for (float t = 0; t < seconds - 1e-4f; t += SnapStep) {
+            Nourished(world);
+            world.MovePlayer(way * SnapStep * world.PlayerSpeed);
+            world.Tick(SnapStep);
         }
-        Checks.Require(wolf.Snap == 0 && wolf.Attack > 0, "the wolf should have snapped once within a second");
-        return world.Health;
     }
 
     /// <summary>A torch night with wolves in follow mode, settled on their circle; returns one of them.</summary>
@@ -75,13 +78,24 @@ internal static class WolfSteps {
     /// <summary>Puts the player a given distance from a wolf, on the line between them, as if they had walked at it.</summary>
     public static void WalkTo(World world, Wolf wolf, float distance) => world.Player = wolf.Pos + (world.Player - wolf.Pos).Normalized() * distance;
 
-    /// <summary>A night with the player starting to step, at a walk, into a cabin four metres up from where they stood.</summary>
-    public static (World World, Thing Hut) SteppingInAtNight(GameData data) {
+    /// <summary>Starts entering just as a wolf is about to bite at the doorstep.</summary>
+    public static Wolf StepIntoBite(World world, Thing hut, Vector2 from, PlayerState? who = null) {
+        who ??= world.Me;
+        var wolf = PlaceWolf(world, new Wolf { Pos = who.Pos + from, Target = who.Id });
+        SnapTick(world, who.Health <= World.TakedownHealth ? .64f : .5f);
+        Require(WolfSnap.InAir(wolf), "a wolf should be in flight as the player starts entering");
+        world.As(who, () => Require(world.Doorways.Enter(hut, false), "the player should step into the cabin during the leap"));
+        return wolf;
+    }
+
+    /// <summary>A night with the player caught while stepping into a cabin.</summary>
+    public static (World World, Thing Hut, Wolf Wolf) TuggedAtNight(GameData data) {
         var world = NightWorld(data);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
         world.Player = Doorways.DoorPoint(hut);
-        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
-        return (world, hut);
+        var wolf = StepIntoBite(world, hut, Vector2.Right * .8f);
+        UntilTugged(world);
+        return (world, hut, wolf);
     }
 
     /// <summary>

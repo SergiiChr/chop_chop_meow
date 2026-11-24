@@ -12,6 +12,7 @@ using static WorldSteps;
 /// <summary>Checks for a player's swings at wolves: when a swing lands, what it reaches and how hard it hits.</summary>
 public static class SwingsChecks {
     public static void Run(GameData data) {
+        Test(CheckSteppingIntoACabinStopsAnUnlandedSwing, data);
         Test(CheckAnAxeLandsWhenItComesDownNotWhenItIsSwung, data);
         Test(CheckASwingHitsOnlyWhereItIsAimedAndAsFarAsTheBladeReaches, data);
         Test(CheckAxeSwingsTakeTurnsAndTheSweepCatchesOnlyAWolfInTheAir, data);
@@ -22,6 +23,19 @@ public static class SwingsChecks {
         Test(CheckABurntWolfRunsFromThePlayerForAMoment, data);
         Test(CheckSwingShapesFollowThePlayersModel, data);
         Test(CheckTorchSwingScaresOnlyWolvesItIsAimedAt, data);
+    }
+
+    private static void CheckSteppingIntoACabinStopsAnUnlandedSwing(GameData data) {
+        var world = AxeNight(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + Vector2.Up * 4);
+        world.Player = Doorways.DoorPoint(hut);
+        var wolf = StillWolf(world, Vector2.Right * 1.5f);
+        world.Attack(Vector2.Right);
+        SnapTick(world, .18f);
+        Require(world.Doorways.Enter(hut, false), "the player should start stepping in before the axe comes down");
+        SnapTick(world, .29f);
+        Require(world.Door == Doorway.Entering && wolf.Health == data.WolfHealth,
+            "the cut-off swing should not hurt a wolf when the player is already stepping into the cabin");
     }
 
     /// <summary>The blow counts when the animation brings the axe down, half way through the swing, so a press alone hurts nothing.</summary>
@@ -64,8 +78,8 @@ public static class SwingsChecks {
         world.Attack(Vector2.Right);
         world.Tick(.2f);
         // A wolf leaping from the left: half way through its leap as the sweep crosses the front, 0.4 seconds into the swing.
-        var leaper = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2.6f, 0).Rotated(Mathf.DegToRad(-60)), Leap = World.LeapSeconds });
-        var behind = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(2.6f, 0).Rotated(Mathf.DegToRad(120)), Leap = World.LeapSeconds });
+        var leaper = AirborneWolf(world, -60);
+        var behind = AirborneWolf(world, 120);
         SnapTick(world, .25f);
         Require(swung.SequenceEqual(new[] { ActorAction.SteelAxeSwing, ActorAction.SteelAxeSweep }), $"axe swings should take turns, overhead then sideways: {string.Join(", ", swung)}");
         Require(ahead.Health == after && left.Health == data.WolfHealth, "the sideways sweep, at chest height, should pass over wolves on the ground");
@@ -110,12 +124,12 @@ public static class SwingsChecks {
         Require(close.Stagger > 0 && close.Flee > 0, "a burnt wolf should be knocked back and run for a moment");
     }
 
-    /// <summary>A blow throws a wolf half a metre back from the player, and it stands reeling there for 0.45 seconds.</summary>
+    /// <summary>A further blow throws a wolf half a metre back and leaves it reeling for 0.45 seconds.</summary>
     private static void CheckABlowThrowsAWolfBackAndLeavesItReeling(GameData data) {
         var world = AxeNight(data);
-        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0) });
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0), Attack = .2f, Aggressive = true });
         world.Attack(Vector2.Right);
-        // The wolf snaps first; the axe comes down 0.4 seconds in.
+        // The axe comes down while the wolf is planted in its windup.
         SnapTick(world, .38f);
         float before = wolf.Pos.DistanceTo(world.Player);
         SnapTick(world, .04f);
@@ -136,8 +150,9 @@ public static class SwingsChecks {
         SnapTick(world, .2f);
         float burnt = wolf.Pos.DistanceTo(world.Player);
         Require(wolf.Health < data.WolfHealth && wolf.Follow == FollowStage.Bold, "a torch should burn a wolf that turned on the player without scaring it");
-        SnapTick(world, 1.5f);
-        Require(wolf.Pos.DistanceTo(world.Player) > burnt + 1, $"a burnt wolf should run from the player, not stay {wolf.Pos.DistanceTo(world.Player):0.0} m off");
+        SnapTick(world, .55f);
+        Require(wolf.Pos.DistanceTo(world.Player) > burnt + .3f,
+            "a burnt wolf should run as soon as it has reeled from the burn");
         Require(world.Health == 100, "a torch that burns a wolf as it gathers itself should stop its bite");
     }
 

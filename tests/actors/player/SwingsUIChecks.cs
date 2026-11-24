@@ -38,6 +38,16 @@ public partial class Game {
         Require(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
         Require(sounds.Heard("tool_air_swing", soundsBefore) && !sounds.Heard("wolf_hit", soundsBefore), "A punch must whoosh before it lands.");
         await Until(() => sounds.Heard("wolf_hit", soundsBefore), "the punch thudding as it lands on the wolf", 2);
+
+        var aim = PlayerControl.KeyDirection(1, 0);
+        await Holding(Key.D, () => Seconds(.07));
+        var turn = world.Player;
+        await Holding(Key.A, () => Seconds(.07));
+        Require((world.Player - turn).Dot(aim) < -.05f, "the player can immediately reverse direction during a fight");
+        var facing = view.PlayerRig.Root.Basis.Z;
+        Require(view.PlayerAnimation == ActorAction.Attack && new Vector2(facing.X, facing.Z).Dot(aim) > .99f,
+            "the punch should keep facing its original aim while retreating");
+
         RemoveWolves(Hosted, w => w == wolf); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
         await Until(() => view.PlayerAnimation != ActorAction.Attack, "the unarmed attack finishing", 3);
         Warp(Hosted, home); await Frames(4);

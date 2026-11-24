@@ -213,8 +213,13 @@ public sealed class PlayerControl {
         // A carried barrel prevents sprinting.
         // Under 15% food or drink the player is too weak to sprint.
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
-        if (cabinApproach.Active) momentum = default;
-        var step = cabinApproach.Active ? direction : momentum.Step(world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero, dt);
+        var wanted = world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero;
+        Vector2 step;
+        if (cabinApproach.Active) {
+            momentum = default; step = direction;
+        } else if (world.WolfNearby(world.Player)) {
+            momentum = new Momentum { Heading = wanted, Pace = 1 }; step = wanted;
+        } else step = momentum.Step(wanted, dt);
         if (step != Vector2.Zero) walked = step.Normalized();
         world.Me.Braking = momentum.Braking;
         var move = step * dt * world.PlayerSpeed;
@@ -249,12 +254,15 @@ public sealed class PlayerControl {
         if (t != null) panel.Select(t);
     }
 
-    /// <summary>Space pumps in reach, or swings along the first-person view or in the last walking direction.</summary>
+    /// <summary>Space pumps in reach, or swings with the first-person view or the overhead movement keys.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
         if (station?.Kind == ThingKind.Pump && world.AtStation(station)) UseWaterPump(station);
         else if (station?.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station);
-        else world.Attack(view.FirstPerson ? view.FirstPersonForward : walked);
+        else {
+            var aim = view.FirstPerson ? view.FirstPersonForward : HeldDirection();
+            world.Attack(aim == Vector2.Zero ? walked : aim);
+        }
     }
 
     /// <summary>A mouse button over the world; <paramref name="overPanel"/> tells that the pointer is on a panel, which passes the wheel on when it has nothing to scroll, but must not zoom the world behind.</summary>

@@ -43,7 +43,7 @@ public static class WolfChecks {
         RunUntilNight(dark);
         SetNeeds(dark, health: 100);
         PlaceWolf(dark, new Wolf { Pos = dark.Player + new Vector2(.8f, 0) });
-        WolfSteps.SnapTick(dark, .5f);
+        WolfSteps.SnapTick(dark, .9f);
         Require(dark.Health < 100, "an unprotected player near a wolf should take damage at night");
 
         var lit = EmptyWorld(data);
@@ -150,7 +150,7 @@ public static class WolfChecks {
         SetNeeds(maul, health: 49);
         foreach (var (item, count) in new[] { ("berries", 3), ("burnt_steak", 2), ("raw_meat", 1), ("water", 2), ("steel_axe", 1), ("wood", 4) })
             Give(maul, item, count);
-        var leaper = new Wolf { Pos = maul.Player + new Vector2(3, 0), Attack = 5 };
+        var leaper = new Wolf { Pos = maul.Player + new Vector2(3, 0) };
         var packmate = new Wolf { Pos = maul.Player + new Vector2(-9, 4), Attack = 5 };
         PlaceWolf(maul, leaper); PlaceWolf(maul, packmate);
         var heard = Listen(maul);
@@ -158,7 +158,7 @@ public static class WolfChecks {
         maul.Notify += said.Add;
         maul.Tick(.1f);
         Require(leaper.Leap > 0 && !maul.Mauled, "a nearby wolf should leap at a player on half health");
-        maul.Tick(World.LeapSeconds);
+        WolfSteps.SnapTick(maul, .64f);
         Require(maul.Mauled, "the leap should pin the player");
         Require(said.Contains("You are pinned and can't move."), $"a pinned player should be told they cannot move: told {string.Join(" | ", said)}");
         Require(heard.Count(name => name == "takedown_scream") == 1, $"a player pinned by a leap should scream once: heard {string.Join(", ", heard)}");
@@ -220,9 +220,14 @@ public static class WolfChecks {
             PlaceWolf(world, wolf);
             world.Me.Sprinting = sprinting;
             var start = world.Player;
-            for (int i = 0; i < 40; i++) { world.MovePlayer(Vector2.Right * .05f * data.WalkSpeed * (sprinting ? data.SprintSpeed : 1)); world.Tick(.05f); }
+            float closest = float.MaxValue;
+            for (int i = 0; i < 40; i++) {
+                world.MovePlayer(Vector2.Right * .05f * data.MoveSpeed(sprinting));
+                world.Tick(.05f);
+                closest = Math.Min(closest, wolf.Pos.DistanceTo(world.Player));
+            }
             Require(world.Player.DistanceTo(start) > 7, "the open ground east of the test spot must let the player flee");
-            return wolf.Pos.DistanceTo(world.Player);
+            return sprinting ? wolf.Pos.DistanceTo(world.Player) : closest;
         }
         Require(Gap(false) < 3, "a chasing wolf must be faster than a walking player");
         Require(Gap(true) > 4.1f, "a sprinting player must outrun a chasing wolf");
@@ -272,7 +277,7 @@ public static class WolfChecks {
             float pace = wolf.Pos.DistanceTo(from);
             SetNeeds(world, health: 100);
             PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
-            WolfSteps.SnapTick(world, .5f);
+            WolfSteps.SnapTick(world, .85f);
             return (wolf.Health, pace, 100 - world.Health);
         }
         var (first, later) = (Wolf(1), Wolf(30));
