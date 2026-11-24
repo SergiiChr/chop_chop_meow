@@ -10,7 +10,8 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
         var stock = new HBoxContainer();
         stock.AddThemeConstantOverride("separation", 8);
         AddChild(stock);
-        StockSlot(stock, World.ResourceItem(thing), thing.Kind == ThingKind.Water ? null : () => thing.Remaining);
+        if (thing.Kind == ThingKind.Water) StockSlot(stock, Water.Liquid, null);
+        else StockSlot(stock, World.ResourceItem(thing), () => thing.Remaining);
         if (thing.Kind == ThingKind.Leaves) StockSlot(stock, TreePlanting.Acorn, () => LeafLitter.Acorns(thing));
 
         if (TreePlanting.NeedsWater(thing)) TreeWater();
@@ -31,9 +32,7 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
     }
 
     private void GatherNote() {
-        string? hint = thing.Kind == ThingKind.Water
-            ? "Hold right mouse at the shore to fill a bottle or bucket, or drink from the lake."
-            : null;
+        string? hint = thing.Kind == ThingKind.Water ? "Hold RMB to drink or fill a container." : null;
         var note = Style.Wrapped("", 14, Style.Beige);
         AddChild(note);
         live.Watch(() => world.GatherBlock(thing) ?? hint, message => {

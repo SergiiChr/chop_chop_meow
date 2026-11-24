@@ -475,7 +475,7 @@ Impassable mountain ranges close in from the left and right toward the valley's 
 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
 Click a resource to see what it yields in read-only item slots with a count for each item.
-The lake shows an unnumbered water bottle slot.
+The lake shows a water droplet in an unnumbered slot.
 A berry bush holds 24 berries and is full again a day after the first one is picked from it, whether or not it was picked clean.
 A felled tree leaves a stump. Trees grow again from planted acorns. A couple of hundred plain bushes grow about the plains.
 Hold right mouse on a stump or a plain bush with a shovel in your backpack to dig it up: a stump gives 3 wood and a bush 36 leaves, three times what lies under an oak.

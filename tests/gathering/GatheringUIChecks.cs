@@ -257,7 +257,9 @@ public partial class Game {
         Require(world.Find(view.Hover)?.Kind == ThingKind.Water, "Pointing at the shoreline should show the water target.");
         await SurvivalReviewShot("water-source");
         await Click(shorePoint);
-        Require(ShowsResourceStock("water", null), "The lake must use an item slot without a stock count.");
+        Require(ShowsResourceStock("fresh_water", null) && panel.HeadingIcon.Texture == Icons.Of("fresh_water"),
+            "The lake must show the water droplet in its heading and unnumbered slot.");
+        Require(HasLabel(panel, "Hold RMB to drink or fill a container."), "The lake must show how to collect water.");
         await CloseWithEsc();
         var press = RightPress(shore, .8f);
         await Until(() => world.Backpack["water"] == 1 && world.Backpack["empty_bottle"] == 0, "holding right mouse on the shoreline filling the retained bottle", world.Data.GatherSeconds + 3);

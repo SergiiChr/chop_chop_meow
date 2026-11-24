@@ -851,7 +851,7 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 ### Resources
 
 `ResourcePanel` shows gatherable items in read-only slots with live stock counts.
-Leaf spots show a second slot for acorns, and the lake shows an unnumbered water bottle slot.
+Leaf spots show a second slot for acorns, and the lake shows a water droplet in an unnumbered slot.
 
 - The valley starts with a patch of leaves beside each oak where ground allows it (`World.LeafPatch`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.

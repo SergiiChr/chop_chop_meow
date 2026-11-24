@@ -92,8 +92,10 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
 
     /// <summary>Names the page after the building it shows, with the building's own icon; its description becomes the icon's tooltip.</summary>
     private void Headline() {
-        headingTitle.Text = thing.Kind == ThingKind.Water ? "Collect water" : world.Data.Name(thing.Kind);
-        headingIcon.Texture = Icons.Of(thing.Kind.Id()); headingIcon.Visible = headingIcon.Texture != null;
+        bool water = thing.Kind == ThingKind.Water;
+        headingTitle.Text = water ? "Collect water" : world.Data.Name(thing.Kind);
+        headingIcon.Texture = Icons.Of(water ? Water.Liquid : thing.Kind.Id());
+        headingIcon.Visible = headingIcon.Texture != null;
         headingIcon.TooltipText = world.Data.Buildings.TryGetValue(thing.Kind, out var def) ? def.Description : "";
     }
 
