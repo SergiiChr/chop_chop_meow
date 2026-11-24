@@ -118,7 +118,7 @@ internal partial class PipeLayerView : Node3D {
     }
 
     /// <summary>Picks the nearest pipe body or riser, checking only tiles along the ray through the trench.</summary>
-    public Vector2I? Pick(Vector3 origin, Vector3 direction) {
+    public Vector2I? Pick(SteelPipes layout, Vector3 origin, Vector3 direction) {
         if (direction.Y >= -1e-5f) return null;
         var top = origin + direction * ((PumpOutletHeight + PickClearance - origin.Y) / direction.Y);
         var bottom = origin + direction * ((PipeGround.FloorY - PickClearance - origin.Y) / direction.Y);
@@ -132,15 +132,22 @@ internal partial class PipeLayerView : Node3D {
         for (int z = min.Y; z <= max.Y; z++)
             for (int x = min.X; x <= max.X; x++) {
                 var tile = new Vector2I(x, z);
-                if (meshes.TryGetValue(Terrain.TileIndex(tile), out var pipe)) Check(tile, pipe);
-                if (risers.TryGetValue(tile, out var riser)) Check(tile, riser);
+                if (meshes.ContainsKey(Terrain.TileIndex(tile)) && layout.ShapeAt(tile) is PipeShape shape
+                    && layout.RotationAt(tile) is float rotation) {
+                    int ports = SteelPipes.PortMask(rotation, shape), links = layout.ConnectionMask(tile);
+                    var localOrigin = origin - WorldView.To3(tile, PipeGround.FloorY);
+                    foreach (var (offset, port, _) in SteelPipes.Sides)
+                        if ((ports & port) != 0) Check(tile, localOrigin, direction, SteelPipeShape.ArmBounds(offset, port, links));
+                }
+                if (risers.TryGetValue(tile, out var riser)) {
+                    var into = riser.GlobalTransform.AffineInverse();
+                    Check(tile, into * origin, into.Basis * direction, riser.GetAabb());
+                }
             }
         return picked;
 
-        void Check(Vector2I tile, MeshInstance3D mesh) {
-            var into = mesh.GlobalTransform.AffineInverse();
-            if (!WorldView.RayBox(into * origin, into.Basis * direction, mesh.GetAabb().Grow(PickClearance), out float hit)
-                || hit >= nearest) return;
+        void Check(Vector2I tile, Vector3 from, Vector3 along, Aabb bounds) {
+            if (!WorldView.RayBox(from, along, bounds.Grow(PickClearance), out float hit) || hit >= nearest) return;
             nearest = hit;
             picked = tile;
         }

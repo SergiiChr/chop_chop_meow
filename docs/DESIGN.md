@@ -1092,7 +1092,7 @@ Ground remains visible under people standing over the trench.
 The Layer button below the left side of the status bar switches the view between the surface and underground.
 In the underground view, a click opens the laid pipe's page (`PipePanel`).
 Placement and removal project the pointer onto the bed.
-Inspection picks the visible pipe body or riser.
+Inspection tests each tube and riser so bare ground between junction arms stays unselectable.
 A vertical pipe joins each building with plumbing to its inlet tile.
 A dotted guide marks a connection still to be made.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.

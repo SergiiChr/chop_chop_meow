@@ -501,7 +501,7 @@ public partial class WorldView : Node3D {
     /// <summary>The laid pipe under the cursor in explored ground.</summary>
     public Vector2I? PickPipe(Vector2 screen) {
         SyncCamera();
-        return pipeLayer.Pick(camera.ProjectRayOrigin(screen), camera.ProjectRayNormal(screen));
+        return pipeLayer.Pick(World.SteelPipes, camera.ProjectRayOrigin(screen), camera.ProjectRayNormal(screen));
     }
 
     private readonly List<Thing> picking = new();

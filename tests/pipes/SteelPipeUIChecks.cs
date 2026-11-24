@@ -14,6 +14,7 @@ public partial class Game {
         await TestClean(CheckHotbarPipePlanRemovesAndReusesALaidPipe);
         await TestClean(CheckRemoveSelectorKeepsTheOtherLayer);
         await TestClean(CheckClickingALaidPipeReadsWaterAndPressure);
+        await TestClean(CheckPipeJunctionCanBeSelectedByItsArms);
         await TestClean(CheckPuttingPipesInThePlumbingSlotInstallsAndRefundsThem);
         await TestClean(CheckSprinklersFollowWaterDelivery);
     }
@@ -119,6 +120,26 @@ public partial class Game {
         Hosted.Construction.TakeUpPipe(tile);
         Drop(Hosted, "steel_pipe"); Drop(Hosted, "gravel", 4); Drop(Hosted, "wood", 8);
         await KeyStroke(Key.Escape); await CloseWithEsc(); await Frames();
+    }
+
+    private async Task CheckPipeJunctionCanBeSelectedByItsArms() {
+        await CloseWithEsc();
+        var tile = SpotsNearby().Select(Terrain.TileAt)
+            .First(t => world.Reaches(t) && !world.SteelPipes.Laid(t) && Uncovered(view.Screen(t, PipeGround.FloorY)));
+        LayPipe(Hosted, tile, shape: PipeShape.Cross);
+        await Frames();
+        var layer = (Button)ui.FindChild("layer", true, false);
+        await Click(layer);
+        Require(view.Underground, "Layer must make the junction visible.");
+        float pipeHeight = PipeGround.FloorY + .065f;
+        await Click(view.Screen((Vector2)tile + new Vector2(.3f, .3f), pipeHeight));
+        Require(!panel.Visible, "Bare ground between two arms must leave the pipe readout closed.");
+        await Click(view.Screen((Vector2)tile + new Vector2(.35f, 0), pipeHeight));
+        Require(panel.Selection.Pipe == tile && ShownPage() == "Steel pipe", "Clicking an arm must open the junction readout.");
+        await Click(layer);
+        Hosted.Construction.TakeUpPipe(tile);
+        Drop(Hosted, "steel_pipe");
+        await Frames();
     }
 
     private async Task CheckClickingALaidPipeReadsWaterAndPressure() {
