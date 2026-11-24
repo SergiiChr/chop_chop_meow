@@ -1,6 +1,6 @@
 # Assets
 
-The world is rendered with low-poly 3D models, code-built apart from the baked trees and a few baked foods.
+The world uses low-poly 3D models, with baked meshes for trees, berry bushes, the dug hole and four foods.
 There are no world or character sprite sheets.
 The only 2D images are interface icons.
 
@@ -43,10 +43,10 @@ Detail past these does not show at the game's camera distance and costs frame ti
 
 ### Assembly and shared helpers
 
-Models are assembled from code-built Godot meshes, with baked meshes for trees, berry bushes and four foods.
+Models are assembled from code-built or baked Godot meshes.
 
 - `src/WorldModels.cs` — world objects, wolf carcass and trade cart.
-- `src/trees/display/TreePlantingShape.cs` — the dig outline, a shallow hole with a raised earth rim, and a soil nub.
+- `src/trees/display/TreePlantingShape.cs` — the dig outline, the Pirate Kit hole scaled to fit the outline, and the planted nub.
   The oak appears after the first full day of growth and scales a little larger at each stage.
 - `src/actors/display/ActorRig.cs` — player, worker, courier and the intro film's boss and catgirls, and the tools
   they hold: the steel shovel is a spade with a bar across the top of its handle and a pointed blade, laid through both
@@ -342,4 +342,10 @@ project's normal, flow, foam and caustic textures, all released under the MIT li
 `tools/water_textures.py` downloads the pinned textures and checks their SHA-256.
 The meshes in `models/food/` are baked from four models of [Kenney's Food Kit](https://kenney.nl/assets/food-kit), released under CC0 1.0, as [Patch's asset library](https://patch.gg) serves them: re-packed, with the texture inside the file, and scaled to real size.
 `tools/food_models.py` downloads the pinned files, checks their SHA-256 and bakes them with `tools/bake_models.gd`.
+The dug hole comes from Kenney's Pirate Kit under CC0 1.0. [Kenney's Pirate Kit](https://kenney.nl/assets/pirate-kit)
+Patch supplies the GLB. [Hole asset page](https://patch.gg/create/toolbox/assets/kenney:pirate-kit/hole.glb)
+`tools/bake_models.gd` bakes its palette and 286 triangles into `models/hole.res`.
+The source GLB has SHA-256 `5d237b5bb48dee8ebb05dafda086fde907c34364fcfe3e4d6a65386db48ce4f8`.
+[Download the source GLB](https://assets.patchusercontent.com/sha256/5d237b5bb48dee8ebb05dafda086fde907c34364fcfe3e4d6a65386db48ce4f8/hole.glb)
+
 No other external game art or third-party packs are used.

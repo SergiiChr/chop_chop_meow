@@ -278,7 +278,8 @@ public static class WorldModels {
 
     public static Hit[] Hits(Thing t) => t.Kind switch {
         ThingKind.Tree => TreeHits(t.Id, t.TreeStage),
-        ThingKind.PlantingSpot or ThingKind.Hole => [new Hit(.46f, 0, .055f)],
+        ThingKind.PlantingSpot => [new Hit(.46f, 0, .055f)],
+        ThingKind.Hole => [new Hit(.46f, 0, .12f)],
         ThingKind.Stone => new[] { new Hit(.75f, 0, .9f) },
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => new[] { new Hit(.8f, 0, 1) },
         ThingKind.LooseCoal or ThingKind.LooseStone or ThingKind.IronChip or ThingKind.TinChip => new[] { new Hit(.45f, 0, .35f) },

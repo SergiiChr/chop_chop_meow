@@ -7,7 +7,8 @@ namespace ChopChopMeow;
 internal static class TreePlantingShape {
     private static readonly StandardMaterial3D Mark = Flat(new Color("eed6a0"));
     private static readonly StandardMaterial3D Soil = Mat("664533", .95f);
-    private static readonly StandardMaterial3D HoleBottom = Mat("2c1c15", 1);
+    private static readonly StandardMaterial3D HoleSoil = Vertex(Surface.Flat, .95f);
+    private static ArrayMesh? hole;
     private static readonly StandardMaterial3D Shoot = Mat("928049", .9f);
 
     public static void Outline(Node3D body) {
@@ -16,11 +17,8 @@ internal static class TreePlantingShape {
         ring.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
     }
 
-    public static void Hole(Node3D body) {
-        Cylinder(body, .37f, .37f, .024f, Vector3.Up * .013f, HoleBottom);
-        var rim = Torus(body, .31f, .46f, Vector3.Up * .027f, Soil);
-        rim.Scale = new Vector3(1, .6f, .89f);
-    }
+    public static void Hole(Node3D body) =>
+        Add(body, hole ??= GD.Load<ArrayMesh>("res://assets/models/hole.res"), HoleSoil, Vector3.Zero, scale: Vector3.One * .32f);
 
     public static Node3D Nub(Node3D body) {
         var nub = Pivot(body, Vector3.Zero);
