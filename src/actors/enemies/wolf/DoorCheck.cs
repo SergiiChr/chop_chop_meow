@@ -130,19 +130,21 @@ public sealed class DoorCheck(World world) {
         var door = Doorways.DoorPoint(cabin);
         // Until its snout is in the door, a wolf turns to a player out in the open within its sight.
         if (wolf.DoorCheck <= DoorCheckStage.Scratching && world.WolfPatrols.Smell(wolf, world.Data.WolfSightRange)) return;
-        float before = wolf.DoorCheckTime, step = dt * world.Data.WolfTrot;
+        float before = wolf.DoorCheckTime, step = dt * (wolf.Aggressive ? world.WolfHunt.RunSpeed
+            : world.Data.WolfTrot);
         switch (wolf.DoorCheck) {
             case DoorCheckStage.Coming:
                 var lead = Lead(cabin.Id, door);
                 var outward = Doorways.OutOfDoor.Rotated(cabin.Rotation);
                 if (lead == wolf) {
-                    // It comes round to face the door, then walks straight up to it, so it gets there facing it and at a walk.
+                    // It comes round to face the door, then goes straight up to it.
                     var asideWay = Doorways.AsideWay.Rotated(cabin.Rotation);
                     var scratch = door + asideWay * ScratchAside;
                     float aside = (wolf.Pos - scratch).Dot(asideWay), outFrom = (wolf.Pos - scratch).Dot(outward);
                     // With no way to the door it gives up on the cabin.
                     if (Math.Abs(aside) < ApproachLane && outFrom > 0 && outFrom < ApproachFrom + ApproachLane) {
-                        if (!world.Travel(wolf, scratch, step * ApproachPace, step * ApproachPace)) GiveUp(wolf, cabin);
+                        float approach = wolf.Aggressive ? step : step * ApproachPace;
+                        if (!world.Travel(wolf, scratch, approach, approach)) GiveUp(wolf, cabin);
                         else if (wolf.Pos.DistanceTo(scratch) < AtDoorSpot) Stage(wolf, DoorCheckStage.Scratching);
                     } else if (!world.Travel(wolf, scratch + outward * ApproachFrom, step, step)) GiveUp(wolf, cabin);
                 } else if (lead != null && WaitSpot(wolf, lead, door, outward) is var spot && wolf.Pos.DistanceTo(spot) >= AtSpot && world.CanStand(spot)) world.Travel(wolf, spot, step, step);
@@ -210,6 +212,7 @@ public sealed class DoorCheck(World world) {
             victim.Health -= world.Data.WolfBite;
             world.Play("wolf_bite", world.Player);
             world.DoorTug.Begin(wolf, Doorway.Tugged, cabin.Id);
+            victim.DoorFrom = victim.Pos + DoorwayPath.IntoCabin.Rotated(cabin.Rotation);
         }
         wolf.DoorCheck = DoorCheckStage.TakingOut; wolf.DoorCheckCabin = cabin.Id; wolf.Attack = 1;
     }

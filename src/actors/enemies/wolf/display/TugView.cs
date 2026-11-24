@@ -11,10 +11,6 @@ namespace ChopChopMeow;
 public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf, Func<Vector2, bool> drawsAt) {
     /// <summary>How far behind a player's hips a tugging wolf's jaws hold them.</summary>
     private const float WaistBehind = .12f;
-    /// <summary>The back of the waist of the player a wolf hunts as drawn, while they are out in the open in a cabin's doorway, or null.</summary>
-    public Vector3? InTheDoorway(Wolf wolf) =>
-        world().PlayerById(wolf.Target) is { Door: Doorway.Entering or Doorway.Following or Doorway.Knocking } p && !Doorways.Indoors(p) && stateOf(p.Id) is ActorState held ? Waist(held) : null;
-
     /// <summary>The player a tugging wolf tugs as drawn, and how far through the tug they are, 0 to 1; null once they are not being tugged.</summary>
     private (ActorState Held, float Progress)? TuggedBy(Wolf wolf) =>
         world().PlayerById(wolf.Target) is { Door: Doorway.Tugged or Doorway.TuggedOff } p && stateOf(p.Id) is ActorState held ? (held, Math.Clamp(p.DoorTime / DoorTug.TugSeconds, 0, 1)) : null;
@@ -118,7 +114,10 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf, F
         var toModel = model.Root.Transform.AffineInverse();
         var torso = rig.Torso.GlobalTransform;
         Vector3 low = toModel * (torso * (LowPaw with { X = LowPaw.X * wolf.Side })), high = toModel * (torso * (HighPaw with { X = HighPaw.X * wolf.Side }));
-        model.Rear(body, WolfModel.Uncrossed(low, high), dt);
+        model.Glance = 0;
+        model.Rear(body, WolfModel.Uncrossed(low, high), dt, arm.Y);
+        grip = arm - model.Root.Basis * model.Bite;
+        model.PlaceRearGrip(model.StepFrom.Lerp(grip with { Y = 0 }, lunge));
         model.Plant();
         model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
         return true;

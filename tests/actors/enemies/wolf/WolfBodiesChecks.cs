@@ -80,11 +80,17 @@ public static class WolfBodiesChecks {
         // The flight comes down on the hind paws, reared up with the jaws at the throat.
         float throat = FallBackView.Throat(Vector2.Zero, Vector2.Down, 0).Y;
         for (float progress = 0; progress <= 1; progress += .125f) {
-            model.Stand(0, 1, true); model.Leap(progress, 1, 1, jawsUp: throat);
-            float flown = WolfModel.LeapPath(Vector3.Zero, Vector3.Zero, progress, World.LeapSeconds).Y;
+            model.Stand(0, 1, true); model.Leap(progress, 1, jawsUp: throat);
+            float flown = Movement.Rise(progress * World.LeapSeconds, World.LeapSeconds);
             float leaping = ModelSteps.WolfTop(model) + flown, world = WolfBodies.Top(new Wolf { Leap = World.LeapSeconds * (1 - progress) + 1e-4f });
-            Require(Math.Abs(leaping - world) < .12f, $"a wolf {progress:0.000} through its leap is {leaping:0.00} m tall in its model and {world:0.00} m in the world");
+            Require(Math.Abs(leaping - world) < .09f,
+                $"a wolf {progress:0.000} through its leap is {leaping:0.00} m tall in its model and {world:0.00} m in the world");
         }
+        Require(Math.Abs(model.Bite.Z - WolfSnap.ThroatJawsAhead) < .02f,
+            $"the throat leap's jaws close {model.Bite.Z:0.00} m ahead, with reach measured at {WolfSnap.ThroatJawsAhead:0.00} m");
+        model.Snap(1, 1, 0, 1);
+        Require(Math.Abs(model.Bite.Z - WolfSnap.JawsAhead) < .02f && Math.Abs(model.Bite.X) < .01f,
+            $"the bite should close on its hitbox when the wolf lands, with the jaw at {model.Bite}");
         model.Root.Free();
     }
 
@@ -100,8 +106,7 @@ public static class WolfBodiesChecks {
         var world = NightWorld(data);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -4));
         world.Player = Doorways.DoorPoint(hut);
-        Require(world.Doorways.Enter(hut, false), "a player at the door should step in");
-        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        WolfSteps.StepIntoBite(world, hut, Vector2.Right * .8f);
         WolfSteps.UntilTugged(world);
         Require(world.Door == Doorway.Tugged, "a wolf should tug the player out of the doorway");
         // With a wolf at each arm, one more waits just past where the tug ends.

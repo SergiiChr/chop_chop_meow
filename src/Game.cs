@@ -139,7 +139,10 @@ public partial class Game : Node, IGameFlow {
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
-    private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at);
+    private void PlayWorldSound(string name, Vector2 at) {
+        if (name == "wolf_hit") view.WolfCounterHit(at);
+        else sounds.Play(name, at);
+    }
     private void BuildHud() {
         cursor = new HeldCursor(world);
         moves = new ItemMoves(kit, blackHole, cursor);

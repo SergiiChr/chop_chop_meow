@@ -322,8 +322,9 @@ public partial class WorldView {
         (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) shown;
         if (now == Doorway.None) {
             float walked = Math.Clamp((time - start) / 1.6f, 0, 1);
-            var from = door - DoorwayView.IntoCabin * 2;
-            shown = (from.Lerp(door, walked), door + DoorwayView.IntoCabin, walked < 1 ? ActorAction.Jog : ActorAction.Idle, false);
+            var from = door - DoorwayPath.IntoCabin * 2;
+            var action = walked < 1 ? ActorAction.Jog : ActorAction.Idle;
+            shown = (from.Lerp(door, walked), door + DoorwayPath.IntoCabin, action, false);
         } else if (now == Doorway.Tugged) {
             // Half way into a run in, the player is tugged back out a metre, then runs in from there as one who goes for the cabin again.
             float run = time - start, tugged = run - Doorways.RushSeconds / 2;
@@ -396,19 +397,24 @@ public partial class WorldView {
                     break;
                 }
             case "wolf leap": {
-                    // From 3 tiles off the leap closes on PinDistance in LeapSeconds, the jaws reaching the throat on the way.
-                    float c = Elapsed % 3.2f, start = 3, progress = Math.Clamp((c - .6f) / World.LeapSeconds, 0, 1), flight = 0;
-                    float gap = Mathf.Lerp(start, World.PinDistance, progress), contact = (start - WolfModel.ContactReach) / (start - World.PinDistance);
+                    float wind = Elapsed % 3.2f - .6f, air = wind - WolfSnap.Windup;
+                    float progress = Math.Clamp(air / World.LeapSeconds, 0, 1);
+                    float gap = Mathf.Lerp(3, WolfSnap.ThroatJawsAhead + .12f, progress);
+                    place = To3(track * gap, Movement.Rise(progress * World.LeapSeconds, World.LeapSeconds));
                     wolf.Toward = track;
-                    if (c < .6f) { wolf.Pinned = 0; wolf.Stand(Elapsed, dt, true); } else {
-                        wolf.Pinned = gap <= WolfModel.ContactReach ? wolf.Pinned + dt : 0;
-                        var chest = FeedingSpots.PawsOnChest(wolf, reviewRigs[0]);
-                        if (wolf.Motion != WolfMotion.Leap && wolf.Pinned == 0) wolf.StepFrom = wolf.Root.Position;
-                        if (wolf.Pinned > 0) PinAt(wolf, Vector2.Zero, chest, Elapsed, dt);
-                        else { wolf.Leap(progress, contact, dt, chest, FallBackView.Throat(Vector2.Zero, Vector2.Up, 0).Y); flight = progress / contact; }
+                    if (wind < 0) {
+                        wolf.Pinned = 0; wolf.Stand(Elapsed, dt, true);
+                    } else if (air <= 0) wolf.Snap(wind / WolfSnap.Windup, 0, 0, dt);
+                    else if (progress < 1)
+                        wolf.Leap(progress, dt, jawsUp: FallBackView.Throat(Vector2.Zero, Vector2.Up, 0).Y);
+                    else {
+                        wolf.Pinned += dt;
+                        PinAt(wolf, Vector2.Zero, FeedingSpots.PawsOnChest(wolf, reviewRigs[0]), Elapsed, dt);
+                        place = AtTheThroat(wolf, Vector2.Zero);
+                        person = wolf.Pinned < ActorAnimation.FallBackSeconds ? ActorAction.FallBack
+                            : ActorAction.Mauled;
+                        downed = wolf.Pinned;
                     }
-                    place = c < .6f ? To3(track * start) : AtTheThroat(wolf, Vector2.Zero, flight, contact * World.LeapSeconds);
-                    if (wolf.Pinned > 0) { person = wolf.Pinned < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled; downed = wolf.Pinned; }
                     break;
                 }
             case "wolf hit": {
@@ -417,20 +423,23 @@ public partial class WorldView {
                     if (punch < lands) { wolf.Stand(Elapsed, dt, true); gap = near; } else if (punch < lands + WolfModel.RecoilSeconds) {
                         float recoil = (punch - lands) / WolfModel.RecoilSeconds, hop = Math.Min(1, recoil / WolfModel.HopShare);
                         gap = near + (far - near) * hop;
-                        wolf.Recoil(recoil, dt);
-                    } else { wolf.Stand(Elapsed, dt, true); gap = far; }
+                        wolf.Recoil(recoil, dt, threatening: true);
+                    } else { wolf.Threaten(punch - lands - WolfModel.RecoilSeconds, dt); gap = far; }
                     place = To3(track * gap);
                     if (punch >= 0 && punch < ActorAnimation.Duration(ActorAction.Attack)) person = ActorAction.Attack;
                     break;
                 }
             case "wolf snap": {
                     // A snap at a player standing still: the wolf gathers itself at biting distance, leaps the last of the way and shuts its jaws on them, then steps back.
-                    float c = Elapsed % 2.4f, snap = c - .6f, landed = snap - WolfSnap.Windup - WolfSnap.Flight, near = WolfBodies.StandOff, close = WolfSnap.JawsAhead, gap;
+                    float snap = Elapsed % 2.4f - .6f, landed = snap - WolfSnap.Windup - WolfSnap.Flight;
+                    float near = WolfSnap.Trigger - .02f, close = WolfSnap.JawsAhead + .12f, gap;
                     if (snap < 0) { wolf.Stand(Elapsed, dt, true); gap = near; } else if (landed < 0) {
                         float drive = Math.Max(0, snap - WolfSnap.Windup) / WolfSnap.Flight;
                         gap = Mathf.Lerp(near, close, drive);
-                        wolf.Snap(Math.Min(1, snap / WolfSnap.Windup), drive, 0, dt, WolfModel.SnapReach(track * gap, Vector2.Zero, reviewPerson.Yaw));
-                    } else if (landed < WolfModel.SnapHold) { gap = close; wolf.Snap(1, 1, landed / WolfModel.SnapHold, dt, WolfModel.SnapReach(track * gap, Vector2.Zero, reviewPerson.Yaw)); } else {
+                        wolf.Snap(Math.Min(1, snap / WolfSnap.Windup), drive, 0, dt);
+                    } else if (landed < WolfSnap.HitRecovery) {
+                        gap = close; wolf.Snap(1, 1, landed / WolfModel.SettleSeconds, dt);
+                    } else {
                         gap = Math.Min(near, reviewLunge + WolfBodies.BackOffSpeed * dt);
                         if (gap < near) wolf.Move(reviewLunge - gap, dt, false, true); else wolf.Stand(Elapsed, dt, true);
                     }
@@ -519,7 +528,8 @@ public partial class WorldView {
         // Moving wolves stride as they would at their speed in the world: a trot at 3 tiles a second and a gallop at a chase's 6.3.
         reviewWolves[0].Stand(Elapsed, dt, false); reviewWolves[1].Move(3 * dt, dt, false, false); reviewWolves[2].Move(6.3f * dt, dt, true, false);
         float leap = Elapsed % 1.2f / World.LeapSeconds;
-        if (leap < .7f) reviewWolves[3].Leap(leap, .7f, dt); else reviewWolves[3].Feed(Elapsed, dt, true, (leap - .7f) * World.LeapSeconds / ActorAnimation.FallBackSeconds);
+        if (leap < .7f) reviewWolves[3].Leap(leap / .7f, dt);
+        else reviewWolves[3].Feed(Elapsed, dt, true, (leap - .7f) * World.LeapSeconds / ActorAnimation.FallBackSeconds);
         reviewWolves[4].Feed(Elapsed, dt, false); reviewWolves[5].Fall(Elapsed % 2 / WolfModel.FallSeconds);
         reviewWolves[6].Recoil(Elapsed % 1.2f / WolfModel.RecoilSeconds, dt);
         foreach (var wolf in reviewWolves) wolf.Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);

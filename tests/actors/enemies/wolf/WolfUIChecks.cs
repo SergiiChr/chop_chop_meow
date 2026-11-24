@@ -36,8 +36,11 @@ public partial class Game {
         var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(0, -4));
         Warp(Hosted, Doorways.DoorPoint(hut));
         await Frames();
-        Require(Hosted.Doorways.Enter(hut, false), "A player at a cabin's door must step in.");
-        var pack = new[] { new Vector2(.8f, 0), new Vector2(-1, .2f), new Vector2(1, .2f) }.Select(from => PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + from })).ToList();
+        var tugger = WolfSteps.StepIntoBite(Hosted, hut, Vector2.Right * .8f);
+        await Until(() => world.Door == Doorway.Tugged, "the first wolf tugging the player out of the doorway", 3);
+        var pack = new[] { new Vector2(-1, .2f), new Vector2(1, .2f) }
+            .Select(from => PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + from })).ToList();
+        pack.Add(tugger);
         await Until(() => world.Door == Doorway.Tugged && world.Wolves.Count(w => w.Side != 0 && view.ModelOf(w) is { Motion: WolfMotion.Rear, Settled: >= 1 }) == 2,
             "a wolf taking each arm of a player another wolf tugs out of a doorway", 3);
         var rig = view.RigOf(world.Me.Id)!;
@@ -49,8 +52,9 @@ public partial class Game {
             float east = model.Root.GlobalPosition.X - rig.Root.GlobalPosition.X;
             Require(left ? east < -.3f : east > .3f, $"A wolf holding a player's {(left ? "left" : "right")} arm must be drawn on that side of them, not {east:0.00} m to their east.");
             Vector3 jaws = model.Root.GlobalTransform * model.Bite;
-            float held = jaws.DistanceTo(rig.Root.GlobalTransform * rig.Elbow(left).Lerp(rig.Fist(left), .5f)), other = jaws.DistanceTo(rig.Root.GlobalTransform * rig.Elbow(!left).Lerp(rig.Fist(!left), .5f));
-            Require(held < .15f && held < other, $"A wolf holding a player's {(left ? "left" : "right")} arm must be drawn with its jaws on that forearm, not {held:0.00} m from it and {other:0.00} m from the other.");
+            var arm = rig.Root.GlobalTransform * rig.Elbow(left).Lerp(rig.Fist(left), .5f);
+            float held = jaws.DistanceTo(arm), other = jaws.DistanceTo(rig.Root.GlobalTransform * rig.Elbow(!left).Lerp(rig.Fist(!left), .5f));
+            Require(held < .15f && held < other, $"A wolf holding a player's {(left ? "left" : "right")} arm must be drawn with its jaws on that forearm, not {held:0.00} m from it and {other:0.00} m from the other. Jaws {jaws}, arm {arm}, pitch {model.Shown.Pitch}.");
         }
         RemoveWolves(Hosted, pack.Contains);
         await Until(() => world.Sheltered == 0 && world.Door == Doorway.None, "a player nobody tugs any more standing free outside the cabin", 4);

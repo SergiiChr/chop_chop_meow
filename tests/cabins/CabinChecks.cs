@@ -201,10 +201,13 @@ public static class CabinChecks {
         var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         world.Tick(.5f);
         Require(world.Health == 100 && wolf.Target == 0, "a wolf should not reach a player in the first half of stepping out");
+        RemoveWolves(world, w => w == wolf);
         world.Tick(.3f);
-        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
-        WolfSteps.SnapTick(world, .5f);
-        Require(world.Health < 100 && world.Door == Doorway.Leaving, "a wolf should bite a player in the second half of stepping out, who walks on out");
+        var exposed = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.15f, 0) });
+        WolfSteps.SnapTick(world, .24f);
+        Require(WolfSnap.Winding(exposed), "a wolf can start a bite once the player is through the doorway");
+        WolfSteps.SnapTick(world, 1.85f);
+        Require(world.Health < 100 && world.Door == Doorway.None, "a wolf can bite a player who stops outside after stepping out");
     }
     private static void CheckACabinHoldsTwoPlayersAndTheThirdKnocksOnTheDoor(GameData data) {
         var (world, guest, _) = Hosted(data);
@@ -387,9 +390,9 @@ public static class CabinChecks {
         Require(world.Dead, "a player with no health left should fall");
         for (int i = 0; i < 4000 && world.RespawnIn > .9f; i++) { world.Tick(.05f); NourishEveryone(world); }
         // The guest, who came to a door after the fallen player last did, is tugged out of the near cabin's doorway as the fallen player wakes.
-        world.As(guest, () => { world.Player = Doorways.DoorPoint(near); Require(world.Doorways.Enter(near, false), "the guest at the door should step in"); });
-        PlaceWolf(world, new Wolf { Pos = guest.Pos + new Vector2(.8f, 0), Target = guest.Id });
-        for (int i = 0; i < 14 && guest.Door == Doorway.Entering; i++) { world.Tick(.05f); NourishEveryone(world); }
+        world.As(guest, () => world.Player = Doorways.DoorPoint(near));
+        WolfSteps.StepIntoBite(world, near, Vector2.Right * .8f, guest);
+        WolfSteps.UntilTugged(world, guest);
         for (int i = 0; i < 20 && world.Dead; i++) { world.Tick(.05f); NourishEveryone(world); }
         Require(!world.Dead && guest.Door == Doorway.Tugged, $"the fallen player should wake while the guest is tugged out, not with the guest {guest.Door}");
         Require(world.Sheltered == far.Id, "a player should not respawn in a cabin someone is being tugged out of the door of");

@@ -44,12 +44,16 @@ public sealed class ActorState {
     /// </summary>
     private ActorAnimation.BlowAim aim = new(), fromAim = new();
     /// <summary>Moves and poses the actor for a frame; it faces where it moves, or <paramref name="facingTarget"/> while standing or <paramref name="backing"/> away from it.</summary>
-    public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt, bool backing = false) {
+    public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt, bool backing = false,
+        Vector2? swingAim = null) {
         float moved = position.DistanceTo(Position);
         bool moving = moved > .001f;
         float yaw = ActorAnimation.Yaw(moving && !backing ? position - Position : facingTarget - position, Yaw);
         // A jump such as a respawn is no speed to lean into.
-        Turning.Step(ref Yaw, yaw, dt > 0 ? Math.Min(moved / dt, 8) : 0, dt, action == ActorAction.Run);
+        if (swingAim is Vector2 aimDirection) {
+            Yaw = ActorAnimation.Yaw(aimDirection, Yaw);
+            Turning.Hold(Yaw);
+        } else Turning.Step(ref Yaw, yaw, dt > 0 ? Math.Min(moved / dt, 8) : 0, dt, action == ActorAction.Run);
         Position = position;
         if (Action != action) {
             From = Action; FromTime = Time; FromMoving = Moving; Blend = 0;
