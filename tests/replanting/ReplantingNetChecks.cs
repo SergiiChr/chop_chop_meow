@@ -41,7 +41,7 @@ public partial class Game {
             "the guest reaching the planting site with water");
         await KeyStroke(Key.Tab);
         var tree = await PlantAndWater(GuestTree, GuestWater);
-        await Until(() => tree.Remaining == 4 && HasLabel(panel, "4 left") && ShowsTreeStatus("Growing"),
+        await Until(() => tree.Remaining == 4 && ShowsTreeWood("4") && ShowsTreeStatus("Growing"),
             "the guest's tree panel updating its wood count after a day of growth");
         await Until(() => world.Player.DistanceTo(GuestTree) > 8, "the guest back near the clearing");
         await CloseWithEsc();

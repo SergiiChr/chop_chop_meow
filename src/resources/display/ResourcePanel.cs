@@ -5,18 +5,8 @@ namespace ChopChopMeow;
 /// <summary>A tree, rock, bush or the lake: what is left, how to gather it, and the gatherers.</summary>
 public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        if (thing.Kind == ThingKind.Tree) TreeStatus();
-        var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
-        row.AddChild(Style.Icon(Icons.Of(World.ResourceItem(thing)), 44));
-        var left = Style.Text("", 16, Style.Ink, wrap: true); left.SizeFlagsHorizontal = SizeFlags.ExpandFill; row.AddChild(left);
-        live.Bind(left, line => {
-            if (thing.Kind != ThingKind.Water) {
-                line.Append(thing.Remaining).Append(" left");
-                if (thing is { Kind: ThingKind.Tree, TreeStage: 1 }) return;
-                line.Append(" · ");
-            }
-            line.Append(world.GatherBlock(thing) ?? (thing.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
-        });
+        if (thing.Kind == ThingKind.Tree) TreeStock();
+        else GatherStock();
         if (TreePlanting.NeedsWater(thing)) TreeWater();
         if (thing.Kind == ThingKind.Leaves) LeafAcorns();
         if (thing.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the lake shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
@@ -25,11 +15,27 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
         else JobButtons();
     }
 
-    private void TreeStatus() {
+    private void GatherStock() {
+        var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
+        row.AddChild(Style.Icon(Icons.Of(World.ResourceItem(thing)), 44));
+        var left = Style.Text("", 16, Style.Ink, wrap: true); left.SizeFlagsHorizontal = SizeFlags.ExpandFill; row.AddChild(left);
+        live.Bind(left, line => {
+            if (thing.Kind != ThingKind.Water) line.Append(thing.Remaining).Append(" left · ");
+            line.Append(world.GatherBlock(thing) ?? (thing.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
+        });
+    }
+
+    private void TreeStock() {
         var status = Style.Text("", 15, Style.Rim);
         AddChild(status);
         live.Watch(() => TreePlanting.IsAdult(thing) ? "Adult tree" : TreePlanting.NeedsWater(thing) ? "Planted" : "Growing",
             shown => status.Text = shown);
+        var (slot, count) = ItemSlot.Create("tree_wood");
+        slot.Icon = Icons.Of("wood");
+        slot.MouseFilter = MouseFilterEnum.Ignore;
+        slot.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
+        AddChild(slot);
+        live.Watch(() => thing.Remaining, amount => count.Text = amount.ToString());
     }
 
     private void LeafAcorns() {

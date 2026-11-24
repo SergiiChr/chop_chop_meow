@@ -870,8 +870,8 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 The outline costs nothing and can be cleared by the remove selector, a building or a gravel tile.
 Holding right mouse on it with a shovel adds digging work; finishing it spends one acorn from the backpack.
 A planted acorn is a selectable nub.
-`ResourcePanel` shows wood throughout its life, **Planted** with a water slot until it takes five liters, then **Growing**
-until it becomes an **Adult tree**.
+`ResourcePanel` shows the wood count in a read-only item slot throughout the tree’s life.
+Its status is **Planted** with a water slot until it takes five liters, then **Growing** until it becomes an **Adult tree**.
 
 The full five liters start growth and are used up.
 `Thing.NextTreeStageAt` holds the next date on the world clock and `TreePlanting` checks only trees ready to grow.

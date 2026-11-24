@@ -494,7 +494,7 @@ You can clear an outline with the remove selector.
 
 Hold right mouse on the outline while carrying a shovel.
 Once the digging finishes, one acorn goes into the ground and a small nub marks the spot.
-Click the nub to see its wood and status in the tree panel.
+Click the nub to see its status and a read-only item slot with the wood count.
 A tree shows **Planted** until you pour a total of 5 L from bottles or buckets into its water slot, then **Growing**.
 After watering, the oak grows daily. It holds 4 wood after one day, 21 after five, and 42 when it becomes an **Adult tree**
 after ten. You can chop it from the first day it produces wood.
