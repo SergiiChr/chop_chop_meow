@@ -243,7 +243,7 @@ public sealed partial class World {
     }
 
     /// <summary>Whether the acting player reaches the holder of a box, by its number from <see cref="Locate"/>: a building, a worker, or their own backpack and the crates in it.</summary>
-    internal bool InReach(int at) => at <= 0 || (Find(at / BoxCodes) is Thing t ? Reaches(t) : Carrier(at) is Worker w && Reaches(w));
+    private bool InReach(int at) => at <= 0 || (Find(at / BoxCodes) is Thing t ? Reaches(t) : Carrier(at) is Worker w && Reaches(w));
 
     /// <summary>Why an item cannot go into a box by hand, by the box's number from <see cref="Locate"/>, or null.</summary>
     private string? BoxBlock(int at, Inventory to, string item) =>

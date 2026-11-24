@@ -286,7 +286,7 @@ Their page then says "Carrying a barrel" or "Carrying a packed crate" above thei
 - A stack put down that does not all fit fills the slot, and the rest stays held until you put it down elsewhere.
 - A slot that does not take the held stack, such as an input slot for another item or an output slot, shakes, and the stack stays held.
 - Esc, a click on open ground or on the interface anywhere but an item slot, closing the side panel or walking out of reach of the building it came from lets go of the held stack, which is then back in its slot.
-- Click over open ground to place a held crate, barrel or building plan, or mark where a held acorn will go.
+- Click over open ground to place a held crate, barrel or building plan.
   Moving back over the interface returns it to the cursor.
 - A press on one slot let go of anywhere else, such as over another slot, does nothing.
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.

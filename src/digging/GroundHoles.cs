@@ -7,11 +7,19 @@ namespace ChopChopMeow;
 public sealed class GroundHoles(World world) {
     internal const float Reach = 1.35f;
 
-    private string SelectedTool => world.InHand != "" ? world.InHand : world.HotbarItem(world.ActiveHotbar);
-    private bool HasShovel(string item) => world.ToolKind(item) == "shovel" && world.Backpack[item] > 0;
+    private string? SelectedShovel {
+        get {
+            string item = world.InHand != "" ? world.InHand : world.HotbarItem(world.ActiveHotbar);
+            if (world.ToolKind(item) != "shovel") return null;
+            int count = world.InHand != "" ? world.Backpack[item] : world.HotbarCount(world.ActiveHotbar);
+            return count > 0 ? item : null;
+        }
+    }
+
+    internal bool ShovelSelected => SelectedShovel != null;
 
     internal string? Block(Vector2 at) {
-        if (!HasShovel(SelectedTool)) return "Select a shovel to dig.";
+        if (!ShovelSelected) return "Select a shovel to dig.";
         if (!float.IsFinite(at.X) || !float.IsFinite(at.Y) || !Terrain.OnMap(Terrain.TileAt(at))) return "Choose dry, open ground.";
         return world.Construction.PlacementBlock(ThingKind.PlantingSpot, at);
     }
@@ -32,8 +40,7 @@ public sealed class GroundHoles(World world) {
     internal void Work(float dt) {
         var player = world.S.Actor;
         if (player.DigAttempt == 0) return;
-        string tool = SelectedTool;
-        if (!HasShovel(tool) || world.Occupied || world.S.Sheltered != 0
+        if (SelectedShovel is not string tool || world.Occupied || world.S.Sheltered != 0
             || world.Player.DistanceTo(Position(player)) > Reach) { Clear(player); return; }
         player.Busy = true;
         if (player.DigReady) return;

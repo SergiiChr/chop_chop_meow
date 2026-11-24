@@ -43,6 +43,7 @@ public sealed class PlayerControl {
     private ClickMode? heldPlacement;
     private Thing? gathering;
     private int digPress, digAttempt;
+    private bool shovelSelected;
     /// <summary>The spot under the mouse when this hold started, locked until it ends.</summary>
     public Vector2? DiggingAt { get; private set; }
     private readonly CabinApproach cabinApproach;
@@ -61,7 +62,7 @@ public sealed class PlayerControl {
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
         cabinApproach = new CabinApproach(world);
-        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; Mode = new ClickMode.Normal(); };
+        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; shovelSelected = false; Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops actions whose targets belong to the previous world.</summary>
@@ -97,7 +98,7 @@ public sealed class PlayerControl {
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started; <paramref name="overPanel"/> tells that the mouse is on the interface.</summary>
     public void Update(float dt, bool overPanel) {
         PlaceHeld(overPanel);
-        if (Mode is ClickMode.Dig && world.BestTool("shovel") == null) Mode = new ClickMode.Normal();
+        UpdateDigMode();
         // The recipe map covers the world, so nothing held over it walks or gathers.
         if (kit.Paused || panel.Map.Visible) { StopGroundDig(); world.Me.Sprinting = false; return; }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
@@ -106,6 +107,14 @@ public sealed class PlayerControl {
         direction = DigGround(direction, right);
         direction = Lift(direction, right, dt);
         Walk(direction, right, dt);
+    }
+
+    /// <summary>Restores digging when a shovel becomes selected through a hotbar binding or a loaded save.</summary>
+    private void UpdateDigMode() {
+        bool selected = world.Holes.ShovelSelected;
+        if (selected && !shovelSelected && Mode is ClickMode.Normal) Mode = new ClickMode.Dig();
+        else if (!selected && Mode is ClickMode.Dig) Mode = new ClickMode.Normal();
+        shovelSelected = selected;
     }
 
     /// <summary>A container or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>

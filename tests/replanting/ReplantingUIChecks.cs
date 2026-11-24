@@ -42,18 +42,24 @@ public partial class Game {
 
     private async Task CheckHotbarShovelShowsADigOutline() {
         Give(Hosted, "steel_shovel");
-        SetHotbarSlot(Hosted, 8, "steel_shovel");
-        SetHotbarSlot(world, 8, "steel_shovel");
+        string previous = world.HotbarItem(8);
         await Frames();
-        await KeyStroke(Key.Key9);
+        await KeyStroke(Key.Tab);
+        await Carry(BagCell(c => c.TooltipText.StartsWith("Steel shovel")), hotbar.Buttons[8]);
+        await Until(() => world.ActiveHotbar == 8 && world.HotbarStack(8) >= 0, "the shovel binding to the selected slot", 2);
         var at = SpotsNearby().First(p => world.Construction.PlacementBlock(ThingKind.PlantingSpot, p) == null
             && Uncovered(view.Screen(p)));
         await Hover(view.Screen(at));
-        Require(view.PlacementGhost != null, "selecting the hotbar shovel should show the dig outline");
+        Require(view.PlacementGhost != null, "binding the shovel to the selected slot should show the dig outline");
         await KeyStroke(Key.Escape);
         Require(view.PlacementGhost == null, "escaping should put away the outline");
-        SetHotbarSlot(Hosted, 8, "");
-        SetHotbarSlot(world, 8, "");
+        await KeyStroke(Key.Key9);
+        await Hover(view.Screen(at));
+        Require(view.PlacementGhost != null, "selecting the hotbar shovel should show the dig outline");
+        await RightClick(hotbar.Buttons[8]);
+        await Hover(view.Screen(at));
+        Require(view.PlacementGhost == null, "emptying the selected slot should put away the outline");
+        SetHotbarSlot(Hosted, 8, previous);
         Drop(Hosted, "steel_shovel");
         await Frames();
     }
