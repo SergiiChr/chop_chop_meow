@@ -1017,8 +1017,8 @@ Axe swings take turns:
 
 A steel axe takes 2.2 to 3.2 of a wolf's 8 health a blow, a torch 0.8 to 1.2 and a punch 0.4 to 0.6.
 A torch and a fist reach only a wolf at biting distance: the flame 1 metre, swung low with you bent over, and the fist 0.7 metres and a little to your right.
-A wolf that survives its first weapon hit winces, hops sideways and skids. With room, it runs wide and takes a second
-hop behind you, lands on its forepaws and slides its hindquarters round to face you. Only then can it bite again.
+A wolf winces, hops sideways and skids if it survives a weapon blow on its first hit. With room, it runs wide and takes a
+second hop behind you, lands on its forepaws and slides its hindquarters round to face you. Only then can it bite again.
 In tight ground it recoils and growls. A struck wolf runs whenever it moves in the open, and later hits still make it reel.
 
 A wolf at biting distance plants its paws and crouches for 0.3 seconds, then makes a short leap along that line.

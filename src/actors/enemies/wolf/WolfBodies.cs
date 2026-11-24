@@ -78,6 +78,14 @@ public sealed class WolfBodies(World world) {
     /// <summary>Whether a wolf holds its place at the player: tugging them, pinning them or in the air.</summary>
     private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Stagger > 0 || wolf.Threaten > 0 || WolfCounter.Active(wolf) || WolfSnap.Active(wolf) || wolf.Recover > 0;
 
+    /// <summary>Squared distance between a proposed wolf body and the body of a packmate.</summary>
+    internal static float DistanceBetween(Vector2 at, float heading, Wolf other) {
+        var ahead = Vector2.FromAngle(heading);
+        var (tail, nose) = Body(other);
+        var (a, b) = Closest(at - ahead * WolfTail, at + ahead * WolfNose, tail, nose);
+        return a.DistanceSquaredTo(b);
+    }
+
     /// <summary>The nearest points to each other on two line segments, from <paramref name="a0"/> to <paramref name="a1"/> and <paramref name="b0"/> to <paramref name="b1"/>.</summary>
     private static (Vector2 OnA, Vector2 OnB) Closest(Vector2 a0, Vector2 a1, Vector2 b0, Vector2 b1) {
         Vector2 da = a1 - a0, db = b1 - b0, r = a0 - b0;

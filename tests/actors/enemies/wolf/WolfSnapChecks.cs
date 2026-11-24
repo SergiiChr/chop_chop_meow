@@ -17,6 +17,7 @@ public static class WolfSnapChecks {
         Test(CheckABlowThatLandsFirstStopsTheBite, data);
         Test(CheckAFirstHitSendsTheWolfAroundBeforeItAttacks, data);
         Test(CheckAWolfUsesTheClearSideAfterTheFirstHit, data);
+        Test(CheckAWolfHopsAwayFromAPackmate, data);
         Test(CheckAStruckWolfRunsAnArcAfterMissingItsBite, data);
     }
 
@@ -137,6 +138,16 @@ public static class WolfSnapChecks {
         SnapTick(world, .55f);
         Require(wolf.Pos.Y < world.Player.Y - .8f && world.CanStand(wolf.Pos) && world.Health == 100,
             $"the wolf should take the other side if a chest blocks the first hop, at {wolf.Pos - world.Player}");
+    }
+
+    private static void CheckAWolfHopsAwayFromAPackmate(GameData data) {
+        var world = NightWorld(data);
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.2f, 0), Id = 2 });
+        StillWolf(world, new Vector2(1.6f, 1.1f));
+        world.Strike(wolf, 1);
+        SnapTick(world, .55f);
+        Require(wolf.Pos.Y < world.Player.Y - .8f && WolfCounter.Active(wolf) && world.Health == 100,
+            "a packmate blocking the preferred side should send the wolf hopping the other way");
     }
 
     private static void CheckAStruckWolfRunsAnArcAfterMissingItsBite(GameData data) {

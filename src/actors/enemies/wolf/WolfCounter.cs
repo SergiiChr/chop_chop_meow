@@ -11,7 +11,8 @@ public sealed class WolfCounter(World world) {
     private const float HopAt = .12f, SlideAt = .43f, RunAt = .67f, BoundAt = 1.43f, PivotAt = 1.87f,
         FaceAt = 2.23f, DoneAt = 2.46f;
     private const float SampleSeconds = .035f, BodyClearance = .64f, ForepawReach = .39f;
-    internal static readonly float SideHopBearing = new Vector2(.40f, 1.05f).Angle();
+    private static readonly Vector2 SideHopStep = new(.40f, 1.05f);
+    internal static readonly float SideHopBearing = SideHopStep.Angle();
     private static readonly Vector2 Launch = new(.55f, -2.48f), Land = new(-2.15f, -1.78f);
     private static readonly Vector2 BoundDirection = (Land - Launch).Normalized();
     private static readonly Vector2 Forepaws = Land + BoundDirection * ForepawReach;
@@ -22,7 +23,7 @@ public sealed class WolfCounter(World world) {
     /// <summary>Selects the first clear route around the bearing the wolf was struck from.</summary>
     internal bool Start(Wolf wolf, Vector2 mark) {
         var offset = wolf.Pos - mark;
-        if (offset.LengthSquared() < .15f) return false;
+        if (offset.LengthSquared() is < .15f or > 9) return false;
         wolf.CounterMarkX = mark.X; wolf.CounterMarkY = mark.Y;
         wolf.CounterBearing = offset.Angle(); wolf.CounterRadius = offset.Length();
         // Wolves try opposite sides when their ids alternate.
@@ -37,12 +38,12 @@ public sealed class WolfCounter(World world) {
         return true;
     }
 
-    /// <summary>Plans on terrain alone; the tick also checks for other bodies as they move.</summary>
+    /// <summary>Checks the ground and makes sure the first hop has room beside any packmates.</summary>
     private bool HasRoom(Wolf wolf) {
         var from = wolf.Pos;
         for (float time = SampleSeconds; time < DoneAt + SampleSeconds; time += SampleSeconds) {
-            var to = Sample(wolf, Math.Min(time, DoneAt)).At;
-            if (!ClearGround(from, to)) return false;
+            var (to, heading) = Sample(wolf, Math.Min(time, DoneAt));
+            if (!ClearGround(from, to) || time < RunAt && PackInWay(wolf, from, to, heading)) return false;
             from = to;
         }
         return true;
@@ -54,7 +55,7 @@ public sealed class WolfCounter(World world) {
         while (wolf.CounterTime < end) {
             float next = Math.Min(end, wolf.CounterTime + SampleSeconds);
             var (at, heading) = Sample(wolf, next);
-            if (at != wolf.Pos && (!ClearGround(wolf.Pos, at) || Crowded(wolf, at))) {
+            if (at != wolf.Pos && (!ClearGround(wolf.Pos, at) || Crowded(wolf, at, heading))) {
                 Clear(wolf); wolf.Stagger = 0;
                 wolf.Threaten = FaceAt < next ? .12f : .25f;
                 var backToPlayer = world.Player - wolf.Pos;
@@ -80,11 +81,21 @@ public sealed class WolfCounter(World world) {
         !world.Protected(to) && world.WolfSnap.ClearTo(from, to) == to;
 
     /// <summary>A clear path may close if a player or another wolf reaches it.</summary>
-    private bool Crowded(Wolf wolf, Vector2 to) {
+    private bool Crowded(Wolf wolf, Vector2 to, float heading) {
         foreach (var p in world.S.Players)
-            if (Approaches(wolf.Pos, to, p.Pos)) return true;
-        foreach (var other in world.S.Wolves)
-            if (other != wolf && Approaches(wolf.Pos, to, other.Pos)) return true;
+            if (p.RespawnIn <= 0 && !Doorways.Indoors(p) && Approaches(wolf.Pos, to, p.Pos)) return true;
+        return PackInWay(wolf, wolf.Pos, to, heading);
+    }
+
+    private bool PackInWay(Wolf wolf, Vector2 from, Vector2 to, float heading) {
+        const float width = 2 * WolfBodies.WolfHalfWidth;
+        const float far = 2 * WolfBodies.WolfNose + width;
+        foreach (var other in world.S.Wolves) {
+            if (other == wolf || other.Pos.DistanceSquaredTo(to) >= far * far) continue;
+            float gap = WolfBodies.DistanceBetween(to, heading, other);
+            if (gap < width * width && (gap < WolfBodies.DistanceBetween(from, wolf.Heading, other) ||
+                to.DistanceSquaredTo(other.Pos) < from.DistanceSquaredTo(other.Pos))) return true;
+        }
         return false;
     }
 
@@ -97,6 +108,12 @@ public sealed class WolfCounter(World world) {
         wolf.CounterSide = 0;
         wolf.CounterTime = wolf.CounterMarkX = wolf.CounterMarkY = wolf.CounterBearing = wolf.CounterRadius = 0;
     }
+
+    /// <summary>An active path has a finite, bounded clock and an anchor inside the map.</summary>
+    internal static bool ValidSavedPath(Wolf? wolf) => wolf != null && (!Active(wolf) ||
+        wolf.CounterSide is 1 or -1 && wolf.CounterTime is >= 0 and < DoneAt &&
+        wolf.CounterMarkX is >= 0 and < Terrain.Size && wolf.CounterMarkY is >= 0 and < Terrain.Size &&
+        wolf.CounterRadius is > 0 and <= 3 && wolf.CounterBearing is >= -MathF.PI and <= MathF.PI);
 
     public static (WolfCounterStage Stage, float Progress) Pose(Wolf wolf) => Active(wolf) ? Phase(wolf.CounterTime) : default;
 
@@ -121,7 +138,7 @@ public sealed class WolfCounter(World world) {
         var (stage, u) = Phase(time);
         float radius = wolf.CounterRadius;
         var start = new Vector2(radius, 0);
-        var hop = new Vector2(radius + .40f, 1.05f);
+        var hop = start + SideHopStep;
         var slide = new Vector2(radius + .56f, 1.44f);
         var startRun = new Vector2(radius + 1.40f, 2.12f);
         var endRun = new Vector2(radius + 1.15f, -2.70f);

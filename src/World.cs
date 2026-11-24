@@ -2488,6 +2488,7 @@ public sealed partial class World {
         loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.First();
         RebuildAllStacks(loaded);
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage) || t.Rotation != 0 && (t.Kind is not (ThingKind.Crate or ThingKind.Barrel) && !Data.Buildings.ContainsKey(t.Kind) || !Construction.ValidRotation(t.Kind, t.Rotation)))) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Wolves.Any(w => !WolfCounter.ValidSavedPath(w))) throw new InvalidOperationException("This save holds an invalid wolf movement.");
         if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded) || loaded.Goal < 0) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.

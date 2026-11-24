@@ -75,6 +75,7 @@ public sealed class WolfModel {
     public float Recover, LandedFor;
     public WolfCounterStage CounterStage;
     public float CounterProgress;
+    public bool CounterHitPending;
     /// <summary>A leap's bearing from the player to the wolf.</summary>
     public Vector2 Toward;
     /// <summary>Where the wolf was drawn as its latest move began, to ease from: lunging in to take hold, stepping round to pin, or onto a feeding spot.</summary>
@@ -915,7 +916,7 @@ public sealed class WolfModel {
         WolfMotion.Recoil => new(Planting.Stepped, .08f),
         WolfMotion.Threaten => new(Planting.Stepped, .1f),
         WolfMotion.CounterAir or WolfMotion.CounterSlide => new(Planting.Held, .055f),
-        WolfMotion.CounterPivot => new(Planting.Stepped, .06f),
+        WolfMotion.CounterPivot => new(Planting.Held, .06f),
         WolfMotion.Leap or WolfMotion.Snap => new(Planting.Held, .08f),
         WolfMotion.Door => new(Planting.Set, .12f),
         WolfMotion.Fall or WolfMotion.Tug or WolfMotion.Brake => new(Planting.Set),

@@ -1526,7 +1526,7 @@ public partial class WorldView : Node3D {
             if (wolf.Side != 0 && tugs.ShowHolding(wolf, model, RigOf(wolf.Target), Elapsed, dt)) continue;
             model.Steps = null;
             if (WolfCounter.Active(wolf)) { ShowWolfCounter(wolf, model, hunted, moved, dt); continue; }
-            model.CounterStage = WolfCounterStage.None;
+            model.CounterStage = WolfCounterStage.None; model.CounterHitPending = false;
             if (wolf.Pinning && wolf.LungeFrom != Vector2.Zero && tugs.ShowLunging(wolf, model, Elapsed, dt)) continue;
             // A blow lands in the world as the swing comes down and throws the wolf back there at once; the model hops back from where it stood.
             // The blow can reach this machine a moment before the swing it shows comes down: the model stands until it does.
@@ -1638,8 +1638,9 @@ public partial class WorldView : Node3D {
     /// <summary>Shows the two hops and puts the dust at the paws that touch or slide.</summary>
     private void ShowWolfCounter(Wolf wolf, WolfModel model, Vector2 hunted, Vector2 moved, float dt) {
         var (stage, progress) = WolfCounter.Pose(wolf);
-        if (model.CounterStage == WolfCounterStage.None) {
-            FurAndEmbers(To3(wolf.Pos, .6f)); Sounds?.Play("wolf_hit", wolf.Pos);
+        if (model.CounterStage == WolfCounterStage.None && stage == WolfCounterStage.Wince) {
+            model.CounterHitPending = true;
+            model.HitIn = SwingLands(wolf.Pos).In;
         }
         bool changed = model.CounterStage != stage;
         int previousDust = (int)(model.CounterProgress * 4);
@@ -1652,6 +1653,20 @@ public partial class WorldView : Node3D {
         model.Turning.Hold(model.Yaw); model.Glance = 0;
         model.Root.Rotation = new Vector3(0, model.Yaw, 0);
 
+        if (model.CounterHitPending) {
+            // A snapshot can reach a guest before the blow in the swing they are drawing lands.
+            model.HitIn = Math.Max(0, model.HitIn - dt);
+            if (model.HitIn > 0 && stage == WolfCounterStage.Wince) {
+                model.Stand(Elapsed + wolf.Id % 7, dt, true);
+                if (model.Root.Visible) model.Plant();
+                return;
+            }
+            model.CounterHitPending = false;
+            var impact = new Vector2(wolf.CounterMarkX, wolf.CounterMarkY) +
+                Vector2.FromAngle(wolf.CounterBearing) * wolf.CounterRadius;
+            if (model.Root.Visible) FurAndEmbers(To3(impact, .6f));
+            Sounds?.Play("wolf_hit", impact);
+        }
         if (stage == WolfCounterStage.Run) model.Move(moved.Length(), dt, true, false);
         else if (stage == WolfCounterStage.Face) model.Threaten(Elapsed + wolf.Id % 7, dt);
         else WolfCounterPoses.Show(model, wolf, hunted, stage, progress, dt);
