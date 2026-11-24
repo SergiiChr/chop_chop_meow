@@ -1084,7 +1084,8 @@ A pipe and its vertical inlet turn dark blue while the tile holds any water, eve
 Ground remains visible under people standing over the trench.
 The Layer button below the bank switches the view between the surface and underground.
 In the underground view, a click opens the laid pipe's page (`PipePanel`).
-Placement, inspection and removal project the pointer onto the bed.
+Placement and removal project the pointer onto the bed.
+Inspection picks the visible pipe body or riser.
 A vertical pipe joins each building with plumbing to its inlet tile.
 A dotted guide marks a connection still to be made.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.

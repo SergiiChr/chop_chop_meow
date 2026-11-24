@@ -480,7 +480,7 @@ public partial class WorldView : Node3D {
         RayBox(origin, direction, new Aabb(new Vector3(-half, 0, -half), new Vector3(2 * half, height, 2 * half)), out distance);
 
     /// <summary>Finds the point where a ray enters a box in its own frame.</summary>
-    private static bool RayBox(Vector3 origin, Vector3 direction, Aabb bounds, out float distance) {
+    internal static bool RayBox(Vector3 origin, Vector3 direction, Aabb bounds, out float distance) {
         var low = bounds.Position; var high = bounds.End;
         float enter = 0, exit = float.MaxValue;
         bool hit = Clip(origin.X, direction.X, low.X, high.X, ref enter, ref exit) &&
@@ -500,9 +500,8 @@ public partial class WorldView : Node3D {
 
     /// <summary>The laid pipe under the cursor in explored ground.</summary>
     public Vector2I? PickPipe(Vector2 screen) {
-        if (!TryGroundPoint(screen, out var ground, PipeGround.FloorY)) return null;
-        var tile = Terrain.TileAt(ground);
-        return World.SteelPipes.Laid(tile) && World.Explored(tile) ? tile : null;
+        SyncCamera();
+        return pipeLayer.Pick(camera.ProjectRayOrigin(screen), camera.ProjectRayNormal(screen));
     }
 
     private readonly List<Thing> picking = new();

@@ -135,9 +135,15 @@ public partial class Game {
         Require(layerControl != null, "The HUD should offer a Layer button.");
         await Click(layerControl!);
         Require(view.Underground && layerControl!.ButtonPressed, "Layer should switch from the surface to the underground view.");
-        await Click(view.Screen(tile, PipeGround.FloorY));
+        Give(Hosted, "wood", 1);
+        await KeyStroke(Key.Tab);
+        await PickUp(BagCellOf("wood"));
+        var farEnd = (Vector2)tile + Vector2.Up * .44f;
+        await Click(view.Screen(farEnd, PipeGround.FloorY + .1f));
         Require(view.Underground && ShownPage() == "Steel pipe" && world.SteelPipes.Laid(tile),
-            "Clicking a pipe should open its readout and keep it laid.");
+            "Clicking the far end of the visible pipe should open its readout and keep it laid.");
+        await Until(() => cursor.Empty, "opening the pipe returning held wood to its stack", 2);
+        Drop(Hosted, "wood", 1);
         Require(HasLabel(panel, "Empty · 0/1 L") && HasLabel(panel, "Pressure 0%"), "A dry pipe should show no water and no pressure.");
 
         var pipe = ModelSteps.AllMeshes(view.FindChild("Underground", true, false)!)

@@ -5,6 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>The buried pipes seen through the surface. Its camera shares the world's framing and zoom.</summary>
 internal partial class PipeLayerView : Node3D {
+    private const float PumpOutletHeight = .17f, PickClearance = .03f;
     private readonly MeshInstance3D composite;
     private readonly ShaderMaterial blend;
     private readonly Vector3[] feet = new Vector3[World.MaxWorkers + Net.MaxPlayers];
@@ -116,6 +117,35 @@ internal partial class PipeLayerView : Node3D {
         ghost.Position = WorldView.To3(at, PipeGround.FloorY + .015f);
     }
 
+    /// <summary>Picks the nearest pipe body or riser, checking only tiles along the ray through the trench.</summary>
+    public Vector2I? Pick(Vector3 origin, Vector3 direction) {
+        if (direction.Y >= -1e-5f) return null;
+        var top = origin + direction * ((PumpOutletHeight + PickClearance - origin.Y) / direction.Y);
+        var bottom = origin + direction * ((PipeGround.FloorY - PickClearance - origin.Y) / direction.Y);
+        var from = new Vector2(top.X, top.Z);
+        var to = new Vector2(bottom.X, bottom.Z);
+        var pad = Vector2.One * PickClearance;
+        var min = Terrain.TileAt(from.Min(to) - pad).Max(Vector2I.Zero);
+        var max = Terrain.TileAt(from.Max(to) + pad).Min(Vector2I.One * (Terrain.Size - 1));
+        Vector2I? picked = null;
+        float nearest = float.MaxValue;
+        for (int z = min.Y; z <= max.Y; z++)
+            for (int x = min.X; x <= max.X; x++) {
+                var tile = new Vector2I(x, z);
+                if (meshes.TryGetValue(Terrain.TileIndex(tile), out var pipe)) Check(tile, pipe);
+                if (risers.TryGetValue(tile, out var riser)) Check(tile, riser);
+            }
+        return picked;
+
+        void Check(Vector2I tile, MeshInstance3D mesh) {
+            var into = mesh.GlobalTransform.AffineInverse();
+            if (!WorldView.RayBox(into * origin, into.Basis * direction, mesh.GetAabb().Grow(PickClearance), out float hit)
+                || hit >= nearest) return;
+            nearest = hit;
+            picked = tile;
+        }
+    }
+
     private void UpdateFooting(List<Vector3> people) {
         bool changed = footCount != people.Count;
         for (int i = 0; i < people.Count; i++) {
@@ -149,7 +179,7 @@ internal partial class PipeLayerView : Node3D {
             }
             if (updateFinish) ShowWater(riser, world.SteelPipes.WaterAt(Terrain.TileIndex(at)), RiserSteel);
             // Expose the foot of the pump's discharge through stones at the waterline.
-            float top = thing.Kind == ThingKind.Pump ? .17f : 0;
+            float top = thing.Kind == ThingKind.Pump ? PumpOutletHeight : 0;
             float height = top - PipeGround.FloorY - SteelPipeShape.CenterHeight;
             if (Mathf.IsEqualApprox(riser.Scale.Y, height)) continue;
             riser.Scale = new Vector3(1, height, 1);

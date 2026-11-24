@@ -287,7 +287,9 @@ public sealed class PlayerControl {
     }
 
     private void LeftPress(Vector2 at) {
-        if (InspectingPipes && cursor.Empty) {
+        PlaceHeld(false);
+        if (InspectingPipes) {
+            cursor.Release();
             if (view.PickPipe(at) is Vector2I pipe) panel.SelectPipe(pipe);
             else panel.Close();
             return;
@@ -299,7 +301,6 @@ public sealed class PlayerControl {
             if (cursor.Stack is HeldStack held && t != null && (t.IsStorage || t.Kind == ThingKind.Hut && Barrel.Is(held.Item))) {
                 kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return;
             }
-            PlaceHeld(false);
             if (Mode.Placing != null) Place(at); else cursor.Release();
             return;
         }
