@@ -490,6 +490,7 @@ A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 
 Select a shovel and point at the sea beach to highlight a one-meter square.
 Hold right mouse to dig the square. It gives 10 sand and leaves a shallow, rounded cut with dark soil at the bottom.
+Cuts that share an edge join into one excavation.
 The sea reaches high tide at each full moon, once every eight in-game days, and replaces the sand as it covers each square.
 You can dig the square again once it is clear of water.
 You can walk out to the low-tide edge of the beach even when the tide is in.

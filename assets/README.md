@@ -65,6 +65,7 @@ Models are assembled from code-built or baked Godot meshes.
   coal, the farm field, the compost mound, the gravel heap and the gravel path tile.
   The beach cut uses the same sand and soil scans in `sand_cut.gdshader`, which follows the view through the rounded
   opening to show the sloped wall or the soil floor.
+  The four tiles at each corner shape the rim, and the view follows the same floor across joined cuts.
   Heap pieces are those meshes shrunk to a heap's size with their place on the scan kept, so a heaped stone or lump
   shows the scan finer than in the world.
   A rounded shape has the scan draped over it from the top down (`NatureShape.Draped`), so only its hidden underside
