@@ -1,0 +1,102 @@
+using System.Linq;
+using System.Threading.Tasks;
+using Godot;
+using static Checks;
+using static ModelSteps;
+using static SetupSteps;
+
+namespace ChopChopMeow;
+
+public partial class Game {
+    private async Task RunFirstPersonUIChecks(bool inGame) {
+        if (!inGame) {
+            await TestClean(CheckFirstPersonPreviewIsOnlyInOptions);
+            return;
+        }
+        await TestClean(CheckFirstPersonDrawsDistantThingsAndTheLocalBody);
+        await TestClean(CheckFirstPersonKeepsTheOverheadCabinMemory);
+        await TestClean(CheckFirstPersonTurnsWalksSwingsAndSelects);
+    }
+
+    private async Task CheckFirstPersonPreviewIsOnlyInOptions() {
+        Require(FirstPersonPreviewOption() == null && !HasLabel(startMenu.Screen, "First-person preview"),
+            "The start menu should not show First-person preview.");
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        Require(HasLabel(startMenu.Screen, "First-person preview") && FirstPersonPreviewOption() is { ButtonPressed: false },
+            "Options should show First-person preview switched off at launch.");
+        await Click(FindButton(startMenu.Screen, "Back · Esc")!);
+    }
+
+    /// <summary>The preview draws objects outside the explored area and shows the player's body from eye level.</summary>
+    private async Task CheckFirstPersonDrawsDistantThingsAndTheLocalBody() {
+        var distant = Hosted.Add(ThingKind.Chest, world.Player - new Vector2(25, 25));
+        await Frames();
+        Require(!world.Explored(distant.Pos), "The distant chest must be outside explored ground.");
+        Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() != true, "Unexplored chests should be hidden in the overhead view.");
+        var environment = view.GetWorld3D().Environment;
+        var overheadSky = environment.Sky;
+        await ToggleFirstPersonPreviewInPauseMenu();
+        Require(environment.BackgroundMode == Environment.BGMode.Sky && environment.Sky != overheadSky,
+            "First person should draw its own sky.");
+        Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() == true, "First person should show the distant chest.");
+        var camera = GetViewport().GetCamera3D();
+        Require(AllMeshes(view.PlayerRig.Torso).Any(part => part.IsVisibleInTree() && (part.Layers & camera.CullMask) != 0),
+            "The player's body must be visible from the first-person camera.");
+        await ToggleFirstPersonPreviewInPauseMenu();
+        Require(environment.BackgroundMode == Environment.BGMode.Color && environment.Sky == overheadSky,
+            "Overhead view should restore its original lighting and switch off the visible sky.");
+        Require(view.PropOf(distant.Id)?.Root.IsVisibleInTree() != true, "Returning overhead should hide unexplored objects again.");
+        RemoveThings(Hosted, t => t == distant);
+        await Frames();
+    }
+
+    /// <summary>A barrel added to a distant cabin does not appear in the player's earlier overhead memory.</summary>
+    private async Task CheckFirstPersonKeepsTheOverheadCabinMemory() {
+        var home = world.Player;
+        var cabin = Hosted.Add(ThingKind.Hut, home + Vector2.Down * 3);
+        await Frames();
+        Require(view.PropOf(cabin.Id) is HutProp { RoofBarrel.Visible: false }, "The cabin should start without a roof barrel.");
+        var distant = home + new Vector2(-25, 25);
+        Warp(Hosted, distant);
+        await Until(() => world.Player.DistanceTo(distant) < .1f, "moving beyond the cabin's sight circle", 2);
+        cabin.Inventory.Add(Barrel.Item, 1);
+        await ToggleFirstPersonPreviewInPauseMenu();
+        await ToggleFirstPersonPreviewInPauseMenu();
+        Require(view.PropOf(cabin.Id) is HutProp { RoofBarrel.Visible: false },
+            "The overhead cabin memory should not show the barrel that was added out of sight.");
+        RemoveThings(Hosted, t => t == cabin);
+        Warp(Hosted, home);
+        await Frames(4);
+    }
+
+    /// <summary>Mouse look steers the player and their swings and points clicks at a station.</summary>
+    private async Task CheckFirstPersonTurnsWalksSwingsAndSelects() {
+        var home = world.Player;
+        var bench = Hosted.Add(ThingKind.Bench, home + new Vector2(2.6f, -2.6f));
+        await ToggleFirstPersonPreviewInPauseMenu();
+        var camera = GetViewport().GetCamera3D();
+        Require(camera.Projection == Camera3D.ProjectionType.Perspective, "The preview must switch to the eye-level camera.");
+        // Turning 90° right from the starting direction makes the player look toward the bench.
+        var center = GetViewport().GetVisibleRect().GetCenter();
+        var window = GetViewport().GetFinalTransform();
+        Input.ParseInputEvent(new InputEventMouseMotion {
+            Position = window * center,
+            GlobalPosition = window * center,
+            Relative = window.BasisXform(new Vector2(628, 0))
+        });
+        await Frames();
+        var worker = AddWorker(Hosted, home + new Vector2(3.5f, -3.5f));
+        await Frames();
+        Require(view.PickWorker(center)?.Id == worker.Id, "The worker must be lined up behind the bench for this check.");
+        await Click(center);
+        Require(Shows(bench), "A first-person click must select the bench in front of the worker.");
+        Hosted.Fire(worker);
+        await CloseWithEsc();
+        await SwingWhileWalkingForward(home);
+        await ToggleFirstPersonPreviewInPauseMenu();
+        Require(camera.Projection == Camera3D.ProjectionType.Orthogonal, "Switching off the preview must restore the overhead camera.");
+        RemoveThings(Hosted, t => t == bench);
+        Warp(Hosted, home);
+        await Frames(4);
+    }
+}

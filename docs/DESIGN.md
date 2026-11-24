@@ -134,7 +134,7 @@ UI and input:
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
-| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
+| `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
@@ -197,9 +197,9 @@ UI and input:
 | `src/guide/display/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
-| `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
+| `src/menus/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
-| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things, E and Space, and `ClickMode`, what the next click does |
+| `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things, E and Space, and `ClickMode`, what the next click does |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
@@ -376,7 +376,14 @@ Every world object is a low-poly model assembled from Godot primitive meshes in 
 Meshes and materials are cached by parameters, so repeated objects share resources.
 `WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, and `WorldView` draws them behind the ground for its first frames, so a building, crate, carcass or wolf that first appears mid-game builds no mesh, material, shader or pipeline; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
-The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
+The default camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
+The first-person preview switches the same camera to a perspective at eye level.
+`FirstPersonCamera` turns the camera from mouse motion and rotates walking directions to match.
+`WorldView` casts the same picking rays from the eye, and shows the sky, distant terrain and live objects without fog.
+The first-person camera hides the local player's head so its view from the eyes can show the body, hands and tools.
+`FirstPersonSky` is created when the preview first opens and draws a sun or moon following the world light's arc.
+Overhead view uses its own ambient sky resource and a solid background.
+Cabins, downed players and underground pipe work keep the overhead view.
 The sun and moon share one shadow map across this view.
 Its small shadow offset keeps the shade attached to feet, trunks and low props, while ambient occlusion shades creases.
 
@@ -650,11 +657,12 @@ A player's **line of sight** is the circle of `SightRadius` (20 metres) around t
 Fog of war is simulation state.
 `World.Look` runs every tick: it marks tiles within `SightRadius` of the player in `SaveState.Explored` and replaces `SaveState.Remembered` entries in sight with snapshots of the live things there.
 
-`World.CollectKnown` gives what the view draws and picks: live things in sight, snapshots elsewhere, nothing never seen.
+`World.CollectKnown` gives what the overhead view draws and picks: live things in sight, snapshots elsewhere, nothing never seen.
+The first-person view draws live objects across the valley. Picking and small details such as fitted tools use the nearby sight circle.
 Snapshots are updated in place and keep only the look: no inventory, fire, heat or work in progress.
 The view picks against what it draws but only returns things that still exist.
 
-Only what is in sight is drawn every frame (`WorldView.SyncThings`).
+In overhead view only what is in sight is drawn every frame (`WorldView.SyncThings`).
 A thing out of sight is drawn once as its snapshot, moved on far enough to finish whatever it was doing, and left alone until its snapshot changes, night falls or lifts, or it is seen again.
 A change that did not happen in front of the player is not played when they see it (`WorldView.Watched`): a tree felled out of sight is a stump, a chest filled out of sight keeps its lid shut, and a chip or a building that appeared out of sight neither flies nor lands in dust.
 A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
