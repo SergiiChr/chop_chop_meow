@@ -190,13 +190,14 @@ public partial class Hotbar : PanelContainer {
 
     /// <summary>Whether a left click on the ground does something with this item selected on the hotbar: drink, eat, light or swing.</summary>
     public bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || id == "torch"
-        || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer";
+        || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer" or "net";
 
     /// <summary>Uses the item selected on the hotbar toward a point on the ground; items without a use do nothing.</summary>
     public void UseSelected(Vector2 at) {
         if (ActiveItem() is not string id || !HasUse(id)) return;
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) FromStack(ActiveStack(), () => world.Consume(id));
         else if (id == "torch") world.UseTorch(at - world.Player);
+        else if (world.ToolKind(id) == "net") world.SwingNet(at - world.Player);
         else world.Attack(at - world.Player);
     }
 

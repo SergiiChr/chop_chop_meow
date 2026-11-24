@@ -4,21 +4,35 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// What a resource is to a gatherer: worked down over many gathers, an ore deposit at a cliff, a loose piece picked up whole in one go,
-/// or something rooted that is dug out of the ground whole.
+/// something rooted that is dug out of the ground whole, a plant plucked whole after one gather's time,
+/// or a creature caught whole in one go.
 /// </summary>
-public enum GatherShape { Patch, Deposit, Loose, Dug }
+public enum GatherShape { Patch, Deposit, Loose, Dug, Plucked, Caught }
 
 /// <summary>How one kind of resource is gathered.</summary>
 /// <param name="Item">What gathering it yields.</param>
 /// <param name="Needs">The tool kind gathering it takes, or null when bare hands do.</param>
 /// <param name="Helps">A tool kind that only speeds gathering it up, or null.</param>
-/// <param name="ByHand">How many times longer a gather takes without the helping tool.</param>
+/// <param name="ByHand">How many times longer a gather takes without a tool that speeds it up.</param>
 /// <param name="Chip">The loose piece a tool hit now and then knocks off it, or null.</param>
 /// <param name="Shape">Whether it is worked down, an ore deposit, a loose piece or dug up whole.</param>
 /// <param name="Job">The gathering job it belongs to when that is not every spot yielding its item, or null.</param>
-public readonly record struct GatherRule(string Item, string? Needs = null, string? Helps = null, float ByHand = 1, ThingKind? Chip = null, GatherShape Shape = GatherShape.Patch, string? Job = null) {
+/// <param name="Sting">Health a second that gathering it takes from a player who carries no tool of the <paramref name="Spares"/> kind.</param>
+/// <param name="Spares">The tool kind that keeps a gatherer from being stung, or null: a player may do without it, and a worker always takes one.</param>
+public readonly record struct GatherRule(string Item, string? Needs = null, string? Helps = null, float ByHand = 1, ThingKind? Chip = null, GatherShape Shape = GatherShape.Patch, string? Job = null,
+    float Sting = 0, string? Spares = null) {
     /// <summary>The job a gatherer of this resource does: they move on only to spots of the same job.</summary>
     public string JobName => Job ?? Item;
+    /// <summary>The tool kind a worker has to hold to gather it, or null when bare hands do.</summary>
+    public string? WorkerNeeds => Needs ?? Spares;
+    /// <summary>Whether a worker takes all of it the moment they reach it, with no gather's time.</summary>
+    public bool TakenAtOnce => Shape is GatherShape.Loose or GatherShape.Caught;
+    /// <summary>Whether it leaves the world once nothing is left of it.</summary>
+    public bool GoneWhenSpent => Shape is GatherShape.Loose or GatherShape.Plucked or GatherShape.Caught;
+    /// <summary>Whether it moves about, so no player remembers where one is and a worker goes to any that is out.</summary>
+    public bool Roams => Shape == GatherShape.Caught;
+    /// <summary>Whether a tool of a kind makes gathering it faster: the one it needs or the one that helps.</summary>
+    public bool SpedUpBy(string tool) => tool == (Needs ?? Helps);
 }
 
 /// <summary>Every gathering rule in one table, so a new resource is one line here.</summary>
@@ -49,6 +63,10 @@ public static class GatherRules {
         // A woodcutter with a shovel to hand digs up stumps too, while bushes are a job apart from raking leaves.
         [ThingKind.Stump] = new("wood", Needs: "shovel", Shape: GatherShape.Dug),
         [ThingKind.Bush] = new("leaves", Needs: "shovel", Shape: GatherShape.Dug, Job: "bushes"),
+        // A nettle takes 3 seconds to pick, whatever is carried.
+        [ThingKind.Nettle] = new("nettle", ByHand: 1.5f, Shape: GatherShape.Plucked, Sting: 1, Spares: "shovel"),
+        // A player catches a firebug with a swing of the net; a worker with a net takes the one they reach.
+        [ThingKind.Firebug] = new("firebug", Needs: "net", Shape: GatherShape.Caught),
     };
 
     // The same rules by kind, since every resource check in the tick and the view asks for one.

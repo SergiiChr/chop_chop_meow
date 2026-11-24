@@ -44,7 +44,9 @@ public enum ActorAction {
     PourWater,
     FillVessel,
     PumpWater,
-    Rake
+    Rake,
+    /// <summary>A bug net swept sideways across the front, hoop first.</summary>
+    NetSwing
 }
 
 /// <summary>
@@ -117,7 +119,7 @@ public static class ActorAnimation {
         ActorAction.Walk or ActorAction.Carry => WalkCycle,
         ActorAction.Jog => Jogging.Cycle,
         ActorAction.Run => Sprinting.Cycle,
-        ActorAction.SteelChop or ActorAction.SteelMine or ActorAction.SteelAxeSwing or ActorAction.SteelAxeSweep => .8f,
+        ActorAction.SteelChop or ActorAction.SteelMine or ActorAction.SteelAxeSwing or ActorAction.SteelAxeSweep or ActorAction.NetSwing => .8f,
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
@@ -152,7 +154,7 @@ public static class ActorAnimation {
     public static float Contact(ActorAction action) => action switch {
         ActorAction.Attack => .32f * Duration(action),
         ActorAction.TorchSwing => .3f * Duration(action),
-        ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep => .5f * Duration(action),
+        ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep or ActorAction.NetSwing => .5f * Duration(action),
         _ => 0
     };
 
@@ -181,6 +183,7 @@ public static class ActorAnimation {
         ActorAction.Grind => "mortar",
         ActorAction.Dig => "steel_shovel",
         ActorAction.Rake => "rake",
+        ActorAction.NetSwing => "bug_net",
         _ => null
     };
 
@@ -520,7 +523,7 @@ public static class ActorAnimation {
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
                 return moving ? Walk(p) with { Lean = carry.Lean, Head = -carry.Lean / 2, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
-            case ActorAction.AxeSweep or ActorAction.SteelAxeSweep:
+            case ActorAction.AxeSweep or ActorAction.SteelAxeSweep or ActorAction.NetSwing:
                 return Keys(p, SweepKeys);
             case ActorAction.AxeSwing or ActorAction.SteelAxeSwing:
                 return Keys(p, AxeSwingKeys, AxeSwingStop);
@@ -735,7 +738,7 @@ public static class ActorAnimation {
     private static Footing? FeetOf(ActorAction action) => action switch {
         ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep
             or ActorAction.Mine or ActorAction.SteelMine or ActorAction.Pump or ActorAction.PumpWater or ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind
-            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock or ActorAction.Rake => StanceFeet,
+            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock or ActorAction.Rake or ActorAction.NetSwing => StanceFeet,
         ActorAction.Gather => SquatFeet,
         ActorAction.Craft => CraftFeet,
         ActorAction.Perch => PerchFeet,

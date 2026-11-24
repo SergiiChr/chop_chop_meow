@@ -390,7 +390,7 @@ public static class WorldModels {
         if (data.VesselFor(id) != null) return null;
         switch (ContainerItem.Base(id)) {
             case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
-            case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
+            case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer" or "bug_net": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);

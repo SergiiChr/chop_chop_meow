@@ -26,7 +26,7 @@ internal class Gathering {
         if (world.DepositFor(item, spot.Pos) == null) { w.Status = "Needs an accepting storage chest"; return false; }
         // A gatherer also fetches a tool that only speeds the work up, such as a rake, while a tool station has one.
         var rule = GatherRules.Of(spot.Kind);
-        string? need = rule?.Needs ?? (rule?.Helps is string helping && world.HasTool(w, helping) ? helping : null);
+        string? need = rule?.WorkerNeeds ?? (rule?.Helps is string helping && world.HasTool(w, helping) ? helping : null);
         if (need == null) { if (!world.HandsFree(w, dt)) return true; } else
             switch (world.Equip(w, need, spot, dt)) {
                 case World.Kit.Busy: return true;
@@ -37,7 +37,8 @@ internal class Gathering {
         w.Status = world.Phrase("Gathering ", world.Data.Name(item));
         if (!world.Walk(w, spot.Pos, dt)) return true;
         w.WorkState = WorkerWorkState.Gathering; w.Exhausted = null;
-        string? tool = w.Tool == "" ? null : w.Tool;
+        // A tool held only to spare the worker a sting makes the work no faster.
+        string? tool = w.Tool != "" && rule?.SpedUpBy(world.ToolKind(w.Tool)) == true ? w.Tool : null;
         if (spot.IsDug) {
             // What is dug up comes out whole; what does not fit in hand waits in the hole for the next load.
             spot.Progress += dt * world.Speed(tool);
@@ -45,9 +46,10 @@ internal class Gathering {
             world.Unearth(spot, w.Bag);
         } else {
             w.Timer += dt;
-            if (!spot.IsLoose && w.Timer < world.GatherTime(spot.Kind, tool)) return true;
+            bool atOnce = rule?.TakenAtOnce == true;
+            if (!atOnce && w.Timer < world.GatherTime(spot.Kind, tool)) return true;
             w.Timer = 0;
-            int took = w.Bag.Add(item, spot.IsLoose ? spot.Remaining : Math.Min(spot.Remaining, World.GatherYield(spot.Kind))); spot.Remaining -= took;
+            int took = w.Bag.Add(item, atOnce ? spot.Remaining : Math.Min(spot.Remaining, World.GatherYield(spot.Kind))); spot.Remaining -= took;
             if (took > 0) { world.Got(item); world.Chip(spot, tool); }
         }
         w.Loading = w.Bag.Room(item) > 0;
@@ -57,7 +59,7 @@ internal class Gathering {
             var stump = world.Fell(spot, w.Pos);
             if (world.CanWork(w, stump.Kind)) { World.MoveTo(w, spot.Id, stump); return true; }
         }
-        if (spot.IsLoose) world.S.Things.Remove(spot);
+        if (rule?.GoneWhenSpent == true) world.S.Things.Remove(spot);
         if (!world.NextSpot(w, spot.Id, spot.Kind, spot.Pos)) w.Loading = false;
         return true;
     }

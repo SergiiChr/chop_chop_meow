@@ -4,8 +4,9 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// Players' swings at wolves in <paramref name="world"/>: an axe, a torch or a fist is swung the way the player aims,
+/// Players' swings in <paramref name="world"/>: an axe, a torch or a fist is swung the way the player aims,
 /// and lands when the animation brings it down, on every wolf whose body it touches then.
+/// A bug net is swung the same way and lands on firebugs.
 /// </summary>
 public sealed class Swings(World world) {
     /// <summary>
@@ -15,6 +16,8 @@ public sealed class Swings(World world) {
     /// over to bring the flame down to a wolf, and the right fist reaches out a little to the right. A fist counts at any height.
     /// </summary>
     public static readonly SwingShape Chop = new(.5f, 1.35f, 10, 8, .7f), Sweep = new(.5f, 1.3f, 138, 62, 1.1f), Torch = new(0, 1, 52, 33, .65f), Punch = new(0, .7f, -10, 35);
+    /// <summary>What a bug net's hoop passes over as it is swept across the front, at any height: a firebug flies where the hoop goes.</summary>
+    public static readonly SwingShape Net = new(.7f, 1.75f, 70, 50);
     /// <summary>What a punch and a torch take off a wolf's health, and an axe for each unit of its speed.</summary>
     public const float PunchDamage = .5f, TorchDamage = 1, AxeDamage = 1.5f;
     /// <summary>How far either side of its damage a blow can land: each one is weaker or stronger by up to this much.</summary>
@@ -32,6 +35,7 @@ public sealed class Swings(World world) {
         ActorAction.AxeSweep or ActorAction.SteelAxeSweep => Sweep,
         ActorAction.TorchSwing => Torch,
         ActorAction.Attack => Punch,
+        ActorAction.NetSwing => Net,
         _ => default
     };
 
@@ -46,6 +50,7 @@ public sealed class Swings(World world) {
 
     /// <summary>What a swing takes off a wolf's health, and how far either side of that a blow can land.</summary>
     private static (float Damage, float Spread) Blow(ActorAction action) => action switch {
+        ActorAction.NetSwing => (0, 0),
         ActorAction.Attack => (PunchDamage, PunchSpread),
         ActorAction.TorchSwing => (TorchDamage, TorchSpread),
         _ => (AxeDamage, AxeSpread)
@@ -75,6 +80,7 @@ public sealed class Swings(World world) {
     /// moment.
     /// </summary>
     private void Land(Swing swing) {
+        if (swing.Action == ActorAction.NetSwing) { world.Firebugs.Sweep(swing.Aim); return; }
         var shape = Shape(swing.Action);
         bool torch = swing.Action == ActorAction.TorchSwing;
         var wolves = world.S.Wolves;

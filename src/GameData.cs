@@ -19,6 +19,8 @@ public sealed class ItemDef {
     /// <summary>What eating or drinking one restores; health comes back only with sleep.</summary>
     public float Hunger { get; set; }
     public float Thirst { get; set; }
+    /// <summary>What the player says of it, shown under its name; empty for an item with nothing said of it.</summary>
+    public string Description { get; set; } = "";
 }
 public sealed class BuildingDef {
     public string Name { get; set; } = "";
@@ -45,6 +47,12 @@ public sealed class RecipeDef {
     public string Tool { get; set; } = "";
     /// <summary>The lowest <see cref="ItemDef.Tier"/> of that tool that will do; a better one always does.</summary>
     public int Tier { get; set; }
+    /// <summary>The highest <see cref="ItemDef.Tier"/> of that tool that will do, for work a harder tool spoils; a tool above it is passed over.</summary>
+    public int MaxTier { get; set; } = int.MaxValue;
+    /// <summary>What a player is told who asks for it with only a tool above <see cref="MaxTier"/> to hand; set for a recipe with a highest tier.</summary>
+    public string TooHard { get; set; } = "";
+    /// <summary>Whether an item is a tool this recipe can be made with.</summary>
+    public bool MadeWith(ItemDef item) => item.Tool == Tool && item.Tier >= Tier && item.Tier <= MaxTier;
     /// <summary>At the cooking table, the one station whose recipes differ in this, advances only while someone works at it; the rest cook unattended.</summary>
     public bool Worked { get; set; }
     /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
@@ -253,7 +261,8 @@ public sealed partial class GameData {
                 throw new InvalidOperationException($"Invalid tool slots for {building.Key}: one a tool its recipes need, at the lowest tier they ask for.");
         }
         foreach (var recipe in Recipes) {
-            bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool && i.Tier >= recipe.Value.Tier);
+            bool tool = recipe.Value.Tool == "" || Items.Values.Any(recipe.Value.MadeWith);
+            if (recipe.Value.TooHard != "" != recipe.Value.MaxTier < int.MaxValue) throw new InvalidOperationException($"{recipe.Key}: a recipe with a highest tool tier says why a harder tool will not do, and no other does.");
             if (!(recipe.Value.Station is ThingKind station ? Buildings.ContainsKey(station) : recipe.Value.Hand) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
             foreach (var input in recipe.Value.Inputs)
@@ -393,6 +402,13 @@ public sealed partial class GameData {
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
     public string PlainestTool(string kind, int tier = 0) => Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
+
+    /// <summary>What a recipe's tool is called: the plainest tool by name when no harder one will do, else as <see cref="ToolName(string, int)"/> names it.</summary>
+    public string ToolName(RecipeDef r) {
+        if (r.MaxTier == int.MaxValue) return ToolName(r.Tool, r.Tier);
+        if (!toolNames.TryGetValue((r.Tool, -1 - r.MaxTier), out var name)) toolNames[(r.Tool, -1 - r.MaxTier)] = name = Items[PlainestTool(r.Tool, r.Tier)].Name.ToLowerInvariant();
+        return name;
+    }
 
     /// <summary>The plainest tool of a kind that meets a tier, for naming what a recipe needs.</summary>
     public string ToolName(string tool, int tier) {

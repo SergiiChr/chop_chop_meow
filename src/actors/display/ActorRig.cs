@@ -393,6 +393,7 @@ public sealed class ActorRig {
         }
         if (name is "steel_hammer" or "wood_hammer") return Hammer(name == "steel_hammer");
         if (name is "stone_chisel" or "steel_chisel") return Chisel(name == "steel_chisel");
+        if (name == "bug_net") return BugNet();
         bool steelTool = name.StartsWith("steel");
         string handle = steelTool ? "e87d1e" : "8a5a32", head = steelTool ? "c9d3d8" : "5b5f62";
         float metal = steelTool ? .85f : .45f;
@@ -407,6 +408,40 @@ public sealed class ActorRig {
             Cylinder(tool, .035f, 0, .3f, new Vector3(0, HeadAt, -.15f), steel, new Vector3(-90, 0, 0), 6);
             Cylinder(tool, .035f, 0, .22f, new Vector3(0, HeadAt, .11f), steel, new Vector3(90, 0, 0), 6);
         }
+        return tool;
+    }
+
+    /// <summary>How long a bug net's handle is, the hoop's radius, and how far the bag hangs behind the hoop.</summary>
+    public const float NetHandle = .95f, NetHoop = .17f, NetBag = .34f;
+    // Seen from both sides, since the hoop shows the inside of the bag.
+    private static readonly StandardMaterial3D NetCloth = TwoSided(Cloth("d8d2b0"));
+    private static StandardMaterial3D TwoSided(StandardMaterial3D material) {
+        var copy = (StandardMaterial3D)material.Duplicate();
+        copy.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        return copy;
+    }
+    /// <summary>The middle of a bug net's hoop, measured from the grip.</summary>
+    public static readonly Vector3 NetMouth = new(0, .08f - NetHandle - NetHoop, 0);
+
+    /// <summary>
+    /// A bug net gripped at the origin: a wood handle down along -Y to a hoop of bent wood that opens toward -Z, and a
+    /// bag of knotted nettle rope hanging behind it.
+    /// </summary>
+    private static Node3D BugNet() {
+        var tool = new Node3D();
+        var wood = Wood("8a5a32", .7f);
+        Cylinder(tool, .018f, .02f, NetHandle, new Vector3(0, .08f - NetHandle / 2, 0), wood, sides: 6);
+        // A rope lashing where the hoop meets the handle.
+        Cylinder(tool, .026f, .026f, .07f, new Vector3(0, .08f - NetHandle + .03f, 0), Cloth("9c955f"), sides: 6);
+        const int segments = 10;
+        float side = 2 * NetHoop * MathF.Sin(MathF.PI / segments);
+        for (int i = 0; i < segments; i++) {
+            float angle = (i + .5f) * MathF.Tau / segments;
+            Cylinder(tool, .012f, .012f, side * 1.08f, NetMouth + new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0) * NetHoop * MathF.Cos(MathF.PI / segments), wood,
+                new Vector3(0, 0, Mathf.RadToDeg(angle)), 5);
+        }
+        // The bag narrows to a blunt end behind the hoop.
+        Cylinder(tool, NetHoop, NetHoop * .28f, NetBag, NetMouth + new Vector3(0, 0, NetBag / 2), NetCloth, new Vector3(-90, 0, 0), 8);
         return tool;
     }
 

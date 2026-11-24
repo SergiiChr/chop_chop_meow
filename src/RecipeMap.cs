@@ -183,7 +183,7 @@ public partial class RecipeMap : Control {
     private string MadeAt(string item) {
         var data = world.Data;
         if (data.RecipeOf(item) is not RecipeDef r) return data.Sources[item].How;
-        string where = MapNode.Where(data, r), tool = r.Tool == "" ? "" : $", {data.ToolName(r.Tool, r.Tier)}";
+        string where = MapNode.Where(data, r), tool = r.Tool == "" ? "" : $", {data.ToolName(r)}";
         string? plainest = r.Tool == "" ? null : data.PlainestTool(r.Tool, r.Tier);
         float byHand = r.Seconds / world.WorkRate(null, plainest), there = r.Seconds / world.WorkRate(r.Station, plainest);
         string time = r.Hand && r.Station is ThingKind station && byHand != there ? $"{byHand:0.#} s by hand, {there:0.#} s at the {data.Name(station).ToLowerInvariant()}" : $"{there:0.#} s";

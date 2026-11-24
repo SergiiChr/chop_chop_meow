@@ -55,6 +55,11 @@ internal static class ItemShape {
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
         ["wheat_seeds"] = new(Seeds, Sacking, .36f, Rise: .8f),
         ["acorn"] = new(Acorn, Plain, .25f, Lay.Loose),
+        ["nettle"] = new(f => { NettleStalk(f, Vector3.Zero, .56f, 0, 4); NettleStalk(f, new Vector3(.1f, 0, .06f), .42f, 1.1f, 3); NettleStalk(f, new Vector3(-.09f, 0, .05f), .36f, 2.3f, 3); }, Plain, .5f, Lay.Rows, .5f,
+            Piece: f => { NettleStalk(f, Vector3.Zero, .5f, 0, 3, false); Turn(f, 0, new Basis(Vector3.Right, Mathf.DegToRad(-80))); }),
+        ["nettle_rope"] = new(f => RopeCoil(f, 3, 10), Plain, .34f, Rise: .8f, Piece: f => RopeCoil(f, 2, 6)),
+        ["bug_net"] = Held("bug_net"),
+        ["firebug"] = new(f => Firebug(f, true), Glossy, .2f, Lay.Loose, .7f, Piece: f => Firebug(f, false)),
         ["fertilizer"] = new(f => Sack(f, "b89b66", "9a8052", null, ("4a3524", "6b5233")), Sacking, .36f, Rise: .8f),
         ["flour"] = new(f => Sack(f, "f2ece0", "d6cdbb", "8fa3b8", null), Sacking, .36f, Rise: .8f),
         ["dough"] = new(Dough, Plain, .36f, Lay.Loose, .8f),
@@ -504,6 +509,118 @@ internal static class ItemShape {
             Vector3 narrow = along * .007f * size, wide = along * .017f * size;
             Quad(faces, knot - narrow, knot + narrow, shoulder + wide, shoulder - wide, Front + Vector3.Up, new Color(Ribbon));
             Quad(faces, shoulder - wide, shoulder + wide, end + wide, end - wide, Front, new Color(Ribbon).Darkened(.15f));
+        }
+    }
+
+    /// <summary>A nettle plant as it stands in the world: a clump of stalks of several heights, each turned its own way, chosen by <paramref name="variant"/>.</summary>
+    public static ArrayMesh NettlePlant(int variant) {
+        var faces = new List<Face>();
+        int stalks = 3 + variant % 2;
+        for (int i = 0; i < stalks; i++) {
+            float turn = i * 2.399963f + variant * 1.3f, off = i == 0 ? 0 : .09f + .03f * (i % 2);
+            NettleStalk(faces, new Vector3(MathF.Cos(turn), 0, MathF.Sin(turn)) * off, .78f - .13f * i + .05f * ((variant + i) % 3), turn, i == 0 ? 5 : 4);
+        }
+        return Commit(faces, Transform3D.Identity, looks["nettle"]);
+    }
+
+    /// <summary>
+    /// One nettle stalk standing at <paramref name="foot"/>: pairs of pointed, toothed leaves hang from it, each pair a
+    /// quarter turn from the one below and smaller toward the top, which ends in a tuft.
+    /// Without <paramref name="detail"/> the leaves have no teeth and no underside, for a heap seen from above.
+    /// </summary>
+    private static void NettleStalk(List<Face> faces, Vector3 foot, float height, float turn, int pairs, bool detail = true) {
+        Color stem = new("7aa052"), top = new("4f8a3a"), light = new("629c46"), under = new("3d6c2e");
+        // The stalk leans a little, its own way.
+        var lean = new Vector3(MathF.Cos(turn * 1.7f), 0, MathF.Sin(turn * 1.7f)) * height * .08f;
+        Vector3 At(float share) => foot + Vector3.Up * height * share + lean * share * share;
+        Bar(faces, foot, At(1), .014f, .006f, 4, stem);
+        for (int pair = 0; pair < pairs; pair++) {
+            float share = .22f + .7f * pair / pairs, length = height * (.42f - .2f * pair / pairs);
+            for (int side = 0; side < 2; side++) {
+                float angle = turn + pair * MathF.PI / 2 + side * MathF.PI;
+                NettleLeaf(faces, At(share), new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle)), length, (pair + side) % 2 == 0 ? top : light, detail ? under : null, detail);
+            }
+        }
+        for (int i = 0; i < 4; i++) {
+            float angle = turn + .6f + i * MathF.PI / 2;
+            NettleLeaf(faces, At(1), new Vector3(MathF.Cos(angle), 1.1f, MathF.Sin(angle)).Normalized(), height * .12f, light, detail ? under : null, false);
+        }
+    }
+
+    /// <summary>
+    /// A nettle leaf from the stalk outward along <paramref name="away"/>: widest a third of the way out, folded along
+    /// its midrib, its tip drooping, with a tooth on each edge when <paramref name="toothed"/>.
+    /// The underside is drawn too, in <paramref name="under"/>, unless that is null.
+    /// </summary>
+    private static void NettleLeaf(List<Face> faces, Vector3 root, Vector3 away, float length, Color top, Color? under, bool toothed) {
+        var across = away.Cross(Vector3.Up).Normalized() * length * .3f;
+        Vector3 droop = Vector3.Down * length, up = across.Cross(away).Normalized();
+        Vector3 Rib(float share) => root + away * length * share + droop * (.05f + .3f * share * share);
+        // Each edge runs out from the root to the widest point and back in to the tip, stepping out at the tooth.
+        (float Share, float Width)[] edge = toothed ? [(.34f, 1), (.58f, .66f), (.63f, .86f), (1, 0)] : [(.34f, 1), (1, 0)];
+        void Both(Vector3 a, Vector3 b, Vector3 c) {
+            Tri(faces, a, b, c, up, top);
+            if (under is Color below) Tri(faces, a, b, c, -up, below);
+        }
+        foreach (float side in new[] { -1f, 1f }) {
+            var last = root;
+            float lastShare = 0;
+            foreach (var (share, width) in edge) {
+                var point = Rib(share) + across * side * width + up * length * .07f * width;
+                Both(Rib(lastShare), last, point);
+                if (share < 1) Both(Rib(lastShare), point, Rib(share));
+                (last, lastShare) = (point, share);
+            }
+        }
+    }
+
+    /// <summary>Turns the faces from <paramref name="first"/> on about the origin.</summary>
+    private static void Turn(List<Face> faces, int first, Basis by) {
+        for (int i = first; i < faces.Count; i++) faces[i] = new(by * faces[i].A, by * faces[i].B, by * faces[i].C, faces[i].Tint);
+    }
+
+    /// <summary>
+    /// A hank of nettle rope coiled flat, <paramref name="coils"/> turns high: the strands twist round it in two
+    /// tones, and its loose end lies out to one side.
+    /// </summary>
+    private static void RopeCoil(List<Face> faces, int coils, int sides) {
+        const float inner = .1f, thick = .05f;
+        string[] strands = ["c9c08a", "8f8856"];
+        var rings = new List<Ring> { (inner, 0, strands[1]) };
+        for (int coil = 0; coil < coils; coil++) {
+            float y = coil * thick * .9f;
+            rings.AddRange(new Ring[] { (inner + thick * 1.6f, y, strands[1]), (inner + thick * 2, y + thick * .5f, strands[0]), (inner + thick * 1.6f, y + thick, strands[0]) });
+        }
+        float height = (coils - 1) * thick * .9f + thick;
+        rings.AddRange(new Ring[] { (inner, height, strands[0]), (inner, 0, "7d774a") });
+        // Every other side of a band is the darker strand, a side further round on each band up, so the twist climbs the coil.
+        Lathe(faces, Transform3D.Identity, rings.ToArray(), sides, (row, side) => row >= rings.Count - 2 ? null : strands[(row + side) % 2]);
+        var end = new Vector3(inner + thick * 1.8f, thick * .5f, 0);
+        Bar(faces, end, end + new Vector3(.02f, -.01f, .13f), thick * .45f, thick * .4f, 5, new Color(strands[0]));
+        Bar(faces, end + new Vector3(.02f, -.01f, .13f), end + new Vector3(.03f, -.01f, .16f), thick * .55f, thick * .2f, 5, new Color(strands[1]));
+    }
+
+    /// <summary>
+    /// A firebug lying along z, head toward +z: a dark head and wing covers over a tail that glows yellow-green.
+    /// With <paramref name="detail"/> it has feelers and six legs, which a heap leaves out.
+    /// </summary>
+    private static void Firebug(List<Face> faces, bool detail) {
+        // The body is turned about its length and pressed flat.
+        var lying = new Transform3D(new Basis(Vector3.Right, MathF.PI / 2) * Basis.FromScale(new Vector3(1, 1, .62f)), new Vector3(0, .06f, -.17f));
+        Lathe(faces, lying, [
+            (0, 0, "f4ffb8"), (.05f, .015f, "f4ffb8"), (.078f, .06f, "d6ff5a"), (.085f, .11f, "b6e63c"),
+            (.088f, .115f, "3a2a22"), (.092f, .2f, "46332a"), (.08f, .255f, "3a2a22"), (.062f, .262f, "8a3b24"),
+            (.058f, .3f, "9c452a"), (.04f, .31f, "2a1d18"), (.036f, .34f, "2a1d18"), (0, .352f, "1d1411")
+        ], detail ? 10 : 6, (row, side) => row is 4 or 5 && side % (detail ? 5 : 3) == 0 ? "2a1d18" : null);
+        if (!detail) return;
+        var dark = new Color("1d1411");
+        foreach (float side in new[] { -1f, 1f }) {
+            Bar(faces, new Vector3(side * .02f, .075f, .17f), new Vector3(side * .08f, .13f, .27f), .006f, .003f, 3, dark);
+            foreach (float z in new[] { .1f, .03f, -.04f }) {
+                var knee = new Vector3(side * .13f, .07f, z + .02f);
+                Bar(faces, new Vector3(side * .06f, .045f, z), knee, .007f, .006f, 3, dark);
+                Bar(faces, knee, new Vector3(side * .17f, 0, z - .02f), .006f, .003f, 3, dark);
+            }
         }
     }
 

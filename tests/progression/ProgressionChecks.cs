@@ -26,7 +26,7 @@ public static class ProgressionChecks {
     /// </summary>
     private static void CheckEverythingIsReachableFromFreshStart(GameData data) {
         var fresh = new World(data);
-        var have = new HashSet<string>(fresh.Backpack.Items.Keys) { "stone", "berries", "water", "water_1", "water_2", "raw_meat" };
+        var have = new HashSet<string>(fresh.Backpack.Items.Keys) { "stone", "berries", "water", "water_1", "water_2", "raw_meat", "nettle" };
         var built = new HashSet<ThingKind>();
         bool HasTool(string tool, int tier = 0) => have.Any(id => data.Items[id].Tool == tool && data.Items[id].Tier >= tier);
         for (bool grew = true; grew;) {
@@ -36,6 +36,7 @@ public static class ProgressionChecks {
             // Crates of berries sold at a signpost buy what the village sells, the first pickaxe among it.
             if (built.Contains(ThingKind.Signpost) && have.Contains("crate") && have.Contains("berries")) foreach (var item in data.Market.Buys.Keys) grew |= have.Add(item);
             if (HasTool("rake")) grew |= have.Add("leaves");
+            if (HasTool("net")) grew |= have.Add("firebug");
             // Crafting the vessel and reaching its liquid opens every fill state.
             foreach (var vessel in data.Vessels) {
                 if (have.Contains(vessel.Full)) grew |= have.Add(vessel.Liquid);
@@ -47,7 +48,7 @@ public static class ProgressionChecks {
             // Seeds are bought with berry money to start the first plot.
             if (built.Contains(ThingKind.Farm) && data.Farm.Sow.Keys.All(id => have.Contains(id) || data.Market.Buys.ContainsKey(id))) foreach (var item in data.Farm.Yield.Keys) grew |= have.Add(item);
             foreach (var r in data.Recipes.Values) {
-                bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool, r.Tier)) || r.Station is ThingKind station && built.Contains(station) && (data.Buildings[station].ToolSlots.Length == 0 || r.Tool == "" || HasTool(r.Tool, r.Tier));
+                bool where = r.Hand && (r.Tool == "" || have.Any(id => r.MadeWith(data.Items[id]))) || r.Station is ThingKind station && built.Contains(station) && (data.Buildings[station].ToolSlots.Length == 0 || r.Tool == "" || have.Any(id => r.MadeWith(data.Items[id])));
                 if (where && r.Inputs.Keys.All(have.Contains)) grew |= have.Add(r.Output);
             }
         }

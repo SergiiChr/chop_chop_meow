@@ -37,6 +37,7 @@ internal static class WorldSteps {
         world.Player = new Vector2(20, 20);
         RunUntilNight(world);
         ShutDens(world);
+        KeepFirebugsIn(world);
         return world;
     }
 

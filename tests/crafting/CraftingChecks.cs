@@ -531,7 +531,7 @@ public static class CraftingChecks {
         Require(world.SlotTool(bench, "wood_hammer"), "the mallet should go into the hammer slot");
         world.SetRecipe(bench, "crate");
         world.LoadBatch(bench, 2);
-        Require(world.ToolInUse(bench, "hammer", 0) == "steel_hammer", "the player should work with the carried steel hammer over the slotted mallet");
+        Require(world.ToolInUse(bench, data.Recipes["crate"]) == "steel_hammer", "the player should work with the carried steel hammer over the slotted mallet");
         // A crate takes 10 s by hand: 5 s at the bench with the mallet, 2.8 s with the steel hammer.
         SafeTick(world, 3.5f);
         Require(bench.Inventory["crate"] == 1, "a bench should work at the speed of a carried steel hammer when only a mallet is slotted");

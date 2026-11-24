@@ -41,6 +41,9 @@ public static class SimulationChecks {
         HaulingChecks.Run(data);
         GatheringChecks.Run(data);
         ReplantingChecks.Run(data);
+        NettleChecks.Run(data);
+        NettleRopeChecks.Run(data);
+        FirebugChecks.Run(data);
         CraftingChecks.Run(data);
         PackingChecks.Run(data);
         LunchChecks.Run(data);

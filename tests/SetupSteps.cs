@@ -77,6 +77,9 @@ internal static class SetupSteps {
     /// <summary>Keeps every den shut tonight, at dusk and through every hour after, so a check meets only the wolves it places.</summary>
     public static void ShutDens(World world) { world.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; world.S.DenHours = 24; }
 
+    /// <summary>Lets no more firebugs out tonight, so a check meets only those already out and those it places.</summary>
+    public static void KeepFirebugsIn(World world) => world.S.FirebugsOut = Firebugs.AtNightfall + 24;
+
     /// <summary>Takes wolves away, which the game does only at dawn or on a respawn.</summary>
     public static void RemoveWolves(World world, Predicate<Wolf> match) => world.S.Wolves.RemoveAll(match);
 

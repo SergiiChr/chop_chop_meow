@@ -824,14 +824,14 @@ public partial class WorldView : Node3D {
     private string? StationHammer(string? tool, Thing? station, PlayerState p) {
         if (tool != "hammer" || station?.Tools == null) return null;
         using var acting = World.ActAs(p);
-        return World.ToolInUse(station, "hammer", 0);
+        return World.Data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "hammer" ? World.ToolInUse(station, r) : null;
     }
 
     /// <summary>Whether a player swinging <paramref name="tool"/> at a station swings the hammer slotted there.</summary>
     private bool SwingsSlottedHammer(string? tool, Thing? station, PlayerState p) {
         if (tool != "hammer" || station?.Tools == null) return false;
         using var acting = World.ActAs(p);
-        return World.WorksWithSlotted(station, "hammer");
+        return World.Data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "hammer" && World.WorksWithSlotted(station, r);
     }
 
     /// <summary>Whether the acting player has the tool a station's recipe needs: slotted, carried or none.</summary>

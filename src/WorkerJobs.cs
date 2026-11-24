@@ -71,7 +71,7 @@ public sealed partial class World {
         }
         return false;
 
-        bool Uses(ThingKind? spot) => spot is ThingKind known && GatherRules.Of(known) is GatherRule rule && (rule.Needs == kind || rule.Helps == kind);
+        bool Uses(ThingKind? spot) => spot is ThingKind known && GatherRules.Of(known) is GatherRule rule && (rule.WorkerNeeds == kind || rule.Helps == kind);
     }
 
     /// <summary>

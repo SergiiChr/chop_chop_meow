@@ -36,7 +36,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         : "Click: queue 1.\nShift/Ctrl-click: queue 5/10.\nRight-click: undo 1/5/10 respectively.";
 
     /// <summary>Seconds a batch takes here with the tool at hand.</summary>
-    private float Seconds(RecipeDef r) => r.Seconds / world.WorkRate(station?.Kind, world.ToolInUse(station, r.Tool, r.Tier));
+    private float Seconds(RecipeDef r) => r.Seconds / world.WorkRate(station?.Kind, world.ToolInUse(station, r));
 
     /// <summary>The groups' headings and cards in a list that scrolls once it outgrows the room the page leaves it.</summary>
     public override void _Ready() {
@@ -102,7 +102,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             // Counts turn brick while the backpack is short.
             live.Watch(() => world.Carried(item) < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
-        var lacks = Style.Text(r.Tool == "" ? "" : $"No {world.Data.ToolName(r.Tool, r.Tier)}", 12, Style.Brick); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
+        var lacks = Style.Text(r.Tool == "" ? "" : $"No {world.Data.ToolName(r)}", 12, Style.Brick); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
         // One look for the tool a refresh: the card names a missing tool in place of its inputs, and its picture fades while the recipe cannot be made from the backpack now.
         live.Watch(() => { bool missing = !world.HasToolFor(station, r); return (Missing: missing, Ready: !missing && (station != null ? world.CarriesBatch(r.Inputs) : world.CanCraft(id))); }, state => {
             lacks.Visible = state.Missing; inputs.Visible = !state.Missing;
@@ -230,7 +230,7 @@ public partial class RecipePopup(World world, Thing? station, RecipeDef r, float
     /// yellow when a station's slot is empty and the player carries it, which works for them but not for a worker; red when there is none.
     /// </summary>
     private void ToolLine() {
-        string? slotted = station != null ? world.BenchTool(station, r.Tool, r.Tier) : null, carried = world.BestTool(r.Tool, null, r.Tier);
+        string? slotted = station != null ? world.BenchTool(station, r) : null, carried = world.BestTool(r);
         string? ready = station != null ? slotted : carried;
         string shown = ready ?? carried ?? world.Data.PlainestTool(r.Tool, r.Tier);
         var line = Line("Tool"); line.Name = "tool_line";
@@ -240,6 +240,7 @@ public partial class RecipePopup(World world, Thing? station, RecipeDef r, float
         state.Name = "tool_state"; line.AddChild(state);
         // A note under the line takes its whole width: who cannot use a carried tool, or how to come by a missing one that needs no tool itself.
         string hint = ready != null ? "" : carried != null ? "Workers can't use it until it is slotted."
+            : world.OnlyTooHard(station, r) ? r.TooHard
             : world.Data.RecipeOf(shown) is { Hand: true, Tool: "" } making ? $"Make one by hand: {PageText.Cost(world, making.Inputs)}" : "";
         if (hint != "") { var note = Style.Text(hint, 12, Style.Beige); note.Name = "tool_hint"; note.CustomMinimumSize = new Vector2(250, 0); line.AddChild(note); }
     }
