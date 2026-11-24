@@ -14,8 +14,11 @@ public sealed class Nettles(World world) {
     private const float Room = 2;
     /// <summary>Random spots tried for one nettle before the night goes without it.</summary>
     private const int Tries = 400;
-    // Seeded, so a new valley's nettles come up in the same places every time.
-    private readonly Random random = new(6131);
+    private const int Seed = 6131;
+    // Seeded, and started again with each world, so a new valley's nettles come up in the same places every time.
+    private Random random = new(Seed);
+
+    internal void Reset() => random = new Random(Seed);
 
     /// <summary>Brings up the night's nettles once night has fallen.</summary>
     internal void Tick() {

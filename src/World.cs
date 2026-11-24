@@ -373,7 +373,7 @@ public sealed partial class World {
         Farms = new Farms(this); SteelPipes = new SteelPipes(this);
         Holes = new GroundHoles(this); Replaced += Holes.Reset;
         Trees = new TreePlanting(this); Replaced += Trees.Reset;
-        Nettles = new Nettles(this);
+        Nettles = new Nettles(this); Replaced += Nettles.Reset;
         Firebugs = new Firebugs(this); Replaced += Firebugs.Reset;
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;

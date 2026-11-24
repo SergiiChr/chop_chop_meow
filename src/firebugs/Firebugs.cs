@@ -41,10 +41,11 @@ public sealed class Firebugs(World world) {
     // Kept only while the world runs: a loaded firebug hovers until a player comes near.
     private readonly Dictionary<int, Flight> flights = new();
     private readonly List<Thing> caught = new();
-    // Seeded, so a recording of a night plays the same every time.
-    private readonly Random random = new(2203);
+    private const int Seed = 2203;
+    // Seeded, and started again with each world, so a recording of a night plays the same every time.
+    private Random random = new(Seed);
 
-    internal void Reset() => flights.Clear();
+    internal void Reset() { flights.Clear(); random = new Random(Seed); }
 
     /// <summary>Where a firebug is now: its place and how far its hovering has carried it from there.</summary>
     public Vector2 At(Thing bug) => bug.Pos + Hover(bug.Id, world.Time);

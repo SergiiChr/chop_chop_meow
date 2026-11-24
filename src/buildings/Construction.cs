@@ -72,7 +72,7 @@ public sealed class Construction(World world) {
         } else if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         if (digging && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
-            if ((!World.BuiltOver(t.Kind) || digging) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
+            if ((!World.BuiltOver(t.Kind) || digging && t.Kind != ThingKind.Firebug) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
                 return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
             var door = p + Doorways.DoorOffset.Rotated(rotation);

@@ -1210,7 +1210,7 @@ public static class ActorAnimation {
             ThingKind.Tree => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,
             ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => backpack["steel_pick"] > 0 ? ActorAction.SteelMine : ActorAction.Gather,
             ThingKind.LeafSpot when backpack["rake"] > 0 => ActorAction.Rake,
-            ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.LeafSpot => ActorAction.Gather,
+            ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.LeafSpot or ThingKind.Nettle => ActorAction.Gather,
             ThingKind.Stump or ThingKind.Bush or ThingKind.Hole => backpack["steel_shovel"] > 0 ? ActorAction.Dig : ActorAction.Idle,
             // A mine is dug with a pickaxe, then its frame and rails are hammered in.
             ThingKind.Mine => fitting ? ActorAction.Hammer : ActorAction.SteelMine,

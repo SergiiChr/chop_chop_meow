@@ -993,6 +993,7 @@ Its flight (`Firebugs.Flight`) is kept only while the world runs:
 - **Rest.** It then stays put for `RestSeconds`, whoever comes near.
 
 `World.SwingNet` (`Verb.SwingNet`) swings a carried net as `ActorAction.NetSwing`, with the axe's cooldown.
+With a net selected, a click on a firebug swings at where it is (`PlayerControl.LeftPress`) instead of selecting it.
 The swing lands like any other (`Swings.Tick`), and `Firebugs.Sweep` catches each firebug the `Swings.Net` shape
 touches, a body `BodyRadius` wide at any height, into the swinger's backpack while it has room.
 Every other firebug within `ScareRadius` darts off, resting or not, and so does one a full backpack could not take.
@@ -1004,6 +1005,7 @@ A worker with the job takes a bug net (`GatherRule.Needs`) and takes the firebug
 is taken (`GatherRule.TakenAtOnce`); no worker is on duty while firebugs are out.
 Held right mouse on a firebug catches nothing: `World.GatherBlock` asks for a swing.
 A nettle blocks building like a berry bush, while a building goes up over a firebug (`World.BuiltOver`).
+A hole is dug under a firebug, which stays where it is, and the ground under one takes no contact shade.
 
 `FirebugShape` draws a firebug in one of two looks on trial, picked with `--firebug-look`: the game's own glow (a dark
 body, a lantern, a halo that grows with the flash and a trail of dots that stretches behind a dart), or the pixel

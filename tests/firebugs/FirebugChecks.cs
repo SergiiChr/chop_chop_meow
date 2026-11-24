@@ -22,6 +22,7 @@ public static class FirebugChecks {
         Test(CheckNetSwingNeedsANet, data);
         Test(CheckFullBackpackCatchesNoFirebug, data);
         Test(CheckHoldingOnToAFirebugCatchesNothing, data);
+        Test(CheckHoleIsDugUnderAFirebug, data);
         Test(CheckFirebugJobNeedsANetAtAToolStation, data);
         Test(CheckFirebugsAndNettlesComeBackFromASave, data);
     }
@@ -148,6 +149,12 @@ public static class FirebugChecks {
         Require(world.Find(bug.Id) != null && world.Backpack["firebug"] == 0, "holding on to a firebug should not catch it");
         Drop(world, "bug_net");
         Require(world.GatherBlock(bug)?.Contains("bug net") == true, $"a firebug should ask for a bug net: {world.GatherBlock(bug)}");
+    }
+
+    private static void CheckHoleIsDugUnderAFirebug(GameData data) {
+        var (world, bug, _) = FirebugNight(data);
+        string? blocked = world.Construction.PlacementBlock(ThingKind.Hole, bug.Pos.Round());
+        Require(blocked == null, $"a firebug in the air should leave the ground under it free to dig: {blocked}");
     }
 
     /// <summary>Workers are off the map while firebugs are out, so the job is checked as far as being given and finding its tool.</summary>

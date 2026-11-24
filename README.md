@@ -499,7 +499,7 @@ Eight firebugs come out as night falls and one more after each hour of the night
 All of them are gone at dawn.
 A firebug hovers about its place and blinks.
 When you come within 4 m it darts off 6.5 m, faster than a walk and slower than a sprint, then rests for 1.6 seconds where it stops, whoever comes near.
-With the bug net selected, a left click sweeps it toward the pointer, from behind the left shoulder across the front.
+With the bug net selected, a left click sweeps it toward the pointer, from behind the left shoulder across the front; a click on a firebug swings at the firebug rather than selecting it.
 The hoop passes 0.9 to 1.4 m from you and lands 0.4 seconds after the click: it catches each firebug it passes over then, one firebug each into the backpack while it has room.
 A firebug nearer or further than the hoop is missed, and a swing sends every firebug it misses within 5 m darting, resting or not.
 

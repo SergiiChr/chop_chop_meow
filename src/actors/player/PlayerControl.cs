@@ -371,6 +371,8 @@ public sealed class PlayerControl {
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
         var w = view.PickWorker(at, thingDistance);
         if (w != null) panel.Select(w);
+        // With a bug net selected a click on a firebug swings at it; with anything else it selects the firebug.
+        else if (t is { Kind: ThingKind.Firebug } && hotbar.ActiveItem() is string net && world.ToolKind(net) == "net") hotbar.UseSelected(world.Firebugs.At(t));
         else if (t != null) ClickThing(t);
         else if (hotbar.ActiveItem() is string selected && hotbar.HasUse(selected)) hotbar.UseSelected(view.ToWorld(at));
         else panel.Close();
@@ -386,7 +388,7 @@ public sealed class PlayerControl {
 
     private void AssignGather(ClickMode.Assign assign, Thing? t) {
         var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);
-        if (worker == null || t?.IsResource != true) { kit.Notify("Choose a tree, stump, bush, leaves, stone, ore, coal, berry bush or water source."); return; }
+        if (worker == null || t?.IsResource != true) { kit.Notify("Choose a tree, stump, bush, leaves, stone, ore, coal, berry bush, nettle, firebug or water source."); return; }
         if (world.GatherBlock(t, true) is string blocked) { kit.Notify(blocked); return; }
         world.SetDuty(worker, t, JobKind.Gather, true); Mode = new ClickMode.Normal(); panel.Select(worker);
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -12,7 +13,7 @@ internal static class RackShape {
     public static Mesh Pick => pick ??= BuildTool("pickaxe");
     public static Mesh Rake => rake ??= BuildTool("rake");
     /// <summary>The hanging shape of every tool kind a peg can show; a kind without one, such as the mortar, hangs nothing.</summary>
-    public static readonly (string Kind, Mesh Mesh)[] Tools = [("axe", Axe), ("pickaxe", Pick), ("rake", Rake), ("shovel", BuildTool("shovel")), ("hammer", BuildTool("hammer")), ("chisel", BuildTool("chisel"))];
+    public static readonly (string Kind, Mesh Mesh)[] Tools = [("axe", Axe), ("pickaxe", Pick), ("rake", Rake), ("shovel", BuildTool("shovel")), ("hammer", BuildTool("hammer")), ("chisel", BuildTool("chisel")), ("net", BuildTool("net"))];
     /// <summary>Where a slot's peg sits across the board.</summary>
     public static float PegX(int slot) => (slot - (World.ToolSlots - 1) / 2f) * .33f;
 
@@ -76,6 +77,13 @@ internal static class RackShape {
                 // A short flat blade in place of a long handle's head.
                 Prism(s, new[] { new Vector2(-.012f, .0f), new(.012f, .0f), new(.018f, .1f), new(-.018f, .1f) }, .012f, "aebabc");
                 break;
+            case "net": {
+                    // The hoop hangs face out below the handle, the bag's cloth filling it.
+                    Vector2[] Ring(float radius) => Enumerable.Range(0, 8).Select(i => new Vector2(MathF.Cos(-i * MathF.Tau / 8), MathF.Sin(-i * MathF.Tau / 8)) * radius + new Vector2(0, -.72f - .13f)).ToArray();
+                    Prism(s, Ring(.15f), .02f, "8a5a32");
+                    Prism(s, Ring(.125f), .03f, "d8d2b0", new Vector3(0, 0, .004f));
+                    break;
+                }
             case "shovel":
                 // A pointed blade hangs face out below the handle, on a short socket.
                 Prism(s, new[] { new Vector2(-.085f, -.7f), new(.085f, -.7f), new(.085f, -.86f), new(0, -.95f), new(-.085f, -.86f) }, .012f, "aebabc", new Vector3(0, 0, .012f));
