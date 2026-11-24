@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 /// <summary>
 /// Reserves a seat for each worker on a break, around a campfire or in a small circle on open ground.
 /// A break is the lunch hour for the whole crew, or any time for a worker with no job that can be done.
-/// A campfire with a worker sitting at it burns, whether or not it has wood.
+/// A campfire with a worker sitting at it burns even with no wood left.
 /// </summary>
 internal sealed class BreakSeats(World world) {
     internal const int FireSeats = 6;

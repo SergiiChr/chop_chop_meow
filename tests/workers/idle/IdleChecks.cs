@@ -12,7 +12,7 @@ internal static class IdleChecks {
         Test(CheckWorkerWithNothingToDoSitsAtTheNearestCampfire, data);
         Test(CheckIdleWorkersPastSixSitOnTheGroundByTheFire, data);
         Test(CheckCampfireBurnsWithNoWoodWhileWorkersSitAndGoesOutAfter, data);
-        Test(CheckCampfireBurnsNoneOfItsWoodWhileWorkersSit, data);
+        Test(CheckCampfireBurnsItsWoodAsUsualWhileWorkersSit, data);
     }
 
     private static bool Seated(Worker w) => w.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching;
@@ -58,16 +58,17 @@ internal static class IdleChecks {
         Require(fire.Burn == 0 && !world.Protected(fire.Pos + Vector2.Right * 3), "with nobody left sitting at it, a fire with no wood should go out");
     }
 
-    private static void CheckCampfireBurnsNoneOfItsWoodWhileWorkersSit(GameData data) {
+    private static void CheckCampfireBurnsItsWoodAsUsualWhileWorkersSit(GameData data) {
         var world = FundedWorld(data);
         var fire = world.Add(ThingKind.Campfire, new Vector2(20, 20));
         fire.Burn = 100; fire.Inventory.Add("wood", 2);
         var worker = AddWorker(world, new Vector2(16, 20));
         Work(world, 30, () => Seated(worker));
-        Work(world, 1);
         float burn = fire.Burn;
-        Work(world, 200);
+        Work(world, 60);
         Require(Seated(worker), "the idle worker should still be sitting at the fire");
-        Require(fire.Inventory["wood"] == 2 && fire.Burn == burn, $"a fire burns none of its wood while workers sit at it: {fire.Inventory["wood"]} wood, {fire.Burn:0} of {burn:0} s left");
+        Require(fire.Burn < burn - 50, $"a fire with wood burning should burn down as usual while workers sit at it: {fire.Burn:0} of {burn:0} s left");
+        Work(world, burn);
+        Require(fire.Inventory["wood"] == 1, $"a fire running low should take a log from its slot while workers sit at it, not leave {fire.Inventory["wood"]}");
     }
 }

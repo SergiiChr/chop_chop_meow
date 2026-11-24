@@ -1137,7 +1137,7 @@ public sealed partial class World {
         if (DoorCheck.Waking) { SayToAll("You are awakened by the noise outside."); return; }
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
-    /// <summary>Seconds of burning a campfire is kept at while workers sit at it with no wood burning, so it goes out soon after they leave.</summary>
+    /// <summary>Seconds of burning a campfire with no wood is kept at while workers sit at it, so it goes out soon after they leave.</summary>
     private const float KindledBurn = 1;
     /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
     public const float FireReach = 5.3f;
@@ -2200,10 +2200,11 @@ public sealed partial class World {
             else if (S.Time >= t.Regrow) { t.Remaining = BushBerries; t.Regrow = 0; }
         }
         foreach (var t in S.Things.Of(ThingKind.Campfire)) {
-            // Workers sitting at a fire on their break light it, and it burns none of its wood while they sit; once they get up it dies down within a second.
-            if (breakSeats.Kindles(t)) { if (t.Burn <= 0) Play("start_fire", t.Pos); t.Burn = Math.Max(t.Burn, KindledBurn); continue; }
+            bool lit = t.Burn > 0;
             t.Burn = Math.Max(0, t.Burn - dt);
             if (t.Burn < 30 && t.Inventory.Remove("wood", 1) > 0) { if (t.Burn <= 0) Play("start_fire", t.Pos); t.Burn += Data.CampfireSeconds; }
+            // A fire with no wood left burns anyway while workers sit at it on their break, and dies down within a second once they get up.
+            if (t.Burn < KindledBurn && breakSeats.Kindles(t)) { if (!lit) Play("start_fire", t.Pos); t.Burn = KindledBurn; }
         }
         // Once a working crew has the forge hot, they keep it at or above the clear bar between strokes.
         // A crew that is striking or stuck on a blocked path is not working, so the forge cools.

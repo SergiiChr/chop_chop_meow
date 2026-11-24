@@ -708,7 +708,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   A player a wolf had pinned goes free as it leaves.
   Patrolling, going home or losing its player (who sheltered or left the game) clears everything a wolf was doing to them (`WolfPatrols.Calm`).
 
-Campfire light repels wolves, and `CampfireHours` sets how long one log burns; a campfire workers sit at burns without wood.
+Campfire light repels wolves, and `CampfireHours` sets how long one log burns; a campfire with no wood left burns while workers sit at it.
 A wolf already chasing the player still follows into the light for a few seconds.
 Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters go to its door (`DoorCheck.Follow`), or give up and patrol on away from a cabin they leave alone.
 
@@ -1290,7 +1290,7 @@ At the `LunchHour` in `GameData` workers break for one in-game hour.
 `BreakSeats` reserves the nearest available campfire seats, with up to six seats per fire.
 It seats workers with nothing to do the same way at any hour; their ground groups gather round the nearest campfire rather than where they stand.
 A worker who sat in the last tick keeps their seat while they still have nothing to do, so the crew still sitting when lunch ends stays put.
-A campfire a worker sat at in the last tick (`BreakSeats.Kindles`) burns at no less than `KindledBurn`, one second, and its own burn time and wood stay as they are; once they leave it dies down within that second unless it has wood.
+A campfire burns its wood as usual while workers sit at it; once it has none left, one a worker sat at in the last tick (`BreakSeats.Kindles`) is kept burning at `KindledBurn`, one second, and dies down within that second once they leave.
 A blocked walk releases its seat, and the worker remembers seats they could not reach until lunch ends.
 Workers on the ground keep their seats when the crew changes, unless they take a vacancy by a fire.
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
