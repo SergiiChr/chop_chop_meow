@@ -110,6 +110,7 @@ public sealed partial class GameData {
         [ThingKind.Signpost] = new() { Name = "Trading post", Cost = new() { ["wood"] = 10, ["stone"] = 4 }, Description = "Trade by cart. Hire and manage neighboring villagers." },
     };
     public Dictionary<string, SourceDef> Sources { get; } = new() {
+        [Inventory.Coins] = new() { How = "Sell goods at the trading post" },
         ["wood"] = new() { How = "Chop trees" },
         ["acorn"] = new() { How = "Chop trees or gather leaves" },
         ["stone"] = new() { How = "Pick up or mine" },
@@ -137,6 +138,7 @@ public sealed partial class GameData {
         new() { Title = "Tin", Roots = new() { "tin_ore" } },
         new() { Title = "Food", Roots = new() { "berries", "raw_meat" } },
         new() { Title = "Farm", Roots = new() { "leaves", "grass", "wheat_seeds" } },
+        new() { Title = "Trade", Roots = new() { Inventory.Coins } },
     };
     public Dictionary<string, RecipeDef> Recipes { get; } = new() {
         ["charcoal"] = new() { Name = "Make charcoal", Group = RecipeGroup.Materials, Station = ThingKind.Furnace, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["wood"] = 2 }, Output = "charcoal", Amount = 1, Seconds = 8 },

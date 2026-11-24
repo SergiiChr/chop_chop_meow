@@ -264,7 +264,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 19;
+    public int Version { get; set; } = 20;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -292,7 +292,6 @@ public sealed class SaveState {
     [JsonIgnore] public float Hunger { get => Actor.Hunger; set => Actor.Hunger = value; }
     [JsonIgnore] public float Thirst { get => Actor.Thirst; set => Actor.Thirst = value; }
     public int NextId { get; set; } = 1;
-    public int Goal { get; set; }
     public int WageDay { get; set; } = 1;
     [JsonIgnore] public List<string> HotbarSlots { get => Actor.HotbarSlots; set => Actor.HotbarSlots = value; }
     /// <summary>Contents of crates packed into items, keyed by the number in their item id.</summary>
@@ -372,6 +371,7 @@ public sealed partial class World {
         Holes = new GroundHoles(this); Replaced += Holes.Reset;
         Trees = new TreePlanting(this); Replaced += Trees.Reset;
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
+        Goals = new Goals(this);
         breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
@@ -393,6 +393,7 @@ public sealed partial class World {
     public GroundHoles Holes { get; }
     public TreePlanting Trees { get; }
     public LeafSpots LeafSpots { get; }
+    public Goals Goals { get; }
     private readonly Barrels barrels;
 
     private readonly BarrelHaul barrelHaul;
@@ -523,7 +524,6 @@ public sealed partial class World {
     public ListView<Wolf> Wolves => new(S.Wolves);
     public ListView<TradeOrder> Orders => new(S.Orders);
     public ListView<PlayerState> Players => new(S.Players);
-    public int Goal => S.Goal;
     public bool Reached(string milestone) => S.Milestones.Contains(milestone);
     /// <summary>
     /// Whether the settlement has ever made, gathered, bought or started with an item, or with anything the item ends up in:
@@ -534,8 +534,8 @@ public sealed partial class World {
         foreach (string product in Data.EndsUpIn(item)) if (HadItself(product)) return true;
         return false;
     }
-    /// <summary>What the settlement gathered, bought or started with is in its record of items, and what it made is among its milestones.</summary>
-    private bool HadItself(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item);
+    /// <summary>Whether the settlement has had this item itself.</summary>
+    internal bool HadItself(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item);
     internal void Got(string item) => S.Obtained.Add(item);
     public int DayRevenue => S.DayRevenue;
     public ListView<int> Profits => new(S.Profits);
@@ -2259,9 +2259,12 @@ public sealed partial class World {
         }
         if (!order.Buying) {
             if (order.Goods.Keys.Any(VillageBuys)) S.Milestones.Add("sold");
+            int payment = (int)order.Value;
+            if (payment > 0) Got(Inventory.Coins);
+            // Played at the player so the payment is heard wherever the player is.
+            Play("payment_from_village_arrives", Player);
+            S.DayRevenue += payment;
         }
-        // Played at the player, not the signpost, so a payment is heard wherever the player is.
-        if (!order.Buying) { Play("payment_from_village_arrives", Player); S.DayRevenue += (int)order.Value; }
         S.Orders.Remove(order); UpdatePrices();
         if (order.Buying) { Say($"Cart returned with {Goods(order.Goods)}."); return; }
         var donated = order.Goods.Where(p => !VillageBuys(p.Key)).ToList();
@@ -2368,7 +2371,6 @@ public sealed partial class World {
             }
         everyone = false;
         Look();
-        UpdateGoal();
     }
     /// <summary>Starts, fuels and finishes the batches of a station's recipe.</summary>
     private void StationTick(Thing t, float dt) {
@@ -2456,47 +2458,25 @@ public sealed partial class World {
         forgotten.Clear();
         foreach (var pair in S.Remembered) if (Sees(pair.Value.Pos) && Find(pair.Key) == null) forgotten.Add(pair.Key);
         foreach (var id in forgotten) S.Remembered.Remove(id);
+        bool seekOre = !Remote && !Reached(Goals.OreSeen);
         // Only the look is remembered: no inventory, and no fire, heat or work, so nothing out of sight smokes or glows.
         foreach (var t in S.Things) {
             if (!Sees(t.Pos)) continue;
+            if (seekOre && t.IsDeposit && t.Remaining > 0) {
+                S.Milestones.Add(Goals.OreSeen);
+                seekOre = false;
+            }
             if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id, Kind = t.Kind, Rotation = t.Rotation };
             memory.RememberedPlumbing = t.PlumbingInstalled;
             memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Keep = t.Keep; memory.Progress = t.Progress; memory.MineStage = t.MineStage; memory.FarmStage = t.FarmStage; memory.OfTree = t.OfTree; memory.TreeStage = t.TreeStage;
         }
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size && S.Explored[(int)p.Y * Terrain.Size + (int)p.X] != 0;
-    /// <summary>The starter goals in order: each one's title, the hint under it in the pause menu, and when it is met.</summary>
-    private static readonly (string Title, string Hint, Func<World, bool> Met)[] StarterGoals = {
-        ("Light in the dark", "Build and light a campfire. Fire keeps wolves away.", w => w.Reached("campfire")),
-        ("Safe place", "Build a cabin for a peace of mind.", w => w.Reached("hut")),
-        ("A start", "Build a crafting bench.", w => w.Reached("bench")),
-        ("Road to riches", "Build a trading post and sell a crate of goods.", w => w.Reached("sold")),
-        ("Stone and embers", "Build a stone furnace.", w => w.Reached("furnace")),
-        ("Hotter than fire", "Build a reinforced furnace and produce your first steel bar.", w => w.Reached("steel_bar")),
-        // Met by a steel hammer and a steel pickaxe the settlement has had, bought or made.
-        ("Steel tools", "Purchase a hammer and a pickaxe from the trading post.", w => w.HadItself("steel_hammer") && w.HadItself("steel_pick")),
-        ("Too soft", "Build an anvil and produce your first steel parts.", w => w.Reached("steel_parts")),
-        ("More hands on deck", "Hire a worker at the trading post and assign a job.", w => w.Reached("assigned")),
-    };
-    public bool GoalComplete => S.Goal >= StarterGoals.Length;
-    private void UpdateGoal() {
-        while (!GoalComplete && StarterGoals[S.Goal].Met(this)) S.Goal++;
-    }
-    public static int GoalCount => StarterGoals.Length;
-    public static (string Title, string Hint) ObjectiveFor(int goal) => (StarterGoals[goal].Title, StarterGoals[goal].Hint);
-    // ---------- End goals ----------
     /// <summary>Finished days in a row, up to today, whose profit reached the goal.</summary>
     public int ProfitStreak => S.Profits.AsEnumerable().Reverse().TakeWhile(p => p >= Data.Goals.DailyProfit).Count();
     /// <summary>Once reached, the week of profit stays reached even if later days fall short.</summary>
     public bool ProfitGoalMet => S.Milestones.Contains("profit_week");
-    // The milestone comes first: it is a set lookup, and the game checks this every frame.
-    public bool EndGoalsComplete {
-        get {
-            if (!ProfitGoalMet) return false;
-            foreach (var ore in Cliff.Ores) if (!Mines.Working(ore)) return false;
-            return true;
-        }
-    }
+    public bool EndGoalsComplete => ProfitGoalMet && Goals.MinesComplete;
     private void CloseDay(int wages) {
         S.Profits.Add(S.DayRevenue - wages); S.DayRevenue = 0;
         if (ProfitStreak >= Data.Goals.ProfitDays) S.Milestones.Add("profit_week");
@@ -2607,7 +2587,7 @@ public sealed partial class World {
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage) || !TreePlanting.ValidStage(t) || t.Rotation != 0 && (t.Kind is not (ThingKind.Crate or ThingKind.Barrel) && !Data.Buildings.ContainsKey(t.Kind) || !Construction.ValidRotation(t.Kind, t.Rotation)))) throw new InvalidOperationException("Unsupported or incomplete save.");
         if (loaded.Wolves.Any(w => w == null || !WolfCounter.ValidSavedPath(w) || !WolfHunt.ValidSavedReaction(w)))
             throw new InvalidOperationException("This save holds an invalid wolf movement.");
-        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded) || loaded.Goal < 0) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
+        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;

@@ -54,8 +54,6 @@ public static class Style {
     public static readonly StyleBoxTexture Plate = EnamelBox(14, 10);
     /// <summary>A beige well inside a board, holding a station's process row or a group of slots.</summary>
     public static readonly StyleBoxFlat Well = Flat(Beige, 14, 16);
-    /// <summary>A goal still to do on the pause board: an empty ring.</summary>
-    public static readonly StyleBoxFlat GoalTodo = Flat(Beige, 12, 0, Tan, 3);
     /// <summary>A job chip on a worker card: a small cream pill with a thin outline.</summary>
     public static readonly StyleBoxFlat Chip = Flat(SlotFill, 13, 2, Line, 2, horizontal: 8);
     /// <summary>A haul group's chip on a crew card.</summary>
