@@ -334,10 +334,12 @@ Queueing another recipe depends on what the station is doing:
 | The station | Queueing another recipe |
 | --- | --- |
 | Is working a batch | Nothing changes, and its input and output slots shake |
-| Is between batches, with something in its slots | Its slots and its fuel slot empty into your backpack, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
-| Is between batches, with no room in your backpack for what its slots and fuel slot hold | Nothing changes, and its slots shake |
+| Is between batches, with something in its slots | Inputs the new recipe uses stay in its slots, and fuel it burns stays in the fuel slot; the rest, its product too, goes into your backpack, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
+| Is between batches, with no room in your backpack for what leaves its slots and fuel slot | Nothing changes, and its slots shake |
 | Has empty slots | It turns to the new recipe, its hard hat with it |
 
+So a station turned from the steel pickaxe to the steel shovel keeps its steel parts and wood parts, and one turned to the bucket keeps the wood parts left over.
+A turn loads from your backpack only what the slots still lack for the batches queued; more of the recipe a station is on loads a whole batch on top of what it holds.
 Fuel a batch has already burned is gone; queueing a recipe loads its fuel again from your backpack.
 When your backpack holds less than one batch, queueing loads what it has, its slots shake, and a message names everything still missing, such as "Missing fuel (wood, coal or charcoal)." or "Missing 2L of water."
 
@@ -347,15 +349,17 @@ Taking the hard hat off, and putting it on the recipe the station is on, always 
 A hard hat moved to another recipe drops the batches that still waited.
 
 So a station with a hard hat is always on the hard-hat recipe: once the batches you queued are done, workers go on making it.
+Only a worker works a hard-hat batch: you work only the batches you queued.
 Click the hard hat off for a station to stop after your batches.
 It starts no batch while its slots hold something another recipe left there, such as a hauler's late delivery: haulers carry that to storage, or you take it out.
 A station page opens with the group of the recipe the station is on open.
 A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
-A bench, anvil, cooking table or packing station with a batch running is worked by a player standing still within 1 m of its edge, or by a worker.
+A bench, anvil or cooking table with a batch you queued is worked by a player standing still within 1 m of its edge, or by a worker; a packing station by either, whatever it packs.
 Pumping the reinforced furnace's bellows needs the same 1 m.
 
 Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
+The output slot takes back what the recipe makes from your backpack, up to a stack.
 A station that burns fuel has its own fuel slot under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
 Fuel the recipe cannot burn shows in brick; workers carry it back to storage and bring a fuel it burns.
 Side outputs and leftovers sit in a second row under the output.

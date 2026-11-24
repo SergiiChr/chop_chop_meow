@@ -74,6 +74,8 @@ public sealed partial class World {
         if (into?.Kind == ThingKind.Farm && to == into.Inventory)
             room = Math.Min(room, Barrels.CanPour(Data, item) ? Farms.WaterRoom(into) : to.SlotRoom(item));
         if (into?.Kind == ThingKind.Packer && to == into.Inventory) room = Math.Min(room, PackingRoom(into, item));
+        // Each of a station's slots holds one stack, its output slot too.
+        if (into != null && IsStation(into.Kind) && to == into.Inventory) room = Math.Min(room, to.SlotRoom(item));
         if (Data.VesselFor(item) != null) {
             bool takes = into != null && to == into.Inventory && TakesLiquid(into, item);
             if (takes && from[item] > 0) return from.TransferTo(to, item, Math.Min(quantity, room));
@@ -104,8 +106,8 @@ public sealed partial class World {
     private string NeedVessel(VesselDef v) => $"You need an empty {Lower(Data.Name(v.Liquid))} vessel.";
 
     /// <summary>Why the backpack's vessels cannot take every liquid a box holds, or null.</summary>
-    private string? NoVesselRoom(Inventory box) {
-        foreach (var v in Data.Vessels) if (box[v.Liquid] > LiquidVesselRoom(S.Backpack, v.Liquid)) return NeedVessel(v);
+    private string? NoVesselRoom(Dictionary<string, int> goods) {
+        foreach (var v in Data.Vessels) if (goods.GetValueOrDefault(v.Liquid) > LiquidVesselRoom(S.Backpack, v.Liquid)) return NeedVessel(v);
         return null;
     }
 
