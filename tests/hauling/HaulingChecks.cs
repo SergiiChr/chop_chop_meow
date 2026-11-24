@@ -17,6 +17,7 @@ public static class HaulingChecks {
         Test(CheckHaulerTakesAFullOutputBeforeToppingUpInputs, data);
         Test(CheckHaulerTakesOutOnlyWhatStorageHasRoomFor, data);
         Test(CheckHaulerPutsALoadBackWhenNothingTakesItAnyMore, data);
+        Test(CheckALoadNothingTakesGoesToAChestThatHoldsIt, data);
         Test(CheckHaulerTopsUpTheInputCoveringTheFewestBatches, data);
         Test(CheckHaulerTopsUpInputsBeforeTakingAnOutputThatIsNotFull, data);
         Test(CheckCarriedGoodsGoToAStationThatUsesThem, data);
@@ -101,6 +102,19 @@ public static class HaulingChecks {
         Work(world, 30, () => hauler.Bag.Count == 0);
         Require(bench.Inventory["planks"] == 20 && chest.Inventory["planks"] == 0,
             $"a hauler whose chest stops taking planks should put them back into the table: the table holds {bench.Inventory["planks"]}, the hands {hauler.Bag["planks"]}");
+    }
+
+    private static void CheckALoadNothingTakesGoesToAChestThatHoldsIt(GameData data) {
+        var world = EmptyWorld(data);
+        // Neither chest's filter takes wood: a new chest takes nothing.
+        var holding = world.Add(ThingKind.Chest, new Vector2(16, 10));
+        holding.Inventory.Add("wood", 20);
+        var empty = world.Add(ThingKind.Chest, new Vector2(12, 10));
+        var worker = AddWorker(world, new Vector2(10, 10));
+        worker.Bag.Add("wood", 6);
+        Work(world, 30, () => worker.Bag.Count == 0);
+        Require(holding.Inventory["wood"] == 26 && empty.Inventory.Count == 0,
+            $"a load nothing takes should go back to the chest already holding wood: it holds {holding.Inventory["wood"]}, the hands {worker.Bag["wood"]}");
     }
 
     /// <summary>Four steel parts cover two pickaxes and three wood parts cover three, so steel parts come first though there are more of them.</summary>

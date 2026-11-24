@@ -10,14 +10,11 @@ namespace ChopChopMeow;
 /// </summary>
 public sealed partial class World {
     private void WorkJobs(Worker w, float dt) {
-        // A load nothing takes stays in hand while the worker does the jobs that need no hands.
-        bool holding = w.Bag.Count > 0 && !w.Loading;
-        // Hands emptied some other way, such as by a player, forget where the load came from.
-        if (w.Bag.Count == 0) w.TakenFrom = 0;
-        if (holding && Deliver(w, dt)) return;
-        string? held = holding ? w.Status : null;
+        // A load nothing takes stays in hand, its status kept as what holds the worker up, while they do the jobs that need no hands.
+        if (w.Bag.Count > 0 && !w.Loading && Deliver(w, dt)) return;
+        string? held = w.Bag.Count > 0 && !w.Loading ? w.Status : null;
         if (w.InHand is JobEntry doing) {
-            if (w.Jobs.Contains(doing) && Rounds(doing) == w.Mark && !(holding && NeedsHands(doing)) && Do(w, doing, dt)) return;
+            if (w.Jobs.Contains(doing) && Rounds(doing) == w.Mark && !(held != null && NeedsHands(doing)) && Do(w, doing, dt)) return;
             w.InHand = null;
         }
         w.Plan = default;
@@ -26,13 +23,13 @@ public sealed partial class World {
         if (w.Loading) {
             w.Loading = false;
             if (w.Bag.Count > 0 && Deliver(w, dt)) return;
-            holding = w.Bag.Count > 0; held = holding ? w.Status : null;
+            held = w.Bag.Count > 0 ? w.Status : null;
         }
         // With nothing to do, the list is read again a few times a second rather than on every tick.
         if (S.Time < w.ReadAgain) { Idle(w, held ?? w.Lacking, dt); return; }
         string? lacking = null;
         foreach (var entry in w.Jobs) {
-            if (holding && NeedsHands(entry)) { lacking ??= held; continue; }
+            if (held != null && NeedsHands(entry)) { lacking ??= held; continue; }
             if (entry is Duty duty && (w.Assignment != duty.Thing || w.Doing != duty.Job)) { w.Assignment = duty.Thing; w.Doing = duty.Job; w.Timer = 0; }
             if (Do(w, entry, dt)) { w.InHand = entry; w.Mark = Rounds(entry); return; }
             lacking ??= w.Status;
@@ -41,8 +38,8 @@ public sealed partial class World {
         Idle(w, lacking, dt);
     }
 
-    /// <summary>Whether a job carries things in the worker's hands: every job whose round ends with a delivery, every haul group, and mining, whose miner carries loads out.</summary>
-    private bool NeedsHands(JobEntry entry) => entry is not Duty duty || !Def(duty.Job).Rounds || duty.Job == JobKind.Mine;
+    /// <summary>Whether a job carries loads in the worker's hands, as its row says; a haul group always does.</summary>
+    private static bool NeedsHands(JobEntry entry) => entry is not Duty duty || Def(duty.Job).Hands;
 
     /// <summary>Seconds a worker with nothing to do waits before reading their job list again.</summary>
     private const float JobListSeconds = .25f;
@@ -88,7 +85,7 @@ public sealed partial class World {
     /// <summary>
     /// Carries what a worker holds to where it goes: the place it was fetched for while that still takes it,
     /// else the nearest station that uses it or storage asking for it, else storage taking everything,
-    /// else back into the place it was carried out of.
+    /// else back to the nearest place that takes it back (<see cref="TakesBack"/>).
     /// Emptied hands end the round.
     /// Tells whether the worker is busy with the load, or holds it with nowhere to take it.
     /// </summary>
@@ -101,11 +98,13 @@ public sealed partial class World {
         if (FillsLeftover(w, dest, item, dt)) return true;
         // Rules are read again every tick, so a filter changed or a slot filled while a load is on its way sends it elsewhere.
         var intake = dest == null ? null : Intake(dest, item, w.Fueling);
-        if (intake == null) {
+        // A load with nowhere to go looks for a place again only a few times a second, as a worker with nothing to do reads their list.
+        if (intake == null && S.Time >= w.LookAgain) {
             dest = DepositFor(item, w.Pos); w.Fueling = false;
             intake = dest == null ? null : Intake(dest, item, false);
+            if (intake == null) { dest = TakeBackPlace(item, w.Pos); w.LookAgain = S.Time + JobListSeconds; }
         }
-        if (dest == null || intake is not (Inventory into, int room)) return PutBack(w, item, dt);
+        if (dest == null || intake is not (Inventory into, int room)) return PutBack(w, dest, item, dt);
         w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
         if (!Walk(w, dest.Pos, dt)) return true;
         // Every vessel carried pours, whatever it holds; the vessels stay in hand, emptier.
@@ -120,24 +119,59 @@ public sealed partial class World {
     }
 
     /// <summary>
-    /// Takes a load nothing else takes back into the box it was carried out of, as far as that has room: a station's slot up to a stack.
-    /// With no room there, or for a load from anywhere else, the worker holds it and says so.
+    /// Takes a load nothing else takes back to a place that takes it back (<see cref="TakesBack"/>), as far as that has room.
+    /// With none, the worker holds it and says so.
     /// </summary>
-    private bool PutBack(Worker w, string item, float dt) {
-        w.Destination = 0;
-        var place = w.TakenFrom == 0 ? null : Find(w.TakenFrom);
-        var box = place == null ? null : Hauling.BoxOf(place, w.TakenBox);
-        int room = box == null ? 0 : IsStation(place!.Kind) && w.TakenBox == CarryBox.Inventory ? box.SlotRoom(item) : box.Room(item);
-        if (room <= 0) { w.Status = Phrase("Holding ", Data.Name(item), " · no accepting storage"); return false; }
-        w.Status = Phrase("Putting back ", Data.Name(item), " → ", Data.Name(place!.Kind));
+    private bool PutBack(Worker w, Thing? place, string item, float dt) {
+        if (place == null || TakesBack(place, item) is not (Inventory box, int room)) {
+            w.Destination = 0; w.Status = Phrase("Holding ", Data.Name(item), " · no accepting storage");
+            return false;
+        }
+        w.Destination = place.Id; w.Status = Phrase("Putting back ", Data.Name(item), " → ", Data.Name(place.Kind));
         if (!Walk(w, place.Pos, dt)) return true;
-        w.Bag.TransferTo(box!, item, Math.Min(w.Bag[item], room));
+        w.Bag.TransferTo(box, item, Math.Min(w.Bag[item], room));
+        w.Destination = 0;
         if (w.Bag.Count == 0) Emptied(w);
         return true;
     }
 
-    /// <summary>Empty hands end the round and forget where the load came from.</summary>
-    private static void Emptied(Worker w) { w.Fueling = false; w.InHand = null; w.TakenFrom = 0; }
+    /// <summary>Empty hands end the round.</summary>
+    private static void Emptied(Worker w) { w.Fueling = false; w.InHand = null; }
+
+    /// <summary>
+    /// The box of a place that takes back a load nothing else takes, and how many of it, or null:
+    /// an output slot takes what its place makes, and a chest or placed crate what it already holds, whatever its filters, each up to a stack.
+    /// </summary>
+    private (Inventory Box, int Room)? TakesBack(Thing t, string item) {
+        var box = t.Kind switch {
+            _ when IsStation(t.Kind) => Product(t) == item ? t.Inventory : null,
+            ThingKind.Farm => Data.Farm.Yield.ContainsKey(item) ? t.Output : null,
+            ThingKind.Mine => item == Mines.Ore(t) || item == "stone" ? t.Output : null,
+            ThingKind.Packer => t.Packs != "" && t.Output!.Count == 0 && World.PackedKind(item).SequenceEqual(CrateOf(t.Packs)) ? t.Output : null,
+            ThingKind.Chest or ThingKind.Crate => t.Inventory[item] > 0 ? t.Inventory : null,
+            _ => null
+        };
+        int room = box?.SlotRoom(item) ?? 0;
+        return box != null && room > 0 ? (box, room) : null;
+    }
+
+    private static readonly ThingKind[] TakeBackKinds = { ThingKind.Farm, ThingKind.Mine, ThingKind.Packer, ThingKind.Chest, ThingKind.Crate };
+
+    /// <summary>The nearest place that takes back a load of an item nothing else takes, or null.</summary>
+    private Thing? TakeBackPlace(string item, Vector2 origin) {
+        Thing? best = null; float nearest = 0;
+        foreach (var kind in stationKinds) Nearer(kind);
+        foreach (var kind in TakeBackKinds) Nearer(kind);
+        return best;
+
+        void Nearer(ThingKind kind) {
+            foreach (var t in S.Things.Of(kind)) {
+                float distance = t.Pos.DistanceSquaredTo(origin);
+                if (best != null && distance >= nearest || TakesBack(t, item) == null) continue;
+                best = t; nearest = distance;
+            }
+        }
+    }
 
     /// <summary>
     /// Which box of a place takes a carried item now, and how many of it, or null when none does:

@@ -732,8 +732,8 @@ A load a worker carries goes to the nearest place that asks for it:
 - a farm plot short of seed or fertilizer for a sowing, or a mine site short of a material.
 
 Only when none of those has room does it go to the nearest storage taking everything (A).
-With none of those either, a load carried out of a place goes back there, a station's slot up to a stack, as far as it has room.
-Any other load stays in hand: the worker says "Holding … · no accepting storage" and goes on with the jobs of their list that need no hands, such as Craft and Bellows, until something takes it.
+With none of those either, the load goes to the nearest place that takes it back, up to a stack, wherever it came from: an output slot takes what its place makes, such as a station's product or a mine's ore, and a chest or placed crate takes what it already holds, whatever its filters.
+With no such place, the load stays in hand: the worker says "Holding … · no accepting storage" and goes on with the jobs of their list that need no hands, such as Craft, Bellows and Farm, until something takes it.
 Workers send a load elsewhere when a filter changes or a slot fills while they carry it.
 A chest or pile near a source fills first and buffers the goods; without one, a gatherer walks each load to the nearest station with room.
 

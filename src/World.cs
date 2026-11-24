@@ -195,10 +195,8 @@ public sealed class Worker : IWalker {
     /// <summary>The kind of resource the worker last said they know no more of.</summary>
     [JsonIgnore] public ThingKind? Exhausted { get; set; }
     public int Destination { get; set; }
-    /// <summary>The place a hauler carried the load in hand out of, which takes it back when nothing else does; 0 for a load from anywhere else.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int TakenFrom { get; set; }
-    /// <summary>Which of <see cref="TakenFrom"/>'s boxes the load came out of.</summary>
-    [JsonInclude, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] internal CarryBox TakenBox { get; set; }
+    /// <summary>When on the world's clock a load with nowhere to go looks for a place to take it again.</summary>
+    [JsonIgnore] public float LookAgain { get; set; }
     public float Timer { get; set; }
     public float WageDebt { get; set; }
     /// <summary>Coins due at each dawn, fixed by the hiring offer.</summary>
@@ -1019,7 +1017,7 @@ public sealed partial class World {
         if (t.Burner != null) Unload(t.Burner, item => !Stays(product, next, true, item));
     }
     /// <summary>What the recipe a station is on makes, or empty for a thing that makes nothing.</summary>
-    private string Product(Thing t) => Data.Recipes.TryGetValue(Selected(t), out var r) ? r.Output : "";
+    internal string Product(Thing t) => Data.Recipes.TryGetValue(Selected(t), out var r) ? r.Output : "";
     private void Unload(Inventory box, Func<string, bool> leaves) { foreach (string item in box.Items.Keys.ToArray()) if (leaves(item)) Carry(box, S.Backpack, null, item, box[item]); }
     private static readonly Dictionary<string, int> NoCost = new();
     /// <summary>

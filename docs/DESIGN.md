@@ -1149,8 +1149,9 @@ Storage with a filter window has `Inventory.Gated` set: there an empty list lets
 `World.Add` gives a chest, placed crate and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; a crate packed at a packing station gets the chest's lists when it is put down.
 Any other box, such as a station's slots or a worker's hands, is not gated, and lets anything through its empty lists.
 Automated deposits go to the nearest place that asks for the item, then to the nearest storage taking everything (`World.DepositFor`).
-A load nothing takes goes back into the box a hauler carried it out of (`Worker.TakenFrom`, `Worker.TakenBox`, `World.PutBack`), a station's slot up to a stack.
-Any other load stays in hand while the worker does only the jobs that need no hands, those whose round is a unit of the place's work, other than mining, whose miner carries loads out (`World.NeedsHands`).
+A load nothing takes goes to the nearest place that takes it back (`World.TakesBack`, `World.PutBack`), up to a stack: an output slot what its place makes, and a chest or placed crate what it already holds, whatever its filters.
+With no taker found, a worker looks again every `JobListSeconds` (`Worker.LookAgain`) rather than every tick.
+With none, the load stays in hand while the worker does only the jobs that need no hands: the job table's `JobDef.Hands` says which jobs carry loads (`World.NeedsHands`).
 Asking for it are a chest, pile, placed crate or trading post whose input filter names it, a packing station packing it, a station whose recipe takes it as an input or burns it, a farm plot short of it for a sowing and a mine site short of it.
 `World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
