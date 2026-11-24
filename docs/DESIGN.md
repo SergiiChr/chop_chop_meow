@@ -137,7 +137,9 @@ UI and input:
 | File | Owns |
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
-| `src/menus/PauseMenu.cs` | The pause menu with the goal chain, access to Controls, and hosting |
+| `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
+| `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
+| `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
@@ -618,21 +620,24 @@ During the respawn countdown, a player with no cabin anywhere in the world is of
 It advances normal simulation through dawn, including needs, trades, production and wages.
 In multiplayer it is available only when everyone is downed; a living player prevents a shared time skip.
 
-### Goals
+### Goal Log
 
-The starter goals are met in order (`World.StarterGoals`): buildings built, the first sale and the first steel bar, a
-steel hammer and a steel pickaxe the settlement has had (bought or made), the first steel parts, and a worker given any
-job, the trading post's deliveries included.
+`Goals` reads the settlement's milestones and its history of obtained items to decide which goals are visible and
+which are complete.
+The initial goals can be completed in any order.
+Building the bench or stone furnace reveals a related goal.
+The first steel bar reveals Too soft and the first steel parts reveal Infinite power.
+The first time a player sees a mineable ore deposit, the server records the discovery in `SaveState.Milestones` and
+Steel tools appears for the settlement.
+Finding loose ore on the ground leaves that goal hidden.
 
-The end goals:
-
-- a working mine on every ore in `Cliff.Ores`;
-- `Goals.ProfitDays` consecutive days of at least `Goals.DailyProfit` profit.
-
+Infinite power lists a mine and links to its item for each ore in `Cliff.Ores`.
+It is complete when a mine is open for every ore in that list.
+NEET is complete after `GoalsDef.ProfitDays` consecutive days of at least `GoalsDef.DailyProfit` profit.
 `SaveState.DayRevenue` collects returned sale coins.
 At dawn the wages charged are taken off and the result joins `SaveState.Profits`.
 Reaching the streak sets the `profit_week` milestone, which stays reached.
-The starter goal chain stays as the tutorial, and the pause menu lists both.
+The open mines and profit milestone together unlock the ending.
 
 ### Survival and needs
 
@@ -1014,8 +1019,9 @@ The panel keeps the list's place while the page draws again, so a click on a rec
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 
-The recipe map badge on the bottom bar opens `RecipeMap` over the screen.
-It is drawn afresh on each `RecipeMap.Open` while the game goes on under it.
+The recipe map badge on the bottom bar opens `RecipeMap` over the running game.
+An item link in the Goal Log opens it through `RecipeMap.OpenAt` with that item highlighted and the game still paused.
+Closing the map returns to the goal details.
 `PlayerControl.Update` moves nobody while it shows, and a `MapNode` turns to made before as soon as `World.Had` knows its item.
 `RecipeMap.Place` puts an item on a grid of steps across and lines down: what is made out of it goes one step on, the first on the same line and the rest on lines below, and `MapTree` draws the lines between them.
 A `MapNode` draws a filled slot for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.

@@ -25,7 +25,7 @@ public static class SaveChecks {
         world.Add(ThingKind.Anvil, new Vector2(10, 10));
         string json = world.Serialize();
         EmptyWorld(data).Deserialize(json);
-        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"steel_hammer\": 1", "\"unobtainium\": 1"), ("\"wood\": 2", "\"unobtainium\": 2"), ("\"Keep\": \"steel_parts\"", "\"Keep\": \"steel_pick\""), ("\"Goal\": 0", "\"Goal\": -1") }) {
+        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"steel_hammer\": 1", "\"unobtainium\": 1"), ("\"wood\": 2", "\"unobtainium\": 2"), ("\"Keep\": \"steel_parts\"", "\"Keep\": \"steel_pick\"") }) {
             bool refused = false;
             try { EmptyWorld(data).Deserialize(Patch(json, edit)); } catch (InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
             Require(refused, $"a save with {edit.Item2} in place of {edit.Item1} should be refused with a clear reason");
