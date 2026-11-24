@@ -365,9 +365,9 @@ public sealed class WolfModel {
 
     private static WolfPose Threatening(float time) {
         float breath = MathF.Sin(time * 5);
-        var body = new WolfPose(Lift: -.07f + .006f * breath, Surge: -.03f, Pitch: -9, Flex: 3, Neck: -8, Head: -10,
+        var body = new WolfPose(Lift: -.02f + .006f * breath, Surge: -.01f, Pitch: -14, Flex: 3, Neck: -6, Head: -10,
             Jaw: 28 + 3 * breath, Ears: 2, Snarl: 1, Tail: -72, Curl: -12);
-        return Planted(body, 1.45f, .05f, frontAhead: .13f, hindSpread: 1.14f);
+        return Planted(body, 1.45f, .05f, frontAhead: .18f, hindSpread: 1.14f);
     }
 
     /// <summary>

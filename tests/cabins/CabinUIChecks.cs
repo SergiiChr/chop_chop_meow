@@ -141,7 +141,11 @@ public partial class Game {
         await Click(FindButton(panel, "Step outside")!);
         Require(world.Sheltered == 0, "Step outside must leave the cabin.");
         await Until(() => world.Door == Doorway.Leaving && world.Me.DoorTime > .12f, "stepping out of the cabin door", 2);
-        CheckBodyAtDoor(hut, "leaving");
+        var start = CheckBodyAtDoor(hut, "starting to leave");
+        await Until(() => world.Door == Doorway.Leaving && world.Me.DoorTime > .45f, "moving out through the cabin door", 2);
+        var later = CheckBodyAtDoor(hut, "further through the exit");
+        Require(later.DistanceTo(Doorways.DoorPoint(hut)) < start.DistanceTo(Doorways.DoorPoint(hut)) - .15f,
+            "the player model should move toward the doorstep while leaving");
         await Until(() => world.Find(hut.Id) is { Locked: false } && Named("key") is { Visible: false }, "stepping out unlocking the door and hiding its key", 2);
         // With no key held the player stops where they stepped in, right by the door.
         await Click(view.Screen(hut.Pos, 1.5f));
@@ -157,10 +161,11 @@ public partial class Game {
         Warp(Hosted, home); await Frames(4);
     }
 
-    private void CheckBodyAtDoor(Thing cabin, string action) {
+    private Vector2 CheckBodyAtDoor(Thing cabin, string action) {
         var root = view.RigOf(world.Me.Id)!.Root;
         var feet = new Vector2(root.Position.X, root.Position.Z);
-        Require(root.Visible && feet.DistanceTo(Doorways.DoorPoint(cabin)) < 1.4f,
+        Require(root.Visible && feet.DistanceTo(Doorways.DoorPoint(cabin)) < DoorwayPath.IntoCabin.Length() + .2f,
             $"the player model should stay visible at the doorway while {action}, feet at {feet}");
+        return feet;
     }
 }

@@ -765,7 +765,7 @@ A player knocking on the door stands on the lower tread, with the front boot on 
 `DoorCheck` (`src/actors/enemies/wolf/DoorCheck.cs`, `World.DoorCheck`) runs a wolf's door check at a cabin with someone inside, a `DoorCheckStage` stage on `Wolf.DoorCheck` at `Wolf.DoorCheckCabin`, timed by `Wolf.DoorCheckTime`.
 A wolf whose player got inside goes there (`DoorCheck.Follow`), and so does a patrolling or called wolf within `SmellRadius` of such a cabin (`DoorCheck.Smell`), without a howl; a campfire lighting the door keeps both off it.
 
-- `Coming`: the wolf nearest the door comes round to face it and walks straight up, at a walk, to `DoorCheck.ScratchAside` toward the free edge from `Doorways.DoorPoint`; the others wait `DoorCheck.WaitBehind` out from it, `DoorCheck.WaitApart` apart.
+- `Coming`: the wolf nearest the door comes round to face it and goes straight up to `DoorCheck.ScratchAside` toward the free edge from `Doorways.DoorPoint`; the others wait `DoorCheck.WaitBehind` out from it, `DoorCheck.WaitApart` apart.
 - `Scratching` lasts `DoorCheck.ScratchSeconds` with `door_scratch`.
   From a locked door every wolf there goes away, and a wolf with no way to a door gives up on it (`DoorCheck.GiveUp`); it leaves alone every cabin it gave up on (`Wolf.Tried`) until it has been out of smell range of that one.
   Until its snout is in the door a wolf turns to a player out in the open within `WolfSightRange`.
