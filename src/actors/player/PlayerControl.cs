@@ -43,7 +43,7 @@ public sealed class PlayerControl {
     private ClickMode? heldPlacement;
     private Thing? gathering;
     private int digPress, digAttempt;
-    private bool shovelSelected;
+    private bool digDismissed;
     /// <summary>The spot under the mouse when this hold started, locked until it ends.</summary>
     public Vector2? DiggingAt { get; private set; }
     private readonly CabinApproach cabinApproach;
@@ -62,7 +62,7 @@ public sealed class PlayerControl {
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
         cabinApproach = new CabinApproach(world);
-        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; shovelSelected = false; Mode = new ClickMode.Normal(); };
+        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; digDismissed = false; Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops actions whose targets belong to the previous world.</summary>
@@ -109,12 +109,22 @@ public sealed class PlayerControl {
         Walk(direction, right, dt);
     }
 
-    /// <summary>Restores digging when a shovel becomes selected through a hotbar binding or a loaded save.</summary>
+    /// <summary>Shows the dig outline again once a temporary action ends, unless the player put it away.</summary>
     private void UpdateDigMode() {
         bool selected = world.Holes.ShovelSelected;
-        if (selected && !shovelSelected && Mode is ClickMode.Normal) Mode = new ClickMode.Dig();
+        if (!selected) digDismissed = false;
+        if (selected && !digDismissed && Mode is ClickMode.Normal) Mode = new ClickMode.Dig();
         else if (!selected && Mode is ClickMode.Dig) Mode = new ClickMode.Normal();
-        shovelSelected = selected;
+    }
+
+    internal void SelectDigging() {
+        digDismissed = false;
+        Mode = new ClickMode.Dig();
+    }
+
+    internal void CancelMode() {
+        if (Mode is ClickMode.Dig) digDismissed = true;
+        Mode = new ClickMode.Normal();
     }
 
     /// <summary>A container or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>
@@ -138,8 +148,8 @@ public sealed class PlayerControl {
     public bool RotatePlacement(int quarters, bool overPanel) {
         PlaceHeld(overPanel);
         var placement = heldPlacement ?? Mode;
-        if (placement.Placing is not ThingKind kind) return false;
-        if (kind is ThingKind.Mine or ThingKind.PlantingSpot) return true;
+        if (placement.Placing is not ThingKind kind || kind == ThingKind.PlantingSpot) return false;
+        if (kind == ThingKind.Mine) return true;
         var turned = placement with { QuarterTurns = (placement.QuarterTurns + quarters + 4) % 4 };
         if (heldPlacement != null) heldPlacement = turned;
         if (placingHeld || heldPlacement == null) Mode = turned;

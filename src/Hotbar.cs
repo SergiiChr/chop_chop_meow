@@ -184,7 +184,7 @@ public partial class Hotbar : PanelContainer {
     }
 
     private void SelectDigging() {
-        panel.Player.Mode = new ClickMode.Dig();
+        panel.Player.SelectDigging();
         panel.Close();
     }
 

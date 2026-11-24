@@ -42,6 +42,7 @@ public partial class Game {
 
     private async Task CheckHotbarShovelShowsADigOutline() {
         Give(Hosted, "steel_shovel");
+        Give(Hosted, "crate");
         string previous = world.HotbarItem(8);
         await Frames();
         await KeyStroke(Key.Tab);
@@ -51,6 +52,15 @@ public partial class Game {
             && Uncovered(view.Screen(p)));
         await Hover(view.Screen(at));
         Require(view.PlacementGhost != null, "binding the shovel to the selected slot should show the dig outline");
+        await KeyStroke(Key.C);
+        Require(panel.Page == Page.Craft, "the crafting shortcut should work with the shovel selected");
+        await KeyStroke(Key.C);
+        await KeyStroke(Key.Tab);
+        await PickUp(BagCell(c => c.TooltipText.StartsWith(world.Data.Name("crate"))));
+        await Hover(view.Screen(at));
+        Require(view.Placing == ThingKind.Crate, "carrying an empty crate over open ground should show its placement");
+        await RightClick(at, 0);
+        Require(cursor.Empty && view.Placing == ThingKind.PlantingSpot, "putting the crate back should restore the selected shovel's outline");
         await KeyStroke(Key.Escape);
         Require(view.PlacementGhost == null, "escaping should put away the outline");
         await KeyStroke(Key.Key9);
@@ -61,6 +71,7 @@ public partial class Game {
         Require(view.PlacementGhost == null, "emptying the selected slot should put away the outline");
         SetHotbarSlot(Hosted, 8, previous);
         Drop(Hosted, "steel_shovel");
+        Drop(Hosted, "crate", 1);
         await Frames();
     }
 

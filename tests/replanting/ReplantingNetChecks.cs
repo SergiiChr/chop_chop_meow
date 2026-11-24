@@ -37,6 +37,8 @@ public partial class Game {
 
     private async Task GuestPlantsAndWatersATree() {
         await CloseWithEsc();
+        int previousSlot = world.ActiveHotbar;
+        string previousTool = world.InHand;
         await Until(() => world.Player.DistanceTo(GuestDigsFrom) < .1f && world.Backpack[GuestWater] == 1,
             "the guest reaching the planting site with water");
         await KeyStroke(Key.Tab);
@@ -46,6 +48,8 @@ public partial class Game {
         await Until(() => tree.Remaining == 4 && ShowsResourceStock("wood", "4") && ShowsTreeStatus("Growing"),
             "the guest's tree panel updating its wood count after a day of growth");
         await Until(() => world.Player.DistanceTo(GuestTree) > 8, "the guest back near the clearing");
+        world.SelectHotbar(previousSlot);
+        if (previousTool != "") world.SelectInHand(previousTool);
         await CloseWithEsc();
     }
 }
