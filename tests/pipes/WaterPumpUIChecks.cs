@@ -100,8 +100,8 @@ public partial class Game {
         var chamber = (Vector2)intake + Vector2.Down * .38f;
         await Hover(view.Screen(chamber, .25f));
         Require(view.Hover == pump.Id, "The chamber in front of the water should show the pump's hover label.");
-        await KeyStroke(Key.E);
-        Require(panel.Selection.Thing == pump.Id, "E over the pump should inspect it even when the lake was selected.");
+        await Click(view.Screen(chamber, .25f));
+        Require(panel.Selection.Thing == pump.Id, "Clicking the chamber should select the pump even when the lake was selected.");
         await Click(view.Screen(shore));
         var shaft = view.Screen(chamber, .89f) + Vector2.Right * 3;
         await Hover(shaft);

@@ -122,16 +122,15 @@ internal static class PlayerSteps {
     }
 
     /// <summary>
-    /// A bench beside the player set to <paramref name="recipe"/>, with a wooden mallet slotted and a batch loaded from
-    /// the backpack, left twenty seconds to make it.
+    /// A bench beside the player with a wooden mallet slotted and a batch of <paramref name="recipe"/> queued with its
+    /// inputs from the backpack, left twenty seconds to make it.
     /// </summary>
     public static Thing BenchLeftWithAMallet(World world, string recipe) {
         var bench = world.Add(ThingKind.Bench, Site(0, 4));
         world.Player = bench.Pos + new Vector2(1.2f, 0);
         Give(world, "wood_hammer", 1);
-        world.SetRecipe(bench, recipe);
         Require(world.SlotTool(bench, "wood_hammer"), "a wooden mallet should fit the hammer slot");
-        world.LoadBatch(bench);
+        world.QueueBatch(bench, recipe);
         SafeTick(world, 20);
         return bench;
     }

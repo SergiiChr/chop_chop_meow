@@ -337,7 +337,7 @@ public sealed partial class World {
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
         bool pile = IsSingleResourceStore(chest);
         if (chest.Kind == ThingKind.Barrel && item != Water.Liquid) return;
-        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate) || Nests(chest, item)) return;
+        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate || !pile && item == Inventory.Everything) || Nests(chest, item)) return;
         if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Busy() || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         if (pile && allowed) SetPileFilter(chest, PileEntry(item));
         else if (pile) chest.Inventory.ClearFilters();

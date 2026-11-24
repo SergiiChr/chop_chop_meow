@@ -36,7 +36,7 @@ public partial class Game {
             "The guest must see the south pipe connected to the host's tee.");
         await Until(() => world.PipeReading(NetPipeSouth).Liters == 1,
             "the server's water reaching the south pipe on the guest");
-        var removal = world.Construction.RemovalAt(null, NetPipeSouth, underground: true);
+        var removal = world.Construction.RemovalAt(null, NetPipeSouth, Layer.Underground);
         Require(world.Construction.Remove(removal), "The guest should be able to take up the host's pipe in reach.");
         await Until(() => !world.SteelPipes.Laid(NetPipeSouth) && world.Backpack["steel_pipe"] == 1,
             "the server taking up the south pipe and giving it to the guest");

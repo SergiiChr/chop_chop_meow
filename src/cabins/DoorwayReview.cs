@@ -130,7 +130,7 @@ public sealed partial class DoorwayReview : Node {
     /// <summary>The least health a review scene keeps a pinned player at, so the wolves on them can be looked at for longer than the game gives them.</summary>
     internal const float KeptAlive = 30;
 
-    /// <summary>Runs the script up to this frame, then walks each player sent to the door a step toward it and steps them in on arrival, as a click on the cabin does.</summary>
+    /// <summary>Runs the script up to this frame, then walks each player sent to the door a step toward it and steps them in on arrival, as a double click on the cabin does.</summary>
     public override void _Process(double delta) {
         float dt = Math.Min((float)delta, .1f);
         time += dt;

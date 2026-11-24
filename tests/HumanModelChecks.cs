@@ -17,14 +17,14 @@ public static class HumanModelChecks {
         };
         try {
             var core = rigs.Select(Core).ToArray();
-            CheckRigsShareGeometryButKeepTheirOwnSkeletons(core);
-            CheckOutfitsShareMaterialsOnlyWhenTheirColorsMatch(core);
-            CheckSleevesShowSkinOrShirtAndFadingKeepsThePalette(core);
-            CheckPosingOneRigLeavesAnotherAlone(rigs, core);
-            CheckCarriedCrateFollowsCarryingVisibility(rigs);
-            CheckGrindingWorksThePestleInsideALevelBowl(rigs);
-            CheckDiggingDrivesTheBladeIntoTheGroundWithBothHandsOnTheShaft(rigs);
-            CheckDiggingKeepsBothArmsOutOfTheTorso(rigs);
+            Test(() => CheckRigsShareGeometryButKeepTheirOwnSkeletons(core));
+            Test(() => CheckOutfitsShareMaterialsOnlyWhenTheirColorsMatch(core));
+            Test(() => CheckSleevesShowSkinOrShirtAndFadingKeepsThePalette(core));
+            Test(() => CheckPosingOneRigLeavesAnotherAlone(rigs, core));
+            Test(() => CheckCarriedCrateFollowsCarryingVisibility(rigs));
+            Test(() => CheckGrindingWorksThePestleInsideALevelBowl(rigs));
+            Test(() => CheckDiggingDrivesTheBladeIntoTheGroundWithBothHandsOnTheShaft(rigs));
+            Test(() => CheckDiggingKeepsBothArmsOutOfTheTorso(rigs));
         } finally {
             foreach (var rig in rigs) rig.Root.Free();
         }

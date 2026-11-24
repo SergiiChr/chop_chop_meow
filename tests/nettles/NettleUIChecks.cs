@@ -27,8 +27,7 @@ public partial class Game {
 
     private async Task CheckRecipeMapShowsItemTextAndTheMalletRopeNeeds() {
         await CloseWithEsc();
-        await KeyStroke(Key.C);
-        await Click(Named("open_map")!);
+        await Click((Button)hotbar.FindChild("map", true, false));
         await Click((Control)recipeMap.NodeOf("firebug")!.FindChild("slot", true, false));
         var details = (Node)recipeMap.FindChild("map_details", true, false);
         Require(((Label)recipeMap.FindChild("detail_text", true, false)).Text == "Glows even after death." && HasLabel(details, "Catch with a bug net after dark"), "A click on the firebug must show what the player says of it and how it is come by.");
@@ -43,8 +42,8 @@ public partial class Game {
         await CloseWithEsc();
         var bench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1.5f, 0));
         bench.Tools!.Add("steel_hammer", 1);
-        await Frames();
-        await KeyStroke(Key.E);
+        await Frames(4);
+        await ClickOn(bench);
         await Until(() => Named("craft_nettle_rope") != null, "the bench's page with the rope card", 2);
         Label Lacks() => (Label)Named("craft_nettle_rope")!.FindChild("lacks", true, false);
         await Until(() => Lacks().Visible && Lacks().Text == "Steel hammer will damage the fibers.", "the rope card saying a steel hammer will damage the fibers", 2);

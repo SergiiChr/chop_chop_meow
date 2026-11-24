@@ -17,6 +17,7 @@ public partial class RecipeMap : Control {
     private readonly SidePanel panel;
     private readonly PanelContainer board;
     private readonly Dictionary<string, MapNode> nodes = new();
+    private Action? leaveGoalLog;
     private ScrollContainer rows = null!;
     private PanelContainer details = null!;
     /// <summary>How long a jumped-to item stays lit, in seconds.</summary>
@@ -53,11 +54,19 @@ public partial class RecipeMap : Control {
         Visible = true;
     }
 
+    /// <summary>Opens the map at a goal's item, with the goal underneath until the player leaves for a recipe.</summary>
+    public void OpenAt(string item, Action leaveGoalLog) {
+        Open();
+        this.leaveGoalLog = leaveGoalLog;
+        Choose(item);
+        Callable.From(() => { if (Visible && Chosen == item) Jump(item); }).CallDeferred();
+    }
+
     public void Close() { Visible = false; Clear(); }
 
     private void Clear() {
         foreach (var child in board.GetChildren()) { board.RemoveChild(child); child.QueueFree(); }
-        nodes.Clear(); Chosen = "";
+        nodes.Clear(); Chosen = ""; leaveGoalLog = null;
     }
 
     /// <summary>The title, what the marks on the map mean, and the close button.</summary>
@@ -200,7 +209,7 @@ public partial class RecipeMap : Control {
         string id = world.Data.RecipeIdOf(item)!;
         bool byHand = station == null && recipe.Hand;
         string place = byHand ? "in the crafting menu" : $"at the {world.Data.Name(recipe.Station!.Value).ToLowerInvariant()}";
-        var show = kit.Button($"Show {place}", () => { Close(); panel.ShowRecipe(station, id); }, disabled: station == null && !byHand);
+        var show = kit.Button($"Show {place}", () => { leaveGoalLog?.Invoke(); Close(); panel.ShowRecipe(station, id); }, disabled: station == null && !byHand);
         show.Name = "map_show"; show.SizeFlagsVertical = SizeFlags.ShrinkCenter; show.CustomMinimumSize = new Vector2(0, 44);
         if (show.Disabled) show.TooltipText = $"Build a {world.Data.Name(recipe.Station!.Value).ToLowerInvariant()} first"; else Style.SkinPill(show, Style.Sage);
         return show;

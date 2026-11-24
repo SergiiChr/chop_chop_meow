@@ -85,7 +85,9 @@ public static class ProgressionChecks {
         var offer = SellSteelToolForTheFirstHire(world, sign);
         SupplyOpeningCampWithHiredWorker(world, sign, offer, tree, stone);
         world.Tick(.01f, true);
-        Require(world.GoalComplete, "objective chain should reach the first automation milestone");
+        foreach (var goal in Goals.Entries)
+            if (goal.Id is not (GoalId.Profit or GoalId.Mines))
+                Require(world.Goals.Status(goal.Id) == GoalStatus.Completed, $"progression to first automation should complete {goal.Title}");
         GD.Print($"Progression simulation elapsed: {world.Time - startTime:0} seconds.");
     }
 }

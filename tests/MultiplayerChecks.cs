@@ -21,27 +21,27 @@ using static WorldSteps;
 /// </summary>
 public static class MultiplayerChecks {
     public static void Run(GameData data) {
-        CheckGuestActsThroughCommands(data);
-        GuestCommandChecks.CheckGuestCopyForwardsActions(data);
-        CheckGuestComesBackFromSaveWithTheirPackAndSpot(data);
-        CheckEveryPlayerSurvivesLoadingAndSavingAgain(data);
-        CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole();
-        CheckSaveKeepsItsOwnersPlayerOnANewComputer(data);
-        CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(data);
-        CheckGuestCopyForwardsLayoutActionsToTheHost(data);
-        CheckHotbarAndEndingReachTheServer(data);
-        CheckPlayerComesBackFreeToWalk(data);
-        CheckServerNamesWhatAPlayerMade(data);
-        CheckCopySaysAnActionWasSent(data);
-        CheckWorkersKeepTheirMissingToolThroughTheSave(data);
-        CheckDropOnAnotherItemsChestCellStoresTheStack(data);
-        CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(data);
-        CheckUpdateFieldsLeftOutStartAsNewObjectsDo();
-        CheckUpdateEntriesReadBackAsTheyWere(data);
-        PipeWaterUpdateChecks.CheckPipeWaterUpdatesKeepTheHostsFieldsAndOrder();
-        CheckATreeUpdateCarriesNoStationFields(data);
-        CheckAChangedInventoryFieldIsNeverFresh();
-        CheckStateReadKeepsNothingFromTheOneBefore();
+        Test(CheckGuestActsThroughCommands, data);
+        Test(GuestCommandChecks.CheckGuestCopyForwardsActions, data);
+        Test(CheckGuestComesBackFromSaveWithTheirPackAndSpot, data);
+        Test(CheckEveryPlayerSurvivesLoadingAndSavingAgain, data);
+        Test(CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole);
+        Test(CheckSaveKeepsItsOwnersPlayerOnANewComputer, data);
+        Test(CheckGuestSlotCommandsMoveOnlyTheirOwnStacks, data);
+        Test(CheckGuestCopyForwardsLayoutActionsToTheHost, data);
+        Test(CheckHotbarAndEndingReachTheServer, data);
+        Test(CheckPlayerComesBackFreeToWalk, data);
+        Test(CheckServerNamesWhatAPlayerMade, data);
+        Test(CheckCopySaysAnActionWasSent, data);
+        Test(CheckWorkersKeepTheirMissingToolThroughTheSave, data);
+        Test(CheckDropOnAnotherItemsChestCellStoresTheStack, data);
+        Test(CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown, data);
+        Test(CheckUpdateFieldsLeftOutStartAsNewObjectsDo);
+        Test(CheckUpdateEntriesReadBackAsTheyWere, data);
+        Test(PipeWaterUpdateChecks.CheckPipeWaterUpdatesKeepTheHostsFieldsAndOrder);
+        Test(CheckATreeUpdateCarriesNoStationFields, data);
+        Test(CheckAChangedInventoryFieldIsNeverFresh);
+        Test(CheckStateReadKeepsNothingFromTheOneBefore);
     }
 
     /// <summary>Updates leave out fields at their type's default, so a guest reading one back must start that field there too.</summary>
@@ -96,6 +96,7 @@ public static class MultiplayerChecks {
             var inventory = new Inventory();
             object changed = field.PropertyType switch {
                 var type when type == typeof(int) => 1,
+                var type when type == typeof(bool) => true,
                 var type when type == typeof(FilterList) => new FilterList { "wood" },
                 var type when type == typeof(List<Inventory.Slot>) => new List<Inventory.Slot>(),
                 var type when type == typeof(Dictionary<string, int>) => new Dictionary<string, int> { ["wood"] = 1 },

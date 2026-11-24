@@ -25,12 +25,12 @@ public static class SteelPipeChecks {
         Require(world.SteelPipes.Laid(tile) && world.GravelPaths.Laid(tile) && world.Find(chest.Id) == chest,
             "The steel pipe must be in its own layer beneath the gravel path and the chest.");
 
-        var removal = world.Construction.RemovalAt(chest, tile, underground: true);
+        var removal = world.Construction.RemovalAt(chest, tile, Layer.Underground);
         Require(removal.Pipe == tile && world.Construction.InReach(removal), "The underground selector must pick the pipe.");
         Require(world.Construction.Remove(removal), "The underground selector should take up the pipe.");
         Require(!world.SteelPipes.Laid(tile) && world.GravelPaths.Laid(tile) && world.Find(chest.Id) == chest,
             "Taking out a steel pipe must leave the path and the chest above it.");
-        Require(world.Construction.RemovalAt(chest, tile, underground: true) == Removal.None,
+        Require(world.Construction.RemovalAt(chest, tile, Layer.Underground) == Removal.None,
             "The underground selector must leave a surface building alone once the pipe is gone.");
     }
 
@@ -47,7 +47,7 @@ public static class SteelPipeChecks {
         world.Construction.Build(ThingKind.SteelPiping, tile);
         Require(world.Backpack["steel_pipe"] == 1, "A second pipe on the tile must be refused without spending it.");
 
-        var removal = world.Construction.RemovalAt(null, tile, underground: true);
+        var removal = world.Construction.RemovalAt(null, tile, Layer.Underground);
         world.Player = tile + Vector2.Down * 16;
         Require(!world.Construction.InReach(removal) && !world.Construction.Remove(removal) && world.SteelPipes.Laid(tile),
             "A player too far away must be unable to take up the pipe.");

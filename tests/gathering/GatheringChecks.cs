@@ -13,6 +13,7 @@ using static GatheringSteps;
 /// <summary>Checks of gathering: the player's and a worker's gathering of trees, ore, leaves, berries and loose pieces, digging up stumps and bushes, and where a gatherer's load goes.</summary>
 public static class GatheringChecks {
     public static void Run(GameData data) {
+        Test(CheckGathererHoldsALoadNothingTakesAndDoesJobsThatNeedNoHands, data);
         Test(CheckWorkerGathersFourPiecesACycleUntilTwelveAreInHand, data);
         Test(CheckGathererGoesOnToTheNextSpotUntilTheirHandsAreFull, data);
         Test(CheckCarriedGoodsGoToTheNearestOfAStationAndFilteredStorage, data);
@@ -50,7 +51,7 @@ public static class GatheringChecks {
     private static void CheckWorkerGathersFourPiecesACycleUntilTwelveAreInHand(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 4000);
-        var chest = world.Add(ThingKind.Chest, new Vector2(18, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(18, 10)));
         var cutter = Staff(world, tree, JobKind.Gather);
         cutter.Tool = "steel_axe";
         Work(world, 2);
@@ -66,7 +67,7 @@ public static class GatheringChecks {
         var first = world.Add(ThingKind.LooseCoal, new Vector2(10, 10), 1);
         world.Add(ThingKind.LooseCoal, new Vector2(12, 10), 1);
         world.Add(ThingKind.LooseCoal, new Vector2(14, 10), 1);
-        var chest = world.Add(ThingKind.Chest, new Vector2(18, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(18, 10)));
         world.Player = new Vector2(12, 12); world.Look();
         Staff(world, first, JobKind.Gather);
         Work(world, 60, () => chest.Inventory["coal"] > 0);
@@ -77,9 +78,9 @@ public static class GatheringChecks {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 4000);
         var near = Bench(world, new Vector2(12, 10), "planks");
-        var asking = world.Add(ThingKind.Chest, new Vector2(20, 10));
-        asking.Inventory.InputFilter.Add("wood");
-        var open = world.Add(ThingKind.Chest, new Vector2(11, 12));
+        var asking = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 10)));
+        asking.Inventory.Filter("wood", false, true);
+        var open = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(11, 12)));
         var cutter = Staff(world, tree, JobKind.Gather);
         cutter.Tool = "steel_axe";
         Work(world, 60, () => near.Inventory["wood"] > 0);
@@ -94,7 +95,7 @@ public static class GatheringChecks {
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 4000);
         var furnace = world.Add(ThingKind.Furnace, new Vector2(13, 10));
         world.SetRecipe(furnace, "bread");
-        world.Add(ThingKind.Chest, new Vector2(11, 12));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(11, 12)));
         var cutter = Staff(world, tree, JobKind.Gather);
         cutter.Tool = "steel_axe";
         Work(world, 60, () => furnace.Burner!["wood"] > 0);
@@ -104,9 +105,9 @@ public static class GatheringChecks {
     private static void CheckWorkerGathersWoodAndRetargetsWhenFilterChanges(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 5);
-        var general = world.Add(ThingKind.Chest, new Vector2(8.5f, 10));
-        var filtered = world.Add(ThingKind.Chest, new Vector2(13, 10));
-        filtered.Inventory.InputFilter.Add("wood");
+        var general = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(8.5f, 10)));
+        var filtered = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10)));
+        filtered.Inventory.Filter("wood", false, true);
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
@@ -122,7 +123,7 @@ public static class GatheringChecks {
         // The worker already chose this destination and is walking with a load. A filter edit must
         // be applied before the eventual deposit, with the carrying bag kept intact during reroute.
         filtered.Inventory.InputFilter.Clear();
-        filtered.Inventory.InputFilter.Add("stone");
+        filtered.Inventory.Filter("stone", false, true);
         SafeTick(world, .1f);
         Require(worker.Destination == general.Id && worker.Bag["wood"] == 5,
                 "worker should retarget in transit when the destination filter changes");
@@ -194,7 +195,7 @@ public static class GatheringChecks {
         Require(world.Backpack["coal"] == 2, "a loose coal piece should give coal");
 
         world = EmptyWorld(data);
-        world.Add(ThingKind.Chest, new Vector2(12, 10));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 10)));
         var worker = AddWorker(world, new Vector2(10, 10));
         var assigned = world.Add(ThingKind.LooseCoal, new Vector2(10.5f, 10), 2);
         world.Assign(worker, assigned);
@@ -239,9 +240,9 @@ public static class GatheringChecks {
         SafeTick(world, data.DaySeconds - world.Time % data.DaySeconds + 1);
         Require(leaves.Remaining == World.LeavesPerSpot, "leaves should fall again by the next day");
 
-        var station = world.Add(ThingKind.Toolstation, new Vector2(14, 10));
+        var station = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(14, 10)));
         station.Inventory.Add("rake", 1);
-        world.Add(ThingKind.Chest, new Vector2(12, 12));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 12)));
         var worker = AddWorker(world, station.Pos);
         world.Assign(worker, leaves);
         world.Player = new Vector2(30, 30);
@@ -281,7 +282,7 @@ public static class GatheringChecks {
     private static void CheckWorkerStateFollowsGatheringAndReassignment(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
-        world.Add(ThingKind.Chest, new Vector2(12, 10));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 10)));
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
@@ -348,8 +349,8 @@ public static class GatheringChecks {
     private static void CheckMinerWorksDepositsBeforePickingUpChips(GameData data) {
         var world = EmptyWorld(data);
         var at = Terrain.Spawn;
-        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 2));
-        world.Add(ThingKind.Toolstation, at + new Vector2(-2, 2)).Inventory.Add("steel_pick", 1);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, at + new Vector2(2, 2)));
+        TakeEverything(world, world.Add(ThingKind.Toolstation, at + new Vector2(-2, 2))).Inventory.Add("steel_pick", 1);
         var near = world.Add(ThingKind.Iron, at + new Vector2(1, 0), 4);
         var chip = world.Add(ThingKind.IronChip, at + new Vector2(2, -1.5f), 1);
         var far = world.Add(ThingKind.Iron, at + new Vector2(6, 0), 4);
@@ -368,7 +369,7 @@ public static class GatheringChecks {
     private static void CheckGathererWithoutAToolPicksUpLoosePieces(GameData data) {
         var world = EmptyWorld(data);
         var at = Terrain.Spawn;
-        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 2));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, at + new Vector2(2, 2)));
         var deposit = world.Add(ThingKind.Iron, at + new Vector2(1, 0), 40);
         var chip = world.Add(ThingKind.IronChip, at + new Vector2(-2, -1.5f), 1);
         world.Player = at; world.Look();
@@ -548,5 +549,29 @@ public static class GatheringChecks {
         Require(guest.Backpack["wood"] >= 4, "a guest holding on to a tree should chop wood into their own backpack");
         Require(world.Backpack["wood"] == 0, "a guest holding on to a tree should put nothing in the host's backpack");
         Require(tree.Remaining < 40, "a guest holding on to a tree should cut the tree down");
+    }
+
+    /// <summary>A gatherer only starts while storage takes the resource, so the load is left with no taker by the chest's filter changing on the way.</summary>
+    private static void CheckGathererHoldsALoadNothingTakesAndDoesJobsThatNeedNoHands(GameData data) {
+        var world = EmptyWorld(data);
+        var leaves = world.Add(ThingKind.LeafSpot, new Vector2(10, 12), 12);
+        world.Player = new Vector2(12, 10); world.Look();
+        var bench = Bench(world, new Vector2(14, 10), "planks", "steel_chisel");
+        bench.Inventory.Add("wood", 4);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(16, 12)));
+        chest.Inventory.Add("wood", 20);
+        var worker = Staff(world, leaves, JobKind.Gather);
+        world.SetDuty(worker, bench, JobKind.Haul, true); world.SetDuty(worker, bench, JobKind.Craft, true);
+        Work(world, 30, () => worker.Bag["leaves"] > 0);
+        // The chest now takes only wood in and lets only wood out, to a hauler, so it takes no leaves back either.
+        world.SetFilter(chest, "wood", false, true); world.SetFilter(chest, "wood", true, true);
+        Work(world, 90, () => bench.Rounds > 0);
+        int held = worker.Bag["leaves"];
+        Require(held > 0 && chest.Inventory["leaves"] == 0, $"a gatherer whose leaves nothing takes should hold them: {worker.Status}");
+        Require(bench.Rounds > 0, $"a worker holding a load nothing takes should craft at the table: {worker.Status}");
+        Require(chest.Inventory["wood"] == 20, "a worker holding a load should not haul wood to the table");
+        world.SetFilter(chest, Inventory.Everything, false, true);
+        Work(world, 30, () => worker.Bag.Count == 0);
+        Require(chest.Inventory["leaves"] >= held, "once the chest takes everything, the worker should store the leaves there");
     }
 }

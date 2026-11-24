@@ -24,9 +24,9 @@ public static class NatureModelChecks {
                 WorldModels.Build(new Thing { Kind = ThingKind.Stone, Id = variant })
             };
             try {
-                CheckOreKindsShareGeometryButKeepTheirOwnPalettes(props);
-                CheckHidingOneOreVariantLeavesPropsSharingItsMesh(props);
-                CheckCoalIsTheStoneRockGroupInTheCoalScan(rocks);
+                Test(() => CheckOreKindsShareGeometryButKeepTheirOwnPalettes(props));
+                Test(() => CheckHidingOneOreVariantLeavesPropsSharingItsMesh(props));
+                Test(() => CheckCoalIsTheStoneRockGroupInTheCoalScan(rocks));
             } finally {
                 foreach (var prop in props.Concat(rocks)) prop.Root.Free();
             }

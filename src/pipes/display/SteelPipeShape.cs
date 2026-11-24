@@ -53,6 +53,14 @@ internal static class SteelPipeShape {
         pipe.Rotation = new Vector3(0, ports == NorthSouth ? Mathf.Pi / 2 : 0, 0);
     }
 
+    /// <summary>Bounds for one tube from the middle of its tile to the open end.</summary>
+    internal static Aabb ArmBounds(Vector2I offset, int port, int links) {
+        var end = new Vector3(offset.X, 0, offset.Y) * End(links, port);
+        var radius = new Vector3(offset.X == 0 ? OuterRadius : 0, OuterRadius, offset.Y == 0 ? OuterRadius : 0);
+        var start = end.Min(Vector3.Zero) - radius;
+        return new Aabb(Center + start, end.Max(Vector3.Zero) + radius - start);
+    }
+
     private static float End(int links, int port) => (links & port) == 0 ? LooseEnd : JoinedEnd;
 
     private static ArrayMesh Straight(float from, float to, Vector2[] ring, bool interior) {

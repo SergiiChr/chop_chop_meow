@@ -28,8 +28,8 @@ internal static class NettleSteps {
     /// <summary>A nettle a worker has the job of picking, with a chest and an empty tool station by it, all in the player's sight.</summary>
     public static (World World, Thing Nettle, Thing Chest, Thing Rack, Worker Picker) NettleYard(GameData data) {
         var (world, nettle) = NettlePatch(data);
-        var chest = world.Add(ThingKind.Chest, new Vector2(12, 12));
-        var rack = world.Add(ThingKind.Toolstation, new Vector2(14, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 12)));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(14, 10)));
         world.Player = rack.Pos + Vector2.One; world.Look();
         var picker = AddWorker(world, nettle.Pos + new Vector2(1, 1));
         world.Assign(picker, nettle);

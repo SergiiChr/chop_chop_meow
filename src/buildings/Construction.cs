@@ -225,8 +225,8 @@ public sealed class Construction(World world) {
     /// What the remove selector points at: a visible pipe in the underground view, or a building or gravel path on
     /// the surface.
     /// </summary>
-    public Removal RemovalAt(Thing? picked, Vector2 at, bool underground = false) {
-        if (underground) {
+    public Removal RemovalAt(Thing? picked, Vector2 at, Layer layer = Layer.Surface) {
+        if (layer == Layer.Underground) {
             var pipe = Terrain.TileAt(at);
             return world.Sees(pipe) && world.SteelPipes.Laid(pipe) ? Removal.OfPipe(pipe) : Removal.None;
         }

@@ -8,6 +8,7 @@ using static SetupSteps;
 using static WorldSteps;
 using static PlayerSteps;
 using static WorkerSteps;
+using static EconomySteps;
 
 /// <summary>Checks of crafting: recipes at stations and by hand, the mark, the queue and batches, the tools a recipe needs, and the workers who craft or pump a station.</summary>
 public static class CraftingChecks {
@@ -17,12 +18,20 @@ public static class CraftingChecks {
         Test(CheckStationTurnsToAnotherRecipeOnlyWhenFree, data);
         Test(CheckMarkMovesOnlyOnAnIdleEmptyStation, data);
         Test(CheckTurningToAnotherRecipeTakesTheFuelOut, data);
+        Test(CheckTurningKeepsTheInputsTheNewRecipeUses, data);
+        Test(CheckTurningSendsTheProductAndUnusedInputsToTheBackpack, data);
+        Test(CheckABenchTakesBackTheSteelBarrelItMakes, data);
+        Test(CheckOnlyOneWorkerHoldingALoadPumpsTheBellows, data);
+        Test(CheckTurningKeepsFuelTheNewRecipeBurns, data);
+        Test(CheckTurningSendsTheOldProductOutEvenWhereTheNewRecipeUsesIt, data);
+        Test(CheckAStationTakesByHandOnlyWhatItsRecipeUsesOrMakes, data);
         Test(CheckIdleStationStaysOnTheRecipeAskedLast, data);
         Test(CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere, data);
         Test(CheckQueuingSeveralBatchesLoadsEachOfThem, data);
         Test(CheckFurnacesBurnOneFuelAndWaitForSteelHeat, data);
         Test(CheckPlayerWorksAStationOnlyWithinAMetreOfItsEdge, data);
         Test(CheckAnvilNeedsHammering, data);
+        Test(CheckPlayerWorksOnlyTheBatchesTheyQueued, data);
         Test(CheckAnvilHammersOnlyWithASteelHammer, data);
         Test(CheckAnvilHammersABarIntoTwoSheets, data);
         Test(CheckGuestStandingAtAnAnvilHammersIt, data);
@@ -44,6 +53,7 @@ public static class CraftingChecks {
         Test(CheckOnlyFirstFurnaceWorkerPumpsBellows, data);
         Test(CheckPackingStationTakesOnlyItsGoodAndPacksCrates, data);
         Test(CheckBenchKeepsMakingToolsWithNowhereElseToPutThem, data);
+        Test(CheckCrewKeepsForgeHot, data);
     }
 
     /// <summary>
@@ -169,6 +179,125 @@ public static class CraftingChecks {
         Require(furnace.Recipe == "iron_bar" && furnace.Burner!["wood"] == 0 && world.Backpack["wood"] == 2, "turning to iron should take the two logs out of the fuel slot into the backpack");
     }
 
+    /// <summary>A turn from the steel pickaxe to the steel shovel keeps the steel parts and wood parts in the bench's slots, and takes none from the backpack.</summary>
+    private static void CheckTurningKeepsTheInputsTheNewRecipeUses(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        Give(world, "steel_parts", 4); Give(world, "wood_parts", 2);
+        world.QueueBatch(bench, "steel_pick");
+        world.QueueBatch(bench, "steel_shovel");
+        Require(bench.Recipe == "steel_shovel" && world.Waiting(bench, "steel_pick") == 0 && world.Waiting(bench, "steel_shovel") == 1,
+            "a double-click on the shovel should turn the bench from the pickaxe to it");
+        Require(bench.Inventory["steel_parts"] == 2 && bench.Inventory["wood_parts"] == 1 && world.Backpack["steel_parts"] == 2 && world.Backpack["wood_parts"] == 1,
+            "the pickaxe's steel parts and wood parts should stay in the bench for the shovel, with nothing more loaded");
+    }
+
+    /// <summary>
+    /// After a steel pickaxe with a wood part to spare, a turn to the bucket keeps that wood part and loads the rest of the bucket from the backpack.
+    /// The pickaxe made goes to the backpack, and so does planks the bucket does not use.
+    /// </summary>
+    private static void CheckTurningSendsTheProductAndUnusedInputsToTheBackpack(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        Give(world, "wood_hammer", 1); world.SlotTool(bench, "wood_hammer");
+        Give(world, "steel_parts", 3); Give(world, "wood_parts", 2); Give(world, "steel_sheet", 3); Give(world, "planks", 1);
+        world.QueueBatch(bench, "steel_pick"); world.LoadInput(bench, "wood_parts", 1);
+        CompleteBatches(world, bench, "steel_pick", 1);
+        // Planks the bucket has no use for, left as a hauler's late delivery would.
+        bench.Inventory.Add("planks", 1); Drop(world, "planks", 1);
+        world.QueueBatch(bench, Bucket.Item);
+        Require(bench.Recipe == Bucket.Item && bench.Inventory["wood_parts"] == 1 && world.Backpack["wood_parts"] == 0,
+            "the wood part left after the pickaxe should stay in the bench for the bucket");
+        Require(bench.Inventory["steel_parts"] == 1 && bench.Inventory["steel_sheet"] == 3 && world.Backpack["steel_parts"] == 0 && world.Backpack["steel_sheet"] == 0,
+            "what the bucket still lacks should load from the backpack");
+        Require(world.Backpack["steel_pick"] == 1 && bench.Inventory["steel_pick"] == 0 && world.Backpack["planks"] == 1 && bench.Inventory["planks"] == 0,
+            "the pickaxe made and the planks the bucket does not use should go to the backpack");
+    }
+
+    /// <summary>
+    /// Planks a bench made go to the backpack when it turns to crates, though crates are made of planks:
+    /// with no room in the backpack for them the turn is refused.
+    /// </summary>
+    private static void CheckTurningSendsTheOldProductOutEvenWhereTheNewRecipeUsesIt(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        Give(world, "stone_chisel", 1); Give(world, "wood", 1);
+        world.QueueBatch(bench, "planks");
+        CompleteBatches(world, bench, "planks", 4);
+        // Stone in every free slot leaves no room for the planks.
+        Give(world, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
+        world.QueueBatch(bench, "crate");
+        Require(world.SwitchBlock(bench, "crate") != null && bench.Recipe != "crate" && bench.Inventory["planks"] == 4,
+            "a turn to crates should be refused while the backpack has no room for the planks the bench made");
+    }
+
+    /// <summary>
+    /// A move by hand into a bench on planks takes wood, which it uses, and planks, which it makes, up to a stack; it refuses stone with the reason.
+    /// A furnace's fuel slot takes the fuel its recipe burns, and its input slots refuse it.
+    /// </summary>
+    private static void CheckAStationTakesByHandOnlyWhatItsRecipeUsesOrMakes(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        world.SetRecipe(bench, "planks");
+        Give(world, "wood", 1); Give(world, "planks", 70); Give(world, "stone", 1);
+        string message = ""; world.Notify = text => message = text;
+        Require(world.Transfer(world.Backpack, bench.Inventory, "wood", 1) == 1, "a bench on planks should take wood by hand");
+        Require(world.Transfer(world.Backpack, bench.Inventory, "planks", 70) == 64 && bench.Inventory["planks"] == 64,
+            "a bench on planks should take planks by hand, up to a stack");
+        Require(world.Transfer(world.Backpack, bench.Inventory, "stone", 1) == 0 && bench.Inventory["stone"] == 0 && message == "Stone is not used by what this station makes.",
+            $"a bench on planks should refuse stone by hand and say why, not \"{message}\"");
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(24, 20));
+        world.Player = furnace.Pos + new Vector2(1.2f, 0);
+        world.SetRecipe(furnace, "iron_bar");
+        Give(world, "coal", 2);
+        Require(world.Transfer(world.Backpack, furnace.Burner!, "coal", 1) == 1, "a furnace on iron should take coal in its fuel slot by hand");
+        Require(world.Transfer(world.Backpack, furnace.Inventory, "coal", 1) == 0 && furnace.Inventory["coal"] == 0, "a furnace on iron should refuse coal in its input slots");
+    }
+
+    private static void CheckABenchTakesBackTheSteelBarrelItMakes(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        world.SetRecipe(bench, Barrel.Item);
+        Give(world, Barrel.Item, 1);
+        string message = ""; world.Notify = text => message = text;
+        Require(world.Transfer(world.Backpack, bench.Inventory, Barrel.Item, 1) == 1 && bench.Inventory[Barrel.Item] == 1,
+            $"a bench making steel barrels should take one back into its output slot by hand, not say \"{message}\"");
+    }
+
+    /// <summary>Two bellows workers each hold a load nothing takes; the one at the bellows still counts, so only one pumps.</summary>
+    private static void CheckOnlyOneWorkerHoldingALoadPumpsTheBellows(GameData data) {
+        var world = EmptyWorld(data);
+        var forge = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
+        forge.Inventory.Add("iron_bar", 20); forge.Inventory.Add("coal", 20); forge.Burner!.Add("coal", 10);
+        var first = Staff(world, forge, JobKind.Bellows);
+        var second = Staff(world, forge, JobKind.Bellows);
+        first.Bag.Add("leaves", 4); second.Bag.Add("leaves", 4);
+        for (int i = 0; i < 40; i++) {
+            world.Tick(.25f);
+            Require(world.Workers.Count(w => w.WorkState == WorkerWorkState.Pumping) <= 1, "only one worker holding a load should pump the bellows at a time");
+        }
+        Require(world.Workers.Count(w => w.WorkState == WorkerWorkState.Pumping) == 1, "one worker holding a load nothing takes should pump the bellows");
+    }
+
+    /// <summary>A turn from jam to stew at the cooking table keeps the wood in its fuel slot, which stew burns too, and takes the crushed berries out.</summary>
+    private static void CheckTurningKeepsFuelTheNewRecipeBurns(GameData data) {
+        var world = EmptyWorld(data);
+        var table = world.Add(ThingKind.Cooktable, new Vector2(20, 20));
+        world.Player = table.Pos + new Vector2(1.2f, 0);
+        Give(world, "crushed_berries", 2); Give(world, "wood", 2); Give(world, "raw_meat", 1);
+        world.QueueBatch(table, "berry_jam"); world.LoadFuel(table, "wood", 1);
+        world.QueueBatch(table, "meat_stew");
+        Require(table.Recipe == "meat_stew" && table.Burner!["wood"] == 2 && world.Backpack["wood"] == 0,
+            "both logs should stay in the fuel slot for the stew, with none more loaded");
+        Require(world.Backpack["crushed_berries"] == 2 && table.Inventory["crushed_berries"] == 0 && table.Inventory["raw_meat"] == 1,
+            "the crushed berries should go to the backpack and the meat load in");
+    }
+
     /// <summary>A station with no mark that has run out of batches stays on the recipe asked for last: more of it counts up and leaves its slots alone, even with a full backpack.</summary>
     private static void CheckIdleStationStaysOnTheRecipeAskedLast(GameData data) {
         var world = EmptyWorld(data);
@@ -275,8 +404,9 @@ public static class CraftingChecks {
     private static void CheckPlayerWorksAStationOnlyWithinAMetreOfItsEdge(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Inventory.Add("steel_bar", 3); SlotPlainestTools(world, anvil);
+        SlotPlainestTools(world, anvil);
         world.Player = anvil.Pos + new Vector2(1.6f, 0);
+        Give(world, "steel_bar", 3); world.QueueBatch(anvil, "steel_parts", 3);
         for (int i = 0; i < 4; i++) world.Tick(.25f);
         Require(!anvil.Processing, "a player standing 1.15 m from the anvil's edge must not hammer it");
         world.Player = anvil.Pos + new Vector2(1.35f, 0);
@@ -295,8 +425,9 @@ public static class CraftingChecks {
     private static void CheckAnvilNeedsHammering(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Inventory.Add("steel_bar", 3); SlotPlainestTools(world, anvil);
+        SlotPlainestTools(world, anvil);
         world.Player = anvil.Pos + new Vector2(1.2f, 0);
+        Give(world, "steel_bar", 3); world.QueueBatch(anvil, "steel_parts", 3);
         for (int i = 0; i < 8; i++) { world.MovePlayer(new Vector2(i % 2 == 0 ? .1f : -.1f, 0)); world.Tick(.25f); }
         Require(!anvil.Processing && anvil.Inventory["steel_bar"] == 3, "an anvil must not start while the player only walks past it");
         world.Tick(.25f);
@@ -307,7 +438,7 @@ public static class CraftingChecks {
         Require(anvil.Progress == progress, "a busy player must not advance the anvil");
 
         // A paid smith stays to hammer a running batch; one on strike beside the anvil does not count.
-        var chest = world.Add(ThingKind.Chest, new Vector2(24, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(24, 10)));
         chest.Inventory.Add("steel_bar", 6);
         var worker = AddWorker(world, anvil.Pos + Vector2.One);
         world.Assign(worker, anvil);
@@ -324,14 +455,33 @@ public static class CraftingChecks {
     }
 
     /// <summary>
+    /// A player standing at an anvil hammers the batch they queued but not the one after it, which is made for the hard hat; a smith hammers that one.
+    /// </summary>
+    private static void CheckPlayerWorksOnlyTheBatchesTheyQueued(GameData data) {
+        var world = EmptyWorld(data);
+        var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
+        SlotPlainestTools(world, anvil);
+        world.Player = anvil.Pos + new Vector2(1.2f, 0);
+        Give(world, "steel_bar", 2);
+        world.QueueBatch(anvil, "steel_parts"); world.LoadInput(anvil, "steel_bar", 1);
+        SafeTick(world, data.Recipes["steel_parts"].Seconds * 3);
+        Require(anvil.Inventory["steel_parts"] == 1 && anvil.Inventory["steel_bar"] == 1 && !anvil.Processing && anvil.Keep == "steel_parts",
+            "a player standing at the anvil should hammer the batch they queued and leave the bar for the hard hat alone");
+        var smith = AddWorker(world, anvil.Pos + Vector2.One);
+        world.Assign(smith, anvil);
+        Work(world, 30, () => anvil.Inventory["steel_parts"] == 2);
+        Require(anvil.Inventory["steel_parts"] == 2, $"a smith should hammer the hard-hat batch: status={smith.Status}, state={smith.WorkState}");
+    }
+
+    /// <summary>
     /// The anvil's recipes need a steel hammer, slotted or carried by the player working it, and run at its 1.8 times.
     /// Its slot refuses a wooden mallet, and a smith with no hammer slotted says what is missing.
     /// </summary>
     private static void CheckAnvilHammersOnlyWithASteelHammer(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Inventory.Add("steel_bar", 2);
         world.Player = anvil.Pos + new Vector2(1.2f, 0);
+        Give(world, "steel_bar", 2); world.QueueBatch(anvil, "steel_parts", 2);
         SafeTick(world, 2);
         Require(!anvil.Processing, "an anvil should not start without a hammer");
         Give(world, "wood_hammer", 1);
@@ -375,7 +525,7 @@ public static class CraftingChecks {
             "the anvil should hammer each bar into two sheets of its metal");
     }
 
-    /// <summary>An anvil nobody stands at does not start, and a guest standing at it hammers it.</summary>
+    /// <summary>An anvil nobody stands at does not start, and a guest who queues a batch there and stands at it hammers it.</summary>
     private static void CheckGuestStandingAtAnAnvilHammersIt(GameData data) {
         var (world, guest, _) = Hosted(data);
         var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(-6, 0));
@@ -383,7 +533,7 @@ public static class CraftingChecks {
         world.Player = Terrain.Spawn + new Vector2(20, 0);
         FedPlayersTick(world, 1);
         Require(!anvil.Processing, "an anvil nobody stands at should not start");
-        world.As(guest, () => world.MoveTo(anvil.Pos + new Vector2(1, 0)));
+        world.As(guest, () => { world.MoveTo(anvil.Pos + new Vector2(1, 0)); world.QueueBatch(anvil, "steel_parts"); });
         FedPlayersTick(world, data.Recipes["steel_parts"].Seconds + 1);
         Require(anvil.Inventory["steel_parts"] == 1, "a guest standing at an anvil should hammer it");
     }
@@ -498,8 +648,7 @@ public static class CraftingChecks {
         var bench = world.Add(ThingKind.Bench, new Vector2(10, 10));
         world.Player = bench.Pos + new Vector2(1.2f, 0);
         Give(world, "wood", 4); Give(world, "wood_hammer", 1);
-        world.SetRecipe(bench, "planks");
-        world.LoadBatch(bench, 2);
+        world.QueueBatch(bench, "planks", 2);
         SafeTick(world, 6);
         Require(!bench.Processing && bench.Inventory["planks"] == 0, "a bench recipe should wait while its tool is neither slotted nor carried");
         Give(world, "stone_chisel", 1);
@@ -513,7 +662,7 @@ public static class CraftingChecks {
         SafeTick(world, data.Recipes["planks"].Seconds / data.BenchSpeed + Step);
         Require(bench.Inventory["planks"] == 8, "a bench should work with its slotted chisel");
         var worker = AddWorker(world, bench.Pos + Vector2.One);
-        var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(14, 10)));
         chest.Inventory.Add("wood", 2);
         world.UnslotTool(bench, "stone_chisel");
         world.Assign(worker, bench);
@@ -529,9 +678,8 @@ public static class CraftingChecks {
         world.Player = bench.Pos + new Vector2(1.2f, 0);
         Give(world, "planks", 12); Give(world, "wood_hammer", 1); Give(world, "steel_hammer", 1);
         Require(world.SlotTool(bench, "wood_hammer"), "the mallet should go into the hammer slot");
-        world.SetRecipe(bench, "crate");
-        world.LoadBatch(bench, 2);
-        Require(world.ToolInUse(bench, data.Recipes["crate"]) == "steel_hammer", "the player should work with the carried steel hammer over the slotted mallet");
+        world.QueueBatch(bench, "crate", 2);
+        Require(world.ToolInUse(bench, "hammer", 0) == "steel_hammer", "the player should work with the carried steel hammer over the slotted mallet");
         // A crate takes 10 s by hand: 5 s at the bench with the mallet, 2.8 s with the steel hammer.
         SafeTick(world, 3.5f);
         Require(bench.Inventory["crate"] == 1, "a bench should work at the speed of a carried steel hammer when only a mallet is slotted");
@@ -649,8 +797,7 @@ public static class CraftingChecks {
         var table = world.Add(ThingKind.Cooktable, new Vector2(20, 20));
         world.Player = table.Pos + new Vector2(1, 0);
         Give(world, "mortar", 1); Give(world, "berries", 4);
-        world.SetRecipe(table, "crushed_berries");
-        world.LoadBatch(table);
+        world.QueueBatch(table, "crushed_berries");
         SafeTick(world, data.Recipes["crushed_berries"].Seconds + 1);
         Require(table.Inventory["crushed_berries"] == 4 && world.Backpack["mortar"] == 1, "the player should crush berries at the table with the mortar they carry");
     }
@@ -683,7 +830,7 @@ public static class CraftingChecks {
         var world = EmptyWorld(data);
         var forge = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 6));
         forge.Inventory.Add("iron_bar", 20); forge.Inventory.Add("coal", 20); forge.Burner!.Add("coal", 10);
-        world.Add(ThingKind.Chest, forge.Pos + World.BellowsStand);
+        TakeEverything(world, world.Add(ThingKind.Chest, forge.Pos + World.BellowsStand));
         var pumper = Staff(world, forge, JobKind.Bellows);
         Work(world, 10, () => pumper.WorkState == WorkerWorkState.Pumping);
         Require(pumper.WorkState == WorkerWorkState.Pumping, $"a pumper whose spot a chest stands on should pump from beside it, not \"{pumper.Status}\"");
@@ -758,5 +905,24 @@ public static class CraftingChecks {
         world.SetDuty(worker, bench, JobKind.Craft, true); world.SetDuty(worker, bench, JobKind.Haul, true);
         Work(world, 180, () => bench.Inventory["steel_pick"] >= 3);
         Require(bench.Inventory["steel_pick"] >= 3, $"the bench should keep making pickaxes it has nowhere else to put: {bench.Inventory["steel_pick"]} made");
+    }
+
+    private static void CheckCrewKeepsForgeHot(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
+        furnace.Heat = World.SteelHeat + 5;
+        // Bellows are pumped only while there is something to smelt.
+        furnace.Inventory.Add("iron_bar", 20); furnace.Inventory.Add("coal", 20); furnace.Burner!.Add("coal", 10);
+        // The worker starts far off, so the forge would cool past the bar before they arrive to pump.
+        world.Assign(AddWorker(world, new Vector2(30, 30)), furnace);
+        SafeTick(world, 4);
+        Require(furnace.Heat >= World.SteelHeat, "a working crew should keep the forge at or above the clear bar");
+        var crew = world.Workers[0];
+        crew.WageDebt = crew.Wage;
+        SafeTick(world, 5);
+        Require(furnace.Heat < World.SteelHeat, "a striking crew should let the forge cool below the clear bar");
+        foreach (var w in world.Workers.ToList()) world.Fire(w);
+        SafeTick(world, 5);
+        Require(furnace.Heat < World.SteelHeat, "without a crew the forge should cool below the clear bar");
     }
 }

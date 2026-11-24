@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>What the next left click in the world does.</summary>
 public abstract record ClickMode {
-    /// <summary>A click selects or uses what is under it.</summary>
+    /// <summary>A left click selects what is under it.</summary>
     public sealed record Normal : ClickMode;
     /// <summary>A click places a building of this kind.</summary>
     public sealed record Build(ThingKind Kind, PipeShape Shape = PipeShape.Straight) : ClickMode;
@@ -17,7 +17,7 @@ public abstract record ClickMode {
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
     /// <summary>The remove selector takes down what the player clicks on the selected layer.</summary>
-    public sealed record Remove(bool Underground = false) : ClickMode;
+    public sealed record Remove(Layer Layer = Layer.Surface) : ClickMode;
 
     internal int QuarterTurns { get; init; }
     /// <summary>The turn of the plan or container awaiting placement, in radians.</summary>
@@ -39,6 +39,7 @@ public sealed class PlayerControl {
     private readonly World world;
     /// <summary>Whether <see cref="Mode"/> places the container or plan on the cursor, which it does only while the mouse is over open ground.</summary>
     private bool placingHeld;
+    private Layer selectedLayer;
     /// <summary>The placement on the cursor, with a turn that stays set while the pointer crosses the interface.</summary>
     private ClickMode? heldPlacement;
     private Thing? gathering;
@@ -55,20 +56,30 @@ public sealed class PlayerControl {
     /// <summary>A container held under the right mouse button; it is lifted once held for <see cref="LiftSeconds"/>.</summary>
     private Thing? lifting;
     private float liftClock;
+    /// <summary>The cabin the last left press in the world opened, which the second press of a double click walks into (<see cref="WalkIntoClickedCabin"/>).</summary>
+    private Thing? clickedCabin;
 
     /// <summary>What the next left click in the world does.</summary>
     public ClickMode Mode { get; set; } = new ClickMode.Normal();
 
+    /// <summary>The layer the player selected, unless a world action needs a particular layer.</summary>
+    public Layer Layer => Mode switch {
+        ClickMode.Remove remove => remove.Layer,
+        ClickMode.Build { Kind: ThingKind.SteelPiping } => Layer.Underground,
+        ClickMode.Normal => selectedLayer,
+        _ => Layer.Surface
+    };
+
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
         cabinApproach = new CabinApproach(world);
-        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; digDismissed = false; Mode = new ClickMode.Normal(); };
+        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; selectedLayer = Layer.Surface; digDismissed = false; Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops actions whose targets belong to the previous world.</summary>
     private void Stop() {
         DiggingAt = null; digAttempt = 0;
-        gathering = null; lifting = null; pumpApproach = null; cabinApproach.Cancel();
+        gathering = null; lifting = null; pumpApproach = null; clickedCabin = null; cabinApproach.Cancel();
     }
 
     public bool Entering(Thing cabin) => cabinApproach.GoesTo(cabin);
@@ -113,13 +124,13 @@ public sealed class PlayerControl {
     private void UpdateDigMode() {
         bool selected = world.Holes.ShovelSelected;
         if (!selected || world.InHand == "") digDismissed = false;
-        if (selected && !digDismissed && Mode is ClickMode.Normal) Mode = new ClickMode.Dig();
+        if (selected && !digDismissed && Mode is ClickMode.Normal && selectedLayer == Layer.Surface) Mode = new ClickMode.Dig();
         else if (!selected && Mode is ClickMode.Dig) Mode = new ClickMode.Normal();
     }
 
     internal void SelectDigging() {
         digDismissed = false;
-        Mode = new ClickMode.Dig();
+        if (selectedLayer == Layer.Surface) Mode = new ClickMode.Dig();
     }
 
     internal bool CanCancelMode => Mode is not ClickMode.Normal && (Mode is not ClickMode.Dig || world.InHand != "");
@@ -300,20 +311,6 @@ public sealed class PlayerControl {
         world.Me.Selected = hotbar.ActiveItem() ?? "";
     }
 
-    /// <summary>E inspects the nearby selection or the nearest thing. A pump under the pointer takes priority over the lake.</summary>
-    public void InspectNearest() {
-        if (view.Underground) { if (view.PointedPipe is Vector2I tile) panel.SelectPipe(tile); return; }
-        var half = Vector2.One * Farms.HalfSize;
-        Vector2 FarmEdge(Thing t) => world.Player.Clamp(t.Pos - half, t.Pos + half);
-        bool CanInspect(Thing t) => world.Near(t, at: t.Kind == ThingKind.Farm ? FarmEdge(t) : null);
-        var t = world.Find(panel.Selection.Thing);
-        if ((t == null || t.Kind == ThingKind.Water || !CanInspect(t)) && (view.MouseLook || view.GetViewport().GuiGetHoveredControl() == null)
-            && world.Find(view.Hover) is { Kind: ThingKind.Pump } pump && CanInspect(pump)) t = pump;
-        if (t == null || !CanInspect(t))
-            t = world.Things.Where(CanInspect).OrderBy(t => world.Player.DistanceSquaredTo(t.Kind == ThingKind.Farm ? FarmEdge(t) : t.Pos)).FirstOrDefault();
-        if (t != null) panel.Select(t);
-    }
-
     /// <summary>Space pumps in reach, or swings with the first-person view or the overhead movement keys.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
@@ -336,25 +333,64 @@ public sealed class PlayerControl {
         if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) LeftPress(at);
     }
 
+    /// <summary>Switches the visible layer. The remove selector keeps its own layer while it is active.</summary>
+    public void ToggleLayer() {
+        StopGroundDig();
+        var next = Layer == Layer.Surface ? Layer.Underground : Layer.Surface;
+        if (Mode is ClickMode.Remove) Mode = new ClickMode.Remove(next);
+        else { Mode = new ClickMode.Normal(); selectedLayer = next; }
+        if (next == Layer.Surface) panel.ClosePipe();
+    }
+
     private void RightPress(Vector2 at) {
         StopGroundDig();
         if (PlacingPipe) {
-            world.Construction.Remove(world.Construction.RemovalAt(null, view.ToWorld(at, PipeGround.FloorY), underground: true));
+            world.Construction.Remove(world.Construction.RemovalAt(null, view.ToWorld(at, PipeGround.FloorY), Layer.Underground));
             return;
         }
-        if (Mode is ClickMode.Remove remove) { Mode = new ClickMode.Remove(!remove.Underground); return; }
+        if (Mode is ClickMode.Remove) { ToggleLayer(); return; }
         // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
+        if (Layer == Layer.Underground) return;
         var t = view.Pick(at);
+        // With a bug net selected a right click on a firebug swings at it, as one on open ground swings toward the pointer.
+        if (t is { Kind: ThingKind.Firebug } && Mode is ClickMode.Normal && hotbar.ActiveItem() is string net && world.ToolKind(net) == "net") {
+            gathering = null; lifting = null;
+            hotbar.UseSelected(world.Firebugs.At(t));
+            return;
+        }
         if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
-        if (t != null || Mode is not ClickMode.Dig || !view.TryGroundPoint(at, out var ground)) return;
-        var spot = ground.Round();
-        if (world.Holes.Block(spot) is string blocked) { kit.Notify(blocked); return; }
-        DiggingAt = spot;
+        if (t != null) return;
+        if (Mode is ClickMode.Dig) {
+            if (!view.TryGroundPoint(at, out var ground)) return;
+            var spot = ground.Round();
+            if (world.Holes.Block(spot) is string blocked) { kit.Notify(blocked); return; }
+            DiggingAt = spot;
+        } else if (Mode is ClickMode.Normal && view.PickWorker(at) == null) hotbar.UseSelected(view.ToWorld(at));
+    }
+
+    /// <summary>
+    /// The second press of a double click on a cabin walks the player to its door and in, wherever the pointer is.
+    /// The first press opened the cabin's page, which moves the world aside under the pointer and can put the page's windows over it.
+    /// So the game hands every left press here before the interface: one that is not such a second press returns false and goes on as usual.
+    /// </summary>
+    public bool WalkIntoClickedCabin(InputEventMouseButton mouse) {
+        if (mouse.ButtonIndex != MouseButton.Left || !mouse.Pressed) return false;
+        var cabin = clickedCabin; clickedCabin = null;
+        if (!mouse.DoubleClick || !cursor.Empty || Mode is not ClickMode.Normal || cabin == null || world.Find(cabin.Id) is not { Kind: ThingKind.Hut } opened) return false;
+        pumpApproach = null; cabinApproach.Start(opened);
+        return true;
     }
 
     private void LeftPress(Vector2 at) {
+        PlaceHeld(false);
+        if (Layer == Layer.Underground && Mode is ClickMode.Normal) {
+            cursor.Release();
+            if (view.PickPipe(at) is Vector2I pipe) panel.SelectPipe(pipe);
+            else panel.Close();
+            return;
+        }
         var t = view.Pick(at, out float thingDistance);
         // A held stack goes into storage clicked in the world; a held container or plan places on open ground, even before a frame has seen the mouse there;
         // and a click anywhere else lets go of the stack, back to its cell.
@@ -362,7 +398,6 @@ public sealed class PlayerControl {
             if (cursor.Stack is HeldStack held && t != null && (t.IsStorage || t.Kind == ThingKind.Hut && Barrel.Is(held.Item))) {
                 kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return;
             }
-            PlaceHeld(false);
             if (Mode.Placing != null && Mode is not ClickMode.Dig) Place(at); else cursor.Release();
             return;
         }
@@ -371,18 +406,15 @@ public sealed class PlayerControl {
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
         var w = view.PickWorker(at, thingDistance);
         if (w != null) panel.Select(w);
-        // With a bug net selected a click on a firebug swings at it; with anything else it selects the firebug.
-        else if (t is { Kind: ThingKind.Firebug } && hotbar.ActiveItem() is string net && world.ToolKind(net) == "net") hotbar.UseSelected(world.Firebugs.At(t));
         else if (t != null) ClickThing(t);
-        else if (hotbar.ActiveItem() is string selected && hotbar.HasUse(selected)) hotbar.UseSelected(view.ToWorld(at));
         else panel.Close();
     }
 
     /// <summary>What the remove selector points at with <paramref name="picked"/> under the mouse at a screen point, or nothing while the selector is away.</summary>
     public Removal RemovalAt(Thing? picked, Vector2 at) {
         if (Mode is not ClickMode.Remove remove) return Removal.None;
-        return view.TryGroundPoint(at, out var ground, remove.Underground ? PipeGround.FloorY : 0)
-            ? world.Construction.RemovalAt(picked, ground, remove.Underground)
+        return view.TryGroundPoint(at, out var ground, remove.Layer == Layer.Underground ? PipeGround.FloorY : 0)
+            ? world.Construction.RemovalAt(picked, ground, remove.Layer)
             : picked == null ? Removal.None : world.Construction.RemovalAt(picked, picked.Pos);
     }
 
@@ -393,8 +425,9 @@ public sealed class PlayerControl {
         world.SetDuty(worker, t, JobKind.Gather, true); Mode = new ClickMode.Normal(); panel.Select(worker);
     }
 
+    /// <summary>Opens a thing's page; a cabin's is the one the second press of a double click then walks into.</summary>
     private void ClickThing(Thing t) {
-        if (t.Kind == ThingKind.Hut) { pumpApproach = null; cabinApproach.Start(t); }
+        if (t.Kind == ThingKind.Hut) clickedCabin = t;
         panel.Select(t);
     }
 

@@ -49,7 +49,7 @@ public partial class Game {
         await Until(() => world.ThingsOf(ThingKind.Firebug).Count == 1 && world.ThingsOf(ThingKind.Firebug)[0].Pos.DistanceTo(placed) < .01f, "the host's firebug showing in the guest's world where the host put it", 15);
         var bug = world.ThingsOf(ThingKind.Firebug)[0];
         await Until(() => view.PropOf(bug.Id) is FirebugProp { Shown: true }, "the guest's window drawing the host's firebug", 5);
-        await ClickGround();
+        await ClickGround(MouseButton.Right);
         await Until(() => world.Find(bug.Id) is Thing fled && fled.Pos.DistanceTo(placed) > 3, "the guest seeing the firebug dart off from its swing", 15);
         Signal("firebug-fled");
         await Signaled("firebug-night-over");

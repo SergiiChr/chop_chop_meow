@@ -4,7 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The start menu and the save, load and options screens it shares with the pause menu.</summary>
+/// <summary>The main menu and the save, load, options and Controls screens shared with the pause menu.</summary>
 public partial class StartMenu : ColorRect {
     /// <summary>Render sizes to pick from, 16:9 and 16:10.</summary>
     public static readonly Vector2I[] Resolutions = { new(1280, 720), new(1440, 900), new(1600, 900), new(1920, 1080), new(1920, 1200), new(2560, 1440), new(2560, 1600), new(3840, 2160), new(3840, 2400) };
@@ -61,7 +61,14 @@ public partial class StartMenu : ColorRect {
         AddButton("Load game", () => ShowSlots(false, ShowStart));
         AddButton("Join game", () => ShowJoin(ShowStart, false));
         AddButton("Options", () => ShowOptions(ShowStart));
+        AddButton("Controls", () => ShowControls(ShowStart));
         AddButton("Quit", flow.Quit);
+    }
+
+    public void ShowControls(Action back) {
+        Open("CONTROLS", back);
+        Screen.AddChild(new ControlsList());
+        AddButton("Back · Esc", back);
     }
 
     public void ShowSlots(bool saving, Action back) {

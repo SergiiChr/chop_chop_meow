@@ -20,7 +20,7 @@ internal sealed class FarmHaul : PlaceHaul {
             if (free == 0) continue;
             // A harvest waits on the plot until its output has room for all of it.
             bool full = farm.Output.Room(item) < plot.Yield.GetValueOrDefault(item);
-            if (world.DepositFor(item, farm.Pos, farm.Id) is Thing store) Offer(ref best, TakeOut(farm, store, CarryBox.Output, item, free, full));
+            if (Taker(farm, item, free) is (Thing store, int count)) Offer(ref best, TakeOut(farm, store, CarryBox.Output, item, count, full));
             // With no storage for it, spare seed stacks up in the plot's own input slots.
             else if (plot.Sow.ContainsKey(item) && farm.Inventory.SlotRoom(item) > 0)
                 Offer(ref best, TakeOut(farm, farm, CarryBox.Output, item, System.Math.Min(free, farm.Inventory.SlotRoom(item)), full));

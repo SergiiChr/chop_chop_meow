@@ -34,7 +34,8 @@ public static class FirebugChecks {
         Require(bench.Inventory["bug_net"] == 1 && world.Backpack["nettle_rope"] == 5 && world.Backpack["wood"] == 1 && world.Backpack["wood_parts"] == 1,
             $"5 rope, 1 wood and 1 wood part should make a bug net with a mallet: {bench.Inventory["bug_net"]}");
         SwapMalletForSteelHammer(world, bench);
-        world.LoadBatch(bench);
+        Drop(world, "wood_hammer");
+        world.QueueBatch(bench, "bug_net");
         SafeTick(world, 20);
         Require(bench.Inventory["bug_net"] == 2, "a steel hammer should make a bug net as well");
     }
@@ -164,7 +165,7 @@ public static class FirebugChecks {
     /// <summary>Workers are off the map while firebugs are out, so the job is checked as far as being given and finding its tool.</summary>
     private static void CheckFirebugJobNeedsANetAtAToolStation(GameData data) {
         var (world, bug, _) = FirebugNight(data);
-        var rack = world.Add(ThingKind.Toolstation, world.Player + new Vector2(2, 0));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, world.Player + new Vector2(2, 0)));
         var catcher = AddWorker(world, world.Player);
         Require(world.Jobs(bug).Contains(JobKind.Gather), "a firebug should offer the gather job");
         world.Assign(catcher, bug);
