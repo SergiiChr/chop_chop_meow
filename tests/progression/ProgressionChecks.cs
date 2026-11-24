@@ -31,7 +31,7 @@ public static class ProgressionChecks {
         bool HasTool(string tool, int tier = 0) => have.Any(id => data.Items[id].Tool == tool && data.Items[id].Tier >= tier);
         for (bool grew = true; grew;) {
             grew = false;
-            if (HasTool("axe")) grew |= have.Add("wood");
+            if (HasTool("axe")) { grew |= have.Add("wood"); grew |= have.Add("acorn"); }
             foreach (var ore in new[] { "iron_ore", "coal", "tin_ore" }) if (HasTool("pickaxe")) grew |= have.Add(ore);
             // Crates of berries sold at a signpost buy what the village sells, the first pickaxe among it.
             if (built.Contains(ThingKind.Signpost) && have.Contains("crate") && have.Contains("berries")) foreach (var item in data.Market.Buys.Keys) grew |= have.Add(item);

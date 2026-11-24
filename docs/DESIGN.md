@@ -26,7 +26,7 @@ These came from the user; change them only after asking.
   and workers keep their routes.
   Tiles join with round ends, strips between neighbours and a slanted strip between any two tiles corner to corner, so
   every corner is cut on the slant; a square of four is filled.
-  A tile goes under buildings and buildings over tiles, but not on a tree, boulder, deposit, berry bush, leaf patch or
+  A tile goes under buildings and buildings over tiles, but not on a tree, boulder, deposit, berry bush, leaf spot or
   wolf carcass.
   A tile cannot be clicked in normal play.
 - **Taking down:** the red cross in the building plans gives the remove selector: a building or path tile in reach
@@ -98,9 +98,11 @@ Simulation and data:
 | `src/farms/model/FarmStage.cs` | Whether a plot is fallow, growing or ripe |
 | `src/mines/Mines.cs` | Mines: where one is marked and stands at its cliff, its three building stages, supplying it, working it underground and the end goal's working mines |
 | `src/mines/model/Cliff.cs`, `src/mines/model/MineStage.cs` | `Cliff`, the valley's ore cliffs and the mine spot at each, and `MineStage`, how far a mine is built |
-| `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
-| `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
-| `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
+| `src/resources/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
+| `src/resources/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
+| `src/digging/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
+| `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
+| `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/packing/Packing.cs` | Packing stations |
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
@@ -187,7 +189,7 @@ UI and input:
 | `src/actors/enemies/wolf/model/Den.cs` | `Den`, a wolf den's mouth, door and clearance |
 | `src/actors/model/IWalker.cs` | `IWalker`, anything that walks the map on its own, along a route around what blocks it |
 | `src/CampfirePanel.cs` | A campfire |
-| `src/ResourcePanel.cs` | A resource in the world |
+| `src/resources/display/ResourcePanel.cs` | Shared resource inspection with stock slots and any extra controls |
 | `src/PilePanel.cs` | A pile or compost heap |
 | `src/ToolRackPanel.cs` | A tool station |
 | `src/containers/barrel/display/BarrelPanel.cs`, `src/containers/barrel/display/CarriedBarrelPanel.cs` | Water and hauling on a placed barrel and the water slot in a backpack barrel |
@@ -396,9 +398,9 @@ Its small shadow offset keeps the shade attached to feet, trunks and low props, 
 Picking and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`).
 Hover labels name buildings, resources and workers in the world.
 The shore label reads “Collect water”.
-A tree crown only wins a click when nothing else is under the cursor, so objects behind a canopy stay selectable.
+Other objects under the cursor take priority over the extra width of an old tree’s trunk.
 Trees use three variants chosen by object id, so saves need no new fields.
-A tree's height comes from its id too (`WorldModels.TreeTall`): its model and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
+A tree's height comes from its id too (`TreePlanting.Tallness`). `TreePlanting.BaseScale` sizes its model and hit boxes from 0.9 to 1.5.
 The bake stands each tree's lowest point on the ground, which on a spruce and one oak is a hanging branch, so their baked trunks start up to 1.8 m higher; `Tree3DShape.Add` carries such a trunk down to the ground with a stem that widens toward its foot.
 A stump keeps the id of the tree that left it (`Thing.OfTree`), so its model stands where that tree's trunk did (`DugProp.Seat`) and is as thick as the trunk was at the ground (`Tree3DShape.Foot`): a birch leaves a thin stump and an oak a stout one.
 A stump with no tree on record, such as a showcase's or one in an older save, is shaped as if a tree with the stump's own id had left it.
@@ -449,7 +451,7 @@ Both arms are solved from there with `ArmReach.ArmTo`, and `ActorRig.Show` lays 
 The front boot stays flat and the back one on its toe at fixed spots, so neither slides as the hips go down and up.
 The handle is kept ahead of the right side of the chest and below the shoulders: at the middle of the chest the folded right arm would lie inside the torso, and higher it would be in front of the face.
 
-Players with a rake in the backpack and workers with one in hand rake leaf patches (`ActorAction.Rake`).
+Players with a rake in the backpack and workers with one in hand rake leaf spots (`ActorAction.Rake`).
 `RakeStroke` places both hands on the shaft and draws the teeth across the ground toward the actor's feet.
 The leaf rustle starts as the teeth touch the patch.
 The animation review clips are `player rake` and `worker rake`.
@@ -883,9 +885,13 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 
 ### Resources
 
-- Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
+`ResourcePanel` shows gatherable items in read-only slots with live stock counts.
+Leaf spots show a second slot for acorns, and the lake shows a water droplet in an unnumbered slot.
+
+- The valley starts with a leaf spot beside each oak where ground allows it (`World.LeavesPerSpot`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
-- `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `GatherRules.ChipReach` of a boulder or deposit on `GatherRules.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
+- `World.Chip` drops a loose piece within `GatherRules.ChipReach` of the target on `GatherRules.ChipChance` of
+  successful player or worker hits. A pickaxe chips rock and ore. An axe drops an acorn from a tree.
 - A felled tree is taken out of the world and its stump (`stump`, `World.StumpWood`) put in its place by `World.Fell`, as a thing of its own with a new id that keeps the tree's id in `Thing.OfTree`.
 - Plain bushes (`bush`, `World.BushLeaves`) grow on the scenery spots `Scenery.Bush` picks (`World.GrowBushes`), away from the clearing and the mountain feet.
 - A stump or a bush is dug up whole (`GatherShape.Dug`, `Thing.IsDug`): digging adds to `Thing.Progress` at the shovel's speed until `GatherRules.DigSeconds`, then `World.Unearth` moves all it holds to the digger and removes it with a `dig_up` sound. The player's backpack must have room for all of it (`World.GatherBlock`), and a worker's hands are sized for it.
@@ -895,6 +901,40 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - Tin ore smelts into tin bars at the stone furnace, the anvil hammers a tin bar into 2 tin sheets, and a tin sheet
   makes 4 cans at the bench.
 - The stone furnace burns 2 wood into 1 charcoal.
+
+### Replanting trees
+
+Selecting a shovel on the hotbar or double-clicking it in the backpack shows the placement outline.
+Esc leaves the outline active while the shovel is selected on the hotbar.
+Holding right mouse on open ground walks the player to the spot.
+`GroundHoles.Begin` starts digging once the player is in reach.
+The outline shows the target while held and lives in the view.
+The server counts shovel work for each hold.
+When enough work has accumulated, `GroundHoles.Finish` places a `Hole` if the player is still holding right mouse.
+Releasing early discards the work.
+The hole has one empty input slot.
+Inserting an acorn spends one from the stack and replaces the hole with a selectable oak nub.
+Empty holes disappear at dawn.
+The remove selector, buildings and gravel paths can clear an empty hole.
+`ResourcePanel` shows the wood count in a read-only item slot throughout the tree’s life.
+Its status is **Planted** with a water slot until it takes five liters, then **Growing** until it becomes an **Adult tree**.
+
+The full five liters start growth and are used up.
+`Thing.NextTreeStageAt` holds the next date on the world clock and `TreePlanting` checks only trees ready to grow.
+`Thing.TreeStage` records the completed days through saves, network updates and fog memories.
+A replanted oak grows linearly for ten full days, then becomes an adult and puts down one leaf spot next to its trunk.
+Size and total wood for an adult use a common logarithmic curve, so daily gains taper with age.
+Each day adds the increase in whole wood units since the last, so it preserves wood already chopped.
+The valley's starting trees first grow at evenly spaced times over one day.
+If a clock jump leaves many trees due, growth work is spread over several ticks.
+A growing trunk destroys buildings whose footprints it overlaps.
+Cabin occupants are moved outside, stored items go to a recovery box, and any cart still on the road delivers its order.
+
+`LeafSpots` gives each leaf spot a capacity of one or two acorns.
+Each spot keeps its tree's id and growth stage. Its ground area widens with the tree and stays at its last size after felling.
+When a player gathers leaves, they also take the acorns that fit in their backpack.
+Leaves refill at dawn. Missing acorns refill one at a time, every ten days from the first gather that took one.
+Chopping out all its current wood fells the tree and leaves its stump.
 
 ### Tools
 
@@ -913,7 +953,7 @@ So a steel chisel does everything a stone chisel does, faster, while the anvil, 
 and the mortar a steel chisel.
 
 `GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for boulders and deposits, a shovel for stumps and bushes), one that only speeds gathering up (a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
-A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf patches.
+A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf spots.
 Stone, leaves, berries and loose pieces need no tool.
 The world's things are also kept by kind (`ThingList.Of`), so a search for one kind, such as tool stations, stores or campfires, and the tick, which runs only kinds that change by themselves, pass over trees and rocks.
 Searches by place, such as what a player sees and room to build, still look at every thing.
@@ -1301,6 +1341,7 @@ Storage that asks for an item never passes it to other storage asking for it, no
 A gatherer works at the player's pace, `World.GatherYield` pieces a cycle, until their hands are full (`Worker.Loading`), then delivers.
 A gatherer whose spot is spent moves the duty to the nearest spot of the same job in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
 Spots that need a tool count only while the worker can get one (`World.CanWork`), and loose pieces come only after every other spot; a gatherer with no tool to be had for their spot goes to the nearest spot they can work at once (`World.OtherSpot`).
+Woodcutters skip trees that have yet to become adults.
 A woodcutter who fells a tree takes its stump as their spot while a shovel is to be had, without waiting for a player to see it; other stumps count once a player has seen them.
 A worker carries one tool, so going between a tree and a stump takes a walk to a tool station to swap.
 With none known they say so once, carry off what they hold and go on to their other jobs.

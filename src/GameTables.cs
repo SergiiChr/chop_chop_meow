@@ -32,6 +32,7 @@ public sealed partial class GameData {
     public GoalsDef Goals { get; } = new() { DailyProfit = 1300, ProfitDays = 7 };
     public Dictionary<string, ItemDef> Items { get; } = new() {
         ["wood"] = new() { Name = "Wood", Color = "af8053" },
+        ["acorn"] = new() { Name = "Acorn", Color = "a46a36" },
         ["planks"] = new() { Name = "Wood planks", Color = "d2a26a" },
         ["wood_parts"] = new() { Name = "Wood parts", Color = "b98552" },
         ["stone"] = new() { Name = "Stone", Color = "aab2af" },
@@ -111,6 +112,7 @@ public sealed partial class GameData {
     public Dictionary<string, SourceDef> Sources { get; } = new() {
         [Inventory.Coins] = new() { How = "Sell goods at the trading post" },
         ["wood"] = new() { How = "Chop trees" },
+        ["acorn"] = new() { How = "Chop trees or gather leaves" },
         ["stone"] = new() { How = "Pick up or mine" },
         ["coal"] = new() { How = "Mine or pick up" },
         ["iron_ore"] = new() { How = "Mine" },
@@ -130,7 +132,7 @@ public sealed partial class GameData {
         new() { States = new(Bucket.Fills), Liquid = Water.Liquid },
     };
     public List<MapRowDef> MapRows { get; } = new() {
-        new() { Title = "Wood", Roots = new() { "wood" } },
+        new() { Title = "Wood", Roots = new() { "wood", "acorn" } },
         new() { Title = "Stone and coal", Roots = new() { "stone", "coal" } },
         new() { Title = "Iron and steel", Roots = new() { "iron_ore" } },
         new() { Title = "Tin", Roots = new() { "tin_ore" } },

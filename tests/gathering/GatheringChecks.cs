@@ -34,7 +34,7 @@ public static class GatheringChecks {
         Test(CheckFelledTreeLeavesAStumpThatNeedsAShovel, data);
         Test(CheckFelledTreeFallsAwayFromWhoeverLandedTheLastBlow, data);
         Test(CheckShovelDigsUpAStumpForThreeWood, data);
-        Test(CheckShovelDigsUpABushForThreeLeafPatches, data);
+        Test(CheckShovelDigsUpABushForThreeLeafSpots, data);
         Test(CheckDiggingWaitsForRoomInTheBackpack, data);
         Test(CheckBuildingOverStumpsAndBushesClearsThem, data);
         Test(CheckNewValleyGrowsBushesOnOpenGround, data);
@@ -221,10 +221,10 @@ public static class GatheringChecks {
     private static void CheckRakeClearsLeavesWhichFallAgain(GameData data) {
         var fresh = new World(data);
         var oaks = fresh.Things.Where(t => t.Kind == ThingKind.Tree && t.Id % 3 == 0).Select(t => t.Pos + World.LeafOffset).ToHashSet();
-        var patches = fresh.Things.Where(t => t.Kind == ThingKind.Leaves).ToList();
+        var patches = fresh.Things.Where(t => t.Kind == ThingKind.LeafSpot).ToList();
         Require(patches.Count > oaks.Count * .8f && patches.All(p => oaks.Contains(p.Pos)), "oaks should drop patches of leaves beside their trunks");
         var world = EmptyWorld(data);
-        var leaves = world.Add(ThingKind.Leaves, new Vector2(10, 10), World.LeafPatch);
+        var leaves = world.Add(ThingKind.LeafSpot, new Vector2(10, 10), World.LeavesPerSpot);
         world.Player = leaves.Pos;
         Require(world.GatherBlock(leaves) == null, "leaves should be gathered by hand without a rake");
         world.Gather(leaves, data.GatherSeconds); world.Gather(leaves, data.GatherSeconds);
@@ -234,10 +234,10 @@ public static class GatheringChecks {
         Give(world, "rake", 1);
         world.Gather(leaves, data.GatherSeconds);
         Require(world.Backpack["leaves"] == 8, "a rake should gather leaves in one stroke's time");
-        GatherUntil(world, leaves, "leaves", World.LeafPatch);
+        GatherUntil(world, leaves, "leaves", World.LeavesPerSpot);
         Require(leaves.Remaining == 0 && world.GatherBlock(leaves) != null, "a raked patch should be empty until it refills");
         SafeTick(world, data.DaySeconds - world.Time % data.DaySeconds + 1);
-        Require(leaves.Remaining == World.LeafPatch, "leaves should fall again by the next day");
+        Require(leaves.Remaining == World.LeavesPerSpot, "leaves should fall again by the next day");
 
         var station = world.Add(ThingKind.Toolstation, new Vector2(14, 10));
         station.Inventory.Add("rake", 1);
@@ -246,7 +246,7 @@ public static class GatheringChecks {
         world.Assign(worker, leaves);
         world.Player = new Vector2(30, 30);
         SafeTick(world, 20);
-        Require(worker.Tool == "rake" && leaves.Remaining < World.LeafPatch, "a worker should fetch the rake and rake leaves");
+        Require(worker.Tool == "rake" && leaves.Remaining < World.LeavesPerSpot, "a worker should fetch the rake and rake leaves");
     }
 
     private static void CheckBerryBushesStartAlikeAndRegrowWhateverIsPicked(GameData data) {
@@ -420,7 +420,7 @@ public static class GatheringChecks {
         Require(heard.Contains("dig_up"), $"a stump coming out of the ground should be heard: {string.Join(",", heard)}");
     }
 
-    private static void CheckShovelDigsUpABushForThreeLeafPatches(GameData data) {
+    private static void CheckShovelDigsUpABushForThreeLeafSpots(GameData data) {
         var world = EmptyWorld(data);
         var bush = world.Add(ThingKind.Bush, new Vector2(10, 10), World.BushLeaves);
         Require(world.GatherBlock(bush)?.Contains("shovel") == true, $"a bush should ask for a shovel: {world.GatherBlock(bush)}");
@@ -430,7 +430,7 @@ public static class GatheringChecks {
         HoldGather(world, bush, 20);
         Require(world.Find(bush.Id) == null, "a shovel should dig a bush out of the ground for good");
         // An oak's patch holds 12 leaves.
-        Require(world.Backpack["leaves"] == 36, $"a dug up bush should give 36 leaves, three leaf patches' worth: {world.Backpack["leaves"]}");
+        Require(world.Backpack["leaves"] == 36, $"a dug up bush should give 36 leaves, three leaf spots' worth: {world.Backpack["leaves"]}");
     }
 
     private static void CheckDiggingWaitsForRoomInTheBackpack(GameData data) {
@@ -498,7 +498,7 @@ public static class GatheringChecks {
         Work(world, 300, () => chest.Inventory["leaves"] == 72);
         Require(world.Find(bush.Id) == null && world.Find(next.Id) == null, "a worker digging bushes should go on to the next bush");
         Require(chest.Inventory["leaves"] == 72, $"two bushes should bring 72 leaves to storage: {chest.Inventory["leaves"]}");
-        Require(leaves.Remaining == 12, $"a worker digging bushes should leave the nearer leaf patch alone: {leaves.Remaining}");
+        Require(leaves.Remaining == 12, $"a worker digging bushes should leave the nearer leaf spot alone: {leaves.Remaining}");
     }
 
     private static void CheckLeafRakerLeavesBushesAlone(GameData data) {

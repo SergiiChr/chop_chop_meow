@@ -18,7 +18,7 @@ internal static class PropMotionSteps {
         var tree = (TreeProp)WorldModels.Build(new Thing { Id = id, Kind = ThingKind.Tree });
         var (species, variant) = WorldModels.TreeLook(id);
         var (wood, _) = Tree3DShape.Outline(species, variant);
-        float scale = WorldModels.TreeScale(id);
+        float scale = TreePlanting.BaseScale(id);
         var fall = WorldModels.Topple(tree, heading);
         float lowest = float.MaxValue, moved = 0, before = 0, step = 0, topSpeed = 0;
         int slowed = 0, frames = 0;

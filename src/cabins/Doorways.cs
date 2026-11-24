@@ -48,6 +48,23 @@ public sealed class Doorways(World world) {
         return DoorPoint(cabin);
     }
 
+    /// <summary>Moves players inside a destroyed cabin or using its doorway to its doorstep.</summary>
+    internal void Evacuate(Thing cabin) {
+        var at = Doorstep(cabin);
+        foreach (var p in world.Players) MoveOutside(p);
+        foreach (var p in world.S.Absent.Values) MoveOutside(p);
+
+        void MoveOutside(PlayerState p) {
+            if (p.Sheltered != cabin.Id && (p.Door == Doorway.None || p.DoorCabin != cabin.Id)) return;
+            p.Sheltered = 0;
+            p.Pos = at;
+            p.Warp++;
+            Stage(p, Doorway.None, 0);
+            p.DoorFrom = p.DoorBody = at;
+            p.DoorQueued = 0;
+        }
+    }
+
     /// <summary>Seconds a player's doorway stage lasts.</summary>
     public static float DoorSeconds(PlayerState p) => p.Door switch {
         Doorway.Entering => p.DoorRush ? RushSeconds : EnterSeconds,
