@@ -151,6 +151,10 @@ public partial class RecipeMap : Control {
         var naming = Column(strip, null);
         var name = Style.Text(data.Name(item), 19, Style.Ink, Style.Head); name.Name = "detail_name"; naming.AddChild(name);
         naming.AddChild(Style.Text(node.Known ? "Made before" : "Not made yet", 12, Style.Tan));
+        if (data.Items[item].Description is { Length: > 0 } said) {
+            var text = Style.Text(said, 12, Style.Ink); text.Name = "detail_text"; text.AutowrapMode = TextServer.AutowrapMode.WordSmart; text.CustomMinimumSize = new Vector2(230, 0);
+            naming.AddChild(text);
+        }
         var recipe = data.RecipeOf(item);
         var madeAt = new HBoxContainer(); madeAt.AddThemeConstantOverride("separation", 6); Column(strip, "Made at").AddChild(madeAt);
         if (recipe?.Station is ThingKind station) madeAt.AddChild(Style.Icon(Icons.Of(station.Id()), 28));

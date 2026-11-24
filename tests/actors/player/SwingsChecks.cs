@@ -179,12 +179,12 @@ public static class SwingsChecks {
         var rig = new ActorRig(ActorSkin.Player);
         foreach (var (action, windup, end, shape) in new[] {
             (ActorAction.SteelAxeSwing, .46f, .52f, Swings.Chop), (ActorAction.SteelAxeSweep, .34f, .6f, Swings.Sweep),
-            (ActorAction.TorchSwing, .2f, .45f, Swings.Torch), (ActorAction.Attack, .18f, .32f, Swings.Punch) }) {
+            (ActorAction.TorchSwing, .2f, .45f, Swings.Torch), (ActorAction.Attack, .18f, .32f, Swings.Punch), (ActorAction.NetSwing, .34f, .6f, Swings.Net) }) {
             float lands = ActorAnimation.Contact(action) / ActorAnimation.Duration(action), far = 0, left = -180, right = -180, low = float.MaxValue;
             Require(lands >= windup && lands <= end, $"{action} should land during its stroke, {windup} to {end} through, not {lands:0.00} through");
             for (float p = windup; p <= end + .001f; p += .01f) {
                 rig.Show(ActorAnimation.PoseAt(action, p * ActorAnimation.Duration(action), false), ActorAnimation.Tool(action), false, lit: action == ActorAction.TorchSwing);
-                var at = action switch { ActorAction.TorchSwing => ModelSteps.InRig(rig, rig.Flame).Origin, ActorAction.Attack => rig.Fist(false), _ => rig.AxeHead };
+                var at = action switch { ActorAction.TorchSwing => ModelSteps.InRig(rig, rig.Flame).Origin, ActorAction.Attack => rig.Fist(false), ActorAction.NetSwing => rig.Holds(ActorRig.NetMouth), _ => rig.AxeHead };
                 // The rig faces +Z with its left hand on +X.
                 float distance = new Vector2(at.X, at.Z).Length(), angle = Mathf.RadToDeg(MathF.Atan2(at.X, at.Z));
                 Require(distance <= shape.Far + .01f && angle <= shape.Left + 1 && angle >= -shape.Right - 1,

@@ -46,8 +46,8 @@ internal static class FirebugSteps {
         Require(false, "a firebug should come to rest after its dart");
     }
 
-    /// <summary>The player stands a metre from a firebug and swings the net at it, then waits until the swing has landed.</summary>
-    public static void SwingAt(World world, Thing bug, float from = 1) {
+    /// <summary>The player stands where the hoop passes, 1.15 m from a firebug, and swings the net at it, then waits until the swing has landed.</summary>
+    public static void SwingAt(World world, Thing bug, float from = 1.15f) {
         world.Player = world.Firebugs.At(bug) + new Vector2(-from, 0);
         world.SwingNet(world.Firebugs.At(bug) - world.Player);
         RunFrames(world, ActorAnimation.Contact(ActorAction.NetSwing) + 2 * Frame);

@@ -740,7 +740,7 @@ public partial class WorldView : Node3D {
             bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking, World.Data);
-            if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
+            if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind or ActorAction.TwistRope && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch ? worker.Pos + Vector2.FromAngle(worker.LunchHeading) : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down.Rotated(assignment.Rotation)

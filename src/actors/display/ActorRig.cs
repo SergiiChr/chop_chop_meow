@@ -413,6 +413,8 @@ public sealed class ActorRig {
 
     /// <summary>How long a bug net's handle is, the hoop's radius, and how far the bag hangs behind the hoop.</summary>
     public const float NetHandle = .95f, NetHoop = .17f, NetBag = .34f;
+    /// <summary>How far down from the handle's free end the fist holds a bug net, so the hoop clears the ground at a hanging arm's end.</summary>
+    private const float NetGrip = .42f;
     // Seen from both sides, since the hoop shows the inside of the bag.
     private static readonly StandardMaterial3D NetCloth = TwoSided(Cloth("d8d2b0"));
     private static StandardMaterial3D TwoSided(StandardMaterial3D material) {
@@ -421,18 +423,18 @@ public sealed class ActorRig {
         return copy;
     }
     /// <summary>The middle of a bug net's hoop, measured from the grip.</summary>
-    public static readonly Vector3 NetMouth = new(0, .08f - NetHandle - NetHoop, 0);
+    public static readonly Vector3 NetMouth = new(0, NetGrip - NetHandle - NetHoop, 0);
 
     /// <summary>
-    /// A bug net gripped at the origin: a wood handle down along -Y to a hoop of bent wood that opens toward -Z, and a
-    /// bag of knotted nettle rope hanging behind it.
+    /// A bug net gripped at the origin, part way down its handle: the wood handle runs down along -Y to a hoop of bent
+    /// wood that opens toward -Z, and a bag of knotted nettle rope hangs behind it.
     /// </summary>
     private static Node3D BugNet() {
         var tool = new Node3D();
         var wood = Wood("8a5a32", .7f);
-        Cylinder(tool, .018f, .02f, NetHandle, new Vector3(0, .08f - NetHandle / 2, 0), wood, sides: 6);
+        Cylinder(tool, .018f, .02f, NetHandle, new Vector3(0, NetGrip - NetHandle / 2, 0), wood, sides: 6);
         // A rope lashing where the hoop meets the handle.
-        Cylinder(tool, .026f, .026f, .07f, new Vector3(0, .08f - NetHandle + .03f, 0), Cloth("9c955f"), sides: 6);
+        Cylinder(tool, .026f, .026f, .07f, new Vector3(0, NetGrip - NetHandle + .03f, 0), Cloth("9c955f"), sides: 6);
         const int segments = 10;
         float side = 2 * NetHoop * MathF.Sin(MathF.PI / segments);
         for (int i = 0; i < segments; i++) {

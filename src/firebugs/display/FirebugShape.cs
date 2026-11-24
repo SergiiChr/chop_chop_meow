@@ -20,8 +20,8 @@ public enum FirebugLook {
 public static class FirebugShape {
     /// <summary>Which look firebugs are built with: the 3D glow, or the pixel sprite with <c>--firebug-look sprite</c>.</summary>
     public static readonly FirebugLook Look = Launch.Value("--firebug-look") == "sprite" ? FirebugLook.Sprite : FirebugLook.Glow;
-    /// <summary>Metres off the ground a firebug flies, and how far up and down of that it bobs.</summary>
-    public const float Height = 1.05f, Bob = .22f;
+    /// <summary>Metres off the ground a firebug flies, the height a net's hoop is swept at, and how far up and down of that it bobs.</summary>
+    public const float Height = 1.25f, Bob = .2f;
     /// <summary>How bright a firebug stays between flashes, of its full glow.</summary>
     private const float Ember = .12f;
     /// <summary>Glow levels and wing beats in the sprite sheet, and metres one of its pixels covers.</summary>

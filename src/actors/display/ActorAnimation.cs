@@ -46,7 +46,9 @@ public enum ActorAction {
     PumpWater,
     Rake,
     /// <summary>A bug net swept sideways across the front, hoop first.</summary>
-    NetSwing
+    NetSwing,
+    /// <summary>Fibres twisted into rope between both hands over a bench; it takes turns with mallet blows.</summary>
+    TwistRope
 }
 
 /// <summary>
@@ -138,6 +140,7 @@ public static class ActorAnimation {
         ActorAction.Pack => 2.4f,
         ActorAction.Craft => 2.4f,
         ActorAction.Grind => 1.8f,
+        ActorAction.TwistRope => 1.3f,
         ActorAction.Dig => 1.1f,
         ActorAction.Rake => RakeStroke.Seconds,
         _ => 1
@@ -520,6 +523,14 @@ public static class ActorAnimation {
                         RaiseL: 48 + a * 9, OutL: -22 + c * 6, ElbowL: 78 + b * 16, RaiseR: 50 - b * 8, OutR: -22 - c * 5, ElbowR: 76 + a * 14,
                         Hips: .28f, TurnL: 14, TurnR: 14);
                 }
+            case ActorAction.TwistRope: {
+                    // Standing over the bench, the hands roll the fibres against each other, one forward as the other comes back, and draw apart as the twist tightens.
+                    float roll = MathF.Sin(p * Mathf.Tau * 4), draw = MathF.Sin(p * Mathf.Tau);
+                    return Stance with {
+                        Lean = 16 + draw * 2, Head = 18, Twist = roll * 3,
+                        RaiseL = 46 + roll * 8, OutL = -12 + draw * 9, ElbowL = 74 - roll * 10, RaiseR = 46 - roll * 8, OutR = -12 + draw * 9, ElbowR = 74 + roll * 10
+                    };
+                }
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
                 return moving ? Walk(p) with { Lean = carry.Lean, Head = -carry.Lean / 2, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
@@ -738,7 +749,7 @@ public static class ActorAnimation {
     private static Footing? FeetOf(ActorAction action) => action switch {
         ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep
             or ActorAction.Mine or ActorAction.SteelMine or ActorAction.Pump or ActorAction.PumpWater or ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind
-            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock or ActorAction.Rake or ActorAction.NetSwing => StanceFeet,
+            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock or ActorAction.Rake or ActorAction.NetSwing or ActorAction.TwistRope => StanceFeet,
         ActorAction.Gather => SquatFeet,
         ActorAction.Craft => CraftFeet,
         ActorAction.Perch => PerchFeet,
@@ -1200,8 +1211,16 @@ public static class ActorAnimation {
         };
     }
 
+    /// <summary>
+    /// How much of a rope's making each round of the work takes, and how much of a round its mallet blows take: at a
+    /// bench, which works twice as fast, two blows in 1.2 seconds and then 1.3 seconds of twisting.
+    /// </summary>
+    public const float RopeRound = 5, RopeBlows = 2.4f;
+
     /// <summary>What someone working at a station does there.</summary>
     public static ActorAction StationAction(Thing station, GameData data) => station.Kind switch {
+        // Rope is beaten with the mallet and twisted by hand in turn, as far as the batch has come.
+        ThingKind.Bench when data.Recipes.TryGetValue(station.Recipe, out var twisted) && twisted.Twists => station.Progress % RopeRound < RopeBlows ? ActorAction.Hammer : ActorAction.TwistRope,
         ThingKind.Packer => ActorAction.Pack,
         // At a cooking table the mortar's recipes are ground, and dough is worked by hand as goods are packed.
         ThingKind.Cooktable => data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "mortar" ? ActorAction.Grind : ActorAction.Pack,

@@ -21,6 +21,9 @@ public sealed class ItemDef {
     public float Thirst { get; set; }
     /// <summary>What the player says of it, shown under its name; empty for an item with nothing said of it.</summary>
     public string Description { get; set; } = "";
+    /// <summary>The description as a line of its own to put after the name in a tooltip, or nothing; built once.</summary>
+    public string DescriptionLine => Description == "" ? "" : descriptionLine ??= "\n" + Description;
+    private string? descriptionLine;
 }
 public sealed class BuildingDef {
     public string Name { get; set; } = "";
@@ -60,6 +63,8 @@ public sealed class RecipeDef {
     /// <summary>The fuels a batch can burn, one unit per batch from the station's fuel slot, in the order workers look for them; empty for a recipe that burns none.</summary>
     public List<string> Fuels { get; set; } = new();
     public bool Burns => Fuels.Count > 0;
+    /// <summary>Made by beating fibres and twisting them by hand: whoever works it strikes blows and twists in turn.</summary>
+    public bool Twists { get; set; }
     /// <summary>The sound of each blow struck while a batch is made, or empty for the station's own.</summary>
     public string Sound { get; set; } = "";
 }
@@ -400,6 +405,8 @@ public sealed partial class GameData {
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
     public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
+    /// <summary>What the player says of an item, as a tooltip line of its own after the name, or nothing.</summary>
+    public string DescriptionLine(string item) => Items.TryGetValue(item, out var def) ? def.DescriptionLine : "";
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
     public string PlainestTool(string kind, int tier = 0) => Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
 

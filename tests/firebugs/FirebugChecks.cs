@@ -95,7 +95,7 @@ public static class FirebugChecks {
         var (world, bug, _) = FirebugNight(data);
         TireOut(world, bug);
         SwingAt(world, bug);
-        Require(world.Find(bug.Id) == null && world.Backpack["firebug"] == 1, "a net swung at a resting firebug a metre off should catch it");
+        Require(world.Find(bug.Id) == null && world.Backpack["firebug"] == 1, "a net swung at a resting firebug 1.15 m off should catch it");
         Require(world.Had("firebug"), "the settlement should know firebugs once one is caught");
     }
 
@@ -108,6 +108,7 @@ public static class FirebugChecks {
         Require(world.Find(bug.Id) != null && world.Backpack["firebug"] == 0, "a firebug that has rested should dart off before a late swing lands");
     }
 
+    /// <summary>The hoop goes round 0.94 to 1.41 m from the player, so a firebug half a metre off is inside its sweep, and one 3 m off beyond it.</summary>
     private static void CheckMissedSwingSendsARestingFirebugDarting(GameData data) {
         var (world, bug, _) = FirebugNight(data);
         TireOut(world, bug);
@@ -115,6 +116,11 @@ public static class FirebugChecks {
         SwingAt(world, bug, from: 3);
         SafeTick(world, Step);
         Require(world.Find(bug.Id) != null && bug.Pos != rest, "a swing that falls short should send a resting firebug darting");
+        TireOut(world, bug);
+        rest = bug.Pos;
+        SwingAt(world, bug, from: .5f);
+        SafeTick(world, Step);
+        Require(world.Find(bug.Id) != null && bug.Pos != rest, "a swing that goes round a firebug too close to the player should send it darting");
     }
 
     private static void CheckNetSwingNeedsANet(GameData data) {
