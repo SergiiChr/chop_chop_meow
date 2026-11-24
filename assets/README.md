@@ -1,6 +1,6 @@
 # Assets
 
-The world is rendered with low-poly 3D models, code-built apart from the baked trees and a few baked foods.
+The world uses low-poly 3D models, with baked meshes for trees, berry bushes, the dug hole and four foods.
 There are no world or character sprite sheets.
 The only 2D images are interface icons.
 
@@ -43,9 +43,11 @@ Detail past these does not show at the game's camera distance and costs frame ti
 
 ### Assembly and shared helpers
 
-Models are assembled from code-built Godot meshes, with baked meshes for trees, berry bushes and four foods.
+Models are assembled from code-built or baked Godot meshes.
 
 - `src/WorldModels.cs` — world objects, wolf carcass and trade cart.
+- `src/trees/display/TreePlantingShape.cs` — the dig outline, the Pirate Kit hole scaled to fit the outline, and the planted nub.
+  The oak appears after the first full day of growth and scales a little larger at each stage.
 - `src/actors/display/ActorRig.cs` — player, worker, courier and the intro film's boss and catgirls, and the tools
   they hold: the steel shovel is a spade with a bar across the top of its handle and a pointed blade, laid through both
   fists while digging. The rake reuses its tool-rack mesh and is laid through both fists while raking.
@@ -81,7 +83,7 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons, and by heaps as six-packs. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
 - `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
   The icon shows the model as built, and a heap is made of pieces of it.
-  - Built in code: wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a
+  - Built in code: the acorn with its brown cap, wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a
     six-sided collar, none with a handle), steel and tin sheets (three in a loose stack, the top one with its near
     corner bent up), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the
     jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a
@@ -344,4 +346,10 @@ project's normal, flow, foam and caustic textures, all released under the MIT li
 `tools/water_textures.py` downloads the pinned textures and checks their SHA-256.
 The meshes in `models/food/` are baked from four models of [Kenney's Food Kit](https://kenney.nl/assets/food-kit), released under CC0 1.0, as [Patch's asset library](https://patch.gg) serves them: re-packed, with the texture inside the file, and scaled to real size.
 `tools/food_models.py` downloads the pinned files, checks their SHA-256 and bakes them with `tools/bake_models.gd`.
+The dug hole comes from Kenney's Pirate Kit under CC0 1.0. [Kenney's Pirate Kit](https://kenney.nl/assets/pirate-kit)
+Patch supplies the GLB. [Hole asset page](https://patch.gg/create/toolbox/assets/kenney:pirate-kit/hole.glb)
+`tools/bake_models.gd` bakes its palette and 286 triangles into `models/hole.res`.
+The source GLB has SHA-256 `5d237b5bb48dee8ebb05dafda086fde907c34364fcfe3e4d6a65386db48ce4f8`.
+[Download the source GLB](https://assets.patchusercontent.com/sha256/5d237b5bb48dee8ebb05dafda086fde907c34364fcfe3e4d6a65386db48ce4f8/hole.glb)
+
 No other external game art or third-party packs are used.

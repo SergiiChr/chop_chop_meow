@@ -249,7 +249,7 @@ public partial class WorldView {
             review.AddChild(rig.Root); reviewRigs.Add(rig);
             // A blow plays against what it works, standing where it does when the player stops to work it and turned the way the views turn the actor.
             if (ReviewWorked(action) is ThingKind kind) {
-                var target = new Thing { Id = ReviewTargetId, Kind = kind, Remaining = kind == ThingKind.Leaves ? World.LeafPatch : 1, Pos = new Vector2(ScreenRight.X, ScreenRight.Z).Rotated(-Mathf.DegToRad(ReviewTurn)) * ReviewTargetAt };
+                var target = new Thing { Id = ReviewTargetId, Kind = kind, Remaining = kind == ThingKind.LeafSpot ? World.LeavesPerSpot : 1, Pos = new Vector2(ScreenRight.X, ScreenRight.Z).Rotated(-Mathf.DegToRad(ReviewTurn)) * ReviewTargetAt };
                 var prop = WorldModels.Build(target);
                 prop.Root.Position = To3(target.Pos);
                 // A stump stands where its tree's trunk did, as the world view places it.
@@ -305,7 +305,7 @@ public partial class WorldView {
 
     /// <summary>What a close-up shows the actor working on, if the action has a target.</summary>
     private static ThingKind? ReviewWorked(ActorAction action) =>
-        action == ActorAction.Rake ? ThingKind.Leaves : ActorAnimation.Works(action) is [var kind, ..] ? kind : null;
+        action == ActorAction.Rake ? ThingKind.LeafSpot : ActorAnimation.Works(action) is [var kind, ..] ? kind : null;
 
     /// <summary>
     /// A player walks up to a cabin at the middle of the ground and through each doorway stage as the game shows them:

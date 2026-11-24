@@ -46,7 +46,7 @@ public static class WorkerStateChecks {
         world.Add(ThingKind.Chest, at + new Vector2(2, 2));
         world.Player = at; world.Look();
         var raker = AddWorker(world, at);
-        var raked = world.Add(ThingKind.Leaves, at + new Vector2(-2, -2), 0);
+        var raked = world.Add(ThingKind.LeafSpot, at + new Vector2(-2, -2), 0);
         var bush = world.Add(ThingKind.Berries, at + new Vector2(-4, -2), 6);
         world.Tick(0);
         raker.Jobs.Add(new Duty { Thing = raked.Id, Job = JobKind.Gather }); raker.Jobs.Add(new Duty { Thing = bush.Id, Job = JobKind.Gather }); raker.Assignment = raked.Id;

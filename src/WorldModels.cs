@@ -32,6 +32,9 @@ public class Prop {
 public sealed class TreeProp : Prop {
     /// <summary>The trunk and crown, which shake and fall about the base.</summary>
     public Node3D Sway = null!;
+    public Node3D? Nub;
+    public int Stage = -1;
+    public float GrowthScale = 1;
     /// <summary>The crown's meshes and their own materials, for fading it without walking its nodes.</summary>
     public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
     /// <summary>The tree's id, which its look and size and the stump it leaves go by.</summary>
@@ -40,7 +43,7 @@ public sealed class TreeProp : Prop {
     public TreeFall? Falling;
     /// <summary>Seconds the felled tree has lain on the ground, or below zero until it lands.</summary>
     public float Lying = -1;
-    /// <summary>How tall the tree stands among trees, from 0 to 1 (<see cref="WorldModels.TreeTall"/>).</summary>
+    /// <summary>How tall the tree stands among trees, from 0 to 1 (<see cref="TreePlanting.Tallness"/>).</summary>
     public float Tall;
     /// <summary>How see-through the crown is while it hides something behind it.</summary>
     public float Fade;
@@ -197,7 +200,6 @@ public sealed class SignpostProp : Prop {
 
 /// <summary>Code-built low-poly models for every world object: natural, modern and DIY rather than fantasy.</summary>
 public static class WorldModels {
-    public const int TreeVariants = 3;
     /// <summary>The render layer of ground marks, which icon renders leave out.</summary>
     public const uint MarkLayer = 1 << 12;
 
@@ -209,7 +211,7 @@ public static class WorldModels {
         foreach (var kind in Kinds.All) {
             if (kind == ThingKind.Mine) continue;
             // Natural things and farm plots look different by id; buildings, crates and backpacks look the same.
-            int looks = kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
+            int looks = kind == ThingKind.Acorn ? 1 : kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
@@ -225,6 +227,7 @@ public static class WorldModels {
                 Stage(prop.Root);
             }
         }
+        Stage(Build(new Thing { Kind = ThingKind.Tree, TreeStage = 1 }).Root);
         foreach (var ore in Cliff.Ores) Stage(Build(new Thing { Kind = ThingKind.Mine, Pos = Cliff.Of(ore).MineSpot }).Root);
         Stage(new WolfModel().Root);
         void Stage(Node3D root) { ModelKit.BuildShaders(root); root.Position = Vector3.Zero; stage.AddChild(root); }
@@ -237,45 +240,37 @@ public static class WorldModels {
         ThingKind.Stone => t.Remaining / (float)World.StonePile,
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => t.Remaining / (float)World.DepositOre,
         ThingKind.WolfCorpse => t.Remaining / (float)World.WolfMeat,
-        ThingKind.Leaves => t.Remaining / (float)World.LeafPatch,
+        ThingKind.LeafSpot => t.Remaining / (float)World.LeavesPerSpot,
         _ => 1
     };
 
-    /// <summary>Stable pseudo-random value in [0, 1) so a thing looks the same after every load.</summary>
-    public static float Jitter(int id, int salt) {
-        uint h = (uint)(id * 73856093) ^ (uint)(salt * 19349663);
-        h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
-        return (h & 0xffff) / 65536f;
-    }
-
     /// <summary>How many looks a tree has: every species in every variant.</summary>
-    public const int TreeLooks = TreeVariants * NatureShape.Variants;
+    public const int TreeLooks = World.TreeSpecies * NatureShape.Variants;
     /// <summary>A tree's species and its variant of that species, by its id.</summary>
-    public static (int Species, int Variant) TreeLook(int id) => (id % TreeVariants, id / TreeVariants % NatureShape.Variants);
+    public static (int Species, int Variant) TreeLook(int id) => (id % World.TreeSpecies, id / World.TreeSpecies % NatureShape.Variants);
     /// <summary>The turn about the vertical, in degrees, a tree or another resource is drawn with, by its id.</summary>
-    private static float Turn(int id) => Jitter(id, 1) * 360;
-    /// <summary>How tall a tree stands among trees by its id, from 0 for the shortest to 1 for the tallest.</summary>
-    public static float TreeTall(int id) => Jitter(id, 2);
-    /// <summary>A tree's size against its baked model: the tallest stand two thirds taller than the shortest.</summary>
-    public static float TreeScale(int id) => .9f + TreeTall(id) * .6f;
+    private static float Turn(int id) => Thing.Variation(id, 1) * 360;
 
-    /// <summary>A tree's trunk and crown, sized with the tree.</summary>
-    private static Hit[] TreeHits(int id) {
-        var (trunk, crown, fork, top) = TreeLook(id).Species switch {
-            1 => (.3f, 1.25f, 1.2f, 5.6f),
-            2 => (.25f, 1.05f, 2.6f, 5.4f),
-            _ => (.35f, 1.8f, 2.5f, 5.3f),
+    private static Hit[] TreeHits(int id, int stage) {
+        float trunk = TreePlanting.TrunkRadius(id, stage);
+        if (stage == 1) return [new Hit(trunk, 0, .19f)];
+        var (crown, fork, top) = TreeLook(id).Species switch {
+            1 => (1.25f, 1.2f, 5.6f),
+            2 => (1.05f, 2.6f, 5.4f),
+            _ => (1.8f, 2.5f, 5.3f),
         };
-        float scale = TreeScale(id);
-        return new[] { new Hit(trunk * scale, 0, fork * scale), new Hit(crown * scale, fork * scale, top * scale) };
+        float scale = TreePlanting.BaseScale(id) * TreePlanting.GrowthScale(stage);
+        return new[] { new Hit(trunk, 0, fork * scale), new Hit(crown * scale, fork * scale, top * scale) };
     }
 
     public static Hit[] Hits(Thing t) => t.Kind switch {
-        ThingKind.Tree => TreeHits(t.Id),
+        ThingKind.Tree => TreeHits(t.Id, t.TreeStage),
+        ThingKind.Hole => [new Hit(.46f, 0, .12f)],
         ThingKind.Stone => new[] { new Hit(.75f, 0, .9f) },
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => new[] { new Hit(.8f, 0, 1) },
         ThingKind.LooseCoal or ThingKind.LooseStone or ThingKind.IronChip or ThingKind.TinChip => new[] { new Hit(.45f, 0, .35f) },
         ThingKind.Stick => new[] { new Hit(.5f, 0, .3f) },
+        ThingKind.Acorn => new[] { new Hit(.28f, 0, .3f) },
         ThingKind.WolfCorpse => new[] { new Hit(.65f, 0, .5f) },
         ThingKind.Berries => new[] { new Hit(.65f, 0, 1) },
         ThingKind.Stump => new[] { new Hit(.4f, 0, .4f) },
@@ -296,7 +291,7 @@ public static class WorldModels {
         ThingKind.Farm => new[] { new Hit(Farms.HalfSize, 0, .5f) },
         ThingKind.Pump => [new Hit(.52f, 0, 1.15f)],
         ThingKind.SteelPiping or ThingKind.GravelPath => Array.Empty<Hit>(),
-        ThingKind.Leaves => new[] { new Hit(.6f, 0, .15f) },
+        ThingKind.LeafSpot => [LeafSpotHit(t.TreeStage)],
         ThingKind.Grave => new[] { new Hit(.65f, 0, 1.5f) },
         ThingKind.Anvil => new[] { new Hit(.45f, 0, .85f) },
         ThingKind.Signpost => new[] { new Hit(1.02f, 0, 1.98f) },
@@ -305,11 +300,14 @@ public static class WorldModels {
         _ => new[] { new Hit(.5f, 0, .8f) },
     };
 
+    private static ArrayMesh? acorn;
+
     public static Prop Build(Thing t) {
         Prop prop;
         switch (t.Kind) {
-            case ThingKind.Tree: prop = Tree(t.Id); break;
-            case ThingKind.Stump: prop = Stump(t.OfTree != 0 ? t.OfTree : t.Id); break;
+            case ThingKind.Tree: prop = Tree(t); break;
+            case ThingKind.Hole: prop = new Prop(); TreePlantingShape.Hole(prop.Body); break;
+            case ThingKind.Stump: prop = Stump(t.OfTree != 0 ? t.OfTree : t.Id, t.TreeStage); break;
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
             case ThingKind.Stone: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero); break;
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Id, "7d5b45", "a8592b", "b4622a"); break;
@@ -319,8 +317,12 @@ public static class WorldModels {
             case ThingKind.LooseStone: prop = new LooseProp(); Add(prop.Body, NatureShape.Pebble(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero, new Vector3(0, t.Id * 47 % 360, 0)); break;
             case ThingKind.IronChip: prop = new LooseProp(); LooseOre(prop.Body, "loose_iron", t.Id, "a35a2e", "8b4f2b"); break;
             case ThingKind.TinChip: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "b9bcb4", "8f928b"); break;
+            case ThingKind.Acorn:
+                prop = new LooseProp();
+                Add(prop.Body, acorn ??= ItemShape.Piece("acorn"), ItemShape.Material("acorn", "")!, Vector3.Zero);
+                break;
             case ThingKind.Stick: prop = new LooseProp(); Stick(prop.Body, t.Id); break;
-            case ThingKind.Leaves: prop = new Prop(); LeafLitter(prop.Body, t.Id); break;
+            case ThingKind.LeafSpot: prop = new Prop(); LeafSpot(prop.Body, t.Id); break;
             case ThingKind.WolfCorpse: prop = Carcass(); break;
             case ThingKind.Berries: prop = Bush(t.Id); break;
             // The lake is the drinking spot; this thing only provides the hit area.
@@ -348,7 +350,8 @@ public static class WorldModels {
             case ThingKind.GravelPath: prop = new Prop(); Add(prop.Body, GravelPathShape.Tile, Scanned(Scan.Gravel, 1), Vector3.Zero); break;
             default: throw new ArgumentOutOfRangeException(nameof(t), t.Kind, "No model for this kind.");
         }
-        prop.Kind = t.Kind; prop.Hits = Hits(t);
+        prop.Kind = t.Kind;
+        if (prop is not TreeProp) prop.Hits = Hits(t);
         if (t.Rotation != 0) prop.Root.Rotation = new Vector3(0, -t.Rotation, 0);
         var body = prop.Body;
         prop.Plumbing = InstalledPlumbingShape.Build(t.Kind, body);
@@ -397,7 +400,7 @@ public static class WorldModels {
             case var bottle when Water.IsBottle(bottle): return BottleShape.Create(Water.BottleLiters(bottle));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
-            case "leaves": return Build(new Thing { Kind = ThingKind.Leaves }).Root;
+            case "leaves": return Build(new Thing { Kind = ThingKind.LeafSpot }).Root;
             case "crate": return Build(new Thing { Kind = ThingKind.Crate }).Root;
             // Loose iron left the world, but its lump still makes the iron ore icon.
             case "iron_ore": { var lump = new Node3D(); LooseOre(lump, "loose_iron", 0, "a35a2e", "8b4f2b"); return lump; }
@@ -434,13 +437,14 @@ public static class WorldModels {
         prop.Stock.Show(fuel, t.Burner?[fuel] ?? 0, data);
     }
 
-    private static TreeProp Tree(int id) {
+    private static TreeProp Tree(Thing thing) {
+        int id = thing.Id;
         var prop = new TreeProp();
         var sway = Pivot(prop.Body, Vector3.Zero);
         prop.Sway = sway; // the whole tree shakes and falls about its base
-        prop.Id = id; prop.Tall = TreeTall(id);
-        float scale = TreeScale(id);
-        sway.Scale = Vector3.One * scale;
+        prop.Id = id; prop.Tall = TreePlanting.Tallness(id);
+        ShowTreeStage(prop, thing.TreeStage);
+        sway.Scale = Vector3.One * TreePlanting.BaseScale(id) * prop.GrowthScale;
         var (species, variant) = TreeLook(id);
         var leaves = Tree3DShape.Add(sway, species, variant);
         PreserveShadows(sway);
@@ -449,31 +453,40 @@ public static class WorldModels {
         return prop;
     }
 
+    internal static void ShowTreeStage(TreeProp tree, int stage) {
+        tree.Stage = stage;
+        tree.GrowthScale = TreePlanting.GrowthScale(stage);
+        if (stage == 1) tree.Nub ??= TreePlantingShape.Nub(tree.Body);
+        if (tree.Nub != null) tree.Nub.Visible = stage == 1;
+        tree.Sway.Visible = stage != 1;
+        tree.Hits = TreeHits(tree.Id, stage);
+    }
+
     /// <summary>The fall of a felled tree toward <paramref name="heading"/>, a way across the world's ground in radians from the x axis toward y, in the frame of its model's turn.</summary>
     public static TreeFall Topple(TreeProp tree, float heading) {
         var (species, variant) = TreeLook(tree.Id);
         var toward = new Vector3(MathF.Cos(heading), 0, MathF.Sin(heading)).Rotated(Vector3.Up, -Mathf.DegToRad(Turn(tree.Id)));
         var (wood, top) = Tree3DShape.Outline(species, variant);
-        return new TreeFall(wood, top, Tree3DShape.Foot(species, variant), TreeScale(tree.Id), toward);
+        return new TreeFall(wood, top, Tree3DShape.Foot(species, variant), TreePlanting.BaseScale(tree.Id) * tree.GrowthScale, toward);
     }
 
     /// <summary>
     /// The stump a felled tree leaves: as thick as that tree's trunk was at the ground, and standing where the trunk stood.
     /// A stump with no tree on record is shaped as if a tree with the stump's own id had left it.
     /// </summary>
-    private static DugProp Stump(int tree) {
+    private static DugProp Stump(int tree, int stage) {
         var prop = new DugProp();
         var stump = Add(prop.Body, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
-        var (seat, radius) = Trunk(tree);
+        var (seat, radius) = Trunk(tree, stage);
         float width = radius / NatureShape.StumpRadius;
-        stump.Scale = new Vector3(width, TreeScale(tree), width);
+        stump.Scale = new Vector3(width, TreePlanting.BaseScale(tree) * TreePlanting.GrowthScale(stage), width);
         prop.Seat = seat;
         return prop;
     }
 
     /// <summary>Where a tree's trunk stands from the tree's spot, and how thick it is at the ground, in metres.</summary>
-    public static (Vector3 Seat, float Radius) Trunk(int tree) {
-        float scale = TreeScale(tree);
+    public static (Vector3 Seat, float Radius) Trunk(int tree, int stage = 0) {
+        float scale = TreePlanting.BaseScale(tree) * TreePlanting.GrowthScale(stage);
         var (species, variant) = TreeLook(tree);
         var (foot, radius) = Tree3DShape.Foot(species, variant);
         // The tree's model was turned by its id, and its trunk with it.
@@ -482,7 +495,7 @@ public static class WorldModels {
 
     /// <summary>A plain bush of three lobes around its middle, each a little different in size and green by its id; it casts a shadow.</summary>
     private static void Shrub(Node3D body, int id) {
-        float size = .85f + Jitter(id, 3) * .4f;
+        float size = .85f + Thing.Variation(id, 3) * .4f;
         for (int lobe = 0; lobe < 3; lobe++) {
             float angle = lobe * Mathf.Tau / 3, radius = (.35f + (id + lobe * 3) % 7 * .05f) * size;
             Add(body, NatureShape.Scrub, NatureShape.ScrubMaterials[(id + lobe) % NatureShape.ScrubHues], new Vector3(MathF.Cos(angle) * .23f, radius * .35f, MathF.Sin(angle) * .23f),
@@ -505,7 +518,7 @@ public static class WorldModels {
 
     /// <summary>A fallen stick lying on the ground, turned by its id.</summary>
     private static void Stick(Node3D body, int id) {
-        var stick = Pivot(body, new Vector3(0, .05f, 0), new Vector3(0, Jitter(id, 5) * 360, 0));
+        var stick = Pivot(body, new Vector3(0, .05f, 0), new Vector3(0, Thing.Variation(id, 5) * 360, 0));
         Cylinder(stick, .045f, .03f, .8f, Vector3.Zero, Wood("78644a", .95f), new Vector3(0, 0, 90), 5);
         Cylinder(stick, .025f, .015f, .25f, new Vector3(.12f, .06f, .05f), Wood("6e5b43", .95f), new Vector3(30, 0, 60), 4);
     }
@@ -806,9 +819,11 @@ public static class WorldModels {
     }
 
     /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>
-    private static void LeafLitter(Node3D body, int id) {
+    private static void LeafSpot(Node3D body, int id) {
         Add(body, LeafShape.For(id), NatureShape.Natural, Vector3.Zero);
     }
+
+    internal static Hit LeafSpotHit(int stage) => new(LeafSpots.Radius(stage), 0, .15f);
 
     /// <summary>
     /// Anvil bolted to a welded square-tube stand; a slotted steel hammer lies on the stand's top plate in front of it.

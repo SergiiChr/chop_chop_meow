@@ -49,6 +49,12 @@ public partial class Game {
     /// <summary>A control of the open page by name, such as a job's row or grip, or null.</summary>
     private Control? OnPage(string name) => panel.FindChild(name, true, false) as Control;
 
+    /// <summary>Whether a resource's item and its count, if any, are visible in a stock slot.</summary>
+    private bool ShowsResourceStock(string item, string? amount) => OnPage($"resource_{item}") is ItemSlot slot
+        && slot.IsVisibleInTree() && slot.Icon == Icons.Of(item)
+        && slot.GetChildren().OfType<Badge>().Any(badge =>
+            amount == null ? !badge.IsVisibleInTree() : badge.IsVisibleInTree() && badge.Text == amount);
+
     private bool HasLabel(Node parent, string text) {
         foreach (var child in parent.GetChildren()) {
             if (child is Label label && label.Text.Contains(text, StringComparison.OrdinalIgnoreCase)) return true;

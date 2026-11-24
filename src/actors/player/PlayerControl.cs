@@ -12,6 +12,8 @@ public abstract record ClickMode {
     public sealed record Build(ThingKind Kind, PipeShape Shape = PipeShape.Straight) : ClickMode;
     /// <summary>A click places a crate or barrel, from a specific backpack cell when one is named.</summary>
     public sealed record Container(string Item, int BackpackSlot = -1) : ClickMode;
+    /// <summary>Holding right mouse on open ground digs a hole.</summary>
+    public sealed record Dig : ClickMode;
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
     /// <summary>The remove selector takes down what the player clicks on the selected layer.</summary>
@@ -22,7 +24,7 @@ public abstract record ClickMode {
     public float Rotation => QuarterTurns * Mathf.Pi / 2;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
-    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, _ => null };
+    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, Dig => ThingKind.Hole, _ => null };
 }
 
 /// <summary>The player in the world: walking, gathering, lifting containers, placing buildings, taking them down and clicking things.</summary>
@@ -41,6 +43,10 @@ public sealed class PlayerControl {
     /// <summary>The placement on the cursor, with a turn that stays set while the pointer crosses the interface.</summary>
     private ClickMode? heldPlacement;
     private Thing? gathering;
+    private int digPress, digAttempt;
+    private bool digDismissed;
+    /// <summary>The spot under the mouse when this hold started, locked until it ends.</summary>
+    public Vector2? DiggingAt { get; private set; }
     private readonly CabinApproach cabinApproach;
     /// <summary>The pump whose handle the player is walking to press.</summary>
     private Thing? pumpApproach;
@@ -60,11 +66,14 @@ public sealed class PlayerControl {
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
         cabinApproach = new CabinApproach(world);
-        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; inspectUnderground = false; Mode = new ClickMode.Normal(); };
+        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; inspectUnderground = false; digDismissed = false; Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops actions whose targets belong to the previous world.</summary>
-    private void Stop() { gathering = null; lifting = null; pumpApproach = null; cabinApproach.Cancel(); }
+    private void Stop() {
+        DiggingAt = null; digAttempt = 0;
+        gathering = null; lifting = null; pumpApproach = null; cabinApproach.Cancel();
+    }
 
     public bool Entering(Thing cabin) => cabinApproach.GoesTo(cabin);
     public bool CancelEntry() => cabinApproach.Cancel();
@@ -93,13 +102,37 @@ public sealed class PlayerControl {
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started; <paramref name="overPanel"/> tells that the mouse is on the interface.</summary>
     public void Update(float dt, bool overPanel) {
         PlaceHeld(overPanel);
+        UpdateDigMode();
         // The recipe map covers the world, so nothing held over it walks or gathers.
-        if (kit.Paused || panel.Map.Visible) { world.Me.Sprinting = false; return; }
+        if (kit.Paused || panel.Map.Visible) { StopGroundDig(); world.Me.Sprinting = false; return; }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
         var direction = cabinApproach.Active ? cabinApproach.Direction() : TowardPump(HeldDirection());
         direction = Gather(direction, right, dt);
+        direction = DigGround(direction, right);
         direction = Lift(direction, right, dt);
         Walk(direction, right, dt);
+    }
+
+    /// <summary>Shows the dig outline again once a temporary action ends, unless the player put it away.</summary>
+    private void UpdateDigMode() {
+        bool selected = world.Holes.ShovelSelected;
+        if (!selected || world.InHand == "") digDismissed = false;
+        if (selected && !digDismissed && Mode is ClickMode.Normal && !inspectUnderground) Mode = new ClickMode.Dig();
+        else if (!selected && Mode is ClickMode.Dig) Mode = new ClickMode.Normal();
+    }
+
+    internal void SelectDigging() {
+        digDismissed = false;
+        if (!inspectUnderground) Mode = new ClickMode.Dig();
+    }
+
+    internal bool CanCancelMode => Mode is not ClickMode.Normal && (Mode is not ClickMode.Dig || world.InHand != "");
+
+    internal bool TryCancelMode() {
+        if (!CanCancelMode) return false;
+        if (Mode is ClickMode.Dig) digDismissed = true;
+        Mode = new ClickMode.Normal();
+        return true;
     }
 
     /// <summary>A container or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>
@@ -123,7 +156,7 @@ public sealed class PlayerControl {
     public bool RotatePlacement(int quarters, bool overPanel) {
         PlaceHeld(overPanel);
         var placement = heldPlacement ?? Mode;
-        if (placement.Placing is not ThingKind kind) return false;
+        if (placement.Placing is not ThingKind kind || kind == ThingKind.Hole) return false;
         if (kind == ThingKind.Mine) return true;
         var turned = placement with { QuarterTurns = (placement.QuarterTurns + quarters + 4) % 4 };
         if (heldPlacement != null) heldPlacement = turned;
@@ -199,6 +232,32 @@ public sealed class PlayerControl {
         return direction;
     }
 
+    private Vector2 DigGround(Vector2 direction, bool right) {
+        if (DiggingAt is not Vector2 at) return direction;
+        if (!right || Mode is not ClickMode.Dig || direction != Vector2.Zero || cabinApproach.Active || pumpApproach != null
+            || world.Occupied || !cursor.Empty) { StopGroundDig(); return direction; }
+        if (world.Player.DistanceTo(at) > GroundHoles.Reach) {
+            if (digAttempt == 0) return world.Player.DirectionTo(at);
+            StopGroundDig();
+            return direction;
+        }
+        if (digAttempt == 0) {
+            int attempt = ++digPress;
+            if (!world.Holes.Begin(at, attempt)) { DiggingAt = null; return direction; }
+            digAttempt = attempt;
+        }
+        if (world.Holes.Ready(digAttempt)) {
+            world.Holes.Finish(digAttempt);
+            DiggingAt = null; digAttempt = 0;
+        }
+        return direction;
+    }
+
+    private void StopGroundDig() {
+        if (digAttempt != 0) world.Holes.Cancel(digAttempt);
+        DiggingAt = null; digAttempt = 0;
+    }
+
     /// <summary>A held right click walks to a container and lifts it once the button has been held long enough.</summary>
     private Vector2 Lift(Vector2 direction, bool right, float dt) {
         if (lifting != null && right && direction == Vector2.Zero && !cabinApproach.Active && pumpApproach == null && world.Find(lifting.Id) != null) {
@@ -237,8 +296,9 @@ public sealed class PlayerControl {
                 kit.Notify("Walk around to the pump handle on the bank.");
             }
         }
-        view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
-        view.GatheringTarget = view.Gathering ? gathering : null;
+        view.GatheringTarget = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f) ? gathering
+            : digAttempt != 0 ? GroundHoles.AnimationTarget(world.Me) : null;
+        view.Gathering = view.GatheringTarget != null;
         // A tool in hand that has left the backpack leaves the hand empty.
         if (world.InHand != "" && world.Backpack[world.InHand] == 0) world.SelectInHand("");
         world.Me.Selected = hotbar.ActiveItem() ?? "";
@@ -259,12 +319,16 @@ public sealed class PlayerControl {
     public void Click(InputEventMouseButton mouse, Vector2 at, bool overPanel) {
         if (mouse.ButtonIndex == MouseButton.WheelUp && mouse.Pressed && !overPanel && !view.FirstPerson) view.Zoom = Math.Min(1.6f, view.Zoom + .1f);
         if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed && !overPanel && !view.FirstPerson) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
-        if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed && !overPanel) RightPress(at);
+        if (mouse.ButtonIndex == MouseButton.Right) {
+            if (!mouse.Pressed) StopGroundDig();
+            else if (!overPanel) RightPress(at);
+        }
         if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) LeftPress(at);
     }
 
     /// <summary>Switches the visible layer. The remove selector keeps its own layer while it is active.</summary>
     public void ToggleLayer() {
+        StopGroundDig();
         bool below = !Underground;
         if (Mode is ClickMode.Remove) Mode = new ClickMode.Remove(below);
         else { Mode = new ClickMode.Normal(); inspectUnderground = below; }
@@ -272,6 +336,7 @@ public sealed class PlayerControl {
     }
 
     private void RightPress(Vector2 at) {
+        StopGroundDig();
         if (PlacingPipe) {
             world.Construction.Remove(world.Construction.RemovalAt(null, view.ToWorld(at, PipeGround.FloorY), underground: true));
             return;
@@ -283,7 +348,13 @@ public sealed class PlayerControl {
         var t = view.Pick(at);
         if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
-        if (t == null && Mode is ClickMode.Normal && view.PickWorker(at) == null) hotbar.UseSelected(view.ToWorld(at));
+        if (t != null) return;
+        if (Mode is ClickMode.Dig) {
+            if (!view.TryGroundPoint(at, out var ground)) return;
+            var spot = ground.Round();
+            if (world.Holes.Block(spot) is string blocked) { kit.Notify(blocked); return; }
+            DiggingAt = spot;
+        } else if (Mode is ClickMode.Normal && view.PickWorker(at) == null) hotbar.UseSelected(view.ToWorld(at));
     }
 
     private void LeftPress(Vector2 at) {
@@ -301,10 +372,10 @@ public sealed class PlayerControl {
             if (cursor.Stack is HeldStack held && t != null && (t.IsStorage || t.Kind == ThingKind.Hut && Barrel.Is(held.Item))) {
                 kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return;
             }
-            if (Mode.Placing != null) Place(at); else cursor.Release();
+            if (Mode.Placing != null && Mode is not ClickMode.Dig) Place(at); else cursor.Release();
             return;
         }
-        if (Mode.Placing != null) { Place(at); return; }
+        if (Mode.Placing != null && Mode is not ClickMode.Dig) { Place(at); return; }
         if (Mode is ClickMode.Remove) { world.Construction.Remove(RemovalAt(t, at)); return; }
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
         var w = view.PickWorker(at, thingDistance);

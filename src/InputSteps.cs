@@ -211,7 +211,7 @@ public partial class Game {
         // and Esc pressed after that would open the pause menu.
         await Frames(1);
         await Until(() => !panel.SubjectGone, "the page of something that is gone closing", 3);
-        for (int i = 0; i < 3 && (player.Mode.Placing != null || panel.Visible || bag.Visible); i++) await KeyStroke(Key.Escape);
+        for (int i = 0; i < 3 && (player.Mode.Placing != null && player.CanCancelMode || panel.Visible || bag.Visible); i++) await KeyStroke(Key.Escape);
     }
 
     /// <summary>Whole spots round the player, two to four tiles out and the nearest ring first: where a check puts something the player can reach.</summary>

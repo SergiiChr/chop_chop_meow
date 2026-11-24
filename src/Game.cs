@@ -386,7 +386,7 @@ public partial class Game : Node, IGameFlow {
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
                 case Key.Escape:
-                    if (!cursor.Empty) cursor.Release(); else if (player.Mode is not ClickMode.Normal) player.Mode = new ClickMode.Normal(); else if (!player.CancelEntry()) { if (panel.Visible || bag.Visible) panel.Close(); else menu.Open(); }
+                    if (!cursor.Empty) cursor.Release(); else if (!player.TryCancelMode() && !player.CancelEntry()) { if (panel.Visible || bag.Visible) panel.Close(); else menu.Open(); }
                     RefreshLive(); break;
                 case Key.B: panel.Open(Page.Build); break;
                 case Key.H: panel.Toggle(Page.Crew); break;
@@ -429,7 +429,10 @@ public partial class Game : Node, IGameFlow {
             ending.ShowOnce();
             needsPlate.DamageFlash(health - world.Health, runTime); shownHealth = world.Health;
         }
-        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection; view.Placing = player.Mode.Placing; view.PlacingRotation = player.Mode.Rotation;
+        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection;
+        view.Placing = overInterface && player.Mode is ClickMode.Dig ? null : player.Mode.Placing;
+        view.PlacingRotation = player.Mode.Rotation;
+        view.DiggingAt = player.DiggingAt;
         view.Underground = player.Underground;
         if (player.Mode is ClickMode.Build { Kind: ThingKind.SteelPiping } pipe) view.PlacingPipeShape = pipe.Shape;
         view.Mouse = looking ? GetViewport().GetVisibleRect().GetCenter() : GetViewport().GetMousePosition();

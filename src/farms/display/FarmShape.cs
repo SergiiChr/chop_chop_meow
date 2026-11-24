@@ -46,20 +46,20 @@ internal static class FarmShape {
         for (int row = 0; row < Rows; row++)
             for (int i = 0; i < PlantsPerRow; i++) {
                 int n = row * PlantsPerRow + i;
-                var at = new Vector3((i - (PlantsPerRow - 1) / 2f) * .68f + (WorldModels.Jitter(variant, n) - .5f) * .1f, .078f, RowZ(row));
+                var at = new Vector3((i - (PlantsPerRow - 1) / 2f) * .68f + (Thing.Variation(variant, n) - .5f) * .1f, .078f, RowZ(row));
                 float turn = n * 2.4f + variant;
                 Vector3 Direction(float angle) => new(MathF.Cos(angle), 0, MathF.Sin(angle));
                 if (stage < 2) {
                     int count = stage == 0 ? 2 : 3;
                     for (int k = 0; k < count; k++) {
                         var direction = Direction(turn + k * 2.3f);
-                        float height = stage == 0 ? .15f : .43f + WorldModels.Jitter(variant, n + 70) * .09f;
+                        float height = stage == 0 ? .15f : .43f + Thing.Variation(variant, n + 70) * .09f;
                         Leaf(s, at, direction, height, stage == 0 ? .04f : .15f, stage == 0 ? .018f : .035f,
                             stage == 0 ? "7fae45" : k == 0 ? "669b38" : "4f8a34");
                     }
                 } else {
                     for (int k = 0; k < 2; k++) {
-                        float height = .59f + WorldModels.Jitter(variant, n + k * 50) * .1f - k * .045f;
+                        float height = .59f + Thing.Variation(variant, n + k * 50) * .1f - k * .045f;
                         var baseAt = at + Direction(turn + k * 3) * .045f;
                         var tip = baseAt + Vector3.Up * height + Direction(turn) * .04f;
                         Stem(s, baseAt, tip);

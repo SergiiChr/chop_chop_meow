@@ -172,6 +172,7 @@ public partial class Hotbar : PanelContainer {
         for (int slot = 0; slot < 9; slot++) if (world.HotbarItem(slot) == tool) { Select(slot); return; }
         panel.Player.Mode = new ClickMode.Normal();
         world.SelectInHand(tool);
+        if (world.InHand == tool && world.ToolKind(tool) == "shovel") SelectDigging();
         kit.Refresh();
     }
 
@@ -184,7 +185,13 @@ public partial class Hotbar : PanelContainer {
         if (string.IsNullOrEmpty(id)) kit.Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
         else if (world.Data.TryBuilding(id, out var kind)) { panel.Player.Mode = new ClickMode.Build(kind); panel.Close(); } else if (id == "crate") panel.Player.PlaceContainer(id);
         else if (Barrel.Is(id) && world.HotbarStack(slot) is int barrelSlot and >= 0) panel.Player.PlaceContainer(id, barrelSlot);
+        else if (world.ToolKind(id) == "shovel" && world.HotbarCount(slot) > 0) SelectDigging();
         kit.Refresh();
+    }
+
+    private void SelectDigging() {
+        panel.Player.SelectDigging();
+        panel.Close();
     }
 
     /// <summary>Whether this item can be eaten, drunk, lit or swung by right-clicking open ground.</summary>

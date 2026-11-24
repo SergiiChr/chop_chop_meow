@@ -2,7 +2,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A two-handed pull through a leaf patch with the boots planted.</summary>
+/// <summary>A two-handed pull through a leaf spot with the boots planted.</summary>
 internal static class RakeStroke {
     public const float Seconds = 2;
     public const float Contact = .27f;

@@ -204,7 +204,7 @@ public partial class SidePanel : MovableWindow {
         if (t.Kind == ThingKind.Reinforced && !(Page == Page.Inspect && Selection.Thing == t.Id)) kit.Sounds.Play("open_steel_smelter", t.Pos);
         Selection = Selection.Of(t);
         // A work order carries on: it waits for a click on a resource, whatever the panel shows meanwhile.
-        if (Player.Mode.Placing != null) Player.Mode = new ClickMode.Normal();
+        if (Player.Mode.Placing != null && Player.Mode is not ClickMode.Dig) Player.Mode = new ClickMode.Normal();
         Open(Page.Inspect);
     }
 

@@ -108,19 +108,25 @@ public partial class Game {
         Require(bushProp.Fruit is { Visible: true }, "A ripe berry bush must display its fruit.");
         var point = view.Screen(berryBush.Pos, .35f);
         Require(view.Pick(point)?.Id == berryBush.Id, "The bush foliage must select its berry resource.");
-        var windowPoint = GetViewport().GetFinalTransform() * point;
+        await Click(point);
+        Require(ShowsResourceStock("berries", "4"), "Inspecting a berry bush must show four berries in its item slot.");
         int soundsBefore = sounds.Played;
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
+        var press = RightPress(berryBush.Pos, .35f);
         await Until(() => sounds.Heard("rustle", soundsBefore), "picking a berry bush by hand rustling its leaves", 3);
         await Until(() => berryBush.Remaining == 0, "holding RMB on a berry bush picking it clean", world.Data.GatherSeconds + 3);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
+        RightRelease(press);
         await Frames(2);
         Require(berryBush.Remaining == 0, "Harvesting must empty the berry bush.");
+        await Until(() => ShowsResourceStock("berries", "0") && HasLabel(panel, "Picked clean"),
+            "the picked bush showing a zero count and the regrowth note", 2);
         Require(world.Backpack["berries"] == 4, "Harvesting must put the berries in the backpack.");
         Require(!bushProp.Fruit.Visible, "Harvesting must hide the fruit.");
         Require(bushProp.Body.Visible, "Harvesting must leave the bush body visible.");
         berryBush.Remaining = 4; await Frames(2);
         Require(bushProp.Fruit.Visible, "A replenished bush must show its fruit again.");
+        await Until(() => ShowsResourceStock("berries", "4") && !HasLabel(panel, "Picked clean"),
+            "the refilled bush showing its berries with no regrowth note", 2);
+        await CloseWithEsc();
         RemoveThings(Hosted, t => t == berryBush);
         Warp(Hosted, home); await Frames(4);
     }
@@ -130,8 +136,9 @@ public partial class Game {
         var start = Terrain.Spawn - new Vector2(30, 30);
         RemoveThings(Hosted, t => t.Pos.DistanceTo(start) < 12);
         Warp(Hosted, start);
-        var leaves = Hosted.Add(ThingKind.Leaves, start + Vector2.Down * 1.25f, World.LeafPatch);
+        var leaves = Hosted.Add(ThingKind.LeafSpot, start + Vector2.Down * 1.25f, World.LeavesPerSpot);
         int before = Hosted.Backpack["leaves"];
+        int acorns = Hosted.Backpack["acorn"];
         await Frames(2);
         var point = RightPress(leaves.Pos);
         await Until(() => view.PlayerAnimation == ActorAction.Gather, "gathering leaves by hand", 2);
@@ -149,7 +156,7 @@ public partial class Game {
         var teeth = view.PlayerRig.Root.Transform * view.PlayerRig.RakeTines;
         Require(Mathf.Abs(teeth.Y - WorldView.To3(leaves.Pos).Y) < .06f
             && new Vector2(teeth.X, teeth.Z).DistanceTo(leaves.Pos) < .35f,
-            $"The rake must brush the leaf patch when it rustles. Teeth at {teeth}, patch at {leaves.Pos}.");
+            $"The rake must brush the leaf spot when it rustles. Teeth at {teeth}, leaf spot at {leaves.Pos}.");
         await Until(() => world.Backpack["leaves"] > before, "raking leaves into the backpack", 3);
         RightRelease(point);
         await Frames(2);
@@ -161,12 +168,13 @@ public partial class Game {
         teeth = view.PlayerRig.Root.Transform * view.PlayerRig.RakeTines;
         Require(Mathf.Abs(teeth.Y - WorldView.To3(leaves.Pos).Y) < .06f
             && new Vector2(teeth.X, teeth.Z).DistanceTo(leaves.Pos) < .48f,
-            $"Raking a patch underfoot must brush the near leaves. Teeth at {teeth}, patch at {leaves.Pos}.");
+            $"Raking a leaf spot underfoot must brush the near leaves. Teeth at {teeth}, leaf spot at {leaves.Pos}.");
         RightRelease(point);
         await Frames(2);
 
         RemoveThings(Hosted, t => t == leaves);
         Drop(Hosted, "leaves", Hosted.Backpack["leaves"] - before);
+        Drop(Hosted, "acorn", Hosted.Backpack["acorn"] - acorns);
         Drop(Hosted, "rake", 1);
         Warp(Hosted, home); await Frames(4);
     }
@@ -297,10 +305,14 @@ public partial class Game {
         await Hover(shorePoint);
         Require(world.Find(view.Hover)?.Kind == ThingKind.Water, "Pointing at the shoreline should show the water target.");
         await SurvivalReviewShot("water-source");
-        var windowPoint = GetViewport().GetFinalTransform() * shorePoint;
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
+        await Click(shorePoint);
+        Require(ShowsResourceStock("fresh_water", null) && panel.HeadingIcon.Texture == Icons.Of("fresh_water"),
+            "The lake must show the water droplet in its heading and unnumbered slot.");
+        Require(HasLabel(panel, "Hold RMB to drink or fill a container."), "The lake must show how to collect water.");
+        await CloseWithEsc();
+        var press = RightPress(shore, .8f);
         await Until(() => world.Backpack["water"] == 1 && world.Backpack["empty_bottle"] == 0, "holding right mouse on the shoreline filling the retained bottle", world.Data.GatherSeconds + 3);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
+        RightRelease(press);
         await Frames(3);
 
         await KeyStroke(Key.Tab); await Frames(3); await SurvivalReviewShot("filled-bottle"); await CloseWithEsc();

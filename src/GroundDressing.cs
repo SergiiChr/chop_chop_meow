@@ -107,7 +107,7 @@ public partial class WorldView {
             case ThingKind.Stone: ShadeObject(t.Pos, .7f, .7f); BareSoil(t.Pos, 1.3f); break;
             case ThingKind.Tree or ThingKind.Stump: ShadeObject(t.Pos, .55f, .7f); break;
             case ThingKind.Berries or ThingKind.Bush: ShadeObject(t.Pos, .6f, .6f); break;
-            case ThingKind.Water or ThingKind.Leaves or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine: break;
+            case ThingKind.Water or ThingKind.LeafSpot or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine: break;
             default:
                 if (t.IsLoose) ShadeObject(t.Pos, .3f, .6f);
                 else if (!Construction.IsZone(t.Kind)) ShadeObject(t.Pos, World.Footprint(t.Kind) + .25f, .5f);
@@ -126,7 +126,8 @@ public partial class WorldView {
         foreach (var t in World.Things) {
             if (t.IsResource || t.Kind is ThingKind.Crate or ThingKind.Grave) continue;
             if (t.Kind == ThingKind.Farm) { ClearFarm(t.Pos); continue; }
-            float radius = t.Kind switch { ThingKind.Hut or ThingKind.Pile => 3.4f, ThingKind.Mine => 3, ThingKind.Campfire => 2.3f, _ => 1.8f };
+            // A hole sits between four texel centres. Clear all four to keep grass out of the hole after filtering.
+            float radius = t.Kind switch { ThingKind.Hut or ThingKind.Pile => 3.4f, ThingKind.Mine => 3, ThingKind.Campfire => 2.3f, ThingKind.Hole => 1.25f, _ => 1.8f };
             Stamp(disturbed, t.Pos, radius, 1);
         }
         disturbanceImage.SetData(Terrain.Size, Terrain.Size, false, Image.Format.R8, disturbed);

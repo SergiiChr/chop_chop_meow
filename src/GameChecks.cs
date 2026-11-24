@@ -1206,6 +1206,7 @@ public partial class Game {
             await TestClean(CheckSoundsRotateAndMusicCrossfades);
             await TestClean(CheckSoundsFadeWithDistanceFromThePlayerAtAnyZoom);
             await RunGatheringUIChecks();
+            await RunReplantingUIChecks();
             await RunFarmUIChecks();
             await RunBuildingRemovalUIChecks();
             await RunGravelPathUIChecks();
