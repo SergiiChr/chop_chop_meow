@@ -46,6 +46,7 @@ public partial class Game {
     private async Task CheckHotbarShovelShowsADigOutline() {
         Give(Hosted, "steel_shovel");
         Give(Hosted, "crate");
+        int active = world.ActiveHotbar;
         string previous = world.HotbarItem(8);
         await Frames();
         await KeyStroke(Key.Tab);
@@ -71,8 +72,10 @@ public partial class Game {
         Require(view.PlacementGhost != null, "selecting the hotbar shovel should show the dig outline");
         await RightClick(hotbar.Buttons[8]);
         await Hover(view.Screen(at));
-        Require(view.PlacementGhost == null, "emptying the selected slot should put away the outline");
+        Require(world.HotbarItem(8) == "steel_shovel" && view.PlacementGhost != null,
+            "right-clicking the shovel slot should keep the shovel assigned and the dig outline visible");
         SetHotbarSlot(Hosted, 8, previous);
+        world.SelectHotbar(active);
         Drop(Hosted, "steel_shovel");
         Drop(Hosted, "crate", 1);
         await Frames();

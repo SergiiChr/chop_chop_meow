@@ -12,11 +12,12 @@ public sealed class FilterState {
 
 /// <summary>
 /// The one filter window for any storage that has filters: a row of what workers bring and one of what they take.
-/// Drop an item on a row to add it, click one to take it off; an empty row allows anything, and a row shows its items in the order they were added.
+/// Drop an item on a row to add it, click one to take it off; a row shows its items in the order they were added.
+/// An empty row lets nothing through, and Everything (an "A" cell, first in the item list) lets all through and stands alone in its row.
 /// The item list runs in <see cref="GameData.ListOrder"/>, with crates of goods after the items in their goods' order, and crates of mixed goods last.
 /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
 /// A plain pile has only the row of what workers bring, naming one resource, which also sets what they take.
-/// A barrel has the same single row and names water.
+/// A barrel has the same single row and names water; neither offers Everything.
 /// A placed crate's filters name no crate.
 /// Water in a full or partly filled vessel is one entry.
 /// </summary>
@@ -47,11 +48,11 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
                 cell.Pressed += () => world.SetFilter(t, id, output, false);
                 row.AddChild(cell);
             }
-            if (filter.Count == 0) { var any = Style.Text(post ? "no deliveries" : barrel ? "water" : "anything", 14, Style.Tan); any.CustomMinimumSize = new Vector2(0, 44); row.AddChild(any); }
+            if (filter.Count == 0) { var any = Style.Text(post ? "no deliveries" : "nothing", 14, Style.Tan); any.CustomMinimumSize = new Vector2(0, 44); row.AddChild(any); }
             // Take the named resource off before adding another.
             if (single && filter.Count > 0) continue;
             var (add, _) = ItemSlot.Create($"filter_add_{(output ? "out" : "in")}", 44);
-            add.Text = "+"; add.AddThemeFontSizeOverride("font_size", 22); add.AddThemeColorOverride("font_color", Style.Tan);
+            Letter(add, "+", Style.Tan);
             add.TooltipText = "Add an item · or put a held one here";
             // A held stack goes back where it was: a filter only names it, or for a packed crate the kind of crate it is.
             add.Controls = new SlotInput(cursor) {
@@ -76,6 +77,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             var items = world.Data.ListOrder.Where(Holds);
             if (pile) items = items.Select(world.PileEntry).Distinct();
             var choices = barrel ? new[] { Water.Liquid } : post ? crates : items.Concat(crates);
+            if (!single) choices = choices.Prepend(Inventory.Everything);
             foreach (var id in choices) {
                 var cell = FilterCell($"pick_{id}", id); cell.TooltipText = world.FilterName(id);
                 cell.Pressed += () => { world.SetFilter(t, id, state.Output, true); state.Picking = false; redraw(); };
@@ -95,9 +97,15 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
         }
     }
 
-    /// <summary>A filter entry's cell: the item, or for a crate of a good, the good with a small crate in the corner.</summary>
+    /// <summary>Shows a letter in a cell in place of an item's icon: "+" to add an item, "A" for Everything.</summary>
+    private static void Letter(ItemSlot cell, string letter, Color color) {
+        cell.Text = letter; cell.AddThemeFontSizeOverride("font_size", 22); cell.AddThemeColorOverride("font_color", color);
+    }
+
+    /// <summary>A filter entry's cell: the item, for a crate of a good the good with a small crate in the corner, or the letter A for Everything.</summary>
     private ItemSlot FilterCell(string name, string id) {
         var (cell, _) = ItemSlot.Create(name, 44);
+        if (id == Inventory.Everything) { Letter(cell, "A", Style.Ink); return cell; }
         string? good = world.CrateGood(id);
         cell.Icon = Icons.Of(good ?? id);
         if (good != null) {

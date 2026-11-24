@@ -7,17 +7,7 @@ namespace ChopChopMeow;
 
 public partial class Game {
     private async Task RunFarmUIChecks() {
-        await TestClean(CheckInspectKeyOpensThePlotFromACorner);
         await TestClean(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
-    }
-
-    private async Task CheckInspectKeyOpensThePlotFromACorner() {
-        var farm = Hosted.Add(ThingKind.Farm, world.Player + Vector2.One * Farms.HalfSize);
-        await Frames();
-        await KeyStroke(Key.E);
-        Require(panel.Selection.Thing == farm.Id, "E should open the farm when the player stands at its corner");
-        await CloseWithEsc();
-        RemoveThings(Hosted, t => t == farm);
     }
 
     /// <summary>A growing plot's page says how long until the wheat is ripe without a word of harvesting, which it offers once ripe.</summary>

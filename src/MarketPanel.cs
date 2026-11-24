@@ -13,7 +13,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         headingTitle.Text = "Trading post";
         Tab("cart", "coins", "Ship", () => memory.Hiring = false, !memory.Hiring);
         Tab("crew", "hardhat", "Hire", () => memory.Hiring = true, memory.Hiring);
-        Tab("guide", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
+        Tab("book", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
         FilterButton();
         // The filters and the price sheet share the board beside the panel, so the sheet waits while the filters are open.
         if (memory.SheetOpen && !FiltersOpen) PriceSheet();

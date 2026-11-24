@@ -27,7 +27,7 @@ public static class FarmSteps {
         farm.FarmStage = FarmStage.Growing;
         var source = world.Add(ThingKind.Barrel, new Vector2(15, 18));
         source.Inventory.Add(Water.Liquid, 50);
-        var rack = world.Add(ThingKind.Toolstation, new Vector2(14, 20));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(14, 20)));
         rack.Inventory.Add(Bucket.AtFill(liters), 1);
         var worker = AddWorker(world, new Vector2(15, 19));
         world.SetDuty(worker, farm, JobKind.Haul, true);

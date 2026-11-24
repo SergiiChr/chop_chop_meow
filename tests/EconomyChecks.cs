@@ -17,10 +17,10 @@ using static WorkerSteps;
 public static class EconomyChecks {
     public static void Run(GameData data) {
         var chain = new ChainCost(data);
-        CheckEveryCrateSellsForMoreThanItsWholeChainCosts(data, chain);
-        CheckHiredWorkersEarnMoreThanTheirPay(data, chain);
-        CheckBasketIsSustainable(data);
-        CheckDailyProfitIsSalesMinusWagesAndAWeekOfItMeetsTheProfitGoal(data);
+        Test(() => CheckEveryCrateSellsForMoreThanItsWholeChainCosts(data, chain));
+        Test(() => CheckHiredWorkersEarnMoreThanTheirPay(data, chain));
+        Test(CheckBasketIsSustainable, data);
+        Test(CheckDailyProfitIsSalesMinusWagesAndAWeekOfItMeetsTheProfitGoal, data);
     }
 
     /// <summary>A worker-day's cost: the lowest daily wage among the hire offers, leaving out what is paid up front.</summary>

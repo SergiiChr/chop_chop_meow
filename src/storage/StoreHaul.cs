@@ -14,10 +14,8 @@ internal sealed class StoreHaul : PlaceHaul {
     public override void Carries(Worker w, Thing t, ref Carry best) {
         foreach (var (item, _) in t.Inventory.Items) {
             int free = t.Inventory.Free(item);
-            if (free == 0 || !t.Inventory.AllowsWithdrawal(item) || world.AskerFor(item, t) is not Thing to || world.Intake(to, item, false) is not (Inventory into, int room)) continue;
-            // Vessels that pour there go as many as its liters of room take.
-            if (world.PoursInto(to, into, item) is VesselDef pours) room = (room + pours.LitersIn(item) - 1) / pours.LitersIn(item);
-            Offer(ref best, new Carry { Place = t, From = t, To = to, Item = item, Count = Math.Min(free, room), Rule = 1 });
+            if (free == 0 || !t.Inventory.AllowsWithdrawal(item) || world.AskerFor(item, t) is not Thing to) continue;
+            Offer(ref best, new Carry { Place = t, From = t, To = to, Item = item, Count = Hauling.Takes(world, to, item, free), Rule = 1 });
         }
         if (FillSource(t, w.Pos) is (string wanted, Thing from, int count)) Offer(ref best, new Carry { Place = t, From = from, To = t, Item = wanted, Count = count, Rule = 1 });
     }
@@ -27,7 +25,7 @@ internal sealed class StoreHaul : PlaceHaul {
     /// Storage that asks for the item itself keeps it, and a station keeps what its recipe takes and any liquid.
     /// </summary>
     private (string Item, Thing Source, int Count)? FillSource(Thing store, Vector2 origin) {
-        if (store.Inventory.InputFilter.Count == 0) return null;
+        if (!store.Inventory.NamesItems) return null;
         string item = ""; Thing? best = null; float nearest = 0; int count = 0;
         foreach (var kind in World.Stores) Nearer(kind, false);
         foreach (var kind in world.StationKinds) Nearer(kind, true);

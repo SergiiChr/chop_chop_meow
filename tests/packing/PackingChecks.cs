@@ -48,7 +48,7 @@ internal static class PackingChecks {
         var at = Terrain.Spawn;
         var station = world.Add(ThingKind.Packer, at + Vector2.Right * 3);
         world.SetPacking(station, "wood");
-        var chest = world.Add(ThingKind.Chest, at);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, at));
         chest.Inventory.Add("wood", 90);
         chest.Inventory.Add("crate", 90);
         world.SetDuty(AddWorker(world, at), chest, JobKind.Haul, true);

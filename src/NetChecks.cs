@@ -56,7 +56,9 @@ public partial class Game {
         await CloseWithEsc();
         await CheckActionsFinishWhenTheServerAnswers();
         RemoveThings(Hosted, t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
-        var anvil = Hosted.Add(ThingKind.Anvil, NetAnvil); anvil.Inventory.Add("steel_bar", 20); SlotPlainestTools(Hosted, anvil);
+        var anvil = Hosted.Add(ThingKind.Anvil, NetAnvil); SlotPlainestTools(Hosted, anvil);
+        // Batches the host queues, which both players hammer.
+        Give(Hosted, "steel_bar", 20); Hosted.QueueBatch(anvil, "steel_parts", 20);
         // Each scene puts down what joining has to bring over to the guest.
         foreach (var scene in NetScenes) scene.Prepare?.Invoke();
         await KeyStroke(Key.Escape);
