@@ -185,7 +185,7 @@ UI and input:
 | `src/actors/enemies/wolf/model/Den.cs` | `Den`, a wolf den's mouth, door and clearance |
 | `src/actors/model/IWalker.cs` | `IWalker`, anything that walks the map on its own, along a route around what blocks it |
 | `src/CampfirePanel.cs` | A campfire |
-| `src/resources/display/ResourcePanel.cs` | Resource inspection, including a tree’s wood, status and watering |
+| `src/resources/display/ResourcePanel.cs` | Shared resource inspection with stock slots and any extra controls |
 | `src/PilePanel.cs` | A pile or compost heap |
 | `src/ToolRackPanel.cs` | A tool station |
 | `src/containers/barrel/display/BarrelPanel.cs`, `src/containers/barrel/display/CarriedBarrelPanel.cs` | Water and hauling on a placed barrel and the water slot in a backpack barrel |
@@ -849,6 +849,9 @@ The death that follows strips food from the recovery box, as does a death with a
 Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the stone furnace cooks into edible meat.
 
 ### Resources
+
+`ResourcePanel` shows gatherable items in read-only slots with live stock counts.
+Leaf spots show a second slot for acorns, and the lake shows an unnumbered water bottle slot.
 
 - The valley starts with a patch of leaves beside each oak where ground allows it (`World.LeafPatch`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.

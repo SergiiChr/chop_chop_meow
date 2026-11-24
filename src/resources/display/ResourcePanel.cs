@@ -1,49 +1,52 @@
+using System;
 using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A tree, rock, bush or the lake: what is left, how to gather it, and the gatherers.</summary>
+/// <summary>Shows what a resource yields, any gathering requirements, and its worker jobs.</summary>
 public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        if (thing.Kind == ThingKind.Tree) TreeStock();
-        else GatherStock();
+        if (thing.Kind == ThingKind.Tree) TreeStatus();
+        var stock = new HBoxContainer();
+        stock.AddThemeConstantOverride("separation", 8);
+        AddChild(stock);
+        StockSlot(stock, World.ResourceItem(thing), thing.Kind == ThingKind.Water ? null : () => thing.Remaining);
+        if (thing.Kind == ThingKind.Leaves) StockSlot(stock, TreePlanting.Acorn, () => LeafLitter.Acorns(thing));
+
         if (TreePlanting.NeedsWater(thing)) TreeWater();
-        if (thing.Kind == ThingKind.Leaves) LeafAcorns();
-        if (thing.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the lake shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
-        if (thing is { Kind: ThingKind.Tree, TreeStage: 1 })
+        if (thing is { Kind: ThingKind.Tree, TreeStage: 1 }) {
             RedrawOnChange(() => (thing.TreeStage == 1, TreePlanting.NeedsWater(thing)));
-        else JobButtons();
+        } else {
+            GatherNote();
+            JobButtons();
+        }
     }
 
-    private void GatherStock() {
-        var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
-        row.AddChild(Style.Icon(Icons.Of(World.ResourceItem(thing)), 44));
-        var left = Style.Text("", 16, Style.Ink, wrap: true); left.SizeFlagsHorizontal = SizeFlags.ExpandFill; row.AddChild(left);
-        live.Bind(left, line => {
-            if (thing.Kind != ThingKind.Water) line.Append(thing.Remaining).Append(" left · ");
-            line.Append(world.GatherBlock(thing) ?? (thing.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
+    private void StockSlot(HBoxContainer stock, string item, Func<int>? amount) {
+        var (slot, count) = ItemSlot.Create($"resource_{item}");
+        slot.Icon = Icons.Of(item);
+        slot.MouseFilter = MouseFilterEnum.Ignore;
+        stock.AddChild(slot);
+        if (amount != null) live.Watch(amount, units => count.Text = units.ToString());
+    }
+
+    private void GatherNote() {
+        string? hint = thing.Kind == ThingKind.Water
+            ? "Hold right mouse at the shore to fill a bottle or bucket, or drink from the lake."
+            : null;
+        var note = Style.Wrapped("", 14, Style.Beige);
+        AddChild(note);
+        live.Watch(() => world.GatherBlock(thing) ?? hint, message => {
+            note.Text = message ?? "";
+            note.Visible = message != null;
         });
     }
 
-    private void TreeStock() {
+    private void TreeStatus() {
         var status = Style.Text("", 15, Style.Rim);
         AddChild(status);
         live.Watch(() => TreePlanting.IsAdult(thing) ? "Adult tree" : TreePlanting.NeedsWater(thing) ? "Planted" : "Growing",
             shown => status.Text = shown);
-        var (slot, count) = ItemSlot.Create("tree_wood");
-        slot.Icon = Icons.Of("wood");
-        slot.MouseFilter = MouseFilterEnum.Ignore;
-        slot.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
-        AddChild(slot);
-        live.Watch(() => thing.Remaining, amount => count.Text = amount.ToString());
-    }
-
-    private void LeafAcorns() {
-        var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
-        row.AddChild(Style.Icon(Icons.Of(TreePlanting.Acorn), 44));
-        var count = Style.Text("", 16, Style.Ink);
-        row.AddChild(count);
-        live.Bind(count, line => line.Append(LeafLitter.Acorns(thing)).Append(" left"));
     }
 
     private void TreeWater() {

@@ -23,7 +23,7 @@ public partial class Game {
         await Frames();
         var tree = world.ThingsOf(ThingKind.Tree).First(t => t.Pos == at);
         await ClickOn(tree);
-        await Until(() => ShowsTreeStatus("Planted") && HasLabel(panel, "Needs 5 L") && ShowsTreeWood("0"),
+        await Until(() => ShowsTreeStatus("Planted") && HasLabel(panel, "Needs 5 L") && ShowsResourceStock("wood", "0"),
             "the planted tree showing its status, wood count, and water needed", 4);
         Require(!HasLabel(panel, "Pour from a filled bottle or bucket"), "the water amount should be enough text beside the slot");
         await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(bucket))), OnPage($"input_{Water.Liquid}")!);
@@ -33,10 +33,6 @@ public partial class Game {
         Require(!HasLabel(panel, "/10 days"), "the tree panel should leave out the day count");
         return tree;
     }
-
-    private bool ShowsTreeWood(string amount) => OnPage("tree_wood") is ItemSlot { Visible: true } slot
-        && slot.Icon == Icons.Of("wood")
-        && slot.GetChildren().OfType<Badge>().Any(badge => badge.IsVisibleInTree() && badge.Text == amount);
 
     private bool ShowsTreeStatus(string status) => panel.FindChildren("*", "Label", true, false).OfType<Label>()
         .Any(label => label.IsVisibleInTree() && label.Text == status);

@@ -43,20 +43,23 @@ public partial class Game {
         Give(Hosted, "rake");
         await Frames();
         await ClickOn(tree);
-        Require(ShowsTreeStatus("Adult tree") && ShowsTreeWood("336"), "an older tree should show its adult status and wood");
-        var woodSlot = OnPage("tree_wood")!;
+        Require(ShowsTreeStatus("Adult tree") && ShowsResourceStock("wood", "336"), "an older tree should show its adult status and wood");
+        var woodSlot = OnPage("resource_wood")!;
         int wood = world.Backpack["wood"];
         await Click(woodSlot);
         await RightClick(woodSlot);
-        Require(ShowsTreeWood("336") && cursor.Empty && world.Backpack["wood"] == wood,
+        Require(ShowsResourceStock("wood", "336") && cursor.Empty && world.Backpack["wood"] == wood,
             "clicking the wood count should leave the tree and backpack as they were");
         await CloseWithEsc();
         await ClickOn(patch);
         Require(panel.Selection.Thing == patch.Id, "the old tree's larger trunk should leave its leaf spot selectable");
+        Require(ShowsResourceStock("leaves", "12") && ShowsResourceStock("acorn", LeafLitter.Acorns(patch).ToString()),
+            "a leaf spot should show separate counts for leaves and acorns");
         var point = RightPress(patch.Pos, .08f);
         try {
             await Until(() => world.Backpack["acorn"] > acorns && world.Backpack["leaves"] > leaves,
                 "gathering leaves and acorns from the spot next to an old tree", 8);
+            await Until(() => ShowsResourceStock("acorn", "0"), "the acorn count reaching zero", 2);
         } finally { RightRelease(point); }
         await CloseWithEsc();
         Drop(Hosted, "rake", 1);
