@@ -103,7 +103,8 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             live.Watch(() => world.Carried(item) < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
         string noTool = r.Tool == "" ? "" : $"No {world.Data.ToolName(r)}";
-        var lacks = Style.Text(noTool, 12, Style.Brick, wrap: true); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
+        // A recipe with words of its own for a tool too hard for it has them in smaller letters, so their two lines fit the card under its name.
+        var lacks = Style.Text(noTool, r.TooHard == "" ? 12 : 10, Style.Brick, wrap: true); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
         // One look for the tool a refresh: the card names a missing tool in place of its inputs, and its picture fades while the recipe cannot be made from the backpack now.
         // With a tool there that is too hard for the recipe, the card says the recipe's own words for it.
         live.Watch(() => { bool missing = !world.HasToolFor(station, r); return (Missing: missing, TooHard: missing && world.TooHardBlock(station, r) != null, Ready: !missing && (station != null ? world.CarriesBatch(r.Inputs) : world.CanCraft(id))); }, state => {

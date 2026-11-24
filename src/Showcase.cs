@@ -132,7 +132,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             return;
         }
         if (Launch.Has("--firebugs")) {
-            // A night meadow: three nettles in a row, one of each look, and firebugs hovering at several distances from a player who carries a net.
+            // A night meadow: three nettles in a row, one of each look, a tool station holding a bug net, and firebugs hovering at several distances from a player who carries a net.
             // The last firebug starts near enough to the player to dart off as the scene opens.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
@@ -146,6 +146,8 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
                 world.Add(ThingKind.Firebug, at + off, 1);
             world.S.Backpack.Add("bug_net", 1);
             world.S.HotbarSlots[0] = "bug_net";
+            // A tool station with a bug net on its first peg.
+            world.Add(ThingKind.Toolstation, at + new Vector2(-3.2f, -3.2f)).Inventory.Add("bug_net", 1);
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear(); world.S.Wolves.Clear();
             world.Player = at;
             world.Tick(0); view.Zoom = Launch.Number("--zoom", 1.8f);
