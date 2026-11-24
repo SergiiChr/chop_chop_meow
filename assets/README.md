@@ -50,7 +50,7 @@ Models are assembled from code-built or baked Godot meshes.
   The oak appears after the first full day of growth and scales a little larger at each stage.
 - `src/actors/display/ActorRig.cs` — player, worker, courier and the intro film's boss and catgirls, and the tools
   they hold: the steel shovel is a spade with a bar across the top of its handle and a pointed blade, laid through both
-  fists while digging.
+  fists while digging. The rake reuses its tool-rack mesh and is laid through both fists while raking.
 - `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
 - `src/intro/display/CatgirlPage.cs` — the web page of dancing catgirls on the hero's screen in the intro film.
 - `src/intro/display/Catgirl.cs` — a catgirl of that page: the person model's slim build with a face, hair, cat ears,
@@ -264,6 +264,10 @@ These were made with ffmpeg from Kenney's sounds:
 Each cut is faded at both ends, and the cuts of one sound are brought to one mean level.
 
 `wolf_howl` (a lone wolf, the night's first howl), `wolf_howl_group` (the pack answering) and `hire_sign` (a pen signing paper, cleaned of rumble and room noise) were supplied for this project.
+
+`rake_leaves` uses three pulls cut from [Pushing Leaves](https://freesound.org/people/jimmybombimmy/sounds/368022/)
+by jimmybombimmy (Freesound, CC0 1.0), also published on [Pixabay](https://pixabay.com/sound-effects/film-special-effects-pushing-leaves-31404/).
+Each cut is faded at both ends and peak-normalised.
 
 `door_knock` is "Door bang 1.wav" by freesound_community (Pixabay 14449), a recording supplied for this project: its three knocks on a door, each cut into its own variant, faded at both ends and brought to one mean level.
 

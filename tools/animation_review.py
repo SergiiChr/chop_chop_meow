@@ -40,13 +40,17 @@ VIEWS = {
 
 def review_source(ref: str | None) -> str:
     """Reads the review's source from the working tree, or from a ref when one is given."""
+    source = "src/world/display/WorldScene.cs"
     if ref is None:
-        return (ROOT / "src" / "WorldScene.cs").read_text()
-    show = ["git", "show", f"{ref}:src/WorldScene.cs"]
-    result = subprocess.run(show, cwd=ROOT, capture_output=True, text=True, check=False)
-    if result.returncode:
-        raise SystemExit(result.stderr.strip())
-    return result.stdout
+        return (ROOT / source).read_text()
+    for path in (source, "src/WorldScene.cs"):
+        show = ["git", "show", f"{ref}:{path}"]
+        result = subprocess.run(
+            show, cwd=ROOT, capture_output=True, text=True, check=False
+        )
+        if not result.returncode:
+            return result.stdout
+    raise SystemExit(result.stderr.strip())
 
 
 def require_clip(ref: str | None, clip: str) -> None:

@@ -685,8 +685,8 @@ public partial class WorldView : Node3D {
         }
         bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
         ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting, World.CraftRate > 0, Fitting(GatheringTarget));
-        Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
+        Vector2 target = GatherFacing(subject, World.Player);
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) {
             action = pulseAction; target = pulseTarget;
             subject = ActorAnimation.SwingsOnTheMove(action) ? null : ThingAt(target);
@@ -877,7 +877,7 @@ public partial class WorldView : Node3D {
             bool gathering = target != null && p.Pos.DistanceTo(World.GatherAt(target, p.Pos)) < 2.5f;
             var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting, p.Making != "" || p.Crafting.Count > 0, Fitting(target));
             var subject = gathering ? target : null;
-            var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
+            var facing = GatherFacing(subject, p.Pos);
             if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) {
                 action = other.Pulse; facing = other.PulseTarget;
                 subject = ActorAnimation.SwingsOnTheMove(action) ? null : ThingAt(facing);
@@ -987,9 +987,17 @@ public partial class WorldView : Node3D {
     /// <summary>Whether working on a thing hammers in a mine's frame and rails rather than digging.</summary>
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
 
-    /// <summary>Where a blow of <paramref name="action"/> lands on <paramref name="subject"/> for an actor standing as <paramref name="state"/> has them, or null when it lands on nothing.</summary>
+    /// <summary>Actors face into a leaf spot even when it extends under them.</summary>
+    private Vector2 GatherFacing(Thing? subject, Vector2 from) => subject switch {
+        null => from,
+        { Kind: ThingKind.LeafSpot } => subject.Pos,
+        _ => World.GatherAt(subject, from)
+    };
+
+    /// <summary>Where the rake, shovel or other tool aims during work.</summary>
     private Vector3? Mark(Thing? subject, ActorState state, ActorAction action) {
         if (subject == null) return null;
+        if (action == ActorAction.Rake) return To3(subject.Pos);
         if (subject is { Kind: ThingKind.Hole, Id: 0 } && action == ActorAction.Dig) return To3(subject.Pos);
         return props.TryGetValue(subject.Id, out var prop) ? strikes.At(subject, state.Position, action, prop) : null;
     }
@@ -1005,15 +1013,17 @@ public partial class WorldView : Node3D {
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
         }
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
-        // Hands close on what they gather twice a loop; packing digs into the heap of goods as each loop starts, grinding plays one clip a loop, and a dig throws its soil aside once.
+        // Hands close on what they gather twice a loop, and a rake rustles the leaves as it starts its pull.
+        // Packing digs into the heap, grinding plays once a loop and a dig throws its soil aside once.
         string? handSound = action switch {
             ActorAction.Gather when actor.Struck(.22f) || actor.Struck(.72f) => GrabSound(subject.Kind),
             ActorAction.Pack when actor.Struck(.04f) => "rustle",
             ActorAction.Grind when actor.Struck(.03f) => "grind_mortar",
             ActorAction.Dig when actor.Struck(ActorAnimation.DigToss) => "dig_toss",
+            ActorAction.Rake when actor.Struck(RakeStroke.Contact) => "rake_leaves",
             _ => null
         };
-        if (handSound != null) Sounds?.Play(handSound, subject.Pos);
+        if (handSound != null) Sounds?.Play(handSound, AnimationReview ? null : subject.Pos);
         // The soil a dig throws aside flies off the blade.
         if (handSound == "dig_toss" && World.Sees(actor.Position)) Burst(rig.Root.Transform * rig.ShovelTip, Soil, 5, 1.6f, .5f, 9, .06f);
         float impact = ActorAnimation.StrikeShare(action) ?? action switch {
