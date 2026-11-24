@@ -255,8 +255,9 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps: `tests/hauling/`, `tests/gathering/`, `tests/crafting/`, `tests/progression/`, `tests/goals/`, `tests/water/`, `tests/trade/`, `tests/saves/`, `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
-| `tests/*Checks.cs` | Simulation checks of the features that have no folder yet, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
+| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps, such as `tests/hauling/`, `tests/storage/`, `tests/trade/`, `tests/tools/`, `tests/workers/jobs/`, `tests/chains/` and `tests/actors/player/` |
+| `tests/SimulationChecks.cs` | The runner of every simulation check, `SimulationChecks.Run` (`SELF-TEST PASS`), which calls each feature's `Run` |
+| `tests/*Checks.cs` | Simulation checks of the features that have no folder yet |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events for the features that have no folder yet, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
@@ -286,11 +287,10 @@ Checks and review tools:
 Keep balance and recipe values in `GameData` and `GameTables`, apart from the rules in the simulation code.
 Keep rendering and input separate from state transitions, so headless checks can exercise gameplay rules without relying on screenshots.
 
-- `tests/SimulationChecks.cs` covers filters, worker routing, trade, wages, recovery after death, saves and a material-driven progression run.
 - `tests/EconomyChecks.cs` measures real workers through a day and checks the economy rules.
-- `tests/AllocationChecks.cs` holds ticks to their allocation budgets.
+- `tests/performance/AllocationChecks.cs` holds ticks to their allocation budgets.
   `tests/pipes/PlumbingAllocationChecks.cs` applies the tick budget to pumping into two barrels.
-- `tests/ProductionChainChecks.cs` covers the trading post's filter and auto-sell, and workers alone running the berry, bread, canned stew and steel pickaxe chains to a sale.
+- `tests/chains/ProductionChainChecks.cs` has workers alone run the berry, bread, canned stew and steel pickaxe chains to a sale.
 
 ### HUD and backpack
 
@@ -347,7 +347,7 @@ A field whose new object starts elsewhere is marked to be always written, which 
 A changed entry whose field names or order changed is sent whole.
 When the field order matches, the host and guest step through the fields once to write or apply changed values.
 `tests/pipes/PipeWaterUpdateChecks.cs` checks that a pipe water update preserves the host's fields and field order.
-`WorldUpdates` writes them into reused buffers and keeps the last update's array for every entry that did not change, so only changed entries allocate (`tests/AllocationChecks.cs`).
+`WorldUpdates` writes them into reused buffers and keeps the last update's array for every entry that did not change, so only changed entries allocate (`tests/performance/AllocationChecks.cs`).
 The welcome is a guest's first update, with the fog uncovered so far.
 
 - Updates go unreliably on their own channel, so a lost one never delays the next.

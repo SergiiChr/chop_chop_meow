@@ -13,6 +13,9 @@ public static class StorageChecks {
         Test(CheckEverythingStandsAloneInItsRow, data);
         Test(CheckANewPileTakesNothingFromWorkersUntilItsResourceIsSet, data);
         Test(CheckATradingPostWithEverythingAsksForEveryCrateItBuys, data);
+        Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
+        Test(CheckFilterNamesEachEntryOnceInTheOrderNamed);
+        Test(CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest, data);
     }
 
     private static void CheckNewStorageTakesNothingInAndLetsEverythingOut(GameData data) {
@@ -65,5 +68,61 @@ public static class StorageChecks {
         world.SetFilter(post, Inventory.Everything, false, true);
         Require(world.DepositFor(berries, world.Player) == post, "a trading post set to Everything should ask for a crate of berries");
         Require(world.DepositFor("berries", world.Player) == null, "a trading post set to Everything should still take only packed crates");
+    }
+
+    private static void CheckOutputFilterBlocksAutomatedWithdrawal(GameData data) {
+        var source = new Inventory { Slots = 1 };
+        var destination = new Inventory { Slots = 1 };
+        source.Add("iron_bar", 4);
+        source.Filter("wood", true, true);
+        destination.Filter("wood", false, true);
+        Require(source.TransferTo(destination, "iron_bar", 3, true) == 0,
+                "automated withdrawal must respect the source output filter");
+        Require(source["iron_bar"] == 4 && destination["iron_bar"] == 0,
+                "blocked automated withdrawal must leave both inventories unchanged");
+
+        source.OutputFilter.Clear();
+        source.Filter("iron_bar", true, true);
+        destination.InputFilter.Clear();
+        destination.Filter("wood", false, true);
+        Require(source.TransferTo(destination, "iron_bar", 3, true) == 0,
+                "automated delivery must respect the destination input filter");
+        destination.Filter("iron_bar", false, true);
+        Require(source.TransferTo(destination, "iron_bar", 3, true) == 3,
+                "matching source and destination filters should permit transfer");
+        Require(source["iron_bar"] == 1 && destination["iron_bar"] == 3,
+                "permitted transfer should move exactly the requested quantity");
+
+        destination.InputFilter.Clear();
+        Require(source.TransferTo(destination, "iron_bar", 1) == 1,
+                "manual transfers should not be blocked by automation filters");
+    }
+
+    /// <summary>A filter keeps its entries in the order they were named, and naming one it has again leaves it where it is.</summary>
+    private static void CheckFilterNamesEachEntryOnceInTheOrderNamed() {
+        var chest = new Inventory();
+        chest.Filter("stone", false, true); chest.Filter("wood", false, true); chest.Filter("stone", false, true);
+        Require(chest.InputFilter.SequenceEqual(["stone", "wood"]), $"naming stone again should leave the filter as stone, wood, not {string.Join(", ", chest.InputFilter)}");
+        chest.Filter("stone", false, false);
+        Require(chest.InputFilter.SequenceEqual(["wood"]) && !chest.Accepts("stone"), "taking stone off once should leave no stone in the filter");
+    }
+
+    private static void CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest(GameData data) {
+        var world = EmptyWorld(data);
+        var nearestGeneral = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(11, 10)));
+        var explicitWood = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(17, 10)));
+        explicitWood.Inventory.Filter("wood", false, true);
+        Require(world.DepositFor("wood", new Vector2(10, 10))?.Id == explicitWood.Id,
+                "explicitly accepting storage should outrank a nearer general chest");
+        Require(world.DepositFor("stone", new Vector2(10, 10))?.Id == nearestGeneral.Id,
+                "an unrestricted chest should accept items not claimed by a filtered chest");
+
+        nearestGeneral.Inventory.Add("wood", 4);
+        nearestGeneral.Inventory.Filter("stone", true, true);
+        Require(world.SourceFor("wood", new Vector2(10, 10)) == null,
+                "workers must not withdraw items forbidden by the source output filter");
+        nearestGeneral.Inventory.Filter("wood", true, true);
+        Require(world.SourceFor("wood", new Vector2(10, 10))?.Id == nearestGeneral.Id,
+                "workers should use a chest once its output filter allows withdrawal");
     }
 }

@@ -8,6 +8,7 @@ using static SetupSteps;
 using static WorldSteps;
 using static PlayerSteps;
 using static WorkerSteps;
+using static EconomySteps;
 
 /// <summary>Checks of crafting: recipes at stations and by hand, the mark, the queue and batches, the tools a recipe needs, and the workers who craft or pump a station.</summary>
 public static class CraftingChecks {
@@ -50,6 +51,7 @@ public static class CraftingChecks {
         Test(CheckOnlyFirstFurnaceWorkerPumpsBellows, data);
         Test(CheckPackingStationTakesOnlyItsGoodAndPacksCrates, data);
         Test(CheckBenchKeepsMakingToolsWithNowhereElseToPutThem, data);
+        Test(CheckCrewKeepsForgeHot, data);
     }
 
     /// <summary>
@@ -875,5 +877,24 @@ public static class CraftingChecks {
         world.SetDuty(worker, bench, JobKind.Craft, true); world.SetDuty(worker, bench, JobKind.Haul, true);
         Work(world, 180, () => bench.Inventory["steel_pick"] >= 3);
         Require(bench.Inventory["steel_pick"] >= 3, $"the bench should keep making pickaxes it has nowhere else to put: {bench.Inventory["steel_pick"]} made");
+    }
+
+    private static void CheckCrewKeepsForgeHot(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
+        furnace.Heat = World.SteelHeat + 5;
+        // Bellows are pumped only while there is something to smelt.
+        furnace.Inventory.Add("iron_bar", 20); furnace.Inventory.Add("coal", 20); furnace.Burner!.Add("coal", 10);
+        // The worker starts far off, so the forge would cool past the bar before they arrive to pump.
+        world.Assign(AddWorker(world, new Vector2(30, 30)), furnace);
+        SafeTick(world, 4);
+        Require(furnace.Heat >= World.SteelHeat, "a working crew should keep the forge at or above the clear bar");
+        var crew = world.Workers[0];
+        crew.WageDebt = crew.Wage;
+        SafeTick(world, 5);
+        Require(furnace.Heat < World.SteelHeat, "a striking crew should let the forge cool below the clear bar");
+        foreach (var w in world.Workers.ToList()) world.Fire(w);
+        SafeTick(world, 5);
+        Require(furnace.Heat < World.SteelHeat, "without a crew the forge should cool below the clear bar");
     }
 }

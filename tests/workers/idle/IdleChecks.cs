@@ -5,6 +5,7 @@ using static Checks;
 using static SetupSteps;
 using static WorkerSteps;
 using static WorldSteps;
+using System;
 
 /// <summary>Checks of where a worker with no job that can be done waits, and the campfire they sit at.</summary>
 internal static class IdleChecks {
@@ -13,6 +14,7 @@ internal static class IdleChecks {
         Test(CheckIdleWorkersPastSixSitOnTheGroundByTheFire, data);
         Test(CheckCampfireBurnsWithNoWoodWhileWorkersSitAndGoesOutAfter, data);
         Test(CheckCampfireBurnsItsWoodAsUsualWhileWorkersSit, data);
+        Test(CheckWorkerWithNothingToDoWaitsAtTheTradingPost, data);
     }
 
     private static bool Seated(Worker w) => w.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching;
@@ -70,5 +72,15 @@ internal static class IdleChecks {
         Require(fire.Burn < burn - 50, $"a fire with wood burning should burn down as usual while workers sit at it: {fire.Burn:0} of {burn:0} s left");
         Work(world, burn);
         Require(fire.Inventory["wood"] == 1, $"a fire running low should take a log from its slot while workers sit at it, not leave {fire.Inventory["wood"]}");
+    }
+
+    private static void CheckWorkerWithNothingToDoWaitsAtTheTradingPost(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, new Vector2(10, 10), "planks", "steel_chisel");
+        var post = world.Add(ThingKind.Signpost, new Vector2(24, 10));
+        var crafter = Staff(world, bench, JobKind.Craft);
+        Work(world, 60, () => crafter.Pos.DistanceTo(post.Pos) < 3);
+        Require(crafter.Pos.DistanceTo(post.Pos) < 3, $"a worker whose jobs cannot be done should wait at the trading post, not {crafter.Pos.DistanceTo(post.Pos):0} m from it");
+        Require(crafter.Status.Contains("wood", System.StringComparison.OrdinalIgnoreCase), $"a waiting worker's status should say what their first job lacks, not \"{crafter.Status}\"");
     }
 }
