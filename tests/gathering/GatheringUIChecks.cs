@@ -138,6 +138,7 @@ public partial class Game {
         Warp(Hosted, start);
         var leaves = Hosted.Add(ThingKind.LeafSpot, start + Vector2.Down * 1.25f, World.LeavesPerSpot);
         int before = Hosted.Backpack["leaves"];
+        int acorns = Hosted.Backpack["acorn"];
         await Frames(2);
         var point = RightPress(leaves.Pos);
         await Until(() => view.PlayerAnimation == ActorAction.Gather, "gathering leaves by hand", 2);
@@ -173,6 +174,7 @@ public partial class Game {
 
         RemoveThings(Hosted, t => t == leaves);
         Drop(Hosted, "leaves", Hosted.Backpack["leaves"] - before);
+        Drop(Hosted, "acorn", Hosted.Backpack["acorn"] - acorns);
         Drop(Hosted, "rake", 1);
         Warp(Hosted, home); await Frames(4);
     }
