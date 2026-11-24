@@ -14,22 +14,27 @@ using static WorkerSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>The UI checks of cabins: going in by a click, the page inside and stepping out.</summary>
+    /// <summary>The UI checks of cabins: a click opening the page, going in by a double click or Enter, the page inside and stepping out.</summary>
     private async Task RunCabinUIChecks() {
-        await TestClean(CheckAClickTakesAPlayerIntoACabinWhereTheyLockUpAndStepOutAgain);
+        await TestClean(CheckADoubleClickTakesAPlayerIntoACabinWhereTheyLockUpAndStepOutAgain);
         await TestClean(CheckCabinHasABarrelWindowAndOffersHaulWhileABarrelIsMounted);
-        await TestClean(CheckEnterWalksAroundAStationAndCanBeCancelled);
+        await TestClean(CheckAClickOpensACabinPageWhoseEnterWalksAroundAStationAndCanBeCancelled);
         await TestClean(CheckUnreachableCabinDoorLeavesThePlayerFreeToWalk);
     }
 
-    private async Task CheckEnterWalksAroundAStationAndCanBeCancelled() {
+    private async Task CheckAClickOpensACabinPageWhoseEnterWalksAroundAStationAndCanBeCancelled() {
         var home = Hosted.Player;
         var cabin = Hosted.Add(ThingKind.Hut, home + new Vector2(0, -4));
         var bench = Hosted.Add(ThingKind.Bench, Doorways.DoorPoint(cabin) + Vector2.Down * 2);
         Warp(Hosted, Doorways.DoorPoint(cabin) + Vector2.Down * 6);
         await Frames(4);
         await ClickOn(cabin);
+        await Until(() => Shows(cabin), "a click on the cabin opening its page", 2);
         var enter = FindButton(panel, "Enter")!;
+        var standing = world.Player;
+        await Seconds(.3);
+        Require(world.Player == standing && enter.GetThemeStylebox("normal") == Style.Pill(Style.Sage).Item1, "A single click on a cabin must only open its page, not walk to its door.");
+        await Click(enter);
         await Until(() => enter.GetThemeStylebox("normal") == Style.Pill(Style.Mustard).Item1, "highlighted Enter while walking to the cabin", 2);
         await Click(enter);
         Require(enter.GetThemeStylebox("normal") == Style.Pill(Style.Sage).Item1, "cancelling should clear the highlight");
@@ -51,7 +56,7 @@ public partial class Game {
         var cabin = Hosted.Add(ThingKind.Hut, home + new Vector2(0, -4));
         // An old layout can have a building on the door spot that new construction keeps clear.
         var bench = Hosted.Add(ThingKind.Bench, Doorways.DoorPoint(cabin));
-        await ClickOn(cabin);
+        await DoubleClickOn(cabin);
         await Until(() => messages.Last == "No clear path to the cabin door.", "the blocked-door message", 2);
         await Until(() => FindButton(panel, "Enter")?.GetThemeStylebox("normal") == Style.Pill(Style.Sage).Item1,
             "the cabin panel clearing Enter's highlight after an unreachable door", 2);
@@ -69,7 +74,7 @@ public partial class Game {
         string item = Barrel.AtFill(20);
         Require(Give(Hosted, item) == 1, "the player starts with a barrel to mount");
         await Until(() => world.Backpack[item] == 1, "the player carrying a barrel with twenty liters", 2);
-        await ClickOn(cabin);
+        await DoubleClickOn(cabin);
         await Until(() => Shows(cabin) && world.Sheltered == cabin.Id && world.Door == Doorway.None, "the cabin page after entering", 5);
         var slot = panel.Aside.FindChild("cabin_barrel", true, false) as ItemSlot;
         Require(panel.Aside.Visible && slot != null && HasLabel(panel.Aside, "Roof barrel") && HasLabel(panel.Aside, "Empty"),
@@ -100,19 +105,19 @@ public partial class Game {
     }
 
     /// <summary>
-    /// A click takes a player into a cabin, walking or standing; inside they lock the door, see what a night's sleep would
+    /// A double click takes a player into a cabin, walking or standing; inside they lock the door, see what a night's sleep would
     /// leave them and cannot walk out, and Step outside lets them out and unlocks the door.
-    /// It is one visit to a cabin from the first click to the last step out, which loses its point when split.
+    /// It is one visit to a cabin from the first double click to the last step out, which loses its point when split.
     /// </summary>
-    private async Task CheckAClickTakesAPlayerIntoACabinWhereTheyLockUpAndStepOutAgain() {
+    private async Task CheckADoubleClickTakesAPlayerIntoACabinWhereTheyLockUpAndStepOutAgain() {
         var home = Hosted.Player;
         await CloseWithEsc();
         var hut = Hosted.Add(ThingKind.Hut, world.Player + new Vector2(0, 4));
-        // The click lands while the player is still walking, as when running from a wolf.
+        // The double click lands while the player is still walking, as when running from a wolf.
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.1);
-        await Click(view.Screen(hut.Pos, 1.5f));
-        await Until(() => world.Sheltered == hut.Id && Shows(hut), "a cabin clicked while walking taking the player inside and opening", 4);
+        await DoubleClick(view.Screen(hut.Pos, 1.5f));
+        await Until(() => world.Sheltered == hut.Id && Shows(hut), "a cabin double clicked while walking taking the player inside and opening", 4);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
         await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind the player once they are inside", 3);
@@ -140,8 +145,8 @@ public partial class Game {
         Require(world.Sheltered == 0, "Step outside must leave the cabin.");
         await Until(() => world.Find(hut.Id) is { Locked: false } && Named("key") is { Visible: false }, "stepping out unlocking the door and hiding its key", 2);
         // With no key held the player stops where they stepped in, right by the door.
-        await Click(view.Screen(hut.Pos, 1.5f));
-        await Until(() => world.Sheltered == hut.Id, "a click on the cabin taking a standing player inside", 4);
+        await DoubleClick(view.Screen(hut.Pos, 1.5f));
+        await Until(() => world.Sheltered == hut.Id, "a double click on the cabin taking a standing player inside", 4);
         await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind a player who stepped in from beside it", 3);
         // A click on the cabin from inside opens its page again, and stepping out then keeps the player out.
         await CloseWithEsc();

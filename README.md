@@ -172,7 +172,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Walk or sprint on a gravel path | Move 1.2× as fast |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
-| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you around obstacles to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
+| Left mouse button | Select a resource, building, crate or worker; place selected building; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
@@ -191,6 +191,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
+| Double LMB on a cabin | Open its page and walk around obstacles to its door and inside |
 | Shift-click / Ctrl-click an item slot | Move the stack clicked / all of that item to the other storage open; this applies across inventory and station panels. Ctrl from the backpack, and Store all, leave stacks bound to the hotbar |
 | RMB on a hotbar slot | Empty the slot |
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
@@ -1067,14 +1068,15 @@ A torch that lands on a wolf burns it and sends it running for a moment.
 
 ### Cabins
 
-Click a cabin, or press Enter in its panel, and you walk around buildings and other obstacles to its door.
+A click on a cabin opens its page.
+Double-click the cabin, or press Enter on its page, and you walk around buildings and other obstacles to its door.
 Enter is highlighted while the game finds a path and while you walk.
 Click it again or press Escape to cancel and move freely.
 If there is no clear path, the walk stops.
 At the door you step in and it shuts behind you.
 Stepping in takes about 1.3 seconds at a walk, hurrying up the second tread, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
 For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and tugs you a metre back out in three tugs over 1.5 seconds, less where water or a building is in the way, you bent over, reaching for the door and screaming.
-It then lets go and leaves you standing there, free to move: click the cabin to go for its door again.
+It then lets go and leaves you standing there, free to move: double-click the cabin to go for its door again.
 At half health or less, its third tug takes you straight over onto your back about 1.2 seconds in.
 Hit the wolf while it tugs someone and it lets go of them.
 No other wolf takes you down while one tugs you.
