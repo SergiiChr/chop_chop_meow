@@ -62,7 +62,9 @@ Models are assembled from code-built or baked Godot meshes.
   layer, so the marks stay put as it moves and a model's own albedo texture stays free.
   `Scanned` draws one of the scans rock, coal, soil and gravel as it is instead, with its bumps and the engine's
   parallax, on a mesh that carries its place on the scan in world units: the stone and coal rocks, loose stones and
-  coal, the farm field, the compost mound, the soil under dug sand, the gravel heap and the gravel path tile.
+  coal, the farm field, the compost mound, the gravel heap and the gravel path tile.
+  The beach cut uses the same sand and soil scans in `sand_cut.gdshader`, which follows the view through the rounded
+  opening to show the sloped wall or the soil floor.
   Heap pieces are those meshes shrunk to a heap's size with their place on the scan kept, so a heaped stone or lump
   shows the scan finer than in the world.
   A rounded shape has the scan draped over it from the top down (`NatureShape.Draped`), so only its hidden underside

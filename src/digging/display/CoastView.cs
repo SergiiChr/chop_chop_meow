@@ -18,7 +18,7 @@ internal sealed class CoastView {
         this.bank = bank;
         this.waves = waves;
 
-        var tile = new PlaneMesh { Size = Vector2.One, Material = ModelKit.Scanned(Scan.Soil, 1) };
+        var tile = SandCut();
         int count = 0;
         for (int z = 1; z < Terrain.Size - 1; z++)
             for (int x = 1; x < Terrain.Size - 1; x++)
@@ -29,6 +29,16 @@ internal sealed class CoastView {
             Multimesh = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = tile, InstanceCount = 1 },
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         });
+    }
+
+    private static PlaneMesh SandCut() {
+        var material = new ShaderMaterial { Shader = GD.Load<Shader>("res://assets/environment/lake/sand_cut.gdshader") };
+        material.SetShaderParameter("sand_albedo", ShorelineAppearance.Map(ShoreLook.Sand, "albedo"));
+        material.SetShaderParameter("sand_tile", ShoreLook.Sand.Tile);
+        material.SetShaderParameter("soil_albedo", ModelKit.ScanMap(Scan.Soil, "albedo"));
+        material.SetShaderParameter("soil_normal", ModelKit.ScanMap(Scan.Soil, "bump"));
+        material.SetShaderParameter("soil_tile", ModelKit.ScanTile);
+        return new PlaneMesh { Size = Vector2.One, Material = material };
     }
 
     internal void Update(Beach beach, TerrainView terrain) {
