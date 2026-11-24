@@ -28,7 +28,9 @@ public partial class ControlsList : PanelContainer {
         AddChild(rows);
 
         for (int i = 0; i < Bindings.Length; i++) {
-            if (i > 0) rows.AddChild(new HSeparator());
+            if (i > 0) rows.AddChild(new ColorRect {
+                Color = new Color(Style.Line, .45f), CustomMinimumSize = new Vector2(0, 2), MouseFilter = MouseFilterEnum.Ignore
+            });
             var (key, action) = Bindings[i];
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 12);

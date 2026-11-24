@@ -133,6 +133,11 @@ public partial class Game {
         await Frames();
         var layerControl = (Button)ui.FindChild("layer", true, false);
         Require(layerControl != null, "The HUD should offer a Layer button.");
+        var switchBounds = layerControl!.GetGlobalRect();
+        float healthCenter = needsPlate.Health.GetGlobalRect().GetCenter().X;
+        Require(switchBounds.Position.Y >= needsPlate.GetGlobalRect().End.Y
+            && switchBounds.Position.X <= healthCenter && healthCenter < switchBounds.End.X,
+            "The Layer button should be below the health end of the status bar.");
         await Click(layerControl!);
         Require(view.Underground && layerControl!.ButtonPressed, "Layer should switch from the surface to the underground view.");
         Give(Hosted, "wood", 1);
