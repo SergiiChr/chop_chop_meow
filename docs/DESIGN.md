@@ -138,7 +138,7 @@ UI and input:
 | `src/menus/PauseMenu.cs` | The pause menu with the goal chain, access to Controls, and hosting |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
-| `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
+| `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/mines/display/MinePanel.cs` | The mine's building steps, miners and outputs |
@@ -264,7 +264,7 @@ Checks and review tools:
 | `tests/*Checks.cs` | Simulation checks of the features that have no folder yet, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
-| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events for the features that have no folder yet, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
+| `src/GameChecks.cs` | Input/UI checks through real input events for the features that have no folder yet, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
 | `tests/crafting/RecipeReadyUIChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
 | `src/NetChecks.cs` | The host and guest network session (`NET-HOST PASS`, `NET-GUEST PASS`): joining, leaving and reconnecting, with each feature's `NetScene` played in between (`Game.NetScenes`) |
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |

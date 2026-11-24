@@ -191,7 +191,8 @@ public partial class Game : Node, IGameFlow {
         if (messages.OffsetTop != messagesTop) messages.OffsetTop = messagesTop;
         panel.Refresh();
         hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
-        if (layerButton.ButtonPressed != player.Underground) layerButton.SetPressedNoSignal(player.Underground);
+        bool below = player.Layer == Layer.Underground;
+        if (layerButton.ButtonPressed != below) layerButton.SetPressedNoSignal(below);
     }
     private void ConnectNet() {
         net.Said += Notify;
@@ -433,16 +434,16 @@ public partial class Game : Node, IGameFlow {
         view.Placing = overInterface && player.Mode is ClickMode.Dig ? null : player.Mode.Placing;
         view.PlacingRotation = player.Mode.Rotation;
         view.DiggingAt = player.DiggingAt;
-        view.Underground = player.Underground;
+        view.Layer = player.Layer;
         if (player.Mode is ClickMode.Build { Kind: ThingKind.SteelPiping } pipe) view.PlacingPipeShape = pipe.Shape;
         view.Mouse = looking ? GetViewport().GetVisibleRect().GetCenter() : GetViewport().GetMousePosition();
         // A recording leaves the pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
         bool recording = Engine.GetWriteMoviePath() != "";
         bool pointing = !recording && (!view.FirstPerson || looking || !overInterface && !kit.Paused);
         float thingDistance = float.MaxValue;
-        var hover = pointing && !view.Underground ? view.Pick(view.Mouse, out thingDistance) : null;
-        var worker = pointing && !view.Underground ? view.PickWorker(view.Mouse, thingDistance) : null;
-        view.PointedPipe = pointing && !overInterface && player.InspectingPipes ? view.PickPipe(view.Mouse) : null;
+        var hover = pointing && view.Layer == Layer.Surface ? view.Pick(view.Mouse, out thingDistance) : null;
+        var worker = pointing && view.Layer == Layer.Surface ? view.PickWorker(view.Mouse, thingDistance) : null;
+        view.PointedPipe = pointing && !overInterface && view.Layer == Layer.Underground && player.Mode is ClickMode.Normal ? view.PickPipe(view.Mouse) : null;
         view.Hover = worker != null && view.FirstPerson ? 0 : hover?.Id ?? 0;
         view.HoverWorker = worker?.Id ?? 0;
         view.Removal = overInterface ? Removal.None : player.RemovalAt(hover, view.Mouse);

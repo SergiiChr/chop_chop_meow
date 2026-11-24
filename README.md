@@ -171,8 +171,9 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | WASD or arrow keys | Move in screen directions. Away from hunting wolves, reversing a run brakes, turns and runs back |
 | Shift while moving | Sprint 1.6× as fast; food and drink drain 1.7× as fast; not under 15% food or drink |
 | Walk or sprint on a gravel path | Move 1.2× as fast |
+| Right mouse button on a loose resource | Walk over and pick it up |
 | Hold right mouse button on a resource | Approach and gather while held |
-| Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
+| Hold right mouse button on a placed crate or barrel | Walk over and pick it up with its contents |
 | Right mouse button on open ground | Use the selected hotbar item to eat, drink or light a torch, or swing a tool or lit torch toward the pointer |
 | Hold right mouse button on open ground with a shovel selected | Walk over and dig a hole |
 | Left mouse button | Select a resource, building, crate or worker, or place a selected building. Clicking a cabin walks you around obstacles to its door and inside. Put a held stack into the storage clicked, or let go of it anywhere else |
@@ -183,16 +184,19 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | LMB / RMB while placing steel pipes | Lay a pipe / take up the pipe under the pointer |
 | R / T while placing steel pipes | Turn 90° / cycle the pipe type |
 | H | Open the crew overview |
-| 1–9 or click a hotbar slot | Select and outline that slot, and start placement if it holds a plan or crate |
+| 1–9 or click a hotbar slot | Select and outline that slot. Start placement if it holds a plan or placeable container |
+| Drag a plan or backpack item to the hotbar | Assign it to that slot |
+| Layer button below the status bar | Switch between the surface and underground. Underground, click a pipe to see its water and pressure |
 | Space at a selected nearby reinforced furnace or water pump | Pump |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with goals, save, load, options, controls, new game and quit |
 | Mouse wheel | Zoom in the overhead view |
-| LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
+| LMB on an item slot | Pick up the entire stack or put down the held stack |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
-| Shift-click / Ctrl-click an item slot | Move the stack clicked / all of that item to the other storage open; this applies across inventory and station panels. Ctrl from the backpack, and Store all, leave stacks bound to the hotbar |
+| Shift-click | Move the entire stack to the other open storage, or queue 5 crafting batches |
+| Ctrl-click | Move all items of that type to the other open storage, or queue 10 crafting batches. Ctrl from the backpack, and Store all, leave stacks bound to the hotbar |
 | RMB or double LMB on a hotbar slot | Use its item |
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
 

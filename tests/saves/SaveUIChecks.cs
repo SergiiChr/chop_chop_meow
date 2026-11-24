@@ -7,6 +7,8 @@ using static SetupSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
+    private Task RunSaveUIChecks(Thing chest) => Test(() => CheckQuickSaveAndLoadRestorePlayerAndChest(chest));
+
     /// <summary>F5 saves into a slot, F9 and the pause menu load it, restoring position, stored items and the hotbar.</summary>
     private async Task CheckQuickSaveAndLoadRestorePlayerAndChest(Thing chest) {
         await KeyStroke(Key.C);

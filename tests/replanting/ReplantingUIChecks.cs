@@ -71,7 +71,8 @@ public partial class Game {
         Require(view.PlacementGhost != null, "selecting the hotbar shovel should show the dig outline");
         await RightClick(hotbar.Buttons[8]);
         await Hover(view.Screen(at));
-        Require(view.PlacementGhost == null, "emptying the selected slot should put away the outline");
+        Require(world.HotbarItem(8) == "steel_shovel" && view.PlacementGhost != null,
+            "right-clicking the shovel slot should keep the shovel assigned and the dig outline visible");
         SetHotbarSlot(Hosted, 8, previous);
         Drop(Hosted, "steel_shovel");
         Drop(Hosted, "crate", 1);

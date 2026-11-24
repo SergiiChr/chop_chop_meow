@@ -17,7 +17,7 @@ public abstract record ClickMode {
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
     /// <summary>The remove selector takes down what the player clicks on the selected layer.</summary>
-    public sealed record Remove(bool Underground = false) : ClickMode;
+    public sealed record Remove(Layer Layer = Layer.Surface) : ClickMode;
 
     internal int QuarterTurns { get; init; }
     /// <summary>The turn of the plan or container awaiting placement, in radians.</summary>
@@ -39,7 +39,7 @@ public sealed class PlayerControl {
     private readonly World world;
     /// <summary>Whether <see cref="Mode"/> places the container or plan on the cursor, which it does only while the mouse is over open ground.</summary>
     private bool placingHeld;
-    private bool inspectUnderground;
+    private Layer selectedLayer;
     /// <summary>The placement on the cursor, with a turn that stays set while the pointer crosses the interface.</summary>
     private ClickMode? heldPlacement;
     private Thing? gathering;
@@ -60,13 +60,18 @@ public sealed class PlayerControl {
     /// <summary>What the next left click in the world does.</summary>
     public ClickMode Mode { get; set; } = new ClickMode.Normal();
 
-    public bool InspectingPipes => inspectUnderground && Mode is ClickMode.Normal;
-    public bool Underground => InspectingPipes || Mode is ClickMode.Remove { Underground: true } || Mode.Placing == ThingKind.SteelPiping;
+    /// <summary>The layer the player selected, unless a world action needs a particular layer.</summary>
+    public Layer Layer => Mode switch {
+        ClickMode.Remove remove => remove.Layer,
+        ClickMode.Build { Kind: ThingKind.SteelPiping } => Layer.Underground,
+        ClickMode.Normal => selectedLayer,
+        _ => Layer.Surface
+    };
 
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
         cabinApproach = new CabinApproach(world);
-        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; inspectUnderground = false; digDismissed = false; Mode = new ClickMode.Normal(); };
+        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; selectedLayer = Layer.Surface; digDismissed = false; Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops actions whose targets belong to the previous world.</summary>
@@ -117,13 +122,13 @@ public sealed class PlayerControl {
     private void UpdateDigMode() {
         bool selected = world.Holes.ShovelSelected;
         if (!selected || world.InHand == "") digDismissed = false;
-        if (selected && !digDismissed && Mode is ClickMode.Normal && !inspectUnderground) Mode = new ClickMode.Dig();
+        if (selected && !digDismissed && Mode is ClickMode.Normal && selectedLayer == Layer.Surface) Mode = new ClickMode.Dig();
         else if (!selected && Mode is ClickMode.Dig) Mode = new ClickMode.Normal();
     }
 
     internal void SelectDigging() {
         digDismissed = false;
-        if (!inspectUnderground) Mode = new ClickMode.Dig();
+        if (selectedLayer == Layer.Surface) Mode = new ClickMode.Dig();
     }
 
     internal bool CanCancelMode => Mode is not ClickMode.Normal && (Mode is not ClickMode.Dig || world.InHand != "");
@@ -329,22 +334,22 @@ public sealed class PlayerControl {
     /// <summary>Switches the visible layer. The remove selector keeps its own layer while it is active.</summary>
     public void ToggleLayer() {
         StopGroundDig();
-        bool below = !Underground;
-        if (Mode is ClickMode.Remove) Mode = new ClickMode.Remove(below);
-        else { Mode = new ClickMode.Normal(); inspectUnderground = below; }
-        if (!below) panel.ClosePipe();
+        var next = Layer == Layer.Surface ? Layer.Underground : Layer.Surface;
+        if (Mode is ClickMode.Remove) Mode = new ClickMode.Remove(next);
+        else { Mode = new ClickMode.Normal(); selectedLayer = next; }
+        if (next == Layer.Surface) panel.ClosePipe();
     }
 
     private void RightPress(Vector2 at) {
         StopGroundDig();
         if (PlacingPipe) {
-            world.Construction.Remove(world.Construction.RemovalAt(null, view.ToWorld(at, PipeGround.FloorY), underground: true));
+            world.Construction.Remove(world.Construction.RemovalAt(null, view.ToWorld(at, PipeGround.FloorY), Layer.Underground));
             return;
         }
         if (Mode is ClickMode.Remove) { ToggleLayer(); return; }
         // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
-        if (InspectingPipes) return;
+        if (Layer == Layer.Underground) return;
         var t = view.Pick(at);
         if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
@@ -359,7 +364,7 @@ public sealed class PlayerControl {
 
     private void LeftPress(Vector2 at) {
         PlaceHeld(false);
-        if (InspectingPipes) {
+        if (Layer == Layer.Underground && Mode is ClickMode.Normal) {
             cursor.Release();
             if (view.PickPipe(at) is Vector2I pipe) panel.SelectPipe(pipe);
             else panel.Close();
@@ -387,8 +392,8 @@ public sealed class PlayerControl {
     /// <summary>What the remove selector points at with <paramref name="picked"/> under the mouse at a screen point, or nothing while the selector is away.</summary>
     public Removal RemovalAt(Thing? picked, Vector2 at) {
         if (Mode is not ClickMode.Remove remove) return Removal.None;
-        return view.TryGroundPoint(at, out var ground, remove.Underground ? PipeGround.FloorY : 0)
-            ? world.Construction.RemovalAt(picked, ground, remove.Underground)
+        return view.TryGroundPoint(at, out var ground, remove.Layer == Layer.Underground ? PipeGround.FloorY : 0)
+            ? world.Construction.RemovalAt(picked, ground, remove.Layer)
             : picked == null ? Removal.None : world.Construction.RemovalAt(picked, picked.Pos);
     }
 

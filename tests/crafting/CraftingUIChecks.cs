@@ -35,6 +35,7 @@ public partial class Game {
         await TestClean(CheckRecipeGroupsCloseAndOpenOnAClick);
         await TestClean(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
         await TestClean(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
+        await TestClean(CheckCraftingLeavesTheRecipeMapOnTheBottomBar);
         await TestClean(CheckRecipeMapOpensFromTheBottomBarAndShowsEveryItemOnce);
         await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
         await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
@@ -387,6 +388,14 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
     }
 
+    /// <summary>Opening crafting leaves the recipe map on its own button in the bottom bar.</summary>
+    private async Task CheckCraftingLeavesTheRecipeMapOnTheBottomBar() {
+        await KeyStroke(Key.C);
+        Require(ShownPage() == "Crafting" && Named("open_map") == null, "Crafting should open without a recipe map button.");
+        Require(hotbar.FindChild("map", true, false) is Button map && map.IsVisibleInTree(), "The bottom bar should still offer the recipe map.");
+        await CloseWithEsc();
+    }
+
     /// <summary>The bottom bar opens the map directly from the world, with every item once and those the settlement has had drawn as known.</summary>
     private async Task CheckRecipeMapOpensFromTheBottomBarAndShowsEveryItemOnce() {
         await CloseWithEsc();
@@ -427,7 +436,6 @@ public partial class Game {
     private async Task CheckGameGoesOnUnderTheOpenRecipeMap() {
         await CloseWithEsc();
         await KeyStroke(Key.C);
-        Require(Named("open_map") == null, "The crafting menu must give the map its own icon on the bottom bar.");
         await Click((Button)hotbar.FindChild("map", true, false));
         var stew = recipeMap.NodeOf("canned_meat_stew")!;
         Require(!stew.Known, "Canned stew nobody has made must be drawn as not made yet.");

@@ -13,6 +13,7 @@ public partial class Game {
         await TestClean(CheckHeldPipePlanTurnsAndCyclesShapes);
         await TestClean(CheckHotbarPipePlanRemovesAndReusesALaidPipe);
         await TestClean(CheckRemoveSelectorKeepsTheOtherLayer);
+        await TestClean(CheckLayerCanSwitchWithAShovelSelected);
         await TestClean(CheckClickingALaidPipeReadsWaterAndPressure);
         await TestClean(CheckPipeJunctionCanBeSelectedByItsArms);
         await TestClean(CheckPuttingPipesInThePlumbingSlotInstallsAndRefundsThem);
@@ -30,7 +31,7 @@ public partial class Game {
         Require(tiles.Length == 2, "The clearing should have two visible tiles for pipes.");
         await Hover(view.Screen(tiles[0], PipeGround.FloorY));
         var ghost = view.FindChild("PipePreview", true, false) as MeshInstance3D;
-        Require(view.Underground && ghost is { Visible: true } && ghost.Basis.X.X > .999f, "The straight pipe should start with an east-west preview.");
+        Require(view.Layer == Layer.Underground && ghost is { Visible: true } && ghost.Basis.X.X > .999f, "The straight pipe should start with an east-west preview.");
         var soil = view.FindChild("ExcavatedSoil", true, false) as MeshInstance3D;
         Require(soil?.Mesh != null && soil.GetAabb().Position.Y < -.5f && soil.GetAabb().End.Y >= 0,
             "The exposed soil should extend from below the pipes to the original ground level.");
@@ -100,7 +101,7 @@ public partial class Game {
         await Click(Named("remove")!);
         await RightClick(tile);
         await Hover(view.Screen(tile, PipeGround.FloorY));
-        Require(view.Underground && view.RemovalShown.Pipe == tile, "Underground removal should mark the pipe beneath the chest.");
+        Require(view.Layer == Layer.Underground && view.RemovalShown.Pipe == tile, "Underground removal should mark the pipe beneath the chest.");
         await Click(view.Screen(tile, PipeGround.FloorY));
         await Until(() => !world.SteelPipes.Laid(tile), "the pipe coming up from beneath the chest", 2);
         Require(world.Find(chest!.Id) != null && world.GravelPaths.Laid(tile), "Taking up the pipe should leave the chest and gravel on the surface.");
@@ -112,7 +113,7 @@ public partial class Game {
         await Until(() => world.Find(chest.Id) == null, "the chest coming down after returning to the surface", 2);
         Require(world.SteelPipes.Laid(tile) && world.GravelPaths.Laid(tile), "Taking down the chest should leave both tiles underneath it.");
         await Hover(view.Screen(tile));
-        Require(!view.Underground && view.RemovalShown.Tile == tile, "Surface removal should mark the gravel above the pipe.");
+        Require(view.Layer == Layer.Surface && view.RemovalShown.Tile == tile, "Surface removal should mark the gravel above the pipe.");
         await Click(view.Screen(tile));
         await Until(() => !world.GravelPaths.Laid(tile), "the gravel coming up from above the pipe", 2);
         Require(world.SteelPipes.Laid(tile), "Taking up the gravel should leave the pipe in the ground.");
@@ -130,7 +131,7 @@ public partial class Game {
         await Frames();
         var layer = (Button)ui.FindChild("layer", true, false);
         await Click(layer);
-        Require(view.Underground, "Layer must make the junction visible.");
+        Require(view.Layer == Layer.Underground, "Layer must make the junction visible.");
         float pipeHeight = PipeGround.FloorY + .065f;
         await Click(view.Screen((Vector2)tile + new Vector2(.3f, .3f), pipeHeight));
         Require(!panel.Visible, "Bare ground between two arms must leave the pipe readout closed.");
@@ -139,6 +140,28 @@ public partial class Game {
         await Click(layer);
         Hosted.Construction.TakeUpPipe(tile);
         Drop(Hosted, "steel_pipe");
+        await Frames();
+    }
+
+    /// <summary>Layer hides the shovel outline underground and restores it on the surface.</summary>
+    private async Task CheckLayerCanSwitchWithAShovelSelected() {
+        string previous = world.HotbarItem(8);
+        Give(Hosted, "steel_shovel", 1);
+        SetHotbarSlot(Hosted, 8, "steel_shovel");
+        await Until(() => world.HotbarCount(8) > 0, "a shovel binding to the ninth slot", 2);
+        await KeyStroke(Key.Key9);
+        var at = SpotsNearby().First(p => world.Construction.PlacementBlock(ThingKind.Hole, p) == null && Uncovered(view.Screen(p)));
+        await Hover(view.Screen(at));
+        Require(view.Layer == Layer.Surface && view.PlacementGhost != null, "The selected shovel should show a dig outline on the surface.");
+        var layerControl = (Button)ui.FindChild("layer", true, false);
+        await Click(layerControl);
+        await Hover(view.Screen(at));
+        Require(view.Layer == Layer.Underground && view.PlacementGhost == null, "Layer should stay underground with the shovel still selected.");
+        await Click(layerControl);
+        await Hover(view.Screen(at));
+        Require(view.Layer == Layer.Surface && view.PlacementGhost != null, "Returning to the surface should restore the selected shovel's outline.");
+        SetHotbarSlot(Hosted, 8, previous);
+        Drop(Hosted, "steel_shovel", 1);
         await Frames();
     }
 
@@ -160,13 +183,13 @@ public partial class Game {
             && switchBounds.Position.X <= healthCenter && healthCenter < switchBounds.End.X,
             "The Layer button should be below the health end of the status bar.");
         await Click(layerControl!);
-        Require(view.Underground && layerControl!.ButtonPressed, "Layer should switch from the surface to the underground view.");
+        Require(view.Layer == Layer.Underground && layerControl!.ButtonPressed, "Layer should switch from the surface to the underground view.");
         Give(Hosted, "wood", 1);
         await KeyStroke(Key.Tab);
         await PickUp(BagCellOf("wood"));
         var farEnd = (Vector2)tile + Vector2.Up * .44f;
         await Click(view.Screen(farEnd, PipeGround.FloorY + .1f));
-        Require(view.Underground && ShownPage() == "Steel pipe" && world.SteelPipes.Laid(tile),
+        Require(view.Layer == Layer.Underground && ShownPage() == "Steel pipe" && world.SteelPipes.Laid(tile),
             "Clicking the far end of the visible pipe should open its readout and keep it laid.");
         await Until(() => cursor.Empty, "opening the pipe returning held wood to its stack", 2);
         Drop(Hosted, "wood", 1);
@@ -199,7 +222,7 @@ public partial class Game {
             "a drained pipe returning to its empty finish", 2);
 
         await Click(layerControl!);
-        Require(!view.Underground && !layerControl!.ButtonPressed && !panel.Visible, "Returning to the surface should close the pipe readout.");
+        Require(view.Layer == Layer.Surface && !layerControl!.ButtonPressed && !panel.Visible, "Returning to the surface should close the pipe readout.");
         foreach (var cell in new[] { tile, tile + Vector2I.Up, tankTile }) Hosted.Construction.TakeUpPipe(cell);
         Drop(Hosted, "steel_pipe", 3);
         RemoveThings(Hosted, t => t == pump || t == tank);

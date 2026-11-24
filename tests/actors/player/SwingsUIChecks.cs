@@ -14,9 +14,10 @@ using static WorkerSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>The UI checks of a player's swings: what Space throws and how it sounds.</summary>
+    /// <summary>The UI checks of a player's swings: a punch with Space and a torch with right-click.</summary>
     private async Task RunSwingsUIChecks() {
         await TestClean(CheckSpaceWithoutAnAxeThrowsAPunchTheWayThePlayerLastWalked);
+        await TestClean(CheckRightClickLightsAndSwingsATorch);
     }
 
     /// <summary>

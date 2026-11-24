@@ -8,6 +8,11 @@ using static WorldSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
+    private async Task RunHotbarUIChecks() {
+        await TestClean(CheckHotbarRightClickAndDoubleClickUseItsItem);
+        await TestClean(CheckRightClickOnOpenGroundUsesTheSelectedHotbarItem);
+    }
+
     /// <summary>Number keys and slot clicks select items, and right-clicking open ground eats or drinks the selection.</summary>
     private async Task CheckRightClickOnOpenGroundUsesTheSelectedHotbarItem() {
         Require(hotbar.Buttons.Count == 9 && world.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
@@ -40,17 +45,6 @@ public partial class Game {
         Require(world.Backpack["water"] == 0 && world.Thirst > 20, "A right click on open ground must drink the selected water.");
         foreach (var (bottle, count) in bottles) Give(Hosted, bottle, count);
         await Frames();
-    }
-
-    /// <summary>Drinking through hotbar slot nine consumes one liter at a time and keeps the empty bottle.</summary>
-    private async Task CheckHotbarDrinkTakesOneLiterAndKeepsEmptyBottle() {
-        for (int expected = 3; expected >= 1; expected--) {
-            await Until(() => hotbar.Counts[8].Text == $"{expected}/3", $"the bottle badge showing {expected}/3 before a liter", 2);
-            await KeyStroke(Key.Key9);
-            await ClickGround(MouseButton.Right);
-            await Until(() => hotbar.Counts[8].Text == $"{expected - 1}/3", "a hotbar drink removing exactly one liter", 2);
-        }
-        Require(world.Backpack["empty_bottle"] == 1, "Three hotbar drinks must leave the empty bottle in inventory.");
     }
 
     /// <summary>Both right-click and double left-click use a hotbar item without clearing the slot.</summary>

@@ -7,6 +7,8 @@ using static WorldSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
+    private Task RunCrateUIChecks() => TestClean(CheckStackLargerThanCrateFillsItAndRestStaysHeld);
+
     /// <summary>Wood left on the cursor after filling one crate can be put into another after walking to it.</summary>
     private async Task CheckStackLargerThanCrateFillsItAndRestStaysHeld() {
         var home = Hosted.Player;

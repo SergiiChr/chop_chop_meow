@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
@@ -13,9 +14,14 @@ public partial class Game {
         Require(controls != null, "The main menu must offer Controls.");
         float time = world.Time;
         await Click(controls!);
-        Require(HasLabel(startMenu.Screen, "CONTROLS") && HasLabel(startMenu.Screen, "Sprint.")
-            && HasLabel(startMenu.Screen, "Move the entire stack or queue 5 crafting batches."),
-            "Controls must show the movement and crafting shortcuts.");
+        Require(HasLabel(startMenu.Screen, "CONTROLS"), "The main menu must open the Controls screen.");
+        var controlsList = startMenu.Screen.GetChildren().OfType<ControlsList>().Single();
+        foreach (string shortcut in new[] { "Sprint.", "Mouse wheel", "C / V", "R / T", "Crew.", "Layer",
+            "LMB on item slot", "RMB on item slot", "Drag a panel", "queue 5 crafting batches", "queue 10 crafting batches" })
+            Require(HasLabel(controlsList, shortcut), $"Controls should explain {shortcut}");
+        var list = controlsList.GetChildren().OfType<ScrollContainer>().Single();
+        await Wheel(list.GetGlobalTransformWithCanvas() * (list.Size / 2));
+        Require(list.ScrollVertical > 0, "Players should be able to scroll down to more controls.");
         Require(view.Paused && world.Time == time, "The world must stay paused on the Controls screen.");
         await KeyStroke(Key.Escape);
         Require(FindButton(startMenu.Screen, "New game") != null, "Esc must return from Controls to the main menu.");
