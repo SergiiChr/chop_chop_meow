@@ -26,11 +26,14 @@ internal abstract class PlaceHaul {
         new() { Place = place, From = from, To = place, Item = item, Count = count, Rule = have < batch ? 1 : 3, Order = have / (float)batch };
 
     /// <summary>The nearest place that takes a load of an item carried out of a place, and how much of the free units it takes, or null when none does.</summary>
-    protected (Thing To, int Count)? Taker(Thing place, string item, int free) {
-        if (world.DepositFor(item, place.Pos, place.Id) is not Thing to || world.Intake(to, item, false) is not (Inventory into, int room)) return null;
-        // Vessels that pour there go as many as its liters of room take.
+    protected (Thing To, int Count)? Taker(Thing place, string item, int free) =>
+        world.DepositFor(item, place.Pos, place.Id) is Thing to && Takes(to, item, free) is > 0 and int count ? (to, count) : null;
+
+    /// <summary>How many of the free units of an item a place a load goes to takes, as far as it has room; vessels that pour there go as many as its liters of room take.</summary>
+    protected int Takes(Thing to, string item, int free) {
+        if (world.Intake(to, item, false) is not (Inventory into, int room)) return 0;
         if (world.PoursInto(to, into, item) is VesselDef pours) room = (room + pours.LitersIn(item) - 1) / pours.LitersIn(item);
-        return (to, System.Math.Min(free, room));
+        return System.Math.Min(free, room);
     }
 
     /// <summary>A carry that takes an output out of a place: a full one comes under the second rule, otherwise under the fourth, most held first.</summary>

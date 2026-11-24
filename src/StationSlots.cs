@@ -99,7 +99,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     public VBoxContainer StationSlot(string item, bool input, string perBatch, float size = 52) {
         var box = t.Inventory;
         var vessel = world.Data.VesselFor(item);
-        bool product = !input && world.Data.Recipes.TryGetValue(world.Selected(t), out var recipe) && recipe.Output == item;
+        bool product = !input && world.Product(t) == item;
         string hint = product ? $"{SlotHint} · put {world.Lower(world.Data.Name(item))} from your backpack back here"
             : !input ? SlotHint : vessel != null ? $"{SlotHint} · put a filled vessel here to pour what it holds" : $"{SlotHint} · put a backpack stack here to load";
         // A liquid's input slot takes the vessels that hold some of it, at any fill.

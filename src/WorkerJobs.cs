@@ -223,7 +223,7 @@ public sealed partial class World {
         return Math.Max(0, t.Inventory.SlotRoom(lands));
     }
 
-    private bool IsStation(ThingKind kind) => Array.IndexOf(stationKinds, kind) >= 0;
+    private bool IsStation(ThingKind kind) => isStation[(int)kind];
 
     /// <summary>
     /// Whether a worker's hands are clear of a tool the job in hand has no use for.

@@ -901,8 +901,8 @@ They run at base speed times the tool's speed while the player carries it, and o
 The queue is written by `QueueJson`, since the generic list writer allocates on every world update.
 
 The bench runs at `BenchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
-At a station someone has to work, a batch a player queued moves while a player or a paid worker works it; a batch for the mark moves only with a worker (`World.BatchWorked`).
-`Thing.QueuedBatch` says which kind the batch in progress is, and only a queued one takes a carried tool or shows the player hammering.
+At a station someone has to work, a batch a player queued moves while a player or a paid worker works it; a batch for the mark moves only with a worker (`World.Hammered`).
+`Thing.Batch` says who the batch in progress was started for (`BatchFor`), and `World.PlayersWork` says whether players work it: only a queued one takes a carried tool or shows the player hammering.
 The packing station has no queue: whoever works it packs.
 
 A station counts batches of one recipe at a time: `Thing.Asked` is the recipe a player queued last and `Thing.Batches` how many of it still wait; a batch leaves the count as it starts.
@@ -1146,7 +1146,7 @@ Both are boxes a player in reach of the worker (`World.Reaches`) picks up from a
 Chests have separate item allowlists for input and output.
 Storage with a filter window has `Inventory.Gated` set: there an empty list lets nothing through and `Inventory.Everything`, shown as an "A" cell, lets every item through.
 `Inventory.Filter` keeps `Everything` alone in its row.
-`World.Add` gives a chest, placed crate and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; a crate packed at a packing station gets the chest's lists when it is put down.
+`World.Add` gives a chest and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; every crate's contents get the chest's lists when made (`World.NewCrate`), packed or not.
 Any other box, such as a station's slots or a worker's hands, is not gated, and lets anything through its empty lists.
 Automated deposits go to the nearest place that asks for the item, then to the nearest storage taking everything (`World.DepositFor`).
 A load nothing takes goes to the nearest place that takes it back (`World.TakesBack`, `World.PutBack`), up to a stack: an output slot what its place makes, and a chest or placed crate what it already holds, whatever its filters.
@@ -1307,7 +1307,7 @@ At the `LunchHour` in `GameData` workers break for one in-game hour.
 `BreakSeats` reserves the nearest available campfire seats, with up to six seats per fire.
 It seats workers with nothing to do the same way at any hour; their ground groups gather round the nearest campfire rather than where they stand.
 A worker who sat in the last tick keeps their seat while they still have nothing to do, so the crew still sitting when lunch ends stays put.
-A campfire burns its wood as usual while workers sit at it; once it has none left, one a worker sat at in the last tick (`BreakSeats.Kindles`) is kept burning at `KindledBurn`, one second, and dies down within that second once they leave.
+A campfire burns its wood as usual while workers sit at it; once it has none left, a worker sitting in one of its seats keeps it burning at `KindledBurn`, one second (`World.Kindle`), and it dies down within that second once they leave.
 A blocked walk releases its seat, and the worker remembers seats they could not reach until lunch ends.
 Workers on the ground keep their seats when the crew changes, unless they take a vacancy by a fire.
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.

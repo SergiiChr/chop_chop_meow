@@ -52,7 +52,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             // Take the named resource off before adding another.
             if (single && filter.Count > 0) continue;
             var (add, _) = ItemSlot.Create($"filter_add_{(output ? "out" : "in")}", 44);
-            add.Text = "+"; add.AddThemeFontSizeOverride("font_size", 22); add.AddThemeColorOverride("font_color", Style.Tan);
+            Letter(add, "+", Style.Tan);
             add.TooltipText = "Add an item · or put a held one here";
             // A held stack goes back where it was: a filter only names it, or for a packed crate the kind of crate it is.
             add.Controls = new SlotInput(cursor) {
@@ -97,10 +97,15 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
         }
     }
 
+    /// <summary>Shows a letter in a cell in place of an item's icon: "+" to add an item, "A" for Everything.</summary>
+    private static void Letter(ItemSlot cell, string letter, Color color) {
+        cell.Text = letter; cell.AddThemeFontSizeOverride("font_size", 22); cell.AddThemeColorOverride("font_color", color);
+    }
+
     /// <summary>A filter entry's cell: the item, for a crate of a good the good with a small crate in the corner, or the letter A for Everything.</summary>
     private ItemSlot FilterCell(string name, string id) {
         var (cell, _) = ItemSlot.Create(name, 44);
-        if (id == Inventory.Everything) { cell.Text = "A"; cell.AddThemeFontSizeOverride("font_size", 22); cell.AddThemeColorOverride("font_color", Style.Ink); return cell; }
+        if (id == Inventory.Everything) { Letter(cell, "A", Style.Ink); return cell; }
         string? good = world.CrateGood(id);
         cell.Icon = Icons.Of(good ?? id);
         if (good != null) {

@@ -39,7 +39,7 @@ internal static class LunchChecks {
         forge.Heat = 100;
         SafeTick(world, 25);
         Require(world.Lunch, "the clock should be at lunch hour");
-        Require(world.Workers.All(w => (w.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching) && w.Pos.DistanceTo(near.Pos) < 2),
+        Require(world.Workers.All(w => Seated(w) && w.Pos.DistanceTo(near.Pos) < 2),
             "at lunch the whole crew should sit around the campfire");
         Require(cutter.Assignment == tree.Id, "lunch should keep the cutter's assignment");
         Require(pumper.Assignment == forge.Id, "lunch should keep the pumper's assignment");
@@ -59,7 +59,7 @@ internal static class LunchChecks {
         var reachable = world.Add(ThingKind.Campfire, at + Vector2.Down * 1.5f);
         var worker = AddWorker(world, at + Vector2.Up * 3);
         Work(world, 15);
-        Require(worker.Pos.DistanceTo(reachable.Pos) < 1.6f && worker.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching,
+        Require(worker.Pos.DistanceTo(reachable.Pos) < 1.6f && Seated(worker),
             "a worker whose nearer fire is across a wall should sit at the reachable one");
     }
 
@@ -71,7 +71,7 @@ internal static class LunchChecks {
         for (int i = 0; i < 6; i++) AddWorker(world, at + Vector2.Up * 3);
         var outside = AddWorker(world, fire.Pos + Vector2.Up * 7);
         Work(world, 15);
-        Require(outside.Pos.DistanceTo(fire.Pos) < 1.6f && outside.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching,
+        Require(outside.Pos.DistanceTo(fire.Pos) < 1.6f && Seated(outside),
             "a worker on the ground should take a fire seat released by a worker who cannot reach it");
     }
 
@@ -143,7 +143,7 @@ internal static class LunchChecks {
         var fire = world.Add(ThingKind.Campfire, nearest.Pos + Vector2.Right * 1.4f);
         Work(world, 12);
         Require(world.Workers.Count(w => w.Pos.DistanceTo(fire.Pos) < 1.6f
-            && w.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching) == 6,
+            && Seated(w)) == 6,
             "a new campfire should fill all six seats, including the spot freed by a ground worker moving to the fire");
     }
 

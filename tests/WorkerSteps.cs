@@ -80,6 +80,9 @@ internal static class WorkerSteps {
         return worker;
     }
 
+    /// <summary>Whether a worker sits, on the ground or perched by a fire, as on a break.</summary>
+    public static bool Seated(Worker w) => w.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching;
+
     /// <summary>A crafting table on a recipe with the tool it needs slotted, and nobody working it.</summary>
     public static Thing Bench(World world, Vector2 at, string recipe, string tool = "") {
         var bench = world.Add(ThingKind.Bench, at);

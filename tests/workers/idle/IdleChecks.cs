@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
@@ -5,7 +6,6 @@ using static Checks;
 using static SetupSteps;
 using static WorkerSteps;
 using static WorldSteps;
-using System;
 
 /// <summary>Checks of where a worker with no job that can be done waits, and the campfire they sit at.</summary>
 internal static class IdleChecks {
@@ -17,7 +17,6 @@ internal static class IdleChecks {
         Test(CheckWorkerWithNothingToDoWaitsAtTheTradingPost, data);
     }
 
-    private static bool Seated(Worker w) => w.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching;
 
     private static void CheckWorkerWithNothingToDoSitsAtTheNearestCampfire(GameData data) {
         var world = FundedWorld(data);
@@ -29,7 +28,7 @@ internal static class IdleChecks {
         Work(world, 60, () => Seated(crafter));
         Require(Seated(crafter) && crafter.Pos.DistanceTo(near.Pos) < 1.6f,
             $"a worker whose jobs cannot be done should sit at the nearest campfire, not {crafter.Pos.DistanceTo(near.Pos):0.0} m from it");
-        Require(crafter.Status.Contains("wood", System.StringComparison.OrdinalIgnoreCase), $"a seated idle worker's status should say what their first job lacks, not \"{crafter.Status}\"");
+        Require(crafter.Status.Contains("wood", StringComparison.OrdinalIgnoreCase), $"a seated idle worker's status should say what their first job lacks, not \"{crafter.Status}\"");
         Require(crafter.Assignment == bench.Id, "a worker waiting at the fire should keep the job's place");
     }
 
@@ -81,6 +80,6 @@ internal static class IdleChecks {
         var crafter = Staff(world, bench, JobKind.Craft);
         Work(world, 60, () => crafter.Pos.DistanceTo(post.Pos) < 3);
         Require(crafter.Pos.DistanceTo(post.Pos) < 3, $"a worker whose jobs cannot be done should wait at the trading post, not {crafter.Pos.DistanceTo(post.Pos):0} m from it");
-        Require(crafter.Status.Contains("wood", System.StringComparison.OrdinalIgnoreCase), $"a waiting worker's status should say what their first job lacks, not \"{crafter.Status}\"");
+        Require(crafter.Status.Contains("wood", StringComparison.OrdinalIgnoreCase), $"a waiting worker's status should say what their first job lacks, not \"{crafter.Status}\"");
     }
 }

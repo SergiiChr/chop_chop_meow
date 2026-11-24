@@ -366,7 +366,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         }
         if (Launch.Has("--idle")) {
             // Idle review: the crew's jobs are taken off and they sit at the campfire, which has no wood and burns while they do.
-            foreach (var w in world.Workers) foreach (var d in w.Jobs.OfType<Duty>().ToArray()) if (world.Find(d.Thing) is Thing place) world.SetDuty(w, place, d.Job, false);
+            foreach (var w in world.Workers) world.Assign(w, null);
             fire.Burn = 0;
             for (int i = 0; i < 60; i++) world.Tick(.25f);
             world.Player = fire.Pos + new Vector2(3, 3); panel.Close(); view.Zoom = 1.6f;

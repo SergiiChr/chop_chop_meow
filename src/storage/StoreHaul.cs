@@ -14,10 +14,8 @@ internal sealed class StoreHaul : PlaceHaul {
     public override void Carries(Worker w, Thing t, ref Carry best) {
         foreach (var (item, _) in t.Inventory.Items) {
             int free = t.Inventory.Free(item);
-            if (free == 0 || !t.Inventory.AllowsWithdrawal(item) || world.AskerFor(item, t) is not Thing to || world.Intake(to, item, false) is not (Inventory into, int room)) continue;
-            // Vessels that pour there go as many as its liters of room take.
-            if (world.PoursInto(to, into, item) is VesselDef pours) room = (room + pours.LitersIn(item) - 1) / pours.LitersIn(item);
-            Offer(ref best, new Carry { Place = t, From = t, To = to, Item = item, Count = Math.Min(free, room), Rule = 1 });
+            if (free == 0 || !t.Inventory.AllowsWithdrawal(item) || world.AskerFor(item, t) is not Thing to) continue;
+            Offer(ref best, new Carry { Place = t, From = t, To = to, Item = item, Count = Takes(to, item, free), Rule = 1 });
         }
         if (FillSource(t, w.Pos) is (string wanted, Thing from, int count)) Offer(ref best, new Carry { Place = t, From = from, To = t, Item = wanted, Count = count, Rule = 1 });
     }

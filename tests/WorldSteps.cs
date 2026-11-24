@@ -25,7 +25,7 @@ internal static class WorldSteps {
     /// <summary>The player sets a chest's, placed crate's, tool station's, trading post's or compost's input filter to Everything, so workers bring it anything it holds.</summary>
     public static Thing TakeEverything(World world, Thing store) {
         world.SetFilter(store, Inventory.Everything, false, true);
-        Require(store.Inventory.InputFilter.Count == 1 && store.Inventory.InputFilter.Contains(Inventory.Everything), $"the {store.Kind} input filter should hold Everything alone");
+        Require(store.Inventory.InputFilter.SequenceEqual([Inventory.Everything]), $"the {store.Kind} input filter should hold Everything alone");
         return store;
     }
 
