@@ -91,7 +91,7 @@ public partial class ModeLabel : VBoxContainer {
         title.Text = shown switch {
             { Placing: ThingKind.SteelPiping } => "Place steel piping",
             ClickMode.Assign => "WORK ORDER · Click a resource to assign this villager. Esc cancels.",
-            ClickMode.Remove { Underground: true } => "REMOVE · Underground · Right click for surface · Esc to finish",
+            ClickMode.Remove { Layer: Layer.Underground } => "REMOVE · Underground · Right click for surface · Esc to finish",
             ClickMode.Remove => "REMOVE · Surface · Right click for underground · Esc to finish",
             { Placing: ThingKind.Mine } => "PLACE MINE · Left click ground · Esc to cancel",
             ClickMode.Dig => "DIG · Hold right mouse on open ground",

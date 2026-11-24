@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dc8s2pevlliik"
-path="res://.godot/imported/line_guide.svg-9876049fcd32decdef7ded15318cd2cf.ctex"
+path="res://.godot/imported/line_book.svg-3762bc3433bf0d4bac6477c472edbcc2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/line_guide.svg"
-dest_files=["res://.godot/imported/line_guide.svg-9876049fcd32decdef7ded15318cd2cf.ctex"]
+source_file="res://assets/ui/line_book.svg"
+dest_files=["res://.godot/imported/line_book.svg-3762bc3433bf0d4bac6477c472edbcc2.ctex"]
 
 [params]
 

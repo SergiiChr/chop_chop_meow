@@ -191,12 +191,15 @@ public partial class Game {
         await Click(to);
     }
 
-    /// <summary>Clicks open ground beside the player, so the click uses the item selected on the hotbar instead of selecting something.</summary>
-    private async Task ClickGround() {
+    /// <summary>Clicks open ground beside the player with the given mouse button.</summary>
+    private async Task ClickGround(MouseButton button = MouseButton.Left) {
         await Frames();
         var open = Enumerable.Range(1, 6).SelectMany(r => Enumerable.Range(0, 8).Select(a => world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r))
-            .Select(p => view.Screen(p)).First(p => view.Pick(p) == null && view.PickWorker(p) == null && GetViewport().GetVisibleRect().HasPoint(p) && p.Y < GetViewport().GetVisibleRect().Size.Y - 120);
-        await Click(open);
+            .First(at => {
+                var screen = view.Screen(at);
+                return GetViewport().GetVisibleRect().HasPoint(screen) && Uncovered(screen) && view.Pick(screen) == null && view.PickWorker(screen) == null;
+            });
+        if (button == MouseButton.Right) await RightClick(open, 0); else await Click(view.Screen(open));
     }
 
     /// <summary>Clicks a thing in the world where its model shows, clear of workers and of the panels over the world.</summary>

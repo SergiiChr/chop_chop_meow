@@ -87,7 +87,7 @@ Simulation and data:
 | `src/pipes/Plumbing.cs` | Connected pipes, standing water and how buildings share and store the supply |
 | `src/pipes/WaterPumps.cs` | Player and worker pump strokes, pressure loss and flow per simulation tick |
 | `src/pipes/display/PipeLayerView.cs`, `src/pipes/display/PipeGround.cs` | Underground view and placement preview |
-| `src/pipes/display/PipePanel.cs` | The selected pipe's water and pressure |
+| `src/pipes/display/PipePanel.cs` | A laid pipe's standing water and pressure |
 | `src/pipes/display/WaterPumpPanel.cs`, `src/pipes/display/PressureGauge.cs` | Pump control, job assignment and dial |
 | `src/pipes/display/WaterPumpProp.cs` | The pump handle's movement in the world |
 | `src/pipes/display/SteelPipeShape.cs`, `src/pipes/display/WaterPumpShape.cs` | Steel pipes, hand pump and lever |
@@ -137,12 +137,12 @@ UI and input:
 | File | Owns |
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
-| `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, and hosting |
+| `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
 | `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
-| `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
+| `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/mines/display/MinePanel.cs` | The mine's building steps, miners and outputs |
@@ -162,7 +162,7 @@ UI and input:
 | `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
 | `src/stations/display/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
 | `src/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
-| `src/CraftPanel.cs` | The crafting menu |
+| `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
 | `src/PageText.cs` | How panels word durations and costs |
@@ -200,13 +200,13 @@ UI and input:
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
-| `src/guide/display/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
-| `src/menus/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
+| `src/menus/StartMenu.cs` | The main menu and its save, load, options, join and Controls screens |
+| `src/menus/ControlsList.cs` | Key caps and actions on the shared Controls screen |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
-| `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things, E and Space, and `ClickMode`, what the next click does |
-| `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
+| `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things and using Space, and `ClickMode`, what the next click does |
+| `src/ui/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
 
@@ -269,7 +269,7 @@ Checks and review tools:
 | `tests/*Checks.cs` | Simulation checks of the features that have no folder yet |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
-| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events for the features that have no folder yet, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
+| `src/GameChecks.cs` | Input/UI checks through real input events for the features that have no folder yet, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
 | `tests/crafting/RecipeReadyUIChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
 | `src/NetChecks.cs` | The host and guest network session (`NET-HOST PASS`, `NET-GUEST PASS`): joining, leaving and reconnecting, with each feature's `NetScene` played in between (`Game.NetScenes`) |
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
@@ -1019,7 +1019,9 @@ The panel keeps the list's place while the page draws again, so a click on a rec
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 
-`RecipeMap` covers the screen while the game goes on under it; it is drawn afresh on each `RecipeMap.Open`.
+The recipe map badge on the bottom bar opens `RecipeMap` over the running game.
+An item link in the Goal Log opens it through `RecipeMap.OpenAt` with that item highlighted and the game still paused.
+Closing the map returns to the goal details.
 `PlayerControl.Update` moves nobody while it shows, and a `MapNode` turns to made before as soon as `World.Had` knows its item.
 `RecipeMap.Place` puts an item on a grid of steps across and lines down: what is made out of it goes one step on, the first on the same line and the rest on lines below, and `MapTree` draws the lines between them.
 A `MapNode` draws a filled slot for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.
@@ -1142,7 +1144,10 @@ The underground view darkens the surface and exposes an earth bed 0.9 m below gr
 Blueprint-blue lines mark the trench edges, pipes and inlets.
 A pipe and its vertical inlet turn dark blue while the tile holds any water, even at zero pressure.
 Ground remains visible under people standing over the trench.
-Placement, inspection and removal project the pointer onto the bed.
+The Layer button below the left side of the status bar switches the view between the surface and underground.
+In the underground view, a click opens the laid pipe's page (`PipePanel`).
+Placement and removal project the pointer onto the bed.
+Inspection tests each tube and riser so bare ground between junction arms stays unselectable.
 A vertical pipe joins each building with plumbing to its inlet tile.
 A dotted guide marks a connection still to be made.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.
@@ -1198,7 +1203,10 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
   The server runs a marked command only when the held stack lies where the command takes from, and on no more than it holds.
   A slot that refuses shakes (`ItemSlot.Shake`), and the stack stays held.
 - Shift-click moves the stack clicked to the other inventory open, and Ctrl-click all of that item.
-- A double click uses an item (`PagePanel.UseFromBag`, `Hotbar`): eats, drinks, lights a torch, opens a crate as storage or selects a tool (`Hotbar.SelectTool`): on its hotbar slot, or in hand (`World.SelectInHand`, `PlayerState.InHand`) with no slot selected.
+- Right-clicking open ground uses the selected hotbar item (`Hotbar.UseSelected`).
+  Right-clicking a resource starts gathering, and holding the button on a placed crate or barrel starts picking it up.
+  Right-clicking a hotbar slot uses the slot's item.
+- A double click uses an item in the backpack or on the hotbar (`PagePanel.UseFromBag`, `Hotbar`): eats, drinks, lights a torch, opens a crate as storage or selects a tool (`Hotbar.SelectTool`): on its hotbar slot, or in hand (`World.SelectInHand`, `PlayerState.InHand`) with no slot selected.
   On a slot with a use, a single click waits `SlotInput.DoubleClickMs` (200 ms) before it picks up, so the two can be told apart; recipe cards use the same time.
 - A slot acts when the button comes up over it, as a plain button does, so a page that draws itself again never takes the slot away under a press; let go of anywhere else, it does nothing.
 - A held stack put on a hotbar slot binds that exact backpack stack (`Inventory.Slot.Hotbar`, `World.BindHeld`), which the backpack rims; the binding goes with the stack and follows it into a stack it merges with (`Inventory.Slot.Empty`, `MoveSlotTo`, `Sort`).
@@ -1470,7 +1478,7 @@ A miner then carries a load of it to the nearest place that takes it (`Mines.Min
 ### Farming
 
 A farm plot (`farm`, `src/farms/Farms.cs`) is a walkable 6×6 zone that snaps beside piles and other plots.
-The ground dressing clears meadow plants across the square, and E measures reach from the nearest point on the plot.
+The ground dressing clears meadow plants across the square.
 `Farm` in `GameTables` sets what sows it, how many days the wheat grows, how many working days the harvest takes and what it yields.
 
 `Thing.FarmStage` is `Fallow`, `Growing` or `Ripe`.

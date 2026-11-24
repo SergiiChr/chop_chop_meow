@@ -20,7 +20,7 @@ public partial class WorldView : Node3D {
     public ThingKind? Placing;
     public float PlacingRotation;
     public PipeShape PlacingPipeShape;
-    public bool Underground;
+    public Layer Layer;
     public Vector2I? PointedPipe;
     public Vector2I? PipePreviewTile;
     private PipeLayerView pipeLayer = null!;
@@ -63,7 +63,7 @@ public partial class WorldView : Node3D {
     private readonly FirstPersonCamera firstPerson = new();
     public bool FirstPersonPreview, MouseLook;
     /// <summary>Cabin scenes, downed players and underground pipe work keep the overhead camera.</summary>
-    public bool FirstPerson => FirstPersonPreview && !Warming && !Underground && !World.Downed && World.Sheltered == 0;
+    public bool FirstPerson => FirstPersonPreview && !Warming && Layer == Layer.Surface && !World.Downed && World.Sheltered == 0;
     public Vector2 FirstPersonForward => firstPerson.Forward;
     public Vector2 FirstPersonMove(Vector2 keys) => firstPerson.GroundDirection(keys);
     public void Look(Vector2 motion) => firstPerson.Look(motion);
@@ -481,7 +481,7 @@ public partial class WorldView : Node3D {
         RayBox(origin, direction, new Aabb(new Vector3(-half, 0, -half), new Vector3(2 * half, height, 2 * half)), out distance);
 
     /// <summary>Finds the point where a ray enters a box in its own frame.</summary>
-    private static bool RayBox(Vector3 origin, Vector3 direction, Aabb bounds, out float distance) {
+    internal static bool RayBox(Vector3 origin, Vector3 direction, Aabb bounds, out float distance) {
         var low = bounds.Position; var high = bounds.End;
         float enter = 0, exit = float.MaxValue;
         bool hit = Clip(origin.X, direction.X, low.X, high.X, ref enter, ref exit) &&
@@ -497,6 +497,12 @@ public partial class WorldView : Node3D {
             exit = Math.Min(exit, Math.Max(a, b));
             return enter <= exit;
         }
+    }
+
+    /// <summary>The laid pipe under the cursor in explored ground.</summary>
+    public Vector2I? PickPipe(Vector2 screen) {
+        SyncCamera();
+        return pipeLayer.Pick(World.SteelPipes, camera.ProjectRayOrigin(screen), camera.ProjectRayNormal(screen));
     }
 
     private readonly List<Thing> picking = new();
@@ -521,7 +527,7 @@ public partial class WorldView : Node3D {
             // The lake has no raised model. Its shore is picked behind the objects standing there.
             if (t.Kind == ThingKind.Water) continue;
             var hits = HitsOf(drawn);
-            // Only the foot of a tree's trunk, its first hit, picks the tree, so a click among the crowns of a forest reaches the ground and swings.
+            // Only the foot of a tree's trunk, its first hit, picks the tree, so a right-click among the crowns of a forest reaches the ground and swings.
             if (t.Kind == ThingKind.Tree) {
                 if (hits.Length == 0) continue;
                 var trunk = hits[0];
@@ -643,13 +649,13 @@ public partial class WorldView : Node3D {
         UpdateCounterHits(dt);
         UpdateEffects(dt);
         UpdateMarkers();
-        if (Underground) {
+        if (Layer == Layer.Underground) {
             surfacePeople.Clear();
             AddFooting(playerRig);
             foreach (var entry in crew.Values) AddFooting(entry.Rig);
             foreach (var other in others.Values) AddFooting(other.Rig);
         }
-        pipeLayer.Update(World, known, surfacePeople, camera, Underground, PipePreviewTile,
+        pipeLayer.Update(World, known, surfacePeople, camera, Layer == Layer.Underground, PipePreviewTile,
             PlacingRotation, PlacingPipeShape, removalMark.Shown.Pipe);
         // The sun and the light move every frame by the window's own clock, which each server update corrects.
         UpdateLighting(Clocked(dayClock, World.Time, true, dt));
@@ -1988,11 +1994,11 @@ public partial class WorldView : Node3D {
             playerRing.Visible = placeTile.Visible = false;
             return;
         }
-        playerRing.Visible = !World.Dead && !Underground && !FirstPerson;
+        playerRing.Visible = !World.Dead && Layer == Layer.Surface && !FirstPerson;
         playerRing.Position = To3(World.Player, .015f);
         removalMark.Update(World, Removal);
         var ground = DiggingAt.GetValueOrDefault();
-        bool canPoint = Placing != null && !Underground && (DiggingAt.HasValue || TryGroundPoint(Mouse, out ground));
+        bool canPoint = Placing != null && Layer == Layer.Surface && (DiggingAt.HasValue || TryGroundPoint(Mouse, out ground));
         var kind = Placing.GetValueOrDefault();
         placeTile.Visible = canPoint && kind != ThingKind.Hole;
         var at = canPoint ? World.Construction.Snap(kind, ground.Round()) : Vector2.Zero;
@@ -2107,7 +2113,7 @@ public partial class WorldView : Node3D {
             overlay.DrawCircle(center, 4, new Color(.12f, .18f, .15f, .9f), antialiased: true);
             overlay.DrawCircle(center, 2, TagText, antialiased: true);
         }
-        if (Underground) {
+        if (Layer == Layer.Underground) {
             // Outline the center tile where a pipe can meet each building, even before it is fitted out.
             foreach (var building in known) {
                 if (building.Kind != ThingKind.Pump && !Plumbing.HasPlumbing(building.Kind)) continue;
@@ -2124,7 +2130,7 @@ public partial class WorldView : Node3D {
                 overlay.DrawLine(center - a, center - b, inlet, 1.5f, true);
                 overlay.DrawLine(center - b, center + a, inlet, 1.5f, true);
             }
-            if (PipePreviewTile == null && PointedPipe is Vector2I tile) Tag(Screen(tile, PipeGround.FloorY + .28f), "Steel pipe · E to inspect");
+            if (PointedPipe is Vector2I tile) Tag(Screen(tile, PipeGround.FloorY + .28f), "Steel pipe");
             return;
         }
         if (World == null) return;

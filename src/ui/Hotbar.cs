@@ -22,28 +22,31 @@ public partial class Hotbar : PanelContainer {
         AnchorLeft = .5f; AnchorRight = .5f; AnchorTop = 1; AnchorBottom = 1; OffsetTop = -14; OffsetBottom = -14; GrowHorizontal = GrowDirection.Both; GrowVertical = GrowDirection.Begin;
         AddThemeStyleboxOverride("panel", Style.Plate);
         var slots = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; slots.AddThemeConstantOverride("separation", 10); AddChild(slots);
-        slots.AddChild(MenuIcon("build", "Build", () => panel.Open(Page.Build), "B", Style.Brick)); slots.AddChild(MenuIcon("bag", "Backpack", () => panel.Open(Page.Backpack), "Tab", Style.Sage));
-        slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open(Page.Craft), "C", new Color("b08a45"))); slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open(Page.Crew), "H", new Color("5f8aa6"))); slots.AddChild(MenuIcon("guide", "Field guide", () => panel.Open(Page.Guide), "I", new Color("7d6488")));
+        slots.AddChild(MenuIcon("build", "Build", () => panel.Open(Page.Build), Style.Brick, "B"));
+        slots.AddChild(MenuIcon("bag", "Backpack", () => panel.Open(Page.Backpack), Style.Sage, "Tab"));
+        slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open(Page.Craft), new Color("b08a45"), "C"));
+        slots.AddChild(MenuIcon("map", "Recipe map", () => panel.Map.Open(), new Color("7d6488")));
+        slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open(Page.Crew), new Color("5f8aa6"), "H"));
         var divider = new ColorRect { Color = new Color(Style.Beige, .6f), CustomMinimumSize = new Vector2(3, 46), SizeFlagsVertical = SizeFlags.ShrinkCenter }; slots.AddChild(divider);
         for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
     }
 
-    /// <summary>A round enamel badge with a line icon, and a pill naming the key that opens the same page.</summary>
-    private Button MenuIcon(string glyph, string tooltip, Action action, string key, Color color) {
+    /// <summary>A round enamel badge with a line icon and a key cap when it has a shortcut.</summary>
+    private Button MenuIcon(string glyph, string tooltip, Action action, Color color, string? key = null) {
         var button = kit.Button("", action);
-        button.Name = glyph; button.TooltipText = $"{tooltip} · {key}";
+        button.Name = glyph; button.TooltipText = key == null ? tooltip : $"{tooltip} · {key}";
         button.Icon = GD.Load<Texture2D>($"res://assets/ui/line_{glyph}.svg");
         button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center; button.VerticalIconAlignment = VerticalAlignment.Center;
         button.CustomMinimumSize = new Vector2(56, 56); button.AddThemeConstantOverride("icon_max_width", 28);
         button.AddThemeColorOverride("icon_normal_color", Style.Rim); button.AddThemeColorOverride("icon_hover_color", Style.Rim); button.AddThemeColorOverride("icon_pressed_color", Style.Rim);
         button.SizeFlagsVertical = SizeFlags.ShrinkCenter;
         var look = Style.Round(color, 28); Style.Skin(button, look.Item1, look.Item2);
-        button.AddChild(Style.Corner(Style.Pill(key, Style.KeyPill, Style.Line, 10), 1, 1, 8));
+        if (key != null) button.AddChild(Style.Corner(Style.Pill(key, Style.KeyPill, Style.Line, 10), 1, 1, 8));
         return button;
     }
 
     /// <summary>
-    /// A hotbar slot: a click selects it, a double click uses its item, a right click empties it and Ctrl or Shift stores its item in the building open.
+    /// A hotbar slot: a left click selects it, a right click or double left click uses it, and Ctrl or Shift stores its item in the building open.
     /// An item or building plan put on it from the cursor assigns that reference, and the stack goes back where it was.
     /// </summary>
     private ItemSlot HotbarButton(int slot) {
@@ -52,13 +55,16 @@ public partial class Hotbar : PanelContainer {
             Takes = held => held.Item is string id && (world.Data.Items.ContainsKey(id) || world.Data.IsBuilding(id)),
             // A held stack binds itself to the slot (World.BindHeld); a plan is only named there.
             Put = (held, _) => {
-                if (held.Stack is HeldStack stack) { world.FromHeldStack(() => world.SetHotbar(slot, stack.Item)); Sound(); } else SetHotbar(slot, held.Plan!);
+                if (held.Stack is HeldStack stack) world.FromHeldStack(() => world.SetHotbar(slot, stack.Item));
+                else world.SetHotbar(slot, held.Plan!);
+                kit.Sounds.Play("putting_items_on_hotbar");
+                kit.Refresh();
                 held.Release();
             },
             Click = () => Select(slot),
             Use = () => Use(slot),
             Batch = () => Store(slot),
-            RightClick = () => SetHotbar(slot, ""),
+            RightClick = () => Use(slot),
         };
         button.CustomMinimumSize = new Vector2(56, 56);
         Style.Skin(button, Style.SlotNormal, Style.SlotHover, Style.SlotPressed);
@@ -108,7 +114,7 @@ public partial class Hotbar : PanelContainer {
                 : count == 1 && world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
-            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}\nLMB: select · Double LMB: use · RMB: empty";
+            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}\nLMB: select · RMB or Double LMB: use";
             // The selected slot gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.SlotWanted : Style.SlotNormal);
@@ -142,7 +148,7 @@ public partial class Hotbar : PanelContainer {
         Select(slot);
     }
 
-    /// <summary>A double click on a slot: uses its stack's item, or else selects the slot.</summary>
+    /// <summary>Uses the slot's stack or selects the slot when its item has no direct use.</summary>
     private void Use(int slot) {
         string id = world.HotbarItem(slot);
         if (world.HotbarCount(slot) == 0 || !UseItem(id, world.HotbarStack(slot))) Select(slot);
@@ -188,8 +194,8 @@ public partial class Hotbar : PanelContainer {
         panel.Close();
     }
 
-    /// <summary>Whether a left click on the ground does something with this item selected on the hotbar: drink, eat, light or swing.</summary>
-    public bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || id == "torch"
+    /// <summary>Whether this item can be eaten, drunk, lit or swung by right-clicking open ground.</summary>
+    private bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || id == "torch"
         || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer";
 
     /// <summary>Uses the item selected on the hotbar toward a point on the ground; items without a use do nothing.</summary>
@@ -199,11 +205,4 @@ public partial class Hotbar : PanelContainer {
         else if (id == "torch") world.UseTorch(at - world.Player);
         else world.Attack(at - world.Player);
     }
-
-    private void SetHotbar(int slot, string id) {
-        world.SetHotbar(slot, id);
-        if (id != "") Sound(); else kit.Refresh();
-    }
-
-    private void Sound() { kit.Sounds.Play("putting_items_on_hotbar"); kit.Refresh(); }
 }

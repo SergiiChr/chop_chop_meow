@@ -36,7 +36,8 @@ public partial class Game {
         await TestClean(CheckRecipeGroupsCloseAndOpenOnAClick);
         await TestClean(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
         await TestClean(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
-        await TestClean(CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce);
+        await TestClean(CheckCraftingLeavesTheRecipeMapOnTheBottomBar);
+        await TestClean(CheckRecipeMapOpensFromTheBottomBarAndShowsEveryItemOnce);
         await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
         await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
         await TestClean(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
@@ -409,26 +410,33 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
     }
 
-    /// <summary>The crafting menu's map button opens the recipe map with every item on it once, those the settlement has had drawn as known; Escape closes it.</summary>
-    private async Task CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce() {
-        await CloseWithEsc();
+    /// <summary>Opening crafting leaves the recipe map on its own button in the bottom bar.</summary>
+    private async Task CheckCraftingLeavesTheRecipeMapOnTheBottomBar() {
         await KeyStroke(Key.C);
-        await Click(Named("open_map")!);
-        Require(recipeMap.Visible, "The crafting menu's map button must open the recipe map.");
+        Require(ShownPage() == "Crafting" && Named("open_map") == null, "Crafting should open without a recipe map button.");
+        Require(hotbar.FindChild("map", true, false) is Button map && map.IsVisibleInTree(), "The bottom bar should still offer the recipe map.");
+        await CloseWithEsc();
+    }
+
+    /// <summary>The bottom bar opens the map directly from the world, with every item once and those the settlement has had drawn as known.</summary>
+    private async Task CheckRecipeMapOpensFromTheBottomBarAndShowsEveryItemOnce() {
+        await CloseWithEsc();
+        var map = hotbar.FindChild("map", true, false) as Button;
+        Require(map != null, "The bottom bar must offer a recipe map icon.");
+        await Click(map!);
+        Require(recipeMap.Visible && !panel.Visible && !bag.Visible, "The icon must open the recipe map directly from the world.");
         Require(world.Data.Items.Keys.Where(id => !GameData.OffTheMap(id)).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
         Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as not made yet.");
         Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources") && HasLabel(recipeMap, "Hunt animals"), "The map must name its marks and where raw meat comes from.");
         await KeyStroke(Key.Escape);
-        Require(!recipeMap.Visible && ShownPage() == "Crafting", "Escape must close the map and leave the crafting menu open.");
-        await CloseWithEsc();
+        Require(!recipeMap.Visible && !panel.Visible && !bag.Visible, "Escape must close the map and return to the world.");
     }
 
     /// <summary>On the recipe map a click on a chip goes to its item and lights it up for a moment, a click on an item shows its details, and Show leaves the map for where it is made.</summary>
     private async Task CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation() {
         await CloseWithEsc();
         var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
-        await KeyStroke(Key.C);
-        await Click(Named("open_map")!);
+        await Click((Button)hotbar.FindChild("map", true, false));
         var coal = recipeMap.NodeOf("coal")!;
         await Click((Control)recipeMap.NodeOf("steel_bar")!.FindChild("also_coal", true, false));
         Require(coal.Lit, "A click on the steel bar's coal chip must light coal up.");
@@ -450,7 +458,7 @@ public partial class Game {
     private async Task CheckGameGoesOnUnderTheOpenRecipeMap() {
         await CloseWithEsc();
         await KeyStroke(Key.C);
-        await Click(Named("open_map")!);
+        await Click((Button)hotbar.FindChild("map", true, false));
         var stew = recipeMap.NodeOf("canned_meat_stew")!;
         Require(!stew.Known, "Canned stew nobody has made must be drawn as not made yet.");
         float opened = world.Time;
@@ -463,6 +471,7 @@ public partial class Game {
         await Holding(Key.D, () => Seconds(.3));
         Require(world.Player.DistanceTo(stood) < .01f, "A walking key held under the map must not move the player.");
         await KeyStroke(Key.Escape);
+        Require(!recipeMap.Visible && ShownPage() == "Crafting", "Escape must leave the previous panel open.");
         await CloseWithEsc();
     }
 

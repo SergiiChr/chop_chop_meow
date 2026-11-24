@@ -24,6 +24,7 @@ public partial class Game : Node, IGameFlow {
     private Corner corner = null!;
     private MessageStack messages = null!;
     private NeedsPlate needsPlate = null!;
+    private Button layerButton = null!;
     private DamageEdges damageEdges = null!;
     private ModeLabel modeLabel = null!;
     private DeathLabel deathLabel = null!;
@@ -159,7 +160,17 @@ public partial class Game : Node, IGameFlow {
         ui.AddChild(panel.Aside); ui.AddChild(panel); ui.AddChild(bag);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        needsPlate = new NeedsPlate(kit, moves, damageEdges, cursor); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
+        layerButton = kit.HeaderButton("layers", "Layer · Switch between the surface and underground", player.ToggleLayer, Style.TabRound, "layer");
+        layerButton.CustomMinimumSize = new Vector2(48, 48);
+        layerButton.AddThemeConstantOverride("icon_max_width", 24);
+        layerButton.ToggleMode = true;
+        Style.Skin(layerButton, Style.TabRound.Normal, Style.TabRound.Hover, Style.TabActive.Normal);
+        needsPlate = new NeedsPlate(kit, moves, damageEdges, cursor);
+        needsPlate.ItemRectChanged += () => {
+            var status = needsPlate.GetRect();
+            layerButton.Position = new Vector2(status.Position.X + 12, status.End.Y + 8);
+        };
+        ui.AddChild(needsPlate); ui.AddChild(layerButton); ui.AddChild(damageEdges);
         recipeMap = new RecipeMap(kit, panel); panel.Map = recipeMap;
         startMenu = new StartMenu(kit, saves, net, panel, () => menu.Close(), this);
         menu = new PauseMenu(kit, net, startMenu, this, recipeMap);
@@ -183,6 +194,8 @@ public partial class Game : Node, IGameFlow {
         menu.RefreshGoalLog();
         panel.Refresh();
         hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
+        bool below = player.Layer == Layer.Underground;
+        if (layerButton.ButtonPressed != below) layerButton.SetPressedNoSignal(below);
     }
     private void ConnectNet() {
         net.Said += Notify;
@@ -272,10 +285,8 @@ public partial class Game : Node, IGameFlow {
     /// <summary>Opens a game this window started: a new one on the welcome page, a loaded one on the backpack.</summary>
     private void Begin(int slot) {
         saves.Slot = Math.Max(slot, 0);
-        if (slot < 0) {
-            panel.Open(Page.Welcome);
-            Notify("Welcome. Press I to see the guide.");
-        } else { panel.Open(Page.Backpack); Notify("Settlement loaded."); }
+        if (slot < 0) panel.Open(Page.Welcome);
+        else { panel.Open(Page.Backpack); Notify("Settlement loaded."); }
     }
 
     public void ShowStart() { LeaveServer(); session = new Session.None(); world.NewGame(); startMenu.ShowStart(); }
@@ -384,7 +395,6 @@ public partial class Game : Node, IGameFlow {
                     if (!cursor.Empty) cursor.Release(); else if (!player.TryCancelMode() && !player.CancelEntry()) { if (panel.Visible || bag.Visible) panel.Close(); else menu.Open(); }
                     RefreshLive(); break;
                 case Key.B: panel.Open(Page.Build); break;
-                case Key.I: panel.Toggle(Page.Guide); break;
                 case Key.H: panel.Toggle(Page.Crew); break;
                 case Key.C:
                     if (!player.RotatePlacement(-1, OverInterface)) panel.Toggle(Page.Craft);
@@ -396,7 +406,6 @@ public partial class Game : Node, IGameFlow {
                 case Key.F5: saves.QuickSave(startMenu); break;
                 case Key.F9: saves.QuickLoad(startMenu); break;
                 case >= Key.Key1 and <= Key.Key9: hotbar.Select((int)(key.PhysicalKeycode - Key.Key1)); break;
-                case Key.E: player.InspectNearest(); break;
                 case Key.Space: player.Swing(); break;
             }
         }
@@ -430,25 +439,21 @@ public partial class Game : Node, IGameFlow {
         view.Placing = overInterface && player.Mode is ClickMode.Dig ? null : player.Mode.Placing;
         view.PlacingRotation = player.Mode.Rotation;
         view.DiggingAt = player.DiggingAt;
-        view.Underground = player.Mode is ClickMode.Remove { Underground: true } || view.Placing == ThingKind.SteelPiping;
+        view.Layer = player.Layer;
         if (player.Mode is ClickMode.Build { Kind: ThingKind.SteelPiping } pipe) view.PlacingPipeShape = pipe.Shape;
         view.Mouse = looking ? GetViewport().GetVisibleRect().GetCenter() : GetViewport().GetMousePosition();
         // A recording leaves the pointer out: wherever it sits on the desktop, nothing in the world shows as hovered.
         bool recording = Engine.GetWriteMoviePath() != "";
         bool pointing = !recording && (!view.FirstPerson || looking || !overInterface && !kit.Paused);
         float thingDistance = float.MaxValue;
-        var hover = pointing ? view.Pick(view.Mouse, out thingDistance) : null;
-        var worker = pointing ? view.PickWorker(view.Mouse, thingDistance) : null;
+        var hover = pointing && view.Layer == Layer.Surface ? view.Pick(view.Mouse, out thingDistance) : null;
+        var worker = pointing && view.Layer == Layer.Surface ? view.PickWorker(view.Mouse, thingDistance) : null;
+        view.PointedPipe = pointing && !overInterface && view.Layer == Layer.Underground && player.Mode is ClickMode.Normal ? view.PickPipe(view.Mouse) : null;
         view.Hover = worker != null && view.FirstPerson ? 0 : hover?.Id ?? 0;
         view.HoverWorker = worker?.Id ?? 0;
         view.Removal = overInterface ? Removal.None : player.RemovalAt(hover, view.Mouse);
-        view.PipePreviewTile = null;
-        view.PointedPipe = null;
-        if (view.Underground && !overInterface) {
-            var tile = Terrain.TileAt(view.ToWorld(view.Mouse, PipeGround.FloorY));
-            if (view.Placing == ThingKind.SteelPiping) view.PipePreviewTile = tile;
-            if (world.SteelPipes.Laid(tile) && world.Explored(tile)) view.PointedPipe = tile;
-        }
+        view.PipePreviewTile = view.Placing == ThingKind.SteelPiping && !overInterface
+            ? Terrain.TileAt(view.ToWorld(view.Mouse, PipeGround.FloorY)) : null;
         uiClock += dt;
         if (uiClock > .2f || net.AwaitingAnswer && net.ShownUpdate != refreshedUpdate) {
             uiClock = 0; refreshedUpdate = net.ShownUpdate; RefreshLive();

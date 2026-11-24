@@ -2,12 +2,16 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
+using static Checks;
 using static SetupSteps;
 
 namespace ChopChopMeow;
 
 public partial class Game {
-    private Task RunPanelUIChecks() => TestClean(CheckPanelPagesRefreshWithoutAllocating);
+    private async Task RunPanelUIChecks() {
+        await TestClean(CheckPanelPagesRefreshWithoutAllocating);
+        await TestClean(CheckMouseWheelOverPanelDoesNotZoom);
+    }
 
     /// <summary>
     /// Every panel page, refreshed again and again while what it shows stays the same, allocates nothing:
@@ -38,5 +42,21 @@ public partial class Game {
         var placed = new[] { chest, pile, forge, furnace, fire, hut, sign, farm, packer };
         RemoveThings(Hosted, t => placed.Contains(t) || t.Kind == ThingKind.Grave);
         await Frames();
+    }
+
+    private async Task CheckMouseWheelOverPanelDoesNotZoom() {
+        float zoom = view.Zoom;
+        await CloseWithEsc();
+        foreach (var (page, key) in new[] { (Page.Backpack, Key.Tab), (Page.Build, Key.B), (Page.Craft, Key.C) }) {
+            await KeyStroke(key);
+            // The backpack shows only its drawer, so the wheel goes over that.
+            var box = layer.Transform * (page == Page.Backpack ? bag.GetGlobalRect() : panel.GetGlobalRect());
+            foreach (var spot in new[] { box.GetCenter(), box.Position + new Vector2(30, 30), box.End - new Vector2(30, 30) }) await Wheel(spot);
+            Require(view.Zoom == zoom, $"The mouse wheel over the {page} panel must not zoom the world.");
+        }
+        await CloseWithEsc();
+        await Wheel(GetViewport().GetVisibleRect().GetCenter());
+        Require(view.Zoom < zoom, "The mouse wheel over the world must still zoom.");
+        await Wheel(GetViewport().GetVisibleRect().GetCenter(), MouseButton.WheelUp);
     }
 }
