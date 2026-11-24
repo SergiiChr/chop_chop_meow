@@ -652,7 +652,7 @@ public partial class WorldView : Node3D {
         UpdateCounterHits(dt);
         UpdateEffects(dt);
         UpdateMarkers();
-        coast.Update(World.Beach, terrainView);
+        coast.Update(World.Beach, World.GravelPaths, terrainView);
         if (Layer == Layer.Underground) {
             surfacePeople.Clear();
             AddFooting(playerRig);

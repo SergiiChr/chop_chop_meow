@@ -91,7 +91,7 @@ public sealed class WorldUpdates {
 
     public Snapshot Empty() => spare.Count > 0 ? spare.Pop() : new Snapshot();
 
-    /// <summary>The world as entries: each thing, worker, wolf, trade order and player under its id, the rest of the world, what each worker is doing, the gravel paths, steel pipes and packed crates.</summary>
+    /// <summary>The world as entries: each thing, worker, wolf, trade order and player under its id, the rest of the world, what each worker is doing, the gravel paths, stripped sand, steel pipes and packed crates.</summary>
     public Snapshot Capture(World world) {
         var s = world.S;
         world.NumberWolvesAndOrders();

@@ -919,6 +919,7 @@ The server checks for dry sand and room for all 10 units of sand before starting
 A completed dig strips a one-meter square.
 A rounded rim and sloping walls show the depth of the cut, with the compost pile's soil texture at its bottom.
 Cuts that share an edge join across a continuous floor. The remaining rim rounds turns in either direction.
+Gravel laid over a cut hides it until taken up. The tide still refills the cut while it is covered.
 The view shows less of the floor behind the near rim at shallower camera angles.
 Only the tile index is saved and shared with guests.
 The sea recedes slightly past its original waterline at the new moon and covers the sand strip at the full moon.

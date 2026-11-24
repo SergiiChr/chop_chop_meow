@@ -58,7 +58,7 @@ internal static class ShorelineAppearance {
         parent.AddChild(new MeshInstance3D { Name = "SoftLakeBank", Mesh = tool.Commit(), MaterialOverride = BankMaterial(ShoreLook.Rocks), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
-    public static CoastView BuildCoast(Node3D parent, Node3D warm, bool still) {
+    public static CoastView BuildCoast(Node3D parent, Node3D warm, Texture2D gravel, bool still) {
         var bank = new SurfaceTool(); bank.Begin(Mesh.PrimitiveType.Triangles);
         const float step = .75f;
         void At(float across, float t) {
@@ -74,6 +74,7 @@ internal static class ShorelineAppearance {
             }
         var sand = BankMaterial(ShoreLook.Sand);
         sand.SetShaderParameter("high_tide_margin", Beach.CrestMargin);
+        sand.SetShaderParameter("coastal_gravel", gravel);
         parent.AddChild(new MeshInstance3D { Name = "SoftCoastalBank", Mesh = bank.Commit(), MaterialOverride = sand, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 
         // The water mesh extends inland past the widest bank. Its shader cuts the wandering edge as the tide moves.

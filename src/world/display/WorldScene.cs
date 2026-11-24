@@ -18,7 +18,7 @@ public partial class WorldView {
         var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
         terrainView = new TerrainView(parent, camera, sun, grass, disturbanceTexture, sceneryShadeTexture, objectShadeTexture, World.Player);
         // Sea and its feathered bank follow the coastline at the valley's mouth.
-        coast = ShorelineAppearance.BuildCoast(parent, warm, EnvironmentReview);
+        coast = ShorelineAppearance.BuildCoast(parent, warm, gravelPaths.Texture, EnvironmentReview);
         LakeDressing.Build(parent, EnvironmentReview);
         foreach (var cliff in Cliff.All) BuildCliff(parent, cliff);
         foreach (var den in WolfPatrols.Dens) BuildDen(parent, den);

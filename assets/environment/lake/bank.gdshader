@@ -19,6 +19,7 @@ uniform float shore_wander;
 uniform float coastal_tide;
 uniform float low_tide_shift;
 uniform float high_tide_margin;
+uniform sampler2D coastal_gravel : hint_default_black, filter_linear, repeat_disable;
 varying vec2 world_at;
 
 void vertex() {
@@ -48,5 +49,7 @@ void fragment() {
     float fray = dot(color, vec3(0.3, 0.59, 0.11)) - 0.45;
     float inland = distance + (patches * 0.6 + fray * 1.2) * grass_fade / 2.2 + bites * shore_wander;
     float sea = low_tide_shift - 0.5 * shore_wander;
-    ALPHA = smoothstep(sea - 0.3, sea + 0.06, distance) * (1.0 - smoothstep(UV.y - grass_fade, UV.y, inland));
+    float gravel = texture(coastal_gravel, (world_at + 0.5) / 216.0).r;
+    float sand = 1.0 - smoothstep(0.46, 0.54, gravel);
+    ALPHA = sand * smoothstep(sea - 0.3, sea + 0.06, distance) * (1.0 - smoothstep(UV.y - grass_fade, UV.y, inland));
 }

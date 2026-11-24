@@ -16,7 +16,8 @@ internal sealed class CoastView {
     private readonly Image cornerImage;
     private readonly ImageTexture cornerTexture;
     private readonly MultiMesh soil;
-    private readonly HashSet<int> drawn = [];
+    private readonly HashSet<int> stripped = [];
+    private int gravelRevision = -1;
     private float lastTide = -1;
 
     internal CoastView(Node3D parent, Node3D warm, Node3D water, ShaderMaterial bank, ShaderMaterial waves) {
@@ -50,7 +51,7 @@ internal sealed class CoastView {
         return new PlaneMesh { Size = Vector2.One, Material = material };
     }
 
-    internal void Update(Beach beach, TerrainView terrain) {
+    internal void Update(Beach beach, GravelPaths paths, TerrainView terrain) {
         float tide = beach.Tide;
         if (lastTide < 0) {
             bank.SetShaderParameter(LowShift, Terrain.LowTideShift);
@@ -64,12 +65,15 @@ internal sealed class CoastView {
             water.Position = Vector3.Up * Mathf.Lerp(LowLevel, HighLevel, tide);
         }
         var squares = beach.StrippedSquares;
-        if (drawn.SetEquals(squares)) return;
-        drawn.Clear(); drawn.UnionWith(squares);
+        int currentGravel = paths.Revision;
+        if (gravelRevision == currentGravel && stripped.SetEquals(squares)) return;
+        gravelRevision = currentGravel;
+        stripped.Clear(); stripped.UnionWith(squares);
         Array.Clear(corners);
         int slot = 0;
         foreach (int index in squares) {
             int x = index % Terrain.Size, z = index / Terrain.Size;
+            if (paths.Laid(x, z)) continue;
             int corner = z * CornerMapSize + x;
             // At each corner the four tile bits go across x, then down z.
             corners[corner] |= 8;
