@@ -362,7 +362,7 @@ public sealed partial class World {
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
         barrelHaul = new BarrelHaul(this, barrels); bedtimeWater = new BedtimeWater(this);
-        hauling = new Hauling(this, barrelHaul); gathering = new Gathering(this); waterGathering = new WaterGathering(this); crafting = new Crafting(this); packCraft = new PackCraft(this);
+        hauling = new Hauling(this, barrelHaul); takeBack = new TakeBack(this); gathering = new Gathering(this); waterGathering = new WaterGathering(this); crafting = new Crafting(this); packCraft = new PackCraft(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         isStation = Array.ConvertAll(Kinds.All, kind => Array.IndexOf(stationKinds, kind) >= 0);
         if (generate) NewGame();
@@ -381,6 +381,7 @@ public sealed partial class World {
     private readonly BarrelHaul barrelHaul;
     // The jobs several kinds of place offer, and the places' own versions of them: the lake's gathering and the packing station's crafting.
     private readonly Hauling hauling;
+    private readonly TakeBack takeBack;
     private readonly Gathering gathering, waterGathering;
     private readonly Crafting crafting, packCraft;
     private readonly BedtimeWater bedtimeWater;
@@ -1196,14 +1197,6 @@ public sealed partial class World {
         if (DoorCheck.Waking) { SayToAll("You are awakened by the noise outside."); return; }
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
-    /// <summary>Seconds of burning a campfire with no wood is kept at while workers sit at it, so it goes out soon after they leave.</summary>
-    private const float KindledBurn = 1;
-    /// <summary>Keeps a campfire a worker sits at on their break burning even with no wood left; one with wood burns it as usual.</summary>
-    internal void Kindle(Thing fire) {
-        if (fire.Burn >= KindledBurn) return;
-        if (fire.Burn <= 0) Play("start_fire", fire.Pos);
-        fire.Burn = KindledBurn;
-    }
     /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
     public const float FireReach = 5.3f;
     /// <summary>Burning campfires keep wolves out of their light, unless a wolf is already chasing the player.</summary>
@@ -1772,7 +1765,7 @@ public sealed partial class World {
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
     private enum HoldRefusal { None, NotUsed, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly }
-    /// <summary>A tool station holds tools and water vessels, a pile one resource, compost what rots and a campfire wood.</summary>
+    /// <summary>A station holds by hand only what its recipe uses or makes, a tool station tools and water vessels, a pile one resource, compost what rots and a campfire wood.</summary>
     private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
         ThingKind.Hut when Barrel.Is(item) => HoldRefusal.None,
         _ when Barrel.Is(item) && (t.Kind != ThingKind.Pile || t.Compost) => HoldRefusal.Barrel,

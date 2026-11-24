@@ -13,6 +13,7 @@ public static class StorageChecks {
         Test(CheckEverythingStandsAloneInItsRow, data);
         Test(CheckANewPileTakesNothingFromWorkersUntilItsResourceIsSet, data);
         Test(CheckATradingPostWithEverythingAsksForEveryCrateItBuys, data);
+        Test(CheckCompostWithEverythingTakesWhatComposts, data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
         Test(CheckFilterNamesEachEntryOnceInTheOrderNamed);
         Test(CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest, data);
@@ -124,5 +125,15 @@ public static class StorageChecks {
         nearestGeneral.Inventory.Filter("wood", true, true);
         Require(world.SourceFor("wood", new Vector2(10, 10))?.Id == nearestGeneral.Id,
                 "workers should use a chest once its output filter allows withdrawal");
+    }
+
+    private static void CheckCompostWithEverythingTakesWhatComposts(GameData data) {
+        var world = EmptyWorld(data);
+        var compost = world.Add(ThingKind.Pile, world.Player + new Vector2(3, 0));
+        Require(world.SetCompost(compost, true), "an empty pile with no filter should turn into compost");
+        world.SetFilter(compost, Inventory.Everything, false, true);
+        Require(compost.Inventory.InputFilter.SequenceEqual(new[] { Inventory.Everything }), "compost should offer Everything");
+        Require(world.DepositFor("leaves", world.Player) == compost && world.DepositFor("wood", world.Player) == null,
+            "compost set to Everything should take leaves but still no wood");
     }
 }

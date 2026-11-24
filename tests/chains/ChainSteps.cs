@@ -6,6 +6,7 @@ using static CabinSteps;
 using static PlayerSteps;
 using static SetupSteps;
 using static WorkerSteps;
+using static WorldSteps;
 
 /// <summary>
 /// Builds the lakeside settlement of the production chain check one chain at a time.
@@ -37,7 +38,7 @@ internal sealed class ChainSite(World world) {
 
     /// <summary>
     /// The player's cabin far away, the trading post that sells each product by cart, the tool rack and a fire.
-    /// Storage follows: a chest asking for each made material, a pile of empty bottles and three open piles.
+    /// Storage follows: a chest asking for each made material, a pile of empty bottles and a chest taking everything else.
     /// Returns the chest that takes raw meat.
     /// </summary>
     public Thing AddSettlement(string[] products) {
@@ -49,16 +50,17 @@ internal sealed class ChainSite(World world) {
         foreach (string product in products) world.SetFilter(sign, World.CrateOf(product), false, true);
         world.SetAutoSell(sign, true);
         // A tool station holds four tools, so the crew's six hang on two.
-        var rack = Place(ThingKind.Toolstation);
+        // Both racks take tools in, so workers put theirs back.
+        var rack = TakeEverything(world, Place(ThingKind.Toolstation));
         rack.Inventory.Add("steel_axe", 2); rack.Inventory.Add("steel_pick", 2);
-        var spare = Place(ThingKind.Toolstation);
+        var spare = TakeEverything(world, Place(ThingKind.Toolstation));
         spare.Inventory.Add("steel_pick", 1); spare.Inventory.Add("rake", 1); spare.Inventory.Add(Bucket.Item, 2);
         Place(ThingKind.Campfire);
 
         foreach (string item in new[] { "planks", "crate", "iron_bar", "tin_bar", "tin_sheet", "steel_bar", "steel_parts", "wood_parts", "tin_can",
                      "raw_meat", "meat_stew", "canned_meat_stew", "wheat", "wheat_seeds", "grass", "fertilizer", "flour", "dough", "bread", "steel_pick" }) Store(item);
         var empties = Place(ThingKind.Pile); empties.Inventory.Add("empty_bottle", 8);
-        Place(ThingKind.Pile); Place(ThingKind.Pile); Place(ThingKind.Pile);
+        TakeEverything(world, Place(ThingKind.Chest));
         return world.Things.Single(t => t.Kind == ThingKind.Chest && t.Inventory.InputFilter.Contains("raw_meat"));
     }
 

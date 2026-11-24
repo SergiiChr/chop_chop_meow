@@ -21,6 +21,7 @@ public static class MineChecks {
         Test(CheckMinersBringOreOutAndStopWhenOutputIsFull, data);
         Test(CheckOnlyAvailableMinersUnload, data);
         Test(CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload, data);
+        Test(CheckAMinerHoldingALoadNothingTakesDoesNotMine, data);
         Test(CheckFullMineUnloadsIntoAPackingStationPackingItsOre, data);
         Test(CheckMiningIsSlowerThanDeposits, data);
         Test(CheckEndGoalsWantAWorkingMineOnEveryOre, data);
@@ -221,6 +222,17 @@ public static class MineChecks {
         var miner = Staff(world, mine, JobKind.Mine);
         Work(world, 20);
         Require(rack.Inventory["steel_pick"] == 1 && miner.Tool == "", "a miner should not fetch a pickaxe for a full mine with nowhere to unload");
+    }
+
+    /// <summary>Mining moves the mine's output into the miner's hands, so a miner holding a load nothing takes does not mine.</summary>
+    private static void CheckAMinerHoldingALoadNothingTakesDoesNotMine(GameData data) {
+        var world = FundedWorld(data);
+        var mine = MarkMine(world); OpenMine(mine);
+        var miner = Staff(world, mine, JobKind.Mine);
+        miner.Tool = "steel_pick"; miner.Bag.Add("wood", 6);
+        Work(world, 20);
+        Require(miner.Bag["wood"] == 6 && mine.Output!.Count == 0 && miner.WorkState != WorkerWorkState.Underground,
+            $"a miner holding wood nothing takes should not mine: {miner.Status}, the mine holds {mine.Output!.Count}");
     }
 
     private static void CheckFullMineUnloadsIntoAPackingStationPackingItsOre(GameData data) {

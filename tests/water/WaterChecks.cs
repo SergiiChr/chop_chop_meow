@@ -26,6 +26,7 @@ public static class WaterChecks {
         Test(CheckFullBottleQueuedForOneLiterKeepsTheRest, data);
         Test(CheckSwitchingRecipeTakesWaterIntoBottles, data);
         Test(CheckStationTakesBottlesForItsWater, data);
+        Test(CheckABucketPouredByHandFillsAStationsWaterToAStack, data);
         Test(CheckDismantledStationFillsBottles, data);
     }
 
@@ -154,6 +155,17 @@ public static class WaterChecks {
         Require(world.Transfer(table.Inventory, world.Backpack, Water.Liquid, 10) == 3 && world.Backpack[Water.Full] == 3 && table.Inventory[Water.Liquid] == 1,
             "taking more must fill bottles while they have room, and leave the rest on the table");
         Require(world.Backpack[Water.Liquid] == 0, "water must never lie loose in the backpack");
+    }
+
+    /// <summary>A station's water slot holds one stack of liters, and a bucket poured by hand fills it to that and keeps the rest.</summary>
+    private static void CheckABucketPouredByHandFillsAStationsWaterToAStack(GameData data) {
+        var world = new World(data, false);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 60);
+        EmptyBackpack(world); Give(world, Bucket.AtFill(Bucket.Capacity), 1);
+        world.Transfer(world.Backpack, table.Inventory, Bucket.AtFill(Bucket.Capacity), 1);
+        Require(table.Inventory[Water.Liquid] == 64 && world.Backpack[Bucket.AtFill(6)] == 1,
+            $"a full bucket poured into a table holding 60 liters should fill it to 64 and keep 6: the table holds {table.Inventory[Water.Liquid]}");
     }
 
     private static void CheckDismantledStationFillsBottles(GameData data) {

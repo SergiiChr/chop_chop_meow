@@ -198,7 +198,7 @@ internal sealed class BreakSeats(World world) {
             LunchStatus(w);
         }
         w.Pos = seat.Position;
-        if (seat.Fire != null) world.Kindle(seat.Fire);
+        if (seat.Fire != null) Kindle(seat.Fire);
         w.LunchHeading = (seat.Center - seat.Position).Angle();
         w.WorkState = seat.Fire != null && w.Id % 2 == 0 ? WorkerWorkState.Perching : WorkerWorkState.Resting;
     }
@@ -228,5 +228,15 @@ internal sealed class BreakSeats(World world) {
         float nearest = float.MaxValue;
         foreach (var seat in reserved.Values) nearest = Math.Min(nearest, position.DistanceSquaredTo(seat.Position));
         return nearest;
+    }
+
+    /// <summary>Seconds of burning a campfire with no wood is kept at while workers sit at it, so it goes out soon after they leave.</summary>
+    private const float KindledBurn = 1;
+
+    /// <summary>Keeps a campfire a worker sits at on their break burning even with no wood left; one with wood burns it as usual.</summary>
+    private void Kindle(Thing fire) {
+        if (fire.Burn >= KindledBurn) return;
+        if (fire.Burn <= 0) world.Play("start_fire", fire.Pos);
+        fire.Burn = KindledBurn;
     }
 }

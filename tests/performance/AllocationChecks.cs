@@ -57,6 +57,20 @@ public static class AllocationChecks {
         Check("tick: chest hauler with nothing to carry", () => { storing.Tick(1 / 60f); Fed(storing); });
         Require(storeHauler.Bag.Count == 0 && store.Inventory["wood"] == 10, "the chest's hauler should have had nothing to carry through the ticks");
 
+        var resting = FundedWorld(data);
+        var fire = resting.Add(ThingKind.Campfire, resting.Player + new Vector2(4, 0));
+        var idle = new[] { AddWorker(resting, fire.Pos + new Vector2(2, 2)), AddWorker(resting, fire.Pos + new Vector2(-2, 2)) };
+        Check("tick: idle workers sitting at a campfire", () => { resting.Tick(1 / 60f); Fed(resting); }, warmup: 1200);
+        Require(idle.All(w => w.WorkState is WorkerWorkState.Resting or WorkerWorkState.Perching) && fire.Burn > 0, "the idle workers should sit at the campfire, which burns with no wood");
+
+        var stuck = FundedWorld(data);
+        var stoneOnly = stuck.Add(ThingKind.Chest, stuck.Player + new Vector2(3, 0));
+        stuck.SetFilter(stoneOnly, "stone", true, true);
+        var holder = AddWorker(stuck, stuck.Player + new Vector2(0, 3));
+        holder.Bag.Add("wood", 6);
+        Check("tick: worker holding a load nothing takes", () => { stuck.Tick(1 / 60f); Fed(stuck); }, warmup: 600);
+        Require(holder.Bag["wood"] == 6 && holder.Status.Contains("no accepting storage"), "the worker should hold the wood nothing takes through the ticks");
+
         // The host sends an update thirty times a second, against one the guest confirmed a few updates back, as over a long connection, and the guest merges it.
         // Only entries that changed are new arrays, on the host and again in the guest's merge: about seven worker and station entries an update in a working settlement (measured 10.5 KB an update).
         var hosting = Settlement(data);
