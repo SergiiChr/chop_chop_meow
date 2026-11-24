@@ -135,9 +135,9 @@ UI and input:
 | File | Owns |
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
-| `src/menus/PauseMenu.cs` | The pause menu with the Quest Log, and hosting |
-| `src/quests/model/Quests.cs` | Quest names, details and the conditions that reveal and complete each quest |
-| `src/quests/display/QuestLog.cs` | The active and completed quests, quest details and item links to the recipe map |
+| `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, and hosting |
+| `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
+| `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
@@ -618,18 +618,23 @@ During the respawn countdown, a player with no cabin anywhere in the world is of
 It advances normal simulation through dawn, including needs, trades, production and wages.
 In multiplayer it is available only when everyone is downed; a living player prevents a shared time skip.
 
-### Quest Log
+### Goal Log
 
-`Quests` reads the settlement's milestones and its history of obtained items to decide which tasks are visible and
-which are complete. The initial tasks can be completed in any order. Building the bench or stone furnace reveals a related
-task. The first steel bar reveals Too soft and the first steel parts reveal Infinite power.
+`Goals` reads the settlement's milestones and its history of obtained items to decide which goals are visible and
+which are complete.
+The initial goals can be completed in any order.
+Building the bench or stone furnace reveals a related goal.
+The first steel bar reveals Too soft and the first steel parts reveal Infinite power.
 The first time a player sees a mineable ore deposit, the server records the discovery in `SaveState.Milestones` and
-Steel tools appears for the settlement. Finding loose ore on the ground leaves that quest hidden.
+Steel tools appears for the settlement.
+Finding loose ore on the ground leaves that goal hidden.
 
-Infinite power is complete when a mine is open on every ore in `Cliff.Ores`.
-NEET is complete after `Goals.ProfitDays` consecutive days of at least `Goals.DailyProfit` profit.
-`SaveState.DayRevenue` collects returned sale coins. At dawn the wages charged are taken off and the result joins
-`SaveState.Profits`. Reaching the streak sets the `profit_week` milestone, which stays reached.
+Infinite power lists a mine and links to its item for each ore in `Cliff.Ores`.
+It is complete when a mine is open for every ore in that list.
+NEET is complete after `GoalsDef.ProfitDays` consecutive days of at least `GoalsDef.DailyProfit` profit.
+`SaveState.DayRevenue` collects returned sale coins.
+At dawn the wages charged are taken off and the result joins `SaveState.Profits`.
+Reaching the streak sets the `profit_week` milestone, which stays reached.
 The open mines and profit milestone together unlock the ending.
 
 ### Survival and needs

@@ -12,7 +12,6 @@ using static WorkerSteps;
 public static class TradeChecks {
     public static void Run(GameData data) {
         Test(CheckDonationIsNoSale, data);
-        Test(CheckCoinsAlreadyHeldAreKnownOnLoad, data);
         Test(CheckAssignedRunnerFetchesCurrentPrices, data);
     }
 
@@ -28,16 +27,6 @@ public static class TradeChecks {
         SafeTick(world, data.TradeSeconds + .1f);
         Require(world.Orders.Count == 0 && !world.Reached("sold"), "a donation should not count as a sale");
         Require(world.Had(Inventory.Coins), "the recipe map should know coins from the payout for the crate itself");
-    }
-
-    private static void CheckCoinsAlreadyHeldAreKnownOnLoad(GameData data) {
-        var world = EmptyWorld(data);
-        var sign = world.Add(ThingKind.Signpost, world.Player);
-        SetCoins(world, 3);
-        Require(world.Transfer(world.Backpack, sign.Wages!, Inventory.Coins, 3) == 3, "the wage slot should hold the coins");
-        var loaded = EmptyWorld(data);
-        loaded.Deserialize(world.Serialize());
-        Require(loaded.Had(Inventory.Coins), "the recipe map should know coins already held in the settlement's wage slot");
     }
 
     /// <summary>

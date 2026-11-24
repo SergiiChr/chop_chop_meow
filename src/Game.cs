@@ -163,7 +163,7 @@ public partial class Game : Node, IGameFlow {
         recipeMap = new RecipeMap(kit, panel); panel.Map = recipeMap;
         startMenu = new StartMenu(kit, saves, net, panel, () => menu.Close(), this);
         menu = new PauseMenu(kit, net, startMenu, this, recipeMap);
-        ui.AddChild(menu); ui.AddChild(menu.QuestDetails); ui.AddChild(recipeMap);
+        ui.AddChild(menu); ui.AddChild(menu.GoalDetails); ui.AddChild(recipeMap);
         ending = new EndingScreen(kit, panel.Close, this); ui.AddChild(ending);
         ui.AddChild(startMenu);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
@@ -180,7 +180,7 @@ public partial class Game : Node, IGameFlow {
         corner.Refresh(); deathLabel.Refresh(); modeLabel.Refresh(); recovery.Refresh();
         float messagesTop = Math.Max(56, modeLabel.OffsetTop + modeLabel.GetCombinedMinimumSize().Y + 10);
         if (messages.OffsetTop != messagesTop) messages.OffsetTop = messagesTop;
-        menu.RefreshQuestLog();
+        menu.RefreshGoalLog();
         panel.Refresh();
         hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
     }

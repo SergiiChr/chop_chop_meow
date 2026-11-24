@@ -4,13 +4,13 @@ using static Checks;
 using static SetupSteps;
 using static WorldSteps;
 
-/// <summary>Checks of discovering and completing quests.</summary>
+/// <summary>Checks of discovering and completing goals.</summary>
 public static class GoalChecks {
     public static void Run(GameData data) {
         Test(CheckADeliveriesJobMeetsTheGoalOfAssigningAJob, data);
         Test(CheckSeeingOreUnlocksSteelToolsAndSurvivesLoading, data);
         Test(CheckSteelToolsGoalWaitsForBothAHammerAndAPickaxe, data);
-        Test(CheckQuestsUnlockAndCompleteIndependently, data);
+        Test(CheckGoalsUnlockAndCompleteIndependently, data);
     }
 
     /// <summary>
@@ -34,15 +34,15 @@ public static class GoalChecks {
         var ore = world.Add(ThingKind.Iron, world.Player + Vector2.Right * (data.SightRadius + 5), 40);
         world.Add(ThingKind.LooseCoal, world.Player + Vector2.Right * 2, 1);
         world.Look();
-        Require(world.Quests.Status(QuestId.SteelTools) == QuestStatus.Hidden, "loose coal and an unseen deposit should leave Steel tools hidden");
+        Require(world.Goals.Status(GoalId.SteelTools) == GoalStatus.Hidden, "loose coal and an unseen deposit should leave Steel tools hidden");
         var home = world.Player;
         world.Player = ore.Pos;
         world.Look();
-        Require(world.Quests.Status(QuestId.SteelTools) == QuestStatus.Active, "seeing a mineable deposit should reveal Steel tools immediately");
+        Require(world.Goals.Status(GoalId.SteelTools) == GoalStatus.Active, "seeing a mineable deposit should reveal Steel tools immediately");
         world.Player = home;
         var loaded = EmptyWorld(data);
         loaded.Deserialize(world.Serialize());
-        Require(loaded.Quests.Status(QuestId.SteelTools) == QuestStatus.Active, "loading out of sight of ore should keep Steel tools visible");
+        Require(loaded.Goals.Status(GoalId.SteelTools) == GoalStatus.Active, "loading out of sight of ore should keep Steel tools visible");
     }
 
     private static void CheckSteelToolsGoalWaitsForBothAHammerAndAPickaxe(GameData data) {
@@ -50,30 +50,30 @@ public static class GoalChecks {
         world.Add(ThingKind.Coal, world.Player + Vector2.Right * 2, 40);
         world.Look();
         Achieve(world, "steel_pick");
-        Require(world.Quests.Status(QuestId.SteelTools) == QuestStatus.Active, "a steel pickaxe alone should leave Steel tools open");
+        Require(world.Goals.Status(GoalId.SteelTools) == GoalStatus.Active, "a steel pickaxe alone should leave Steel tools open");
         Achieve(world, "steel_hammer");
-        Require(world.Quests.Status(QuestId.SteelTools) == QuestStatus.Completed, "having had both tools should complete Steel tools");
+        Require(world.Goals.Status(GoalId.SteelTools) == GoalStatus.Completed, "having had both tools should complete Steel tools");
     }
 
-    private static void CheckQuestsUnlockAndCompleteIndependently(GameData data) {
+    private static void CheckGoalsUnlockAndCompleteIndependently(GameData data) {
         var world = EmptyWorld(data);
-        foreach (var id in new[] { QuestId.Trade, QuestId.SteelBar, QuestId.SteelParts, QuestId.Mines })
-            Require(world.Quests.Status(id) == QuestStatus.Hidden, $"{id} should be hidden in a fresh settlement");
+        foreach (var id in new[] { GoalId.Trade, GoalId.SteelBar, GoalId.SteelParts, GoalId.Mines })
+            Require(world.Goals.Status(id) == GoalStatus.Hidden, $"{id} should be hidden in a fresh settlement");
 
         Achieve(world, "bench", "furnace");
-        Require(world.Quests.Status(QuestId.Campfire) == QuestStatus.Active, "building stations should leave the campfire quest open");
-        Require(world.Quests.Status(QuestId.Bench) == QuestStatus.Completed, "the bench quest can be completed before the campfire");
-        Require(world.Quests.Status(QuestId.Trade) == QuestStatus.Active, "the bench should reveal Road to riches");
-        Require(world.Quests.Status(QuestId.SteelBar) == QuestStatus.Active, "the furnace should reveal Hotter than fire");
+        Require(world.Goals.Status(GoalId.Campfire) == GoalStatus.Active, "building stations should leave the campfire goal open");
+        Require(world.Goals.Status(GoalId.Bench) == GoalStatus.Completed, "the bench goal can be completed before the campfire");
+        Require(world.Goals.Status(GoalId.Trade) == GoalStatus.Active, "the bench should reveal Road to riches");
+        Require(world.Goals.Status(GoalId.SteelBar) == GoalStatus.Active, "the furnace should reveal Hotter than fire");
 
         Achieve(world, "steel_bar");
-        Require(world.Quests.Status(QuestId.SteelParts) == QuestStatus.Active, "the first steel bar should reveal Too soft");
-        Require(world.Quests.Status(QuestId.Mines) == QuestStatus.Hidden, "Infinite power should stay hidden before the first steel parts");
+        Require(world.Goals.Status(GoalId.SteelParts) == GoalStatus.Active, "the first steel bar should reveal Too soft");
+        Require(world.Goals.Status(GoalId.Mines) == GoalStatus.Hidden, "Infinite power should stay hidden before the first steel parts");
         Achieve(world, "steel_parts");
-        Require(world.Quests.Status(QuestId.Mines) == QuestStatus.Active, "completing Too soft should reveal Infinite power");
+        Require(world.Goals.Status(GoalId.Mines) == GoalStatus.Active, "completing Too soft should reveal Infinite power");
         foreach (var ore in new[] { ThingKind.Iron, ThingKind.Coal }) OpenMine(world.Add(ThingKind.Mine, Cliff.Of(ore).MineSpot));
-        Require(world.Quests.Status(QuestId.Mines) == QuestStatus.Active, "iron and coal mines should leave the tin mine to build");
+        Require(world.Goals.Status(GoalId.Mines) == GoalStatus.Active, "iron and coal mines should leave the tin mine to build");
         OpenMine(world.Add(ThingKind.Mine, Cliff.Of(ThingKind.Tin).MineSpot));
-        Require(world.Quests.Status(QuestId.Mines) == QuestStatus.Completed, "open iron, coal and tin mines should complete Infinite power");
+        Require(world.Goals.Status(GoalId.Mines) == GoalStatus.Completed, "open iron, coal and tin mines should complete Infinite power");
     }
 }

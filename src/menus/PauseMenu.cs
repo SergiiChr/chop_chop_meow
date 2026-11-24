@@ -4,19 +4,19 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The Esc menu: holds the player, shows the quest log and offers game controls.</summary>
+/// <summary>The Esc menu: holds the player, shows the goal log and offers game controls.</summary>
 public partial class PauseMenu : PanelContainer {
     private readonly UiKit kit;
     private readonly World world;
     private readonly Net net;
     private readonly StartMenu startMenu;
     private readonly IGameFlow flow;
-    private readonly QuestLog questLog;
+    private readonly GoalLog goalLog;
     private readonly Button loadButton, newGameButton;
     private readonly Label netLine;
     private int shownGuests;
 
-    public Control QuestDetails => questLog.Details;
+    public Control GoalDetails => goalLog.Details;
     public Button HostButton { get; }
     public Button JoinButton { get; }
     public Button SaveButton { get; }
@@ -31,7 +31,7 @@ public partial class PauseMenu : PanelContainer {
         var title = Style.Heading("Paused", 28); column.AddChild(title);
         var body = new HBoxContainer(); body.AddThemeConstantOverride("separation", 20); column.AddChild(body);
         var well = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; well.AddThemeStyleboxOverride("panel", Style.Well); body.AddChild(well);
-        questLog = new QuestLog(kit, map, Close); well.AddChild(questLog);
+        goalLog = new GoalLog(kit, map, Close); well.AddChild(goalLog);
         var side = new VBoxContainer { CustomMinimumSize = new Vector2(220, 0) }; side.AddThemeConstantOverride("separation", 12); body.AddChild(side);
         var resume = kit.BigButton("Resume · Esc", Style.Brick, Close); resume.Name = "resume"; side.AddChild(resume);
         SaveButton = MenuButton("Save", Style.Enamel, () => startMenu.ShowSlots(true, BackToPause)); SaveButton.Name = "save"; side.AddChild(SaveButton);
@@ -52,9 +52,9 @@ public partial class PauseMenu : PanelContainer {
         return button;
     }
 
-    /// <summary>Opens the board with the settlement's current quest progress and the game's online state.</summary>
+    /// <summary>Opens the board with the settlement's current goal progress and the game's online state.</summary>
     public void Open() {
-        questLog.Refresh();
+        goalLog.Refresh();
         HostButton.Disabled = !net.Owning || net.Opened; HostButton.Text = net.Opened ? "Hosting" : "Host";
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.
         bool guest = world.Remote && !flow.Owns;
@@ -70,13 +70,13 @@ public partial class PauseMenu : PanelContainer {
 
     private void BackToPause() { startMenu.Close(); Open(); }
 
-    public void RefreshQuestLog() { if (Visible) questLog.Refresh(); }
+    public void RefreshGoalLog() { if (Visible) goalLog.Refresh(); }
 
     public void Back() {
-        if (QuestDetails.Visible) questLog.CloseDetails(); else Close();
+        if (GoalDetails.Visible) goalLog.CloseDetails(); else Close();
     }
 
-    public void Close() { questLog.CloseDetails(); Hide(); }
+    public void Close() { goalLog.CloseDetails(); Hide(); }
 
     private void HostGame() {
         net.Open();

@@ -84,9 +84,9 @@ public static class ProgressionChecks {
         var offer = SellSteelToolForTheFirstHire(world, sign);
         SupplyOpeningCampWithHiredWorker(world, sign, offer, tree, stone);
         world.Tick(.01f, true);
-        foreach (var quest in Quests.Entries)
-            if (quest.Id is not (QuestId.Profit or QuestId.Mines))
-                Require(world.Quests.Status(quest.Id) == QuestStatus.Completed, $"progression to first automation should complete {quest.Title}");
+        foreach (var goal in Goals.Entries)
+            if (goal.Id is not (GoalId.Profit or GoalId.Mines))
+                Require(world.Goals.Status(goal.Id) == GoalStatus.Completed, $"progression to first automation should complete {goal.Title}");
         GD.Print($"Progression simulation elapsed: {world.Time - startTime:0} seconds.");
     }
 }

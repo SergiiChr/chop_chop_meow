@@ -259,7 +259,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 18;
+    public int Version { get; set; } = 19;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -366,7 +366,7 @@ public sealed partial class World {
         Holes = new GroundHoles(this); Replaced += Holes.Reset;
         Trees = new TreePlanting(this); Replaced += Trees.Reset;
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
-        Quests = new Quests(this);
+        Goals = new Goals(this);
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
@@ -385,7 +385,7 @@ public sealed partial class World {
     public GroundHoles Holes { get; }
     public TreePlanting Trees { get; }
     public LeafSpots LeafSpots { get; }
-    public Quests Quests { get; }
+    public Goals Goals { get; }
     private readonly Barrels barrels;
 
     private readonly BarrelHaul barrelHaul;
@@ -525,8 +525,8 @@ public sealed partial class World {
         foreach (string product in Data.EndsUpIn(item)) if (HadItself(product)) return true;
         return false;
     }
-    /// <summary>Whether the settlement has had this item, including coins earned from prior sales.</summary>
-    internal bool HadItself(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item) || item == Inventory.Coins && Reached("sold");
+    /// <summary>Whether the settlement has had this item itself.</summary>
+    internal bool HadItself(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item);
     internal void Got(string item) => S.Obtained.Add(item);
     public int DayRevenue => S.DayRevenue;
     public ListView<int> Profits => new(S.Profits);
@@ -2389,12 +2389,12 @@ public sealed partial class World {
         forgotten.Clear();
         foreach (var pair in S.Remembered) if (Sees(pair.Value.Pos) && Find(pair.Key) == null) forgotten.Add(pair.Key);
         foreach (var id in forgotten) S.Remembered.Remove(id);
-        bool seekOre = !Remote && !Reached(Quests.OreSeen);
+        bool seekOre = !Remote && !Reached(Goals.OreSeen);
         // Only the look is remembered: no inventory, and no fire, heat or work, so nothing out of sight smokes or glows.
         foreach (var t in S.Things) {
             if (!Sees(t.Pos)) continue;
             if (seekOre && t.IsDeposit && t.Remaining > 0) {
-                S.Milestones.Add(Quests.OreSeen);
+                S.Milestones.Add(Goals.OreSeen);
                 seekOre = false;
             }
             if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id, Kind = t.Kind, Rotation = t.Rotation };
@@ -2407,7 +2407,7 @@ public sealed partial class World {
     public int ProfitStreak => S.Profits.AsEnumerable().Reverse().TakeWhile(p => p >= Data.Goals.DailyProfit).Count();
     /// <summary>Once reached, the week of profit stays reached even if later days fall short.</summary>
     public bool ProfitGoalMet => S.Milestones.Contains("profit_week");
-    public bool EndGoalsComplete => ProfitGoalMet && Quests.MinesComplete;
+    public bool EndGoalsComplete => ProfitGoalMet && Goals.MinesComplete;
     private void CloseDay(int wages) {
         S.Profits.Add(S.DayRevenue - wages); S.DayRevenue = 0;
         if (ProfitStreak >= Data.Goals.ProfitDays) S.Milestones.Add("profit_week");
@@ -2501,15 +2501,6 @@ public sealed partial class World {
         static void RebuildThing(Thing? thing) { if (thing != null) foreach (var box in Boxes(thing)) box?.RebuildStacks(); }
     }
 
-    /// <summary>Whether the saved accounts or inventories show that coins have reached this settlement.</summary>
-    private static bool HasCoinHistory(SaveState save) =>
-        save.DayRevenue > 0 || save.Profits.Exists(static day => day > 0)
-        || save.Absent.Values.Any(static player => player.Backpack[Inventory.Coins] > 0)
-        || save.Crates.Values.Any(static crate => crate[Inventory.Coins] > 0)
-        || save.Workers.Any(static worker => worker.Bag[Inventory.Coins] > 0)
-        || save.Things.Any(static thing => thing.Inventory[Inventory.Coins] > 0
-            || thing.Wages?[Inventory.Coins] > 0 || thing.Output?[Inventory.Coins] > 0);
-
     /// <summary>
     /// Takes over a save written by this version of the game.
     /// One from any other version is refused rather than converted, and one that is incomplete, names unknown items or recipes or holds values out of range is refused rather than repaired.
@@ -2528,7 +2519,6 @@ public sealed partial class World {
         if (loaded.Wolves.Any(w => w == null || !WolfCounter.ValidSavedPath(w) || !WolfHunt.ValidSavedReaction(w)))
             throw new InvalidOperationException("This save holds an invalid wolf movement.");
         if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
-        if (!loaded.Obtained.Contains(Inventory.Coins) && HasCoinHistory(loaded)) loaded.Obtained.Add(Inventory.Coins);
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;
@@ -2537,8 +2527,6 @@ public sealed partial class World {
         S = loaded;
         toolsChanged = true;
         foreach (var t in S.Things.Of(ThingKind.Toolstation)) WatchTools(t);
-        if (!Reached(Quests.OreSeen) && S.Remembered.Values.Any(t => t.IsDeposit))
-            S.Milestones.Add(Quests.OreSeen);
         gatherClock = 0; ExploredRevision++; Look();
         Replaced?.Invoke();
     }

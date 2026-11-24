@@ -6,13 +6,18 @@ using static SetupSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>Esc opens the pause menu with the quest log; New game and Quit ask first, and confirming a new game starts a fresh settlement.</summary>
+    private Task RunPauseMenuUIChecks() => TestClean(CheckPauseMenuAsksBeforeNewGameAndQuit);
+
+    /// <summary>
+    /// Esc opens the pause menu with the goal log.
+    /// New game and Quit ask for confirmation, and confirming New game starts a fresh settlement.
+    /// </summary>
     private async Task CheckPauseMenuAsksBeforeNewGameAndQuit() {
         await CloseWithEsc();
         await KeyStroke(Key.Escape);
         Require(menu.Visible, "Esc must open the pause menu.");
         Require(view.Paused, "Esc must pause the game.");
-        Require(HasLabel(menu, "Quest Log"), "The pause menu must show the quest log.");
+        Require(HasLabel(menu, "Goal Log"), "The pause menu must show the goal log.");
         // New game and Quit ask first, and Esc or Back returns to the pause menu.
         Warp(Hosted, Terrain.Spawn + new Vector2(6, 0));
         await Click(FindButton(menu, "New game")!);

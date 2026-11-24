@@ -3,8 +3,8 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The pause menu's list of discovered quests and the window that shows a quest's details.</summary>
-public partial class QuestLog : VBoxContainer {
+/// <summary>The pause menu's list of discovered goals and the window that shows a goal's details.</summary>
+public partial class GoalLog : VBoxContainer {
     private readonly UiKit kit;
     private readonly RecipeMap map;
     private readonly Action leaveMenu;
@@ -12,7 +12,7 @@ public partial class QuestLog : VBoxContainer {
     private readonly VBoxContainer active = new(), completed = new();
     private readonly Label explore;
     private readonly Button disclosure;
-    private readonly QuestStatus[] shown = new QuestStatus[Quests.Entries.Length];
+    private readonly GoalStatus[] shown = new GoalStatus[Goals.Entries.Length];
     private readonly Label detailTitle;
     private readonly HBoxContainer detailItems;
     private readonly VBoxContainer detailBody;
@@ -20,20 +20,20 @@ public partial class QuestLog : VBoxContainer {
 
     public Control Details { get; }
 
-    public QuestLog(UiKit kit, RecipeMap map, Action leaveMenu) {
+    public GoalLog(UiKit kit, RecipeMap map, Action leaveMenu) {
         this.kit = kit; this.map = map; this.leaveMenu = leaveMenu; world = kit.World;
         AddThemeConstantOverride("separation", 10);
-        AddChild(Style.WellLabel("Quest Log"));
+        AddChild(Style.WellLabel("Goal Log"));
         var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         AddChild(scroll);
         var list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         list.AddThemeConstantOverride("separation", 8); scroll.AddChild(list);
         active.AddThemeConstantOverride("separation", 5); list.AddChild(active);
-        explore = Style.Text("Explore to unlock more tasks.", 14, Style.Tan, wrap: true); list.AddChild(explore);
-        disclosure = Row("▸  Completed", ToggleCompleted); disclosure.Name = "quest_completed"; list.AddChild(disclosure);
+        explore = Style.Text("Explore to unlock more goals.", 14, Style.Tan, wrap: true); list.AddChild(explore);
+        disclosure = Row("▸  Completed", ToggleCompleted); disclosure.Name = "goal_completed"; list.AddChild(disclosure);
         completed.Visible = false; completed.AddThemeConstantOverride("separation", 5); list.AddChild(completed);
 
-        Details = new Control { Name = "quest_details", Visible = false };
+        Details = new Control { Name = "goal_details", Visible = false };
         Details.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var shade = new ColorRect { Color = new Color(Style.Line, .55f) };
         shade.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); Details.AddChild(shade);
@@ -43,29 +43,29 @@ public partial class QuestLog : VBoxContainer {
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 12); board.AddChild(column);
         var header = new HBoxContainer(); column.AddChild(header);
         detailTitle = Style.Heading("", 23); detailTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill; header.AddChild(detailTitle);
-        header.AddChild(kit.HeaderButton("close", "Close · Esc", CloseDetails, Style.CloseRound, "quest_close"));
+        header.AddChild(kit.HeaderButton("close", "Close · Esc", CloseDetails, Style.CloseRound, "goal_close"));
         var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); column.AddChild(well);
         var content = new VBoxContainer(); content.AddThemeConstantOverride("separation", 12); well.AddChild(content);
         detailItems = new HBoxContainer(); detailItems.AddThemeConstantOverride("separation", 8); content.AddChild(detailItems);
         detailBody = new VBoxContainer(); detailBody.AddThemeConstantOverride("separation", 6); content.AddChild(detailBody);
     }
 
-    /// <summary>Draws quest titles when their visibility or completion changes.</summary>
+    /// <summary>Draws goal titles when their visibility or completion changes.</summary>
     public void Refresh() {
         if (Details.Visible) progress.Run();
-        var quests = Quests.Entries;
-        Span<QuestStatus> statuses = stackalloc QuestStatus[quests.Length];
-        for (int i = 0; i < quests.Length; i++) statuses[i] = world.Quests.Status(quests[i].Id);
+        var goals = Goals.Entries;
+        Span<GoalStatus> statuses = stackalloc GoalStatus[goals.Length];
+        for (int i = 0; i < goals.Length; i++) statuses[i] = world.Goals.Status(goals[i].Id);
         if (statuses.SequenceEqual(shown)) return;
         statuses.CopyTo(shown);
 
         Clear(active); Clear(completed);
         bool hasHidden = false;
-        for (int i = 0; i < quests.Length; i++) {
-            var quest = quests[i];
-            if (shown[i] == QuestStatus.Hidden) { hasHidden = true; continue; }
-            var row = Row(quest.Title, () => ShowDetails(quest));
-            (shown[i] == QuestStatus.Completed ? completed : active).AddChild(row);
+        for (int i = 0; i < goals.Length; i++) {
+            var goal = goals[i];
+            if (shown[i] == GoalStatus.Hidden) { hasHidden = true; continue; }
+            var row = Row(goal.Title, () => ShowDetails(goal));
+            (shown[i] == GoalStatus.Completed ? completed : active).AddChild(row);
         }
         explore.Visible = hasHidden;
         disclosure.Visible = completed.GetChildCount() > 0;
@@ -84,12 +84,12 @@ public partial class QuestLog : VBoxContainer {
         disclosure.Text = completed.Visible ? "▾  Completed" : "▸  Completed";
     }
 
-    private void ShowDetails(Quest quest) {
-        detailTitle.Text = quest.Title;
+    private void ShowDetails(Goal goal) {
+        detailTitle.Text = goal.Title;
         Clear(detailItems);
-        foreach (string item in quest.Items) {
+        foreach (string item in goal.Items) {
             var icon = kit.Button("", () => map.OpenAt(item, leaveMenu));
-            icon.Name = $"quest_item_{item}";
+            icon.Name = $"goal_item_{item}";
             icon.TooltipText = world.Data.Name(item);
             icon.CustomMinimumSize = new Vector2(46, 46);
             icon.Icon = Icons.Of(item);
@@ -99,24 +99,26 @@ public partial class QuestLog : VBoxContainer {
             Style.Skin(icon, Style.SlotNormal, Style.SlotHover, Style.SlotPressed);
             detailItems.AddChild(icon);
         }
-        detailItems.Visible = quest.Items.Length > 0;
-        SetDescription(quest);
+        detailItems.Visible = goal.Items.Length > 0;
+        SetDescription(goal);
         progress.Run();
         Details.Show();
     }
 
-    private void SetDescription(Quest quest) {
+    private void SetDescription(Goal goal) {
         Clear(detailBody);
         progress.Clear();
-        if (quest.Id == QuestId.Mines) {
-            foreach (var (ore, task) in Quests.MineTasks) {
+        if (goal.Id == GoalId.Mines) {
+            foreach (var ore in Cliff.Ores) {
+                string oreName = ore.Id();
+                string article = "aeiou".Contains(oreName[0]) ? "an" : "a";
                 var row = new HBoxContainer();
                 detailBody.AddChild(row);
                 var mark = Style.Text("", 16, Style.Tan);
-                mark.Name = $"quest_mine_{ore.Id()}";
+                mark.Name = $"goal_mine_{oreName}";
                 mark.CustomMinimumSize = new Vector2(20, 0);
                 row.AddChild(mark);
-                row.AddChild(Style.Text(task, 16, Style.Ink));
+                row.AddChild(Style.Text($"Build {article} {oreName} mine.", 16, Style.Ink));
                 progress.Watch(() => world.Mines.Working(ore), open => {
                     mark.Text = open ? "✓" : "○";
                     mark.AddThemeColorOverride("font_color", open ? Style.Rise : Style.Tan);
@@ -124,8 +126,8 @@ public partial class QuestLog : VBoxContainer {
             }
             return;
         }
-        detailBody.AddChild(Style.Text(world.Quests.Description(quest), 16, Style.Ink, wrap: true));
-        if (quest.Id != QuestId.Profit) return;
+        detailBody.AddChild(Style.Text(world.Goals.Description(goal), 16, Style.Ink, wrap: true));
+        if (goal.Id != GoalId.Profit) return;
         var figures = Style.Text("", 14, Style.Tan, wrap: true);
         detailBody.AddChild(figures);
         progress.Watch(() => (world.Profits.Count, world.DayRevenue, world.ProfitGoalMet), current => {

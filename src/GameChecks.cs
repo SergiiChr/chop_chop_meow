@@ -1321,8 +1321,8 @@ public partial class Game {
             await TestClean(CheckPaintFilterSwitchDrawsTheFilter);
             await TestClean(CheckInterfaceTextIsDrawnAtTheSizeItShows);
             await TestClean(CheckNewGameStartsTheWelcomePage);
-            await TestClean(CheckPauseMenuAsksBeforeNewGameAndQuit);
-            await TestClean(CheckFreshQuestLogHidesUnknownTasksAndLinksItems);
+            await RunPauseMenuUIChecks();
+            await RunGoalUIChecks(freshGame: true);
             await RunFirstPersonUIChecks(inGame: true);
             await TestClean(CheckWasdJogsAndShiftSprintsUnlessTooThirsty);
             await TestClean(CheckMessagesStackFadeAndKeepClearOfHud);
@@ -1366,7 +1366,7 @@ public partial class Game {
             await TestClean(CheckItemListRunsByGroupSimplestFirst);
             await TestClean(CheckFilterRowKeepsTheOrderAdded);
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
-            await RunGoalUIChecks();
+            await RunGoalUIChecks(freshGame: false);
             await RunCraftingUIChecks();
             var furnace = await Test(CheckSteelFurnaceSlotsLoadHeldStacksThenPump);
             await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));
