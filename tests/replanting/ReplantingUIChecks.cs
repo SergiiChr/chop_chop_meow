@@ -7,7 +7,10 @@ using static SetupSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    private async Task RunReplantingUIChecks() => await TestClean(CheckHeldAcornMarksGroundAndCanBePlantedAndWatered);
+    private async Task RunReplantingUIChecks() {
+        await TestClean(CheckHeldAcornMarksGroundAndCanBePlantedAndWatered);
+        await TestClean(CheckLeavesBesideAnOldTreeCanStillBeGathered);
+    }
 
     private async Task CheckHeldAcornMarksGroundAndCanBePlantedAndWatered() {
         var home = Hosted.Player;
@@ -25,6 +28,38 @@ public partial class Game {
         RemoveThings(Hosted, t => t.Id == tree.Id);
         Drop(Hosted, "steel_shovel", 1);
         Drop(Hosted, Bucket.Item, 1);
+        Warp(Hosted, home);
+        await Frames();
+    }
+
+    private async Task CheckLeavesBesideAnOldTreeCanStillBeGathered() {
+        var home = Hosted.Player;
+        var at = SpotsNearby().First(p => world.Construction.PlacementBlock(ThingKind.PlantingSpot, p) == null
+            && Uncovered(view.Screen(p + World.LeafOffset)));
+        var tree = Hosted.Add(ThingKind.Tree, at, 336);
+        tree.TreeStage = 81;
+        var patch = Hosted.Add(ThingKind.Leaves, at + World.LeafOffset, 12);
+        int acorns = world.Backpack["acorn"], leaves = world.Backpack["leaves"];
+        Give(Hosted, "rake");
+        await Frames();
+        await ClickOn(tree);
+        Require(ShowsTreeStatus("Adult tree") && HasLabel(panel, "336 left"), "an older tree should show its adult status and wood");
+        await CloseWithEsc();
+        await ClickOn(patch);
+        Require(panel.Selection.Thing == patch.Id, "the old tree's larger trunk should leave its leaf spot selectable");
+        var point = RightPress(patch.Pos, .08f);
+        try {
+            await Until(() => world.Backpack["acorn"] > acorns && world.Backpack["leaves"] > leaves,
+                "gathering leaves and acorns from the spot next to an old tree", 8);
+        } finally { RightRelease(point); }
+        await CloseWithEsc();
+        Drop(Hosted, "rake", 1);
+        Drop(Hosted, "acorn", Hosted.Backpack["acorn"] - acorns);
+        Drop(Hosted, "leaves", Hosted.Backpack["leaves"] - leaves);
+        // Remove the old tree out of sight so the next check does not inherit its long falling animation.
+        Warp(Hosted, home + Vector2.One * 24);
+        await Frames(2);
+        RemoveThings(Hosted, t => t.Id == tree.Id || t.Id == patch.Id);
         Warp(Hosted, home);
         await Frames();
     }

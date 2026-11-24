@@ -506,7 +506,9 @@ public partial class WorldView : Node3D {
         SyncCamera();
         // One ray for the whole pick: asking the camera again for every thing is most of what a pick costs.
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
-        Thing? best = null; nearest = float.MaxValue;
+        Thing? best = null, wideTrunk = null;
+        nearest = float.MaxValue;
+        float wideTrunkDistance = float.MaxValue;
         // Hits follow what is drawn, including memories, but only things that still exist can be picked.
         World.CollectKnown(picking);
         bool firstPerson = FirstPerson;
@@ -520,8 +522,15 @@ public partial class WorldView : Node3D {
             // Only the foot of a tree's trunk, its first hit, picks the tree, so a click among the crowns of a forest reaches the ground and swings.
             if (t.Kind == ThingKind.Tree) {
                 if (hits.Length == 0) continue;
-                var trunk = firstPerson ? hits[0] : hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) };
-                if (RayCylinder(origin, direction, t.Pos, trunk, out float s) && s < nearest) { nearest = s; best = t; }
+                var trunk = hits[0];
+                float growth = WorldModels.GrowthScale(drawn.TreeStage);
+                // The added reach of a wide trunk is selectable when no ground object is under the pointer.
+                var foot = growth > 1 ? trunk with { Radius = trunk.Radius / growth, Top = trunk.Top / growth } : trunk;
+                if (RayCylinder(origin, direction, t.Pos, TrunkPickHeight(foot, firstPerson), out float s)) {
+                    if (s < nearest) { nearest = s; best = t; }
+                } else if (growth > 1 && RayCylinder(origin, direction, t.Pos, TrunkPickHeight(trunk, firstPerson), out s) && s < wideTrunkDistance) {
+                    wideTrunk = t; wideTrunkDistance = s;
+                }
                 continue;
             }
             bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, drawn, out float d)
@@ -531,6 +540,7 @@ public partial class WorldView : Node3D {
             if (hit && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
+        if (wideTrunk != null) { nearest = wideTrunkDistance; return wideTrunk; }
         if (GroundPoint(origin, direction, 0, out var point) && Terrain.WaterRing(point) && World.Sees(point)) {
             foreach (var thing in World.ThingsOf(ThingKind.Water)) {
                 nearest = origin.DistanceTo(To3(point));
@@ -539,6 +549,9 @@ public partial class WorldView : Node3D {
         }
         return null;
     }
+
+    private static Hit TrunkPickHeight(Hit trunk, bool firstPerson) =>
+        firstPerson ? trunk : trunk with { Top = Math.Min(trunk.Top, StumpHeight) };
 
     private static readonly Hit[] PersonHit = { new(.38f, 0, 1.75f) };
     public Worker? PickWorker(Vector2 screen, float thingDistance = float.MaxValue) {

@@ -389,7 +389,7 @@ Its small shadow offset keeps the shade attached to feet, trunks and low props, 
 Picking and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`).
 Hover labels name buildings, resources and workers in the world.
 The shore label reads “Collect water”.
-A tree crown only wins a click when nothing else is under the cursor, so objects behind a canopy stay selectable.
+Other objects under the cursor take priority over the extra width of an old tree’s trunk.
 Trees use three variants chosen by object id, so saves need no new fields.
 A tree's height comes from its id too (`WorldModels.TreeTall`): its model and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
 The bake stands each tree's lowest point on the ground, which on a spruce and one oak is a hanging branch, so their baked trunks start up to 1.8 m higher; `Tree3DShape.Add` carries such a trunk down to the ground with a stem that widens toward its foot.
@@ -881,7 +881,7 @@ All standing trees gain size and wood daily, including after adulthood.
 Each day adds the increase in whole wood units since the last, so it preserves wood already chopped.
 
 `LeafLitter` gives each leaf spot a capacity of one or two acorns.
-Gathering leaves also gathers any acorns that fit in the bag.
+When a player gathers leaves, they also take the acorns that fit in their backpack.
 Leaves refill at dawn. Missing acorns refill one at a time, every ten days from the first gather that took one.
 Chopping out all its current wood fells the tree and leaves its stump.
 

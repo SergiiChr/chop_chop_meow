@@ -262,8 +262,8 @@ public static class WorldModels {
     /// <summary>A tree's size against its baked model: the tallest stand two thirds taller than the shortest.</summary>
     public static float TreeScale(int id) => .9f + TreeTall(id) * .6f;
 
-    /// <summary>A tree's trunk and crown, sized with the tree.</summary>
-    private static float GrowthScale(int stage) => stage == 0 ? 1 : (stage - 1) / (float)TreePlanting.AdultDays;
+    /// <summary>How large a tree has grown against its size on reaching adulthood.</summary>
+    internal static float GrowthScale(int stage) => stage == 0 ? 1 : (stage - 1) / (float)TreePlanting.AdultDays;
 
     private static Hit[] TreeHits(int id, int stage) {
         if (stage == 1) return [new Hit(.32f, 0, .19f)];

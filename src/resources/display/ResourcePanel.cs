@@ -20,7 +20,8 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
         if (TreePlanting.NeedsWater(thing)) TreeWater();
         if (thing.Kind == ThingKind.Leaves) LeafAcorns();
         if (thing.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the lake shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
-        if (thing is { Kind: ThingKind.Tree, TreeStage: 1 }) RedrawOnChange(() => thing.TreeStage == 1);
+        if (thing is { Kind: ThingKind.Tree, TreeStage: 1 })
+            RedrawOnChange(() => (thing.TreeStage == 1, TreePlanting.NeedsWater(thing)));
         else JobButtons();
     }
 
@@ -52,7 +53,6 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
         var water = Style.InWell(row);
         AddChild(water);
         live.Bind(need, line => line.Append("Needs ").Append(TreePlanting.WaterNeeded - thing.Inventory[Water.Liquid]).Append(" L of water to start growing."));
-        live.Watch(() => TreePlanting.NeedsWater(thing), needed => water.Visible = needed);
         StoreBagGrid(item => TreePlanting.NeedsWater(thing) && Barrels.CanPour(world.Data, item));
     }
 }

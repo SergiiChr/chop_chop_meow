@@ -29,8 +29,9 @@ public partial class Game {
             .Any(icon => icon.IsVisibleInTree() && icon.Texture == Icons.Of("wood")), "the planted tree should show the usual wood icon");
         Require(!HasLabel(panel, "Pour from a filled bottle or bucket"), "the water amount should be enough text beside the slot");
         await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(bucket))), OnPage($"input_{Water.Liquid}")!);
-        await Until(() => ShowsTreeStatus("Growing") && world.Backpack[Bucket.Item] > 0,
-            "the tree showing Growing after the bucket is poured", 4);
+        await Until(() => ShowsTreeStatus("Growing") && world.Backpack[Bucket.Item] > 0
+            && OnPage($"input_{Water.Liquid}") == null && !bag.Visible,
+            "the tree showing Growing and closing its watering controls after the bucket is poured", 4);
         Require(!HasLabel(panel, "/10 days"), "the tree panel should leave out the day count");
         return tree;
     }
