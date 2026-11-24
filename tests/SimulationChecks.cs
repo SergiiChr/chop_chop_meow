@@ -44,6 +44,7 @@ public static class SimulationChecks {
         CraftingChecks.Run(data);
         PackingChecks.Run(data);
         LunchChecks.Run(data);
+        IdleChecks.Run(data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
         Test(CheckFilterNamesEachEntryOnceInTheOrderNamed);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);

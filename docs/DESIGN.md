@@ -168,7 +168,7 @@ UI and input:
 | `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, sleep and the needs a night would leave |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
-| `src/workers/lunch/LunchBreak.cs` | Reserves campfire and ground seats for workers on their lunch break |
+| `src/workers/breaks/BreakSeats.cs` | Reserves campfire and ground seats for workers at lunch or with nothing to do, and lights the campfires they sit at |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
 | `src/actors/enemies/wolf/DoorTug.cs` | A wolf tugging a player back out of a cabin's doorway, letting go and handing a badly hurt one to the takedown |
 | `src/actors/enemies/wolf/WolfBodies.cs` | How wolves at a player keep their distance: closing in only to biting reach, and stepping aside from another wolf's body |
@@ -708,7 +708,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   A player a wolf had pinned goes free as it leaves.
   Patrolling, going home or losing its player (who sheltered or left the game) clears everything a wolf was doing to them (`WolfPatrols.Calm`).
 
-Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
+Campfire light repels wolves, and `CampfireHours` sets how long one log burns; a campfire with no wood left burns while workers sit at it.
 A wolf already chasing the player still follows into the light for a few seconds.
 Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters go to its door (`DoorCheck.Follow`), or give up and patrol on away from a cabin they leave alone.
 
@@ -1243,7 +1243,7 @@ The job in hand is `Worker.Assignment` and `Worker.Doing`.
 - a crafted batch, a furnace batch at the bellows, a crate packed full, a piece mined, a harvest and a mine building stage end it for the jobs the table marks, counted by the place (`Thing.Rounds`, `Worker.Mark`).
 
 A job with nothing to do sets the status to what it lacks.
-With none to do the worker waits at the nearest trading post (`World.Idle`), shows the first job's status and reads the list again every `JobListSeconds`, or at once when the list changes.
+With none to do the worker sits at the nearest campfire as at lunch (`World.Idle`, `BreakSeats.Rest`), or with no campfire waits at the nearest trading post, shows the first job's status and reads the list again every `JobListSeconds`, or at once when the list changes.
 A tool none of their jobs uses goes back to a tool station first (`World.JobUses`).
 
 `World.MoveJob` moves an entry from one `JobSpot` to another: a place in the list, or a place among a group's hauls.
@@ -1280,7 +1280,7 @@ Spots that need a tool count only while the worker can get one (`World.CanWork`)
 A woodcutter who fells a tree takes its stump as their spot while a shovel is to be had, without waiting for a player to see it; other stumps count once a player has seen them.
 A worker carries one tool, so going between a tree and a stump takes a walk to a tool station to swap.
 With none known they say so once, carry off what they hold and go on to their other jobs.
-A worker with no duties waits at the nearest trading post.
+A worker with no duties sits at the nearest campfire, or with none waits at the nearest trading post.
 
 Only one worker ever pumps a reinforced furnace: the bellows job has nothing to do while another worker has it in hand (`World.Pump`).
 It also has nothing to do while the furnace neither smelts nor holds a batch to smelt, so a worker with both jobs hauls then.
@@ -1297,7 +1297,10 @@ A dismissed worker's tool goes into their recovery box.
 #### Schedule
 
 At the `LunchHour` in `GameData` workers break for one in-game hour.
-`LunchBreak` reserves the nearest available campfire seats, with up to six seats per fire.
+`BreakSeats` reserves the nearest available campfire seats, with up to six seats per fire.
+It seats workers with nothing to do the same way at any hour; their ground groups gather round the nearest campfire rather than where they stand.
+A worker who sat in the last tick keeps their seat while they still have nothing to do, so the crew still sitting when lunch ends stays put.
+A campfire burns its wood as usual while workers sit at it; once it has none left, one a worker sat at in the last tick (`BreakSeats.Kindles`) is kept burning at `KindledBurn`, one second, and dies down within that second once they leave.
 A blocked walk releases its seat, and the worker remembers seats they could not reach until lunch ends.
 Workers on the ground keep their seats when the crew changes, unless they take a vacancy by a fire.
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.

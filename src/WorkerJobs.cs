@@ -60,13 +60,14 @@ public sealed partial class World {
     }
 
     /// <summary>
-    /// With no job to do, a worker waits at the nearest trading post; their status says what their first job lacks.
+    /// With no job to do, a worker sits at the nearest campfire they can reach, as at lunch, or with no campfire waits
+    /// at the nearest trading post; their status says what their first job lacks.
     /// A tool none of their jobs uses goes back to a tool station first.
     /// </summary>
     private void Idle(Worker w, string? lacking, float dt) {
         w.Assignment = FirstPlace(w); w.Doing = null;
         if (w.Tool != "" && !JobUses(w, ToolKind(w.Tool)) && !ReturnTool(w, dt)) return;
-        WaitAtPost(w, dt);
+        if (!breakSeats.Rest(w, dt)) WaitAtPost(w, dt);
         if (w.WorkState != WorkerWorkState.Blocked) w.Status = lacking ?? "Available";
     }
 

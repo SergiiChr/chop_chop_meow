@@ -357,7 +357,7 @@ public sealed partial class World {
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
         Farms = new Farms(this); SteelPipes = new SteelPipes(this);
-        lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
+        breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
         barrelHaul = new BarrelHaul(this, barrels); bedtimeWater = new BedtimeWater(this);
@@ -380,7 +380,7 @@ public sealed partial class World {
     private readonly Gathering gathering, waterGathering;
     private readonly Crafting crafting, packCraft;
     private readonly BedtimeWater bedtimeWater;
-    private readonly LunchBreak lunchBreak;
+    private readonly BreakSeats breakSeats;
     /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
     public GravelPaths GravelPaths { get; }
     public SteelPipes SteelPipes { get; }
@@ -1144,6 +1144,8 @@ public sealed partial class World {
         if (DoorCheck.Waking) { SayToAll("You are awakened by the noise outside."); return; }
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
+    /// <summary>Seconds of burning a campfire with no wood is kept at while workers sit at it, so it goes out soon after they leave.</summary>
+    private const float KindledBurn = 1;
     /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
     public const float FireReach = 5.3f;
     /// <summary>Burning campfires keep wolves out of their light, unless a wolf is already chasing the player.</summary>
@@ -1953,7 +1955,7 @@ public sealed partial class World {
             return;
         }
         if (w.WageDebt > 0) { w.Status = "On strike · wages owed"; return; }
-        if (Lunch) { lunchBreak.Sit(w, dt); return; }
+        if (Lunch) { breakSeats.Sit(w, dt); return; }
         TidyDuties(w);
         WorkJobs(w, dt);
     }
@@ -2209,8 +2211,11 @@ public sealed partial class World {
             else if (S.Time >= t.Regrow) { t.Remaining = BushBerries; t.Regrow = 0; }
         }
         foreach (var t in S.Things.Of(ThingKind.Campfire)) {
+            bool lit = t.Burn > 0;
             t.Burn = Math.Max(0, t.Burn - dt);
             if (t.Burn < 30 && t.Inventory.Remove("wood", 1) > 0) { if (t.Burn <= 0) Play("start_fire", t.Pos); t.Burn += Data.CampfireSeconds; }
+            // A fire with no wood left burns anyway while workers sit at it on their break, and dies down within a second once they get up.
+            if (t.Burn < KindledBurn && breakSeats.Kindles(t)) { if (!lit) Play("start_fire", t.Pos); t.Burn = KindledBurn; }
         }
         // Once a working crew has the forge hot, they keep it at or above the clear bar between strokes.
         // A crew that is striking or stuck on a blocked path is not working, so the forge cools.
@@ -2219,7 +2224,7 @@ public sealed partial class World {
         foreach (var kind in stationKinds) foreach (var t in Ticking(kind)) StationTick(t, dt);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) CraftTick(dt);
-        lunchBreak.Prepare();
+        breakSeats.Prepare();
         crew.Clear(); crew.AddRange(S.Workers);
         foreach (var w in crew) WorkerTick(w, dt);
         for (int i = 0; i < S.Workers.Count; i++) for (int j = i + 1; j < S.Workers.Count; j++) {

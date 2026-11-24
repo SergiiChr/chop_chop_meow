@@ -58,6 +58,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase` | Load a populated review fixture instead of a fresh game |
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
+| `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
@@ -386,13 +387,16 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 | Resource | Gather |
 
 A worker on Tend fire keeps a campfire fed with wood from storage.
+A campfire with no wood left burns anyway while a worker sits at it, at lunch or with nothing to do, and goes out once nobody sits there; a campfire with wood burns it as usual.
 
 Clicking a job lists the crew with a tick box each.
 A circled number beside a worker counts their other jobs, and hovering it lists them.
 A worker can hold several jobs, at one place or several, and a new job goes to the end of their list.
 The list is in order: they do the first job that can be done, and after each round of it they read the list from the top again.
 A round is a delivery, a crafted batch, a crate packed full, a furnace batch at the bellows, a piece mined or a harvest.
-With no job that can be done, a worker waits at the nearest trading post, or in the clearing without one, and their status says what their first job lacks.
+With no job that can be done, a worker sits at the nearest campfire they can reach, as at lunch: six to a fire, the rest on the ground nearby in groups of up to three.
+With no campfire they wait at the nearest trading post, or in the clearing without one.
+Their status says what their first job lacks.
 A worker on Bellows pumps only while the furnace smelts or holds a batch to smelt, and only one worker pumps at a time.
 
 The crew button opens an overview with each worker's daily pay and the total above.
@@ -951,7 +955,7 @@ There are at most forty workers.
 A worker gathers as fast as the player does with the same tool, 4 pieces a time, until their hands hold 12, then carries the load off.
 A worker gathering a resource moves on to the next nearest spot of the same kind once theirs is spent, such as the next tree after felling one, and goes on filling their hands there.
 They only go to spots a player has seen, even if fog hides them now.
-With no other spot known they say so and go on to their other jobs, or wait at the trading post.
+With no other spot known they say so and go on to their other jobs, or wait by a campfire.
 
 ### Worker page
 
@@ -974,7 +978,7 @@ The crew overview shows each worker's jobs as numbered chips in that order, with
 ### Daily routine
 
 - Workers break for an hour of lunch at noon.
-  They take the closest open campfire seats they can reach, up to six workers per fire.
+  They take the closest open campfire seats they can reach, up to six workers per fire, and the fire burns while they sit at it, with no wood if it has none.
   Workers without a fire seat sit on the ground facing each other in groups of up to three.
   When the crew changes, a worker keeps their ground seat unless they take an open seat by a fire.
 - As dusk falls they walk to the nearest trading post and head off down the valley like a trade cart, fading from view, then walk back in the same way at dawn.
@@ -1048,6 +1052,7 @@ An hour before dawn every wolf gives up and heads back to the nearest den.
 
 A burning campfire keeps them away, and a wolf already chasing you follows you into its light for a few seconds.
 One log burns about 4 in-game hours.
+A campfire with no wood left burns anyway while workers sit at it.
 Cabin windows glow but do not deter wolves; a campfire whose light reaches a cabin's door keeps them off the door.
 
 ### Torch
