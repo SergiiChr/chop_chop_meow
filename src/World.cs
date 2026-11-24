@@ -949,7 +949,7 @@ public sealed partial class World {
         string? missing = BatchShort(t, recipe);
         var r = Data.Recipes[recipe];
         bool switching = recipe != Selected(t);
-        if (switching) Unload(t, r);
+        if (switching) Unload(t, Product(t), r);
         t.Keep = recipe;
         Ask(t, recipe, waiting + batches);
         batches = t.Batches - waiting;
@@ -966,14 +966,16 @@ public sealed partial class World {
     public string? BatchShort(Thing t, string recipe) {
         if (!Data.Recipes.TryGetValue(recipe, out var r)) return null;
         bool switching = recipe != Selected(t);
-        int Unloaded(Inventory? box, string item) => box == null || Stays(r, box == t.Burner, item) ? 0 : box[item];
+        string product = Product(t);
+        int Unloaded(Inventory? box, string item) => box == null || Stays(product, r, box == t.Burner, item) ? 0 : box[item];
+        int Kept(string item) => switching ? t.Inventory[item] - Unloaded(t.Inventory, item) : t.Inventory[item];
         int Have(string item) => Carried(item) + t.Inventory[item] + (switching ? Unloaded(t.Burner, item) : 0);
         var missing = new List<string>();
         foreach (var (item, needed) in r.Inputs)
             if (needed - Have(item) is > 0 and int lack) missing.Add($"{lack}{(Data.VesselFor(item) != null ? "L of" : "")} {Lower(Data.Name(item))}");
         // Fuel burns only from the fuel slot: what it holds now, or carried fuel left once a batch's inputs are loaded in the input slots.
         // A turn loads only what the slots lack, so an input kept there takes none from the backpack.
-        int Loads(string item) => Math.Max(0, r.Inputs.GetValueOrDefault(item) - (switching ? t.Inventory[item] : 0));
+        int Loads(string item) => Math.Max(0, r.Inputs.GetValueOrDefault(item) - (switching ? Kept(item) : 0));
         int Spare(string fuel) => Carried(fuel) + (switching ? Unloaded(t.Inventory, fuel) + Unloaded(t.Burner, fuel) : 0) - Loads(fuel);
         bool fuelled = !r.Burns || t.Burner?.First() is string held && r.Fuels.Contains(held) || r.Fuels.Exists(f => Spare(f) > 0);
         if (!fuelled) missing.Add($"fuel ({FuelWords(r.Fuels)})");
@@ -986,28 +988,31 @@ public sealed partial class World {
     public string? SwitchBlock(Thing t, string recipe) {
         if (recipe == Selected(t) || !Data.Recipes.TryGetValue(recipe, out var r)) return null;
         if (t.Processing) return Busy(t);
-        var leaving = Leaving(t, r);
+        var leaving = Leaving(t, Product(t), r);
         if (NoVesselRoom(leaving) is string dry) return dry;
         foreach (string item in leaving.Keys.ToArray()) if (Data.VesselFor(item) != null) leaving.Remove(item);
         return S.Backpack.Fits(leaving) ? null : $"No room in your backpack for what the {Lower(Data.Name(t.Kind))} holds.";
     }
     /// <summary>
-    /// Whether an item stays at a station turning to a recipe: an input of that recipe in its slots, or a fuel it burns in its fuel slot.
-    /// Everything else, the old recipe's product included, goes to the backpack.
+    /// Whether an item stays at a station turning from a recipe that makes <paramref name="product"/> to another: an input of the new recipe in its slots,
+    /// other than the old product, or a fuel the new recipe burns in its fuel slot. Everything else goes to the backpack, the old product even where the new recipe uses it.
     /// </summary>
-    private static bool Stays(RecipeDef next, bool fuelSlot, string item) => fuelSlot ? next.Burns && next.Fuels.Contains(item) : next.Inputs.ContainsKey(item);
-    /// <summary>What leaves a station's slots and fuel slot for the backpack as it turns to a recipe, by item.</summary>
-    private static Dictionary<string, int> Leaving(Thing t, RecipeDef next) {
+    private static bool Stays(string product, RecipeDef next, bool fuelSlot, string item) =>
+        fuelSlot ? next.Burns && next.Fuels.Contains(item) : item != product && next.Inputs.ContainsKey(item);
+    /// <summary>What leaves a station's slots and fuel slot for the backpack as it turns from a recipe that makes <paramref name="product"/> to another, by item.</summary>
+    private static Dictionary<string, int> Leaving(Thing t, string product, RecipeDef next) {
         var leaving = new Dictionary<string, int>();
-        foreach (var (item, count) in t.Inventory.Items) if (!Stays(next, false, item)) leaving[item] = count;
-        if (t.Burner != null) foreach (var (item, count) in t.Burner.Items) if (!Stays(next, true, item)) leaving[item] = leaving.GetValueOrDefault(item) + count;
+        foreach (var (item, count) in t.Inventory.Items) if (!Stays(product, next, false, item)) leaving[item] = count;
+        if (t.Burner != null) foreach (var (item, count) in t.Burner.Items) if (!Stays(product, next, true, item)) leaving[item] = leaving.GetValueOrDefault(item) + count;
         return leaving;
     }
-    /// <summary>Moves what a station turning to a recipe has no use for into the backpack, as far as it fits; a liquid goes into the backpack's vessels.</summary>
-    private void Unload(Thing t, RecipeDef next) {
-        Unload(t.Inventory, item => !Stays(next, false, item));
-        if (t.Burner != null) Unload(t.Burner, item => !Stays(next, true, item));
+    /// <summary>Moves what a station turning from a recipe that makes <paramref name="product"/> to another has no use for into the backpack, as far as it fits; a liquid goes into the backpack's vessels.</summary>
+    private void Unload(Thing t, string product, RecipeDef next) {
+        Unload(t.Inventory, item => !Stays(product, next, false, item));
+        if (t.Burner != null) Unload(t.Burner, item => !Stays(product, next, true, item));
     }
+    /// <summary>What the recipe a station is on makes, or empty for a thing that makes nothing.</summary>
+    private string Product(Thing t) => Data.Recipes.TryGetValue(Selected(t), out var r) ? r.Output : "";
     private void Unload(Inventory box, Func<string, bool> leaves) { foreach (string item in box.Items.Keys.ToArray()) if (leaves(item)) Carry(box, S.Backpack, null, item, box[item]); }
     private static readonly Dictionary<string, int> NoCost = new();
     /// <summary>
@@ -1061,6 +1066,10 @@ public sealed partial class World {
             if (!Pending(t, pair.Key) && pair.Key != r.Output) return true;
         return false;
     }
+    /// <summary>The refusal for an item a station's recipe neither uses nor makes.</summary>
+    private string NotUsedHere(string item) => $"{Data.Name(item)} is not used by what this station makes.";
+    /// <summary>Whether a hand move puts an item into a station's slots: an input of the recipe it is on or keeps to, a vessel holding a liquid input, or what its recipe makes.</summary>
+    private bool SlotsTake(Thing t, string item) => Pending(t, item) || PoursInto(t, t.Inventory, item) != null || item == Product(t);
     /// <summary>Whether a station takes an item from the player: an input of the recipe it is on or keeps to, a vessel holding a liquid input, or a fuel it burns.</summary>
     public bool Takes(Thing t, string item) => Pending(t, item) || PoursInto(t, t.Inventory, item) != null || t.Burner != null && FuelFits(t, item);
     /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it, with nothing left by another recipe in its slots.</summary>
@@ -1091,7 +1100,7 @@ public sealed partial class World {
         // A vessel pours what it holds into the station's input slot for its liquid.
         var vessel = PoursInto(t, t.Inventory, item);
         string lands = vessel?.Liquid ?? item;
-        if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
+        if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say(NotUsedHere(item)); return 0; }
         if (Busy() || Forwarded(Verb.LoadInput, t.Id, item: item, count: quantity)) return 0;
         int moved = Load(t, item, quantity);
         if (moved == 0) Say(Carried(item) == 0 ? $"No {Data.Name(item)} in your backpack." : FullInput(lands));
@@ -1736,7 +1745,7 @@ public sealed partial class World {
         }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
-    private enum HoldRefusal { None, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly }
+    private enum HoldRefusal { None, NotUsed, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly }
     /// <summary>A tool station holds tools and water vessels, a pile one resource, compost what rots and a campfire wood.</summary>
     private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
         ThingKind.Hut when Barrel.Is(item) => HoldRefusal.None,
@@ -1745,6 +1754,7 @@ public sealed partial class World {
         ThingKind.Barrel => HoldRefusal.LiquidOnly,
         ThingKind.Hut => HoldRefusal.BarrelOnly,
         ThingKind.Toolstation when ToolKind(item) == "" => HoldRefusal.ToolsOnly,
+        _ when IsStation(t.Kind) && !SlotsTake(t, item) => HoldRefusal.NotUsed,
         ThingKind.Pile when t.Compost && !Compostable(item) && item != "fertilizer" => HoldRefusal.CompostOnly,
         ThingKind.Pile when !t.Compost && !PileTakes(t.Inventory, item) => HoldRefusal.OtherResource,
         ThingKind.Farm when !Data.Farm.Sow.ContainsKey(item) && !Barrels.CanPour(Data, item) => HoldRefusal.FarmOnly,
@@ -1761,6 +1771,7 @@ public sealed partial class World {
         HoldRefusal.LiquidOnly => "The barrel only holds water.",
         HoldRefusal.BarrelOnly => "The cabin slot only holds a steel barrel.",
         HoldRefusal.ToolsOnly => "The tool station only holds tools, buckets and bottles.",
+        HoldRefusal.NotUsed => NotUsedHere(item),
         HoldRefusal.CompostOnly => "The compost takes leaves, grass and food.",
         HoldRefusal.OtherResource => Phrase("This is ", A(PileName(t)!), " pile."),
         HoldRefusal.PackerOnly => t.Packs == "" ? "Choose what to pack first." : $"The packing station takes {Data.Name(t.Packs).ToLowerInvariant()} and empty crates.",

@@ -913,7 +913,7 @@ A station is always on one: taking the mark off with no batches waiting leaves t
 So a station with nothing to make keeps showing its slots, and more batches of that recipe are not a turn to another.
 Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
 `World.QueueBatch` adds to the count, and for a recipe other than the selected one it first turns the station to it:
-it drops the batches that waited and moves to the acting player's backpack what the new recipe has no use for: in `Thing.Inventory` all but its inputs, the old product included, and in the fuel slot (`Thing.Burner`) a fuel it does not burn (`World.Stays`).
+it drops the batches that waited and moves to the acting player's backpack what the new recipe has no use for: in `Thing.Inventory` all but its inputs, and the old product even where the new recipe uses it, and in the fuel slot (`Thing.Burner`) a fuel it does not burn (`World.Stays`).
 It then loads from the backpack only what the slots still lack for the batches queued, where more of the same recipe loads a whole batch on top.
 It always puts the mark on the recipe queued.
 `World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for what leaves (`Inventory.Fits`).
@@ -925,6 +925,7 @@ A station takes inputs for the selected recipe and the kept one, and haulers car
 A station starts no batch while its slots hold something that is neither such an input nor what its recipe makes (`World.Blocked`), as when a hauler delivers after the station has turned.
 What no storage takes stays in the station, which goes on working until its output stack is full.
 The output slot of the recipe the station is on takes back by hand what that recipe makes, one stack at most, as every station slot holds (`StationSlots.StationSlot`).
+Every move by hand into a station's slots goes through `World.HoldCheck`, which lets in only an input of the recipe it is on or keeps to, a vessel holding a liquid input, or what the recipe makes (`World.SlotsTake`); its fuel slot takes what `World.FuelBlock` allows.
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu; only the crafting menu has a `QueueStrip` under the work.
 The board asks `World.SwitchBlock` before it queues at a station and `World.MarkBlock` before it marks, and when the answer is a refusal it shakes the slots of the station's `ProcessRow` (`ProcessRow.Shake`).

@@ -20,6 +20,8 @@ public static class CraftingChecks {
         Test(CheckTurningKeepsTheInputsTheNewRecipeUses, data);
         Test(CheckTurningSendsTheProductAndUnusedInputsToTheBackpack, data);
         Test(CheckTurningKeepsFuelTheNewRecipeBurns, data);
+        Test(CheckTurningSendsTheOldProductOutEvenWhereTheNewRecipeUsesIt, data);
+        Test(CheckAStationTakesByHandOnlyWhatItsRecipeUsesOrMakes, data);
         Test(CheckIdleStationStaysOnTheRecipeAskedLast, data);
         Test(CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere, data);
         Test(CheckQueuingSeveralBatchesLoadsEachOfThem, data);
@@ -208,6 +210,48 @@ public static class CraftingChecks {
             "what the bucket still lacks should load from the backpack");
         Require(world.Backpack["steel_pick"] == 1 && bench.Inventory["steel_pick"] == 0 && world.Backpack["planks"] == 1 && bench.Inventory["planks"] == 0,
             "the pickaxe made and the planks the bucket does not use should go to the backpack");
+    }
+
+    /// <summary>
+    /// Planks a bench made go to the backpack when it turns to crates, though crates are made of planks:
+    /// with no room in the backpack for them the turn is refused.
+    /// </summary>
+    private static void CheckTurningSendsTheOldProductOutEvenWhereTheNewRecipeUsesIt(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        Give(world, "stone_chisel", 1); Give(world, "wood", 1);
+        world.QueueBatch(bench, "planks");
+        CompleteBatches(world, bench, "planks", 4);
+        // Stone in every free slot leaves no room for the planks.
+        Give(world, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
+        world.QueueBatch(bench, "crate");
+        Require(world.SwitchBlock(bench, "crate") != null && bench.Recipe != "crate" && bench.Inventory["planks"] == 4,
+            "a turn to crates should be refused while the backpack has no room for the planks the bench made");
+    }
+
+    /// <summary>
+    /// A move by hand into a bench on planks takes wood, which it uses, and planks, which it makes, up to a stack; it refuses stone with the reason.
+    /// A furnace's fuel slot takes the fuel its recipe burns, and its input slots refuse it.
+    /// </summary>
+    private static void CheckAStationTakesByHandOnlyWhatItsRecipeUsesOrMakes(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        world.SetRecipe(bench, "planks");
+        Give(world, "wood", 1); Give(world, "planks", 70); Give(world, "stone", 1);
+        string message = ""; world.Notify = text => message = text;
+        Require(world.Transfer(world.Backpack, bench.Inventory, "wood", 1) == 1, "a bench on planks should take wood by hand");
+        Require(world.Transfer(world.Backpack, bench.Inventory, "planks", 70) == 64 && bench.Inventory["planks"] == 64,
+            "a bench on planks should take planks by hand, up to a stack");
+        Require(world.Transfer(world.Backpack, bench.Inventory, "stone", 1) == 0 && bench.Inventory["stone"] == 0 && message == "Stone is not used by what this station makes.",
+            $"a bench on planks should refuse stone by hand and say why, not \"{message}\"");
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(24, 20));
+        world.Player = furnace.Pos + new Vector2(1.2f, 0);
+        world.SetRecipe(furnace, "iron_bar");
+        Give(world, "coal", 2);
+        Require(world.Transfer(world.Backpack, furnace.Burner!, "coal", 1) == 1, "a furnace on iron should take coal in its fuel slot by hand");
+        Require(world.Transfer(world.Backpack, furnace.Inventory, "coal", 1) == 0 && furnace.Inventory["coal"] == 0, "a furnace on iron should refuse coal in its input slots");
     }
 
     /// <summary>A turn from jam to stew at the cooking table keeps the wood in its fuel slot, which stew burns too, and takes the crushed berries out.</summary>

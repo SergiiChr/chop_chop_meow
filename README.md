@@ -334,7 +334,7 @@ Queueing another recipe depends on what the station is doing:
 | The station | Queueing another recipe |
 | --- | --- |
 | Is working a batch | Nothing changes, and its input and output slots shake |
-| Is between batches, with something in its slots | Inputs the new recipe uses stay in its slots, and fuel it burns stays in the fuel slot; the rest, its product too, goes into your backpack, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
+| Is between batches, with something in its slots | Inputs the new recipe uses stay in its slots, and fuel it burns stays in the fuel slot; the rest goes into your backpack, its product too even where the new recipe uses it, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
 | Is between batches, with no room in your backpack for what leaves its slots and fuel slot | Nothing changes, and its slots shake |
 | Has empty slots | It turns to the new recipe, its hard hat with it |
 
@@ -360,6 +360,7 @@ Pumping the reinforced furnace's bellows needs the same 1 m.
 
 Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
 The output slot takes back what the recipe makes from your backpack, up to a stack.
+By hand a station takes only what its recipe uses, the fuel it burns in its fuel slot, and what it makes; anything else is refused, such as "Stone is not used by what this station makes."
 A station that burns fuel has its own fuel slot under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
 Fuel the recipe cannot burn shows in brick; workers carry it back to storage and bring a fuel it burns.
 Side outputs and leftovers sit in a second row under the output.
