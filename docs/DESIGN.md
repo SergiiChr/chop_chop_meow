@@ -20,7 +20,7 @@ These came from the user; change them only after asking.
   after the pressure falls. Buildings with ten steel pipes in their Plumbing slot share water according to demand.
 - **Building orientation:** Plans turn in quarter turns during placement. A mine faces the cliff it fits.
 - **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, shovel for stumps and bushes, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they go to another spot of the job that they can work, loose pieces last, or wait and say so once.
-- **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
+- **Transfers:** automated transfers respect input and output allowlists of storage, where empty lets nothing through and `Inventory.Everything` lets all, and prefer storage whose input filter names the item. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
 - **Gravel paths:** a steel hammer at the bench crushes 1 stone into 1 gravel in 10 base seconds, and a path tile, one
   metre square, costs 4 gravel. Players, walking or sprinting, and workers move 1.2 times as fast where gravel is drawn,
   and workers keep their routes.
@@ -109,9 +109,11 @@ Simulation and data:
 | `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the bellows and fire jobs |
 | `src/jobs/hauling/Hauling.cs`, `src/jobs/hauling/Carry.cs` | The Haul job: the best carry across a haul job's places, the carry in hand and what a hauler says |
 | `src/jobs/hauling/PlaceHaul.cs` | The part of the Haul job each kind of place extends, and the four haul rules its carries come under |
+| `src/jobs/hauling/TakeBack.cs` | Where a worker takes a load nothing else takes: the nearest building whose output filter lets it out |
 | `src/stations/StationHaul.cs`, `src/farms/FarmHaul.cs`, `src/mines/MineHaul.cs`, `src/packing/PackerHaul.cs`, `src/storage/StoreHaul.cs` | What a crafting station, a farm plot, a mine site, a packing station, and a chest or placed crate offer a hauler |
 | `src/jobs/gathering/Gathering.cs`, `src/water/WaterGathering.cs` | The Gather job at resource spots, and the lake's version of it, which fills bottles |
 | `src/stations/model/ToolSlotRule.cs` | What one of a station's tool slots takes: a kind of tool at a tier or better |
+| `src/stations/model/BatchFor.cs` | `BatchFor`, who a station's batch in progress was started for: none in progress, the mark or a player's queue |
 | `src/stations/display/SlottedTool.cs` | A tool lying in a station's slot, at the bench and the anvil, showing the grade slotted |
 | `src/jobs/crafting/Crafting.cs`, `src/packing/PackCraft.cs` | The Craft job at a station, and the packing station's version of it, which packs crates |
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
@@ -170,7 +172,7 @@ UI and input:
 | `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, sleep and the needs a night would leave |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
-| `src/workers/lunch/LunchBreak.cs` | Reserves campfire and ground seats for workers on their lunch break |
+| `src/workers/breaks/BreakSeats.cs` | Reserves campfire and ground seats for workers at lunch or with nothing to do, and lights the campfires they sit at |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
 | `src/actors/enemies/wolf/DoorTug.cs` | A wolf tugging a player back out of a cabin's doorway, letting go and handing a badly hurt one to the takedown |
 | `src/actors/enemies/wolf/WolfBodies.cs` | How wolves at a player keep their distance: closing in only to biting reach, and stepping aside from another wolf's body |
@@ -260,8 +262,9 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps: `tests/hauling/`, `tests/gathering/`, `tests/crafting/`, `tests/progression/`, `tests/goals/`, `tests/water/`, `tests/trade/`, `tests/saves/`, `tests/paths/`, `tests/cabins/`, `tests/farms/`, `tests/mines/`, `tests/containers/barrel/`, `tests/actors/enemies/wolf/` and `tests/actors/player/` |
-| `tests/*Checks.cs` | Simulation checks of the features that have no folder yet, and the runner of them all, `SimulationChecks.Run` (`SELF-TEST PASS`) |
+| `tests/<feature>/` | Every check of a feature, as a player or worker sees it, beside its steps, such as `tests/hauling/`, `tests/storage/`, `tests/trade/`, `tests/tools/`, `tests/workers/jobs/`, `tests/chains/` and `tests/actors/player/` |
+| `tests/SimulationChecks.cs` | The runner of every simulation check, `SimulationChecks.Run` (`SELF-TEST PASS`), which calls each feature's `Run` |
+| `tests/*Checks.cs` | Simulation checks of the features that have no folder yet |
 | `tests/*Steps.cs` | Steps several features' simulation checks share |
 | `tests/NetScene.cs` | `NetScene`, one feature's scene in the network session: what the host puts down, the host's half and the guest's |
 | `src/GameChecks.cs` | Input/UI checks through real input events for the features that have no folder yet, and the runner of them all, `Game.RunUIChecks` (`UI-TEST PASS`) |
@@ -291,11 +294,10 @@ Checks and review tools:
 Keep balance and recipe values in `GameData` and `GameTables`, apart from the rules in the simulation code.
 Keep rendering and input separate from state transitions, so headless checks can exercise gameplay rules without relying on screenshots.
 
-- `tests/SimulationChecks.cs` covers filters, worker routing, trade, wages, recovery after death, saves and a material-driven progression run.
 - `tests/EconomyChecks.cs` measures real workers through a day and checks the economy rules.
-- `tests/AllocationChecks.cs` holds ticks to their allocation budgets.
+- `tests/performance/AllocationChecks.cs` holds ticks to their allocation budgets.
   `tests/pipes/PlumbingAllocationChecks.cs` applies the tick budget to pumping into two barrels.
-- `tests/ProductionChainChecks.cs` covers the trading post's filter and auto-sell, and workers alone running the berry, bread, canned stew and steel pickaxe chains to a sale.
+- `tests/chains/ProductionChainChecks.cs` has workers alone run the berry, bread, canned stew and steel pickaxe chains to a sale.
 
 ### HUD and backpack
 
@@ -352,7 +354,7 @@ A field whose new object starts elsewhere is marked to be always written, which 
 A changed entry whose field names or order changed is sent whole.
 When the field order matches, the host and guest step through the fields once to write or apply changed values.
 `tests/pipes/PipeWaterUpdateChecks.cs` checks that a pipe water update preserves the host's fields and field order.
-`WorldUpdates` writes them into reused buffers and keeps the last update's array for every entry that did not change, so only changed entries allocate (`tests/AllocationChecks.cs`).
+`WorldUpdates` writes them into reused buffers and keeps the last update's array for every entry that did not change, so only changed entries allocate (`tests/performance/AllocationChecks.cs`).
 The welcome is a guest's first update, with the fog uncovered so far.
 
 - Updates go unreliably on their own channel, so a lost one never delays the next.
@@ -735,14 +737,15 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   A player a wolf had pinned goes free as it leaves.
   Patrolling, going home or losing its player (who sheltered or left the game) clears the wolf’s current attack, stance and repositioning (`WolfPatrols.Calm`). It still runs if it has been hit.
 
-Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
+Campfire light repels wolves, and `CampfireHours` sets how long one log burns; a campfire with no wood left burns while workers sit at it.
 A wolf already chasing the player still follows into the light for a few seconds.
 Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters go to its door (`DoorCheck.Follow`), or give up and patrol on away from a cabin they leave alone.
 
 #### Cabin doors
 
 `Doorways` (`src/cabins/Doorways.cs`) runs a cabin's door, which lets one player through at a time into a cabin that holds `Doorways.Places`, and `DoorTug` (`src/actors/enemies/wolf/DoorTug.cs`) a wolf tugging a player out of it; `World` holds one of each (`World.Doorways`, `World.DoorTug`) and ticks the doorway with the acting player.
-A click on a cabin starts a `CabinApproach` to `Doorways.DoorPoint`, using the same grid routes workers use to avoid obstacles.
+A double click on a cabin, or its page's Enter button, starts a `CabinApproach` to `Doorways.DoorPoint`, using the same grid routes workers use to avoid obstacles.
+The click's first press opens the page, which moves the world aside and can put the page's windows under the pointer, so `Game._Input` hands the second press to `PlayerControl.WalkIntoClickedCabin` before the interface sees it.
 `WalkSearch` checks nearby building footprints and spreads long searches across frames.
 If a failed search saw a layout that has changed, the approach tries again with the current buildings.
 The panel highlights Enter while finding a path and during the walk.
@@ -974,6 +977,9 @@ They run at base speed times the tool's speed while the player carries it, and o
 The queue is written by `QueueJson`, since the generic list writer allocates on every world update.
 
 The bench runs at `BenchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
+At a station someone has to work, a batch a player queued moves while a player or a paid worker works it; a batch for the mark moves only with a worker (`World.Hammered`).
+`Thing.Batch` says who the batch in progress was started for (`BatchFor`), and `World.PlayersWork` says whether players work it: only a queued one takes a carried tool or shows the player hammering.
+The packing station has no queue: whoever works it packs.
 
 A station counts batches of one recipe at a time: `Thing.Asked` is the recipe a player queued last and `Thing.Batches` how many of it still wait; a batch leaves the count as it starts.
 `Thing.Keep` is the recipe workers keep it making once those batches are done, and a building's `Recipe` in `GameTables` names the one it starts with.
@@ -984,9 +990,10 @@ A station is always on one: taking the mark off with no batches waiting leaves t
 So a station with nothing to make keeps showing its slots, and more batches of that recipe are not a turn to another.
 Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
 `World.QueueBatch` adds to the count, and for a recipe other than the selected one it first turns the station to it:
-it drops the batches that waited and moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack.
+it drops the batches that waited and moves to the acting player's backpack what the new recipe has no use for: in `Thing.Inventory` all but its inputs, and the old product even where the new recipe uses it, and in the fuel slot (`Thing.Burner`) a fuel it does not burn (`World.Stays`).
+It then loads from the backpack only what the slots still lack for the batches queued, where more of the same recipe loads a whole batch on top.
 It always puts the mark on the recipe queued.
-`World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for all of it (`Inventory.Fits`).
+`World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for what leaves (`Inventory.Fits`).
 So batches only wait for the recipe in progress when there is one, and `World.Deserialize` refuses a save where they wait for another.
 `World.Unqueue` takes waiting batches off the count.
 `World.SetRecipe` moves the mark, and a move to a recipe other than the selected one turns the station to it and drops the batches that waited; `World.MarkBlock` refuses that move while a batch is in progress or `Thing.Inventory` holds anything.
@@ -994,6 +1001,8 @@ So a station with a mark is on its marked recipe, and `World.Deserialize` refuse
 A station takes inputs for the selected recipe and the kept one, and haulers carry out only what neither takes.
 A station starts no batch while its slots hold something that is neither such an input nor what its recipe makes (`World.Blocked`), as when a hauler delivers after the station has turned.
 What no storage takes stays in the station, which goes on working until its output stack is full.
+The output slot of the recipe the station is on takes back by hand what that recipe makes, one stack at most, as every station slot holds (`StationSlots.StationSlot`).
+Every move by hand into a station's slots goes through `World.HoldCheck`, which lets in only an input of the recipe it is on or keeps to, a vessel holding a liquid input, or what the recipe makes (`World.SlotsTake`); its fuel slot takes what `World.FuelBlock` allows.
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu; only the crafting menu has a `QueueStrip` under the work.
 The board asks `World.SwitchBlock` before it queues at a station and `World.MarkBlock` before it marks, and when the answer is a refusal it shakes the slots of the station's `ProcessRow` (`ProcessRow.Shake`).
@@ -1217,8 +1226,16 @@ Both are boxes a player in reach of the worker (`World.Reaches`) picks up from a
 
 #### Chests
 
-Chests have separate item allowlists for input and output, and empty lists allow all items.
-Automated deposits go to the nearest place that asks for the item, then to the nearest unrestricted storage (`World.DepositFor`).
+Chests have separate item allowlists for input and output.
+Storage with a filter window has `Inventory.Gated` set: there an empty list lets nothing through and `Inventory.Everything`, shown as an "A" cell, lets every item through.
+`Inventory.Filter` keeps `Everything` alone in its row.
+`World.Add` gives a chest and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; every crate's contents get the chest's lists when made (`World.NewCrate`), packed or not.
+Any other box, such as a station's slots or a worker's hands, is not gated, and lets anything through its empty lists.
+Automated deposits go to the nearest place that asks for the item, then to the nearest storage taking everything (`World.DepositFor`).
+A load nothing takes goes back to the nearest building whose output filter lets it out, up to one stack of it (`TakeBack`, which `World` holds): storage by the output filter set on it (`Inventory.AllowsWithdrawal`), and a building with output slots by what it outputs, worked out from the building rather than stored (`TakeBack.Outbox`): a station its recipe's product, a farm plot its yield, an open mine its ore and stone (a mine's output shows only once it opens), a packing station crates of its good.
+A station's slots hold inputs and leftovers of other recipes as well as its product, so a stored output filter there would also stop haulers carrying the leftovers out.
+With no taker found, a worker looks again every `JobListSeconds` (`Worker.LookAgain`) rather than every tick.
+With none, the load stays in hand while the worker does only the jobs that need no hands: the job table's `JobDef.Hands` says which jobs carry loads (`World.NeedsHands`).
 Asking for it are a chest, pile, placed crate or trading post whose input filter names it, a packing station packing it, a station whose recipe takes it as an input or burns it, a farm plot short of it for a sowing and a mine site short of it.
 `World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
@@ -1238,7 +1255,9 @@ Piles (`pile`) are 3×3 yards (`Construction.IsZone`, `ZoneSize`) that do not bl
 
 A pile takes part in automation like a chest.
 Its input and output filters name the same one `World.PileEntry`: an item, a kind of crate (`World.MixedCrate` for crates of mixed goods), or a vessel's liquid for every fill of that vessel holding some, apart from the empty vessel.
-The player sets it on an empty pile through `SetFilter`, or `World.PileFilters` sets it on a tick from the first resource put in.
+A pile with none named takes nothing from workers.
+The player sets it on an empty pile through `SetFilter`, or `World.PileFilters` sets it on a tick from the first resource put in by hand.
+A pile's filter never holds `Inventory.Everything`.
 It stays when the pile empties, and `SetFilter` and `ClearFilters` refuse to change it while the pile holds anything.
 `HoldBlock` refuses any other resource, including for manual transfers.
 
@@ -1294,7 +1313,7 @@ Workers are tracked individually.
 
 #### Jobs
 
-The kinds of work are `JobKind`, each with an id in saves and commands (`JobKinds.Id`), and one table holds each job's title, hint, whether a round of it is a unit of the place's work, the tools it takes and what it does (`World.Def`, `JobDef`).
+The kinds of work are `JobKind`, each with an id in saves and commands (`JobKinds.Id`), and one table holds each job's title, hint, whether a round of it is a unit of the place's work, whether it carries loads in the worker's hands, the tools it takes and what it does (`World.Def`, `JobDef`).
 A place offers some of them (`World.Jobs`), such as Craft and Haul at a crafting bench.
 A job that several kinds of place offer is a class in `src/jobs/` that `World` holds: `Hauling`, `Gathering` and `Crafting`.
 A place with its own way of doing it extends it in its feature's folder: every place that offers Haul has a `PlaceHaul`, the lake gathers through `WaterGathering` and a packing station is worked through `PackCraft`.
@@ -1315,7 +1334,7 @@ The job in hand is `Worker.Assignment` and `Worker.Doing`.
 - a crafted batch, a furnace batch at the bellows, a crate packed full, a piece mined, a harvest and a mine building stage end it for the jobs the table marks, counted by the place (`Thing.Rounds`, `Worker.Mark`).
 
 A job with nothing to do sets the status to what it lacks.
-With none to do the worker waits at the nearest trading post (`World.Idle`), shows the first job's status and reads the list again every `JobListSeconds`, or at once when the list changes.
+With none to do the worker sits at the nearest campfire as at lunch (`World.Idle`, `BreakSeats.Rest`), or with no campfire waits at the nearest trading post, shows the first job's status and reads the list again every `JobListSeconds`, or at once when the list changes.
 A tool none of their jobs uses goes back to a tool station first (`World.JobUses`).
 
 `World.MoveJob` moves an entry from one `JobSpot` to another: a place in the list, or a place among a group's hauls.
@@ -1339,8 +1358,9 @@ Each kind of place offers its carries through its own `PlaceHaul` (`StationHaul`
 Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold one sowing (`Farms.SowRoom`) and a mine site what it lacks.
 A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
 Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
+A load carried out of a place is as much as the place taking it has room for (`PlaceHaul.Taker`), and is sized again at pickup (`Hauling.Takes`), so none is left in hand when the place filled meanwhile.
 
-A chest's or placed crate's hauler carries out what its output filter lets go to the nearest place asking for it (`World.AskerFor`), then fills it with what its input filter names (`StoreHaul.FillSource`); every such carry comes under the first rule.
+A chest's or placed crate's hauler carries out what its output filter lets go to the nearest place asking for it (`World.AskerFor`), then fills it with what its input filter names (`StoreHaul.FillSource`, never for `Everything`); every such carry comes under the first rule.
 Storage that asks for an item never passes it to other storage asking for it, nor takes it from one, so two never trade it back and forth.
 
 #### Gathering and the bellows
@@ -1352,7 +1372,7 @@ Woodcutters skip trees that have yet to become adults.
 A woodcutter who fells a tree takes its stump as their spot while a shovel is to be had, without waiting for a player to see it; other stumps count once a player has seen them.
 A worker carries one tool, so going between a tree and a stump takes a walk to a tool station to swap.
 With none known they say so once, carry off what they hold and go on to their other jobs.
-A worker with no duties waits at the nearest trading post.
+A worker with no duties sits at the nearest campfire, or with none waits at the nearest trading post.
 
 Only one worker ever pumps a reinforced furnace: the bellows job has nothing to do while another worker has it in hand (`World.Pump`).
 It also has nothing to do while the furnace neither smelts nor holds a batch to smelt, so a worker with both jobs hauls then.
@@ -1369,8 +1389,11 @@ A dismissed worker's tool goes into their recovery box.
 #### Schedule
 
 At the `LunchHour` in `GameData` workers break for one in-game hour.
-`LunchBreak` reserves the nearest available campfire seats, with up to six seats per fire.
-A blocked walk releases its seat, and the worker remembers seats they could not reach until lunch ends.
+`BreakSeats` reserves the nearest available campfire seats, with up to six seats per fire.
+It seats workers with nothing to do the same way at any hour; their ground groups gather round the nearest campfire rather than where they stand.
+A worker who sat in the last tick keeps their seat while they still have nothing to do, so the crew still sitting when lunch ends stays put.
+A campfire burns its wood as usual while workers sit at it; once it has none left, a worker sitting in one of its seats keeps it burning at `KindledBurn`, one second (`BreakSeats.Kindle`), and it dies down within that second once they leave.
+A blocked walk releases its seat, and the worker remembers seats they could not reach until nobody is on a break any more, lunch or idle, or until the number of buildings that block walking changes (`BreakSeats.Prepare`), when every seat is tried again.
 Workers on the ground keep their seats when the crew changes, unless they take a vacancy by a fire.
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
 When a worker cannot reach a group, they sit near where they stopped if there is room, or wait standing.
@@ -1411,8 +1434,8 @@ Buying costs a fixed 1.25× the base price.
 A cart trip takes 30 seconds.
 Purchases settle on return into the trading post's market output (`Thing.Output`), with overflow in a box beside it.
 
-The trading post's input filter names the crates it asks for.
-`DepositFor` treats a post as storage only for an item its filter names, so workers deliver those crates there when it is the nearest storage asking for them.
+The trading post's input filter names the crates it asks for, or holds `Inventory.Everything` for every kind of crate it buys.
+`DepositFor` treats a post as storage only for an item its filter takes, so workers deliver those crates there when it is the nearest storage asking for them; with `Everything` it ranks with storage taking everything.
 With `Thing.AutoSell` set, the cart leaves on its own once every market slot holds a crate and a cart is free.
 Sale coins land in the trading post's wage slot (`Thing.Wages`, coins only), whose coin stack (`Inventory.CoinStack`) is `Inventory.UnlimitedCoins`, so the bank has no limit.
 Dawn wages, settled strikes and hiring payments draw on every wage slot before the payer's backpack; purchases come from the backpack only.

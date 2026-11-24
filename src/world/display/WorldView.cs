@@ -811,7 +811,7 @@ public partial class WorldView : Node3D {
         && (state.Blend >= 1 || state.From is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run || ActorAnimation.Tool(state.From) != null);
 
     /// <summary>
-    /// A worked station near a player that is processing with nobody of the crew working it, for an idle player to work at.
+    /// A worked station near a player that is processing a batch a player queued with nobody of the crew working it, for an idle player to work at.
     /// A player holding on to a gather target is busy with that, even with a pose that shows no gathering.
     /// A station whose recipe waits for a tool that is neither slotted nor carried by the player is not worked.
     /// </summary>
@@ -819,7 +819,7 @@ public partial class WorldView : Node3D {
         if (p.GatherTarget != 0) return null;
         using var acting = World.ActAs(p);
         foreach (var kind in World.WorkedKinds)
-            foreach (var t in World.ThingsOf(kind)) if (World.Worked(t) && t.Processing && World.AtStation(t) && !World.CrewHammers(t) && Tooled(t)) return t;
+            foreach (var t in World.ThingsOf(kind)) if (World.Worked(t) && t.Processing && World.PlayersWork(t) && World.AtStation(t) && !World.CrewHammers(t) && Tooled(t)) return t;
         return null;
     }
 

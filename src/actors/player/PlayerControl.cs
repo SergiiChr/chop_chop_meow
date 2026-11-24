@@ -56,6 +56,8 @@ public sealed class PlayerControl {
     /// <summary>A container held under the right mouse button; it is lifted once held for <see cref="LiftSeconds"/>.</summary>
     private Thing? lifting;
     private float liftClock;
+    /// <summary>The cabin the last left press in the world opened, which the second press of a double click walks into (<see cref="WalkIntoClickedCabin"/>).</summary>
+    private Thing? clickedCabin;
 
     /// <summary>What the next left click in the world does.</summary>
     public ClickMode Mode { get; set; } = new ClickMode.Normal();
@@ -77,7 +79,7 @@ public sealed class PlayerControl {
     /// <summary>Drops actions whose targets belong to the previous world.</summary>
     private void Stop() {
         DiggingAt = null; digAttempt = 0;
-        gathering = null; lifting = null; pumpApproach = null; cabinApproach.Cancel();
+        gathering = null; lifting = null; pumpApproach = null; clickedCabin = null; cabinApproach.Cancel();
     }
 
     public bool Entering(Thing cabin) => cabinApproach.GoesTo(cabin);
@@ -362,6 +364,19 @@ public sealed class PlayerControl {
         } else if (Mode is ClickMode.Normal && view.PickWorker(at) == null) hotbar.UseSelected(view.ToWorld(at));
     }
 
+    /// <summary>
+    /// The second press of a double click on a cabin walks the player to its door and in, wherever the pointer is.
+    /// The first press opened the cabin's page, which moves the world aside under the pointer and can put the page's windows over it.
+    /// So the game hands every left press here before the interface: one that is not such a second press returns false and goes on as usual.
+    /// </summary>
+    public bool WalkIntoClickedCabin(InputEventMouseButton mouse) {
+        if (mouse.ButtonIndex != MouseButton.Left || !mouse.Pressed) return false;
+        var cabin = clickedCabin; clickedCabin = null;
+        if (!mouse.DoubleClick || !cursor.Empty || Mode is not ClickMode.Normal || cabin == null || world.Find(cabin.Id) is not { Kind: ThingKind.Hut } opened) return false;
+        pumpApproach = null; cabinApproach.Start(opened);
+        return true;
+    }
+
     private void LeftPress(Vector2 at) {
         PlaceHeld(false);
         if (Layer == Layer.Underground && Mode is ClickMode.Normal) {
@@ -404,8 +419,9 @@ public sealed class PlayerControl {
         world.SetDuty(worker, t, JobKind.Gather, true); Mode = new ClickMode.Normal(); panel.Select(worker);
     }
 
+    /// <summary>Opens a thing's page; a cabin's is the one the second press of a double click then walks into.</summary>
     private void ClickThing(Thing t) {
-        if (t.Kind == ThingKind.Hut) { pumpApproach = null; cabinApproach.Start(t); }
+        if (t.Kind == ThingKind.Hut) clickedCabin = t;
         panel.Select(t);
     }
 

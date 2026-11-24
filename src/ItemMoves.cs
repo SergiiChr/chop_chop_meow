@@ -57,10 +57,10 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole, HeldCursor cursor)
         if (slot >= 0) world.TransferSlot(from, to, held.Slot, slot, item, units); else world.Transfer(from, to, item, units);
     };
 
-    /// <summary>Stores what a thing takes from the backpack, <paramref name="amount"/> saying how much of each item; stacks bound to the hotbar stay.</summary>
+    /// <summary>Stores what a thing holds from the backpack, whatever its filters say, as any move by hand; <paramref name="amount"/> says how much of each item, and stacks bound to the hotbar stay.</summary>
     public void StoreAll(Thing t, Func<string, int> amount) {
         if (!InReach(t)) return;
-        foreach (var id in world.Backpack.Items.Keys.Where(id => world.Holds(t, id) && t.Inventory.Accepts(id)).ToArray())
+        foreach (var id in world.Backpack.Items.Keys.Where(id => world.Holds(t, id)).ToArray())
             if (amount(id) is > 0 and int count) world.FromSpares(() => world.Transfer(world.Backpack, t.Inventory, id, count));
     }
 

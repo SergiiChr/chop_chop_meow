@@ -83,7 +83,7 @@ public partial class Game {
     private async Task CheckABenchCrushingRocksSoundsLikeMiningStone() {
         int soundsBefore = sounds.Played;
         var bench = Hosted.Add(ThingKind.Bench, Hosted.Player + new Vector2(1.2f, 0));
-        bench.Tools!.Add("steel_hammer", 1); Hosted.SetRecipe(bench, "gravel"); bench.Inventory.Add("stone", 6);
+        bench.Tools!.Add("steel_hammer", 1); Give(Hosted, "stone", 6); Hosted.QueueBatch(bench, "gravel", 6);
         await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Heard("mine_ore", soundsBefore), "the idle player crushing rocks at the bench beside it with the sound of mining stone", 4);
         RemoveThings(Hosted, t => t == bench);
     }

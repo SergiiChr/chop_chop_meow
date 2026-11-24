@@ -112,6 +112,15 @@ public partial class Game {
     private async Task DoubleClick(Control control) {
         var at = await At(control);
         await Apart(at);
+        await DoublePress(at);
+        Handled(at);
+    }
+
+    /// <summary>Double clicks a window point in the world, as <see cref="DoubleClick(Control)"/> does a control.</summary>
+    private async Task DoubleClick(Vector2 point) => await DoublePress(GetViewport().GetFinalTransform() * point);
+
+    /// <summary>Two presses and releases at a window point, the second press flagged as a double click, each waiting out the frames after it.</summary>
+    private async Task DoublePress(Vector2 at) {
         foreach (bool second in new[] { false, true }) {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true, DoubleClick = second });
             await Frames();
@@ -119,7 +128,6 @@ public partial class Game {
             await Frames();
         }
         await Frames();
-        Handled(at);
     }
 
     /// <summary>Picks up a cell's stack with a left click, which on a cell with a use waits out a possible second press first.</summary>
@@ -195,11 +203,17 @@ public partial class Game {
     }
 
     /// <summary>Clicks a thing in the world where its model shows, clear of workers and of the panels over the world.</summary>
-    private async Task ClickOn(Thing thing) {
+    private async Task ClickOn(Thing thing) => await Click(await SpotOn(thing));
+
+    /// <summary>Double clicks a thing in the world where its model shows, clear of workers and of the panels over the world.</summary>
+    private async Task DoubleClickOn(Thing thing) => await DoubleClick(await SpotOn(thing));
+
+    /// <summary>A point on a thing's model in the world that a click reaches, clear of workers and of the panels over it.</summary>
+    private async Task<Vector2> SpotOn(Thing thing) {
         await Frames();
         var spots = Enumerable.Range(0, 24).Select(i => view.Screen(thing.Pos, i * .15f)).Where(p => view.Pick(p)?.Id == thing.Id && view.PickWorker(p) == null && Uncovered(p)).ToArray();
         Require(spots.Length > 0, $"No spot on the {thing.Kind} can be clicked: it is off screen, hidden or under a panel.");
-        await Click(spots[0]);
+        return spots[0];
     }
 
     /// <summary>Whether a click at this point reaches the world rather than a panel over it.</summary>

@@ -9,6 +9,7 @@ using static WorldSteps;
 public static class HiringChecks {
     public static void Run(GameData data) {
         Test(CheckHiringOfferPaysUpFrontFromTheBankFirst, data);
+        Test(CheckHiringSignsAWorkerOn, data);
     }
 
     /// <summary>
@@ -30,5 +31,15 @@ public static class HiringChecks {
         world.Transfer(world.Backpack, sign.Wages!, Inventory.Coins, (int)dear.Upfront - 2);
         Require(world.Hire(sign, dear) != null && sign.Wages![Inventory.Coins] == 0 && world.Coins == 5,
             "hiring should be paid from the bank first and the backpack for the rest");
+    }
+
+    private static void CheckHiringSignsAWorkerOn(GameData data) {
+        var world = EmptyWorld(data);
+        var heard = Listen(world);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(20, 16));
+        world.Player = sign.Pos;
+        SetCoins(world, 100);
+        heard.Clear(); world.Hire(sign, data.HireOffers[0]);
+        Require(heard.SequenceEqual(new[] { "hire_sign" }), "hiring a worker should sign them on");
     }
 }

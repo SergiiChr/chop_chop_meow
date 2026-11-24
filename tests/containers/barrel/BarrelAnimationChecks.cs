@@ -7,13 +7,13 @@ using static Checks;
 /// <summary>Contact checks for the actual rig and props used to carry and fill a barrel.</summary>
 internal static class BarrelAnimationChecks {
     public static void Run() {
-        CheckPlayerWalksUnderTheWeightOfWater();
-        CheckActorsHugTheBarrelThroughAFullStride();
-        CheckBarrelCarryKeepsTheTorchVisible();
-        CheckWorkerKeepsTheirHandOnTheLadderUntilTheNextReach();
-        CheckBothVesselsPourIntoTheRoofOpening();
-        CheckBucketPoursOntoTheFarmSoil();
-        CheckBottleGaugeKeepsItsFillAfterFading();
+        Test(CheckPlayerWalksUnderTheWeightOfWater);
+        Test(CheckActorsHugTheBarrelThroughAFullStride);
+        Test(CheckBarrelCarryKeepsTheTorchVisible);
+        Test(CheckWorkerKeepsTheirHandOnTheLadderUntilTheNextReach);
+        Test(CheckBothVesselsPourIntoTheRoofOpening);
+        Test(CheckBucketPoursOntoTheFarmSoil);
+        Test(CheckBottleGaugeKeepsItsFillAfterFading);
     }
 
     private static void CheckPlayerWalksUnderTheWeightOfWater() {

@@ -14,7 +14,8 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var mine = world.Construction.Build(ThingKind.Mine, cliff.MineSpot)!;
         mine.MineStage = stage; mine.Progress = stage is MineStage.Marked or MineStage.Supplied ? world.Mines.StageSeconds / 2 : 0;
         if (stage == MineStage.Dug) mine.Inventory.Add("wood", 20);
-        world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 + cliff.Along * 2);
+        // The scene's storage takes what the crew brings, as a player would set it.
+        world.SetFilter(world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 + cliff.Along * 2), Inventory.Everything, false, true);
         foreach (var w in world.Workers.ToArray()) world.Assign(w, null);
         foreach (var w in world.Workers.Take(stage == MineStage.Open ? 3 : 1)) { w.Pos = world.Player; world.Assign(w, mine); }
         if (stage == MineStage.Open && !Launch.Has("--idle")) mine.Output!.Add(Mines.Ore(mine), 20);
@@ -172,13 +173,13 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(-2, -2)); var fire = world.Add(ThingKind.Campfire, Terrain.Spawn + new Vector2(1, -3)); fire.Burn = 200;
         var f = world.Add(ThingKind.Furnace, Terrain.Spawn + new Vector2(4, -2)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);
         var bellows = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
-        var chest = world.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 3)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
+        var chest = world.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 3)); world.SetFilter(chest, Inventory.Everything, false, true); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
         var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(4, 4)); anvil.Tools!.Add("steel_hammer", 1); var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(-1, 4));
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add(Water.Full, 4); world.S.Backpack.Add("steel_pick", 1);
         var bench = world.Add(ThingKind.Bench, Terrain.Spawn + new Vector2(-4, 1.5f)); world.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
-        var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1); rack.Inventory.Add("steel_shovel", 1);
+        var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); world.SetFilter(rack, Inventory.Everything, false, true); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1); rack.Inventory.Add("steel_shovel", 1);
         world.Add(ThingKind.LeafSpot, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeavesPerSpot);
-        var crate = world.Add(ThingKind.Crate, Terrain.Spawn + new Vector2(1.5f, 1.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
+        var crate = world.Add(ThingKind.Crate, Terrain.Spawn + new Vector2(1.5f, 1.5f)); world.SetFilter(crate, Inventory.Everything, false, true); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
         foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1), ("torch", 2) }) world.S.Backpack.Add(item, count);
         world.S.Milestones.UnionWith(new[] { "bench", "crate", "sold", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil" });
         // The review fixture is deliberately separate from a fresh playable game.
@@ -280,7 +281,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
                 (11, 11), (12, 11), (11, 12), (12, 12), (13, 12), (12, 13), (13, 13), (14, 13),
             };
             foreach (var (x, y) in tiles) world.GravelPaths.Lay(at + new Vector2I(x, y));
-            world.Add(ThingKind.Chest, at + new Vector2(12, 2));
+            world.SetFilter(world.Add(ThingKind.Chest, at + new Vector2(12, 2)), Inventory.Everything, false, true);
             var pile = world.Add(ThingKind.Pile, at + new Vector2(9.5f, 5)); pile.Inventory.Add("gravel", 5 * pile.Inventory.StackSize);
             world.Player = at + new Vector2(7.5f, 6.5f); world.Tick(0); view.Zoom = .7f; panel.Close();
             if (Launch.Has("--top")) { view.CameraTurn = -45; view.CameraPitch = 89; }
@@ -340,7 +341,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.SetFilter(sign, World.CrateOf("bread"), false, true); world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);
             if (Launch.Has("--post")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); Press("filters"); } else if (Launch.Has("--panel")) { panel.Select(packer); if (Launch.Has("--pick")) Press("pack_good"); } else panel.Close();
         }
-        if (Launch.Has("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (Launch.Has("--panel")) panel.Select(rack); else panel.Close(); }
+        if (Launch.Has("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (Launch.Has("--panel")) panel.Select(rack); else panel.Close(); if (Launch.Has("--filters")) { panel.Select(rack); Press("filters"); } }
         if (Launch.Has("--tin")) { var cliff = Cliff.Of(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }
         if (Launch.Has("--pantry")) {
             foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
@@ -362,6 +363,13 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.S.Time = (world.Data.LunchHour - 6) / 24 * world.Data.DaySeconds;
             for (int i = 0; i < 60; i++) world.Tick(.25f);
             panel.Open(Page.Crew);
+        }
+        if (Launch.Has("--idle")) {
+            // Idle review: the crew's jobs are taken off and they sit at the campfire, which has no wood and burns while they do.
+            foreach (var w in world.Workers) world.Assign(w, null);
+            fire.Burn = 0;
+            for (int i = 0; i < 60; i++) world.Tick(.25f);
+            world.Player = fire.Pos + new Vector2(3, 3); panel.Close(); view.Zoom = 1.6f;
         }
         if (Launch.Has("--strike")) {
             // Strike review: the whole crew owes wages and stands holding protest signs.

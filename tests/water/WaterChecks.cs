@@ -12,21 +12,22 @@ namespace ChopChopMeow.Tests;
 /// <summary>Focused bottle-state checks; called from the deterministic simulation checks.</summary>
 public static class WaterChecks {
     public static void Run(GameData data) {
-        CheckBottlesPourTheLitersTheyHold(data);
-        CheckBottleStatesAreDefinedInData(data);
-        CheckBottleGivesThreeLiters(data);
-        CheckBottleKeepsPartialStateAcrossSave(data);
-        CheckBottleRecipeMakesEmptyBottleFromTinAndWood(data);
-        CheckRecipesReturnReusableBottles(data);
-        CheckTakingWaterOutNeedsABottleWithRoom(data);
-        CheckQueuedBatchPoursWaterFromBottles(data);
-        CheckQueuedBatchSaysWhatItIsMissing(data);
-        CheckPileHoldsWaterAtAnyFillApartFromEmptyBottles(data);
-        CheckQueuedBatchCountsOnlyCarriedFuel(data);
-        CheckFullBottleQueuedForOneLiterKeepsTheRest(data);
-        CheckSwitchingRecipeTakesWaterIntoBottles(data);
-        CheckStationTakesBottlesForItsWater(data);
-        CheckDismantledStationFillsBottles(data);
+        Test(CheckBottlesPourTheLitersTheyHold, data);
+        Test(CheckBottleStatesAreDefinedInData, data);
+        Test(CheckBottleGivesThreeLiters, data);
+        Test(CheckBottleKeepsPartialStateAcrossSave, data);
+        Test(CheckBottleRecipeMakesEmptyBottleFromTinAndWood, data);
+        Test(CheckRecipesReturnReusableBottles, data);
+        Test(CheckTakingWaterOutNeedsABottleWithRoom, data);
+        Test(CheckQueuedBatchPoursWaterFromBottles, data);
+        Test(CheckQueuedBatchSaysWhatItIsMissing, data);
+        Test(CheckPileHoldsWaterAtAnyFillApartFromEmptyBottles, data);
+        Test(CheckQueuedBatchCountsOnlyCarriedFuel, data);
+        Test(CheckFullBottleQueuedForOneLiterKeepsTheRest, data);
+        Test(CheckSwitchingRecipeTakesWaterIntoBottles, data);
+        Test(CheckStationTakesBottlesForItsWater, data);
+        Test(CheckABucketPouredByHandFillsAStationsWaterToAStack, data);
+        Test(CheckDismantledStationFillsBottles, data);
     }
 
     private static void CheckBottlesPourTheLitersTheyHold(GameData data) {
@@ -55,7 +56,7 @@ public static class WaterChecks {
         Give(batch, Water.Full, 1);
         Require(batch.Transfer(batch.Backpack, table2.Inventory, Water.Full, 1) == 1 && table2.Inventory[Water.Liquid] == 6 && batch.Backpack[Water.Empty] == 3,
             "a bottle moved into the table by hand must pour too");
-        var chest = batch.Add(ThingKind.Chest, batch.Player + Vector2.Left);
+        var chest = TakeEverything(batch, batch.Add(ThingKind.Chest, batch.Player + Vector2.Left));
         Give(batch, Water.TwoLiters, 1);
         Require(batch.Transfer(batch.Backpack, chest.Inventory, Water.TwoLiters, 1) == 1 && chest.Inventory[Water.TwoLiters] == 1, "bottles must store in ordinary storage as they are");
     }
@@ -112,13 +113,15 @@ public static class WaterChecks {
     private static void CheckRecipesReturnReusableBottles(GameData data) {
         var world = new World(data, false);
         var bench = world.Add(ThingKind.Bench, world.Player + Vector2.Right * 1.4f);
-        bench.Tools!.Add("steel_hammer", 1); world.SetRecipe(bench, "water_bottle");
-        bench.Inventory.Add("tin_sheet", 1); bench.Inventory.Add("wood_parts", 1);
+        bench.Tools!.Add("steel_hammer", 1);
+        Give(world, "tin_sheet", 1); Give(world, "wood_parts", 1);
+        world.QueueBatch(bench, "water_bottle");
         for (int i = 0; i < 100; i++) world.Tick(.25f, true);
         Require(bench.Inventory["empty_bottle"] == 1 && bench.Inventory["water"] == 0,
             "the actual bench recipe must make exactly one empty bottle without creating water");
         var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Left * 1.4f);
-        world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 3); table.Inventory.Add("flour", 1);
+        world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 3);
+        Give(world, "flour", 1); world.QueueBatch(table, "dough");
         for (int i = 0; i < 100; i++) world.Tick(.25f, true);
         Require(table.Inventory[Water.Empty] == 0, "cooking must leave no bottle on the table: the bottle stayed with whoever poured it");
         Require(table.Inventory[Water.Liquid] == 0, "cooking must use the water");
@@ -128,7 +131,7 @@ public static class WaterChecks {
         var shore = Terrain.WaterPoint(Terrain.Spawn);
         var outward = (shore - Terrain.Lake).Normalized();
         var lake = world.Add(ThingKind.Water, shore, 9999);
-        var chest = world.Add(ThingKind.Chest, shore + outward * 5); chest.Inventory.Add("empty_bottle", 1);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, shore + outward * 5)); chest.Inventory.Add("empty_bottle", 1);
         var worker = AddWorker(world, chest.Pos);
         world.Assign(worker, lake);
         for (int i = 0; i < 240; i++) world.Tick(.25f, true);
@@ -152,6 +155,17 @@ public static class WaterChecks {
         Require(world.Transfer(table.Inventory, world.Backpack, Water.Liquid, 10) == 3 && world.Backpack[Water.Full] == 3 && table.Inventory[Water.Liquid] == 1,
             "taking more must fill bottles while they have room, and leave the rest on the table");
         Require(world.Backpack[Water.Liquid] == 0, "water must never lie loose in the backpack");
+    }
+
+    /// <summary>A station's water slot holds one stack of liters, and a bucket poured by hand fills it to that and keeps the rest.</summary>
+    private static void CheckABucketPouredByHandFillsAStationsWaterToAStack(GameData data) {
+        var world = new World(data, false);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 60);
+        EmptyBackpack(world); Give(world, Bucket.AtFill(Bucket.Capacity), 1);
+        world.Transfer(world.Backpack, table.Inventory, Bucket.AtFill(Bucket.Capacity), 1);
+        Require(table.Inventory[Water.Liquid] == 64 && world.Backpack[Bucket.AtFill(6)] == 1,
+            $"a full bucket poured into a table holding 60 liters should fill it to 64 and keep 6: the table holds {table.Inventory[Water.Liquid]}");
     }
 
     private static void CheckDismantledStationFillsBottles(GameData data) {

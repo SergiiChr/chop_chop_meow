@@ -369,7 +369,9 @@ public partial class Game : Node, IGameFlow {
     private bool Looking => view.FirstPerson && !kit.Paused && !panel.Visible && !bag.Visible && !recipeMap.Visible;
 
     public override void _Input(InputEvent ev) {
-        if (view == null || !view.MouseLook || !Looking) return;
+        if (view == null) return;
+        if (ev is InputEventMouseButton press && player.WalkIntoClickedCabin(press)) { GetViewport().SetInputAsHandled(); return; }
+        if (!view.MouseLook || !Looking) return;
         // Captured input belongs to the world even if a HUD control lies under the centre point.
         if (ev is InputEventMouseMotion motion) view.Look(motion.Relative);
         else if (ev is InputEventMouseButton mouse) player.Click(mouse, GetViewport().GetVisibleRect().GetCenter(), false);

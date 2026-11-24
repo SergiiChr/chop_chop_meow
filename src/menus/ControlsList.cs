@@ -21,6 +21,7 @@ public partial class ControlsList : PanelContainer {
         ("LMB on item slot", "Pick up the entire stack or put down the held stack."),
         ("RMB on item slot", "Pick up half the stack or put down one item."),
         ("Double LMB", "Use an item in the backpack or on the hotbar."),
+        ("Double LMB on cabin", "Walk to the cabin door and enter."),
         ("Shift-click", "Move the entire stack to the other open storage, or queue 5 crafting batches."),
         ("Ctrl-click", "Move all items of this type to the other open storage, or queue 10 crafting batches."),
         ("Drag a panel", "Drag an empty spot to move the side panel or backpack."),

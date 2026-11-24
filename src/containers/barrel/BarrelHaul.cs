@@ -32,6 +32,7 @@ internal sealed class BarrelHaul : PlaceHaul {
     public override void Carries(Worker w, Thing place, ref Carry best) { }
 
     public override string Wait(Thing place) => place.Kind == ThingKind.Hut && Barrel.In(place.Inventory) == null ? "Needs a steel barrel in the cabin"
+        : place.Kind == ThingKind.Barrel && !place.Inventory.Accepts(Water.Liquid) ? "The barrel's filter does not name water"
         : Barrels.Room(place) == 0 ? "The barrel is full" : base.Wait(place);
 
     /// <summary>Fills the barrels of a haul job with water, carrying on a walk already started.</summary>
@@ -46,9 +47,12 @@ internal sealed class BarrelHaul : PlaceHaul {
         return false;
     }
 
-    private bool NeedsWater(Thing target) => target.Kind == ThingKind.Farm
-        ? target.FarmStage == FarmStage.Growing && world.Farms.Dry(target) && !WateredByCrew(target)
-        : Barrels.Room(target) > 0;
+    /// <summary>A dry growing farm plot nobody waters, a placed barrel whose filter names water and has room, or a cabin's roof barrel with room, which has no filter.</summary>
+    private bool NeedsWater(Thing target) => target.Kind switch {
+        ThingKind.Farm => target.FarmStage == FarmStage.Growing && world.Farms.Dry(target) && !WateredByCrew(target),
+        ThingKind.Barrel => target.Inventory.Accepts(Water.Liquid) && Barrels.Room(target) > 0,
+        _ => Barrels.Room(target) > 0
+    };
 
     private bool WateredByCrew(Thing farm) {
         foreach (var worker in world.Workers) if (worker.WaterTarget == farm.Id) return true;

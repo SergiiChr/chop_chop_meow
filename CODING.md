@@ -76,7 +76,11 @@ Project rules on top of the global coding and testing guides.
 - A check that a load restores something changes that thing between saving and loading.
 - Check files hold only checks and their runners. Steps only one feature uses live in its folder, as `GravelPathSteps.cs` does, or `GravelPathUISteps.cs` for its UI and network checks. Steps several features use live in the shared step files: `tests/*Steps.cs` for rule checks and `src/*Steps.cs` for UI and network checks. A step moves to the shared files when a second feature starts to use it.
 - Checks fail through the shared `Checks.Require` in `tests/Checks.cs`.
-- A runner calls each check through `Checks.Test`, which logs its time and stops the process when it runs past 20 seconds. A check that needs longer, such as a whole network session, is tagged `slow: true` for 180 seconds, since the lossy relay makes reconnects vary from 20 to over 130 seconds. `./build.py` also gives each test stage its own 300-second deadline.
+- Every check runs on its own timer: a runner calls each check through `Checks.Test`, never directly, and UI checks through `TestClean` or `Test`, which call it.
+  `Checks.Test` logs the check's time and stops the process when it runs past 20 seconds.
+  A check that needs longer, such as a whole network session, is tagged `slow: true` for 180 seconds, since the lossy relay makes reconnects vary from 20 to over 130 seconds.
+  A runner that calls a feature's runner calls it plainly, and a step inside one scenario check, such as one half of the network session, is not wrapped either: timers do not nest, and a new one resets the outer check's.
+  `./build.py` also gives each test stage its own 300-second deadline, so a run that hangs outside any check still stops.
 - A check over 50 lines is long: split it into one check per behaviour, or move its setup into steps. A longer one stays only when it is a single scenario that loses its point when split, and says so in its summary.
 - Do not weaken assertions to make broken behavior pass.
 
@@ -107,7 +111,7 @@ Allocation is fine while loading, setting up and on rare events.
 
 Allocation budgets:
 
-- `tests/AllocationChecks.cs` holds simulation ticks to their budget after a warm-up with `AllocationChecks.Check()`: walking and a night hunt at 0 bytes, and a working settlement at a commented byte count a tick for stores growing their tables. It counts the calling thread's allocations, so it holds on any machine. A warm-up runs every path its budget allows at least once, so a first-time cost stays out of the measured runs. A new path that runs every tick gets a case there; a path that must allocate passes its measured bytes per run as an explicit, commented budget.
+- `tests/performance/AllocationChecks.cs` holds simulation ticks to their budget after a warm-up with `AllocationChecks.Check()`: walking and a night hunt at 0 bytes, and a working settlement at a commented byte count a tick for stores growing their tables. It counts the calling thread's allocations, so it holds on any machine. A warm-up runs every path its budget allows at least once, so a first-time cost stays out of the measured runs. A new path that runs every tick gets a case there; a path that must allocate passes its measured bytes per run as an explicit, commented budget.
 - `CheckWalkingStaysWithinAllocationBudget` holds real frames to a measured budget: a change that adds a third more garbage fails it, and one that removes some lowers the budget. `src/ServerChecks.cs` runs it on the real server, whose updates are what a window pays for: each update's changed entries are new arrays, while numbers go into the window's copy in place through `WorldUpdates.SetNumbers`.
 - `CheckPanelPagesRefreshWithoutAllocating` holds every panel page to 0 bytes a refresh while what it shows stays the same. Live panel updates go through `LiveUpdates`: `Watch` draws only when a value changes, and `Bind` rebuilds text in a reused buffer and hands Godot a new string only when it changes.
 - Real frames are measured only while walking, so per-frame code for gathering, a mauling or a settlement in view has no allocation check yet; review those paths by hand.

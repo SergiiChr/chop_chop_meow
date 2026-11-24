@@ -20,7 +20,7 @@ internal sealed class StationHaul : PlaceHaul {
                 // A liquid leaves in vessels with room for it, which the hauler brings, fills here and stores.
                 if (world.DepositFor(v.Full, t.Pos, t.Id) == null || RoomySource(v, w.Pos) is not (string roomy, Thing holder)) continue;
                 Offer(ref best, new Carry { Place = t, From = holder, To = t, Item = roomy, Count = (free + v.Capacity - 1) / v.Capacity, Clears = true, Rule = full ? 2 : 4, Order = -free });
-            } else if (world.DepositFor(item, t.Pos, t.Id) is Thing store) Offer(ref best, TakeOut(t, store, CarryBox.Inventory, item, free, full));
+            } else if (Taker(t, item, free) is (Thing store, int count)) Offer(ref best, TakeOut(t, store, CarryBox.Inventory, item, count, full));
         }
         if (recipe == null) return;
         foreach (var (input, batch) in recipe.Inputs) {
@@ -34,7 +34,7 @@ internal sealed class StationHaul : PlaceHaul {
         if (recipe.Fuels.Count == 0 || t.Burner is not Inventory burner) return;
         if (burner.First() is string held && world.FuelOf(t) == null) {
             // Fuel the recipe does not burn leaves the fuel slot, so the right one can go in.
-            if (!t.Processing && world.DepositFor(held, t.Pos, t.Id) is Thing store) Offer(ref best, new Carry { Place = t, From = t, To = store, Box = CarryBox.Burner, Item = held, Count = burner.Free(held), Rule = 1 });
+            if (!t.Processing && Taker(t, held, burner.Free(held)) is (Thing store, int count)) Offer(ref best, new Carry { Place = t, From = t, To = store, Box = CarryBox.Burner, Item = held, Count = count, Rule = 1 });
         } else if (FuelSource(t, w.Pos) is (string fuel, Thing from))
             Offer(ref best, Bring(t, from, fuel, burner.Room(fuel) + (recipe.Inputs.ContainsKey(fuel) ? Math.Max(0, t.Inventory.SlotRoom(fuel)) : 0), burner[fuel], 1) with { Fuel = true });
     }

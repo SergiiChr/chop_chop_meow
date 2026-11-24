@@ -58,6 +58,8 @@ Play accepts Godot arguments after `--`:
 | `--showcase` | Load a populated review fixture instead of a fresh game |
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
+| `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
+| `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
@@ -176,7 +178,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Hold right mouse button on a placed crate or barrel | Walk over and pick it up with its contents |
 | Right mouse button on open ground | Eat, drink, light a torch, or swing toward the pointer using the hotbar selection |
 | Hold right mouse button on open ground with a shovel selected | Walk over and dig a hole |
-| Left mouse button | Select a resource, building, crate or worker, or place a selected building. Clicking a cabin walks you around obstacles to its door and inside. Put a held stack into the storage clicked, or let go of it anywhere else |
+| Left mouse button | Select a resource, building, crate or worker, or place a selected building. Put a held stack into the storage clicked, or let go of it anywhere else |
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
 | C / V during placement | Turn a building, crate, barrel or pipe 90° |
@@ -195,6 +197,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | LMB on an item slot | Pick up the entire stack or put down the held stack |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
+| Double LMB on a cabin | Open its page and walk around obstacles to its door and inside |
 | Shift-click | Move the entire stack to the other open storage, or queue 5 crafting batches |
 | Ctrl-click | Move all items of that type to the other open storage, or queue 10 crafting batches. Ctrl from the backpack, and Store all, leave stacks bound to the hotbar |
 | RMB or double LMB on a hotbar slot | Use its item |
@@ -339,10 +342,12 @@ Queueing another recipe depends on what the station is doing:
 | The station | Queueing another recipe |
 | --- | --- |
 | Is working a batch | Nothing changes, and its input and output slots shake |
-| Is between batches, with something in its slots | Its slots and its fuel slot empty into your backpack, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
-| Is between batches, with no room in your backpack for what its slots and fuel slot hold | Nothing changes, and its slots shake |
+| Is between batches, with something in its slots | Inputs the new recipe uses stay in its slots, and fuel it burns stays in the fuel slot; the rest goes into your backpack, its product too even where the new recipe uses it, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
+| Is between batches, with no room in your backpack for what leaves its slots and fuel slot | Nothing changes, and its slots shake |
 | Has empty slots | It turns to the new recipe, its hard hat with it |
 
+So a station turned from the steel pickaxe to the steel shovel keeps its steel parts and wood parts, and one turned to the bucket keeps the wood parts left over.
+A turn loads from your backpack only what the slots still lack for the batches queued; more of the recipe a station is on loads a whole batch on top of what it holds.
 Fuel a batch has already burned is gone; queueing a recipe loads its fuel again from your backpack.
 When your backpack holds less than one batch, queueing loads what it has, its slots shake, and a message names everything still missing, such as "Missing fuel (wood, coal or charcoal)." or "Missing 2L of water."
 
@@ -352,15 +357,18 @@ Taking the hard hat off, and putting it on the recipe the station is on, always 
 A hard hat moved to another recipe drops the batches that still waited.
 
 So a station with a hard hat is always on the hard-hat recipe: once the batches you queued are done, workers go on making it.
+Only a worker works a hard-hat batch: you work only the batches you queued.
 Click the hard hat off for a station to stop after your batches.
 It starts no batch while its slots hold something another recipe left there, such as a hauler's late delivery: haulers carry that to storage, or you take it out.
 A station page opens with the group of the recipe the station is on open.
 A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
-A bench, anvil, cooking table or packing station with a batch running is worked by a player standing still within 1 m of its edge, or by a worker.
+A bench, anvil or cooking table with a batch you queued is worked by a player standing still within 1 m of its edge, or by a worker; a packing station by either, whatever it packs.
 Pumping the reinforced furnace's bellows needs the same 1 m.
 
 Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
+The output slot takes back what the recipe makes from your backpack, up to a stack.
+By hand a station takes only what its recipe uses, the fuel it burns in its fuel slot, and what it makes; anything else is refused, such as "Stone is not used by what this station makes."
 A station that burns fuel has its own fuel slot under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
 Fuel the recipe cannot burn shows in brick; workers carry it back to storage and bring a fuel it burns.
 Side outputs and leftovers sit in a second row under the output.
@@ -390,14 +398,18 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 | Resource | Gather |
 
 A worker on Tend fire keeps a campfire fed with wood from storage.
+A campfire with no wood left burns anyway while a worker sits at it, at lunch or with nothing to do, and goes out once nobody sits there; a campfire with wood burns it as usual.
 
 Clicking a job lists the crew with a tick box each.
 A circled number beside a worker counts their other jobs, and hovering it lists them.
 A worker can hold several jobs, at one place or several, and a new job goes to the end of their list.
 The list is in order: they do the first job that can be done, and after each round of it they read the list from the top again.
 A round is a delivery, a crafted batch, a crate packed full, a furnace batch at the bellows, a piece mined or a harvest.
-With no job that can be done, a worker waits at the nearest trading post, or in the clearing without one, and their status says what their first job lacks.
-A worker on Bellows pumps only while the furnace smelts or holds a batch to smelt, and only one worker pumps at a time.
+With no job that can be done, a worker sits at the nearest campfire they can reach, as at lunch: six to a fire, the rest on the ground nearby in groups of up to three.
+A worker who could not reach a fire's seats tries again once a building goes up or comes down.
+With no campfire they wait at the nearest trading post, or in the clearing without one.
+Their status says what their first job lacks.
+A worker on Bellows pumps only while the furnace smelts or holds a batch to smelt, and only one worker pumps at a time, also one holding a load nothing takes.
 
 The crew button opens an overview with each worker's daily pay and the total above.
 
@@ -684,13 +696,14 @@ The pour needs room for the split before it uses any water.
 Sorting the backpack or swapping the opened barrel's cell returns you to the backpack.
 Shift-click or Ctrl-click a vessel to pour into an open barrel, including vessels bound to the hotbar.
 A placed barrel's single filter names water, like a pile's filter names its resource.
+A barrel put down empty takes no water from workers until its filter names water; one put down with water in it names water at once.
 A barrel holds 50 liters.
 A steel bucket holds 10 liters and hangs by its handle on the tool rack.
 
 A placed barrel offers Haul.
 A cabin offers Haul while its roof barrel is mounted.
 A worker fills the bucket or bottle in their tool slot at the lake or a nearer full placed barrel, then pours it
-into the barrel they were assigned to stock.
+into the barrel they were assigned to stock, while its filter names water.
 Workers can fetch a bucket or bottle from the tool rack.
 They climb the outside ladder to fill a roof barrel and then climb down.
 
@@ -709,14 +722,15 @@ The crate being packed shows on the right with how full it is; a full crate wait
 Workers deliver the good straight to the station while its input has room.
 
 A crate of one good is a kind of item that filters can name: "Crate of bread" in a chest's filter, or in the trading post's.
-A full crate goes to the nearest storage whose filter asks for that crate, otherwise to the nearest open storage.
+A full crate goes to the nearest storage whose filter asks for that crate, otherwise to the nearest storage taking everything.
 A pile of crates takes more crates of the same good.
 
 ### Piles
 
 A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that show as a heap of the resource itself, bigger the more it holds.
 Its resource is set by its filter, which has one row and one item: what workers bring is also what they take.
-Set the filter on an empty pile, or put a first resource in and the filter is set to it.
+A new pile takes nothing from workers until its filter names a resource.
+Set the filter on an empty pile, or put a first resource in by hand and the filter is set to it.
 From then on workers store and take only that, and anything else is refused, by hand too: "This is a wood pile."
 The filter stays when the pile is emptied.
 It can be taken off or changed only while the pile is empty, and a new resource goes on only once the old one is off.
@@ -737,12 +751,16 @@ A worker on its Tend job fetches what its filters take from storage and carries 
 ### Filters
 
 Storage input filters govern automated deposits; output filters govern worker withdrawals.
-Empty filters allow all items.
+An empty row lets nothing through.
+**Everything**, the cell marked A first in the item list, lets every item through and stands alone in its row: adding it takes the row's items off, and adding an item takes it off.
+A new chest, placed crate or tool station takes nothing in and lets everything out: its input row is empty and its output row holds A.
+A trading post with A asks for every kind of packed crate, and compost with A takes everything that composts.
+Piles and barrels name one resource and have no A.
 A row shows its items in the order they were added.
 The item list that **+** opens shows items in groups, each simplest first: what is gathered, grown or bought, then materials, tools, containers and food, and last crates of goods.
 Bottles, buckets and barrels come among containers at any fill.
-**Clear** takes everything off both rows.
-Manual inventory transfers ignore these automation filters.
+**Clear** takes everything off both rows, so nothing goes in or out.
+Manual inventory transfers ignore these automation filters, and so does a page's Store all button.
 
 A load a worker carries goes to the nearest place that asks for it:
 
@@ -750,8 +768,13 @@ A load a worker carries goes to the nearest place that asks for it:
 - a station whose recipe uses it, into the input slot or the fuel slot, up to a stack;
 - a farm plot short of seed or fertilizer for a sowing, or a mine site short of a material.
 
-Only when none of those has room does it go to the nearest storage with no filter.
+Only when none of those has room does it go to the nearest storage taking everything (A).
+With none of those either, the load goes back, wherever it came from, to the nearest building whose output filter lets it out, up to one stack of it.
+Storage counts by the output filter set on it, so a new chest or placed crate, whose output row holds A, takes back anything it holds.
+A building with output slots has an output filter of what it outputs: a station its recipe's product, a farm plot its harvest, an open mine its ore and stone, and a packing station crates of its good.
+With no such place, the load stays in hand: the worker says "Holding … · no accepting storage" and goes on with the jobs of their list that need no hands, such as Craft, Bellows and Farm, until something takes it.
 Workers send a load elsewhere when a filter changes or a slot fills while they carry it.
+A hauler sizes a load carried out again when picking it up, to what the place it goes to still has room for.
 A chest or pile near a source fills first and buffers the goods; without one, a gatherer walks each load to the nearest station with room.
 
 ### Hauling
@@ -770,8 +793,8 @@ A station keeps the goods it makes when no storage takes them, and goes on worki
 Workers fetching a station's inputs take them from storage or straight from another station's finished goods, such as steel parts from the anvil.
 
 A chest or placed crate offers Haul too.
-Its hauler first carries out what its output filter lets go, to the nearest place asking for it: never to storage with no filter.
-Then they bring what its input filter names, from storage or from a station's finished goods.
+Its hauler first carries out what its output filter lets go, to the nearest place asking for it: never to storage taking everything.
+Then they bring what its input filter names, from storage or from a station's finished goods; A names nothing to bring.
 Two storages that both ask for an item never pass it to each other.
 So a chest asking for crates of bread sends them on to a trading post asking for them, but not to another chest asking for them.
 In a haul group, every carry for a chest or crate ranks with an input short of a batch, before full outputs and topping up.
@@ -789,7 +812,8 @@ Workers need tools for some jobs:
 
 Leaves, berries and loose pieces need no tool, though a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
-They put it back when the job in hand has no use for it or when heading home at dusk.
+They put it back when the job in hand has no use for it or when heading home at dusk, into a tool station whose input filter takes it.
+A new tool station takes nothing in, so set its input to A or name the tools for workers to put theirs back.
 If there is none, the worker goes to the nearest known spot of the same job that they can work, one that needs no tool or one whose tool is to be had, and to loose pieces only after those; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
 A gatherer whose spot runs out goes on to the next known spot of the same resource, and to loose pieces of it only once no other spot is left.
 
@@ -801,7 +825,7 @@ A worker carries one tool at a time, so they swap the axe for the shovel at a to
 Digging up bushes is a job of its own: a worker given a bush goes on to the next known bush and never rakes leaves, and a worker raking leaves never digs up a bush.
 A dug-up bush gives 36 leaves, which a worker carries off 12 at a time.
 
-A worker on the station's Stock job brings tools from other storage to the rack.
+A worker on the station's Stock job brings the tools its input filter takes from other storage to the rack.
 
 Oaks drop a patch of leaves beside the trunk.
 Gather them by hand, or pull a rake through them with both hands to gather them three times as fast.
@@ -979,7 +1003,7 @@ There are at most forty workers.
 A worker gathers as fast as the player does with the same tool, 4 pieces a time, until their hands hold 12, then carries the load off.
 A worker gathering a resource moves on to the next nearest spot of the same kind once theirs is spent, such as the next tree after felling one, and goes on filling their hands there.
 They only go to spots a player has seen, even if fog hides them now.
-With no other spot known they say so and go on to their other jobs, or wait at the trading post.
+With no other spot known they say so and go on to their other jobs, or wait by a campfire.
 
 ### Worker page
 
@@ -1002,7 +1026,7 @@ The crew overview shows each worker's jobs as numbered chips in that order, with
 ### Daily routine
 
 - Workers break for an hour of lunch at noon.
-  They take the closest open campfire seats they can reach, up to six workers per fire.
+  They take the closest open campfire seats they can reach, up to six workers per fire, and the fire burns while they sit at it, with no wood if it has none.
   Workers without a fire seat sit on the ground facing each other in groups of up to three.
   When the crew changes, a worker keeps their ground seat unless they take an open seat by a fire.
 - As dusk falls they walk to the nearest trading post and head off down the valley like a trade cart, fading from view, then walk back in the same way at dawn.
@@ -1085,6 +1109,7 @@ An hour before dawn every wolf gives up and heads back to the nearest den.
 
 A burning campfire keeps them away, and a wolf already chasing you follows you into its light for a few seconds.
 One log burns about 4 in-game hours.
+A campfire with no wood left burns anyway while workers sit at it.
 Cabin windows glow but do not deter wolves; a campfire whose light reaches a cabin's door keeps them off the door.
 
 ### Torch
@@ -1113,14 +1138,15 @@ A torch that lands on a wolf burns it and sends it running for a moment.
 
 ### Cabins
 
-Click a cabin, or press Enter in its panel, and you walk around buildings and other obstacles to its door.
+A click on a cabin opens its page.
+Double-click the cabin, or press Enter on its page, and you walk around buildings and other obstacles to its door.
 Enter is highlighted while the game finds a path and while you walk.
 Click it again or press Escape to cancel and move freely.
 If there is no clear path, the walk stops.
 At the door you step in and it shuts behind you.
 Stepping in takes about 1.3 seconds at a walk, hurrying up the second tread, or 0.7 seconds and a slammed door if you sprinted there with Shift held.
 For the first half of it you are still out in the open: a wolf that bites or leaps at you takes you by the waist and tugs you a metre back out in three tugs over 1.5 seconds, less where water or a building is in the way, you bent over, reaching for the door and screaming.
-It then lets go and leaves you standing there, free to move: click the cabin to go for its door again.
+It then lets go and leaves you standing there, free to move: double-click the cabin to go for its door again.
 At half health or less, its third tug takes you straight over onto your back about 1.2 seconds in.
 Hit the wolf while it tugs someone and it lets go of them.
 No other wolf takes you down while one tugs you.

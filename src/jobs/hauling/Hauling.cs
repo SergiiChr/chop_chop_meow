@@ -32,9 +32,20 @@ internal sealed class Hauling(World world, BarrelHaul barrels) {
         var box = BoxOf(c);
         // Seed from a plot's own harvest goes straight back into its input slots.
         if (c.From == c.To) box.TransferTo(c.To!.Inventory, c.Item, Math.Min(c.Count, c.To.Inventory.SlotRoom(c.Item)), true);
-        else { box.TransferTo(w.Bag, c.Item, c.Count, true); w.Destination = c.To!.Id; w.Fueling = c.Fuel; }
+        else {
+            // A load carried out is sized again at pickup, since where it goes may have filled while the hauler walked here.
+            int count = c.From == place && !c.Clears ? Takes(world, c.To!, c.Item, c.Count) : c.Count;
+            box.TransferTo(w.Bag, c.Item, count, true); w.Destination = c.To!.Id; w.Fueling = c.Fuel;
+        }
         w.Plan = default;
         return true;
+    }
+
+    /// <summary>How many of the free units of an item a place a load goes to takes, as far as it has room; vessels that pour there go as many as its liters of room take.</summary>
+    internal static int Takes(World world, Thing to, string item, int free) {
+        if (world.Intake(to, item, false) is not (Inventory into, int room)) return 0;
+        if (world.PoursInto(to, into, item) is VesselDef pours) room = (room + pours.LitersIn(item) - 1) / pours.LitersIn(item);
+        return Math.Min(free, room);
     }
 
     /// <summary>The part of the job a kind of place offers.</summary>
