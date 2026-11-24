@@ -16,17 +16,17 @@ internal static class FirebugSteps {
         RemoveThings(world, t => t.Kind == ThingKind.Firebug);
         var bug = world.Add(ThingKind.Firebug, world.Player + new Vector2(10, 0), 1);
         Give(world, "bug_net");
-        var said = new List<string>();
-        world.Notify = said.Add;
-        return (world, bug, said);
+        return (world, bug, Told(world));
     }
 
     /// <summary>A frame of the game, which a firebug's dart and a swing's landing are timed to.</summary>
     public const float Frame = 1 / 60f;
 
-    /// <summary>Runs the world a frame at a time with the player fed.</summary>
-    public static void RunFrames(World world, float seconds) {
-        for (; seconds > 0; seconds -= Frame) { Nourished(world); world.Tick(Frame); }
+    /// <summary>The night of <see cref="FirebugNight"/> with its firebug tired out: it has darted off from the player and come to rest.</summary>
+    public static (World World, Thing Bug, List<string> Said) RestingFirebug(GameData data) {
+        var night = FirebugNight(data);
+        TireOut(night.World, night.Bug);
+        return night;
     }
 
     /// <summary>
@@ -36,11 +36,11 @@ internal static class FirebugSteps {
     public static void TireOut(World world, Thing bug) {
         var from = bug.Pos;
         world.Player = world.Firebugs.At(bug) + new Vector2(-3, 0);
-        RunFrames(world, Firebugs.DartSeconds / 2);
+        SafeTick(world, Firebugs.DartSeconds / 2, Frame);
         Require(bug.Pos.DistanceTo(from) > 2, $"a firebug should dart off from a player three metres away: it moved {bug.Pos.DistanceTo(from):0.0} m");
         for (int frames = 0; frames < 120; frames++) {
             var before = bug.Pos;
-            RunFrames(world, Frame);
+            SafeTick(world, Frame, Frame);
             if (bug.Pos == before) return;
         }
         Require(false, "a firebug should come to rest after its dart");
@@ -50,6 +50,6 @@ internal static class FirebugSteps {
     public static void SwingAt(World world, Thing bug, float from = 1.15f) {
         world.Player = world.Firebugs.At(bug) + new Vector2(-from, 0);
         world.SwingNet(world.Firebugs.At(bug) - world.Player);
-        RunFrames(world, ActorAnimation.Contact(ActorAction.NetSwing) + 2 * Frame);
+        SafeTick(world, ActorAnimation.Contact(ActorAction.NetSwing) + 2 * Frame, Frame);
     }
 }

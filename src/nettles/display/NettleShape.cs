@@ -38,7 +38,6 @@ internal static class NettleShape {
             var basis = new Basis(Vector3.Up, turn) * new Basis(Vector3.Right, i == 0 ? 0 : .22f) * Basis.FromScale(Vector3.One * Scale);
             tool.AppendFrom(Sprig(Clumps[look][i]), 0, new Transform3D(basis, new Vector3(MathF.Sin(turn), 0, MathF.Cos(turn)) * off));
         }
-        tool.GenerateTangents();
         return plants[look] = tool.Commit();
     }
 }

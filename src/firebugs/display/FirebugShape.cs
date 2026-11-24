@@ -35,7 +35,8 @@ public static class FirebugShape {
     private static readonly QuadMesh Quad = new() { Size = Vector2.One };
     private static readonly StandardMaterial3D Soft = Shine(Glow3);
     private static readonly StandardMaterial3D Lantern = new() { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, AlbedoColor = Glow5, Transparency = BaseMaterial3D.TransparencyEnum.Alpha };
-    private static readonly Texture2D Sheet = GD.Load<Texture2D>("res://assets/models/firebug/firebug_sprite.png");
+    // Loaded only for the sprite look.
+    private static Texture2D? sheet;
 
     /// <summary>A light that adds to what is behind it and always faces the camera, brightest in the middle and fading to its rim.</summary>
     private static StandardMaterial3D Shine(Color colour) {
@@ -57,7 +58,7 @@ public static class FirebugShape {
         prop.Root.AddChild(prop.Fly);
         if (Look == FirebugLook.Sprite) {
             prop.Sprite = new Sprite3D {
-                Texture = Sheet,
+                Texture = sheet ??= GD.Load<Texture2D>("res://assets/models/firebug/firebug_sprite.png"),
                 Hframes = SpriteLevels,
                 Vframes = SpriteBeats,
                 PixelSize = PixelSize,
@@ -74,8 +75,7 @@ public static class FirebugShape {
             prop.Halo = Add(prop.Fly, Quad, Soft, Vector3.Zero);
             prop.Trail = new MeshInstance3D[TrailDots]; prop.Trailed = new Vector3[TrailDots];
             for (int i = 0; i < TrailDots; i++) prop.Trail[i] = Add(prop.Root, Quad, Soft, Vector3.Zero, scale: Vector3.One * (.16f - .025f * i));
-            NoShadows(prop.Fly);
-            foreach (var dot in prop.Trail) dot.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+            NoShadows(prop.Root);
         }
         prop.Light = new OmniLight3D { OmniRange = 3.2f, LightColor = Glow4, LightEnergy = 0, ShadowEnabled = false, OmniAttenuation = 1.4f };
         prop.Fly.AddChild(prop.Light);
@@ -93,6 +93,9 @@ public static class FirebugShape {
         return Thing.Variation(id, 23) < .35f ? Math.Max(glow, Pulse(turn - .22f) * .8f) : glow;
     }
 
+    /// <summary>Draws a part or leaves it out, writing to it only when that changes.</summary>
+    private static void Show(Node3D part, bool shown) { if (part.Visible != shown) part.Visible = shown; }
+
     private static float Pulse(float turn) => turn < 0 ? 0 : turn < .06f ? turn / .06f : turn < .14f ? 1 : turn < .4f ? 1 - (turn - .14f) / .26f : 0;
 
     /// <summary>
@@ -105,9 +108,12 @@ public static class FirebugShape {
         var target = WorldView.To3(at, Height + Bob * MathF.Sin(elapsed * (1.1f + Thing.Variation(id, 24)) + id));
         // A dart is drawn at its own speed, with a little more to catch up, so the steps of the world's updates never show.
         var drawn = prop.Drawn is Vector3 before && before.DistanceTo(target) < 4 ? before.MoveToward(target, dartSpeed * 1.4f * dt) : target;
+        var root = prop.Root.Position;
         prop.Drawn = drawn;
-        prop.Fly.Position = drawn - prop.Root.Position;
+        prop.Fly.Position = drawn - root;
         float glow = Glow(id, elapsed), shown = Ember + (1 - Ember) * glow;
+        // Between flashes it throws no light, so the light is not drawn at all.
+        Show(prop.Light, glow > 0);
         prop.Light.LightEnergy = 1.6f * glow;
         if (prop.Sprite is Sprite3D sprite) {
             sprite.Frame = (int)MathF.Round(shown * (SpriteLevels - 1)) + SpriteLevels * ((int)(elapsed * 30) % SpriteBeats);
@@ -120,10 +126,10 @@ public static class FirebugShape {
         for (int i = 0; i < prop.Trail.Length; i++) {
             var dot = prop.Trailed[i] == default ? ahead : prop.Trailed[i].Lerp(ahead, Math.Min(1, dt / TrailLag));
             prop.Trailed[i] = dot;
-            prop.Trail[i].Position = dot - prop.Root.Position;
             // It shows only while the bug is lit, fainter along its length and where a dot has caught up with the one ahead.
-            float apart = Math.Min(1, dot.DistanceTo(ahead) / .08f);
-            prop.Trail[i].Transparency = 1 - Math.Clamp((glow - .3f) * (1 - (i + 1) / 5f) * 1.3f, 0, 1) * apart;
+            float bright = Math.Clamp((glow - .3f) * (1 - (i + 1) / 5f) * 1.3f, 0, 1) * Math.Min(1, dot.DistanceTo(ahead) / .08f);
+            Show(prop.Trail[i], bright > 0);
+            if (bright > 0) { prop.Trail[i].Position = dot - root; prop.Trail[i].Transparency = 1 - bright; }
             ahead = dot;
         }
     }

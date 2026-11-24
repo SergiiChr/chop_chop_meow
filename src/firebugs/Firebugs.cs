@@ -26,8 +26,6 @@ public sealed class Firebugs(World world) {
     public const float ScareRadius = 5;
     /// <summary>How far to either side of straight away from a player a dart can head, in radians.</summary>
     private const float Swerve = .6f;
-    /// <summary>Random spots tried for one firebug before the night goes without it.</summary>
-    private const int Tries = 400;
 
     /// <summary>Metres a second a firebug darts: halfway between a player's walk and sprint, so only a sprint gains on it.</summary>
     public float DartSpeed => (world.Data.WalkSpeed + world.Data.MoveSpeed(true)) / 2;
@@ -68,28 +66,22 @@ public sealed class Firebugs(World world) {
         var bugs = s.Things.Of(ThingKind.Firebug);
         if (!world.Night) {
             if (bugs.Count > 0) { s.Things.RemoveAll(ThingKind.Firebug, static _ => true); flights.Clear(); }
+            s.FirebugsOut = 0;
             return;
         }
-        if (s.FirebugNight < world.Day) { s.FirebugNight = world.Day; s.FirebugsOut = 0; }
-        int due = AtNightfall + (int)((world.DayPhase - world.Data.NightStarts) * 24);
-        for (; s.FirebugsOut < due; s.FirebugsOut++)
-            if (Spot() is Vector2 spot) world.Add(ThingKind.Firebug, spot, 1);
+        if (!world.QuietNights) {
+            int due = AtNightfall + (int)((world.DayPhase - world.Data.NightStarts) * 24);
+            for (; s.FirebugsOut < due; s.FirebugsOut++)
+                if (world.UnseenSpot(random, Free) is Vector2 spot) world.Add(ThingKind.Firebug, spot, 1);
+        }
         foreach (var bug in bugs) Fly(bug, dt);
     }
 
     /// <summary>Lets no more firebugs out tonight; those already out stay.</summary>
-    internal void KeepIn() {
-        world.S.FirebugNight = world.Day; world.S.FirebugsOut = AtNightfall + 24;
-    }
+    internal void KeepIn() => world.S.FirebugsOut = AtNightfall + 24;
 
-    /// <summary>A random spot of open ground no player sees, away from every building, or null when the tries find none.</summary>
-    private Vector2? Spot() {
-        for (int i = 0; i < Tries; i++) {
-            var p = new Vector2(random.Next(3, Terrain.Size - 3), random.Next(3, Terrain.Size - 3));
-            if (world.Unseen(p) && world.CanStand(p) && !NearBuilding(p)) return p;
-        }
-        return null;
-    }
+    /// <summary>Whether a firebug may come out over a spot: ground to stand on, away from every building.</summary>
+    private bool Free(Vector2 p) => world.CanStand(p) && !NearBuilding(p);
 
     private bool NearBuilding(Vector2 p) {
         foreach (var kind in world.Data.Buildings.Keys)

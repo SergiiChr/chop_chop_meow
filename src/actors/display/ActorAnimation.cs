@@ -1219,15 +1219,15 @@ public static class ActorAnimation {
     }
 
     /// <summary>
-    /// How much of a rope's making each round of the work takes, and how much of a round its mallet blows take: at a
-    /// bench, which works twice as fast, two blows in 1.2 seconds and then 1.3 seconds of twisting.
+    /// Rounds of work in a batch of something twisted by hand, and the share of each round its mallet blows take:
+    /// for rope at a bench, 10 seconds made twice as fast, two blows in 1.2 seconds and then 1.3 seconds of twisting.
     /// </summary>
-    public const float RopeRound = 5, RopeBlows = 2.4f;
+    public const float TwistRounds = 2, TwistBlowShare = .48f;
 
     /// <summary>What someone working at a station does there.</summary>
     public static ActorAction StationAction(Thing station, GameData data) => station.Kind switch {
         // Rope is beaten with the mallet and twisted by hand in turn, as far as the batch has come.
-        ThingKind.Bench when data.Recipes.TryGetValue(station.Recipe, out var twisted) && twisted.Twists => station.Progress % RopeRound < RopeBlows ? ActorAction.Hammer : ActorAction.TwistRope,
+        ThingKind.Bench when data.Recipes.TryGetValue(station.Recipe, out var twisted) && twisted.Twists => station.Progress / twisted.Seconds * TwistRounds % 1 < TwistBlowShare ? ActorAction.Hammer : ActorAction.TwistRope,
         ThingKind.Packer => ActorAction.Pack,
         // At a cooking table the mortar's recipes are ground, and dough is worked by hand as goods are packed.
         ThingKind.Cooktable => data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "mortar" ? ActorAction.Grind : ActorAction.Pack,

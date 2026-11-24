@@ -77,20 +77,6 @@ internal static class SetupSteps {
     /// <summary>Keeps every den shut tonight, at dusk and through every hour after, so a check meets only the wolves it places.</summary>
     public static void ShutDens(World world) { world.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; world.S.DenHours = 24; }
 
-    /// <summary>Lets no more firebugs out tonight, so a check meets only those already out and those it places.</summary>
-    public static void KeepFirebugsIn(World world) => world.Firebugs.KeepIn();
-
-    /// <summary>
-    /// Lets no nettle come up and no firebug out in this world on any night, a new game or a load of it included.
-    /// A session's checks take each thing's look from its id, so things that come by themselves at night would change
-    /// which tree, stump or rock a later check is given.
-    /// </summary>
-    public static void StillNights(World world) {
-        void Still() { world.S.NettleNight = world.S.FirebugNight = int.MaxValue; world.S.FirebugsOut = int.MaxValue; }
-        Still();
-        world.Replaced += Still;
-    }
-
     /// <summary>Takes wolves away, which the game does only at dawn or on a respawn.</summary>
     public static void RemoveWolves(World world, Predicate<Wolf> match) => world.S.Wolves.RemoveAll(match);
 

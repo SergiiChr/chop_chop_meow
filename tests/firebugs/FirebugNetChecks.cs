@@ -18,7 +18,7 @@ public partial class Game {
         Give(guest, "bug_net");
         await Signaled("net-in-hand");
         // By day firebugs are cleared away at once.
-        RunUntilNight(Hosted); ShutDens(Hosted); KeepFirebugsIn(Hosted); SetNeeds(guest, 100, 100, 100);
+        RunUntilNight(Hosted); ShutDens(Hosted); Hosted.Firebugs.KeepIn(); SetNeeds(guest, 100, 100, 100);
         RemoveThings(Hosted, t => t.Kind == ThingKind.Firebug);
         // Past the 4 m a firebug darts from on its own, and within the 5 m a missed swing scares it from.
         var off = Enumerable.Range(0, 8).Select(i => Vector2.Right.Rotated(i * Mathf.Tau / 8) * 4.5f)

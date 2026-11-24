@@ -48,13 +48,15 @@ public partial class World {
     }
 
     /// <summary>Whether a kind grows low enough to build on: a building or yard goes up over it and clears it away.</summary>
-    public static bool BuiltOver(ThingKind kind) => kind is ThingKind.Stump or ThingKind.Bush or ThingKind.Hole or ThingKind.Firebug;
+    public static bool BuiltOver(ThingKind kind) => kind is ThingKind.Stump or ThingKind.Bush or ThingKind.Hole;
 
     /// <summary>Whether a spot is on the ground a building, yard or crate keeps clear of other resources, where it leaves no stump or bush.</summary>
-    public static bool Clears(Thing built, Vector2 p) {
-        if (!Construction.IsZone(built.Kind)) return p.DistanceTo(built.Pos) < Footprint(built.Kind) + Construction.ResourceRoom;
-        float room = Footprint(built.Kind) + Construction.YardResourceRoom;
-        return Math.Abs(p.X - built.Pos.X) < room && Math.Abs(p.Y - built.Pos.Y) < room;
+    public static bool Clears(Thing built, Vector2 p) => Within(built, p, Construction.IsZone(built.Kind) ? Construction.YardResourceRoom : Construction.ResourceRoom);
+
+    /// <summary>Whether a spot lies within <paramref name="room"/> metres of a thing's footprint: a square for a yard, a circle for anything else.</summary>
+    internal static bool Within(Thing t, Vector2 p, float room) {
+        float reach = Footprint(t.Kind) + room;
+        return Construction.IsZone(t.Kind) ? Math.Abs(p.X - t.Pos.X) < reach && Math.Abs(p.Y - t.Pos.Y) < reach : p.DistanceTo(t.Pos) < reach;
     }
 
     /// <summary>Clears away the stumps and bushes under a new building, yard or crate.</summary>

@@ -211,7 +211,7 @@ public static class WorldModels {
         foreach (var kind in Kinds.All) {
             if (kind == ThingKind.Mine) continue;
             // Natural things and farm plots look different by id; buildings, crates and backpacks look the same.
-            int looks = kind == ThingKind.Acorn ? 1 : kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
+            int looks = kind is ThingKind.Acorn or ThingKind.Firebug ? 1 : kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
@@ -230,6 +230,8 @@ public static class WorldModels {
         Stage(Build(new Thing { Kind = ThingKind.Tree, TreeStage = 1 }).Root);
         foreach (var ore in Cliff.Ores) Stage(Build(new Thing { Kind = ThingKind.Mine, Pos = Cliff.Of(ore).MineSpot }).Root);
         Stage(new WolfModel().Root);
+        // The net's bag has a material of its own, seen from both sides, which no world model draws.
+        Stage(ActorRig.Tool("bug_net"));
         void Stage(Node3D root) { ModelKit.BuildShaders(root); root.Position = Vector3.Zero; stage.AddChild(root); }
         _ = BackpackShape.Details; _ = BackpackShape.Flap;
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);

@@ -959,10 +959,10 @@ Chopping out all its current wood fells the tree and leaves its stump.
 
 ### Nettles and firebugs
 
-`Nettles` (`src/nettles/Nettles.cs`) brings up `Nettles.PerNight` nettles once night has fallen (`SaveState.NettleNight`
-holds the last day whose night has had them), while fewer than `Nettles.Most` stand.
-Each comes up on a random spot no player sees (`World.Unseen`) that is bare (`World.Bare`): ground to stand on with
-no thing, yard, gravel path, beach, lake shore or den within 2 m.
+`Nettles` (`src/nettles/Nettles.cs`) brings up `Nettles.PerNight` nettles once night has fallen (`SaveState.NettlesUp`
+says tonight's have come, and day clears it), while fewer than `Nettles.Most` stand.
+Each comes up on a random spot no player sees (`World.UnseenSpot`) that is bare (`Nettles.Bare`): ground to stand on
+with no thing, yard, gravel path, beach, lake shore or den within 2 m.
 
 A nettle is a resource of the shape `GatherShape.Plucked`: one gather's time takes it whole and removes it
 (`GatherRule.GoneWhenSpent`), and the backpack needs room for it first, as for a stump.
@@ -974,13 +974,13 @@ and it makes their work no faster (`GatherRule.SpedUpBy`).
 Nothing the player reads says a shovel spares the sting; only a worker's status names the tool it waits for.
 
 Nettle rope's recipe has a `MaxTier` of 0, so only the wooden mallet makes it ([Tools](#tools)).
-`World.OnlyTooHard` tells when every hammer a player has, slotted or carried, is too hard: `World.QueueBatch` and
-`World.LoadBatch` then refuse with the recipe's `TooHard` words, and the recipe's tool line says them too.
+`World.TooHardBlock` gives the recipe's `TooHard` words when every hammer a player has, slotted or carried, is too
+hard: `World.QueueBatch` and `World.LoadBatch` then refuse with them, and the recipe's tool line says them too.
 A recipe marked `RecipeDef.Twists` is worked in rounds (`ActorAnimation.StationAction`): by the batch's `Thing.Progress`,
-two mallet blows (`ActorAnimation.RopeBlows` of each `RopeRound`), then `ActorAction.TwistRope` with empty hands.
+`ActorAnimation.TwistRounds` rounds a batch, each a `TwistBlowShare` of mallet blows and then `ActorAction.TwistRope` with empty hands.
 
 `Firebugs` (`src/firebugs/Firebugs.cs`) lets out `Firebugs.AtNightfall` firebugs as night falls and one more for each
-whole hour of the night since (`SaveState.FirebugsOut` counts those let out on the night of `SaveState.FirebugNight`, caught or not), each on ground to
+whole hour of the night since (`SaveState.FirebugsOut` counts those let out tonight, caught or not, and day sets it back), each on ground to
 stand on that no player sees, `Firebugs.BuildingRoom` from every building.
 By day it removes them all.
 A firebug is a thing of the shape `GatherShape.Caught`, kept at its place: where it is now is `Firebugs.At`, its
@@ -1004,8 +1004,11 @@ out rather than one a player has seen.
 A worker with the job takes a bug net (`GatherRule.Needs`) and takes the firebug they reach at once, as a loose piece
 is taken (`GatherRule.TakenAtOnce`); no worker is on duty while firebugs are out.
 Held right mouse on a firebug catches nothing: `World.GatherBlock` asks for a swing.
-A nettle blocks building like a berry bush, while a building goes up over a firebug (`World.BuiltOver`).
-A hole is dug under a firebug, which stays where it is, and the ground under one takes no contact shade.
+A nettle blocks building like a berry bush.
+A firebug takes no ground (`Thing.Roams`): buildings, gravel paths, holes and nettles go where one hovers, it stays, and
+the ground under it takes no contact shade.
+`World.QuietNights` keeps nettles and firebugs from coming by themselves; a check session sets it (`Game.StartGame`),
+since each thing takes its look from its id.
 
 `FirebugShape` draws a firebug in one of two looks on trial, picked with `--firebug-look`: the game's own glow (a dark
 body, a lantern, a halo that grows with the flash and a trail of dots that stretches behind a dart), or the pixel

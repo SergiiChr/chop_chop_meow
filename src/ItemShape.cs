@@ -55,7 +55,7 @@ internal static class ItemShape {
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
         ["wheat_seeds"] = new(Seeds, Sacking, .36f, Rise: .8f),
         ["acorn"] = new(Acorn, Plain, .25f, Lay.Loose),
-        ["nettle"] = new(f => NettleSprig(f, "tall_a"), Plain, .5f, Lay.Rows, .5f, Piece: f => { NettleSprig(f, "small_b"); Turn(f, 0, new Basis(Vector3.Right, Mathf.DegToRad(-60))); },
+        ["nettle"] = new(f => NettleSprig(f, "tall_a"), Plain, .5f, Lay.Rows, .5f, Piece: f => NettleSprig(f, "small_b", new Basis(Vector3.Right, Mathf.DegToRad(-60))),
             Scan: NettleShape.Leaves),
         ["nettle_rope"] = new(f => Baked(f, "rope_bundle_A", Swap(("ab9a89", RopeGreen)), folder: "nettle"), Plain, .5f, Lay.Rows, .8f, Piece: RopeBundle),
         ["bug_net"] = Held("bug_net"),
@@ -512,14 +512,9 @@ internal static class ItemShape {
         }
     }
 
-    /// <summary>A scanned nettle sprig standing at the game's size, its leaves cut out of the sprigs' texture.</summary>
-    private static void NettleSprig(List<Face> faces, string name) =>
-        Copy(faces, NettleShape.Sprig(name), new Transform3D(Basis.FromScale(Vector3.One * NettleShape.Scale), Vector3.Zero), Colors.White, draped: true);
-
-    /// <summary>Turns the faces from <paramref name="first"/> on about the origin.</summary>
-    private static void Turn(List<Face> faces, int first, Basis by) {
-        for (int i = first; i < faces.Count; i++) faces[i] = new(by * faces[i].A, by * faces[i].B, by * faces[i].C, faces[i].Tint, faces[i].Draped?.Turned(by));
-    }
+    /// <summary>A scanned nettle sprig at the game's size, its leaves cut out of the sprigs' texture, standing or as <paramref name="pose"/> turns it.</summary>
+    private static void NettleSprig(List<Face> faces, string name, Basis? pose = null) =>
+        Copy(faces, NettleShape.Sprig(name), new Transform3D((pose ?? Basis.Identity) * Basis.FromScale(Vector3.One * NettleShape.Scale), Vector3.Zero), Colors.White, draped: true);
 
     // Nettle fibre green, in a lighter and a darker strand.
     private const string RopeGreen = "7c9a48", RopeShade = "66803a";

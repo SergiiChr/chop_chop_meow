@@ -412,7 +412,8 @@ public sealed class ActorRig {
     }
 
     /// <summary>How long a bug net's handle is, the hoop's radius, and how far the bag hangs behind the hoop.</summary>
-    public const float NetHandle = .95f, NetHoop = .17f, NetBag = .34f;
+    private const float NetHandle = .95f, NetHoop = .17f, NetBag = .34f;
+    private static readonly TorusMesh NetRim = new() { InnerRadius = NetHoop - .012f, OuterRadius = NetHoop + .012f, Rings = 10, RingSegments = 4 };
     /// <summary>How far down from the handle's free end the fist holds a bug net, so the hoop clears the ground at a hanging arm's end.</summary>
     private const float NetGrip = .42f;
     // Seen from both sides, since the hoop shows the inside of the bag.
@@ -435,13 +436,8 @@ public sealed class ActorRig {
         Cylinder(tool, .018f, .02f, NetHandle, new Vector3(0, NetGrip - NetHandle / 2, 0), wood, sides: 6);
         // A rope lashing where the hoop meets the handle.
         Cylinder(tool, .026f, .026f, .07f, new Vector3(0, NetGrip - NetHandle + .03f, 0), Cloth("9c955f"), sides: 6);
-        const int segments = 10;
-        float side = 2 * NetHoop * MathF.Sin(MathF.PI / segments);
-        for (int i = 0; i < segments; i++) {
-            float angle = (i + .5f) * MathF.Tau / segments;
-            Cylinder(tool, .012f, .012f, side * 1.08f, NetMouth + new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0) * NetHoop * MathF.Cos(MathF.PI / segments), wood,
-                new Vector3(0, 0, Mathf.RadToDeg(angle)), 5);
-        }
+        // The rim is turned to stand in the plane the handle lies in.
+        Add(tool, NetRim, wood, NetMouth, new Vector3(90, 0, 0));
         // The bag narrows to a blunt end behind the hoop.
         Cylinder(tool, NetHoop, NetHoop * .28f, NetBag, NetMouth + new Vector3(0, 0, NetBag / 2), NetCloth, new Vector3(-90, 0, 0), 8);
         return tool;

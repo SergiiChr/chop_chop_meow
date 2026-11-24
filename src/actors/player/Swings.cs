@@ -39,7 +39,6 @@ public sealed class Swings(World world) {
         ActorAction.AxeSweep or ActorAction.SteelAxeSweep => Sweep,
         ActorAction.TorchSwing => Torch,
         ActorAction.Attack => Punch,
-        ActorAction.NetSwing => Net,
         _ => default
     };
 

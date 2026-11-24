@@ -21,9 +21,6 @@ public sealed class ItemDef {
     public float Thirst { get; set; }
     /// <summary>What the player says of it, shown under its name; empty for an item with nothing said of it.</summary>
     public string Description { get; set; } = "";
-    /// <summary>The description as a line of its own to put after the name in a tooltip, or nothing; built once.</summary>
-    public string DescriptionLine => Description == "" ? "" : descriptionLine ??= "\n" + Description;
-    private string? descriptionLine;
 }
 public sealed class BuildingDef {
     public string Name { get; set; } = "";
@@ -267,6 +264,7 @@ public sealed partial class GameData {
         }
         foreach (var recipe in Recipes) {
             bool tool = recipe.Value.Tool == "" || Items.Values.Any(recipe.Value.MadeWith);
+            if (recipe.Value.Twists && (recipe.Value.Station != ThingKind.Bench || recipe.Value.Tool != "hammer")) throw new InvalidOperationException($"{recipe.Key}: only a bench recipe made with a hammer is twisted by hand between blows.");
             if (recipe.Value.TooHard != "" != recipe.Value.MaxTier < int.MaxValue) throw new InvalidOperationException($"{recipe.Key}: a recipe with a highest tool tier says why a harder tool will not do, and no other does.");
             if (!(recipe.Value.Station is ThingKind station ? Buildings.ContainsKey(station) : recipe.Value.Hand) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
@@ -406,25 +404,24 @@ public sealed partial class GameData {
     public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>What the player says of an item, as a tooltip line of its own after the name, or nothing.</summary>
-    public string DescriptionLine(string item) => Items.TryGetValue(item, out var def) ? def.DescriptionLine : "";
+    public string DescriptionLine(string item) => Items.TryGetValue(item, out var def) && def.Description != "" ? "\n" + def.Description : "";
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
     public string PlainestTool(string kind, int tier = 0) => Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
 
-    /// <summary>What a recipe's tool is called: the plainest tool by name when no harder one will do, else as <see cref="ToolName(string, int)"/> names it.</summary>
-    public string ToolName(RecipeDef r) {
-        if (r.MaxTier == int.MaxValue) return ToolName(r.Tool, r.Tier);
-        if (!toolNames.TryGetValue((r.Tool, -1 - r.MaxTier), out var name)) toolNames[(r.Tool, -1 - r.MaxTier)] = name = Items[PlainestTool(r.Tool, r.Tier)].Name.ToLowerInvariant();
-        return name;
-    }
+    /// <summary>What a recipe's tool is called.</summary>
+    public string ToolName(RecipeDef r) => ToolName(r.Tool, r.Tier, r.MaxTier);
 
-    /// <summary>The plainest tool of a kind that meets a tier, for naming what a recipe needs.</summary>
-    public string ToolName(string tool, int tier) {
-        if (!toolNames.TryGetValue((tool, tier), out var name))
-            toolNames[(tool, tier)] = name = Items.Values.Where(i => i.Tool == tool && i.Tier >= tier).MinBy(i => i.Tier) is ItemDef def && tier > 0 ? def.Name.ToLowerInvariant() : tool;
+    /// <summary>
+    /// The plainest tool of a kind that meets a tier, for naming what a recipe needs: by the kind alone at the lowest
+    /// tier, and by its own name at a higher one or when no tool above <paramref name="maxTier"/> will do.
+    /// </summary>
+    public string ToolName(string tool, int tier, int maxTier = int.MaxValue) {
+        if (!toolNames.TryGetValue((tool, tier, maxTier), out var name))
+            toolNames[(tool, tier, maxTier)] = name = Items.Values.Where(i => i.Tool == tool && i.Tier >= tier).MinBy(i => i.Tier) is ItemDef def && (tier > 0 || maxTier < int.MaxValue) ? def.Name.ToLowerInvariant() : tool;
         return name;
     }
-    // Named once per tool and tier, since workers ask every tick while a station waits for its tool.
-    private readonly Dictionary<(string, int), string> toolNames = new();
+    // Named once per tool and tiers, since workers ask every tick while a station waits for its tool.
+    private readonly Dictionary<(string, int, int), string> toolNames = new();
     /// <summary>Whether an id, such as a hotbar slot's, names a building plan, and which.</summary>
     public bool TryBuilding(string id, out ThingKind kind) => Kinds.TryParse(id, out kind) && Buildings.ContainsKey(kind);
     public bool IsBuilding(string id) => TryBuilding(id, out _);

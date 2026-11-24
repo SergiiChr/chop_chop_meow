@@ -114,8 +114,8 @@ public sealed class Thing {
     [JsonIgnore] public bool IsLoose => GatherRules.Of(Kind)?.Shape == GatherShape.Loose;
     /// <summary>A stump or a bush: digging adds up in <see cref="Progress"/> until it comes out of the ground whole.</summary>
     [JsonIgnore] public bool IsDug => GatherRules.Of(Kind)?.Shape == GatherShape.Dug;
-    /// <summary>A nettle: one gather's time takes it whole, and it is gone.</summary>
-    [JsonIgnore] public bool IsPlucked => GatherRules.Of(Kind)?.Shape == GatherShape.Plucked;
+    /// <summary>A creature that moves about in the air: it takes no ground, so anything is built, laid or dug where it is, and no player remembers where one was.</summary>
+    [JsonIgnore] public bool Roams => GatherRules.Of(Kind)?.Roams == true;
     [JsonIgnore] public bool IsStorage => Kind is ThingKind.Chest or ThingKind.Grave or ThingKind.Crate or ThingKind.Toolstation or ThingKind.Pile or ThingKind.Barrel;
 }
 /// <summary>Batches of one recipe waiting in the hand's queue.</summary>
@@ -270,10 +270,9 @@ public sealed class SaveState {
     public int DensOut { get; set; }
     /// <summary>Whole hours since dusk that have had their one more wolf tonight.</summary>
     public int DenHours { get; set; }
-    /// <summary>The last day whose night has brought up its nettles.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int NettleNight { get; set; }
-    /// <summary>The last day whose night has let firebugs out, and how many it has let out so far, caught or not.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int FirebugNight { get; set; }
+    /// <summary>Tonight's nettles have come up; cleared by day.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool NettlesUp { get; set; }
+    /// <summary>Firebugs let out tonight, caught or not; back to none by day.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int FirebugsOut { get; set; }
     /// <summary>A wolf has howled tonight.</summary>
     public bool Howled { get; set; }
@@ -396,6 +395,12 @@ public sealed partial class World {
     public LeafSpots LeafSpots { get; }
     public Nettles Nettles { get; }
     public Firebugs Firebugs { get; }
+    /// <summary>
+    /// While set, no nettle comes up and no firebug comes out at night.
+    /// A check session sets it, since each thing takes its look from its id and things that come by themselves would
+    /// change which tree, stump or rock a later check is given.
+    /// </summary>
+    public bool QuietNights { get; set; }
     private readonly Barrels barrels;
 
     private readonly BarrelHaul barrelHaul;
@@ -470,16 +475,15 @@ public sealed partial class World {
         foreach (var player in S.Players) if (player.Pos.DistanceTo(p) <= Data.SightRadius) return false;
         return true;
     }
-    /// <summary>
-    /// Whether a spot is ground to stand on with nothing on it or within <paramref name="room"/> metres of it:
-    /// no thing, yard, gravel path, beach, lake shore or den.
-    /// </summary>
-    internal bool Bare(Vector2 p, float room) {
-        if (!CanStand(p) || Terrain.Beach(p) || Terrain.InLake(p, room) || WolfPatrols.NearDen(p, Den.Clearance) || GravelPaths.Covers(p)) return false;
-        foreach (var t in S.Things) {
-            if (Construction.IsZone(t.Kind) ? Math.Abs(p.X - t.Pos.X) < Footprint(t.Kind) + room && Math.Abs(p.Y - t.Pos.Y) < Footprint(t.Kind) + room : t.Pos.DistanceTo(p) < Footprint(t.Kind) + room) return false;
+    /// <summary>Random spots tried for something that comes up by itself before it goes without one.</summary>
+    private const int SpotTries = 400;
+    /// <summary>A random spot of the valley that no player sees and that <paramref name="fits"/>, or null when the tries find none.</summary>
+    internal Vector2? UnseenSpot(Random random, Predicate<Vector2> fits) {
+        for (int i = 0; i < SpotTries; i++) {
+            var p = new Vector2(random.Next(3, Terrain.Size - 3), random.Next(3, Terrain.Size - 3));
+            if (Unseen(p) && fits(p)) return p;
         }
-        return true;
+        return null;
     }
     /// <summary>Raised whenever newly seen tiles join the explored map.</summary>
     public int ExploredRevision { get; private set; }
@@ -784,7 +788,7 @@ public sealed partial class World {
         };
         if (t.Kind == ThingKind.Firebug) return "Swing the bug net at the firebug to catch it.";
         // A stump, a bush or a nettle comes out whole, so all of it has to fit.
-        if ((t.IsDug || t.IsPlucked) && S.Backpack.Room(ResourceItem(t)) < t.Remaining) return Phrase(Phrase("No room in your backpack for ", Number(t.Remaining), " "), Lower(Data.Name(ResourceItem(t))), ".");
+        if (GatherRules.Of(t.Kind)?.Shape is GatherShape.Dug or GatherShape.Plucked && S.Backpack.Room(ResourceItem(t)) < t.Remaining) return Phrase(Phrase("No room in your backpack for ", Number(t.Remaining), " "), Lower(Data.Name(ResourceItem(t))), ".");
         return null;
     }
     public static string ResourceItem(Thing t) => ResourceItem(t.Kind);
@@ -962,11 +966,11 @@ public sealed partial class World {
     /// </summary>
     public bool WorksWithSlotted(Thing station, RecipeDef r) => BenchTool(station, r) is string slotted && Faster(slotted, BestTool(r)) == slotted;
     /// <summary>
-    /// Whether every tool of a recipe's kind that the acting player has, slotted at the station or carried, is too hard
-    /// for it; false with no such tool at all.
+    /// What a recipe says to a player whose every tool of its kind, slotted at the station or carried, is too hard for
+    /// it; null when one will do, or when they have none at all.
     /// </summary>
-    public bool OnlyTooHard(Thing? station, RecipeDef r) =>
-        r.TooHard != "" && !HasToolFor(station, r) && (station != null && BenchTool(station, r.Tool, r.Tier) != null || BestTool(r.Tool, null, r.Tier) != null);
+    public string? TooHardBlock(Thing? station, RecipeDef r) =>
+        r.TooHard != "" && !HasToolFor(station, r) && (station != null && BenchTool(station, r.Tool, r.Tier) != null || BestTool(r.Tool, null, r.Tier) != null) ? r.TooHard : null;
     /// <summary>
     /// The tool a station's recipe is worked with: the fastest of the one slotted and those carried by players working at the station.
     /// A worker brings none, so a station worked only by its crew works with the slotted tool and waits when there is none.
@@ -990,7 +994,7 @@ public sealed partial class World {
     /// Asks a station for batches of a recipe and loads their inputs and one fuel each from the backpack, on top of what the station holds.
     /// A station counts batches of one recipe at a time.
     /// The recipe asked for gets the station's mark, so workers go on making it once the batches are done.
-    /// A recipe whose only tool there is too hard for it is refused in the recipe's own words (<see cref="OnlyTooHard"/>).
+    /// A recipe whose only tool there is too hard for it is refused in the recipe's own words (<see cref="TooHardBlock"/>).
     /// Turning from the recipe it is on to another drops the batches still waiting and takes what the station's boxes and fuel slot hold into the backpack;
     /// <see cref="SwitchBlock"/> says when it cannot.
     /// </summary>
@@ -1000,7 +1004,7 @@ public sealed partial class World {
         if (Busy() || Forwarded(Verb.QueueBatch, t.Id, item: recipe, count: batches)) return;
         if (SwitchBlock(t, recipe) is string blocked) { Say(blocked); return; }
         var r = Data.Recipes[recipe];
-        if (OnlyTooHard(t, r)) { Say(r.TooHard); return; }
+        if (TooHardBlock(t, r) is string tooHard) { Say(tooHard); return; }
         int waiting = Waiting(t, recipe);
         if (waiting >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
         string? missing = BatchShort(t, recipe);
@@ -1105,7 +1109,7 @@ public sealed partial class World {
         var cost = BatchCost(recipe);
         if (cost.Count == 0) { Say("Choose a recipe first."); return; }
         var r = Data.Recipes[recipe];
-        if (OnlyTooHard(t, r)) { Say(r.TooHard); return; }
+        if (TooHardBlock(t, r) is string tooHard) { Say(tooHard); return; }
         string? fuel = null;
         if (r.Burns && (fuel = FuelFromBackpack(t, r, cost)) == null) return;
         for (int i = 0; i < batches; i++) {
@@ -2113,7 +2117,7 @@ public sealed partial class World {
         foreach (var kind in Kinds.All) {
             if (GatherRules.Of(kind)?.JobName != job || !CanWork(w, kind)) continue;
             foreach (var t in S.Things.Of(kind)) {
-                if (t.Remaining <= 0 || TreePlanting.IsYoung(t) || !S.Remembered.ContainsKey(t.Id) && !GatherRules.Of(kind)!.Value.Roams || HasDuty(w, t.Id)) continue;
+                if (t.Remaining <= 0 || TreePlanting.IsYoung(t) || !S.Remembered.ContainsKey(t.Id) && !t.Roams || HasDuty(w, t.Id)) continue;
                 float distance = t.Pos.DistanceSquaredTo(from);
                 if (t.IsLoose) { if (loose == null || distance < nearestLoose) { loose = t; nearestLoose = distance; } } else if (next == null || distance < nearest) { next = t; nearest = distance; }
             }
@@ -2444,7 +2448,7 @@ public sealed partial class World {
         // Only the look is remembered: no inventory, and no fire, heat or work, so nothing out of sight smokes or glows.
         foreach (var t in S.Things) {
             // A firebug is never where it was last seen, so it leaves no memory.
-            if (!Sees(t.Pos) || GatherRules.Of(t.Kind)?.Roams == true) continue;
+            if (!Sees(t.Pos) || t.Roams) continue;
             if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id, Kind = t.Kind, Rotation = t.Rotation };
             memory.RememberedPlumbing = t.PlumbingInstalled;
             memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Keep = t.Keep; memory.Progress = t.Progress; memory.MineStage = t.MineStage; memory.FarmStage = t.FarmStage; memory.OfTree = t.OfTree; memory.TreeStage = t.TreeStage;

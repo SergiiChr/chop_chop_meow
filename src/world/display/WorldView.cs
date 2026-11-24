@@ -1107,7 +1107,7 @@ public partial class WorldView : Node3D {
     private readonly List<Prop> leaving = new();
     private SaveState? builtFor;
     // How many things the world held, and the newest of them, when models were last cleared away: a tree swapped for its stump changes only the second.
-    private int thingsCounted = -1, newestThing;
+    private int thingsCounted = -1, newestThing, groundedCounted = -1, newestGrounded;
     private static readonly Vector2 Nowhere = new(-1e6f, -1e6f);
     // Where the player stood when things were last drawn.
     private Vector2 sawFrom = Nowhere;
@@ -1135,7 +1135,7 @@ public partial class WorldView : Node3D {
         // Another world, loaded or started, starts from fresh models: the old ones carry the state of things with the same ids.
         if (builtFor != World.S) {
             builtFor = World.S;
-            thingsCounted = -1;
+            thingsCounted = groundedCounted = -1;
             // Nothing in a world just loaded appeared in front of the player.
             sawFrom = Nowhere;
             foreach (var (_, old) in props) old.Root.QueueFree();
@@ -1185,7 +1185,14 @@ public partial class WorldView : Node3D {
         int newest = World.Things.Count > 0 ? World.Things[World.Things.Count - 1].Id : 0;
         if (thingsCounted != World.Things.Count || newestThing != newest) {
             (thingsCounted, newestThing) = (World.Things.Count, newest);
-            RefreshDressing();
+            // A firebug marks nothing on the ground, so the dressing is drawn again only when something else has come or gone.
+            int last = World.Things.Count - 1;
+            while (last >= 0 && World.Things[last].Roams) last--;
+            int grounded = World.Things.Count - World.ThingsOf(ThingKind.Firebug).Count, newestOnGround = last >= 0 ? World.Things[last].Id : 0;
+            if (groundedCounted != grounded || newestGrounded != newestOnGround) {
+                (groundedCounted, newestGrounded) = (grounded, newestOnGround);
+                RefreshDressing();
+            }
             gone.Clear();
             foreach (var (id, _) in props) if (!seen.Contains(id) && World.Find(id) == null) gone.Add(id);
             foreach (int id in gone) { props[id].Root.QueueFree(); props.Remove(id); }

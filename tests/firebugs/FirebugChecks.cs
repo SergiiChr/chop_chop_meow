@@ -22,7 +22,7 @@ public static class FirebugChecks {
         Test(CheckNetSwingNeedsANet, data);
         Test(CheckFullBackpackCatchesNoFirebug, data);
         Test(CheckHoldingOnToAFirebugCatchesNothing, data);
-        Test(CheckHoleIsDugUnderAFirebug, data);
+        Test(CheckFirebugTakesNoGround, data);
         Test(CheckFirebugJobNeedsANetAtAToolStation, data);
         Test(CheckFirebugsAndNettlesComeBackFromASave, data);
     }
@@ -86,15 +86,14 @@ public static class FirebugChecks {
         Require(bug.Pos.DistanceTo(world.Player) > 8, $"a firebug should dart away from the player: {bug.Pos.DistanceTo(world.Player):0.0} m off");
         var rest = bug.Pos;
         world.Player = bug.Pos + new Vector2(1, 0);
-        RunFrames(world, 1.5f);
+        SafeTick(world, 1.5f, Frame);
         Require(bug.Pos == rest, "a firebug should rest for 1.6 s whoever stands beside it");
-        RunFrames(world, .3f);
+        SafeTick(world, .3f, Frame);
         Require(bug.Pos != rest, "a rested firebug should dart again from a player beside it");
     }
 
     private static void CheckNetSwingCatchesARestingFirebug(GameData data) {
-        var (world, bug, _) = FirebugNight(data);
-        TireOut(world, bug);
+        var (world, bug, _) = RestingFirebug(data);
         SwingAt(world, bug);
         Require(world.Find(bug.Id) == null && world.Backpack["firebug"] == 1, "a net swung at a resting firebug 1.15 m off should catch it");
         Require(world.Had("firebug"), "the settlement should know firebugs once one is caught");
@@ -102,17 +101,15 @@ public static class FirebugChecks {
 
     /// <summary>The swing lands 0.4 s after it starts; started 0.1 s before the rest ends, it gives the firebug 0.3 s to dart 1.6 m off.</summary>
     private static void CheckSwingThatLandsAfterTheRestCatchesNothing(GameData data) {
-        var (world, bug, _) = FirebugNight(data);
-        TireOut(world, bug);
-        RunFrames(world, 1.5f);
+        var (world, bug, _) = RestingFirebug(data);
+        SafeTick(world, 1.5f, Frame);
         SwingAt(world, bug);
         Require(world.Find(bug.Id) != null && world.Backpack["firebug"] == 0, "a firebug that has rested should dart off before a late swing lands");
     }
 
     /// <summary>The hoop goes round 0.94 to 1.41 m from the player, so a firebug half a metre off is inside its sweep, and one 3 m off beyond it.</summary>
     private static void CheckMissedSwingSendsARestingFirebugDarting(GameData data) {
-        var (world, bug, _) = FirebugNight(data);
-        TireOut(world, bug);
+        var (world, bug, _) = RestingFirebug(data);
         var rest = bug.Pos;
         SwingAt(world, bug, from: 3);
         SafeTick(world, Step);
@@ -125,8 +122,7 @@ public static class FirebugChecks {
     }
 
     private static void CheckNetSwingNeedsANet(GameData data) {
-        var (world, bug, said) = FirebugNight(data);
-        TireOut(world, bug);
+        var (world, bug, said) = RestingFirebug(data);
         Drop(world, "bug_net");
         SwingAt(world, bug);
         Require(world.Find(bug.Id) != null && said.Contains("No bug net in your backpack."), $"a swing without a net should catch nothing and say why: {string.Join(" | ", said)}");
@@ -142,8 +138,7 @@ public static class FirebugChecks {
     }
 
     private static void CheckHoldingOnToAFirebugCatchesNothing(GameData data) {
-        var (world, bug, _) = FirebugNight(data);
-        TireOut(world, bug);
+        var (world, bug, _) = RestingFirebug(data);
         Require(world.GatherBlock(bug)?.Contains("Swing") == true, $"a firebug should ask for a swing of the net: {world.GatherBlock(bug)}");
         HoldGather(world, bug, 1);
         Require(world.Find(bug.Id) != null && world.Backpack["firebug"] == 0, "holding on to a firebug should not catch it");
@@ -151,10 +146,14 @@ public static class FirebugChecks {
         Require(world.GatherBlock(bug)?.Contains("bug net") == true, $"a firebug should ask for a bug net: {world.GatherBlock(bug)}");
     }
 
-    private static void CheckHoleIsDugUnderAFirebug(GameData data) {
+    private static void CheckFirebugTakesNoGround(GameData data) {
         var (world, bug, _) = FirebugNight(data);
         string? blocked = world.Construction.PlacementBlock(ThingKind.Hole, bug.Pos.Round());
         Require(blocked == null, $"a firebug in the air should leave the ground under it free to dig: {blocked}");
+        Give(world, "wood", 8);
+        GravelPathSteps.LayPath(world, Terrain.TileAt(bug.Pos));
+        BuildAt(world, ThingKind.Chest, bug.Pos.Round() + new Vector2(2, 0));
+        Require(world.Find(bug.Id) != null, "a firebug should stay when a path is laid under it and a chest goes up beside it");
     }
 
     /// <summary>Workers are off the map while firebugs are out, so the job is checked as far as being given and finding its tool.</summary>

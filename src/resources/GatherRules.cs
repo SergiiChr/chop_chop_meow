@@ -15,7 +15,7 @@ public enum GatherShape { Patch, Deposit, Loose, Dug, Plucked, Caught }
 /// <param name="Helps">A tool kind that only speeds gathering it up, or null.</param>
 /// <param name="ByHand">How many times longer a gather takes without a tool that speeds it up.</param>
 /// <param name="Chip">The loose piece a tool hit now and then knocks off it, or null.</param>
-/// <param name="Shape">Whether it is worked down, an ore deposit, a loose piece or dug up whole.</param>
+/// <param name="Shape">How it is taken: worked down, an ore deposit, a loose piece, dug up whole, plucked whole or caught.</param>
 /// <param name="Job">The gathering job it belongs to when that is not every spot yielding its item, or null.</param>
 /// <param name="Sting">Health a second that gathering it takes from a player who carries no tool of the <paramref name="Spares"/> kind.</param>
 /// <param name="Spares">The tool kind that keeps a gatherer from being stung, or null: a player may do without it, and a worker always takes one.</param>

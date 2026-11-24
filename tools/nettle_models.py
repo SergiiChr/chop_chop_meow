@@ -11,8 +11,6 @@ sys.path.insert(0, str(ROOT))
 
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
-# Patch's asset library serves each model under the SHA-256 of its file.
-SOURCE = "https://assets.patchusercontent.com/sha256"
 # Poly Haven's nettle plant at its lightest level of detail: six sprigs that share one texture.
 NETTLE = (
     "nettle_plant_lod2.glb",
@@ -33,19 +31,18 @@ OUTPUT = ROOT / "assets" / "models" / "nettle"
 def main() -> None:
     build.fetch_godot()
     build.BUILD.mkdir(exist_ok=True)
-    CACHE.mkdir(parents=True, exist_ok=True)
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    for name, sha256 in (NETTLE, ROPE):
-        build.fetch_pinned(f"{SOURCE}/{sha256}/{name}", CACHE / name, sha256)
+    nettle = build.fetch_patch_asset(*NETTLE, CACHE)
+    rope = build.fetch_patch_asset(*ROPE, CACHE)
     build.run_tool_script(
         ROOT / "tools" / "bake_cards.gd",
-        [OUTPUT, CACHE / NETTLE[0], TEXTURE, str(TEXTURE_SIZE)],
+        [OUTPUT, nettle, TEXTURE, str(TEXTURE_SIZE)],
         "CARD-BAKE PASS",
         timeout=300,
     )
     build.run_tool_script(
         ROOT / "tools" / "bake_models.gd",
-        [OUTPUT, CACHE / ROPE[0]],
+        [OUTPUT, rope],
         "MODEL-BAKE PASS",
         timeout=300,
     )

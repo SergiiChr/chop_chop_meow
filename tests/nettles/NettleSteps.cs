@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using ChopChopMeow;
 using Godot;
 using static SetupSteps;
+using static WorkerSteps;
 using static WorldSteps;
 
 /// <summary>Nettles in checks: a plant to pick and a yard a worker picks them in.</summary>
@@ -18,14 +19,10 @@ internal static class NettleSteps {
     /// </summary>
     public static (World World, Thing Bench, List<string> Said) RopeBench(GameData data, string slotted) {
         var world = EmptyWorld(data);
-        var bench = world.Add(ThingKind.Bench, Site(0, 4));
+        var bench = Bench(world, Site(0, 4), "nettle_rope", slotted);
         world.Player = bench.Pos + new Vector2(1.2f, 0);
-        world.SetRecipe(bench, "nettle_rope");
-        bench.Tools!.Add(slotted, 1);
         Give(world, "nettle", 1);
-        var said = new List<string>();
-        world.Notify = said.Add;
-        return (world, bench, said);
+        return (world, bench, Told(world));
     }
 
     /// <summary>A nettle a worker has the job of picking, with a chest and an empty tool station by it, all in the player's sight.</summary>

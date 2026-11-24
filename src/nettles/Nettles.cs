@@ -12,8 +12,6 @@ public sealed class Nettles(World world) {
     public const int PerNight = 3, Most = 10;
     /// <summary>Metres a nettle keeps from anything else on the ground.</summary>
     private const float Room = 2;
-    /// <summary>Random spots tried for one nettle before the night goes without it.</summary>
-    private const int Tries = 400;
     private const int Seed = 6131;
     // Seeded, and started again with each world, so a new valley's nettles come up in the same places every time.
     private Random random = new(Seed);
@@ -23,18 +21,20 @@ public sealed class Nettles(World world) {
     /// <summary>Brings up the night's nettles once night has fallen.</summary>
     internal void Tick() {
         var s = world.S;
-        if (!world.Night || s.NettleNight >= world.Day) return;
-        s.NettleNight = world.Day;
+        if (!world.Night) { s.NettlesUp = false; return; }
+        if (s.NettlesUp || world.QuietNights) return;
+        s.NettlesUp = true;
         for (int grown = 0; grown < PerNight && s.Things.Of(ThingKind.Nettle).Count < Most; grown++)
-            if (Spot() is Vector2 spot) world.Add(ThingKind.Nettle, spot, 1);
+            if (world.UnseenSpot(random, Bare) is Vector2 spot) world.Add(ThingKind.Nettle, spot, 1);
     }
 
-    /// <summary>A random spot of open ground no player sees with nothing else by it, or null when the tries find none.</summary>
-    private Vector2? Spot() {
-        for (int i = 0; i < Tries; i++) {
-            var p = new Vector2(random.Next(3, Terrain.Size - 3), random.Next(3, Terrain.Size - 3));
-            if (world.Unseen(p) && world.Bare(p, Room)) return p;
-        }
-        return null;
+    /// <summary>
+    /// Whether a spot is ground to stand on with nothing on it or within <see cref="Room"/> of it:
+    /// no thing, yard, gravel path, beach, lake shore or den. A firebug in the air is not in the way.
+    /// </summary>
+    private bool Bare(Vector2 p) {
+        if (!world.CanStand(p) || Terrain.Beach(p) || Terrain.InLake(p, Room) || WolfPatrols.NearDen(p, Den.Clearance) || world.GravelPaths.Covers(p)) return false;
+        foreach (var t in world.S.Things) if (!t.Roams && World.Within(t, p, Room)) return false;
+        return true;
     }
 }
