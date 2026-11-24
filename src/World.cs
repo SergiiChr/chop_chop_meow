@@ -504,8 +504,8 @@ public sealed partial class World {
         foreach (string product in Data.EndsUpIn(item)) if (HadItself(product)) return true;
         return false;
     }
-    /// <summary>What the settlement gathered, bought or started with is in its record of items, and what it made is among its milestones.</summary>
-    internal bool HadItself(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item);
+    /// <summary>Whether the settlement has had this item, including coins earned from prior sales.</summary>
+    internal bool HadItself(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item) || item == Inventory.Coins && Reached("sold");
     internal void Got(string item) => S.Obtained.Add(item);
     public int DayRevenue => S.DayRevenue;
     public ListView<int> Profits => new(S.Profits);
@@ -2161,9 +2161,12 @@ public sealed partial class World {
         }
         if (!order.Buying) {
             if (order.Goods.Keys.Any(VillageBuys)) S.Milestones.Add("sold");
+            int payment = (int)order.Value;
+            if (payment > 0) Got(Inventory.Coins);
+            // Played at the player so the payment is heard wherever the player is.
+            Play("payment_from_village_arrives", Player);
+            S.DayRevenue += payment;
         }
-        // Played at the player, not the signpost, so a payment is heard wherever the player is.
-        if (!order.Buying) { Play("payment_from_village_arrives", Player); S.DayRevenue += (int)order.Value; }
         S.Orders.Remove(order); UpdatePrices();
         if (order.Buying) { Say($"Cart returned with {Goods(order.Goods)}."); return; }
         var donated = order.Goods.Where(p => !VillageBuys(p.Key)).ToList();
@@ -2489,7 +2492,7 @@ public sealed partial class World {
         S = loaded;
         toolsChanged = true;
         foreach (var t in S.Things.Of(ThingKind.Toolstation)) WatchTools(t);
-        if (!Reached(Quests.OreSeen) && S.Remembered.Values.Any(t => t.IsDeposit && t.Remaining > 0))
+        if (!Reached(Quests.OreSeen) && S.Remembered.Values.Any(t => t.IsDeposit))
             S.Milestones.Add(Quests.OreSeen);
         gatherClock = 0; ExploredRevision++; Look();
         Replaced?.Invoke();

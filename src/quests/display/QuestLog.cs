@@ -13,8 +13,10 @@ public partial class QuestLog : VBoxContainer {
     private readonly Label explore;
     private readonly Button disclosure;
     private readonly QuestStatus[] shown = new QuestStatus[Quests.Entries.Length];
-    private readonly Label detailTitle, detailDescription, profitProgress;
+    private readonly Label detailTitle;
     private readonly HBoxContainer detailItems;
+    private readonly VBoxContainer detailBody;
+    private readonly LiveUpdates progress = new();
 
     public Control Details { get; }
 
@@ -45,12 +47,12 @@ public partial class QuestLog : VBoxContainer {
         var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); column.AddChild(well);
         var content = new VBoxContainer(); content.AddThemeConstantOverride("separation", 12); well.AddChild(content);
         detailItems = new HBoxContainer(); detailItems.AddThemeConstantOverride("separation", 8); content.AddChild(detailItems);
-        detailDescription = Style.Text("", 16, Style.Ink, wrap: true); content.AddChild(detailDescription);
-        profitProgress = Style.Text("", 14, Style.Tan); content.AddChild(profitProgress);
+        detailBody = new VBoxContainer(); detailBody.AddThemeConstantOverride("separation", 6); content.AddChild(detailBody);
     }
 
     /// <summary>Draws quest titles when their visibility or completion changes.</summary>
     public void Refresh() {
+        if (Details.Visible) progress.Run();
         var quests = Quests.Entries;
         Span<QuestStatus> statuses = stackalloc QuestStatus[quests.Length];
         for (int i = 0; i < quests.Length; i++) statuses[i] = world.Quests.Status(quests[i].Id);
@@ -84,7 +86,6 @@ public partial class QuestLog : VBoxContainer {
 
     private void ShowDetails(Quest quest) {
         detailTitle.Text = quest.Title;
-        detailDescription.Text = world.Quests.Description(quest);
         Clear(detailItems);
         foreach (string item in quest.Items) {
             var icon = kit.Button("", () => map.OpenAt(item, leaveMenu));
@@ -99,13 +100,40 @@ public partial class QuestLog : VBoxContainer {
             detailItems.AddChild(icon);
         }
         detailItems.Visible = quest.Items.Length > 0;
-        profitProgress.Visible = quest.Id == QuestId.Profit;
-        if (profitProgress.Visible) {
-            int days = world.Data.Goals.ProfitDays;
-            int streak = world.ProfitGoalMet ? days : world.ProfitStreak;
-            profitProgress.Text = $"{streak} of {days} days in a row";
-        }
+        SetDescription(quest);
+        progress.Run();
         Details.Show();
+    }
+
+    private void SetDescription(Quest quest) {
+        Clear(detailBody);
+        progress.Clear();
+        if (quest.Id == QuestId.Mines) {
+            foreach (var (ore, task) in Quests.MineTasks) {
+                var row = new HBoxContainer();
+                detailBody.AddChild(row);
+                var mark = Style.Text("", 16, Style.Tan);
+                mark.Name = $"quest_mine_{ore.Id()}";
+                mark.CustomMinimumSize = new Vector2(20, 0);
+                row.AddChild(mark);
+                row.AddChild(Style.Text(task, 16, Style.Ink));
+                progress.Watch(() => world.Mines.Working(ore), open => {
+                    mark.Text = open ? "✓" : "○";
+                    mark.AddThemeColorOverride("font_color", open ? Style.Rise : Style.Tan);
+                });
+            }
+            return;
+        }
+        detailBody.AddChild(Style.Text(world.Quests.Description(quest), 16, Style.Ink, wrap: true));
+        if (quest.Id != QuestId.Profit) return;
+        var figures = Style.Text("", 14, Style.Tan, wrap: true);
+        detailBody.AddChild(figures);
+        progress.Watch(() => (world.Profits.Count, world.DayRevenue, world.ProfitGoalMet), current => {
+            int days = world.Data.Goals.ProfitDays;
+            int streak = current.ProfitGoalMet ? days : world.ProfitStreak;
+            string yesterday = current.Count > 0 ? $"Yesterday's profit {world.Profits[^1]}" : "No day finished yet";
+            figures.Text = $"{streak} of {days} days in a row\n{yesterday} · Today's sales {current.DayRevenue}";
+        });
     }
 
     public void CloseDetails() => Details.Hide();

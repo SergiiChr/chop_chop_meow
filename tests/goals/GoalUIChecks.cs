@@ -25,6 +25,10 @@ public partial class Game {
         await Click(FindButton(menu, "NEET")!);
         Require(menu.QuestDetails.Visible && HasLabel(menu.QuestDetails, "Earn at least 1,300 coins in profit each day for 7 days in a row."),
             "Clicking NEET should open the full profit description.");
+        int revenue = Hosted.DayRevenue;
+        SetDayRevenue(Hosted, 125);
+        await Until(() => HasLabel(menu.QuestDetails, "Today's sales 125"), "sales updating in the open quest", 2);
+        SetDayRevenue(Hosted, revenue);
         var coins = (Button)menu.QuestDetails.FindChild("quest_item_coins", true, false);
         Require(coins.Icon != null && coins.TooltipText == "Coins", "Coins should be a hoverable icon with the item name.");
         await Click(coins);
@@ -55,10 +59,16 @@ public partial class Game {
         Require(menu.QuestDetails.Visible && HasLabel(menu.QuestDetails, "Build an iron mine.") &&
             HasLabel(menu.QuestDetails, "Build a coal mine.") && HasLabel(menu.QuestDetails, "Build a tin mine."),
             "Infinite power must open its details with all three mines.");
+        var ironMark = (Label)menu.QuestDetails.FindChild("quest_mine_iron", true, false);
+        var coalMark = (Label)menu.QuestDetails.FindChild("quest_mine_coal", true, false);
+        Require(ironMark.Text == "○", "An unopened iron mine must be unchecked.");
+        OpenMine(Hosted.Add(ThingKind.Mine, Cliff.Of(ThingKind.Iron).MineSpot));
+        await Until(() => ironMark.Text == "✓", "the iron mine's completion showing in the quest", 2);
+        Require(coalMark.Text == "○", "Opening an iron mine must leave the coal mine unchecked.");
         await KeyStroke(Key.Escape);
         Require(menu.Visible && !menu.QuestDetails.Visible, "Escape from quest details must go back to the quest log.");
         await KeyStroke(Key.Escape);
-        foreach (var ore in Cliff.Ores) OpenMine(Hosted.Add(ThingKind.Mine, Cliff.Of(ore).MineSpot));
+        foreach (var ore in new[] { ThingKind.Coal, ThingKind.Tin }) OpenMine(Hosted.Add(ThingKind.Mine, Cliff.Of(ore).MineSpot));
         Achieve(Hosted, "profit_week");
         await Frames(3);
         Require(ending.Visible && view.Paused, "Reaching the end goals must show the ending and pause the world.");

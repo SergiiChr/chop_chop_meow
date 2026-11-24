@@ -12,6 +12,12 @@ public sealed record Quest(QuestId Id, string Title, string Description, params 
 public sealed class Quests(World world) {
     internal const string OreSeen = "ore_seen";
 
+    internal static readonly (ThingKind Ore, string Task)[] MineTasks = [
+        (ThingKind.Iron, "Build an iron mine."),
+        (ThingKind.Coal, "Build a coal mine."),
+        (ThingKind.Tin, "Build a tin mine."),
+    ];
+
     private static readonly Quest[] entries = [
         new(QuestId.Campfire, "Light in the dark", "Build and light a campfire. Fire keeps wolves away."),
         new(QuestId.Cabin, "Safe place", "Build a cabin for a peace of mind."),
@@ -23,7 +29,7 @@ public sealed class Quests(World world) {
         new(QuestId.SteelBar, "Hotter than fire", "Build a reinforced furnace and produce your first steel bar.", "steel_bar"),
         new(QuestId.SteelTools, "Steel tools", "Purchase a hammer and a pickaxe from the trading post.", "steel_hammer", "steel_pick"),
         new(QuestId.SteelParts, "Too soft", "Build an anvil and produce your first steel parts.", "steel_parts"),
-        new(QuestId.Mines, "Infinite power", "• Build an iron mine.\n• Build a coal mine.\n• Build a tin mine.", "iron_ore", "coal", "tin_ore"),
+        new(QuestId.Mines, "Infinite power", "", "iron_ore", "coal", "tin_ore"),
     ];
     public static ReadOnlySpan<Quest> Entries => entries;
 

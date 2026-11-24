@@ -22,9 +22,11 @@ public static class TradeChecks {
         world.Player = sign.Pos;
         // A steel chisel is a steel tool, so only the village not buying it keeps this from counting as selling steel.
         world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("steel_chisel", 1)), 1);
+        Require(!world.Had(Inventory.Coins), "the recipe map should show coins as unknown before a payout");
         Require(world.Sell(sign), "a cart should take a crate of goods the village does not buy");
         SafeTick(world, data.TradeSeconds + .1f);
         Require(world.Orders.Count == 0 && !world.Reached("sold"), "a donation should not count as a sale");
+        Require(world.Had(Inventory.Coins), "the recipe map should know coins from the payout for the crate itself");
     }
 
     /// <summary>
