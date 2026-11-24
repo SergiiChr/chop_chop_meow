@@ -23,6 +23,8 @@ internal sealed class BreakSeats(World world) {
     private readonly HashSet<Worker> cutOffFromGroup = new();
     private readonly List<Worker> leaving = new();
     private int fireCount;
+    /// <summary>How many buildings that block walking stood when seats were last given out; a change can open or shut the way to a seat.</summary>
+    private int blockerCount;
     // Workers who sat or looked for a seat in the last tick, and those doing so in this one.
     // Out of the lunch hour, only they are on a break, so a crew sitting at the end of lunch keeps its seats while it has nothing to do.
     private HashSet<Worker> resting = new(), restingNext = new();
@@ -30,7 +32,14 @@ internal sealed class BreakSeats(World world) {
     public void Reset() { ClearSeats(); resting.Clear(); restingNext.Clear(); }
 
     /// <summary>Gives up every seat, for a world with nobody on a break.</summary>
-    private void ClearSeats() { reserved.Clear(); unreachable.Clear(); cutOffFromGroup.Clear(); fireCount = 0; }
+    private void ClearSeats() { reserved.Clear(); unreachable.Clear(); cutOffFromGroup.Clear(); fireCount = 0; blockerCount = 0; }
+
+    /// <summary>How many buildings that block walking stand now.</summary>
+    private int Blockers() {
+        int count = 0;
+        foreach (var kind in World.WalkBlockers) count += world.ThingsOf(kind).Count;
+        return count;
+    }
 
     private bool OnBreak(Worker w) => !w.Home && w.Away <= 0 && w.Commute == 0 && w.WageDebt <= 0 && (world.Lunch || resting.Contains(w));
 
@@ -46,7 +55,11 @@ internal sealed class BreakSeats(World world) {
             count++;
             if (reserved.TryGetValue(w, out var seat) && FireStillThere(seat)) assigned++;
         }
-        if (assigned == count && assigned == reserved.Count && fireCount == campfires.Count) return;
+        // A building put up or taken down may open or shut the way to a seat, so seats out of reach are tried again.
+        int blockers = Blockers();
+        bool moved = blockers != blockerCount;
+        if (moved) { blockerCount = blockers; unreachable.Clear(); cutOffFromGroup.Clear(); }
+        if (assigned == count && assigned == reserved.Count && fireCount == campfires.Count && !moved) return;
         if (assigned != reserved.Count) {
             leaving.Clear();
             foreach (var (worker, seat) in reserved)

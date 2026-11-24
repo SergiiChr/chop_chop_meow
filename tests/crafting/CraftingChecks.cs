@@ -20,6 +20,8 @@ public static class CraftingChecks {
         Test(CheckTurningToAnotherRecipeTakesTheFuelOut, data);
         Test(CheckTurningKeepsTheInputsTheNewRecipeUses, data);
         Test(CheckTurningSendsTheProductAndUnusedInputsToTheBackpack, data);
+        Test(CheckABenchTakesBackTheSteelBarrelItMakes, data);
+        Test(CheckOnlyOneWorkerHoldingALoadPumpsTheBellows, data);
         Test(CheckTurningKeepsFuelTheNewRecipeBurns, data);
         Test(CheckTurningSendsTheOldProductOutEvenWhereTheNewRecipeUsesIt, data);
         Test(CheckAStationTakesByHandOnlyWhatItsRecipeUsesOrMakes, data);
@@ -254,6 +256,32 @@ public static class CraftingChecks {
         Give(world, "coal", 2);
         Require(world.Transfer(world.Backpack, furnace.Burner!, "coal", 1) == 1, "a furnace on iron should take coal in its fuel slot by hand");
         Require(world.Transfer(world.Backpack, furnace.Inventory, "coal", 1) == 0 && furnace.Inventory["coal"] == 0, "a furnace on iron should refuse coal in its input slots");
+    }
+
+    private static void CheckABenchTakesBackTheSteelBarrelItMakes(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        world.SetRecipe(bench, Barrel.Item);
+        Give(world, Barrel.Item, 1);
+        string message = ""; world.Notify = text => message = text;
+        Require(world.Transfer(world.Backpack, bench.Inventory, Barrel.Item, 1) == 1 && bench.Inventory[Barrel.Item] == 1,
+            $"a bench making steel barrels should take one back into its output slot by hand, not say \"{message}\"");
+    }
+
+    /// <summary>Two bellows workers each hold a load nothing takes; the one at the bellows still counts, so only one pumps.</summary>
+    private static void CheckOnlyOneWorkerHoldingALoadPumpsTheBellows(GameData data) {
+        var world = EmptyWorld(data);
+        var forge = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
+        forge.Inventory.Add("iron_bar", 20); forge.Inventory.Add("coal", 20); forge.Burner!.Add("coal", 10);
+        var first = Staff(world, forge, JobKind.Bellows);
+        var second = Staff(world, forge, JobKind.Bellows);
+        first.Bag.Add("leaves", 4); second.Bag.Add("leaves", 4);
+        for (int i = 0; i < 40; i++) {
+            world.Tick(.25f);
+            Require(world.Workers.Count(w => w.WorkState == WorkerWorkState.Pumping) <= 1, "only one worker holding a load should pump the bellows at a time");
+        }
+        Require(world.Workers.Count(w => w.WorkState == WorkerWorkState.Pumping) == 1, "one worker holding a load nothing takes should pump the bellows");
     }
 
     /// <summary>A turn from jam to stew at the cooking table keeps the wood in its fuel slot, which stew burns too, and takes the crushed berries out.</summary>

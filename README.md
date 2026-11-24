@@ -401,9 +401,10 @@ A worker can hold several jobs, at one place or several, and a new job goes to t
 The list is in order: they do the first job that can be done, and after each round of it they read the list from the top again.
 A round is a delivery, a crafted batch, a crate packed full, a furnace batch at the bellows, a piece mined or a harvest.
 With no job that can be done, a worker sits at the nearest campfire they can reach, as at lunch: six to a fire, the rest on the ground nearby in groups of up to three.
+A worker who could not reach a fire's seats tries again once a building goes up or comes down.
 With no campfire they wait at the nearest trading post, or in the clearing without one.
 Their status says what their first job lacks.
-A worker on Bellows pumps only while the furnace smelts or holds a batch to smelt, and only one worker pumps at a time.
+A worker on Bellows pumps only while the furnace smelts or holds a batch to smelt, and only one worker pumps at a time, also one holding a load nothing takes.
 
 The crew button opens an overview with each worker's daily pay and the total above.
 
@@ -667,7 +668,7 @@ A steel bucket holds 10 liters and hangs by its handle on the tool rack.
 A placed barrel offers Haul.
 A cabin offers Haul while its roof barrel is mounted.
 A worker fills the bucket or bottle in their tool slot at the lake or a nearer full placed barrel, then pours it
-into the barrel they were assigned to stock.
+into the barrel they were assigned to stock, while its filter names water.
 Workers can fetch a bucket or bottle from the tool rack.
 They climb the outside ladder to fill a roof barrel and then climb down.
 
@@ -735,9 +736,10 @@ A load a worker carries goes to the nearest place that asks for it:
 Only when none of those has room does it go to the nearest storage taking everything (A).
 With none of those either, the load goes back, wherever it came from, to the nearest building whose output filter lets it out, up to one stack of it.
 Storage counts by the output filter set on it, so a new chest or placed crate, whose output row holds A, takes back anything it holds.
-A building with output slots has an output filter of what it outputs: a station its recipe's product, a farm plot its harvest, a mine its ore and stone, and a packing station crates of its good.
+A building with output slots has an output filter of what it outputs: a station its recipe's product, a farm plot its harvest, an open mine its ore and stone, and a packing station crates of its good.
 With no such place, the load stays in hand: the worker says "Holding … · no accepting storage" and goes on with the jobs of their list that need no hands, such as Craft, Bellows and Farm, until something takes it.
 Workers send a load elsewhere when a filter changes or a slot fills while they carry it.
+A hauler sizes a load carried out again when picking it up, to what the place it goes to still has room for.
 A chest or pile near a source fills first and buffers the goods; without one, a gatherer walks each load to the nearest station with room.
 
 ### Hauling

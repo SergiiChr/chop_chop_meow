@@ -230,9 +230,9 @@ public sealed partial class World {
         return true;
     }
 
-    /// <summary>Whether a worker has a furnace's bellows in hand, on duty and with nothing to carry off first.</summary>
+    /// <summary>Whether a worker has a furnace's bellows in hand, on duty and not carrying a load somewhere first; a load nothing takes stays in hand while they pump.</summary>
     private bool AtBellows(Worker w, Thing forge) =>
-        w.Assignment == forge.Id && w.Doing == JobKind.Bellows && w.Bag.Count == 0 && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w);
+        w.Assignment == forge.Id && w.Doing == JobKind.Bellows && (w.Bag.Count == 0 || w.Destination == 0) && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w);
 
     /// <summary>A campfire's keeper brings wood from storage once the fire runs low.</summary>
     private bool TendFire(Worker w, Thing fire, float dt) {

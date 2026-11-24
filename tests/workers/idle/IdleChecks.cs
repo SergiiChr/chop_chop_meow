@@ -15,6 +15,7 @@ internal static class IdleChecks {
         Test(CheckCampfireBurnsWithNoWoodWhileWorkersSitAndGoesOutAfter, data);
         Test(CheckCampfireBurnsItsWoodAsUsualWhileWorkersSit, data);
         Test(CheckWorkerWithNothingToDoWaitsAtTheTradingPost, data);
+        Test(CheckIdleWorkerCutOffFromTheFireTakesASeatOnceTheWayOpens, data);
     }
 
 
@@ -30,6 +31,22 @@ internal static class IdleChecks {
             $"a worker whose jobs cannot be done should sit at the nearest campfire, not {crafter.Pos.DistanceTo(near.Pos):0.0} m from it");
         Require(crafter.Status.Contains("wood", StringComparison.OrdinalIgnoreCase), $"a seated idle worker's status should say what their first job lacks, not \"{crafter.Status}\"");
         Require(crafter.Assignment == bench.Id, "a worker waiting at the fire should keep the job's place");
+    }
+
+    /// <summary>A ring of chests shuts an idle worker off from the fire, so they sit where they stand; once one chest goes, they take a fire seat and light it.</summary>
+    private static void CheckIdleWorkerCutOffFromTheFireTakesASeatOnceTheWayOpens(GameData data) {
+        var world = FundedWorld(data);
+        var fire = world.Add(ThingKind.Campfire, new Vector2(30, 20));
+        var center = new Vector2(20, 20);
+        for (int i = 0; i < 12; i++) world.Add(ThingKind.Chest, center + Vector2.Right.Rotated(i * Mathf.Tau / 12) * 1.5f);
+        var worker = AddWorker(world, center);
+        Work(world, 30, () => Seated(worker));
+        Require(Seated(worker) && worker.Pos.DistanceTo(center) < 1.5f, $"a worker shut in by chests should sit where they stand: {worker.Status}");
+        var gap = world.Things.First(t => t.Kind == ThingKind.Chest && t.Pos.X > center.X + 1.4f);
+        RemoveThings(world, t => t == gap);
+        Work(world, 60, () => Seated(worker) && worker.Pos.DistanceTo(fire.Pos) < 1.6f);
+        Require(Seated(worker) && worker.Pos.DistanceTo(fire.Pos) < 1.6f && fire.Burn > 0,
+            $"once a chest goes, the worker should take a seat at the fire and light it, not sit {worker.Pos.DistanceTo(fire.Pos):0.0} m from it");
     }
 
     private static void CheckIdleWorkersPastSixSitOnTheGroundByTheFire(GameData data) {

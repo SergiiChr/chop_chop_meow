@@ -1185,7 +1185,7 @@ Storage with a filter window has `Inventory.Gated` set: there an empty list lets
 `World.Add` gives a chest and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; every crate's contents get the chest's lists when made (`World.NewCrate`), packed or not.
 Any other box, such as a station's slots or a worker's hands, is not gated, and lets anything through its empty lists.
 Automated deposits go to the nearest place that asks for the item, then to the nearest storage taking everything (`World.DepositFor`).
-A load nothing takes goes back to the nearest building whose output filter lets it out, up to one stack of it (`TakeBack`, which `World` holds): storage by the output filter set on it (`Inventory.AllowsWithdrawal`), and a building with output slots by what it outputs, worked out from the building rather than stored (`TakeBack.Outbox`): a station its recipe's product, a farm plot its yield, a mine its ore and stone, a packing station crates of its good.
+A load nothing takes goes back to the nearest building whose output filter lets it out, up to one stack of it (`TakeBack`, which `World` holds): storage by the output filter set on it (`Inventory.AllowsWithdrawal`), and a building with output slots by what it outputs, worked out from the building rather than stored (`TakeBack.Outbox`): a station its recipe's product, a farm plot its yield, an open mine its ore and stone (a mine's output shows only once it opens), a packing station crates of its good.
 A station's slots hold inputs and leftovers of other recipes as well as its product, so a stored output filter there would also stop haulers carrying the leftovers out.
 With no taker found, a worker looks again every `JobListSeconds` (`Worker.LookAgain`) rather than every tick.
 With none, the load stays in hand while the worker does only the jobs that need no hands: the job table's `JobDef.Hands` says which jobs carry loads (`World.NeedsHands`).
@@ -1311,7 +1311,7 @@ Each kind of place offers its carries through its own `PlaceHaul` (`StationHaul`
 Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold one sowing (`Farms.SowRoom`) and a mine site what it lacks.
 A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
 Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
-A load carried out of a place is as much as the place taking it has room for (`PlaceHaul.Taker`), so none is left in hand.
+A load carried out of a place is as much as the place taking it has room for (`PlaceHaul.Taker`), and is sized again at pickup (`Hauling.Takes`), so none is left in hand when the place filled meanwhile.
 
 A chest's or placed crate's hauler carries out what its output filter lets go to the nearest place asking for it (`World.AskerFor`), then fills it with what its input filter names (`StoreHaul.FillSource`, never for `Everything`); every such carry comes under the first rule.
 Storage that asks for an item never passes it to other storage asking for it, nor takes it from one, so two never trade it back and forth.
@@ -1345,7 +1345,7 @@ At the `LunchHour` in `GameData` workers break for one in-game hour.
 It seats workers with nothing to do the same way at any hour; their ground groups gather round the nearest campfire rather than where they stand.
 A worker who sat in the last tick keeps their seat while they still have nothing to do, so the crew still sitting when lunch ends stays put.
 A campfire burns its wood as usual while workers sit at it; once it has none left, a worker sitting in one of its seats keeps it burning at `KindledBurn`, one second (`BreakSeats.Kindle`), and it dies down within that second once they leave.
-A blocked walk releases its seat, and the worker remembers seats they could not reach until nobody is on a break any more, lunch or idle.
+A blocked walk releases its seat, and the worker remembers seats they could not reach until nobody is on a break any more, lunch or idle, or until the number of buildings that block walking changes (`BreakSeats.Prepare`), when every seat is tried again.
 Workers on the ground keep their seats when the crew changes, unless they take a vacancy by a fire.
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
 When a worker cannot reach a group, they sit near where they stopped if there is room, or wait standing.

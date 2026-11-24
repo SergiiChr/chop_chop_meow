@@ -13,6 +13,7 @@ using static WorkerSteps;
 public static class MineChecks {
     public static void Run(GameData data) {
         Test(CheckMineSitesAlignWithCliffs, data);
+        Test(CheckALoadNothingTakesStaysOutOfAMineNotYetOpen, data);
         Test(CheckMinesAreMarkedAtCliffsOnceEach, data);
         Test(CheckWorkersDigAndFrameMineWithTheirTools, data);
         Test(CheckWorkerTakesTheFreeHammerFromTheRack, data);
@@ -296,5 +297,17 @@ public static class MineChecks {
         Require(!world.EndGoalsComplete, "an unfinished mine must not count");
         OpenMine(world.Things.Last(t => t.Kind == ThingKind.Mine));
         Require(world.EndGoalsComplete, "a working mine on every ore and a week of profit must complete the end goals");
+    }
+
+    /// <summary>A marked mine's output is not shown until the mine opens, so a worker holding stone nothing takes keeps it rather than putting it there.</summary>
+    private static void CheckALoadNothingTakesStaysOutOfAMineNotYetOpen(GameData data) {
+        var world = EmptyWorld(data);
+        var cliff = Cliff.Of(ThingKind.Coal);
+        var mine = world.Add(ThingKind.Mine, cliff.MineSpot);
+        Require(mine.MineStage == MineStage.Marked, "a mine just added should be marked, not open");
+        var worker = AddWorker(world, cliff.MineSpot + cliff.Face * 3);
+        worker.Bag.Add("stone", 4);
+        Work(world, 30);
+        Require(mine.Output!["stone"] == 0 && worker.Bag["stone"] == 4, $"a worker should keep stone nothing takes rather than put it in a mine not yet open: {worker.Status}");
     }
 }

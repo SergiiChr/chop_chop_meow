@@ -16,6 +16,8 @@ public static class HaulingChecks {
         Test(CheckHaulerBringsAnInputShortOfABatchBeforeTakingAFullOutput, data);
         Test(CheckHaulerTakesAFullOutputBeforeToppingUpInputs, data);
         Test(CheckHaulerTakesOutOnlyWhatStorageHasRoomFor, data);
+        Test(CheckHaulerTakesOutOnlyWhatStorageStillHasRoomForAtPickup, data);
+        Test(CheckHaulerTakesOutOnlyTheRejectedFuelStorageHasRoomFor, data);
         Test(CheckHaulerPutsALoadBackWhenNothingTakesItAnyMore, data);
         Test(CheckALoadNothingTakesGoesToTheNearestStorageWhoseOutputFilterLetsItOut, data);
         Test(CheckAChestsHaulerPutsTheLastOfAStackBackIntoTheChest, data);
@@ -79,6 +81,34 @@ public static class HaulingChecks {
         var hauler = Staff(world, bench, JobKind.Haul);
         Require(FirstCarry(world, hauler) == "planks", $"a hauler should take out a full stack of planks before topping up wood, not carry {hauler.Bag.First()}");
         Require(hauler.Bag["planks"] == 12, $"a hauler should carry 12 planks at a time, not {hauler.Bag["planks"]}");
+    }
+
+    /// <summary>The chest fills while the hauler walks to the table, so the load is sized again when it is picked up.</summary>
+    private static void CheckHaulerTakesOutOnlyWhatStorageStillHasRoomForAtPickup(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, new Vector2(10, 10), "planks");
+        bench.Inventory.Add("planks", 64);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10)));
+        chest.Inventory.Slots = 1;
+        var hauler = Staff(world, bench, JobKind.Haul);
+        hauler.Pos = bench.Pos + new Vector2(0, 10);
+        Work(world, 1);
+        Require(hauler.Bag.Count == 0 && hauler.Pos.DistanceTo(bench.Pos) > 5, "the hauler should still be on the way to the table");
+        chest.Inventory.Add("planks", 63);
+        Work(world, 30, () => hauler.Bag.Count > 0);
+        Require(hauler.Bag["planks"] == 1, $"a hauler should take out only the 1 plank the chest still has room for, not {hauler.Bag["planks"]}");
+    }
+
+    private static void CheckHaulerTakesOutOnlyTheRejectedFuelStorageHasRoomFor(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
+        world.SetRecipe(furnace, "iron_bar");
+        furnace.Burner!.Add("wood", 3);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(24, 20)));
+        chest.Inventory.Slots = 1; chest.Inventory.Add("wood", 63);
+        var hauler = Staff(world, furnace, JobKind.Haul);
+        Work(world, 30, () => hauler.Bag.Count > 0);
+        Require(hauler.Bag["wood"] == 1, $"a hauler should take only the 1 wood iron cannot burn that the chest has room for, not {hauler.Bag["wood"]}");
     }
 
     private static void CheckHaulerTakesOutOnlyWhatStorageHasRoomFor(GameData data) {

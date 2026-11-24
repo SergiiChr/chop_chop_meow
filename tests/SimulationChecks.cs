@@ -72,7 +72,7 @@ public static class SimulationChecks {
         ProductionChainChecks.Run(data);
         ProgressionChecks.Run(data);
         MultiplayerChecks.Run(data);
-        Test(AllocationChecks.Run, data);
+        AllocationChecks.Run(data);
         GD.Print("SELF-TEST PASS");
     }
 }

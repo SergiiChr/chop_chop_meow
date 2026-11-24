@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 /// whose output filter lets the item out, into the box it gives out from, up to one stack of the item.
 /// Storage has the output filter the player sets on it, so a new chest or crate takes back anything.
 /// A building with output slots has one made from what it outputs: a station its recipe's product, a farm plot its yield,
-/// a mine its ore and stone, and a packing station crates of its good.
+/// an open mine its ore and stone, and a packing station crates of its good.
 /// </summary>
 internal sealed class TakeBack(World world) {
     /// <summary>Storage whose output filter counts: a barrel or the trading post's market output gives out without taking back.</summary>
@@ -60,7 +60,8 @@ internal sealed class TakeBack(World world) {
     private Inventory? Outbox(Thing t, string item) => t.Kind switch {
         _ when world.IsStation(t.Kind) => world.Product(t) == item ? t.Inventory : null,
         ThingKind.Farm => world.Data.Farm.Yield.ContainsKey(item) ? t.Output : null,
-        ThingKind.Mine => item == Mines.Ore(t) || item == "stone" ? t.Output : null,
+        // A mine's output shows on its page only once the mine opens.
+        ThingKind.Mine => t.MineStage == MineStage.Open && (item == Mines.Ore(t) || item == "stone") ? t.Output : null,
         ThingKind.Packer => t.Packs != "" && CrateOfGood(item, t.Packs) ? t.Output : null,
         ThingKind.Chest or ThingKind.Pile or ThingKind.Crate or ThingKind.Toolstation => t.Inventory.AllowsWithdrawal(item) && world.Holds(t, item) && !World.Nests(t, item) ? t.Inventory : null,
         _ => null

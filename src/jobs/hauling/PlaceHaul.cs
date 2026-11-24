@@ -27,14 +27,7 @@ internal abstract class PlaceHaul {
 
     /// <summary>The nearest place that takes a load of an item carried out of a place, and how much of the free units it takes, or null when none does.</summary>
     protected (Thing To, int Count)? Taker(Thing place, string item, int free) =>
-        world.DepositFor(item, place.Pos, place.Id) is Thing to && Takes(to, item, free) is > 0 and int count ? (to, count) : null;
-
-    /// <summary>How many of the free units of an item a place a load goes to takes, as far as it has room; vessels that pour there go as many as its liters of room take.</summary>
-    protected int Takes(Thing to, string item, int free) {
-        if (world.Intake(to, item, false) is not (Inventory into, int room)) return 0;
-        if (world.PoursInto(to, into, item) is VesselDef pours) room = (room + pours.LitersIn(item) - 1) / pours.LitersIn(item);
-        return System.Math.Min(free, room);
-    }
+        world.DepositFor(item, place.Pos, place.Id) is Thing to && Hauling.Takes(world, to, item, free) is > 0 and int count ? (to, count) : null;
 
     /// <summary>A carry that takes an output out of a place: a full one comes under the second rule, otherwise under the fourth, most held first.</summary>
     protected static Carry TakeOut(Thing place, Thing to, CarryBox box, string item, int count, bool full) =>

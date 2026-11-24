@@ -294,6 +294,7 @@ internal static class BarrelChecks {
         var world = EmptyWorld(data);
         var at = Terrain.Spawn + new Vector2(0, 6);
         var barrel = world.Add(ThingKind.Barrel, at);
+        world.SetFilter(barrel, Water.Liquid, false, true);
         var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, at + Vector2.Right * 4));
         rack.Inventory.Add(Bucket.Item, 1);
         rack.Inventory.Filter(Bucket.Item, false, true);
@@ -330,6 +331,9 @@ internal static class BarrelChecks {
         Require(world.Transfer(world.Backpack, rack.Inventory, Water.Full, 1) == 1, "the only available vessel is the full bottle on the rack");
         var worker = AddWorker(world, world.Player + Vector2.Down);
         world.SetDuty(worker, target, JobKind.Haul, true);
+        Work(world, 6);
+        Require(target.Inventory[Water.Liquid] == 0, "a worker hauling for a barrel whose filter does not name water should pour none in");
+        world.SetFilter(target, Water.Liquid, false, true);
         Work(world, 6, () => target.Inventory[Water.Liquid] > 0);
         Require(target.Inventory[Water.Liquid] == 3 && worker.Tool == Water.Empty, "a worker fetches a bottle and pours its three liters");
     }
@@ -338,6 +342,7 @@ internal static class BarrelChecks {
         var world = EmptyWorld(data);
         var cliff = Cliff.Of(ThingKind.Coal);
         var barrel = world.Add(ThingKind.Barrel, cliff.Center + cliff.Face * 1.7f);
+        world.SetFilter(barrel, Water.Liquid, false, true);
         var tree = world.Add(ThingKind.Tree, barrel.Pos + cliff.Face * 4, 10);
         TakeEverything(world, world.Add(ThingKind.Chest, tree.Pos + cliff.Face * 2));
         var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, tree.Pos + cliff.Along * 2));
@@ -355,6 +360,7 @@ internal static class BarrelChecks {
     private static void CheckWorkerReachesBarrelAroundAChest(GameData data) {
         var world = EmptyWorld(data);
         var barrel = world.Add(ThingKind.Barrel, new Vector2(74.08f, 123.28f));
+        world.SetFilter(barrel, Water.Liquid, false, true);
         TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(74.98f, 124.44f)));
         var worker = AddWorker(world, new Vector2(80.91f, 126.81f));
         worker.Tool = Bucket.AtFill(10);

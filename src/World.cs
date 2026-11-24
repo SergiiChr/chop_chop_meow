@@ -1785,7 +1785,8 @@ public sealed partial class World {
     /// <summary>A station holds by hand only what its recipe uses or makes, a tool station tools and water vessels, a pile one resource, compost what rots and a campfire wood.</summary>
     private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
         ThingKind.Hut when Barrel.Is(item) => HoldRefusal.None,
-        _ when Barrel.Is(item) && (t.Kind != ThingKind.Pile || t.Compost) => HoldRefusal.Barrel,
+        // A station's output slot takes back the barrels it makes; nothing else but a pile holds one.
+        _ when Barrel.Is(item) && !(IsStation(t.Kind) && SlotsTake(t, item)) && (t.Kind != ThingKind.Pile || t.Compost) => HoldRefusal.Barrel,
         ThingKind.Barrel when Barrels.CanPour(Data, item) => HoldRefusal.None,
         ThingKind.Barrel => HoldRefusal.LiquidOnly,
         ThingKind.Hut => HoldRefusal.BarrelOnly,
