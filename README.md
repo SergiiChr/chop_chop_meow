@@ -1017,12 +1017,14 @@ Axe swings take turns:
 
 A steel axe takes 2.2 to 3.2 of a wolf's 8 health a blow, a torch 0.8 to 1.2 and a punch 0.4 to 0.6.
 A torch and a fist reach only a wolf at biting distance: the flame 1 metre, swung low with you bent over, and the fist 0.7 metres and a little to your right.
-A blow knocks a wolf back and leaves it reeling for a moment.
+A wolf that survives its first hit hops back, turns to face you and plants its forepaws with its teeth bared.
+From then on it runs whenever it moves in the open. Later hits still knock it back and leave it reeling for a moment.
 
 A wolf at biting distance plants its paws and crouches for 0.3 seconds, then makes a short leap along that line.
 Its jaws close as it lands. Step sideways during the crouch or leap to get clear.
 A blow that lands before the jaws close interrupts the bite.
-A wolf that misses lands hard and stands for about half a second before it chases again, giving you time to counter.
+A wolf that misses lands hard and stands for about half a second, giving you time to counter.
+A wolf you have hit then runs in an arc away from you and back in for another bite.
 In a cabin's doorway the same snap is how a wolf takes hold of you: only a bite that lands starts a tug.
 
 An hour before dawn every wolf gives up and heads back to the nearest den.
@@ -1043,7 +1045,7 @@ After that each click swings it, which briefly widens its light by a fifth.
 Swinging four times within 2 seconds, as fast as swings go, puts it out with a message.
 Relighting takes the same 2 seconds and keeps the burn time it had left.
 
-While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into follow mode, which also stops a bite it was gathering itself for.
+While it burns, a lone wolf that you have yet to hit still creeps in slowly. A swing toward it scares it into follow mode and stops a bite it was gathering itself for.
 Every wave sends the wolves it reaches walking back out to their circle, however near they were, a second wave as much as a first.
 Take any step toward one that is still backing off and it stops backing off: alone it runs, and among others it stands its ground, both as below.
 Wolves in follow mode keep circling you at a walk at the edge of the light, about 4.5 metres off, each the way round it took at random; those going the same way spread evenly, and each wanders a little in and out and ahead and back, and turns its head to you now and then.

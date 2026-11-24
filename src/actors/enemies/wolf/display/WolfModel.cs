@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What a wolf model shows; a change blends from the pose it had into the new one.</summary>
-public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Rear, Door, Brace, Snap }
+public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Rear, Door, Brace, Snap, Threaten }
 
 /// <summary>
 /// A leg's joint angles in degrees, each swinging the segment below forward from its parent's line; Splay swings the whole leg out from the body.
@@ -360,6 +360,16 @@ public sealed class WolfModel {
         return Planted(body, 1.35f, 0, frontAhead: .1f, hindSpread: 1.15f);
     }
 
+    /// <summary>A wolf facing the player after the first hit, with its chest up, forepaws braced and teeth bared.</summary>
+    public void Threaten(float time, float dt) => Show(WolfMotion.Threaten, Threatening(time), dt);
+
+    private static WolfPose Threatening(float time) {
+        float breath = MathF.Sin(time * 5);
+        var body = new WolfPose(Lift: -.07f + .006f * breath, Surge: -.03f, Pitch: -9, Flex: 3, Neck: -8, Head: -10,
+            Jaw: 28 + 3 * breath, Ears: 2, Snarl: 1, Tail: -72, Curl: -12);
+        return Planted(body, 1.45f, .05f, frontAhead: .13f, hindSpread: 1.14f);
+    }
+
     /// <summary>
     /// Eases onto the hind legs through <paramref name="wind"/>, springs forward through <paramref name="drive"/>,
     /// then puts its weight on the forepaws through <paramref name="settle"/>.
@@ -595,7 +605,7 @@ public sealed class WolfModel {
     /// Struck: the head snaps away from the blow and the wolf hops back off its forelegs, lands hind paws first and ducks low with its ears flat and tail tucked, then rises wary.
     /// <paramref name="progress"/> runs 0 to 1 over the recoil; the view moves the wolf back only while it is in the air, the first HopShare of it.
     /// </summary>
-    public void Recoil(float progress, float dt) {
+    public void Recoil(float progress, float dt, bool threatening = false) {
         // In the air it rises and falls under gravity.
         float t = Math.Clamp(progress, 0, 1), hop = t / HopShare, air = t < HopShare ? 4 * hop * (1 - hop) : 0, rise = t < HopShare ? Movement.Rise(hop * HopSeconds, HopSeconds) : 0;
         float snap = Mathf.SmoothStep(0, .08f, t) * (1 - Mathf.SmoothStep(.15f, .55f, t));
@@ -612,6 +622,7 @@ public sealed class WolfModel {
             var at = new Vector3(WolfShape.Pivot(leg).X * (1 + .2f * duck), WolfShape.Sole + rise + .05f * MathF.Sin(MathF.PI * Math.Min(1, hop)), Home(leg) + (hind ? -.1f : .07f) * air + (hind ? 0 : .05f * duck));
             body = body.WithLeg(leg, Reach(halves, leg, at, hind ? 2 - 24 * air : 10 - 50 * air, hind ? 0 : -30 * air));
         }
+        if (threatening) body = Blended(body, Threatening(0), Mathf.SmoothStep(HopShare, .78f, t));
         Show(WolfMotion.Recoil, body, dt);
     }
 
@@ -900,6 +911,7 @@ public sealed class WolfModel {
         WolfMotion.Stand or WolfMotion.Brace or WolfMotion.Feed or WolfMotion.Howl => new(Planting.Stepped),
         WolfMotion.Pin or WolfMotion.Rear => new(Planting.Stepped, .12f),
         WolfMotion.Recoil => new(Planting.Stepped, .08f),
+        WolfMotion.Threaten => new(Planting.Stepped, .1f),
         WolfMotion.Leap or WolfMotion.Snap => new(Planting.Held, .08f),
         WolfMotion.Door => new(Planting.Set, .12f),
         WolfMotion.Fall or WolfMotion.Tug or WolfMotion.Brake => new(Planting.Set),

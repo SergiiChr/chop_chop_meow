@@ -1561,25 +1561,27 @@ public partial class WorldView : Node3D {
             // No faster than a wolf backs off.
             bool slow = moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
             // Easing back from its player to biting distance, a wolf steps backward still facing them.
-            bool backing = running && wolf.Flee <= 0 && !wolf.Following && moved.Dot(hunted - wolf.Pos) < 0 && slow;
+            bool backing = running && !wolf.Aggressive && wolf.Flee <= 0 && !wolf.Following && moved.Dot(hunted - wolf.Pos) < 0 && slow;
             // A scared or galloping wolf turns fast. At a walk or a trot, one that sets off far from the way it faces turns
             // round where it stands first, and only then goes after its place in the world.
-            bool fast = wolf.Chase > 0 || wolf.Flee > 0;
+            bool fast = wolf.Aggressive || wolf.Chase > 0 || wolf.Flee > 0;
+            bool threatening = wolf.Threaten > 0;
             bool turnsRound = running && !backing && !fast && moved.Normalized().Dot(ActorAnimation.Forward(model.Yaw)) < WolfModel.SetsOffWithin;
             // Where it is drawn away from its place in the world, after turning round or letting go of a player it tugged,
             // closes up only as it walks, so it never slides.
             var drifted = model.Drift;
-            model.Drift = committed ? Vector2.Zero : turnsRound ? model.Drift - moved : model.Drift.MoveToward(Vector2.Zero, WolfModel.CatchingUp(moved.Length(), dt));
+            model.Drift = committed || threatening ? Vector2.Zero : turnsRound ? model.Drift - moved : model.Drift.MoveToward(Vector2.Zero, WolfModel.CatchingUp(moved.Length(), dt));
             float walked = (moved + model.Drift - drifted).Length(), faced = model.Yaw;
             // A struck wolf keeps facing whoever hit it; a running one turns into its path.
-            var facing = struck ? model.Striker - wolf.Pos - model.KnockBack : running && !backing ? moved : hunted - wolf.Pos;
+            var facing = threatening ? Vector2.FromAngle(wolf.Heading) :
+                struck ? model.Striker - wolf.Pos - model.KnockBack : running && !backing ? moved : hunted - wolf.Pos;
             // A struck wolf snaps round to whoever hit it; otherwise the head turns first and the body follows, leaning in.
             // Reversing, its body still faces the old way for a moment: it brakes rather than running backward.
             bool braking = false;
             if (struck) {
                 model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(facing, model.Yaw), Math.Min(1, dt * 16)); model.Turning.Hold(model.Yaw);
                 model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-            } else if (committed) {
+            } else if (committed || threatening) {
                 model.Yaw = ActorAnimation.Yaw(Vector2.FromAngle(wolf.Heading), model.Yaw);
                 model.Turning.Hold(model.Yaw); model.Glance = 0;
                 model.Root.Rotation = new Vector3(0, model.Yaw, 0);
@@ -1598,7 +1600,8 @@ public partial class WorldView : Node3D {
             float rise = 0;
             if (!wolf.Pinning) model.Pinned = 0;
             if (model.Struck) model.Stand(Elapsed + wolf.Id % 7, dt, true);
-            else if (model.Recoiling > 0) model.Recoil(1 - model.Recoiling / WolfModel.RecoilSeconds, dt);
+            else if (model.Recoiling > 0) model.Recoil(1 - model.Recoiling / WolfModel.RecoilSeconds, dt, threatening);
+            else if (threatening && !wolf.Feeding) model.Threaten(Elapsed + wolf.Id % 7, dt);
             else if (wolf.Leap > 0 && !gathers) {
                 model.Leap(drive, dt, jawsUp: FallBackView.Throat(Vector2.Zero, Vector2.Up, 0).Y);
                 rise = Movement.Rise(drive * flight, flight);
@@ -1614,7 +1617,7 @@ public partial class WorldView : Node3D {
             } else if (stepsRound) model.Move(Math.Abs(turned) * WolfModel.TurnStep, dt, false, wary);
             else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (braking) model.Brake(moved.Length(), dt);
-            else if (running) model.Move(backing ? -walked : walked, dt, (wolf.Chase > 0 || wolf.Follow == FollowStage.Routed) && !backing, wary);
+            else if (running) model.Move(backing ? -walked : walked, dt, (wolf.Aggressive || wolf.Chase > 0 || wolf.Follow == FollowStage.Routed) && !backing, wary);
             else if (wolf.Follow == FollowStage.Braced) model.Brace(Elapsed + wolf.Id % 7, dt);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
             var place = To3(wolf.Pos + model.KnockBack + model.Drift, rise);

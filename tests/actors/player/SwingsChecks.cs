@@ -110,10 +110,10 @@ public static class SwingsChecks {
         Require(close.Stagger > 0 && close.Flee > 0, "a burnt wolf should be knocked back and run for a moment");
     }
 
-    /// <summary>A blow throws a wolf half a metre back from the player, and it stands reeling there for 0.45 seconds.</summary>
+    /// <summary>A further blow throws a wolf half a metre back and leaves it reeling for 0.45 seconds.</summary>
     private static void CheckABlowThrowsAWolfBackAndLeavesItReeling(GameData data) {
         var world = AxeNight(data);
-        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0), Attack = .2f });
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.05f, 0), Attack = .2f, Aggressive = true });
         world.Attack(Vector2.Right);
         // The axe comes down while the wolf is planted in its windup.
         SnapTick(world, .38f);

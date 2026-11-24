@@ -1201,9 +1201,17 @@ public sealed partial class World {
     internal void Strike(Wolf wolf, float damage) {
         wolf.Health -= damage; KnockBack(wolf);
         if (wolf.Health <= 0) KillWolf(wolf);
+        else WolfHunt.ReactToHit(wolf);
     }
     /// <summary>Throws a wolf back from the acting player and leaves it reeling, which stops a snap it had begun.</summary>
-    private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, WolfHunt.AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; wolf.Snap = wolf.Leap = wolf.Recover = 0; }
+    private void KnockBack(Wolf wolf) {
+        var away = WolfHunt.AwayFromPlayer(wolf);
+        wolf.Pos = Slide(wolf.Pos, away * KnockBackDistance);
+        wolf.Heading = (-away).Angle();
+        wolf.Stagger = StaggerSeconds;
+        wolf.Snap = wolf.Leap = wolf.Recover = wolf.Threaten = wolf.Circle = 0;
+        wolf.Route.Clear();
+    }
     /// <summary>Leaves a carcass where a struck wolf fell.</summary>
     private void KillWolf(Wolf wolf) {
         S.Wolves.Remove(wolf); Add(ThingKind.WolfCorpse, wolf.Pos, WolfMeat);

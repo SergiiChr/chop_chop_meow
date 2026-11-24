@@ -73,10 +73,10 @@ public sealed class WolfBodies(World world) {
     /// Where the body of a wolf at a player runs: toward them for one closing in, and along its own way for one that
     /// follows them round, so two going opposite ways pass side by side.
     /// </summary>
-    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Following || Holds(wolf) ? Body(wolf) : Body(wolf, player);
+    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Following || wolf.Circle != 0 || Holds(wolf) ? Body(wolf) : Body(wolf, player);
 
     /// <summary>Whether a wolf holds its place at the player: tugging them, pinning them or in the air.</summary>
-    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Stagger > 0 || WolfSnap.Active(wolf) || wolf.Recover > 0;
+    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Stagger > 0 || wolf.Threaten > 0 || WolfSnap.Active(wolf) || wolf.Recover > 0;
 
     /// <summary>The nearest points to each other on two line segments, from <paramref name="a0"/> to <paramref name="a1"/> and <paramref name="b0"/> to <paramref name="b1"/>.</summary>
     private static (Vector2 OnA, Vector2 OnB) Closest(Vector2 a0, Vector2 a1, Vector2 b0, Vector2 b1) {

@@ -91,7 +91,10 @@ public sealed class WolfSnap(World world) {
         bool hit = !world.Downed && !world.DoorTug.Tugged && jaws.DistanceSquaredTo(mark) <= Reach * Reach &&
             ClearTo(wolf.Pos, mark, steps) == mark;
         wolf.Recover = hit ? HitRecovery : MissRecovery;
-        if (!hit) return;
+        if (!hit) {
+            if (wolf.Aggressive) world.WolfHunt.CircleOnMiss(wolf);
+            return;
+        }
         bool pins = throat && !world.Protected(world.Player);
         if (!pins) world.S.Health -= world.Data.WolfBite;
         if (world.DoorTug.TugOut(wolf) || !pins) world.Play("wolf_bite", mark);

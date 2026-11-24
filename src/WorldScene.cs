@@ -420,8 +420,8 @@ public partial class WorldView {
                     if (punch < lands) { wolf.Stand(Elapsed, dt, true); gap = near; } else if (punch < lands + WolfModel.RecoilSeconds) {
                         float recoil = (punch - lands) / WolfModel.RecoilSeconds, hop = Math.Min(1, recoil / WolfModel.HopShare);
                         gap = near + (far - near) * hop;
-                        wolf.Recoil(recoil, dt);
-                    } else { wolf.Stand(Elapsed, dt, true); gap = far; }
+                        wolf.Recoil(recoil, dt, threatening: true);
+                    } else { wolf.Threaten(punch - lands - WolfModel.RecoilSeconds, dt); gap = far; }
                     place = To3(track * gap);
                     if (punch >= 0 && punch < ActorAnimation.Duration(ActorAction.Attack)) person = ActorAction.Attack;
                     break;

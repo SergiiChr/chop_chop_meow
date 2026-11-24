@@ -701,11 +701,15 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   on the doorway path (`DoorwayPath`), and their jaws can reach onto the exposed step.
   The wolf stays facing the same way during `WolfSnap.MissRecovery` or `WolfSnap.HitRecovery`, and waits
   `WolfSnap.Rest` before starting another attack.
-  A blow that lands first interrupts either leap, and a torch waved at a wolf gathering for a normal snap scares it off.
+  A blow that lands first interrupts either leap. A torch wave can interrupt a normal snap's windup while the wolf is still wary.
   A bite that lands on a player in the open part of a doorway starts a tug (`DoorTug.TugOut`).
+- **First hit.** A surviving wolf is knocked back and turns toward the attacker. After the hop and stagger, it growls with its
+  chest raised and forepaws planted (`Wolf.Threaten`, `WolfModel.Threaten`). It runs thereafter (`Wolf.Aggressive`), including
+  outside sight range, and torch waves cease to scare it. After a miss, it holds for the usual recovery, then runs out and
+  around the player before closing in for another committed bite (`Wolf.Circle`, `WolfHunt.CircleOnMiss`).
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
   A player a wolf had pinned goes free as it leaves.
-  Patrolling, going home or losing its player (who sheltered or left the game) clears everything a wolf was doing to them (`WolfPatrols.Calm`).
+  Patrolling, going home or losing its player (who sheltered or left the game) clears the wolf’s current attack, stance and circle (`WolfPatrols.Calm`). It still runs if it has been hit.
 
 Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
 A wolf already chasing the player still follows into the light for a few seconds.
@@ -746,7 +750,8 @@ Building keeps `Construction.DoorRoom` clear round every cabin's door spot, and 
   The view walks them in from there up the side of the step (`DoorwayPath.Inward`), the two turning chest to chest with their arms hanging as they pass (`DoorwayView.SqueezePast`), the one going in with the right palm on the door frame (`ArmReach.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
 - A follower waits aside, out of the way, while the one ahead is tugged back out (`DoorwayPath.Follow`).
 
-The view walks the player through the doorway over the stage (`DoorwayView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, lifting or lowering its neck to their waist as drawn, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
+The host sends the origin and current position of the doorway step as scalar coordinates. The view walks the player through
+the doorway over the stage (`DoorwayView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, lifting or lowering its neck to their waist as drawn, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
 On the two treads of the step and the floor (`StairSteps.StepEdges`) the body heads for the tread of the boot that bears its weight, rising onto the other boot's tread as one lifts off behind, and lowering ahead of a boot about to step down (`StairSteps.OnSteps`).
 It gets there over several frames, carried from frame to frame in `ActorState.Lift`, never higher than a boot on the ground reaches down to its tread toe first, never lower than a leg bearing the weight alone bends, and never dropping faster than falling.
 A knee bends to put a boot on a higher tread, so no boot sinks into the step; a boot a tug drags off a tread's edge hangs over the lower one while the body falls onto it.

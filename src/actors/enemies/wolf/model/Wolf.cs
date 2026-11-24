@@ -76,6 +76,12 @@ public sealed class Wolf : IWalker {
     public float Flee { get; set; }
     /// <summary>Seconds left reeling from a hit, knocked back and holding still before it runs or attacks again.</summary>
     public float Stagger { get; set; }
+    /// <summary>Whether a player has landed a blow and the wolf now runs whenever it moves in the open.</summary>
+    public bool Aggressive { get; set; }
+    /// <summary>Seconds spent standing its ground after the first hit, after the stagger.</summary>
+    public float Threaten { get; set; }
+    /// <summary>Seconds left circling after a miss; the sign gives the direction, and zero means it has finished.</summary>
+    public float Circle { get; set; }
     /// <summary>Id of the player this wolf hunts, or zero while it patrols, answers a howl or heads home.</summary>
     public int Target { get; set; }
     public WolfMode Mode { get; set; }
