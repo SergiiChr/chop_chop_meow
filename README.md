@@ -174,7 +174,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Right mouse button on a loose resource | Walk over and pick it up |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate or barrel | Walk over and pick it up with its contents |
-| Right mouse button on open ground | Use the selected hotbar item to eat, drink or light a torch, or swing a tool or lit torch toward the pointer |
+| Right mouse button on open ground | Eat, drink, light a torch, or swing toward the pointer using the hotbar selection |
 | Hold right mouse button on open ground with a shovel selected | Walk over and dig a hole |
 | Left mouse button | Select a resource, building, crate or worker, or place a selected building. Clicking a cabin walks you around obstacles to its door and inside. Put a held stack into the storage clicked, or let go of it anywhere else |
 | B | Open building plans, and the remove selector that takes buildings down |
@@ -185,7 +185,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | R / T while placing steel pipes | Turn 90° / cycle the pipe type |
 | H | Open the crew overview |
 | 1–9 or click a hotbar slot | Select and outline that slot. Start placement if it holds a plan or placeable container |
-| Drag a plan or backpack item to the hotbar | Assign it to that slot |
+| Pick up a plan or backpack item and click a hotbar slot | Assign it to that slot |
 | Layer button below the status bar | Switch between the surface and underground. Underground, click a pipe to see its water and pressure |
 | Space at a selected nearby reinforced furnace or water pump | Pump |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |

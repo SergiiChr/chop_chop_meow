@@ -16,9 +16,11 @@ public partial class Game {
         await Click(controls!);
         Require(HasLabel(startMenu.Screen, "CONTROLS"), "The main menu must open the Controls screen.");
         var controlsList = startMenu.Screen.GetChildren().OfType<ControlsList>().Single();
-        foreach (string shortcut in new[] { "Sprint.", "Mouse wheel", "C / V", "R / T", "Crew.", "Layer",
-            "LMB on item slot", "RMB on item slot", "Drag a panel", "queue 5 crafting batches", "queue 10 crafting batches" })
-            Require(HasLabel(controlsList, shortcut), $"Controls should explain {shortcut}");
+        foreach (string shortcut in new[] {
+            "Sprint.", "Mouse wheel", "Select a resource, building, container, or worker", "Pick up loose resources",
+            "Pump a selected water pump or reinforced furnace", "Select a hotbar slot", "C / V", "R / T", "Crew.", "Layer",
+            "LMB on item slot", "RMB on item slot", "Drag a panel", "queue 5 crafting batches", "queue 10 crafting batches"
+        }) Require(HasLabel(controlsList, shortcut), $"Controls should explain {shortcut}.");
         var list = controlsList.GetChildren().OfType<ScrollContainer>().Single();
         await Wheel(list.GetGlobalTransformWithCanvas() * (list.Size / 2));
         Require(list.ScrollVertical > 0, "Players should be able to scroll down to more controls.");

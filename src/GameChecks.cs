@@ -898,25 +898,6 @@ public partial class Game {
         await CloseWithEsc();
         Drop(Hosted, "stone"); await Frames();
     }
-    /// <summary>A double click on a tool in the backpack that no hotbar slot holds takes it in hand with no slot selected, until a number key selects a slot.</summary>
-    private async Task CheckDoubleClickTakesAToolOffTheHotbarInHand() {
-        await CloseWithEsc();
-        int active = world.ActiveHotbar;
-        Give(Hosted, "steel_shovel", 1);
-        Require(Enumerable.Range(0, 9).All(i => world.HotbarItem(i) != "steel_shovel"), "The default hotbar must not hold a shovel for this check.");
-        await KeyStroke(Key.Tab);
-        await DoubleClick(BagCell(c => c.TooltipText.StartsWith("Steel shovel")));
-        await Until(() => world.InHand == "steel_shovel" && hotbar.ActiveItem() == "steel_shovel", "a double click on the shovel taking it in hand", 2);
-        Require(Enumerable.Range(0, 9).All(i => world.HotbarItem(i) != "steel_shovel"), "Taking a tool in hand must not put it on the hotbar.");
-        await CloseWithEsc();
-        Drop(Hosted, "steel_shovel");
-        await Until(() => world.InHand == "" && hotbar.ActiveItem() == null, "the hand emptying once the shovel leaves the backpack", 2);
-        Give(Hosted, "steel_shovel", 1); await Frames();
-        Require(world.InHand == "", "A shovel coming back must not go back in hand by itself.");
-        await KeyStroke(Key.Key2);
-        await Until(() => world.InHand == "" && world.ActiveHotbar == 1 && hotbar.ActiveItem() == world.HotbarItem(1), "key 2 selecting its slot instead of the shovel in hand", 2);
-        Drop(Hosted, "steel_shovel"); world.SelectHotbar(active); await Frames();
-    }
     /// <summary>
     /// A held stack goes into a chest clicked in the world, and back to its cell on Esc or a click on open ground;
     /// with nothing held, an item only selected on the hotbar stays out of a clicked chest.
@@ -1215,7 +1196,6 @@ public partial class Game {
             await TestClean(CheckDriverPlaysItsCommandFileAsRealInput);
             await TestClean(CheckEmptiedCrateGivesWayToTheBackpack);
             await TestClean(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
-            await TestClean(CheckDoubleClickTakesAToolOffTheHotbarInHand);
             await TestClean(CheckABoundStackIsRimmedAndStaysBehindOnCtrl);
             await TestClean(CheckAPressLetGoOverAnotherSlotDoesNothing);
             await TestClean(CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround);

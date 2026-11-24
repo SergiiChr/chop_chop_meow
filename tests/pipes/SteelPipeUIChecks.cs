@@ -13,8 +13,10 @@ public partial class Game {
         await TestClean(CheckHeldPipePlanTurnsAndCyclesShapes);
         await TestClean(CheckHotbarPipePlanRemovesAndReusesALaidPipe);
         await TestClean(CheckRemoveSelectorKeepsTheOtherLayer);
+        await TestClean(CheckLayerButtonSitsBelowTheHealthVial);
         await TestClean(CheckLayerCanSwitchWithAShovelSelected);
-        await TestClean(CheckClickingALaidPipeReadsWaterAndPressure);
+        await TestClean(CheckClickingALaidPipeReturnsTheHeldStack);
+        await TestClean(CheckOpenPipeReadoutTracksWaterAndPressure);
         await TestClean(CheckPipeJunctionCanBeSelectedByItsArms);
         await TestClean(CheckPuttingPipesInThePlumbingSlotInstallsAndRefundsThem);
         await TestClean(CheckSprinklersFollowWaterDelivery);
@@ -143,8 +145,20 @@ public partial class Game {
         await Frames();
     }
 
+    private async Task CheckLayerButtonSitsBelowTheHealthVial() {
+        await Frames();
+        var layerControl = ui.FindChild("layer", true, false) as Button;
+        Require(layerControl is { Visible: true }, "The HUD should offer a visible Layer button.");
+        var switchBounds = layerControl!.GetGlobalRect();
+        float healthCenter = needsPlate.Health.GetGlobalRect().GetCenter().X;
+        Require(switchBounds.Position.Y >= needsPlate.GetGlobalRect().End.Y
+            && switchBounds.Position.X <= healthCenter && healthCenter < switchBounds.End.X,
+            "The Layer button should be below the health end of the status bar.");
+    }
+
     /// <summary>Layer hides the shovel outline underground and restores it on the surface.</summary>
     private async Task CheckLayerCanSwitchWithAShovelSelected() {
+        int active = world.ActiveHotbar;
         string previous = world.HotbarItem(8);
         Give(Hosted, "steel_shovel", 1);
         SetHotbarSlot(Hosted, 8, "steel_shovel");
@@ -161,29 +175,18 @@ public partial class Game {
         await Hover(view.Screen(at));
         Require(view.Layer == Layer.Surface && view.PlacementGhost != null, "Returning to the surface should restore the selected shovel's outline.");
         SetHotbarSlot(Hosted, 8, previous);
+        world.SelectHotbar(active);
         Drop(Hosted, "steel_shovel", 1);
         await Frames();
     }
 
-    private async Task CheckClickingALaidPipeReadsWaterAndPressure() {
-        var home = world.Player;
-        var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
-        var tile = Terrain.TileAt(bank + Vector2.Down * 1.1f);
-        var pump = Hosted.Add(ThingKind.Pump, tile);
-        Warp(Hosted, pump.ToWorld(World.BellowsStand)); await Frames(4);
-        var tankTile = tile + Vector2I.Up * 2;
-        var tank = Hosted.Add(ThingKind.Barrel, tankTile);
+    private async Task CheckClickingALaidPipeReturnsTheHeldStack() {
+        var tile = SpotsNearby().Select(Terrain.TileAt)
+            .First(t => world.Reaches(t) && !world.SteelPipes.Laid(t) && Uncovered(view.Screen(t, PipeGround.FloorY)));
         LayPipe(Hosted, tile, Mathf.Pi / 2);
-        await Frames();
         var layerControl = (Button)ui.FindChild("layer", true, false);
-        Require(layerControl != null, "The HUD should offer a Layer button.");
-        var switchBounds = layerControl!.GetGlobalRect();
-        float healthCenter = needsPlate.Health.GetGlobalRect().GetCenter().X;
-        Require(switchBounds.Position.Y >= needsPlate.GetGlobalRect().End.Y
-            && switchBounds.Position.X <= healthCenter && healthCenter < switchBounds.End.X,
-            "The Layer button should be below the health end of the status bar.");
-        await Click(layerControl!);
-        Require(view.Layer == Layer.Underground && layerControl!.ButtonPressed, "Layer should switch from the surface to the underground view.");
+        await Click(layerControl);
+        Require(view.Layer == Layer.Underground && layerControl.ButtonPressed, "Layer should switch from the surface to the underground view.");
         Give(Hosted, "wood", 1);
         await KeyStroke(Key.Tab);
         await PickUp(BagCellOf("wood"));
@@ -193,6 +196,26 @@ public partial class Game {
             "Clicking the far end of the visible pipe should open its readout and keep it laid.");
         await Until(() => cursor.Empty, "opening the pipe returning held wood to its stack", 2);
         Drop(Hosted, "wood", 1);
+        await Click(layerControl);
+        Require(view.Layer == Layer.Surface && !layerControl.ButtonPressed && !panel.Visible, "Returning to the surface should close the pipe readout.");
+        Hosted.Construction.TakeUpPipe(tile);
+        Drop(Hosted, "steel_pipe", 1);
+        await Frames();
+    }
+
+    /// <summary>An open pipe readout and its mesh follow the same pipe from empty through wet, full, settled water and drained.</summary>
+    private async Task CheckOpenPipeReadoutTracksWaterAndPressure() {
+        var home = world.Player;
+        var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
+        var tile = Terrain.TileAt(bank + Vector2.Down * 1.1f);
+        var pump = Hosted.Add(ThingKind.Pump, tile);
+        Warp(Hosted, pump.ToWorld(World.BellowsStand)); await Frames(4);
+        var tankTile = tile + Vector2I.Up * 2;
+        var tank = Hosted.Add(ThingKind.Barrel, tankTile);
+        LayPipe(Hosted, tile, Mathf.Pi / 2);
+        var layerControl = (Button)ui.FindChild("layer", true, false);
+        await Click(layerControl);
+        await Click(view.Screen(tile, PipeGround.FloorY + .1f));
         Require(HasLabel(panel, "Empty · 0/1 L") && HasLabel(panel, "Pressure 0%"), "A dry pipe should show no water and no pressure.");
 
         var pipe = ModelSteps.AllMeshes(view.FindChild("Underground", true, false)!)
@@ -221,8 +244,7 @@ public partial class Game {
         await Until(() => HasLabel(panel, "Empty · 0/1 L") && pipe.MaterialOverride == empty,
             "a drained pipe returning to its empty finish", 2);
 
-        await Click(layerControl!);
-        Require(view.Layer == Layer.Surface && !layerControl!.ButtonPressed && !panel.Visible, "Returning to the surface should close the pipe readout.");
+        await Click(layerControl);
         foreach (var cell in new[] { tile, tile + Vector2I.Up, tankTile }) Hosted.Construction.TakeUpPipe(cell);
         Drop(Hosted, "steel_pipe", 3);
         RemoveThings(Hosted, t => t == pump || t == tank);

@@ -10,6 +10,7 @@ namespace ChopChopMeow;
 public partial class Game {
     private async Task RunHotbarUIChecks() {
         await TestClean(CheckHotbarRightClickAndDoubleClickUseItsItem);
+        await TestClean(CheckDoubleClickTakesAToolOffTheHotbarInHand);
         await TestClean(CheckRightClickOnOpenGroundUsesTheSelectedHotbarItem);
     }
 
@@ -45,6 +46,28 @@ public partial class Game {
         Require(world.Backpack["water"] == 0 && world.Thirst > 20, "A right click on open ground must drink the selected water.");
         foreach (var (bottle, count) in bottles) Give(Hosted, bottle, count);
         await Frames();
+    }
+
+    /// <summary>A double click on a tool in the backpack that no hotbar slot holds takes it in hand with no slot selected, until a number key selects a slot.</summary>
+    private async Task CheckDoubleClickTakesAToolOffTheHotbarInHand() {
+        await CloseWithEsc();
+        int active = world.ActiveHotbar;
+        await KeyStroke(Key.Key3);
+        await CloseWithEsc();
+        Give(Hosted, "steel_shovel", 1);
+        Require(Enumerable.Range(0, 9).All(i => world.HotbarItem(i) != "steel_shovel"), "The default hotbar must not hold a shovel for this check.");
+        await KeyStroke(Key.Tab);
+        await DoubleClick(BagCell(c => c.TooltipText.StartsWith("Steel shovel")));
+        await Until(() => world.InHand == "steel_shovel" && hotbar.ActiveItem() == "steel_shovel", "a double click on the shovel taking it in hand", 2);
+        Require(Enumerable.Range(0, 9).All(i => world.HotbarItem(i) != "steel_shovel"), "Taking a tool in hand must not put it on the hotbar.");
+        await CloseWithEsc();
+        Drop(Hosted, "steel_shovel");
+        await Until(() => world.InHand == "" && hotbar.ActiveItem() == null, "the hand emptying once the shovel leaves the backpack", 2);
+        Give(Hosted, "steel_shovel", 1); await Frames();
+        Require(world.InHand == "", "A shovel coming back must not go back in hand by itself.");
+        await KeyStroke(Key.Key2);
+        await Until(() => world.InHand == "" && world.ActiveHotbar == 1 && hotbar.ActiveItem() == world.HotbarItem(1), "key 2 selecting its slot instead of the shovel in hand", 2);
+        Drop(Hosted, "steel_shovel"); world.SelectHotbar(active); await Frames();
     }
 
     /// <summary>Both right-click and double left-click use a hotbar item without clearing the slot.</summary>
