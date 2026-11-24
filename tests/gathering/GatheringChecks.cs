@@ -563,8 +563,8 @@ public static class GatheringChecks {
         var worker = Staff(world, leaves, JobKind.Gather);
         world.SetDuty(worker, bench, JobKind.Haul, true); world.SetDuty(worker, bench, JobKind.Craft, true);
         Work(world, 30, () => worker.Bag["leaves"] > 0);
-        // The chest now takes only wood, and still lets its wood out to a hauler.
-        world.SetFilter(chest, "wood", false, true);
+        // The chest now takes only wood in and lets only wood out, to a hauler, so it takes no leaves back either.
+        world.SetFilter(chest, "wood", false, true); world.SetFilter(chest, "wood", true, true);
         Work(world, 90, () => bench.Rounds > 0);
         int held = worker.Bag["leaves"];
         Require(held > 0 && chest.Inventory["leaves"] == 0, $"a gatherer whose leaves nothing takes should hold them: {worker.Status}");

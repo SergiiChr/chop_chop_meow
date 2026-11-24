@@ -17,7 +17,8 @@ public static class HaulingChecks {
         Test(CheckHaulerTakesAFullOutputBeforeToppingUpInputs, data);
         Test(CheckHaulerTakesOutOnlyWhatStorageHasRoomFor, data);
         Test(CheckHaulerPutsALoadBackWhenNothingTakesItAnyMore, data);
-        Test(CheckALoadNothingTakesGoesToAChestThatHoldsIt, data);
+        Test(CheckALoadNothingTakesGoesToTheNearestStorageWhoseOutputFilterLetsItOut, data);
+        Test(CheckAChestsHaulerPutsTheLastOfAStackBackIntoTheChest, data);
         Test(CheckHaulerTopsUpTheInputCoveringTheFewestBatches, data);
         Test(CheckHaulerTopsUpInputsBeforeTakingAnOutputThatIsNotFull, data);
         Test(CheckCarriedGoodsGoToAStationThatUsesThem, data);
@@ -104,17 +105,31 @@ public static class HaulingChecks {
             $"a hauler whose chest stops taking planks should put them back into the table: the table holds {bench.Inventory["planks"]}, the hands {hauler.Bag["planks"]}");
     }
 
-    private static void CheckALoadNothingTakesGoesToAChestThatHoldsIt(GameData data) {
+    private static void CheckALoadNothingTakesGoesToTheNearestStorageWhoseOutputFilterLetsItOut(GameData data) {
         var world = EmptyWorld(data);
-        // Neither chest's filter takes wood: a new chest takes nothing.
-        var holding = world.Add(ThingKind.Chest, new Vector2(16, 10));
-        holding.Inventory.Add("wood", 20);
-        var empty = world.Add(ThingKind.Chest, new Vector2(12, 10));
+        // Neither chest's input filter takes wood: a new chest takes nothing in and lets everything out.
+        var stoneOnly = world.Add(ThingKind.Chest, new Vector2(12, 10));
+        world.SetFilter(stoneOnly, "stone", true, true);
+        var open = world.Add(ThingKind.Chest, new Vector2(16, 10));
         var worker = AddWorker(world, new Vector2(10, 10));
         worker.Bag.Add("wood", 6);
         Work(world, 30, () => worker.Bag.Count == 0);
-        Require(holding.Inventory["wood"] == 26 && empty.Inventory.Count == 0,
-            $"a load nothing takes should go back to the chest already holding wood: it holds {holding.Inventory["wood"]}, the hands {worker.Bag["wood"]}");
+        Require(open.Inventory["wood"] == 6 && stoneOnly.Inventory.Count == 0,
+            $"a load nothing takes should go to the nearest chest whose output filter lets wood out: it holds {open.Inventory["wood"]}, the hands {worker.Bag["wood"]}");
+    }
+
+    private static void CheckAChestsHaulerPutsTheLastOfAStackBackIntoTheChest(GameData data) {
+        var world = EmptyWorld(data);
+        var chest = world.Add(ThingKind.Chest, new Vector2(10, 10));
+        chest.Inventory.Add("iron_ore", 5);
+        var asking = world.Add(ThingKind.Chest, new Vector2(20, 10));
+        world.SetFilter(asking, "iron_ore", false, true);
+        var hauler = Staff(world, chest, JobKind.Haul);
+        Require(FirstCarry(world, hauler) == "iron_ore" && chest.Inventory["iron_ore"] == 0, "a chest's hauler should carry all 5 iron ore out to the chest asking for it");
+        world.SetFilter(asking, "iron_ore", false, false);
+        Work(world, 30, () => hauler.Bag.Count == 0);
+        Require(chest.Inventory["iron_ore"] == 5 && asking.Inventory["iron_ore"] == 0,
+            $"once nothing takes the ore, the hauler should put it back into the chest it came from, which lets everything out: it holds {chest.Inventory["iron_ore"]}, the hands {hauler.Bag["iron_ore"]}");
     }
 
     /// <summary>Four steel parts cover two pickaxes and three wood parts cover three, so steel parts come first though there are more of them.</summary>

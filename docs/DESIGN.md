@@ -107,9 +107,11 @@ Simulation and data:
 | `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the bellows and fire jobs |
 | `src/jobs/hauling/Hauling.cs`, `src/jobs/hauling/Carry.cs` | The Haul job: the best carry across a haul job's places, the carry in hand and what a hauler says |
 | `src/jobs/hauling/PlaceHaul.cs` | The part of the Haul job each kind of place extends, and the four haul rules its carries come under |
+| `src/jobs/hauling/TakeBack.cs` | Where a worker takes a load nothing else takes: the nearest building whose output filter lets it out |
 | `src/stations/StationHaul.cs`, `src/farms/FarmHaul.cs`, `src/mines/MineHaul.cs`, `src/packing/PackerHaul.cs`, `src/storage/StoreHaul.cs` | What a crafting station, a farm plot, a mine site, a packing station, and a chest or placed crate offer a hauler |
 | `src/jobs/gathering/Gathering.cs`, `src/water/WaterGathering.cs` | The Gather job at resource spots, and the lake's version of it, which fills bottles |
 | `src/stations/model/ToolSlotRule.cs` | What one of a station's tool slots takes: a kind of tool at a tier or better |
+| `src/stations/model/BatchFor.cs` | `BatchFor`, who a station's batch in progress was started for: none in progress, the mark or a player's queue |
 | `src/stations/display/SlottedTool.cs` | A tool lying in a station's slot, at the bench and the anvil, showing the grade slotted |
 | `src/jobs/crafting/Crafting.cs`, `src/packing/PackCraft.cs` | The Craft job at a station, and the packing station's version of it, which packs crates |
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
@@ -1149,7 +1151,8 @@ Storage with a filter window has `Inventory.Gated` set: there an empty list lets
 `World.Add` gives a chest and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; every crate's contents get the chest's lists when made (`World.NewCrate`), packed or not.
 Any other box, such as a station's slots or a worker's hands, is not gated, and lets anything through its empty lists.
 Automated deposits go to the nearest place that asks for the item, then to the nearest storage taking everything (`World.DepositFor`).
-A load nothing takes goes to the nearest place that takes it back (`World.TakesBack`, `World.PutBack`), up to a stack: an output slot what its place makes, and a chest or placed crate what it already holds, whatever its filters.
+A load nothing takes goes back to the nearest building whose output filter lets it out, up to one stack of it (`TakeBack`, which `World` holds): storage by the output filter set on it (`Inventory.AllowsWithdrawal`), and a building with output slots by what it outputs, worked out from the building rather than stored (`TakeBack.Outbox`): a station its recipe's product, a farm plot its yield, a mine its ore and stone, a packing station crates of its good.
+A station's slots hold inputs and leftovers of other recipes as well as its product, so a stored output filter there would also stop haulers carrying the leftovers out.
 With no taker found, a worker looks again every `JobListSeconds` (`Worker.LookAgain`) rather than every tick.
 With none, the load stays in hand while the worker does only the jobs that need no hands: the job table's `JobDef.Hands` says which jobs carry loads (`World.NeedsHands`).
 Asking for it are a chest, pile, placed crate or trading post whose input filter names it, a packing station packing it, a station whose recipe takes it as an input or burns it, a farm plot short of it for a sowing and a mine site short of it.
@@ -1229,7 +1232,7 @@ Workers are tracked individually.
 
 #### Jobs
 
-The kinds of work are `JobKind`, each with an id in saves and commands (`JobKinds.Id`), and one table holds each job's title, hint, whether a round of it is a unit of the place's work, the tools it takes and what it does (`World.Def`, `JobDef`).
+The kinds of work are `JobKind`, each with an id in saves and commands (`JobKinds.Id`), and one table holds each job's title, hint, whether a round of it is a unit of the place's work, whether it carries loads in the worker's hands, the tools it takes and what it does (`World.Def`, `JobDef`).
 A place offers some of them (`World.Jobs`), such as Craft and Haul at a crafting bench.
 A job that several kinds of place offer is a class in `src/jobs/` that `World` holds: `Hauling`, `Gathering` and `Crafting`.
 A place with its own way of doing it extends it in its feature's folder: every place that offers Haul has a `PlaceHaul`, the lake gathers through `WaterGathering` and a packing station is worked through `PackCraft`.
@@ -1307,8 +1310,8 @@ At the `LunchHour` in `GameData` workers break for one in-game hour.
 `BreakSeats` reserves the nearest available campfire seats, with up to six seats per fire.
 It seats workers with nothing to do the same way at any hour; their ground groups gather round the nearest campfire rather than where they stand.
 A worker who sat in the last tick keeps their seat while they still have nothing to do, so the crew still sitting when lunch ends stays put.
-A campfire burns its wood as usual while workers sit at it; once it has none left, a worker sitting in one of its seats keeps it burning at `KindledBurn`, one second (`World.Kindle`), and it dies down within that second once they leave.
-A blocked walk releases its seat, and the worker remembers seats they could not reach until lunch ends.
+A campfire burns its wood as usual while workers sit at it; once it has none left, a worker sitting in one of its seats keeps it burning at `KindledBurn`, one second (`BreakSeats.Kindle`), and it dies down within that second once they leave.
+A blocked walk releases its seat, and the worker remembers seats they could not reach until nobody is on a break any more, lunch or idle.
 Workers on the ground keep their seats when the crew changes, unless they take a vacancy by a fire.
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
 When a worker cannot reach a group, they sit near where they stopped if there is room, or wait standing.

@@ -59,6 +59,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
+| `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
@@ -732,7 +733,9 @@ A load a worker carries goes to the nearest place that asks for it:
 - a farm plot short of seed or fertilizer for a sowing, or a mine site short of a material.
 
 Only when none of those has room does it go to the nearest storage taking everything (A).
-With none of those either, the load goes to the nearest place that takes it back, up to a stack, wherever it came from: an output slot takes what its place makes, such as a station's product or a mine's ore, and a chest or placed crate takes what it already holds, whatever its filters.
+With none of those either, the load goes back, wherever it came from, to the nearest building whose output filter lets it out, up to one stack of it.
+Storage counts by the output filter set on it, so a new chest or placed crate, whose output row holds A, takes back anything it holds.
+A building with output slots has an output filter of what it outputs: a station its recipe's product, a farm plot its harvest, a mine its ore and stone, and a packing station crates of its good.
 With no such place, the load stays in hand: the worker says "Holding … · no accepting storage" and goes on with the jobs of their list that need no hands, such as Craft, Bellows and Farm, until something takes it.
 Workers send a load elsewhere when a filter changes or a slot fills while they carry it.
 A chest or pile near a source fills first and buffers the goods; without one, a gatherer walks each load to the nearest station with room.
@@ -772,7 +775,8 @@ Workers need tools for some jobs:
 
 Leaves, berries and loose pieces need no tool, though a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
-They put it back when the job in hand has no use for it or when heading home at dusk.
+They put it back when the job in hand has no use for it or when heading home at dusk, into a tool station whose input filter takes it.
+A new tool station takes nothing in, so set its input to A or name the tools for workers to put theirs back.
 If there is none, the worker goes to the nearest known spot of the same job that they can work, one that needs no tool or one whose tool is to be had, and to loose pieces only after those; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
 A gatherer whose spot runs out goes on to the next known spot of the same resource, and to loose pieces of it only once no other spot is left.
 
@@ -783,7 +787,7 @@ A worker carries one tool at a time, so they swap the axe for the shovel at a to
 Digging up bushes is a job of its own: a worker given a bush goes on to the next known bush and never rakes leaves, and a worker raking leaves never digs up a bush.
 A dug-up bush gives 36 leaves, which a worker carries off 12 at a time.
 
-A worker on the station's Stock job brings tools from other storage to the rack.
+A worker on the station's Stock job brings the tools its input filter takes from other storage to the rack.
 
 Oaks drop a patch of leaves beside the trunk.
 Gather them by hand, or three times as fast with a rake, and they fall again every day.
