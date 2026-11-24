@@ -687,8 +687,11 @@ public partial class WorldView : Node3D {
             downedFor += dt;
         } else downedFor = 0;
         var at = World.Player;
-        var door = doorways.AtDoor(World.Me, player, dt);
-        if (door is DoorShown shown) { at = shown.At; target = shown.Facing; action = shown.Action; subject = null; }
+        var door = doorways.AtDoor(World.Me, player, dt, ActorAnimation.SwingsOnTheMove(action));
+        if (door is DoorShown shown) {
+            at = shown.At; target = shown.Facing; action = shown.Action; subject = null;
+            if (ActorAnimation.SwingsOnTheMove(pulseAction)) pulseRemaining = 0;
+        }
         action = WorkPose(action, subject);
         player.Update(at, action, target, dt, door?.Backing ?? false, ActorAnimation.SwingsOnTheMove(action) ? target : null);
         if (FirstPerson && door == null && action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake) {
@@ -870,8 +873,11 @@ public partial class WorldView : Node3D {
                 other.DownedFor += dt;
             } else other.DownedFor = 0;
             var at = p.Pos;
-            var door = doorways.AtDoor(p, state, dt);
-            if (door is DoorShown shown) { at = shown.At; facing = shown.Facing; action = shown.Action; subject = null; }
+            var door = doorways.AtDoor(p, state, dt, ActorAnimation.SwingsOnTheMove(action));
+            if (door is DoorShown shown) {
+                at = shown.At; facing = shown.Facing; action = shown.Action; subject = null;
+                if (ActorAnimation.SwingsOnTheMove(other.Pulse)) other.PulseRemaining = 0;
+            }
             action = WorkPose(action, subject);
             state.Update(at, action, facing, dt, door?.Backing ?? false, ActorAnimation.SwingsOnTheMove(action) ? facing : null);
             state.Mark = Mark(subject, state, action);
@@ -1742,7 +1748,7 @@ public partial class WorldView : Node3D {
         model.CounterStage = stage; model.CounterProgress = progress;
         model.KnockBack = model.Drift = Vector2.Zero;
         model.Struck = false; model.Recoiling = model.Recover = 0; model.Stagger = wolf.Stagger;
-        model.Root.Visible = World.Sees(wolf.Pos);
+        model.Root.Visible = DrawsAt(wolf.Pos);
         model.Root.Position = To3(wolf.Pos, WolfCounter.Height(wolf));
         model.Yaw = ActorAnimation.Yaw(Vector2.FromAngle(wolf.Heading), model.Yaw);
         model.Turning.Hold(model.Yaw); model.Glance = 0;

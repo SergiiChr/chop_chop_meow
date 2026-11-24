@@ -12,12 +12,16 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
     /// <summary>
     /// A player at a cabin's door as their doorway stage shows them, null when they are at no door.
     /// </summary>
-    public DoorShown? AtDoor(PlayerState p, ActorState state, float dt) {
+    public DoorShown? AtDoor(PlayerState p, ActorState state, float dt, bool swinging) {
         if (state.Stage != p.Door) {
             if (state.Stage == Doorway.Knocking && p.Door == Doorway.None) state.SteppingDown = DoorwayPath.StepUpSeconds;
             state.StageBefore = state.Stage; state.Stage = p.Door; state.StageFrom = state.Position;
         }
-        if (p.Door == Doorway.None && state.SteppingDown <= 0 || world().Find(p.DoorCabin) is not Thing cabin) return null;
+        if (p.Door == Doorway.None && (state.SteppingDown <= 0 || swinging)) {
+            state.SteppingDown = 0;
+            return null;
+        }
+        if (world().Find(p.DoorCabin) is not Thing cabin) return null;
         var door = Doorways.DoorPoint(cabin);
         var inside = door + DoorwayPath.IntoCabin.Rotated(cabin.Rotation);
         if (p.Door == Doorway.None && state.SteppingDown > 0) {
@@ -31,10 +35,8 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
             state.Yaw = ActorAnimation.Yaw(inside - door, state.Yaw);
             state.Turning.Hold(state.Yaw);
         }
-        var shown = DoorwayPath.UsesBody(p.Door)
-            ? FacingAt(p.Door, p.DoorBody, door, inside, p.DoorFrom, p.DoorTime, p.DoorRush, cabin.Rotation)
-            : DoorStep(p.Door, door, p.Pos, p.DoorFrom, p.DoorTime, Doorways.DoorSeconds(p), p.DoorRush,
-                world().DoorTug.TugDistanceFrom(p.Pos, Doorways.OutOfDoor.Rotated(cabin.Rotation)), cabin.Rotation);
+        var body = DoorwayPath.UsesBody(p.Door) ? p.DoorBody : world().DoorTug.BodyAt(p);
+        var shown = FacingAt(p.Door, body, door, inside, p.DoorFrom, p.DoorTime, p.DoorRush, cabin.Rotation);
         float twist = 0, grip = 0;
         // Waiting aside, the right hand starts up toward the door frame as the one coming out nears the doorway; squeezing in
         // past them, it goes on to the frame.
@@ -61,7 +63,7 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
         Vector2 from, Vector2 start, float time, float seconds, bool rush, float reach, float rotation = 0) {
         var inward = DoorwayPath.IntoCabin.Rotated(rotation);
         var at = stage is Doorway.Tugged or Doorway.TuggedOff
-            ? start.Lerp(from - inward.Normalized() * reach, DoorTug.TugProgress(time / DoorTug.TugSeconds))
+            ? DoorTug.AtTime(start, from - inward.Normalized() * reach, time)
             : DoorwayPath.At(stage, door, from, start, time, seconds, rush, rotation);
         return FacingAt(stage, at, door, door + inward, start, time, rush, rotation);
     }

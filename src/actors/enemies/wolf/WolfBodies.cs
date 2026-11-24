@@ -75,14 +75,29 @@ public sealed class WolfBodies(World world) {
     /// </summary>
     private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Following || wolf.Circle != 0 || Holds(wolf) ? Body(wolf) : Body(wolf, player);
 
-    /// <summary>Whether a wolf holds its place at the player: tugging them, pinning them or in the air.</summary>
+    /// <summary>Whether a wolf holds the player, reels from a hit or is committed to a move and cannot be pushed aside.</summary>
     private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Stagger > 0 || wolf.Threaten > 0 || WolfCounter.Active(wolf) || WolfSnap.Active(wolf) || wolf.Recover > 0;
 
+    /// <summary>Whether a leap can finish without landing in another committed wolf's body.</summary>
+    internal bool HasLandingRoom(Wolf wolf, Vector2 at, float heading) {
+        const float width = 2 * WolfHalfWidth;
+        const float far = 2 * WolfNose + width;
+        foreach (var other in world.S.Wolves) {
+            if (other == wolf || !Holds(other)) continue;
+            var there = WolfSnap.Active(other) ? other.SnapTo : other.Pos;
+            if (there.DistanceSquaredTo(at) < far * far && DistanceBetween(at, heading, there, other.Heading) < width * width)
+                return false;
+        }
+        return true;
+    }
+
     /// <summary>Squared distance between a proposed wolf body and the body of a packmate.</summary>
-    internal static float DistanceBetween(Vector2 at, float heading, Wolf other) {
+    internal static float DistanceBetween(Vector2 at, float heading, Wolf other) => DistanceBetween(at, heading, other.Pos, other.Heading);
+
+    private static float DistanceBetween(Vector2 at, float heading, Vector2 there, float otherHeading) {
         var ahead = Vector2.FromAngle(heading);
-        var (tail, nose) = Body(other);
-        var (a, b) = Closest(at - ahead * WolfTail, at + ahead * WolfNose, tail, nose);
+        var otherAhead = Vector2.FromAngle(otherHeading);
+        var (a, b) = Closest(at - ahead * WolfTail, at + ahead * WolfNose, there - otherAhead * WolfTail, there + otherAhead * WolfNose);
         return a.DistanceSquaredTo(b);
     }
 

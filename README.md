@@ -1020,6 +1020,7 @@ Click with an axe, pickaxe, hammer or torch selected to aim at the pointer.
 Overhead, Space aims along the held movement keys or, from a stand, the last direction you walked.
 In first person, Space aims where you look.
 You can move during the swing, and near a hunting wolf the movement keys reverse you immediately.
+Starting a doorway action interrupts a swing before it lands.
 A steel axe lands 0.4 seconds into its swing and hits every wolf the blade reaches.
 Axe swings take turns:
 
@@ -1034,6 +1035,7 @@ second hop behind you, lands on its forepaws and slides its hindquarters round t
 In tight ground it recoils and growls. A struck wolf runs whenever it moves in the open, and later hits still make it reel.
 
 A wolf at biting distance plants its paws and crouches for 0.3 seconds, then makes a short leap along that line.
+Wolves leave room for packmates to land and run aside if they are too close to leap and blocked from backing up.
 Its jaws close as it lands. Step sideways during the crouch or leap to get clear.
 A blow that lands before the jaws close interrupts the bite.
 A wolf that misses lands hard and stands for about half a second, giving you time to counter.

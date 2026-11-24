@@ -107,7 +107,8 @@ public sealed class WolfHunt(World world) {
                     wolf.Threaten > 0 || wolf.Recover > 0 || wolf.Circle != 0 || WolfCounter.Active(wolf)) continue;
                 hunter = wolf; closest = distance;
             }
-            if (hunter != null) { world.WolfSnap.Commit(hunter, mark, throat: true); world.Say("A wolf gathers to leap for your throat!"); }
+            if (hunter != null && world.WolfSnap.Commit(hunter, mark, throat: true))
+                world.Say("A wolf gathers to leap for your throat!");
         }
         // A chase always outpaces a walk but not a sprint.
         float speed = world.Data.WolfTrot, chase = RunSpeed;
@@ -197,8 +198,16 @@ public sealed class WolfHunt(World world) {
         float direct = WolfBodies.Closing(wolf, at, step, dt);
         if (wolf.Aggressive && direct < 0 && !world.DoorTug.Tugged) {
             // Make room to leap at a run when the player comes inside reach.
-            var away = wolf.Pos == at ? Vector2.Right : (wolf.Pos - at).Normalized();
-            wolf.Pos = world.Slide(wolf.Pos, away * Math.Min(step, WolfBodies.StandOff - wolf.Pos.DistanceTo(at)));
+            var from = wolf.Pos;
+            var away = from == at ? Vector2.Right : (from - at).Normalized();
+            var retreat = away * Math.Min(step, WolfBodies.StandOff - from.DistanceTo(at));
+            wolf.Pos = world.Slide(from, retreat);
+            if (wolf.Pos == from) {
+                // Something is behind it. Run outward along the first side that has room.
+                float turn = (wolf.Id & 1) == 0 ? Mathf.Pi / 3 : -Mathf.Pi / 3;
+                wolf.Pos = world.Slide(from, retreat.Rotated(turn));
+                if (wolf.Pos == from) wolf.Pos = world.Slide(from, retreat.Rotated(-turn));
+            }
         } else world.Travel(wolf, at, direct, step, RouteSlack);
     }
 

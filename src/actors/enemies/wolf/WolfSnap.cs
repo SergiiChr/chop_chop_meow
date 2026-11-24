@@ -38,15 +38,19 @@ public sealed class WolfSnap(World world) {
         Commit(wolf, mark, throat: false);
     }
 
-    internal void Commit(Wolf wolf, Vector2 mark, bool throat) {
+    internal bool Commit(Wolf wolf, Vector2 mark, bool throat) {
         var toward = mark - wolf.Pos;
-        if (toward.LengthSquared() > 1e-6f) wolf.Heading = toward.Angle();
+        float heading = toward.LengthSquared() > 1e-6f ? toward.Angle() : wolf.Heading;
         float jawsAhead = throat ? ThroatJawsAhead : JawsAhead;
         float longHop = throat ? World.LeapRange - jawsAhead : LongestHop;
         float distance = Math.Clamp(toward.Length() - jawsAhead - NearSide, ShortestHop, longHop);
-        wolf.SnapTo = wolf.Pos + Vector2.FromAngle(wolf.Heading) * distance;
+        var landing = wolf.Pos + Vector2.FromAngle(heading) * distance;
+        if (!world.WolfBodies.HasLandingRoom(wolf, landing, heading)) return false;
+        wolf.Heading = heading;
+        wolf.SnapTo = landing;
         if (throat) wolf.Leap = Windup + World.LeapSeconds;
         else wolf.Snap = Windup + Flight;
+        return true;
     }
 
     /// <summary>Spends the last part of the countdown in flight. Ground or buildings can cut the leap short.</summary>

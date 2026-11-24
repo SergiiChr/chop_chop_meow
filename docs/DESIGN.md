@@ -526,7 +526,7 @@ The path is the simulation's, unchanged: the brake is only drawn.
 - a throat leap fixes its direction before it springs.
   The wolf rises under gravity and its jaws can catch the player at landing.
   On a hit the wolf keeps its jaws on the player's throat as they fall and while they lie on the ground (`FallBackView.Throat`);
-- a wolf a swing lands on (`Wolf.Stagger` rising) hops back `World.KnockBackDistance`, moving only while in the air, at an even pace and rising and falling under gravity (`WolfModel.HopSeconds`), and ducks low once it has landed before rising wary; where the blow reaches a machine a moment before the swing it shows comes down (`ActorAnimation.Contact`), the wolf stands until it does (`WolfModel.Struck`);
+- a wolf that recoils from a swing (`Wolf.Stagger` rising) hops back `World.KnockBackDistance`, moving only while in the air, at an even pace and rising and falling under gravity (`WolfModel.HopSeconds`), and ducks low once it has landed before rising wary; where the blow reaches a machine a moment before the swing it shows comes down (`ActorAnimation.Contact`), the wolf stands until it does (`WolfModel.Struck`);
 - a snapping wolf (`Wolf.Snap`) sinks onto its haunches, springs out with its jaws open and shuts them as it lands.
   The forelegs absorb the landing as the wolf holds its place (`WolfModel.Snap`);
 - a following wolf its player has walked up to (`FollowStage.Braced`) stands braced, low over forepaws set wide, ears flat and lips drawn back (`WolfModel.Brace`);

@@ -611,9 +611,15 @@ public partial class Net : Node {
             // Setting numbers leaves those that did not change, so a glider starts from the last update's position, not from how far it has glided.
             if (glide && goals.TryGetValue(old, out var goal)) Place(old, goal);
             if (!SetInPlace(old, key, json)) CopyExcept(old, WorldUpdates.Read<T>(json), null);
-            // A bite uses the same snapshot for the wolf's place and its attack clock.
-            if (old is Wolf wolf && (wasAttacking || ShowsWolfAttack(wolf))) goals.Remove(old);
-            else if (glide && old != except) { goals[old] = Position(old); Place(old, from); }
+            if (!glide || old == except) continue;
+            // A bite uses the same snapshot for the wolf's place, its attack clock and the player's feet.
+            bool inFight = old switch {
+                Wolf wolf => wasAttacking || ShowsWolfAttack(wolf),
+                PlayerState player => World.WolfNearby(player.Pos),
+                _ => false
+            };
+            if (inFight) goals.Remove(old);
+            else { goals[old] = Position(old); Place(old, from); }
         }
     }
 

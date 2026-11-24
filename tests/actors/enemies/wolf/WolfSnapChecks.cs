@@ -9,6 +9,8 @@ using static WorldSteps;
 /// <summary>Checks for a wolf's bite: the windup, leap, bite, and the player's chance to get out of the way.</summary>
 public static class WolfSnapChecks {
     public static void Run(GameData data) {
+        Test(CheckTwoWolvesLeaveRoomForEachOthersBites, data);
+        Test(CheckAStruckWolfMakesRoomToBiteBesideAnObstacle, data);
         Test(CheckAWolfGathersItselfBeforeItBites, data);
         Test(CheckAWalkingPlayerCanEvadeAndCounter, data);
         Test(CheckAWoundedPlayerCanEvadeAThroatLeap, data);
@@ -19,6 +21,28 @@ public static class WolfSnapChecks {
         Test(CheckAWolfUsesTheClearSideAfterTheFirstHit, data);
         Test(CheckAWolfHopsAwayFromAPackmate, data);
         Test(CheckAStruckWolfRunsAnArcAfterMissingItsBite, data);
+    }
+
+    private static void CheckTwoWolvesLeaveRoomForEachOthersBites(GameData data) {
+        var world = NightWorld(data);
+        var first = PlaceWolf(world, new Wolf { Pos = world.Player + Vector2.Right.Rotated(-Mathf.Pi / 10) * 1.46f });
+        var second = PlaceWolf(world, new Wolf { Pos = world.Player + Vector2.Right.Rotated(Mathf.Pi / 10) * 1.46f });
+        SnapTick(world, .2f);
+        Require(WolfSnap.Winding(first) != WolfSnap.Winding(second),
+            "wolves approaching from the same side should only start one bite if their landing bodies would overlap");
+        SnapTick(world, .4f);
+        Require(world.Health == 100 - data.WolfBite, "one wolf should land a bite while the other makes room");
+    }
+
+    private static void CheckAStruckWolfMakesRoomToBiteBesideAnObstacle(GameData data) {
+        var world = NightWorld(data);
+        var from = world.Player + Vector2.Right * .62f;
+        var wolf = PlaceWolf(world, new Wolf { Pos = from, Aggressive = true });
+        world.Add(ThingKind.Chest, from + Vector2.Right * (World.Footprint(ThingKind.Chest) + .005f));
+        Require(world.CanStand(from) && !world.CanStand(from + Vector2.Right * .1f), "the chest should block a straight retreat");
+        for (int i = 0; i < 30 && !WolfSnap.Winding(wolf); i++) world.Tick(.02f);
+        Require(WolfSnap.Winding(wolf) && MathF.Abs(wolf.Pos.Y - from.Y) > .03f,
+            "a struck wolf pressed up against a chest should run aside far enough to start another bite");
     }
 
     private static void CheckAWolfGathersItselfBeforeItBites(GameData data) {

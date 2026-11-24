@@ -52,21 +52,25 @@ public sealed class DoorTug(World world) {
     /// <summary>How hard a tug is tugging <paramref name="u"/> of the way through it: rising and falling over its heave, then nothing while the wolf holds.</summary>
     public static float HeavePulse(float u) => u < Heave ? MathF.Sin(MathF.PI * u / Heave) : 0;
 
-    /// <summary>Where the acting player is: their place, or as far back from it as a wolf tugging them out of a doorway has taken them.</summary>
-    public Vector2 TuggedTo {
-        get {
-            var p = world.S.Actor;
-            if (p.Door is not (Doorway.Tugged or Doorway.TuggedOff)) return world.Player;
-            var outward = world.Doorways.OutOfDoorAt(p.DoorCabin);
-            return world.Player + outward * (TugDistanceFrom(world.Player, outward) * TugProgress(p.DoorTime / TugSeconds));
-        }
+    /// <summary>Where the acting player's body stands during the tug.</summary>
+    public Vector2 TuggedTo => BodyAt(world.S.Actor);
+
+    /// <summary>Where a player is along the pull from where the wolf caught them to open ground.</summary>
+    internal Vector2 BodyAt(PlayerState player) {
+        if (player.Door is not (Doorway.Tugged or Doorway.TuggedOff)) return player.Pos;
+        var outward = world.Doorways.OutOfDoorAt(player.DoorCabin);
+        var end = player.Pos + outward * TugDistanceFrom(player.Pos, outward);
+        return AtTime(player.DoorFrom, end, player.DoorTime);
     }
+
+    internal static Vector2 AtTime(Vector2 from, Vector2 to, float time) =>
+        from.Lerp(to, TugProgress(time / TugSeconds));
 
     /// <summary>
     /// How far a wolf tugs a player standing at <paramref name="from"/> straight out of a doorway: <see cref="TugDistance"/>, cut
     /// short where open ground ends, leaving room on it for the wolf behind them where there is any.
     /// </summary>
-    public float TugDistanceFrom(Vector2 from, Vector2 outward) {
+    private float TugDistanceFrom(Vector2 from, Vector2 outward) {
         if (from != measured.From || outward != measured.Outward || Math.Abs(world.Time - measured.At) > TugSeconds) {
             float both = OpenOut(from, outward, TugDistance + TugReach) - TugReach;
             measured = (from, outward, world.Time, both >= 0 ? both : OpenOut(from, outward, TugDistance));
@@ -209,6 +213,8 @@ public sealed class DoorTug(World world) {
         // The wolves at the player's sides let go with the one that tugged, and bite again no sooner than after any other bite.
         foreach (var w in world.S.Wolves) if (w.Side != 0 && w.Target == p.Id) { w.LetGoOfArm(); w.Attack = 1; }
         var at = TuggedTo;
+        // If the wolf lets go inside the cabin blocker, return control at the doorstep.
+        if (!world.CanStand(at)) at = p.Pos;
         world.Player = at; p.Warp++;
         if (takedown != null) world.WolfHunt.Pin(takedown, BodySide.Out(Facing, BodySide.Of(at, Facing, takedown.Pos)));
         p.Door = Doorway.None;

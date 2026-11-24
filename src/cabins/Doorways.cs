@@ -204,6 +204,7 @@ public sealed class Doorways(World world) {
     public static void Stage(PlayerState p, Doorway door, int cabin, bool rush = false) {
         p.DoorFrom = p.DoorBody = DoorwayPath.UsesBody(p.Door) ? p.DoorBody : p.Pos;
         p.Door = door; p.DoorCabin = cabin; p.DoorTime = 0; p.DoorRush = rush;
+        p.Swing = null;
     }
 
     /// <summary>

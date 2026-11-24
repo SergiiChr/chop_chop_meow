@@ -12,6 +12,7 @@ using static WorldSteps;
 /// <summary>Checks for a player's swings at wolves: when a swing lands, what it reaches and how hard it hits.</summary>
 public static class SwingsChecks {
     public static void Run(GameData data) {
+        Test(CheckSteppingIntoACabinStopsAnUnlandedSwing, data);
         Test(CheckAnAxeLandsWhenItComesDownNotWhenItIsSwung, data);
         Test(CheckASwingHitsOnlyWhereItIsAimedAndAsFarAsTheBladeReaches, data);
         Test(CheckAxeSwingsTakeTurnsAndTheSweepCatchesOnlyAWolfInTheAir, data);
@@ -22,6 +23,19 @@ public static class SwingsChecks {
         Test(CheckABurntWolfRunsFromThePlayerForAMoment, data);
         Test(CheckSwingShapesFollowThePlayersModel, data);
         Test(CheckTorchSwingScaresOnlyWolvesItIsAimedAt, data);
+    }
+
+    private static void CheckSteppingIntoACabinStopsAnUnlandedSwing(GameData data) {
+        var world = AxeNight(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + Vector2.Up * 4);
+        world.Player = Doorways.DoorPoint(hut);
+        var wolf = StillWolf(world, Vector2.Right * 1.5f);
+        world.Attack(Vector2.Right);
+        SnapTick(world, .18f);
+        Require(world.Doorways.Enter(hut, false), "the player should start stepping in before the axe comes down");
+        SnapTick(world, .29f);
+        Require(world.Door == Doorway.Entering && wolf.Health == data.WolfHealth,
+            "the cut-off swing should not hurt a wolf when the player is already stepping into the cabin");
     }
 
     /// <summary>The blow counts when the animation brings the axe down, half way through the swing, so a press alone hurts nothing.</summary>

@@ -16,6 +16,7 @@ using static CabinSteps;
 /// <summary>Checks of a wolf tugging a player back out of a cabin's doorway, letting go, and taking a badly hurt one down.</summary>
 public static class DoorTugChecks {
     public static void Run(GameData data) {
+        Test(CheckATugStartsWhereTheWolfTakesHold, data);
         Test(CheckAWolfTugsAPlayerOutOfTheDoorwayAndLeavesThemOutside, data);
         Test(CheckAWoundedPlayerTuggedOutOfTheDoorwayIsPinned, data);
         Test(CheckOnlyTheTuggingWolfTakesDownAWoundedPlayerItTugs, data);
@@ -31,6 +32,15 @@ public static class DoorTugChecks {
         Test(CheckAWolfWithNoArmToTakeWaitsBesideATuggedPlayerAndSnapsOnceTheyAreLetGo, data);
         Test(CheckABodysLeftAndRightFollowFromTheWayItFaces);
         Test(CheckAWolfWithNoRoomBehindAPlayerItTuggedOutPinsThemFromTheSideItStandsOn, data);
+    }
+
+    private static void CheckATugStartsWhereTheWolfTakesHold(GameData data) {
+        var (world, hut, _) = TuggedAtNight(data);
+        var door = Doorways.DoorPoint(hut);
+        Require(world.Door == Doorway.Tugged && world.Me.DoorFrom.Y < door.Y - .02f,
+            "the wolf should catch the player after they have stepped partway into the doorway");
+        Require(world.DoorTug.TuggedTo.IsEqualApprox(world.Me.DoorFrom),
+            "at the start of the tug, the wolf should hold the player where its jaws took hold");
     }
 
     /// <summary>On the map, north is -Y and east is +X: facing north, a body's left hand is to the west.</summary>

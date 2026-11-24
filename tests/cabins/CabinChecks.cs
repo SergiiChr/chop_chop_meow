@@ -201,6 +201,7 @@ public static class CabinChecks {
         var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         world.Tick(.5f);
         Require(world.Health == 100 && wolf.Target == 0, "a wolf should not reach a player in the first half of stepping out");
+        RemoveWolves(world, w => w == wolf);
         world.Tick(.3f);
         var exposed = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.15f, 0) });
         WolfSteps.SnapTick(world, .24f);
