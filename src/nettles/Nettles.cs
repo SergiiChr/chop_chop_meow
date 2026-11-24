@@ -20,7 +20,7 @@ public sealed class Nettles(World world) {
     /// <summary>Brings up the night's nettles once night has fallen.</summary>
     internal void Tick() {
         var s = world.S;
-        if (!world.Night || s.NettleNight == world.Day) return;
+        if (!world.Night || s.NettleNight >= world.Day) return;
         s.NettleNight = world.Day;
         for (int grown = 0; grown < PerNight && s.Things.Of(ThingKind.Nettle).Count < Most; grown++)
             if (Spot() is Vector2 spot) world.Add(ThingKind.Nettle, spot, 1);

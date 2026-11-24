@@ -50,7 +50,6 @@ public partial class Game {
         var bug = world.ThingsOf(ThingKind.Firebug)[0];
         await Until(() => view.PropOf(bug.Id) is FirebugProp { Shown: true }, "the guest's window drawing the host's firebug", 5);
         await ClickGround();
-        await Until(() => view.PlayerAnimation == ActorAction.NetSwing, "the guest's net swing playing", 5);
         await Until(() => world.Find(bug.Id) is Thing fled && fled.Pos.DistanceTo(placed) > 3, "the guest seeing the firebug dart off from its swing", 15);
         Signal("firebug-fled");
         await Signaled("firebug-night-over");

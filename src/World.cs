@@ -270,9 +270,10 @@ public sealed class SaveState {
     public int DensOut { get; set; }
     /// <summary>Whole hours since dusk that have had their one more wolf tonight.</summary>
     public int DenHours { get; set; }
-    /// <summary>The day whose night has brought up its nettles.</summary>
+    /// <summary>The last day whose night has brought up its nettles.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int NettleNight { get; set; }
-    /// <summary>Firebugs that have come out tonight, caught or not.</summary>
+    /// <summary>The last day whose night has let firebugs out, and how many it has let out so far, caught or not.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int FirebugNight { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int FirebugsOut { get; set; }
     /// <summary>A wolf has howled tonight.</summary>
     public bool Howled { get; set; }

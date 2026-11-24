@@ -140,7 +140,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // By day, with --day-phase, only the nettles stand.
             world.S.Time = world.Data.DaySeconds * Launch.Number("--day-phase", world.Data.NightStarts + .1f);
             // No wolves and no more firebugs than these come out.
-            world.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; world.S.DenHours = 24; world.S.FirebugsOut = Firebugs.AtNightfall + 24;
+            world.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; world.S.DenHours = 24; world.Firebugs.KeepIn();
             foreach (var off in new Vector2[] { new(-4.5f, -1), new(-2.5f, -4.5f), new(1, -5.5f), new(4.6f, -2), new(5, 2.5f), new(-5.5f, 3), new(-1, 5.5f), new(2.4f, 1.6f) })
                 world.Add(ThingKind.Firebug, at + off, 1);
             world.S.Backpack.Add("bug_net", 1);

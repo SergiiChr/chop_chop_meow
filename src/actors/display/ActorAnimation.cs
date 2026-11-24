@@ -527,8 +527,15 @@ public static class ActorAnimation {
                     // Standing over the bench, the hands roll the fibres against each other, one forward as the other comes back, and draw apart as the twist tightens.
                     float roll = MathF.Sin(p * Mathf.Tau * 4), draw = MathF.Sin(p * Mathf.Tau);
                     return Stance with {
-                        Lean = 16 + draw * 2, Head = 18, Twist = roll * 3,
-                        RaiseL = 46 + roll * 8, OutL = -12 + draw * 9, ElbowL = 74 - roll * 10, RaiseR = 46 - roll * 8, OutR = -12 + draw * 9, ElbowR = 74 + roll * 10
+                        Lean = 16 + draw * 2,
+                        Head = 18,
+                        Twist = roll * 3,
+                        RaiseL = 46 + roll * 8,
+                        OutL = -12 + draw * 9,
+                        ElbowL = 74 - roll * 10,
+                        RaiseR = 46 - roll * 8,
+                        OutR = -12 + draw * 9,
+                        ElbowR = 74 + roll * 10
                     };
                 }
             case ActorAction.Carry:

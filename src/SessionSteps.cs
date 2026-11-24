@@ -15,7 +15,15 @@ public partial class Game {
     }
 
     /// <summary>The world of the server this window runs for the check, which the check sets up directly.</summary>
-    private World Hosted => hosted?.World ?? throw new InvalidOperationException("No server is running in this window.");
+    private World Hosted {
+        get {
+            var served = hosted?.World ?? throw new InvalidOperationException("No server is running in this window.");
+            // Each game a session starts runs on a server of its own, whose world is stilled as a check first reaches for it.
+            if (stilled != served) { stilled = served; SetupSteps.StillNights(served); }
+            return served;
+        }
+    }
+    private World? stilled;
 
     /// <summary>
     /// Passes everything on the line to the server inside this window and brings its answer back, at once.

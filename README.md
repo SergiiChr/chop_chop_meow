@@ -59,6 +59,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
+| `--showcase --firebugs` | Show a night meadow with three nettles, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--firebug-look sprite` draws the firebugs as pixel sprites while the two looks are on trial |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
@@ -173,7 +174,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
 | Hold right mouse button on open ground with a shovel selected | Walk over and dig a hole |
-| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you around obstacles to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
+| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you around obstacles to its door and inside; on open ground, use the item selected on the hotbar (swing a tool, bug net or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
@@ -486,6 +487,25 @@ Loose stones and sticks lie about the plains: each picks up the same way as 1 st
 A pickaxe hit on a rock or an ore deposit knocks a loose piece of it off one time in twenty; it flies off and lands within 2 tiles, ready to pick up.
 A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 
+### Nettles and firebugs
+
+Three nettles come up each night where nobody is looking, until ten stand in the valley.
+Hold right mouse on one to pick it: it takes 3 seconds, gives 1 nettle and stings for 1% of health a second, which can kill.
+A picked nettle is gone for good, a backpack with no room for it leaves it standing, and nothing is built or laid where one stands.
+Nettle rope is made at the crafting bench, 1 rope from 1 nettle, and a bug net from 5 rope, 1 wood and 1 wood part ([Crafting bench](#crafting-bench)).
+Whoever makes rope strikes two mallet blows, then twists the fibres by hand, in turn.
+
+Eight firebugs come out as night falls and one more after each hour of the night, at least 25 m from every building and where nobody is looking.
+All of them are gone at dawn.
+A firebug hovers about its place and blinks.
+When you come within 4 m it darts off 6.5 m, faster than a walk and slower than a sprint, then rests for 1.6 seconds where it stops, whoever comes near.
+With the bug net selected, a left click sweeps it toward the pointer, from behind the left shoulder across the front.
+The hoop passes 0.9 to 1.4 m from you and lands 0.4 seconds after the click: it catches each firebug it passes over then, one firebug each into the backpack while it has room.
+A firebug nearer or further than the hoop is missed, and a swing sends every firebug it misses within 5 m darting, resting or not.
+
+Nettles, nettle rope, bug nets and firebugs are not bought or sold, and a firebug is not made into anything yet.
+A nettle, a bug net and a firebug each say a line under their name in tooltips and in their details on the recipe map.
+
 ### Replanting trees
 
 An axe hit has the same one-in-twenty chance to drop an acorn as a pickaxe hit has to drop a chip.
@@ -588,6 +608,7 @@ It makes what the menu's chisel makes (planks, wood parts, the mallet, torches a
 | Steel axe, pickaxe, shovel, hammer | see Steel tools below |
 | Steel chisel | 1 steel part + 1 wood part |
 | Rake | 1 steel part + 2 wood parts |
+| Bug net | 5 nettle rope + 1 wood + 1 wood part |
 
 Some recipes need a better tool:
 
@@ -595,6 +616,11 @@ Some recipes need a better tool:
 - Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
 - A tin water bottle (1 tin sheet + 1 wood part) needs a steel hammer.
+
+Nettle rope (1 nettle → 1 rope) is the one recipe a better tool spoils: it is made only at the bench and only with a wooden mallet.
+The mallet may be the one in the bench's hammer slot or one in your backpack, whichever hammer the other is.
+Asked for with a steel hammer and no mallet, the bench takes nothing and says "Steel hammer will damage the fibers."
+A worker needs the mallet in the slot, so a bench with one hammer slot makes either rope or what a steel hammer makes.
 
 A better tool always does a plainer tool's work; the steel chisel works twice as fast as the stone one.
 The stone chisel itself is only knapped by hand.
@@ -778,7 +804,8 @@ Workers need tools for some jobs:
 - an axe to chop wood;
 - a pickaxe to break boulders and mine ore and coal;
 - a shovel to dig up stumps and bushes;
-- a hammer to fit a mine.
+- a hammer to fit a mine;
+- a bug net to catch firebugs.
 
 Leaves, berries and loose pieces need no tool, though a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
@@ -793,6 +820,10 @@ With no shovel to be had they leave stumps and go on chopping.
 A worker carries one tool at a time, so they swap the axe for the shovel at a tool station and back.
 Digging up bushes is a job of its own: a worker given a bush goes on to the next known bush and never rakes leaves, and a worker raking leaves never digs up a bush.
 A dug-up bush gives 36 leaves, which a worker carries off 12 at a time.
+
+Nettles and firebugs can be given to a worker like any resource, each as a job of its own.
+A nettle picker says what tool they wait for.
+A firebug catcher takes a bug net and catches the firebug they reach, but workers leave at dusk, before firebugs come out, so a catcher finds none to catch yet.
 
 A worker on the station's Stock job brings tools from other storage to the rack.
 
@@ -871,7 +902,7 @@ Tiles join into paths three quarters of a metre wide with round ends:
 
 A tile goes on any dry open ground within 5 tiles of you, also under your feet and under buildings and yards already
 there; a building or yard goes up over tiles and leaves them under it.
-It does not go on a tile where a tree, boulder, ore deposit, berry bush or leaf spot stands, picked clean or not.
+It does not go on a tile where a tree, boulder, ore deposit, berry bush, nettle or leaf spot stands, picked clean or not.
 It clears a stump or plain bush away.
 Nothing grows through gravel.
 A click on a path does what a click on open ground does.

@@ -49,7 +49,9 @@ def main() -> None:
         "MODEL-BAKE PASS",
         timeout=300,
     )
-    print(f"Baked the nettle sprigs and the rope bundle into {OUTPUT.relative_to(ROOT)}")
+    print(
+        f"Baked the nettle sprigs and the rope bundle into {OUTPUT.relative_to(ROOT)}"
+    )
 
 
 if __name__ == "__main__":

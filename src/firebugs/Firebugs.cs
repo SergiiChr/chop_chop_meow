@@ -67,13 +67,18 @@ public sealed class Firebugs(World world) {
         var bugs = s.Things.Of(ThingKind.Firebug);
         if (!world.Night) {
             if (bugs.Count > 0) { s.Things.RemoveAll(ThingKind.Firebug, static _ => true); flights.Clear(); }
-            s.FirebugsOut = 0;
             return;
         }
+        if (s.FirebugNight < world.Day) { s.FirebugNight = world.Day; s.FirebugsOut = 0; }
         int due = AtNightfall + (int)((world.DayPhase - world.Data.NightStarts) * 24);
         for (; s.FirebugsOut < due; s.FirebugsOut++)
             if (Spot() is Vector2 spot) world.Add(ThingKind.Firebug, spot, 1);
         foreach (var bug in bugs) Fly(bug, dt);
+    }
+
+    /// <summary>Lets no more firebugs out tonight; those already out stay.</summary>
+    internal void KeepIn() {
+        world.S.FirebugNight = world.Day; world.S.FirebugsOut = AtNightfall + 24;
     }
 
     /// <summary>A random spot of open ground no player sees, away from every building, or null when the tries find none.</summary>

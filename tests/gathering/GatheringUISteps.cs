@@ -10,13 +10,11 @@ public partial class Game {
     /// Puts a resource of a kind at an offset from where the player starts, holds right mouse on it until its blow is
     /// heard, and returns it with the point held and where the end of the player's tool, as <paramref name="toolEnd"/>
     /// finds it on the rig, is at that moment.
-    /// A stump is of the tree <paramref name="ofTree"/> when one is named, so its trunk does not go by its own id.
     /// </summary>
     private async Task<(Thing Thing, Vector2 Press, Vector3 End)> WorkUntilBlowHeard(Vector2 start, ThingKind kind, Vector2 offset, string sound,
-        Func<ActorRig, Vector3> toolEnd, int ofTree = 0) {
+        Func<ActorRig, Vector3> toolEnd) {
         Warp(Hosted, start); await Frames(3);
         var thing = Hosted.Add(kind, start + offset, kind == ThingKind.Stone ? World.StonePile : 40);
-        thing.OfTree = ofTree;
         await Frames(2);
         int soundsBefore = sounds.Played;
         var press = RightPress(thing.Pos);

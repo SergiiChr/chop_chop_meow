@@ -13,8 +13,11 @@ internal static class NettleShape {
     public const float Scale = 3.4f;
     /// <summary>The sprigs' shared texture, with the leaves cut out of it and seen from both sides.</summary>
     public static readonly StandardMaterial3D Leaves = new() {
-        AlbedoTexture = GD.Load<Texture2D>(Folder + "nettle_plant.png"), Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = .5f,
-        CullMode = BaseMaterial3D.CullModeEnum.Disabled, Roughness = .8f,
+        AlbedoTexture = GD.Load<Texture2D>(Folder + "nettle_plant.png"),
+        Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor,
+        AlphaScissorThreshold = .5f,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        Roughness = .8f,
     };
     // The sprigs each look of the plant is made of, tallest first.
     private static readonly string[][] Clumps = [["tall_a", "medium_b", "small_a"], ["tall_b", "medium_a", "small_b"], ["tall_a", "tall_b", "small_b"]];

@@ -41,8 +41,13 @@ public static class FirebugShape {
     private static StandardMaterial3D Shine(Color colour) {
         var falloff = new Gradient { Offsets = [0, .35f, 1], Colors = [Colors.White, new Color(1, 1, 1, .3f), new Color(1, 1, 1, 0)] };
         return new StandardMaterial3D {
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BlendMode = BaseMaterial3D.BlendModeEnum.Add, Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, BillboardKeepScale = true, AlbedoColor = colour, DisableReceiveShadows = true,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+            BillboardKeepScale = true,
+            AlbedoColor = colour,
+            DisableReceiveShadows = true,
             AlbedoTexture = new GradientTexture2D { Gradient = falloff, Fill = GradientTexture2D.FillEnum.Radial, FillFrom = new Vector2(.5f, .5f), FillTo = new Vector2(1, .5f), Width = 64, Height = 64 },
         };
     }
@@ -52,8 +57,14 @@ public static class FirebugShape {
         prop.Root.AddChild(prop.Fly);
         if (Look == FirebugLook.Sprite) {
             prop.Sprite = new Sprite3D {
-                Texture = Sheet, Hframes = SpriteLevels, Vframes = SpriteBeats, PixelSize = PixelSize, Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-                Shaded = false, TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                Texture = Sheet,
+                Hframes = SpriteLevels,
+                Vframes = SpriteBeats,
+                PixelSize = PixelSize,
+                Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+                Shaded = false,
+                TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
             };
             prop.Fly.AddChild(prop.Sprite);
         } else {
