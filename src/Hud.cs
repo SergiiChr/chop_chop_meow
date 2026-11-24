@@ -94,7 +94,7 @@ public partial class ModeLabel : VBoxContainer {
             ClickMode.Remove { Underground: true } => "REMOVE · Underground · Right click for surface · Esc to finish",
             ClickMode.Remove => "REMOVE · Surface · Right click for underground · Esc to finish",
             { Placing: ThingKind.Mine } => "PLACE MINE · Left click ground · Esc to cancel",
-            ClickMode.Dig => "Hold RMB to dig.",
+            ClickMode.Dig => "DIG · Hold right mouse on open ground",
             { Placing: ThingKind kind } => $"PLACE {world.Data.Name(kind).ToUpperInvariant()} · Left click ground · C / V to turn · Esc to cancel",
             _ => ""
         };

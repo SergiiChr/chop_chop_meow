@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using ChopChopMeow;
 using Godot;
@@ -17,13 +16,16 @@ public static class ReplantingChecks {
         Test(CheckReleasingTheShovelRestartsTheDig, data);
         Test(CheckEmptyHoleLastsUntilDawnAcrossASave, data);
         Test(CheckWateredTreeKeepsGrowingAfterBecomingAnAdult, data);
+        Test(CheckLeafSpotGrowsWithTheTreeAndStaysAfterFelling, data);
+        Test(CheckGrowingTrunkCrushesABuildingAndSavesItsContents, data);
+        Test(CheckGrowingTrunkClearsAnOccupiedCabin, data);
+        Test(CheckACartReturnsAfterItsPostIsCrushed, data);
         Test(CheckValleyTreesKeepGrowing, data);
         Test(CheckDueTreesSpreadTheirGrowthAcrossUpdates, data);
         Test(CheckWoodcutterSkipsYoungTrees, data);
         Test(CheckGatheringLeavesGivesAcornsThatRefillOneAtATime, data);
         Test(CheckAGrowingTreeKeepsItsAgeOnLoadAndCanBeFelledEarly, data);
         Test(CheckSaveRefusesAnInvalidRememberedTreeStage, data);
-        Test(CheckSaveRefusesAnObsoleteDigOutline, data);
     }
 
     private static void CheckAxeHitsDropAcornsLikePickaxeHitsDropChips(GameData data) {
@@ -145,6 +147,65 @@ public static class ReplantingChecks {
         Require(grown > 0 && grown < trees.Count, "some standing trees should grow before the others");
         RunUntil(world, began + 3 * data.DaySeconds);
         Require(trees.All(tree => tree.Remaining == 53), "each standing tree should gain eleven wood over three days");
+        var spots = world.ThingsOf(ThingKind.LeafSpot);
+        Require(spots.Count > 0 && spots.All(spot => world.Find(spot.OfTree) is { Kind: ThingKind.Tree } tree
+            && spot.TreeStage == tree.TreeStage), "starting leaf spots should keep growing with their trees");
+    }
+
+    private static void CheckLeafSpotGrowsWithTheTreeAndStaysAfterFelling(GameData data) {
+        var world = EmptyWorld(data);
+        var tree = PlantAnAcorn(world);
+        PourIntoTree(world, tree, Bucket.AtFill(5), Bucket.Item);
+        RunUntil(world, world.Time + 10 * data.DaySeconds);
+        var spot = world.ThingsOf(ThingKind.LeafSpot).Single();
+        Require(spot.OfTree == tree.Id, "the leaf spot should belong to the new adult tree");
+        float firstRadius = WorldModels.Hits(spot)[0].Radius;
+
+        world.Deserialize(world.Serialize());
+        tree = world.Find(tree.Id)!;
+        spot = world.Find(spot.Id)!;
+        RunUntil(world, world.Time + 10 * data.DaySeconds);
+        float grownRadius = WorldModels.Hits(spot)[0].Radius;
+        Require(grownRadius > firstRadius, "the saved leaf spot should keep growing with its tree");
+        Give(world, "steel_axe");
+        world.Player = tree.Pos + Vector2.Right;
+        for (int strike = 0; strike < 32 && world.Find(tree.Id) != null; strike++) world.Gather(tree, data.GatherSeconds);
+        Require(world.Find(tree.Id) == null && world.Find(spot.Id) == spot && WorldModels.Hits(spot)[0].Radius == grownRadius,
+            "felling the tree should leave its grown leaf spot in place");
+    }
+
+    private static void CheckGrowingTrunkCrushesABuildingAndSavesItsContents(GameData data) {
+        var (world, chest) = TreeReadyToGrowBeside(data, ThingKind.Chest);
+        var far = world.Add(ThingKind.Chest, chest.Pos + 3 * Vector2.Right);
+        chest.Inventory.Add("berries", 7);
+        world.Tick(1, true);
+        Require(world.Find(chest.Id) == chest, "the chest should stand until the trunk grows over it");
+        world.Tick(1, true);
+        var recovery = world.ThingsOf(ThingKind.Grave).Single();
+        Require(world.Find(chest.Id) == null && world.Find(far.Id) == far && recovery.Pos == chest.Pos
+            && recovery.Inventory["berries"] == 7 && recovery.Inventory["wood"] == 0,
+            "growth should destroy the overlapping chest and leave its stored items in a recovery box");
+    }
+
+    private static void CheckGrowingTrunkClearsAnOccupiedCabin(GameData data) {
+        var (world, cabin) = TreeReadyToGrowBeside(data, ThingKind.Hut);
+        SetSheltered(world, cabin);
+        world.Player = cabin.Pos;
+        world.Tick(2, true);
+        Require(world.Find(cabin.Id) == null && world.Sheltered == 0 && world.Door == Doorway.None
+            && world.Player == Doorways.DoorPoint(cabin), "a crushed cabin should put its occupant outside immediately");
+    }
+
+    private static void CheckACartReturnsAfterItsPostIsCrushed(GameData data) {
+        var (world, post) = TreeReadyToGrowBeside(data, ThingKind.Signpost);
+        world.Player = post.Pos + Vector2.Right;
+        SetCoins(world, 200);
+        int axes = world.Backpack["steel_axe"];
+        Require(world.Buy(post, "steel_axe", 1), "the post should have a cart out before it is crushed");
+        world.Tick(2, true);
+        Require(world.Find(post.Id) == null && world.Orders.Count == 1, "the trunk should destroy the post immediately");
+        RunUntil(world, world.Time + data.TradeSeconds);
+        Require(world.Orders.Count == 0 && world.Backpack["steel_axe"] == axes + 1, "the cart should still deliver its order");
     }
 
     private static void CheckDueTreesSpreadTheirGrowthAcrossUpdates(GameData data) {
@@ -197,9 +258,9 @@ public static class ReplantingChecks {
         Require(world.Backpack["acorn"] == first + 2, "the next acorn should take another ten days");
 
         var saved = JsonNode.Parse(world.Serialize())!;
-        Require((string?)saved["Things"]?[0]?["Kind"] == "leaves", "leaf spots should keep the existing save id");
+        Require((string?)saved["Things"]?[0]?["Kind"] == "leaf_spot", "a leaf spot should save under its own id");
         world.Deserialize(saved.ToJsonString());
-        Require(world.Find(patch.Id) is { Kind: ThingKind.LeafSpot }, "the existing leaves id should load as a leaf spot");
+        Require(world.Find(patch.Id) is { Kind: ThingKind.LeafSpot }, "the saved leaf spot should load");
     }
 
     private static void CheckAGrowingTreeKeepsItsAgeOnLoadAndCanBeFelledEarly(GameData data) {
@@ -239,17 +300,4 @@ public static class ReplantingChecks {
         Require(refused, "the save should refuse an invalid remembered growth stage");
     }
 
-    private static void CheckSaveRefusesAnObsoleteDigOutline(GameData data) {
-        var world = EmptyWorld(data);
-        DigHole(world);
-        var save = JsonNode.Parse(world.Serialize())!;
-        save["Things"]![0]!["Kind"] = "planting_spot";
-        try {
-            world.Deserialize(save.ToJsonString());
-        } catch (JsonException error) {
-            Require(error.Message.Contains("planting_spot"), "the load error should name the unsupported outline");
-            return;
-        }
-        Require(false, "loading should refuse a saved dig outline");
-    }
 }

@@ -94,7 +94,11 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     private void Headline() {
         bool water = thing.Kind == ThingKind.Water;
         headingTitle.Text = water ? "Collect water" : world.Data.Name(thing.Kind);
-        headingIcon.Texture = Icons.Of(water ? Water.Liquid : thing.Kind.Id());
+        headingIcon.Texture = Icons.Of(thing.Kind switch {
+            ThingKind.Water => Water.Liquid,
+            ThingKind.LeafSpot => World.ResourceItem(thing),
+            _ => thing.Kind.Id()
+        });
         headingIcon.Visible = headingIcon.Texture != null;
         headingIcon.TooltipText = world.Data.Buildings.TryGetValue(thing.Kind, out var def) ? def.Description : "";
     }

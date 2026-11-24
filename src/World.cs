@@ -10,6 +10,13 @@ using Godot;
 namespace ChopChopMeow;
 
 public sealed class Thing {
+    /// <summary>A stable variation between things, from zero up to one.</summary>
+    internal static float Variation(int id, int salt) {
+        uint h = (uint)(id * 73856093) ^ (uint)(salt * 19349663);
+        h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
+        return (h & 0xffff) / 65536f;
+    }
+
     public int Id { get; init; }
     public ThingKind Kind { get; init; }
     public float X { get; set; }
@@ -17,7 +24,7 @@ public sealed class Thing {
     /// <summary>A building's turn in radians from its original direction, positive from X toward Y on the ground.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Rotation { get; init; }
     public int Remaining { get; set; }
-    /// <summary>One plus the whole days spent growing, or zero for a tree at the starting adult size.</summary>
+    /// <summary>One plus a tree's age in days, or zero at the starting adult size. Stumps and leaf spots keep their tree's stage.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int TreeStage { get; set; }
     /// <summary>World time of the next growth stage, or zero for an acorn waiting for water.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float NextTreeStageAt { get; set; }
@@ -59,7 +66,7 @@ public sealed class Thing {
     public float Regrow { get; set; }
     /// <summary>Acorns still missing from a leaf spot after gathering.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int LeafAcornsTaken { get; set; }
-    /// <summary>The id of the tree that left a stump, whose species and size shape the stump; zero for a stump with no tree on record, which is shaped by its own id.</summary>
+    /// <summary>The tree that left this stump or leaf spot. Stumps use its species and size to match the trunk.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OfTree { get; set; }
     /// <summary>The way a stump's tree fell across the ground, away from whoever landed the last blow on it, in radians from the x axis toward y.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float FellToward { get; set; }
@@ -252,7 +259,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 17;
+    public int Version { get; set; } = 18;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -459,6 +466,7 @@ public sealed partial class World {
     public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind switch {
         ThingKind.Water => Terrain.WaterPoint(from),
         ThingKind.Mine => Mines.WorkSpot(t, from),
+        ThingKind.LeafSpot => t.Pos + (from - t.Pos).LimitLength(LeafSpots.Radius(t.TreeStage)),
         _ => t.Pos
     };
     /// <summary>How far, in metres, the player reaches to move items in and out of storage and stations.</summary>

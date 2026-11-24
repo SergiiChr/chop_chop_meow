@@ -293,7 +293,6 @@ Keep rendering and input separate from state transitions, so headless checks can
 - `tests/SimulationChecks.cs` covers filters, worker routing, trade, wages, recovery after death, saves and a material-driven progression run.
 - `tests/EconomyChecks.cs` measures real workers through a day and checks the economy rules.
 - `tests/AllocationChecks.cs` holds ticks to their allocation budgets.
-  `tests/replanting/ReplantingAllocationChecks.cs` applies the tick budget to a settlement with woodcutters.
   `tests/pipes/PlumbingAllocationChecks.cs` applies the tick budget to pumping into two barrels.
 - `tests/ProductionChainChecks.cs` covers the trading post's filter and auto-sell, and workers alone running the berry, bread, canned stew and steel pickaxe chains to a sale.
 
@@ -398,7 +397,7 @@ Hover labels name buildings, resources and workers in the world.
 The shore label reads “Collect water”.
 Other objects under the cursor take priority over the extra width of an old tree’s trunk.
 Trees use three variants chosen by object id, so saves need no new fields.
-A tree's height comes from its id too (`WorldModels.TreeTall`): its model and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
+A tree's height comes from its id too (`TreePlanting.Tallness`). `TreePlanting.BaseScale` sizes its model and hit boxes from 0.9 to 1.5.
 The bake stands each tree's lowest point on the ground, which on a spruce and one oak is a hanging branch, so their baked trunks start up to 1.8 m higher; `Tree3DShape.Add` carries such a trunk down to the ground with a stem that widens toward its foot.
 A stump keeps the id of the tree that left it (`Thing.OfTree`), so its model stands where that tree's trunk did (`DugProp.Seat`) and is as thick as the trunk was at the ground (`Tree3DShape.Foot`): a birch leaves a thin stump and an oak a stout one.
 A stump with no tree on record, such as a showcase's or one in an older save, is shaped as if a tree with the stump's own id had left it.
@@ -922,8 +921,11 @@ Size and total wood for an adult use a common logarithmic curve, so daily gains 
 Each day adds the increase in whole wood units since the last, so it preserves wood already chopped.
 The valley's starting trees first grow at evenly spaced times over one day.
 If a clock jump leaves many trees due, growth work is spread over several ticks.
+A growing trunk destroys buildings whose footprints it overlaps.
+Cabin occupants are moved outside, stored items go to a recovery box, and any cart still on the road delivers its order.
 
 `LeafSpots` gives each leaf spot a capacity of one or two acorns.
+Each spot keeps its tree's id and growth stage. Its ground area widens with the tree and stays at its last size after felling.
 When a player gathers leaves, they also take the acorns that fit in their backpack.
 Leaves refill at dawn. Missing acorns refill one at a time, every ten days from the first gather that took one.
 Chopping out all its current wood fells the tree and leaves its stump.

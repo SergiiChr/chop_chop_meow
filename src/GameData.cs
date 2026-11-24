@@ -407,13 +407,13 @@ public sealed partial class GameData {
     public bool IsBuilding(string id) => TryBuilding(id, out _);
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' ');
     public string Name(ThingKind kind) {
-        if (kind == ThingKind.LeafSpot) return "Leaf spot";
         if (Items.TryGetValue(kind.Id(), out var item)) return item.Name;
         if (Buildings.TryGetValue(kind, out var building)) return building.Name;
         return kind switch {
             ThingKind.Barrel => Items[Barrel.Item].Name,
             ThingKind.Tree => "Tree",
             ThingKind.Hole => "Hole",
+            ThingKind.LeafSpot => "Leaf spot",
             ThingKind.Stump => "Stump",
             ThingKind.Bush => "Bush",
             ThingKind.Iron => "Iron deposit",

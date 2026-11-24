@@ -25,6 +25,7 @@ public partial class World {
     /// away from <paramref name="feller"/>, who landed the last blow.
     /// </summary>
     internal Thing Fell(Thing tree, Vector2 feller) {
+        LeafSpots.TreeFelled(tree);
         S.Things.Remove(tree);
         var stump = Add(ThingKind.Stump, tree.Pos, StumpWood);
         stump.OfTree = tree.Id;

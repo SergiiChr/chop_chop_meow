@@ -25,12 +25,24 @@ public sealed class TreePlanting(World world) {
     /// <summary>Size relative to adulthood, with a straight start and slower gains each day from then on.</summary>
     internal static float GrowthScale(int stage) => (float)GrowthAt(DaysGrown(stage));
 
+    internal static float Tallness(int id) => Thing.Variation(id, 2);
+
+    /// <summary>Size variation between trees of the same age.</summary>
+    internal static float BaseScale(int id) => .9f + Tallness(id) * .6f;
+
+    /// <summary>The same trunk radius used to draw and pick the tree.</summary>
+    internal static float TrunkRadius(int id, int stage) {
+        if (stage == 1) return .32f;
+        float trunk = (id % World.TreeSpecies) switch { 1 => .3f, 2 => .25f, _ => .35f };
+        return Math.Max(.2f, trunk * BaseScale(id) * GrowthScale(stage));
+    }
+
     private static double GrowthAt(int days) {
         double age = days / (double)AdultDays;
         return days <= AdultDays ? age : 1 + Math.Log(age);
     }
 
-    private static long WoodAt(int days) => (long)(World.TreeWood * GrowthAt(days));
+    private static int WoodAt(int days) => (int)(World.TreeWood * GrowthAt(days));
 
     internal void BeginGrowth(Thing tree) {
         tree.Inventory.Remove(Water.Liquid, WaterNeeded);
@@ -44,11 +56,15 @@ public sealed class TreePlanting(World world) {
             && world.Time >= at; processed++) {
             growing.Dequeue();
             if (world.Find(tree.Id) != tree) continue;
+            float previousRadius = TrunkRadius(tree.Id, tree.TreeStage);
             int before = DaysGrown(tree), after = before + 1;
-            tree.Remaining = (int)Math.Min(int.MaxValue, tree.Remaining + WoodAt(after) - WoodAt(before));
-            tree.TreeStage = after == int.MaxValue ? after : after + 1;
+            tree.Remaining += WoodAt(after) - WoodAt(before);
+            tree.TreeStage = after + 1;
             if (after == AdultDays) world.LeafSpots.Drop(tree);
-            tree.NextTreeStageAt = Math.Max(at + world.Data.DaySeconds, MathF.BitIncrement(at));
+            else if (after > AdultDays) world.LeafSpots.Grow(tree);
+            float radius = TrunkRadius(tree.Id, tree.TreeStage);
+            if (radius > previousRadius) world.Construction.CrushInTrunk(tree.Pos, radius);
+            tree.NextTreeStageAt = at + world.Data.DaySeconds;
             growing.Enqueue(tree, tree.NextTreeStageAt);
         }
     }
@@ -68,6 +84,7 @@ public sealed class TreePlanting(World world) {
     internal static bool ValidStage(Thing thing) => thing.TreeStage == 0 || thing.Kind switch {
         ThingKind.Tree => thing.TreeStage >= 1,
         ThingKind.Stump => thing.TreeStage >= 2,
+        ThingKind.LeafSpot => thing.TreeStage > AdultDays && thing.OfTree > 0,
         _ => false
     };
 

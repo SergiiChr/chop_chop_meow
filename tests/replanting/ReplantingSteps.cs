@@ -33,4 +33,15 @@ internal static class ReplantingSteps {
         Require(world.Transfer(world.Backpack, tree.Inventory, vessel, 1) == 1 && world.Backpack[left] > 0,
             $"the tree should take water and leave {world.Data.Name(left)} in the backpack");
     }
+
+    /// <summary>Loads a tree due to grow in two seconds, with a building just outside its trunk.</summary>
+    public static (World World, Thing Building) TreeReadyToGrowBeside(GameData data, ThingKind kind) {
+        var world = WorldSteps.EmptyWorld(data);
+        var tree = world.Add(ThingKind.Tree, PlantingGround, 42);
+        tree.NextTreeStageAt = world.Time + 2;
+        float trunk = WorldModels.Hits(tree)[0].Radius;
+        var building = world.Add(kind, tree.Pos + Vector2.Right * (trunk + World.Footprint(kind) + .01f));
+        world.Deserialize(world.Serialize());
+        return (world, world.Find(building.Id)!);
+    }
 }

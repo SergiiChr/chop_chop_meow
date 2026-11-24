@@ -7,15 +7,17 @@ namespace ChopChopMeow;
 public sealed class LeafSpots(World world) {
     private const int AcornRefillDays = 10;
     private readonly PriorityQueue<Thing, float> refilling = new();
+    private readonly Dictionary<int, Thing> attached = new();
 
     private static int Capacity(Thing spot) => 1 + (spot.Id & 1);
     public static int Acorns(Thing spot) => Capacity(spot) - spot.LeafAcornsTaken;
+    internal static float Radius(int stage) => .6f * TreePlanting.GrowthScale(stage);
 
     /// <summary>Places leaf spots offset from the trunks when the valley is made.</summary>
     internal void Scatter() {
         foreach (var tree in world.ThingsOf(ThingKind.Tree)) {
             var at = tree.Pos + World.LeafOffset;
-            if (tree.Id % World.TreeSpecies == 0 && Terrain.Open(at)) world.Add(ThingKind.LeafSpot, at, World.LeavesPerSpot);
+            if (tree.Id % World.TreeSpecies == 0 && Terrain.Open(at)) Add(tree, at);
         }
     }
 
@@ -26,11 +28,24 @@ public sealed class LeafSpots(World world) {
             for (int direction = 0; direction < 8; direction++) {
                 var at = tree.Pos + offset.Rotated(direction * Mathf.Tau / 8);
                 if (!Room(at)) continue;
-                world.Add(ThingKind.LeafSpot, at, World.LeavesPerSpot);
+                attached.Add(tree.Id, Add(tree, at));
                 return;
             }
-        world.Add(ThingKind.LeafSpot, tree.Pos, World.LeavesPerSpot);
+        attached.Add(tree.Id, Add(tree, tree.Pos));
     }
+
+    private Thing Add(Thing tree, Vector2 at) {
+        var spot = world.Add(ThingKind.LeafSpot, at, World.LeavesPerSpot);
+        spot.OfTree = tree.Id;
+        spot.TreeStage = tree.TreeStage;
+        return spot;
+    }
+
+    internal void Grow(Thing tree) {
+        if (attached.TryGetValue(tree.Id, out var spot)) spot.TreeStage = tree.TreeStage;
+    }
+
+    internal void TreeFelled(Thing tree) => attached.Remove(tree.Id);
 
     private bool Room(Vector2 at) {
         if (!world.CanStand(at) || world.GravelPaths.Covers(at)) return false;
@@ -70,8 +85,11 @@ public sealed class LeafSpots(World world) {
 
     internal void Reset() {
         refilling.Clear();
-        foreach (var spot in world.ThingsOf(ThingKind.LeafSpot))
+        attached.Clear();
+        foreach (var spot in world.ThingsOf(ThingKind.LeafSpot)) {
             if (spot.Regrow > 0) refilling.Enqueue(spot, spot.Regrow);
+            if (world.Find(spot.OfTree) is { Kind: ThingKind.Tree }) attached.Add(spot.OfTree, spot);
+        }
     }
 
     internal static bool Valid(Thing thing) => thing.Kind != ThingKind.LeafSpot ? thing.LeafAcornsTaken == 0

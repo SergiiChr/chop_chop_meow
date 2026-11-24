@@ -10,7 +10,7 @@ public partial class Game {
     private async Task<Thing> DigHole(Vector2 at) {
         var screen = view.Screen(at);
         await Hover(screen);
-        Require(view.PlacementGhost != null && HasLabel(modeLabel, "Hold RMB to dig."),
+        Require(view.PlacementGhost != null && HasLabel(modeLabel, "DIG · Hold right mouse on open ground"),
             "the selected shovel should show the dig outline and hint");
         var point = RightPress(at, .025f);
         try {

@@ -43,7 +43,7 @@ public sealed class TreeProp : Prop {
     public TreeFall? Falling;
     /// <summary>Seconds the felled tree has lain on the ground, or below zero until it lands.</summary>
     public float Lying = -1;
-    /// <summary>How tall the tree stands among trees, from 0 to 1 (<see cref="WorldModels.TreeTall"/>).</summary>
+    /// <summary>How tall the tree stands among trees, from 0 to 1 (<see cref="TreePlanting.Tallness"/>).</summary>
     public float Tall;
     /// <summary>How see-through the crown is while it hides something behind it.</summary>
     public float Fade;
@@ -244,33 +244,23 @@ public static class WorldModels {
         _ => 1
     };
 
-    /// <summary>Stable pseudo-random value in [0, 1) so a thing looks the same after every load.</summary>
-    public static float Jitter(int id, int salt) {
-        uint h = (uint)(id * 73856093) ^ (uint)(salt * 19349663);
-        h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
-        return (h & 0xffff) / 65536f;
-    }
-
     /// <summary>How many looks a tree has: every species in every variant.</summary>
     public const int TreeLooks = World.TreeSpecies * NatureShape.Variants;
     /// <summary>A tree's species and its variant of that species, by its id.</summary>
     public static (int Species, int Variant) TreeLook(int id) => (id % World.TreeSpecies, id / World.TreeSpecies % NatureShape.Variants);
     /// <summary>The turn about the vertical, in degrees, a tree or another resource is drawn with, by its id.</summary>
-    private static float Turn(int id) => Jitter(id, 1) * 360;
-    /// <summary>How tall a tree stands among trees by its id, from 0 for the shortest to 1 for the tallest.</summary>
-    public static float TreeTall(int id) => Jitter(id, 2);
-    /// <summary>A tree's size against its baked model: the tallest stand two thirds taller than the shortest.</summary>
-    public static float TreeScale(int id) => .9f + TreeTall(id) * .6f;
+    private static float Turn(int id) => Thing.Variation(id, 1) * 360;
 
     private static Hit[] TreeHits(int id, int stage) {
-        if (stage == 1) return [new Hit(.32f, 0, .19f)];
-        var (trunk, crown, fork, top) = TreeLook(id).Species switch {
-            1 => (.3f, 1.25f, 1.2f, 5.6f),
-            2 => (.25f, 1.05f, 2.6f, 5.4f),
-            _ => (.35f, 1.8f, 2.5f, 5.3f),
+        float trunk = TreePlanting.TrunkRadius(id, stage);
+        if (stage == 1) return [new Hit(trunk, 0, .19f)];
+        var (crown, fork, top) = TreeLook(id).Species switch {
+            1 => (1.25f, 1.2f, 5.6f),
+            2 => (1.05f, 2.6f, 5.4f),
+            _ => (1.8f, 2.5f, 5.3f),
         };
-        float scale = TreeScale(id) * TreePlanting.GrowthScale(stage);
-        return new[] { new Hit(Math.Max(.2f, trunk * scale), 0, fork * scale), new Hit(crown * scale, fork * scale, top * scale) };
+        float scale = TreePlanting.BaseScale(id) * TreePlanting.GrowthScale(stage);
+        return new[] { new Hit(trunk, 0, fork * scale), new Hit(crown * scale, fork * scale, top * scale) };
     }
 
     public static Hit[] Hits(Thing t) => t.Kind switch {
@@ -301,7 +291,7 @@ public static class WorldModels {
         ThingKind.Farm => new[] { new Hit(Farms.HalfSize, 0, .5f) },
         ThingKind.Pump => [new Hit(.52f, 0, 1.15f)],
         ThingKind.SteelPiping or ThingKind.GravelPath => Array.Empty<Hit>(),
-        ThingKind.LeafSpot => new[] { new Hit(.6f, 0, .15f) },
+        ThingKind.LeafSpot => [LeafSpotHit(t.TreeStage)],
         ThingKind.Grave => new[] { new Hit(.65f, 0, 1.5f) },
         ThingKind.Anvil => new[] { new Hit(.45f, 0, .85f) },
         ThingKind.Signpost => new[] { new Hit(1.02f, 0, 1.98f) },
@@ -452,9 +442,9 @@ public static class WorldModels {
         var prop = new TreeProp();
         var sway = Pivot(prop.Body, Vector3.Zero);
         prop.Sway = sway; // the whole tree shakes and falls about its base
-        prop.Id = id; prop.Tall = TreeTall(id);
+        prop.Id = id; prop.Tall = TreePlanting.Tallness(id);
         ShowTreeStage(prop, thing.TreeStage);
-        sway.Scale = Vector3.One * TreeScale(id) * prop.GrowthScale;
+        sway.Scale = Vector3.One * TreePlanting.BaseScale(id) * prop.GrowthScale;
         var (species, variant) = TreeLook(id);
         var leaves = Tree3DShape.Add(sway, species, variant);
         PreserveShadows(sway);
@@ -477,7 +467,7 @@ public static class WorldModels {
         var (species, variant) = TreeLook(tree.Id);
         var toward = new Vector3(MathF.Cos(heading), 0, MathF.Sin(heading)).Rotated(Vector3.Up, -Mathf.DegToRad(Turn(tree.Id)));
         var (wood, top) = Tree3DShape.Outline(species, variant);
-        return new TreeFall(wood, top, Tree3DShape.Foot(species, variant), TreeScale(tree.Id) * tree.GrowthScale, toward);
+        return new TreeFall(wood, top, Tree3DShape.Foot(species, variant), TreePlanting.BaseScale(tree.Id) * tree.GrowthScale, toward);
     }
 
     /// <summary>
@@ -489,14 +479,14 @@ public static class WorldModels {
         var stump = Add(prop.Body, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
         var (seat, radius) = Trunk(tree, stage);
         float width = radius / NatureShape.StumpRadius;
-        stump.Scale = new Vector3(width, TreeScale(tree) * TreePlanting.GrowthScale(stage), width);
+        stump.Scale = new Vector3(width, TreePlanting.BaseScale(tree) * TreePlanting.GrowthScale(stage), width);
         prop.Seat = seat;
         return prop;
     }
 
     /// <summary>Where a tree's trunk stands from the tree's spot, and how thick it is at the ground, in metres.</summary>
     public static (Vector3 Seat, float Radius) Trunk(int tree, int stage = 0) {
-        float scale = TreeScale(tree) * TreePlanting.GrowthScale(stage);
+        float scale = TreePlanting.BaseScale(tree) * TreePlanting.GrowthScale(stage);
         var (species, variant) = TreeLook(tree);
         var (foot, radius) = Tree3DShape.Foot(species, variant);
         // The tree's model was turned by its id, and its trunk with it.
@@ -505,7 +495,7 @@ public static class WorldModels {
 
     /// <summary>A plain bush of three lobes around its middle, each a little different in size and green by its id; it casts a shadow.</summary>
     private static void Shrub(Node3D body, int id) {
-        float size = .85f + Jitter(id, 3) * .4f;
+        float size = .85f + Thing.Variation(id, 3) * .4f;
         for (int lobe = 0; lobe < 3; lobe++) {
             float angle = lobe * Mathf.Tau / 3, radius = (.35f + (id + lobe * 3) % 7 * .05f) * size;
             Add(body, NatureShape.Scrub, NatureShape.ScrubMaterials[(id + lobe) % NatureShape.ScrubHues], new Vector3(MathF.Cos(angle) * .23f, radius * .35f, MathF.Sin(angle) * .23f),
@@ -528,7 +518,7 @@ public static class WorldModels {
 
     /// <summary>A fallen stick lying on the ground, turned by its id.</summary>
     private static void Stick(Node3D body, int id) {
-        var stick = Pivot(body, new Vector3(0, .05f, 0), new Vector3(0, Jitter(id, 5) * 360, 0));
+        var stick = Pivot(body, new Vector3(0, .05f, 0), new Vector3(0, Thing.Variation(id, 5) * 360, 0));
         Cylinder(stick, .045f, .03f, .8f, Vector3.Zero, Wood("78644a", .95f), new Vector3(0, 0, 90), 5);
         Cylinder(stick, .025f, .015f, .25f, new Vector3(.12f, .06f, .05f), Wood("6e5b43", .95f), new Vector3(30, 0, 60), 4);
     }
@@ -832,6 +822,8 @@ public static class WorldModels {
     private static void LeafSpot(Node3D body, int id) {
         Add(body, LeafShape.For(id), NatureShape.Natural, Vector3.Zero);
     }
+
+    internal static Hit LeafSpotHit(int stage) => new(LeafSpots.Radius(stage), 0, .15f);
 
     /// <summary>
     /// Anvil bolted to a welded square-tube stand; a slotted steel hammer lies on the stand's top plate in front of it.

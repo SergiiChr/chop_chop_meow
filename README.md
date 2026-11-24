@@ -489,11 +489,11 @@ A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 ### Replanting trees
 
 An axe hit has the same one-in-twenty chance to drop an acorn as a pickaxe hit has to drop a chip.
-Right-click the acorn to pick it up.
+Use right mouse to pick up the acorn.
 Double-click a shovel in your backpack, or select it on the hotbar, to see an outline over open ground.
 Esc leaves the outline active while the shovel is selected on the hotbar.
-Hold RMB over open ground to walk there and dig a hole when you get close enough.
-Releasing RMB before the dig finishes cancels it.
+Hold right mouse over open ground to walk there and dig a hole when you get close enough.
+Releasing right mouse before the dig finishes cancels it.
 Open the hole and place one acorn in its empty slot to plant it. A small nub marks the planted acorn.
 An unused hole disappears at dawn.
 Click the nub to see its status and a read-only item slot with the wood count.
@@ -501,9 +501,13 @@ A tree shows **Planted** until you pour a total of 5 L from bottles or buckets i
 After watering, the oak grows daily. It holds 4 wood after one day, 21 after five, and 42 when it becomes an **Adult tree**
 after ten. You can chop it from the first day it produces wood.
 All standing trees keep growing. After adulthood, size and wood grow logarithmically, adding less as each tree ages.
-Untouched trees hold 71 wood at 20 days and 100 at 40 days.
+A tree that has never been chopped holds 71 wood at age 20 days and 100 at age 40 days.
+Starting trees are already 10 days old.
+A growing trunk destroys any building it reaches.
+Players in a crushed cabin move outside, and stored items go into a recovery box where the building stood.
 
 When a replanted oak becomes an adult it makes a spot of leaves near its trunk.
+The leaf spot grows wider as the tree grows and keeps that size after the tree is felled.
 Gathering leaves from any such spot also picks up the acorns there.
 A leaf spot holds one or two acorns and replaces one every ten in-game days until full.
 

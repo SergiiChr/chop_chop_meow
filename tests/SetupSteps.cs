@@ -90,7 +90,7 @@ internal static class SetupSteps {
     public static Thing PlantTree(World world, Vector2 at, bool tall) {
         while (true) {
             var tree = world.Add(ThingKind.Tree, at, 42);
-            float height = WorldModels.TreeTall(tree.Id);
+            float height = TreePlanting.Tallness(tree.Id);
             if (tall ? height > .85f : height < .15f) return tree;
             RemoveThings(world, t => t == tree);
         }

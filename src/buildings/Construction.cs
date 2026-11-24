@@ -104,6 +104,7 @@ public sealed class Construction(World world) {
     /// </summary>
     private const float DoorRoom = .45f;
     private static bool TooClose(Thing t, ThingKind kind, Vector2 at) {
+        if (t.Kind == ThingKind.Tree && TrunkOverlaps(at - t.Pos, kind, TreePlanting.TrunkRadius(t.Id, t.TreeStage))) return true;
         float margin = World.Footprint(kind) + (t.IsResource ? ResourceRoom : World.Footprint(t.Kind) + .45f);
         var delta = t.Pos - at;
         return t.Kind == ThingKind.Farm ? Math.Abs(delta.X) < margin && Math.Abs(delta.Y) < margin
@@ -123,6 +124,8 @@ public sealed class Construction(World world) {
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in world.S.Things) {
             if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind)) continue;
+            if (t.Kind == ThingKind.Tree && TrunkOverlaps(p - t.Pos, kind, TreePlanting.TrunkRadius(t.Id, t.TreeStage)))
+                return "Leave room around resources and buildings.";
             float margin = IsZone(t.Kind) ? World.Footprint(t.Kind) - .05f : t.IsResource ? YardResourceRoom : World.Footprint(t.Kind) + .2f;
             if (Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin) return "Leave room around resources and buildings.";
         }
@@ -177,10 +180,46 @@ public sealed class Construction(World world) {
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in world.Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
         foreach (var box in World.Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
-        world.S.Things.Remove(t); world.Play("take_down_building", t.Pos);
-        if (t.Kind == ThingKind.Toolstation) world.ToolsChanged();
+        RemoveBuilding(t);
         world.Say((GiveBack(back, t.Pos) ? $"The {world.Lower(def.Name)} is down. Everything is back in your backpack." : $"The {world.Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
         return true;
+    }
+
+    /// <summary>Destroys buildings reached by a growing trunk and leaves their stored items in recovery boxes.</summary>
+    internal void CrushInTrunk(Vector2 centre, float radius) {
+        foreach (var kind in world.Data.Buildings.Keys) {
+            var buildings = world.ThingsOf(kind);
+            for (int i = buildings.Count - 1; i >= 0; i--) {
+                var building = buildings[i];
+                if (TrunkOverlaps(building.Pos - centre, kind, radius)) Crush(building);
+            }
+        }
+    }
+
+    private static bool TrunkOverlaps(Vector2 offset, ThingKind kind, float radius) {
+        float footprint = World.Footprint(kind);
+        if (IsZone(kind)) offset = (offset.Abs() - Vector2.One * footprint).Max(Vector2.Zero);
+        else radius += footprint;
+        return offset.LengthSquared() < radius * radius;
+    }
+
+    private void Crush(Thing t) {
+        if (t.Kind == ThingKind.Hut) world.Doorways.Evacuate(t);
+        Inventory? recovery = null;
+        foreach (var box in World.Boxes(t)) {
+            if (box == null) continue;
+            world.ReleaseIn(box);
+            foreach (var (item, count) in box.Items)
+                if (world.Data.VesselFor(item) == null) Recover(ref recovery, t.Pos, item, count);
+        }
+        RemoveBuilding(t);
+        world.Say($"A growing tree crushed the {world.Lower(world.Data.Name(t.Kind))}.");
+    }
+
+    private void RemoveBuilding(Thing t) {
+        world.S.Things.Remove(t);
+        world.Play("take_down_building", t.Pos);
+        if (t.Kind == ThingKind.Toolstation) world.ToolsChanged();
     }
     /// <summary>
     /// What the remove selector points at: a visible pipe in the underground view, or a building or gravel path on
@@ -231,9 +270,15 @@ public sealed class Construction(World world) {
         foreach (var (item, amount) in items) {
             int left = amount - world.S.Backpack.Add(item, amount);
             if (left <= 0) continue;
-            if (rest == null) { rest = world.Add(ThingKind.Grave, at).Inventory; rest.Slots = 0; }
-            rest.Slots += (left + rest.StackOf(item) - 1) / rest.StackOf(item); rest.Add(item, left);
+            Recover(ref rest, at, item, left);
         }
         return rest == null;
+    }
+
+    private void Recover(ref Inventory? box, Vector2 at, string item, int count) {
+        if (box == null) { box = world.Add(ThingKind.Grave, at).Inventory; box.Slots = 0; }
+        int stack = box.StackOf(item);
+        box.Slots += (count + stack - 1) / stack;
+        box.Add(item, count);
     }
 }

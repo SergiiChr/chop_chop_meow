@@ -1049,7 +1049,7 @@ public partial class WorldView : Node3D {
         switch (subject.Kind) {
             case ThingKind.Tree when prop is TreeProp tree:
                 Burst(Hit(1.1f), Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
-                Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id) * tree.GrowthScale), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
+                Burst(To3(subject.Pos, 3.6f * TreePlanting.BaseScale(subject.Id) * tree.GrowthScale), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
             case ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Mine:
                 Burst(Hit(.5f), Mat(RockColor(subject.Kind)), 6, 2.4f, .5f, 9, .07f);
@@ -1085,7 +1085,7 @@ public partial class WorldView : Node3D {
     private const float TreeLiesSeconds = .1f, TreeFadeSeconds = .5f;
     /// <summary>How small a rock or deposit has grown as it is mined down to its last piece, and the seconds it then takes to crumble away.</summary>
     private const float MinedSize = .55f, CrumbleSeconds = .2f;
-    /// <summary>How tall a tree stands (<see cref="WorldModels.TreeTall"/>) before it tears at length as it goes over rather than cracks.</summary>
+    /// <summary>How tall a tree stands (<see cref="TreePlanting.Tallness"/>) before it tears at length as it goes over rather than cracks.</summary>
     private const float TearsFrom = .7f;
     /// <summary>How much lower and slower a tree's sounds play the taller it stands.</summary>
     private static float TreePitch(float tall) => 1.1f - .2f * tall;
@@ -1147,7 +1147,7 @@ public partial class WorldView : Node3D {
             // so such a thing is settled once and then left alone: only what is in sight is drawn every frame.
             bool live = everything || World.Sees(t.Pos);
             // What a thing drawn as last seen can show: what a memory keeps of it (World.LookAround) that its kind draws, and night in a cabin's windows.
-            var look = (t.Pos, t.Remaining, t.Kind == ThingKind.Tree ? t.TreeStage : t.Kind is ThingKind.Mine or ThingKind.WolfCorpse || t.IsDug ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
+            var look = (t.Pos, t.Remaining, t.Kind is ThingKind.Tree or ThingKind.LeafSpot ? t.TreeStage : t.Kind is ThingKind.Mine or ThingKind.WolfCorpse || t.IsDug ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
             if (!live && prop.Seen && prop.Look == look) continue;
             Show(prop, true);
             if (prop.Look.Pos != t.Pos) prop.Root.Position = To3(t.Pos);
@@ -1250,7 +1250,7 @@ public partial class WorldView : Node3D {
                 } else if (tree.Lying >= 0) tree.Lying += dt;
                 // The last blow's shake carries on as it goes over.
                 prop.Shake = Math.Max(0, prop.Shake - dt * ShakeFades);
-                tree.Sway.Transform = fall.Turn * new Transform3D(TreeShake(prop.Shake).Scaled(Vector3.One * WorldModels.TreeScale(tree.Id) * tree.GrowthScale), Vector3.Zero);
+                tree.Sway.Transform = fall.Turn * new Transform3D(TreeShake(prop.Shake).Scaled(Vector3.One * TreePlanting.BaseScale(tree.Id) * tree.GrowthScale), Vector3.Zero);
                 SetFade(tree.SwayParts, Math.Clamp((tree.Lying - TreeLiesSeconds) / TreeFadeSeconds, 0, 1));
                 return tree.Lying < TreeLiesSeconds + TreeFadeSeconds;
             case DugProp dug:
@@ -1298,7 +1298,7 @@ public partial class WorldView : Node3D {
                 bool grew = tree.Stage != t.TreeStage;
                 if (grew) WorldModels.ShowTreeStage(tree, t.TreeStage);
                 if (first || shaking || grew)
-                    tree.Sway.Basis = TreeShake(prop.Shake).Scaled(Vector3.One * WorldModels.TreeScale(tree.Id) * tree.GrowthScale);
+                    tree.Sway.Basis = TreeShake(prop.Shake).Scaled(Vector3.One * TreePlanting.BaseScale(tree.Id) * tree.GrowthScale);
                 break;
             case DugProp dug:
                 float worked = Clocked(dug.Worked, t.Progress, live, dt);
@@ -1339,9 +1339,15 @@ public partial class WorldView : Node3D {
                 rock.Body.Position = new Vector3(wobble * .03f, 0, 0);
                 break;
             case Prop when t.IsLoose || t.Kind is ThingKind.LeafSpot:
-                if (still) break;
+                if (still && prop.Look.Progress == t.TreeStage) break;
                 prop.Body.Visible = t.Remaining > 0;
-                prop.Body.Scale = Vector3.One * (MinedSize + (1 - MinedSize) * Math.Clamp(WorldModels.Fullness(t), 0, 1));
+                float fullness = MinedSize + (1 - MinedSize) * Math.Clamp(WorldModels.Fullness(t), 0, 1);
+                float width = fullness;
+                if (t.Kind == ThingKind.LeafSpot) {
+                    width *= TreePlanting.GrowthScale(t.TreeStage);
+                    prop.Hits[0] = WorldModels.LeafSpotHit(t.TreeStage);
+                }
+                prop.Body.Scale = new Vector3(width, fullness, width);
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
                 break;
             case CarcassProp carcass:
