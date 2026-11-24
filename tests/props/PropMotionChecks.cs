@@ -13,15 +13,15 @@ public static class PropMotionChecks {
     private const float Frame = 1 / 60f;
 
     public static void Run() {
-        CheckAFelledTreeTurnsAboutItsFootAndComesToRestOnItsWood();
-        CheckATallerTreeFallsLongerAndLandsFaster();
-        CheckATreeFallsTheSameAtAnyFrameRate();
-        CheckADugOutStumpOrBushIsThrownUnderGravityAndStaysOutOfTheGround();
-        CheckAChipArcsUnderGravityAndSkidsToAStop();
-        CheckASlammedDoorSpeedsUpIntoItsFrame();
-        CheckACartSetsOffAndStopsWithoutAJump();
-        CheckTheWindowsClockMovesEveryFrameBetweenUpdates();
-        CheckAFireThatGoesOutFadesOverHalfASecond();
+        Test(CheckAFelledTreeTurnsAboutItsFootAndComesToRestOnItsWood);
+        Test(CheckATallerTreeFallsLongerAndLandsFaster);
+        Test(CheckATreeFallsTheSameAtAnyFrameRate);
+        Test(CheckADugOutStumpOrBushIsThrownUnderGravityAndStaysOutOfTheGround);
+        Test(CheckAChipArcsUnderGravityAndSkidsToAStop);
+        Test(CheckASlammedDoorSpeedsUpIntoItsFrame);
+        Test(CheckACartSetsOffAndStopsWithoutAJump);
+        Test(CheckTheWindowsClockMovesEveryFrameBetweenUpdates);
+        Test(CheckAFireThatGoesOutFadesOverHalfASecond);
     }
 
     /// <summary>

@@ -18,9 +18,10 @@ public sealed class JobConverter() : JsonStringEnumConverter<JobKind>(JsonNaming
 /// <param name="Title">The job's name on buttons and rows.</param>
 /// <param name="Hint">What the job does, on its button.</param>
 /// <param name="Rounds">Whether a round of it is a unit of the place's work, such as a batch, rather than a delivery.</param>
+/// <param name="Hands">Whether the job carries loads in the worker's hands, so it waits while they hold a load nothing takes.</param>
 /// <param name="Tools">The tool kinds the job itself takes; a gather job takes what its spot needs.</param>
 /// <param name="Do">Does the job for a tick at its place, which is null only for a gather job whose spot is gone; tells whether there was anything to do.</param>
-public sealed record JobDef(JobKind Job, string Title, string Hint, bool Rounds, string[] Tools, Func<World, Worker, Duty, Thing?, float, bool> Do);
+public sealed record JobDef(JobKind Job, string Title, string Hint, bool Rounds, bool Hands, string[] Tools, Func<World, Worker, Duty, Thing?, float, bool> Do);
 
 /// <summary>One entry of a worker's job list: a job at one place, or a haul group.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "Entry")]
@@ -91,20 +92,20 @@ public static class JobKinds {
 /// <summary>A worker's job list: the table of jobs, and adding, moving and grouping the entries.</summary>
 public sealed partial class World {
     private static readonly JobDef[] JobDefs = ByKind(
-        new(JobKind.Gather, "Gather", "Gathers and carries to storage.", false, [],
+        new(JobKind.Gather, "Gather", "Gathers and carries to storage.", false, true, [],
             static (world, w, d, place, dt) => (place?.Kind == ThingKind.Water ? world.waterGathering : world.gathering).Work(w, d, place, dt)),
-        new(JobKind.Haul, "Haul", "Brings ingredients and fuel and carries what is made to storage.", false, [], static (world, w, d, _, dt) => world.hauling.Haul(w, d, dt)),
-        new(JobKind.Craft, "Craft", "Works the station; it only makes progress while someone works it.", true, [],
+        new(JobKind.Haul, "Haul", "Brings ingredients and fuel and carries what is made to storage.", false, true, [], static (world, w, d, _, dt) => world.hauling.Haul(w, d, dt)),
+        new(JobKind.Craft, "Craft", "Works the station; it only makes progress while someone works it.", true, false, [],
             static (world, w, _, place, dt) => (place!.Kind == ThingKind.Packer ? world.packCraft : world.crafting).Work(w, place, dt)),
-        new(JobKind.Bellows, "Bellows", "Keeps the fire hot. Only one worker pumps at a time.", true, [], static (world, w, _, place, dt) => world.Pump(w, place!, dt)),
-        new(JobKind.Pump, "Pump", "Works the handle to keep water flowing.", true, [], static (world, w, _, place, dt) => WaterPumps.Work(world, w, place!, dt)),
-        new(JobKind.Farm, "Farm", "Harvests the ripe wheat.", true, [], static (world, w, _, place, dt) => world.Reap(w, place!, dt)),
-        new(JobKind.Build, "Build", "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.", true, ["pickaxe", "hammer"], static (world, w, _, place, dt) => world.Mines.Build(w, place!, dt)),
-        new(JobKind.Mine, "Mine", "Mines ore and stone underground with a pickaxe.", true, ["pickaxe"], static (world, w, _, place, dt) => world.Mines.Mine(w, place!, dt)),
-        new(JobKind.Deliveries, "Manage deliveries", "Fetches fresh prices on request and carries deliveries to storage.", false, [], static (world, w, _, place, dt) => world.ManageDeliveries(w, place!, dt)),
-        new(JobKind.Fuel, "Tend fire", "Keeps the fire fed with wood from storage.", false, [], static (world, w, _, place, dt) => world.TendFire(w, place!, dt)),
-        new(JobKind.Stock, "Stock", "Brings tools from storage to the rack.", false, [], static (world, w, _, place, dt) => world.StockTools(w, place!, dt)),
-        new(JobKind.Tend, "Tend", "Brings what the compost takes from storage and carries fertilizer back.", false, [], static (world, w, _, place, dt) => world.TendCompost(w, place!, dt))
+        new(JobKind.Bellows, "Bellows", "Keeps the fire hot. Only one worker pumps at a time.", true, false, [], static (world, w, _, place, dt) => world.Pump(w, place!, dt)),
+        new(JobKind.Pump, "Pump", "Works the handle to keep water flowing.", true, false, [], static (world, w, _, place, dt) => WaterPumps.Work(world, w, place!, dt)),
+        new(JobKind.Farm, "Farm", "Harvests the ripe wheat.", true, false, [], static (world, w, _, place, dt) => world.Reap(w, place!, dt)),
+        new(JobKind.Build, "Build", "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.", true, false, ["pickaxe", "hammer"], static (world, w, _, place, dt) => world.Mines.Build(w, place!, dt)),
+        new(JobKind.Mine, "Mine", "Mines ore and stone underground with a pickaxe.", true, true, ["pickaxe"], static (world, w, _, place, dt) => world.Mines.Mine(w, place!, dt)),
+        new(JobKind.Deliveries, "Manage deliveries", "Fetches fresh prices on request and carries deliveries to storage.", false, true, [], static (world, w, _, place, dt) => world.ManageDeliveries(w, place!, dt)),
+        new(JobKind.Fuel, "Tend fire", "Keeps the fire fed with wood from storage.", false, true, [], static (world, w, _, place, dt) => world.TendFire(w, place!, dt)),
+        new(JobKind.Stock, "Stock", "Brings tools from storage to the rack.", false, true, [], static (world, w, _, place, dt) => world.StockTools(w, place!, dt)),
+        new(JobKind.Tend, "Tend", "Brings what the compost takes from storage and carries fertilizer back.", false, true, [], static (world, w, _, place, dt) => world.TendCompost(w, place!, dt))
     );
 
     /// <summary>A job's row in the table.</summary>

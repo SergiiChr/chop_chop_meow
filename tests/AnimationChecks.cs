@@ -12,27 +12,27 @@ public static class AnimationChecks {
 
     public static void Run(GameData gameData) {
         data = gameData;
-        CheckActionsLoopAndWrapByTheirDuration();
-        CheckActorsTurnToFaceTheirMovement();
-        CheckPlayerHeadTurnsBeforeTheBody();
-        CheckPlayerTurnsHalfwayRoundOneWay();
-        CheckPlayerLeansIntoATurn();
-        CheckPlayerActionFollowsToolAndTarget();
-        CheckWorkerHoldingALoadCarriesIt();
-        CheckStationWorkFollowsWorkStateNotItsWording();
-        CheckStrikingWorkerProtestsUntilWalking();
-        CheckGatheringWorkerSwingsTheToolOfItsTarget();
-        CheckEveryActionMovesThroughDistinctPoses();
-        CheckCraftingSquatsOnlyWhileStandingStill();
-        CheckChangingActionBlendsBetweenPoses();
-        CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning();
-        CheckEveryMomentOfAStrideHasAPose();
-        CheckDiggingKeepsBothFeetWhereTheyStand();
-        CheckAHandReachesItsPointWithTheElbowTheWayAsked();
-        CheckABlowLandsItsToolOnItsMarkSmoothlyWithinReach();
-        CheckAHandReachesItsPointOnTheSlimBuild();
+        Test(CheckActionsLoopAndWrapByTheirDuration);
+        Test(CheckActorsTurnToFaceTheirMovement);
+        Test(CheckPlayerHeadTurnsBeforeTheBody);
+        Test(CheckPlayerTurnsHalfwayRoundOneWay);
+        Test(CheckPlayerLeansIntoATurn);
+        Test(CheckPlayerActionFollowsToolAndTarget);
+        Test(CheckWorkerHoldingALoadCarriesIt);
+        Test(CheckStationWorkFollowsWorkStateNotItsWording);
+        Test(CheckStrikingWorkerProtestsUntilWalking);
+        Test(CheckGatheringWorkerSwingsTheToolOfItsTarget);
+        Test(CheckEveryActionMovesThroughDistinctPoses);
+        Test(CheckCraftingSquatsOnlyWhileStandingStill);
+        Test(CheckChangingActionBlendsBetweenPoses);
+        Test(CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning);
+        Test(CheckEveryMomentOfAStrideHasAPose);
+        Test(CheckDiggingKeepsBothFeetWhereTheyStand);
+        Test(CheckAHandReachesItsPointWithTheElbowTheWayAsked);
+        Test(CheckABlowLandsItsToolOnItsMarkSmoothlyWithinReach);
+        Test(CheckAHandReachesItsPointOnTheSlimBuild);
         BarrelAnimationChecks.Run();
-        CheckPosingAllocatesNothing();
+        Test(CheckPosingAllocatesNothing);
     }
 
     /// <summary>Every worker and player in the world is posed every frame, so working out a pose makes no garbage.</summary>
