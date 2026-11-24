@@ -156,7 +156,7 @@ UI and input:
 | `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
 | `src/stations/display/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
 | `src/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
-| `src/CraftPanel.cs` | The crafting menu |
+| `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
 | `src/PageText.cs` | How panels word durations and costs |
@@ -200,7 +200,7 @@ UI and input:
 | `src/menus/ControlsList.cs` | Key caps and actions on the shared Controls screen |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
 | `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things and using Space, and `ClickMode`, what the next click does |
-| `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
+| `src/ui/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
 
@@ -965,7 +965,8 @@ The panel keeps the list's place while the page draws again, so a click on a rec
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 
-`RecipeMap` covers the screen while the game goes on under it; it is drawn afresh on each `RecipeMap.Open`.
+The recipe map badge on the bottom bar opens `RecipeMap` over the screen.
+It is drawn afresh on each `RecipeMap.Open` while the game goes on under it.
 `PlayerControl.Update` moves nobody while it shows, and a `MapNode` turns to made before as soon as `World.Had` knows its item.
 `RecipeMap.Place` puts an item on a grid of steps across and lines down: what is made out of it goes one step on, the first on the same line and the rest on lines below, and `MapTree` draws the lines between them.
 A `MapNode` draws a filled slot for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.

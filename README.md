@@ -193,7 +193,6 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
 | Shift-click / Ctrl-click an item slot | Move the stack clicked / all of that item to the other storage open; this applies across inventory and station panels. Ctrl from the backpack, and Store all, leave stacks bound to the hotbar |
 | RMB or double LMB on a hotbar slot | Use its item |
-| Layer button below the status bar | Switch between the surface and underground |
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
 
 Mines face their cliff and open their panel as soon as you place them.
@@ -237,7 +236,7 @@ With a side panel open they keep to the space left of it.
 
 ### Bottom bar and hotbar
 
-The bottom bar holds round badges for building, the backpack, crafting and the crew, each with its key, next to the hotbar.
+The bottom bar holds round badges for building, the backpack, crafting, the recipe map and the crew next to the hotbar.
 
 Put a held stack or a plan from the building plans on a hotbar slot to assign it.
 A stack put on a slot binds that exact backpack stack to it, which then has the selected hotbar slot's rim in the backpack.
@@ -537,7 +536,7 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 
 ### Recipe map
 
-The map button in the crafting menu's header opens the recipe map over the whole screen.
+The recipe map icon next to Crafting on the bottom bar opens the map over the whole screen.
 Esc or its close button closes it.
 The game goes on under it, with your character standing where they were, and an item first made meanwhile turns to made before.
 

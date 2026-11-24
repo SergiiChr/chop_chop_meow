@@ -22,23 +22,26 @@ public partial class Hotbar : PanelContainer {
         AnchorLeft = .5f; AnchorRight = .5f; AnchorTop = 1; AnchorBottom = 1; OffsetTop = -14; OffsetBottom = -14; GrowHorizontal = GrowDirection.Both; GrowVertical = GrowDirection.Begin;
         AddThemeStyleboxOverride("panel", Style.Plate);
         var slots = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; slots.AddThemeConstantOverride("separation", 10); AddChild(slots);
-        slots.AddChild(MenuIcon("build", "Build", () => panel.Open(Page.Build), "B", Style.Brick)); slots.AddChild(MenuIcon("bag", "Backpack", () => panel.Open(Page.Backpack), "Tab", Style.Sage));
-        slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open(Page.Craft), "C", new Color("b08a45"))); slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open(Page.Crew), "H", new Color("5f8aa6")));
+        slots.AddChild(MenuIcon("build", "Build", () => panel.Open(Page.Build), Style.Brick, "B"));
+        slots.AddChild(MenuIcon("bag", "Backpack", () => panel.Open(Page.Backpack), Style.Sage, "Tab"));
+        slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open(Page.Craft), new Color("b08a45"), "C"));
+        slots.AddChild(MenuIcon("map", "Recipe map", () => panel.Map.Open(), new Color("7d6488")));
+        slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open(Page.Crew), new Color("5f8aa6"), "H"));
         var divider = new ColorRect { Color = new Color(Style.Beige, .6f), CustomMinimumSize = new Vector2(3, 46), SizeFlagsVertical = SizeFlags.ShrinkCenter }; slots.AddChild(divider);
         for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
     }
 
-    /// <summary>A round enamel badge with a line icon, and a pill naming the key that opens the same page.</summary>
-    private Button MenuIcon(string glyph, string tooltip, Action action, string key, Color color) {
+    /// <summary>A round enamel badge with a line icon and a key cap when it has a shortcut.</summary>
+    private Button MenuIcon(string glyph, string tooltip, Action action, Color color, string? key = null) {
         var button = kit.Button("", action);
-        button.Name = glyph; button.TooltipText = $"{tooltip} · {key}";
+        button.Name = glyph; button.TooltipText = key == null ? tooltip : $"{tooltip} · {key}";
         button.Icon = GD.Load<Texture2D>($"res://assets/ui/line_{glyph}.svg");
         button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center; button.VerticalIconAlignment = VerticalAlignment.Center;
         button.CustomMinimumSize = new Vector2(56, 56); button.AddThemeConstantOverride("icon_max_width", 28);
         button.AddThemeColorOverride("icon_normal_color", Style.Rim); button.AddThemeColorOverride("icon_hover_color", Style.Rim); button.AddThemeColorOverride("icon_pressed_color", Style.Rim);
         button.SizeFlagsVertical = SizeFlags.ShrinkCenter;
         var look = Style.Round(color, 28); Style.Skin(button, look.Item1, look.Item2);
-        button.AddChild(Style.Corner(Style.Pill(key, Style.KeyPill, Style.Line, 10), 1, 1, 8));
+        if (key != null) button.AddChild(Style.Corner(Style.Pill(key, Style.KeyPill, Style.Line, 10), 1, 1, 8));
         return button;
     }
 

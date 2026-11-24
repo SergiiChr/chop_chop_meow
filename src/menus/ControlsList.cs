@@ -4,7 +4,7 @@ namespace ChopChopMeow;
 
 /// <summary>Key caps and actions shown on the Controls screen.</summary>
 public partial class ControlsList : PanelContainer {
-    private static readonly (string? Key, string Action)[] Bindings = {
+    private static readonly (string Key, string Action)[] Bindings = {
         ("WASD", "Move."),
         ("Shift", "Sprint."),
         ("RMB", "Hold to collect resources or pick up items. Click open ground or a hotbar slot to use an item."),
@@ -16,8 +16,7 @@ public partial class ControlsList : PanelContainer {
         ("Shift-click", "Move the entire stack or queue 5 crafting batches."),
         ("Ctrl-click", "Move all items of this type or queue 10 crafting batches."),
         ("F5 · F9", "Quick save and load."),
-        ("Esc", "Cancel, close a panel, or pause."),
-        (null, "Switch layers with the Layer button below the status bar. Click an underground pipe to see its water and pressure.")
+        ("Esc", "Cancel, close a panel, or pause.")
     };
 
     public ControlsList() {
@@ -39,7 +38,7 @@ public partial class ControlsList : PanelContainer {
             rows.AddChild(row);
 
             var lead = new HBoxContainer { CustomMinimumSize = new Vector2(104, 28) };
-            Control cap = key != null ? Style.Pill(key, Style.KeyPill, Style.Line, 13) : Style.Glyph("line_layers", 24, Style.Ink);
+            var cap = Style.Pill(key, Style.KeyPill, Style.Line, 13);
             cap.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
             lead.AddChild(cap);
             row.AddChild(lead);
