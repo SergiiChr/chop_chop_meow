@@ -2501,6 +2501,15 @@ public sealed partial class World {
         static void RebuildThing(Thing? thing) { if (thing != null) foreach (var box in Boxes(thing)) box?.RebuildStacks(); }
     }
 
+    /// <summary>Whether the saved accounts or inventories show that coins have reached this settlement.</summary>
+    private static bool HasCoinHistory(SaveState save) =>
+        save.DayRevenue > 0 || save.Profits.Exists(static day => day > 0)
+        || save.Absent.Values.Any(static player => player.Backpack[Inventory.Coins] > 0)
+        || save.Crates.Values.Any(static crate => crate[Inventory.Coins] > 0)
+        || save.Workers.Any(static worker => worker.Bag[Inventory.Coins] > 0)
+        || save.Things.Any(static thing => thing.Inventory[Inventory.Coins] > 0
+            || thing.Wages?[Inventory.Coins] > 0 || thing.Output?[Inventory.Coins] > 0);
+
     /// <summary>
     /// Takes over a save written by this version of the game.
     /// One from any other version is refused rather than converted, and one that is incomplete, names unknown items or recipes or holds values out of range is refused rather than repaired.
@@ -2519,6 +2528,7 @@ public sealed partial class World {
         if (loaded.Wolves.Any(w => w == null || !WolfCounter.ValidSavedPath(w) || !WolfHunt.ValidSavedReaction(w)))
             throw new InvalidOperationException("This save holds an invalid wolf movement.");
         if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
+        if (!loaded.Obtained.Contains(Inventory.Coins) && HasCoinHistory(loaded)) loaded.Obtained.Add(Inventory.Coins);
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;
