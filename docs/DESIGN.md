@@ -353,6 +353,9 @@ When the field order matches, the host and guest step through the fields once to
 The welcome is a guest's first update, with the fog uncovered so far.
 
 - Updates go unreliably on their own channel, so a lost one never delays the next.
+  Other players and wolves glide between updates. On a bite's landing the host uses the target's latest movement report.
+  Observers align the landing wolf and its target to the same update. The target keeps their own movement input.
+  A reliable sound message carries the first-hit effect even when the update showing the wince is lost.
 - The whole world after a long stall, or a change too large for one packet, goes reliably on a third channel, so messages and actions never wait behind it.
 - Guests merge entries into their copy in place, so panels and the view keep their objects, and touch only entries that differ from what they show. A change to numbers alone is set directly (`WorldUpdates.SetNumbers`); anything else reads the entry whole.
 - The server writes every entry for each update and compares the bytes. With 876 things that costs 0.7 ms of its own process; marking what changed would save most of it, and one mutation missed would leave a guest's copy wrong without a sound.
@@ -717,7 +720,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   It takes a wide running arc into a second hop behind the line of the blow (`WolfCounter`). It lands on its forepaws first,
   slides its rear paws round them, and stands facing the player before it can start a bite.
   The wolf tries the other side if the first route is blocked. With no room, it uses its usual recoil and growl.
-  Fire, shelter, and bodies that enter the route can cut the move short. A torch burn still sends the wolf running off.
+  Fire, shelter, and bodies that enter the route can cut the move short. A torch burn sends the wolf running off as soon as the recoil ends.
   A struck wolf runs thereafter (`Wolf.Aggressive`) and torch waves cease to scare it.
   After a missed bite it holds for the usual recovery, then runs out and around the player (`Wolf.Circle`, `WolfHunt.CircleOnMiss`).
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
@@ -760,11 +763,16 @@ Building keeps `Construction.DoorRoom` clear round every cabin's door spot, and 
   Each captured arm opens out at the elbow as the wolf takes its weight. With both arms held, the chest comes up.
 - `Leaving` puts the player on the doorstep and takes `Doorways.LeaveSeconds`.
   Anyone knocking on that door goes `Aside` to `Doorways.AsideSpot`, a step along `Doorways.AsideWay`, and steps in once the leaver is through the doorway, in the order they came, while the leaver keeps `Doorways.MakeWay` to the other side; a player just standing at the door stays put, and the leaver ends `Doorways.ClearOf` beside them.
-  The view walks them in from there up the side of the step (`DoorwayPath.Inward`), the two turning chest to chest with their arms hanging as they pass (`DoorwayView.SqueezePast`), the one going in with the right palm on the door frame (`ArmReach.Reaching`), the hand starting up while they wait aside and the elbow kept below it.
+  The simulation moves them in along the side of the step (`DoorwayPath.Inward`).
+  The view draws the two turning chest to chest as they pass (`DoorwayView.SqueezePast`).
+  The one going in starts raising their right hand while they wait aside and keeps their elbow below the palm on the
+  door frame (`ArmReach.Reaching`).
 - A follower waits aside, out of the way, while the one ahead is tugged back out (`DoorwayPath.Follow`).
 
-The host sends the origin and current position of the doorway step as scalar coordinates. The view walks the player through
-the doorway over the stage (`DoorwayView.AtDoor`), hurrying from the second tread, and takes a tugged one back out facing the door, bent over and stepping back with each tug (`ActorAction.Tugged`), while the wolf holds the back of their hips in its jaws, lifting or lowering its neck to their waist as drawn, braced wide on its forelegs, and throws its weight back (`WolfModel.Tug`).
+The simulation moves the player through each doorway stage (`DoorwayPath.At`), hurrying from the second tread.
+The host sends the path's starting point and the current body position, and `DoorwayView.AtDoor` draws that position.
+A tugged player faces the door, bends over and steps back with each tug (`ActorAction.Tugged`).
+The wolf braces its forelegs and throws its weight back with its jaws on the player's waist (`WolfModel.Tug`).
 On the two treads of the step and the floor (`StairSteps.StepEdges`) the body heads for the tread of the boot that bears its weight, rising onto the other boot's tread as one lifts off behind, and lowering ahead of a boot about to step down (`StairSteps.OnSteps`).
 It gets there over several frames, carried from frame to frame in `ActorState.Lift`, never higher than a boot on the ground reaches down to its tread toe first, never lower than a leg bearing the weight alone bends, and never dropping faster than falling.
 A knee bends to put a boot on a higher tread, so no boot sinks into the step; a boot a tug drags off a tread's edge hangs over the lower one while the body falls onto it.

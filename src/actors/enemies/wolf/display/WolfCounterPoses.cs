@@ -13,7 +13,8 @@ internal static class WolfCounterPoses {
             WolfCounterStage.Wince => new WolfPose(Lift: -.13f * down, Roll: side * 14 * down, Pitch: 7 * down,
                 Flex: 11 * down, Neck: 20 * down, Head: -23 * down, HeadTurn: -side * 32 * down, Ears: 42 * down,
                 Jaw: 18 * (1 - .7f * down), Snarl: down, Tail: -65 - 20 * down, Wag: -side * 22 * down),
-            WolfCounterStage.SideHop => new WolfPose(Lift: Mathf.Lerp(-.09f, -.02f, down), Roll: side * (12 * air - 9 * down),
+            WolfCounterStage.SideHop => new WolfPose(Lift: Mathf.Lerp(-.09f, -.02f, down),
+                Roll: side * (12 * air - 9 * down),
                 Pitch: 6 * down, Flex: 12 * air, Neck: 20, Head: -16, Ears: 25, Jaw: 10, Snarl: .75f,
                 Tail: -45 - 18 * down, Wag: -side * (20 + 25 * air)),
             WolfCounterStage.Slide => new WolfPose(Lift: -.08f - .065f * air, Roll: -side * (13 - 8 * down),
@@ -27,8 +28,9 @@ internal static class WolfCounterPoses {
                 Ears: 19 * (1 - down), Jaw: 12 + 9 * down, Snarl: 1, Tail: -30 - 40 * down, Wag: -side * 32 * air)
         };
         if (stage is WolfCounterStage.SideHop or WolfCounterStage.Slide) {
-            float look = Mathf.RadToDeg(Mathf.AngleDifference(model.Yaw, ActorAnimation.Yaw(player - wolf.Pos, model.Yaw)));
-            body = body with { NeckTurn = .50f * Math.Clamp(look, -78, 78), HeadTurn = .32f * Math.Clamp(look, -78, 78) };
+            float facing = ActorAnimation.Yaw(player - wolf.Pos, model.Yaw);
+            float look = Math.Clamp(Mathf.RadToDeg(Mathf.AngleDifference(model.Yaw, facing)), -78, 78);
+            body = body with { NeckTurn = .50f * look, HeadTurn = .32f * look };
         }
         var toward = Vector2.FromAngle(wolf.CounterBearing + side * WolfCounter.SideHopBearing);
         var sideways = model.Root.Basis.Inverse() * WorldView.To3(toward);

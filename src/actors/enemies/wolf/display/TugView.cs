@@ -117,7 +117,7 @@ public sealed class TugView(Func<World> world, Func<int, ActorState?> stateOf, F
         model.Glance = 0;
         model.Rear(body, WolfModel.Uncrossed(low, high), dt, arm.Y);
         grip = arm - model.Root.Basis * model.Bite;
-        model.Root.Position = model.StepFrom.Lerp(grip with { Y = 0 }, lunge);
+        model.PlaceRearGrip(model.StepFrom.Lerp(grip with { Y = 0 }, lunge));
         model.Plant();
         model.Drift = new Vector2(model.Root.Position.X, model.Root.Position.Z) - wolf.Pos;
         return true;

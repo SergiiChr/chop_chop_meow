@@ -71,7 +71,8 @@ public sealed class Swings(World world) {
 
     /// <summary>
     /// A swing lands on every wolf it touches: each takes its own roll of the damage and is knocked back.
-    /// A torch leaves alone a wolf in the air in a throat leap or feeding, and sends the ones it burns running for a moment.
+    /// A torch leaves alone a wolf in the air in a throat leap or feeding, and sends the ones it burns running for a
+    /// moment.
     /// </summary>
     private void Land(Swing swing) {
         var shape = Shape(swing.Action);
@@ -80,7 +81,8 @@ public sealed class Swings(World world) {
         // A wolf that falls leaves the list, so it is walked from its end.
         for (int i = wolves.Count - 1; i >= 0; i--) {
             var wolf = wolves[i];
-            if (torch && (wolf.Leap > 0 && WolfSnap.InAir(wolf) || wolf.Feeding) || !Touches(shape, world.Player, swing.Aim, wolf)) continue;
+            if (torch && (wolf.Leap > 0 && WolfSnap.InAir(wolf) || wolf.Feeding) || !Touches(shape, world.Player,
+                swing.Aim, wolf)) continue;
             world.Strike(wolf, swing.Damage + ((float)rolls.NextDouble() * 2 - 1) * swing.Spread, burnt: torch);
             if (torch) wolf.Flee = World.FleeSeconds;
         }

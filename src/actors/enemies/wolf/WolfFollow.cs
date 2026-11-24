@@ -58,7 +58,9 @@ public sealed class WolfFollow(World world) {
     internal void Scare(Vector2 direction) {
         if (world.PackAround >= World.PackSize) return;
         foreach (var wolf in world.S.Wolves)
-            if (!wolf.Aggressive && wolf.Follow is not (FollowStage.Bold or FollowStage.Routed) && wolf.Pos.DistanceTo(world.Player) < World.ScareRange && (wolf.Pos - world.Player).Normalized().Dot(direction) > .7f) {
+            if (!wolf.Aggressive && wolf.Follow is not (FollowStage.Bold or FollowStage.Routed)
+                && wolf.Pos.DistanceTo(world.Player) < World.ScareRange
+                && (wolf.Pos - world.Player).Normalized().Dot(direction) > .7f) {
                 // Every wave sends it back out to its circle, one already following too.
                 wolf.Follow = FollowStage.BackingOff; wolf.Watched = world.Player;
                 // The fire stops a wolf still gathering itself to snap; one already in the air lands.

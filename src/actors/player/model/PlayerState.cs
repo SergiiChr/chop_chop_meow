@@ -47,8 +47,16 @@ public sealed class PlayerState {
     public float DoorBodyX { get; set; }
     public float DoorBodyY { get; set; }
     /// <summary>Where the body began its current doorway step, and where it is along that step now.</summary>
-    [JsonIgnore] public Vector2 DoorFrom { get => new(DoorFromX, DoorFromY); set { DoorFromX = value.X; DoorFromY = value.Y; } }
-    [JsonIgnore] public Vector2 DoorBody { get => new(DoorBodyX, DoorBodyY); set { DoorBodyX = value.X; DoorBodyY = value.Y; } }
+    [JsonIgnore]
+    public Vector2 DoorFrom {
+        get => new(DoorFromX, DoorFromY);
+        set { DoorFromX = value.X; DoorFromY = value.Y; }
+    }
+    [JsonIgnore]
+    public Vector2 DoorBody {
+        get => new(DoorBodyX, DoorBodyY);
+        set { DoorBodyX = value.X; DoorBodyY = value.Y; }
+    }
     /// <summary>The player sprinted to the door, so they step in at a run and slam it.</summary>
     public bool DoorRush { get; set; }
     /// <summary>When the player came to the door, numbered by <see cref="SaveState.DoorArrivals"/>, which sets who of those tugged back out goes in first.</summary>

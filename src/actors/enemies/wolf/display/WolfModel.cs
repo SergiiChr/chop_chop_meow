@@ -4,7 +4,10 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What a wolf model shows; a change blends from the pose it had into the new one.</summary>
-public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Rear, Door, Brace, Snap, Threaten, CounterAir, CounterSlide, CounterPivot }
+public enum WolfMotion {
+    Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Rear, Door, Brace, Snap, Threaten,
+    CounterAir, CounterSlide, CounterPivot
+}
 
 /// <summary>
 /// A leg's joint angles in degrees, each swinging the segment below forward from its parent's line; Splay swings the whole leg out from the body.
@@ -75,7 +78,7 @@ public sealed class WolfModel {
     public float Recover, LandedFor;
     public WolfCounterStage CounterStage;
     public float CounterProgress;
-    public bool CounterHitPending;
+    public float CounterHitIn;
     /// <summary>A leap's bearing from the player to the wolf.</summary>
     public Vector2 Toward;
     /// <summary>Where the wolf was drawn as its latest move began, to ease from: lunging in to take hold, stepping round to pin, or onto a feeding spot.</summary>
@@ -363,7 +366,9 @@ public sealed class WolfModel {
         return Planted(body, 1.35f, 0, frontAhead: .1f, hindSpread: 1.15f);
     }
 
-    /// <summary>A wolf facing the player after the first hit, with its chest up, forepaws braced and teeth bared.</summary>
+    /// <summary>
+    /// A wolf facing the player after the first hit, with its chest up, forepaws braced and teeth bared.
+    /// </summary>
     public void Threaten(float time, float dt) => Show(WolfMotion.Threaten, Threatening(time), dt);
 
     private static WolfPose Threatening(float time) {
@@ -388,7 +393,8 @@ public sealed class WolfModel {
         float rest = Mathf.SmoothStep(.2f, 1, settle);
         float Through(float wary, float gathered, float struck) => Mathf.Lerp(Mathf.Lerp(wary, gathered, g), struck, d);
         var body = new WolfPose(Lift: Through(-.04f, -.19f, -.05f) + hop - .12f * load,
-            Surge: Through(0, -.14f, surge) * (1 - .7f * rest), Pitch: Through(2, -5, 3) + 10 * load, Flex: Through(0, 14, -10),
+            Surge: Through(0, -.14f, surge) * (1 - .7f * rest), Pitch: Through(2, -5, 3) + 10 * load, Flex: Through(0,
+                14, -10),
             Neck: Through(28, 24, 14) + 13 * load, Head: Through(-24, -18, -12),
             Jaw: Through(8, 16, 35 - 31 * shut), Ears: Through(-10, 34, 22), Snarl: 1 - .5f * rest,
             Tail: Through(-74, -78, -40) - 20 * rest, Curl: -4);
@@ -397,7 +403,8 @@ public sealed class WolfModel {
             bool hind = leg >= 2;
             var at = new Vector3(WolfShape.Pivot(leg).X * Through(1.15f, 1.3f, 1),
                 WolfShape.Sole + hop + (hind ? .035f : .09f) * air, Home(leg) + (hind ? -.09f : surge) * d);
-            body = body.WithLeg(leg, Reach(halves, leg, at, hind ? 2 - 20 * air : 10 - 40 * air, hind ? -24 * air : -20 * air));
+            body = body.WithLeg(leg, Reach(halves, leg, at, hind ? 2 - 20 * air : 10 - 40 * air, hind ? -24 * air
+                : -20 * air));
         }
         return body;
     }
@@ -431,13 +438,16 @@ public sealed class WolfModel {
     }
 
     /// <summary>A throat leap reaches up with its forepaws and closes its jaws at the end of its flight.</summary>
-    public void Leap(float progress, float dt, float? jawsUp = null) => Show(WolfMotion.Leap, Leaping(progress, jawsUp), dt);
+    public void Leap(float progress, float dt, float? jawsUp = null) => Show(WolfMotion.Leap, Leaping(progress,
+        jawsUp), dt);
 
     private static WolfPose Leaping(float t, float? jawsUp) {
         // It rises out of its crouch onto straightening hind legs as it pushes off, faster as it goes, and leaves the ground at full stretch.
         float drive = Math.Min(1, t / PushShare), push = Mathf.SmoothStep(0, 1, drive), air = Mathf.SmoothStep(PushShare, 1, t), reach = Mathf.SmoothStep(.4f, 1, t);
         var body = new WolfPose(Lift: -.06f + LeapRise * push, Pitch: -12 * push - 22 * air, Flex: Mathf.Lerp(8, -12, air),
-            Neck: Mathf.Lerp(10, 16, air), Head: Mathf.Lerp(-8, 8, reach), Jaw: 8 + 26 * reach * (1 - Mathf.SmoothStep(.82f, 1, t)), Ears: Mathf.Lerp(0, 22, air), Snarl: 1, Tail: Mathf.Lerp(-50, -10, air), Curl: -8);
+            Neck: Mathf.Lerp(10, 16, air), Head: Mathf.Lerp(-8, 8, reach), Jaw: 8 + 26 * reach * (1 -
+                Mathf.SmoothStep(.82f, 1, t)), Ears: Mathf.Lerp(0, 22, air), Snarl: 1, Tail: Mathf.Lerp(-50, -10, air),
+                Curl: -8);
         if (jawsUp is float high) body = body with { Pitch = Mathf.Lerp(body.Pitch, RearedTo(body, high, MostNoseDown).Pitch, reach) };
         var halves = new Halves(body);
         for (int leg = 0; leg < 4; leg++) {
@@ -602,6 +612,23 @@ public sealed class WolfModel {
             body = body.WithLeg(leg, hind ? ReachTo(halves, leg, at, -8, 0) : Reach(halves, leg, at, 55, 30));
         }
         Show(WolfMotion.Rear, body, dt, jawsUp: jawsUp);
+    }
+
+    /// <summary>Moves the jaws onto the arm while keeping the blended forepaw contacts in place.</summary>
+    internal void PlaceRearGrip(Vector3 position) {
+        var shift = Root.Basis.Inverse() * (Root.Position - position) * Mathf.SmoothStep(0, 1, blend);
+        Root.Position = position;
+        if (shift.LengthSquared() < Hair * Hair) return;
+        var halves = new Halves(shown);
+        var chest = halves.Of(0);
+        for (int leg = 0; leg < 2; leg++) {
+            var paw = shown.Leg(leg);
+            var at = PawFrame(chest.At, paw, leg).Origin + shift;
+            var (lower, slant) = Slant(chest, paw);
+            var solved = ReachTo(halves, leg, at, lower, slant);
+            shown = shown.WithLeg(leg, solved);
+            if (Root.Visible) ApplyLeg(leg, solved);
+        }
     }
 
     /// <summary>
@@ -850,7 +877,9 @@ public sealed class WolfModel {
     /// <summary>How high off the ground, in metres, a paw starts to count as held up rather than stepping, and counts as held up.</summary>
     private const float HeldFrom = .12f, HeldBy = .3f;
 
-    /// <summary>Holds the same footholds when steps tip the rear up or down and the jaws have to come back to the arm.</summary>
+    /// <summary>
+    /// Holds the same footholds when steps tip the rear up or down and the jaws have to come back to the arm.
+    /// </summary>
     private static WolfPose RearToGrip(WolfPose pose, float height) {
         var reared = RearedTo(pose, height, ShallowestRear);
         reared = reared with { Lift = reared.Lift + height - BiteOf(reared).Y };

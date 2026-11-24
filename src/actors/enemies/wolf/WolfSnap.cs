@@ -89,6 +89,7 @@ public sealed class WolfSnap(World world) {
 
     private void Land(Wolf wolf, bool throat) {
         wolf.Attack = Rest;
+        world.PlaceBiteTarget?.Invoke(world.S.Actor);
         var mark = BitePosition();
         var jaws = wolf.Pos + Vector2.FromAngle(wolf.Heading) * (throat ? ThroatJawsAhead : JawsAhead);
         var steps = DoorwayPath.UsesBody(world.S.Actor.Door) ? world.Find(world.S.Actor.DoorCabin) : null;

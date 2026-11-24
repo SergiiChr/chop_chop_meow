@@ -92,7 +92,8 @@ public sealed partial class DoorwayReview : Node {
             },
             // The same with the host hurt enough to go down once all three have bitten: the wolf that tugged pins them and the others feed.
             "takedown" => new (float, Action)[] {
-                (0, () => { World.S.Health = 80; GuestAway(); }), (0, ThreeWolves), (.49f, () => World.Doorways.Enter(Cabin, false)),
+                (0, () => { World.S.Health = 80; GuestAway(); }), (0, ThreeWolves), (.49f, () =>
+                    World.Doorways.Enter(Cabin, false)),
             },
             // A badly hurt host is tugged out of the doorway and pinned.
             _ => new (float, Action)[] {

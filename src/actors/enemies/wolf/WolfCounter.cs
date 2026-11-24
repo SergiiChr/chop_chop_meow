@@ -115,7 +115,8 @@ public sealed class WolfCounter(World world) {
         wolf.CounterMarkX is >= 0 and < Terrain.Size && wolf.CounterMarkY is >= 0 and < Terrain.Size &&
         wolf.CounterRadius is > 0 and <= 3 && wolf.CounterBearing is >= -MathF.PI and <= MathF.PI);
 
-    public static (WolfCounterStage Stage, float Progress) Pose(Wolf wolf) => Active(wolf) ? Phase(wolf.CounterTime) : default;
+    public static (WolfCounterStage Stage, float Progress) Pose(Wolf wolf) =>
+        Active(wolf) ? Phase(wolf.CounterTime) : default;
 
     private static (WolfCounterStage Stage, float Progress) Phase(float time) =>
         time < HopAt ? (WolfCounterStage.Wince, time / HopAt) :
@@ -167,7 +168,8 @@ public sealed class WolfCounter(World world) {
                 break;
             default:
                 // The forepaw midpoint stays fixed while the body swings around it.
-                heading = stage == WolfCounterStage.Face ? TurnHeading : Mathf.LerpAngle(LandHeading, TurnHeading, u * (2 - u));
+                heading = stage == WolfCounterStage.Face ? TurnHeading
+                    : Mathf.LerpAngle(LandHeading, TurnHeading, u * (2 - u));
                 at = Forepaws - Vector2.FromAngle(heading) * ForepawReach;
                 break;
         }

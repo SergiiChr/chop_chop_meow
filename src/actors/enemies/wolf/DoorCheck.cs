@@ -130,7 +130,8 @@ public sealed class DoorCheck(World world) {
         var door = Doorways.DoorPoint(cabin);
         // Until its snout is in the door, a wolf turns to a player out in the open within its sight.
         if (wolf.DoorCheck <= DoorCheckStage.Scratching && world.WolfPatrols.Smell(wolf, world.Data.WolfSightRange)) return;
-        float before = wolf.DoorCheckTime, step = dt * (wolf.Aggressive ? world.WolfHunt.RunSpeed : world.Data.WolfTrot);
+        float before = wolf.DoorCheckTime, step = dt * (wolf.Aggressive ? world.WolfHunt.RunSpeed
+            : world.Data.WolfTrot);
         switch (wolf.DoorCheck) {
             case DoorCheckStage.Coming:
                 var lead = Lead(cabin.Id, door);

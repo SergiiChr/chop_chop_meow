@@ -29,7 +29,8 @@ public sealed class WolfBodies(World world) {
 
     /// <summary>How high off the ground the top of a wolf's body is: it rises through the first part of a leap for the throat, and stands taller reared up.</summary>
     public static float Top(Wolf wolf) {
-        if (wolf.Leap <= 0 || !WolfSnap.InAir(wolf)) return wolf.Side != 0 ? RearedTop : StandingTop + WolfCounter.Height(wolf);
+        if (wolf.Leap <= 0 || !WolfSnap.InAir(wolf))
+            return wolf.Side != 0 ? RearedTop : StandingTop + WolfCounter.Height(wolf);
         float flown = World.LeapSeconds - wolf.Leap;
         return StandingTop + LeapRise * Mathf.SmoothStep(.05f, .875f, flown / World.LeapSeconds) +
             Movement.Rise(flown, World.LeapSeconds);
@@ -73,10 +74,14 @@ public sealed class WolfBodies(World world) {
     /// Where the body of a wolf at a player runs: toward them for one closing in, and along its own way for one that
     /// follows them round, so two going opposite ways pass side by side.
     /// </summary>
-    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Following || wolf.Circle != 0 || Holds(wolf) ? Body(wolf) : Body(wolf, player);
+    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) =>
+        wolf.Following || wolf.Circle != 0 || Holds(wolf) ? Body(wolf) : Body(wolf, player);
 
-    /// <summary>Whether a wolf holds the player, reels from a hit or is committed to a move and cannot be pushed aside.</summary>
-    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Stagger > 0 || wolf.Threaten > 0 || WolfCounter.Active(wolf) || WolfSnap.Active(wolf) || wolf.Recover > 0;
+    /// <summary>
+    /// Whether a wolf holds the player, reels from a hit or is committed to a move and cannot be pushed aside.
+    /// </summary>
+    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Stagger > 0
+        || wolf.Threaten > 0 || WolfCounter.Active(wolf) || WolfSnap.Active(wolf) || wolf.Recover > 0;
 
     /// <summary>Whether a leap can finish without landing in another committed wolf's body.</summary>
     internal bool HasLandingRoom(Wolf wolf, Vector2 at, float heading) {
@@ -85,19 +90,22 @@ public sealed class WolfBodies(World world) {
         foreach (var other in world.S.Wolves) {
             if (other == wolf || !Holds(other)) continue;
             var there = WolfSnap.Active(other) ? other.SnapTo : other.Pos;
-            if (there.DistanceSquaredTo(at) < far * far && DistanceBetween(at, heading, there, other.Heading) < width * width)
+            if (there.DistanceSquaredTo(at) < far * far
+                && DistanceBetween(at, heading, there, other.Heading) < width * width)
                 return false;
         }
         return true;
     }
 
     /// <summary>Squared distance between a proposed wolf body and the body of a packmate.</summary>
-    internal static float DistanceBetween(Vector2 at, float heading, Wolf other) => DistanceBetween(at, heading, other.Pos, other.Heading);
+    internal static float DistanceBetween(Vector2 at, float heading, Wolf other) =>
+        DistanceBetween(at, heading, other.Pos, other.Heading);
 
     private static float DistanceBetween(Vector2 at, float heading, Vector2 there, float otherHeading) {
         var ahead = Vector2.FromAngle(heading);
         var otherAhead = Vector2.FromAngle(otherHeading);
-        var (a, b) = Closest(at - ahead * WolfTail, at + ahead * WolfNose, there - otherAhead * WolfTail, there + otherAhead * WolfNose);
+        var (a, b) = Closest(at - ahead * WolfTail, at + ahead * WolfNose,
+            there - otherAhead * WolfTail, there + otherAhead * WolfNose);
         return a.DistanceSquaredTo(b);
     }
 

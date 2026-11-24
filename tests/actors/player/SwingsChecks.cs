@@ -150,8 +150,9 @@ public static class SwingsChecks {
         SnapTick(world, .2f);
         float burnt = wolf.Pos.DistanceTo(world.Player);
         Require(wolf.Health < data.WolfHealth && wolf.Follow == FollowStage.Bold, "a torch should burn a wolf that turned on the player without scaring it");
-        SnapTick(world, 1.5f);
-        Require(wolf.Pos.DistanceTo(world.Player) > burnt + 1, $"a burnt wolf should run from the player, not stay {wolf.Pos.DistanceTo(world.Player):0.0} m off");
+        SnapTick(world, .55f);
+        Require(wolf.Pos.DistanceTo(world.Player) > burnt + .3f,
+            "a burnt wolf should run as soon as it has reeled from the burn");
         Require(world.Health == 100, "a torch that burns a wolf as it gathers itself should stop its bite");
     }
 

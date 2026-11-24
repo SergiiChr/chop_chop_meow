@@ -314,6 +314,8 @@ public sealed partial class World {
     public SaveState S { get; private set; } = new();
     public Action<string>? Notify;
     public Action<ActorAction, Vector2>? PlayerActed;
+    /// <summary>The server takes its newest movement report for the acting player as a wolf's bite lands.</summary>
+    internal Action<PlayerState>? PlaceBiteTarget;
     /// <summary>Raised once the whole state has been replaced by a new game, a load or a guest's copy of the host's world; what belonged to the old world resets itself on it.</summary>
     public Action? Replaced;
     /// <summary>A named sound effect and where it happens; the simulation only names it.</summary>
@@ -345,7 +347,8 @@ public sealed partial class World {
     public World(GameData data, bool generate = true) {
         Data = data;
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
-        WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfCounter = new WolfCounter(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
+        WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this);
+        WolfCounter = new WolfCounter(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
         Farms = new Farms(this); SteelPipes = new SteelPipes(this);
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
@@ -626,7 +629,9 @@ public sealed partial class World {
 
     internal bool CanStand(Vector2 p, Thing? except) {
         if (!Open(p)) return false;
-        foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) if (t != except && Blocks(t, p)) return false;
+        foreach (var kind in Blockers)
+            foreach (var t in S.Things.Of(kind))
+                if (t != except && Blocks(t, p)) return false;
         return true;
     }
     /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their outcrops.</summary>
@@ -1198,12 +1203,17 @@ public sealed partial class World {
     public const float StaggerSeconds = .45f;
     /// <summary>How far a blow throws a wolf back: a short hop, which the view plays as the wolf jumping clear.</summary>
     public const float KnockBackDistance = .5f;
-    /// <summary>Applies a blow, interrupts the wolf's attack and starts its reaction, or drops it if the blow kills it.</summary>
+    /// <summary>
+    /// Applies a blow, interrupts the wolf's attack and starts its reaction, or drops it if the blow kills it.
+    /// </summary>
     internal void Strike(Wolf wolf, float damage, bool burnt = false) {
         wolf.Health -= damage;
         wolf.Snap = wolf.Leap = wolf.Recover = wolf.Threaten = wolf.Circle = 0;
         wolf.Route.Clear(); WolfCounter.Clear(wolf);
-        if (wolf.Health > 0 && WolfHunt.ReactToHit(wolf, burnt)) return;
+        if (wolf.Health > 0 && WolfHunt.ReactToHit(wolf, burnt)) {
+            Play("wolf_hit", wolf.Pos);
+            return;
+        }
         KnockBack(wolf);
         if (wolf.Health <= 0) KillWolf(wolf);
     }
@@ -2114,7 +2124,9 @@ public sealed partial class World {
         if (!PayWage((int)w.WageDebt)) { Say("Not enough coins in the wage slot or your backpack to settle wages."); return; }
         w.WageDebt = 0;
     }
-    /// <summary>Whether a wolf is fighting or hunting within six metres, including one hunting another player.</summary>
+    /// <summary>
+    /// Whether a wolf is fighting or hunting within six metres, including one hunting another player.
+    /// </summary>
     internal bool WolfNearby(Vector2 at) {
         const float distance = 6;
         foreach (var wolf in S.Wolves)
@@ -2413,6 +2425,8 @@ public sealed partial class World {
         if (p.HotbarSlots == null || p.Crafting == null || p.Making == null || !ValidInventory(p.Backpack, crates) || !p.Backpack.ValidFor(Inventory.Carrier.Player)) return false;
         foreach (var q in p.Crafting) if (q == null || !Hand(q.Recipe) || q.Count is <= 0 or > MaxQueued) return false;
         if (p.Making != "" && !Hand(p.Making)) return false;
+        if (!float.IsFinite(p.DoorTime) || p.DoorTime < 0 || !p.DoorFrom.IsFinite()
+            || !p.DoorBody.IsFinite()) return false;
         // A player who left while dead comes back still waiting to respawn.
         return (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
             && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
@@ -2488,7 +2502,8 @@ public sealed partial class World {
         loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.First();
         RebuildAllStacks(loaded);
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage) || t.Rotation != 0 && (t.Kind is not (ThingKind.Crate or ThingKind.Barrel) && !Data.Buildings.ContainsKey(t.Kind) || !Construction.ValidRotation(t.Kind, t.Rotation)))) throw new InvalidOperationException("Unsupported or incomplete save.");
-        if (loaded.Wolves.Any(w => !WolfCounter.ValidSavedPath(w))) throw new InvalidOperationException("This save holds an invalid wolf movement.");
+        if (loaded.Wolves.Any(w => w == null || !WolfCounter.ValidSavedPath(w) || !WolfHunt.ValidSavedReaction(w)))
+            throw new InvalidOperationException("This save holds an invalid wolf movement.");
         if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded) || loaded.Goal < 0) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.

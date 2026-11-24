@@ -14,7 +14,8 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
     /// </summary>
     public DoorShown? AtDoor(PlayerState p, ActorState state, float dt, bool swinging) {
         if (state.Stage != p.Door) {
-            if (state.Stage == Doorway.Knocking && p.Door == Doorway.None) state.SteppingDown = DoorwayPath.StepUpSeconds;
+            if (state.Stage == Doorway.Knocking && p.Door == Doorway.None) state.SteppingDown =
+                DoorwayPath.StepUpSeconds;
             state.StageBefore = state.Stage; state.Stage = p.Door; state.StageFrom = state.Position;
         }
         if (p.Door == Doorway.None && (state.SteppingDown <= 0 || swinging)) {
@@ -27,7 +28,8 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
         if (p.Door == Doorway.None && state.SteppingDown > 0) {
             // Done knocking, the player steps back down off the step to where they stand, still facing the door.
             state.SteppingDown = Math.Max(0, state.SteppingDown - dt);
-            var down = state.StageFrom.Lerp(p.Pos, Mathf.SmoothStep(0, 1, 1 - state.SteppingDown / DoorwayPath.StepUpSeconds));
+            var down = state.StageFrom.Lerp(p.Pos, Mathf.SmoothStep(0, 1, 1 -
+                state.SteppingDown / DoorwayPath.StepUpSeconds));
             return new DoorShown(down, inside, ActorAction.Walk, door, true, 0, 0, 0, cabin.Rotation);
         }
         if (p.Door is Doorway.Tugged or Doorway.TuggedOff) {
@@ -70,7 +72,8 @@ public sealed class DoorwayView(Func<World> world, Func<int, ActorState?> stateO
 
     private static (Vector2 At, Vector2 Facing, ActorAction Action, bool Backing) FacingAt(Doorway stage, Vector2 at,
         Vector2 door, Vector2 inside, Vector2 start, float time, bool rush, float rotation) => stage switch {
-            Doorway.Entering => (at, inside, rush ? ActorAction.Jog : ActorAction.Walk, DoorwayPath.FromTheSide(start, door, rotation)),
+            Doorway.Entering => (at, inside, rush ? ActorAction.Jog : ActorAction.Walk, DoorwayPath.FromTheSide(start,
+                door, rotation)),
             Doorway.Leaving => (at, 2 * door - inside, ActorAction.Walk, false),
             Doorway.Knocking => (at, inside, time >= Doorways.KnockLead ? ActorAction.Knock :
                 DoorwayPath.KnockStep(time) > 0 ? ActorAction.Walk : ActorAction.Idle, false),

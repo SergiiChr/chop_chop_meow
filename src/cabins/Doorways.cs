@@ -220,12 +220,16 @@ public sealed class Doorways(World world) {
     public void Tick(float dt) {
         var p = world.S.Actor;
         if (p.Door == Doorway.None) return;
-        if (world.Downed || world.Find(p.DoorCabin) is not { Kind: ThingKind.Hut } cabin) { p.Door = Doorway.None; return; }
+        if (world.Downed || world.Find(p.DoorCabin) is not { Kind: ThingKind.Hut } cabin) {
+            p.Door = Doorway.None;
+            return;
+        }
         float before = p.DoorTime;
         p.DoorTime += dt;
         if (DoorwayPath.UsesBody(p.Door))
             p.DoorBody = p.Door == Doorway.Following ? DoorwayPath.Follow(p, world.Players, cabin, dt) :
-                DoorwayPath.At(p.Door, DoorPoint(cabin), p.Pos, p.DoorFrom, p.DoorTime, DoorSeconds(p), p.DoorRush, cabin.Rotation);
+                DoorwayPath.At(p.Door, DoorPoint(cabin), p.Pos, p.DoorFrom, p.DoorTime, DoorSeconds(p), p.DoorRush,
+                    cabin.Rotation);
         bool done = p.DoorTime >= DoorSeconds(p);
         switch (p.Door) {
             case Doorway.Entering when done:
