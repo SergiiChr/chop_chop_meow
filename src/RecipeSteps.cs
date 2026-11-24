@@ -59,6 +59,18 @@ public partial class Game {
         await Until(() => station.Processing && station.Making == recipe, $"{recipe} starting {how}", 3);
 
     /// <summary>
+    /// Waits for a station loaded for its hard-hat recipe to begin a batch: on its own, or at a station someone works, once a worker
+    /// with the recipe's tool slotted comes to it, since the player works only batches they queued.
+    /// </summary>
+    private async Task ExpectStartsForTheHardHat(Thing station, string recipe, RecipeDef r, string how) {
+        if (!Hosted.Worked(station)) { await ExpectStarts(station, recipe, how); return; }
+        if (r.Tool != "") Require(Hosted.SlotTool(station, world.Data.PlainestTool(r.Tool, r.Tier)), $"The {r.Tool} {recipe} takes should fit the station's slot.");
+        var crafter = AddWorker(Hosted, station.Pos + new Vector2(0, 1.2f)); Hosted.Assign(crafter, station);
+        await ExpectStarts(station, recipe, $"{how}, with a worker at it");
+        Hosted.Fire(crafter);
+    }
+
+    /// <summary>
     /// Requires that a double-click left a station short of a batch: its slots shake at once, a new message names each thing it is missing,
     /// and several ticks later it has begun no batch.
     /// </summary>

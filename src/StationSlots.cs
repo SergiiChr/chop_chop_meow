@@ -92,15 +92,22 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     /// <summary>What a click on a slot does, for its tooltip.</summary>
     public const string SlotHint = "LMB: pick up · RMB: pick up half · Shift or Ctrl: to backpack";
 
-    /// <summary>A slot for one input or output of a station, which takes a held backpack stack as an input.</summary>
+    /// <summary>
+    /// A slot for one input or output of a station, which takes a held backpack stack as an input.
+    /// The output slot of the recipe the station is on takes back what that recipe makes, and side slots take nothing.
+    /// </summary>
     public VBoxContainer StationSlot(string item, bool input, string perBatch, float size = 52) {
         var box = t.Inventory;
         var vessel = world.Data.VesselFor(item);
-        string hint = !input ? SlotHint : vessel != null ? $"{SlotHint} · put a filled vessel here to pour what it holds" : $"{SlotHint} · put a backpack stack here to load";
+        bool product = !input && world.Data.Recipes.TryGetValue(world.Selected(t), out var recipe) && recipe.Output == item;
+        string hint = product ? $"{SlotHint} · put {world.Lower(world.Data.Name(item))} from your backpack back here"
+            : !input ? SlotHint : vessel != null ? $"{SlotHint} · put a filled vessel here to pour what it holds" : $"{SlotHint} · put a backpack stack here to load";
         // A liquid's input slot takes the vessels that hold some of it, at any fill.
-        var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size,
-            takes: input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || world.Data.VesselOf(stack.Item) is VesselDef heldVessel && heldVessel.Liquid == item && heldVessel.LitersIn(stack.Item) > 0) : null,
-            put: (held, units) => world.LoadInput(t, held, units));
+        Func<HeldCursor, bool>? takes = input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || world.Data.VesselOf(stack.Item) is VesselDef heldVessel && heldVessel.Liquid == item && heldVessel.LitersIn(stack.Item) > 0)
+            : product ? held => held.Stack is { Box: 0 } stack && stack.Item == item : null;
+        // The product goes back as into storage; an input loads through the station's own rules.
+        var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size, takes: takes,
+            put: product ? null : (held, units) => world.LoadInput(t, held, units));
         return Labelled(cell, perBatch);
     }
 }

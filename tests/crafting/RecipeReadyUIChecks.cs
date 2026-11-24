@@ -73,11 +73,14 @@ public partial class Game {
         await CloseStation(station);
     }
 
-    /// <summary>With its fuel and items put on their slots one by one, the recipe is ready to start.</summary>
+    /// <summary>
+    /// With its fuel and items put on their slots one by one, the recipe is ready to start: on its own, or at a station someone works,
+    /// once a worker comes to it, since nobody queued a batch for the player to work.
+    /// </summary>
     private async Task CheckRecipeIsReadyToStartWhenLoadedByHand(string id, RecipeDef r) {
         var station = await OpenStationFor(r);
         await LoadByHand(station, id, r);
-        await ExpectStarts(station, id, "once its fuel and items are put on their slots");
+        await ExpectStartsForTheHardHat(station, id, r, "once its fuel and items are put on their slots");
         await CloseStation(station);
     }
 }

@@ -20,8 +20,7 @@ public static class BuildingPlumbingChecks {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, world.Player + Vector2.Right);
         Give(world, "steel_bar", 2);
-        world.SetRecipe(anvil, "steel_pipe");
-        world.LoadInput(anvil, "steel_bar", 2);
+        world.QueueBatch(anvil, "steel_pipe", 2);
         SafeTick(world, 12);
         Require(anvil.Inventory["steel_pipe"] == 0, "An anvil needs a steel hammer to form pipes.");
         Give(world, "steel_hammer");

@@ -174,17 +174,10 @@ public sealed class Inventory {
         return used > Slots ? 0 : Math.Min(room, CarryRoom(item));
     }
 
-    /// <summary>
-    /// Whether everything two other inventories hold fits in this one at once: each item tops up its own stacks, and the rest takes empty slots.
-    /// </summary>
-    /// <param name="more">The second inventory, or null for none.</param>
-    /// <param name="leaveOut">Items that go elsewhere and need no room here, such as a liquid, which fills vessels.</param>
-    public bool Fits(Inventory other, Inventory? more = null, Func<string, bool>? leaveOut = null) {
+    /// <summary>Whether these goods, counted by item, all fit in this inventory at once: each item tops up its own stacks, and the rest takes empty slots.</summary>
+    public bool Fits(Dictionary<string, int> goods) {
         int limit = Math.Min(Slots, Layout.Count), empty = 0;
         for (int i = 0; i < limit; i++) if (Layout[i].Item == "") empty++;
-        var goods = new Dictionary<string, int>(other.items);
-        if (more != null) foreach (var (item, count) in more.items) goods[item] = goods.GetValueOrDefault(item) + count;
-        if (leaveOut != null) foreach (string item in goods.Keys.Where(leaveOut).ToArray()) goods.Remove(item);
         foreach (var (item, count) in goods) {
             if (count > CarryRoom(item)) return false;
             int stack = StackOf(item), spare = 0;
