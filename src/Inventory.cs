@@ -80,10 +80,17 @@ public sealed class Inventory {
     [JsonInclude, JsonPropertyName("Items")] internal Dictionary<string, int> SavedItems { get => items; set { if (!ReferenceEquals(value, items)) { items.Clear(); foreach (var pair in value) items[pair.Key] = pair.Value; } } }
     /// <summary>Physical stack positions; <see cref="Items"/> holds each item's total across them.</summary>
     public List<Slot> Layout { get; set; } = new();
-    /// <summary>What workers bring here, in the order it was named; empty for anything.</summary>
+    /// <summary>What workers bring here, in the order it was named, or <see cref="Everything"/> alone; see <see cref="Gated"/> for an empty one.</summary>
     public FilterList InputFilter { get; set; } = new();
-    /// <summary>What workers take from here, in the order it was named; empty for anything.</summary>
+    /// <summary>What workers take from here, in the order it was named, or <see cref="Everything"/> alone; see <see cref="Gated"/> for an empty one.</summary>
     public FilterList OutputFilter { get; set; } = new();
+    /// <summary>
+    /// Storage with a filter window, where an empty filter lets nothing through and <see cref="Everything"/> lets all.
+    /// Any other box, such as a station's slots or a worker's hands, lets anything through an empty filter.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Gated { get; set; }
+    /// <summary>The filter entry that names every item; it stands alone in its row.</summary>
+    public const string Everything = "everything";
     /// <summary>Number of cells. Changing it adds empty cells or moves stacks out of removed ones.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
     /// <summary>Most units of one item per cell. Changing it splits or merges stacks to fit.</summary>
@@ -141,7 +148,7 @@ public sealed class Inventory {
         return free;
     }
     /// <summary>Empty with the settings of a new inventory, so it saves the same as one.</summary>
-    [JsonIgnore] public bool Fresh => items.Count == 0 && CarriedBy == Carrier.None && slots == NewSlots && stackSize == NewStackSize && CoinStack == NewCoinStack && Capacity == 0 && InputFilter.Count == 0 && OutputFilter.Count == 0 && Layout.Count == NewSlots && UsedSlots == 0;
+    [JsonIgnore] public bool Fresh => items.Count == 0 && CarriedBy == Carrier.None && slots == NewSlots && stackSize == NewStackSize && CoinStack == NewCoinStack && Capacity == 0 && !Gated && InputFilter.Count == 0 && OutputFilter.Count == 0 && Layout.Count == NewSlots && UsedSlots == 0;
 
     /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Unstacked = new();
@@ -352,18 +359,25 @@ public sealed class Inventory {
         PadLayout();
     }
 
-    /// <summary>Lets an item in or out through a filter, or stops naming it there.</summary>
+    /// <summary>Lets an item in or out through a filter, or stops naming it there; <see cref="Everything"/> takes the row's items off, and an item takes it off.</summary>
     public void Filter(string item, bool output, bool allowed) {
         var filter = output ? OutputFilter : InputFilter;
+        if (allowed && item == Everything) filter.Clear();
+        else if (allowed) filter.Remove(Everything);
         if (allowed) filter.Add(item); else filter.Remove(item);
         Changed?.Invoke();
     }
-    /// <summary>Empties both filters, so anything goes in and out.</summary>
+    /// <summary>Empties both filters, so nothing goes in or out of storage.</summary>
     public void ClearFilters() { InputFilter.Clear(); OutputFilter.Clear(); Changed?.Invoke(); }
-    public bool Accepts(string item) => InputFilter.Count == 0 || Names(InputFilter, item);
-    public bool AllowsWithdrawal(string item) => OutputFilter.Count == 0 || Names(OutputFilter, item);
-    /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over unrestricted ones.</summary>
-    public bool Wants(string item) => InputFilter.Count > 0 && Names(InputFilter, item);
+    /// <summary>Makes this box storage that takes nothing in and lets everything out, as a new chest does.</summary>
+    public void GateNew() { Gated = true; InputFilter.Clear(); OutputFilter.Clear(); OutputFilter.Add(Everything); }
+    public bool Accepts(string item) => Passes(InputFilter, item);
+    public bool AllowsWithdrawal(string item) => Passes(OutputFilter, item);
+    /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over one taking everything.</summary>
+    public bool Wants(string item) => Names(InputFilter, item);
+    /// <summary>Whether the input filter names any item, which a chest's hauler fills it with; <see cref="Everything"/> names none.</summary>
+    public bool NamesItems => InputFilter.Count > 0 && !InputFilter.Contains(Everything);
+    private bool Passes(FilterList filter, string item) => (Gated ? filter.Contains(Everything) : filter.Count == 0) || Names(filter, item);
     /// <summary>A filter names an item itself, or for a packed crate the kind of crate it is (<see cref="World.CrateOf"/>).</summary>
     private static bool Names(FilterList filter, string item) {
         if (filter.Contains(item)) return true;

@@ -67,7 +67,7 @@ internal static class BarrelChecks {
     private static void CheckPileStacksEmptyBarrelsAndKeepsFullBarrelsSeparate(GameData data) {
         var world = new World(data, false);
         var pile = world.Add(ThingKind.Pile, world.Player + Vector2.Down * 3);
-        var chest = world.Add(ThingKind.Chest, world.Player + Vector2.Right);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, world.Player + Vector2.Right));
         Give(world, Barrel.Item);
         var said = new System.Collections.Generic.List<string>(); world.Notify += said.Add;
         Require(world.Transfer(world.Backpack, chest.Inventory, Barrel.Item, 1) == 0 && said.Contains("Barrel does not fit in storage chest."),
@@ -239,7 +239,7 @@ internal static class BarrelChecks {
 
     private static void CheckFillingABucketInAFullCrateKeepsItsItemCount(GameData data) {
         var world = EmptyWorld(data);
-        var crate = world.Add(ThingKind.Crate, world.Player + Vector2.Right);
+        var crate = TakeEverything(world, world.Add(ThingKind.Crate, world.Player + Vector2.Right));
         var barrel = world.Add(ThingKind.Barrel, world.Player + Vector2.Left);
         Give(world, Bucket.Item, 12);
         Require(world.Transfer(world.Backpack, crate.Inventory, Bucket.Item, 12) == 12, "a crate takes twelve empty buckets");
@@ -262,7 +262,7 @@ internal static class BarrelChecks {
         world.SetDuty(worker, cabin, JobKind.Haul, true);
         Work(world, 2);
         Require(source.Inventory[Water.Liquid] == 50 && worker.Tool == "", "hauling requires a vessel");
-        var rack = world.Add(ThingKind.Toolstation, source.Pos + new Vector2(2, 1));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, source.Pos + new Vector2(2, 1)));
         rack.Inventory.Add(Bucket.Item, 1);
         Work(world, .5f, () => worker.Status == "Fetching a steel bucket from the tool station");
         Require(worker.Status == "Fetching a steel bucket from the tool station", "the worker names the bucket as a person would see it");
@@ -294,11 +294,11 @@ internal static class BarrelChecks {
         var world = EmptyWorld(data);
         var at = Terrain.Spawn + new Vector2(0, 6);
         var barrel = world.Add(ThingKind.Barrel, at);
-        var rack = world.Add(ThingKind.Toolstation, at + Vector2.Right * 4);
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, at + Vector2.Right * 4));
         rack.Inventory.Add(Bucket.Item, 1);
-        rack.Inventory.InputFilter.Add(Bucket.Item);
+        rack.Inventory.Filter(Bucket.Item, false, true);
         var tree = world.Add(ThingKind.Tree, at + Vector2.Left * 4, 10);
-        world.Add(ThingKind.Chest, at + Vector2.Down * 4);
+        TakeEverything(world, world.Add(ThingKind.Chest, at + Vector2.Down * 4));
         var worker = AddWorker(world, tree.Pos + Vector2.Down);
         worker.Tool = "steel_axe";
         world.SetDuty(worker, barrel, JobKind.Haul, true);
@@ -309,9 +309,9 @@ internal static class BarrelChecks {
 
     private static void CheckWorkerSwapsABottleForAnAxe(GameData data) {
         var world = EmptyWorld(data);
-        var rack = world.Add(ThingKind.Toolstation, world.Player + Vector2.Right);
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, world.Player + Vector2.Right));
         var tree = world.Add(ThingKind.Tree, world.Player + Vector2.Left * 2, 10);
-        world.Add(ThingKind.Chest, world.Player + Vector2.Down * 2);
+        TakeEverything(world, world.Add(ThingKind.Chest, world.Player + Vector2.Down * 2));
         var worker = AddWorker(world, world.Player);
         Give(world, Water.Full);
         Require(world.Transfer(world.Backpack, rack.Inventory, Water.Full, 1) == 1, "a rack accepts a filled bottle from the player");
@@ -324,7 +324,7 @@ internal static class BarrelChecks {
 
     private static void CheckWorkerFetchesABottleFromTheRack(GameData data) {
         var world = EmptyWorld(data);
-        var rack = world.Add(ThingKind.Toolstation, world.Player + Vector2.Right);
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, world.Player + Vector2.Right));
         var target = world.Add(ThingKind.Barrel, world.Player + Vector2.Left * 3);
         Give(world, Water.Full);
         Require(world.Transfer(world.Backpack, rack.Inventory, Water.Full, 1) == 1, "the only available vessel is the full bottle on the rack");
@@ -339,8 +339,8 @@ internal static class BarrelChecks {
         var cliff = Cliff.Of(ThingKind.Coal);
         var barrel = world.Add(ThingKind.Barrel, cliff.Center + cliff.Face * 1.7f);
         var tree = world.Add(ThingKind.Tree, barrel.Pos + cliff.Face * 4, 10);
-        world.Add(ThingKind.Chest, tree.Pos + cliff.Face * 2);
-        var rack = world.Add(ThingKind.Toolstation, tree.Pos + cliff.Along * 2);
+        TakeEverything(world, world.Add(ThingKind.Chest, tree.Pos + cliff.Face * 2));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, tree.Pos + cliff.Along * 2));
         rack.Inventory.Add("steel_axe", 1);
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = Bucket.AtFill(10);
@@ -355,7 +355,7 @@ internal static class BarrelChecks {
     private static void CheckWorkerReachesBarrelAroundAChest(GameData data) {
         var world = EmptyWorld(data);
         var barrel = world.Add(ThingKind.Barrel, new Vector2(74.08f, 123.28f));
-        world.Add(ThingKind.Chest, new Vector2(74.98f, 124.44f));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(74.98f, 124.44f)));
         var worker = AddWorker(world, new Vector2(80.91f, 126.81f));
         worker.Tool = Bucket.AtFill(10);
         Require(world.CanStand(barrel.Pos + BarrelHaul.SpoutApproach), "the chest leaves the barrel's spout on open ground");

@@ -38,6 +38,7 @@ public static class SimulationChecks {
         Test(MineRockChecks.Run);
         Test(WorkerStateChecks.Run, data);
         Test(WorkerJobChecks.Run, data);
+        StorageChecks.Run(data);
         HaulingChecks.Run(data);
         GatheringChecks.Run(data);
         CraftingChecks.Run(data);
@@ -127,7 +128,7 @@ public static class SimulationChecks {
     /// <summary>A worker with jobs at two places takes turns at them, and taking one job away keeps the other.</summary>
     private static void CheckWorkerWithTwoJobsTakesTurns(GameData data) {
         var world = EmptyWorld(data);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
         chest.Inventory.Add("wood", 20);
         var bush = world.Add(ThingKind.Berries, new Vector2(24, 20), 30);
         var fire = world.Add(ThingKind.Campfire, new Vector2(20, 24));
@@ -144,8 +145,8 @@ public static class SimulationChecks {
 
     private static void CheckStockerFillsToolRack(GameData data) {
         var world = EmptyWorld(data);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
-        var rack = world.Add(ThingKind.Toolstation, new Vector2(16, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(16, 20)));
         chest.Inventory.Add("steel_axe", 1);
         var stocker = AddWorker(world, new Vector2(18, 20));
         world.SetDuty(stocker, rack, JobKind.Stock, true);
@@ -156,7 +157,7 @@ public static class SimulationChecks {
     /// <summary>A tender feeds compost from storage, skipping food when told to, and carries its fertilizer back.</summary>
     private static void CheckTenderFeedsCompostWithoutFood(GameData data) {
         var world = EmptyWorld(data);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
         var compost = world.Add(ThingKind.Pile, new Vector2(16, 24));
         Require(world.SetCompost(compost, true), "an empty pile should turn into compost");
         world.SetSkipFood(compost, true);
@@ -174,7 +175,7 @@ public static class SimulationChecks {
     /// <summary>A trading post's runner carries what the cart delivered, other than coins, to storage.</summary>
     private static void CheckRunnerCarriesDeliveriesIntoStorage(GameData data) {
         var world = EmptyWorld(data);
-        var store = world.Add(ThingKind.Chest, new Vector2(26, 28));
+        var store = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(26, 28)));
         var sign = world.Add(ThingKind.Signpost, new Vector2(24, 26));
         sign.Output!.Add("tin_bar", 3); sign.Output.Add(Inventory.Coins, 20);
         var runner = AddWorker(world, new Vector2(24, 25));
@@ -188,8 +189,8 @@ public static class SimulationChecks {
     /// <summary>A tool station's output filter keeps workers from taking a tool it does not let out.</summary>
     private static void CheckWorkerLeavesToolTheFilterHolds(GameData data) {
         var world = EmptyWorld(data);
-        world.Add(ThingKind.Chest, new Vector2(20, 20));
-        var heldRack = world.Add(ThingKind.Toolstation, new Vector2(30, 20));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
+        var heldRack = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(30, 20)));
         heldRack.Inventory.Add("steel_axe", 1);
         world.SetFilter(heldRack, "steel_pick", true, true);
         var oak = world.Add(ThingKind.Tree, new Vector2(32, 22), 5);
@@ -199,10 +200,10 @@ public static class SimulationChecks {
         Require(cutter.Tool == "", "a worker should not take a tool the station's output filter holds back");
         Require(cutter.Missing == "axe", "a worker with no axe to take should say an axe is missing");
         Require(heldRack.Inventory["steel_axe"] == 1, "the station should keep the held back axe");
-        world.SetFilter(heldRack, "steel_pick", true, false);
+        world.SetFilter(heldRack, Inventory.Everything, true, true);
         // The cutter waited in the clearing, with no trading post to wait at, and walks back for the axe.
         Work(world, 90, () => cutter.Tool == "steel_axe");
-        Require(cutter.Tool == "steel_axe", "with the filter cleared, the worker should take the axe");
+        Require(cutter.Tool == "steel_axe", "with the output filter set to Everything, the worker should take the axe");
     }
 
     private static void CheckDismantlingABuildingReturnsItsCostAndContents(GameData data) {
@@ -279,9 +280,9 @@ public static class SimulationChecks {
     private static void CheckPlayerMovesItemsWithinFifteenMetres(GameData data) {
         var world = EmptyWorld(data);
         world.Player = new Vector2(20, 20);
-        var chest = world.Add(ThingKind.Chest, world.Player + new Vector2(14, 0));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, world.Player + new Vector2(14, 0)));
         var furnace = world.Add(ThingKind.Furnace, world.Player + new Vector2(0, 14));
-        var far = world.Add(ThingKind.Chest, world.Player + new Vector2(-17, 0));
+        var far = TakeEverything(world, world.Add(ThingKind.Chest, world.Player + new Vector2(-17, 0)));
         Give(world, "wood", 6); Give(world, "iron_ore", 4);
         Require(world.Transfer(world.Backpack, chest.Inventory, "wood", 2) == 2, "a chest 14 m away should take items from the backpack");
         Require(world.LoadInput(furnace, "iron_ore", 4) == 4, "a station 14 m away should take its inputs from the backpack");
@@ -301,20 +302,20 @@ public static class SimulationChecks {
         var source = new Inventory { Slots = 1 };
         var destination = new Inventory { Slots = 1 };
         source.Add("iron_bar", 4);
-        source.OutputFilter.Add("wood");
-        destination.InputFilter.Add("wood");
+        source.Filter("wood", true, true);
+        destination.Filter("wood", false, true);
         Require(source.TransferTo(destination, "iron_bar", 3, true) == 0,
                 "automated withdrawal must respect the source output filter");
         Require(source["iron_bar"] == 4 && destination["iron_bar"] == 0,
                 "blocked automated withdrawal must leave both inventories unchanged");
 
         source.OutputFilter.Clear();
-        source.OutputFilter.Add("iron_bar");
+        source.Filter("iron_bar", true, true);
         destination.InputFilter.Clear();
-        destination.InputFilter.Add("wood");
+        destination.Filter("wood", false, true);
         Require(source.TransferTo(destination, "iron_bar", 3, true) == 0,
                 "automated delivery must respect the destination input filter");
-        destination.InputFilter.Add("iron_bar");
+        destination.Filter("iron_bar", false, true);
         Require(source.TransferTo(destination, "iron_bar", 3, true) == 3,
                 "matching source and destination filters should permit transfer");
         Require(source["iron_bar"] == 1 && destination["iron_bar"] == 3,
@@ -327,19 +328,19 @@ public static class SimulationChecks {
 
     private static void CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest(GameData data) {
         var world = EmptyWorld(data);
-        var nearestGeneral = world.Add(ThingKind.Chest, new Vector2(11, 10));
-        var explicitWood = world.Add(ThingKind.Chest, new Vector2(17, 10));
-        explicitWood.Inventory.InputFilter.Add("wood");
+        var nearestGeneral = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(11, 10)));
+        var explicitWood = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(17, 10)));
+        explicitWood.Inventory.Filter("wood", false, true);
         Require(world.DepositFor("wood", new Vector2(10, 10))?.Id == explicitWood.Id,
                 "explicitly accepting storage should outrank a nearer general chest");
         Require(world.DepositFor("stone", new Vector2(10, 10))?.Id == nearestGeneral.Id,
                 "an unrestricted chest should accept items not claimed by a filtered chest");
 
         nearestGeneral.Inventory.Add("wood", 4);
-        nearestGeneral.Inventory.OutputFilter.Add("stone");
+        nearestGeneral.Inventory.Filter("stone", true, true);
         Require(world.SourceFor("wood", new Vector2(10, 10)) == null,
                 "workers must not withdraw items forbidden by the source output filter");
-        nearestGeneral.Inventory.OutputFilter.Add("wood");
+        nearestGeneral.Inventory.Filter("wood", true, true);
         Require(world.SourceFor("wood", new Vector2(10, 10))?.Id == nearestGeneral.Id,
                 "workers should use a chest once its output filter allows withdrawal");
     }
@@ -348,7 +349,7 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         static Vector2 Bank(Vector2 direction, float past) => Terrain.Lake + direction * (Terrain.Shore(MathF.Atan2(direction.Y, direction.X)) + past);
         var tree = world.Add(ThingKind.Tree, Bank(Terrain.Seaward, 2), 12);
-        var chest = world.Add(ThingKind.Chest, Bank(-Terrain.Seaward, 1.5f));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, Bank(-Terrain.Seaward, 1.5f)));
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
@@ -368,9 +369,9 @@ public static class SimulationChecks {
     private static void CheckCampfireWorkerFetchesFuelFromAllowedStorage(GameData data) {
         var world = EmptyWorld(data);
         var fire = world.Add(ThingKind.Campfire, new Vector2(20, 20));
-        var chest = world.Add(ThingKind.Chest, new Vector2(24, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(24, 20)));
         chest.Inventory.Add("wood", 6);
-        chest.Inventory.OutputFilter.Add("stone");
+        chest.Inventory.Filter("stone", true, true);
         var worker = AddWorker(world, fire.Pos);
         world.Assign(worker, fire);
 
@@ -378,7 +379,7 @@ public static class SimulationChecks {
         Require(chest.Inventory["wood"] == 6 && fire.Inventory["wood"] == 0,
                 "campfire worker must respect the source chest output filter when fetching fuel");
 
-        chest.Inventory.OutputFilter.Add("wood");
+        chest.Inventory.Filter("wood", true, true);
         bool sawFirewoodInTransit = false;
         for (int i = 0; i < 120 && chest.Inventory["wood"] == 6; i++) {
             SafeTick(world, Step);
@@ -525,7 +526,7 @@ public static class SimulationChecks {
         world.Player = new Vector2(12, 10);
         Give(world, "wood", 5);
         var tree = world.Add(ThingKind.Tree, new Vector2(13, 10), 30);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 10)));
         var worker = AddWorker(world, new Vector2(14, 10));
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
@@ -652,7 +653,7 @@ public static class SimulationChecks {
         world.Player = new Vector2(40, 10);
         SafeTick(world, Step);
         tree.Remaining = 0;
-        var gone = world.Add(ThingKind.Chest, new Vector2(11, 11));
+        var gone = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(11, 11)));
         RemoveThings(world, t => t == gone);
         var memory = Known(world).Single(t => t.Id == tree.Id);
         Require(memory != tree, "explored ground out of sight should show a remembered copy of the tree");
@@ -716,7 +717,7 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         var picked = world.Add(ThingKind.LooseStone, new Vector2(20, 20), 1);
         var left = world.Add(ThingKind.LooseStone, new Vector2(24, 20), 1);
-        var chest = world.Add(ThingKind.Chest, new Vector2(30, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(30, 20)));
         PickUp(world, picked);
         RemoveThings(world, t => t == chest);
         var pile = world.Add(ThingKind.Pile, new Vector2(40, 20));
@@ -724,7 +725,7 @@ public static class SimulationChecks {
             "a picked-up stone and a cleared chest should leave the lists of their kinds");
         Require(world.ThingsOf(ThingKind.Pile).Count == 1 && world.ThingsOf(ThingKind.Pile)[0] == pile, "a placed pile should be listed with its kind");
         var loaded = EmptyWorld(data);
-        loaded.Add(ThingKind.Chest, new Vector2(50, 20));
+        TakeEverything(loaded, loaded.Add(ThingKind.Chest, new Vector2(50, 20)));
         loaded.Deserialize(world.Serialize());
         Require(loaded.ThingsOf(ThingKind.LooseStone).Count == 1 && loaded.ThingsOf(ThingKind.LooseStone)[0].Id == left.Id && loaded.ThingsOf(ThingKind.Chest).Count == 0
             && loaded.ThingsOf(ThingKind.Pile).Count == 1 && loaded.Find(pile.Id)?.Kind == ThingKind.Pile,
@@ -753,7 +754,7 @@ public static class SimulationChecks {
     private static void CheckCratesShowOneSlotPerItemTheyCanHold(GameData data) {
         var world = EmptyWorld(data);
         world.Player = new Vector2(10, 10);
-        var crate = world.Add(ThingKind.Crate, new Vector2(11, 10)).Inventory;
+        var crate = TakeEverything(world, world.Add(ThingKind.Crate, new Vector2(11, 10))).Inventory;
         int cap = data.CrateCapacity;
         Require(crate.ShownSlots == cap, "an empty crate should show one slot per item it can hold");
         Require(crate.Add("berries", cap + 5) == cap, "a full stack should fill the crate only up to its capacity");
@@ -792,7 +793,7 @@ public static class SimulationChecks {
 
     private static void CheckALitTorchMovedOutOfTheBackpackGoesOut(GameData data) {
         var world = EmptyWorld(data);
-        var chest = world.Add(ThingKind.Chest, world.Player + Vector2.One);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, world.Player + Vector2.One));
         Give(world, "torch", 1); world.UseTorch(Vector2.Zero); SafeTick(world, World.KindleSeconds + .1f);
         Require(world.TorchLit, "the torch should light");
         world.Transfer(world.Backpack, chest.Inventory, "torch", 1);
@@ -861,7 +862,7 @@ public static class SimulationChecks {
         Require(world.Backpack.UsedSlots == 5, "each refillable bottle and each tool should take its own slot");
         var crate = world.NewCrate();
         Require(crate.Add("steel_pick", data.CrateCapacity) == data.CrateCapacity && crate.UsedSlots == data.CrateCapacity, "a crate should hold a full crate of single tools");
-        var chest = world.Add(ThingKind.Chest, new Vector2(10, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(10, 10)));
         Require(crate.TransferTo(chest.Inventory, "steel_pick", 8) == World.ChestStacks, "a chest should take one tool per slot");
         var hands = new Worker().Bag;
         Require(hands.Add("steel_axe", 20) == 12 && hands.Add("wood", 1) == 0, "a worker should carry twelve tools, one per slot");
@@ -959,7 +960,8 @@ public static class SimulationChecks {
         SafeTick(world, 10);
         Require(worker.Tool == "steel_axe", "back on the tree the worker should fetch the axe again");
         RunUntil(world, (world.Day - 1 + data.DuskStarts) * data.DaySeconds - .5f);
-        for (int i = 0; i < 400 && !worker.Home; i++) SafeTick(world, Step);
+        // By dusk the day's wood has filled the chest, so the worker waits in the clearing holding a load and walks back to the rack with the axe first.
+        for (int i = 0; i < 800 && !worker.Home; i++) SafeTick(world, Step);
         Require(worker.Home, "a worker going home should be home");
         Require(worker.Tool == "", "a worker going home should put the axe back");
         Require(station.Inventory["steel_axe"] == 1, "a worker going home should leave the axe in the tool station");
@@ -977,7 +979,7 @@ public static class SimulationChecks {
         world.Player = origin;
         Give(world, "wood", 11);
         var pile = world.Add(ThingKind.Pile, origin);
-        var chest = world.Add(ThingKind.Chest, origin + new Vector2(0, 5));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, origin + new Vector2(0, 5)));
         var said = new List<string>();
         world.Notify += said.Add;
         world.Transfer(world.Backpack, pile.Inventory, "wood", 10); world.Tick(.1f);
@@ -1029,7 +1031,7 @@ public static class SimulationChecks {
         Require(pile != null, "a pile should be built");
         Require(world.Backpack["wood"] == 32, "a pile should cost 8 wood");
         Require(pile!.Inventory.Slots == World.PileStacks, "a pile should hold 14 stacks");
-        Require(world.Add(ThingKind.Chest, origin + new Vector2(0, 8)).Inventory.Slots == 5, "a chest should hold a third of a pile, 5 stacks");
+        Require(TakeEverything(world, world.Add(ThingKind.Chest, origin + new Vector2(0, 8))).Inventory.Slots == 5, "a chest should hold a third of a pile, 5 stacks");
         Require(world.Construction.Snap(ThingKind.Pile, origin + new Vector2(3.4f, .4f)) == origin + new Vector2(3, 0) && world.Construction.Snap(ThingKind.Pile, origin + new Vector2(9, 0)) == origin + new Vector2(9, 0),
                 "a pile placed beside another should snap edge to edge, and one far away should not");
         var east = world.Construction.Build(ThingKind.Pile, origin + new Vector2(3.3f, 0));
@@ -1041,7 +1043,7 @@ public static class SimulationChecks {
         Require(world.Transfer(world.Backpack, pile!.Inventory, "wood", 10) == 10 && world.HoldBlock(pile, "stone") == "This is a wood pile.", "the first resource in should be the only one the pile takes");
         world.Tick(.1f);
         Require(pile.Inventory.InputFilter.SequenceEqual(new[] { "wood" }) && pile.Inventory.OutputFilter.SequenceEqual(new[] { "wood" }), "the first resource in should set the pile's filters, in and out");
-        var chest = world.Add(ThingKind.Chest, origin + new Vector2(0, 5));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, origin + new Vector2(0, 5)));
         Require(world.DepositFor("wood", chest.Pos) == pile && world.DepositFor("stone", origin) != pile, "workers should prefer the matching pile and keep other goods out of it");
 
         Require(world.SetCompost(east, true), "compost should be set on the pile");
@@ -1057,7 +1059,7 @@ public static class SimulationChecks {
         Require(east.Inventory["fertilizer"] == 2 && east.Inventory.Items.Keys.All(k => k == "fertilizer"), "compost should keep going while it has 4 inputs");
         Require(world.SourceFor("fertilizer", origin) == east, "workers should be able to take the fertilizer out");
 
-        var station = world.Add(ThingKind.Toolstation, origin + new Vector2(-4, 4));
+        var station = TakeEverything(world, world.Add(ThingKind.Toolstation, origin + new Vector2(-4, 4)));
         station.Inventory.Add("rake", 1);
         var leaves = world.Add(ThingKind.Leaves, origin + new Vector2(-4, -4), World.LeafPatch);
         var worker = AddWorker(world, station.Pos);
@@ -1291,7 +1293,7 @@ public static class SimulationChecks {
         var (world, tree, chest, _, forge, cutter, pumper, hauler) = crew;
         var sign = SignOutCrew(crew);
         RunUntil(world, data.DaySeconds - 1);
-        chest.Inventory.InputFilter.Clear();
+        world.SetFilter(chest, Inventory.Everything, false, true);
         SafeTick(world, 1 + data.TradeSeconds / 4);
         Require(cutter.Commute > 0, "at dawn a worker should fade in on the walk");
         Require(!cutter.Home, "at dawn a worker should no longer be home");

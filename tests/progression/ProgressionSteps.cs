@@ -165,12 +165,12 @@ internal static class ProgressionSteps {
         Require(worker != null, "sale proceeds should fund a new worker");
         // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning; the night's wolves are not what this checks.
         for (int i = 0; i < 4000 && !world.OnDuty(worker!); i++) { SafeTick(world, Step); RemoveWolves(world, _ => true); }
-        var chest = BuildAt(world, ThingKind.Chest, Site(37, 25));
+        var chest = TakeEverything(world, BuildAt(world, ThingKind.Chest, Site(37, 25)));
         // A woodcutter takes an axe from a tool station, so the player racks theirs: a station is 8 planks and 4 stone.
         GatherUntil(world, tree, "wood", 2);
         GatherUntil(world, stone, "stone", 4);
         CraftByHand(world, "planks", 2);
-        var station = BuildAt(world, ThingKind.Toolstation, Site(37, 28));
+        var station = TakeEverything(world, BuildAt(world, ThingKind.Toolstation, Site(37, 28)));
         Require(world.Transfer(world.Backpack, station.Inventory, "steel_axe", 1) == 1, "the player should rack their axe in the tool station");
         var workerTree = world.Things.FirstOrDefault(t => t.Kind == ThingKind.Tree && t.Remaining > 0);
         Require(workerTree != null, "a remaining tree should be available for the hired worker");

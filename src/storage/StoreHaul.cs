@@ -27,7 +27,7 @@ internal sealed class StoreHaul : PlaceHaul {
     /// Storage that asks for the item itself keeps it, and a station keeps what its recipe takes and any liquid.
     /// </summary>
     private (string Item, Thing Source, int Count)? FillSource(Thing store, Vector2 origin) {
-        if (store.Inventory.InputFilter.Count == 0) return null;
+        if (!store.Inventory.NamesItems) return null;
         string item = ""; Thing? best = null; float nearest = 0; int count = 0;
         foreach (var kind in World.Stores) Nearer(kind, false);
         foreach (var kind in world.StationKinds) Nearer(kind, true);

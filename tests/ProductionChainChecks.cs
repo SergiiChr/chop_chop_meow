@@ -61,14 +61,14 @@ public static class ProductionChainChecks {
     private static void CheckPostsTakeOnlyAskedForCratesAndSendTheCartWhenFull(GameData data) {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(20, 20));
-        var chest = world.Add(ThingKind.Chest, new Vector2(30, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(30, 20)));
         world.Player = sign.Pos;
         string crate = PackCrate(world, ("berries", 12));
         Require(world.DepositFor(crate, sign.Pos) == chest, "a post without a filter should not take deliveries");
         world.SetFilter(sign, World.CrateOf("berries"), false, true);
         Require(world.DepositFor(crate, sign.Pos) == sign, "a post asking for crates of berries should take them");
         Require(world.DepositFor("berries", sign.Pos) == chest, "a post should never take loose goods");
-        chest.Inventory.InputFilter.Add(World.CrateOf("berries"));
+        chest.Inventory.Filter(World.CrateOf("berries"), false, true);
         Require(world.DepositFor(crate, chest.Pos) == chest && world.DepositFor(crate, sign.Pos) == sign, "between storage asking for the same crates, the nearer one should win");
 
         world.SetAutoSell(sign, true);

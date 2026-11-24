@@ -32,7 +32,11 @@ internal sealed class Hauling(World world, BarrelHaul barrels) {
         var box = BoxOf(c);
         // Seed from a plot's own harvest goes straight back into its input slots.
         if (c.From == c.To) box.TransferTo(c.To!.Inventory, c.Item, Math.Min(c.Count, c.To.Inventory.SlotRoom(c.Item)), true);
-        else { box.TransferTo(w.Bag, c.Item, c.Count, true); w.Destination = c.To!.Id; w.Fueling = c.Fuel; }
+        else {
+            box.TransferTo(w.Bag, c.Item, c.Count, true); w.Destination = c.To!.Id; w.Fueling = c.Fuel;
+            // A load carried out of the place goes back there if nothing takes it on the way.
+            (w.TakenFrom, w.TakenBox) = c.From == c.Place ? (place.Id, c.Box) : (0, CarryBox.Inventory);
+        }
         w.Plan = default;
         return true;
     }
@@ -66,7 +70,9 @@ internal sealed class Hauling(World world, BarrelHaul barrels) {
         return false;
     }
 
-    private static Inventory BoxOf(in Carry c) => c.Box switch { CarryBox.Output => c.From!.Output!, CarryBox.Burner => c.From!.Burner!, _ => c.From!.Inventory };
+    private static Inventory BoxOf(in Carry c) => BoxOf(c.From!, c.Box);
+    /// <summary>One of a place's boxes: its slots, its output or its fuel slot.</summary>
+    internal static Inventory BoxOf(Thing place, CarryBox box) => box switch { CarryBox.Output => place.Output!, CarryBox.Burner => place.Burner!, _ => place.Inventory };
 
     /// <summary>Whether a carry a hauler set out on can still be made: its places stand, the load is still there to take and where it goes still takes it.</summary>
     private bool Stands(in Carry c) =>

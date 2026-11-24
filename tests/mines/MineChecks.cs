@@ -64,7 +64,7 @@ public static class MineChecks {
         var world = FundedWorld(data);
         var mine = MarkMine(world);
         var cliff = Cliff.Nearest(mine.Pos);
-        var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 - cliff.Along * 2);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 - cliff.Along * 2));
         foreach (var (item, amount) in data.Mine.Materials) chest.Inventory.Add(item, amount);
         chest.Inventory.Add("wood", 20);
         var worker = AddWorker(world, chest.Pos);
@@ -75,7 +75,7 @@ public static class MineChecks {
         Require(worker.Status.Contains("pickaxe"), "a worker without a pickaxe must say so");
 
         // Workers take their tools from a tool station by the storage.
-        var station = world.Add(ThingKind.Toolstation, chest.Pos + cliff.Along * 2);
+        var station = TakeEverything(world, world.Add(ThingKind.Toolstation, chest.Pos + cliff.Along * 2));
         station.Inventory.Add("steel_pick", 1);
         float started = world.Time;
         Work(world, data.DaySeconds * 3, () => mine.MineStage > MineStage.Marked);
@@ -111,7 +111,7 @@ public static class MineChecks {
         var cliff = Cliff.Of(ThingKind.Iron);
         var mine = world.Add(ThingKind.Mine, cliff.MineSpot);
         mine.MineStage = MineStage.Supplied;
-        var rack = world.Add(ThingKind.Toolstation, mine.Pos + cliff.Face * 2);
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, mine.Pos + cliff.Face * 2));
         rack.Inventory.Add("steel_hammer", 1);
         rack.Inventory.Add("wood_hammer", 1);
         world.Player = rack.Pos + cliff.Along;
@@ -168,7 +168,7 @@ public static class MineChecks {
         var mine = MarkMine(world);
         mine.MineStage = MineStage.Open;
         var cliff = Cliff.Nearest(mine.Pos);
-        var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3));
         var crew = Enumerable.Range(0, 4).Select(_ => AddWorker(world, chest.Pos + cliff.Along)).ToList();
         foreach (var w in crew) { w.Tool = "steel_pick"; world.Assign(w, mine); }
         Require(crew.Take(3).All(w => w.Assignment == mine.Id) && crew[3].Assignment == 0, "a mine must take three workers and refuse a fourth");
@@ -204,7 +204,7 @@ public static class MineChecks {
         Require(loaded.MineStage == MineStage.Open && loaded.Output!.Count == held, "a save must keep the mine's stage and output");
 
         // A miner dismissed mid-haul leaves their load in a recovery box.
-        world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
+        TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3));
         // The miners waited in the clearing while the mine had nowhere to unload, and walk back.
         Work(world, 90, () => crew.Any(w => w.Bag.Count > 0));
         var carrier = crew.First(w => w.Bag.Count > 0);
@@ -216,7 +216,7 @@ public static class MineChecks {
         var world = FundedWorld(data);
         var mine = MarkMine(world); OpenMine(mine);
         mine.Output!.Add(Mines.Ore(mine), mine.Output.StackSize);
-        var rack = world.Add(ThingKind.Toolstation, mine.Pos + Cliff.Nearest(mine.Pos).Face * 4);
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, mine.Pos + Cliff.Nearest(mine.Pos).Face * 4));
         rack.Inventory.Add("steel_pick", 1);
         var miner = Staff(world, mine, JobKind.Mine);
         Work(world, 20);
@@ -240,7 +240,7 @@ public static class MineChecks {
         var world = FundedWorld(data);
         var mine = MarkMine(world); mine.MineStage = MineStage.Open;
         var cliff = Cliff.Nearest(mine.Pos);
-        var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3));
         var builder = AddWorker(world, mine.Pos);
         world.SetDuty(builder, mine, JobKind.Build, true);
         var elsewhere = AddWorker(world, chest.Pos);
@@ -264,7 +264,7 @@ public static class MineChecks {
             var cliff = Cliff.Of(ThingKind.Iron);
             Thing source;
             if (mining) { source = MarkMine(world); source.MineStage = MineStage.Open; } else source = world.Add(ThingKind.Iron, cliff.MineSpot, 400);
-            var chest = world.Add(ThingKind.Chest, source.Pos + cliff.Face * 2.5f);
+            var chest = TakeEverything(world, world.Add(ThingKind.Chest, source.Pos + cliff.Face * 2.5f));
             var worker = AddWorker(world, chest.Pos);
             worker.Tool = "steel_pick";
             world.Assign(worker, source);

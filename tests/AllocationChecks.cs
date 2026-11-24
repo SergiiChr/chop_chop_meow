@@ -25,7 +25,7 @@ public static class AllocationChecks {
 
         // A stack held from a chest is checked every tick: it must still be there, in reach and in the same box, without allocating.
         var holding = new World(data);
-        var chest = holding.Add(ThingKind.Chest, holding.Player + Vector2.One);
+        var chest = TakeEverything(holding, holding.Add(ThingKind.Chest, holding.Player + Vector2.One));
         Give(holding, "wood", 10); holding.Transfer(holding.Backpack, chest.Inventory, "wood", 10);
         holding.Hold(chest.Inventory, 0, 10);
         Require(holding.Held != null, "the allocation fixture should hold the chest's wood");
@@ -48,10 +48,10 @@ public static class AllocationChecks {
 
         // A chest's hauler with nothing to carry looks on every tick for a place asking for what the chest holds, and for storage or a station giving out what its filter names.
         var storing = new World(data);
-        var store = storing.Add(ThingKind.Chest, storing.Player + new Vector2(3, 0));
+        var store = TakeEverything(storing, storing.Add(ThingKind.Chest, storing.Player + new Vector2(3, 0)));
         store.Inventory.Add("wood", 10);
         storing.SetFilter(store, "stone", false, true);
-        storing.Add(ThingKind.Chest, storing.Player + new Vector2(-3, 0)).Inventory.Add("planks", 10);
+        TakeEverything(storing, storing.Add(ThingKind.Chest, storing.Player + new Vector2(-3, 0))).Inventory.Add("planks", 10);
         WorkerSteps.Bench(storing, storing.Player + new Vector2(0, 4), "crate");
         var storeHauler = WorkerSteps.Staff(storing, store, JobKind.Haul);
         Check("tick: chest hauler with nothing to carry", () => { storing.Tick(1 / 60f); Fed(storing); });

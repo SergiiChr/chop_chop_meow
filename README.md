@@ -649,6 +649,7 @@ The pour needs room for the split before it uses any water.
 Sorting the backpack or swapping the opened barrel's cell returns you to the backpack.
 Shift-click or Ctrl-click a vessel to pour into an open barrel, including vessels bound to the hotbar.
 A placed barrel's single filter names water, like a pile's filter names its resource.
+A barrel put down empty takes no water from workers until its filter names water; one put down with water in it names water at once.
 A barrel holds 50 liters.
 A steel bucket holds 10 liters and hangs by its handle on the tool rack.
 
@@ -674,14 +675,15 @@ The crate being packed shows on the right with how full it is; a full crate wait
 Workers deliver the good straight to the station while its input has room.
 
 A crate of one good is a kind of item that filters can name: "Crate of bread" in a chest's filter, or in the trading post's.
-A full crate goes to the nearest storage whose filter asks for that crate, otherwise to the nearest open storage.
+A full crate goes to the nearest storage whose filter asks for that crate, otherwise to the nearest storage taking everything.
 A pile of crates takes more crates of the same good.
 
 ### Piles
 
 A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that show as a heap of the resource itself, bigger the more it holds.
 Its resource is set by its filter, which has one row and one item: what workers bring is also what they take.
-Set the filter on an empty pile, or put a first resource in and the filter is set to it.
+A new pile takes nothing from workers until its filter names a resource.
+Set the filter on an empty pile, or put a first resource in by hand and the filter is set to it.
 From then on workers store and take only that, and anything else is refused, by hand too: "This is a wood pile."
 The filter stays when the pile is emptied.
 It can be taken off or changed only while the pile is empty, and a new resource goes on only once the old one is off.
@@ -702,12 +704,16 @@ A worker on its Tend job fetches what its filters take from storage and carries 
 ### Filters
 
 Storage input filters govern automated deposits; output filters govern worker withdrawals.
-Empty filters allow all items.
+An empty row lets nothing through.
+**Everything**, the cell marked A first in the item list, lets every item through and stands alone in its row: adding it takes the row's items off, and adding an item takes it off.
+A new chest, placed crate or tool station takes nothing in and lets everything out: its input row is empty and its output row holds A.
+A trading post with A asks for every kind of packed crate, and compost with A takes everything that composts.
+Piles and barrels name one resource and have no A.
 A row shows its items in the order they were added.
 The item list that **+** opens shows items in groups, each simplest first: what is gathered, grown or bought, then materials, tools, containers and food, and last crates of goods.
 Bottles, buckets and barrels come among containers at any fill.
-**Clear** takes everything off both rows.
-Manual inventory transfers ignore these automation filters.
+**Clear** takes everything off both rows, so nothing goes in or out.
+Manual inventory transfers ignore these automation filters, and so does a page's Store all button.
 
 A load a worker carries goes to the nearest place that asks for it:
 
@@ -715,7 +721,9 @@ A load a worker carries goes to the nearest place that asks for it:
 - a station whose recipe uses it, into the input slot or the fuel slot, up to a stack;
 - a farm plot short of seed or fertilizer for a sowing, or a mine site short of a material.
 
-Only when none of those has room does it go to the nearest storage with no filter.
+Only when none of those has room does it go to the nearest storage taking everything (A).
+With none of those either, a load carried out of a place goes back there, a station's slot up to a stack, as far as it has room.
+Any other load stays in hand: the worker says "Holding … · no accepting storage" and goes on with the jobs of their list that need no hands, such as Craft and Bellows, until something takes it.
 Workers send a load elsewhere when a filter changes or a slot fills while they carry it.
 A chest or pile near a source fills first and buffers the goods; without one, a gatherer walks each load to the nearest station with room.
 
@@ -735,8 +743,8 @@ A station keeps the goods it makes when no storage takes them, and goes on worki
 Workers fetching a station's inputs take them from storage or straight from another station's finished goods, such as steel parts from the anvil.
 
 A chest or placed crate offers Haul too.
-Its hauler first carries out what its output filter lets go, to the nearest place asking for it: never to storage with no filter.
-Then they bring what its input filter names, from storage or from a station's finished goods.
+Its hauler first carries out what its output filter lets go, to the nearest place asking for it: never to storage taking everything.
+Then they bring what its input filter names, from storage or from a station's finished goods; A names nothing to bring.
 Two storages that both ask for an item never pass it to each other.
 So a chest asking for crates of bread sends them on to a trading post asking for them, but not to another chest asking for them.
 In a haul group, every carry for a chest or crate ranks with an input short of a batch, before full outputs and topping up.

@@ -18,7 +18,7 @@ internal static class WorkerSteps {
         var world = EmptyWorld(data);
         SetCoins(world, 200);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 4000);
-        var chest = world.Add(ThingKind.Chest, new Vector2(12, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 10)));
         chest.Inventory.Slots = 60;
         // Iron and coal for a day of steel, so the forge crew has something to smelt.
         chest.Inventory.Add("iron_bar", 300); chest.Inventory.Add("coal", 500);
@@ -38,7 +38,7 @@ internal static class WorkerSteps {
         var world = crew.World;
         RunUntil(world, world.Data.DuskStarts * world.Data.DaySeconds - 2);
         crew.Cutter.Bag.Remove("wood", 99); crew.Cutter.Bag.Add("wood", 2);
-        crew.Chest.Inventory.InputFilter.Add("iron_bar");
+        crew.Chest.Inventory.Filter("iron_bar", false, true);
         var sign = world.Add(ThingKind.Signpost, new Vector2(30, 20));
         world.Assign(AddWorker(world, sign.Pos), sign);
         Work(world, 40);
@@ -50,8 +50,8 @@ internal static class WorkerSteps {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 400);
         var bush = world.Add(ThingKind.Berries, new Vector2(10, 14), 400);
-        world.Add(ThingKind.Chest, new Vector2(12, 12));
-        var station = world.Add(ThingKind.Toolstation, new Vector2(14, 10));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 12)));
+        var station = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(14, 10)));
         world.Player = station.Pos + Vector2.One;
         return (world, tree, bush, station);
     }
@@ -61,8 +61,8 @@ internal static class WorkerSteps {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 5);
         var next = world.Add(ThingKind.Tree, new Vector2(16, 10), 400);
-        var chest = world.Add(ThingKind.Chest, new Vector2(12, 12));
-        var rack = world.Add(ThingKind.Toolstation, new Vector2(12, 8));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 12)));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(12, 8)));
         rack.Inventory.Add("steel_axe", 1);
         world.Player = new Vector2(13, 14); world.Look();
         var cutter = AddWorker(world, tree.Pos + new Vector2(1, 1));

@@ -193,6 +193,10 @@ public sealed class Worker : IWalker {
     /// <summary>The kind of resource the worker last said they know no more of.</summary>
     [JsonIgnore] public ThingKind? Exhausted { get; set; }
     public int Destination { get; set; }
+    /// <summary>The place a hauler carried the load in hand out of, which takes it back when nothing else does; 0 for a load from anywhere else.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int TakenFrom { get; set; }
+    /// <summary>Which of <see cref="TakenFrom"/>'s boxes the load came out of.</summary>
+    [JsonInclude, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] internal CarryBox TakenBox { get; set; }
     public float Timer { get; set; }
     public float WageDebt { get; set; }
     /// <summary>Coins due at each dawn, fixed by the hiring offer.</summary>
@@ -246,7 +250,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 16;
+    public int Version { get; set; } = 17;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -543,6 +547,9 @@ public sealed partial class World {
         if (kind == ThingKind.Pile) t.Inventory.Slots = PileStacks;
         if (kind == ThingKind.Chest) t.Inventory.Slots = ChestStacks;
         if (kind == ThingKind.Farm) { t.Inventory.Slots = Data.Farm.Sow.Count + 1; t.Output = new() { Slots = Data.Farm.Yield.Count }; }
+        // Storage takes nothing from workers until its filter names something; a chest, crate or tool station lets everything out.
+        if (kind is ThingKind.Chest or ThingKind.Crate or ThingKind.Toolstation) t.Inventory.GateNew();
+        if (kind is ThingKind.Pile or ThingKind.Barrel or ThingKind.Signpost) t.Inventory.Gated = true;
         S.Things.Add(t); return t;
     }
     public void NewGame() {
@@ -1424,7 +1431,7 @@ public sealed partial class World {
     public static bool IsPlainPile(Thing t) => t.Kind == ThingKind.Pile && !t.Compost;
     public static bool IsSingleResourceStore(Thing t) => IsPlainPile(t) || t.Kind == ThingKind.Barrel;
     /// <summary>What a filter entry names: an item, a crate of a good, or a crate of mixed goods.</summary>
-    public string FilterName(string entry) => entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good))) : Data.Name(entry);
+    public string FilterName(string entry) => entry == Inventory.Everything ? "Everything" : entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good))) : Data.Name(entry);
     /// <summary>The contents of a packed crate item, or null for anything else.</summary>
     public Inventory? Packed(string item) => S.Crates.GetValueOrDefault(PackedId(item));
     public Inventory NewCrate() => new() { Slots = Data.CrateCapacity, StackSize = Data.CrateCapacity, Capacity = Data.CrateCapacity };
@@ -1479,7 +1486,11 @@ public sealed partial class World {
         // A crate put down from the held stack comes from wherever it is held, such as a chest; any other from the backpack.
         (MarkedSource ?? S.Backpack).Remove(item, 1);
         var crate = Add(ThingKind.Crate, p, rotation: rotation); ClearGround(crate);
-        if (Packed(item) is Inventory contents) { ReleaseIn(contents); crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
+        if (Packed(item) is Inventory contents) {
+            // A crate packed at a packing station comes down as a new crate does; one picked up keeps its filters.
+            if (!contents.Gated) contents.GateNew();
+            ReleaseIn(contents); crate.Inventory = contents; S.Crates.Remove(PackedId(item));
+        }
         Play("close_chest", p); return crate;
     }
     /// <summary>Lifts a placed crate into the backpack; anything inside stays packed in it.</summary>

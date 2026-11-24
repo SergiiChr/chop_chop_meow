@@ -44,11 +44,11 @@ internal static class EconomySteps {
     public static float Gather(GameData data, ThingKind kind, int days = 1) {
         var world = WorkDay(data);
         var source = world.Add(kind, new Vector2(20, 20), kind == ThingKind.Berries ? 24 : 9999);
-        var chest = world.Add(ThingKind.Chest, new Vector2(22.5f, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(22.5f, 20)));
         // Room for more than a day's gathering, so the chest never caps the measure.
         chest.Inventory.Slots = 60;
         // Workers take plain iron tools from a station beside the chest, so the measure stays the baseline output.
-        var station = world.Add(ThingKind.Toolstation, new Vector2(22.5f, 22));
+        var station = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(22.5f, 22)));
         station.Inventory.Add("steel_axe", 1); station.Inventory.Add("steel_pick", 1);
         Hire(world, source);
         Work(world, days * data.DaySeconds);
@@ -60,8 +60,8 @@ internal static class EconomySteps {
         var world = WorkDay(data);
         var shore = Terrain.WaterPoint(Terrain.Spawn);
         var lake = world.Add(ThingKind.Water, shore, 9999);
-        var chest = world.Add(ThingKind.Chest, shore + (shore - Terrain.Lake).Normalized() * 2.5f);
-        chest.Inventory.Slots = 600; chest.Inventory.Add(Water.Empty, 500); chest.Inventory.OutputFilter.Add(Water.Empty);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, shore + (shore - Terrain.Lake).Normalized() * 2.5f));
+        chest.Inventory.Slots = 600; chest.Inventory.Add(Water.Empty, 500); chest.Inventory.Filter(Water.Empty, true, true);
         Hire(world, lake);
         Work(world, data.DaySeconds);
         return chest.Inventory[Water.Full] * data.Vessels[0].Capacity;
@@ -72,14 +72,14 @@ internal static class EconomySteps {
         var world = WorkDay(data);
         var packer = world.Add(ThingKind.Packer, new Vector2(20, 20));
         world.SetPacking(packer, item);
-        var supply = world.Add(ThingKind.Chest, new Vector2(23, 20));
+        var supply = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(23, 20)));
         // Room for more than a day's packing, since tools take a slot each.
         supply.Inventory.Slots = 900;
         supply.Inventory.Add(item, 600); supply.Inventory.Add("crate", 100);
-        supply.Inventory.OutputFilter.Add(item); supply.Inventory.OutputFilter.Add("crate");
+        supply.Inventory.Filter(item, true, true); supply.Inventory.Filter("crate", true, true);
         // Full crates go to the store, not back into the supply.
-        supply.Inventory.InputFilter.Add(item);
-        var store = world.Add(ThingKind.Chest, new Vector2(20, 23));
+        supply.Inventory.Filter(item, false, true);
+        var store = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 23)));
         store.Inventory.Slots = 200;
         Hire(world, packer);
         Work(world, data.DaySeconds);
@@ -95,16 +95,16 @@ internal static class EconomySteps {
         var station = world.Add(r.Station!.Value, new Vector2(20, 20));
         world.SetRecipe(station, recipe);
         foreach (var slot in world.SlotRules(station.Kind)) station.Tools!.Add(slot.Tool switch { "chisel" => "stone_chisel", "hammer" => "steel_hammer", _ => slot.Tool }, 1);
-        var supply = world.Add(ThingKind.Chest, new Vector2(23, 20));
+        var supply = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(23, 20)));
         supply.Inventory.Slots = 300;
         foreach (var item in BatchCost(world, recipe).Keys) {
             // A liquid comes in full vessels.
             string stocked = data.VesselFor(item)?.Full ?? item;
-            supply.Inventory.Add(stocked, stocked == item ? 600 : 200); supply.Inventory.OutputFilter.Add(stocked);
+            supply.Inventory.Add(stocked, stocked == item ? 600 : 200); supply.Inventory.Filter(stocked, true, true);
         }
-        var store = world.Add(ThingKind.Chest, new Vector2(20, 23));
+        var store = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 23)));
         // Room for a whole day's tools, which take a slot each.
-        store.Inventory.Slots = 60; store.Inventory.InputFilter.Add(r.Output);
+        store.Inventory.Slots = 60; store.Inventory.Filter(r.Output, false, true);
         Hire(world, station);
         Work(world, data.DaySeconds);
         return store.Inventory[r.Output] + station.Inventory[r.Output];

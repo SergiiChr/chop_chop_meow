@@ -30,7 +30,7 @@ internal sealed class ChainSite(World world) {
         return t;
     }
 
-    public void Store(string item) => Place(ThingKind.Chest).Inventory.InputFilter.Add(item);
+    public void Store(string item) => Place(ThingKind.Chest).Inventory.Filter(item, false, true);
 
     /// <summary>Adds a worker at a building with the given duties.</summary>
     public Worker Employ(Thing place, params JobKind[] jobs) => Staff(world, place, jobs);

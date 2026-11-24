@@ -20,7 +20,7 @@ These came from the user; change them only after asking.
   after the pressure falls. Buildings with ten steel pipes in their Plumbing slot share water according to demand.
 - **Building orientation:** Plans turn in quarter turns during placement. A mine faces the cliff it fits.
 - **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, shovel for stumps and bushes, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they go to another spot of the job that they can work, loose pieces last, or wait and say so once.
-- **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
+- **Transfers:** automated transfers respect input and output allowlists of storage, where empty lets nothing through and `Inventory.Everything` lets all, and prefer storage whose input filter names the item. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
 - **Gravel paths:** a steel hammer at the bench crushes 1 stone into 1 gravel in 10 base seconds, and a path tile, one
   metre square, costs 4 gravel. Players, walking or sprinting, and workers move 1.2 times as fast where gravel is drawn,
   and workers keep their routes.
@@ -1136,8 +1136,14 @@ Both are boxes a player in reach of the worker (`World.Reaches`) picks up from a
 
 #### Chests
 
-Chests have separate item allowlists for input and output, and empty lists allow all items.
-Automated deposits go to the nearest place that asks for the item, then to the nearest unrestricted storage (`World.DepositFor`).
+Chests have separate item allowlists for input and output.
+Storage with a filter window has `Inventory.Gated` set: there an empty list lets nothing through and `Inventory.Everything`, shown as an "A" cell, lets every item through.
+`Inventory.Filter` keeps `Everything` alone in its row.
+`World.Add` gives a chest, placed crate and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; a crate packed at a packing station gets the chest's lists when it is put down.
+Any other box, such as a station's slots or a worker's hands, is not gated, and lets anything through its empty lists.
+Automated deposits go to the nearest place that asks for the item, then to the nearest storage taking everything (`World.DepositFor`).
+A load nothing takes goes back into the box a hauler carried it out of (`Worker.TakenFrom`, `Worker.TakenBox`, `World.PutBack`), a station's slot up to a stack.
+Any other load stays in hand while the worker does only the jobs that need no hands, those whose round is a unit of the place's work (`World.NeedsHands`).
 Asking for it are a chest, pile, placed crate or trading post whose input filter names it, a packing station packing it, a station whose recipe takes it as an input or burns it, a farm plot short of it for a sowing and a mine site short of it.
 `World.Intake` gives each kind of place's one answer to which of its boxes takes a carried item now, and how many of it.
 Automated withdrawals respect output filters.
@@ -1157,7 +1163,9 @@ Piles (`pile`) are 3×3 yards (`Construction.IsZone`, `ZoneSize`) that do not bl
 
 A pile takes part in automation like a chest.
 Its input and output filters name the same one `World.PileEntry`: an item, a kind of crate (`World.MixedCrate` for crates of mixed goods), or a vessel's liquid for every fill of that vessel holding some, apart from the empty vessel.
-The player sets it on an empty pile through `SetFilter`, or `World.PileFilters` sets it on a tick from the first resource put in.
+A pile with none named takes nothing from workers.
+The player sets it on an empty pile through `SetFilter`, or `World.PileFilters` sets it on a tick from the first resource put in by hand.
+A pile's filter never holds `Inventory.Everything`.
 It stays when the pile empties, and `SetFilter` and `ClearFilters` refuse to change it while the pile holds anything.
 `HoldBlock` refuses any other resource, including for manual transfers.
 
@@ -1258,8 +1266,9 @@ Each kind of place offers its carries through its own `PlaceHaul` (`StationHaul`
 Inputs and fuel fill to a stack (`Inventory.SlotRoom`); a farm plot's slots hold one sowing (`Farms.SowRoom`) and a mine site what it lacks.
 A load of an item the recipe takes both as an input and as fuel is shared between the two slots as a batch uses them (`World.FuelSplit`).
 Spare seed in a plot's output that no storage takes stacks up in the plot's own seed slot.
+A load carried out of a place is as much as the place taking it has room for (`PlaceHaul.Taker`), so none is left in hand.
 
-A chest's or placed crate's hauler carries out what its output filter lets go to the nearest place asking for it (`World.AskerFor`), then fills it with what its input filter names (`StoreHaul.FillSource`); every such carry comes under the first rule.
+A chest's or placed crate's hauler carries out what its output filter lets go to the nearest place asking for it (`World.AskerFor`), then fills it with what its input filter names (`StoreHaul.FillSource`, never for `Everything`); every such carry comes under the first rule.
 Storage that asks for an item never passes it to other storage asking for it, nor takes it from one, so two never trade it back and forth.
 
 #### Gathering and the bellows
@@ -1329,8 +1338,8 @@ Buying costs a fixed 1.25× the base price.
 A cart trip takes 30 seconds.
 Purchases settle on return into the trading post's market output (`Thing.Output`), with overflow in a box beside it.
 
-The trading post's input filter names the crates it asks for.
-`DepositFor` treats a post as storage only for an item its filter names, so workers deliver those crates there when it is the nearest storage asking for them.
+The trading post's input filter names the crates it asks for, or holds `Inventory.Everything` for every kind of crate it buys.
+`DepositFor` treats a post as storage only for an item its filter takes, so workers deliver those crates there when it is the nearest storage asking for them; with `Everything` it ranks with storage taking everything.
 With `Thing.AutoSell` set, the cart leaves on its own once every market slot holds a crate and a cart is free.
 Sale coins land in the trading post's wage slot (`Thing.Wages`, coins only), whose coin stack (`Inventory.CoinStack`) is `Inventory.UnlimitedCoins`, so the bank has no limit.
 Dawn wages, settled strikes and hiring payments draw on every wage slot before the payer's backpack; purchases come from the backpack only.

@@ -126,7 +126,7 @@ public static class FarmChecks {
         world.Player = farm.Pos;
         world.Gather(farm, world.Farms.HarvestSeconds / 2);
         Require(farm.FarmStage == FarmStage.Ripe && Math.Abs(farm.Progress - world.Farms.HarvestSeconds / 2) < .01f, "the player should harvest by hand, without a tool");
-        var chest = world.Add(ThingKind.Chest, origin + new Vector2(3, 4));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, origin + new Vector2(3, 4)));
         var worker = AddWorker(world, chest.Pos);
         world.Assign(worker, farm);
         Give(world, Inventory.Coins, 500);

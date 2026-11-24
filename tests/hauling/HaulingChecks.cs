@@ -15,6 +15,8 @@ public static class HaulingChecks {
         Test(CheckHaulerFillsInputsToAFullStack, data);
         Test(CheckHaulerBringsAnInputShortOfABatchBeforeTakingAFullOutput, data);
         Test(CheckHaulerTakesAFullOutputBeforeToppingUpInputs, data);
+        Test(CheckHaulerTakesOutOnlyWhatStorageHasRoomFor, data);
+        Test(CheckHaulerPutsALoadBackWhenNothingTakesItAnyMore, data);
         Test(CheckHaulerTopsUpTheInputCoveringTheFewestBatches, data);
         Test(CheckHaulerTopsUpInputsBeforeTakingAnOutputThatIsNotFull, data);
         Test(CheckCarriedGoodsGoToAStationThatUsesThem, data);
@@ -48,7 +50,7 @@ public static class HaulingChecks {
     private static void CheckHaulerFillsInputsToAFullStack(GameData data) {
         var world = EmptyWorld(data);
         var bench = Bench(world, new Vector2(10, 10), "steel_pick");
-        var chest = world.Add(ThingKind.Chest, new Vector2(13, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10)));
         chest.Inventory.Add("steel_parts", 100); chest.Inventory.Add("wood_parts", 100);
         Staff(world, bench, JobKind.Haul);
         Work(world, 300, () => bench.Inventory["steel_parts"] == 64 && bench.Inventory["wood_parts"] == 64);
@@ -62,7 +64,7 @@ public static class HaulingChecks {
         var world = EmptyWorld(data);
         var bench = Bench(world, new Vector2(10, 10), "planks");
         bench.Inventory.Add("planks", 64);
-        world.Add(ThingKind.Chest, new Vector2(13, 10)).Inventory.Add("wood", 40);
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10))).Inventory.Add("wood", 40);
         var hauler = Staff(world, bench, JobKind.Haul);
         Require(FirstCarry(world, hauler) == "wood", $"a hauler should first bring wood to a table with none, not carry {hauler.Bag.First()}");
     }
@@ -71,10 +73,34 @@ public static class HaulingChecks {
         var world = EmptyWorld(data);
         var bench = Bench(world, new Vector2(10, 10), "planks");
         bench.Inventory.Add("planks", 64); bench.Inventory.Add("wood", 5);
-        world.Add(ThingKind.Chest, new Vector2(13, 10)).Inventory.Add("wood", 40);
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10))).Inventory.Add("wood", 40);
         var hauler = Staff(world, bench, JobKind.Haul);
         Require(FirstCarry(world, hauler) == "planks", $"a hauler should take out a full stack of planks before topping up wood, not carry {hauler.Bag.First()}");
         Require(hauler.Bag["planks"] == 12, $"a hauler should carry 12 planks at a time, not {hauler.Bag["planks"]}");
+    }
+
+    private static void CheckHaulerTakesOutOnlyWhatStorageHasRoomFor(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, new Vector2(10, 10), "planks");
+        bench.Inventory.Add("planks", 64);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10)));
+        chest.Inventory.Slots = 1; chest.Inventory.Add("planks", 61);
+        var hauler = Staff(world, bench, JobKind.Haul);
+        Require(FirstCarry(world, hauler) == "planks" && hauler.Bag["planks"] == 3,
+            $"a hauler should take out only the 3 planks the chest has room for, not {hauler.Bag["planks"]}");
+    }
+
+    private static void CheckHaulerPutsALoadBackWhenNothingTakesItAnyMore(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, new Vector2(10, 10), "planks");
+        bench.Inventory.Add("planks", 20);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(30, 10)));
+        var hauler = Staff(world, bench, JobKind.Haul);
+        Require(FirstCarry(world, hauler) == "planks" && bench.Inventory["planks"] == 8, "a hauler should take 12 planks out of the table");
+        world.SetFilter(chest, "wood", false, true);
+        Work(world, 30, () => hauler.Bag.Count == 0);
+        Require(bench.Inventory["planks"] == 20 && chest.Inventory["planks"] == 0,
+            $"a hauler whose chest stops taking planks should put them back into the table: the table holds {bench.Inventory["planks"]}, the hands {hauler.Bag["planks"]}");
     }
 
     /// <summary>Four steel parts cover two pickaxes and three wood parts cover three, so steel parts come first though there are more of them.</summary>
@@ -82,7 +108,7 @@ public static class HaulingChecks {
         var world = EmptyWorld(data);
         var bench = Bench(world, new Vector2(10, 10), "steel_pick");
         bench.Inventory.Add("steel_parts", 4); bench.Inventory.Add("wood_parts", 3);
-        var chest = world.Add(ThingKind.Chest, new Vector2(13, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10)));
         chest.Inventory.Add("steel_parts", 40); chest.Inventory.Add("wood_parts", 40);
         var hauler = Staff(world, bench, JobKind.Haul);
         Require(FirstCarry(world, hauler) == "steel_parts", $"a hauler should top up the input that covers the fewest batches, not carry {hauler.Bag.First()}");
@@ -92,7 +118,7 @@ public static class HaulingChecks {
         var world = EmptyWorld(data);
         var bench = Bench(world, new Vector2(10, 10), "planks");
         bench.Inventory.Add("planks", 20); bench.Inventory.Add("wood", 10);
-        world.Add(ThingKind.Chest, new Vector2(13, 10)).Inventory.Add("wood", 40);
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10))).Inventory.Add("wood", 40);
         var hauler = Staff(world, bench, JobKind.Haul);
         Require(FirstCarry(world, hauler) == "wood", $"a hauler should top up wood before taking out planks that are not a full stack, not carry {hauler.Bag.First()}");
     }
@@ -103,7 +129,7 @@ public static class HaulingChecks {
         var table = world.Add(ThingKind.Cooktable, new Vector2(10, 10));
         world.SetRecipe(table, "dough");
         table.Inventory.Add("flour", 5);
-        var chest = world.Add(ThingKind.Chest, new Vector2(13, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10)));
         chest.Inventory.Slots = 1; chest.Inventory.Add("stone", 64);
         var hauler = Staff(world, table, JobKind.Haul);
         hauler.Bag.Add("flour", 1); hauler.Destination = chest.Id;
@@ -116,7 +142,7 @@ public static class HaulingChecks {
         var world = EmptyWorld(data);
         var forge = world.Add(ThingKind.Reinforced, new Vector2(10, 10));
         forge.Inventory.Add("iron_bar", 64);
-        world.Add(ThingKind.Chest, new Vector2(13, 10)).Inventory.Add("coal", 100);
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10))).Inventory.Add("coal", 100);
         var hauler = Staff(world, forge, JobKind.Haul);
         FirstCarry(world, hauler);
         Work(world, 30, () => hauler.Bag.Count == 0);
@@ -139,7 +165,7 @@ public static class HaulingChecks {
         var stocked = Bench(world, new Vector2(10, 10), "planks");
         stocked.Inventory.Add("wood", 5);
         var bare = Bench(world, new Vector2(10, 16), "planks");
-        world.Add(ThingKind.Chest, new Vector2(13, 13)).Inventory.Add("wood", 60);
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 13))).Inventory.Add("wood", 60);
         var hauler = Staff(world, stocked, JobKind.Haul);
         world.SetDuty(hauler, bare, JobKind.Haul, true);
         FirstCarry(world, hauler);
@@ -157,7 +183,7 @@ public static class HaulingChecks {
         few.Inventory.Add("planks", 20);
         var many = Bench(world, new Vector2(10, 16), "planks");
         many.Inventory.Add("planks", 30);
-        var chest = world.Add(ThingKind.Chest, new Vector2(13, 13));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 13)));
         var hauler = Staff(world, few, JobKind.Haul);
         world.SetDuty(hauler, many, JobKind.Haul, true);
         GroupHauls(world, hauler, few, many);
@@ -194,10 +220,10 @@ public static class HaulingChecks {
         var world = EmptyWorld(data);
         var bench = Bench(world, new Vector2(10, 10), "planks");
         bench.Inventory.Add("wood", 5);
-        world.Add(ThingKind.Chest, new Vector2(13, 10)).Inventory.Add("wood", 40);
-        var asking = world.Add(ThingKind.Chest, new Vector2(10, 16));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10))).Inventory.Add("wood", 40);
+        var asking = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(10, 16)));
         world.SetFilter(asking, "stone", false, true);
-        world.Add(ThingKind.Chest, new Vector2(13, 16)).Inventory.Add("stone", 12);
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 16))).Inventory.Add("stone", 12);
         var hauler = Staff(world, bench, JobKind.Haul);
         world.SetDuty(hauler, asking, JobKind.Haul, true);
         GroupHauls(world, hauler, bench, asking);
@@ -223,7 +249,7 @@ public static class HaulingChecks {
         var post = world.Add(ThingKind.Signpost, new Vector2(10, 10));
         string crate = World.CrateOf("berries");
         world.SetFilter(post, crate, false, true);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 10)));
         var worker = AddWorker(world, new Vector2(15, 12));
         worker.Bag.Add(PackCrate(world, ("berries", 12)), 1);
         world.Tick(.1f);
@@ -262,12 +288,12 @@ public static class HaulingChecks {
 
     private static void CheckAChestsHaulerFillsItFromStorageThatDoesNotAskForTheItem(GameData data) {
         var world = EmptyWorld(data);
-        var asking = world.Add(ThingKind.Chest, new Vector2(10, 10));
+        var asking = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(10, 10)));
         world.SetFilter(asking, "stone", false, true);
-        var alsoAsking = world.Add(ThingKind.Chest, new Vector2(12, 12));
+        var alsoAsking = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 12)));
         alsoAsking.Inventory.Add("stone", 20);
         world.SetFilter(alsoAsking, "stone", false, true);
-        var open = world.Add(ThingKind.Chest, new Vector2(18, 10));
+        var open = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(18, 10)));
         open.Inventory.Add("stone", 20);
         Staff(world, asking, JobKind.Haul);
         Work(world, 90, () => asking.Inventory["stone"] == 20);
@@ -281,7 +307,7 @@ public static class HaulingChecks {
         string berries = World.CrateOf("berries");
         var chest = StoreCrates(world, new Vector2(10, 10), 1)[0];
         world.SetFilter(chest, berries, false, true);
-        var nearer = world.Add(ThingKind.Chest, new Vector2(13, 10));
+        var nearer = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10)));
         world.SetFilter(nearer, berries, false, true);
         var post = world.Add(ThingKind.Signpost, new Vector2(24, 10));
         world.SetFilter(post, berries, false, true);
@@ -295,7 +321,7 @@ public static class HaulingChecks {
         var world = EmptyWorld(data);
         var bench = Bench(world, new Vector2(10, 10), "planks");
         bench.Inventory.Add("planks", 20);
-        var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(14, 10)));
         world.SetFilter(chest, "planks", false, true);
         Staff(world, chest, JobKind.Haul);
         Work(world, 60, () => chest.Inventory["planks"] == 20);
@@ -304,10 +330,10 @@ public static class HaulingChecks {
 
     private static void CheckAChestsHaulerCarriesOutBeforeFilling(GameData data) {
         var world = EmptyWorld(data);
-        var chest = world.Add(ThingKind.Chest, new Vector2(10, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(10, 10)));
         chest.Inventory.Add("wood", 12);
         world.SetFilter(chest, "stone", false, true);
-        world.Add(ThingKind.Chest, new Vector2(13, 10)).Inventory.Add("stone", 12);
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 10))).Inventory.Add("stone", 12);
         Bench(world, new Vector2(16, 10), "planks");
         var hauler = Staff(world, chest, JobKind.Haul);
         Require(FirstCarry(world, hauler) == "wood", $"a chest's hauler should carry wood out to the table asking for it before fetching stone, not carry {hauler.Bag.First()}");
@@ -315,13 +341,13 @@ public static class HaulingChecks {
 
     private static void CheckAPlacedCrateTakesLoadsLikeAChestButNoCrate(GameData data) {
         var world = EmptyWorld(data);
-        var crate = world.Add(ThingKind.Crate, new Vector2(14, 10));
+        var crate = TakeEverything(world, world.Add(ThingKind.Crate, new Vector2(14, 10)));
         var worker = AddWorker(world, new Vector2(10, 10));
         worker.Bag.Add("stone", 6);
         Work(world, 30, () => worker.Bag.Count == 0);
         Require(crate.Inventory["stone"] == 6, "a worker should store a load in a placed crate as in a chest");
         world.SetFilter(crate, World.CrateOf("berries"), false, true);
-        Require(crate.Inventory.InputFilter.Count == 0, "a placed crate's filter should not name a crate");
+        Require(crate.Inventory.InputFilter.SequenceEqual(new[] { Inventory.Everything }), "a placed crate's filter should not name a crate");
         string packed = PackCrate(world, ("berries", 12));
         Warp(world, worker.Pos + Vector2.One);
         Require(world.Transfer(world.Backpack, worker.Bag, packed, 1) == 1, "a player should hand a worker a packed crate");
@@ -334,7 +360,7 @@ public static class HaulingChecks {
         var table = world.Add(ThingKind.Cooktable, new Vector2(10, 10));
         world.SetRecipe(table, "crushed_berries");
         table.Inventory.Add(Water.Liquid, 5);
-        var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(14, 10)));
         world.SetFilter(chest, Water.Liquid, false, true);
         var hauler = Staff(world, chest, JobKind.Haul);
         Work(world, 30);
@@ -348,7 +374,7 @@ public static class HaulingChecks {
         world.SetRecipe(table, "meat_stew");
         // A stack of 64 liters with 58 in it has room for 6: two full bottles of 3 liters.
         table.Inventory.Add(Water.Liquid, 58);
-        var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(14, 10)));
         chest.Inventory.Add(Water.Full, 5);
         var hauler = Staff(world, chest, JobKind.Haul);
         Work(world, 30, () => hauler.Bag.Count > 0);
@@ -358,7 +384,7 @@ public static class HaulingChecks {
     /// <summary>A bench hauler only stocks it; the work itself waits for a crafter.</summary>
     private static void CheckHaulerStocksBenchForCrafter(GameData data) {
         var world = EmptyWorld(data);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
         chest.Inventory.Add("wood", 20);
         var bench = world.Add(ThingKind.Bench, new Vector2(28, 24));
         bench.Tools!.Add("stone_chisel", 1);
@@ -387,7 +413,7 @@ public static class HaulingChecks {
                 "collecting should also return goods made by a previous recipe");
 
         furnace.Inventory.Add("iron_bar", 1);
-        var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(14, 10)));
         var worker = AddWorker(world, new Vector2(11, 11));
         world.Player = new Vector2(30, 30);
         world.Assign(worker, furnace);
@@ -401,7 +427,7 @@ public static class HaulingChecks {
         var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
         world.SetRecipe(furnace, "iron_bar");
         furnace.Burner!.Add("wood", 3);
-        var chest = world.Add(ThingKind.Chest, new Vector2(24, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(24, 20)));
         chest.Inventory.Add("iron_ore", 4); chest.Inventory.Add("coal", 4);
         world.Assign(AddWorker(world, furnace.Pos), furnace);
         SafeTick(world, 60);
@@ -421,7 +447,7 @@ public static class HaulingChecks {
     private static void CheckTheSecondFurnaceWorkerHaulsRecipeInputsAndStoresSteel(GameData data) {
         var world = EmptyWorld(data);
         var furnace = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
-        var chest = world.Add(ThingKind.Chest, new Vector2(23, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(23, 20)));
         chest.Inventory.Add("iron_bar", 4);
         chest.Inventory.Add("coal", 6);
         var bellowsWorker = AddWorker(world, furnace.Pos + World.BellowsStand);
@@ -453,9 +479,9 @@ public static class HaulingChecks {
         SafeTick(world, data.PackSeconds * data.CrateCapacity + 1);
         string crate = packer.Output!.First()!;
         world.Player = new Vector2(40, 40);
-        var general = world.Add(ThingKind.Chest, packer.Pos + new Vector2(2, 0));
-        var crates = world.Add(ThingKind.Chest, packer.Pos + new Vector2(6, 0));
-        crates.Inventory.InputFilter.Add(World.CrateOf("bread"));
+        var general = TakeEverything(world, world.Add(ThingKind.Chest, packer.Pos + new Vector2(2, 0)));
+        var crates = TakeEverything(world, world.Add(ThingKind.Chest, packer.Pos + new Vector2(6, 0)));
+        crates.Inventory.Filter(World.CrateOf("bread"), false, true);
         general.Inventory.Add("bread", 30); general.Inventory.Add("crate", 4);
         var worker = AddWorker(world, packer.Pos + new Vector2(0, 1));
         worker.Wage = 18;
@@ -491,7 +517,7 @@ public static class HaulingChecks {
 
     private static void CheckHaulerPoursWaterAndStoresTheEmptyBottle(GameData data) {
         var world = new World(data, false);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
         chest.Inventory.Add(Water.Full, 1); chest.Inventory.Add("flour", 4);
         var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
         world.SetRecipe(table, "dough");
@@ -505,7 +531,7 @@ public static class HaulingChecks {
 
     private static void CheckHaulerTakesLeftoverWaterOutInBottles(GameData data) {
         var world = new World(data, false);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
         chest.Inventory.Add(Water.Empty, 1);
         var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
         world.SetRecipe(table, "berry_jam"); table.Inventory.Add(Water.Liquid, 1);

@@ -22,8 +22,8 @@ public static class WorkerStateChecks {
     private static void CheckWaitingWorkerTakesAToolOnceOneIsHung(GameData data) {
         var world = EmptyWorld(data);
         var at = Terrain.Spawn;
-        world.Add(ThingKind.Chest, at + new Vector2(2, 2));
-        var rack = world.Add(ThingKind.Toolstation, at + new Vector2(-2, 2));
+        TakeEverything(world, world.Add(ThingKind.Chest, at + new Vector2(2, 2)));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, at + new Vector2(-2, 2)));
         var tree = world.Add(ThingKind.Tree, at + new Vector2(1, 0), 40);
         world.Player = at; world.Look();
         var cutter = AddWorker(world, tree.Pos);
@@ -35,7 +35,7 @@ public static class WorkerStateChecks {
         Give(world, "steel_axe", 2); world.Transfer(world.Backpack, rack.Inventory, "steel_axe", 1);
         for (int i = 0; i < 20; i++) world.Tick(.1f);
         Require(cutter.Tool == "" && rack.Inventory["steel_axe"] == 1, "a tool station whose filter keeps its axe in should not give it out");
-        world.ClearFilters(rack);
+        world.SetFilter(rack, Inventory.Everything, true, true);
         for (int i = 0; i < 100 && cutter.Tool == ""; i++) world.Tick(.1f);
         Require(cutter.Tool == "steel_axe" && rack.Inventory["steel_axe"] == 0, "a waiting woodcutter should take the axe once the tool station gives it out");
     }
@@ -43,7 +43,7 @@ public static class WorkerStateChecks {
     private static void CheckWorkerOutOfPatchesMovesToTheirOtherJob(GameData data) {
         var world = EmptyWorld(data);
         var at = Terrain.Spawn;
-        world.Add(ThingKind.Chest, at + new Vector2(2, 2));
+        TakeEverything(world, world.Add(ThingKind.Chest, at + new Vector2(2, 2)));
         world.Player = at; world.Look();
         var raker = AddWorker(world, at);
         var raked = world.Add(ThingKind.Leaves, at + new Vector2(-2, -2), 0);
@@ -71,7 +71,7 @@ public static class WorkerStateChecks {
     private static void CheckStrikeResetsWorkState(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
-        world.Add(ThingKind.Chest, new Vector2(12, 10));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 10)));
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
@@ -87,7 +87,7 @@ public static class WorkerStateChecks {
         var world = EmptyWorld(data);
         // Off the map's edge: the tree is out of reach.
         var tree = world.Add(ThingKind.Tree, Vector2.One * (Terrain.Size - 1), 12);
-        world.Add(ThingKind.Chest, Vector2.One * (Terrain.Size - 6));
+        TakeEverything(world, world.Add(ThingKind.Chest, Vector2.One * (Terrain.Size - 6)));
         var worker = AddWorker(world, Vector2.One * (Terrain.Size - 8));
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
@@ -100,7 +100,7 @@ public static class WorkerStateChecks {
     private static void CheckSavedWorkerRestartsWithDefaultWorkState(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
-        world.Add(ThingKind.Chest, new Vector2(12, 10));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 10)));
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);

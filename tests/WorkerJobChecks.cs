@@ -33,7 +33,7 @@ public static class WorkerJobChecks {
         var world = EmptyWorld(data);
         var berries = world.Add(ThingKind.Berries, new Vector2(10, 10), 400);
         var leaves = world.Add(ThingKind.Leaves, new Vector2(10, 14), 400);
-        var chest = world.Add(ThingKind.Chest, new Vector2(13, 12));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 12)));
         var picker = Staff(world, berries, JobKind.Gather);
         world.SetDuty(picker, leaves, JobKind.Gather, true);
         Work(world, 90);
@@ -48,7 +48,7 @@ public static class WorkerJobChecks {
         var tree = world.Add(ThingKind.Tree, new Vector2(14, 10), 4000);
         var crafter = Staff(world, bench, JobKind.Craft);
         world.SetDuty(crafter, tree, JobKind.Gather, true);
-        world.Add(ThingKind.Toolstation, new Vector2(12, 12)).Inventory.Add("steel_axe", 1);
+        TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(12, 12))).Inventory.Add("steel_axe", 1);
         Work(world, 200, () => bench.Inventory["planks"] >= 8);
         Require(bench.Inventory["planks"] >= 8, $"a crafter who also cuts wood should saw planks from the wood they brought: {bench.Inventory["planks"]} planks");
         Require(tree.Remaining == 3988, $"a crafter should go back to sawing after one load of wood, not cut {4000 - tree.Remaining}");
@@ -58,8 +58,8 @@ public static class WorkerJobChecks {
         var world = EmptyWorld(data);
         var forge = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
         var berries = world.Add(ThingKind.Berries, new Vector2(20, 25), 400);
-        var chest = world.Add(ThingKind.Chest, new Vector2(24, 22));
-        chest.Inventory.InputFilter.Add("berries"); chest.Inventory.InputFilter.Add("steel_bar");
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(24, 22)));
+        chest.Inventory.Filter("berries", false, true); chest.Inventory.Filter("steel_bar", false, true);
         var pumper = Staff(world, forge, JobKind.Bellows);
         world.SetDuty(pumper, berries, JobKind.Gather, true);
         Work(world, 60, () => chest.Inventory["berries"] > 0);
@@ -87,8 +87,8 @@ public static class WorkerJobChecks {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 400);
         var next = world.Add(ThingKind.Tree, new Vector2(12, 10), 400);
-        world.Add(ThingKind.Chest, new Vector2(14, 12));
-        var rack = world.Add(ThingKind.Toolstation, new Vector2(11, 13));
+        TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(14, 12)));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(11, 13)));
         foreach (string tool in new[] { "steel_axe", "steel_pick", "steel_hammer", "rake" }) rack.Inventory.Add(tool, 1);
         world.Player = new Vector2(11, 12); world.Look();
         var cutter = Staff(world, tree, JobKind.Gather);
@@ -103,7 +103,7 @@ public static class WorkerJobChecks {
         var world = EmptyWorld(data);
         var berries = world.Add(ThingKind.Berries, new Vector2(10, 10), 400);
         var leaves = world.Add(ThingKind.Leaves, new Vector2(10, 14), 400);
-        var chest = world.Add(ThingKind.Chest, new Vector2(13, 12));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 12)));
         var picker = Staff(world, berries, JobKind.Gather);
         world.SetDuty(picker, leaves, JobKind.Gather, true);
         world.MoveJob(picker, new JobSpot(1), new JobSpot(0));
@@ -129,7 +129,7 @@ public static class WorkerJobChecks {
 
     private static void CheckPlayerGivesAWorkerALoadToCarryOff(GameData data) {
         var world = EmptyWorld(data);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
         var worker = AddWorker(world, chest.Pos + new Vector2(6, 0));
         world.Player = worker.Pos + Vector2.One;
         Give(world, "stone", 20);
@@ -165,7 +165,7 @@ public static class WorkerJobChecks {
 
     private static void CheckAWorkerKeepsALoadAPlayerHoldsUntilTheyLetGo(GameData data) {
         var world = EmptyWorld(data);
-        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
         var worker = AddWorker(world, chest.Pos + new Vector2(1, 0));
         worker.Bag.Add("wood", 12);
         world.Player = worker.Pos + Vector2.One;
@@ -194,7 +194,7 @@ public static class WorkerJobChecks {
         var first = Bench(world, new Vector2(10, 10), "planks");
         var second = Bench(world, new Vector2(10, 16), "planks", "steel_chisel");
         second.Inventory.Add("wood", 5);
-        var chest = world.Add(ThingKind.Chest, new Vector2(13, 13));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 13)));
         var worker = Staff(world, first, JobKind.Haul);
         world.SetDuty(worker, second, JobKind.Craft, true);
         Work(world, 10, () => second.Processing);
@@ -230,7 +230,7 @@ public static class WorkerJobChecks {
         var loaded = EmptyWorld(data);
         loaded.Deserialize(world.Serialize());
         var back = loaded.Workers.Single(w => w.Id == worker.Id);
-        var rack = loaded.Add(ThingKind.Toolstation, back.Pos + new Vector2(3, 0));
+        var rack = TakeEverything(loaded, loaded.Add(ThingKind.Toolstation, back.Pos + new Vector2(3, 0)));
         Work(loaded, 30, () => rack.Inventory["steel_axe"] == 1);
         Require(rack.Inventory["steel_axe"] == 1 && back.Tool == "" && back.ToolSlot.Room("steel_pick") == 1,
             $"after loading, a worker with no job should put the axe back and have room for another tool: rack {rack.Inventory["steel_axe"]}, tool \"{back.Tool}\"");
@@ -238,7 +238,7 @@ public static class WorkerJobChecks {
 
     private static void CheckAWorkerDeliversWhatAPlayerDoesNotHold(GameData data) {
         var world = EmptyWorld(data);
-        var chest = world.Add(ThingKind.Chest, world.Player + new Vector2(3, 0));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, world.Player + new Vector2(3, 0)));
         var worker = AddWorker(world, world.Player + Vector2.One);
         worker.Bag.Add("wood", 6); worker.Bag.Add("stone", 6);
         world.Hold(worker.Bag, worker.Bag.Layout.FindIndex(s => s.Item == "wood"), 6);
@@ -248,7 +248,7 @@ public static class WorkerJobChecks {
 
     private static void CheckAPackedCrateKeepsItsFiltersWhenPutDownAgain(GameData data) {
         var world = EmptyWorld(data);
-        var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
+        var crate = TakeEverything(world, world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0)));
         crate.Inventory.Add("wood", 3);
         world.SetFilter(crate, "wood", false, true); world.SetFilter(crate, "stone", true, true);
         Require(world.PickUpCrate(crate), "a nearby crate should be picked up");
@@ -259,6 +259,7 @@ public static class WorkerJobChecks {
         world.Transfer(placed.Inventory, world.Backpack, "wood", 3);
         Require(world.PickUpCrate(placed), "the emptied crate should be picked up");
         var empty = world.PlaceCrate("crate", world.Player + new Vector2(2, 0))!;
-        Require(empty.Inventory.InputFilter.Count == 0 && empty.Inventory.OutputFilter.Count == 0, "an empty crate put down again should have no filters");
+        Require(empty.Inventory.InputFilter.Count == 0 && empty.Inventory.OutputFilter.SequenceEqual(new[] { Inventory.Everything }),
+            "an empty crate put down again should have a new crate's filters: nothing in, everything out");
     }
 }

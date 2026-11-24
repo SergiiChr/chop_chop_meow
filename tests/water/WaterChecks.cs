@@ -55,7 +55,7 @@ public static class WaterChecks {
         Give(batch, Water.Full, 1);
         Require(batch.Transfer(batch.Backpack, table2.Inventory, Water.Full, 1) == 1 && table2.Inventory[Water.Liquid] == 6 && batch.Backpack[Water.Empty] == 3,
             "a bottle moved into the table by hand must pour too");
-        var chest = batch.Add(ThingKind.Chest, batch.Player + Vector2.Left);
+        var chest = TakeEverything(batch, batch.Add(ThingKind.Chest, batch.Player + Vector2.Left));
         Give(batch, Water.TwoLiters, 1);
         Require(batch.Transfer(batch.Backpack, chest.Inventory, Water.TwoLiters, 1) == 1 && chest.Inventory[Water.TwoLiters] == 1, "bottles must store in ordinary storage as they are");
     }
@@ -128,7 +128,7 @@ public static class WaterChecks {
         var shore = Terrain.WaterPoint(Terrain.Spawn);
         var outward = (shore - Terrain.Lake).Normalized();
         var lake = world.Add(ThingKind.Water, shore, 9999);
-        var chest = world.Add(ThingKind.Chest, shore + outward * 5); chest.Inventory.Add("empty_bottle", 1);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, shore + outward * 5)); chest.Inventory.Add("empty_bottle", 1);
         var worker = AddWorker(world, chest.Pos);
         world.Assign(worker, lake);
         for (int i = 0; i < 240; i++) world.Tick(.25f, true);

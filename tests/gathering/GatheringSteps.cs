@@ -27,7 +27,7 @@ internal static class GatheringSteps {
         world.Notify += said.Add;
         var at = Terrain.Spawn;
         var post = world.Add(ThingKind.Signpost, at + new Vector2(-3, 2));
-        world.Add(ThingKind.Chest, at + new Vector2(2, 2));
+        TakeEverything(world, world.Add(ThingKind.Chest, at + new Vector2(2, 2)));
         world.Add(ThingKind.Tree, at + new Vector2(1, 0), 1);
         world.Add(ThingKind.Tree, at + new Vector2(6, 0), 2);
         world.Add(ThingKind.LooseCoal, at + new Vector2(0, 3), 1);
@@ -45,8 +45,8 @@ internal static class GatheringSteps {
         var world = EmptyWorld(data);
         var bush = world.Add(ThingKind.Bush, new Vector2(10, 10), World.BushLeaves);
         var leaves = world.Add(ThingKind.Leaves, new Vector2(11, 11), World.LeafPatch);
-        var chest = world.Add(ThingKind.Chest, new Vector2(12, 13));
-        var rack = world.Add(ThingKind.Toolstation, new Vector2(12, 8));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 13)));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(12, 8)));
         world.Player = new Vector2(14, 12); world.Look();
         return (world, bush, leaves, chest, rack);
     }

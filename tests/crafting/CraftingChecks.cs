@@ -307,7 +307,7 @@ public static class CraftingChecks {
         Require(anvil.Progress == progress, "a busy player must not advance the anvil");
 
         // A paid smith stays to hammer a running batch; one on strike beside the anvil does not count.
-        var chest = world.Add(ThingKind.Chest, new Vector2(24, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(24, 10)));
         chest.Inventory.Add("steel_bar", 6);
         var worker = AddWorker(world, anvil.Pos + Vector2.One);
         world.Assign(worker, anvil);
@@ -513,7 +513,7 @@ public static class CraftingChecks {
         SafeTick(world, data.Recipes["planks"].Seconds / data.BenchSpeed + Step);
         Require(bench.Inventory["planks"] == 8, "a bench should work with its slotted chisel");
         var worker = AddWorker(world, bench.Pos + Vector2.One);
-        var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(14, 10)));
         chest.Inventory.Add("wood", 2);
         world.UnslotTool(bench, "stone_chisel");
         world.Assign(worker, bench);
@@ -683,7 +683,7 @@ public static class CraftingChecks {
         var world = EmptyWorld(data);
         var forge = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 6));
         forge.Inventory.Add("iron_bar", 20); forge.Inventory.Add("coal", 20); forge.Burner!.Add("coal", 10);
-        world.Add(ThingKind.Chest, forge.Pos + World.BellowsStand);
+        TakeEverything(world, world.Add(ThingKind.Chest, forge.Pos + World.BellowsStand));
         var pumper = Staff(world, forge, JobKind.Bellows);
         Work(world, 10, () => pumper.WorkState == WorkerWorkState.Pumping);
         Require(pumper.WorkState == WorkerWorkState.Pumping, $"a pumper whose spot a chest stands on should pump from beside it, not \"{pumper.Status}\"");

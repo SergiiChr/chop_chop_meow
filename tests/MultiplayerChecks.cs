@@ -96,6 +96,7 @@ public static class MultiplayerChecks {
             var inventory = new Inventory();
             object changed = field.PropertyType switch {
                 var type when type == typeof(int) => 1,
+                var type when type == typeof(bool) => true,
                 var type when type == typeof(FilterList) => new FilterList { "wood" },
                 var type when type == typeof(List<Inventory.Slot>) => new List<Inventory.Slot>(),
                 var type when type == typeof(Dictionary<string, int>) => new Dictionary<string, int> { ["wood"] = 1 },
