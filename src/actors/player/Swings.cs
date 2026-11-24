@@ -81,7 +81,7 @@ public sealed class Swings(World world) {
         for (int i = wolves.Count - 1; i >= 0; i--) {
             var wolf = wolves[i];
             if (torch && (wolf.Leap > 0 && WolfSnap.InAir(wolf) || wolf.Feeding) || !Touches(shape, world.Player, swing.Aim, wolf)) continue;
-            world.Strike(wolf, swing.Damage + ((float)rolls.NextDouble() * 2 - 1) * swing.Spread);
+            world.Strike(wolf, swing.Damage + ((float)rolls.NextDouble() * 2 - 1) * swing.Spread, burnt: torch);
             if (torch) wolf.Flee = World.FleeSeconds;
         }
     }

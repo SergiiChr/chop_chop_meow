@@ -29,7 +29,7 @@ public sealed class WolfBodies(World world) {
 
     /// <summary>How high off the ground the top of a wolf's body is: it rises through the first part of a leap for the throat, and stands taller reared up.</summary>
     public static float Top(Wolf wolf) {
-        if (wolf.Leap <= 0 || !WolfSnap.InAir(wolf)) return wolf.Side != 0 ? RearedTop : StandingTop;
+        if (wolf.Leap <= 0 || !WolfSnap.InAir(wolf)) return wolf.Side != 0 ? RearedTop : StandingTop + WolfCounter.Height(wolf);
         float flown = World.LeapSeconds - wolf.Leap;
         return StandingTop + LeapRise * Mathf.SmoothStep(.05f, .875f, flown / World.LeapSeconds) +
             Movement.Rise(flown, World.LeapSeconds);
@@ -76,7 +76,7 @@ public sealed class WolfBodies(World world) {
     private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) => wolf.Following || wolf.Circle != 0 || Holds(wolf) ? Body(wolf) : Body(wolf, player);
 
     /// <summary>Whether a wolf holds its place at the player: tugging them, pinning them or in the air.</summary>
-    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Stagger > 0 || wolf.Threaten > 0 || WolfSnap.Active(wolf) || wolf.Recover > 0;
+    private static bool Holds(Wolf wolf) => wolf.Tugging || wolf.Side != 0 || wolf.Pinning || wolf.Stagger > 0 || wolf.Threaten > 0 || WolfCounter.Active(wolf) || WolfSnap.Active(wolf) || wolf.Recover > 0;
 
     /// <summary>The nearest points to each other on two line segments, from <paramref name="a0"/> to <paramref name="a1"/> and <paramref name="b0"/> to <paramref name="b1"/>.</summary>
     private static (Vector2 OnA, Vector2 OnB) Closest(Vector2 a0, Vector2 a1, Vector2 b0, Vector2 b1) {

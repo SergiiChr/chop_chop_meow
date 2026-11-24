@@ -1525,6 +1525,8 @@ public partial class WorldView : Node3D {
             if (wolf.Tugging && tugs.ShowTugging(wolf, model, Elapsed, dt)) continue;
             if (wolf.Side != 0 && tugs.ShowHolding(wolf, model, RigOf(wolf.Target), Elapsed, dt)) continue;
             model.Steps = null;
+            if (WolfCounter.Active(wolf)) { ShowWolfCounter(wolf, model, hunted, moved, dt); continue; }
+            model.CounterStage = WolfCounterStage.None;
             if (wolf.Pinning && wolf.LungeFrom != Vector2.Zero && tugs.ShowLunging(wolf, model, Elapsed, dt)) continue;
             // A blow lands in the world as the swing comes down and throws the wolf back there at once; the model hops back from where it stood.
             // The blow can reach this machine a moment before the swing it shows comes down: the model stands until it does.
@@ -1631,6 +1633,43 @@ public partial class WorldView : Node3D {
         }
         foreach (var (wolf, model) in wolves)
             if (!World.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
+    }
+
+    /// <summary>Shows the two hops and puts the dust at the paws that touch or slide.</summary>
+    private void ShowWolfCounter(Wolf wolf, WolfModel model, Vector2 hunted, Vector2 moved, float dt) {
+        var (stage, progress) = WolfCounter.Pose(wolf);
+        if (model.CounterStage == WolfCounterStage.None) {
+            FurAndEmbers(To3(wolf.Pos, .6f)); Sounds?.Play("wolf_hit", wolf.Pos);
+        }
+        bool changed = model.CounterStage != stage;
+        int previousDust = (int)(model.CounterProgress * 4);
+        model.CounterStage = stage; model.CounterProgress = progress;
+        model.KnockBack = model.Drift = Vector2.Zero;
+        model.Struck = false; model.Recoiling = model.Recover = 0; model.Stagger = wolf.Stagger;
+        model.Root.Visible = World.Sees(wolf.Pos);
+        model.Root.Position = To3(wolf.Pos, WolfCounter.Height(wolf));
+        model.Yaw = ActorAnimation.Yaw(Vector2.FromAngle(wolf.Heading), model.Yaw);
+        model.Turning.Hold(model.Yaw); model.Glance = 0;
+        model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+
+        if (stage == WolfCounterStage.Run) model.Move(moved.Length(), dt, true, false);
+        else if (stage == WolfCounterStage.Face) model.Threaten(Elapsed + wolf.Id % 7, dt);
+        else WolfCounterPoses.Show(model, wolf, hunted, stage, progress, dt);
+        if (!model.Root.Visible) return;
+        model.Plant();
+        if (changed && stage is WolfCounterStage.Slide or WolfCounterStage.Pivot)
+            Sounds?.Play(Footsteps.Sound(World, wolf.Pos), wolf.Pos, pitch: .76f);
+        if (stage == WolfCounterStage.Slide && (changed || (int)(progress * 4) > previousDust))
+            CounterDust(model, 0, 1);
+        else if (stage == WolfCounterStage.Pivot) {
+            if (changed) CounterDust(model, 0, 1);
+            else if (progress > .36f && (int)(progress * 4) > previousDust) CounterDust(model, 2, 3);
+        }
+    }
+
+    private void CounterDust(WolfModel model, int left, int right) {
+        Burst((model.Root.Transform * model.SolePoint(left, 4)) with { Y = .05f }, FallDust, 2, .65f, .65f, -.25f, .095f, 1.4f);
+        Burst((model.Root.Transform * model.SolePoint(right, 4)) with { Y = .05f }, FallDust, 2, .65f, .65f, -.25f, .095f, 1.4f);
     }
 
     /// <summary>Seconds into its door check at a cabin a wolf is drawn at, or as the world has it for one not drawn at the door yet.</summary>

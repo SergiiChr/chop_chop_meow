@@ -65,7 +65,7 @@ public sealed class WolfSnap(World world) {
     }
 
     /// <summary>Checks the line in short steps, as a leap stays on its bearing even when it meets a wall.</summary>
-    private Vector2 ClearTo(Vector2 from, Vector2 to, Thing? cabin = null) {
+    internal Vector2 ClearTo(Vector2 from, Vector2 to, Thing? cabin = null) {
         int steps = Math.Max(1, (int)MathF.Ceiling(from.DistanceTo(to) / GroundStep));
         var last = from;
         for (int i = 1; i <= steps; i++) {

@@ -178,6 +178,7 @@ UI and input:
 | `src/actors/enemies/wolf/WolfPatrols.cs` | Wolf dens, the wolves they let out, patrols, smell, howls and the way home |
 | `src/actors/enemies/wolf/WolfHunt.cs` | The pack hunting a player: howling, closing in, leaping, pinning and backing off from firelight |
 | `src/actors/enemies/wolf/WolfSnap.cs` | A wolf's bite: planting its paws, leaping on a fixed line and closing its jaws |
+| `src/actors/enemies/wolf/WolfCounter.cs` | A struck wolf's sideways hop, skid, run, bound behind the attacker and pivot |
 | `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: wolves a torch scared off circling a player, bracing when walked at, running or standing their ground |
 | `src/actors/player/Swings.cs`, `src/actors/player/model/Swing.cs`, `src/actors/player/model/SwingShape.cs` | Players' swings at wolves: when a swing lands, the ground its blade, flame or fist passes over, and the wolves it touches |
 | `src/actors/enemies/wolf/model/Wolf.cs` | `Wolf`, a wolf as the world saves it |
@@ -229,6 +230,7 @@ Rendering and sound:
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
 | `src/actors/model/BodySide.cs` | Which side of a body is its left and which its right, and which side a spot is on |
 | `src/actors/enemies/wolf/display/WolfModel.cs`, `src/actors/enemies/wolf/display/WolfShape.cs` | Builds the wolf and poses it: its gaits, leap, howl, tug, recoil and fall |
+| `src/actors/enemies/wolf/display/WolfCounterPoses.cs` | Poses the wolf's sideways hop, sliding paws and forepaw landing |
 | `src/actors/display/Turning.cs` | How an actor's head, then body, turn toward where it heads, with inertia |
 | `src/actors/display/ActorState.cs` | How a player or worker is drawn: where, facing which way, doing what, and at which doorway stage |
 | `src/actors/display/ArmReach.cs` | Putting a hand on a point: the arm's joint angles for it, and a pose with the arm moved there |
@@ -703,13 +705,16 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   `WolfSnap.Rest` before starting another attack.
   A blow that lands first interrupts either leap. A torch wave can interrupt a normal snap's windup while the wolf is still wary.
   A bite that lands on a player in the open part of a doorway starts a tug (`DoorTug.TugOut`).
-- **First hit.** A surviving wolf is knocked back and turns toward the attacker. After the hop and stagger, it growls with its
-  chest raised and forepaws planted (`Wolf.Threaten`, `WolfModel.Threaten`). It runs thereafter (`Wolf.Aggressive`), including
-  outside sight range, and torch waves cease to scare it. After a miss, it holds for the usual recovery, then runs out and
-  around the player before closing in for another committed bite (`Wolf.Circle`, `WolfHunt.CircleOnMiss`).
+- **First hit.** A wolf that survives a weapon blow in the open winces, hops sideways, and slides on its forepaws.
+  It takes a wide running arc into a second hop behind the line of the blow (`WolfCounter`). It lands on its forepaws first,
+  slides its rear paws round them, and stands facing the player before it can start a bite.
+  The wolf tries the other side if the first route is blocked. With no room, it uses its usual recoil and growl.
+  Fire, shelter, and bodies that enter the route can cut the move short. A torch burn still sends the wolf running off.
+  A struck wolf runs thereafter (`Wolf.Aggressive`) and torch waves cease to scare it.
+  After a missed bite it holds for the usual recovery, then runs out and around the player (`Wolf.Circle`, `WolfHunt.CircleOnMiss`).
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
   A player a wolf had pinned goes free as it leaves.
-  Patrolling, going home or losing its player (who sheltered or left the game) clears the wolf’s current attack, stance and circle (`WolfPatrols.Calm`). It still runs if it has been hit.
+  Patrolling, going home or losing its player (who sheltered or left the game) clears the wolf’s current attack, stance and repositioning (`WolfPatrols.Calm`). It still runs if it has been hit.
 
 Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
 A wolf already chasing the player still follows into the light for a few seconds.

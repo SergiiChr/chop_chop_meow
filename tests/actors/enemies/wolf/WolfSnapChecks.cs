@@ -15,7 +15,8 @@ public static class WolfSnapChecks {
         Test(CheckALeapStopsAtABuilding, data);
         Test(CheckSteppingIntoTheDoorwayCanEvadeABite, data);
         Test(CheckABlowThatLandsFirstStopsTheBite, data);
-        Test(CheckAFirstHitMakesTheWolfLandFacingItsAttacker, data);
+        Test(CheckAFirstHitSendsTheWolfAroundBeforeItAttacks, data);
+        Test(CheckAWolfUsesTheClearSideAfterTheFirstHit, data);
         Test(CheckAStruckWolfRunsAnArcAfterMissingItsBite, data);
     }
 
@@ -103,27 +104,46 @@ public static class WolfSnapChecks {
         Require(world.Health == 100 && wolf.Health < data.WolfHealth, $"a blow that lands while a wolf gathers itself should stop its bite: health {world.Health}");
     }
 
-    private static void CheckAFirstHitMakesTheWolfLandFacingItsAttacker(GameData data) {
+    private static void CheckAFirstHitSendsTheWolfAroundBeforeItAttacks(GameData data) {
         var world = AxeNight(data);
         var wolf = StillWolf(world, Vector2.Right * 1.25f);
-        wolf.Heading = 0;
-        var before = wolf.Pos;
         world.Attack(Vector2.Right);
         SnapTick(world, .44f);
-        Require(wolf.Health < data.WolfHealth && wolf.Pos.X > before.X + .4f, "the first hit should throw the wolf back");
-        var landing = wolf.Pos;
-        SnapTick(world, .52f);
-        Require(wolf.Pos == landing && Vector2.FromAngle(wolf.Heading).Dot(Vector2.Left) > .99f,
-            "the wolf should turn to face the attacker and stand its ground after the hop");
-        SnapTick(world, .6f);
-        Require(wolf.Pos.X < landing.X - .3f && wolf.Chase > 0, "the wolf should run in after standing its ground");
+        Require(wolf.Health < data.WolfHealth, "the blow should land before the wolf hops away");
+        SnapTick(world, .56f);
+        Require(MathF.Abs(wolf.Pos.Y - world.Player.Y) > .8f && wolf.Pos.X > world.Player.X,
+            "the struck wolf should hop to the side and slide wide before running round");
+
+        bool gotBehind = false, facedBehind = false, bounded = false, pivoted = false;
+        for (int i = 0; i < 150 && !WolfSnap.Active(wolf); i++) {
+            var (stage, _) = WolfCounter.Pose(wolf);
+            bounded |= stage == WolfCounterStage.Bound && WolfCounter.Height(wolf) > .12f;
+            pivoted |= bounded && stage == WolfCounterStage.Pivot && WolfCounter.Height(wolf) == 0;
+            bool behind = wolf.Pos.X < world.Player.X - 1;
+            gotBehind |= behind;
+            facedBehind |= behind && Vector2.FromAngle(wolf.Heading).Dot((world.Player - wolf.Pos).Normalized()) > .99f;
+            SnapTick(world, .02f);
+            Require(world.Health == 100, "the wolf must not bite during either repositioning hop or its turn");
+        }
+        Require(bounded && pivoted && gotBehind && facedBehind && WolfSnap.Winding(wolf),
+            "the wolf should bound behind the player, land and turn before it gathers itself for the bite");
+    }
+
+    private static void CheckAWolfUsesTheClearSideAfterTheFirstHit(GameData data) {
+        var world = NightWorld(data);
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(1.2f, 0), Id = 2 });
+        world.Add(ThingKind.Chest, world.Player + new Vector2(1.45f, .58f));
+        world.Strike(wolf, 1);
+        SnapTick(world, .55f);
+        Require(wolf.Pos.Y < world.Player.Y - .8f && world.CanStand(wolf.Pos) && world.Health == 100,
+            $"the wolf should take the other side if a chest blocks the first hop, at {wolf.Pos - world.Player}");
     }
 
     private static void CheckAStruckWolfRunsAnArcAfterMissingItsBite(GameData data) {
         var world = NightWorld(data);
         var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + Vector2.Right * 1.2f });
         world.Strike(wolf, 1);
-        for (int i = 0; i < 75 && !WolfSnap.Winding(wolf); i++) SnapTick(world, .02f);
+        for (int i = 0; i < 175 && !WolfSnap.Winding(wolf); i++) SnapTick(world, .02f);
         Require(WolfSnap.Winding(wolf), "the struck wolf should come in for another bite");
         WalkThroughSnap(world, Vector2.Up, .55f);
         Require(world.Health == 100 && wolf.Recover > 0, "the aggravated wolf should still miss a player who sidesteps the committed bite");

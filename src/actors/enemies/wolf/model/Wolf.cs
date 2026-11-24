@@ -78,6 +78,13 @@ public sealed class Wolf : IWalker {
     public float Stagger { get; set; }
     /// <summary>Whether a player has landed a blow and the wolf now runs whenever it moves in the open.</summary>
     public bool Aggressive { get; set; }
+    /// <summary>The locked path after the first weapon hit: zero side means no repositioning is active.</summary>
+    public int CounterSide { get; set; }
+    public float CounterTime { get; set; }
+    public float CounterMarkX { get; set; }
+    public float CounterMarkY { get; set; }
+    public float CounterBearing { get; set; }
+    public float CounterRadius { get; set; }
     /// <summary>Seconds spent standing its ground after the first hit, after the stagger.</summary>
     public float Threaten { get; set; }
     /// <summary>Seconds left circling after a miss; the sign gives the direction, and zero means it has finished.</summary>

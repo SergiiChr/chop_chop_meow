@@ -25,8 +25,8 @@ public sealed class WolfHunt(World world) {
     internal float RunSpeed => world.Data.WalkSpeed * world.Data.WolfChase;
 
     /// <summary>The first hit turns a surviving wolf on its attacker, if it hasn't got prey to let go of.</summary>
-    internal void ReactToHit(Wolf wolf) {
-        if (wolf.Aggressive) return;
+    internal bool ReactToHit(Wolf wolf, bool burnt) {
+        if (wolf.Aggressive) return false;
         wolf.Aggressive = true;
         wolf.Threaten = ThreatenSeconds;
         wolf.Howl = wolf.HowlIn = 0;
@@ -35,8 +35,14 @@ public sealed class WolfHunt(World world) {
         if (wolf.Mode != WolfMode.Home && !world.Downed && !Doorways.Indoors(world.S.Actor) &&
             !wolf.Tugging && !wolf.Pinning && wolf.Side == 0) {
             wolf.Target = world.S.Actor.Id;
+            bool outside = wolf.DoorCheck == DoorCheckStage.None && world.S.Actor.Door == Doorway.None;
             wolf.EndDoorCheck();
+            if (outside && !burnt && !world.Protected(world.Player) && world.WolfCounter.Start(wolf, world.Player)) {
+                wolf.Threaten = 0;
+                return true;
+            }
         }
+        return false;
     }
 
     /// <summary>Holds a wolf in place through the stagger and the stance that follows the first hit.</summary>
@@ -98,7 +104,7 @@ public sealed class WolfHunt(World world) {
                 if (distance >= closest || WolfSnap.Active(wolf) || wolf.Attack > 0 || Held(wolf, wary) ||
                     wolf.Follow == FollowStage.Routed || world.Protected(wolf.Pos) ||
                     wolf.Howl > 0 || wolf.HowlIn > 0 || wolf.Flee > 0 || wolf.Stagger > 0 ||
-                    wolf.Threaten > 0 || wolf.Recover > 0 || wolf.Circle != 0) continue;
+                    wolf.Threaten > 0 || wolf.Recover > 0 || wolf.Circle != 0 || WolfCounter.Active(wolf)) continue;
                 hunter = wolf; closest = distance;
             }
             if (hunter != null) { world.WolfSnap.Commit(hunter, mark, throat: true); world.Say("A wolf gathers to leap for your throat!"); }
@@ -128,6 +134,11 @@ public sealed class WolfHunt(World world) {
         bool braced = wolf.Follow == FollowStage.Braced;
         if (braced) wolf.Follow = FollowStage.Circling;
         if (wolf.Tugging && world.DoorTug.Tug(wolf) || world.DoorTug.Hold(wolf)) return;
+        if (WolfCounter.Active(wolf)) {
+            if (lit || world.Downed || world.DoorTug.Tugged) WolfCounter.Clear(wolf);
+            else world.WolfCounter.Tick(wolf, dt);
+            return;
+        }
         if (RecoverFromHit(wolf, dt)) return;
         if (wolf.HowlIn > 0) {
             wolf.HowlIn = Math.Max(0, wolf.HowlIn - dt);
@@ -202,7 +213,7 @@ public sealed class WolfHunt(World world) {
     /// <paramref name="following"/> tells that it is in follow mode: scared, with a torch holding it back.
     /// </summary>
     private void Face(Wolf wolf, Vector2 from, float dt, bool following) {
-        if (wolf.Stagger > 0 || wolf.Threaten > 0 || WolfSnap.Active(wolf) || wolf.Recover > 0 || wolf.Pinning) return;
+        if (WolfCounter.Active(wolf) || wolf.Stagger > 0 || wolf.Threaten > 0 || WolfSnap.Active(wolf) || wolf.Recover > 0 || wolf.Pinning) return;
         var went = wolf.Pos - from;
         // A following wolf walks round its player, slower than that, and still faces its way.
         float pace = following ? FollowsItsWayFrom : FacesItsWayFrom;

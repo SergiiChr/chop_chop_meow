@@ -345,7 +345,7 @@ public sealed partial class World {
     public World(GameData data, bool generate = true) {
         Data = data;
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
-        WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
+        WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfCounter = new WolfCounter(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
         Farms = new Farms(this); SteelPipes = new SteelPipes(this);
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
@@ -394,6 +394,7 @@ public sealed partial class World {
     public WolfHunt WolfHunt { get; }
     /// <summary>A wolf's bite: gathering itself, leaping and snapping at where the player is heading.</summary>
     public WolfSnap WolfSnap { get; }
+    public WolfCounter WolfCounter { get; }
     /// <summary>Follow mode: wolves scared by a torch circling a player, bracing, running or standing their ground.</summary>
     public WolfFollow WolfFollow { get; }
     /// <summary>Players' swings at wolves: when each lands and which wolves it touches.</summary>
@@ -1197,11 +1198,14 @@ public sealed partial class World {
     public const float StaggerSeconds = .45f;
     /// <summary>How far a blow throws a wolf back: a short hop, which the view plays as the wolf jumping clear.</summary>
     public const float KnockBackDistance = .5f;
-    /// <summary>A blow landing on a wolf: it takes the damage and is thrown back, and falls once its health is gone.</summary>
-    internal void Strike(Wolf wolf, float damage) {
-        wolf.Health -= damage; KnockBack(wolf);
+    /// <summary>Applies a blow, interrupts the wolf's attack and starts its reaction, or drops it if the blow kills it.</summary>
+    internal void Strike(Wolf wolf, float damage, bool burnt = false) {
+        wolf.Health -= damage;
+        wolf.Snap = wolf.Leap = wolf.Recover = wolf.Threaten = wolf.Circle = 0;
+        wolf.Route.Clear(); WolfCounter.Clear(wolf);
+        if (wolf.Health > 0 && WolfHunt.ReactToHit(wolf, burnt)) return;
+        KnockBack(wolf);
         if (wolf.Health <= 0) KillWolf(wolf);
-        else WolfHunt.ReactToHit(wolf);
     }
     /// <summary>Throws a wolf back from the acting player and leaves it reeling, which stops a snap it had begun.</summary>
     private void KnockBack(Wolf wolf) {
@@ -1209,8 +1213,6 @@ public sealed partial class World {
         wolf.Pos = Slide(wolf.Pos, away * KnockBackDistance);
         wolf.Heading = (-away).Angle();
         wolf.Stagger = StaggerSeconds;
-        wolf.Snap = wolf.Leap = wolf.Recover = wolf.Threaten = wolf.Circle = 0;
-        wolf.Route.Clear();
     }
     /// <summary>Leaves a carcass where a struck wolf fell.</summary>
     private void KillWolf(Wolf wolf) {

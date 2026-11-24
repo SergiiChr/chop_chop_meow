@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What a wolf model shows; a change blends from the pose it had into the new one.</summary>
-public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Rear, Door, Brace, Snap, Threaten }
+public enum WolfMotion { Stand, Walk, Trot, Gallop, Brake, Leap, Feed, Pin, Recoil, Fall, Howl, Tug, Rear, Door, Brace, Snap, Threaten, CounterAir, CounterSlide, CounterPivot }
 
 /// <summary>
 /// A leg's joint angles in degrees, each swinging the segment below forward from its parent's line; Splay swings the whole leg out from the body.
@@ -73,6 +73,8 @@ public sealed class WolfModel {
     public const float GlanceEvery = 4.6f, GlanceSeconds = 1.7f, GlanceApart = 1.3f;
     /// <summary>The recovery clock last seen, and time since the paws landed on screen.</summary>
     public float Recover, LandedFor;
+    public WolfCounterStage CounterStage;
+    public float CounterProgress;
     /// <summary>A leap's bearing from the player to the wolf.</summary>
     public Vector2 Toward;
     /// <summary>Where the wolf was drawn as its latest move began, to ease from: lunging in to take hold, stepping round to pin, or onto a feeding spot.</summary>
@@ -912,6 +914,8 @@ public sealed class WolfModel {
         WolfMotion.Pin or WolfMotion.Rear => new(Planting.Stepped, .12f),
         WolfMotion.Recoil => new(Planting.Stepped, .08f),
         WolfMotion.Threaten => new(Planting.Stepped, .1f),
+        WolfMotion.CounterAir or WolfMotion.CounterSlide => new(Planting.Held, .055f),
+        WolfMotion.CounterPivot => new(Planting.Stepped, .06f),
         WolfMotion.Leap or WolfMotion.Snap => new(Planting.Held, .08f),
         WolfMotion.Door => new(Planting.Set, .12f),
         WolfMotion.Fall or WolfMotion.Tug or WolfMotion.Brake => new(Planting.Set),
@@ -994,6 +998,11 @@ public sealed class WolfModel {
             // Where the paw bone goes, moved from where the pose has it.
             Vector3 shift;
             switch (contacts[leg]) {
+                case var _ when motion == WolfMotion.CounterSlide || motion == WolfMotion.CounterPivot && leg >= 2:
+                    // These pads are deliberately scrubbing across the ground, not anchored to a footprint.
+                    contacts[leg] = PawContact.Free; parted[leg] = Vector3.Zero; since[leg] = 1;
+                    shift = Vector3.Zero;
+                    break;
                 case PawContact.Down when lowest > UpBy:
                     contacts[leg] = PawContact.Free; parted[leg] = toModel.Basis * HeldShift(leg, toes, lowest); since[leg] = 0;
                     shift = parted[leg];

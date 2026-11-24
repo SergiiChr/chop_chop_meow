@@ -47,7 +47,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 22;
+    private const int Protocol = 23;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -618,7 +618,7 @@ public partial class Net : Node {
     }
 
     private static bool ShowsWolfAttack(Wolf wolf) =>
-        WolfSnap.Active(wolf) || wolf.Recover > 0 || wolf.Stagger > 0 || wolf.Threaten > 0 || wolf.Tugging || wolf.Pinning;
+        WolfCounter.Active(wolf) || WolfSnap.Active(wolf) || wolf.Recover > 0 || wolf.Stagger > 0 || wolf.Threaten > 0 || wolf.Tugging || wolf.Pinning;
 
     /// <summary>Sets the numbers that differ from the entry this copy shows, or says the new entry must be read whole.</summary>
     private bool SetInPlace<T>(T target, EntryKey key, byte[] json) where T : class => applied.TryGetValue(key, out var before) && updates.SetNumbers(target, before, json);
