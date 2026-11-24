@@ -37,6 +37,7 @@ public sealed partial class GameData {
         ["wood_parts"] = new() { Name = "Wood parts", Color = "b98552" },
         ["stone"] = new() { Name = "Stone", Color = "aab2af" },
         ["gravel"] = new() { Name = "Gravel", Color = "8f948f" },
+        [Beach.Sand] = new() { Name = "Sand", Color = "d1b17c" },
         ["steel_pipe"] = new() { Name = "Steel pipe", Color = "9cabb3" },
         ["torch"] = new() { Name = "Torch", Color = "e8913a" },
         ["stone_chisel"] = new() { Name = "Stone chisel", Color = "9aa29f", Tool = "chisel" },
@@ -113,6 +114,7 @@ public sealed partial class GameData {
         ["wood"] = new() { How = "Chop trees" },
         ["acorn"] = new() { How = "Chop trees or gather leaves" },
         ["stone"] = new() { How = "Pick up or mine" },
+        [Beach.Sand] = new() { How = "Dig at the beach with a shovel" },
         ["coal"] = new() { How = "Mine or pick up" },
         ["iron_ore"] = new() { How = "Mine" },
         ["tin_ore"] = new() { How = "Mine" },
@@ -132,7 +134,7 @@ public sealed partial class GameData {
     };
     public List<MapRowDef> MapRows { get; } = new() {
         new() { Title = "Wood", Roots = new() { "wood", "acorn" } },
-        new() { Title = "Stone and coal", Roots = new() { "stone", "coal" } },
+        new() { Title = "Stone, coal and sand", Roots = new() { "stone", "coal", Beach.Sand } },
         new() { Title = "Iron and steel", Roots = new() { "iron_ore" } },
         new() { Title = "Tin", Roots = new() { "tin_ore" } },
         new() { Title = "Food", Roots = new() { "berries", "raw_meat" } },

@@ -116,6 +116,8 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<ThingKind, Prop> ghosts = new(), mineGhosts = new();
     private Prop? ghost;
     private MeshInstance3D playerRing = null!, placeTile = null!;
+    private CoastView coast = null!;
+    private const float PlacementSize = 1.4f;
     /// <summary>The red on what the remove selector points at.</summary>
     private RemovalMark removalMark = null!;
     private float pulseRemaining;
@@ -239,12 +241,13 @@ public partial class WorldView : Node3D {
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
         };
         camera.AddChild(fogCover);
-        BuildGround(scene);
+        warmStage = new Node3D();
+        BuildGround(scene, warmStage);
         BuildLook();
         BuildEffects(scene);
         PileShape.Warm(World.Data);
         DoorCheckView.Warm();
-        warmStage = new Node3D(); WorldModels.Warm(warmStage); PileShape.Stage(warmStage, World.Data); LakeDressing.Warm(warmStage); scene.AddChild(warmStage);
+        WorldModels.Warm(warmStage); PileShape.Stage(warmStage, World.Data); LakeDressing.Warm(warmStage); scene.AddChild(warmStage);
         BuildGhosts();
         for (int i = 0; i < World.Carts; i++) idleCarts.Push(NewCart());
         playerShirt = Shirts[0];
@@ -253,7 +256,7 @@ public partial class WorldView : Node3D {
         playerRing.Scale = new Vector3(.42f, 1, .42f);
         playerRing.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         playerRing.Visible = false;
-        placeTile = Add(scene, new PlaneMesh { Size = new Vector2(1.4f, 1.4f) }, GhostValid, Vector3.Zero);
+        placeTile = Add(scene, new PlaneMesh { Size = Vector2.One * PlacementSize }, GhostValid, Vector3.Zero);
         placeTile.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         placeTile.Visible = false;
         removalMark = new RemovalMark(scene, id => props.GetValueOrDefault(id)?.Root);
@@ -643,6 +646,7 @@ public partial class WorldView : Node3D {
         UpdateCounterHits(dt);
         UpdateEffects(dt);
         UpdateMarkers();
+        coast.Update(World.Beach);
         if (Underground) {
             surfacePeople.Clear();
             AddFooting(playerRig);
@@ -1994,22 +1998,28 @@ public partial class WorldView : Node3D {
         var ground = DiggingAt.GetValueOrDefault();
         bool canPoint = Placing != null && !Underground && (DiggingAt.HasValue || TryGroundPoint(Mouse, out ground));
         var kind = Placing.GetValueOrDefault();
-        placeTile.Visible = canPoint && kind != ThingKind.Hole;
         var at = canPoint ? World.Construction.Snap(kind, ground.Round()) : Vector2.Zero;
-        var shown = !canPoint ? null : kind == ThingKind.Mine ? mineGhosts[Cliff.Nearest(at).Ore] : ghosts[kind];
+        bool digging = kind == ThingKind.Hole, sand = canPoint && digging && Beach.IsSand(at);
+        placeTile.Visible = canPoint && (!digging || sand);
+        var shown = !canPoint || sand ? null : kind == ThingKind.Mine ? mineGhosts[Cliff.Nearest(at).Ore] : ghosts[kind];
         if (shown != ghost) {
             if (ghost != null) ghost.Root.Visible = false;
             if (shown != null) shown.Root.Visible = true;
             ghost = shown;
         }
+        if (!canPoint) return;
+        bool valid = digging ? World.Holes.Block(at) == null : World.Construction.PlacementBlock(kind, at, rotation: PlacingRotation) == null;
+        if (placeTile.Visible) {
+            placeTile.Position = To3(at, sand ? .023f : .02f);
+            float scale = sand ? 1 / PlacementSize : 1;
+            placeTile.Scale = new Vector3(scale, 1, scale);
+            placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
+        }
         if (shown == null) return;
-        bool valid = World.Construction.PlacementBlock(kind, at, rotation: PlacingRotation) == null;
         if (shown.Tint != valid) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid; }
         shown.Root.Position = To3(at);
         if (kind == ThingKind.Mine) shown.Body.Rotation = MineModel.Yaw(Cliff.Nearest(at).Face);
         else shown.Root.Rotation = new Vector3(0, -PlacingRotation, 0);
-        placeTile.Position = To3(at, .02f);
-        placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
     }
 
     /// <summary>Builds a hidden, faded ghost of every building, crate and barrel, so picking one in build mode compiles nothing mid-game.</summary>
@@ -2034,6 +2044,9 @@ public partial class WorldView : Node3D {
     public Removal RemovalShown => removalMark.Shown;
     /// <summary>The visible placement preview's model, while a plan or container is being placed.</summary>
     internal Node3D? PlacementGhost => ghost?.Root;
+    /// <summary>The sand square highlighted by the selected shovel.</summary>
+    internal Vector2I? SandTarget => placeTile.Visible && Placing == ThingKind.Hole && ghost == null
+        ? Terrain.TileAt(new Vector2(placeTile.Position.X, placeTile.Position.Z)) : null;
 
     // Strong sun against weak ambient light keeps shaded sides and shadows dark enough to show shapes.
     private const float DaySun = 1, DayAmbientEnergy = .22f;

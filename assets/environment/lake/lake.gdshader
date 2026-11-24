@@ -60,6 +60,9 @@ uniform sampler2D depth_texture : hint_depth_texture, filter_nearest, repeat_dis
 // showing the sand, along its UV.y, the distance out from its line, which starts half of this inland.
 // Zero for the lake, which keeps its whole surface.
 uniform float shore_wander;
+// The coast mesh carries its high-tide waterline in UV.x, in world units inland from its original line.
+uniform float coastal_tide;
+uniform float low_tide_shift;
 
 varying vec2 surface_uv; // Where the surface's maps are read, from its world position
 varying vec2 rest_position; // World x and z of the surface where the waves leave it, which the coast's cut follows
@@ -91,7 +94,8 @@ void fragment() {
 	vec2 at = rest_position;
 	float lobes = sin(at.x * 0.83 + at.y * 0.37) * sin(at.y * 0.61 - at.x * 0.29);
 	float bites = sin(at.x * 2.7 + at.y * 1.9) * sin(at.y * 3.1 - at.x * 2.3);
-	if (UV.y < (lobes * 0.7 + bites * 0.3) * shore_wander * 0.5) discard;
+	float shore = mix(low_tide_shift, UV.x, coastal_tide);
+	if (UV.y + shore < (lobes * 0.7 + bites * 0.3) * shore_wander * 0.5) discard;
 	float time = now();
 
 	// Calculation of the UV with the UV motion sampler

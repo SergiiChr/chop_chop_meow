@@ -16,7 +16,13 @@ public partial class ClockPlate : PanelContainer {
         MouseFilter = MouseFilterEnum.Ignore;
         AddThemeStyleboxOverride("panel", Style.Plate);
         var column = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore }; column.AddThemeConstantOverride("separation", 6); AddChild(column);
-        dial = new DayDial { Arc = () => world.SkyArc, Night = () => world.MoonUp, CustomMinimumSize = new Vector2(0, 62), MouseFilter = MouseFilterEnum.Ignore }; column.AddChild(dial);
+        dial = new DayDial {
+            Arc = () => world.SkyArc,
+            Night = () => world.MoonUp,
+            MoonPhase = () => (world.Moonlight, world.MoonWaxing),
+            CustomMinimumSize = new Vector2(0, 62),
+            MouseFilter = MouseFilterEnum.Ignore,
+        }; column.AddChild(dial);
         time = Style.Heading("", 16); time.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(time);
     }
 

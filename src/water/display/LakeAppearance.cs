@@ -107,12 +107,12 @@ public static class LakeAppearance {
     /// Adds a large surface as tiles of <see cref="Grid"/>, each sharing its edge columns and rows with its neighbours so
     /// they meet without cracks, which Godot leaves undrawn while they are off screen.
     /// </summary>
-    internal static void AddTiles(Node3D parent, string name, float[] columns, float[] rows, Func<float, float, Vector3> at, Material material) {
+    internal static void AddTiles(Node3D parent, string name, float[] columns, float[] rows, Func<float, float, Vector3> at, Material material, Func<float, float, Vector2> uv) {
         for (int column = 0; column + 1 < columns.Length; column += TileVertices - 1)
             for (int row = 0; row + 1 < rows.Length; row += TileVertices - 1)
                 parent.AddChild(new MeshInstance3D {
                     Name = $"{name}_{column}_{row}",
-                    Mesh = Grid(columns[column..Math.Min(columns.Length, column + TileVertices)], rows[row..Math.Min(rows.Length, row + TileVertices)], at),
+                    Mesh = Grid(columns[column..Math.Min(columns.Length, column + TileVertices)], rows[row..Math.Min(rows.Length, row + TileVertices)], at, uv),
                     MaterialOverride = material,
                     CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
                     // The waves move the surface a little past the mesh's own bounds.
@@ -125,14 +125,14 @@ public static class LakeAppearance {
     /// puts its column and row values and those values as its UV.
     /// Every row shares the columns, so a grid denser in some places than others has no cracks between them.
     /// </summary>
-    internal static ArrayMesh Grid(float[] columns, float[] rows, Func<float, float, Vector3> at) {
+    internal static ArrayMesh Grid(float[] columns, float[] rows, Func<float, float, Vector3> at, Func<float, float, Vector2>? uv = null) {
         int width = columns.Length;
         var vertices = new Vector3[width * rows.Length];
         var uvs = new Vector2[vertices.Length];
         for (int row = 0; row < rows.Length; row++)
             for (int column = 0; column < width; column++) {
                 vertices[row * width + column] = at(columns[column], rows[row]);
-                uvs[row * width + column] = new Vector2(columns[column], rows[row]);
+                uvs[row * width + column] = uv?.Invoke(columns[column], rows[row]) ?? new Vector2(columns[column], rows[row]);
             }
         var normals = new Vector3[vertices.Length];
         Array.Fill(normals, Vector3.Up);

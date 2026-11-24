@@ -2,7 +2,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Tracks a held dig until the player finishes it and leaves a hole in the ground.</summary>
+/// <summary>Tracks a held dig until it leaves a planting hole or strips a square of beach sand.</summary>
 public sealed class GroundHoles(World world) {
     internal const float Reach = 1.35f;
 
@@ -20,7 +20,8 @@ public sealed class GroundHoles(World world) {
     internal string? Block(Vector2 at) {
         if (!ShovelSelected) return "Select a shovel to dig.";
         if (!float.IsFinite(at.X) || !float.IsFinite(at.Y) || !Terrain.OnMap(Terrain.TileAt(at))) return "Choose dry, open ground.";
-        return world.Construction.PlacementBlock(ThingKind.Hole, at);
+        return world.Construction.PlacementBlock(ThingKind.Hole, at)
+            ?? (Beach.IsSand(at) ? world.Beach.DigBlock(at) : null);
     }
 
     /// <summary>Starts a fresh dig once the player reaches the tile.</summary>
@@ -58,7 +59,7 @@ public sealed class GroundHoles(World world) {
         Clear(player);
         if (world.Player.DistanceTo(at) > Reach) return false;
         if (Block(at) is string blocked) { world.Say(blocked); return false; }
-        world.Add(ThingKind.Hole, at);
+        if (Beach.IsSand(at)) world.Beach.Strip(at); else world.Add(ThingKind.Hole, at);
         world.Play("dig_toss", at);
         return true;
     }

@@ -19,6 +19,7 @@ public static class Terrain {
     public const float LakeRadius = 15;
     /// <summary>Where the shore starts, measured along the valley; beyond it is sea.</summary>
     public const float CoastLine = 240;
+    internal const float LowTideShift = -.7f;
 
     /// <summary>Distance from the inland corner along the valley.</summary>
     public static float Along(Vector2 p) => p.Dot(Seaward);
@@ -42,12 +43,22 @@ public static class Terrain {
         float along = Along(p), across = Across(p);
         return Math.Min(HalfWidth(along, Math.Sign(across)) - Math.Abs(across), along - 14);
     }
-    /// <summary>Along the valley, the line where the drawn sea meets the sand, a little inland of where walking stops.</summary>
+    /// <summary>The sea's original waterline along the valley, from which the tide shifts the shore.</summary>
     public static float Waterline(float across) => Coast(across) - 1.2f;
-    /// <summary>Units out to sea past where walking stops, just past the drawn waterline; negative inland.</summary>
-    public static float OutToSea(Vector2 p) => Along(p) - Coast(Across(p)) + 1;
-    /// <summary>Water, from just past the line where the drawn sea meets the sand.</summary>
-    public static bool Sea(Vector2 p) => OutToSea(p) > 0;
+    /// <summary>Distance out past the low-tide waterline, including its small wandering edge.</summary>
+    public static float OutToSea(Vector2 p) => FromLowTideLine(p) - SeaWander(p);
+    private static float FromLowTideLine(Vector2 p) => Along(p) - Waterline(Across(p)) + LowTideShift;
+    /// <summary>Water beyond the beach's walkable edge, even when the tide is out.</summary>
+    public static bool Sea(Vector2 p) {
+        float distance = FromLowTideLine(p), wander = ShoreLook.Sand.Wander / 2;
+        return distance > wander || distance > -wander && distance > SeaWander(p);
+    }
+    /// <summary>The coastal water shader's small deviations inland and out to sea from the waterline.</summary>
+    internal static float SeaWander(Vector2 p) {
+        float lobes = MathF.Sin(p.X * .83f + p.Y * .37f) * MathF.Sin(p.Y * .61f - p.X * .29f);
+        float bites = MathF.Sin(p.X * 2.7f + p.Y * 1.9f) * MathF.Sin(p.Y * 3.1f - p.X * 2.3f);
+        return (lobes * .7f + bites * .3f) * ShoreLook.Sand.Wander / 2;
+    }
     /// <summary>How far the drawn sand reaches inland from the line where the drawn sea meets it, from about 2 to 8 units.</summary>
     public static float SandWidth(float across) =>
         5.15f + 1.6f * MathF.Sin(across * .13f + .4f) + .9f * MathF.Sin(across * .41f) + .4f * MathF.Sin(across * 1.1f);

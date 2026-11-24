@@ -58,12 +58,12 @@ internal static class ShorelineAppearance {
         parent.AddChild(new MeshInstance3D { Name = "SoftLakeBank", Mesh = tool.Commit(), MaterialOverride = BankMaterial(ShoreLook.Rocks), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
-    public static void BuildCoast(Node3D parent, bool still) {
+    public static CoastView BuildCoast(Node3D parent, Node3D warm, bool still) {
         var bank = new SurfaceTool(); bank.Begin(Mesh.PrimitiveType.Triangles);
         const float step = .75f;
         void At(float across, float t) {
             float width = Terrain.SandWidth(across);
-            float distance = Mathf.Lerp(BankStart(ShoreLook.Sand), width, t);
+            float distance = Mathf.Lerp(BankStart(ShoreLook.Sand) + Terrain.LowTideShift, width, t);
             Vertex(bank, Terrain.Point(Terrain.Waterline(across) - distance, across), distance, width);
         }
         for (float across = -300; across < 300; across += step)
@@ -72,19 +72,22 @@ internal static class ShorelineAppearance {
                 At(across, a); At(across, b); At(across + step, b);
                 At(across, a); At(across + step, b); At(across + step, a);
             }
-        parent.AddChild(new MeshInstance3D { Name = "SoftCoastalBank", Mesh = bank.Commit(), MaterialOverride = BankMaterial(ShoreLook.Sand), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        var sand = BankMaterial(ShoreLook.Sand);
+        sand.SetShaderParameter("high_tide_margin", Beach.CrestMargin);
+        parent.AddChild(new MeshInstance3D { Name = "SoftCoastalBank", Mesh = bank.Commit(), MaterialOverride = sand, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 
-        // The water starts inland of its line by as far as the waterline wanders, and its shader cuts the wandering edge.
+        // The water mesh extends inland past the widest bank. Its shader cuts the wandering edge as the tide moves.
         // It is dense wherever the map can show it, and coarser out at sea and along the coast past the map's ends.
         float[] sides = [.. LakeAppearance.Steps(-300, -150, 3).SkipLast(1), .. LakeAppearance.Steps(-150, 150, WaterBody.Spacing), .. LakeAppearance.Steps(150, 300, 3).Skip(1)];
-        float[] distances = [.. LakeAppearance.Steps(-ShoreLook.Sand.Wander / 2, 90, WaterBody.Spacing), 120, 200, 400];
+        float[] distances = [.. LakeAppearance.Steps(-10, 90, WaterBody.Spacing), 120, 200, 400];
         var material = LakeAppearance.CreateMaterial(WaterBody.Sea, still);
         material.SetShaderParameter("shore_wander", ShoreLook.Sand.Wander);
-        var water = new Node3D { Name = "CoastalWater" };
+        var water = new Node3D { Name = "CoastalWater", Position = Vector3.Up * LakeAppearance.Level };
         parent.AddChild(water);
         LakeAppearance.AddTiles(water, "CoastalWater", sides, distances, (side, distance) => {
             var p = Terrain.Point(Terrain.Waterline(side) + distance, side);
-            return new Vector3(p.X, LakeAppearance.Level, p.Y);
-        }, material);
+            return new Vector3(p.X, 0, p.Y);
+        }, material, (side, distance) => new Vector2(Terrain.SandWidth(side) + Beach.CrestMargin, distance));
+        return new CoastView(parent, warm, water, sand, material);
     }
 }
