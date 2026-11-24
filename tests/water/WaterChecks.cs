@@ -12,21 +12,21 @@ namespace ChopChopMeow.Tests;
 /// <summary>Focused bottle-state checks; called from the deterministic simulation checks.</summary>
 public static class WaterChecks {
     public static void Run(GameData data) {
-        CheckBottlesPourTheLitersTheyHold(data);
-        CheckBottleStatesAreDefinedInData(data);
-        CheckBottleGivesThreeLiters(data);
-        CheckBottleKeepsPartialStateAcrossSave(data);
-        CheckBottleRecipeMakesEmptyBottleFromTinAndWood(data);
-        CheckRecipesReturnReusableBottles(data);
-        CheckTakingWaterOutNeedsABottleWithRoom(data);
-        CheckQueuedBatchPoursWaterFromBottles(data);
-        CheckQueuedBatchSaysWhatItIsMissing(data);
-        CheckPileHoldsWaterAtAnyFillApartFromEmptyBottles(data);
-        CheckQueuedBatchCountsOnlyCarriedFuel(data);
-        CheckFullBottleQueuedForOneLiterKeepsTheRest(data);
-        CheckSwitchingRecipeTakesWaterIntoBottles(data);
-        CheckStationTakesBottlesForItsWater(data);
-        CheckDismantledStationFillsBottles(data);
+        Test(CheckBottlesPourTheLitersTheyHold, data);
+        Test(CheckBottleStatesAreDefinedInData, data);
+        Test(CheckBottleGivesThreeLiters, data);
+        Test(CheckBottleKeepsPartialStateAcrossSave, data);
+        Test(CheckBottleRecipeMakesEmptyBottleFromTinAndWood, data);
+        Test(CheckRecipesReturnReusableBottles, data);
+        Test(CheckTakingWaterOutNeedsABottleWithRoom, data);
+        Test(CheckQueuedBatchPoursWaterFromBottles, data);
+        Test(CheckQueuedBatchSaysWhatItIsMissing, data);
+        Test(CheckPileHoldsWaterAtAnyFillApartFromEmptyBottles, data);
+        Test(CheckQueuedBatchCountsOnlyCarriedFuel, data);
+        Test(CheckFullBottleQueuedForOneLiterKeepsTheRest, data);
+        Test(CheckSwitchingRecipeTakesWaterIntoBottles, data);
+        Test(CheckStationTakesBottlesForItsWater, data);
+        Test(CheckDismantledStationFillsBottles, data);
     }
 
     private static void CheckBottlesPourTheLitersTheyHold(GameData data) {

@@ -9,16 +9,16 @@ using static WorldSteps;
 /// <summary>Checks for hotbar slots bound to the exact backpack stack put on them.</summary>
 public static class HotbarStackChecks {
     public static void Run(GameData data) {
-        CheckAStackPutOnTheHotbarBindsThatExactStack(data);
-        CheckCtrlAndStoreAllLeaveTheBoundStackBehind(data);
-        CheckABoundStackMovedOutEmptiesItsSlot(data);
-        CheckAMergedStackTakesTheMovedStacksSlot(data);
-        CheckAStackHeldFromAChestMovesIntoTheBackpackOnTheHotbar(data);
-        CheckAWaitingSlotBindsTheFirstStackToArrive(data);
-        CheckABoundStackPutOnAnotherSlotMovesThere(data);
-        CheckABottleStaysBoundThroughSips(data);
-        CheckBindingsComeBackFromASave(data);
-        CheckAStackUsedUpPassesItsSlotToTheNextStack(data);
+        Test(CheckAStackPutOnTheHotbarBindsThatExactStack, data);
+        Test(CheckCtrlAndStoreAllLeaveTheBoundStackBehind, data);
+        Test(CheckABoundStackMovedOutEmptiesItsSlot, data);
+        Test(CheckAMergedStackTakesTheMovedStacksSlot, data);
+        Test(CheckAStackHeldFromAChestMovesIntoTheBackpackOnTheHotbar, data);
+        Test(CheckAWaitingSlotBindsTheFirstStackToArrive, data);
+        Test(CheckABoundStackPutOnAnotherSlotMovesThere, data);
+        Test(CheckABottleStaysBoundThroughSips, data);
+        Test(CheckBindingsComeBackFromASave, data);
+        Test(CheckAStackUsedUpPassesItsSlotToTheNextStack, data);
     }
 
     private static void CheckAStackUsedUpPassesItsSlotToTheNextStack(GameData data) {

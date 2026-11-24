@@ -12,18 +12,18 @@ using static WorkerSteps;
 /// <summary>Simulation checks for mines: marking, building, supplying and mining one, and the end goal's mines.</summary>
 public static class MineChecks {
     public static void Run(GameData data) {
-        CheckMineSitesAlignWithCliffs(data);
-        CheckMinesAreMarkedAtCliffsOnceEach(data);
-        CheckWorkersDigAndFrameMineWithTheirTools(data);
-        CheckWorkerTakesTheFreeHammerFromTheRack(data);
-        CheckPlayerDigsAndFitsAMineWithTheirTools(data);
-        CheckPlayerDeliversOnlyWhatAMineStillNeeds(data);
-        CheckMinersBringOreOutAndStopWhenOutputIsFull(data);
-        CheckOnlyAvailableMinersUnload(data);
-        CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(data);
-        CheckFullMineUnloadsIntoAPackingStationPackingItsOre(data);
-        CheckMiningIsSlowerThanDeposits(data);
-        CheckEndGoalsWantAWorkingMineOnEveryOre(data);
+        Test(CheckMineSitesAlignWithCliffs, data);
+        Test(CheckMinesAreMarkedAtCliffsOnceEach, data);
+        Test(CheckWorkersDigAndFrameMineWithTheirTools, data);
+        Test(CheckWorkerTakesTheFreeHammerFromTheRack, data);
+        Test(CheckPlayerDigsAndFitsAMineWithTheirTools, data);
+        Test(CheckPlayerDeliversOnlyWhatAMineStillNeeds, data);
+        Test(CheckMinersBringOreOutAndStopWhenOutputIsFull, data);
+        Test(CheckOnlyAvailableMinersUnload, data);
+        Test(CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload, data);
+        Test(CheckFullMineUnloadsIntoAPackingStationPackingItsOre, data);
+        Test(CheckMiningIsSlowerThanDeposits, data);
+        Test(CheckEndGoalsWantAWorkingMineOnEveryOre, data);
     }
 
     private static void CheckMineSitesAlignWithCliffs(GameData data) {

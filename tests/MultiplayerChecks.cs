@@ -21,27 +21,27 @@ using static WorldSteps;
 /// </summary>
 public static class MultiplayerChecks {
     public static void Run(GameData data) {
-        CheckGuestActsThroughCommands(data);
+        Test(CheckGuestActsThroughCommands, data);
         GuestCommandChecks.CheckGuestCopyForwardsActions(data);
-        CheckGuestComesBackFromSaveWithTheirPackAndSpot(data);
-        CheckEveryPlayerSurvivesLoadingAndSavingAgain(data);
-        CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole();
-        CheckSaveKeepsItsOwnersPlayerOnANewComputer(data);
-        CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(data);
-        CheckGuestCopyForwardsLayoutActionsToTheHost(data);
-        CheckHotbarAndEndingReachTheServer(data);
-        CheckPlayerComesBackFreeToWalk(data);
-        CheckServerNamesWhatAPlayerMade(data);
-        CheckCopySaysAnActionWasSent(data);
-        CheckWorkersKeepTheirMissingToolThroughTheSave(data);
-        CheckDropOnAnotherItemsChestCellStoresTheStack(data);
-        CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(data);
-        CheckUpdateFieldsLeftOutStartAsNewObjectsDo();
-        CheckUpdateEntriesReadBackAsTheyWere(data);
+        Test(CheckGuestComesBackFromSaveWithTheirPackAndSpot, data);
+        Test(CheckEveryPlayerSurvivesLoadingAndSavingAgain, data);
+        Test(CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole);
+        Test(CheckSaveKeepsItsOwnersPlayerOnANewComputer, data);
+        Test(CheckGuestSlotCommandsMoveOnlyTheirOwnStacks, data);
+        Test(CheckGuestCopyForwardsLayoutActionsToTheHost, data);
+        Test(CheckHotbarAndEndingReachTheServer, data);
+        Test(CheckPlayerComesBackFreeToWalk, data);
+        Test(CheckServerNamesWhatAPlayerMade, data);
+        Test(CheckCopySaysAnActionWasSent, data);
+        Test(CheckWorkersKeepTheirMissingToolThroughTheSave, data);
+        Test(CheckDropOnAnotherItemsChestCellStoresTheStack, data);
+        Test(CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown, data);
+        Test(CheckUpdateFieldsLeftOutStartAsNewObjectsDo);
+        Test(CheckUpdateEntriesReadBackAsTheyWere, data);
         PipeWaterUpdateChecks.CheckPipeWaterUpdatesKeepTheHostsFieldsAndOrder();
-        CheckATreeUpdateCarriesNoStationFields(data);
-        CheckAChangedInventoryFieldIsNeverFresh();
-        CheckStateReadKeepsNothingFromTheOneBefore();
+        Test(CheckATreeUpdateCarriesNoStationFields, data);
+        Test(CheckAChangedInventoryFieldIsNeverFresh);
+        Test(CheckStateReadKeepsNothingFromTheOneBefore);
     }
 
     /// <summary>Updates leave out fields at their type's default, so a guest reading one back must start that field there too.</summary>

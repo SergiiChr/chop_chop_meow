@@ -9,21 +9,21 @@ using static WorldSteps;
 /// <summary>Checks for held stacks: units a player picks up stay in their slot, nobody else takes them, and they land by the rules of where they are put down.</summary>
 public static class HeldStackChecks {
     public static void Run(GameData data) {
-        CheckAHeldStackStaysInItsSlotUntilLetGo(data);
-        CheckPuttingDownFillsTheCellAndKeepsTheRestHeld(data);
-        CheckPuttingDownOnAnotherItemInTheBackpackSwapsThem(data);
-        CheckAnotherPlayerCannotTakeAHeldStackAndIsToldWhy(data);
-        CheckTakeAllAndCollectSayHowManyAnotherPlayerHolds(data);
-        CheckAStationStartsNoBatchWhileAStackInItIsHeld(data);
-        CheckAStationInputTakesOnlyWhatItsRecipeUses(data);
-        CheckAHeldStackIsLetGoOutOfReachAndOnLeaving(data);
-        CheckAHeldBottleStaysOutOfGatheringWater(data);
-        CheckAnEmptyCratePacksOnlyTheHeldUnits(data);
-        CheckAHeldStackIsLetGoOnceItsCrateIsPutDown(data);
-        CheckCompostMakesNothingWhileAStackInItIsHeld(data);
-        CheckACrateHeldFromAChestIsPlacedFromThere(data);
-        CheckAGuestsCommandFromTheHeldStackTakesNoMoreThanItHolds(data);
-        CheckACommandFromTheHeldStackTakesOnlyFromWhereItLies(data);
+        Test(CheckAHeldStackStaysInItsSlotUntilLetGo, data);
+        Test(CheckPuttingDownFillsTheCellAndKeepsTheRestHeld, data);
+        Test(CheckPuttingDownOnAnotherItemInTheBackpackSwapsThem, data);
+        Test(CheckAnotherPlayerCannotTakeAHeldStackAndIsToldWhy, data);
+        Test(CheckTakeAllAndCollectSayHowManyAnotherPlayerHolds, data);
+        Test(CheckAStationStartsNoBatchWhileAStackInItIsHeld, data);
+        Test(CheckAStationInputTakesOnlyWhatItsRecipeUses, data);
+        Test(CheckAHeldStackIsLetGoOutOfReachAndOnLeaving, data);
+        Test(CheckAHeldBottleStaysOutOfGatheringWater, data);
+        Test(CheckAnEmptyCratePacksOnlyTheHeldUnits, data);
+        Test(CheckAHeldStackIsLetGoOnceItsCrateIsPutDown, data);
+        Test(CheckCompostMakesNothingWhileAStackInItIsHeld, data);
+        Test(CheckACrateHeldFromAChestIsPlacedFromThere, data);
+        Test(CheckAGuestsCommandFromTheHeldStackTakesNoMoreThanItHolds, data);
+        Test(CheckACommandFromTheHeldStackTakesOnlyFromWhereItLies, data);
     }
 
     private static void CheckAGuestsCommandFromTheHeldStackTakesNoMoreThanItHolds(GameData data) {
