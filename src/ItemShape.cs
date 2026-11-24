@@ -55,9 +55,9 @@ internal static class ItemShape {
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
         ["wheat_seeds"] = new(Seeds, Sacking, .36f, Rise: .8f),
         ["acorn"] = new(Acorn, Plain, .25f, Lay.Loose),
-        ["nettle"] = new(f => { NettleStalk(f, Vector3.Zero, .56f, 0, 4); NettleStalk(f, new Vector3(.1f, 0, .06f), .42f, 1.1f, 3); NettleStalk(f, new Vector3(-.09f, 0, .05f), .36f, 2.3f, 3); }, Plain, .5f, Lay.Rows, .5f,
-            Piece: f => { NettleStalk(f, Vector3.Zero, .5f, 0, 3, false); Turn(f, 0, new Basis(Vector3.Right, Mathf.DegToRad(-80))); }),
-        ["nettle_rope"] = new(f => RopeCoil(f, 3, 10), Plain, .34f, Rise: .8f, Piece: f => RopeCoil(f, 2, 6)),
+        ["nettle"] = new(f => NettleSprig(f, "tall_a"), Plain, .5f, Lay.Rows, .5f, Piece: f => { NettleSprig(f, "small_b"); Turn(f, 0, new Basis(Vector3.Right, Mathf.DegToRad(-60))); },
+            Scan: NettleShape.Leaves),
+        ["nettle_rope"] = new(f => Baked(f, "rope_bundle_A", Swap(("ab9a89", RopeGreen)), folder: "nettle"), Plain, .5f, Lay.Rows, .8f, Piece: RopeBundle),
         ["bug_net"] = Held("bug_net"),
         ["firebug"] = new(f => Firebug(f, true), Glossy, .2f, Lay.Loose, .7f, Piece: f => Firebug(f, false)),
         ["fertilizer"] = new(f => Sack(f, "b89b66", "9a8052", null, ("4a3524", "6b5233")), Sacking, .36f, Rise: .8f),
@@ -240,11 +240,11 @@ internal static class ItemShape {
 
     /// <summary>
     /// A baked mesh's triangles, each in the colour <paramref name="recolour"/> gives for its own, the mesh stretched
-    /// by <paramref name="stretch"/> where one is given.
+    /// by <paramref name="stretch"/> where one is given. The mesh is in the food folder unless <paramref name="folder"/> names another.
     /// </summary>
-    private static void Baked(List<Face> faces, string name, Func<Color, Color> recolour, Vector3? stretch = null) {
+    private static void Baked(List<Face> faces, string name, Func<Color, Color> recolour, Vector3? stretch = null, string folder = "food") {
         int first = faces.Count;
-        Copy(faces, GD.Load<Mesh>($"res://assets/models/food/{name}.res"), new Transform3D(Basis.FromScale(stretch ?? Vector3.One), Vector3.Zero), Colors.White);
+        Copy(faces, GD.Load<Mesh>($"res://assets/models/{folder}/{name}.res"), new Transform3D(Basis.FromScale(stretch ?? Vector3.One), Vector3.Zero), Colors.White);
         for (int i = first; i < faces.Count; i++) faces[i] = faces[i] with { Tint = recolour(faces[i].Tint) };
     }
 
@@ -512,92 +512,38 @@ internal static class ItemShape {
         }
     }
 
-    /// <summary>A nettle plant as it stands in the world: a clump of stalks of several heights, each turned its own way, chosen by <paramref name="variant"/>.</summary>
-    public static ArrayMesh NettlePlant(int variant) {
-        var faces = new List<Face>();
-        int stalks = 3 + variant % 2;
-        for (int i = 0; i < stalks; i++) {
-            float turn = i * 2.399963f + variant * 1.3f, off = i == 0 ? 0 : .09f + .03f * (i % 2);
-            NettleStalk(faces, new Vector3(MathF.Cos(turn), 0, MathF.Sin(turn)) * off, .78f - .13f * i + .05f * ((variant + i) % 3), turn, i == 0 ? 5 : 4);
-        }
-        return Commit(faces, Transform3D.Identity, looks["nettle"]);
-    }
-
-    /// <summary>
-    /// One nettle stalk standing at <paramref name="foot"/>: pairs of pointed, toothed leaves hang from it, each pair a
-    /// quarter turn from the one below and smaller toward the top, which ends in a tuft.
-    /// Without <paramref name="detail"/> the leaves have no teeth and no underside, for a heap seen from above.
-    /// </summary>
-    private static void NettleStalk(List<Face> faces, Vector3 foot, float height, float turn, int pairs, bool detail = true) {
-        Color stem = new("7aa052"), top = new("4f8a3a"), light = new("629c46"), under = new("3d6c2e");
-        // The stalk leans a little, its own way.
-        var lean = new Vector3(MathF.Cos(turn * 1.7f), 0, MathF.Sin(turn * 1.7f)) * height * .08f;
-        Vector3 At(float share) => foot + Vector3.Up * height * share + lean * share * share;
-        Bar(faces, foot, At(1), .014f, .006f, 4, stem);
-        for (int pair = 0; pair < pairs; pair++) {
-            float share = .22f + .7f * pair / pairs, length = height * (.42f - .2f * pair / pairs);
-            for (int side = 0; side < 2; side++) {
-                float angle = turn + pair * MathF.PI / 2 + side * MathF.PI;
-                NettleLeaf(faces, At(share), new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle)), length, (pair + side) % 2 == 0 ? top : light, detail ? under : null, detail);
-            }
-        }
-        for (int i = 0; i < 4; i++) {
-            float angle = turn + .6f + i * MathF.PI / 2;
-            NettleLeaf(faces, At(1), new Vector3(MathF.Cos(angle), 1.1f, MathF.Sin(angle)).Normalized(), height * .12f, light, detail ? under : null, false);
-        }
-    }
-
-    /// <summary>
-    /// A nettle leaf from the stalk outward along <paramref name="away"/>: widest a third of the way out, folded along
-    /// its midrib, its tip drooping, with a tooth on each edge when <paramref name="toothed"/>.
-    /// The underside is drawn too, in <paramref name="under"/>, unless that is null.
-    /// </summary>
-    private static void NettleLeaf(List<Face> faces, Vector3 root, Vector3 away, float length, Color top, Color? under, bool toothed) {
-        var across = away.Cross(Vector3.Up).Normalized() * length * .3f;
-        Vector3 droop = Vector3.Down * length, up = across.Cross(away).Normalized();
-        Vector3 Rib(float share) => root + away * length * share + droop * (.05f + .3f * share * share);
-        // Each edge runs out from the root to the widest point and back in to the tip, stepping out at the tooth.
-        (float Share, float Width)[] edge = toothed ? [(.34f, 1), (.58f, .66f), (.63f, .86f), (1, 0)] : [(.34f, 1), (1, 0)];
-        void Both(Vector3 a, Vector3 b, Vector3 c) {
-            Tri(faces, a, b, c, up, top);
-            if (under is Color below) Tri(faces, a, b, c, -up, below);
-        }
-        foreach (float side in new[] { -1f, 1f }) {
-            var last = root;
-            float lastShare = 0;
-            foreach (var (share, width) in edge) {
-                var point = Rib(share) + across * side * width + up * length * .07f * width;
-                Both(Rib(lastShare), last, point);
-                if (share < 1) Both(Rib(lastShare), point, Rib(share));
-                (last, lastShare) = (point, share);
-            }
-        }
-    }
+    /// <summary>A scanned nettle sprig standing at the game's size, its leaves cut out of the sprigs' texture.</summary>
+    private static void NettleSprig(List<Face> faces, string name) =>
+        Copy(faces, NettleShape.Sprig(name), new Transform3D(Basis.FromScale(Vector3.One * NettleShape.Scale), Vector3.Zero), Colors.White, draped: true);
 
     /// <summary>Turns the faces from <paramref name="first"/> on about the origin.</summary>
     private static void Turn(List<Face> faces, int first, Basis by) {
-        for (int i = first; i < faces.Count; i++) faces[i] = new(by * faces[i].A, by * faces[i].B, by * faces[i].C, faces[i].Tint);
+        for (int i = first; i < faces.Count; i++) faces[i] = new(by * faces[i].A, by * faces[i].B, by * faces[i].C, faces[i].Tint, faces[i].Draped?.Turned(by));
     }
 
+    // Nettle fibre green, in a lighter and a darker strand.
+    private const string RopeGreen = "7c9a48", RopeShade = "66803a";
+
     /// <summary>
-    /// A hank of nettle rope coiled flat, <paramref name="coils"/> turns high: the strands twist round it in two
-    /// tones, and its loose end lies out to one side.
+    /// A bundle of rope light enough to heap: two long loops, one on the other, bound round the middle.
+    /// The icon shows KayKit's rope bundle instead.
     /// </summary>
-    private static void RopeCoil(List<Face> faces, int coils, int sides) {
-        const float inner = .1f, thick = .05f;
-        string[] strands = ["c9c08a", "8f8856"];
-        var rings = new List<Ring> { (inner, 0, strands[1]) };
-        for (int coil = 0; coil < coils; coil++) {
-            float y = coil * thick * .9f;
-            rings.AddRange(new Ring[] { (inner + thick * 1.6f, y, strands[1]), (inner + thick * 2, y + thick * .5f, strands[0]), (inner + thick * 1.6f, y + thick, strands[0]) });
+    private static void RopeBundle(List<Face> faces) {
+        const float half = .34f, bend = .13f, thick = .034f;
+        const int turns = 4;
+        for (int loop = 0; loop < 2; loop++) {
+            // Each loop runs down one side, round the end, back up the other and round again.
+            var path = new List<Vector3>();
+            float wide = bend * (loop == 0 ? 1 : .86f);
+            for (int end = 0; end < 2; end++)
+                for (int i = 0; i <= turns; i++) {
+                    float angle = (end - .5f) * MathF.PI + MathF.PI * i / turns;
+                    path.Add(new Vector3((end == 0 ? half : -half) + MathF.Cos(angle) * wide, thick + loop * thick * 1.5f, MathF.Sin(angle) * wide));
+                }
+            for (int i = 0; i < path.Count; i++) Bar(faces, path[i], path[(i + 1) % path.Count], thick, thick, 4, new Color(loop == 0 ? RopeGreen : RopeShade));
         }
-        float height = (coils - 1) * thick * .9f + thick;
-        rings.AddRange(new Ring[] { (inner, height, strands[0]), (inner, 0, "7d774a") });
-        // Every other side of a band is the darker strand, a side further round on each band up, so the twist climbs the coil.
-        Lathe(faces, Transform3D.Identity, rings.ToArray(), sides, (row, side) => row >= rings.Count - 2 ? null : strands[(row + side) % 2]);
-        var end = new Vector3(inner + thick * 1.8f, thick * .5f, 0);
-        Bar(faces, end, end + new Vector3(.02f, -.01f, .13f), thick * .45f, thick * .4f, 5, new Color(strands[0]));
-        Bar(faces, end + new Vector3(.02f, -.01f, .13f), end + new Vector3(.03f, -.01f, .16f), thick * .55f, thick * .2f, 5, new Color(strands[1]));
+        var across = new Transform3D(new Basis(Vector3.Forward, MathF.PI / 2), new Vector3(-.03f, thick * 1.7f, 0));
+        Lathe(faces, across, new Ring[] { (bend * 1.25f, 0, RopeShade), (bend * 1.25f, .07f, RopeGreen) }, 6, square: 0);
     }
 
     /// <summary>

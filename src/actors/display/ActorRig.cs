@@ -268,7 +268,7 @@ public sealed class ActorRig {
 
     /// <summary>Builds the tools that hang from the right fist and those that lie along both fists.</summary>
     private void BuildTools() {
-        foreach (var name in new[] { "steel_axe", "steel_pick", "steel_shovel", "rake", "wood_hammer", "steel_hammer", "protest_sign" }) {
+        foreach (var name in new[] { "steel_axe", "steel_pick", "steel_shovel", "rake", "wood_hammer", "steel_hammer", "bug_net", "protest_sign" }) {
             var tool = name == "protest_sign" ? ProtestSign() : Tool(name);
             // The shovel and rake lie through both hands and turn independently of the wrist.
             switch (name) {

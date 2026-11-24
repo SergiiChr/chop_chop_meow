@@ -275,6 +275,8 @@ public static class WorldModels {
         ThingKind.Berries => new[] { new Hit(.65f, 0, 1) },
         ThingKind.Stump => new[] { new Hit(.4f, 0, .4f) },
         ThingKind.Bush => new[] { new Hit(.6f, 0, .6f) },
+        ThingKind.Nettle => [new Hit(.35f, 0, .8f)],
+        ThingKind.Firebug => [new Hit(.5f, FirebugShape.Height - .5f, FirebugShape.Height + .5f)],
         ThingKind.Water => new[] { new Hit(1.2f, 0, .5f) },
         ThingKind.Furnace => new[] { new Hit(.72f, 0, 1.15f) },
         ThingKind.Reinforced => new[] { new Hit(.95f, 0, 1.45f) },
@@ -309,6 +311,8 @@ public static class WorldModels {
             case ThingKind.Hole: prop = new Prop(); TreePlantingShape.Hole(prop.Body); break;
             case ThingKind.Stump: prop = Stump(t.OfTree != 0 ? t.OfTree : t.Id, t.TreeStage); break;
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
+            case ThingKind.Nettle: prop = new Prop(); Add(prop.Body, NettleShape.Plant(t.Id), NettleShape.Leaves, Vector3.Zero); break;
+            case ThingKind.Firebug: prop = FirebugShape.Build(); break;
             case ThingKind.Stone: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero); break;
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case ThingKind.Coal: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.CoalRock, Vector3.Zero); break;

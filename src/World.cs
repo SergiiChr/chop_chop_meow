@@ -961,8 +961,8 @@ public sealed partial class World {
     /// </summary>
     public bool WorksWithSlotted(Thing station, RecipeDef r) => BenchTool(station, r) is string slotted && Faster(slotted, BestTool(r)) == slotted;
     /// <summary>
-    /// Whether the only tool of a recipe's kind the acting player has to hand, slotted at the station or carried, is too
-    /// hard for it.
+    /// Whether every tool of a recipe's kind that the acting player has, slotted at the station or carried, is too hard
+    /// for it; false with no such tool at all.
     /// </summary>
     public bool OnlyTooHard(Thing? station, RecipeDef r) =>
         r.TooHard != "" && !HasToolFor(station, r) && (station != null && BenchTool(station, r.Tool, r.Tier) != null || BestTool(r.Tool, null, r.Tier) != null);
@@ -989,6 +989,7 @@ public sealed partial class World {
     /// Asks a station for batches of a recipe and loads their inputs and one fuel each from the backpack, on top of what the station holds.
     /// A station counts batches of one recipe at a time.
     /// The recipe asked for gets the station's mark, so workers go on making it once the batches are done.
+    /// A recipe whose only tool there is too hard for it is refused in the recipe's own words (<see cref="OnlyTooHard"/>).
     /// Turning from the recipe it is on to another drops the batches still waiting and takes what the station's boxes and fuel slot hold into the backpack;
     /// <see cref="SwitchBlock"/> says when it cannot.
     /// </summary>
@@ -997,6 +998,8 @@ public sealed partial class World {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
         if (Busy() || Forwarded(Verb.QueueBatch, t.Id, item: recipe, count: batches)) return;
         if (SwitchBlock(t, recipe) is string blocked) { Say(blocked); return; }
+        var r = Data.Recipes[recipe];
+        if (OnlyTooHard(t, r)) { Say(r.TooHard); return; }
         int waiting = Waiting(t, recipe);
         if (waiting >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
         string? missing = BatchShort(t, recipe);
@@ -1004,12 +1007,10 @@ public sealed partial class World {
         t.Keep = recipe;
         Ask(t, recipe, waiting + batches);
         batches = t.Batches - waiting;
-        var r = Data.Recipes[recipe];
         // What loads, loads; one message names all that is still missing for the first batch, or else why the fuel slot takes no fuel.
         foreach (var (item, amount) in r.Inputs) Load(t, item, amount * batches);
         if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost, say: missing == null) is string fuel) LoadFuel(t, fuel, batches);
         if (missing != null) Say(missing);
-        if (OnlyTooHard(t, r)) Say(r.TooHard);
     }
     /// <summary>
     /// What a station would still lack for one batch of a recipe once the backpack's share is loaded, as a message, or null for nothing.
@@ -1103,6 +1104,7 @@ public sealed partial class World {
         var cost = BatchCost(recipe);
         if (cost.Count == 0) { Say("Choose a recipe first."); return; }
         var r = Data.Recipes[recipe];
+        if (OnlyTooHard(t, r)) { Say(r.TooHard); return; }
         string? fuel = null;
         if (r.Burns && (fuel = FuelFromBackpack(t, r, cost)) == null) return;
         for (int i = 0; i < batches; i++) {

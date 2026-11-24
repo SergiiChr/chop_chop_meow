@@ -18,7 +18,7 @@ public static class NettleChecks {
         Test(CheckCarriedShovelPicksANettleUnharmed, data);
         Test(CheckFullBackpackLeavesANettleUnpickedAndUnstung, data);
         Test(CheckWorkerPicksNettlesOnlyWithAShovelFromTheRack, data);
-        Test(CheckBuildingOverANettleClearsIt, data);
+        Test(CheckNettleBlocksBuildingUntilItIsPicked, data);
     }
 
     private static void CheckThreeNettlesComeUpEachNightUntilTenStand(GameData data) {
@@ -98,10 +98,13 @@ public static class NettleChecks {
         Require(picker.Tool == "steel_shovel", $"the picker should hold the shovel they picked with: {picker.Tool}");
     }
 
-    private static void CheckBuildingOverANettleClearsIt(GameData data) {
+    private static void CheckNettleBlocksBuildingUntilItIsPicked(GameData data) {
         var (world, nettle) = NettlePatch(data);
-        Give(world, "wood", 8);
+        Give(world, "wood", 8); Give(world, "gravel", 4); Give(world, "steel_shovel");
+        world.Player = nettle.Pos + new Vector2(2, 0);
+        Require(world.Construction.Build(ThingKind.Chest, nettle.Pos) == null && world.Find(nettle.Id) != null, "a chest should not go up where a nettle stands");
+        Require(world.Construction.Build(ThingKind.GravelPath, nettle.Pos) == null, "a gravel path should not be laid where a nettle stands");
+        HoldGather(world, nettle, 4);
         BuildAt(world, ThingKind.Chest, nettle.Pos);
-        Require(world.ThingsOf(ThingKind.Chest).Count == 1 && world.Find(nettle.Id) == null, "a chest should go up on a nettle and clear it away");
     }
 }

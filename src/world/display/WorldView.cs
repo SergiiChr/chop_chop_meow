@@ -669,7 +669,7 @@ public partial class WorldView : Node3D {
 
     private static string? HeldTool(string? selected, Inventory backpack) => selected switch {
         "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
-        "wood_hammer" or "steel_hammer" when backpack[selected] > 0 => selected,
+        "wood_hammer" or "steel_hammer" or "bug_net" when backpack[selected] > 0 => selected,
         _ => null
     };
 
@@ -1309,6 +1309,9 @@ public partial class WorldView : Node3D {
                 if (grew) WorldModels.ShowTreeStage(tree, t.TreeStage);
                 if (first || shaking || grew)
                     tree.Sway.Basis = TreeShake(prop.Shake).Scaled(Vector3.One * TreePlanting.BaseScale(tree.Id) * tree.GrowthScale);
+                break;
+            case FirebugProp bug:
+                FirebugShape.Fly(bug, t.Id, World.Firebugs.At(t), World.Firebugs.DartSpeed, Elapsed, dt);
                 break;
             case DugProp dug:
                 float worked = Clocked(dug.Worked, t.Progress, live, dt);

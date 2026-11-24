@@ -32,6 +32,10 @@ public static class NettleRopeChecks {
         Require(!world.HasToolFor(bench, data.Recipes["nettle_rope"]), "a steel hammer should not count as the tool for nettle rope");
         world.QueueBatch(bench, "nettle_rope");
         Require(said.Contains("Steel hammer will damage the fibers."), $"asking for rope with only a steel hammer should say why not: {string.Join(" | ", said)}");
+        Require(world.Waiting(bench, "nettle_rope") == 0 && bench.Inventory["nettle"] == 0 && world.Backpack["nettle"] == 1, "a refused rope should queue nothing and leave the nettle in the backpack");
+        said.Clear();
+        world.LoadBatch(bench);
+        Require(said.Contains("Steel hammer will damage the fibers.") && bench.Inventory["nettle"] == 0, "loading a batch of rope with only a steel hammer should be refused the same way");
         SafeTick(world, 20);
         Require(bench.Inventory["nettle_rope"] == 0 && !bench.Processing, "a bench with only a steel hammer should start no rope");
     }

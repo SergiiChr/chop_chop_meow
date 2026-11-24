@@ -49,7 +49,7 @@ public sealed class RecipeDef {
     public int Tier { get; set; }
     /// <summary>The highest <see cref="ItemDef.Tier"/> of that tool that will do, for work a harder tool spoils; a tool above it is passed over.</summary>
     public int MaxTier { get; set; } = int.MaxValue;
-    /// <summary>What a player is told who asks for it with only a tool above <see cref="MaxTier"/> to hand; set for a recipe with a highest tier.</summary>
+    /// <summary>What a player is told who asks for it with no tool of its kind but one above <see cref="MaxTier"/>; set for a recipe with a highest tier.</summary>
     public string TooHard { get; set; } = "";
     /// <summary>Whether an item is a tool this recipe can be made with.</summary>
     public bool MadeWith(ItemDef item) => item.Tool == Tool && item.Tier >= Tier && item.Tier <= MaxTier;
