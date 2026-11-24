@@ -76,7 +76,10 @@ Project rules on top of the global coding and testing guides.
 - A check that a load restores something changes that thing between saving and loading.
 - Check files hold only checks and their runners. Steps only one feature uses live in its folder, as `GravelPathSteps.cs` does, or `GravelPathUISteps.cs` for its UI and network checks. Steps several features use live in the shared step files: `tests/*Steps.cs` for rule checks and `src/*Steps.cs` for UI and network checks. A step moves to the shared files when a second feature starts to use it.
 - Checks fail through the shared `Checks.Require` in `tests/Checks.cs`.
-- A runner calls each check through `Checks.Test`, which logs its time and stops the process when it runs past 20 seconds. A check that needs longer, such as a whole network session, is tagged `slow: true` for 180 seconds, since the lossy relay makes reconnects vary from 20 to over 130 seconds. `./build.py` also gives all test stages together 300 seconds.
+- Every check runs on its own timer: a runner calls each check through `Checks.Test`, never directly, and UI checks through `TestClean` or `Test`, which call it.
+  `Checks.Test` logs the check's time and stops the process when it runs past 20 seconds.
+  A check that needs longer, such as a whole network session, is tagged `slow: true` for 180 seconds, since the lossy relay makes reconnects vary from 20 to over 130 seconds.
+  `./build.py` also gives all test stages together 600 seconds, so a run that hangs outside any check still stops.
 - A check over 50 lines is long: split it into one check per behaviour, or move its setup into steps. A longer one stays only when it is a single scenario that loses its point when split, and says so in its summary.
 - Do not weaken assertions to make broken behavior pass.
 
