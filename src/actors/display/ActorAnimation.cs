@@ -43,7 +43,8 @@ public enum ActorAction {
     ClimbLadder,
     PourWater,
     FillVessel,
-    PumpWater
+    PumpWater,
+    Rake
 }
 
 /// <summary>
@@ -65,6 +66,9 @@ public readonly record struct Pose(
     float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Hips = 0, float Sway = 0, float FootL = 0, float FootR = 0, float SplayL = 0, float SplayR = 0, float Grip = 0) {
     /// <summary>How far the hips move forward over the feet, in metres.</summary>
     public float HipShift { get; init; }
+    /// <summary>How far each upper arm turns about its length to put the elbow behind a held shaft.</summary>
+    public float ArmRollL { get; init; }
+    public float ArmRollR { get; init; }
 
     /// <summary>Blends two poses; set hips blend by how far they sit above or below a standing foot, so a foot on or above the ground in both poses stays there.</summary>
     public static Pose Lerp(Pose a, Pose b, float t) {
@@ -75,7 +79,11 @@ public readonly record struct Pose(
             Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
             Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t),
             Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), 0, Mathf.Lerp(a.Sway, b.Sway, t),
-            Mathf.Lerp(a.FootL, b.FootL, t), Mathf.Lerp(a.FootR, b.FootR, t), Mathf.Lerp(a.SplayL, b.SplayL, t), Mathf.Lerp(a.SplayR, b.SplayR, t), Mathf.Lerp(a.Grip, b.Grip, t)) { HipShift = Mathf.Lerp(a.HipShift, b.HipShift, t) };
+            Mathf.Lerp(a.FootL, b.FootL, t), Mathf.Lerp(a.FootR, b.FootR, t), Mathf.Lerp(a.SplayL, b.SplayL, t), Mathf.Lerp(a.SplayR, b.SplayR, t), Mathf.Lerp(a.Grip, b.Grip, t)) {
+            HipShift = Mathf.Lerp(a.HipShift, b.HipShift, t),
+            ArmRollL = Mathf.Lerp(a.ArmRollL, b.ArmRollL, t),
+            ArmRollR = Mathf.Lerp(a.ArmRollR, b.ArmRollR, t)
+        };
         return a.Hips == 0 && b.Hips == 0 ? blend : blend with { Hips = blend.Standing + Mathf.Lerp(a.Hips > 0 ? a.Hips - a.Standing : 0, b.Hips > 0 ? b.Hips - b.Standing : 0, t) };
     }
 
@@ -129,6 +137,7 @@ public static class ActorAnimation {
         ActorAction.Craft => 2.4f,
         ActorAction.Grind => 1.8f,
         ActorAction.Dig => 1.1f,
+        ActorAction.Rake => RakeStroke.Seconds,
         _ => 1
     };
 
@@ -171,6 +180,7 @@ public static class ActorAnimation {
         ActorAction.Protest => "protest_sign",
         ActorAction.Grind => "mortar",
         ActorAction.Dig => "steel_shovel",
+        ActorAction.Rake => "rake",
         _ => null
     };
 
@@ -514,6 +524,8 @@ public static class ActorAnimation {
                 return Keys(p, SweepKeys);
             case ActorAction.AxeSwing or ActorAction.SteelAxeSwing:
                 return Keys(p, AxeSwingKeys, AxeSwingStop);
+            case ActorAction.Rake:
+                return RakeStroke.PoseAt(p, aim?.Mark);
             case ActorAction.Gather:
                 return Keys(p, GatherKeys);
             case ActorAction.PickUp:
@@ -723,7 +735,7 @@ public static class ActorAnimation {
     private static Footing? FeetOf(ActorAction action) => action switch {
         ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep
             or ActorAction.Mine or ActorAction.SteelMine or ActorAction.Pump or ActorAction.PumpWater or ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind
-            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock => StanceFeet,
+            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock or ActorAction.Rake => StanceFeet,
         ActorAction.Gather => SquatFeet,
         ActorAction.Craft => CraftFeet,
         ActorAction.Perch => PerchFeet,
@@ -938,7 +950,8 @@ public static class ActorAnimation {
         bool moving, float blend, BlowAim? aim = null, BlowAim? fromAim = null) {
         var now = PoseAt(to, time, moving, aim);
         if (blend >= 1) return now;
-        return Pose.Lerp(PoseAt(from, fromTime, fromMoving, fromAim), now, Mathf.SmoothStep(0, 1, blend));
+        var pose = Pose.Lerp(PoseAt(from, fromTime, fromMoving, fromAim), now, Mathf.SmoothStep(0, 1, blend));
+        return to == ActorAction.Rake ? RakeStroke.PoseAt(Phase(to, time), aim?.Mark, pose) : pose;
     }
 
     /// <summary>
@@ -1175,6 +1188,7 @@ public static class ActorAnimation {
         return resourceKind switch {
             ThingKind.Tree => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,
             ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => backpack["steel_pick"] > 0 ? ActorAction.SteelMine : ActorAction.Gather,
+            ThingKind.Leaves when backpack["rake"] > 0 => ActorAction.Rake,
             ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.Leaves => ActorAction.Gather,
             ThingKind.Stump or ThingKind.Bush => backpack["steel_shovel"] > 0 ? ActorAction.Dig : ActorAction.Idle,
             // A mine is dug with a pickaxe, then its frame and rails are hammered in.
@@ -1207,6 +1221,7 @@ public static class ActorAnimation {
                 ThingKind.Tree => ActorAction.Chop,
                 ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => ActorAction.Mine,
                 ThingKind.Stump or ThingKind.Bush => ActorAction.Dig,
+                ThingKind.Leaves when worker.Tool == "rake" => ActorAction.Rake,
                 _ => ActorAction.Gather
             };
         }

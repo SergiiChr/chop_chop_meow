@@ -19,7 +19,7 @@ Icons and models are committed; playing does not call an image-generation servic
 ## Source map
 
 - `src/World.cs`: authoritative simulation, independent of menus and rendering.
-- `src/WorldView.cs`: reads world state and draws it.
+- `src/world/display/WorldView.cs`: reads world state and draws it.
 - `src/Game.cs`: creates and holds the interface's parts, routes input.
 - `src/SidePanel.cs` and `src/*Panel.cs`: the side panel and its pages, one node per feature.
 - `src/GameData.cs` and `src/GameTables.cs`: items, buildings, recipes, trade and time values, checked to fit together.

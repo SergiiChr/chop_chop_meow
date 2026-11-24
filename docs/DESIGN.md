@@ -206,10 +206,10 @@ Rendering and sound:
 
 | File | Owns |
 | --- | --- |
-| `src/WorldView.cs` | The 3D scene, orthographic camera, picking, lighting and world animation |
+| `src/world/display/WorldView.cs` | The 3D scene, orthographic camera, picking, lighting and world animation |
 | `src/props/display/TreeFall.cs`, `src/props/display/Thrown.cs` | A felled tree going over about its trunk's foot, and a dug out stump or bush or a chip thrown through the air |
 | `src/props/display/LocalClock.cs` | A count the server keeps, run on by the window between updates for a motion that follows it |
-| `src/WorldScene.cs` | Ground dressing, particles and the animation review |
+| `src/world/display/WorldScene.cs` | Ground dressing, particles and the animation review |
 | `src/terrain/display/TerrainView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/terrain/display/BedMap.cs` | The baked map of where the drawn water lies, which the terrain draws its beds by |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
@@ -227,7 +227,8 @@ Rendering and sound:
 | `src/WorldModels.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/actors/display/ActorRig.cs`, `src/actors/display/HumanShape.cs` | The person model, its joints and the shapes of its body (see [assets/README.md](../assets/README.md)) |
 | `src/actors/display/Outfit.cs`, `src/actors/display/BodyBuild.cs` | The colours a person is drawn in, and the game's and the slim build of a body |
-| `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
+| `src/actors/display/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
+| `src/actors/display/RakeStroke.cs` | The rake's ground stroke and both hands' grips |
 | `src/actors/model/BodySide.cs` | Which side of a body is its left and which its right, and which side a spot is on |
 | `src/actors/enemies/wolf/display/WolfModel.cs`, `src/actors/enemies/wolf/display/WolfShape.cs` | Builds the wolf and poses it: its gaits, leap, howl, tug, recoil and fall |
 | `src/actors/enemies/wolf/display/WolfCounterPoses.cs` | Poses the wolf's sideways hop, sliding paws and forepaw landing |
@@ -251,7 +252,7 @@ Rendering and sound:
 | `src/actors/enemies/wolf/display/TugView.cs` | A wolf tugging a player out of a doorway, wolves reared up onto the player's arms, and the lunge onto them as they fall |
 | `src/actors/enemies/wolf/display/FeedingSpots.cs` | Where wolves stand round a fallen player: feeders side-on to the body, a pinner's paws on the chest |
 | `src/IconRender.cs` | Renders item and building icons from the models (`./build.py icons`) |
-| `src/Sounds.cs` | Plays sound effects |
+| `src/audio/Sounds.cs` | Plays sound effects |
 
 Checks and review tools:
 
@@ -445,6 +446,11 @@ Digging (`ActorAction.Dig`) holds the shovel in both hands: the right on top of 
 Both arms are solved from there with `ArmReach.ArmTo`, and `ActorRig.Show` lays the shaft from the right fist through the left, so the blade goes where the keys take it.
 The front boot stays flat and the back one on its toe at fixed spots, so neither slides as the hips go down and up.
 The handle is kept ahead of the right side of the chest and below the shoulders: at the middle of the chest the folded right arm would lie inside the torso, and higher it would be in front of the face.
+
+Players with a rake in the backpack and workers with one in hand rake leaf patches (`ActorAction.Rake`).
+`RakeStroke` places both hands on the shaft and draws the teeth across the ground toward the actor's feet.
+The leaf rustle starts as the teeth touch the patch.
+The animation review clips are `player rake` and `worker rake`.
 
 A player with something to make by hand squats over it, turning it in both hands (`ActorAction.Craft`), only while standing still.
 

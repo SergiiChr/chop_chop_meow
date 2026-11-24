@@ -772,7 +772,8 @@ A dug-up bush gives 36 leaves, which a worker carries off 12 at a time.
 A worker on the station's Stock job brings tools from other storage to the rack.
 
 Oaks drop a patch of leaves beside the trunk.
-Gather them by hand, or three times as fast with a rake, and they fall again every day.
+Gather them by hand, or pull a rake through them with both hands to gather them three times as fast.
+They fall again every day.
 
 ## Steel piping and water pumps
 
@@ -1228,7 +1229,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), knocking on a cabin door, being tugged back out of one and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, raking leaves, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), knocking on a cabin door, being tugged back out of one and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 A tree is felled with strokes from the side into its trunk, while an axe swung in the air comes down from overhead.
 
@@ -1256,6 +1257,7 @@ Sound effects follow the same actions:
 - axes, pickaxes, anvils, benches and swings have impacts, and fitting a mine's frame clinks on its rails;
 - a bench crushing rocks rings like a pickaxe on stone in place of its knock;
 - a felled tree cracks as it breaks, a tall one tearing at length, and crashes as it reaches the ground;
+- a rake rustles the leaves as its teeth pull them along the ground.
 - a shovel crunches into the soil and throws it aside, and a stump or bush comes out with a heave of earth;
 - picking plants by hand and packing crates rustle, butchering tears, and a mortar grinds;
 - bellows puff;
@@ -1287,6 +1289,7 @@ Sound credits:
 
 - Kenney ([www.kenney.nl](https://www.kenney.nl))
 - Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com))
+- jimmybombimmy for [Pushing Leaves](https://freesound.org/people/jimmybombimmy/sounds/368022/)
 - kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the grass
   and gravel footsteps, the digging, the stomach growl and the intro film's train and office recordings
   ([assets/README.md](assets/README.md#intro-film))
