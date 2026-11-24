@@ -20,8 +20,11 @@ public partial class Game {
         Give(Hosted, bucket);
         await Frames();
         await KeyStroke(Key.Tab);
-        var at = SpotsNearby().First(p => world.Construction.PlacementBlock(ThingKind.Hole, p) == null
-            && Uncovered(view.Screen(p)));
+        var at = Enumerable.Range(0, 16)
+            .Select(i => (home + Vector2.Right.Rotated(i * Mathf.Tau / 16) * 8).Round())
+            .First(p => Uncovered(view.Screen(p)) && world.CanStand(p) && !Terrain.InLake(p, .8f)
+                && world.Things.All(t => t.Pos.DistanceTo(p) > 2.5f)
+                && Enumerable.Range(1, 7).All(step => world.CanStand(home.Lerp(p, step / 8f))));
         await DoubleClick(BagCell(c => c.TooltipText.StartsWith("Steel shovel")));
         await Click(view.Screen(at));
         Require(world.ThingsOf(ThingKind.Hole).Count == 0, "left-clicking open ground should leave the ground unchanged");

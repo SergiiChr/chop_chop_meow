@@ -42,7 +42,7 @@ public sealed class Construction(World world) {
     /// </summary>
     internal const float ResourceRoom = .65f, YardResourceRoom = .3f;
     /// <summary>
-    /// Why a building, or a crate from the backpack when <paramref name="item"/> names one, cannot go here.
+    /// Why a building, a container, or a hole cannot go here.
     /// </summary>
     public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null, float rotation = 0, PipeShape pipeShape = PipeShape.Straight) {
         bool portable = kind is ThingKind.Crate or ThingKind.Barrel;
@@ -63,7 +63,7 @@ public sealed class Construction(World world) {
         if (kind == ThingKind.Mine) return world.Mines.Block(p);
         if (kind == ThingKind.GravelPath) return world.GravelPaths.Block(Terrain.TileAt(p));
         if (IsZone(kind)) return ZoneBlock(kind, p);
-        if (TooFar(p) is string far) return digging ? "Dig within 5 tiles of yourself." : far;
+        if (!digging && TooFar(p) is string far) return far;
         if (Terrain.Spawn.DistanceTo(p) < 1.2f || !digging && world.Player.DistanceTo(p) < 1.2f)
             return "Leave your feet and the arrival point clear.";
         if (kind == ThingKind.Pump) {

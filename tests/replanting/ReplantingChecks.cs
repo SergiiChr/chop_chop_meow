@@ -57,8 +57,9 @@ public static class ReplantingChecks {
         Require(!world.Holes.Begin(PlantingGround, 1), "digging should require a selected shovel");
         Drop(world, "acorn");
         var hole = DigHole(world);
-        Require(world.Construction.PlacementBlock(ThingKind.Hole, PlantingGround + Vector2.Right * 8)
-            == "Dig within 5 tiles of yourself.", "the range message should name digging");
+        var far = PlantingGround + Vector2.Right * 8;
+        Require(world.Construction.PlacementBlock(ThingKind.Hole, far) == null && !world.Holes.Begin(far, 2),
+            "distant open ground should be eligible, but shovel work should start only on arrival");
         Require(hole.Inventory.Count == 0 && world.ThingsOf(ThingKind.Tree).Count == 0,
             "digging without acorns should leave an empty hole");
         Give(world, "wood");

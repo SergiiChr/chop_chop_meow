@@ -873,7 +873,8 @@ Leaf spots show a second slot for acorns, and the lake shows a water droplet in 
 
 Selecting a shovel on the hotbar or double-clicking it in the backpack shows the placement outline.
 Esc leaves the outline active while the shovel is selected on the hotbar.
-Holding right mouse on open ground walks the player to the spot and starts a dig through `GroundHoles.Begin`.
+Holding right mouse on open ground walks the player to the spot.
+`GroundHoles.Begin` starts digging once the player is in reach.
 The outline shows the target while held and lives in the view.
 The server counts shovel work for each hold.
 When enough work has accumulated, `GroundHoles.Finish` places a `Hole` if the player is still holding right mouse.

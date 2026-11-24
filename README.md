@@ -492,7 +492,7 @@ An axe hit has the same one-in-twenty chance to drop an acorn as a pickaxe hit h
 Right-click the acorn to pick it up.
 Double-click a shovel in your backpack, or select it on the hotbar, to see an outline over open ground.
 Esc leaves the outline active while the shovel is selected on the hotbar.
-Hold RMB over the spot to walk over and dig a hole.
+Hold RMB over open ground to walk there and dig a hole when you get close enough.
 Releasing RMB before the dig finishes cancels it.
 Open the hole and place one acorn in its empty slot to plant it. A small nub marks the planted acorn.
 An unused hole disappears at dawn.
