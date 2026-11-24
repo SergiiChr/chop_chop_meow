@@ -12,18 +12,20 @@ using static WorkerSteps;
 /// <summary>Simulation checks for mines: marking, building, supplying and mining one, and the end goal's mines.</summary>
 public static class MineChecks {
     public static void Run(GameData data) {
-        CheckMineSitesAlignWithCliffs(data);
-        CheckMinesAreMarkedAtCliffsOnceEach(data);
-        CheckWorkersDigAndFrameMineWithTheirTools(data);
-        CheckWorkerTakesTheFreeHammerFromTheRack(data);
-        CheckPlayerDigsAndFitsAMineWithTheirTools(data);
-        CheckPlayerDeliversOnlyWhatAMineStillNeeds(data);
-        CheckMinersBringOreOutAndStopWhenOutputIsFull(data);
-        CheckOnlyAvailableMinersUnload(data);
-        CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload(data);
-        CheckFullMineUnloadsIntoAPackingStationPackingItsOre(data);
-        CheckMiningIsSlowerThanDeposits(data);
-        CheckEndGoalsWantAWorkingMineOnEveryOre(data);
+        Test(CheckMineSitesAlignWithCliffs, data);
+        Test(CheckALoadNothingTakesStaysOutOfAMineNotYetOpen, data);
+        Test(CheckMinesAreMarkedAtCliffsOnceEach, data);
+        Test(CheckWorkersDigAndFrameMineWithTheirTools, data);
+        Test(CheckWorkerTakesTheFreeHammerFromTheRack, data);
+        Test(CheckPlayerDigsAndFitsAMineWithTheirTools, data);
+        Test(CheckPlayerDeliversOnlyWhatAMineStillNeeds, data);
+        Test(CheckMinersBringOreOutAndStopWhenOutputIsFull, data);
+        Test(CheckOnlyAvailableMinersUnload, data);
+        Test(CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload, data);
+        Test(CheckAMinerHoldingALoadNothingTakesDoesNotMine, data);
+        Test(CheckFullMineUnloadsIntoAPackingStationPackingItsOre, data);
+        Test(CheckMiningIsSlowerThanDeposits, data);
+        Test(CheckEndGoalsWantAWorkingMineOnEveryOre, data);
     }
 
     private static void CheckMineSitesAlignWithCliffs(GameData data) {
@@ -64,7 +66,7 @@ public static class MineChecks {
         var world = FundedWorld(data);
         var mine = MarkMine(world);
         var cliff = Cliff.Nearest(mine.Pos);
-        var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 - cliff.Along * 2);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 - cliff.Along * 2));
         foreach (var (item, amount) in data.Mine.Materials) chest.Inventory.Add(item, amount);
         chest.Inventory.Add("wood", 20);
         var worker = AddWorker(world, chest.Pos);
@@ -75,7 +77,7 @@ public static class MineChecks {
         Require(worker.Status.Contains("pickaxe"), "a worker without a pickaxe must say so");
 
         // Workers take their tools from a tool station by the storage.
-        var station = world.Add(ThingKind.Toolstation, chest.Pos + cliff.Along * 2);
+        var station = TakeEverything(world, world.Add(ThingKind.Toolstation, chest.Pos + cliff.Along * 2));
         station.Inventory.Add("steel_pick", 1);
         float started = world.Time;
         Work(world, data.DaySeconds * 3, () => mine.MineStage > MineStage.Marked);
@@ -111,7 +113,7 @@ public static class MineChecks {
         var cliff = Cliff.Of(ThingKind.Iron);
         var mine = world.Add(ThingKind.Mine, cliff.MineSpot);
         mine.MineStage = MineStage.Supplied;
-        var rack = world.Add(ThingKind.Toolstation, mine.Pos + cliff.Face * 2);
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, mine.Pos + cliff.Face * 2));
         rack.Inventory.Add("steel_hammer", 1);
         rack.Inventory.Add("wood_hammer", 1);
         world.Player = rack.Pos + cliff.Along;
@@ -168,7 +170,7 @@ public static class MineChecks {
         var mine = MarkMine(world);
         mine.MineStage = MineStage.Open;
         var cliff = Cliff.Nearest(mine.Pos);
-        var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3));
         var crew = Enumerable.Range(0, 4).Select(_ => AddWorker(world, chest.Pos + cliff.Along)).ToList();
         foreach (var w in crew) { w.Tool = "steel_pick"; world.Assign(w, mine); }
         Require(crew.Take(3).All(w => w.Assignment == mine.Id) && crew[3].Assignment == 0, "a mine must take three workers and refuse a fourth");
@@ -204,7 +206,7 @@ public static class MineChecks {
         Require(loaded.MineStage == MineStage.Open && loaded.Output!.Count == held, "a save must keep the mine's stage and output");
 
         // A miner dismissed mid-haul leaves their load in a recovery box.
-        world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
+        TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3));
         // The miners waited in the clearing while the mine had nowhere to unload, and walk back.
         Work(world, 90, () => crew.Any(w => w.Bag.Count > 0));
         var carrier = crew.First(w => w.Bag.Count > 0);
@@ -216,11 +218,22 @@ public static class MineChecks {
         var world = FundedWorld(data);
         var mine = MarkMine(world); OpenMine(mine);
         mine.Output!.Add(Mines.Ore(mine), mine.Output.StackSize);
-        var rack = world.Add(ThingKind.Toolstation, mine.Pos + Cliff.Nearest(mine.Pos).Face * 4);
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, mine.Pos + Cliff.Nearest(mine.Pos).Face * 4));
         rack.Inventory.Add("steel_pick", 1);
         var miner = Staff(world, mine, JobKind.Mine);
         Work(world, 20);
         Require(rack.Inventory["steel_pick"] == 1 && miner.Tool == "", "a miner should not fetch a pickaxe for a full mine with nowhere to unload");
+    }
+
+    /// <summary>Mining moves the mine's output into the miner's hands, so a miner holding a load nothing takes does not mine.</summary>
+    private static void CheckAMinerHoldingALoadNothingTakesDoesNotMine(GameData data) {
+        var world = FundedWorld(data);
+        var mine = MarkMine(world); OpenMine(mine);
+        var miner = Staff(world, mine, JobKind.Mine);
+        miner.Tool = "steel_pick"; miner.Bag.Add("wood", 6);
+        Work(world, 20);
+        Require(miner.Bag["wood"] == 6 && mine.Output!.Count == 0 && miner.WorkState != WorkerWorkState.Underground,
+            $"a miner holding wood nothing takes should not mine: {miner.Status}, the mine holds {mine.Output!.Count}");
     }
 
     private static void CheckFullMineUnloadsIntoAPackingStationPackingItsOre(GameData data) {
@@ -240,7 +253,7 @@ public static class MineChecks {
         var world = FundedWorld(data);
         var mine = MarkMine(world); mine.MineStage = MineStage.Open;
         var cliff = Cliff.Nearest(mine.Pos);
-        var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3));
         var builder = AddWorker(world, mine.Pos);
         world.SetDuty(builder, mine, JobKind.Build, true);
         var elsewhere = AddWorker(world, chest.Pos);
@@ -264,7 +277,7 @@ public static class MineChecks {
             var cliff = Cliff.Of(ThingKind.Iron);
             Thing source;
             if (mining) { source = MarkMine(world); source.MineStage = MineStage.Open; } else source = world.Add(ThingKind.Iron, cliff.MineSpot, 400);
-            var chest = world.Add(ThingKind.Chest, source.Pos + cliff.Face * 2.5f);
+            var chest = TakeEverything(world, world.Add(ThingKind.Chest, source.Pos + cliff.Face * 2.5f));
             var worker = AddWorker(world, chest.Pos);
             worker.Tool = "steel_pick";
             world.Assign(worker, source);
@@ -284,5 +297,17 @@ public static class MineChecks {
         Require(!world.EndGoalsComplete, "an unfinished mine must not count");
         OpenMine(world.Things.Last(t => t.Kind == ThingKind.Mine));
         Require(world.EndGoalsComplete, "a working mine on every ore and a week of profit must complete the end goals");
+    }
+
+    /// <summary>A marked mine's output is not shown until the mine opens, so a worker holding stone nothing takes keeps it rather than putting it there.</summary>
+    private static void CheckALoadNothingTakesStaysOutOfAMineNotYetOpen(GameData data) {
+        var world = EmptyWorld(data);
+        var cliff = Cliff.Of(ThingKind.Coal);
+        var mine = world.Add(ThingKind.Mine, cliff.MineSpot);
+        Require(mine.MineStage == MineStage.Marked, "a mine just added should be marked, not open");
+        var worker = AddWorker(world, cliff.MineSpot + cliff.Face * 3);
+        worker.Bag.Add("stone", 4);
+        Work(world, 30);
+        Require(mine.Output!["stone"] == 0 && worker.Bag["stone"] == 4, $"a worker should keep stone nothing takes rather than put it in a mine not yet open: {worker.Status}");
     }
 }

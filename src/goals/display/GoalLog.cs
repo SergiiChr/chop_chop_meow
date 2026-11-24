@@ -111,14 +111,14 @@ public partial class GoalLog : VBoxContainer {
         if (goal.Id == GoalId.Mines) {
             foreach (var ore in Cliff.Ores) {
                 string oreName = ore.Id();
-                string article = "aeiou".Contains(oreName[0]) ? "an" : "a";
                 var row = new HBoxContainer();
                 detailBody.AddChild(row);
                 var mark = Style.Text("", 16, Style.Tan);
                 mark.Name = $"goal_mine_{oreName}";
                 mark.CustomMinimumSize = new Vector2(20, 0);
                 row.AddChild(mark);
-                row.AddChild(Style.Text($"Build {article} {oreName} mine.", 16, Style.Ink));
+                string mine = world.A($"{oreName} mine");
+                row.AddChild(Style.Text($"Build {mine}.", 16, Style.Ink));
                 progress.Watch(() => world.Mines.Working(ore), open => {
                     mark.Text = open ? "✓" : "○";
                     mark.AddThemeColorOverride("font_color", open ? Style.Rise : Style.Tan);

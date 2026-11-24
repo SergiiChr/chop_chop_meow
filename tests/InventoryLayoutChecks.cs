@@ -10,12 +10,12 @@ public static class InventoryLayoutChecks {
         Inventory.Unstacked.Add("water"); Inventory.Unstacked.Add("water_2");
         Inventory.Unstacked.Add("water_1"); Inventory.Unstacked.Add("empty_bottle");
         Inventory.Unstacked.Add("steel_axe");
-        CheckStacksMoveAndSplitToChosenCells();
-        CheckMovesBetweenInventoriesKeepEveryUnit();
-        CheckMovesAndMergesTakeOnlyTheRoomThereIs();
-        CheckReplacedItemKeepsItsCellAndSavesKeepTheLayout();
-        CheckEachBottleKeepsItsOwnCell();
-        CheckShrunkSlotLimitKeepsOverflowingStacks();
+        Test(CheckStacksMoveAndSplitToChosenCells);
+        Test(CheckMovesBetweenInventoriesKeepEveryUnit);
+        Test(CheckMovesAndMergesTakeOnlyTheRoomThereIs);
+        Test(CheckReplacedItemKeepsItsCellAndSavesKeepTheLayout);
+        Test(CheckEachBottleKeepsItsOwnCell);
+        Test(CheckShrunkSlotLimitKeepsOverflowingStacks);
     }
 
     private static void CheckStacksMoveAndSplitToChosenCells() {

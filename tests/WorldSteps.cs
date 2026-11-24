@@ -22,6 +22,13 @@ internal static class WorldSteps {
         foreach (var slot in world.SlotRules(station.Kind)) station.Tools!.Add(world.Data.PlainestTool(slot.Tool, slot.Tier), 1);
     }
 
+    /// <summary>The player sets a chest's, placed crate's, tool station's, trading post's or compost's input filter to Everything, so workers bring it anything it holds.</summary>
+    public static Thing TakeEverything(World world, Thing store) {
+        world.SetFilter(store, Inventory.Everything, false, true);
+        Require(store.Inventory.InputFilter.SequenceEqual([Inventory.Everything]), $"the {store.Kind} input filter should hold Everything alone");
+        return store;
+    }
+
     /// <summary>A world without its starting map, with a fed and healthy player on the first morning.</summary>
     public static World EmptyWorld(GameData data) => new(data, false);
 
@@ -74,10 +81,10 @@ internal static class WorldSteps {
         var world = new World(data);
         RunUntilPhase(world, .3f);
         var at = world.Player;
-        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 0));
-        world.Add(ThingKind.Chest, at + new Vector2(2, -2));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, at + new Vector2(2, 0)));
+        TakeEverything(world, world.Add(ThingKind.Chest, at + new Vector2(2, -2)));
         chest.Inventory.Add("iron_bar", 20); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_ore", 20); chest.Inventory.Add("wood", 30);
-        var rack = world.Add(ThingKind.Toolstation, at + new Vector2(-2, 0));
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, at + new Vector2(-2, 0)));
         rack.Inventory.Add("steel_axe", 2);
         var fire = world.Add(ThingKind.Campfire, at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
         var furnace = world.Add(ThingKind.Furnace, at + new Vector2(3, 3));
@@ -104,7 +111,7 @@ internal static class WorldSteps {
         var bottles = world.Add(ThingKind.Pile, shore + inland * 4);
         bottles.Inventory.Add(Water.Full, 4); bottles.Inventory.Add(Water.TwoLiters, 2);
         world.Add(ThingKind.Pile, shore + inland * 4 + new Vector2(-3, 0)).Inventory.Add(Water.Empty, 4);
-        stock = world.Add(ThingKind.Chest, shore + inland * 4 + new Vector2(3, 0));
+        stock = TakeEverything(world, world.Add(ThingKind.Chest, shore + inland * 4 + new Vector2(3, 0)));
         stock.Inventory.Slots = 40; stock.Inventory.Add("raw_meat", 64); stock.Inventory.Add("wood", 64);
         var table = world.Add(ThingKind.Cooktable, shore + inland * 4 + new Vector2(0, 3));
         world.SetRecipe(table, "meat_stew");
@@ -120,7 +127,7 @@ internal static class WorldSteps {
         var cliff = Cliff.Of(ThingKind.Iron);
         world.Player = cliff.MineSpot + cliff.Face * 3;
         mine = world.Add(ThingKind.Mine, cliff.MineSpot); mine.MineStage = MineStage.Open;
-        world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
+        TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3));
         for (int i = 0; i < data.Mine.Workers; i++) {
             var w = AddWorker(world, mine.Pos + cliff.Face * 2);
             w.Tool = "steel_pick"; world.Assign(w, mine);
@@ -134,7 +141,7 @@ internal static class WorldSteps {
         RunUntilPhase(world, .3f);
         var at = Terrain.Spawn;
         world.Player = at + new Vector2(-20, 0);
-        stock = world.Add(ThingKind.Chest, at + new Vector2(2, 0));
+        stock = TakeEverything(world, world.Add(ThingKind.Chest, at + new Vector2(2, 0)));
         var packer = world.Add(ThingKind.Packer, at); world.SetPacking(packer, "berries");
         var sign = world.Add(ThingKind.Signpost, at + new Vector2(0, 3));
         world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);

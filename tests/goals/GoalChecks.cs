@@ -3,6 +3,8 @@ using Godot;
 using static Checks;
 using static SetupSteps;
 using static WorldSteps;
+using static EconomySteps;
+using static PlayerSteps;
 
 /// <summary>Checks of discovering and completing goals.</summary>
 public static class GoalChecks {
@@ -11,6 +13,7 @@ public static class GoalChecks {
         Test(CheckSeeingOreUnlocksSteelToolsAndSurvivesLoading, data);
         Test(CheckSteelToolsGoalWaitsForBothAHammerAndAPickaxe, data);
         Test(CheckGoalsUnlockAndCompleteIndependently, data);
+        Test(CheckSettlementRemembersWhatItHasHad, data);
     }
 
     /// <summary>
@@ -75,5 +78,29 @@ public static class GoalChecks {
         Require(world.Goals.Status(GoalId.Mines) == GoalStatus.Active, "iron and coal mines should leave the tin mine to build");
         OpenMine(world.Add(ThingKind.Mine, Cliff.Of(ThingKind.Tin).MineSpot));
         Require(world.Goals.Status(GoalId.Mines) == GoalStatus.Completed, "open iron, coal and tin mines should complete Infinite power");
+    }
+
+    private static void CheckSettlementRemembersWhatItHasHad(GameData data) {
+        var fresh = new World(data);
+        Require(fresh.Had("steel_axe") && fresh.Had("berries") && !fresh.Had("stone") && !fresh.Had("stone_chisel") && !fresh.Had("planks"), "a new settlement should know only what it starts with");
+        Require(fresh.Had("steel_parts") && fresh.Had("iron_ore") && fresh.Had("coal") && fresh.Had("tin_bar") && fresh.Had("tin_ore"), "what the starting axe and bottle are made of should count as had along with them");
+        var world = EmptyWorld(data);
+        var tin = world.Add(ThingKind.Tin, Site(0, 0), 400);
+        world.Player = tin.Pos;
+        Give(world, "steel_pick", 1);
+        GatherUntil(world, tin, "tin_ore", 4);
+        Require(world.Had("tin_ore") && !world.Had("steel_pick"), "gathering should mark the ore as had, and a tool only handed over should not be");
+        Give(world, "stone", 2);
+        Require(world.Craft("stone_chisel"), "two stone should queue a stone chisel");
+        SafeTick(world, data.Recipes["stone_chisel"].Seconds + 1);
+        Require(world.Had("stone_chisel") && world.Had("stone"), "crafting should mark the product as had, and the stone it is made of with it");
+        Require(!world.Had("iron_ore"), "ore nobody dug and nothing was made of should not count as had");
+        Achieve(world, "iron_bar");
+        Require(world.Had("iron_bar") && world.Had("iron_ore") && !world.Had("steel_bar"), "what the settlement's milestones say it made should count as had with its ingredients, and what is made of it should not");
+        string save = world.Serialize();
+        var loose = world.Add(ThingKind.LooseCoal, Site(2, 0), 1);
+        world.Player = loose.Pos; world.Gather(loose, Step);
+        var loaded = new World(data, false); loaded.Deserialize(save);
+        Require(world.Had("coal") && loaded.Had("tin_ore") && !loaded.Had("coal"), "a save should keep what the settlement had when it was written");
     }
 }

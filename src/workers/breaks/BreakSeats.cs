@@ -4,8 +4,12 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Reserves a seat for each worker at lunch, around a campfire or in a small circle on open ground.</summary>
-internal sealed class LunchBreak(World world) {
+/// <summary>
+/// Reserves a seat for each worker on a break, around a campfire or in a small circle on open ground.
+/// A break is the lunch hour for the whole crew, or any time for a worker with no job that can be done.
+/// A campfire with a worker sitting at it burns even with no wood left.
+/// </summary>
+internal sealed class BreakSeats(World world) {
     internal const int FireSeats = 6;
     private const int GroupSeats = 3;
     private const float FireRadius = 1.4f, GroupRadius = .8f, SeatGap = .9f;
@@ -19,14 +23,30 @@ internal sealed class LunchBreak(World world) {
     private readonly HashSet<Worker> cutOffFromGroup = new();
     private readonly List<Worker> leaving = new();
     private int fireCount;
+    /// <summary>How many buildings that block walking stood when seats were last given out; a change can open or shut the way to a seat.</summary>
+    private int blockerCount;
+    // Workers who sat or looked for a seat in the last tick, and those doing so in this one.
+    // Out of the lunch hour, only they are on a break, so a crew sitting at the end of lunch keeps its seats while it has nothing to do.
+    private HashSet<Worker> resting = new(), restingNext = new();
 
-    public void Reset() { reserved.Clear(); unreachable.Clear(); cutOffFromGroup.Clear(); fireCount = 0; }
+    public void Reset() { ClearSeats(); resting.Clear(); restingNext.Clear(); }
 
-    private static bool OnBreak(Worker w) => !w.Home && w.Away <= 0 && w.Commute == 0 && w.WageDebt <= 0;
+    /// <summary>Gives up every seat, for a world with nobody on a break.</summary>
+    private void ClearSeats() { reserved.Clear(); unreachable.Clear(); cutOffFromGroup.Clear(); fireCount = 0; blockerCount = 0; }
 
-    /// <summary>Keeps each worker's seat until they leave lunch, lose the seat or take a place by a fire.</summary>
+    /// <summary>How many buildings that block walking stand now.</summary>
+    private int Blockers() {
+        int count = 0;
+        foreach (var kind in World.WalkBlockers) count += world.ThingsOf(kind).Count;
+        return count;
+    }
+
+    private bool OnBreak(Worker w) => !w.Home && w.Away <= 0 && w.Commute == 0 && w.WageDebt <= 0 && (world.Lunch || resting.Contains(w));
+
+    /// <summary>Keeps each worker's seat until their break ends, they lose the seat or take a place by a fire.</summary>
     public void Prepare() {
-        if (!world.Lunch) { Reset(); return; }
+        (resting, restingNext) = (restingNext, resting); restingNext.Clear();
+        if (!world.Lunch && resting.Count == 0) { ClearSeats(); return; }
         var campfires = world.ThingsOf(ThingKind.Campfire);
         var crew = world.Workers;
         int count = 0, assigned = 0;
@@ -35,7 +55,11 @@ internal sealed class LunchBreak(World world) {
             count++;
             if (reserved.TryGetValue(w, out var seat) && FireStillThere(seat)) assigned++;
         }
-        if (assigned == count && assigned == reserved.Count && fireCount == campfires.Count) return;
+        // A building put up or taken down may open or shut the way to a seat, so seats out of reach are tried again.
+        int blockers = Blockers();
+        bool moved = blockers != blockerCount;
+        if (moved) { blockerCount = blockers; unreachable.Clear(); cutOffFromGroup.Clear(); }
+        if (assigned == count && assigned == reserved.Count && fireCount == campfires.Count && !moved) return;
         if (assigned != reserved.Count) {
             leaving.Clear();
             foreach (var (worker, seat) in reserved)
@@ -106,7 +130,7 @@ internal sealed class LunchBreak(World world) {
     }
 
     private void ReserveGroup() {
-        var anchor = waiting[0].Pos;
+        var anchor = Anchor(waiting[0]);
         int count = Math.Min(GroupSeats, waiting.Count);
         for (int radius = 0; radius <= GroundSearch; radius++) {
             for (int y = -radius; y <= radius; y++) {
@@ -128,6 +152,9 @@ internal sealed class LunchBreak(World world) {
         if (!ReserveWhereStanding(waiting[0])) cutOffFromGroup.Add(waiting[0]);
         waiting.RemoveAt(0);
     }
+
+    /// <summary>Where a ground group gathers: around the worker at lunch, near the nearest campfire for a worker with nothing to do.</summary>
+    private Vector2 Anchor(Worker w) => !world.Lunch && world.Nearest(ThingKind.Campfire, w.Pos) is Thing fire ? fire.Pos : w.Pos;
 
     private bool ReserveWhereStanding(Worker w) {
         if (!RoomForSeat(w.Pos)) return false;
@@ -158,10 +185,22 @@ internal sealed class LunchBreak(World world) {
         waiting.RemoveAt(index);
     }
 
+    /// <summary>
+    /// Seats a worker with no job that can be done for this tick, like lunch: false when there is no campfire to gather at.
+    /// The status is the caller's to set.
+    /// </summary>
+    public bool Rest(Worker w, float dt) {
+        if (world.ThingsOf(ThingKind.Campfire).Count == 0) return false;
+        Sit(w, dt);
+        return true;
+    }
+
+    /// <summary>Walks a worker on a break to their seat and sits them down; at lunch the status says so.</summary>
     public void Sit(Worker w, float dt) {
+        restingNext.Add(w);
         if (!reserved.TryGetValue(w, out var seat)) { WaitForSpace(w, dt); return; }
         if (!world.CanStand(seat.Position)) { reserved.Remove(w); return; }
-        w.Status = seat.Fire != null ? "Lunch break by the campfire" : "Lunch break";
+        LunchStatus(w, seat.Fire);
         if (!world.Walk(w, seat.Position, dt, .08f, exact: true)) {
             if (w.WorkState != WorkerWorkState.Blocked) return;
             reserved.Remove(w);
@@ -169,16 +208,17 @@ internal sealed class LunchBreak(World world) {
             cutOffFromGroup.Add(w);
             if (!ReserveWhereStanding(w)) { WaitForSpace(w, dt); return; }
             seat = reserved[w];
-            w.Status = "Lunch break";
+            LunchStatus(w);
         }
         w.Pos = seat.Position;
+        if (seat.Fire != null) Kindle(seat.Fire);
         w.LunchHeading = (seat.Center - seat.Position).Angle();
         w.WorkState = seat.Fire != null && w.Id % 2 == 0 ? WorkerWorkState.Perching : WorkerWorkState.Resting;
     }
 
     // Step only where there is more room, so a trapped worker does not sway between two seats.
     private void WaitForSpace(Worker w, float dt) {
-        w.Status = "Lunch break";
+        LunchStatus(w);
         float best = Clearance(w.Pos);
         if (best >= SeatGap * SeatGap || dt <= 0) return;
         var next = w.Pos;
@@ -194,9 +234,22 @@ internal sealed class LunchBreak(World world) {
         w.Pos = next;
     }
 
+    /// <summary>At lunch, says the worker is on their lunch break, by the campfire when their seat is at one.</summary>
+    private void LunchStatus(Worker w, Thing? fire = null) { if (world.Lunch) w.Status = fire != null ? "Lunch break by the campfire" : "Lunch break"; }
+
     private float Clearance(Vector2 position) {
         float nearest = float.MaxValue;
         foreach (var seat in reserved.Values) nearest = Math.Min(nearest, position.DistanceSquaredTo(seat.Position));
         return nearest;
+    }
+
+    /// <summary>Seconds of burning a campfire with no wood is kept at while workers sit at it, so it goes out soon after they leave.</summary>
+    private const float KindledBurn = 1;
+
+    /// <summary>Keeps a campfire a worker sits at on their break burning even with no wood left; one with wood burns it as usual.</summary>
+    private void Kindle(Thing fire) {
+        if (fire.Burn >= KindledBurn) return;
+        if (fire.Burn <= 0) world.Play("start_fire", fire.Pos);
+        fire.Burn = KindledBurn;
     }
 }

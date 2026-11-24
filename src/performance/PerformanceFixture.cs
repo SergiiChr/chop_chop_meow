@@ -29,6 +29,8 @@ internal static class PerformanceFixture {
             Place(ThingKind.Chest, new Vector2(8, 3)),
             Place(ThingKind.Chest, new Vector2(8, -3))
         };
+        // The camp's storage takes what the crew brings, as a player would set it.
+        foreach (var store in stores) world.SetFilter(store, Inventory.Everything, false, true);
         var supply = stores[0].Inventory;
         supply.Add("iron_bar", 128); supply.Add("coal", 128); supply.Add("iron_ore", 128); supply.Add("wood", 128);
         var wagePost = Place(ThingKind.Signpost, new Vector2(-7, -4));
@@ -38,6 +40,7 @@ internal static class PerformanceFixture {
         world.S.Backpack.Add("torch", 1);
 
         var tools = Place(ThingKind.Toolstation, new Vector2(-7, 0));
+        world.SetFilter(tools, Inventory.Everything, false, true);
         tools.Inventory.Add("steel_chisel", 1);
 
         var forge = Place(ThingKind.Reinforced, new Vector2(-4, 3));

@@ -4,13 +4,14 @@ using Godot;
 using static Checks;
 using static SetupSteps;
 using static WorldSteps;
-using static PlayerSteps;
-using static WorkerSteps;
+using System.Linq;
+using System.Text.Json.Nodes;
 
 /// <summary>Checks of saves: what a save the game cannot take is refused with.</summary>
 public static class SaveChecks {
     public static void Run(GameData data) {
         Test(CheckSaveWithUnknownItemRefused, data);
+        Test(CheckSaveFromAnotherVersionIsRefused, data);
         Test(CheckSaveWithInvalidCombatMovementRefused, data);
     }
 
@@ -29,6 +30,16 @@ public static class SaveChecks {
             try { EmptyWorld(data).Deserialize(Patch(json, edit)); } catch (InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
             Require(refused, $"a save with {edit.Item2} in place of {edit.Item1} should be refused with a clear reason");
         }
+    }
+
+    /// <summary>A save from another version of the game is refused with a clear reason, never converted.</summary>
+    private static void CheckSaveFromAnotherVersionIsRefused(GameData data) {
+        var old = EmptyWorld(data);
+        var older = JsonNode.Parse(old.Serialize())!;
+        older["Version"] = 5;
+        bool refused = false;
+        try { EmptyWorld(data).Deserialize(older.ToJsonString()); } catch (InvalidOperationException error) { refused = error.Message.Contains("another version"); }
+        Require(refused, "a save from another version should be refused with a clear reason");
     }
 
     private static void CheckSaveWithInvalidCombatMovementRefused(GameData data) {

@@ -53,8 +53,7 @@ internal static class ProgressionSteps {
         Require(world.Backpack["wood_hammer"] == 1, "hand crafting should turn wood into a mallet");
         var bench = BuildAt(world, ThingKind.Bench, Site(28, 28));
         Require(world.SlotTool(bench, "wood_hammer") && world.BenchTool(bench, "hammer") == "wood_hammer", "the mallet should go into the bench's hammer slot");
-        world.SetRecipe(bench, "crate");
-        world.LoadBatch(bench, 6);
+        world.QueueBatch(bench, "crate", 6);
         CompleteBatches(world, bench, "crate", 6);
         world.Collect(bench);
         Require(world.Backpack["crate"] == 6 && world.Reached("crate"), "the bench should make crates from planks with the mallet slotted");
@@ -119,16 +118,14 @@ internal static class ProgressionSteps {
         var anvil = BuildAt(world, ThingKind.Anvil, Site(28, 25));
         world.Player = anvil.Pos + Vector2.One;
         Require(world.SlotTool(anvil, "steel_hammer"), "the bought steel hammer should go into the anvil's hammer slot");
-        world.LoadBatch(anvil, 2);
+        world.QueueBatch(anvil, "steel_parts", 2);
         CompleteBatches(world, anvil, "steel_parts", 2);
         world.Collect(anvil);
         world.Player = bench.Pos + Vector2.One;
-        world.SetRecipe(bench, "steel_pick");
-        world.LoadBatch(bench);
+        world.QueueBatch(bench, "steel_pick");
         CompleteBatches(world, bench, "steel_pick", 1);
         world.Collect(bench);
-        world.SetRecipe(bench, "crate");
-        world.LoadBatch(bench, 2);
+        world.QueueBatch(bench, "crate", 2);
         CompleteBatches(world, bench, "crate", 2);
         world.Collect(bench);
         Require(world.Backpack["steel_pick"] == 2, "the bench should craft a steel pickaxe from steel parts");
@@ -165,12 +162,12 @@ internal static class ProgressionSteps {
         Require(worker != null, "sale proceeds should fund a new worker");
         // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning; the night's wolves are not what this checks.
         for (int i = 0; i < 4000 && !world.OnDuty(worker!); i++) { SafeTick(world, Step); RemoveWolves(world, _ => true); }
-        var chest = BuildAt(world, ThingKind.Chest, Site(37, 25));
+        var chest = TakeEverything(world, BuildAt(world, ThingKind.Chest, Site(37, 25)));
         // A woodcutter takes an axe from a tool station, so the player racks theirs: a station is 8 planks and 4 stone.
         GatherUntil(world, tree, "wood", 2);
         GatherUntil(world, stone, "stone", 4);
         CraftByHand(world, "planks", 2);
-        var station = BuildAt(world, ThingKind.Toolstation, Site(37, 28));
+        var station = TakeEverything(world, BuildAt(world, ThingKind.Toolstation, Site(37, 28)));
         Require(world.Transfer(world.Backpack, station.Inventory, "steel_axe", 1) == 1, "the player should rack their axe in the tool station");
         var workerTree = world.Things.FirstOrDefault(t => t.Kind == ThingKind.Tree && t.Remaining > 0);
         Require(workerTree != null, "a remaining tree should be available for the hired worker");

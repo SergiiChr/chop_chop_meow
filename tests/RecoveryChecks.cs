@@ -10,8 +10,8 @@ using static WorldSteps;
 /// <summary>Checks the no-cabin recovery path and its world-time effects.</summary>
 public static class RecoveryChecks {
     public static void Run(GameData data) {
-        CheckSkipToMorningNeedsNoCabinAndNoOtherLivingPlayer(data);
-        CheckSkipAdvancesWorld(data);
+        Test(CheckSkipToMorningNeedsNoCabinAndNoOtherLivingPlayer, data);
+        Test(CheckSkipAdvancesWorld, data);
     }
 
     private static void CheckSkipToMorningNeedsNoCabinAndNoOtherLivingPlayer(GameData data) {

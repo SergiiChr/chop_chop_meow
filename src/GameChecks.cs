@@ -1387,6 +1387,7 @@ public partial class Game {
             await TestClean(CheckWorkerPageFollowsItsJobs);
             await TestClean(CheckWorkerPageShowsWhatEachPlaceIsSetToMake);
             await TestClean(CheckDraggingAJobBelowAnotherMakesItComeAfter);
+            await RunStorageUIChecks();
             await RunHaulingUIChecks();
             await TestClean(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
             await TestClean(CheckAWorkerHoldingAPackedCrateSaysSoAboveTheirHands);
