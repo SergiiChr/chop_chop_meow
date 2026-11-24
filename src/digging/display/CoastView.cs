@@ -31,7 +31,7 @@ internal sealed class CoastView {
         });
     }
 
-    internal void Update(Beach beach) {
+    internal void Update(Beach beach, TerrainView terrain) {
         float tide = beach.Tide;
         if (lastTide < 0) {
             bank.SetShaderParameter(LowShift, Terrain.LowTideShift);
@@ -41,6 +41,7 @@ internal sealed class CoastView {
             lastTide = tide;
             bank.SetShaderParameter(Tide, tide);
             waves.SetShaderParameter(Tide, tide);
+            terrain.SetCoastalTide(tide);
             water.Position = Vector3.Up * Mathf.Lerp(LowLevel, HighLevel, tide);
         }
         var squares = beach.StrippedSquares;

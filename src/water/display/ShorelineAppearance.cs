@@ -79,7 +79,7 @@ internal static class ShorelineAppearance {
         // The water mesh extends inland past the widest bank. Its shader cuts the wandering edge as the tide moves.
         // It is dense wherever the map can show it, and coarser out at sea and along the coast past the map's ends.
         float[] sides = [.. LakeAppearance.Steps(-300, -150, 3).SkipLast(1), .. LakeAppearance.Steps(-150, 150, WaterBody.Spacing), .. LakeAppearance.Steps(150, 300, 3).Skip(1)];
-        float[] distances = [.. LakeAppearance.Steps(-10, 90, WaterBody.Spacing), 120, 200, 400];
+        float[] distances = [.. LakeAppearance.Steps(-11, 90, WaterBody.Spacing), 120, 200, 400];
         var material = LakeAppearance.CreateMaterial(WaterBody.Sea, still);
         material.SetShaderParameter("shore_wander", ShoreLook.Sand.Wander);
         var water = new Node3D { Name = "CoastalWater", Position = Vector3.Up * LakeAppearance.Level };
@@ -87,7 +87,7 @@ internal static class ShorelineAppearance {
         LakeAppearance.AddTiles(water, "CoastalWater", sides, distances, (side, distance) => {
             var p = Terrain.Point(Terrain.Waterline(side) + distance, side);
             return new Vector3(p.X, 0, p.Y);
-        }, material, (side, distance) => new Vector2(Terrain.SandWidth(side) + Beach.CrestMargin, distance));
+        }, material, (side, distance) => new Vector2(Beach.HighTideShift(side), distance));
         return new CoastView(parent, warm, water, sand, material);
     }
 }

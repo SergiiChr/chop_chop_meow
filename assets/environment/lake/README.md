@@ -6,7 +6,7 @@ The lake is a bowl 2.5 units deep at its middle, level at the shore and deepenin
 unit for every eight out, to 6 units deep.
 The terrain draws the ground under the drawn water with the shore photoscan, at the wet shade of the waterline: mossy
 stones in the lake, sand under the sea, also where the sea's waterline wanders inland of where walking stops.
-`BedMap`, baked while loading at one texel a world unit, tells it where the drawn water lies.
+`BedMap`, baked at one texel a world unit, marks the lake bed and the tide that submerges each point on the beach.
 
 `lake.gdshader` is a Godot 4 port of the [Realistic Water Shader](https://godotshaders.com/shader/realistic-water/) by
 UnionBytes (Achim Menzel), released under the MIT licence in `LICENSE`, with its contributors in `AUTHORS.md`.

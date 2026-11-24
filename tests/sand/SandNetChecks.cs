@@ -33,6 +33,8 @@ public partial class Game {
 
     private async Task GuestDigsBeachSand() {
         await CloseWithEsc();
+        int previousSlot = world.ActiveHotbar;
+        string previousTool = world.InHand;
         var stand = SandSquare + Vector2.Left;
         await Until(() => world.Player.DistanceTo(stand) < .1f && world.Backpack["steel_shovel"] > 0,
             "the guest reaching the beach with a shovel");
@@ -52,5 +54,8 @@ public partial class Game {
         await Until(() => !world.Beach.Stripped(tile), "the guest seeing high tide refill the stripped square");
         Signal("guest-saw-refilled-sand");
         await Until(() => world.Player.DistanceTo(stand) > 10, "the guest returning from the beach");
+        world.SelectHotbar(previousSlot);
+        if (previousTool != "") world.SelectInHand(previousTool);
+        await Frames();
     }
 }

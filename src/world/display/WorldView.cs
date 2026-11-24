@@ -646,7 +646,7 @@ public partial class WorldView : Node3D {
         UpdateCounterHits(dt);
         UpdateEffects(dt);
         UpdateMarkers();
-        coast.Update(World.Beach);
+        coast.Update(World.Beach, terrainView);
         if (Underground) {
             surfacePeople.Clear();
             AddFooting(playerRig);

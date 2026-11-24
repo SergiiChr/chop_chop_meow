@@ -9,6 +9,7 @@ public static class SandChecks {
     public static void Run(GameData data) {
         Test(CheckShovelDigsTenSandFromOneSquare, data);
         Test(CheckSandStaysStrippedUntilTheNextHighTideEvenAcrossASave, data);
+        Test(CheckSandAtTheInlandEdgeIsDugAndRefilled, data);
         Test(CheckTheWholeSandYieldMustFit, data);
         Test(CheckWalkReachesTheSandExposedAtLowTide, data);
         Test(CheckStrippedSandStaysWithinTickBudget, data);
@@ -17,9 +18,9 @@ public static class SandChecks {
     private static void CheckShovelDigsTenSandFromOneSquare(GameData data) {
         var world = EmptyWorld(data);
         world.Player = SandSquare + Vector2.Left;
-        Require(!world.Holes.Begin(SandSquare, 1), "digging a sand square should require a selected shovel");
-        EquipBeachShovel(world);
         RunUntil(world, 4 * data.DaySeconds);
+        Require(!world.Holes.Begin(SandSquare, 1), "digging a dry sand square should require a selected shovel");
+        EquipBeachShovel(world);
 
         DigSand(world, 2);
         Require(world.Backpack["sand"] == 10 && world.ThingsOf(ThingKind.Hole).Count == 0,
@@ -54,6 +55,22 @@ public static class SandChecks {
         Require(!world.Beach.Stripped(tile), "advancing past high tide should still refill the square");
     }
 
+    private static void CheckSandAtTheInlandEdgeIsDugAndRefilled(GameData data) {
+        var world = EmptyWorld(data);
+        var edge = new Vector2(198, 133);
+        EquipBeachShovel(world);
+        world.Player = edge + Vector2.Left;
+        Require(!world.Holes.Begin(edge, 1), "the tide should prevent digging a planting hole in flooded sand");
+        RunUntil(world, 4 * data.DaySeconds);
+
+        DigSand(world, edge, 2);
+        var tile = Terrain.TileAt(edge);
+        Require(world.Beach.Stripped(tile) && world.ThingsOf(ThingKind.Hole).Count == 0,
+            "digging at the inland end of the beach should still strip sand");
+        RunUntil(world, 8 * data.DaySeconds);
+        Require(!world.Beach.Stripped(tile), "high tide should reach and refill the inland end of the beach");
+    }
+
     private static void CheckTheWholeSandYieldMustFit(GameData data) {
         var world = EmptyWorld(data);
         EquipBeachShovel(world);
@@ -71,6 +88,8 @@ public static class SandChecks {
         var world = EmptyWorld(data);
         var exposed = Terrain.Point(Terrain.Waterline(0) + .6f, 0);
         var pastSand = exposed + Terrain.Seaward;
+        var oldEdge = Terrain.Point(Terrain.Coast(-40.8f) - 1.005f, -40.8f);
+        Require(world.CanStand(oldEdge), "the new low-tide line should keep the original beach walkable at its bends");
         Require(world.CanStand(exposed), "the exposed beach should stay walkable while the sea is high");
         RunUntil(world, 4 * data.DaySeconds);
         world.Player = exposed - Terrain.Seaward;

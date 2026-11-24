@@ -13,8 +13,10 @@ internal static class SandSteps {
         world.Player = SandSquare + Vector2.Left;
     }
 
-    public static void DigSand(World world, int attempt) {
-        Require(world.Holes.Begin(SandSquare, attempt), "the shovel should start digging the dry sand square");
+    public static void DigSand(World world, int attempt) => DigSand(world, SandSquare, attempt);
+
+    public static void DigSand(World world, Vector2 at, int attempt) {
+        Require(world.Holes.Begin(at, attempt), "the shovel should start digging the dry sand square");
         world.Tick(6);
         Require(world.Holes.Finish(attempt), "the completed shovel work should strip the square");
     }

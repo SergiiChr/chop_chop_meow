@@ -8,34 +8,49 @@ namespace ChopChopMeow;
 public sealed class Beach(World world) {
     public const string Sand = "sand";
     public const int SandPerSquare = 10;
-    internal const float CrestMargin = .65f;
+    // At high tide the water clears the inland corners of squares along the ragged sand edge.
+    internal const float CrestMargin = 1.3f;
     private readonly List<int> flooded = [];
 
     internal float Tide => world.Moonlight;
 
     /// <summary>Distance the coast's waterline has moved inland at this point across the valley.</summary>
     private static float Shift(float across, float tide) =>
-        Mathf.Lerp(Terrain.LowTideShift, Terrain.SandWidth(across) + CrestMargin, tide);
+        Mathf.Lerp(Terrain.LowTideShift, HighTideShift(across), tide);
 
-    internal static bool IsSand(Vector2 at) => Terrain.Beach(at) && !Terrain.Sea(at);
+    internal static float HighTideShift(float across) => Terrain.SandWidth(across) + CrestMargin;
+
+    /// <summary>The tide share at which water reaches the sand below this point, or above 1 past the sand's edge.</summary>
+    internal static float TideOverSand(Vector2 at, float across, float fromWaterline) =>
+        fromWaterline < -Terrain.SandWidth(across) ? 1.25f
+            : -Terrain.OutToSea(at) / (HighTideShift(across) - Terrain.LowTideShift);
+
+    internal static bool IsSand(Vector2 at) {
+        float across = Terrain.Across(at);
+        return Terrain.Along(at) > Terrain.Waterline(across) - Terrain.SandWidth(across)
+            && !Terrain.Sea(at, across, Terrain.LowTideShift);
+    }
 
     private static bool Covered(Vector2 at, float tide) {
         float across = Terrain.Across(at);
-        return Terrain.Along(at) - Terrain.Waterline(across) + Shift(across, tide) >= Terrain.SeaWander(at);
+        return Terrain.Sea(at, across, Shift(across, tide));
     }
 
     private static bool SquareIs(Vector2 at, float tide, bool wet) {
-        for (float y = -.5f; y <= .5f; y++)
-            for (float x = -.5f; x <= .5f; x++)
+        // The waterline can bow into a tile between its corners.
+        for (float y = -.5f; y <= .5f; y += .5f)
+            for (float x = -.5f; x <= .5f; x += .5f)
                 if (Covered(at + new Vector2(x, y), tide) != wet) return false;
-        return Covered(at, tide) == wet;
+        return true;
     }
 
     public bool Stripped(Vector2I tile) => Terrain.OnMap(tile) && world.S.StrippedSand.Contains(Terrain.TileIndex(tile));
     internal HashSet<int> StrippedSquares => world.S.StrippedSand;
 
     internal string? DigBlock(Vector2 at) {
-        if (!SquareIs(at, Tide, wet: false)) return "Wait for the tide to uncover this sand.";
+        float tide = Tide;
+        if (!IsSand(at)) return Covered(at, tide) ? "Choose dry, open ground." : null;
+        if (!SquareIs(at, tide, wet: false)) return "Wait for the tide to uncover this sand.";
         if (Stripped(Terrain.TileAt(at))) return "The tide has not refilled this square yet.";
         return world.Backpack.Room(Sand) < SandPerSquare ? "Make room for 10 sand in your backpack." : null;
     }

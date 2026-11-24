@@ -19,7 +19,7 @@ public static class Terrain {
     public const float LakeRadius = 15;
     /// <summary>Where the shore starts, measured along the valley; beyond it is sea.</summary>
     public const float CoastLine = 240;
-    internal const float LowTideShift = -.7f;
+    internal const float LowTideShift = -.8f;
 
     /// <summary>Distance from the inland corner along the valley.</summary>
     public static float Along(Vector2 p) => p.Dot(Seaward);
@@ -46,15 +46,15 @@ public static class Terrain {
     /// <summary>The sea's original waterline along the valley, from which the tide shifts the shore.</summary>
     public static float Waterline(float across) => Coast(across) - 1.2f;
     /// <summary>Distance out past the low-tide waterline, including its small wandering edge.</summary>
-    public static float OutToSea(Vector2 p) => FromLowTideLine(p) - SeaWander(p);
-    private static float FromLowTideLine(Vector2 p) => Along(p) - Waterline(Across(p)) + LowTideShift;
+    public static float OutToSea(Vector2 p) => Along(p) - Waterline(Across(p)) + LowTideShift - SeaWander(p);
     /// <summary>Water beyond the beach's walkable edge, even when the tide is out.</summary>
-    public static bool Sea(Vector2 p) {
-        float distance = FromLowTideLine(p), wander = ShoreLook.Sand.Wander / 2;
+    public static bool Sea(Vector2 p) => Sea(p, Across(p), LowTideShift);
+    internal static bool Sea(Vector2 p, float across, float shift) {
+        float distance = Along(p) - Waterline(across) + shift, wander = ShoreLook.Sand.Wander / 2;
         return distance > wander || distance > -wander && distance > SeaWander(p);
     }
     /// <summary>The coastal water shader's small deviations inland and out to sea from the waterline.</summary>
-    internal static float SeaWander(Vector2 p) {
+    private static float SeaWander(Vector2 p) {
         float lobes = MathF.Sin(p.X * .83f + p.Y * .37f) * MathF.Sin(p.Y * .61f - p.X * .29f);
         float bites = MathF.Sin(p.X * 2.7f + p.Y * 1.9f) * MathF.Sin(p.Y * 3.1f - p.X * 2.3f);
         return (lobes * .7f + bites * .3f) * ShoreLook.Sand.Wander / 2;

@@ -20,8 +20,7 @@ public sealed class GroundHoles(World world) {
     internal string? Block(Vector2 at) {
         if (!ShovelSelected) return "Select a shovel to dig.";
         if (!float.IsFinite(at.X) || !float.IsFinite(at.Y) || !Terrain.OnMap(Terrain.TileAt(at))) return "Choose dry, open ground.";
-        return world.Construction.PlacementBlock(ThingKind.Hole, at)
-            ?? (Beach.IsSand(at) ? world.Beach.DigBlock(at) : null);
+        return world.Construction.PlacementBlock(ThingKind.Hole, at) ?? world.Beach.DigBlock(at);
     }
 
     /// <summary>Starts a fresh dig once the player reaches the tile.</summary>
