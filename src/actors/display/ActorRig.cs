@@ -323,8 +323,7 @@ public sealed class ActorRig {
     internal Vector3 RakeTines => FromForearm(false, rake.Transform * RakeStroke.Tines);
 
     /// <summary>
-    /// Turns an upper arm about its own length, on top of the pose just shown.
-    /// A <see cref="Pose"/> has no such turn, so an elbow folds only forward; with it a forearm can lie across the chest.
+    /// Turns an upper arm about its own length so the elbow can bend sideways.
     /// </summary>
     public void RollArm(bool left, float degrees) => (left ? shoulderL : shoulderR).RotateObjectLocal(Vector3.Up, Mathf.DegToRad(degrees));
 

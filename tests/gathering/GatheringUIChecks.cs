@@ -154,6 +154,17 @@ public partial class Game {
         RightRelease(point);
         await Frames(2);
 
+        Warp(Hosted, leaves.Pos); await Frames(2);
+        soundsBefore = sounds.Played;
+        point = RightPress(leaves.Pos);
+        await Until(() => sounds.Heard("rake_leaves", soundsBefore), "raking leaves underfoot", 2);
+        teeth = view.PlayerRig.Root.Transform * view.PlayerRig.RakeTines;
+        Require(Mathf.Abs(teeth.Y - WorldView.To3(leaves.Pos).Y) < .06f
+            && new Vector2(teeth.X, teeth.Z).DistanceTo(leaves.Pos) < .48f,
+            $"Raking a patch underfoot must brush the near leaves. Teeth at {teeth}, patch at {leaves.Pos}.");
+        RightRelease(point);
+        await Frames(2);
+
         RemoveThings(Hosted, t => t == leaves);
         Drop(Hosted, "leaves", Hosted.Backpack["leaves"] - before);
         Drop(Hosted, "rake", 1);
