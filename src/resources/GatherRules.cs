@@ -33,7 +33,7 @@ public static class GatherRules {
     private static readonly Dictionary<ThingKind, GatherRule> All = new() {
         [ThingKind.Tree] = new("wood", Needs: "axe", Chip: ThingKind.Acorn),
         [ThingKind.Stone] = new("stone", Needs: "pickaxe", Chip: ThingKind.LooseStone),
-        [ThingKind.Leaves] = new("leaves", Helps: "rake", ByHand: 3),
+        [ThingKind.LeafSpot] = new("leaves", Helps: "rake", ByHand: 3),
         [ThingKind.Berries] = new("berries"),
         [ThingKind.Water] = new(Water.Full),
         [ThingKind.WolfCorpse] = new("raw_meat"),

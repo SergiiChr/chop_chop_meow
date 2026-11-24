@@ -361,7 +361,7 @@ public sealed partial class World {
         Farms = new Farms(this); SteelPipes = new SteelPipes(this);
         Holes = new GroundHoles(this); Replaced += Holes.Reset;
         Trees = new TreePlanting(this); Replaced += Trees.Reset;
-        LeafSpots = new LeafLitter(this); Replaced += LeafSpots.Reset;
+        LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
@@ -379,7 +379,7 @@ public sealed partial class World {
     public Farms Farms { get; }
     public GroundHoles Holes { get; }
     public TreePlanting Trees { get; }
-    public LeafLitter LeafSpots { get; }
+    public LeafSpots LeafSpots { get; }
     private readonly Barrels barrels;
 
     private readonly BarrelHaul barrelHaul;
@@ -592,7 +592,7 @@ public sealed partial class World {
         Replaced?.Invoke();
     }
     /// <summary>Leaves a rake gathers in one go from a patch, which fills again every day.</summary>
-    public const int LeafPatch = 12;
+    public const int LeavesPerSpot = 12;
     /// <summary>Ore in a full coal, iron or tin deposit at a cliff.</summary>
     public const int DepositOre = 600;
     /// <summary>Berries on a full bush, at the start and each time it fruits again.</summary>
@@ -651,7 +651,7 @@ public sealed partial class World {
     /// <summary>The kinds that are not resources: buildings, yards and what is left on the ground, such as graves.</summary>
     public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null);
     /// <summary>The kinds that stand in the way; resources, yards, campfires, graves, signposts and mines are walked past.</summary>
-    private static readonly ThingKind[] Blockers = Array.FindAll(Structures, kind => !Construction.IsZone(kind) && kind is not (ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine or ThingKind.PlantingSpot or ThingKind.Hole));
+    private static readonly ThingKind[] Blockers = Array.FindAll(Structures, kind => !Construction.IsZone(kind) && kind is not (ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine or ThingKind.Hole));
     internal static ReadOnlySpan<ThingKind> WalkBlockers => Blockers;
     /// <summary>Whether a thing of one of the <see cref="Blockers"/> kinds stands on a spot.</summary>
     private static bool Blocks(Thing t, Vector2 p) => t.Pos.DistanceTo(p) < Footprint(t.Kind);
@@ -669,7 +669,7 @@ public sealed partial class World {
     public string A(string word) => Phrase("aeiou".Contains(word[0]) ? "an " : "a ", word);
     private string Task(Thing t) => t.Kind switch {
         ThingKind.Tree => "chop wood",
-        ThingKind.Leaves => "rake leaves",
+        ThingKind.LeafSpot => "rake leaves",
         ThingKind.Stump => "dig up the stump",
         ThingKind.Bush => "dig up the bush",
         _ when t.IsLoose => Phrase("pick up ", Lower(Data.Name(t.Kind))),
@@ -727,10 +727,11 @@ public sealed partial class World {
         if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == Water.Full && !Water.HasBucketRoom(S.Backpack)) return "Your bottles are filled.";
         if (t.Kind == ThingKind.Mine) return Mines.BuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
+        if (worker && TreePlanting.IsYoung(t)) return "Woodcutters wait for adult trees.";
         if (t.Kind == ThingKind.Tree && t.TreeStage == 1)
             return TreePlanting.NeedsWater(t) ? "Water the planted acorn first." : "Wait for the first day of growth.";
         if (!t.IsResource) return "Select a natural resource.";
-        if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again within ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
+        if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again within ", Number(Data.BerryRegrowHours), " hours."), ThingKind.LeafSpot => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
         // Workers fetch their tools from a tool station instead of needing them carried, and carry off whatever they dig up.
         if (worker) return null;
         if (GatherRules.Of(t.Kind)?.Needs is string kind && BestTool(kind) == null) return kind switch {
@@ -781,7 +782,7 @@ public sealed partial class World {
         if (t.Kind == ThingKind.Tree && t.Remaining <= 0) Fell(t, Player);
         if (amount == 0) { Say("Backpack full. Store or sell some supplies."); return; }
         Chip(t, tool);
-        if (t.Kind == ThingKind.Leaves) LeafSpots.Gather(t, S.Backpack);
+        if (t.Kind == ThingKind.LeafSpot) LeafSpots.Gather(t, S.Backpack);
         Got(item);
     }
     private void PickUp(Thing t) {
@@ -1716,7 +1717,7 @@ public sealed partial class World {
     private enum HoldRefusal { None, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly, TreeWaterOnly, TreeNoWater, AcornsOnly }
     /// <summary>A tool station holds tools and water vessels, a pile one resource, compost what rots and a campfire wood.</summary>
     private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
-        ThingKind.Tree or ThingKind.PlantingSpot => TreePlanting.NeedsWater(t)
+        ThingKind.Tree => TreePlanting.NeedsWater(t)
             ? (Barrels.CanPour(Data, item) ? HoldRefusal.None : HoldRefusal.TreeWaterOnly) : HoldRefusal.TreeNoWater,
         ThingKind.Hole when item != TreePlanting.Acorn => HoldRefusal.AcornsOnly,
         ThingKind.Hut when Barrel.Is(item) => HoldRefusal.None,
@@ -2035,7 +2036,7 @@ public sealed partial class World {
         foreach (var kind in Kinds.All) {
             if (GatherRules.Of(kind)?.JobName != job || !CanWork(w, kind)) continue;
             foreach (var t in S.Things.Of(kind)) {
-                if (t.Remaining <= 0 || !S.Remembered.ContainsKey(t.Id) || HasDuty(w, t.Id)) continue;
+                if (t.Remaining <= 0 || TreePlanting.IsYoung(t) || !S.Remembered.ContainsKey(t.Id) || HasDuty(w, t.Id)) continue;
                 float distance = t.Pos.DistanceSquaredTo(from);
                 if (t.IsLoose) { if (loose == null || distance < nearestLoose) { loose = t; nearestLoose = distance; } } else if (next == null || distance < nearest) { next = t; nearest = distance; }
             }
@@ -2183,7 +2184,7 @@ public sealed partial class World {
             // Workers on strike are not charged, so their wage does not count against the day.
             int wages = S.Workers.Where(w => w.WageDebt <= 0).Sum(w => w.Wage);
             PayWages(); CloseDay(wages); S.WageDay = Day; Say(Phrase("Day ", Number(Day), "."));
-            foreach (var leaves in S.Things.Of(ThingKind.Leaves)) leaves.Remaining = LeafPatch;
+            foreach (var leaves in S.Things.Of(ThingKind.LeafSpot)) leaves.Remaining = LeavesPerSpot;
             Holes.AtDawn();
         }
         if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Workers head home until morning.");
@@ -2440,7 +2441,7 @@ public sealed partial class World {
             if (t.PlumbingSlot is Inventory plumbingSlot && (!Plumbing.HasPlumbing(t.Kind) || plumbingSlot.Slots != 1
                 || plumbingSlot.Capacity != Plumbing.InstallCost || plumbingSlot.StackSize != Plumbing.InstallCost
                 || plumbingSlot.Count > Plumbing.InstallCost || plumbingSlot.Count != plumbingSlot["steel_pipe"])) return false;
-            if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t) || !TreePlanting.ValidGrowth(t) || !LeafLitter.Valid(t)) return false;
+            if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t) || !TreePlanting.ValidGrowth(t) || !LeafSpots.Valid(t)) return false;
             if (!(t.Pressure >= 0 && t.Pressure <= 100 && t.PumpStrokeLeft >= 0 && t.PumpStrokeLeft <= WaterPumps.StrokeSeconds)
                 || t.Kind != ThingKind.Pump && (t.Pressure != 0 || t.PumpStrokeLeft != 0)) return false;
             if (t.Kind == ThingKind.Hole && !GroundHoles.Valid(t)) return false;

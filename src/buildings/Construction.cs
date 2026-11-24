@@ -46,8 +46,8 @@ public sealed class Construction(World world) {
     /// </summary>
     public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null, float rotation = 0, PipeShape pipeShape = PipeShape.Straight) {
         bool portable = kind is ThingKind.Crate or ThingKind.Barrel;
-        bool planting = kind == ThingKind.PlantingSpot;
-        if (!portable && !planting && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
+        bool digging = kind == ThingKind.Hole;
+        if (!portable && !digging && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
         if (!ValidRotation(kind, rotation)) return "That building cannot go up at this angle.";
         if (world.Occupied) return "You are busy.";
         if (world.S.Sheltered != 0) return "Leave the cabin first.";
@@ -63,16 +63,16 @@ public sealed class Construction(World world) {
         if (kind == ThingKind.Mine) return world.Mines.Block(p);
         if (kind == ThingKind.GravelPath) return world.GravelPaths.Block(Terrain.TileAt(p));
         if (IsZone(kind)) return ZoneBlock(kind, p);
-        if (TooFar(p) is string far) return far;
-        if (Terrain.Spawn.DistanceTo(p) < 1.2f || !planting && world.Player.DistanceTo(p) < 1.2f)
+        if (TooFar(p) is string far) return digging ? "Dig within 5 tiles of yourself." : far;
+        if (Terrain.Spawn.DistanceTo(p) < 1.2f || !digging && world.Player.DistanceTo(p) < 1.2f)
             return "Leave your feet and the arrival point clear.";
         if (kind == ThingKind.Pump) {
             if (!Terrain.InLake(p)) return "Place the intake in the freshwater lake’s shallows.";
             if (!world.CanStand(p + World.BellowsStand.Rotated(rotation))) return "Turn the handle toward open ground on the bank.";
         } else if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
-        if (planting && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
+        if (digging && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
-            if ((!World.BuiltOver(t.Kind) || planting) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
+            if ((!World.BuiltOver(t.Kind) || digging) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
                 return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
             var door = p + Doorways.DoorOffset.Rotated(rotation);
@@ -86,7 +86,7 @@ public sealed class Construction(World world) {
         }
         foreach (var pump in world.ThingsOf(ThingKind.Pump))
             if (pump.ToWorld(World.BellowsStand).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the pump handle clear.";
-        if (planting) return null;
+        if (digging) return null;
         if (!portable) return Unaffordable(kind);
         if (item == null || (world.MarkedSource ?? world.S.Backpack)[item] > 0) return null;
         return kind == ThingKind.Crate ? "That crate is no longer in your backpack." : "That barrel is no longer available.";

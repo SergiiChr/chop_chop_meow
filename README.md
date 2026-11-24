@@ -491,6 +491,7 @@ A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 An axe hit has the same one-in-twenty chance to drop an acorn as a pickaxe hit has to drop a chip.
 Right-click the acorn to pick it up.
 Double-click a shovel in your backpack, or select it on the hotbar, to see an outline over open ground.
+Esc leaves the outline active while the shovel is selected on the hotbar.
 Hold RMB over the spot to walk over and dig a hole.
 Releasing RMB before the dig finishes cancels it.
 Open the hole and place one acorn in its empty slot to plant it. A small nub marks the planted acorn.
@@ -499,7 +500,8 @@ Click the nub to see its status and a read-only item slot with the wood count.
 A tree shows **Planted** until you pour a total of 5 L from bottles or buckets into its water slot, then **Growing**.
 After watering, the oak grows daily. It holds 4 wood after one day, 21 after five, and 42 when it becomes an **Adult tree**
 after ten. You can chop it from the first day it produces wood.
-All standing trees keep getting larger and gaining wood each day.
+All standing trees keep growing. After adulthood, size and wood grow logarithmically, adding less as each tree ages.
+Untouched trees hold 71 wood at 20 days and 100 at 40 days.
 
 When a replanted oak becomes an adult it makes a spot of leaves near its trunk.
 Gathering leaves from any such spot also picks up the acorns there.
@@ -780,6 +782,7 @@ They put it back when the job in hand has no use for it or when heading home at 
 If there is none, the worker goes to the nearest known spot of the same job that they can work, one that needs no tool or one whose tool is to be had, and to loose pieces only after those; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
 A gatherer whose spot runs out goes on to the next known spot of the same resource, and to loose pieces of it only once no other spot is left.
 
+Woodcutters skip trees that have yet to become adults.
 Stumps are part of gathering wood.
 A woodcutter who fells a tree digs up its stump next while a tool station has a shovel, and counts any other known stump as a spot like a tree, going to whichever is nearer.
 With no shovel to be had they leave stumps and go on chopping.
@@ -863,7 +866,7 @@ Tiles join into paths three quarters of a metre wide with round ends:
 
 A tile goes on any dry open ground within 5 tiles of you, also under your feet and under buildings and yards already
 there; a building or yard goes up over tiles and leaves them under it.
-It does not go on a tile where a tree, boulder, ore deposit, berry bush or leaf patch stands, picked clean or not.
+It does not go on a tile where a tree, boulder, ore deposit, berry bush or leaf spot stands, picked clean or not.
 It clears a stump or plain bush away.
 Nothing grows through gravel.
 A click on a path does what a click on open ground does.

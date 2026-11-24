@@ -29,7 +29,7 @@ public partial class Game {
             await Until(() => view.PlayerAnimation == ActorAction.Dig, "the shovel starting to dig", 6);
         } finally { RightRelease(point); }
         await Until(() => view.PlayerAnimation != ActorAction.Dig, "the shovel stopping when released", 3);
-        Require(world.ThingsOf(ThingKind.PlantingSpot).Count == 0 && world.ThingsOf(ThingKind.Hole).All(t => t.Pos != at),
+        Require(world.ThingsOf(ThingKind.Hole).All(t => t.Pos != at),
             "releasing early should leave no outline or hole on the ground");
     }
 

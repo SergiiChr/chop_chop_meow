@@ -240,7 +240,7 @@ public static class WorldModels {
         ThingKind.Stone => t.Remaining / (float)World.StonePile,
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => t.Remaining / (float)World.DepositOre,
         ThingKind.WolfCorpse => t.Remaining / (float)World.WolfMeat,
-        ThingKind.Leaves => t.Remaining / (float)World.LeafPatch,
+        ThingKind.LeafSpot => t.Remaining / (float)World.LeavesPerSpot,
         _ => 1
     };
 
@@ -262,9 +262,6 @@ public static class WorldModels {
     /// <summary>A tree's size against its baked model: the tallest stand two thirds taller than the shortest.</summary>
     public static float TreeScale(int id) => .9f + TreeTall(id) * .6f;
 
-    /// <summary>How large a tree has grown against its size on reaching adulthood.</summary>
-    internal static float GrowthScale(int stage) => stage == 0 ? 1 : (stage - 1) / (float)TreePlanting.AdultDays;
-
     private static Hit[] TreeHits(int id, int stage) {
         if (stage == 1) return [new Hit(.32f, 0, .19f)];
         var (trunk, crown, fork, top) = TreeLook(id).Species switch {
@@ -272,13 +269,12 @@ public static class WorldModels {
             2 => (.25f, 1.05f, 2.6f, 5.4f),
             _ => (.35f, 1.8f, 2.5f, 5.3f),
         };
-        float scale = TreeScale(id) * GrowthScale(stage);
+        float scale = TreeScale(id) * TreePlanting.GrowthScale(stage);
         return new[] { new Hit(Math.Max(.2f, trunk * scale), 0, fork * scale), new Hit(crown * scale, fork * scale, top * scale) };
     }
 
     public static Hit[] Hits(Thing t) => t.Kind switch {
         ThingKind.Tree => TreeHits(t.Id, t.TreeStage),
-        ThingKind.PlantingSpot => [new Hit(.46f, 0, .055f)],
         ThingKind.Hole => [new Hit(.46f, 0, .12f)],
         ThingKind.Stone => new[] { new Hit(.75f, 0, .9f) },
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => new[] { new Hit(.8f, 0, 1) },
@@ -305,7 +301,7 @@ public static class WorldModels {
         ThingKind.Farm => new[] { new Hit(Farms.HalfSize, 0, .5f) },
         ThingKind.Pump => [new Hit(.52f, 0, 1.15f)],
         ThingKind.SteelPiping or ThingKind.GravelPath => Array.Empty<Hit>(),
-        ThingKind.Leaves => new[] { new Hit(.6f, 0, .15f) },
+        ThingKind.LeafSpot => new[] { new Hit(.6f, 0, .15f) },
         ThingKind.Grave => new[] { new Hit(.65f, 0, 1.5f) },
         ThingKind.Anvil => new[] { new Hit(.45f, 0, .85f) },
         ThingKind.Signpost => new[] { new Hit(1.02f, 0, 1.98f) },
@@ -320,7 +316,6 @@ public static class WorldModels {
         Prop prop;
         switch (t.Kind) {
             case ThingKind.Tree: prop = Tree(t); break;
-            case ThingKind.PlantingSpot: prop = new Prop(); TreePlantingShape.Outline(prop.Body); break;
             case ThingKind.Hole: prop = new Prop(); TreePlantingShape.Hole(prop.Body); break;
             case ThingKind.Stump: prop = Stump(t.OfTree != 0 ? t.OfTree : t.Id, t.TreeStage); break;
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
@@ -337,7 +332,7 @@ public static class WorldModels {
                 Add(prop.Body, acorn ??= ItemShape.Piece("acorn"), ItemShape.Material("acorn", "")!, Vector3.Zero);
                 break;
             case ThingKind.Stick: prop = new LooseProp(); Stick(prop.Body, t.Id); break;
-            case ThingKind.Leaves: prop = new Prop(); LeafLitter(prop.Body, t.Id); break;
+            case ThingKind.LeafSpot: prop = new Prop(); LeafSpot(prop.Body, t.Id); break;
             case ThingKind.WolfCorpse: prop = Carcass(); break;
             case ThingKind.Berries: prop = Bush(t.Id); break;
             // The lake is the drinking spot; this thing only provides the hit area.
@@ -415,7 +410,7 @@ public static class WorldModels {
             case var bottle when Water.IsBottle(bottle): return BottleShape.Create(Water.BottleLiters(bottle));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
-            case "leaves": return Build(new Thing { Kind = ThingKind.Leaves }).Root;
+            case "leaves": return Build(new Thing { Kind = ThingKind.LeafSpot }).Root;
             case "crate": return Build(new Thing { Kind = ThingKind.Crate }).Root;
             // Loose iron left the world, but its lump still makes the iron ore icon.
             case "iron_ore": { var lump = new Node3D(); LooseOre(lump, "loose_iron", 0, "a35a2e", "8b4f2b"); return lump; }
@@ -470,7 +465,7 @@ public static class WorldModels {
 
     internal static void ShowTreeStage(TreeProp tree, int stage) {
         tree.Stage = stage;
-        tree.GrowthScale = GrowthScale(stage);
+        tree.GrowthScale = TreePlanting.GrowthScale(stage);
         if (stage == 1) tree.Nub ??= TreePlantingShape.Nub(tree.Body);
         if (tree.Nub != null) tree.Nub.Visible = stage == 1;
         tree.Sway.Visible = stage != 1;
@@ -494,14 +489,14 @@ public static class WorldModels {
         var stump = Add(prop.Body, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
         var (seat, radius) = Trunk(tree, stage);
         float width = radius / NatureShape.StumpRadius;
-        stump.Scale = new Vector3(width, TreeScale(tree) * GrowthScale(stage), width);
+        stump.Scale = new Vector3(width, TreeScale(tree) * TreePlanting.GrowthScale(stage), width);
         prop.Seat = seat;
         return prop;
     }
 
     /// <summary>Where a tree's trunk stands from the tree's spot, and how thick it is at the ground, in metres.</summary>
     public static (Vector3 Seat, float Radius) Trunk(int tree, int stage = 0) {
-        float scale = TreeScale(tree) * GrowthScale(stage);
+        float scale = TreeScale(tree) * TreePlanting.GrowthScale(stage);
         var (species, variant) = TreeLook(tree);
         var (foot, radius) = Tree3DShape.Foot(species, variant);
         // The tree's model was turned by its id, and its trunk with it.
@@ -834,7 +829,7 @@ public static class WorldModels {
     }
 
     /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>
-    private static void LeafLitter(Node3D body, int id) {
+    private static void LeafSpot(Node3D body, int id) {
         Add(body, LeafShape.For(id), NatureShape.Natural, Vector3.Zero);
     }
 

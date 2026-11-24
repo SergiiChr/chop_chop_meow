@@ -1,4 +1,3 @@
-using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -21,7 +20,7 @@ public sealed class GroundHoles(World world) {
     internal string? Block(Vector2 at) {
         if (!ShovelSelected) return "Select a shovel to dig.";
         if (!float.IsFinite(at.X) || !float.IsFinite(at.Y) || !Terrain.OnMap(Terrain.TileAt(at))) return "Choose dry, open ground.";
-        return world.Construction.PlacementBlock(ThingKind.PlantingSpot, at);
+        return world.Construction.PlacementBlock(ThingKind.Hole, at);
     }
 
     /// <summary>Starts a fresh dig once the player reaches the tile.</summary>
@@ -83,7 +82,7 @@ public sealed class GroundHoles(World world) {
     /// <summary>The point the shovel animation aims at while digging open ground.</summary>
     internal static Thing? AnimationTarget(PlayerState player) {
         if (player.DigAttempt == 0) return null;
-        var target = player.DigSubject ??= new Thing { Kind = ThingKind.PlantingSpot };
+        var target = player.DigSubject ??= new Thing { Kind = ThingKind.Hole };
         target.Pos = Position(player);
         return target;
     }
@@ -91,10 +90,6 @@ public sealed class GroundHoles(World world) {
     internal void Reset() {
         foreach (var player in world.Players) Clear(player);
         foreach (var player in world.S.Absent.Values) Clear(player);
-        // A dig outline is a preview, so old outlines and their fog memories disappear when the world opens.
-        world.S.Things.RemoveAll(ThingKind.PlantingSpot, static _ => true);
-        foreach (int id in world.S.Remembered.Where(pair => pair.Value.Kind == ThingKind.PlantingSpot).Select(pair => pair.Key).ToArray())
-            world.S.Remembered.Remove(id);
     }
 
     internal void AtDawn() => world.S.Things.RemoveAll(ThingKind.Hole, static _ => true);

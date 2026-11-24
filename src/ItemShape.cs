@@ -595,7 +595,7 @@ internal static class ItemShape {
         return reach => middle.Y + height * MathF.Sqrt(MathF.Max(0, 1 - reach * reach / (radius * radius)));
     }
 
-    /// <summary>The leaf patch's own leaves laid flat on a mound, spread from its middle out.</summary>
+    /// <summary>The leaf spot's own leaves laid flat on a mound, spread from its middle out.</summary>
     private static void Litter(List<Face> faces, Func<float, float> top, float radius, int leaves) {
         // A leaf of the patch is eleven triangles that start at the middle of its ridge.
         var patch = new List<Face>(); Copy(patch, LeafShape.For(0), Transform3D.Identity, Colors.White);
@@ -607,7 +607,7 @@ internal static class ItemShape {
         }
     }
 
-    /// <summary>A raked-up mound of fallen leaves in the leaf patch's colours, with some of the patch's own leaves lying on it.</summary>
+    /// <summary>A mound of raked leaves in the leaf spot's colours, with some of its leaves lying on it.</summary>
     private static void Leaves(List<Face> faces) {
         var top = Mound(faces, .95f, .42f, 11, new Color[] { new("c08a3a"), new("a8652c"), new("d0a347"), new("8e5a2a"), new("b8753a") });
         Litter(faces, top, .95f, 16);

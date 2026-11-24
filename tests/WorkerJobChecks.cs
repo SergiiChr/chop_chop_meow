@@ -32,7 +32,7 @@ public static class WorkerJobChecks {
     private static void CheckWorkerKeepsToTheFirstJobWhileItCanBeDone(GameData data) {
         var world = EmptyWorld(data);
         var berries = world.Add(ThingKind.Berries, new Vector2(10, 10), 400);
-        var leaves = world.Add(ThingKind.Leaves, new Vector2(10, 14), 400);
+        var leaves = world.Add(ThingKind.LeafSpot, new Vector2(10, 14), 400);
         var chest = world.Add(ThingKind.Chest, new Vector2(13, 12));
         var picker = Staff(world, berries, JobKind.Gather);
         world.SetDuty(picker, leaves, JobKind.Gather, true);
@@ -102,7 +102,7 @@ public static class WorkerJobChecks {
     private static void CheckAJobMovedUpComesFirst(GameData data) {
         var world = EmptyWorld(data);
         var berries = world.Add(ThingKind.Berries, new Vector2(10, 10), 400);
-        var leaves = world.Add(ThingKind.Leaves, new Vector2(10, 14), 400);
+        var leaves = world.Add(ThingKind.LeafSpot, new Vector2(10, 14), 400);
         var chest = world.Add(ThingKind.Chest, new Vector2(13, 12));
         var picker = Staff(world, berries, JobKind.Gather);
         world.SetDuty(picker, leaves, JobKind.Gather, true);

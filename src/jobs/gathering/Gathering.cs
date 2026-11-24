@@ -16,7 +16,7 @@ internal class Gathering {
     /// Full hands, or no spot left, send the load off.
     /// </summary>
     public virtual bool Work(Worker w, Duty duty, Thing? spot, float dt) {
-        if (spot == null || spot.Remaining <= 0) {
+        if (spot == null || spot.Remaining <= 0 || TreePlanting.IsYoung(spot)) {
             if (duty.Kind is not ThingKind gone || !world.NextSpot(w, duty.Thing, gone, spot?.Pos ?? w.Pos)) return false;
             spot = world.Find(duty.Thing)!;
         }

@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Leaf spots beneath oaks and the acorns that can be gathered with their leaves.</summary>
-public sealed class LeafLitter(World world) {
+public sealed class LeafSpots(World world) {
     private const int AcornRefillDays = 10;
     private readonly PriorityQueue<Thing, float> refilling = new();
 
@@ -15,7 +15,7 @@ public sealed class LeafLitter(World world) {
     internal void Scatter() {
         foreach (var tree in world.ThingsOf(ThingKind.Tree)) {
             var at = tree.Pos + World.LeafOffset;
-            if (tree.Id % World.TreeSpecies == 0 && Terrain.Open(at)) world.Add(ThingKind.Leaves, at, World.LeafPatch);
+            if (tree.Id % World.TreeSpecies == 0 && Terrain.Open(at)) world.Add(ThingKind.LeafSpot, at, World.LeavesPerSpot);
         }
     }
 
@@ -26,16 +26,16 @@ public sealed class LeafLitter(World world) {
             for (int direction = 0; direction < 8; direction++) {
                 var at = tree.Pos + offset.Rotated(direction * Mathf.Tau / 8);
                 if (!Room(at)) continue;
-                world.Add(ThingKind.Leaves, at, World.LeafPatch);
+                world.Add(ThingKind.LeafSpot, at, World.LeavesPerSpot);
                 return;
             }
-        world.Add(ThingKind.Leaves, tree.Pos, World.LeafPatch);
+        world.Add(ThingKind.LeafSpot, tree.Pos, World.LeavesPerSpot);
     }
 
     private bool Room(Vector2 at) {
         if (!world.CanStand(at) || world.GravelPaths.Covers(at)) return false;
         foreach (var t in world.Things) {
-            if (t.Kind == ThingKind.Leaves && t.Pos.DistanceSquaredTo(at) < .36f) return false;
+            if (t.Kind == ThingKind.LeafSpot && t.Pos.DistanceSquaredTo(at) < .36f) return false;
             if (!Construction.IsZone(t.Kind)) continue;
             var offset = (at - t.Pos).Abs();
             if (Mathf.Max(offset.X, offset.Y) < World.Footprint(t.Kind)) return false;
@@ -70,11 +70,11 @@ public sealed class LeafLitter(World world) {
 
     internal void Reset() {
         refilling.Clear();
-        foreach (var spot in world.ThingsOf(ThingKind.Leaves))
+        foreach (var spot in world.ThingsOf(ThingKind.LeafSpot))
             if (spot.Regrow > 0) refilling.Enqueue(spot, spot.Regrow);
     }
 
-    internal static bool Valid(Thing thing) => thing.Kind != ThingKind.Leaves ? thing.LeafAcornsTaken == 0
+    internal static bool Valid(Thing thing) => thing.Kind != ThingKind.LeafSpot ? thing.LeafAcornsTaken == 0
         : thing.LeafAcornsTaken >= 0 && thing.LeafAcornsTaken <= Capacity(thing)
         && (thing.LeafAcornsTaken == 0 ? thing.Regrow == 0 : float.IsFinite(thing.Regrow) && thing.Regrow > 0);
 }

@@ -107,7 +107,7 @@ public partial class WorldView {
             case ThingKind.Stone: ShadeObject(t.Pos, .7f, .7f); BareSoil(t.Pos, 1.3f); break;
             case ThingKind.Tree or ThingKind.Stump: ShadeObject(t.Pos, .55f, .7f); break;
             case ThingKind.Berries or ThingKind.Bush: ShadeObject(t.Pos, .6f, .6f); break;
-            case ThingKind.Water or ThingKind.Leaves or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine: break;
+            case ThingKind.Water or ThingKind.LeafSpot or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine: break;
             default:
                 if (t.IsLoose) ShadeObject(t.Pos, .3f, .6f);
                 else if (!Construction.IsZone(t.Kind)) ShadeObject(t.Pos, World.Footprint(t.Kind) + .25f, .5f);

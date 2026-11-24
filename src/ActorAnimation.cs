@@ -995,7 +995,7 @@ public static class ActorAnimation {
         new ToolSwing(MineKeys, 2, ActorRig.PickPoint, TwoHanded: true, ElbowMost));
     private static readonly Blow Hammering = new(new[] { ThingKind.Anvil, ThingKind.Bench },
         new ToolSwing(HammerKeys, 2, ActorRig.HammerFace, TwoHanded: false, ElbowMost));
-    private static readonly Blow Digging = new(new[] { ThingKind.Stump, ThingKind.Bush, ThingKind.PlantingSpot }, DigStrike, null);
+    private static readonly Blow Digging = new(new[] { ThingKind.Stump, ThingKind.Bush, ThingKind.Hole }, DigStrike, null);
 
     /// <summary>The blow an action lands on what it works, or null for an action that lands none.</summary>
     private static Blow? BlowOf(ActorAction action) => action switch {
@@ -1175,8 +1175,8 @@ public static class ActorAnimation {
         return resourceKind switch {
             ThingKind.Tree => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,
             ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => backpack["steel_pick"] > 0 ? ActorAction.SteelMine : ActorAction.Gather,
-            ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.Leaves => ActorAction.Gather,
-            ThingKind.Stump or ThingKind.Bush or ThingKind.PlantingSpot => backpack["steel_shovel"] > 0 ? ActorAction.Dig : ActorAction.Idle,
+            ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.LeafSpot => ActorAction.Gather,
+            ThingKind.Stump or ThingKind.Bush or ThingKind.Hole => backpack["steel_shovel"] > 0 ? ActorAction.Dig : ActorAction.Idle,
             // A mine is dug with a pickaxe, then its frame and rails are hammered in.
             ThingKind.Mine => fitting ? ActorAction.Hammer : ActorAction.SteelMine,
             _ => ActorAction.Idle

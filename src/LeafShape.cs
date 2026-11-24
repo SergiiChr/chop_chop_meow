@@ -3,7 +3,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Three cached, vertex-coloured autumn leaf scatters for rakeable leaf patches.</summary>
+/// <summary>Three cached, vertex-coloured autumn leaf scatters for rakeable leaf spots.</summary>
 internal static class LeafShape {
     public const int Variants = 3;
     private static readonly ArrayMesh?[] variants = new ArrayMesh[Variants];

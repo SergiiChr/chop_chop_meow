@@ -6,18 +6,19 @@ namespace ChopChopMeow;
 /// <summary>Shows what a resource yields, any gathering requirements, and its worker jobs.</summary>
 public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        if (thing.Kind == ThingKind.Tree) TreeStatus();
+        if (thing.Kind == ThingKind.Tree) {
+            TreeStatus();
+            RedrawOnChange(() => (thing.TreeStage == 1, TreePlanting.NeedsWater(thing), TreePlanting.IsAdult(thing)));
+        }
         var stock = new HBoxContainer();
         stock.AddThemeConstantOverride("separation", 8);
         AddChild(stock);
         if (thing.Kind == ThingKind.Water) StockSlot(stock, Water.Liquid, null);
         else StockSlot(stock, World.ResourceItem(thing), () => thing.Remaining);
-        if (thing.Kind == ThingKind.Leaves) StockSlot(stock, TreePlanting.Acorn, () => LeafLitter.Acorns(thing));
+        if (thing.Kind == ThingKind.LeafSpot) StockSlot(stock, TreePlanting.Acorn, () => LeafSpots.Acorns(thing));
 
         if (TreePlanting.NeedsWater(thing)) TreeWater();
-        if (thing is { Kind: ThingKind.Tree, TreeStage: 1 }) {
-            RedrawOnChange(() => (thing.TreeStage == 1, TreePlanting.NeedsWater(thing)));
-        } else {
+        if (thing is not { Kind: ThingKind.Tree, TreeStage: 1 }) {
             GatherNote();
             JobButtons();
         }

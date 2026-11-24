@@ -406,22 +406,26 @@ public sealed partial class GameData {
     public bool TryBuilding(string id, out ThingKind kind) => Kinds.TryParse(id, out kind) && Buildings.ContainsKey(kind);
     public bool IsBuilding(string id) => TryBuilding(id, out _);
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' ');
-    public string Name(ThingKind kind) => Items.TryGetValue(kind.Id(), out var i) ? i.Name : Buildings.TryGetValue(kind, out var b) ? b.Name : kind switch {
-        ThingKind.Barrel => Items[Barrel.Item].Name,
-        ThingKind.Tree => "Tree",
-        ThingKind.PlantingSpot => "Dig site",
-        ThingKind.Hole => "Hole",
-        ThingKind.Stump => "Stump",
-        ThingKind.Bush => "Bush",
-        ThingKind.Iron => "Iron deposit",
-        ThingKind.Tin => "Tin deposit",
-        ThingKind.LooseCoal => "Coal",
-        ThingKind.LooseStone => "Loose stone",
-        ThingKind.Stick => "Stick",
-        ThingKind.IronChip => "Iron ore",
-        ThingKind.TinChip => "Tin ore",
-        ThingKind.Grave => "Recovery box",
-        ThingKind.WolfCorpse => "Wolf carcass",
-        _ => kind.Id().Replace('_', ' ')
-    };
+    public string Name(ThingKind kind) {
+        if (kind == ThingKind.LeafSpot) return "Leaf spot";
+        if (Items.TryGetValue(kind.Id(), out var item)) return item.Name;
+        if (Buildings.TryGetValue(kind, out var building)) return building.Name;
+        return kind switch {
+            ThingKind.Barrel => Items[Barrel.Item].Name,
+            ThingKind.Tree => "Tree",
+            ThingKind.Hole => "Hole",
+            ThingKind.Stump => "Stump",
+            ThingKind.Bush => "Bush",
+            ThingKind.Iron => "Iron deposit",
+            ThingKind.Tin => "Tin deposit",
+            ThingKind.LooseCoal => "Coal",
+            ThingKind.LooseStone => "Loose stone",
+            ThingKind.Stick => "Stick",
+            ThingKind.IronChip => "Iron ore",
+            ThingKind.TinChip => "Tin ore",
+            ThingKind.Grave => "Recovery box",
+            ThingKind.WolfCorpse => "Wolf carcass",
+            _ => kind.Id().Replace('_', ' ')
+        };
+    }
 }

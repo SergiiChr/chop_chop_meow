@@ -5,14 +5,14 @@ using System.Text.Json.Serialization;
 
 namespace ChopChopMeow;
 
-/// <summary>What a world object is. Saves and network updates name each kind by its id, the member name in snake case, such as "wolf_corpse".</summary>
+/// <summary>What a world object is. Saves and network updates name each kind by its id.</summary>
 [JsonConverter(typeof(KindConverter))]
 public enum ThingKind {
     Tree,
     Stone,
     Berries,
     Water,
-    Leaves,
+    LeafSpot,
     WolfCorpse,
     Iron,
     Coal,
@@ -46,7 +46,6 @@ public enum ThingKind {
     SteelPiping,
     Pump,
     Acorn,
-    PlantingSpot,
     Hole,
 }
 
@@ -59,7 +58,8 @@ public static class Kinds {
     static Kinds() {
         ids = new string[All.Length];
         foreach (var kind in All) {
-            ids[(int)kind] = JsonNamingPolicy.SnakeCaseLower.ConvertName(kind.ToString());
+            // Leaf spots and the leaves they yield share the established "leaves" id.
+            ids[(int)kind] = kind == ThingKind.LeafSpot ? "leaves" : JsonNamingPolicy.SnakeCaseLower.ConvertName(kind.ToString());
             byId[ids[(int)kind]] = kind;
         }
     }
@@ -78,7 +78,15 @@ public static class Kinds {
 }
 
 /// <summary>Reads and writes a kind as its id.</summary>
-public sealed class KindConverter() : JsonStringEnumConverter<ThingKind>(JsonNamingPolicy.SnakeCaseLower);
+public sealed class KindConverter : JsonConverter<ThingKind> {
+    public override ThingKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
+        if (reader.TokenType != JsonTokenType.String) throw new JsonException("A world object kind must be a name.");
+        var id = reader.GetString();
+        return Kinds.TryParse(id, out var kind) ? kind : throw new JsonException($"Unknown world object kind: {id}");
+    }
+
+    public override void Write(Utf8JsonWriter writer, ThingKind value, JsonSerializerOptions options) => writer.WriteStringValue(value.Id());
+}
 
 /// <summary>Reads an optional kind, where an empty id means none, and writes none as an empty id.</summary>
 public sealed class OptionalKind : JsonConverter<ThingKind?> {

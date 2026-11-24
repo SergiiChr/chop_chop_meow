@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using ChopChopMeow;
 using Godot;
@@ -7,6 +8,7 @@ using static Checks;
 using static SetupSteps;
 using static WorldSteps;
 using static ReplantingSteps;
+using static WorkerSteps;
 
 public static class ReplantingChecks {
     public static void Run(GameData data) {
@@ -16,9 +18,12 @@ public static class ReplantingChecks {
         Test(CheckEmptyHoleLastsUntilDawnAcrossASave, data);
         Test(CheckWateredTreeKeepsGrowingAfterBecomingAnAdult, data);
         Test(CheckValleyTreesKeepGrowing, data);
+        Test(CheckDueTreesSpreadTheirGrowthAcrossUpdates, data);
+        Test(CheckWoodcutterSkipsYoungTrees, data);
         Test(CheckGatheringLeavesGivesAcornsThatRefillOneAtATime, data);
         Test(CheckAGrowingTreeKeepsItsAgeOnLoadAndCanBeFelledEarly, data);
         Test(CheckSaveRefusesAnInvalidRememberedTreeStage, data);
+        Test(CheckSaveRefusesAnObsoleteDigOutline, data);
     }
 
     private static void CheckAxeHitsDropAcornsLikePickaxeHitsDropChips(GameData data) {
@@ -52,6 +57,8 @@ public static class ReplantingChecks {
         Require(!world.Holes.Begin(PlantingGround, 1), "digging should require a selected shovel");
         Drop(world, "acorn");
         var hole = DigHole(world);
+        Require(world.Construction.PlacementBlock(ThingKind.Hole, PlantingGround + Vector2.Right * 8)
+            == "Dig within 5 tiles of yourself.", "the range message should name digging");
         Require(hole.Inventory.Count == 0 && world.ThingsOf(ThingKind.Tree).Count == 0,
             "digging without acorns should leave an empty hole");
         Give(world, "wood");
@@ -75,7 +82,7 @@ public static class ReplantingChecks {
         world.Tick(2);
         Require(!world.Holes.Finish(1), "two seconds should not be enough shovel work");
         world.Holes.Cancel(1);
-        Require(!world.ThingsOf(ThingKind.PlantingSpot).Any() && !world.ThingsOf(ThingKind.Hole).Any(),
+        Require(!world.ThingsOf(ThingKind.Hole).Any(),
             "letting go should leave the ground as it was");
         Require(world.Holes.Begin(PlantingGround, 2), "another hold should start a fresh dig");
         world.Tick(2);
@@ -110,27 +117,68 @@ public static class ReplantingChecks {
         float watered = world.Time;
         RunUntil(world, watered + data.DaySeconds - 1);
         Require(tree.Remaining == 0, "the tree should have no wood until the first full day after watering");
-        int[] wood = [4, 8, 12, 16, 21, 25, 29, 33, 37, 42, 46, 50];
+        int[] wood = [4, 8, 12, 16, 21, 25, 29, 33, 37, 42, 46, 49];
         for (int day = 0; day < wood.Length; day++) {
             RunUntil(world, watered + data.DaySeconds * (day + 1));
             Require(tree.Remaining == wood[day], $"the tree should hold {wood[day]} wood after {day + 1} days, found {tree.Remaining}");
-            if (day < 9) Require(world.ThingsOf(ThingKind.Leaves).Count == 0, "a young tree should have no leaf spot");
+            if (day < 9) Require(world.ThingsOf(ThingKind.LeafSpot).Count == 0, "a young tree should have no leaf spot");
         }
-        var patches = world.ThingsOf(ThingKind.Leaves);
+        var patches = world.ThingsOf(ThingKind.LeafSpot);
         Require(patches.Count == 1 && patches[0].Pos.DistanceTo(tree.Pos) < 2 && patches[0].Remaining == 12,
             "an oak should make one leaf spot when it reaches adulthood");
+        RunUntil(world, watered + 20 * data.DaySeconds);
+        Require(tree.Remaining == 71, "after another ten days a tree should hold 71 wood");
+        RunUntil(world, watered + 40 * data.DaySeconds);
+        Require(tree.Remaining == 100, "doubling the age again should add the same 29 wood over twice as many days");
+        var adult = new Thing { Kind = ThingKind.Tree, Id = tree.Id };
+        float heightRatio = WorldModels.Hits(tree)[1].Top / WorldModels.Hits(adult)[1].Top;
+        Require(Mathf.IsEqualApprox(heightRatio, 2.3862944f), "a forty-day tree should scale by the logarithmic growth curve");
     }
 
     private static void CheckValleyTreesKeepGrowing(GameData data) {
         var world = new World(data);
-        var tree = world.ThingsOf(ThingKind.Tree)[0];
-        RunUntil(world, world.Time + 3 * data.DaySeconds);
-        Require(tree.Remaining == 54, "an existing tree with 42 wood should reach 54 after three more days");
+        float began = world.Time;
+        var trees = world.ThingsOf(ThingKind.Tree);
+        RunUntil(world, began + .5f * data.DaySeconds);
+        int grown = trees.Count(tree => tree.Remaining > 42);
+        Require(grown > 0 && grown < trees.Count, "some standing trees should grow before the others");
+        RunUntil(world, began + 3 * data.DaySeconds);
+        Require(trees.All(tree => tree.Remaining == 53), "each standing tree should gain eleven wood over three days");
+    }
+
+    private static void CheckDueTreesSpreadTheirGrowthAcrossUpdates(GameData data) {
+        var world = EmptyWorld(data);
+        for (int i = 0; i < 64; i++) {
+            var tree = world.Add(ThingKind.Tree, PlantingGround + new Vector2(i % 8, i / 8) * 3, 42);
+            tree.NextTreeStageAt = world.Time + 1;
+        }
+        world.Deserialize(world.Serialize());
+        var trees = world.ThingsOf(ThingKind.Tree);
+        world.Tick(1, true);
+        int grown = trees.Count(tree => tree.Remaining == 46);
+        Require(grown > 0 && grown < trees.Count, "saved trees due together should grow across several updates");
+        world.Tick(.1f, true);
+        Require(trees.All(tree => tree.Remaining == 46), "later updates should finish the queued growth");
+    }
+
+    private static void CheckWoodcutterSkipsYoungTrees(GameData data) {
+        var lot = Woodlot(data);
+        var young = lot.World.Add(ThingKind.Tree, new Vector2(13, 10), 21);
+        young.TreeStage = 6;
+        lot.World.Look();
+        Work(lot.World, 30, () => lot.Next.Remaining < 400);
+        Require(lot.World.Find(young.Id) == young && young.Remaining == 21 && lot.Next.Remaining < 400,
+            "the woodcutter should leave the nearer young tree untouched and chop the adult tree");
+
+        lot.World.SetDuty(lot.Cutter, young, JobKind.Gather, true);
+        lot.World.Assign(lot.Cutter, young);
+        Require(!World.HasDuty(lot.Cutter, young.Id) && World.HasDuty(lot.Cutter, lot.Next.Id),
+            "assigning a young tree should leave the woodcutter's existing duty in place");
     }
 
     private static void CheckGatheringLeavesGivesAcornsThatRefillOneAtATime(GameData data) {
         var world = EmptyWorld(data);
-        var patch = world.Add(ThingKind.Leaves, PlantingGround, 12);
+        var patch = world.Add(ThingKind.LeafSpot, PlantingGround, 12);
         world.Player = patch.Pos;
         Give(world, "rake", 1);
         world.Gather(patch, data.GatherSeconds);
@@ -146,6 +194,11 @@ public static class ReplantingChecks {
         RunUntil(world, started + data.DaySeconds * 20);
         world.Gather(patch, data.GatherSeconds);
         Require(world.Backpack["acorn"] == first + 2, "the next acorn should take another ten days");
+
+        var saved = JsonNode.Parse(world.Serialize())!;
+        Require((string?)saved["Things"]?[0]?["Kind"] == "leaves", "leaf spots should keep the existing save id");
+        world.Deserialize(saved.ToJsonString());
+        Require(world.Find(patch.Id) is { Kind: ThingKind.LeafSpot }, "the existing leaves id should load as a leaf spot");
     }
 
     private static void CheckAGrowingTreeKeepsItsAgeOnLoadAndCanBeFelledEarly(GameData data) {
@@ -183,5 +236,19 @@ public static class ReplantingChecks {
         bool refused = false;
         try { world.Deserialize(saved.ToJsonString()); } catch (InvalidOperationException error) { refused = error.Message.Contains("Unsupported"); }
         Require(refused, "the save should refuse an invalid remembered growth stage");
+    }
+
+    private static void CheckSaveRefusesAnObsoleteDigOutline(GameData data) {
+        var world = EmptyWorld(data);
+        DigHole(world);
+        var save = JsonNode.Parse(world.Serialize())!;
+        save["Things"]![0]!["Kind"] = "planting_spot";
+        try {
+            world.Deserialize(save.ToJsonString());
+        } catch (JsonException error) {
+            Require(error.Message.Contains("planting_spot"), "the load error should name the unsupported outline");
+            return;
+        }
+        Require(false, "loading should refuse a saved dig outline");
     }
 }

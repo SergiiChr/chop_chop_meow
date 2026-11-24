@@ -8,6 +8,7 @@ public sealed class TreePlanting(World world) {
     public const string Acorn = "acorn";
     public const int WaterNeeded = 5;
     public const int AdultDays = 10;
+    private const int StagesPerTick = 32;
 
     private readonly PriorityQueue<Thing, float> growing = new();
 
@@ -15,9 +16,21 @@ public sealed class TreePlanting(World world) {
 
     public static bool IsAdult(Thing tree) => DaysGrown(tree) >= AdultDays;
 
-    public static int DaysGrown(Thing tree) => tree.TreeStage == 0 ? AdultDays : tree.TreeStage - 1;
+    internal static bool IsYoung(Thing thing) => thing.Kind == ThingKind.Tree && !IsAdult(thing);
 
-    private static long WoodAt(int days) => (long)World.TreeWood * days / AdultDays;
+    public static int DaysGrown(Thing tree) => DaysGrown(tree.TreeStage);
+
+    private static int DaysGrown(int stage) => stage == 0 ? AdultDays : stage - 1;
+
+    /// <summary>Size relative to adulthood, with a straight start and slower gains each day from then on.</summary>
+    internal static float GrowthScale(int stage) => (float)GrowthAt(DaysGrown(stage));
+
+    private static double GrowthAt(int days) {
+        double age = days / (double)AdultDays;
+        return days <= AdultDays ? age : 1 + Math.Log(age);
+    }
+
+    private static long WoodAt(int days) => (long)(World.TreeWood * GrowthAt(days));
 
     internal void BeginGrowth(Thing tree) {
         tree.Inventory.Remove(Water.Liquid, WaterNeeded);
@@ -25,9 +38,10 @@ public sealed class TreePlanting(World world) {
         growing.Enqueue(tree, tree.NextTreeStageAt);
     }
 
-    /// <summary>Only trees due for their next stage do work on a tick, including any days passed while sleeping.</summary>
+    /// <summary>Advances due trees, spreading any backlog after a clock jump over several ticks.</summary>
     internal void Tick() {
-        while (growing.TryPeek(out var tree, out float at) && world.Time >= at) {
+        for (int processed = 0; processed < StagesPerTick && growing.TryPeek(out var tree, out float at)
+            && world.Time >= at; processed++) {
             growing.Dequeue();
             if (world.Find(tree.Id) != tree) continue;
             int before = DaysGrown(tree), after = before + 1;
@@ -41,9 +55,12 @@ public sealed class TreePlanting(World world) {
 
     internal void Reset() {
         growing.Clear();
-        foreach (var tree in world.ThingsOf(ThingKind.Tree)) {
+        var trees = world.ThingsOf(ThingKind.Tree);
+        for (int slot = 0; slot < trees.Count; slot++) {
+            var tree = trees[slot];
+            // The starting trees each grow once a day, with their first changes spread across that day.
             if (tree.TreeStage == 0 && tree.NextTreeStageAt == 0)
-                tree.NextTreeStageAt = world.Time + world.Data.DaySeconds;
+                tree.NextTreeStageAt = world.Time + world.Data.DaySeconds * (slot + 1) / trees.Count;
             if (tree.NextTreeStageAt > 0) growing.Enqueue(tree, tree.NextTreeStageAt);
         }
     }

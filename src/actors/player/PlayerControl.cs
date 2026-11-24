@@ -24,7 +24,7 @@ public abstract record ClickMode {
     public float Rotation => QuarterTurns * Mathf.Pi / 2;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
-    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, Dig => ThingKind.PlantingSpot, _ => null };
+    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, Dig => ThingKind.Hole, _ => null };
 }
 
 /// <summary>The player in the world: walking, gathering, lifting containers, placing buildings, taking them down and clicking things.</summary>
@@ -112,7 +112,7 @@ public sealed class PlayerControl {
     /// <summary>Shows the dig outline again once a temporary action ends, unless the player put it away.</summary>
     private void UpdateDigMode() {
         bool selected = world.Holes.ShovelSelected;
-        if (!selected) digDismissed = false;
+        if (!selected || world.InHand == "") digDismissed = false;
         if (selected && !digDismissed && Mode is ClickMode.Normal) Mode = new ClickMode.Dig();
         else if (!selected && Mode is ClickMode.Dig) Mode = new ClickMode.Normal();
     }
@@ -122,9 +122,13 @@ public sealed class PlayerControl {
         Mode = new ClickMode.Dig();
     }
 
-    internal void CancelMode() {
+    internal bool CanCancelMode => Mode is not ClickMode.Normal && (Mode is not ClickMode.Dig || world.InHand != "");
+
+    internal bool TryCancelMode() {
+        if (!CanCancelMode) return false;
         if (Mode is ClickMode.Dig) digDismissed = true;
         Mode = new ClickMode.Normal();
+        return true;
     }
 
     /// <summary>A container or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>
@@ -148,7 +152,7 @@ public sealed class PlayerControl {
     public bool RotatePlacement(int quarters, bool overPanel) {
         PlaceHeld(overPanel);
         var placement = heldPlacement ?? Mode;
-        if (placement.Placing is not ThingKind kind || kind == ThingKind.PlantingSpot) return false;
+        if (placement.Placing is not ThingKind kind || kind == ThingKind.Hole) return false;
         if (kind == ThingKind.Mine) return true;
         var turned = placement with { QuarterTurns = (placement.QuarterTurns + quarters + 4) % 4 };
         if (heldPlacement != null) heldPlacement = turned;

@@ -8,7 +8,7 @@ public partial class World {
     /// <summary>Wood a stump gives when it is dug up.</summary>
     public const int StumpWood = 3;
     /// <summary>Leaves a bush gives when it is dug up, three oak patches' worth.</summary>
-    public const int BushLeaves = 3 * LeafPatch;
+    public const int BushLeaves = 3 * LeavesPerSpot;
 
     /// <summary>Grows a bush on every scenery spot that is one, away from the clearing and the mountain feet, unless something already stands there.</summary>
     private void GrowBushes() {
@@ -47,7 +47,7 @@ public partial class World {
     }
 
     /// <summary>Whether a kind grows low enough to build on: a building or yard goes up over it and clears it away.</summary>
-    public static bool BuiltOver(ThingKind kind) => kind is ThingKind.Stump or ThingKind.Bush or ThingKind.PlantingSpot or ThingKind.Hole;
+    public static bool BuiltOver(ThingKind kind) => kind is ThingKind.Stump or ThingKind.Bush or ThingKind.Hole;
 
     /// <summary>Whether a spot is on the ground a building, yard or crate keeps clear of other resources, where it leaves no stump or bush.</summary>
     public static bool Clears(Thing built, Vector2 p) {
