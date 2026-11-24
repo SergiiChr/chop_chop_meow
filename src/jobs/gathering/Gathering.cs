@@ -48,7 +48,12 @@ internal class Gathering {
             if (!spot.IsLoose && w.Timer < world.GatherTime(spot.Kind, tool)) return true;
             w.Timer = 0;
             int took = w.Bag.Add(item, spot.IsLoose ? spot.Remaining : Math.Min(spot.Remaining, World.GatherYield(spot.Kind))); spot.Remaining -= took;
-            if (took > 0) { world.Got(item); world.Chip(spot, tool); }
+            if (took > 0) {
+                world.Got(item);
+                world.Chip(spot, tool);
+                if (spot.Kind == ThingKind.Leaves && LeafLitter.Acorns(spot) > 0
+                    && world.DepositFor(TreePlanting.Acorn, spot.Pos) != null) world.LeafSpots.Gather(spot, w.Bag);
+            }
         }
         w.Loading = w.Bag.Room(item) > 0;
         if (spot.Remaining > 0) return true;

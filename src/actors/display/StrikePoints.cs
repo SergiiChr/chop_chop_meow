@@ -74,8 +74,8 @@ public sealed class StrikePoints {
 
     /// <summary>Where the blow's own swing first meets what it works, or null where the swing passes it by.</summary>
     private static Vector3? OnTheSwing(Thing subject, Transform3D rig, ActorAction action, ReadOnlySpan<Part> meshes) {
-        if (subject.Kind == ThingKind.Tree && subject.TreeStage != 0) return null;
-        var trunk = subject.Kind == ThingKind.Tree ? WorldModels.Trunk(subject.Id) : default;
+        if (subject.Kind == ThingKind.Tree && !TreePlanting.IsAdult(subject)) return null;
+        var trunk = subject.Kind == ThingKind.Tree ? WorldModels.Trunk(subject.Id, subject.TreeStage) : default;
         var axis = WorldView.To3(subject.Pos) + trunk.Seat;
         var last = rig * ActorAnimation.Swing(action, 0)!.Value;
         for (int i = 1; i <= SwingSteps; i++) {
@@ -113,7 +113,7 @@ public sealed class StrikePoints {
                     var (seat, radius) = WorldModels.Trunk(subject.Id, subject.TreeStage);
                     var trunk = new Vector2(spot.X + seat.X, spot.Z + seat.Z);
                     float height = ActorAnimation.Swing(action, 1)?.Y ?? 1;
-                    if (prop is TreeProp tree) height *= tree.GrowthScale;
+                    if (prop is TreeProp tree) height *= Math.Min(tree.GrowthScale, 1);
                     return WorldView.To3(trunk + (from - trunk).Normalized() * radius, height);
                 }
             case ThingKind.Anvil or ThingKind.Bench: {

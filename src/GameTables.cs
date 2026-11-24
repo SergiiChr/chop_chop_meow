@@ -111,7 +111,7 @@ public sealed partial class GameData {
     };
     public Dictionary<string, SourceDef> Sources { get; } = new() {
         ["wood"] = new() { How = "Chop trees" },
-        ["acorn"] = new() { How = "Pick up after chopping" },
+        ["acorn"] = new() { How = "Chop trees or gather leaves" },
         ["stone"] = new() { How = "Pick up or mine" },
         ["coal"] = new() { How = "Mine or pick up" },
         ["iron_ore"] = new() { How = "Mine" },

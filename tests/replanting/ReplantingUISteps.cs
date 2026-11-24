@@ -23,9 +23,18 @@ public partial class Game {
         await Frames();
         var tree = world.ThingsOf(ThingKind.Tree).First(t => t.Pos == at);
         await ClickOn(tree);
-        await Until(() => HasLabel(panel, "Needs 5 L"), "the planted tree asking for five liters");
+        await Until(() => ShowsTreeStatus("Planted") && HasLabel(panel, "Needs 5 L") && HasLabel(panel, "0 left"),
+            "the planted tree showing its status, wood count, and water needed", 4);
+        Require(panel.FindChildren("*", "TextureRect", true, false).OfType<TextureRect>()
+            .Any(icon => icon.IsVisibleInTree() && icon.Texture == Icons.Of("wood")), "the planted tree should show the usual wood icon");
+        Require(!HasLabel(panel, "Pour from a filled bottle or bucket"), "the water amount should be enough text beside the slot");
         await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(bucket))), OnPage($"input_{Water.Liquid}")!);
-        await Until(() => HasLabel(panel, "Growth") && world.Backpack[Bucket.Item] > 0, "the tree starting to grow after the bucket is poured");
+        await Until(() => ShowsTreeStatus("Growing") && world.Backpack[Bucket.Item] > 0,
+            "the tree showing Growing after the bucket is poured", 4);
+        Require(!HasLabel(panel, "/10 days"), "the tree panel should leave out the day count");
         return tree;
     }
+
+    private bool ShowsTreeStatus(string status) => panel.FindChildren("*", "Label", true, false).OfType<Label>()
+        .Any(label => label.IsVisibleInTree() && label.Text == status);
 }

@@ -101,7 +101,7 @@ Simulation and data:
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
-| `src/trees/TreePlanting.cs`, `src/trees/display/TreePlantingShape.cs`, `src/trees/display/TreePlantingPanel.cs` | Marking, planting, watering and growing trees, with the planting outline, nub and inspection page |
+| `src/trees/TreePlanting.cs`, `src/trees/LeafLitter.cs`, `src/trees/display/TreePlantingShape.cs`, `src/trees/display/TreePlantingPanel.cs` | Tree planting and growth, leaf spots and their acorns, and the planting outline, nub and page |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/packing/Packing.cs` | Packing stations |
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
@@ -185,7 +185,7 @@ UI and input:
 | `src/actors/enemies/wolf/model/Den.cs` | `Den`, a wolf den's mouth, door and clearance |
 | `src/actors/model/IWalker.cs` | `IWalker`, anything that walks the map on its own, along a route around what blocks it |
 | `src/CampfirePanel.cs` | A campfire |
-| `src/ResourcePanel.cs` | A resource in the world |
+| `src/resources/display/ResourcePanel.cs` | Resource inspection, including a tree’s wood, status and watering |
 | `src/PilePanel.cs` | A pile or compost heap |
 | `src/ToolRackPanel.cs` | A tool station |
 | `src/containers/barrel/display/BarrelPanel.cs`, `src/containers/barrel/display/CarriedBarrelPanel.cs` | Water and hauling on a placed barrel and the water slot in a backpack barrel |
@@ -869,13 +869,20 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 `TreePlanting.Mark` places a `PlantingSpot` outline on a click while an acorn is on the cursor.
 The outline costs nothing and can be cleared by the remove selector, a building or a gravel tile.
 Holding right mouse on it with a shovel adds digging work; finishing it spends one acorn from the backpack.
-A planted acorn is a selectable nub and its water slot accepts up to five liters from bottles or buckets.
+A planted acorn is a selectable nub.
+`ResourcePanel` shows wood throughout its life, **Planted** with a water slot until it takes five liters, then **Growing**
+until it becomes an **Adult tree**.
 
 The full five liters start growth and are used up.
 `Thing.NextTreeStageAt` holds the next date on the world clock and `TreePlanting` checks only trees ready to grow.
 `Thing.TreeStage` records the completed days through saves, network updates and fog memories.
-The oak grows one stage after each full day, with whole wood units rounded down from its share of `World.TreeWood`.
-Each stage adds just the increase since the last, so it preserves wood already chopped.
+A replanted oak becomes an adult after ten full days and puts down one leaf spot next to its trunk.
+All standing trees gain size and wood daily, including after adulthood.
+Each day adds the increase in whole wood units since the last, so it preserves wood already chopped.
+
+`LeafLitter` gives each leaf spot a capacity of one or two acorns.
+Gathering leaves also gathers any acorns that fit in the bag.
+Leaves refill at dawn. Missing acorns refill one at a time, every ten days from the first gather that took one.
 Chopping out all its current wood fells the tree and leaves its stump.
 
 ### Tools

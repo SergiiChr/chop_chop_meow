@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -7,15 +8,17 @@ namespace ChopChopMeow;
 public sealed class TreePlanting(World world) {
     public const string Acorn = "acorn";
     public const int WaterNeeded = 5;
-    public const int GrowDays = 10;
+    public const int AdultDays = 10;
 
     private readonly PriorityQueue<Thing, float> growing = new();
 
     public static bool NeedsWater(Thing tree) => tree.Kind == ThingKind.Tree && tree.TreeStage == 1 && tree.NextTreeStageAt == 0;
 
-    public static int DaysGrown(Thing tree) => tree.TreeStage == 0 ? GrowDays : tree.TreeStage - 1;
+    public static bool IsAdult(Thing tree) => DaysGrown(tree) >= AdultDays;
 
-    private static int WoodAt(int days) => World.TreeWood * days / GrowDays;
+    public static int DaysGrown(Thing tree) => tree.TreeStage == 0 ? AdultDays : tree.TreeStage - 1;
+
+    private static long WoodAt(int days) => (long)World.TreeWood * days / AdultDays;
 
     internal void BeginGrowth(Thing tree) {
         tree.Inventory.Remove(Water.Liquid, WaterNeeded);
@@ -29,29 +32,34 @@ public sealed class TreePlanting(World world) {
             growing.Dequeue();
             if (world.Find(tree.Id) != tree) continue;
             int before = DaysGrown(tree), after = before + 1;
-            tree.Remaining += WoodAt(after) - WoodAt(before);
-            tree.TreeStage = after == GrowDays ? 0 : after + 1;
-            tree.NextTreeStageAt = after == GrowDays ? 0 : at + world.Data.DaySeconds;
-            if (tree.NextTreeStageAt > 0) growing.Enqueue(tree, tree.NextTreeStageAt);
+            tree.Remaining = (int)Math.Min(int.MaxValue, tree.Remaining + WoodAt(after) - WoodAt(before));
+            tree.TreeStage = after == int.MaxValue ? after : after + 1;
+            if (after == AdultDays) world.LeafSpots.Drop(tree);
+            tree.NextTreeStageAt = Math.Max(at + world.Data.DaySeconds, MathF.BitIncrement(at));
+            growing.Enqueue(tree, tree.NextTreeStageAt);
         }
     }
 
     internal void Reset() {
         growing.Clear();
-        foreach (var tree in world.ThingsOf(ThingKind.Tree))
+        foreach (var tree in world.ThingsOf(ThingKind.Tree)) {
+            if (tree.TreeStage == 0 && tree.NextTreeStageAt == 0)
+                tree.NextTreeStageAt = world.Time + world.Data.DaySeconds;
             if (tree.NextTreeStageAt > 0) growing.Enqueue(tree, tree.NextTreeStageAt);
+        }
     }
 
     internal static bool ValidStage(Thing thing) => thing.TreeStage == 0 || thing.Kind switch {
-        ThingKind.Tree => thing.TreeStage is >= 1 and <= GrowDays,
-        ThingKind.Stump => thing.TreeStage is >= 2 and <= GrowDays,
+        ThingKind.Tree => thing.TreeStage >= 1,
+        ThingKind.Stump => thing.TreeStage >= 2,
         _ => false
     };
 
     internal static bool ValidGrowth(Thing thing) {
-        if (thing.TreeStage == 0 || thing.Kind == ThingKind.Stump) return thing.NextTreeStageAt == 0;
-        return thing.Remaining >= 0 && thing.Remaining <= WoodAt(DaysGrown(thing))
-            && float.IsFinite(thing.NextTreeStageAt) && thing.NextTreeStageAt >= 0
+        if (thing.Kind != ThingKind.Tree) return thing.NextTreeStageAt == 0;
+        if (!float.IsFinite(thing.NextTreeStageAt) || thing.NextTreeStageAt < 0 || thing.Remaining < 0) return false;
+        if (IsAdult(thing)) return thing.TreeStage == 0 || thing.NextTreeStageAt > 0;
+        return thing.Remaining <= WoodAt(DaysGrown(thing))
             && (thing.NextTreeStageAt > 0 || thing.TreeStage == 1)
             && thing.Inventory.Slots == 1 && thing.Inventory.StackSize == WaterNeeded && thing.Inventory.Capacity == WaterNeeded
             && thing.Inventory.Count == thing.Inventory[Water.Liquid]
@@ -70,7 +78,7 @@ public sealed class TreePlanting(World world) {
 
     internal string? DigBlock() {
         if (world.BestTool("shovel") == null) return "Carry a shovel to plant the acorn.";
-        return world.S.Backpack.Free(Acorn) == 0 ? "Carry an acorn in your backpack." : null;
+        return world.S.Backpack.Free(Acorn) == 0 ? "Nothing to plant" : null;
     }
 
     internal void Dig(Thing spot, float dt) {

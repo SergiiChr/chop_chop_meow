@@ -494,9 +494,15 @@ You can clear an outline with the remove selector.
 
 Hold right mouse on the outline while carrying a shovel.
 Once the digging finishes, one acorn goes into the ground and a small nub marks the spot.
-Click the nub and pour a total of 5 L from bottles or buckets into its water slot.
-After watering, the oak grows in daily stages. It holds 4 wood after one day, 21 after five, and 42 after ten.
-You can chop it from the first day it produces wood.
+Click the nub to see its wood and status in the tree panel.
+A tree shows **Planted** until you pour a total of 5 L from bottles or buckets into its water slot, then **Growing**.
+After watering, the oak grows daily. It holds 4 wood after one day, 21 after five, and 42 when it becomes an **Adult tree**
+after ten. You can chop it from the first day it produces wood.
+All standing trees keep getting larger and gaining wood each day.
+
+When a replanted oak becomes an adult it makes a spot of leaves near its trunk.
+Gathering leaves from any such spot also picks up the acorns there.
+A leaf spot holds one or two acorns and replaces one every ten in-game days until full.
 
 ## Progression
 

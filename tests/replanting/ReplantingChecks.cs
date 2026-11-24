@@ -12,7 +12,9 @@ public static class ReplantingChecks {
     public static void Run(GameData data) {
         Test(CheckAxeHitsDropAcornsLikePickaxeHitsDropChips, data);
         Test(CheckMarkingIsFreeAndPlantingUsesOneAcornAndAShovel, data);
-        Test(CheckPlantedAcornNeedsFiveLitersThenGrowsThroughTenStages, data);
+        Test(CheckWateredTreeKeepsGrowingAfterBecomingAnAdult, data);
+        Test(CheckValleyTreesKeepGrowing, data);
+        Test(CheckGatheringLeavesGivesAcornsThatRefillOneAtATime, data);
         Test(CheckAGrowingTreeKeepsItsAgeOnLoadAndCanBeFelledEarly, data);
         Test(CheckSaveRefusesAnInvalidRememberedTreeStage, data);
     }
@@ -48,6 +50,9 @@ public static class ReplantingChecks {
         world.Gather(spot, 10);
         Require(world.Find(spot.Id) == spot && world.Backpack["acorn"] == 1, "planting without a shovel should do nothing");
         Give(world, "steel_shovel", 1);
+        Drop(world, "acorn");
+        Require(world.GatherBlock(spot) == "Nothing to plant", "trying to dig without an acorn should say Nothing to plant");
+        Give(world, "acorn");
         world.Gather(spot, 1);
         Require(world.Find(spot.Id) == spot && world.Backpack["acorn"] == 1, "a short press should leave the outline and acorn");
         var tree = FinishPlanting(world, spot);
@@ -55,7 +60,7 @@ public static class ReplantingChecks {
             "planting should spend one acorn and leave the shovel and a tree with no wood");
     }
 
-    private static void CheckPlantedAcornNeedsFiveLitersThenGrowsThroughTenStages(GameData data) {
+    private static void CheckWateredTreeKeepsGrowingAfterBecomingAnAdult(GameData data) {
         var world = EmptyWorld(data);
         var tree = FinishPlanting(world, MarkPlantingGround(world));
         PourIntoTree(world, tree, Water.Full, Water.Empty);
@@ -65,11 +70,42 @@ public static class ReplantingChecks {
         float watered = world.Time;
         RunUntil(world, watered + data.DaySeconds - 1);
         Require(tree.Remaining == 0, "the tree should have no wood until the first full day after watering");
-        int[] wood = [4, 8, 12, 16, 21, 25, 29, 33, 37, 42];
+        int[] wood = [4, 8, 12, 16, 21, 25, 29, 33, 37, 42, 46, 50];
         for (int day = 0; day < wood.Length; day++) {
             RunUntil(world, watered + data.DaySeconds * (day + 1));
             Require(tree.Remaining == wood[day], $"the tree should hold {wood[day]} wood after {day + 1} days, found {tree.Remaining}");
+            if (day < 9) Require(world.ThingsOf(ThingKind.Leaves).Count == 0, "a young tree should have no leaf spot");
         }
+        var patches = world.ThingsOf(ThingKind.Leaves);
+        Require(patches.Count == 1 && patches[0].Pos.DistanceTo(tree.Pos) < 2 && patches[0].Remaining == 12,
+            "an oak should make one leaf spot when it reaches adulthood");
+    }
+
+    private static void CheckValleyTreesKeepGrowing(GameData data) {
+        var world = new World(data);
+        var tree = world.ThingsOf(ThingKind.Tree)[0];
+        RunUntil(world, world.Time + 3 * data.DaySeconds);
+        Require(tree.Remaining == 54, "an existing tree with 42 wood should reach 54 after three more days");
+    }
+
+    private static void CheckGatheringLeavesGivesAcornsThatRefillOneAtATime(GameData data) {
+        var world = EmptyWorld(data);
+        var patch = world.Add(ThingKind.Leaves, PlantingGround, 12);
+        world.Player = patch.Pos;
+        Give(world, "rake", 1);
+        world.Gather(patch, data.GatherSeconds);
+        int first = world.Backpack["acorn"];
+        Require(first is 1 or 2 && world.Backpack["leaves"] == 4, "gathering leaves should pick up the spot's one or two acorns too");
+        float started = world.Time;
+        RunUntil(world, started + data.DaySeconds * 10 - 1);
+        world.Gather(patch, data.GatherSeconds);
+        Require(world.Backpack["acorn"] == first, "acorns should take ten full days to refill");
+        RunUntil(world, started + data.DaySeconds * 10);
+        world.Gather(patch, data.GatherSeconds);
+        Require(world.Backpack["acorn"] == first + 1, "one acorn should return after ten days");
+        RunUntil(world, started + data.DaySeconds * 20);
+        world.Gather(patch, data.GatherSeconds);
+        Require(world.Backpack["acorn"] == first + 2, "the next acorn should take another ten days");
     }
 
     private static void CheckAGrowingTreeKeepsItsAgeOnLoadAndCanBeFelledEarly(GameData data) {

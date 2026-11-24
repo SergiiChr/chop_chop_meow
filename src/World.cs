@@ -17,9 +17,9 @@ public sealed class Thing {
     /// <summary>A building's turn in radians from its original direction, positive from X toward Y on the ground.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Rotation { get; init; }
     public int Remaining { get; set; }
-    /// <summary>Zero for a mature tree; otherwise one plus the whole days spent growing after watering.</summary>
+    /// <summary>One plus the whole days spent growing, or zero for a tree at the starting adult size.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int TreeStage { get; set; }
-    /// <summary>World time of the next growth stage, or zero before watering and after maturity.</summary>
+    /// <summary>World time of the next growth stage, or zero for an acorn waiting for water.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float NextTreeStageAt { get; set; }
     public Inventory Inventory { get; set; } = new();
     /// <summary>A station's recipe now: the batch in progress, else <see cref="Asked"/> while batches of it wait, else <see cref="Keep"/>; empty when it has nothing to make.</summary>
@@ -55,8 +55,10 @@ public sealed class Thing {
     /// <summary>Liters supplied through connected plumbing below one whole liter, carried until the next delivery.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float PipedWaterRemainder { get; set; }
     public float Burn { get; set; }
-    /// <summary>When a picked berry bush fruits again, on the world's clock, or zero while it is full.</summary>
+    /// <summary>When a berry bush fruits again or a leaf spot replaces an acorn, or zero while full.</summary>
     public float Regrow { get; set; }
+    /// <summary>Acorns still missing from a leaf spot after gathering.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int LeafAcornsTaken { get; set; }
     /// <summary>The id of the tree that left a stump, whose species and size shape the stump; zero for a stump with no tree on record, which is shaped by its own id.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OfTree { get; set; }
     /// <summary>The way a stump's tree fell across the ground, away from whoever landed the last blow on it, in radians from the x axis toward y.</summary>
@@ -356,7 +358,9 @@ public sealed partial class World {
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
         WolfPatrols = new WolfPatrols(this); WolfHunt = new WolfHunt(this); WolfSnap = new WolfSnap(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
-        Farms = new Farms(this); Trees = new TreePlanting(this); Replaced += Trees.Reset; SteelPipes = new SteelPipes(this);
+        Farms = new Farms(this); SteelPipes = new SteelPipes(this);
+        Trees = new TreePlanting(this); Replaced += Trees.Reset;
+        LeafSpots = new LeafLitter(this); Replaced += LeafSpots.Reset;
         lunchBreak = new LunchBreak(this); Replaced += lunchBreak.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
@@ -373,6 +377,7 @@ public sealed partial class World {
     public Construction Construction { get; }
     public Farms Farms { get; }
     public TreePlanting Trees { get; }
+    public LeafLitter LeafSpots { get; }
     private readonly Barrels barrels;
 
     private readonly BarrelHaul barrelHaul;
@@ -577,7 +582,7 @@ public sealed partial class World {
         // Trees are occasional on the plains and thicken into woods toward the mountains.
         // Full-size trees need room for their crowns, so even the woods stay walkable and readable.
         Scatter(rng, ThingKind.Tree, int.MaxValue, TreeWood, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
-        DropLeaves();
+        LeafSpots.Scatter();
         ScatterLoose();
         GrowBushes();
         Look();
@@ -594,10 +599,6 @@ public sealed partial class World {
     /// <summary>Meat on a fresh wolf carcass.</summary>
     public const int WolfMeat = 4;
     public static readonly Vector2 LeafOffset = new(.9f, .9f);
-    /// <summary>Leaf litter around every oak, the broadleaf one of the three tree variants picked by id; the patch sits off the trunk so both can be clicked.</summary>
-    private void DropLeaves() {
-        foreach (var tree in S.Things.Of(ThingKind.Tree)) if (tree.Id % TreeSpecies == 0 && Terrain.Open(tree.Pos + LeafOffset)) Add(ThingKind.Leaves, tree.Pos + LeafOffset, LeafPatch);
-    }
     /// <summary>Places resources on open ground away from the clearing, at least <paramref name="spacing"/> apart from their own kind.</summary>
     /// <param name="chance">How likely a spot is kept, so density can follow the landscape.</param>
     /// <param name="tries">Random spots to consider; with a low chance this, not the count, sets how many are placed.</param>
@@ -777,9 +778,10 @@ public sealed partial class World {
         string item = ResourceItem(t);
         amount = S.Backpack.Add(item, amount); t.Remaining -= amount;
         if (t.Kind == ThingKind.Tree && t.Remaining <= 0) Fell(t, Player);
-        if (amount > 0) Chip(t, tool);
-        if (amount == 0) Say("Backpack full. Store or sell some supplies.");
-        if (amount > 0) Got(item);
+        if (amount == 0) { Say("Backpack full. Store or sell some supplies."); return; }
+        Chip(t, tool);
+        if (t.Kind == ThingKind.Leaves) LeafSpots.Gather(t, S.Backpack);
+        Got(item);
     }
     private void PickUp(Thing t) {
         string item = ResourceItem(t);
@@ -2196,6 +2198,7 @@ public sealed partial class World {
         S.Things.RemoveAll(ThingKind.Grave, t => t.Inventory.Count == 0);
         S.Things.RemoveAll(ThingKind.WolfCorpse, t => t.Remaining <= 0);
         Trees.Tick();
+        LeafSpots.Tick();
         // Only kinds that change by themselves tick; a tick that can add or remove things walks a copy.
         // A carcass keeps its age so the death animation plays once and not again after loading.
         foreach (var t in S.Things.Of(ThingKind.WolfCorpse)) t.Progress = Math.Min(60, t.Progress + dt);
@@ -2432,7 +2435,7 @@ public sealed partial class World {
             if (t.PlumbingSlot is Inventory plumbingSlot && (!Plumbing.HasPlumbing(t.Kind) || plumbingSlot.Slots != 1
                 || plumbingSlot.Capacity != Plumbing.InstallCost || plumbingSlot.StackSize != Plumbing.InstallCost
                 || plumbingSlot.Count > Plumbing.InstallCost || plumbingSlot.Count != plumbingSlot["steel_pipe"])) return false;
-            if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t) || !TreePlanting.ValidGrowth(t)) return false;
+            if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t) || !TreePlanting.ValidGrowth(t) || !LeafLitter.Valid(t)) return false;
             if (!(t.Pressure >= 0 && t.Pressure <= 100 && t.PumpStrokeLeft >= 0 && t.PumpStrokeLeft <= WaterPumps.StrokeSeconds)
                 || t.Kind != ThingKind.Pump && (t.Pressure != 0 || t.PumpStrokeLeft != 0)) return false;
             if (!Plumbing.ValidReceiver(t)) return false;
