@@ -41,8 +41,8 @@ public sealed partial class World {
         Idle(w, lacking, dt);
     }
 
-    /// <summary>Whether a job carries things in the worker's hands: every job whose round ends with a delivery, and every haul group.</summary>
-    private bool NeedsHands(JobEntry entry) => entry is not Duty duty || !Def(duty.Job).Rounds;
+    /// <summary>Whether a job carries things in the worker's hands: every job whose round ends with a delivery, every haul group, and mining, whose miner carries loads out.</summary>
+    private bool NeedsHands(JobEntry entry) => entry is not Duty duty || !Def(duty.Job).Rounds || duty.Job == JobKind.Mine;
 
     /// <summary>Seconds a worker with nothing to do waits before reading their job list again.</summary>
     private const float JobListSeconds = .25f;

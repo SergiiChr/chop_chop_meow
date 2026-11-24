@@ -800,7 +800,7 @@ public sealed partial class World {
     public static readonly ThingKind[] WorkedKinds = Array.FindAll(Kinds.All, Worked);
     /// <summary>Whether the station's current recipe only advances while someone works at it; at the cooking table, a recipe marked <see cref="RecipeDef.Worked"/>.</summary>
     public bool Worked(Thing t) => Worked(t.Kind) && (t.Kind != ThingKind.Cooktable || Data.Recipes.TryGetValue(t.Recipe, out var r) && r.Worked);
-    /// <summary>A packing station only works while the player or a paid worker is working at it, not merely standing near.</summary>
+    /// <summary>Whether a player or a paid worker is working at a station right now, not merely standing near; a packing station packs only then.</summary>
     public bool Hammered(Thing anvil) => PlayersHammer(anvil) || CrewHammers(anvil);
     /// <summary>Whether any player is working at a station right now.</summary>
     private bool PlayersHammer(Thing anvil) {
@@ -1844,14 +1844,14 @@ public sealed partial class World {
     internal static readonly ThingKind[] Stores = { ThingKind.Chest, ThingKind.Pile, ThingKind.Crate };
     // Trading posts also take deliveries, of the crates they ask for, and packing stations of the good they pack.
     private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Crate, ThingKind.Signpost, ThingKind.Packer };
-    /// <summary>Where a load of an item goes: the nearest place asking for it, else the nearest storage with no filter, and compost last for food.</summary>
+    /// <summary>Where a load of an item goes: the nearest place asking for it, else the nearest storage taking everything, and compost last for food.</summary>
     public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) => Deposit(item, origin, exclude, askersOnly: false, storesTake: true);
     /// <summary>
     /// The nearest place asking for an item that a chest's or crate's hauler carries out to, or null.
-    /// Storage with no filter does not count, and other storage only while this one does not ask for the item too, so two that ask never pass it back and forth.
+    /// Storage taking everything does not count, and other storage only while this one does not ask for the item too, so two that ask never pass it back and forth.
     /// </summary>
     internal Thing? AskerFor(string item, Thing store) => Deposit(item, store.Pos, store.Id, askersOnly: true, storesTake: !store.Inventory.Wants(item));
-    /// <param name="askersOnly">Only places asking for the item count, not storage with no filter nor compost.</param>
+    /// <param name="askersOnly">Only places asking for the item count, not storage taking everything nor compost.</param>
     /// <param name="storesTake">Chests, piles and placed crates count; without them only trading posts, packing stations and places that use the item do.</param>
     private Thing? Deposit(string item, Vector2 origin, int exclude, bool askersOnly, bool storesTake) {
         Thing? best = null; int bestRank = 0; float bestDistance = 0;

@@ -22,7 +22,7 @@ using static WorldSteps;
 public static class MultiplayerChecks {
     public static void Run(GameData data) {
         Test(CheckGuestActsThroughCommands, data);
-        GuestCommandChecks.CheckGuestCopyForwardsActions(data);
+        Test(GuestCommandChecks.CheckGuestCopyForwardsActions, data);
         Test(CheckGuestComesBackFromSaveWithTheirPackAndSpot, data);
         Test(CheckEveryPlayerSurvivesLoadingAndSavingAgain, data);
         Test(CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole);
@@ -38,7 +38,7 @@ public static class MultiplayerChecks {
         Test(CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown, data);
         Test(CheckUpdateFieldsLeftOutStartAsNewObjectsDo);
         Test(CheckUpdateEntriesReadBackAsTheyWere, data);
-        PipeWaterUpdateChecks.CheckPipeWaterUpdatesKeepTheHostsFieldsAndOrder();
+        Test(PipeWaterUpdateChecks.CheckPipeWaterUpdatesKeepTheHostsFieldsAndOrder);
         Test(CheckATreeUpdateCarriesNoStationFields, data);
         Test(CheckAChangedInventoryFieldIsNeverFresh);
         Test(CheckStateReadKeepsNothingFromTheOneBefore);

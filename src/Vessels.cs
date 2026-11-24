@@ -74,8 +74,8 @@ public sealed partial class World {
         if (into?.Kind == ThingKind.Farm && to == into.Inventory)
             room = Math.Min(room, Barrels.CanPour(Data, item) ? Farms.WaterRoom(into) : to.SlotRoom(item));
         if (into?.Kind == ThingKind.Packer && to == into.Inventory) room = Math.Min(room, PackingRoom(into, item));
-        // Each of a station's slots holds one stack, its output slot too.
-        if (into != null && IsStation(into.Kind) && to == into.Inventory) room = Math.Min(room, to.SlotRoom(item));
+        // Each of a station's slots holds one stack, its output slot too; a vessel pours into the stack of its liquid.
+        if (into != null && IsStation(into.Kind) && to == into.Inventory) room = Math.Min(room, to.SlotRoom(PoursInto(into, to, item)?.Liquid ?? item));
         if (Data.VesselFor(item) != null) {
             bool takes = into != null && to == into.Inventory && TakesLiquid(into, item);
             if (takes && from[item] > 0) return from.TransferTo(to, item, Math.Min(quantity, room));
