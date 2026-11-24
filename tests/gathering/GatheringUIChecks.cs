@@ -132,7 +132,7 @@ public partial class Game {
         var point = view.Screen(hidden.Pos, .15f);
         Require(view.Pick(point)?.Id == hidden.Id, "A tree crown must not steal the click from a loose piece behind it.");
         RemoveThings(Hosted, t => t == hidden); await Frames();
-        Require(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
+        Require(view.Pick(point) == null, "A crown alone must not select its tree, so a right-click in a forest can swing.");
         Require(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
     }
 

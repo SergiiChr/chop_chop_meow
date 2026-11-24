@@ -52,4 +52,29 @@ public partial class Game {
         await Until(() => view.PlayerAnimation != ActorAction.Attack, "the unarmed attack finishing", 3);
         Warp(Hosted, home); await Frames(4);
     }
+
+    /// <summary>A torch in the backpack is lit by a right-click after the kindling animation, and swung by the next right-click, standing still or walking.</summary>
+    private async Task CheckRightClickLightsAndSwingsATorch() {
+        var home = Hosted.Player;
+        await CloseWithEsc(); Give(Hosted, "torch", 1); SetHotbarSlot(Hosted, 8, "torch");
+        await KeyStroke(Key.Key9);
+        Require(world.Torch == 0, "Selecting a torch must not light it.");
+        await ClickGround(MouseButton.Right);
+        Require(world.TorchKindling > 0, "The first right-click must start striking flint and steel.");
+        Require(world.Backpack["torch"] == 1, "The first right-click must leave the torch it lights in the backpack.");
+        Require(view.PlayerAnimation == ActorAction.Kindle, "The first right-click must play the kindling animation.");
+        await Until(() => world.TorchLit, "the torch catching after the lighting animation", World.KindleSeconds + 2);
+        await ClickGround(MouseButton.Right);
+        Require(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Right-clicking with a lit torch must swing it.");
+        // A swing made on the move plays out in full instead of giving way to the walk.
+        await Until(() => view.PlayerAnimation != ActorAction.TorchSwing, "the end of a torch swing made standing still", 2);
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
+        await Seconds(.15);
+        var from = world.Player;
+        await ClickGround(MouseButton.Right); await Seconds(.25);
+        bool swungWalking = view.PlayerAnimation == ActorAction.TorchSwing && world.Player.DistanceTo(from) > .3f;
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
+        Require(swungWalking, "A torch swing made while walking must keep playing as the player walks on.");
+        Warp(Hosted, home); await Frames(4);
+    }
 }

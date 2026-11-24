@@ -35,16 +35,6 @@ public partial class Game {
             await Frames(2);
         }
     }
-    /// <summary>Drinking through hotbar slot nine consumes one liter at a time and keeps the empty bottle.</summary>
-    private async Task CheckHotbarDrinkTakesOneLiterAndKeepsEmptyBottle() {
-        for (int expected = 3; expected >= 1; expected--) {
-            await Until(() => hotbar.Counts[8].Text == $"{expected}/3", $"the bottle badge showing {expected}/3 before a liter", 2);
-            await KeyStroke(Key.Key9);
-            await ClickGround();
-            await Until(() => hotbar.Counts[8].Text == $"{expected - 1}/3", "a hotbar drink removing exactly one liter", 2);
-        }
-        Require(world.Backpack["empty_bottle"] == 1, "Three hotbar drinks must leave the empty bottle in inventory.");
-    }
     /// <summary>Distinct stacks show a held stack lands on the exact cell it is put on and leaves other cells alone.</summary>
     private async Task CheckHeldStackLandsInExactSlotAndSortOrdersByName() {
         await CloseWithEsc();

@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>What the next left click in the world does.</summary>
 public abstract record ClickMode {
-    /// <summary>A click selects or uses what is under it.</summary>
+    /// <summary>A left click selects what is under it.</summary>
     public sealed record Normal : ClickMode;
     /// <summary>A click places a building of this kind.</summary>
     public sealed record Build(ThingKind Kind, PipeShape Shape = PipeShape.Straight) : ClickMode;
@@ -37,6 +37,7 @@ public sealed class PlayerControl {
     private readonly World world;
     /// <summary>Whether <see cref="Mode"/> places the container or plan on the cursor, which it does only while the mouse is over open ground.</summary>
     private bool placingHeld;
+    private bool inspectUnderground;
     /// <summary>The placement on the cursor, with a turn that stays set while the pointer crosses the interface.</summary>
     private ClickMode? heldPlacement;
     private Thing? gathering;
@@ -53,10 +54,13 @@ public sealed class PlayerControl {
     /// <summary>What the next left click in the world does.</summary>
     public ClickMode Mode { get; set; } = new ClickMode.Normal();
 
+    public bool InspectingPipes => inspectUnderground && Mode is ClickMode.Normal;
+    public bool Underground => InspectingPipes || Mode is ClickMode.Remove { Underground: true } || Mode.Placing == ThingKind.SteelPiping;
+
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
         cabinApproach = new CabinApproach(world);
-        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; Mode = new ClickMode.Normal(); };
+        world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; inspectUnderground = false; Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops actions whose targets belong to the previous world.</summary>
@@ -240,20 +244,6 @@ public sealed class PlayerControl {
         world.Me.Selected = hotbar.ActiveItem() ?? "";
     }
 
-    /// <summary>E inspects the nearby selection or the nearest thing. A pump under the pointer takes priority over the lake.</summary>
-    public void InspectNearest() {
-        if (view.Underground) { if (view.PointedPipe is Vector2I tile) panel.SelectPipe(tile); return; }
-        var half = Vector2.One * Farms.HalfSize;
-        Vector2 FarmEdge(Thing t) => world.Player.Clamp(t.Pos - half, t.Pos + half);
-        bool CanInspect(Thing t) => world.Near(t, at: t.Kind == ThingKind.Farm ? FarmEdge(t) : null);
-        var t = world.Find(panel.Selection.Thing);
-        if ((t == null || t.Kind == ThingKind.Water || !CanInspect(t)) && (view.MouseLook || view.GetViewport().GuiGetHoveredControl() == null)
-            && world.Find(view.Hover) is { Kind: ThingKind.Pump } pump && CanInspect(pump)) t = pump;
-        if (t == null || !CanInspect(t))
-            t = world.Things.Where(CanInspect).OrderBy(t => world.Player.DistanceSquaredTo(t.Kind == ThingKind.Farm ? FarmEdge(t) : t.Pos)).FirstOrDefault();
-        if (t != null) panel.Select(t);
-    }
-
     /// <summary>Space pumps in reach, or swings with the first-person view or the overhead movement keys.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
@@ -273,20 +263,35 @@ public sealed class PlayerControl {
         if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) LeftPress(at);
     }
 
+    /// <summary>Switches the visible layer. The remove selector keeps its own layer while it is active.</summary>
+    public void ToggleLayer() {
+        bool below = !Underground;
+        if (Mode is ClickMode.Remove) Mode = new ClickMode.Remove(below);
+        else { Mode = new ClickMode.Normal(); inspectUnderground = below; }
+        if (!below) panel.ClosePipe();
+    }
+
     private void RightPress(Vector2 at) {
         if (PlacingPipe) {
             world.Construction.Remove(world.Construction.RemovalAt(null, view.ToWorld(at, PipeGround.FloorY), underground: true));
             return;
         }
-        if (Mode is ClickMode.Remove remove) { Mode = new ClickMode.Remove(!remove.Underground); return; }
+        if (Mode is ClickMode.Remove) { ToggleLayer(); return; }
         // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
+        if (InspectingPipes) return;
         var t = view.Pick(at);
         if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
+        if (t == null && Mode is ClickMode.Normal && view.PickWorker(at) == null) hotbar.UseSelected(view.ToWorld(at));
     }
 
     private void LeftPress(Vector2 at) {
+        if (InspectingPipes && cursor.Empty) {
+            if (view.PickPipe(at) is Vector2I pipe) panel.SelectPipe(pipe);
+            else panel.Close();
+            return;
+        }
         var t = view.Pick(at, out float thingDistance);
         // A held stack goes into storage clicked in the world; a held container or plan places on open ground, even before a frame has seen the mouse there;
         // and a click anywhere else lets go of the stack, back to its cell.
@@ -304,7 +309,6 @@ public sealed class PlayerControl {
         var w = view.PickWorker(at, thingDistance);
         if (w != null) panel.Select(w);
         else if (t != null) ClickThing(t);
-        else if (hotbar.ActiveItem() is string selected && hotbar.HasUse(selected)) hotbar.UseSelected(view.ToWorld(at));
         else panel.Close();
     }
 

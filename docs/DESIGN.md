@@ -87,7 +87,7 @@ Simulation and data:
 | `src/pipes/Plumbing.cs` | Connected pipes, standing water and how buildings share and store the supply |
 | `src/pipes/WaterPumps.cs` | Player and worker pump strokes, pressure loss and flow per simulation tick |
 | `src/pipes/display/PipeLayerView.cs`, `src/pipes/display/PipeGround.cs` | Underground view and placement preview |
-| `src/pipes/display/PipePanel.cs` | The selected pipe's water and pressure |
+| `src/pipes/display/PipePanel.cs` | A laid pipe's standing water and pressure |
 | `src/pipes/display/WaterPumpPanel.cs`, `src/pipes/display/PressureGauge.cs` | Pump control, job assignment and dial |
 | `src/pipes/display/WaterPumpProp.cs` | The pump handle's movement in the world |
 | `src/pipes/display/SteelPipeShape.cs`, `src/pipes/display/WaterPumpShape.cs` | Steel pipes, hand pump and lever |
@@ -1082,6 +1082,8 @@ The underground view darkens the surface and exposes an earth bed 0.9 m below gr
 Blueprint-blue lines mark the trench edges, pipes and inlets.
 A pipe and its vertical inlet turn dark blue while the tile holds any water, even at zero pressure.
 Ground remains visible under people standing over the trench.
+The Layer button below the bank switches the view between the surface and underground.
+In the underground view, a click opens the laid pipe's page (`PipePanel`).
 Placement, inspection and removal project the pointer onto the bed.
 A vertical pipe joins each building with plumbing to its inlet tile.
 A dotted guide marks a connection still to be made.
@@ -1138,7 +1140,10 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
   The server runs a marked command only when the held stack lies where the command takes from, and on no more than it holds.
   A slot that refuses shakes (`ItemSlot.Shake`), and the stack stays held.
 - Shift-click moves the stack clicked to the other inventory open, and Ctrl-click all of that item.
-- A double click uses an item (`PagePanel.UseFromBag`, `Hotbar`): eats, drinks, lights a torch, opens a crate as storage or selects a tool (`Hotbar.SelectTool`): on its hotbar slot, or in hand (`World.SelectInHand`, `PlayerState.InHand`) with no slot selected.
+- Right-clicking open ground uses the selected hotbar item (`Hotbar.UseSelected`).
+  Right-clicking a resource starts gathering, and holding the button on a placed crate or barrel starts picking it up.
+  Right-clicking a hotbar slot uses the slot's item.
+- A double click uses an item in the backpack or on the hotbar (`PagePanel.UseFromBag`, `Hotbar`): eats, drinks, lights a torch, opens a crate as storage or selects a tool (`Hotbar.SelectTool`): on its hotbar slot, or in hand (`World.SelectInHand`, `PlayerState.InHand`) with no slot selected.
   On a slot with a use, a single click waits `SlotInput.DoubleClickMs` (200 ms) before it picks up, so the two can be told apart; recipe cards use the same time.
 - A slot acts when the button comes up over it, as a plain button does, so a page that draws itself again never takes the slot away under a press; let go of anywhere else, it does nothing.
 - A held stack put on a hotbar slot binds that exact backpack stack (`Inventory.Slot.Hotbar`, `World.BindHeld`), which the backpack rims; the binding goes with the stack and follows it into a stack it merges with (`Inventory.Slot.Empty`, `MoveSlotTo`, `Sort`).
@@ -1395,7 +1400,7 @@ A miner then carries a load of it to the nearest place that takes it (`Mines.Min
 ### Farming
 
 A farm plot (`farm`, `src/farms/Farms.cs`) is a walkable 6×6 zone that snaps beside piles and other plots.
-The ground dressing clears meadow plants across the square, and E measures reach from the nearest point on the plot.
+The ground dressing clears meadow plants across the square.
 `Farm` in `GameTables` sets what sows it, how many days the wheat grows, how many working days the harvest takes and what it yields.
 
 `Thing.FarmStage` is `Fallow`, `Growing` or `Ripe`.

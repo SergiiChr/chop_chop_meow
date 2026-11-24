@@ -172,8 +172,8 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Walk or sprint on a gravel path | Move 1.2× as fast |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
-| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you around obstacles to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
-| E | Inspect the selected object if nearby, otherwise the nearest nearby object |
+| Right mouse button on open ground | Use the selected hotbar item to eat, drink or light a torch, or swing a tool or lit torch toward the pointer |
+| Left mouse button | Select a resource, building, crate or worker, or place a selected building. Clicking a cabin walks you around obstacles to its door and inside. Put a held stack into the storage clicked, or let go of it anywhere else |
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
 | C / V during placement | Turn a building, crate, barrel or pipe 90° |
@@ -192,7 +192,8 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
 | Shift-click / Ctrl-click an item slot | Move the stack clicked / all of that item to the other storage open; this applies across inventory and station panels. Ctrl from the backpack, and Store all, leave stacks bound to the hotbar |
-| RMB on a hotbar slot | Empty the slot |
+| RMB or double LMB on a hotbar slot | Use its item |
+| Layer button below the bank | Switch between the surface and underground |
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
 
 Mines face their cliff and open their panel as soon as you place them.
@@ -238,7 +239,7 @@ With a side panel open they keep to the space left of it.
 
 The bottom bar holds round badges for building, the backpack, crafting, the crew and the field guide, each with its key, next to the hotbar.
 
-Put a held stack or a plan from the building plans on a hotbar slot to assign it; RMB on a slot empties it.
+Put a held stack or a plan from the building plans on a hotbar slot to assign it.
 A stack put on a slot binds that exact backpack stack to it, which then has the selected hotbar slot's rim in the backpack.
 The stack goes back where it was; one held from storage, such as a chest, moves into the backpack first, into an empty slot or onto a stack of its item with room for all of it.
 Slots reference backpack stacks or building plans; they are not extra storage.
@@ -618,7 +619,9 @@ Both stations, like the stone furnace's food recipes, take wood, coal or charcoa
 
 A wood crate holds 12 items in total, as one stack or as single items, and its slots grow and shrink with its contents.
 Place one from the hotbar, or pick it up from the backpack and click open ground; click it to open it, and hold right mouse on it to pick it up with its contents packed inside.
-Double-click a crate in the backpack or on the hotbar to open it as storage where it is, even an empty one: it works like a chest with the backpack, and you can put it down from there.
+Double-click a crate in the backpack or on the hotbar to open it as storage.
+Right-click also opens it from the hotbar.
+Even an empty crate works like a chest with the backpack, and you can put it down from there.
 Picking up the open crate itself closes it, and it is then a held stack like any other.
 
 Workers never open or place crates; they pack them at a packing station.
@@ -641,6 +644,7 @@ A player carrying water in the barrel braces it and walks.
 Each liter makes the carry slower, down to half speed at 50 liters.
 
 Double-click a barrel in the backpack or on the hotbar to open its water slot.
+Right-click also opens it from the hotbar.
 Select it on the hotbar to place it.
 Hold right-click on a placed barrel to pick it up with its water.
 Pour from a bottle or bucket into its one slot, or take water back into vessels in your backpack.
@@ -819,8 +823,9 @@ Buildings that need water share the available flow evenly.
 A closed tap can have a full pipe at its inlet.
 When pressure falls to zero, water stays in the pipes for the next building that needs it.
 Cutting a line leaves the water in each surviving section.
-While placing pipes or removing things underground, point at a pipe and press **E** to inspect its water and pressure.
-Right-click in the remove tool to switch layers, then left-click to take up just the selected pipe or surface object.
+Click the round Layer button below the bank to switch between the surface and underground.
+Click a laid pipe underground to see how much water it holds and its current pressure.
+The remove tool still switches layers with right-click and takes up a pipe or a surface object with left-click.
 
 ## Gravel paths
 
@@ -850,7 +855,6 @@ Take tiles up with the remove selector, which gives the 4 gravel back ([Taking b
 ## Farming
 
 A farm plot (8 wood) is 6×6 tiles and snaps edge to edge with piles and other plots.
-Press E to inspect a nearby plot from its edge or corner.
 Put 1 wheat seeds and 1 fertilizer in it and it sows.
 The soil darkens, and over 3 days of watered growth small green straws come up, grow into tall green plants and turn into yellow wheat.
 Wheat uses 10 liters of water per day of growth and pauses when the plot runs dry.
@@ -1016,7 +1020,7 @@ A wolf that reaches you stops at biting distance, about a metre off, and waits t
 ### Fighting
 
 A swing keeps the direction you gave it at the start.
-Click with an axe, pickaxe, hammer or torch selected to aim at the pointer.
+Right-click open ground with an axe, pickaxe, hammer or torch selected to aim at the pointer.
 Overhead, Space aims along the held movement keys or, from a stand, the last direction you walked.
 In first person, Space aims where you look.
 You can move during the swing, and near a hunting wolf the movement keys reverse you immediately.
@@ -1053,9 +1057,9 @@ Cabin windows glow but do not deter wolves; a campfire whose light reaches a cab
 ### Torch
 
 A torch burns just as long as a log, once.
-With a torch selected, the first left click on open ground strikes flint and steel for 2 seconds to light it.
+With a torch selected, the first right-click on open ground strikes flint and steel for 2 seconds to light it.
 The lit torch shows in the left hand but stays in the backpack, and burning out uses it up; moving it out of the backpack, such as into a chest, puts it out, and it goes as a fresh torch.
-After that each click swings it, which briefly widens its light by a fifth.
+After that each right-click on open ground swings it, which briefly widens its light by a fifth.
 
 Swinging four times within 2 seconds, as fast as swings go, puts it out with a message.
 Relighting takes the same 2 seconds and keeps the burn time it had left.

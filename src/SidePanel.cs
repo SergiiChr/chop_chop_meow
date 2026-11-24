@@ -27,7 +27,7 @@ public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, Page
 /// <summary>The pages of the side panel.</summary>
 public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, Crate, Barrel }
 
-/// <summary>What the side panel inspects: a thing, a worker or nothing, never both.</summary>
+/// <summary>What the side panel inspects: a thing, a worker, a pipe or nothing.</summary>
 public readonly record struct Selection {
     public int Thing { get; private init; }
     public int Worker { get; private init; }
@@ -236,6 +236,13 @@ public partial class SidePanel : MovableWindow {
 
     /// <summary>Opens the inspection page for the underground pipe at this tile.</summary>
     public void SelectPipe(Vector2I tile) { Selection = Selection.OfPipe(tile); Open(Page.Inspect); }
+
+    /// <summary>Leaves a pipe's page when its layer is hidden.</summary>
+    public void ClosePipe() {
+        if (Selection.Pipe == null) return;
+        Selection = default;
+        if (Page == Page.Inspect) Close();
+    }
 
     /// <summary>Selects a worker and shows them.</summary>
     public void Select(Worker w) { Selection = Selection.Of(w); Open(Page.Inspect); }

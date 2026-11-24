@@ -498,6 +498,13 @@ public partial class WorldView : Node3D {
         }
     }
 
+    /// <summary>The laid pipe under the cursor in explored ground.</summary>
+    public Vector2I? PickPipe(Vector2 screen) {
+        if (!TryGroundPoint(screen, out var ground, PipeGround.FloorY)) return null;
+        var tile = Terrain.TileAt(ground);
+        return World.SteelPipes.Laid(tile) && World.Explored(tile) ? tile : null;
+    }
+
     private readonly List<Thing> picking = new();
     private const float StumpHeight = 1.3f;
     /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit shapes.</summary>
@@ -518,7 +525,7 @@ public partial class WorldView : Node3D {
             // The lake has no raised model. Its shore is picked behind the objects standing there.
             if (t.Kind == ThingKind.Water) continue;
             var hits = HitsOf(drawn);
-            // Only the foot of a tree's trunk, its first hit, picks the tree, so a click among the crowns of a forest reaches the ground and swings.
+            // Only the foot of a tree's trunk, its first hit, picks the tree, so a right-click among the crowns of a forest reaches the ground and swings.
             if (t.Kind == ThingKind.Tree) {
                 if (hits.Length == 0) continue;
                 var trunk = firstPerson ? hits[0] : hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) };
@@ -2082,7 +2089,7 @@ public partial class WorldView : Node3D {
                 overlay.DrawLine(center - a, center - b, inlet, 1.5f, true);
                 overlay.DrawLine(center - b, center + a, inlet, 1.5f, true);
             }
-            if (PipePreviewTile == null && PointedPipe is Vector2I tile) Tag(Screen(tile, PipeGround.FloorY + .28f), "Steel pipe · E to inspect");
+            if (PointedPipe is Vector2I tile) Tag(Screen(tile, PipeGround.FloorY + .28f), "Steel pipe");
             return;
         }
         if (World == null) return;

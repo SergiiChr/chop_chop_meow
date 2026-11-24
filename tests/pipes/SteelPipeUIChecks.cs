@@ -13,7 +13,7 @@ public partial class Game {
         await TestClean(CheckHeldPipePlanTurnsAndCyclesShapes);
         await TestClean(CheckHotbarPipePlanRemovesAndReusesALaidPipe);
         await TestClean(CheckRemoveSelectorKeepsTheOtherLayer);
-        await TestClean(CheckInspectReadsWaterAndPressureWhileUnderground);
+        await TestClean(CheckClickingALaidPipeReadsWaterAndPressure);
         await TestClean(CheckPuttingPipesInThePlumbingSlotInstallsAndRefundsThem);
         await TestClean(CheckSprinklersFollowWaterDelivery);
     }
@@ -121,7 +121,7 @@ public partial class Game {
         await KeyStroke(Key.Escape); await CloseWithEsc(); await Frames();
     }
 
-    private async Task CheckInspectReadsWaterAndPressureWhileUnderground() {
+    private async Task CheckClickingALaidPipeReadsWaterAndPressure() {
         var home = world.Player;
         var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
         var tile = Terrain.TileAt(bank + Vector2.Down * 1.1f);
@@ -131,12 +131,13 @@ public partial class Game {
         var tank = Hosted.Add(ThingKind.Barrel, tankTile);
         LayPipe(Hosted, tile, Mathf.Pi / 2);
         await Frames();
-        await KeyStroke(Key.B);
-        await Click(Named("remove")!);
-        await RightClick(tile);
-        await Hover(view.Screen(tile, PipeGround.FloorY));
-        await KeyStroke(Key.E);
-        Require(view.Underground && ShownPage() == "Steel pipe", "E over a pipe should inspect it and keep the underground layer visible.");
+        var layerControl = (Button)ui.FindChild("layer", true, false);
+        Require(layerControl != null, "The HUD should offer a Layer button.");
+        await Click(layerControl!);
+        Require(view.Underground && layerControl!.ButtonPressed, "Layer should switch from the surface to the underground view.");
+        await Click(view.Screen(tile, PipeGround.FloorY));
+        Require(view.Underground && ShownPage() == "Steel pipe" && world.SteelPipes.Laid(tile),
+            "Clicking a pipe should open its readout and keep it laid.");
         Require(HasLabel(panel, "Empty · 0/1 L") && HasLabel(panel, "Pressure 0%"), "A dry pipe should show no water and no pressure.");
 
         var pipe = ModelSteps.AllMeshes(view.FindChild("Underground", true, false)!)
@@ -165,7 +166,8 @@ public partial class Game {
         await Until(() => HasLabel(panel, "Empty · 0/1 L") && pipe.MaterialOverride == empty,
             "a drained pipe returning to its empty finish", 2);
 
-        await KeyStroke(Key.Escape); await CloseWithEsc();
+        await Click(layerControl!);
+        Require(!view.Underground && !layerControl!.ButtonPressed && !panel.Visible, "Returning to the surface should close the pipe readout.");
         foreach (var cell in new[] { tile, tile + Vector2I.Up, tankTile }) Hosted.Construction.TakeUpPipe(cell);
         Drop(Hosted, "steel_pipe", 3);
         RemoveThings(Hosted, t => t == pump || t == tank);

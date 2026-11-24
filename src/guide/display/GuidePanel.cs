@@ -15,19 +15,19 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
     /// <summary>Each topic's tips: a key cap ("key:…"), a line glyph ("line_…") or an item or building icon, then the tip.</summary>
     private static readonly System.Collections.Generic.Dictionary<string, (string Lead, string Tip)[]> GuideTips = new() {
         ["controls"] = new[] {
-            ("key:WASD", "Move. Hold Shift to sprint; food and drink drain faster."),
-            ("key:Hold RMB", "Walk over and gather. On a placed crate, pick it up with what is inside."),
-            ("key:LMB", "Select. On open ground, use what is selected on the hotbar: swing, eat, drink."),
-            ("key:E", "Inspect what is nearest."),
-            ("key:Space", "Swing the tool selected on the hotbar, or pump a selected reinforced furnace."),
-            ("key:1–9", "Select a hotbar slot. Put a held item or plan on a slot to assign it; RMB on a slot empties it."),
-            ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Your crew."), ("key:I", "This guide."),
-            ("key:LMB on a slot", "Pick up its stack, or put down the held stack. RMB picks up half, or puts down one."),
-            ("key:Double LMB", "Use an item: eat, drink, light a torch, open a crate as storage, or take a tool in hand."),
-            ("key:Shift / Ctrl", "Move the stack clicked, or all of that item, to the other storage open."),
-            ("key:Drag", "Drag an empty spot on a panel or the backpack to move it."),
+            ("key:WASD", "Move."),
+            ("key:Shift", "Sprint."),
+            ("key:RMB", "Hold to collect resources or pick up items. Click open ground or a hotbar slot to use an item."),
+            ("key:LMB", "Select item."),
+            ("key:Space", "Use the selected building or item. Swing an axe or pump water."),
+            ("key:1–9", "Select a hotbar slot. Pick up a building plan or backpack item and put it on the hotbar."),
+            ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Worker management."),
+            ("key:Double LMB", "Use an item in the backpack or on the hotbar."),
+            ("key:Shift-click", "Move the entire stack or queue 5 crafting batches."),
+            ("key:Ctrl-click", "Move all items of this type or queue 10 crafting batches."),
             ("key:F5 · F9", "Quick save and load."),
-            ("key:Esc", "Cancel, close a panel, or pause.")
+            ("key:Esc", "Cancel, close a panel, or pause."),
+            ("line_layers", "Switch layers with the Layer button below the bank. Click an underground pipe to see its water and pressure.")
         },
         ["steel"] = new[] {
             ("steel_pick", "Buy your first pickaxe at a trading post with crates of berries."),
@@ -57,7 +57,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
             (Water.Full, "Your bottle holds three liters. Refill it at the lake; the sea is salt. Without a bottle, drink at the source."),
             ("hut", "Build a cabin and campfire before dusk. A cabin shelters you; a lit fire keeps wolves away. Sleep inside after 10 pm if your food and water will last until dawn."),
             ("campfire", "Wolves leave their dens at dusk and keep out of fire light. A log burns about 4 hours."),
-            ("torch", "Click open ground to light a torch, click again to swing it. Four quick swings put it out."),
+            ("torch", "Right-click open ground to light a torch. Right-click again to swing it. Four quick swings put it out."),
             ("raw_meat", "Butcher a slain wolf for raw meat and cook it before eating.")
         },
         ["trade"] = new[] {
