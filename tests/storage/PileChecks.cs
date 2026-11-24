@@ -58,7 +58,7 @@ public static class PileChecks {
 
         var station = TakeEverything(world, world.Add(ThingKind.Toolstation, origin + new Vector2(-4, 4)));
         station.Inventory.Add("rake", 1);
-        var leaves = world.Add(ThingKind.Leaves, origin + new Vector2(-4, -4), World.LeafPatch);
+        var leaves = world.Add(ThingKind.LeafSpot, origin + new Vector2(-4, -4), World.LeavesPerSpot);
         var worker = AddWorker(world, station.Pos);
         world.Assign(worker, leaves);
         world.Player = new Vector2(40, 40);

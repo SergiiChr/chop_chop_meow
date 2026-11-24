@@ -29,7 +29,7 @@ public static class WorkerJobChecks {
     private static void CheckWorkerKeepsToTheFirstJobWhileItCanBeDone(GameData data) {
         var world = EmptyWorld(data);
         var berries = world.Add(ThingKind.Berries, new Vector2(10, 10), 400);
-        var leaves = world.Add(ThingKind.Leaves, new Vector2(10, 14), 400);
+        var leaves = world.Add(ThingKind.LeafSpot, new Vector2(10, 14), 400);
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 12)));
         var picker = Staff(world, berries, JobKind.Gather);
         world.SetDuty(picker, leaves, JobKind.Gather, true);
@@ -72,7 +72,7 @@ public static class WorkerJobChecks {
     private static void CheckAJobMovedUpComesFirst(GameData data) {
         var world = EmptyWorld(data);
         var berries = world.Add(ThingKind.Berries, new Vector2(10, 10), 400);
-        var leaves = world.Add(ThingKind.Leaves, new Vector2(10, 14), 400);
+        var leaves = world.Add(ThingKind.LeafSpot, new Vector2(10, 14), 400);
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(13, 12)));
         var picker = Staff(world, berries, JobKind.Gather);
         world.SetDuty(picker, leaves, JobKind.Gather, true);
@@ -120,7 +120,7 @@ public static class WorkerJobChecks {
         TakeEverything(world, world.Add(ThingKind.Chest, at + new Vector2(2, 2)));
         world.Player = at; world.Look();
         var raker = AddWorker(world, at);
-        var raked = world.Add(ThingKind.Leaves, at + new Vector2(-2, -2), 0);
+        var raked = world.Add(ThingKind.LeafSpot, at + new Vector2(-2, -2), 0);
         var bush = world.Add(ThingKind.Berries, at + new Vector2(-4, -2), 6);
         world.Tick(0);
         raker.Jobs.Add(new Duty { Thing = raked.Id, Job = JobKind.Gather }); raker.Jobs.Add(new Duty { Thing = bush.Id, Job = JobKind.Gather }); raker.Assignment = raked.Id;

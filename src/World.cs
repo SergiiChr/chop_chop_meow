@@ -10,6 +10,13 @@ using Godot;
 namespace ChopChopMeow;
 
 public sealed class Thing {
+    /// <summary>A stable variation between things, from zero up to one.</summary>
+    internal static float Variation(int id, int salt) {
+        uint h = (uint)(id * 73856093) ^ (uint)(salt * 19349663);
+        h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
+        return (h & 0xffff) / 65536f;
+    }
+
     public int Id { get; init; }
     public ThingKind Kind { get; init; }
     public float X { get; set; }
@@ -17,6 +24,10 @@ public sealed class Thing {
     /// <summary>A building's turn in radians from its original direction, positive from X toward Y on the ground.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Rotation { get; init; }
     public int Remaining { get; set; }
+    /// <summary>One plus a tree's age in days, or zero at the starting adult size. Stumps and leaf spots keep their tree's stage.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int TreeStage { get; set; }
+    /// <summary>World time of the next growth stage, or zero for an acorn waiting for water.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float NextTreeStageAt { get; set; }
     public Inventory Inventory { get; set; } = new();
     /// <summary>A station's recipe now: the batch in progress, else <see cref="Asked"/> while batches of it wait, else <see cref="Keep"/>; empty when it has nothing to make.</summary>
     [JsonIgnore] public string Recipe => Making != "" ? Making : NextRecipe;
@@ -54,9 +65,11 @@ public sealed class Thing {
     /// <summary>Liters supplied through connected plumbing below one whole liter, carried until the next delivery.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float PipedWaterRemainder { get; set; }
     public float Burn { get; set; }
-    /// <summary>When a picked berry bush fruits again, on the world's clock, or zero while it is full.</summary>
+    /// <summary>When a berry bush fruits again or a leaf spot replaces an acorn, or zero while full.</summary>
     public float Regrow { get; set; }
-    /// <summary>The id of the tree that left a stump, whose species and size shape the stump; zero for a stump with no tree on record, which is shaped by its own id.</summary>
+    /// <summary>Acorns still missing from a leaf spot after gathering.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int LeafAcornsTaken { get; set; }
+    /// <summary>The tree that left this stump or leaf spot. Stumps use its species and size to match the trunk.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OfTree { get; set; }
     /// <summary>The way a stump's tree fell across the ground, away from whoever landed the last blow on it, in radians from the x axis toward y.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float FellToward { get; set; }
@@ -251,7 +264,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 18;
+    public int Version { get; set; } = 19;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -356,6 +369,9 @@ public sealed partial class World {
         WolfCounter = new WolfCounter(this); WolfFollow = new WolfFollow(this); Swings = new Swings(this);
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
         Farms = new Farms(this); SteelPipes = new SteelPipes(this);
+        Holes = new GroundHoles(this); Replaced += Holes.Reset;
+        Trees = new TreePlanting(this); Replaced += Trees.Reset;
+        LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
@@ -374,6 +390,9 @@ public sealed partial class World {
     /// <summary>Putting buildings, yards and crates up and taking buildings down.</summary>
     public Construction Construction { get; }
     public Farms Farms { get; }
+    public GroundHoles Holes { get; }
+    public TreePlanting Trees { get; }
+    public LeafSpots LeafSpots { get; }
     private readonly Barrels barrels;
 
     private readonly BarrelHaul barrelHaul;
@@ -456,6 +475,7 @@ public sealed partial class World {
     public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind switch {
         ThingKind.Water => Terrain.WaterPoint(from),
         ThingKind.Mine => Mines.WorkSpot(t, from),
+        ThingKind.LeafSpot => t.Pos + (from - t.Pos).LimitLength(LeafSpots.Radius(t.TreeStage)),
         _ => t.Pos
     };
     /// <summary>How far, in metres, the player reaches to move items in and out of storage and stations.</summary>
@@ -550,6 +570,7 @@ public sealed partial class World {
         if (kind == ThingKind.Toolstation) { t.Inventory.Slots = ToolSlots; WatchTools(t); }
         if (kind == ThingKind.Pile) t.Inventory.Slots = PileStacks;
         if (kind == ThingKind.Chest) t.Inventory.Slots = ChestStacks;
+        if (kind == ThingKind.Hole) t.Inventory = new Inventory { Slots = 1, StackSize = 1, Capacity = 1 };
         if (kind == ThingKind.Farm) { t.Inventory.Slots = Data.Farm.Sow.Count + 1; t.Output = new() { Slots = Data.Farm.Yield.Count }; }
         // Storage takes nothing from workers until its filter names something; a chest, crate or tool station lets everything out.
         if (kind is ThingKind.Chest or ThingKind.Toolstation) t.Inventory.GateNew();
@@ -579,18 +600,18 @@ public sealed partial class World {
         Scatter(rng, ThingKind.Berries, 24, BushBerries, 14, 10, _ => 1, 2000);
         var shore = Terrain.Spawn - Terrain.Lake;
         Add(ThingKind.Water, Terrain.Lake + shore.Normalized() * (Terrain.Shore(MathF.Atan2(shore.Y, shore.X)) + .2f), 9999);
-        Add(ThingKind.Tree, Terrain.Spawn + new Vector2(5, 0), 42);
+        Add(ThingKind.Tree, Terrain.Spawn + new Vector2(5, 0), TreeWood);
         // Trees are occasional on the plains and thicken into woods toward the mountains.
         // Full-size trees need room for their crowns, so even the woods stay walkable and readable.
-        Scatter(rng, ThingKind.Tree, int.MaxValue, 42, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
-        DropLeaves();
+        Scatter(rng, ThingKind.Tree, int.MaxValue, TreeWood, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
+        LeafSpots.Scatter();
         ScatterLoose();
         GrowBushes();
         Look();
         Replaced?.Invoke();
     }
     /// <summary>Leaves a rake gathers in one go from a patch, which fills again every day.</summary>
-    public const int LeafPatch = 12;
+    public const int LeavesPerSpot = 12;
     /// <summary>Ore in a full coal, iron or tin deposit at a cliff.</summary>
     public const int DepositOre = 600;
     /// <summary>Berries on a full bush, at the start and each time it fruits again.</summary>
@@ -600,10 +621,6 @@ public sealed partial class World {
     /// <summary>Meat on a fresh wolf carcass.</summary>
     public const int WolfMeat = 4;
     public static readonly Vector2 LeafOffset = new(.9f, .9f);
-    /// <summary>Leaf litter around every oak, the broadleaf one of the three tree variants picked by id; the patch sits off the trunk so both can be clicked.</summary>
-    private void DropLeaves() {
-        foreach (var tree in S.Things.Of(ThingKind.Tree)) if (tree.Id % 3 == 0 && Terrain.Open(tree.Pos + LeafOffset)) Add(ThingKind.Leaves, tree.Pos + LeafOffset, LeafPatch);
-    }
     /// <summary>Places resources on open ground away from the clearing, at least <paramref name="spacing"/> apart from their own kind.</summary>
     /// <param name="chance">How likely a spot is kept, so density can follow the landscape.</param>
     /// <param name="tries">Random spots to consider; with a low chance this, not the count, sets how many are placed.</param>
@@ -657,10 +674,12 @@ public sealed partial class World {
     /// <summary>The kinds that are not resources: buildings, yards and what is left on the ground, such as graves.</summary>
     public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null);
     /// <summary>The kinds that stand in the way; resources, yards, campfires, graves, signposts and mines are walked past.</summary>
-    private static readonly ThingKind[] Blockers = Array.FindAll(Structures, kind => !Construction.IsZone(kind) && kind is not (ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine));
+    private static readonly ThingKind[] Blockers = Array.FindAll(Structures, kind => !Construction.IsZone(kind) && kind is not (ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine or ThingKind.Hole));
     internal static ReadOnlySpan<ThingKind> WalkBlockers => Blockers;
     /// <summary>Whether a thing of one of the <see cref="Blockers"/> kinds stands on a spot.</summary>
     private static bool Blocks(Thing t, Vector2 p) => t.Pos.DistanceTo(p) < Footprint(t.Kind);
+    public const int TreeWood = 42;
+    public const int TreeSpecies = 3;
     public const int PileStacks = 14;
     /// <summary>A third of a pile, rounded to the nearest stack.</summary>
     public const int ChestStacks = (PileStacks + 1) / 3;
@@ -673,7 +692,7 @@ public sealed partial class World {
     public string A(string word) => Phrase("aeiou".Contains(word[0]) ? "an " : "a ", word);
     private string Task(Thing t) => t.Kind switch {
         ThingKind.Tree => "chop wood",
-        ThingKind.Leaves => "rake leaves",
+        ThingKind.LeafSpot => "rake leaves",
         ThingKind.Stump => "dig up the stump",
         ThingKind.Bush => "dig up the bush",
         _ when t.IsLoose => Phrase("pick up ", Lower(Data.Name(t.Kind))),
@@ -731,8 +750,11 @@ public sealed partial class World {
         if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == Water.Full && !Water.HasBucketRoom(S.Backpack)) return "Your bottles are filled.";
         if (t.Kind == ThingKind.Mine) return Mines.BuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
+        if (worker && TreePlanting.IsYoung(t)) return "Woodcutters wait for adult trees.";
+        if (t.Kind == ThingKind.Tree && t.TreeStage == 1)
+            return TreePlanting.NeedsWater(t) ? "Water the planted acorn first." : "Wait for the first day of growth.";
         if (!t.IsResource) return "Select a natural resource.";
-        if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again within ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
+        if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again within ", Number(Data.BerryRegrowHours), " hours."), ThingKind.LeafSpot => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
         // Workers fetch their tools from a tool station instead of needing them carried, and carry off whatever they dig up.
         if (worker) return null;
         if (GatherRules.Of(t.Kind)?.Needs is string kind && BestTool(kind) == null) return kind switch {
@@ -781,9 +803,10 @@ public sealed partial class World {
         string item = ResourceItem(t);
         amount = S.Backpack.Add(item, amount); t.Remaining -= amount;
         if (t.Kind == ThingKind.Tree && t.Remaining <= 0) Fell(t, Player);
-        if (amount > 0) Chip(t, tool);
-        if (amount == 0) Say("Backpack full. Store or sell some supplies.");
-        if (amount > 0) Got(item);
+        if (amount == 0) { Say("Backpack full. Store or sell some supplies."); return; }
+        Chip(t, tool);
+        if (t.Kind == ThingKind.LeafSpot) LeafSpots.Gather(t, S.Backpack);
+        Got(item);
     }
     private void PickUp(Thing t) {
         string item = ResourceItem(t);
@@ -1781,9 +1804,12 @@ public sealed partial class World {
         }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
-    private enum HoldRefusal { None, NotUsed, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly }
+    private enum HoldRefusal { None, NotUsed, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly, TreeWaterOnly, TreeNoWater, AcornsOnly }
     /// <summary>A station holds by hand only what its recipe uses or makes, a tool station tools and water vessels, a pile one resource, compost what rots and a campfire wood.</summary>
     private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
+        ThingKind.Tree => TreePlanting.NeedsWater(t)
+            ? (Barrels.CanPour(Data, item) ? HoldRefusal.None : HoldRefusal.TreeWaterOnly) : HoldRefusal.TreeNoWater,
+        ThingKind.Hole when item != TreePlanting.Acorn => HoldRefusal.AcornsOnly,
         ThingKind.Hut when Barrel.Is(item) => HoldRefusal.None,
         // A station's output slot takes back the barrels it makes; nothing else but a pile holds one.
         _ when Barrel.Is(item) && !(IsStation(t.Kind) && SlotsTake(t, item)) && (t.Kind != ThingKind.Pile || t.Compost) => HoldRefusal.Barrel,
@@ -1807,6 +1833,9 @@ public sealed partial class World {
         HoldRefusal.Barrel => $"Barrel does not fit in {Lower(Data.Name(t.Kind))}.",
         HoldRefusal.LiquidOnly => "The barrel only holds water.",
         HoldRefusal.BarrelOnly => "The cabin slot only holds a steel barrel.",
+        HoldRefusal.TreeWaterOnly => "Pour water from a filled bottle or bucket.",
+        HoldRefusal.TreeNoWater => "There is nowhere to put that here.",
+        HoldRefusal.AcornsOnly => "The hole only takes acorns.",
         HoldRefusal.ToolsOnly => "The tool station only holds tools, buckets and bottles.",
         HoldRefusal.NotUsed => NotUsedHere(item),
         HoldRefusal.CompostOnly => "The compost takes leaves, grass and food.",
@@ -2100,7 +2129,7 @@ public sealed partial class World {
         foreach (var kind in Kinds.All) {
             if (GatherRules.Of(kind)?.JobName != job || !CanWork(w, kind)) continue;
             foreach (var t in S.Things.Of(kind)) {
-                if (t.Remaining <= 0 || !S.Remembered.ContainsKey(t.Id) || HasDuty(w, t.Id)) continue;
+                if (t.Remaining <= 0 || TreePlanting.IsYoung(t) || !S.Remembered.ContainsKey(t.Id) || HasDuty(w, t.Id)) continue;
                 float distance = t.Pos.DistanceSquaredTo(from);
                 if (t.IsLoose) { if (loose == null || distance < nearestLoose) { loose = t; nearestLoose = distance; } } else if (next == null || distance < nearest) { next = t; nearest = distance; }
             }
@@ -2258,7 +2287,8 @@ public sealed partial class World {
             // Workers on strike are not charged, so their wage does not count against the day.
             int wages = S.Workers.Where(w => w.WageDebt <= 0).Sum(w => w.Wage);
             PayWages(); CloseDay(wages); S.WageDay = Day; Say(Phrase("Day ", Number(Day), "."));
-            foreach (var leaves in S.Things.Of(ThingKind.Leaves)) leaves.Remaining = LeafPatch;
+            foreach (var leaves in S.Things.Of(ThingKind.LeafSpot)) leaves.Remaining = LeavesPerSpot;
+            Holes.AtDawn();
         }
         if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Workers head home until morning.");
         if (S.Workers.Count > 0 && Lunch && !wasLunch) Say("Midday. Your workers take an hour for lunch.");
@@ -2275,7 +2305,9 @@ public sealed partial class World {
         }
         S.Things.RemoveAll(ThingKind.Grave, t => t.Inventory.Count == 0);
         S.Things.RemoveAll(ThingKind.WolfCorpse, t => t.Remaining <= 0);
-        // Only kinds that change by themselves tick, so trees and rocks cost nothing; a tick that can add or remove things walks a copy.
+        Trees.Tick();
+        LeafSpots.Tick();
+        // Only kinds that change by themselves tick; a tick that can add or remove things walks a copy.
         // A carcass keeps its age so the death animation plays once and not again after loading.
         foreach (var t in S.Things.Of(ThingKind.WolfCorpse)) t.Progress = Math.Min(60, t.Progress + dt);
         foreach (var t in Ticking(ThingKind.Mine)) Mines.Tick(t, dt);
@@ -2395,6 +2427,7 @@ public sealed partial class World {
         attackClock = Math.Max(0, attackClock - dt);
         Swings.Tick(dt);
         if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
+        Holes.Work(dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
             float drain = !asleep && S.Actor.Sprinting && CanSprint ? Data.SprintDrain : 1, fed = S.Hunger;
             S.Hunger = Math.Max(0, S.Hunger - dt * drain * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * drain * Data.ThirstPerSecond);
@@ -2428,7 +2461,7 @@ public sealed partial class World {
             if (!Sees(t.Pos)) continue;
             if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id, Kind = t.Kind, Rotation = t.Rotation };
             memory.RememberedPlumbing = t.PlumbingInstalled;
-            memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Keep = t.Keep; memory.Progress = t.Progress; memory.MineStage = t.MineStage; memory.FarmStage = t.FarmStage; memory.OfTree = t.OfTree;
+            memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Keep = t.Keep; memory.Progress = t.Progress; memory.MineStage = t.MineStage; memory.FarmStage = t.FarmStage; memory.OfTree = t.OfTree; memory.TreeStage = t.TreeStage;
         }
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size && S.Explored[(int)p.Y * Terrain.Size + (int)p.X] != 0;
@@ -2514,9 +2547,10 @@ public sealed partial class World {
             if (t.PlumbingSlot is Inventory plumbingSlot && (!Plumbing.HasPlumbing(t.Kind) || plumbingSlot.Slots != 1
                 || plumbingSlot.Capacity != Plumbing.InstallCost || plumbingSlot.StackSize != Plumbing.InstallCost
                 || plumbingSlot.Count > Plumbing.InstallCost || plumbingSlot.Count != plumbingSlot["steel_pipe"])) return false;
-            if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t)) return false;
+            if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t) || !TreePlanting.ValidGrowth(t) || !LeafSpots.Valid(t)) return false;
             if (!(t.Pressure >= 0 && t.Pressure <= 100 && t.PumpStrokeLeft >= 0 && t.PumpStrokeLeft <= WaterPumps.StrokeSeconds)
                 || t.Kind != ThingKind.Pump && (t.Pressure != 0 || t.PumpStrokeLeft != 0)) return false;
+            if (t.Kind == ThingKind.Hole && !GroundHoles.Valid(t)) return false;
             if (!Plumbing.ValidReceiver(t)) return false;
             if (t.Kind == ThingKind.Hut && (t.Inventory.Slots != 1 || t.Inventory.StackSize != 1 || t.Inventory.Count > 1
                 || t.Inventory.Count == 1 && Barrel.In(t.Inventory) == null)) return false;
@@ -2570,7 +2604,7 @@ public sealed partial class World {
         // Until its machines join, the save's world runs as the player no machine has claimed, else the first.
         loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.First();
         RebuildAllStacks(loaded);
-        if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage) || t.Rotation != 0 && (t.Kind is not (ThingKind.Crate or ThingKind.Barrel) && !Data.Buildings.ContainsKey(t.Kind) || !Construction.ValidRotation(t.Kind, t.Rotation)))) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage) || !TreePlanting.ValidStage(t) || t.Rotation != 0 && (t.Kind is not (ThingKind.Crate or ThingKind.Barrel) && !Data.Buildings.ContainsKey(t.Kind) || !Construction.ValidRotation(t.Kind, t.Rotation)))) throw new InvalidOperationException("Unsupported or incomplete save.");
         if (loaded.Wolves.Any(w => w == null || !WolfCounter.ValidSavedPath(w) || !WolfHunt.ValidSavedReaction(w)))
             throw new InvalidOperationException("This save holds an invalid wolf movement.");
         if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded) || loaded.Goal < 0) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");

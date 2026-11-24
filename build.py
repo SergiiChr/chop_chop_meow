@@ -66,9 +66,9 @@ RECORD_MIN_SECONDS = 600
 RECORD_SECONDS_PER_FRAME = 2
 PYTHON_TOOLS = TOOLS / "python"
 REQUIREMENTS = ROOT / "requirements-dev.txt"
-# Seconds all test stages together may take, so a run that hangs outside any check still stops.
+# Seconds a test stage may take, so a run that hangs outside any check still stops.
 # Each check has its own limit in tests/Checks.cs.
-TEST_LIMIT = 600
+TEST_STAGE_LIMIT = 300
 ERRORS = re.compile(r"SCRIPT ERROR|Parse Error|ERROR:|Unhandled exception")
 
 
@@ -644,13 +644,15 @@ TEST_STAGES = {
 
 
 def test(env: dict[str, str], stage: str | None = None) -> None:
-    """Run one test stage, or every stage in order, all within TEST_LIMIT."""
+    """Run one test stage, or every stage in order, with an independent deadline for each."""
     started = time.monotonic()
     with check_ports() as port:
         for name, run in TEST_STAGES.items():
             if stage in {None, name}:
-                run(env, started + TEST_LIMIT, port)
-    print(f"Tests took {time.monotonic() - started:.0f}s of {TEST_LIMIT}s")
+                run(env, time.monotonic() + TEST_STAGE_LIMIT, port)
+    print(
+        f"Tests took {time.monotonic() - started:.0f}s ({TEST_STAGE_LIMIT}s limit per stage)"
+    )
 
 
 def fetch_templates(env: dict[str, str]) -> None:

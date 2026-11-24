@@ -12,6 +12,7 @@ public static class InspectPage {
         if (selection.Worker > 0) return new WorkerPanel(tools, world.Workers.FirstOrDefault(w => w.Id == selection.Worker));
         return world.Find(selection.Thing) switch {
             null => new NothingSelectedPage(tools),
+            { Kind: ThingKind.Hole } t => new HolePanel(tools, t),
             { IsResource: true } t => new ResourcePanel(tools, t),
             { Kind: ThingKind.Hut } t => new CabinPanel(tools, t),
             { Kind: ThingKind.Signpost } t => new MarketPanel(tools, t),
@@ -91,8 +92,14 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
 
     /// <summary>Names the page after the building it shows, with the building's own icon; its description becomes the icon's tooltip.</summary>
     private void Headline() {
-        headingTitle.Text = thing.Kind == ThingKind.Water ? "Collect water" : world.Data.Name(thing.Kind);
-        headingIcon.Texture = Icons.Of(thing.Kind.Id()); headingIcon.Visible = headingIcon.Texture != null;
+        bool water = thing.Kind == ThingKind.Water;
+        headingTitle.Text = water ? "Collect water" : world.Data.Name(thing.Kind);
+        headingIcon.Texture = Icons.Of(thing.Kind switch {
+            ThingKind.Water => Water.Liquid,
+            ThingKind.LeafSpot => World.ResourceItem(thing),
+            _ => thing.Kind.Id()
+        });
+        headingIcon.Visible = headingIcon.Texture != null;
         headingIcon.TooltipText = world.Data.Buildings.TryGetValue(thing.Kind, out var def) ? def.Description : "";
     }
 

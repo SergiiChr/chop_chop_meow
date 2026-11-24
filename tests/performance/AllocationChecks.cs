@@ -64,10 +64,10 @@ public static class AllocationChecks {
 
     private static void CheckAWorkingSettlementStaysWithinItsBudget(GameData data) {
         var settlement = Settlement(data);
-        // Twenty seconds first, so every worker has been through its trips once and the status and cost caches hold what they will show.
-        // A store taking an item it has not held before grows its table once (measured 0.2 to 0.5 bytes a tick).
-        // A woodcutter's first tree falls during the measured runs and leaves a stump, a new thing: those rare events are what this budget allows (measured 6.2).
-        Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 7, warmup: 1200);
+        // Warm up worker trips and the status and cost caches.
+        // A store can see a new item during the check. Stumps and dropped acorns also create things and fog memories.
+        // Measured 7,792 bytes over 600 ticks, or 13.0 bytes per tick.
+        Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 14, warmup: 1200);
     }
 
     private static void CheckAChestHaulerWithNothingToCarryAllocatesNothing(GameData data) {

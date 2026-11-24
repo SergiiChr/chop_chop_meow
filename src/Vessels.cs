@@ -60,7 +60,8 @@ public sealed partial class World {
     internal VesselDef? PoursInto(Thing? t, Inventory to, string item) =>
         t != null && to == t.Inventory && Data.VesselOf(item) is VesselDef v && v.LitersIn(item) > 0 && TakesLiquid(t, v.Liquid) ? v : null;
 
-    private bool TakesLiquid(Thing t, string liquid) => t.Kind is ThingKind.Barrel or ThingKind.Farm ? liquid == Water.Liquid : Pending(t, liquid);
+    private bool TakesLiquid(Thing t, string liquid) =>
+        t.Kind is ThingKind.Barrel or ThingKind.Farm || TreePlanting.NeedsWater(t) ? liquid == Water.Liquid : Pending(t, liquid);
 
     /// <summary>
     /// Moves items between two boxes, by hand or by a worker; <paramref name="quantity"/> counts liters of a liquid and vessels of anything else.

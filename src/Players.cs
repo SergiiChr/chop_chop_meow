@@ -137,6 +137,9 @@ public sealed partial class World {
         var w = S.Workers.Find(w => w.Id == c.Other);
         switch (c.Verb) {
             case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Construction.Build(kind, c.At, c.Rotation, c.PipeShape); break;
+            case Verb.BeginDig: Holes.Begin(c.At, c.Count); break;
+            case Verb.CancelDig: Holes.Cancel(c.Count); break;
+            case Verb.FinishDig: Holes.Finish(c.Count); break;
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
             case Verb.TakeUpPipe: Construction.TakeUpPipe(Terrain.TileAt(c.At)); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At, c.Rotation)); break;
@@ -262,7 +265,7 @@ public sealed partial class World {
         if (quantity > 0 && from != to && from[item] > 0 && into?.Kind == ThingKind.Packer
             && to == into.Inventory && PackingRoom(into, item) == 0) { Say(FullInput(item)); return 0; }
         int moved = Carry(from, to, into, item, quantity);
-        if (moved > 0 && into?.Kind == ThingKind.Barrel) PileFilters(into);
+        if (moved > 0 && into != null) AfterTransfer(into, to);
         if (moved < quantity) SayHeldBehind(from, item);
         return moved;
     }
@@ -316,8 +319,18 @@ public sealed partial class World {
             from.PreferredSlot = sourceSlot;
             try { moved = from.TransferTo(to, item, quantity); } finally { from.PreferredSlot = -1; }
         } else moved = from.MoveSlotTo(sourceSlot, to, targetSlot, quantity);
-        if (moved > 0 && into?.Kind == ThingKind.Barrel) PileFilters(into);
+        if (moved > 0 && into != null) AfterTransfer(into, to);
         return moved;
+    }
+
+    private void AfterTransfer(Thing into, Inventory to) {
+        if (into.Kind == ThingKind.Barrel) PileFilters(into);
+        if (to != into.Inventory) return;
+        if (into.Kind == ThingKind.Hole) Trees.PlantIn(into);
+        else if (TreePlanting.NeedsWater(into) && to[Water.Liquid] >= TreePlanting.WaterNeeded) {
+            ReleaseIn(to);
+            Trees.BeginGrowth(into);
+        }
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
@@ -372,6 +385,7 @@ public sealed partial class World {
         if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
         Forget(p);
         p.Mauled = false; p.GatherTarget = 0; p.Selected = ""; p.Sprinting = p.Braking = false; p.TorchKindling = 0;
+        GroundHoles.Clear(p);
         S.Players.Add(p);
         // A packed crate's own name is no item, so it leaves no mark.
         foreach (var pair in p.Backpack.Items) if (Data.Items.ContainsKey(pair.Key)) Got(pair.Key);
@@ -390,6 +404,7 @@ public sealed partial class World {
     public void Depart(int id) {
         if (PlayerById(id) is not PlayerState p) return;
         ReleaseFor(p);
+        GroundHoles.Clear(p);
         S.Players.Remove(p); S.Absent[p.Key] = p;
         Doorways.UnlockEmpty(p.Sheltered);
         if (S.Actor == p) S.Actor = S.Players.FirstOrDefault() ?? new PlayerState();

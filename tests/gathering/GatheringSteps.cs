@@ -40,11 +40,11 @@ internal static class GatheringSteps {
         return (world, said, post);
     }
 
-    /// <summary>A bush with an oak's leaf patch beside it, a chest and an empty tool station, all in the player's sight.</summary>
+    /// <summary>A bush with an oak's leaf spot beside it, a chest and an empty tool station, all in the player's sight.</summary>
     public static (World World, Thing Bush, Thing Leaves, Thing Chest, Thing Rack) Thicket(GameData data) {
         var world = EmptyWorld(data);
         var bush = world.Add(ThingKind.Bush, new Vector2(10, 10), World.BushLeaves);
-        var leaves = world.Add(ThingKind.Leaves, new Vector2(11, 11), World.LeafPatch);
+        var leaves = world.Add(ThingKind.LeafSpot, new Vector2(11, 11), World.LeavesPerSpot);
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(12, 13)));
         var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(12, 8)));
         world.Player = new Vector2(14, 12); world.Look();

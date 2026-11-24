@@ -178,7 +178,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add(Water.Full, 4); world.S.Backpack.Add("steel_pick", 1);
         var bench = world.Add(ThingKind.Bench, Terrain.Spawn + new Vector2(-4, 1.5f)); world.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
         var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); world.SetFilter(rack, Inventory.Everything, false, true); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1); rack.Inventory.Add("steel_shovel", 1);
-        world.Add(ThingKind.Leaves, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
+        world.Add(ThingKind.LeafSpot, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeavesPerSpot);
         var crate = world.Add(ThingKind.Crate, Terrain.Spawn + new Vector2(1.5f, 1.5f)); world.SetFilter(crate, Inventory.Everything, false, true); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
         foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1), ("torch", 2) }) world.S.Backpack.Add(item, count);
         world.S.Milestones.UnionWith(new[] { "bench", "crate", "sold", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil" });

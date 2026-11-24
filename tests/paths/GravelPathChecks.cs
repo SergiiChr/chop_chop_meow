@@ -98,7 +98,7 @@ public static class GravelPathChecks {
         }
         Require(said.Contains("A resource is in the way."), "the player should be told a resource is in the way");
         var bush = world.Add(ThingKind.Berries, new Vector2(80, 82), 0);
-        var patch = world.Add(ThingKind.Leaves, new Vector2(82, 82), 0);
+        var patch = world.Add(ThingKind.LeafSpot, new Vector2(82, 82), 0);
         foreach (var empty in new[] { bush, patch }) {
             world.Construction.Build(ThingKind.GravelPath, empty.Pos);
             Require(!world.GravelPaths.Laid(Terrain.TileAt(empty.Pos)), $"a path tile should not be laid on {empty.Kind} with nothing left to gather");

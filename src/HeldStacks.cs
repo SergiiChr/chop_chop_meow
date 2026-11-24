@@ -124,7 +124,7 @@ public sealed partial class World {
     }
 
     /// <summary>Server: lets go of every stack held in an inventory, such as a packed crate's contents once the crate is put down.</summary>
-    private void ReleaseIn(Inventory box) {
+    internal void ReleaseIn(Inventory box) {
         foreach (var p in S.Players) if (p.HeldBox == box) using (ActAs(p)) Release();
     }
 
