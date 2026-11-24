@@ -37,6 +37,7 @@ public partial class Sounds : Node {
         ["bellows_pump"] = -14,
         ["grind_mortar"] = -10,
         ["rustle"] = -7,
+        ["rake_leaves"] = -9,
         ["butcher_carcass"] = -6.5f,
         ["place_building"] = -6.5f,
         ["take_down_building"] = -4.5f,
