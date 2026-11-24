@@ -43,6 +43,7 @@ public static class SimulationChecks {
         CraftingChecks.Run(data);
         PackingChecks.Run(data);
         LunchChecks.Run(data);
+        IdleChecks.Run(data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
         Test(CheckFilterNamesEachEntryOnceInTheOrderNamed);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
@@ -393,6 +394,8 @@ public static class SimulationChecks {
         SafeTick(world, Step);
         Require(fire.Inventory["wood"] > 0 && fire.Burn > 0,
                 "carried firewood should be deposited into the fire and consumed to sustain its burn");
+        // A worker with nothing more to do sits at the fire, which then burns none of its wood: let them go to see it burn.
+        world.Fire(worker);
         int storedBeforeBurn = fire.Inventory["wood"];
         SafeTick(world, fire.Burn - 29);
         Require(fire.Inventory["wood"] < storedBeforeBurn && fire.Burn > 0,

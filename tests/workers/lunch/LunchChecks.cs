@@ -19,6 +19,17 @@ internal static class LunchChecks {
         Test(CheckWorkersCutOffFromTheirGroupDoNotSitOnOneAnother, data);
         Test(CheckTwoWorkersCannotClaimTheSameLastPatchOfGround, data);
         Test(CheckANewFireFillsSeatsReleasedByWorkersMovingOffTheGround, data);
+        Test(CheckCampfireWithNoWoodBurnsWhileTheCrewLunchesAtIt, data);
+    }
+
+    private static void CheckCampfireWithNoWoodBurnsWhileTheCrewLunchesAtIt(GameData data) {
+        var world = WorldAtLunch(data);
+        var fire = world.Add(ThingKind.Campfire, Terrain.Spawn + Vector2.Right * 4);
+        for (int i = 0; i < 3; i++) AddWorker(world, Terrain.Spawn);
+        Require(fire.Burn == 0, "the campfire should start out unlit");
+        Work(world, 15);
+        Require(fire.Burn > 0 && world.Protected(fire.Pos + Vector2.Up * 3) && fire.Inventory["wood"] == 0,
+            "a campfire with no wood should burn while the crew sits at it for lunch");
     }
 
     private static void CheckCrewLunchesAtTheNearestFireAndGoesBackToWork(GameData data) {

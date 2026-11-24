@@ -364,6 +364,13 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             for (int i = 0; i < 60; i++) world.Tick(.25f);
             panel.Open(Page.Crew);
         }
+        if (Launch.Has("--idle")) {
+            // Idle review: the crew's jobs are taken off and they sit at the campfire, which burns with no wood while they do.
+            foreach (var w in world.Workers) foreach (var d in w.Jobs.OfType<Duty>().ToArray()) if (world.Find(d.Thing) is Thing place) world.SetDuty(w, place, d.Job, false);
+            fire.Burn = 0;
+            for (int i = 0; i < 60; i++) world.Tick(.25f);
+            world.Player = fire.Pos + new Vector2(3, 3); panel.Close(); view.Zoom = 1.6f;
+        }
         if (Launch.Has("--strike")) {
             // Strike review: the whole crew owes wages and stands holding protest signs.
             foreach (var w in world.Workers) w.WageDebt = w.Wage;
