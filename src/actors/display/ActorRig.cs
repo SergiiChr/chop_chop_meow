@@ -34,7 +34,7 @@ public sealed class ActorRig {
     /// <summary>What each tool puts in the hands, by its name: one piece, or two for a tool that fills both.</summary>
     private readonly List<(string Name, Node3D Node)> tools = new();
     private readonly Node3D torch;
-    private Node3D shovel = null!;
+    private Node3D shovel = null!, rake = null!;
     private readonly List<(Skeleton3D Skeleton, Node3D Joint)> limbs = new();
     // The leg skins, whose third bone turns the foot at the ankle.
     private readonly Skeleton3D footL, footR;
@@ -266,12 +266,16 @@ public sealed class ActorRig {
         return elbow;
     }
 
-    /// <summary>Tools hang from the right fist along the forearm; blades face local -Z, the direction of a downward stroke, until the grip turns them.</summary>
+    /// <summary>Builds the tools that hang from the right fist and those that lie along both fists.</summary>
     private void BuildTools() {
-        foreach (var name in new[] { "steel_axe", "steel_pick", "steel_shovel", "wood_hammer", "steel_hammer", "protest_sign" }) {
+        foreach (var name in new[] { "steel_axe", "steel_pick", "steel_shovel", "rake", "wood_hammer", "steel_hammer", "protest_sign" }) {
             var tool = name == "protest_sign" ? ProtestSign() : Tool(name);
-            // The shovel is laid through both fists (LayShovel), so it hangs from the fist itself and not from the grip that turns.
-            if (name == "steel_shovel") { Hold(tool); shovel = tool; } else wrist.AddChild(tool);
+            // The shovel and rake lie through both hands and turn independently of the wrist.
+            switch (name) {
+                case "steel_shovel": Hold(tool); shovel = tool; break;
+                case "rake": Hold(tool); rake = tool; break;
+                default: wrist.AddChild(tool); break;
+            }
             tool.Visible = false;
             tools.Add((name, tool));
         }
@@ -310,8 +314,13 @@ public sealed class ActorRig {
         // The face looks ahead with the shaft upright and at the sky with it level.
         var face = along.Cross(Vector3.Right).Normalized();
         var held = new Basis(along.Cross(face), -along, -face);
-        shovel.Basis = (torso.Basis * chest.Basis * shoulderR.Basis * elbowR.Basis).Inverse() * held;
+        shovel.Basis = InRightFist(held);
     }
+
+    private Basis InRightFist(Basis held) => (torso.Basis * chest.Basis * shoulderR.Basis * elbowR.Basis).Inverse() * held;
+
+    /// <summary>The rake's row of teeth at its lowest edge, from the rig's root.</summary>
+    internal Vector3 RakeTines => FromForearm(false, rake.Transform * RakeStroke.Tines);
 
     /// <summary>
     /// Turns an upper arm about its own length, on top of the pose just shown.
@@ -378,6 +387,11 @@ public sealed class ActorRig {
     /// <summary>A held tool gripped at the origin, handle down along -Y and blade toward -Z; the icon renderer shows it on its own.</summary>
     public static Node3D Tool(string name) {
         if (name == "steel_shovel") return Shovel();
+        if (name == "rake") {
+            var rake = new Node3D();
+            Add(rake, RackShape.Rake, RackShape.Tool, Vector3.Zero, scale: Vector3.One * RakeStroke.Scale);
+            return rake;
+        }
         if (name is "steel_hammer" or "wood_hammer") return Hammer(name == "steel_hammer");
         if (name is "stone_chisel" or "steel_chisel") return Chisel(name == "steel_chisel");
         bool steelTool = name.StartsWith("steel");
@@ -497,6 +511,8 @@ public sealed class ActorRig {
         shoulderR.RotationDegrees = new Vector3(-pose.RaiseR, 0, -pose.OutR);
         elbowL.RotationDegrees = new Vector3(-pose.ElbowL, 0, 0);
         elbowR.RotationDegrees = new Vector3(-pose.ElbowR, 0, 0);
+        if (pose.ArmRollL != 0) RollArm(true, pose.ArmRollL);
+        if (pose.ArmRollR != 0) RollArm(false, pose.ArmRollR);
         legL.Basis = HipTurn(pose.SplayL, pose.SwingL, pose.TurnL, pose.RollL);
         legR.Basis = HipTurn(-pose.SplayR, pose.SwingR, -pose.TurnR, -pose.RollR);
         kneeL.RotationDegrees = new Vector3(pose.KneeL, 0, 0);
@@ -510,8 +526,8 @@ public sealed class ActorRig {
         if (pose.Grip != grip) { grip = pose.Grip; wrist.RotationDegrees = new Vector3(0, grip, 0); }
         foreach (var (name, node) in tools) node.Visible = name == tool;
         ToolShown = tool;
-        // A shovel is only ever dug with, held in both fists.
         if (shovel.Visible) LayShovel();
+        if (rake.Visible) rake.Basis = InRightFist(RakeStroke.Shaft((Fist(true) - Fist(false)).Normalized()));
         crate.Visible = carrying;
         if (barrel?.Visible == true) torch.Transform = new Transform3D(Basis.Identity, new Vector3(0, -build.Forearm, Palm));
         barrel?.Hide();

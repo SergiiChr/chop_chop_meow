@@ -30,7 +30,7 @@ description: Animate players, workers, or creatures in Chop Chop Meow and check 
   A body moves across the ground only while stepping or in the air.
   Sliding after a knockback looks like sliding on ice.
   Keep a knockback short and show it as a hop or a throw.
-- Human poses are in [ActorAnimation.cs](../../../src/ActorAnimation.cs) and are applied by
+- Human poses are in [ActorAnimation.cs](../../../src/actors/display/ActorAnimation.cs) and are applied by
   [ActorRig](../../../src/actors/display/ActorRig.cs).
   Use [ArmReach.ArmTo](../../../src/actors/display/ArmReach.cs) for all arm reach calculations.
   It takes a target point in the trunk's frame.
