@@ -160,7 +160,7 @@ public sealed class Construction(World world) {
     /// and what does not fit waits in a recovery box where it stood.
     /// </summary>
     public bool Dismantle(Thing t) {
-        if (t.Kind == ThingKind.PlantingSpot) {
+        if (t.Kind is ThingKind.PlantingSpot or ThingKind.Hole) {
             if (!world.Reaches(t)) { world.Say("Walk closer first."); return false; }
             if (world.Busy() || world.Forwarded(Verb.Dismantle, t.Id)) return true;
             return world.S.Things.Remove(t);
@@ -190,7 +190,7 @@ public sealed class Construction(World world) {
             var pipe = Terrain.TileAt(at);
             return world.Sees(pipe) && world.SteelPipes.Laid(pipe) ? Removal.OfPipe(pipe) : Removal.None;
         }
-        if (picked is { } building && (building.Kind == ThingKind.PlantingSpot || world.Data.Buildings.ContainsKey(building.Kind))) return Removal.Of(building);
+        if (picked is { } building && (building.Kind is ThingKind.PlantingSpot or ThingKind.Hole || world.Data.Buildings.ContainsKey(building.Kind))) return Removal.Of(building);
         return world.GravelPaths.TileUnder(at) is Vector2I tile ? Removal.Of(tile) : Removal.None;
     }
     /// <summary>Whether what the remove selector points at is within the acting player's reach.</summary>

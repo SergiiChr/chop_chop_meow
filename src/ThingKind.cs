@@ -47,6 +47,7 @@ public enum ThingKind {
     Pump,
     Acorn,
     PlantingSpot,
+    Hole,
 }
 
 /// <summary>Converts kinds to and from the ids that hotbar slots, icons and sounds use.</summary>

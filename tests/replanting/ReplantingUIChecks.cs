@@ -8,27 +8,50 @@ namespace ChopChopMeow;
 
 public partial class Game {
     private async Task RunReplantingUIChecks() {
-        await TestClean(CheckHeldAcornMarksGroundAndCanBePlantedAndWatered);
+        await TestClean(CheckDiggingWithAShovelComesBeforePlantingAndWatering);
+        await TestClean(CheckHotbarShovelShowsADigOutline);
         await TestClean(CheckLeavesBesideAnOldTreeCanStillBeGathered);
     }
 
-    private async Task CheckHeldAcornMarksGroundAndCanBePlantedAndWatered() {
+    private async Task CheckDiggingWithAShovelComesBeforePlantingAndWatering() {
         var home = Hosted.Player;
         string bucket = Bucket.AtFill(5);
-        Give(Hosted, "acorn");
         Give(Hosted, "steel_shovel");
         Give(Hosted, bucket);
         await Frames();
         await KeyStroke(Key.Tab);
         var at = SpotsNearby().First(p => world.Construction.PlacementBlock(ThingKind.PlantingSpot, p) == null
             && Uncovered(view.Screen(p)));
-        var tree = await PlantAndWater(at, bucket);
+        await DoubleClick(BagCell(c => c.TooltipText.StartsWith("Steel shovel")));
+        var hole = await DigHole(at);
+        Require(world.Backpack["acorn"] == 0 && hole.Inventory.Count == 0, "digging should leave an empty hole without any acorn");
+        Give(Hosted, "acorn");
+        await Frames();
+        var tree = await PlantAndWater(hole, bucket);
         Require(world.Backpack["acorn"] == 0, "planting the tree should spend the acorn");
         await CloseWithEsc();
         RemoveThings(Hosted, t => t.Id == tree.Id);
         Drop(Hosted, "steel_shovel", 1);
         Drop(Hosted, Bucket.Item, 1);
         Warp(Hosted, home);
+        await Frames();
+    }
+
+    private async Task CheckHotbarShovelShowsADigOutline() {
+        Give(Hosted, "steel_shovel");
+        SetHotbarSlot(Hosted, 8, "steel_shovel");
+        SetHotbarSlot(world, 8, "steel_shovel");
+        await Frames();
+        await KeyStroke(Key.Key9);
+        var at = SpotsNearby().First(p => world.Construction.PlacementBlock(ThingKind.PlantingSpot, p) == null
+            && Uncovered(view.Screen(p)));
+        await Hover(view.Screen(at));
+        Require(view.PlacementGhost != null, "selecting the hotbar shovel should show the dig outline");
+        await KeyStroke(Key.Escape);
+        Require(view.PlacementGhost == null, "escaping should put away the outline");
+        SetHotbarSlot(Hosted, 8, "");
+        SetHotbarSlot(world, 8, "");
+        Drop(Hosted, "steel_shovel");
         await Frames();
     }
 

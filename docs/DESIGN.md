@@ -101,7 +101,8 @@ Simulation and data:
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
-| `src/trees/TreePlanting.cs`, `src/trees/LeafLitter.cs`, `src/trees/display/TreePlantingShape.cs`, `src/trees/display/TreePlantingPanel.cs` | Tree planting and growth, leaf spots and their acorns, and the planting outline, nub and page |
+| `src/digging/GroundHoles.cs`, `src/digging/display/DigSitePanel.cs` | Shovel marks, empty holes and the hole's input slot |
+| `src/trees/TreePlanting.cs`, `src/trees/LeafLitter.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/packing/Packing.cs` | Packing stations |
 | `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
@@ -869,10 +870,13 @@ Leaf spots show a second slot for acorns, and the lake shows a water droplet in 
 
 ### Replanting trees
 
-`TreePlanting.Mark` places a `PlantingSpot` outline on a click while an acorn is on the cursor.
-The outline costs nothing and can be cleared by the remove selector, a building or a gravel tile.
-Holding right mouse on it with a shovel adds digging work; finishing it spends one acorn from the backpack.
-A planted acorn is a selectable nub.
+Selecting a shovel on the hotbar or double-clicking it in the backpack shows the placement outline.
+`GroundHoles.Mark` places a `PlantingSpot` outline on a click with a shovel selected.
+Holding right mouse on it adds shovel work and replaces the finished spot with a `Hole`.
+The hole has one empty input slot.
+Inserting an acorn spends one from the stack and replaces the hole with a selectable oak nub.
+Empty holes disappear at dawn.
+The remove selector, buildings and gravel paths can clear both the outline and the empty hole.
 `ResourcePanel` shows the wood count in a read-only item slot throughout the tree’s life.
 Its status is **Planted** with a water slot until it takes five liters, then **Growing** until it becomes an **Adult tree**.
 

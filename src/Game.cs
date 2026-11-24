@@ -418,7 +418,9 @@ public partial class Game : Node, IGameFlow {
             ending.ShowOnce();
             needsPlate.DamageFlash(health - world.Health, runTime); shownHealth = world.Health;
         }
-        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection; view.Placing = player.Mode.Placing; view.PlacingRotation = player.Mode.Rotation;
+        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection;
+        view.Placing = overInterface && player.Mode is ClickMode.Dig ? null : player.Mode.Placing;
+        view.PlacingRotation = player.Mode.Rotation;
         view.Underground = player.Mode is ClickMode.Remove { Underground: true } || view.Placing == ThingKind.SteelPiping;
         if (player.Mode is ClickMode.Build { Kind: ThingKind.SteelPiping } pipe) view.PlacingPipeShape = pipe.Shape;
         view.Mouse = looking ? GetViewport().GetVisibleRect().GetCenter() : GetViewport().GetMousePosition();

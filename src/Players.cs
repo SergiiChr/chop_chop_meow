@@ -137,7 +137,7 @@ public sealed partial class World {
         var w = S.Workers.Find(w => w.Id == c.Other);
         switch (c.Verb) {
             case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Construction.Build(kind, c.At, c.Rotation, c.PipeShape); break;
-            case Verb.MarkTree: Trees.Mark(c.At); break;
+            case Verb.MarkDig: Holes.Mark(c.At); break;
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
             case Verb.TakeUpPipe: Construction.TakeUpPipe(Terrain.TileAt(c.At)); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At, c.Rotation)); break;
@@ -323,9 +323,12 @@ public sealed partial class World {
 
     private void AfterTransfer(Thing into, Inventory to) {
         if (into.Kind == ThingKind.Barrel) PileFilters(into);
-        if (to != into.Inventory || !TreePlanting.NeedsWater(into) || to[Water.Liquid] < TreePlanting.WaterNeeded) return;
-        ReleaseIn(to);
-        Trees.BeginGrowth(into);
+        if (to != into.Inventory) return;
+        if (into.Kind == ThingKind.Hole) Trees.PlantIn(into);
+        else if (TreePlanting.NeedsWater(into) && to[Water.Liquid] >= TreePlanting.WaterNeeded) {
+            ReleaseIn(to);
+            Trees.BeginGrowth(into);
+        }
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {

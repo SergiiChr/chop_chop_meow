@@ -11,7 +11,8 @@ using static ReplantingSteps;
 public static class ReplantingChecks {
     public static void Run(GameData data) {
         Test(CheckAxeHitsDropAcornsLikePickaxeHitsDropChips, data);
-        Test(CheckMarkingIsFreeAndPlantingUsesOneAcornAndAShovel, data);
+        Test(CheckAShovelDigsAHoleBeforePlantingAnAcorn, data);
+        Test(CheckEmptyHoleLastsUntilDawnAcrossASave, data);
         Test(CheckWateredTreeKeepsGrowingAfterBecomingAnAdult, data);
         Test(CheckValleyTreesKeepGrowing, data);
         Test(CheckGatheringLeavesGivesAcornsThatRefillOneAtATime, data);
@@ -43,26 +44,54 @@ public static class ReplantingChecks {
         Require(woods.Backpack["acorn"] == 1, "one click should pick up one acorn");
     }
 
-    private static void CheckMarkingIsFreeAndPlantingUsesOneAcornAndAShovel(GameData data) {
+    private static void CheckAShovelDigsAHoleBeforePlantingAnAcorn(GameData data) {
         var world = EmptyWorld(data);
-        var spot = MarkPlantingGround(world);
-        Require(world.Backpack["acorn"] == 1 && world.ThingsOf(ThingKind.Tree).Count == 0, "marking should spend nothing and leave only an outline");
-        world.Gather(spot, 10);
-        Require(world.Find(spot.Id) == spot && world.Backpack["acorn"] == 1, "planting without a shovel should do nothing");
-        Give(world, "steel_shovel", 1);
+        world.Player = PlantingGround + Vector2.Right * 2;
+        Give(world, "acorn", 2);
+        Require(!world.Holes.Mark(PlantingGround), "an acorn alone should not mark a dig site");
+        var marker = MarkDigSite(world);
+        Require(world.Transfer(world.Backpack, marker.Inventory, "acorn", 1) == 0, "an undug marker should refuse an acorn");
+        Drop(world, "steel_shovel");
+        world.Gather(marker, 10);
+        Require(marker.Progress == 0 && world.Find(marker.Id) == marker, "digging should need a shovel");
+        Give(world, "steel_shovel");
         Drop(world, "acorn");
-        Require(world.GatherBlock(spot) == "Nothing to plant", "trying to dig without an acorn should say Nothing to plant");
-        Give(world, "acorn");
-        world.Gather(spot, 1);
-        Require(world.Find(spot.Id) == spot && world.Backpack["acorn"] == 1, "a short press should leave the outline and acorn");
-        var tree = FinishPlanting(world, spot);
-        Require(world.Backpack["acorn"] == 0 && world.Backpack["steel_shovel"] > 0 && tree.Remaining == 0,
-            "planting should spend one acorn and leave the shovel and a tree with no wood");
+        world.Gather(marker, 1);
+        Require(world.Find(marker.Id) == marker, "a short press should leave the outline");
+        var hole = DigHole(world, marker);
+        Require(hole.Inventory.Count == 0 && world.ThingsOf(ThingKind.Tree).Count == 0,
+            "digging without acorns should leave an empty hole");
+        Give(world, "wood");
+        Require(world.Transfer(world.Backpack, hole.Inventory, "wood", 1) == 0 && hole.Inventory.Count == 0,
+            "a hole should refuse wood");
+        Give(world, "acorn", 2);
+        Require(world.Transfer(world.Backpack, hole.Inventory, "acorn", 2) == 1 && world.Backpack["acorn"] == 1,
+            "the hole should accept exactly one acorn from a stack");
+        var tree = world.ThingsOf(ThingKind.Tree).Single();
+        Require(world.Find(hole.Id) == null && tree.Pos == PlantingGround && TreePlanting.NeedsWater(tree)
+            && tree.Remaining == 0 && world.Backpack["steel_shovel"] == 1,
+            "planting should replace the hole with an unwatered nub and leave the shovel in the backpack");
+        Require(world.Transfer(world.Backpack, hole.Inventory, "acorn", 1) == 0 && world.Backpack["acorn"] == 1,
+            "an old reference to the hole should not plant a second acorn");
+    }
+
+    private static void CheckEmptyHoleLastsUntilDawnAcrossASave(GameData data) {
+        var world = EmptyWorld(data);
+        var hole = DigHole(world, MarkDigSite(world));
+        RunUntil(world, data.DaySeconds - 1);
+        Require(world.Find(hole.Id) == hole, "an empty hole should still be there just before dawn");
+        string saved = world.Serialize();
+        RunUntilDawn(world);
+        Require(world.Find(hole.Id) == null, "an unused hole should disappear at dawn");
+        world.Deserialize(saved);
+        Require(world.Find(hole.Id) is { Kind: ThingKind.Hole, Inventory.Count: 0 }, "the saved hole should load empty");
+        RunUntilDawn(world);
+        Require(world.Find(hole.Id) == null, "a loaded empty hole should disappear at dawn too");
     }
 
     private static void CheckWateredTreeKeepsGrowingAfterBecomingAnAdult(GameData data) {
         var world = EmptyWorld(data);
-        var tree = FinishPlanting(world, MarkPlantingGround(world));
+        var tree = PlantAnAcorn(world);
         PourIntoTree(world, tree, Water.Full, Water.Empty);
         RunUntil(world, world.Time + data.DaySeconds * 12);
         Require(tree.Remaining == 0 && tree.Inventory[Water.Liquid] == 3, "three liters should leave the acorn dormant");
@@ -110,7 +139,7 @@ public static class ReplantingChecks {
 
     private static void CheckAGrowingTreeKeepsItsAgeOnLoadAndCanBeFelledEarly(GameData data) {
         var world = EmptyWorld(data);
-        var tree = FinishPlanting(world, MarkPlantingGround(world));
+        var tree = PlantAnAcorn(world);
         PourIntoTree(world, tree, Bucket.AtFill(5), Bucket.Item);
         float watered = world.Time;
         RunUntil(world, watered + data.DaySeconds * 2.5f);
@@ -132,7 +161,7 @@ public static class ReplantingChecks {
 
     private static void CheckSaveRefusesAnInvalidRememberedTreeStage(GameData data) {
         var world = EmptyWorld(data);
-        var tree = FinishPlanting(world, MarkPlantingGround(world));
+        var tree = PlantAnAcorn(world);
         world.Look();
         world.Player = tree.Pos + Vector2.Right * (data.SightRadius + 2);
         world.Look();

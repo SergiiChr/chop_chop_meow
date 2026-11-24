@@ -6,22 +6,31 @@ using static Checks;
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>Marks a planting spot with a held acorn, digs it and pours a bucket into the resulting tree.</summary>
-    private async Task<Thing> PlantAndWater(Vector2 at, string bucket) {
-        await PickUp(BagCell(c => c.TooltipText.StartsWith("Acorn")));
+    /// <summary>Marks the ground with the selected shovel and holds right mouse until an empty hole appears.</summary>
+    private async Task<Thing> DigHole(Vector2 at) {
         var screen = view.Screen(at);
         await Hover(screen);
-        Require(view.PlacementGhost != null, "holding an acorn over open ground should show a placement outline");
+        Require(view.PlacementGhost != null, "the selected shovel should show a placement outline");
         await Click(screen);
-        await Until(() => cursor.Empty && world.ThingsOf(ThingKind.PlantingSpot).Any(t => t.Pos == at), "the unplanted outline appearing");
-        Require(world.Backpack["acorn"] == 1, "putting down the outline should keep the acorn");
+        await Until(() => world.ThingsOf(ThingKind.PlantingSpot).Any(t => t.Pos == at), "the dig outline appearing");
         var point = RightPress(at, .025f);
         try {
             await Until(() => view.PlayerAnimation == ActorAction.Dig, "the shovel digging at the outline", 6);
-            await Until(() => world.ThingsOf(ThingKind.Tree).Any(t => t.Pos == at), "the outline turning into a planted acorn", 10);
+            await Until(() => world.ThingsOf(ThingKind.Hole).Any(t => t.Pos == at), "the outline turning into an empty hole", 10);
         } finally { RightRelease(point); }
         await Frames();
-        var tree = world.ThingsOf(ThingKind.Tree).First(t => t.Pos == at);
+        return world.ThingsOf(ThingKind.Hole).First(t => t.Pos == at);
+    }
+
+    /// <summary>Puts one acorn in a dug hole and pours a bucket into the resulting tree.</summary>
+    private async Task<Thing> PlantAndWater(Thing hole, string bucket) {
+        await ClickOn(hole);
+        Require(OnPage("input_acorn") is ItemSlot { Visible: true }, "the dug hole should show an acorn slot");
+        await Carry(BagCell(c => c.TooltipText.StartsWith("Acorn")), OnPage("input_acorn")!);
+        await Until(() => world.Find(hole.Id) == null && world.ThingsOf(ThingKind.Tree).Any(t => t.Pos == hole.Pos),
+            "one acorn replacing the hole with a planted tree", 4);
+        await CloseWithEsc();
+        var tree = world.ThingsOf(ThingKind.Tree).First(t => t.Pos == hole.Pos);
         await ClickOn(tree);
         await Until(() => ShowsTreeStatus("Planted") && HasLabel(panel, "Needs 5 L") && ShowsResourceStock("wood", "0"),
             "the planted tree showing its status, wood count, and water needed", 4);

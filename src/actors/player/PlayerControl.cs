@@ -12,8 +12,8 @@ public abstract record ClickMode {
     public sealed record Build(ThingKind Kind, PipeShape Shape = PipeShape.Straight) : ClickMode;
     /// <summary>A click places a crate or barrel, from a specific backpack cell when one is named.</summary>
     public sealed record Container(string Item, int BackpackSlot = -1) : ClickMode;
-    /// <summary>A click marks the ground for the held acorn.</summary>
-    public sealed record Plant : ClickMode;
+    /// <summary>A click marks open ground for digging a hole.</summary>
+    public sealed record Dig : ClickMode;
     /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
     public sealed record Assign(int Worker) : ClickMode;
     /// <summary>The remove selector takes down what the player clicks on the selected layer.</summary>
@@ -24,7 +24,7 @@ public abstract record ClickMode {
     public float Rotation => QuarterTurns * Mathf.Pi / 2;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
-    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, Plant => ThingKind.PlantingSpot, _ => null };
+    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, Dig => ThingKind.PlantingSpot, _ => null };
 }
 
 /// <summary>The player in the world: walking, gathering, lifting containers, placing buildings, taking them down and clicking things.</summary>
@@ -91,6 +91,7 @@ public sealed class PlayerControl {
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started; <paramref name="overPanel"/> tells that the mouse is on the interface.</summary>
     public void Update(float dt, bool overPanel) {
         PlaceHeld(overPanel);
+        if (Mode is ClickMode.Dig && world.BestTool("shovel") == null) Mode = new ClickMode.Normal();
         // The recipe map covers the world, so nothing held over it walks or gathers.
         if (kit.Paused || panel.Map.Visible) { world.Me.Sprinting = false; return; }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
@@ -110,8 +111,6 @@ public sealed class PlayerControl {
             if (heldPlacement is not ClickMode.Build build || build.Kind != kind) heldPlacement = new ClickMode.Build(kind);
         } else if (container != null) {
             if (heldPlacement is not ClickMode.Container placing || placing.Item != container) heldPlacement = new ClickMode.Container(container);
-        } else if (cursor.Stack?.Item == TreePlanting.Acorn) {
-            if (heldPlacement is not ClickMode.Plant) heldPlacement = new ClickMode.Plant();
         } else heldPlacement = null;
         bool showing = heldPlacement != null && !overPanel;
         if (showing) Mode = heldPlacement!;
@@ -291,7 +290,7 @@ public sealed class PlayerControl {
                 kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return;
             }
             PlaceHeld(false);
-            if (Mode.Placing != null) Place(at); else cursor.Release();
+            if (Mode.Placing != null && Mode is not ClickMode.Dig) Place(at); else cursor.Release();
             return;
         }
         if (Mode.Placing != null) { Place(at); return; }
@@ -332,11 +331,8 @@ public sealed class PlayerControl {
     private void Place(Vector2 screen) {
         if (!view.TryGroundPoint(screen, out var ground, Mode.Placing == ThingKind.SteelPiping ? PipeGround.FloorY : 0)) return;
         var at = ground.Round();
-        if (Mode is ClickMode.Plant) {
-            if (world.Trees.Mark(at)) {
-                cursor.Release();
-                Mode = new ClickMode.Normal();
-            }
+        if (Mode is ClickMode.Dig) {
+            if (world.Holes.Mark(at)) Mode = new ClickMode.Normal();
             return;
         }
         if (Mode is ClickMode.Container { BackpackSlot: >= 0 } selected && ContainerCount(selected) == 0) {

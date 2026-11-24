@@ -47,7 +47,7 @@ public partial class World {
     }
 
     /// <summary>Whether a kind grows low enough to build on: a building or yard goes up over it and clears it away.</summary>
-    public static bool BuiltOver(ThingKind kind) => kind is ThingKind.Stump or ThingKind.Bush or ThingKind.PlantingSpot;
+    public static bool BuiltOver(ThingKind kind) => kind is ThingKind.Stump or ThingKind.Bush or ThingKind.PlantingSpot or ThingKind.Hole;
 
     /// <summary>Whether a spot is on the ground a building, yard or crate keeps clear of other resources, where it leaves no stump or bush.</summary>
     public static bool Clears(Thing built, Vector2 p) {

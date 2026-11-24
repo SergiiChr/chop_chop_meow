@@ -172,7 +172,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Walk or sprint on a gravel path | Move 1.2× as fast |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
-| Hold right mouse button on a planting outline | Walk over and plant an acorn with a shovel |
+| Hold right mouse button on a dig outline | Walk over and dig a hole with a shovel |
 | Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you around obstacles to its door and inside; on open ground, use the item selected on the hotbar (swing a tool or torch toward the pointer, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans, and the remove selector that takes buildings down |
@@ -490,12 +490,10 @@ A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 
 An axe hit has the same one-in-twenty chance to drop an acorn as a pickaxe hit has to drop a chip.
 Right-click the acorn to pick it up.
-Pick up its stack in your backpack and move the cursor over open ground, as you would with a crate.
-Left-click to leave an outline and return the stack to your backpack.
-You can clear an outline with the remove selector.
-
-Hold right mouse on the outline while carrying a shovel.
-Once the digging finishes, one acorn goes into the ground and a small nub marks the spot.
+Double-click a shovel in your backpack, or select it on the hotbar, to see an outline over open ground.
+Left-click to mark the spot, then hold RMB on the outline with the shovel to dig a hole.
+Open the hole and place one acorn in its empty slot to plant it. A small nub marks the planted acorn.
+An unused hole disappears at dawn.
 Click the nub to see its status and a read-only item slot with the wood count.
 A tree shows **Planted** until you pour a total of 5 L from bottles or buckets into its water slot, then **Growing**.
 After watering, the oak grows daily. It holds 4 wood after one day, 21 after five, and 42 when it becomes an **Adult tree**

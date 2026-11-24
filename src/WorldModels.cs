@@ -278,7 +278,7 @@ public static class WorldModels {
 
     public static Hit[] Hits(Thing t) => t.Kind switch {
         ThingKind.Tree => TreeHits(t.Id, t.TreeStage),
-        ThingKind.PlantingSpot => [new Hit(.46f, 0, .055f)],
+        ThingKind.PlantingSpot or ThingKind.Hole => [new Hit(.46f, 0, .055f)],
         ThingKind.Stone => new[] { new Hit(.75f, 0, .9f) },
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => new[] { new Hit(.8f, 0, 1) },
         ThingKind.LooseCoal or ThingKind.LooseStone or ThingKind.IronChip or ThingKind.TinChip => new[] { new Hit(.45f, 0, .35f) },
@@ -320,6 +320,7 @@ public static class WorldModels {
         switch (t.Kind) {
             case ThingKind.Tree: prop = Tree(t); break;
             case ThingKind.PlantingSpot: prop = new Prop(); TreePlantingShape.Outline(prop.Body); break;
+            case ThingKind.Hole: prop = new Prop(); TreePlantingShape.Hole(prop.Body); break;
             case ThingKind.Stump: prop = Stump(t.OfTree != 0 ? t.OfTree : t.Id, t.TreeStage); break;
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
             case ThingKind.Stone: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero); break;

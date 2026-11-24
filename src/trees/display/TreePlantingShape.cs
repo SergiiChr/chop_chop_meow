@@ -3,16 +3,23 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-/// <summary>The outline before digging and the nub of disturbed earth after the acorn goes in.</summary>
+/// <summary>The outline, shallow hole and planted nub.</summary>
 internal static class TreePlantingShape {
     private static readonly StandardMaterial3D Mark = Flat(new Color("eed6a0"));
     private static readonly StandardMaterial3D Soil = Mat("664533", .95f);
+    private static readonly StandardMaterial3D HoleBottom = Mat("2c1c15", 1);
     private static readonly StandardMaterial3D Shoot = Mat("928049", .9f);
 
     public static void Outline(Node3D body) {
         var ring = Torus(body, .38f, .45f, Vector3.Up * .03f, Mark);
         ring.Scale = new Vector3(1, .45f, 1);
         ring.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+    }
+
+    public static void Hole(Node3D body) {
+        Cylinder(body, .37f, .37f, .024f, Vector3.Up * .013f, HoleBottom);
+        var rim = Torus(body, .31f, .46f, Vector3.Up * .027f, Soil);
+        rim.Scale = new Vector3(1, .6f, .89f);
     }
 
     public static Node3D Nub(Node3D body) {

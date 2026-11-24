@@ -126,7 +126,7 @@ public partial class WorldView {
         foreach (var t in World.Things) {
             if (t.IsResource || t.Kind is ThingKind.Crate or ThingKind.Grave) continue;
             if (t.Kind == ThingKind.Farm) { ClearFarm(t.Pos); continue; }
-            float radius = t.Kind switch { ThingKind.Hut or ThingKind.Pile => 3.4f, ThingKind.Mine => 3, ThingKind.Campfire => 2.3f, _ => 1.8f };
+            float radius = t.Kind switch { ThingKind.Hut or ThingKind.Pile => 3.4f, ThingKind.Mine => 3, ThingKind.Campfire => 2.3f, ThingKind.Hole => .55f, _ => 1.8f };
             Stamp(disturbed, t.Pos, radius, 1);
         }
         disturbanceImage.SetData(Terrain.Size, Terrain.Size, false, Image.Format.R8, disturbed);

@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Marks where an acorn goes and turns the mark into a planted tree after shovel work.</summary>
+/// <summary>Plants acorns and advances standing trees as they grow.</summary>
 public sealed class TreePlanting(World world) {
     public const string Acorn = "acorn";
     public const int WaterNeeded = 5;
@@ -66,34 +65,13 @@ public sealed class TreePlanting(World world) {
             && thing.Inventory.Count < WaterNeeded && (thing.NextTreeStageAt == 0 || thing.Inventory.Count == 0);
     }
 
-    /// <summary>Puts an outline on open ground, leaving the held acorn in its stack.</summary>
-    public bool Mark(Vector2 at) {
-        at = at.Round();
-        if (world.Held is not { Item: Acorn } held || !world.InReach(held.Box)) return false;
-        if (world.Construction.PlacementBlock(ThingKind.PlantingSpot, at) is string blocked) { world.Say(blocked); return false; }
-        if (world.Forwarded(Verb.MarkTree, at: at)) return true;
-        world.Add(ThingKind.PlantingSpot, at);
-        return true;
-    }
-
-    internal string? DigBlock() {
-        if (world.BestTool("shovel") == null) return "Carry a shovel to plant the acorn.";
-        return world.S.Backpack.Free(Acorn) == 0 ? "Nothing to plant" : null;
-    }
-
-    internal void Dig(Thing spot, float dt) {
-        if (!world.Near(spot, 1.35f)) return;
-        spot.Progress = Mathf.Min(GatherRules.DigSeconds, spot.Progress + dt * world.Speed(world.BestTool("shovel")));
-        if (!World.DugOut(spot) || world.S.Backpack.Remove(Acorn, 1) == 0) return;
-        world.S.Things.Remove(spot);
-        Plant(spot.Pos);
-        world.Play("dig_toss", spot.Pos);
-    }
-
-    private void Plant(Vector2 at) {
+    /// <summary>Consumes an acorn just placed in a hole and replaces it with an oak nub.</summary>
+    internal void PlantIn(Thing hole) {
+        if (hole.Inventory.Remove(Acorn, 1) != 1) return;
+        world.S.Things.Remove(hole);
         // Oaks are the trees whose id has no remainder across the three species.
         world.S.NextId += (World.TreeSpecies - world.S.NextId % World.TreeSpecies) % World.TreeSpecies;
-        var tree = world.Add(ThingKind.Tree, at);
+        var tree = world.Add(ThingKind.Tree, hole.Pos);
         tree.TreeStage = 1;
         tree.Inventory = new Inventory { Slots = 1, StackSize = WaterNeeded, Capacity = WaterNeeded };
     }

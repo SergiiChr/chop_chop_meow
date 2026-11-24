@@ -46,7 +46,7 @@ Detail past these does not show at the game's camera distance and costs frame ti
 Models are assembled from code-built Godot meshes, with baked meshes for trees, berry bushes and four foods.
 
 - `src/WorldModels.cs` — world objects, wolf carcass and trade cart.
-- `src/trees/display/TreePlantingShape.cs` — the planting outline and a soil nub.
+- `src/trees/display/TreePlantingShape.cs` — the dig outline, a shallow hole with a raised earth rim, and a soil nub.
   The oak appears after the first full day of growth and scales a little larger at each stage.
 - `src/actors/display/ActorRig.cs` — player, worker, courier and the intro film's boss and catgirls, and the tools
   they hold: the steel shovel is a spade with a bar across the top of its handle and a pointed blade, laid through both
