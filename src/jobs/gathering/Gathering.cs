@@ -38,7 +38,7 @@ internal class Gathering {
         if (!world.Walk(w, spot.Pos, dt)) return true;
         w.WorkState = WorkerWorkState.Gathering; w.Exhausted = null;
         // A tool held only to spare the worker a sting makes the work no faster.
-        string? tool = w.Tool != "" && rule?.SpedUpBy(world.ToolKind(w.Tool)) == true ? w.Tool : null;
+        string? tool = w.Tool == "" || rule?.Spares == world.ToolKind(w.Tool) ? null : w.Tool;
         if (spot.IsDug) {
             // What is dug up comes out whole; what does not fit in hand waits in the hole for the next load.
             spot.Progress += dt * world.Speed(tool);

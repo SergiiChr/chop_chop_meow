@@ -970,12 +970,13 @@ Its rule sets `ByHand` to 1.5, so the gather takes 3 seconds whatever is carried
 `Spares`, the tool kind that spares the gatherer.
 `World.Gather` takes the sting off a player who carries no shovel; the death that follows is an ordinary one.
 A worker always needs the sparing tool (`GatherRule.WorkerNeeds`) and takes it from a tool station like a needed one,
-and it makes their work no faster (`GatherRule.SpedUpBy`).
+and it makes their work no faster.
 Nothing the player reads says a shovel spares the sting; only a worker's status names the tool it waits for.
 
 Nettle rope's recipe has a `MaxTier` of 0, so only the wooden mallet makes it ([Tools](#tools)).
 `World.TooHardBlock` gives the recipe's `TooHard` words when every hammer a player has, slotted or carried, is too
-hard: `World.QueueBatch` and `World.LoadBatch` then refuse with them, and the recipe's tool line says them too.
+hard: `World.QueueBatch` and `World.LoadBatch` then refuse with them, and the recipe's card and tool line say them too.
+Putting nettles into the bench's slots by hand is not refused.
 A recipe marked `RecipeDef.Twists` is worked in rounds (`ActorAnimation.StationAction`): by the batch's `Thing.Progress`,
 `ActorAnimation.TwistRounds` rounds a batch, each a `TwistBlowShare` of mallet blows and then `ActorAction.TwistRope` with empty hands.
 
@@ -1005,8 +1006,8 @@ A worker with the job takes a bug net (`GatherRule.Needs`) and takes the firebug
 is taken (`GatherRule.TakenAtOnce`); no worker is on duty while firebugs are out.
 Held right mouse on a firebug catches nothing: `World.GatherBlock` asks for a swing.
 A nettle blocks building like a berry bush.
-A firebug takes no ground (`Thing.Roams`): buildings, gravel paths, holes and nettles go where one hovers, it stays, and
-the ground under it takes no contact shade.
+A firebug takes no ground (`Thing.Roams`): buildings, yards, gravel paths, holes and nettles go where one hovers, it
+stays, grass grows under it and the ground takes no contact shade.
 `World.QuietNights` keeps nettles and firebugs from coming by themselves; a check session sets it (`Game.StartGame`),
 since each thing takes its look from its id.
 

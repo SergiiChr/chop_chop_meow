@@ -9,6 +9,7 @@ public partial class Game {
     private async Task RunNettleUIChecks() {
         await TestClean(CheckItemTextShowsUnderItsNameInTheBackpackAndOnTheHotbar);
         await TestClean(CheckRecipeMapShowsItemTextAndTheMalletRopeNeeds);
+        await TestClean(CheckRopeCardSaysASteelHammerWillDamageTheFibers);
     }
 
     private async Task CheckItemTextShowsUnderItsNameInTheBackpackAndOnTheHotbar() {
@@ -35,6 +36,23 @@ public partial class Game {
         // Ten seconds, halved by the bench, at the mallet's speed of 1.
         Require(HasLabel(details, "wooden mallet · 5 s") && recipeMap.FindChild("detail_text", true, false) == null, "Nettle rope must name the wooden mallet it needs and show no text of its own.");
         await KeyStroke(Key.Escape);
+        await CloseWithEsc();
+    }
+
+    private async Task CheckRopeCardSaysASteelHammerWillDamageTheFibers() {
+        await CloseWithEsc();
+        var bench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1.5f, 0));
+        bench.Tools!.Add("steel_hammer", 1);
+        await Frames();
+        await KeyStroke(Key.E);
+        await Until(() => Named("craft_nettle_rope") != null, "the bench's page with the rope card", 2);
+        Label Lacks() => (Label)Named("craft_nettle_rope")!.FindChild("lacks", true, false);
+        await Until(() => Lacks().Visible && Lacks().Text == "Steel hammer will damage the fibers.", "the rope card saying a steel hammer will damage the fibers", 2);
+        bench.Tools.Clear();
+        await Until(() => Lacks().Visible && Lacks().Text == "No wooden mallet", "the rope card naming the mallet it lacks at a bench with no hammer", 2);
+        bench.Tools.Add("wood_hammer", 1);
+        await Until(() => !Lacks().Visible, "the rope card showing its inputs once a mallet is slotted", 2);
+        RemoveThings(Hosted, t => t == bench);
         await CloseWithEsc();
     }
 }

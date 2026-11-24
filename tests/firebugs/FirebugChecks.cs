@@ -148,12 +148,17 @@ public static class FirebugChecks {
 
     private static void CheckFirebugTakesNoGround(GameData data) {
         var (world, bug, _) = FirebugNight(data);
-        string? blocked = world.Construction.PlacementBlock(ThingKind.Hole, bug.Pos.Round());
-        Require(blocked == null, $"a firebug in the air should leave the ground under it free to dig: {blocked}");
+        var under = bug.Pos.Round();
+        // Within a builder's reach of the spot, and past the 4 m the firebug darts from.
+        world.Player = under + new Vector2(-4.5f, 0);
         Give(world, "wood", 8);
+        string? hole = world.Construction.PlacementBlock(ThingKind.Hole, under), yard = world.Construction.PlacementBlock(ThingKind.Pile, under);
+        Require(hole == null, $"a firebug in the air should leave the ground under it free to dig: {hole}");
+        Require(yard == null, $"a yard should go where a firebug hovers: {yard}");
         GravelPathSteps.LayPath(world, Terrain.TileAt(bug.Pos));
-        BuildAt(world, ThingKind.Chest, bug.Pos.Round() + new Vector2(2, 0));
-        Require(world.Find(bug.Id) != null, "a firebug should stay when a path is laid under it and a chest goes up beside it");
+        Give(world, "wood", 8);
+        BuildAt(world, ThingKind.Chest, under + new Vector2(.5f, 0));
+        Require(world.Find(bug.Id) != null, "a firebug should stay when a path is laid under it and a chest goes up half a metre from it");
     }
 
     /// <summary>Workers are off the map while firebugs are out, so the job is checked as far as being given and finding its tool.</summary>

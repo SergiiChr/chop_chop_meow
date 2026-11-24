@@ -955,6 +955,8 @@ public sealed partial class World {
     /// <summary>The recipes a station makes, or with none those made by hand.</summary>
     public IEnumerable<string> RecipesAt(Thing? station) => station == null ? HandRecipes : Data.Recipes.Where(p => p.Value.Station == station.Kind).Select(p => p.Key);
     /// <summary>The tool the acting player works a recipe with: the faster of the one slotted at a station and the best one carried; null when there is none or none is needed.</summary>
+    public string? ToolInUse(Thing? station, string tool, int tier) => tool == "" ? null : Faster(station == null ? null : BenchTool(station, tool, tier), BestTool(tool, null, tier));
+    /// <summary>The tool the acting player works a recipe with, as <see cref="ToolInUse(Thing?, string, int)"/> finds it among the tools the recipe can be made with.</summary>
     public string? ToolInUse(Thing? station, RecipeDef r) => r.Tool == "" ? null : Faster(station == null ? null : BenchTool(station, r), BestTool(r));
     /// <summary>
     /// Whether the acting player has the tool a recipe needs, slotted at the station or carried, or it needs none.
@@ -964,6 +966,8 @@ public sealed partial class World {
     /// Whether the acting player works a station's recipe with the tool slotted there rather than one they carry: one
     /// is slotted, and they carry none faster.
     /// </summary>
+    public bool WorksWithSlotted(Thing station, string tool) => BenchTool(station, tool) is string slotted && Faster(slotted, BestTool(tool, null, 0)) == slotted;
+    /// <summary>Whether the acting player works a station's recipe with the tool slotted there for it rather than one they carry.</summary>
     public bool WorksWithSlotted(Thing station, RecipeDef r) => BenchTool(station, r) is string slotted && Faster(slotted, BestTool(r)) == slotted;
     /// <summary>
     /// What a recipe says to a player whose every tool of its kind, slotted at the station or carried, is too hard for

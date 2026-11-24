@@ -824,14 +824,15 @@ public partial class WorldView : Node3D {
     private string? StationHammer(string? tool, Thing? station, PlayerState p) {
         if (tool != "hammer" || station?.Tools == null) return null;
         using var acting = World.ActAs(p);
-        return World.Data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "hammer" ? World.ToolInUse(station, r) : null;
+        // A recipe made with a hammer names the hammers that will do; any other work at the station is shown with whichever hammer is there.
+        return World.Data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "hammer" ? World.ToolInUse(station, r) : World.ToolInUse(station, "hammer", 0);
     }
 
     /// <summary>Whether a player swinging <paramref name="tool"/> at a station swings the hammer slotted there.</summary>
     private bool SwingsSlottedHammer(string? tool, Thing? station, PlayerState p) {
         if (tool != "hammer" || station?.Tools == null) return false;
         using var acting = World.ActAs(p);
-        return World.Data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "hammer" && World.WorksWithSlotted(station, r);
+        return World.Data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "hammer" ? World.WorksWithSlotted(station, r) : World.WorksWithSlotted(station, "hammer");
     }
 
     /// <summary>Whether the acting player has the tool a station's recipe needs: slotted, carried or none.</summary>

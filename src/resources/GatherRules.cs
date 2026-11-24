@@ -31,8 +31,6 @@ public readonly record struct GatherRule(string Item, string? Needs = null, stri
     public bool GoneWhenSpent => Shape is GatherShape.Loose or GatherShape.Plucked or GatherShape.Caught;
     /// <summary>Whether it moves about, so no player remembers where one is and a worker goes to any that is out.</summary>
     public bool Roams => Shape == GatherShape.Caught;
-    /// <summary>Whether a tool of a kind makes gathering it faster: the one it needs or the one that helps.</summary>
-    public bool SpedUpBy(string tool) => tool == (Needs ?? Helps);
 }
 
 /// <summary>Every gathering rule in one table, so a new resource is one line here.</summary>

@@ -123,7 +123,7 @@ public sealed class Construction(World world) {
             }
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in world.S.Things) {
-            if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind)) continue;
+            if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind) || t.Roams) continue;
             if (t.Kind == ThingKind.Tree && TrunkOverlaps(p - t.Pos, kind, TreePlanting.TrunkRadius(t.Id, t.TreeStage)))
                 return "Leave room around resources and buildings.";
             float margin = IsZone(t.Kind) ? World.Footprint(t.Kind) - .05f : t.IsResource ? YardResourceRoom : World.Footprint(t.Kind) + .2f;

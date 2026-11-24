@@ -102,9 +102,12 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             // Counts turn brick while the backpack is short.
             live.Watch(() => world.Carried(item) < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
-        var lacks = Style.Text(r.Tool == "" ? "" : $"No {world.Data.ToolName(r)}", 12, Style.Brick); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
+        string noTool = r.Tool == "" ? "" : $"No {world.Data.ToolName(r)}";
+        var lacks = Style.Text(noTool, 12, Style.Brick, wrap: true); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
         // One look for the tool a refresh: the card names a missing tool in place of its inputs, and its picture fades while the recipe cannot be made from the backpack now.
-        live.Watch(() => { bool missing = !world.HasToolFor(station, r); return (Missing: missing, Ready: !missing && (station != null ? world.CarriesBatch(r.Inputs) : world.CanCraft(id))); }, state => {
+        // With a tool there that is too hard for the recipe, the card says the recipe's own words for it.
+        live.Watch(() => { bool missing = !world.HasToolFor(station, r); return (Missing: missing, TooHard: missing && world.TooHardBlock(station, r) != null, Ready: !missing && (station != null ? world.CarriesBatch(r.Inputs) : world.CanCraft(id))); }, state => {
+            lacks.Text = state.TooHard ? r.TooHard : noTool;
             lacks.Visible = state.Missing; inputs.Visible = !state.Missing;
             product.Modulate = state.Ready ? Colors.White : Style.Faded;
         });
