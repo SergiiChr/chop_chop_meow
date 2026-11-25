@@ -780,7 +780,7 @@ public sealed partial class World {
         return n >= 0 && n < Numbers.Length ? Numbers[n] : n.ToString();
     }
     /// <summary>The kind of tool an item counts as in a worker's slot and on the tool rack.</summary>
-    public string ToolKind(string item) => Water.IsBottle(item) ? Water.BottleTool : Data.Items.GetValueOrDefault(item)?.Tool ?? "";
+    public string ToolKind(string item) => ContainerItem.IsBottle(item) ? Water.BottleTool : Data.Items.GetValueOrDefault(item)?.Tool ?? "";
 
     /// <summary>The fastest carried tool of a kind at or above <paramref name="tier"/>, or null when none is carried.</summary>
     public string? BestTool(string tool, Inventory? from = null, int tier = 0) => BestTool(tool, from ?? S.Backpack, tier, requireFree: false);
@@ -1915,7 +1915,7 @@ public sealed partial class World {
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
     private enum HoldRefusal { None, NotUsed, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly, TreeWaterOnly, TreeNoWater, AcornsOnly }
-    /// <summary>A station holds by hand only what its recipe uses or makes, a tool station tools and water vessels, a pile one resource, compost what rots and a campfire wood.</summary>
+    /// <summary>A station holds by hand only what its recipe uses or makes, a tool station tools, buckets and bottles, a pile one resource, compost what rots and a campfire wood.</summary>
     private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
         ThingKind.Tree => TreePlanting.NeedsWater(t)
             ? (Barrels.CanPourWater(Data, item) ? HoldRefusal.None : HoldRefusal.TreeWaterOnly) : HoldRefusal.TreeNoWater,

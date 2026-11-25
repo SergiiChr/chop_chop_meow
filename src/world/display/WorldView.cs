@@ -770,9 +770,10 @@ public partial class WorldView : Node3D {
             bool sameAction = state.Action == work;
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
-            string? vessel = BarrelHaul.Vessel(worker.Tool) ? worker.Tool : null;
+            bool waterTool = BarrelHaul.Vessel(worker.Tool);
+            string? vessel = waterTool || BerryJam.InBottle(worker.Tool) ? worker.Tool : null;
             var waterTarget = worker.WaterAction is WorkerWaterAction.None or WorkerWaterAction.WalkFarm ? null : World.Find(worker.WaterTarget);
-            if (waterTarget != null && vessel != null) {
+            if (waterTarget != null && vessel != null && waterTool) {
                 var point = waterTarget.Kind switch {
                     ThingKind.Barrel when worker.WaterAction == WorkerWaterAction.Fill => To3(waterTarget.Pos) + VesselShape.BarrelSpout.Rotated(Vector3.Up, -waterTarget.Rotation),
                     ThingKind.Barrel => To3(waterTarget.Pos) + VesselShape.BarrelFillOpening.Rotated(Vector3.Up, -waterTarget.Rotation),
@@ -791,6 +792,7 @@ public partial class WorldView : Node3D {
             } else {
                 // A worker works a station with the hammer slotted there, never one of their own, so that is the one they swing.
                 string? slotted = ActorAnimation.Tool(work) == "hammer" && assignment?.Tools != null ? World.BenchTool(assignment, "hammer") : null;
+                if (work == ActorAction.Carry && worker.Bag.First() is string load && ContainerItem.IsBottle(load)) vessel = load;
                 Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), slotted ?? worker.Tool, assignment?.Tools),
                     barrel: work == ActorAction.Carry && Barrel.In(worker.Bag) != null,
                     vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null);
@@ -965,7 +967,10 @@ public partial class WorldView : Node3D {
         float downed, string? tool, bool torch, DoorShown? door, float dt) {
         var pose = tugs.PulledArms(downed > 0 ? state.Pose : StandingPose(rig, state), who, ref pull, dt);
         if (downed > 0) FallBackView.FallBack(rig, state, pose, downed, torch, who.RespawnIn > 0 ? null : HoldingOff(who.Id));
-        else ShowStanding(rig, state, pose, tool, torch, door, dt, HugsBarrel(state.Action, who.Backpack), null);
+        else {
+            string? vessel = Carries(state) && ContainerItem.IsBottle(who.Selected) && who.Backpack[who.Selected] > 0 ? who.Selected : null;
+            ShowStanding(rig, state, pose, tool, torch, door, dt, HugsBarrel(state.Action, who.Backpack), vessel);
+        }
     }
 
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null,
@@ -994,7 +999,7 @@ public partial class WorldView : Node3D {
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
         if (barrel) rig.HugBarrel(pose, torch);
-        else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel);
+        else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel, torch);
         else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
         if (state.From == ActorAction.PumpWater && state.Action == ActorAction.Idle && state.Blend < 1 && !barrel && vessel == null)
             rig.ReleasePumpHandle(pose, 1 - Ease(state.Blend));
@@ -1509,10 +1514,9 @@ public partial class WorldView : Node3D {
                     string kind = World.ToolKind(held);
                     foreach (var (tool, hook) in rack.Pegs[slot]) hook.Visible = tool == kind;
                     if (kind == Water.BottleTool) {
-                        int liters = Water.BottleLiters(held);
-                        if (liters == rack.BottleLiters[slot]) continue;
-                        BottleShape.SetGauge(rack.Pegs[slot][kind].GetChild<Node3D>(0), liters);
-                        rack.BottleLiters[slot] = liters;
+                        if (held == rack.BottleItems[slot]) continue;
+                        BottleShape.SetGauge(rack.Pegs[slot][kind].GetChild<Node3D>(0), held);
+                        rack.BottleItems[slot] = held;
                     }
                 }
                 break;

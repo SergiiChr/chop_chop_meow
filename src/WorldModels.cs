@@ -191,7 +191,7 @@ public sealed class PackerProp : Prop {
 public sealed class RackProp : Prop {
     /// <summary>One peg per tool slot, each with a hanging tool of every kind it can show; the view shows the one its slot holds.</summary>
     public readonly Dictionary<string, Node3D>[] Pegs = new Dictionary<string, Node3D>[World.ToolSlots];
-    public readonly int[] BottleLiters = new int[World.ToolSlots];
+    public readonly string?[] BottleItems = new string?[World.ToolSlots];
 }
 
 public sealed class SignpostProp : Prop {
@@ -405,7 +405,7 @@ public static class WorldModels {
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
             case Barrel.Item: return Build(new Thing { Kind = ThingKind.Barrel }).Root;
             case Bucket.Item: { var root = new Node3D(); VesselShape.AddBucket(root, Vector3.Zero); return root; }
-            case var bottle when Water.IsBottle(bottle): return BottleShape.Create(Water.BottleLiters(bottle));
+            case var bottle when ContainerItem.IsBottle(bottle): return BottleShape.Create(bottle);
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
             case "leaves": return Build(new Thing { Kind = ThingKind.LeafSpot }).Root;

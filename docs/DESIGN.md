@@ -1454,7 +1454,7 @@ If confirmed, it ends the run in a black hole with a reload or main-menu choice.
 
 #### Tool station
 
-A tool station (`toolstation`) holds tools, buckets and bottles in `World.ToolSlots` (4) slots.
+A tool station (`toolstation`) holds tools, buckets and bottles in `World.ToolSlots` (4) slots. A jam bottle hangs on the same peg but is not offered for water jobs.
 Its rack hangs whatever each slot holds.
 
 ### Workers

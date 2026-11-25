@@ -25,7 +25,7 @@ internal partial class PipeLayerView : Node3D {
     private static readonly Material Blocked = ModelKit.PlacementTint(new Color("ff7467"));
     private static readonly Material RemovalTint = ModelKit.Flat(new Color("f25043"));
     private static readonly Material WetSteel = ModelKit.Vertex(Surface.Metal, .52f, .47f, "356fc6");
-    private static readonly Material JamSteel = ModelKit.Vertex(Surface.Metal, .52f, .47f, "b84663");
+    private static readonly Material JamSteel = ModelKit.Vertex(Surface.Metal, .52f, .47f, BerryJam.Color);
     private static readonly Material RiserSteel = ModelKit.Metal("93a6af", .55f, .38f);
     private int revision = -1, explored = -1, waterRevision = -1;
     private int? marked;

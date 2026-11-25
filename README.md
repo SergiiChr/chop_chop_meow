@@ -444,7 +444,7 @@ Taking down a cabin returns its barrel with its water.
 Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one liter, taking the same gathering time.
 Filling a bottle takes the same time as one gather action.
 Empty or filled replacements can be bought individually.
-Craft an empty bottle at a bench from one tin sheet and one wood part, with the same steel hammer used for tin cans.
+Craft an empty bottle at a bench from one steel sheet and one wood part with a steel hammer.
 A recipe that uses water, such as meat stew or dough, takes liters of it poured out.
 Drag a bottle to the station's water input or Shift-click or Ctrl-click it to pour while the bottle stays in your backpack.
 Ctrl-click also pours from vessels bound to the hotbar.
@@ -663,7 +663,7 @@ Some recipes need a better tool:
 - Tin cans (1 tin sheet → 2) need a steel hammer.
 - Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
-- A tin water bottle (1 tin sheet + 1 wood part) needs a steel hammer.
+- A steel water bottle (1 steel sheet + 1 wood part) needs a steel hammer.
 
 Nettle rope (1 nettle → 1 rope) is the one recipe a better tool spoils: it is made only at the bench and only with a wooden mallet.
 The mallet may be the one in the bench's hammer slot or one in your backpack, whichever hammer the other is.
@@ -729,7 +729,7 @@ Its other recipes cook on their own:
 - 2 servings of crushed berries → 1 L of berry jam, over one wood, coal or charcoal
 - 1 raw meat + 1 liter of water → meat stew, over one wood, coal or charcoal
 
-Pour jam into a bottle, steel bucket or barrel. Each can of jam takes 1 L and 1 tin can.
+Pour jam into a bottle, steel bucket or barrel. The same bottle shows pink gauge bars for jam and blue bars for water. Each can of jam takes 1 L and 1 tin can.
 The canning station (2 steel bars, 8 planks) seals jam or meat stew over one wood, coal or charcoal.
 The village buys canned jam at a base price of 80 coins per can, but does not buy loose or bottled jam.
 Raw meat sells as it is, in crates.
@@ -885,7 +885,7 @@ In a haul group, every carry for a chest or crate ranks with an input short of a
 
 ### Tool station
 
-The tool station (8 planks, 4 stone) is a rack with four slots for tools, buckets or bottles.
+The tool station (8 planks, 4 stone) is a rack with four slots for tools, buckets or bottles, including bottles holding jam. Workers use only water vessels for water jobs.
 Its page lists which worker has which tool out and who waits for one.
 Workers need tools for some jobs:
 

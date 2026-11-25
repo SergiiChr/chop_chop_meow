@@ -48,9 +48,8 @@ internal static class ItemShape {
             Piece: f => Copy(f, SteelPipeShape.Heap, Transform3D.Identity, Colors.White)),
         // Cans heap as six-packs of plain cans.
         ["tin_can"] = new(f => OpenCan(f, true), Tin, .42f, Piece: f => SixPack(f, one => OpenCan(one, false))),
-        ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "b83a5c", null, false))),
+        ["canned_jam"] = new(f => Can(f, BerryJam.Color, "8f2436"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, BerryJam.Color, null, false))),
         ["canned_meat_stew"] = new(f => Can(f, "c07a48", "7a4a26"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "c07a48", null, false))),
-        [BerryJam.Bottle] = new(f => Jar(f, true), Glossy, .2f, Piece: f => Jar(f, false)),
         [GlassBlowing.Item] = new(null, GlassJarShape.Finish),
         ["grass"] = new(f => Sheaf(f, 20, .5f, .24f, false, "8fae55", "7c9c46", "a3bf63"), Plain, .32f, Rise: .7f),
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
@@ -103,6 +102,9 @@ internal static class ItemShape {
         [Water.TwoLiters] = Bottle(Water.TwoLiters),
         [Water.OneLiter] = Bottle(Water.OneLiter),
         [Water.Empty] = Bottle(Water.Empty),
+        [BerryJam.Bottles[1]] = Bottle(BerryJam.Bottles[1]),
+        [BerryJam.Bottles[2]] = Bottle(BerryJam.Bottles[2]),
+        [BerryJam.Bottle] = Bottle(BerryJam.Bottle),
         // Berries heap one by one.
         ["berries"] = new(Berry, Glossy, .16f, Lay.Loose, .7f),
         // Leaves, sand, gravel and compost are each one mound, which swells with what is in it.
@@ -117,7 +119,7 @@ internal static class ItemShape {
         new(f => Lighter(f, ActorRig.Tool(tool), pose ?? new Basis(Vector3.Back, MathF.PI / 2)), Plain, Lay: Lay.Rows);
     /// <summary>A bottle lying on its back, its gauge up.</summary>
     private static Look Bottle(string item) =>
-        new(f => Lighter(f, BottleShape.Create(Water.BottleLiters(item)), new Basis(Vector3.Right, -MathF.PI / 2)), Plain, .45f, Lay.Rows, .85f);
+        new(f => Lighter(f, BottleShape.Create(item), new Basis(Vector3.Right, -MathF.PI / 2)), Plain, .45f, Lay.Rows, .85f);
     /// <summary>One loose lump of ore or coal, the first of those the world scatters, in the given colour.</summary>
     private static Look Nugget(string kind, string colour) =>
         new(f => First(f, NatureShape.Loose(kind, new Color(colour), new Color(colour), 0), 20), NatureShape.Rock, .24f, Lay.Loose, .7f);
@@ -473,24 +475,6 @@ internal static class ItemShape {
                 if (ends) Tri(faces, knot, end - along * side * .011f, end + along * side * .011f, facing, tint.Darkened(.15f));
             }
         }
-    }
-
-    /// <summary>
-    /// A glass jar of berry jam under a cloth cover tied round the neck with a ribbon, its bow toward the game
-    /// camera.
-    /// A plain jar, for jars standing three to a pile slot, has the cover alone.
-    /// </summary>
-    private static void Jar(List<Face> faces, bool detail) {
-        const string jam = "b3263c", cloth = "e9dcc0";
-        if (!detail) {
-            Lathe(faces, Transform3D.Identity, new Ring[] { (.055f, 0, jam), (.055f, .096f, jam), (.046f, .132f, cloth), (0, .138f, "f6eeda") }, 8);
-            return;
-        }
-        // Below the ribbon the cover flares into a frill, and above it the cover swells over the lid.
-        Lathe(faces, Transform3D.Identity, new Ring[] {
-            (.055f, 0, jam), (.055f, .09f, jam), (.07f, .084f, "c9bb9c"), (.055f, .099f, cloth), (.055f, .109f, Ribbon), (.06f, .116f, cloth), (.048f, .138f, cloth),
-            (0, .144f, "f6eeda") }, 8);
-        Bow(faces, Front * .058f + Vector3.Up * .104f, Front);
     }
 
     /// <summary>

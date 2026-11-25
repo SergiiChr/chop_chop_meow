@@ -237,7 +237,7 @@ public sealed partial class GameData {
         for (int liters = 1; liters <= Bucket.Capacity; liters++)
             data.Items.Add(Bucket.AtFill(liters), new() { Name = $"Steel bucket ({liters} L)", Color = data.Items[Bucket.Item].Color, Tool = Bucket.Item });
         for (int liters = 1; liters < BerryJam.Bottles.Length; liters++)
-            data.Items.Add(BerryJam.Bottles[liters], new() { Name = $"Berry jam bottle ({liters} L)", Color = "b3263c", Food = true, Hunger = BerryJam.HungerPerLiter });
+            data.Items.Add(BerryJam.Bottles[liters], new() { Name = $"Berry jam bottle ({liters} L)", Color = BerryJam.Color, Food = true, Hunger = BerryJam.HungerPerLiter });
         for (int liters = 1; liters <= Bucket.Capacity; liters++)
             data.Items.Add(BerryJam.Buckets[liters], new() { Name = $"Steel bucket ({liters} L berry jam)", Color = data.Items[Bucket.Item].Color });
         for (int liters = 1; liters <= Barrel.Capacity; liters++)

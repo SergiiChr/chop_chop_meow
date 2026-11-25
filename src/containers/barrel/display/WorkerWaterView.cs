@@ -24,8 +24,8 @@ internal static class WorkerWaterView {
         WorkAtOpening(rig, vessel, opening, progress, action == WorkerWaterAction.Fill, roof: false, ground);
     }
 
-    public static void Carry(ActorRig rig, Pose pose, string vessel) =>
-        rig.HoldWater(pose, vessel, VesselAtGrip(vessel, TravelGrip), TravelGrip);
+    public static void Carry(ActorRig rig, Pose pose, string vessel, bool lit = false) =>
+        rig.HoldWater(pose, vessel, VesselAtGrip(vessel, TravelGrip), TravelGrip, lit: lit);
 
     private static void ShowOnCabin(ActorRig rig, WorkerWaterAction action, float progress, string vessel) {
         if (action == WorkerWaterAction.Pour) {
