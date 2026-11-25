@@ -12,6 +12,7 @@ internal static class SteelPipeShape {
     internal const float CenterHeight = .065f, OuterRadius = .047f;
     private const float InnerRadius = .033f;
     private const float LooseEnd = .45f, JoinedEnd = .5f;
+    internal const float LooseLength = LooseEnd * 2;
     private const int Sides = 8;
     private static readonly Color Steel = new("8e9fa8"), Inside = new("566872");
     private static readonly Vector3 Center = Vector3.Up * CenterHeight;

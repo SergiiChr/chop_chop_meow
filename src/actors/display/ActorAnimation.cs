@@ -44,7 +44,8 @@ public enum ActorAction {
     PourWater,
     FillVessel,
     PumpWater,
-    Rake
+    Rake,
+    Glassblow
 }
 
 /// <summary>
@@ -138,6 +139,7 @@ public static class ActorAnimation {
         ActorAction.Grind => 1.8f,
         ActorAction.Dig => 1.1f,
         ActorAction.Rake => RakeStroke.Seconds,
+        ActorAction.Glassblow => 1.45f,
         _ => 1
     };
 
@@ -262,6 +264,15 @@ public static class ActorAnimation {
     private static readonly Pose PumpLever = Stance with { Lean = 16, RaiseL = 78, OutL = -12, ElbowL = 42, RaiseR = 78, OutR = -12, ElbowR = 42 };
     private static readonly Pose PumpPressed = PumpLever with { Lean = 32, RaiseL = 44, ElbowL = 6, RaiseR = 44, ElbowR = 6, Hips = .787f };
     private static readonly (float At, Pose Pose)[] PumpKeys = { (0, PumpLever), (.35f, PumpPressed), (.5f, PumpPressed with { Lean = 30, Hips = .792f }) };
+    /// <summary>The glass bellows operator shifts weight over planted feet to keep the raised handle within reach.</summary>
+    internal static Pose GlassBellows(Pose pose, float pressed, float weight) =>
+        Pose.Lerp(pose, OnFeet(pose with {
+            Lean = Mathf.Lerp(31, 23, pressed),
+            Hips = Mathf.Lerp(.805f, .755f, pressed),
+            HipShift = Mathf.Lerp(.065f, .035f, pressed),
+            Head = Mathf.Lerp(10, 18, pressed)
+        }, StanceFeet), weight);
+
     // The operator braces before the lever moves, drives it down with their weight, then straightens as it comes back.
     internal const float WaterPumpBottom = .38f;
     internal static float WaterPumpPress(float time) {
@@ -504,6 +515,9 @@ public static class ActorAnimation {
         if (BlowOf(action)?.Swung is ToolSwing swung)
             return Keys(p, swung.Keys, swung.StrikeKey, aim?.Mark is Vector3 at ? aim.Offset(action, swung, at) : default);
         switch (action) {
+            case ActorAction.Glassblow:
+                // Each breath brings the mouth forward, then the shoulders settle back above the planted boots.
+                return Stance with { Lean = 3 + 1.8f * wave, Head = 1.5f + .9f * MathF.Cos(p * Mathf.Tau) };
             case ActorAction.Walk:
                 return Walk(p);
             case ActorAction.Jog:
@@ -735,7 +749,8 @@ public static class ActorAnimation {
     private static Footing? FeetOf(ActorAction action) => action switch {
         ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep
             or ActorAction.Mine or ActorAction.SteelMine or ActorAction.Pump or ActorAction.PumpWater or ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind
-            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock or ActorAction.Rake => StanceFeet,
+            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock or ActorAction.Rake
+            or ActorAction.Glassblow => StanceFeet,
         ActorAction.Gather => SquatFeet,
         ActorAction.Craft => CraftFeet,
         ActorAction.Perch => PerchFeet,

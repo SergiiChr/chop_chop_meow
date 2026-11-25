@@ -5,6 +5,8 @@ namespace ChopChopMeow;
 
 /// <summary>Shared continuous tank shell, recessed refractory chamber and fitted bellows boards.</summary>
 internal static class ForgeShape {
+    internal static readonly Vector3 BellowsHandle = new(1, .75f, 0);
+    internal const float BellowsGrip = .115f;
     private static ArrayMesh? shell, fire, board;
     public static Mesh Shell => shell ??= BuildShell();
     public static Mesh Fire => fire ??= BuildFire();

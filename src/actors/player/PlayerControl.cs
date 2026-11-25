@@ -315,6 +315,7 @@ public sealed class PlayerControl {
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
         if (station?.Kind == ThingKind.Pump && world.AtStation(station)) UseWaterPump(station);
+        else if (GlassBlowing.PumpAtPlayer(world) is Thing glass) world.Pump(glass);
         else if (station?.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station);
         else {
             var aim = view.FirstPerson ? view.FirstPersonForward : HeldDirection();

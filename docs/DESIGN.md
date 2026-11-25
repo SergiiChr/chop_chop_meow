@@ -16,6 +16,7 @@ These came from the user; change them only after asking.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
+- **Glass jars:** need 5 sand, coal fuel, one steel pipe fitted to the reinforced furnace, and two operators. Keep the furnace at 1,300–1,600 °C for 10 seconds. Cold pauses the batch. More than half a second continuously above range melts the batch off the pipe.
 - **Plumbing:** Pumps draw from the freshwater shallows. Each connected pipe holds one liter, including standing water
   after the pressure falls. Buildings with ten steel pipes in their Plumbing slot share water according to demand.
 - **Building orientation:** Plans turn in quarter turns during placement. A mine faces the cliff it fits.
@@ -1081,7 +1082,7 @@ It hammers a steel bar into a steel part or two steel sheets, and a tin bar into
 The containers are made of sheets.
 A smith stays with a running batch and fetches the next load once it is done.
 
-#### Furnaces and steel
+#### Furnaces, steel and glass
 
 The stone furnace smelts ore over coal or charcoal, and cooks and makes charcoal over wood, coal or charcoal.
 The reinforced furnace (`reinforced`) burns coal only.
@@ -1090,6 +1091,13 @@ Steel recipes consume iron bars and coal.
 Steel only progresses while the heat is at or above the clear bar (`World.SteelHeat`, shown as 1450 °C through `World.Celsius`).
 A batch below it pauses, keeps burning one coal from its fuel slot per batch length while cold, and resumes when reheated, with no failure.
 Once an active crew has the forge hot, it never falls below the bar while they are on duty.
+A manual bellows stroke adds 145 °C for either recipe.
+
+`GlassBlowing` runs a glass batch in the same station slots. The Glass blower slot accepts exactly one steel pipe, which stays stackable outside the slot.
+One player or worker works from each end of the furnace. The front operator faces the furnace and works the pipe. At the rear a player pumps manually or a worker keeps the heat near 1,450 °C.
+No progress is made with either operator missing or outside the working range. A cooldown below 1,300 °C does not spend another coal.
+After more than half a second above 1,600 °C, a batch loses the sand and coal it already spent, keeps the pipe and retries with fresh materials when the furnace is ready.
+The server sends the blower's id, overheat time and batch result to each view. The view uses those values to pose the hands and mouth, set the jar on success or drop the molten glass on failure.
 
 ### Taking buildings down
 
@@ -1397,7 +1405,7 @@ With none known they say so once, carry off what they hold and go on to their ot
 A worker with no duties sits at the nearest campfire, or with none waits at the nearest trading post.
 
 Only one worker ever pumps a reinforced furnace: the bellows job has nothing to do while another worker has it in hand (`World.Pump`).
-It also has nothing to do while the furnace neither smelts nor holds a batch to smelt, so a worker with both jobs hauls then.
+It also has nothing to do while the furnace neither works nor holds a batch to make, so a worker with both jobs hauls then. A worker on Blow glass goes to the front only for the glass recipe, and leaves the pipe to a player standing there.
 
 #### Worker tools
 

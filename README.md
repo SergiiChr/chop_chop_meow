@@ -357,14 +357,14 @@ Taking the hard hat off, and putting it on the recipe the station is on, always 
 A hard hat moved to another recipe drops the batches that still waited.
 
 So a station with a hard hat is always on the hard-hat recipe: once the batches you queued are done, workers go on making it.
-Only a worker works a hard-hat batch: you work only the batches you queued.
+Only a worker works a hard-hat batch at the bench, anvil or cooking table: you work only the batches you queued there.
 Click the hard hat off for a station to stop after your batches.
 It starts no batch while its slots hold something another recipe left there, such as a hauler's late delivery: haulers carry that to storage, or you take it out.
 A station page opens with the group of the recipe the station is on open.
 A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
 A bench, anvil or cooking table with a batch you queued is worked by a player standing still within 1 m of its edge, or by a worker; a packing station by either, whatever it packs.
-Pumping the reinforced furnace's bellows needs the same 1 m.
+Pumping the reinforced furnace's bellows for steel needs the same 1 m. For glass, stand behind the furnace at the bellows.
 
 Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
 The output slot takes back what the recipe makes from your backpack, up to a stack.
@@ -386,7 +386,7 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 | --- | --- |
 | Crafting bench, anvil, cooking table, packing station | Craft, Haul |
 | Stone furnace, canning station | Haul |
-| Reinforced furnace | Bellows, Haul |
+| Reinforced furnace | Bellows, Blow glass, Haul |
 | Water pump | Pump |
 | Mine | Build, Haul, Mine |
 | Farm plot | Farm, Haul |
@@ -409,7 +409,7 @@ With no job that can be done, a worker sits at the nearest campfire they can rea
 A worker who could not reach a fire's seats tries again once a building goes up or comes down.
 With no campfire they wait at the nearest trading post, or in the clearing without one.
 Their status says what their first job lacks.
-A worker on Bellows pumps only while the furnace smelts or holds a batch to smelt, and only one worker pumps at a time, also one holding a load nothing takes.
+A worker on Bellows pumps while the furnace works or holds a batch to make. Only one worker pumps at a time. For glass, a worker on Blow glass can work the pipe at the front.
 
 The crew button opens an overview with each worker's daily pay and the total above.
 
@@ -653,11 +653,19 @@ The steel hammer's speed multiplies the anvil's rate, as a tool's does at the be
 Making a steel hammer takes steel parts, so the first one is bought at a trading post.
 A small steel tool such as a hammer takes 1 steel part and a big one such as an axe, pickaxe or shovel 2, plus 1 wood part for the handle.
 
-## Furnaces and steel
+## Furnaces, steel and glass
 
 - The stone furnace smelts 2 iron ore into an iron bar and 2 tin ore into a tin bar over coal or charcoal.
 - It also burns 2 wood into 1 charcoal, sears meat and bakes bread (see Cooking) over wood, coal or charcoal.
 - The reinforced furnace smelts 2 iron bars and 2 coal into 2 steel bars, burns only coal from its fuel slot, and needs heat from manual or worker-operated bellows. Steel forms from 1450 °C; below that it keeps burning coal without making steel.
+
+### Glass jars
+
+Choose Glass jar at the reinforced furnace and fit one Steel pipe in the Glass blower slot. The pipe stays in the slot at the end of the batch. Each attempt uses 5 Sand and 1 coal from the fuel slot.
+
+Work in pairs. The blower stands in front and faces the furnace. The other person stands behind it and presses Space or clicks Pump to work the bellows. Either job can be done by a player or a hired worker. A manual stroke adds 145 °C for either furnace recipe.
+
+A jar takes 10 seconds between 1,300 and 1,600 °C. If the furnace cools, progress waits. Stop pumping above 1,600 °C. If it stays that hot for more than half a second, the glass melts off the pipe and falls to the ground. That attempt's sand and fuel are lost, and the furnace starts a fresh batch once it is in range again and supplied.
 
 ## Cooking and canning
 
@@ -1315,7 +1323,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, raking leaves, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), knocking on a cabin door, being tugged back out of one and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, raking leaves, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, glassblowing, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), knocking on a cabin door, being tugged back out of one and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 A tree is felled with strokes from the side into its trunk, while an axe swung in the air comes down from overhead.
 
@@ -1326,7 +1334,8 @@ The world reacts too:
 - deposits shrink and throw chips, and crumble into chips and dust when their last piece is mined;
 - a fire that runs out of work or fuel dies down over half a second;
 - the bellows board travels with each press, and the heat gauge tracks the forge;
-- a bar under the reinforced furnace and its panel dial mark the heat steel needs;
+- a bar under the reinforced furnace and its panel dial mark the heat needed for the selected recipe;
+- glass swells on the pipe and comes off as a clear jar when it succeeds, or sags, drops and splashes on the ground when it overheats;
 - furnaces smoke (the reinforced furnace darker and thicker), and anvils spark;
 - storage lids open on transfers, and the cabin door opens for someone stepping in or out and shuts behind them, or as far as a wolf forcing it has pushed it;
 - the market mailbox flag rises while a cart is out;

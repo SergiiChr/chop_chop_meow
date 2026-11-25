@@ -152,6 +152,7 @@ public sealed class StoveProp : HearthProp {
 public sealed class ForgeProp : HearthProp {
     public MeshInstance3D Glow = null!;
     public Node3D Needle = null!, Lever = null!;
+    internal GlassBlowingView Blowing = null!;
     /// <summary>The forge's heat as its glow and gauge show it; a pump of the bellows jumps it at once.</summary>
     public readonly LocalClock Heat = new(5);
     /// <summary>How far the bellows board was last pressed down, from 0 to 1, and seconds since it was let go.</summary>
@@ -215,6 +216,7 @@ public static class WorldModels {
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
+                if (prop is ForgeProp forge) forge.Blowing.Warm();
                 if (prop is FarmProp farm) {
                     farm.Crops[0].Visible = id != 0;
                     farm.Soil.Show(5, farm.Crops[0].Visible);
@@ -569,6 +571,7 @@ public static class WorldModels {
     /// <summary>A propane-tank forge on an angle-iron stand, fed by a hinged leather bellows with a heat gauge on top.</summary>
     private static ForgeProp DrumForge() {
         var prop = new ForgeProp();
+        prop.Blowing = new GlassBlowingView(prop.Root);
         var body = prop.Body;
         var steel = Metal("3b3f42", .5f, .7f);
         foreach (var (x, z) in new[] { (-.35f, -.3f), (.35f, -.3f), (-.35f, .3f), (.35f, .3f) }) Box(body, new Vector3(.05f, .5f, .05f), new Vector3(x, .25f, z), steel);
@@ -607,7 +610,7 @@ public static class WorldModels {
         var lever = Pivot(rig, hinge);
         Add(lever, ForgeShape.Board, wood, new Vector3(0, .13f, 0));
         Box(lever, new Vector3(.06f, .62f, .06f), new Vector3(1f, .44f, 0), Wood("8a5a32"));
-        Cylinder(lever, .03f, .03f, .34f, new Vector3(1f, .75f, 0), Mat("222222"), new Vector3(90, 0, 0), 8);
+        Cylinder(lever, .03f, .03f, .34f, ForgeShape.BellowsHandle, Mat("222222"), new Vector3(90, 0, 0), 8);
         prop.Lever = lever;
         // Each pleat hangs from the hinge and follows a share of the lid's swing, so the leather folds as it closes.
         prop.Pleats = new Node3D[3];

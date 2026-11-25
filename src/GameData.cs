@@ -249,11 +249,14 @@ public sealed partial class GameData {
             var slots = building.Value.ToolSlots;
             var needs = Recipes.Values.Where(r => r.Station == building.Key && r.Tool != "").ToList();
             if (slots.DistinctBy(s => s.Tool).Count() != slots.Length || needs.Any(r => !slots.Any(s => s.Tool == r.Tool))
-                || slots.Any(s => !needs.Any(r => r.Tool == s.Tool) || needs.Where(r => r.Tool == s.Tool).Min(r => r.Tier) != s.Tier))
+                || slots.Any(s => !needs.Any(r => r.Tool == s.Tool) || needs.Where(r => r.Tool == s.Tool).Min(r => r.Tier) != s.Tier
+                    || s.Item is string item && (!Items.ContainsKey(item) || s.Tier != 0)))
                 throw new InvalidOperationException($"Invalid tool slots for {building.Key}: one a tool its recipes need, at the lowest tier they ask for.");
         }
         foreach (var recipe in Recipes) {
-            bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool && i.Tier >= recipe.Value.Tier);
+            var r = recipe.Value;
+            bool tool = r.Tool == "" || Items.Values.Any(i => i.Tool == r.Tool && i.Tier >= r.Tier)
+                || !r.Hand && r.Station is ThingKind fitted && FixedTool(fitted, r.Tool) != null;
             if (!(recipe.Value.Station is ThingKind station ? Buildings.ContainsKey(station) : recipe.Value.Hand) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
             foreach (var input in recipe.Value.Inputs)
@@ -314,6 +317,7 @@ public sealed partial class GameData {
     public IEnumerable<string> UsedFor(string item) {
         var uses = ProductsOf(item);
         if (Items[item].Tool is { Length: > 0 } kind) uses = uses.Concat(Recipes.Values.Where(r => r.Tool == kind && r.Tier <= Items[item].Tier).Select(r => r.Output));
+        uses = uses.Concat(Recipes.Values.Where(r => r.Station is ThingKind station && FixedTool(station, r.Tool) == item).Select(r => r.Output));
         return uses.Distinct();
     }
     /// <summary>The products that take an item as an input or come out of it.</summary>
@@ -392,7 +396,15 @@ public sealed partial class GameData {
     public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
-    public string PlainestTool(string kind, int tier = 0) => Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
+    public string PlainestTool(string kind, int tier = 0, ThingKind? station = null) =>
+        (station is ThingKind at ? FixedTool(at, kind) : null) ?? Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
+
+    /// <summary>The exact item fitted to a tool slot that takes a part instead of a hand tool.</summary>
+    internal string? FixedTool(ThingKind station, string tool) {
+        if (!Buildings.TryGetValue(station, out var building)) return null;
+        foreach (var slot in building.ToolSlots) if (slot.Tool == tool) return slot.Item;
+        return null;
+    }
 
     /// <summary>The plainest tool of a kind that meets a tier, for naming what a recipe needs.</summary>
     public string ToolName(string tool, int tier) {
