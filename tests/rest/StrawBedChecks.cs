@@ -76,7 +76,10 @@ public static class StrawBedChecks {
         world.Player = Terrain.Spawn;
         var bed = StrawBedSteps.Build(world);
         var wolf = PlaceWolf(world, new Wolf {
-            Pos = bed.Pos + Vector2.Right * 1.1f, Heading = Mathf.Pi, Howl = 5, HowlLength = 5
+            Pos = bed.Pos + Vector2.Right * 1.1f,
+            Heading = Mathf.Pi,
+            Howl = 5,
+            HowlLength = 5
         });
         world.Attack(Vector2.Right);
         world.Sleep.Start(bed);
