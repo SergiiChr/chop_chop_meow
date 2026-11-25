@@ -5,9 +5,10 @@ namespace ChopChopMeow;
 
 public enum GlassResult { None, Success, Melted }
 
-/// <summary>A blowpipe at the front of the reinforced furnace, worked with someone tending heat at the rear.</summary>
+/// <summary>Glass batches at a reinforced furnace with a glass blower at the front and a bellows operator behind.</summary>
 internal sealed class GlassBlowing(World world) {
-    internal const string Item = "glass_jar", Tool = "glass blower";
+    internal const string Item = "glass_jar", Tool = "glass blowing pipe";
+    private const string NeedPipe = "Needs a steel pipe in the Glass blowing pipe slot";
     internal const float Seconds = 10, ResultSeconds = 1, OverheatSeconds = .5f;
     private const float Reach = .45f;
     internal static readonly float MinHeat = World.FurnaceHeat(1300), MaxHeat = World.FurnaceHeat(1600);
@@ -102,14 +103,15 @@ internal sealed class GlassBlowing(World world) {
 
     internal bool Blow(Worker w, Thing forge, float dt) {
         if (forge.GlassResult != GlassResult.None) {
-            if (forge.GlassBlower != -w.Id) return false;
+            if (forge.GlassBlower != -w.Id) { w.Status = "Waiting for the current glass batch to finish"; return false; }
             w.WorkState = WorkerWorkState.Blowing;
             w.Status = forge.GlassResult == GlassResult.Success ? "Glass jar finished" : "Glass melted";
             return true;
         }
-        if (!IsRecipe(forge) || !ReadyToWork(forge)) return false;
+        if (!IsRecipe(forge)) { w.Status = "Furnace is not making glass jars"; return false; }
+        if (WorkBlock(forge) is string reason) { w.Status = reason; return false; }
         int other = Blower(forge);
-        if (other != 0 && other != -w.Id) { w.Status = "The blowpipe is in use"; return false; }
+        if (other != 0 && other != -w.Id) { w.Status = "The glass blowing pipe is in use"; return false; }
         if (!world.HandsFree(w, dt)) return true;
         w.Status = "Blowing glass";
         if (world.Walk(w, forge.ToWorld(BlowStand), dt, .1f, exact: true)) w.WorkState = WorkerWorkState.Blowing;
@@ -117,7 +119,8 @@ internal sealed class GlassBlowing(World world) {
     }
 
     internal bool Pump(Worker w, Thing forge, float dt) {
-        if (!ReadyToWork(forge) || forge.GlassResult != GlassResult.None && forge.GlassBlower == -w.Id) return false;
+        if (forge.GlassResult != GlassResult.None && forge.GlassBlower == -w.Id) { w.Status = "Finishing a glass batch"; return false; }
+        if (WorkBlock(forge) is string reason) { w.Status = reason; return false; }
         int other = WorkerAt(forge, JobKind.Bellows, WorkerWorkState.Pumping);
         if (PlayerAt(forge, World.BellowsStand, still: false) != 0 || other != 0 && other != -w.Id) {
             w.Status = "Bellows are manned";
@@ -134,7 +137,14 @@ internal sealed class GlassBlowing(World world) {
     }
 
     private bool HasPipe(Thing forge) => world.BenchTool(forge, Tool) != null;
-    private bool ReadyToWork(Thing forge) => HasPipe(forge) && (forge.Processing && forge.Progress < Seconds || !forge.Processing && world.Stocked(forge));
+    /// <summary>Why a worker cannot start or continue at this furnace, or null when ready.</summary>
+    private string? WorkBlock(Thing forge) {
+        if (!HasPipe(forge)) return NeedPipe;
+        if (forge.Processing) return forge.Progress < Seconds ? null : "Glass jar waiting for room in the output slot";
+        if (world.Stocked(forge)) return null;
+        if (!forge.Inventory.Has(world.BatchCost(forge))) return "Needs sand";
+        return world.FuelOf(forge) == null ? "Needs coal in the fuel slot" : "Nothing to make";
+    }
 
     private int Blower(Thing forge) {
         int player = PlayerAt(forge, BlowStand, still: true);
@@ -161,7 +171,7 @@ internal sealed class GlassBlowing(World world) {
             float next = pos.DistanceSquaredTo(other.ToWorld(World.BellowsStand));
             if (canBlow) next = Math.Min(next, pos.DistanceSquaredTo(other.ToWorld(BlowStand)));
             if ((next < distance || next == distance && other.Id < forge.Id)
-                && (other.GlassResult != GlassResult.None || ReadyToWork(other))) return false;
+                && (other.GlassResult != GlassResult.None || WorkBlock(other) == null)) return false;
         }
         return true;
     }
@@ -177,12 +187,12 @@ internal sealed class GlassBlowing(World world) {
         if (forge.Processing && forge.Progress >= Seconds) return "Glass jar finished · make room in the output slot";
         if (forge.GlassResult == GlassResult.Melted) return "Glass melted. Starting again with a fresh batch.";
         if (forge.GlassResult == GlassResult.Success) return "Glass jar finished";
-        if (forge.Tools?["steel_pipe"] != 1) return "Put one steel pipe in the Glass blower slot.";
-        if (forge.GlassBlower == 0 && !world.CanStand(forge.ToWorld(BlowStand))) return "Clear ground in front of the furnace for the blower.";
+        if (forge.Tools?["steel_pipe"] != 1) return "Put one steel pipe in the Glass blowing pipe slot.";
+        if (forge.GlassBlower == 0 && !world.CanStand(forge.ToWorld(BlowStand))) return "Clear ground in front of the furnace for the glass blower.";
         if (forge.GlassBlower == 0 && !world.CanStand(forge.ToWorld(World.BellowsStand))) return "Clear ground behind the furnace for the bellows.";
         if (forge.Heat > MaxHeat) return "Too hot · stop pumping";
         if (forge.Heat < MinHeat) return "Too cold · pump the bellows";
-        return forge.GlassBlower == 0 ? "Needs a blower and a bellows operator." : "Blowing glass";
+        return forge.GlassBlower == 0 ? "Needs a glass blower and a bellows operator." : "Blowing glass";
     }
 
     internal static bool Valid(Thing forge) {

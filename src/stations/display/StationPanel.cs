@@ -90,12 +90,12 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         var degrees = Style.Heading("", 30); column.AddChild(degrees);
         column.AddChild(Style.Text(heatRange, 14, Style.Beige));
         if (glass) {
-            column.AddChild(Style.Text("Stand in front facing the furnace to blow. Stand behind it to pump.", 14, Style.Beige, wrap: true));
+            var hint = Style.Text("Stand behind the furnace to pump.", 14, Style.Beige, wrap: true); hint.Name = "bellows_hint"; column.AddChild(hint);
             var status = Style.Text("", 14, Style.Beige, wrap: true); status.Name = "glass_status"; column.AddChild(status);
             live.Watch(() => GlassBlowing.Status(world, thing), text => status.Text = text);
         }
         var pumpRow = new HBoxContainer(); pumpRow.AddThemeConstantOverride("separation", 8); column.AddChild(pumpRow);
-        var pump = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before operating the bellows."); else world.Pump(thing); });
+        var pump = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before operating the bellows."); else panel.Player.UseFurnaceBellows(thing); });
         pump.Name = "pump"; pump.TooltipText = "Pump the bellows · Space"; pump.CustomMinimumSize = new Vector2(84, 38);
         Style.SkinPill(pump, Style.Sage);
         pumpRow.AddChild(pump); pumpRow.AddChild(Style.Pill("Space", Style.KeyPill, Style.Line, 12));

@@ -4,12 +4,12 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-/// <summary>The forge's blowpipe and glass, positioned against the hands and mouth of whoever works it.</summary>
+/// <summary>The forge's glass blowing pipe and molten glass, positioned against the hands and mouth of whoever works it.</summary>
 internal sealed class GlassBlowingView {
     private const float PipeLength = SteelPipeShape.LooseLength, NearGrip = .18f, FarGrip = .40f;
     private const float LiftSeconds = .32f, DetachAt = .075f, Gravity = 15f, StartSpeed = 1.45f;
     private const float StretchDistance = StartSpeed * DetachAt / 2;
-    private static readonly Vector3 Blowing = new Vector3(.48f, 0, .877f).Normalized();
+    private static readonly Vector3 Resting = new Vector3(.48f, 0, .877f).Normalized();
     private static readonly Vector3 Showing = new Vector3(.988f, .03f, .15f).Normalized();
     private static readonly Vector3 Low = new(-.11f, 1.02f, .13f), Ready = new(-.57f, 1.14f, .25f);
     private static readonly Vector3 Lip = new(0, .084f, .111f);
@@ -40,6 +40,9 @@ internal sealed class GlassBlowingView {
         for (int i = 0; i < splash.Length; i++) splash[i] = Add(parent, Bead, cooling, Vector3.Zero);
         Hide();
     }
+
+    internal Vector3 PipeEnd => tube.Transform * new Vector3(PipeLength * .5f, SteelPipeShape.CenterHeight, 0);
+    internal Vector3 PipeDirection => tube.Transform.Basis.X.Normalized();
 
     public void Warm() {
         tube.Show(); gather.Show(); neck.Show(); puddle.Show(); jar.Show();
@@ -72,7 +75,10 @@ internal sealed class GlassBlowingView {
             Mathf.DegToRad(-pose.Twist * .5f), Mathf.DegToRad(-pose.Sway * .6f)));
         var mouth = ArmReach.FromTrunk(pose, HumanShape.Standard.HeadOffset + rotation * Lip);
         var tail = Low.Lerp(mouth, lift).Lerp(Ready, showJar).Lerp(Low, lower);
-        var along = Blowing.Lerp(Showing, showJar).Lerp(Blowing.Rotated(Vector3.Right, .17f), lower).Normalized();
+        var toForge = parent.GlobalTransform.AffineInverse() * rig.Root.GlobalTransform;
+        var fire = toForge.AffineInverse() * ForgeShape.FireCenter;
+        var aiming = (fire - mouth).Normalized();
+        var along = Resting.Lerp(aiming, lift).Lerp(Showing, showJar).Lerp(aiming.Rotated(Vector3.Right, .17f), lower).Normalized();
         var tip = tail + along * PipeLength;
         var left = tail + along * FarGrip;
         float present = Mathf.SmoothStep(.18f, .42f, since);
@@ -87,10 +93,13 @@ internal sealed class GlassBlowingView {
 
         // Draw the shaft through the posed fists, including while the hands are moving up to their marks.
         var rightHand = rig.Fist(false);
-        if (result != GlassResult.Success || present == 0) along = (rig.Fist(true) - rightHand).Normalized();
+        if (result != GlassResult.Success || present == 0) {
+            var throughHands = (rig.Fist(true) - rightHand).Normalized();
+            // The working pipe points into the glowing chamber even at the edge of the standing spot.
+            along = throughHands.Lerp((fire - rightHand).Normalized(), lift * (1 - showJar) * (1 - lower)).Normalized();
+        }
         tail = rightHand - along * NearGrip;
         tip = tail + along * PipeLength;
-        var toForge = parent.GlobalTransform.AffineInverse() * rig.Root.GlobalTransform;
         var up = Vector3.Up;
         var side = along.Cross(up).Normalized();
         var pipeBasis = new Basis(along, side.Cross(along), side);
@@ -104,7 +113,7 @@ internal sealed class GlassBlowingView {
         ClearGlass();
         if (result == GlassResult.Melted) {
             float radius = lastBlower == forge.GlassBlower ? lastRadius : .115f;
-            if (reset) StartFall(lastGather ?? toForge * DroopedAt(mouth, radius), radius);
+            if (reset) StartFall(lastGather ?? toForge * DroopedAt(mouth, aiming, radius), radius);
             Melt(since);
         } else if (result == GlassResult.Success) {
             float shape = Mathf.SmoothStep(.08f, .34f, since);
@@ -132,7 +141,7 @@ internal sealed class GlassBlowingView {
         if (forge.GlassResult != GlassResult.Melted) { Hide(); return; }
         float elapsed = GlassBlowing.ResultSeconds - forge.GlassResultLeft;
         if (lastResult != GlassResult.Melted) {
-            var at = lastBlower != 0 && gather.Visible ? gather.Position : new Vector3(-.46f, 1.22f, .78f);
+            var at = lastBlower != 0 && gather.Visible ? gather.Position : ForgeShape.FireCenter + new Vector3(0, .06f, .5f);
             StartFall(at, lastBlower != 0 ? lastRadius : .115f);
             ending.Set(elapsed, time);
         }
@@ -167,8 +176,8 @@ internal sealed class GlassBlowingView {
         neck.Visible = width > .002f;
     }
 
-    private static Vector3 DroopedAt(Vector3 mouth, float radius) =>
-        mouth + Blowing * (PipeLength + radius * .33f) + Vector3.Down * .19f;
+    private static Vector3 DroopedAt(Vector3 mouth, Vector3 aim, float radius) =>
+        mouth + aim * (PipeLength + radius * .33f) + Vector3.Down * .19f;
 
     private void StartFall(Vector3 at, float radius) {
         fallingRadius = Math.Max(radius * .78f, .055f);
@@ -186,8 +195,7 @@ internal sealed class GlassBlowingView {
             gather.Scale = Vector3.One * fallingRadius;
             gather.Show();
             if (since < DetachAt && tube.Visible) {
-                var rim = tube.Transform * new Vector3(PipeLength * .5f, SteelPipeShape.CenterHeight, 0);
-                Stretch(rim, gather.Position, fallingRadius * .41f * (1 - since / DetachAt));
+                Stretch(PipeEnd, gather.Position, fallingRadius * .41f * (1 - since / DetachAt));
             }
             return;
         }

@@ -48,6 +48,7 @@ public sealed class PlayerControl {
     /// <summary>The spot under the mouse when this hold started, locked until it ends.</summary>
     public Vector2? DiggingAt { get; private set; }
     private readonly CabinApproach cabinApproach;
+    private readonly BellowsApproach bellowsApproach;
     /// <summary>The pump whose handle the player is walking to press.</summary>
     private Thing? pumpApproach;
     private Momentum momentum;
@@ -73,13 +74,14 @@ public sealed class PlayerControl {
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
         cabinApproach = new CabinApproach(world);
+        bellowsApproach = new BellowsApproach(world, kit);
         world.Replaced += () => { Stop(); heldPlacement = null; placingHeld = false; selectedLayer = Layer.Surface; digDismissed = false; Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops actions whose targets belong to the previous world.</summary>
     private void Stop() {
         DiggingAt = null; digAttempt = 0;
-        gathering = null; lifting = null; pumpApproach = null; clickedCabin = null; cabinApproach.Cancel();
+        gathering = null; lifting = null; pumpApproach = null; clickedCabin = null; cabinApproach.Cancel(); bellowsApproach.Cancel();
     }
 
     public bool Entering(Thing cabin) => cabinApproach.GoesTo(cabin);
@@ -87,16 +89,26 @@ public sealed class PlayerControl {
 
     /// <summary>Starts or cancels the walk to this cabin's door from its Enter button.</summary>
     public void ToggleEntry(Thing cabin) {
-        pumpApproach = null;
+        pumpApproach = null; bellowsApproach.Cancel();
         if (Entering(cabin)) CancelEntry(); else cabinApproach.Start(cabin);
     }
 
     /// <summary>Steps up to the water pump's handle and presses it once.</summary>
     internal void UseWaterPump(Thing pump) {
         if (!world.AtStation(pump)) { kit.Notify("Walk closer to the pump."); return; }
-        cabinApproach.Cancel();
+        cabinApproach.Cancel(); bellowsApproach.Cancel();
         if (world.Player.IsEqualApprox(pump.ToWorld(World.BellowsStand))) world.Pump(pump);
         else pumpApproach = pump;
+    }
+
+    /// <summary>Pumps a furnace in reach or walks to the bellows for one stroke.</summary>
+    internal void UseFurnaceBellows(Thing forge) {
+        if (world.Occupied || world.Sheltered != 0) return;
+        cabinApproach.Cancel(); pumpApproach = null;
+        if (GlassBlowing.IsRecipe(forge) ? GlassBlowing.AtPump(world, forge) : world.AtStation(forge)) {
+            bellowsApproach.Cancel();
+            world.Pump(forge);
+        } else bellowsApproach.Start(forge);
     }
 
     /// <summary>Enters placement for a container from the backpack.</summary>
@@ -113,7 +125,8 @@ public sealed class PlayerControl {
         // The recipe map covers the world, so nothing held over it walks or gathers.
         if (kit.Paused || panel.Map.Visible) { StopGroundDig(); world.Me.Sprinting = false; return; }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
-        var direction = cabinApproach.Active ? cabinApproach.Direction() : TowardPump(HeldDirection());
+        var direction = cabinApproach.Active ? cabinApproach.Direction()
+            : bellowsApproach.Active ? bellowsApproach.Direction(HeldDirection(), panel.Selection.Thing) : TowardPump(HeldDirection());
         direction = Gather(direction, right, dt);
         direction = DigGround(direction, right);
         direction = Lift(direction, right, dt);
@@ -217,7 +230,7 @@ public sealed class PlayerControl {
     private Vector2 Gather(Vector2 direction, bool right, float dt) {
         // What was being worked on can go: a tree falls and leaves its stump, and a stump or a bush comes out of the ground.
         if (gathering != null && world.Find(gathering.Id) == null) { panel.Deselect(gathering.Id); gathering = null; }
-        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || cabinApproach.Active || pumpApproach != null) {
+        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || cabinApproach.Active || bellowsApproach.Active || pumpApproach != null) {
             world.ResetGather();
             if (!right || gathering?.IsLoose == true) gathering = null;
             return direction;
@@ -241,7 +254,7 @@ public sealed class PlayerControl {
 
     private Vector2 DigGround(Vector2 direction, bool right) {
         if (DiggingAt is not Vector2 at) return direction;
-        if (!right || Mode is not ClickMode.Dig || direction != Vector2.Zero || cabinApproach.Active || pumpApproach != null
+        if (!right || Mode is not ClickMode.Dig || direction != Vector2.Zero || cabinApproach.Active || bellowsApproach.Active || pumpApproach != null
             || world.Occupied || !cursor.Empty) { StopGroundDig(); return direction; }
         if (world.Player.DistanceTo(at) > GroundHoles.Reach) {
             if (digAttempt == 0) return world.Player.DirectionTo(at);
@@ -267,7 +280,7 @@ public sealed class PlayerControl {
 
     /// <summary>A held right click walks to a container and lifts it once the button has been held long enough.</summary>
     private Vector2 Lift(Vector2 direction, bool right, float dt) {
-        if (lifting != null && right && direction == Vector2.Zero && !cabinApproach.Active && pumpApproach == null && world.Find(lifting.Id) != null) {
+        if (lifting != null && right && direction == Vector2.Zero && !cabinApproach.Active && !bellowsApproach.Active && pumpApproach == null && world.Find(lifting.Id) != null) {
             if (!world.Near(lifting, 1.5f)) direction = (lifting.Pos - world.Player).Normalized();
             else if ((liftClock += dt) >= LiftSeconds) {
                 var container = lifting; lifting = null;
@@ -285,7 +298,7 @@ public sealed class PlayerControl {
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
         var wanted = world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero;
         Vector2 step;
-        if (cabinApproach.Active) {
+        if (cabinApproach.Active || bellowsApproach.Active) {
             momentum = default; step = direction;
         } else if (world.WolfNearby(world.Player)) {
             momentum = new Momentum { Heading = wanted, Pace = 1 }; step = wanted;
@@ -294,6 +307,7 @@ public sealed class PlayerControl {
         world.Me.Braking = momentum.Braking;
         var move = step * dt * world.PlayerSpeed;
         if (cabinApproach.Active) cabinApproach.Move(move.Length());
+        else if (bellowsApproach.Active) bellowsApproach.Move(move.Length());
         else {
             var from = world.Player;
             if (pumpApproach != null) move = move.LimitLength(from.DistanceTo(pumpApproach.ToWorld(World.BellowsStand)));
@@ -311,12 +325,12 @@ public sealed class PlayerControl {
         world.Me.Selected = hotbar.ActiveItem() ?? "";
     }
 
-    /// <summary>Space pumps in reach, or swings with the first-person view or the overhead movement keys.</summary>
+    /// <summary>Space works a pump or bellows, or swings with the current aim.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
         if (station?.Kind == ThingKind.Pump && world.AtStation(station)) UseWaterPump(station);
+        else if (station?.Kind == ThingKind.Reinforced) UseFurnaceBellows(station);
         else if (GlassBlowing.PumpAtPlayer(world) is Thing glass) world.Pump(glass);
-        else if (station?.Kind == ThingKind.Reinforced && world.AtStation(station)) world.Pump(station);
         else {
             var aim = view.FirstPerson ? view.FirstPersonForward : HeldDirection();
             world.Attack(aim == Vector2.Zero ? walked : aim);
@@ -374,7 +388,7 @@ public sealed class PlayerControl {
         if (mouse.ButtonIndex != MouseButton.Left || !mouse.Pressed) return false;
         var cabin = clickedCabin; clickedCabin = null;
         if (!mouse.DoubleClick || !cursor.Empty || Mode is not ClickMode.Normal || cabin == null || world.Find(cabin.Id) is not { Kind: ThingKind.Hut } opened) return false;
-        pumpApproach = null; cabinApproach.Start(opened);
+        pumpApproach = null; bellowsApproach.Cancel(); cabinApproach.Start(opened);
         return true;
     }
 

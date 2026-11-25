@@ -11,7 +11,7 @@ public partial class ControlsList : PanelContainer {
         ("LMB", "Select a resource, building, container, or worker. Put a held stack into storage, or place a building, pipe, or container."),
         ("RMB", "Pick up loose resources. On open ground, eat, drink, light a torch, or swing using the hotbar selection. On a hotbar slot, use its item."),
         ("Hold RMB", "Gather from a resource or pick up a placed crate or barrel. With a shovel selected, dig a planting hole or gather sand."),
-        ("Space", "Pump a selected water pump or reinforced furnace in reach. For glass, stand behind the furnace. Otherwise, swing or punch."),
+        ("Space", "Pump a selected water pump or reinforced furnace in reach. Walk to the furnace bellows if needed. Otherwise, swing or punch."),
         ("1–9 / Click slot", "Select a hotbar slot. A plan or placeable container starts placement."),
         ("Assign to hotbar", "Pick up a building plan or backpack item, then click a hotbar slot."),
         ("B", "Building plans."), ("Tab", "Backpack."), ("C", "Crafting outside placement."), ("H", "Crew."),

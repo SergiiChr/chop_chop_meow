@@ -54,7 +54,7 @@ public sealed class Thing {
     /// <summary>Units of work finished here since the world loaded: batches made, pieces mined, harvests and building stages; a worker reads their job list again after each.</summary>
     [JsonIgnore] public int Rounds { get; set; }
     public float Heat { get; set; }
-    /// <summary>The actor holding the blowpipe, a player by positive id or a worker by negative id.</summary>
+    /// <summary>The actor holding the glass blowing pipe, a player by positive id or a worker by negative id.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int GlassBlower { get; set; }
     /// <summary>How long glass on the pipe has stayed above its working range without cooling.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float GlassOverheat { get; set; }
@@ -842,7 +842,7 @@ public sealed partial class World {
     /// <summary>Whether the player stands within <see cref="WorkReach"/> of a station's edge.</summary>
     public bool AtStation(Thing t) => Near(t, Footprint(t.Kind) + WorkReach)
         || t.Kind == ThingKind.Pump && Near(t, WorkReach, t.ToWorld(BellowsStand))
-        || GlassBlowing.IsRecipe(t) && GlassBlowing.AtPump(this, t);
+        || t.Kind == ThingKind.Reinforced && GlassBlowing.AtPump(this, t);
     /// <summary>Stations that can need someone working at them.</summary>
     public static bool Worked(ThingKind kind) => kind is ThingKind.Anvil or ThingKind.Bench or ThingKind.Cooktable or ThingKind.Packer;
     public static readonly ThingKind[] WorkedKinds = Array.FindAll(Kinds.All, Worked);
@@ -1748,9 +1748,15 @@ public sealed partial class World {
         var def = Data.Items.GetValueOrDefault(item);
         var slots = SlotRules(station.Kind);
         int at = def == null ? -1 : Array.FindIndex(slots, slot => slot.Takes(item, def));
-        if (at < 0) return $"The {Lower(Data.Name(station.Kind))} has slots for {Listed(slots.Select(slot => A(Data.ToolName(slot.Tool, slot.Tier))).ToList(), "and")}.";
+        if (at < 0) {
+            if (slots is [{ Item: string accepted } fixedSlot])
+                return $"The {fixedSlot.Tool} slot takes {A(Lower(Data.Name(accepted)))}.";
+            return $"The {Lower(Data.Name(station.Kind))} has slots for {Listed(slots.Select(slot => A(Data.ToolName(slot.Tool, slot.Tier))).ToList(), "and")}.";
+        }
         string tool = slots[at].Tool;
-        return BenchTool(station, tool) != null ? $"The {tool} slot is taken. Take that {tool} out first." : null;
+        if (BenchTool(station, tool) == null) return null;
+        string fitted = slots[at].Item == null ? tool : Lower(Data.Name(item));
+        return $"The {tool} slot is taken. Take that {fitted} out first.";
     }
     /// <summary>
     /// Puts a tool from the backpack into the station's empty slot for its kind, when <see cref="SlotBlock"/> allows it.

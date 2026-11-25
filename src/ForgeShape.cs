@@ -5,6 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>Shared continuous tank shell, recessed refractory chamber and fitted bellows boards.</summary>
 internal static class ForgeShape {
+    internal static readonly Vector3 FireCenter = new(0, .9f, .22f);
     internal static readonly Vector3 BellowsHandle = new(1, .75f, 0);
     internal const float BellowsGrip = .115f;
     private static ArrayMesh? shell, fire, board;
@@ -46,9 +47,9 @@ internal static class ForgeShape {
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         for (int i = 0; i < 24; i++) {
             float a = i * Mathf.Tau / 24, b = (i + 1) * Mathf.Tau / 24;
-            s.SetColor(new Color("ffb44c")); Vertex(s, new Vector3(0, .9f, .22f), Vector3.Back);
-            s.SetColor(new Color("e96020")); Vertex(s, new Vector3(MathF.Cos(b) * .21f, .9f + MathF.Sin(b) * .21f, .22f), Vector3.Back);
-            Vertex(s, new Vector3(MathF.Cos(a) * .21f, .9f + MathF.Sin(a) * .21f, .22f), Vector3.Back);
+            s.SetColor(new Color("ffb44c")); Vertex(s, FireCenter, Vector3.Back);
+            s.SetColor(new Color("e96020")); Vertex(s, FireCenter + new Vector3(MathF.Cos(b) * .21f, MathF.Sin(b) * .21f, 0), Vector3.Back);
+            Vertex(s, FireCenter + new Vector3(MathF.Cos(a) * .21f, MathF.Sin(a) * .21f, 0), Vector3.Back);
         }
         return s.Commit();
     }

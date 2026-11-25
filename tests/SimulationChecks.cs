@@ -33,7 +33,6 @@ public static class SimulationChecks {
         ReplantingChecks.Run(data);
         SandChecks.Run(data);
         GlassJarChecks.Run(data);
-        Test(GlassJarUpdateChecks.CheckGlassBlowerAndMeltReachAGuest, data);
         CraftingChecks.Run(data);
         PackingChecks.Run(data);
         LunchChecks.Run(data);

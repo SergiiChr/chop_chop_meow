@@ -19,6 +19,8 @@ internal static class GlassJarChecks {
         Test(CheckFullJarOutputDoesNotHoldTheBlower, data);
         Test(CheckAPlayerWithTwoPipesInReachBlowsAtTheCloserFurnace, data);
         Test(CheckSteelStillTakesEightHeatFromASideStroke, data);
+        Test(CheckGlassWorkersSayWhyWorkStopped, data);
+        Test(GlassJarUpdateChecks.CheckGlassBlowerAndMeltReachAGuest, data);
     }
 
     private static void CheckGlassFurnaceNeedsAnInstalledPipe(GameData data) {
@@ -30,10 +32,12 @@ internal static class GlassJarChecks {
         TickGlassAt(world, furnace, 80, 8);
         Require(furnace.Inventory[Beach.Sand] == 5 && furnace.Burner?["coal"] == 1 && !furnace.Processing,
             "Neither worker heat nor a carried pipe should let a glass batch start without the slotted pipe.");
+        Require(world.SlotBlock(furnace, "stone") == "The glass blowing pipe slot takes a steel pipe.",
+            "The refusal should name the slot and the item it accepts.");
         Require(world.SlotTool(furnace, "steel_pipe"), "The furnace should accept a steel pipe.");
         Require(world.Backpack["steel_pipe"] == 1 && world.BenchTool(furnace, GlassBlowing.Tool) == "steel_pipe",
-            "Only one pipe should leave the backpack for the glass blower slot.");
-        Require(!world.SlotTool(furnace, "steel_pipe"), "A second pipe should not fit the occupied glass blower slot.");
+            "Only one pipe should leave the backpack for the glass blowing pipe slot.");
+        Require(!world.SlotTool(furnace, "steel_pipe"), "A second pipe should not fit the occupied glass blowing pipe slot.");
         world.UnslotTool(furnace, "steel_pipe");
         Require(world.Backpack["steel_pipe"] == 2 && world.BenchTool(furnace, GlassBlowing.Tool) == null,
             "Removing the pipe should return it to the backpack.");
@@ -113,13 +117,13 @@ internal static class GlassJarChecks {
         world.Player = near.ToWorld(GlassBlowing.BlowStand);
         SafeTick(world, 2);
         Require(near.Progress > 0 && !other.Processing && other.Inventory[Beach.Sand] == 5,
-            "One player in reach of both blowpipes must make progress at only the closer furnace.");
+            "One player in reach of both glass blowing pipes must make progress at only the closer furnace.");
 
         world.Player = other.ToWorld(GlassBlowing.BlowStand);
         float progress = near.Progress;
         SafeTick(world, 2);
         Require(near.Progress == progress && other.Progress > 0,
-            "Moving closer to the other blowpipe should pause the first batch and start the second.");
+            "Moving closer to the other glass blowing pipe should pause the first batch and start the second.");
     }
 
     private static void CheckGlassPausesOutsideTheHeatWindowAndNeedsTenSecondsInIt(GameData data) {
@@ -226,6 +230,36 @@ internal static class GlassJarChecks {
         // Keep all the measured ticks within the same batch, before finishing can add the new product.
         AllocationChecks.Check("tick: glass blower and bellows crew", () => world.Tick(1 / 60f), runs: 400);
         Require(furnace.Processing && furnace.Progress > 7, "Both workers should have kept blowing for the measured ticks.");
+    }
+
+    private static void CheckGlassWorkersSayWhyWorkStopped(GameData data) {
+        var world = EmptyWorld(data);
+        var forge = GlassFurnace(world, Terrain.Spawn + new Vector2(6, 6));
+        var blower = HireAtGlassFurnace(world, forge, JobKind.BlowGlass);
+        var pumper = HireAtGlassFurnace(world, forge, JobKind.Bellows);
+        Work(world, 40, () => forge.Inventory[GlassBlowing.Item] == 1);
+        SafeTick(world, 2);
+        Require(blower.Status == "Needs sand" && pumper.Status == "Needs sand",
+            "After finishing the last jar, both workers should say they need sand.");
+
+        Give(world, Beach.Sand, 5);
+        world.LoadInput(forge, Beach.Sand, 5);
+        SafeTick(world, 1);
+        Require(blower.Status == "Needs coal in the fuel slot" && pumper.Status == "Needs coal in the fuel slot",
+            "Sand without fuel should make both glass workers say they need coal.");
+
+        world.UnslotTool(forge, "steel_pipe");
+        SafeTick(world, 1);
+        Require(blower.Status == "Needs a steel pipe in the Glass blowing pipe slot" && blower.Status == pumper.Status,
+            "Both workers should tell the player when the steel pipe is no longer fitted.");
+
+        forge.Inventory.Remove(Beach.Sand, 5);
+        forge.Inventory.Remove(GlassBlowing.Item, 1);
+        world.SetRecipe(forge, "steel_bar");
+        Require(world.Selected(forge) == "steel_bar", "The emptied furnace should switch back to steel.");
+        SafeTick(world, 1);
+        Require(blower.Status == "Furnace is not making glass jars" && pumper.Status == "Nothing to smelt",
+            "A furnace switched back to steel should give each worker the current reason for stopping.");
     }
 
     private static void CheckSteelStillTakesEightHeatFromASideStroke(GameData data) {

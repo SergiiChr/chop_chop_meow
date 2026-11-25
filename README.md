@@ -364,7 +364,9 @@ A station page opens with the group of the recipe the station is on open.
 A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
 A bench, anvil or cooking table with a batch you queued is worked by a player standing still within 1 m of its edge, or by a worker; a packing station by either, whatever it packs.
-Pumping the reinforced furnace's bellows for steel needs the same 1 m. For glass, stand behind the furnace at the bellows.
+A reinforced furnace pumps at once within reach.
+For glass, the pump position is behind the furnace.
+Press Space with the furnace selected, or click Pump, to walk to the bellows and press once if out of reach.
 
 Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
 The output slot takes back what the recipe makes from your backpack, up to a stack.
@@ -386,7 +388,7 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 | --- | --- |
 | Crafting bench, anvil, cooking table, packing station | Craft, Haul |
 | Stone furnace, canning station | Haul |
-| Reinforced furnace | Bellows, Blow glass, Haul |
+| Reinforced furnace | Bellows, Glass blower, Haul |
 | Water pump | Pump |
 | Mine | Build, Haul, Mine |
 | Farm plot | Farm, Haul |
@@ -409,7 +411,9 @@ With no job that can be done, a worker sits at the nearest campfire they can rea
 A worker who could not reach a fire's seats tries again once a building goes up or comes down.
 With no campfire they wait at the nearest trading post, or in the clearing without one.
 Their status says what their first job lacks.
-A worker on Bellows pumps while the furnace works or holds a batch to make. Only one worker pumps at a time. For glass, a worker on Blow glass can work the pipe at the front.
+A worker on Bellows pumps while the furnace works or holds a batch to make.
+Only one worker pumps at a time.
+A worker on Glass blower can work the pipe at the front.
 
 The crew button opens an overview with each worker's daily pay and the total above.
 
@@ -661,12 +665,23 @@ A small steel tool such as a hammer takes 1 steel part and a big one such as an 
 
 ### Glass jars
 
-Choose Glass jar at the reinforced furnace and fit one Steel pipe in the Glass blower slot. The pipe stays in the slot at the end of the batch. Each attempt uses 5 Sand and 1 coal from the fuel slot.
+Choose Glass jar at the reinforced furnace and fit one Steel pipe in the Glass blowing pipe slot.
+The pipe stays in the slot at the end of the batch.
+Each attempt uses 5 Sand and 1 coal from the fuel slot.
 
-Work in pairs. The blower stands in front and faces the furnace. The other person stands behind it and presses Space or clicks Pump to work the bellows. Either job can be done by a player or a hired worker. Leave clear ground at both ends.
-Each player works at the closest available work spot. A manual stroke adds 145 °C for either furnace recipe.
+Work in pairs.
+The glass blower stands in front, faces the furnace and aims the pipe at the glowing center of the chamber.
+The other person presses Space or clicks Pump to walk to the bellows and work them.
+Either job can be done by a player or a hired worker.
+Leave clear ground at both ends.
+Each player works at the closest available work spot.
+A manual stroke adds 145 °C for either furnace recipe.
 
-A jar takes 10 seconds between 1,300 and 1,600 °C. If the furnace cools, progress waits. Stop pumping above 1,600 °C. If it stays that hot for more than half a second, the glass melts off the pipe and falls to the ground. That attempt's sand and fuel are lost, and the furnace starts a fresh batch once it is in range again and supplied.
+A jar takes 10 seconds between 1,300 and 1,600 °C.
+If the furnace cools, progress waits.
+Stop pumping above 1,600 °C.
+If it stays that hot for more than half a second, the glass melts off the pipe and falls to the ground.
+That attempt's sand and fuel are lost, and the furnace starts a fresh batch once it is in range again and supplied.
 
 ## Cooking and canning
 
