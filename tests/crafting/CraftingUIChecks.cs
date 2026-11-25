@@ -452,22 +452,24 @@ public partial class Game {
 
     /// <summary>Alt-clicking an item on the hotbar shows its place on the map without selecting the slot.</summary>
     private async Task CheckAltClickHotbarItemOpensItsRecipeMapEntry() {
-        int active = world.ActiveHotbar, axeSlot = active == 0 ? 1 : 0;
-        string previous = world.HotbarItem(axeSlot);
-        int given = world.Carried("steel_axe") == 0 ? Give(Hosted, "steel_axe") : 0;
-        SetHotbarSlot(Hosted, axeSlot, "steel_axe");
-        await Until(() => world.HotbarItem(axeSlot) == "steel_axe" && !hotbar.Buttons[axeSlot].Disabled,
-            "the steel axe appearing in an unselected hotbar slot", 2);
-        await Click(hotbar.Buttons[axeSlot], alt: true);
-        await Until(() => recipeMap.Visible && recipeMap.Chosen == "steel_axe" && recipeMap.NodeOf("steel_axe")!.Lit,
-            "the hotbar's steel axe highlighted on the recipe map", 2);
+        int active = world.ActiveHotbar, slot = active == 0 ? 1 : 0;
+        string previous = world.HotbarItem(slot);
+        Give(Hosted, "glass_jar"); await Frames();
+        await KeyStroke(Key.Tab);
+        await Carry(BagCellOf("glass_jar"), hotbar.Buttons[slot]);
+        await Until(() => world.HotbarItem(slot) == "glass_jar" && !hotbar.Buttons[slot].Disabled,
+            "the glass jar appearing in an unselected hotbar slot", 2);
+        await CloseWithEsc();
+        await Click(hotbar.Buttons[slot], alt: true);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "glass_jar" && recipeMap.NodeOf("glass_jar")!.Lit,
+            "the hotbar's glass jar highlighted on the recipe map", 2);
         var rows = (ScrollContainer)recipeMap.FindChild("map_rows", true, false);
-        var axe = recipeMap.NodeOf("steel_axe")!;
-        await Until(() => rows.GetGlobalRect().Encloses(axe.GetGlobalRect()), "the steel axe scrolling fully into view", 2);
-        Require(world.ActiveHotbar == active, "Looking up the axe must not select its hotbar slot.");
+        var jar = recipeMap.NodeOf("glass_jar")!;
+        await Until(() => rows.GetGlobalRect().Encloses(jar.GetGlobalRect()), "the glass jar scrolling fully into view", 2);
+        Require(world.ActiveHotbar == active, "Looking up the jar must not select its hotbar slot.");
         await KeyStroke(Key.Escape);
-        SetHotbarSlot(Hosted, axeSlot, previous);
-        if (given > 0) Drop(Hosted, "steel_axe", given);
+        SetHotbarSlot(Hosted, slot, previous);
+        Drop(Hosted, "glass_jar", 1);
         await Frames();
     }
 
