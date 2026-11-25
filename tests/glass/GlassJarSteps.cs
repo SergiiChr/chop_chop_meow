@@ -6,8 +6,8 @@ using static WorkerSteps;
 using static WorldSteps;
 
 internal static class GlassJarSteps {
-    public static Thing GlassFurnace(World world, Vector2 at, int batches = 1, bool installPipe = true) {
-        var furnace = world.Add(ThingKind.Reinforced, at);
+    public static Thing GlassFurnace(World world, Vector2 at, int batches = 1, bool installPipe = true, float rotation = 0) {
+        var furnace = world.Add(ThingKind.Reinforced, at, rotation: rotation);
         world.Player = at + Vector2.Right;
         world.SetRecipe(furnace, GlassBlowing.Item);
         Require(world.Selected(furnace) == GlassBlowing.Item, "The reinforced furnace should switch to glass jars.");

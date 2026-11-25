@@ -92,7 +92,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         if (glass) {
             column.AddChild(Style.Text("Stand in front facing the furnace to blow. Stand behind it to pump.", 14, Style.Beige, wrap: true));
             var status = Style.Text("", 14, Style.Beige, wrap: true); status.Name = "glass_status"; column.AddChild(status);
-            live.Watch(() => GlassBlowing.Status(thing), text => status.Text = text);
+            live.Watch(() => GlassBlowing.Status(world, thing), text => status.Text = text);
         }
         var pumpRow = new HBoxContainer(); pumpRow.AddThemeConstantOverride("separation", 8); column.AddChild(pumpRow);
         var pump = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before operating the bellows."); else world.Pump(thing); });

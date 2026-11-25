@@ -663,7 +663,8 @@ A small steel tool such as a hammer takes 1 steel part and a big one such as an 
 
 Choose Glass jar at the reinforced furnace and fit one Steel pipe in the Glass blower slot. The pipe stays in the slot at the end of the batch. Each attempt uses 5 Sand and 1 coal from the fuel slot.
 
-Work in pairs. The blower stands in front and faces the furnace. The other person stands behind it and presses Space or clicks Pump to work the bellows. Either job can be done by a player or a hired worker. A manual stroke adds 145 °C for either furnace recipe.
+Work in pairs. The blower stands in front and faces the furnace. The other person stands behind it and presses Space or clicks Pump to work the bellows. Either job can be done by a player or a hired worker. Leave clear ground at both ends.
+Each player works at the closest available work spot. A manual stroke adds 145 °C for either furnace recipe.
 
 A jar takes 10 seconds between 1,300 and 1,600 °C. If the furnace cools, progress waits. Stop pumping above 1,600 °C. If it stays that hot for more than half a second, the glass melts off the pipe and falls to the ground. That attempt's sand and fuel are lost, and the furnace starts a fresh batch once it is in range again and supplied.
 

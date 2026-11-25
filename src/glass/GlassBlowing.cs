@@ -19,9 +19,17 @@ internal sealed class GlassBlowing(World world) {
 
     /// <summary>The furnace whose bellows the player stands at, even when its page is closed.</summary>
     internal static Thing? PumpAtPlayer(World world) {
-        foreach (var forge in world.ThingsOf(ThingKind.Reinforced))
-            if (IsRecipe(forge) && AtPump(world, forge)) return forge;
-        return null;
+        Thing? closest = null;
+        float distance = float.PositiveInfinity;
+        foreach (var forge in world.ThingsOf(ThingKind.Reinforced)) {
+            if (!IsRecipe(forge) || !AtPump(world, forge)) continue;
+            float next = world.Player.DistanceSquaredTo(forge.ToWorld(World.BellowsStand));
+            if (next < distance || next == distance && (closest == null || forge.Id < closest.Id)) {
+                closest = forge;
+                distance = next;
+            }
+        }
+        return closest;
     }
 
     /// <summary>Whole degrees without rounding an out-of-range reading into the working range.</summary>
@@ -32,6 +40,8 @@ internal sealed class GlassBlowing(World world) {
 
     /// <summary>A finished batch leaves its pipe and pose in place for the end of the motion.</summary>
     internal bool Resolve(Thing forge, float dt) {
+        // When the output was full, this is an already formed jar waiting to be put down.
+        if (forge.Processing) world.FinishStationBatch(forge, world.Data.Recipes[Item]);
         forge.GlassResultLeft = Math.Max(0, forge.GlassResultLeft - dt);
         if (forge.GlassResultLeft > .00001f) {
             if (forge.GlassBlower != 0 && Blower(forge) != forge.GlassBlower) forge.GlassBlower = 0;
@@ -45,9 +55,8 @@ internal sealed class GlassBlowing(World world) {
 
     internal void Tick(Thing forge, RecipeDef recipe, float dt, bool wasBurning) {
         if (forge.Processing && forge.Progress >= recipe.Seconds) {
-            // The jar is already formed. Let its blower go while it waits for a full output slot.
-            forge.GlassBlower = 0;
-            if (world.FinishStationBatch(forge, recipe)) Finish(forge, GlassResult.Success);
+            // The blower already finished the jar. Only room to put it down is missing.
+            world.FinishStationBatch(forge, recipe);
             return;
         }
         if (!HasPipe(forge) || !forge.Processing && !world.Stocked(forge)) {
@@ -71,8 +80,8 @@ internal sealed class GlassBlowing(World world) {
         if (!paired || forge.Heat < MinHeat) return;
         forge.Progress = Math.Min(recipe.Seconds, forge.Progress + dt);
         if (forge.Progress < recipe.Seconds) return;
-        if (world.FinishStationBatch(forge, recipe)) Finish(forge, GlassResult.Success);
-        else forge.GlassBlower = 0;
+        world.FinishStationBatch(forge, recipe);
+        Finish(forge, GlassResult.Success);
     }
 
     /// <summary>The sand and fuel are already spent. A lost batch still owes the jar that was queued.</summary>
@@ -134,11 +143,27 @@ internal sealed class GlassBlowing(World world) {
 
     private int PlayerAt(Thing forge, Vector2 offset, bool still) {
         Vector2 spot = forge.ToWorld(offset);
-        foreach (var p in world.Players)
-            if (p.Sheltered == 0 && p.Door == Doorway.None && p.RespawnIn == 0 && !p.Mauled
-                && (!still || !p.Busy && p.Still >= World.CraftSettle)
-                && new Vector2(p.PlayerX, p.PlayerY).DistanceSquaredTo(spot) <= Reach * Reach) return p.Id;
+        foreach (var p in world.Players) {
+            if (p.Sheltered != 0 || p.Door != Doorway.None || p.RespawnIn != 0 || p.Mauled) continue;
+            bool canBlow = !p.Busy && p.Still >= World.CraftSettle;
+            if (still && !canBlow) continue;
+            var pos = new Vector2(p.PlayerX, p.PlayerY);
+            float distance = pos.DistanceSquaredTo(spot);
+            if (distance <= Reach * Reach && ClosestWorkSpot(forge, pos, distance, canBlow)) return p.Id;
+        }
         return 0;
+    }
+
+    /// <summary>One player can operate only the nearest work spot, even when several furnaces are in reach.</summary>
+    private bool ClosestWorkSpot(Thing forge, Vector2 pos, float distance, bool canBlow) {
+        foreach (var other in world.ThingsOf(ThingKind.Reinforced)) {
+            if (other == forge || other.GlassResult == GlassResult.None && !IsRecipe(other)) continue;
+            float next = pos.DistanceSquaredTo(other.ToWorld(World.BellowsStand));
+            if (canBlow) next = Math.Min(next, pos.DistanceSquaredTo(other.ToWorld(BlowStand)));
+            if ((next < distance || next == distance && other.Id < forge.Id)
+                && (other.GlassResult != GlassResult.None || ReadyToWork(other))) return false;
+        }
+        return true;
     }
 
     private int WorkerAt(Thing forge, JobKind job, WorkerWorkState action) {
@@ -148,14 +173,16 @@ internal sealed class GlassBlowing(World world) {
         return 0;
     }
 
-    internal static string Status(Thing forge) {
+    internal static string Status(World world, Thing forge) {
+        if (forge.Processing && forge.Progress >= Seconds) return "Glass jar finished · make room in the output slot";
         if (forge.GlassResult == GlassResult.Melted) return "Glass melted. Starting again with a fresh batch.";
         if (forge.GlassResult == GlassResult.Success) return "Glass jar finished";
         if (forge.Tools?["steel_pipe"] != 1) return "Put one steel pipe in the Glass blower slot.";
+        if (forge.GlassBlower == 0 && !world.CanStand(forge.ToWorld(BlowStand))) return "Clear ground in front of the furnace for the blower.";
+        if (forge.GlassBlower == 0 && !world.CanStand(forge.ToWorld(World.BellowsStand))) return "Clear ground behind the furnace for the bellows.";
         if (forge.Heat > MaxHeat) return "Too hot · stop pumping";
         if (forge.Heat < MinHeat) return "Too cold · pump the bellows";
-        if (forge.GlassBlower == 0) return "Needs a blower and a bellows operator.";
-        return "Blowing glass";
+        return forge.GlassBlower == 0 ? "Needs a blower and a bellows operator." : "Blowing glass";
     }
 
     internal static bool Valid(Thing forge) {
@@ -165,7 +192,8 @@ internal sealed class GlassBlowing(World world) {
             || tools.Count > 1 || tools.Count != tools["steel_pipe"]) return false;
         if (forge.GlassResult != GlassResult.None)
             return forge.GlassResult is GlassResult.Success or GlassResult.Melted && forge.GlassResultLeft is > 0 and <= ResultSeconds
-                && !forge.Processing && forge.GlassOverheat == 0;
+                && forge.GlassOverheat == 0
+                && (!forge.Processing || forge.GlassResult == GlassResult.Success && IsRecipe(forge) && forge.Progress == Seconds);
         if (forge.GlassResultLeft != 0) return false;
         return IsRecipe(forge) && forge.Processing
             ? forge.GlassOverheat is >= 0 and <= OverheatSeconds + .00001f && forge.Progress is >= 0 and <= Seconds

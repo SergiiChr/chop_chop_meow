@@ -31,6 +31,11 @@ public partial class Game {
             && panel.Aside.FindChild("tool_glass blower", true, false) is ItemSlot { TooltipText: var tip } && tip.StartsWith("Steel pipe"),
             "installing just one steel pipe from the held stack into the glass blower slot", 2);
 
+        var blocker = Hosted.Add(ThingKind.Hut, furnace.ToWorld(World.BellowsStand) + new Vector2(0, -.8f));
+        await Until(() => panel.FindChild("glass_status", true, false) is Label { Text: "Clear ground behind the furnace for the bellows." },
+            "showing that access to the bellows is blocked", 2);
+        RemoveThings(Hosted, t => t == blocker);
+
         var blower = HireAtGlassFurnace(Hosted, furnace, JobKind.BlowGlass);
         await CloseWithEsc();
         Warp(Hosted, furnace.ToWorld(World.BellowsStand));

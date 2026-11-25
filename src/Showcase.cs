@@ -116,6 +116,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.SetRecipe(forge, GlassBlowing.Item);
         forge.Tools!.Add("steel_pipe", 1);
         forge.Inventory.Add(Beach.Sand, 5);
+        if (Launch.Has("--full-output")) forge.Inventory.Add(GlassBlowing.Item, forge.Inventory.SlotRoom(GlassBlowing.Item));
         forge.Burner!.Add("coal", 1);
         forge.Heat = manual ? GlassBlowing.MinHeat : World.SteelHeat;
         float start = scene switch { "success" => 9.35f, "failure" => 8, "work" => 3, _ => 0 };

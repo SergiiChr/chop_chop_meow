@@ -17,6 +17,7 @@ internal static class GlassJarChecks {
         Test(CheckGlassMeltsOnlyAfterMoreThanHalfASecondOfContinuousOverheat, data);
         Test(CheckGlassWorkSurvivesSaveAndLoad, data);
         Test(CheckFullJarOutputDoesNotHoldTheBlower, data);
+        Test(CheckAPlayerWithTwoPipesInReachBlowsAtTheCloserFurnace, data);
         Test(CheckSteelStillTakesEightHeatFromASideStroke, data);
     }
 
@@ -101,6 +102,26 @@ internal static class GlassJarChecks {
             "Assigning both jobs to one worker cannot substitute for two people at opposite ends.");
     }
 
+    private static void CheckAPlayerWithTwoPipesInReachBlowsAtTheCloserFurnace(GameData data) {
+        var world = EmptyWorld(data);
+        var near = GlassFurnace(world, Terrain.Spawn + new Vector2(6, 6));
+        var other = GlassFurnace(world, near.Pos + new Vector2(.25f, 3.4f), rotation: Mathf.Pi);
+        HireAtGlassFurnace(world, near, JobKind.Bellows);
+        HireAtGlassFurnace(world, other, JobKind.Bellows);
+        near.Heat = other.Heat = 80;
+
+        world.Player = near.ToWorld(GlassBlowing.BlowStand);
+        SafeTick(world, 2);
+        Require(near.Progress > 0 && !other.Processing && other.Inventory[Beach.Sand] == 5,
+            "One player in reach of both blowpipes must make progress at only the closer furnace.");
+
+        world.Player = other.ToWorld(GlassBlowing.BlowStand);
+        float progress = near.Progress;
+        SafeTick(world, 2);
+        Require(near.Progress == progress && other.Progress > 0,
+            "Moving closer to the other blowpipe should pause the first batch and start the second.");
+    }
+
     private static void CheckGlassPausesOutsideTheHeatWindowAndNeedsTenSecondsInIt(GameData data) {
         var world = EmptyWorld(data);
         var furnace = GlassFurnace(world, Terrain.Spawn + new Vector2(6, 6));
@@ -178,9 +199,13 @@ internal static class GlassJarChecks {
         world.Player = forge.ToWorld(GlassBlowing.BlowStand);
         int full = forge.Inventory.SlotRoom(GlassBlowing.Item);
         forge.Inventory.Add(GlassBlowing.Item, full);
-        TickGlassAt(world, forge, 80, 44);
-        Require(forge.Processing && forge.Progress == GlassBlowing.Seconds && forge.GlassBlower == 0,
-            "A completed jar should wait for output room without holding the blower in place.");
+        for (int i = 0; i < 48 && forge.Progress < 10; i++) TickGlassAt(world, forge, 80, 1);
+        Require(forge.Processing && forge.Progress == 10 && forge.GlassResult == GlassResult.Success
+            && forge.GlassBlower == world.Me.Id && forge.GlassResultLeft > 0,
+            "The jar should finish with the blower's success pose even when its output slot is full.");
+        TickGlassAt(world, forge, 80, 4);
+        Require(forge.Processing && forge.GlassResult == GlassResult.None && forge.GlassBlower == 0,
+            "Once the success pose ends, a jar waiting for output room must release the blower.");
 
         world.Player = forge.Pos + Vector2.Right * 3;
         Require(world.Transfer(forge.Inventory, world.Backpack, GlassBlowing.Item, 1) == 1, "Take one jar from the full stack.");

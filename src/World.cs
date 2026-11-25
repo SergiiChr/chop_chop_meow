@@ -2429,11 +2429,10 @@ public sealed partial class World {
         if (recipe.Burns && !wasBurning) Play("start_fire", t.Pos);
     }
     /// <summary>Moves a finished batch into its output slot once there is room.</summary>
-    internal bool FinishStationBatch(Thing t, RecipeDef recipe) {
-        if (t.Inventory.SlotRoom(recipe.Output) < recipe.Amount) return false;
+    internal void FinishStationBatch(Thing t, RecipeDef recipe) {
+        if (t.Inventory.SlotRoom(recipe.Output) < recipe.Amount) return;
         t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Making = ""; t.Progress = 0; t.Rounds++; stillBurning.Add(t.Id);
         S.Milestones.Add(recipe.Output);
-        return true;
     }
     private List<Thing> Ticking(ThingKind kind) {
         ticking.Clear();
