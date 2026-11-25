@@ -34,7 +34,7 @@ public interface IGameFlow {
 /// What the interface's parts work with: the world, how a player action runs, and the buttons that run one.
 /// Every button runs its action through <see cref="Act"/> and then refreshes the screen.
 /// </summary>
-public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Action refresh) {
+public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Action refresh, Action<string> openRecipeMap) {
     public World World { get; } = world;
     public Sounds Sounds { get; } = sounds;
     private readonly List<Func<bool>> holds = new();
@@ -65,6 +65,11 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
         T result = default!;
         Run(() => { result = action(); });
         return result;
+    }
+
+    /// <summary>Lets Alt-click look up the item shown by a slot without doing its usual action.</summary>
+    public void LinkRecipeMap(ItemSlot slot, Func<string?> item) {
+        slot.RecipeLink = () => { if (item() is { Length: > 0 } id) openRecipeMap(id); };
     }
 
     public Button Button(string text, Action action, bool disabled = false) {

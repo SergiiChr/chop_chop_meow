@@ -66,6 +66,7 @@ public partial class Hotbar : PanelContainer {
             Batch = () => Store(slot),
             RightClick = () => Use(slot),
         };
+        kit.LinkRecipeMap(button, () => world.HotbarItem(slot));
         button.CustomMinimumSize = new Vector2(56, 56);
         Style.Skin(button, Style.SlotNormal, Style.SlotHover, Style.SlotPressed);
         button.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
@@ -115,6 +116,7 @@ public partial class Hotbar : PanelContainer {
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}\nLMB: select · RMB or Double LMB: use";
+            if (!building && id.Length > 0) button.TooltipText += $"\n{RecipeMap.AltClickHint}";
             // The selected slot gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.SlotWanted : Style.SlotNormal);

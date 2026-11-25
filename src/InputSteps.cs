@@ -79,13 +79,13 @@ public partial class Game {
     private Vector2? lastClicked;
     private ulong lastClickAt;
 
-    private async Task Click(Control control) {
+    private async Task Click(Control control, bool alt = false) {
         var at = await At(control);
         await Apart(at);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, AltPressed = alt, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
         await Frames();
         Handled(at);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, AltPressed = alt, Position = at, GlobalPosition = at, Pressed = false });
         await Frames();
     }
 

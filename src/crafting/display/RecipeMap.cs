@@ -1,0 +1,276 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Godot;
+
+namespace ChopChopMeow;
+
+/// <summary>
+/// The Recipe map shows item chains by category, with arrows from materials to what they make.
+/// Stations stand in a strip on top with what they cost. A click on an item shows how it is made and what it is used for;
+/// a click on a chip for a required tool or an additional resource goes to that item and lights it up for a moment.
+/// The map is drawn afresh each time it opens. It keeps the game or Goal Log underneath.
+/// </summary>
+public partial class RecipeMap : Control {
+    private readonly UiKit kit;
+    private readonly World world;
+    private readonly SidePanel panel;
+    private readonly PanelContainer board;
+    private readonly Dictionary<string, MapNode> nodes = new();
+    private static readonly StyleBoxFlat LaneBack = Style.Flat(new Color("283c50"), 14, 12, horizontal: 14);
+    private static readonly StyleBoxFlat StationBuilt = Style.Flat(Style.Beige, 10, 6, horizontal: 10);
+    private static readonly StyleBoxFlat StationPlanned = Style.Flat(new Color("34495e"), 10, 6, new Color(Style.Beige, .55f), 1, 10);
+    private Action? leaveGoalLog;
+    private ScrollContainer rows = null!;
+    private PanelContainer details = null!;
+    /// <summary>How long a jumped-to item stays lit, in seconds.</summary>
+    public const float LitSeconds = 1.5f;
+    public const string AltClickHint = "Alt-click: open the Recipe map";
+
+    public RecipeMap(UiKit kit, SidePanel panel) {
+        this.kit = kit; this.panel = panel; world = kit.World;
+        Name = "recipe_map"; Visible = false;
+        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        // The dimmed backdrop takes clicks, so none falls through to the world behind the map.
+        var backdrop = new ColorRect { Color = new Color(Style.Line, .75f) }; backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); AddChild(backdrop);
+        board = new PanelContainer(); board.AddThemeStyleboxOverride("panel", Style.Board);
+        board.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 20); AddChild(board);
+        world.Replaced += Close;
+    }
+
+    /// <summary>The item whose details show, or empty.</summary>
+    public string Chosen { get; private set; } = "";
+
+    /// <summary>An item's place on the map, or null while the map is closed.</summary>
+    public MapNode? NodeOf(string item) => nodes.GetValueOrDefault(item);
+
+    public void Open() => OpenAt("");
+
+    /// <summary>Opens at the item's map entry, leaving any open panel or Goal Log underneath.</summary>
+    public void OpenAt(string item, Action? leaveGoalLog = null) {
+        item = EntryFor(item);
+        if (item != "" && !world.Data.Items.ContainsKey(item)) return;
+        Clear();
+        this.leaveGoalLog = leaveGoalLog;
+        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); board.AddChild(column);
+        column.AddChild(Header());
+        column.AddChild(Stations());
+        rows = new ScrollContainer { Name = "map_rows", SizeFlagsVertical = SizeFlags.ExpandFill };
+        var lanes = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        lanes.AddThemeConstantOverride("separation", 8); rows.AddChild(lanes);
+        foreach (var row in world.Data.MapRows) lanes.AddChild(Lane(row));
+        column.AddChild(rows);
+        details = new PanelContainer { Name = "map_details" };
+        details.AddThemeStyleboxOverride("panel", Style.Well); column.AddChild(details);
+        Choose(item);
+        Visible = true;
+        if (item != "") JumpWhenReady(rows, item);
+    }
+
+    /// <summary>Waits for the map to size its cards and scroll area before putting the chosen item in view.</summary>
+    private async void JumpWhenReady(ScrollContainer opened, string item) {
+        opened.Modulate = Colors.Transparent;
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (!Visible || rows != opened) return;
+        if (Chosen == item && nodes.TryGetValue(item, out var node)) {
+            var offset = node.GetGlobalRect().GetCenter() - opened.GetGlobalRect().GetCenter();
+            opened.ScrollHorizontal += Mathf.RoundToInt(offset.X);
+            opened.ScrollVertical += Mathf.RoundToInt(offset.Y);
+            node.Light(LitSeconds);
+        }
+        opened.Modulate = Colors.White;
+    }
+
+    /// <summary>Uses the map entry for a carried container whose exact contents or fill are not separate entries.</summary>
+    private static string EntryFor(string item) {
+        if (World.IsPacked(item)) return "crate";
+        if (BerryJam.InBottle(item)) return BerryJam.Liquid;
+        if (GameData.OffTheMap(item) && Water.IsBottle(item)) return Water.Full;
+        return ContainerItem.Base(item);
+    }
+
+    public void Close() { Visible = false; Clear(); }
+
+    private void Clear() {
+        foreach (var child in board.GetChildren()) { board.RemoveChild(child); child.QueueFree(); }
+        nodes.Clear(); Chosen = ""; leaveGoalLog = null;
+    }
+
+    /// <summary>The title, what the marks on the map mean, and the close button.</summary>
+    private HBoxContainer Header() {
+        var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 16);
+        var glyph = Style.Glyph("line_map", 34, Style.Rim);
+        glyph.SizeFlagsVertical = SizeFlags.ShrinkCenter; header.AddChild(glyph);
+        var intro = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        intro.AddThemeConstantOverride("separation", 1); header.AddChild(intro);
+        intro.AddChild(Style.Heading("Recipe map", 30));
+        intro.AddChild(Style.Text("Follow the arrows from materials to what they make.", 15, Style.Beige));
+        header.AddChild(Legend(new MapSlot { Known = true }, "Made before"));
+        header.AddChild(Legend(new MapSlot(), "Not made yet"));
+        header.AddChild(Legend(Sample(MapNode.ToolChip), "Required tool"));
+        header.AddChild(Legend(Sample(MapNode.ResourceChip), "Additional resources"));
+        header.AddChild(kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "map_close"));
+        return header;
+    }
+
+    private static Panel Sample(StyleBox look) {
+        var sample = new Panel(); sample.AddThemeStyleboxOverride("panel", look);
+        return sample;
+    }
+
+    private static HBoxContainer Legend(Control sample, string words) {
+        var entry = new HBoxContainer(); entry.AddThemeConstantOverride("separation", 6);
+        sample.CustomMinimumSize = new Vector2(18, 18); sample.SizeFlagsVertical = SizeFlags.ShrinkCenter; entry.AddChild(sample);
+        entry.AddChild(Style.Text(words, 14, Style.Beige));
+        return entry;
+    }
+
+    /// <summary>The stations that make something, in the order the building plans list them, each with its cost; one not built yet is outlined.</summary>
+    private HBoxContainer Stations() {
+        var strip = new HBoxContainer { Name = "map_stations" }; strip.AddThemeConstantOverride("separation", 8);
+        foreach (var (kind, def) in world.Data.Buildings) {
+            if (!world.Data.Recipes.Values.Any(r => r.Station == kind)) continue;
+            bool built = world.Reached(kind.Id());
+            var chip = new PanelContainer { Name = $"station_{kind.Id()}", SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            chip.AddThemeStyleboxOverride("panel", built ? StationBuilt : StationPlanned);
+            var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 8); chip.AddChild(row);
+            var icon = Style.Icon(Icons.Of(kind.Id()), 38); icon.Modulate = built ? Colors.White : Style.Unready; row.AddChild(icon);
+            var words = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center }; words.AddThemeConstantOverride("separation", 0); row.AddChild(words);
+            words.AddChild(Style.Text(def.Name, 15, built ? Style.Ink : Style.Rim, Style.Head));
+            words.AddChild(Style.Text(PageText.Cost(world, def.Cost), 12, built ? Style.Tan : Style.Beige, wrap: true));
+            strip.AddChild(chip);
+        }
+        return strip;
+    }
+
+    /// <summary>One category's row: its name, then its items on a grid of steps, each on the line of the item it is made out of or on a line of its own below.</summary>
+    private PanelContainer Lane(MapRowDef row) {
+        var lane = new PanelContainer { Name = $"lane_{row.Title}" }; lane.AddThemeStyleboxOverride("panel", LaneBack);
+        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 7); lane.AddChild(column);
+        var heading = new HBoxContainer(); heading.AddThemeConstantOverride("separation", 12); column.AddChild(heading);
+        heading.AddChild(Style.Text(row.Title, 19, Style.Rim, Style.Head));
+        heading.AddChild(new ColorRect {
+            Color = new Color(Style.Beige, .24f),
+            CustomMinimumSize = new Vector2(0, 1),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ShrinkCenter,
+            MouseFilter = MouseFilterEnum.Ignore
+        });
+        var tree = new MapTree(); column.AddChild(tree);
+        int line = 0;
+        foreach (string root in row.Roots) { Place(tree, root, 0, ref line); line++; }
+        // An item that comes out of several others hangs under the first; the others reach it with a joining line.
+        foreach (var (item, node) in nodes)
+            if (node.GetParent() == tree && world.Data.Sources.TryGetValue(item, out var source))
+                foreach (string other in source.From.Skip(1)) tree.Join(nodes[other], node);
+        tree.CustomMinimumSize = new Vector2(tree.Columns * MapTree.Pitch - MapTree.Gap, line * MapNode.RowPitch);
+        return lane;
+    }
+
+    /// <summary>Puts an item at a step and line, then what is made out of it one step on: the first on the same line, the rest on new lines below.</summary>
+    private void Place(MapTree tree, string item, int step, ref int line) {
+        var node = new MapNode(world, item, Choose, Jump) { Position = new Vector2(step * MapTree.Pitch, line * MapNode.RowPitch) };
+        nodes[item] = node; tree.AddChild(node); tree.Columns = Math.Max(tree.Columns, step + 1);
+        var made = world.Data.MadeOutOf(item);
+        for (int i = 0; i < made.Count; i++) {
+            if (i > 0) line++;
+            Place(tree, made[i], step + 1, ref line);
+            tree.Link(node, nodes[made[i]]);
+        }
+    }
+
+    /// <summary>Scrolls to an item and lights it up for a moment.</summary>
+    private void Jump(string item) {
+        if (!nodes.TryGetValue(item, out var node)) return;
+        rows.EnsureControlVisible(node);
+        node.Light(LitSeconds);
+    }
+
+    /// <summary>Shows an item's details in the strip under the map and rings it; an empty item shows what a click does.</summary>
+    private void Choose(string item) {
+        if (nodes.TryGetValue(Chosen, out var before)) before.Chosen = false;
+        Chosen = item;
+        foreach (var child in details.GetChildren()) { details.RemoveChild(child); child.QueueFree(); }
+        if (!nodes.TryGetValue(item, out var node)) {
+            details.AddChild(Style.Text("Click an item for its recipe. Click a small ingredient or tool icon to find it on the map.",
+                16, Style.Ink));
+            return;
+        }
+
+        node.Chosen = true;
+        var data = world.Data;
+        var recipe = data.RecipeOf(item);
+        var content = new VBoxContainer(); content.AddThemeConstantOverride("separation", 9); details.AddChild(content);
+        var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 12); content.AddChild(header);
+        header.AddChild(Style.Icon(Icons.Of(item), 46));
+        var identity = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
+        identity.AddThemeConstantOverride("separation", 2); header.AddChild(identity);
+        var title = new HBoxContainer(); title.AddThemeConstantOverride("separation", 12); identity.AddChild(title);
+        var name = Style.Text(data.Name(item), 23, Style.Ink, Style.Head); name.Name = "detail_name"; title.AddChild(name);
+        var known = Style.Pill(node.Known ? "Made before" : "Not made yet", Style.Tag(node.Known ? Style.Sage : Style.Tan), Style.SlotFill, 12);
+        known.SizeFlagsVertical = SizeFlags.ShrinkCenter; title.AddChild(known);
+        if (data.Items[item].Description is { Length: > 0 } said) {
+            var text = Style.Text(said, 14, Style.Ink, wrap: true); text.Name = "detail_text"; identity.AddChild(text);
+        }
+        if (recipe != null) header.AddChild(ShowButton(item, recipe));
+
+        var facts = new HBoxContainer(); facts.AddThemeConstantOverride("separation", 26); content.AddChild(facts);
+        var madeAt = Fact(facts, recipe == null ? "Source" : "Made at");
+        madeAt.AddChild(Style.Text(MadeAt(item), 16, Style.Ink, wrap: true));
+        var needs = recipe != null
+            ? recipe.Inputs.Select(p => (p.Key, $"{p.Value} {data.Name(p.Key)}"))
+            : data.Sources[item].From.Concat(data.Sources[item].Also).Select(input => (input, data.Name(input)));
+        var requires = Flow(Fact(facts, "Requires"));
+        foreach (var (input, words) in needs) {
+            var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 4);
+            pair.AddChild(Style.Icon(Icons.Of(input), 28)); pair.AddChild(Style.Text(words, 15, Style.Ink));
+            requires.AddChild(pair);
+        }
+        if (requires.GetChildCount() == 0) requires.AddChild(Style.Text("No ingredients", 15, Style.Tan));
+        var uses = data.UsedFor(item).ToList();
+        var used = Flow(Fact(facts, "Used for")); used.Name = "detail_uses";
+        foreach (string use in uses) {
+            var icon = Style.Icon(Icons.Of(use), 28); icon.Name = $"use_{use}";
+            icon.TooltipText = data.Name(use); icon.MouseFilter = MouseFilterEnum.Stop; used.AddChild(icon);
+        }
+        if (uses.Count == 1) used.AddChild(Style.Text(data.Name(uses[0]), 15, Style.Ink));
+        if (uses.Count == 0) used.AddChild(Style.Text("—", 15, Style.Tan));
+    }
+
+    private static VBoxContainer Fact(HBoxContainer strip, string heading) {
+        var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        column.AddThemeConstantOverride("separation", 2); strip.AddChild(column);
+        column.AddChild(Style.Text(heading, 14, Style.Tan, Style.Head));
+        return column;
+    }
+
+    private static HFlowContainer Flow(VBoxContainer column) {
+        var flow = new HFlowContainer();
+        flow.AddThemeConstantOverride("h_separation", 9); flow.AddThemeConstantOverride("v_separation", 2);
+        column.AddChild(flow);
+        return flow;
+    }
+
+    /// <summary>Where an item is made or come by, with the tool and the time a batch takes with the plainest one, by hand and at its station where the two differ.</summary>
+    private string MadeAt(string item) {
+        var data = world.Data;
+        if (data.RecipeOf(item) is not RecipeDef r) return data.Sources[item].How;
+        string where = MapNode.Where(data, r), tool = r.Tool == "" ? "" : $", {data.ToolName(r)}";
+        string? plainest = r.Tool == "" ? null : data.PlainestTool(r.Tool, r.Tier, r.Station);
+        float byHand = r.Seconds / world.WorkRate(null, plainest), there = r.Seconds / world.WorkRate(r.Station, plainest);
+        string time = r.Hand && r.Station is ThingKind station && byHand != there ? $"{byHand:0.#} s by hand, {there:0.#} s at the {data.Name(station).ToLowerInvariant()}" : $"{there:0.#} s";
+        return $"{where}{tool} · {time}";
+    }
+
+    /// <summary>The button that leaves the map for the place a recipe is made: the nearest station of its kind, else the crafting menu for one made by hand.</summary>
+    private Button ShowButton(string item, RecipeDef recipe) {
+        var station = recipe.Station is ThingKind kind ? world.Nearest(kind, world.Player) : null;
+        string id = world.Data.RecipeIdOf(item)!;
+        bool byHand = station == null && recipe.Hand;
+        string place = byHand ? "in the crafting menu" : $"at the {world.Data.Name(recipe.Station!.Value).ToLowerInvariant()}";
+        var show = kit.Button($"Show {place}", () => { leaveGoalLog?.Invoke(); Close(); panel.ShowRecipe(station, id); }, disabled: station == null && !byHand);
+        show.Name = "map_show"; show.SizeFlagsVertical = SizeFlags.ShrinkCenter; show.CustomMinimumSize = new Vector2(0, 44);
+        if (show.Disabled) show.TooltipText = $"Build a {world.Data.Name(recipe.Station!.Value).ToLowerInvariant()} first"; else Style.SkinPill(show, Style.Sage);
+        return show;
+    }
+}

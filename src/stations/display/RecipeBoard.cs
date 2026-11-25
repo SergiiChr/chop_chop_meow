@@ -32,8 +32,8 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
     public static int Step => Input.IsKeyPressed(Key.Ctrl) ? 10 : Input.IsKeyPressed(Key.Shift) ? 5 : 1;
 
     private string Hint => station != null
-        ? "Click: marks as a recurring recipe for the worker.\nDouble-click: queue 1.\nShift/Ctrl-click: queue 5/10.\nRight-click: undo 1/5/10 respectively."
-        : "Click: queue 1.\nShift/Ctrl-click: queue 5/10.\nRight-click: undo 1/5/10 respectively.";
+        ? $"Click: marks as a recurring recipe for the worker.\nDouble-click: queue 1.\nShift/Ctrl-click: queue 5/10.\nRight-click: undo 1/5/10 respectively.\n{RecipeMap.AltClickHint}"
+        : $"Click: queue 1.\nShift/Ctrl-click: queue 5/10.\nRight-click: undo 1/5/10 respectively.\n{RecipeMap.AltClickHint}";
 
     /// <summary>Seconds a batch takes here with the tool at hand.</summary>
     private float Seconds(RecipeDef r) => r.Seconds / world.WorkRate(station?.Kind, world.ToolInUse(station, r));
@@ -86,6 +86,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
     private ItemSlot Card(string id) {
         var r = world.Data.Recipes[id];
         var (cell, _) = ItemSlot.Create($"craft_{id}");
+        kit.LinkRecipeMap(cell, () => r.Output);
         cell.CustomMinimumSize = new Vector2(0, 64); cell.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         var face = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         face.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 8); face.AddThemeConstantOverride("separation", 8); cell.AddChild(face);
@@ -270,10 +271,11 @@ public partial class QueueStrip(UiKit kit, LiveUpdates live) : HBoxContainer {
         foreach (var q in queue) {
             var r = kit.World.Data.Recipes[q.Recipe];
             var (cell, count) = ItemSlot.Create($"queued_{q.Recipe}", 44); cell.Icon = Icons.Of(r.Output);
+            kit.LinkRecipeMap(cell, () => r.Output);
             cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
             string id = q.Recipe;
             // The server's answer brings a new list, so the count is read from the world each time.
-            live.Watch(() => world.Waiting(null, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
+            live.Watch(() => world.Waiting(null, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off\n{RecipeMap.AltClickHint}"; });
             cell.RightClicked = () => kit.Run(() => world.CancelCraft(id, RecipeBoard.Step));
             AddChild(cell);
         }

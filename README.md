@@ -196,6 +196,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with the Goal Log, save, load, options, Controls, new game and quit |
 | Mouse wheel | Zoom in the overhead view |
 | LMB on an item slot | Pick up the entire stack or put down the held stack |
+| Alt-click an item slot or recipe card | Open the Recipe map at that item without moving, using or crafting it |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
 | Double LMB on a cabin | Open its page and walk around obstacles to its door and inside |
@@ -624,23 +625,22 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 
 The recipe map icon next to Crafting on the bottom bar opens the map over the whole screen.
 Esc or its close button closes it.
-Opening it from the bottom bar lets the game run underneath.
+Alt-click an item in an inventory, on the hotbar, on a station or resource panel, or on a recipe card to open the map at that
+item. The map scrolls to the item, highlights it and opens its details. Closing the map returns to the panel you came from.
+Opening it from the bottom bar or by Alt-clicking lets the game run underneath.
 Opening it from a goal keeps the pause menu open underneath.
 Movement controls are disabled while the map is open.
 An item first made while the map is open turns to **Made before**.
 
-- The map splits items into rows for wood, stone and coal, iron and steel, tin, food, farm, nettle and firebugs, and trade.
-  In a row each item hangs off the one it is made out of, raw material first.
-- Every item is on the map, with where it is made or come by under its name.
-- An item the settlement has made, gathered, bought or started with has a filled slot, and so has everything that item
-  is made of.
-  Other items have dashed outlines.
-  The stations along the top, with their costs, are outlined until first built.
-- Chips beside an item's slot show the tool its recipe requires (yellow rim) and each additional resource it takes
-  (dark rim).
-  A click on a chip scrolls to that item and lights it up for a moment.
-- A click on an item shows how it is made, what it requires and what it is used for, with a button that opens
-  the nearest station that makes it, or the crafting menu for a recipe made by hand.
+- The map groups items by category, from wood and stone to food and trade. Follow the arrows from a material to what
+  it makes. Each card names where the item is made or found.
+- Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
+  Other items have dashed icon outlines. The stations along the top show their costs and are outlined until first built.
+- Small icons at the foot of a card show a required tool (gold rim) or an additional resource (blue rim).
+  Click one to find that item on the map and light it up briefly.
+- Click anywhere on a card to highlight it and the arrows connected to it. Its details below show how it is made,
+  what it requires and what it is used for. The button opens the nearest station that makes it or the crafting menu
+  for a recipe made by hand.
 
 ### Crafting bench
 

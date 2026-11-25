@@ -22,7 +22,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         live.Watch(() => box[item], held => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
             count.Text = held > 0 ? held.ToString() : "";
-            cell.TooltipText = tooltip(held);
+            cell.TooltipText = $"{tooltip(held)}\n{RecipeMap.AltClickHint}";
         });
         return cell;
     }

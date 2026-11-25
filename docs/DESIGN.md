@@ -182,17 +182,22 @@ UI and input:
 | `src/ProcessRow.cs` | The process row every station shares and the fuel row under its bar |
 | `src/JobRow.cs` | A place's job buttons, their worker lists and what each job is called |
 | `src/storage/display/FilterWindow.cs` | The filter window beside the panel |
-| `src/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
-| `src/Grid.cs` | Draws the icon-slot grids |
-| `src/ItemSlot.cs` | The cream item slot, which tells a click, a right click and a double click apart and shakes on a refusal |
-| `src/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse, and `SlotInput`, what each click does on an item slot |
+| `src/items/display/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
+| `src/items/display/Grid.cs` | Draws the icon-slot grids |
+| `src/items/display/Badge.cs` | The count pill on an item slot |
+| `src/items/display/ItemSlot.cs` | The cream item slot, which tells plain, right, double and Alt-clicks apart and shakes on a refusal |
+| `src/items/display/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse |
+| `src/items/display/SlotInput.cs` | What a click does on an item slot |
 | `src/HotbarStacks.cs` | `World`'s hotbar slots bound to backpack stacks: binding, waiting slots and reading what a slot shows |
 | `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
 | `src/stations/display/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
 | `src/stations/display/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
-| `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
+| `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout, station strip and item details |
+| `src/crafting/display/MapTree.cs` | The arrows from materials to products in a category |
+| `src/crafting/display/MapNode.cs` | An item card with its icon, source and links to required tools and additional resources |
+| `src/crafting/display/MapSlot.cs` | The filled or dashed icon slot shared by the cards and the legend |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
@@ -308,7 +313,7 @@ Checks and review tools:
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps several features' UI and network checks share, and `Game.TestClean`, which fails a UI check that leaves a mess |
 | `src/RecipeSteps.cs` | Steps that open a fresh station for a recipe, give and load its items and fuel, and expect a batch to start or be refused |
 | `src/showcase/Showcase.cs` | The review scenes behind `--showcase` |
-| `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
+| `src/playtest/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
 | `src/performance/PerformanceRun.cs` | The rendered performance run's window half: sprinting the route by day and night, sampling frames, writing results |
 | `src/performance/PerformanceStage.cs`, `src/performance/PerformanceFixture.cs` | The run's server half, and the staffed camp it plays |
 | `src/performance/PerformanceRoute.cs` | The run's sprint from the beach past the camp and the lake to the valley's top corner |
@@ -1140,13 +1145,17 @@ The panel keeps the list's place while the page draws again, so a click on a rec
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 
-The recipe map badge on the bottom bar opens `RecipeMap` over the running game.
-An item link in the Goal Log opens it through `RecipeMap.OpenAt` with that item highlighted and the game still paused.
-Closing the map returns to the goal details.
+The Recipe map badge on the bottom bar opens `RecipeMap` over the running game.
+`UiKit.LinkRecipeMap` lets Alt-click on an item slot or recipe card look up its item through `RecipeMap.OpenAt` without
+running the slot's usual action. An item link in the Goal Log uses the same entry point with the game still paused.
+Closing the map returns to the panel or goal details underneath.
 `PlayerControl.Update` moves nobody while it shows, and a `MapNode` turns to made before as soon as `World.Had` knows its item.
-`RecipeMap.Place` puts an item on a grid of steps across and lines down: what is made out of it goes one step on, the first on the same line and the rest on lines below, and `MapTree` draws the lines between them.
-A `MapNode` draws a filled slot for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.
-A click on a chip scrolls to that item and lights it (`MapNode.Light`); a click on a slot shows its details, whose button leaves the map through `SidePanel.ShowRecipe`.
+`RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
+and the rest go on lines below. `MapTree` draws arrows to the products and highlights those connected to the chosen card.
+A `MapNode` draws a filled icon slot for an item `World.Had` knows and a dashed one otherwise.
+Chips below the card link to the required tool and to each input after the first. A click on a chip scrolls to its item
+and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details, whose button leaves the
+map through `SidePanel.ShowRecipe`.
 
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
 `SaveState.Obtained` holds every item the settlement has gathered, grown, bought or started with; with what it made, which is among `SaveState.Milestones`, those are the items the recipe map shows as known (`World.Had`).

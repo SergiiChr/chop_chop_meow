@@ -38,6 +38,9 @@ public partial class Game {
         await TestClean(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
         await TestClean(CheckCraftingLeavesTheRecipeMapOnTheBottomBar);
         await TestClean(CheckRecipeMapOpensFromTheBottomBarAndShowsEveryItemOnce);
+        await TestClean(CheckAltClickBackpackItemOpensItsRecipeMapEntry);
+        await TestClean(CheckAltClickHotbarItemOpensItsRecipeMapEntry);
+        await TestClean(CheckAltClickRecipeShowsTheProductWithoutQueueing);
         await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
         await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
         await TestClean(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
@@ -430,6 +433,53 @@ public partial class Game {
         Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources") && HasLabel(recipeMap, "Hunt animals"), "The map must name its marks and where raw meat comes from.");
         await KeyStroke(Key.Escape);
         Require(!recipeMap.Visible && !panel.Visible && !bag.Visible, "Escape must close the map and return to the world.");
+    }
+
+    /// <summary>Alt-clicking the backpack's wood opens its details without picking it up and returns to the backpack on Escape.</summary>
+    private async Task CheckAltClickBackpackItemOpensItsRecipeMapEntry() {
+        Give(Hosted, "wood", 1); await Frames();
+        await KeyStroke(Key.Tab);
+        int count = world.Carried("wood");
+        await Click(BagCellOf("wood"), alt: true);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "wood", "the backpack's wood highlighted on the recipe map", 2);
+        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "Chop trees") && cursor.Empty && world.Carried("wood") == count,
+            "The map should explain how to get wood without picking up or moving the stack.");
+        await KeyStroke(Key.Escape);
+        Require(!recipeMap.Visible && bag.Visible, "Escape should return to the open backpack.");
+        Drop(Hosted, "wood", 1); await CloseWithEsc();
+    }
+
+    /// <summary>Alt-clicking an item on the hotbar shows its place on the map without selecting the slot.</summary>
+    private async Task CheckAltClickHotbarItemOpensItsRecipeMapEntry() {
+        int axeSlot = Enumerable.Range(0, 9).First(i => world.HotbarItem(i) == "steel_axe");
+        bool axeWasSelected = world.ActiveHotbar == axeSlot;
+        if (axeWasSelected) await KeyStroke(Key.Key8);
+        int active = world.ActiveHotbar;
+        Require(active != axeSlot, "Start with a different slot selected so the shortcut cannot select the axe unnoticed.");
+        await Click(hotbar.Buttons[axeSlot], alt: true);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "steel_axe" && recipeMap.NodeOf("steel_axe")!.Lit,
+            "the hotbar's steel axe highlighted on the recipe map", 2);
+        var rows = (ScrollContainer)recipeMap.FindChild("map_rows", true, false);
+        var axe = recipeMap.NodeOf("steel_axe")!;
+        await Until(() => rows.GetGlobalRect().Encloses(axe.GetGlobalRect()), "the steel axe scrolling fully into view", 2);
+        Require(world.ActiveHotbar == active, "Looking up the axe must not select its hotbar slot.");
+        await KeyStroke(Key.Escape);
+        if (axeWasSelected) await KeyStroke(Key.Key1 + axeSlot);
+    }
+
+    /// <summary>Alt-clicking a crafting card shows its product without queueing the recipe.</summary>
+    private async Task CheckAltClickRecipeShowsTheProductWithoutQueueing() {
+        Give(Hosted, "stone", 2); await Frames();
+        await KeyStroke(Key.C);
+        int stone = world.Carried("stone");
+        int chisels = world.Carried("stone_chisel");
+        await Click((Control)Named("craft_stone_chisel")!, alt: true);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "stone_chisel", "the stone chisel highlighted on the recipe map", 2);
+        Require(world.Waiting(null, "stone_chisel") == 0 && world.Carried("stone") == stone && world.Carried("stone_chisel") == chisels,
+            "Looking up a recipe must not craft it.");
+        await KeyStroke(Key.Escape);
+        Require(ShownPage() == "Crafting", "Closing the map must return to crafting.");
+        Drop(Hosted, "stone", 2); await CloseWithEsc();
     }
 
     /// <summary>On the recipe map a click on a chip goes to its item and lights it up for a moment, a click on an item shows its details, and Show leaves the map for where it is made.</summary>
