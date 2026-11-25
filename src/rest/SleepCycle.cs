@@ -6,6 +6,7 @@ namespace ChopChopMeow;
 public sealed class SleepCycle(World world) {
     /// <summary>Health gained per second asleep while both needs are above the healing threshold.</summary>
     public const float FedNeed = 45, HealPerSecond = .12f;
+    private const float SnapshotRoom = .15f;
     private const string Scratching = "You are awakened by the noise outside.";
     internal bool FastForwarding { get; private set; }
     public int Place => world.S.Actor.SleepingAt;
@@ -21,13 +22,13 @@ public sealed class SleepCycle(World world) {
         var p = world.S.Actor;
         bool cabin = p.Sheltered == place.Id && place.Kind == ThingKind.Hut;
         float seconds = SecondsToDawn;
-        var water = cabin ? world.BedtimeWater.Preview(p, seconds * world.Data.ThirstPerSecond)
-            : (p.Thirst, Math.Max(0, p.Thirst - seconds * world.Data.ThirstPerSecond));
-        float thirst = p.SleepingAt == place.Id ? p.Thirst : water.Item1;
+        float thirst = cabin ? world.BedtimeWater.Preview(p, 0, fillBottles: false).Bedtime : p.Thirst;
         float life = place.Kind == ThingKind.StrawBed ? Math.Max(0, StrawBed.Left(world, place)) : seconds;
         float duration = Math.Min(Math.Min(seconds, life), SecondsFed(p.Hunger, thirst, 0));
-        return (duration, Healed(p, duration, thirst), Math.Max(0, p.Hunger - duration * world.Data.HungerPerSecond),
-            duration == seconds ? water.Item2 : Math.Max(0, thirst - duration * world.Data.ThirstPerSecond));
+        float loss = duration * world.Data.ThirstPerSecond;
+        float thirstAtWake = cabin ? world.BedtimeWater.Preview(p, loss, duration == seconds || OthersAsleep(p)).Dawn
+            : Math.Max(0, thirst - loss);
+        return (duration, Healed(p, duration, thirst), Math.Max(0, p.Hunger - duration * world.Data.HungerPerSecond), thirstAtWake);
     }
 
     private float Healed(PlayerState p, float dt, float thirst) =>
@@ -41,7 +42,7 @@ public sealed class SleepCycle(World world) {
             if (p.Sheltered != place.Id) return "Enter the cabin first.";
             if (!place.Locked && world.DoorCheck.AtDoor(place.Id) != null) return Scratching;
         } else if (place.Kind == ThingKind.StrawBed) {
-            if (p.Sheltered != 0 || !world.Reaches(place)) return "Walk closer to the straw bed.";
+            if (p.Sheltered != 0 || !StrawBed.Reachable(world, place)) return "Walk closer to the straw bed.";
             foreach (var other in world.Players) if (other.SleepingAt == place.Id) return "Someone is sleeping here.";
         } else return "You need a cabin or a straw bed.";
         if (p.Hunger <= 0) return "You are too hungry to sleep.";
@@ -58,8 +59,8 @@ public sealed class SleepCycle(World world) {
         world.Release(); world.ResetGather(); GroundHoles.Clear(p);
         p.SleepingAt = place.Id;
         p.Sprinting = p.Braking = false;
-        if (place.Kind == ThingKind.StrawBed) { p.Pos = place.Pos; p.Warp++; }
-        else world.BedtimeWater.DrinkAtBedtime(p, place);
+        p.SleepReadyAt = place.Kind == ThingKind.StrawBed ? world.Time + StrawBed.LieDownSeconds + SnapshotRoom : world.Time;
+        if (place.Kind == ThingKind.StrawBed) { p.Pos = place.Pos; p.Warp++; } else world.BedtimeWater.DrinkAtBedtime(p, place);
         FastForward();
     }
 
@@ -110,6 +111,11 @@ public sealed class SleepCycle(World world) {
         return false;
     }
 
+    private bool OthersAsleep(PlayerState player) {
+        foreach (var p in world.Players) if (p != player && p.SleepingAt == 0) return false;
+        return true;
+    }
+
     private bool EveryoneAsleep() {
         if (world.Players.Count == 0) return false;
         foreach (var p in world.Players) if (p.SleepingAt == 0) return false;
@@ -119,6 +125,8 @@ public sealed class SleepCycle(World world) {
     /// <summary>Runs the normal world toward dawn in one-second steps, stopping if anyone wakes.</summary>
     internal void FastForward(bool recovery = false) {
         if (FastForwarding || !recovery && !EveryoneAsleep()) return;
+        // Leave time to draw the last sleeper lying down, including across the next server snapshot.
+        if (!recovery) foreach (var p in world.Players) if (p.SleepReadyAt > world.Time) return;
         float dawn = Dawn;
         BedtimeWater.FillBottles(world.BedtimeWater.Occupants());
         FastForwarding = true;

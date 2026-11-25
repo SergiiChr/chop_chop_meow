@@ -24,27 +24,27 @@ internal sealed class BedtimeWater(World world) {
     }
 
     /// <summary>Projects thirst before sleep starts and on waking, using the cabin barrel's current water.</summary>
-    internal (float Bedtime, float Dawn) Preview(PlayerState player, float loss) {
+    internal (float Bedtime, float Dawn) Preview(PlayerState player, float loss, bool fillBottles = true) {
         var cabin = world.Find(player.Sheltered);
         float dryDawn = Math.Max(0, player.Thirst - loss);
         if (cabin == null) return (player.Thirst, dryDawn);
         int available = Supply(cabin);
         if (available == 0) return (player.Thirst, dryDawn);
-        int own = ThirstLiters(player.Thirst), total = own + BottleRoom(player), ahead = 0, aheadLiters = 0;
+        int own = player.SleepingAt == cabin.Id ? 0 : ThirstLiters(player.Thirst);
+        int total = own + (fillBottles ? BottleRoom(player) : 0), aheadLiters = 0, aheadAtWake = 0;
         foreach (var other in world.Players) {
             if (other == player || other.Sheltered != cabin.Id) continue;
-            int liters = ThirstLiters(other.Thirst);
-            total += liters + BottleRoom(other);
-            if (other.CabinEntry < player.CabinEntry || other.CabinEntry == player.CabinEntry && other.Id < player.Id) {
-                ahead++;
+            bool asleep = other.SleepingAt == cabin.Id;
+            int liters = asleep ? 0 : ThirstLiters(other.Thirst);
+            if (fillBottles || asleep) total += liters + (fillBottles ? BottleRoom(other) : 0);
+            if (Before(other, player)) {
                 aheadLiters += liters;
+                if (fillBottles || asleep) aheadAtWake += ThirstLiters(Math.Max(0, (asleep ? other.Thirst : 100) - loss));
             }
         }
         float bedtime = Drank(player.Thirst, Math.Min(own, Math.Max(0, available - aheadLiters)));
         float dawn = Math.Max(0, bedtime - loss);
-        // If there is any water left after bedtime, every occupant started the night full.
-        int beforeDawn = ahead * ThirstLiters(Math.Max(0, 100 - loss));
-        int dawnLiters = Math.Min(ThirstLiters(dawn), Math.Max(0, available - total - beforeDawn));
+        int dawnLiters = Math.Min(ThirstLiters(dawn), Math.Max(0, available - total - aheadAtWake));
         return (bedtime, Drank(dawn, dawnLiters));
     }
 
@@ -59,10 +59,13 @@ internal sealed class BedtimeWater(World world) {
         int available = Supply(cabin);
         foreach (var other in world.Players)
             if (other != player && other.Sheltered == cabin.Id && other.SleepingAt == 0
-                && (other.CabinEntry < player.CabinEntry || other.CabinEntry == player.CabinEntry && other.Id < player.Id))
+                && Before(other, player))
                 available -= ThirstLiters(other.Thirst);
         Drink(player, cabin, Math.Max(0, available));
     }
+
+    private static bool Before(PlayerState a, PlayerState b) =>
+        a.CabinEntry < b.CabinEntry || a.CabinEntry == b.CabinEntry && a.Id < b.Id;
 
     internal static void Drink(PlayerState player, Thing cabin, int limit = int.MaxValue) {
         if (player.Health > 0 && player.Thirst < 100 && limit > 0)

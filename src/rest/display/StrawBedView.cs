@@ -5,7 +5,6 @@ namespace ChopChopMeow;
 
 /// <summary>Lower onto a supporting hand, roll onto the bed, and use the same contacts in reverse when getting up.</summary>
 internal sealed class StrawBedView {
-    private const float Seconds = 1.25f;
     private float down;
     private Thing? bed;
 
@@ -26,10 +25,10 @@ internal sealed class StrawBedView {
         if (who.Mauled || who.RespawnIn > 0 || who.Sheltered != 0) { down = 0; bed = null; return false; }
         if (sleepingPlace is { Kind: ThingKind.StrawBed } mat) {
             if (bed != mat) { bed = mat; down = 0; }
-            down = Math.Min(1, down + dt / Seconds);
+            down = Math.Min(1, down + dt / StrawBed.LieDownSeconds);
         } else {
             if (bed == null || who.Pos.DistanceSquaredTo(bed.Pos) > .18f * .18f) { down = 0; bed = null; return false; }
-            down = Math.Max(0, down - dt / Seconds);
+            down = Math.Max(0, down - dt / StrawBed.LieDownSeconds);
             if (down == 0) { bed = null; return false; }
         }
         Draw(rig, bed, down);
@@ -56,9 +55,12 @@ internal sealed class StrawBedView {
             var (swing, knee) = ActorAnimation.LegTo(ankle.Z, -ankle.Y);
             float foot = tip + swing - knee;
             pose = pose with {
-                SwingL = Mathf.Lerp(pose.SwingL, swing, plant), SwingR = Mathf.Lerp(pose.SwingR, swing, plant),
-                KneeL = Mathf.Lerp(pose.KneeL, knee, plant), KneeR = Mathf.Lerp(pose.KneeR, knee, plant),
-                FootL = Mathf.Lerp(pose.FootL, foot, plant), FootR = Mathf.Lerp(pose.FootR, foot, plant)
+                SwingL = Mathf.Lerp(pose.SwingL, swing, plant),
+                SwingR = Mathf.Lerp(pose.SwingR, swing, plant),
+                KneeL = Mathf.Lerp(pose.KneeL, knee, plant),
+                KneeR = Mathf.Lerp(pose.KneeR, knee, plant),
+                FootL = Mathf.Lerp(pose.FootL, foot, plant),
+                FootR = Mathf.Lerp(pose.FootR, foot, plant)
             };
         }
         var at = WorldView.To3(mat.Pos);

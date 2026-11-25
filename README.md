@@ -1274,6 +1274,7 @@ A guest that loses the connection tries to get back in on its own for up to 120 
 
 Everyone shares the world, the market and the workers.
 The clock skips to the next dawn when everyone in the game is asleep, in cabins, on straw beds, or both.
+The skip waits for the last straw-bed sleeper to finish lying down.
 Workers, production, trade and needs advance during the skip, and wolves still roam.
 A wolf that starts scratching at an unlocked cabin door wakes the people sleeping there.
 Wolves can also bite and wake an outdoor sleeper. If anyone wakes before dawn, the skip stops.

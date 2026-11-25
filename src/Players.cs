@@ -170,6 +170,7 @@ public sealed partial class World {
             case Verb.SetHotbar: SetHotbar(c.Count, c.Item); break;
             case Verb.EndingShown: MarkEndingShown(); break;
             case Verb.SkipMorning: SkipMorning(); break;
+            case Verb.Wake: Sleep.Wake(); break;
             case Verb.Assign: if (w != null) Assign(w, t); break;
             case Verb.Duty: if (w != null && JobKinds.TryParse(c.Item, out var job) && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, job, c.Count != 0); break;
             case Verb.Fire: if (w != null) Fire(w); break;
@@ -197,7 +198,6 @@ public sealed partial class World {
             case Verb.Collect: Collect(t); break;
             case Verb.Enter: Doorways.Enter(t, c.Count == 1); break;
             case Verb.Sleep: Sleep.Start(t); break;
-            case Verb.Wake: Sleep.Wake(); break;
             case Verb.Sell: Sell(t); break;
             case Verb.AutoSell: SetAutoSell(t, c.Count != 0); break;
             case Verb.SetPacking: SetPacking(t, c.Item); break;

@@ -18,18 +18,18 @@ public abstract partial class SleepPage(PageTools tools, Thing subject) : ThingP
 
         live.Watch(() => (world.Data.GameMinutes(world.Sleep.SecondsToDawn), (int)world.Health,
             (int)world.Hunger, (int)world.Thirst, Barrel.In(thing.Inventory), world.Sheltered, world.Sleep.Place), _ => {
-            var (seconds, health, hunger, thirst) = world.Sleep.Preview(thing);
-            bool dawn = seconds == world.Sleep.SecondsToDawn;
-            until.Text = LiveText.Of(text => PageText.AppendGameHours(world, text.Append(dawn ? "until dawn · +" : "up to "), seconds));
-            Show(0, "Health", health); Show(1, "Hunger", hunger); Show(2, "Thirst", thirst);
+                var (seconds, health, hunger, thirst) = world.Sleep.Preview(thing);
+                bool dawn = seconds == world.Sleep.SecondsToDawn;
+                until.Text = LiveText.Of(text => PageText.AppendGameHours(world, text.Append(dawn ? "until dawn · +" : "up to "), seconds));
+                Show(0, "Health", health); Show(1, "Hunger", hunger); Show(2, "Thirst", thirst);
 
-            void Show(int i, string need, float level) {
-                var vial = needs[i].Vial;
-                vial.Level = level; vial.Warn = level <= 25;
-                vial.TooltipText = $"{need} {(dawn ? "at dawn" : "on waking")} {level:0}%";
-                vial.QueueRedraw();
-            }
-        });
+                void Show(int i, string need, float level) {
+                    var vial = needs[i].Vial;
+                    vial.Level = level; vial.Warn = level <= 25;
+                    vial.TooltipText = $"{need} {(dawn ? "at dawn" : "on waking")} {level:0}%";
+                    vial.QueueRedraw();
+                }
+            });
         return well;
     }
 

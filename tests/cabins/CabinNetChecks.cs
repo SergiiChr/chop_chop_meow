@@ -15,10 +15,7 @@ public partial class Game {
 
     /// <summary>The guest sees the host's quarter-turned cabin and walks into its door with a double click.</summary>
     private NetScene CabinNetScene => new("cabins",
-        () => {
-            Hosted.Add(ThingKind.Hut, NetHut, rotation: NetHutRotation);
-            Hosted.Add(ThingKind.StrawBed, NetStrawBed);
-        },
+        () => Hosted.Add(ThingKind.Hut, NetHut, rotation: NetHutRotation),
         HostSleepsOnStrawWhileGuestEntersCabin, GuestEntersCabinAndSleepsToDawn);
 
     private async Task HostSleepsOnStrawWhileGuestEntersCabin(PlayerState guest) {
@@ -28,9 +25,14 @@ public partial class Game {
         Hosted.As(guest, Hosted.Doorways.TurnKey);
         RunUntilPhase(Hosted, .65f);
         SetNeeds(Hosted, 100, 100, 50); SetNeeds(guest, 100, 100, 50);
+        Signal("cabin-wake-ready");
+        await Signaled("cabin-guest-woke");
+        SetNeeds(guest, 100, 100, 50);
         Hosted.Add(ThingKind.Campfire, NetStrawBed + Vector2.Down * 2).Burn = Hosted.Data.DaySeconds;
+        var home = Hosted.Player;
         Warp(Hosted, NetStrawBed + Vector2.Right * 1.5f);
-        var bed = Hosted.Things.Single(t => t.Kind == ThingKind.StrawBed);
+        // The earlier tree scene moves several days forward, so lay the three-day bed only now.
+        var bed = Hosted.Add(ThingKind.StrawBed, NetStrawBed);
         int day = Hosted.Day;
         await CloseWithEsc();
         await Until(() => view.Pick(view.Screen(NetStrawBed, .06f))?.Id == bed.Id, "the straw bed within reach of the pointer");
@@ -42,6 +44,8 @@ public partial class Game {
         Signal("host-on-straw-bed");
         await Until(() => Hosted.Day == day + 1 && world.Day == day + 1 && world.Me.SleepingAt == 0 && guest.SleepingAt == 0,
             "the guest's sleep taking both players to dawn and waking them");
+        await CloseWithEsc();
+        Warp(Hosted, home);
     }
 
     private async Task GuestEntersCabinAndSleepsToDawn() {
@@ -50,8 +54,17 @@ public partial class Game {
         Require(hut.Rotation == NetHutRotation, "the host's cabin angle should reach the guest");
         await CloseWithEsc(); await DoubleClick(view.Screen(NetHut, .8f));
         await Until(() => world.Sheltered == hut.Id, "the host letting the guest into the cabin it walked to");
+        await Signaled("cabin-wake-ready");
+        await Until(() => Named("sleep") is Button { Visible: true, Text: "Sleep" }, "the cabin's Sleep button appearing inside");
+        await Click(Named("sleep")!);
+        await Until(() => world.Me.SleepingAt == hut.Id && Named("sleep") is Button { Text: "Wake" },
+            "the guest falling asleep before the host");
+        await Click(Named("sleep")!);
+        await Until(() => world.Me.SleepingAt == 0, "the guest waking before the host turns in");
+        Signal("cabin-guest-woke");
         await Signaled("host-on-straw-bed");
-        var bed = world.Things.Single(t => t.Kind == ThingKind.StrawBed);
+        await Until(() => world.ThingsOf(ThingKind.StrawBed).Count == 1, "the guest receiving the new straw bed");
+        var bed = world.ThingsOf(ThingKind.StrawBed)[0];
         await Until(() => world.Players.Single(p => p != world.Me).SleepingAt == bed.Id,
             "the guest seeing the host asleep on the new straw bed");
         int day = world.Day;
@@ -59,5 +72,6 @@ public partial class Game {
         await Click(Named("sleep")!);
         await Until(() => world.Day == day + 1 && world.Me.SleepingAt == 0 && world.Sheltered == hut.Id,
             "the guest waking in the cabin at dawn with the host");
+        await CloseWithEsc();
     }
 }

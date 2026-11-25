@@ -34,6 +34,7 @@ internal static class BarrelChecks {
         Test(CheckWorkerKeepsTheirWaterSourceWhileWalking, data);
         Test(CheckCabinServesThirstBeforeBottlesInEntryOrder, data);
         Test(CheckCabinBarrelReplacesThirstLostWhileSleeping, data);
+        Test(CheckSleepingPreviewUsesRemainingWaterOnWaking, data);
         Test(CheckCabinFillsBottlesAtBedtime, data);
         Test(CheckCabinServesScarceWakeUpWaterInEntryOrder, data);
         Test(CheckAWholeLiterAtDawnServesEachOccupant, data);
@@ -422,6 +423,22 @@ internal static class BarrelChecks {
         world.Sleep.Start(cabin);
         Require(world.Thirst == 100 && world.Backpack[Water.Full] == 1, "the player wakes fully watered with a full bottle");
         Require(cabin.Inventory[Barrel.AtFill(14)] == 1, "two liters at bedtime, one at dawn and three in the bottle leave fourteen");
+    }
+
+    private static void CheckSleepingPreviewUsesRemainingWaterOnWaking(GameData data) {
+        var (world, _, _) = Hosted(data);
+        var cabin = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -7));
+        StepInside(world, cabin);
+        world.Doorways.TurnKey();
+        RunUntilPhase(world, .75f);
+        Drop(world.Me, Water.Empty);
+        SetNeeds(world, 100, 90);
+        world.Sleep.Start(cabin);
+        cabin.Inventory.Add(Barrel.AtFill(1), 1);
+        float preview = world.Sleep.Preview(cabin).Thirst;
+        world.Tick(data.DaySeconds / 4, sleeping: true);
+        Require(preview is > 98 and < 99 && System.Math.Abs(world.Thirst - preview) < .05f,
+            "a sleeper's forecast should leave the last liter for morning rather than counting a second bedtime drink");
     }
 
     private static void CheckCabinFillsBottlesAtBedtime(GameData data) {

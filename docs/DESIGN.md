@@ -655,7 +655,7 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
 
 A player can sleep at any hour inside a cabin or on an outdoor straw bed. The cabin's Sleep button appears only inside.
 `PlayerState.SleepingAt` identifies a sleeper's place. The window draws outdoor sleep on the mat without sheltering the player.
-`SleepCycle` advances the simulation toward dawn only while everyone is asleep.
+`SleepCycle` advances the simulation toward dawn only while everyone is asleep, once an outdoor sleeper has lain down.
 Hunger or thirst running out, an attack outdoors, or scratching at an unlocked cabin door wakes those affected and stops the skip.
 Sleepers can also choose Wake. At dawn everyone still asleep wakes.
 A straw bed takes two grass and twenty leaves, lasts three full days from `Thing.BedBuiltAt` and refunds only within one hour.

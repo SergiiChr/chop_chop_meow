@@ -12,6 +12,8 @@ public static class StrawBedChecks {
         Test(CheckAnHourOldBedReturnsNothing, data);
         Test(CheckABedDisappearsAfterThreeDaysEvenWithoutUse, data);
         Test(CheckAWolfCanWakeAStrawBedSleeper, data);
+        Test(CheckSleepingOnStrawNeedsThePlayerBesideTheBed, data);
+        Test(CheckSoloStrawBedSleeperHasTimeToLieDownBeforeDawn, data);
         Test(CheckCabinAndStrawBedSleepTogetherSkipToDawn, data);
     }
 
@@ -58,6 +60,34 @@ public static class StrawBedChecks {
         WolfSteps.SnapTick(world, .8f);
         Require(world.Me.SleepingAt == 0 && world.Health < 100 && wolf.Target == world.Me.Id,
             "a wolf can bite a straw bed sleeper and wake them");
+    }
+
+    private static void CheckSleepingOnStrawNeedsThePlayerBesideTheBed(GameData data) {
+        var (world, _, _) = Hosted(data);
+        var bed = StrawBedSteps.Build(world);
+        world.Player = bed.Pos + Vector2.Right * 6;
+        var far = world.Player;
+        world.Sleep.Start(bed);
+        Require(world.Me.SleepingAt == 0 && world.Player == far, "Sleep should not jump the player across a clearing.");
+        world.Player = bed.Pos + Vector2.Right;
+        world.Sleep.Start(bed);
+        Require(world.Me.SleepingAt == bed.Id, "a player just beside the mat should be able to lie down.");
+    }
+
+    private static void CheckSoloStrawBedSleeperHasTimeToLieDownBeforeDawn(GameData data) {
+        var world = EmptyWorld(data);
+        var bed = StrawBedSteps.Build(world);
+        RunUntilPhase(world, .72f);
+        world.Add(ThingKind.Campfire, bed.Pos + Vector2.Right * 2).Burn = data.DaySeconds;
+        SetNeeds(world, 100, 100, 60);
+        float time = world.Time;
+        int day = world.Day;
+        world.Sleep.Start(bed);
+        world.Tick(.5f);
+        Require(world.Me.SleepingAt == bed.Id && world.Time == time + .5f && world.Health > 60,
+            "a solo sleeper should start healing with time to lie down before the clock skips.");
+        world.Tick(1.5f);
+        Require(world.Day == day + 1 && world.Me.SleepingAt == 0, "the clock should skip automatically once the sleeper lies down.");
     }
 
     private static void CheckCabinAndStrawBedSleepTogetherSkipToDawn(GameData data) {
