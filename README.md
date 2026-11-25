@@ -625,8 +625,8 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 
 The recipe map icon next to Crafting on the bottom bar opens the map over the whole screen.
 Esc or its close button closes it.
-Alt-click an item in an inventory, on the hotbar, on a station or resource panel, or on a recipe card to open the map at that
-item. The map scrolls to the item, highlights it and opens its details. Closing the map returns to the panel you came from.
+Alt-click an item slot or recipe card to open the map at that item. The map scrolls to the item, highlights it and
+opens its details. Closing the map returns to the panel you came from.
 Opening it from the bottom bar or by Alt-clicking lets the game run underneath.
 Opening it from a goal keeps the pause menu open underneath.
 Movement controls are disabled while the map is open.

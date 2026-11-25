@@ -200,7 +200,7 @@ UI and input:
 | `src/crafting/display/MapSlot.cs` | The filled or dashed icon slot shared by the cards and the legend |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
-| `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
+| `src/trade/display/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel, with their hands and tool slot |
 | `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
@@ -232,8 +232,8 @@ UI and input:
 | `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |
-| `src/PackerPanel.cs` | The packing station panel and its good picker |
-| `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
+| `src/packing/display/PackerPanel.cs` | The packing station panel and its good picker |
+| `src/ui/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/menus/StartMenu.cs` | The main menu and its save, load, options, join and Controls screens |
 | `src/menus/ControlsList.cs` | Key caps and actions on the shared Controls screen |

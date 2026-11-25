@@ -26,20 +26,26 @@ public partial class MapTree : Control {
             Vector2 start = Exit(from);
             float trunk = to.Position.X - Gap / 2;
             DrawLine(start, new Vector2(trunk, start.Y), color, stroke, true);
-            DrawLine(new Vector2(trunk, start.Y), new Vector2(trunk, Entry(to).Y), color, stroke, true);
+            Vector2 end = Entry(to), joint = new(trunk, end.Y);
+            DrawLine(new Vector2(trunk, start.Y), joint, color, stroke, true);
+            if (highlighted && !to.Chosen) DrawArrow(joint, end, color, stroke);
         }
         foreach (var (from, to) in links) {
             if ((from.Chosen || to.Chosen) != highlighted) continue;
             Vector2 start = Exit(from), end = Entry(to);
             float trunk = to.Position.X - Gap / 2;
-            if (start.Y == end.Y) DrawLine(start, end - new Vector2(6, 0), color, stroke, true);
-            else {
+            if (start.Y != end.Y) {
                 DrawLine(start, new Vector2(trunk, start.Y), color, stroke, true);
                 DrawLine(new Vector2(trunk, start.Y), new Vector2(trunk, end.Y), color, stroke, true);
-                DrawLine(new Vector2(trunk, end.Y), end - new Vector2(6, 0), color, stroke, true);
+                start = new Vector2(trunk, end.Y);
             }
-            DrawColoredPolygon([end, end - new Vector2(7, 4), end - new Vector2(7, -4)], color);
+            DrawArrow(start, end, color, stroke);
         }
+    }
+
+    private void DrawArrow(Vector2 start, Vector2 end, Color color, float stroke) {
+        DrawLine(start, end - new Vector2(6, 0), color, stroke, true);
+        DrawColoredPolygon([end, end - new Vector2(7, 4), end - new Vector2(7, -4)], color);
     }
 
     private static Vector2 Exit(MapNode node) => node.Position + new Vector2(MapNode.Width, MapNode.Height / 2);

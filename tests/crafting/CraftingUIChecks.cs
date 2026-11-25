@@ -41,6 +41,7 @@ public partial class Game {
         await TestClean(CheckAltClickBackpackItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickHotbarItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickRecipeShowsTheProductWithoutQueueing);
+        await TestClean(CheckAltClickIngredientInTheActiveCraftingRow);
         await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
         await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
         await TestClean(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
@@ -480,6 +481,22 @@ public partial class Game {
         await KeyStroke(Key.Escape);
         Require(ShownPage() == "Crafting", "Closing the map must return to crafting.");
         Drop(Hosted, "stone", 2); await CloseWithEsc();
+    }
+
+    /// <summary>Alt-clicking the stone in the active crafting row shows the stone rather than the chisel being made.</summary>
+    private async Task CheckAltClickIngredientInTheActiveCraftingRow() {
+        Give(Hosted, "stone", 2); await Frames();
+        await KeyStroke(Key.C);
+        int chisels = world.Carried("stone_chisel");
+        await Click(Named("craft_stone_chisel")!);
+        await Until(() => Named("queue_input_stone") != null && world.Making == "stone_chisel", "the chisel's ingredient slot appearing", 2);
+        await Click(Named("queue_input_stone")!, alt: true);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "stone", "the active recipe's stone highlighted on the recipe map", 2);
+        await KeyStroke(Key.Escape);
+        Hosted.Tick(8);
+        await Until(() => world.Carried("stone_chisel") == chisels + 1, "the chisel finishing without queueing another", 2);
+        Drop(Hosted, "stone_chisel", 1);
+        await CloseWithEsc();
     }
 
     /// <summary>On the recipe map a click on a chip goes to its item and lights it up for a moment, a click on an item shows its details, and Show leaves the map for where it is made.</summary>
