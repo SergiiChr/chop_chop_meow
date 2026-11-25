@@ -17,22 +17,30 @@ public partial class ClockPlate : PanelContainer {
         AddThemeStyleboxOverride("panel", Style.Plate);
         var column = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore }; column.AddThemeConstantOverride("separation", 6); AddChild(column);
         dial = new DayDial {
+            Name = "sky_dial",
             Arc = () => world.SkyArc,
             Night = () => world.MoonUp,
             MoonPhase = () => (world.Moonlight, world.MoonWaxing),
-            CustomMinimumSize = new Vector2(0, 62),
-            MouseFilter = MouseFilterEnum.Ignore,
+            MoonTip = TideTip,
+            CustomMinimumSize = new Vector2(0, 84),
+            MouseFilter = MouseFilterEnum.Pass,
         }; column.AddChild(dial);
         time = Style.Heading("", 16); time.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(time);
     }
 
     public void Refresh() {
-        var now = (world.Day, (int)(world.DayPhase * GameData.MinutesPerDay), world.Night);
+        var now = (world.Day, (int)(world.DayPhase * GameData.MinutesPerDay), world.MoonUp);
         if (now == shown) return;
         shown = now;
         int hour = (int)world.Hour;
         time.Text = $"Day {world.Day} · {hour}:{(int)(world.DayPhase * GameData.MinutesPerDay) % 60:00}";
         dial.QueueRedraw();
+    }
+
+    private string TideTip() {
+        var (days, high) = world.Beach.NextTide;
+        int tenths = Mathf.CeilToInt(days * 10);
+        return $"{tenths / 10f:0.#} {(tenths == 10 ? "day" : "days")} till {(high ? "high" : "low")} tide";
     }
 }
 

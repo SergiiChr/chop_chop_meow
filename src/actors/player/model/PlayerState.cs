@@ -90,6 +90,8 @@ public sealed class PlayerState {
     internal float GatherClock, AttackClock, DigWork;
     /// <summary>World time when this sleeper has finished lying down and can join a skip to dawn.</summary>
     internal float SleepReadyAt;
+    /// <summary>A wolf is within hearing range and this sleeper is not in a locked cabin.</summary>
+    internal bool HearsWolves;
     internal Thing? DigSubject;
     /// <summary>Seconds since the player last moved or gathered; hand crafting only goes on while they stand still.</summary>
     internal float Still;

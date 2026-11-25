@@ -530,6 +530,7 @@ Select a shovel and point at the sea beach to highlight a one-meter square.
 Hold right mouse to dig the square. It gives 10 sand and leaves a shallow, rounded cut with dark soil at the bottom.
 Cuts that share an edge join into one excavation.
 The sea reaches high tide at each full moon, once every eight in-game days, and replaces the sand as it covers each square.
+Hover over the moon on the clock to see how many in-game days remain until the next high or low tide.
 You can dig the square again once it is clear of water.
 You can walk out to the low-tide edge of the beach even when the tide is in.
 
@@ -1206,12 +1207,12 @@ A torch that lands on a wolf burns it and sends it running for a moment.
 
 “Not the best sleep score.”
 
-Lay a straw bed on dry, open ground from Building plans for 2 grass and 20 leaves.
+Lay a straw bed on dry, open ground from Building plans for 20 leaves.
 A bed holds one sleeper and doesn't shelter them from wolves.
-After waking, you finish getting up before you can walk away.
+Press W, A, S or D, or click Wake, to get up. You finish standing before you can walk away.
 If you already have a burning torch, it stands beside the bed while you sleep.
 It falls apart after three full in-game days, whether or not anyone slept in it.
-Taking it down less than one in-game hour after building returns 2 grass and 20 leaves. After that it returns nothing.
+Taking it down less than one in-game hour after building returns 20 leaves. After that it returns nothing.
 
 ### Cabins
 
@@ -1309,11 +1310,14 @@ A guest that loses the connection tries to get back in on its own for up to 120 
 ### Shared world
 
 Everyone shares the world, the market and the workers.
-The clock skips to the next dawn when everyone in the game is asleep, in cabins, on straw beds, or both.
-The skip waits for the last straw-bed sleeper to finish lying down.
-Workers, production, trade and needs advance during the skip, and wolves still roam.
+Time runs faster toward dawn when everyone in the game is asleep, in cabins, on straw beds, or both.
+The clock waits for the last straw-bed sleeper to finish lying down before speeding up.
+Workers, production, trade, needs and wolves all keep running in ordinary simulation steps.
+Outside a locked cabin, a wolf within your usual sight radius triggers “You hear something” and returns time to normal speed, even in darkness.
+You keep sleeping and healing. Time speeds up again when no sleeper hears a wolf.
+A locked cabin prevents both the warning and the slowdown. Its sleepers still wake at dawn.
 A wolf that starts scratching at an unlocked cabin door wakes the people sleeping there.
-Wolves can also bite and wake an outdoor sleeper. If anyone wakes before dawn, the skip stops.
+Wolves can also bite and wake an outdoor sleeper. If anyone wakes before dawn, time goes back to normal speed.
 Night wolves hunt each player separately.
 
 Thirty times a second the server sends each player only what changed since the last update that player confirmed, usually a few hundred bytes, so it plays over the internet as well as at home.

@@ -217,6 +217,12 @@ internal static class WorldSteps {
     /// <summary>Ticks to the moment the next day begins, when wages fall due.</summary>
     public static void RunUntilDawn(World world) => RunUntil(world, world.Day * world.Data.DaySeconds);
 
+    /// <summary>Lets the normal frame clock run until all sleepers wake from an uninterrupted sleep.</summary>
+    public static void UntilAllAwake(World world) {
+        for (int frame = 0; frame < 120 * 60 && world.Players.Any(p => p.SleepingAt != 0); frame++) world.Tick(1f / 60);
+        Require(world.Players.All(p => p.SleepingAt == 0), "sleep should finish within two minutes of simulated frames");
+    }
+
     /// <summary>Runs the world for a time with the player kept fed and watered, in ticks of <paramref name="step"/> seconds.</summary>
     public static void SafeTick(World world, float seconds, float step = Step) {
         Nourished(world);

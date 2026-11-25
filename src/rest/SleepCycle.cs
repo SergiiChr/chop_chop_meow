@@ -1,15 +1,22 @@
 using System;
+using System.Diagnostics;
 
 namespace ChopChopMeow;
 
-/// <summary>Each player's sleep, and the shared fast-forward that starts only when everyone is asleep.</summary>
+/// <summary>Each player's sleep and the shared speed-up, which runs while all are asleep and no sleeper hears a wolf.</summary>
 public sealed class SleepCycle(World world) {
     /// <summary>Health gained per second asleep while both needs are above the healing threshold.</summary>
     public const float FedNeed = 45, HealPerSecond = .12f;
     private const float SnapshotRoom = .15f;
     private const string Scratching = "You are awakened by the noise outside.";
-    internal bool FastForwarding { get; private set; }
+    private const int TargetRate = 12;
+    private const float SleepStep = 1f / World.TicksPerSecond;
+    private static readonly TimeSpan WorkBudget = TimeSpan.FromMilliseconds(4);
+    private bool speedingUp;
+    internal bool AdvancingTime { get; private set; }
+    internal bool Recovering { get; private set; }
     public int Place => world.S.Actor.SleepingAt;
+    internal bool OnStrawBed => world.Find(Place)?.Kind == ThingKind.StrawBed;
 
     private float Dawn => world.Day * world.Data.DaySeconds;
     public float SecondsToDawn => Dawn - world.Time;
@@ -61,7 +68,8 @@ public sealed class SleepCycle(World world) {
         p.Sprinting = p.Braking = false;
         p.SleepReadyAt = place.Kind == ThingKind.StrawBed ? world.Time + StrawBed.LieDownSeconds + SnapshotRoom : world.Time;
         if (place.Kind == ThingKind.StrawBed) { p.Pos = place.Pos; p.Warp++; } else world.BedtimeWater.DrinkAtBedtime(p, place);
-        FastForward();
+        p.HearsWolves = false;
+        ListenForWolves(p);
     }
 
     /// <summary>Wakes the acting player on request.</summary>
@@ -88,19 +96,31 @@ public sealed class SleepCycle(World world) {
             if (p.SleepingAt == place.Id) using (world.ActAs(p)) WakeActor(reason);
     }
 
-    /// <summary>Checks for a wolf at a sleeper's door and wakes sleepers at dawn even if time ran normally.</summary>
+    /// <summary>Checks what sleepers hear and wakes them at dawn even if time ran normally.</summary>
     internal void AfterTick(bool dawn) {
         if (dawn) {
             if (!SomeoneAsleep()) return;
             var cabins = world.BedtimeWater.Occupants();
-            if (!FastForwarding) BedtimeWater.FillBottles(cabins);
+            if (!speedingUp && !Recovering) BedtimeWater.FillBottles(cabins);
             BedtimeWater.ServeThirst(cabins);
             foreach (var p in world.Players) p.SleepingAt = 0;
             AnnounceDawn();
-        } else foreach (var p in world.Players)
-            if (p.SleepingAt != 0 && p.SleepingAt == p.Sheltered && world.Find(p.Sheltered) is { Locked: false }
-                && world.DoorCheck.AtDoor(p.Sheltered) != null)
+        } else foreach (var p in world.Players) {
+            if (p.SleepingAt == 0) continue;
+            ListenForWolves(p);
+            if (SleepingCabin(p) is { Locked: false } cabin && world.DoorCheck.AtDoor(cabin.Id) != null)
                 using (world.ActAs(p)) WakeActor(Scratching);
+        }
+    }
+
+    /// <summary>Outside a locked cabin, a wolf within sight radius can be heard in light or darkness.</summary>
+    private void ListenForWolves(PlayerState sleeper) {
+        if (SleepingCabin(sleeper) is { Locked: true }) { sleeper.HearsWolves = false; return; }
+        using var _ = world.ActAs(sleeper);
+        bool hears = false;
+        foreach (var wolf in world.Wolves) if (world.Sees(wolf.Pos)) { hears = true; break; }
+        if (hears && !sleeper.HearsWolves) world.Say("You hear something");
+        sleeper.HearsWolves = hears;
     }
 
     private void AnnounceDawn() => world.SayToAll(world.Workers.Count > 0
@@ -116,29 +136,54 @@ public sealed class SleepCycle(World world) {
         return true;
     }
 
-    private bool EveryoneAsleep() {
+    private Thing? SleepingCabin(PlayerState sleeper) => sleeper.SleepingAt == sleeper.Sheltered ? world.Find(sleeper.Sheltered) : null;
+
+    private bool CanAccelerate() {
         if (world.Players.Count == 0) return false;
-        foreach (var p in world.Players) if (p.SleepingAt == 0) return false;
+        // Let the last sleeper finish lying down and leave time for the next server snapshot.
+        foreach (var p in world.Players) if (p.SleepingAt == 0 || p.SleepReadyAt > world.Time || p.HearsWolves) return false;
         return true;
     }
 
-    /// <summary>Runs the normal world toward dawn in one-second steps, stopping if anyone wakes.</summary>
-    internal void FastForward(bool recovery = false) {
-        if (FastForwarding || !recovery && !EveryoneAsleep()) return;
-        // Leave time to draw the last sleeper lying down, including across the next server snapshot.
-        if (!recovery) foreach (var p in world.Players) if (p.SleepReadyAt > world.Time) return;
+    /// <summary>Adds ordinary simulation steps to a frame, leaving time for the next network update or draw.</summary>
+    internal void Accelerate(float elapsed) {
+        if (!CanAccelerate()) { speedingUp = false; return; }
+        if (elapsed <= 0) return;
+        long began = Stopwatch.GetTimestamp();
+        if (!speedingUp) {
+            BedtimeWater.FillBottles(world.BedtimeWater.Occupants());
+            speedingUp = true;
+        }
+        // Do not accumulate work during a slow frame: do what fits now and leave the next frame its own budget.
+        float extra = Math.Min(elapsed, SleepStep) * (TargetRate - 1);
+        AdvancingTime = true;
+        try {
+            for (int i = 1; i < TargetRate && extra > .0001f && CanAccelerate()
+                && Stopwatch.GetElapsedTime(began) < WorkBudget; i++) {
+                float step = Math.Min(SleepStep, Math.Min(extra, SecondsToDawn));
+                world.TickAcceleratedSleep(step);
+                extra -= step;
+            }
+        } finally {
+            AdvancingTime = false;
+        }
+        if (!CanAccelerate()) speedingUp = false;
+    }
+
+    /// <summary>Advances to dawn from the recovery screen when nobody is able to play.</summary>
+    internal void SkipToDawnAfterDeath() {
         float dawn = Dawn;
         BedtimeWater.FillBottles(world.BedtimeWater.Occupants());
-        FastForwarding = true;
+        Recovering = AdvancingTime = true;
         try {
-            while (world.Time < dawn && (recovery || EveryoneAsleep())) {
+            while (world.Time < dawn) {
                 float dt = Math.Min(1, dawn - world.Time);
                 world.Tick(dt, sleeping: true);
             }
         } finally {
-            FastForwarding = false;
+            Recovering = AdvancingTime = false;
         }
         world.Look();
-        if (recovery && world.Time >= dawn) AnnounceDawn();
+        AnnounceDawn();
     }
 }

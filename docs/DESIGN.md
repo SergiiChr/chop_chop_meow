@@ -196,7 +196,7 @@ UI and input:
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, the roof barrel and the shared sleep controls |
-| `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, the shared skip to dawn, outdoor bed expiry and salvage |
+| `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, accelerated time, outdoor bed expiry and salvage |
 | `src/rest/display/SleepPage.cs`, `src/rest/display/StrawBedPanel.cs` | Shared sleep controls and the straw bed’s remaining life |
 | `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The mat and a player lowering onto it or getting up, transferring weight from boots to a palm, then the hip and forearm |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
@@ -369,7 +369,7 @@ A host-made move such as a respawn bumps `PlayerState.Warp`, so it wins over the
 
 Shared rules:
 
-- Sleep is individual. The clock advances to dawn only when every present player is asleep.
+- Sleep is individual. The clock runs faster only while every present player is asleep and no sleeper outside a locked cabin hears a wolf.
 - Wolves each hunt one player (`Wolf.Target`).
 - Messages reach the acting player unless they concern everyone.
 
@@ -399,7 +399,7 @@ The welcome is a guest's first update, with the fog uncovered so far.
 - An action's result comes back with a later update. A window checks what it can before sending, and `Net.Made` names a new mine or worker so the panel opens on it. Panels refresh with every update while `Net.AwaitingAnswer` holds, and a page draws itself again when what sets its layout changes (`PagePanel.RedrawOnChange`), since drawing it right after an action would show the world before the answer.
 - Leaving waits for the server to confirm before the line closes, so actions still in flight arrive; the owner's server closes instead, and the line going is the confirmation.
 - Joining another game from your own autosaves it and leaves with `Game.StepAway`, which keeps its server up: a failed or cancelled join goes back to it, and after a good one it ends with nobody in it, 30 seconds later.
-- A window applies updates thirty times a second and draws more often, so a motion the view drives from a count the server keeps runs on its own clock in between (`LocalClock`): a stump or bush leaning as it is dug, a thrown wolf carcass, a mine's hole and frame, a forge's heat and gauge, a cart's trip and the time of day the sun and light show. The clock moves every drawn frame at the rate the count last ran at against the world's clock; an update makes up a small difference over the next frames without turning the motion back, and a big one, such as a pump of the bellows or a sleep that skips the night, is taken at once.
+- A window applies updates thirty times a second and draws more often, so a motion the view drives from a count the server keeps runs on its own clock in between (`LocalClock`): a stump or bush leaning as it is dug, a thrown wolf carcass, a mine's hole and frame, a forge's heat and gauge, a cart's trip and the time of day the sun and light show. The clock moves every drawn frame at the rate the count last ran at against the world's clock; an update makes up a small difference over the next frames without turning the motion back, and a big one, such as a pump of the bellows or skipping to dawn from the recovery screen, is taken at once.
 - A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key. It goes on trying while the server says the game is not open yet, as after the host loads a save.
 - Until the owner opens the game, the server refuses peers that are not on this computer. Only the owner can save; any player can hold the world, and it stands still while all of them do.
 - The server's welcome says whether the player owns the game, from their machine's key, so an owner who types their own game's address into the join popup still owns it.
@@ -639,7 +639,7 @@ The window advances the visible haul phase between server updates through `Local
 Construction keeps the ladder approach on dry ground and clear of other buildings.
 
 A player who sleeps in a cabin drinks from the roof barrel, leaving water for earlier occupants who have not turned in.
-Sleepers fill bottles when a shared skip starts, or at dawn if time runs normally.
+Sleepers fill bottles when the clock speeds up, or at dawn if time runs normally.
 On waking, sleepers drink from what is left, in cabin-entry order when they wake together.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
@@ -678,11 +678,15 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
 
 A player can sleep at any hour inside a cabin or on an outdoor straw bed. The cabin's Sleep button appears only inside.
 `PlayerState.SleepingAt` identifies a sleeper's place. The window draws outdoor sleep on the mat without sheltering the player.
-`SleepCycle` advances the simulation toward dawn only while everyone is asleep, once an outdoor sleeper has lain down.
-Hunger or thirst running out, an attack outdoors, or scratching at an unlocked cabin door wakes those affected and stops the skip.
-Sleepers can also choose Wake. At dawn everyone still asleep wakes.
+`SleepCycle` speeds up the clock only while everyone is asleep, once an outdoor sleeper has lain down.
+It adds normal simulation steps between frames instead of jumping over the night, up to 12× normal speed.
+The extra steps use at most 4 milliseconds of work per frame before starting no more, so a busy world can slow down.
+Outside a locked cabin, a wolf within a sleeper's sight radius triggers “You hear something” and restores normal speed, regardless of lighting.
+A locked cabin prevents both the warning and the slowdown. Sleep keeps healing the player either way.
+Hunger or thirst running out, an attack outdoors, or scratching at an unlocked cabin door wakes those affected and restores normal speed.
+Sleepers can choose Wake, and a press of W, A, S or D also wakes a straw-bed sleeper. At dawn everyone still asleep wakes.
 After an outdoor wake-up the window holds walking input through `StrawBedView.Rising`, then hands off facing the same way as the mat.
-A straw bed takes two grass and twenty leaves, lasts three full days from `Thing.BedBuiltAt` and refunds only within one hour.
+A straw bed takes twenty leaves, lasts three full days from `Thing.BedBuiltAt` and refunds only within one hour.
 
 #### Sprinting
 
@@ -958,6 +962,7 @@ The view shows less of the floor behind the near rim at shallower camera angles.
 Only the tile index is saved and shared with guests.
 The sea recedes slightly past its original waterline at the new moon and covers the sand strip at the full moon.
 The day dial shows the moon's lit side waxing and waning over the same eight-day cycle.
+Hovering over the moon icon shows the days to `Beach.NextTide`, high at full moon or low at new moon, whichever comes next.
 The tide clears each stripped square as water covers it. The low-tide waterline bounds walking throughout the cycle.
 
 ### Replanting trees
@@ -1712,7 +1717,7 @@ A sound within a metre of the player plays with no place too, so a long one such
 
 Sounds come from three places:
 
-- The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
+- The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment). Extra sleep steps do not play sped-up sounds.
 - The view plays sounds tied to animation timing: footsteps by ground type (`Footsteps.Sound`: gravel paths, water, rock, grass), axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
@@ -1726,7 +1731,7 @@ Both play lower and slower the taller the tree, from a tenth above their recorde
 
 ### Music
 
-Music in `assets/music` crossfades over four seconds between the day music and the night music when night falls or dawn breaks, including a sleep that skips to morning.
+Music in `assets/music` crossfades over four seconds between the day music and the night music when night falls or dawn breaks, including during sleep.
 The day plays its tracks one after another and the night loops one.
 
 Each keeps its place for the running session, so music longer than its part of the day carries on next time.

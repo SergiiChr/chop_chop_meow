@@ -93,7 +93,7 @@ public sealed partial class GameData {
     public Dictionary<ThingKind, BuildingDef> Buildings { get; } = new() {
         [ThingKind.Chest] = new() { Name = "Storage chest", Cost = new() { ["wood"] = 8 }, Description = "5 slots of 64. Separate input/output filters for workers." },
         [ThingKind.Campfire] = new() { Name = "Campfire", Cost = new() { ["wood"] = 6, ["stone"] = 4 }, Description = "Burns wood. Keeps wolves back until five or more are near." },
-        [ThingKind.StrawBed] = new() { Name = "Straw bed", Cost = new() { ["grass"] = 2, ["leaves"] = 20 }, Description = "Not the best sleep score." },
+        [ThingKind.StrawBed] = new() { Name = "Straw bed", Cost = new() { ["leaves"] = 20 }, Description = "Not the best sleep score." },
         [ThingKind.Hut] = new() { Name = "Cabin", Cost = new() { ["wood"] = 20, ["stone"] = 8 }, Description = "Shelter from wolves. Sleep inside at any hour." },
         [ThingKind.Furnace] = new() { Name = "Stone furnace", Cost = new() { ["stone"] = 16, ["wood"] = 6 }, Description = "Smelts iron and tin ore with coal or charcoal; sears meat, bakes bread and makes charcoal over wood, coal or charcoal.", Recipe = "iron_bar" },
         [ThingKind.Anvil] = new() { Name = "Anvil", Cost = new() { ["iron_bar"] = 4, ["stone"] = 6 }, Recipe = "steel_parts", ToolSlots = [new("hammer", 2)] },

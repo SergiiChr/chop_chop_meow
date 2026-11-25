@@ -69,8 +69,11 @@ public partial class Game {
         await Until(() => world.Players.Single(p => p != world.Me).SleepingAt == bed.Id,
             "the guest seeing the host asleep on the new straw bed");
         int day = world.Day;
+        float time = world.Time;
         await Until(() => Named("sleep") is Button { Visible: true, Text: "Sleep" }, "the cabin's Sleep button appearing inside");
         await Click(Named("sleep")!);
+        await Until(() => world.Day == day && world.Me.SleepingAt == hut.Id && world.Time > time + 2,
+            "the guest seeing the clock advance through the same night while still asleep");
         await Until(() => world.Day == day + 1 && world.Me.SleepingAt == 0 && world.Sheltered == hut.Id,
             "the guest waking in the cabin at dawn with the host");
         await CloseWithEsc();

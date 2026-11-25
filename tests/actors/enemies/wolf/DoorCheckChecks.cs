@@ -26,7 +26,7 @@ public static class DoorCheckChecks {
         Test(CheckOtherWolvesWaitBehindTheOneAtTheDoorAndJoinIn, data);
         Test(CheckAWolfAtADoorTurnsToAPlayerOutInTheOpen, data);
         Test(CheckSleepBehindAnUnlockedDoorStopsWhenAWolfScratches, data);
-        Test(CheckSleepBehindALockedDoorLastsUntilDawn, data);
+        Test(CheckWolvesDoNotSlowSleepBehindALockedDoor, data);
         Test(CheckNobodySleepsWhileAWolfForcesTheDoor, data);
         Test(CheckAHitKnocksAWolfOffTheDoorItForces, data);
         Test(CheckAWolfLeavesAloneEveryLockedCabinItTriedWhileItSmellsThem, data);
@@ -211,24 +211,36 @@ public static class DoorCheckChecks {
         float time = world.Time;
         Nourished(world);
         world.Sleep.Start(hut);
-        Require(world.Day == day && world.Night && world.Time > time, "sleep behind an unlocked door should stop in the night a wolf comes to it");
+        for (int i = 0; i < 120 && !told.Contains("You hear something"); i++) world.Tick(1f / 60);
+        Require(world.Day == day && world.Sleep.Place == hut.Id && told.Contains("You hear something"),
+            "a wolf coming within sight should stop the skip but leave the cabin sleeper asleep");
+        for (int i = 0; i < 240 && world.Sleep.Place != 0; i++) DoorCheckTick(world, .05f);
         // A wolf trots 3 m a second, so it covers the 20 m in about 7 seconds.
         Require(world.Time - time < 12, $"sleep should stop as the wolf reaches the door, not {world.Time - time:0} s later");
         Require(wolf.DoorCheck == DoorCheckStage.Scratching && wolf.DoorCheckTime == 0, $"sleep should stop as the wolf starts scratching, not with it {wolf.DoorCheck} for {wolf.DoorCheckTime} s");
-        Require(world.Sheltered == hut.Id && told.Contains("You are awakened by the noise outside."), $"the sleeper should wake inside and be told why: {string.Join(" | ", told)}");
+        Require(world.Sleep.Place == 0 && world.Sheltered == hut.Id && told.Contains("You are awakened by the noise outside."), $"the sleeper should wake inside and be told why: {string.Join(" | ", told)}");
         DoorCheckTick(world, .05f);
         Require(Heard(heard, "door_scratch") == 1, $"the sleeper should hear the scratching from its start: heard {string.Join(", ", heard)}");
     }
 
-    private static void CheckSleepBehindALockedDoorLastsUntilDawn(GameData data) {
-        var (world, hut, heard) = ShelteredNight(data, locked: true);
-        PatrolWolf(world, new Wolf { Pos = Doorways.DoorPoint(hut) + new Vector2(0, 20) });
+    private static void CheckWolvesDoNotSlowSleepBehindALockedDoor(GameData data) {
+        var (world, hut, _) = ShelteredNight(data, locked: true);
+        ScratchingWolf(world, hut);
+        SetNeeds(world, 100, 100, 60);
+        var told = new List<string>();
+        world.Notify += told.Add;
+        float time = world.Time;
         int day = world.Day;
-        Nourished(world);
         world.Sleep.Start(hut);
-        Require(world.Day == day + 1 && !world.Night, "sleep behind a locked door should last until dawn");
-        Require(world.Sheltered == hut.Id && world.Health == 100 && hut.Locked, "the sleeper should wake inside, unhurt, behind the locked door");
-        Require(!heard.Contains("door_scratch") && world.Wolves.Count == 0, $"a slept night should be silent and end with the wolves gone: heard {string.Join(", ", heard)}");
+        world.Tick(1f / 60);
+        Require(world.Time > time + 1f / 60 && !told.Contains("You hear something"),
+            "a wolf outside a locked door should not warn the sleeper or slow time");
+        Require(world.Sleep.Place == hut.Id && world.Sheltered == hut.Id && world.Health > 60 && hut.Locked,
+            "the sleeper should stay inside and heal even as the wolf scratches at the locked door");
+        UntilAllAwake(world);
+        Require(!told.Contains("You hear something"), "the wolf should not trigger the warning later in the same sleep");
+        Require(world.Day == day + 1 && world.Sheltered == hut.Id && hut.Locked,
+            "the player should still wake inside the locked cabin at dawn");
     }
 
     /// <summary>A wolf walks at 1.5 m a second, so 12 seconds after its second scratch it is still within the 30 m it smells both cabins from.</summary>

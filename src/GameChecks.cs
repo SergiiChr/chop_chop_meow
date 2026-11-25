@@ -1181,6 +1181,7 @@ public partial class Game {
             await TestClean(CheckBackpackCellsAndHudIconsTrackStats);
             await TestClean(CheckPinnedPlayerStaysDownAndDeathCountsDown);
             await RunCabinUIChecks();
+            await RunStrawBedUIChecks();
             await TestClean(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
             await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
             await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);

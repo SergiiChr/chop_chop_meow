@@ -472,7 +472,7 @@ public sealed partial class World {
     /// <summary>How much of the moon is lit, from 0 at new moon to 1 at full; a new game starts near full moon so the first night is not the darkest.</summary>
     public float Moonlight => MoonlightAt(S.Time);
     public float MoonlightAt(float time) => (1 + MathF.Cos(MathF.Tau * MoonPhaseAt(time))) / 2;
-    private float MoonPhaseAt(float time) => time / (Data.DaySeconds * Data.MoonCycleDays) % 1;
+    internal float MoonPhaseAt(float time) => time / (Data.DaySeconds * Data.MoonCycleDays) % 1;
     /// <summary>Clock hour, with the day starting at 06:00.</summary>
     public float Hour => (DayPhase * 24 + 6) % 24;
     /// <summary>From the first fading light until dawn; workers are off duty and wolves hunt.</summary>
@@ -594,8 +594,8 @@ public sealed partial class World {
         if (everyone || S.Actor.Id == LocalId) Notify?.Invoke(message);
         if (everyone || S.Actor.Id != LocalId) Relay?.Invoke(everyone ? null : S.Actor, message);
     }
-    // Sleep fast-forwards hours in one frame, so its events stay silent instead of playing all at once.
-    internal void Play(string sound, Vector2 at) { if (!Sleep.FastForwarding) Sound?.Invoke(sound, at); }
+    // Extra sleep steps stay silent so ordinary sounds do not pile up at the accelerated rate.
+    internal void Play(string sound, Vector2 at) { if (!Sleep.AdvancingTime) Sound?.Invoke(sound, at); }
     /// <summary>The recipe game data names for a station placed or loaded without one, or empty.</summary>
     private string StartingRecipe(ThingKind kind) => Data.Buildings.TryGetValue(kind, out var building) ? building.Recipe : "";
     public Thing Add(ThingKind kind, Vector2 pos, int remaining = 0, float rotation = 0) {
@@ -2307,25 +2307,35 @@ public sealed partial class World {
         var donated = order.Goods.Where(p => !VillageBuys(p.Key)).ToList();
         Say($"Cart returned with {(int)order.Value} coins.{(donated.Count > 0 ? $" Donated {Goods(donated)}." : "")}");
     }
+    /// <summary>Target rate of the server's ordinary steps and maximum size of an accelerated sleep step.</summary>
+    internal const int TicksPerSecond = 60;
+
     /// <summary>
     /// Advances the world. It runs as the world's own player, whoever's action started it, such as a guest's sleep:
     /// wages come out of that player's backpack, and each player's own part runs as that player.
     /// </summary>
     public void Tick(float dt, bool sleeping = false) {
+        Step(dt, sleeping);
+        if (!sleeping) Sleep.Accelerate(dt);
+    }
+
+    /// <summary>Runs an ordinary simulation step without counting it as time spent playing.</summary>
+    internal void TickAcceleratedSleep(float dt) => Step(dt, sleeping: false, accelerated: true);
+
+    private void Step(float dt, bool sleeping, bool accelerated = false) {
         using (ActAs(S.Players[0])) {
             int day = Day;
-            TickWorld(dt, sleeping);
+            TickWorld(dt, sleeping, accelerated);
             Sleep.AfterTick(Day != day);
-            if (!sleeping) Sleep.FastForward();
         }
     }
-    private void TickWorld(float dt, bool sleeping) {
+    private void TickWorld(float dt, bool sleeping, bool accelerated) {
         bool wasDusk = Dusk, wasLunch = Lunch;
         everyone = true;
         float before = S.Time;
         S.Time += dt;
         Beach.Tick(before);
-        if (!sleeping) S.PlaySeconds += dt;
+        if (!sleeping && !accelerated) S.PlaySeconds += dt;
         // A wolf whose player left the game goes back to patrolling.
         foreach (var wolf in S.Wolves) if (wolf.Target != 0 && PlayerById(wolf.Target) == null) WolfPatrols.Patrol(wolf, wolf.Heading);
         acting.Clear(); acting.AddRange(S.Players);
@@ -2400,14 +2410,14 @@ public sealed partial class World {
             }
         }
         // Wolves still hunt and check doors during sleep. A test tick that only skips ahead leaves them where they are.
-        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.DenHours = 0; S.Howled = false; } else if (!sleeping || Sleep.FastForwarding) WolfPatrols.TickDens(dt);
+        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.DenHours = 0; S.Howled = false; } else if (!sleeping || Sleep.Recovering) WolfPatrols.TickDens(dt);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
             using (ActAs(p)) {
                 if (!sleeping) Doorways.Tick(dt);
                 if (!Dusk) {
                     if (!Dead) S.Mauled = false;
-                } else if (!sleeping || Sleep.FastForwarding && (p.SleepingAt != 0 || Doorways.Indoors(p))) {
+                } else if (!sleeping || Sleep.Recovering && (p.SleepingAt != 0 || Doorways.Indoors(p))) {
                     float health = S.Health;
                     hunting.Clear();
                     foreach (var w in S.Wolves) if (w.Target == p.Id) hunting.Add(w);
@@ -2419,7 +2429,7 @@ public sealed partial class World {
                 playerBusy = false;
             }
         everyone = false;
-        if (!Sleep.FastForwarding) Look();
+        if (!Sleep.Recovering) Look();
     }
     /// <summary>Starts, fuels and finishes the batches of a station's recipe.</summary>
     private void StationTick(Thing t, float dt) {

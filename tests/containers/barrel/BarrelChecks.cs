@@ -401,10 +401,12 @@ internal static class BarrelChecks {
         StepInside(world, cabin);
         world.Doorways.TurnKey();
         RunUntilNight(world);
+        ShutDens(world);
         SetNeeds(world, hunger: 100, thirst: 55);
         SetNeeds(guest, hunger: 100, thirst: 55);
         world.Sleep.Start(cabin);
         world.As(guest, () => world.Sleep.Start(cabin));
+        UntilAllAwake(world);
         Require(cabin.Inventory[Barrel.Item] == 1 && world.Backpack[Water.Empty] == 1 && guest.Backpack[Water.Empty] == 1,
             "both players' thirst takes all available water before either bottle");
         Require(guest.Thirst - world.Thirst > 11 && guest.Thirst - world.Thirst < 12, "the first player inside received two liters and the next received one");
@@ -418,9 +420,11 @@ internal static class BarrelChecks {
         StepInside(world, cabin);
         world.Doorways.TurnKey();
         RunUntilPhase(world, .75f);
+        ShutDens(world);
         SetNeeds(world, hunger: 100, thirst: 55);
         Require(world.Sleep.Preview(cabin).Thirst == 100, "enough water in the cabin barrel should predict full thirst at dawn");
         world.Sleep.Start(cabin);
+        UntilAllAwake(world);
         Require(world.Thirst == 100 && world.Backpack[Water.Full] == 1, "the player wakes fully watered with a full bottle");
         Require(cabin.Inventory[Barrel.AtFill(14)] == 1, "two liters at bedtime, one at dawn and three in the bottle leave fourteen");
     }
@@ -452,10 +456,12 @@ internal static class BarrelChecks {
         StepInside(world, cabin);
         world.Doorways.TurnKey();
         RunUntilPhase(world, .75f);
+        ShutDens(world);
         SetNeeds(world, hunger: 100, thirst: 55);
         float preview = world.Sleep.Preview(cabin).Thirst;
         Require(preview is > 74 and < 76, "after two bedtime liters, the bottle uses the remaining three before dawn");
         world.Sleep.Start(cabin);
+        UntilAllAwake(world);
         Require(System.Math.Abs(world.Thirst - preview) < .1f && world.Backpack[Water.Full] == 1 && cabin.Inventory[Barrel.Item] == 1,
             "the player wakes thirsty with a full bottle when bedtime uses all five liters");
     }
@@ -496,12 +502,14 @@ internal static class BarrelChecks {
         world.Doorways.TurnKey();
         // Eight game hours cost one liter per person.
         RunUntil(world, data.DaySeconds - data.DaySeconds / 3 + 1);
+        ShutDens(world);
         SetNeeds(world, hunger: 100, thirst: 100);
         SetNeeds(guest, hunger: 100, thirst: 100);
         Require(world.Sleep.Preview(cabin).Thirst == 100 && world.As(guest, () => world.Sleep.Preview(cabin).Thirst) == 100,
             "two liters for two people should forecast full thirst after an eight-hour sleep");
         world.Sleep.Start(cabin);
         world.As(guest, () => world.Sleep.Start(cabin));
+        UntilAllAwake(world);
         Require(guest.Thirst == 100 && world.Thirst == 100 && cabin.Inventory[Barrel.Item] == 1,
             "the player who wakes first should use only one liter despite the rounding of the needs during sleep");
     }

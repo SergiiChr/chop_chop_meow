@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -14,6 +15,9 @@ public static class StrawBedChecks {
         Test(CheckAWolfCanWakeAStrawBedSleeper, data);
         Test(CheckSleepingOnStrawNeedsThePlayerBesideTheBed, data);
         Test(CheckSoloStrawBedSleeperHasTimeToLieDownBeforeDawn, data);
+        Test(CheckANearbyWolfKeepsTimeAtNormalSpeedWithoutStoppingHealing, data);
+        Test(CheckAWolfComingIntoSightStopsAnOngoingSkip, data);
+        Test(CheckOnlyTheSleeperNearTheWolfHearsIt, data);
         Test(CheckMovementWaitsForTheStandingHandoff, data);
         Test(CheckCabinAndStrawBedSleepTogetherSkipToDawn, data);
         Test(CheckBootsStayPlantedAndClearTheMat);
@@ -24,11 +28,11 @@ public static class StrawBedChecks {
     private static void CheckTakingApartAFreshBedGivesBackExactlyItsCost(GameData data) {
         var world = EmptyWorld(data);
         var bed = StrawBedSteps.Build(world);
-        Require(world.Backpack["grass"] == 0 && world.Backpack["leaves"] == 0, "building a straw bed spends two grass and twenty leaves");
+        Require(world.Backpack["leaves"] == 0, "building a straw bed spends all twenty leaves");
         Require(world.CanStand(bed.Pos), "the low mat should not block walking");
         world.Tick(data.HourSeconds - 1);
         Require(world.Construction.Dismantle(bed) && world.Find(bed.Id) == null, "taking down a fresh bed should remove it");
-        Require(world.Backpack["grass"] == 2 && world.Backpack["leaves"] == 20, "a bed less than an hour old returns its cost");
+        Require(world.Backpack["grass"] == 0 && world.Backpack["leaves"] == 20, "a bed less than an hour old returns only twenty leaves");
     }
 
     private static void CheckAnHourOldBedReturnsNothing(GameData data) {
@@ -94,7 +98,76 @@ public static class StrawBedChecks {
         world.Tick(StrawBed.LieDownSeconds - .5f);
         Require(world.Day == day && world.Me.SleepingAt == bed.Id, "dawn should leave time for the last frame to reach clients");
         world.Tick(.25f);
+        Require(world.Day == day && world.Time > time + StrawBed.LieDownSeconds + .25f,
+            "after lying down the clock should run faster, with intermediate frames still shown");
+        UntilAllAwake(world);
         Require(world.Day == day + 1 && world.Me.SleepingAt == 0, "the clock should skip automatically once the sleeper lies down.");
+    }
+
+    private static void CheckANearbyWolfKeepsTimeAtNormalSpeedWithoutStoppingHealing(GameData data) {
+        foreach (bool lit in new[] { false, true }) {
+            var world = NightWorld(data);
+            world.Player = Terrain.Spawn;
+            var bed = StrawBedSteps.Build(world);
+            RemoveWolves(world, _ => true);
+            if (lit) world.Add(ThingKind.Campfire, bed.Pos).Burn = 90;
+            PlaceWolf(world, new Wolf { Pos = bed.Pos + Vector2.Right * (data.SightRadius - .5f), Howl = 10 });
+            SetNeeds(world, 100, 100, 60);
+            var messages = new List<string>();
+            world.Notify += messages.Add;
+            float time = world.Time;
+            world.Sleep.Start(bed);
+            world.Tick(3);
+            world.Tick(.25f);
+            Require(world.Time == time + 3.25f && world.Sleep.Place == bed.Id,
+                "a wolf in sight should keep a straw-bed sleeper at normal speed, even by firelight");
+            Require(Mathf.IsEqualApprox(world.Health, 60.39f), "the sleeper should keep healing at the normal rate");
+            Require(messages.FindAll(message => message == "You hear something").Count == 1,
+                "a nearby wolf should warn the sleeper once, not on every tick");
+        }
+    }
+
+    private static void CheckAWolfComingIntoSightStopsAnOngoingSkip(GameData data) {
+        var world = NightWorld(data);
+        world.Player = Terrain.Spawn;
+        var bed = StrawBedSteps.Build(world);
+        RemoveWolves(world, _ => true);
+        SetNeeds(world, 100, 100, 60);
+        world.Sleep.Start(bed);
+        var wolf = PlaceWolf(world, new Wolf { Pos = bed.Pos + Vector2.Left * (data.SightRadius + 7) });
+        float time = world.Time;
+        int frames = 0;
+        while (!world.Sees(wolf.Pos) && frames++ < 240) world.Tick(1f / 60);
+        Require(world.Time > time + frames / 60f && world.Time < time + 9 && world.Sees(wolf.Pos),
+            "the skip should advance until the wolf comes into sight and then stop before it reaches the sleeper");
+        Require(world.Sleep.Place == bed.Id && world.Health > 60, "a wolf approaching during the skip should leave the player asleep and healing");
+    }
+
+    private static void CheckOnlyTheSleeperNearTheWolfHearsIt(GameData data) {
+        var (world, guest, heard) = Hosted(data);
+        var bed = StrawBedSteps.Build(world);
+        var hut = world.Add(ThingKind.Hut, Terrain.Point(135, 0));
+        StepInside(world, hut, guest);
+        RunUntilNight(world);
+        ShutDens(world);
+        SetNeeds(world, 100, 100, 60); SetNeeds(guest, 100, 100, 60);
+        world.Sleep.Start(bed);
+        world.Tick(2.25f);
+        var wolf = PatrolWolf(world, new Wolf { Pos = guest.Pos + Vector2.Right * 7, Stagger = 1 });
+        var hostMessages = new List<string>();
+        world.Notify += hostMessages.Add;
+        float time = world.Time;
+        world.As(guest, () => world.Sleep.Start(hut));
+        world.Tick(.25f);
+        Require(world.Sleep.Place == bed.Id && guest.SleepingAt == hut.Id && world.Time == time + .25f,
+            "one sleeper hearing a wolf should hold the shared clock at normal speed without waking either sleeper");
+        Require(heard.Contains("You hear something") && !hostMessages.Contains("You hear something"),
+            "only the sleeper within sight radius of the wolf should see its warning");
+        int day = world.Day;
+        RemoveWolves(world, w => w == wolf);
+        UntilAllAwake(world);
+        Require(world.Day == day + 1 && world.Sleep.Place == 0 && guest.SleepingAt == 0,
+            "once the wolf is gone, two players who stayed asleep should skip to dawn");
     }
 
     private static void CheckMovementWaitsForTheStandingHandoff(GameData data) {
@@ -134,6 +207,7 @@ public static class StrawBedChecks {
         Require(world.Day == day && world.Me.SleepingAt == bed.Id && Math.Abs(world.Health - 61.2f) < .02f,
             "a straw bed sleeper rests and heals while the guest stays awake");
         world.As(guest, () => world.Sleep.Start(hut));
+        UntilAllAwake(world);
         Require(world.Day == day + 1 && world.Me.SleepingAt == 0 && guest.SleepingAt == 0,
             "sleeping at different kinds of bed should take both players to the next dawn");
     }
