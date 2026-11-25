@@ -1139,7 +1139,7 @@ An hour before dawn every wolf gives up and heads back to the nearest den.
 
 Fewer than five nearby wolves stop closing in when you reach a burning campfire and circle outside its light.
 Like a torch swing, the fire stops a bite a wolf is still gathering for, but one already in the air finishes its leap.
-Once five or more wolves are nearby, they attack through the firelight just as they do against a torch.
+Once five or more wolves are near the fire, they attack through its light just as they do against a torch.
 One log burns about 4 in-game hours.
 A campfire with no wood left burns anyway while workers sit at it.
 Cabin windows glow but do not deter wolves; a campfire whose light reaches a cabin's door keeps them off the door.

@@ -78,7 +78,7 @@ public sealed class WolfCounter(World world) {
     }
 
     private bool ClearGround(Vector2 from, Vector2 to) =>
-        (!world.Protected(to) || world.Protected(world.Player) && world.FullPackAt(world.Player)) &&
+        (!world.Protected(to) || world.FireLighting(world.Player) is Thing fire && world.FullPackAt(fire.Pos)) &&
         world.WolfSnap.ClearTo(from, to) == to;
 
     /// <summary>A clear path may close if a player or another wolf reaches it.</summary>

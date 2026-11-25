@@ -67,7 +67,7 @@ internal static class StrawBedModel {
         float Rand() => (float)rng.NextDouble();
         static Vector3 On(Vector2 p, float y) => new(p.X, y, p.Y);
         void Band(Vector3 a, Vector3 b, Vector3 upperA, Vector3 upperB, Color color) {
-            Tri(a, upperA, upperB, color); Tri(a, upperB, b, color);
+            Tri(a, upperB, upperA, color); Tri(a, b, upperB, color);
         }
         void Blade(Vector3 a, Vector3 b, Vector3 c, Color color) {
             if ((c - a).Cross(b - a).Y < 0) (b, c) = (c, b);

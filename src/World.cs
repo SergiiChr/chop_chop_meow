@@ -1224,7 +1224,7 @@ public sealed partial class World {
         return false;
     }
     /// <summary>Fire deters hunting wolves unless a full pack is near their prey.</summary>
-    internal bool FireDeters(Vector2 prey) => Protected(prey) && !FullPackAt(prey);
+    internal bool FireDeters(Vector2 prey) => FireLighting(prey) is Thing fire && !FullPackAt(fire.Pos);
     /// <summary>A burning torch in hand, with the player out in the open, sets how wolves behave.</summary>
     internal bool Torchlit => S.TorchLit && !Downed && S.Sheltered == 0 && !Protected(Player);
     /// <summary>

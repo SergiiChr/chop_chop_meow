@@ -24,7 +24,7 @@ public partial class Game {
         Require(guest.Pos.DistanceTo(NetHut + new Vector2(2, .34f)) < .18f, "the guest should enter from the rotated doorstep");
         Hosted.As(guest, Hosted.Doorways.TurnKey);
         RunUntilPhase(Hosted, .65f);
-        Hosted.S.Wolves.Clear();
+        RemoveWolves(Hosted, _ => true);
         ShutDens(Hosted);
         SetNeeds(Hosted, 100, 100, 50); SetNeeds(guest, 100, 100, 50);
         Signal("cabin-wake-ready");

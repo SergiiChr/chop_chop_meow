@@ -84,6 +84,10 @@ internal static class ProgressionSteps {
     /// hammers steel parts at the anvil for a steel pickaxe at the bench, which also makes two more crates.
     /// </summary>
     public static void MakeSteelToolsFromMinedOre(World world, Thing stone, Thing iron, Thing coal, Thing bench) {
+        // Isolate the production steps from combat. Campfires no longer stop a complete pack.
+        if (!world.Dusk) RunUntilPhase(world, world.Data.DuskStarts + .01f);
+        RemoveWolves(world, _ => true);
+        ShutDens(world);
         GatherUntil(world, stone, "stone", 52);
         GatherUntil(world, iron, "iron_ore", 22);
         GatherUntil(world, coal, "coal", 17);
@@ -115,9 +119,6 @@ internal static class ProgressionSteps {
         Require(world.Backpack["steel_bar"] == 2 && world.Backpack["iron_bar"] == bars - 2,
                 "one smelt of 2 iron bars and coal should make two steel bars from real inputs");
 
-        // Keep the hand-work and trade checks about production. A complete pack now attacks through the firelight.
-        RemoveWolves(world, _ => true);
-        ShutDens(world);
         var anvil = BuildAt(world, ThingKind.Anvil, Site(28, 25));
         world.Player = anvil.Pos + Vector2.One;
         Require(world.SlotTool(anvil, "steel_hammer"), "the bought steel hammer should go into the anvil's hammer slot");

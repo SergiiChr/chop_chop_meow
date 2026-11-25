@@ -80,7 +80,7 @@ public static class StrawBedChecks {
         var world = EmptyWorld(data);
         var bed = StrawBedSteps.Build(world);
         RunUntilPhase(world, .72f);
-        world.S.Wolves.Clear();
+        RemoveWolves(world, _ => true);
         ShutDens(world);
         SetNeeds(world, 100, 100, 60);
         float time = world.Time;
@@ -102,7 +102,7 @@ public static class StrawBedChecks {
         StepInside(world, hut, guest);
         world.As(guest, world.Doorways.TurnKey);
         RunUntilPhase(world, data.DuskStarts + .02f);
-        world.S.Wolves.Clear();
+        RemoveWolves(world, _ => true);
         ShutDens(world);
         SetNeeds(world, 100, 100, 60); SetNeeds(guest, 100, 100, 60);
         int day = world.Day;

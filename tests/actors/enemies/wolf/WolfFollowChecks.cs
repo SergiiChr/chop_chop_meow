@@ -50,7 +50,9 @@ public static class WolfFollowChecks {
     /// <summary>A fifth nearby wolf makes the same circle give way to an attack through the firelight.</summary>
     private static void CheckAFifthWolfBreaksTheCampfireCircle(GameData data) {
         var world = NightWorld(data);
-        var centre = world.Player = Terrain.Spawn;
+        var centre = Terrain.Spawn;
+        // Near the edge of the light, two of the circlers are more than 9 m from the player but still near the same fire.
+        world.Player = centre + Vector2.Right * 4;
         var fire = world.Add(ThingKind.Campfire, centre);
         fire.Burn = 90;
         var wolves = Enumerable.Range(0, 5).Select(i => PlaceWolf(world, new Wolf {
@@ -61,7 +63,7 @@ public static class WolfFollowChecks {
         world.Notify += told.Add;
         WolfTick(world, .4f, wolves);
         Require(!told.Contains("The pack has you surrounded. They attack!"), "a distant fifth wolf should not count yet");
-        wolves[4].Pos = centre + new Vector2(6, -3);
+        wolves[4].Pos = centre + new Vector2(-5, -4);
         wolves[4].Howl = 0;
         WolfTick(world, 3, wolves);
         Require(told.Count(message => message == "The pack has you surrounded. They attack!") == 1,

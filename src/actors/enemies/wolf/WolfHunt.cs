@@ -95,7 +95,7 @@ public sealed class WolfHunt(World world) {
             return;
         }
         var fire = world.FireLighting(world.Player);
-        bool torch = world.Torchlit, pack = (fire != null || torch) && world.FullPackAt(world.Player);
+        bool torch = world.Torchlit, pack = (fire != null || torch) && world.FullPackAt(fire?.Pos ?? world.Player);
         bool circlingFire = fire != null && !pack, chargeThroughFire = fire != null && pack, wary = torch && !pack;
         if (pack && !world.S.Actor.PackAttack) world.Say("The pack has you surrounded. They attack!");
         world.S.Actor.PackAttack = pack;
