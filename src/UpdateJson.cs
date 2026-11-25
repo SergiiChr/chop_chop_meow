@@ -20,6 +20,7 @@ namespace ChopChopMeow;
 [JsonSerializable(typeof(Dictionary<int, Inventory>))]
 [JsonSerializable(typeof(Dictionary<int, PipeTile>))]
 [JsonSerializable(typeof(Dictionary<int, double>))]
+[JsonSerializable(typeof(HashSet<int>))]
 internal partial class UpdateJson : JsonSerializerContext;
 
 /// <summary>Every inventory that is not fresh, written as <see cref="UpdateJson"/> writes the rest.</summary>

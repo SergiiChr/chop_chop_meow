@@ -10,7 +10,7 @@ public partial class WorldView {
     private readonly Random effectRandom = new(1337);
     private float Jitter() => (float)effectRandom.NextDouble();
 
-    private void BuildGround(Node3D parent) {
+    private void BuildGround(Node3D parent, Node3D warm) {
         InitializeDressing();
         // The meadow's colours: fine grass grain with occasional bare-earth flecks at the top of the ramp.
         var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
@@ -18,7 +18,7 @@ public partial class WorldView {
         var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
         terrainView = new TerrainView(parent, camera, sun, grass, disturbanceTexture, sceneryShadeTexture, objectShadeTexture, World.Player);
         // Sea and its feathered bank follow the coastline at the valley's mouth.
-        ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
+        coast = ShorelineAppearance.BuildCoast(parent, warm, gravelPaths.Texture, EnvironmentReview);
         LakeDressing.Build(parent, EnvironmentReview);
         foreach (var cliff in Cliff.All) BuildCliff(parent, cliff);
         foreach (var den in WolfPatrols.Dens) BuildDen(parent, den);

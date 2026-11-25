@@ -4,8 +4,8 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The map of where the drawn water lies, one texel a world unit, which the terrain draws the beds by: red under the
-/// lake's water and green under the sea's.
+/// Where the terrain draws the beds, one texel a world unit: red under the lake, green under the sea at its original
+/// level, and blue for the tide at which the sea reaches each part of the beach.
 /// </summary>
 internal static class BedMap {
     /// <summary>
@@ -16,15 +16,21 @@ internal static class BedMap {
 
     /// <summary>The map over <paramref name="span"/> world units square from <paramref name="corner"/> in world x and z.</summary>
     public static ImageTexture Bake(Vector2 corner, int span) {
-        var beds = new byte[span * span * 2];
+        var beds = new byte[span * span * 3];
         // Rows are independent and the water's lines are read-only, so the map fills on all cores.
         Parallel.For(0, span, z => {
             for (int x = 0; x < span; x++) {
                 var p = corner + new Vector2(x + .5f, z + .5f);
-                beds[(z * span + x) * 2] = (byte)(Terrain.InLake(p, Margin) ? 255 : 0);
-                beds[(z * span + x) * 2 + 1] = (byte)(Terrain.Along(p) > ShoreLook.SeaWaterEdge(Terrain.Across(p)) - Margin ? 255 : 0);
+                int at = (z * span + x) * 3;
+                float across = Terrain.Across(p);
+                beds[at] = (byte)(Terrain.InLake(p, Margin) ? 255 : 0);
+                beds[at + 1] = (byte)(Terrain.Along(p) > ShoreLook.SeaWaterEdge(across) - Margin ? 255 : 0);
+                if (beds[at + 1] == 255) continue;
+                // The shader reads back tide shares in [-0.25, 1.25] to feather the wet sand at both ends.
+                float tide = Beach.TideOverSand(p, across, Terrain.Along(p) - Terrain.Waterline(across));
+                beds[at + 2] = (byte)(255 * Mathf.Clamp((tide + .25f) / 1.5f, 0, 1));
             }
         });
-        return ImageTexture.CreateFromImage(Image.CreateFromData(span, span, false, Image.Format.Rg8, beds));
+        return ImageTexture.CreateFromImage(Image.CreateFromData(span, span, false, Image.Format.Rgb8, beds));
     }
 }

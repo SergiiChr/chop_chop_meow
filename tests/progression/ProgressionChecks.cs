@@ -22,7 +22,7 @@ public static class ProgressionChecks {
 
     /// <summary>
     /// Every item and building must be reachable from a fresh start with only gathering, recipes and berry trade, and the tools that unlock the loop must never be lost.
-    /// Resources need their tool first: trees an axe, deposits a pickaxe; stone, berries, water and loose pieces need none.
+    /// Trees need an axe, deposits a pickaxe and beach sand a shovel. Stone, berries, water and loose pieces need no tools.
     /// </summary>
     private static void CheckEverythingIsReachableFromFreshStart(GameData data) {
         var fresh = new World(data);
@@ -36,6 +36,7 @@ public static class ProgressionChecks {
             // Crates of berries sold at a signpost buy what the village sells, the first pickaxe among it.
             if (built.Contains(ThingKind.Signpost) && have.Contains("crate") && have.Contains("berries")) foreach (var item in data.Market.Buys.Keys) grew |= have.Add(item);
             if (HasTool("rake")) grew |= have.Add("leaves");
+            if (HasTool("shovel")) grew |= have.Add("sand");
             // Crafting the vessel and reaching its liquid opens every fill state.
             foreach (var vessel in data.Vessels) {
                 if (have.Contains(vessel.Full)) grew |= have.Add(vessel.Liquid);

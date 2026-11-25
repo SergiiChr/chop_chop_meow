@@ -16,6 +16,10 @@ uniform float shore_wet = 0.6;
 uniform float grass_fade = 2.2;
 // Units over which the shore's edges wander in small bites; the strip starts half that further out under the water.
 uniform float shore_wander;
+uniform float coastal_tide;
+uniform float low_tide_shift;
+uniform float high_tide_margin;
+uniform sampler2D coastal_gravel : hint_default_black, filter_linear, repeat_disable;
 varying vec2 world_at;
 
 void vertex() {
@@ -28,7 +32,8 @@ void vertex() {
 void fragment() {
     float fleck = sin(world_at.x * 2.7 + world_at.y * 1.3) * sin(world_at.y * 3.1 - world_at.x * 1.7);
     float distance = UV.x + fleck * 0.1;
-    float dryness = smoothstep(0.12, 1.3, distance);
+    float tide = mix(low_tide_shift, UV.y + high_tide_margin, coastal_tide);
+    float dryness = smoothstep(0.12, 1.3, distance - tide);
     vec2 shore_uv = world_at / shore_tile;
     // One read of the height map shifts the photoscan along the view, so its low spots look sunk in.
     vec3 view = normalize(VIEW * mat3(TANGENT, -BINORMAL, NORMAL));
@@ -43,6 +48,8 @@ void fragment() {
     float bites = sin(world_at.x * 1.9 + world_at.y * 1.1) * sin(world_at.y * 2.3 - world_at.x * 1.4);
     float fray = dot(color, vec3(0.3, 0.59, 0.11)) - 0.45;
     float inland = distance + (patches * 0.6 + fray * 1.2) * grass_fade / 2.2 + bites * shore_wander;
-    float sea = -0.5 * shore_wander;
-    ALPHA = smoothstep(sea - 0.3, sea + 0.06, distance) * (1.0 - smoothstep(UV.y - grass_fade, UV.y, inland));
+    float sea = low_tide_shift - 0.5 * shore_wander;
+    float gravel = texture(coastal_gravel, (world_at + 0.5) / 216.0).r;
+    float sand = 1.0 - smoothstep(0.46, 0.54, gravel);
+    ALPHA = sand * smoothstep(sea - 0.3, sea + 0.06, distance) * (1.0 - smoothstep(UV.y - grass_fade, UV.y, inland));
 }

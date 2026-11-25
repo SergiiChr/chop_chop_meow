@@ -177,7 +177,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate or barrel | Walk over and pick it up with its contents |
 | Right mouse button on open ground | Eat, drink, light a torch, or swing toward the pointer using the hotbar selection |
-| Hold right mouse button on open ground with a shovel selected | Walk over and dig a hole |
+| Hold right mouse button on open ground with a shovel selected | Walk over and dig a planting hole or gather sand |
 | Left mouse button | Select a resource, building, crate or worker, or place a selected building. Put a held stack into the storage clicked, or let go of it anywhere else |
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
@@ -233,7 +233,7 @@ Beside them the bank shows the coins in the trading post's wage slot, which has 
 Under the wages it shows the coins sales brought in since dawn, green once they are above a day's wages and red until then.
 Beside a trading post, put coins on it to pay in, or click it to pick up all its coins and put them in your backpack.
 
-The day dial in the top-right corner shows the sun crossing its arc from sunrise to sunset; then the moon crosses the same arc until dawn.
+The day dial in the top-right corner shows the sun crossing its arc from sunrise to sunset, then the moon in its current phase until dawn.
 A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
 Your stomach growls as food falls under 20%, and again at 15%, 10% and 5%.
 
@@ -502,13 +502,22 @@ Loose stones and sticks lie about the plains: each picks up the same way as 1 st
 A pickaxe hit on a rock or an ore deposit knocks a loose piece of it off one time in twenty; it flies off and lands within 2 tiles, ready to pick up.
 A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 
+### Sand and tides
+
+Select a shovel and point at the sea beach to highlight a one-meter square.
+Hold right mouse to dig the square. It gives 10 sand and leaves a shallow, rounded cut with dark soil at the bottom.
+Cuts that share an edge join into one excavation.
+The sea reaches high tide at each full moon, once every eight in-game days, and replaces the sand as it covers each square.
+You can dig the square again once it is clear of water.
+You can walk out to the low-tide edge of the beach even when the tide is in.
+
 ### Replanting trees
 
 An axe hit has the same one-in-twenty chance to drop an acorn as a pickaxe hit has to drop a chip.
 Use right mouse to pick up the acorn.
 Double-click a shovel in your backpack, or select it on the hotbar, to see an outline over open ground.
 Esc leaves the outline active while the shovel is selected on the hotbar.
-Hold right mouse over open ground to walk there and dig a hole when you get close enough.
+Hold right mouse over open ground away from beach sand to walk there and dig a hole when you get close enough.
 Releasing right mouse before the dig finishes cancels it.
 Open the hole and place one acorn in its empty slot to plant it. A small nub marks the planted acorn.
 An unused hole disappears at dawn.

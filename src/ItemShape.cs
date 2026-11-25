@@ -99,9 +99,10 @@ internal static class ItemShape {
         [Water.Empty] = Bottle(Water.Empty),
         // Berries heap one by one.
         ["berries"] = new(Berry, Glossy, .16f, Lay.Loose, .7f),
-        // Leaves, gravel and compost are each one mound, which swells with what is in it.
+        // Leaves, sand, gravel and compost are each one mound, which swells with what is in it.
         ["leaves"] = new(Leaves, Plain, Lay: Lay.Mound),
         ["gravel"] = new(Gravel, Plain, Lay: Lay.Mound, Scan: ModelKit.Scanned(Scan.Gravel, 1)),
+        [Beach.Sand] = new(Sand, Plain, Lay: Lay.Mound),
         [Compost] = new(Mulch, Plain, Lay: Lay.Mound, Scan: ModelKit.Scanned(Scan.Soil, 1)),
     };
 
@@ -624,6 +625,10 @@ internal static class ItemShape {
             Box(faces, at, new Vector3(size, size * .7f, size * 1.2f), stones[i % stones.Length]);
         }
     }
+
+    private static readonly Color[] SandColors = [new("cfac78"), new("d1b17c"), new("d9b984"), new("c5a36e")];
+
+    private static void Sand(List<Face> faces) => Mound(faces, .95f, .37f, 17, SandColors);
 
     /// <summary>A compost heap: a mound of dark soil with leaves on it and stalks and scraps poking out of it.</summary>
     private static void Mulch(List<Face> faces) {

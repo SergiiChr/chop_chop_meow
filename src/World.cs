@@ -319,6 +319,8 @@ public sealed class SaveState {
     public Dictionary<int, Thing> Remembered { get; set; } = new();
     /// <summary>Every tile with a gravel path laid on it, as its place in the map's rows, <c>y * Terrain.Size + x</c>.</summary>
     public List<int> GravelPaths { get; set; } = new();
+    /// <summary>Beach squares whose sand was dug up, keyed by their tile index.</summary>
+    public HashSet<int> StrippedSand { get; set; } = new();
     /// <summary>The shape and rotation of each steel pipe, keyed by the tile's place in the map's rows.</summary>
     public Dictionary<int, PipeTile> SteelPipes { get; set; } = new();
     /// <summary>Liters in each wet steel pipe, keyed by its index in the map's rows.</summary>
@@ -369,6 +371,7 @@ public sealed partial class World {
         Construction = new Construction(this); GravelPaths = new GravelPaths(this); Mines = new Mines(this);
         Farms = new Farms(this); SteelPipes = new SteelPipes(this);
         Holes = new GroundHoles(this); Replaced += Holes.Reset;
+        Beach = new Beach(this);
         Trees = new TreePlanting(this); Replaced += Trees.Reset;
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         Goals = new Goals(this);
@@ -406,6 +409,8 @@ public sealed partial class World {
     private readonly BreakSeats breakSeats;
     /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
     public GravelPaths GravelPaths { get; }
+    /// <summary>Beach sand, shovel work on sand, and the tide that refills stripped squares.</summary>
+    public Beach Beach { get; }
     public SteelPipes SteelPipes { get; }
     private readonly Plumbing plumbing;
     /// <summary>Standing liters in a pipe and pressure from the pumps attached to its connected pipes.</summary>
@@ -444,9 +449,12 @@ public sealed partial class World {
     /// <summary>How far the sun, or the moon after sunset, has crossed the sky, from 0 where it rises to 1 where it sets.</summary>
     public float SkyArc => SkyArcAt(S.Time);
     public float SkyArcAt(float time) => MoonUpAt(time) ? (DayPhaseAt(time) - Data.Sunset) / (1 - Data.Sunset) : DayPhaseAt(time) / Data.Sunset;
+    /// <summary>Whether the lit part of the moon is growing on its way from new moon to full moon.</summary>
+    public bool MoonWaxing => MoonPhaseAt(S.Time) > .5f;
     /// <summary>How much of the moon is lit, from 0 at new moon to 1 at full; a new game starts near full moon so the first night is not the darkest.</summary>
     public float Moonlight => MoonlightAt(S.Time);
-    public float MoonlightAt(float time) => (1 + MathF.Cos(MathF.Tau * time / Data.DaySeconds / Data.MoonCycleDays)) / 2;
+    public float MoonlightAt(float time) => (1 + MathF.Cos(MathF.Tau * MoonPhaseAt(time))) / 2;
+    private float MoonPhaseAt(float time) => time / (Data.DaySeconds * Data.MoonCycleDays) % 1;
     /// <summary>Clock hour, with the day starting at 06:00.</summary>
     public float Hour => (DayPhase * 24 + 6) % 24;
     /// <summary>From the first fading light until dawn; workers are off duty and wolves hunt.</summary>
@@ -2278,7 +2286,9 @@ public sealed partial class World {
     private void TickWorld(float dt, bool sleeping) {
         bool wasDusk = Dusk, wasLunch = Lunch;
         everyone = true;
+        float before = S.Time;
         S.Time += dt;
+        Beach.Tick(before);
         if (!sleeping) S.PlaySeconds += dt;
         // A wolf whose player left the game goes back to patrolling.
         foreach (var wolf in S.Wolves) if (wolf.Target != 0 && PlayerById(wolf.Target) == null) WolfPatrols.Patrol(wolf, wolf.Heading);
@@ -2578,7 +2588,7 @@ public sealed partial class World {
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
         if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Obtained == null || loaded.Prices == null
-            || loaded.Remembered == null || loaded.GravelPaths == null || loaded.GravelPaths.Exists(tile => (uint)tile >= Terrain.Size * Terrain.Size) || loaded.GravelPaths.Distinct().Count() != loaded.GravelPaths.Count || !SteelPipes.ValidLayout(loaded.SteelPipes) || !SteelPipes.ValidWater(loaded.PipeWater, loaded.SteelPipes) || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
+            || loaded.Remembered == null || loaded.GravelPaths == null || loaded.GravelPaths.Exists(tile => (uint)tile >= Terrain.Size * Terrain.Size) || loaded.GravelPaths.Distinct().Count() != loaded.GravelPaths.Count || !Beach.Valid(loaded.StrippedSand) || !SteelPipes.ValidLayout(loaded.SteelPipes) || !SteelPipes.ValidWater(loaded.PipeWater, loaded.SteelPipes) || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
             throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Players = new();
         // Until its machines join, the save's world runs as the player no machine has claimed, else the first.

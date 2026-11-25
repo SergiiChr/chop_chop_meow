@@ -60,8 +60,9 @@ uniform sampler2D sand_normal : hint_normal, filter_linear_mipmap_anisotropic, r
 uniform sampler2D sand_height : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float sand_tile;
 uniform float sand_wet;
-// Red under the lake's drawn water and green under the sea's, on the same texels as the woods map.
+// Red under the lake, green under the original sea, and blue for the tide that covers the sand.
 uniform sampler2D beds : filter_linear, repeat_disable;
+uniform float coastal_tide = -1.0;
 
 // Shifts a photoscan at uv, in tiles, along the view given along world x and z and up, by the depth its height map
 // gives there, so its lowest point moves shift tiles from its highest, seen edge on: one read in place of stepping down
