@@ -16,7 +16,7 @@ public static class StrawBedChecks {
         Test(CheckSoloStrawBedSleeperHasTimeToLieDownBeforeDawn, data);
         Test(CheckCabinAndStrawBedSleepTogetherSkipToDawn, data);
         Test(CheckBootsStayPlantedAndClearTheMat);
-        Test(CheckSupportHandStaysPlantedThroughTheWeightShift);
+        Test(CheckWeightPassesSmoothlyFromThePalmToTheForearm);
     }
 
     private static void CheckTakingApartAFreshBedGivesBackExactlyItsCost(GameData data) {
@@ -125,7 +125,7 @@ public static class StrawBedChecks {
             for (int frame = 0; frame <= frames; frame++) {
                 float down = (float)frame / frames;
                 StrawBedView.Draw(rig, mat, down);
-                Check(Sole(true), left, down); Check(Sole(false), right, down);
+                Check(Sole(true), left, down, .10f); Check(Sole(false), right, down, .19f);
             }
         } finally { rig.Root.Free(); }
 
@@ -134,10 +134,12 @@ public static class StrawBedChecks {
             return (rig.Root.Transform * toe, rig.Root.Transform * heel);
         }
 
-        static void Check((Vector3 Toe, Vector3 Heel) actual, (Vector3 Toe, Vector3 Heel) start, float down) {
+        static void Check((Vector3 Toe, Vector3 Heel) actual, (Vector3 Toe, Vector3 Heel) start, float down, float clearance) {
             const float tolerance = .008f;
-            Require(actual.Toe.IsFinite() && actual.Heel.IsFinite() && Math.Min(actual.Toe.Y, actual.Heel.Y) >= StrawBedModel.Top - tolerance,
+            float sole = Math.Min(actual.Toe.Y, actual.Heel.Y) - StrawBedModel.Top;
+            Require(actual.Toe.IsFinite() && actual.Heel.IsFinite() && sole >= -tolerance,
                 $"boot must not go through the straw at phase {down:F3}, got {actual}");
+            Require(sole < clearance, $"the leg should fold close to the mat rather than kicking upward, got {sole:F3} m at {down:F3}");
             if (down <= StrawBedView.BothBootsOnUntil) {
                 Require(Math.Abs(actual.Toe.Y - StrawBedModel.Top) < tolerance && Math.Abs(actual.Heel.Y - StrawBedModel.Top) < tolerance,
                     $"both boots should stand flat while bearing weight at phase {down:F3}, got {actual}");
@@ -147,23 +149,40 @@ public static class StrawBedChecks {
         }
     }
 
-    private static void CheckSupportHandStaysPlantedThroughTheWeightShift() {
+    private static void CheckWeightPassesSmoothlyFromThePalmToTheForearm() {
         var rig = new ActorRig(ActorSkin.Player);
-        var mat = new Thing { Kind = ThingKind.StrawBed };
+        var mat = new Thing { Kind = ThingKind.StrawBed, Rotation = Mathf.Pi };
         try {
-            var contact = Palm(StrawBedView.HandOn);
-            int frames = Mathf.CeilToInt((StrawBedView.HandOff - StrawBedView.HandOn) * StrawBed.LieDownSeconds * 60);
-            for (int frame = 0; frame <= frames; frame++) {
-                float down = Mathf.Lerp(StrawBedView.HandOn, StrawBedView.HandOff, (float)frame / frames);
-                var planted = Palm(down);
-                Require(Math.Abs(planted.Y - StrawBedModel.Top) < .012f && planted.DistanceTo(contact) < .012f,
-                    $"the hand should stay on the straw while it supports the weight shift at phase {down:F3}, got {planted} from {contact}");
+            StrawBedView.Draw(rig, mat, StrawBedView.HandOn);
+            var palm = Palm(true);
+            StrawBedView.Draw(rig, mat, StrawBedView.SecondHandOn);
+            var secondPalm = Palm(false);
+            StrawBedView.Draw(rig, mat, 0);
+            var lastLeft = Palm(true); var lastRight = Palm(false);
+            var lastElbow = Elbow();
+            int frames = Mathf.CeilToInt(StrawBed.LieDownSeconds * 60);
+            for (int frame = 1; frame <= frames; frame++) {
+                float down = (float)frame / frames;
+                StrawBedView.Draw(rig, mat, down);
+                var left = Palm(true); var right = Palm(false); var elbow = Elbow();
+                if (down >= StrawBedView.HandOn) StaysPlanted(left, palm, "leading", down);
+                if (down is >= StrawBedView.SecondHandOn and <= StrawBedView.SecondHandOff) StaysPlanted(right, secondPalm, "trailing", down);
+                if (down > StrawBedView.SecondHandOff) Require(right.Y >= StrawBedModel.Top,
+                    $"the relaxed hand should stay above the straw at {down:F3}, got {right}");
+                if (down >= StrawBedView.ForearmOn) Require(elbow.Y - StrawBedModel.Top is > .03f and < .057f,
+                    $"the forearm should bear weight while the shoulder descends at {down:F3}, elbow is at {elbow}");
+                Require(left.DistanceTo(lastLeft) < .072f && right.DistanceTo(lastRight) < .072f && elbow.DistanceTo(lastElbow) < .072f,
+                    $"neither hand nor the support elbow should jump between successive frames at phase {down:F3}, " +
+                    $"steps were {left.DistanceTo(lastLeft):F3}, {right.DistanceTo(lastRight):F3}, {elbow.DistanceTo(lastElbow):F3} m");
+                lastLeft = left; lastRight = right; lastElbow = elbow;
             }
         } finally { rig.Root.Free(); }
 
-        Vector3 Palm(float down) {
-            StrawBedView.Draw(rig, mat, down);
-            return rig.Root.Transform * rig.HandPad(true);
-        }
+        Vector3 Palm(bool left) => rig.Root.Transform * rig.HandPad(left);
+        Vector3 Elbow() => rig.Root.Transform * rig.Elbow(true);
+
+        static void StaysPlanted(Vector3 actual, Vector3 start, string hand, float down) =>
+            Require(Math.Abs(actual.Y - StrawBedModel.Top) < .012f && actual.DistanceTo(start) < .012f,
+                $"the {hand} hand should stay planted at phase {down:F3}, got {actual} from {start}");
     }
 }

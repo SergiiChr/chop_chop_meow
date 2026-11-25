@@ -8,7 +8,9 @@ Generated with built-in ImageGen for this game. The reference sheets are not exp
   down, lower into a palm-supported sit, lie lengthwise on the side with a hand near the head and knees softly bent,
   then rise through the supported sit. Keep the hands, boots and ground in view.
 
-For the hand and elbow support during the roll, compare the first four figures in [Aurora BayCare’s floor transfer sequence](https://ahc.aurorahealthcare.org/fywb/baycare/x14019bc.pdf).
+The revised transfer uses real people as the pose reference. The photographed side-sit in [Peggy Trueblood’s floor transfer sequence](https://www.slideserve.com/robert-pickett/floor-to-stand-transfers-powerpoint-ppt-presentation) shows one hip down, knees swept together and the palms staggered. [Aurora BayCare’s bed transfer photographs](https://ahc.aurorahealthcare.org/fywb/baycare/x20530bc.pdf) show the elbow taking weight before the shoulder settles. [Sikana’s exercise mat demonstration](https://www.sikana.tv/en/sport/50-gym-exercises-for-seniors/how-to-lie-down-on-a-floor-mat) shows the same forearm-first transition close to the ground.
+
+The game starts over the middle of a narrower mat, so it uses a crouch rather than the demonstration’s approach and kneel. At 60 frames per second, the first palm lands around frame 53, the near hip reaches the straw around 64, knees turn together toward the foot of the bed, the forearm takes weight around 89 and the other hand steadies the last part of the descent. The shoulder and head settle last. Getting up follows the same contacts in reverse.
 
 ## Prompts
 

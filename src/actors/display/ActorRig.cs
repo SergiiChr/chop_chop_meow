@@ -330,6 +330,9 @@ public sealed class ActorRig {
     /// <summary>Where an elbow is from the rig's root, under the pose just shown.</summary>
     public Vector3 Elbow(bool left) => FromForearm(left, Vector3.Zero);
 
+    /// <summary>Tilts the head toward the shoulder after posing the rest of the body.</summary>
+    internal void TipHead(float roll) => head.RotationDegrees += Vector3.Back * roll;
+
     /// <summary>Where the middle of the axe's head is from the rig's root, under the pose just shown.</summary>
     public Vector3 AxeHead => Holds(AxeHeadPoint);
 

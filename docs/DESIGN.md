@@ -176,7 +176,7 @@ UI and input:
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, the roof barrel and the shared sleep controls |
 | `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, the shared skip to dawn, outdoor bed expiry and salvage |
 | `src/rest/display/SleepPage.cs`, `src/rest/display/StrawBedPanel.cs` | Shared sleep controls and the straw bed’s remaining life |
-| `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The mat and a player lowering onto it or getting up, with planted boots and a support hand during the weight shift |
+| `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The mat and a player lowering onto it or getting up, transferring weight from boots to a palm, then the hip and forearm |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
 | `src/workers/breaks/BreakSeats.cs` | Reserves campfire and ground seats for workers at lunch or with nothing to do, and lights the campfires they sit at |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |

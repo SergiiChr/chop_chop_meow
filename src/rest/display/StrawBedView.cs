@@ -3,28 +3,30 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Squat on planted boots, put weight on one hand and the seat, then roll onto the side.</summary>
+/// <summary>Shift from a crouch to one hip, then lower through a palm and forearm onto the side.</summary>
 internal sealed class StrawBedView {
     private float down;
     private Thing? bed;
 
     private const float RigHips = FallBackView.FallHips;
-    internal const float HandOn = .43f, HandOff = .78f, BothBootsOnUntil = .57f;
-    private const float BootHalfWidth = .059f;
-    private static readonly Vector3 Handhold = new(.31f, StrawBedModel.Top + .005f, -.235f);
+    internal const float HandOn = .43f, ForearmOn = .72f, SecondHandOn = .79f, SecondHandOff = .89f, BothBootsOnUntil = .57f;
+    private const float BootHalfWidth = .059f, ElbowRadius = .043f;
+    private static readonly Vector3 Handhold = new(.275f, StrawBedModel.Top + .009f, -.255f);
+    private static readonly Vector3 SecondHandhold = new(.20f, StrawBedModel.Top + .01f, -.15f);
+    private static readonly Vector3 RestingHand = new(.16f, StrawBedModel.Top + .03f, -.36f);
     private static readonly Basis SideBoot = new Basis(Vector3.Right, -Mathf.Pi / 2) * new Basis(Vector3.Up, Mathf.DegToRad(84));
 
-    private readonly record struct Key(float At, Vector3 Hips, float Tip, float Roll, Pose Pose);
+    private readonly record struct Key(float At, Vector3 Hips, float Recline, float Turn, Pose Pose);
     private static readonly Key[] Keys = [
         new(0, new(0, new Pose().HipHeight, 0), 0, 0, new Pose()),
-        new(.24f, new(-.02f, .585f, -.09f), 0, 0, new Pose(Lean: 29, Head: 15, Sway: -8, RaiseR: 22)),
-        new(.43f, new(.018f, .285f, -.22f), -3, 0, new Pose(Lean: 39, Head: 20, Sway: -28, RaiseR: 34, ElbowR: 26)),
-        new(.53f, new(.03f, .117f, -.29f), -9, 7, new Pose(Lean: 25, Head: 18, Sway: -25, RaiseR: 42, ElbowR: 51)),
-        new(.65f, new(.055f, .128f, -.22f), -33, 30, new Pose(Lean: 13, Head: 18, Sway: -13, RaiseR: 48, ElbowR: 66)),
-        new(.81f, new(.04f, .152f, -.055f), -70, 70, new Pose(Lean: 3, Head: 11, RaiseL: 93, OutL: 22, ElbowL: 65,
-            RaiseR: 48, OutR: -22, ElbowR: 65)),
-        new(1, new(0, .158f, .065f), -90, 84, new Pose(Head: 7, RaiseL: 115, OutL: 24, ElbowL: 55,
-            RaiseR: 40, OutR: -30, ElbowR: 67))
+        new(.23f, new(-.03f, .59f, -.065f), 0, 0, new Pose(Lean: 23, Head: 12, Sway: -7, RaiseR: 13, ElbowR: 24)),
+        new(HandOn, new(.02f, .282f, -.24f), -4, 3, new Pose(Lean: 41, Head: 17, Sway: -25, RaiseR: 19, ElbowR: 41)),
+        new(.52f, new(.045f, .12f, -.315f), -13, 25, new Pose(Lean: 20, Head: 21, Sway: -21, RaiseR: 18, ElbowR: 54)),
+        new(.60f, new(.06f, .124f, -.296f), -32, 55, new Pose(Lean: 12, Head: 19, Sway: -9, RaiseR: 26, ElbowR: 60)),
+        new(.69f, new(.052f, .132f, -.20f), -51, 75, new Pose(Lean: 5, Head: 15, Sway: -4, RaiseR: 36, ElbowR: 62)),
+        new(.79f, new(.04f, .142f, -.09f), -69, 82, new Pose(Lean: 1, Head: 11, Sway: 5, RaiseR: 40, ElbowR: 67)),
+        new(.88f, new(.016f, .151f, .008f), -82, 84, new Pose(Twist: 9, Head: 14, Sway: 6, RaiseR: 40, ElbowR: 67)),
+        new(1, new(0, .155f, .065f), -90, 84, new Pose(Twist: 36, Head: 25, Sway: 2, RaiseR: 40, ElbowR: 67))
     ];
 
     /// <summary>Draws a sleeper, or a player getting up from a bed they have not walked away from.</summary>
@@ -51,29 +53,42 @@ internal sealed class StrawBedView {
         float h = b.At - a.At, t = (u - a.At) / h;
         var hips = new Vector3(Curve(before.Hips.X, a.Hips.X, b.Hips.X, after.Hips.X),
             StrawBedModel.Top + Curve(before.Hips.Y, a.Hips.Y, b.Hips.Y, after.Hips.Y), Curve(before.Hips.Z, a.Hips.Z, b.Hips.Z, after.Hips.Z));
-        float tip = Curve(before.Tip, a.Tip, b.Tip, after.Tip), roll = Curve(before.Roll, a.Roll, b.Roll, after.Roll);
-        var tilt = new Basis(Vector3.Right, Mathf.DegToRad(tip)) * new Basis(Vector3.Up, Mathf.DegToRad(roll));
+        float recline = Curve(before.Recline, a.Recline, b.Recline, after.Recline), turn = Curve(before.Turn, a.Turn, b.Turn, after.Turn);
+        var tilt = new Basis(Vector3.Right, Mathf.DegToRad(recline)) * new Basis(Vector3.Up, Mathf.DegToRad(turn));
         var bedFrame = new Transform3D(new Basis(Vector3.Up, -mat.Rotation), WorldView.To3(mat.Pos));
         var root = new Transform3D(tilt, hips - tilt * (Vector3.Up * RigHips));
         var pose = Pose.Lerp(a.Pose, b.Pose, Mathf.SmoothStep(0, 1, t)) with {
             Hips = RigHips,
             Lean = Curve(before.Pose.Lean, a.Pose.Lean, b.Pose.Lean, after.Pose.Lean),
             Sway = Curve(before.Pose.Sway, a.Pose.Sway, b.Pose.Sway, after.Pose.Sway),
+            Twist = Curve(before.Pose.Twist, a.Pose.Twist, b.Pose.Twist, after.Pose.Twist),
             Head = Curve(before.Pose.Head, a.Pose.Head, b.Pose.Head, after.Pose.Head)
         };
         var fromBed = root.AffineInverse();
-        float hand = Mathf.SmoothStep(.23f, HandOn, u) * (1 - Mathf.SmoothStep(HandOff, .96f, u));
-        if (hand > 0) {
-            var grip = ArmReach.ToTrunk(pose, fromBed * Handhold);
-            var (raise, outward, elbow, armRoll) = ArmReach.ArmTo(grip, true, new Vector3(1, -.3f, -.8f),
-                ActorRig.Palm, forearm: ActorRig.Forearm + ActorRig.HandPadReach);
-            raise = pose.RaiseL + Mathf.RadToDeg(Mathf.AngleDifference(Mathf.DegToRad(pose.RaiseL), Mathf.DegToRad(raise)));
-            pose = ArmReach.WithArm(pose, true, raise, outward, elbow, hand) with { ArmRollL = armRoll * hand };
-        }
+        var toTrunk = (tilt * ArmReach.TrunkBasis(pose)).Transposed();
+        float settle = Mathf.SmoothStep(SecondHandOff, 1, u);
+        var relaxed = SecondHandhold.Lerp(RestingHand, settle) + Vector3.Up * (.09f * settle * (1 - settle));
+        Plant(true, Handhold, Mathf.SmoothStep(.23f, HandOn, u));
+        Plant(false, relaxed, Mathf.SmoothStep(.56f, SecondHandOn, u));
         rig.Root.Transform = bedFrame * root;
         rig.Show(pose, null, false);
-        Boot(true, .64f, 1, .15f, .012f, .73f, 0);
-        Boot(false, BothBootsOnUntil, .95f, .17f, -.06f, .63f, .089f);
+        rig.TipHead(-23 * settle);
+        Boot(true, BothBootsOnUntil, .88f, .025f, .012f, .66f, 0);
+        Boot(false, .62f, .92f, .035f, -.045f, .60f, .095f);
+
+        void Plant(bool left, Vector3 palm, float weight) {
+            if (weight <= 0) return;
+            var grip = toTrunk * (palm - hips);
+            var bend = left ? new Vector3(.7f, -.18f, -1) : new Vector3(.7f, 0, .7f);
+            ArmReach.ElbowSupport? floor = left ? new(toTrunk * Vector3.Up, StrawBedModel.Top + ElbowRadius - hips.Y,
+                Mathf.SmoothStep(.59f, ForearmOn, u)) : null;
+            var (raise, outward, elbow, roll) = ArmReach.ArmTo(grip, left, toTrunk * bend,
+                ActorRig.Palm, ActorRig.Forearm + ActorRig.HandPadReach, floor);
+            float idle = left ? pose.RaiseL : pose.RaiseR;
+            raise = idle + Mathf.RadToDeg(Mathf.AngleDifference(Mathf.DegToRad(idle), Mathf.DegToRad(raise)));
+            pose = ArmReach.WithArm(pose, left, raise, outward, elbow, weight);
+            pose = left ? pose with { ArmRollL = roll * weight } : pose with { ArmRollR = roll * weight };
+        }
 
         // Preserve velocity at passing keys, without overshooting the low point that takes the player's weight.
         float Curve(float prev, float start, float end, float following) {
