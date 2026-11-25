@@ -308,6 +308,11 @@ public sealed partial class GameData {
                 if (!vesselOf.TryAdd(v.States[fill], v))
                     throw new InvalidOperationException($"Invalid vessel: {v.Full}. Every filled state belongs to only one vessel.");
         }
+        // Every diary day is in exactly one find, and every find holds days of the diary.
+        foreach (var day in DiaryDay.All)
+            if (DiaryFindDef.All.ToArray().Count(find => find.Days.Contains(day.Number)) != 1) throw new InvalidOperationException($"Diary day {day.Number} must be in exactly one find.");
+        foreach (var find in DiaryFindDef.All)
+            if (find.Days.Length == 0 || find.Days.Any(number => DiaryDay.All.ToArray().All(day => day.Number != number))) throw new InvalidOperationException($"The diary find {find.Find} must hold days the diary has.");
         ValidateMap();
     }
     /// <summary>The vessel that carries a liquid, or null for an item that is not one.</summary>
@@ -467,6 +472,7 @@ public sealed partial class GameData {
             ThingKind.TinChip => "Tin ore",
             ThingKind.Grave => "Recovery box",
             ThingKind.WolfCorpse => "Wolf carcass",
+            ThingKind.FloatingPage or ThingKind.FallenPage => "Piece of paper",
             _ => kind.Id().Replace('_', ' ')
         };
     }

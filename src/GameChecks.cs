@@ -1157,6 +1157,7 @@ public partial class Game {
             await RunFarmUIChecks();
             await RunNettleUIChecks();
             await RunFirebugUIChecks();
+            await RunDiaryUIChecks();
             await RunBuildingRemovalUIChecks();
             await RunGravelPathUIChecks();
             await TestClean(CheckPageClosesWhenWhatItShowsIsGone);

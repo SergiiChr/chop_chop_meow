@@ -74,11 +74,11 @@ public sealed class Construction(World world) {
         } else if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         if (digging && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
-            if (!t.Roams && (!World.BuiltOver(t.Kind) || digging) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
+            if (t.TakesGround && (!World.BuiltOver(t.Kind) || digging) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
                 return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
             var door = p + Doorways.DoorOffset.Rotated(rotation);
-            if (!world.CanStand(door) || Terrain.InLake(door, .8f) || world.S.Things.Any(t => !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
+            if (!world.CanStand(door) || Terrain.InLake(door, .8f) || world.S.Things.Any(t => t.TakesGround && !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
                 return "Leave open ground in front of the door.";
             if (!world.CanStand(p + BarrelHaul.LadderApproach.Rotated(rotation))) return "Leave dry, open ground at the cabin's ladder.";
         }
@@ -125,7 +125,7 @@ public sealed class Construction(World world) {
             }
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in world.S.Things) {
-            if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind) || t.Roams) continue;
+            if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind) || !t.TakesGround) continue;
             if (t.Kind == ThingKind.Tree && TrunkOverlaps(p - t.Pos, kind, TreePlanting.TrunkRadius(t.Id, t.TreeStage)))
                 return "Leave room around resources and buildings.";
             float margin = IsZone(t.Kind) ? World.Footprint(t.Kind) - .05f : t.IsResource ? YardResourceRoom : World.Footprint(t.Kind) + .2f;

@@ -212,7 +212,7 @@ public static class WorldModels {
         foreach (var kind in Kinds.All) {
             if (kind == ThingKind.Mine) continue;
             // Natural things and farm plots look different by id; buildings, crates and backpacks look the same.
-            int looks = kind is ThingKind.Acorn or ThingKind.Firebug ? 1 : kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
+            int looks = kind is ThingKind.Acorn or ThingKind.Firebug or ThingKind.FloatingPage or ThingKind.FallenPage ? 1 : kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
@@ -281,6 +281,7 @@ public static class WorldModels {
         ThingKind.Bush => new[] { new Hit(.6f, 0, .6f) },
         ThingKind.Nettle => [new Hit(.35f, 0, .8f)],
         ThingKind.Firebug => [new Hit(.5f, FirebugShape.Height - .5f, FirebugShape.Height + .5f)],
+        ThingKind.FloatingPage or ThingKind.FallenPage => [new Hit(.3f, 0, .2f)],
         ThingKind.Water => new[] { new Hit(1.2f, 0, .5f) },
         ThingKind.Furnace => new[] { new Hit(.72f, 0, 1.15f) },
         ThingKind.Reinforced => new[] { new Hit(.95f, 0, 1.45f) },
@@ -317,6 +318,7 @@ public static class WorldModels {
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
             case ThingKind.Nettle: prop = new Prop(); Add(prop.Body, NettleShape.Plant(t.Id), NettleShape.Leaves, Vector3.Zero); break;
             case ThingKind.Firebug: prop = FirebugShape.Build(); break;
+            case ThingKind.FloatingPage or ThingKind.FallenPage: prop = PageShape.Build(); break;
             case ThingKind.Stone: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero); break;
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case ThingKind.Coal: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.CoalRock, Vector3.Zero); break;

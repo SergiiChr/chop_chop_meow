@@ -550,7 +550,7 @@ public partial class WorldView : Node3D {
             bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, drawn, out float d)
                 : t.Kind == ThingKind.Pump && PropOf(drawn.Id) is WaterPumpProp pump
                     ? RayPump(origin, direction, drawn, pump.Pump, out d)
-                    : RayHits(origin, direction, t.Pos, hits, out d);
+                    : RayHits(origin, direction, t.IsPage ? World.Diary.At(t) : t.Pos, hits, out d);
             if (hit && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
@@ -979,7 +979,8 @@ public partial class WorldView : Node3D {
 
     /// <summary>Places the upright rig so the pose can aim at the actor's mark in its own frame.</summary>
     private static Pose StandingPose(ActorRig rig, ActorState state) {
-        rig.Root.Position = To3(state.Position);
+        // Wading in the lake's shallows, the feet go down to its bed.
+        rig.Root.Position = To3(state.Position, -Terrain.BedDepth(state.Position));
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
         state.MarkInRig = state.Mark is Vector3 mark ? rig.Root.Transform.AffineInverse() * mark : null;
@@ -1158,7 +1159,8 @@ public partial class WorldView : Node3D {
     private void CollectDrawnThings(List<Thing> into, bool everything) {
         if (!everything) { World.CollectKnown(into); return; }
         into.Clear();
-        foreach (var thing in World.Things) into.Add(thing);
+        var me = World.Me;
+        foreach (var thing in World.Things) if (Diary.ShowsTo(me, thing)) into.Add(thing);
     }
 
     private void SyncThings(float dt) {
@@ -1216,10 +1218,12 @@ public partial class WorldView : Node3D {
         int newest = World.Things.Count > 0 ? World.Things[World.Things.Count - 1].Id : 0;
         if (thingsCounted != World.Things.Count || newestThing != newest) {
             (thingsCounted, newestThing) = (World.Things.Count, newest);
-            // A firebug marks nothing on the ground, so the dressing is drawn again only when something else has come or gone.
+            // A firebug or a diary page marks nothing on the ground, so the dressing is drawn again only when something else has come or gone.
             int last = World.Things.Count - 1;
-            while (last >= 0 && World.Things[last].Roams) last--;
-            int grounded = World.Things.Count - World.ThingsOf(ThingKind.Firebug).Count, newestOnGround = last >= 0 ? World.Things[last].Id : 0;
+            while (last >= 0 && !World.Things[last].TakesGround) last--;
+            int grounded = 0;
+            foreach (var t in World.Things) if (t.TakesGround) grounded++;
+            int newestOnGround = last >= 0 ? World.Things[last].Id : 0;
             if (groundedCounted != grounded || newestGrounded != newestOnGround) {
                 (groundedCounted, newestGrounded) = (grounded, newestOnGround);
                 RefreshDressing();
@@ -1256,6 +1260,8 @@ public partial class WorldView : Node3D {
         }
         // A chip that appears in front of the player was knocked off the rock beside it, and flies from there.
         if (prop is LooseProp chip && appeared && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
+        // A page that appears in front of its player has just come off the tree beside it, and flutters down from its crown.
+        if (prop is PageProp page && t.Kind == ThingKind.FallenPage && appeared) { page.Fall = 0; Sounds?.Play("paper_fall", t.Pos); }
         return prop;
     }
 
@@ -1359,6 +1365,13 @@ public partial class WorldView : Node3D {
                 float loose = Ease(Math.Clamp(worked / GatherRules.DigSeconds, 0, 1));
                 prop.Body.RotationDegrees = new Vector3(loose * 16 + wobble * 5, dug.Yaw, wobble * 3);
                 prop.Body.Position = dug.Seat + new Vector3(wobble * .02f, loose * .07f, 0);
+                break;
+            case PageProp page when t.Kind == ThingKind.FloatingPage:
+                prop.Root.Position = To3(World.Diary.At(t));
+                PageShape.Float(page, t.Id, Elapsed);
+                break;
+            case PageProp page when page.Fall < PageShape.FallSeconds:
+                PageShape.Fly(page, t.Id, dt);
                 break;
             case LooseProp chip when chip.Flight < WorldModels.ChipFlight + WorldModels.ChipSettle:
                 // An arc under gravity from the rock, spinning steadily round its middle, then a short skid to a stop where it lies.
@@ -1856,7 +1869,9 @@ public partial class WorldView : Node3D {
                 || wolf.Follow == FollowStage.Routed) && !backing, wary);
             else if (wolf.Follow == FollowStage.Braced) model.Brace(Elapsed + wolf.Id % 7, dt);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
-            var place = To3(wolf.Pos + model.KnockBack + model.Drift, rise);
+            var stands = wolf.Pos + model.KnockBack + model.Drift;
+            // Wading in the lake's shallows, the paws go down to its bed.
+            var place = To3(stands, rise - Terrain.BedDepth(stands));
             if (wolf.Pinning) place = AtTheThroat(model, hunted);
             else model.Toward = Vector2.Zero;
             if (wolf.Feeding && !wolf.Pinning && Fallen(wolf) is var (lying, lyingRig)) place = feeding.Place(wolf, model, lying, lyingRig, dt);
@@ -2232,7 +2247,8 @@ public partial class WorldView : Node3D {
         if (hovered != null) {
             float top = 0;
             foreach (var hit in HitsOf(hovered)) top = Math.Max(top, hit.Top);
-            Tag(Screen(hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(Mouse)) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
+            var at = hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(Mouse)) : hovered.IsPage ? World.Diary.At(hovered) : hovered.Pos;
+            Tag(Screen(at, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
         }
         foreach (var w in World.Workers) {
             if (!World.Sees(w) || w.Id != HoverWorker && w.Id != Selection.Worker) continue;

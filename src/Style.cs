@@ -39,6 +39,10 @@ public static class Style {
     public static readonly Font Head = Weighted("res://assets/fonts/Fredoka.ttf", 600);
     public static readonly Font Body = Weighted("res://assets/fonts/Nunito.ttf", 700);
     public static readonly Font Bold = Weighted("res://assets/fonts/Nunito.ttf", 800);
+    /// <summary>Handwriting, for the diary.</summary>
+    public static readonly Font Hand = Weighted("res://assets/fonts/Caveat.ttf", 500), HandBold = Weighted("res://assets/fonts/Caveat.ttf", 700);
+    /// <summary>The diary's ink.</summary>
+    public static readonly Color DiaryInk = new("33405a");
 
     private static Font Weighted(string path, int weight) {
         var font = new FontVariation { BaseFont = GD.Load<FontFile>(path) };
@@ -141,15 +145,23 @@ public static class Style {
         button.AddThemeStyleboxOverride("disabled", normal); button.AddThemeStyleboxOverride("focus", None);
     }
 
+    /// <summary>Sets a panel on the enamel board in the middle of the screen, at a size it grows from both ways.</summary>
+    public static void Centered(PanelContainer panel, float width, float height) {
+        panel.AnchorLeft = .5f; panel.AnchorRight = .5f; panel.AnchorTop = .5f; panel.AnchorBottom = .5f;
+        panel.OffsetLeft = -width / 2; panel.OffsetRight = width / 2; panel.OffsetTop = -height / 2; panel.OffsetBottom = height / 2;
+        panel.GrowHorizontal = Control.GrowDirection.Both; panel.GrowVertical = Control.GrowDirection.Both;
+        panel.AddThemeStyleboxOverride("panel", Board);
+    }
+
     /// <summary>Gives a button the rounded look of a job or action button in this colour.</summary>
     public static void SkinPill(Button button, Color color) { var look = Pill(color); Skin(button, look.Item1, look.Item2); }
 
     /// <summary>Dark text on a check box that sits on a beige well.</summary>
     public static void InkCheck(CheckBox box) => InkText(box);
 
-    /// <summary>Dark text on a button that sits on a beige well, in every state.</summary>
-    public static void InkText(Button button) {
-        foreach (var state in CheckStates) button.AddThemeColorOverride(state, Ink);
+    /// <summary>Dark text on a button that sits on a beige well, in every state: ink, or another dark colour.</summary>
+    public static void InkText(Button button, Color? color = null) {
+        foreach (var state in CheckStates) button.AddThemeColorOverride(state, color ?? Ink);
     }
     private static readonly string[] CheckStates = { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color" };
 

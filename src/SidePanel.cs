@@ -23,7 +23,7 @@ public sealed class PageMemory {
 public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory, HeldCursor Cursor);
 
 /// <summary>The pages of the side panel.</summary>
-public enum Page { None, Welcome, Build, Backpack, Crew, Craft, Inspect, Crate, Barrel }
+public enum Page { None, Welcome, Build, Backpack, Crew, Craft, Inspect, Crate, Barrel, Diary }
 
 /// <summary>What the side panel inspects: a thing, a worker, a pipe or nothing.</summary>
 public readonly record struct Selection {
@@ -55,6 +55,7 @@ public partial class SidePanel : MovableWindow {
         ("Inspect", InspectPage.For),
         ("Wood crate", (tools, _) => new CarriedCratePanel(tools, tools.Memory.CarriedCrate)),
         ("Steel barrel", (tools, _) => new CarriedBarrelPanel(tools, tools.Memory.CarriedBarrelSlot)),
+        ("Diary", (tools, _) => new DiaryPage(tools)),
     };
     private readonly World world;
     private readonly UiKit kit;
@@ -102,6 +103,8 @@ public partial class SidePanel : MovableWindow {
     public PlayerControl Player { get; set; } = null!;
     /// <summary>The recipe map, which also needs this panel, so the game sets it once both exist.</summary>
     public RecipeMap Map { get; set; } = null!;
+    /// <summary>The diary day opened large, which the game sets once it exists.</summary>
+    public ReadingSheet Sheet { get; set; } = null!;
     /// <summary>The open page, or nothing while the panel is closed.</summary>
     public Page Page { get; private set; }
     public Selection Selection { get; private set; }

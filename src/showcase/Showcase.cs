@@ -6,6 +6,34 @@ namespace ChopChopMeow;
 
 /// <summary>The review fixtures behind <c>--showcase</c> and its flags: settled scenes for screenshots, separate from a playable game.</summary>
 public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit) {
+    /// <summary>
+    /// Diary review: the player on the lake's shore by its floating page, with a page lying on the ground beside them and three finds in their diary, two of whose days are unread.
+    /// <c>--diary-fall</c> drops another page off the oak beside them a second in, <c>--panel</c> opens the diary,
+    /// <c>--diary-day N</c> opens day N large and <c>--diary-find</c> shows the pop-up of a page found in leaves.
+    /// </summary>
+    private void DiaryReview() {
+        var me = world.Me;
+        world.S.Time = world.Data.DaySeconds * Launch.Number("--day-phase", .2f);
+        var page = world.ThingsOf(ThingKind.FloatingPage)[0];
+        var floating = Diary.FloatAt(page, world.Time);
+        var shore = Terrain.WaterPoint(floating);
+        var inland = (shore - Terrain.Lake).Normalized();
+        world.S.Things.RemoveAll(t => !t.IsPage && t.Pos.DistanceTo(shore) < 8 && t.Kind != ThingKind.Water);
+        world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear(); world.S.Wolves.Clear();
+        world.Player = shore + inland * .6f;
+        var tree = world.Add(ThingKind.Tree, shore + inland * 4.5f + inland.Orthogonal() * 2, World.TreeWood);
+        world.Diary.Drop(me, world.Player + inland.Orthogonal() * 1.4f + inland * .8f);
+        me.DiaryFinds.AddRange([DiaryFind.Sand, DiaryFind.Berries, DiaryFind.Tree]);
+        me.DiaryRead.AddRange([6, 36]);
+        if (Launch.Has("--diary-fall"))
+            view.GetTree().CreateTimer(1).Timeout += () => world.Diary.Drop(me, tree.Pos - inland * 1.2f);
+        if (Launch.Has("--diary-find")) me.DiaryFinding = DiaryFind.Leaves;
+        world.Tick(0); view.Zoom = Launch.Number("--zoom", 1.8f);
+        if (Launch.Has("--panel")) panel.Open(Page.Diary); else panel.Close();
+        if (Launch.Value("--diary-day") is string day) panel.Sheet.Open(int.Parse(day), quiet: true);
+        if (Launch.Has("--hide-ui")) ui.Visible = false;
+    }
+
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
         var stage = int.TryParse(Launch.Value("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
@@ -162,6 +190,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             panel.Close(); ui.Visible = false; kit.HoldWhile(() => true);
             return;
         }
+        if (Launch.Has("--diary")) { DiaryReview(); return; }
         if (Launch.Has("--firebugs")) {
             // A night meadow: three nettles in a row, one of each look, a tool station holding a bug net, and firebugs hovering at several distances from a player who carries a net.
             // The last firebug starts near enough to the player to dart off as the scene opens.

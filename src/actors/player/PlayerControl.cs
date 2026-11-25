@@ -202,18 +202,18 @@ public sealed class PlayerControl {
     /// <summary>The ground direction for right <paramref name="x"/> and down <paramref name="y"/> on screen, each -1, 0 or 1 as movement keys give them.</summary>
     public static Vector2 KeyDirection(float x, float y) => new Vector2(x + y * 2, y * 2 - x).Normalized();
 
-    /// <summary>Carries on a gather; a loose piece needs only one click: the player keeps walking to it after the button is released.</summary>
+    /// <summary>Carries on a gather; a loose piece or a page needs only one click: the player keeps walking to it after the button is released.</summary>
     private Vector2 Gather(Vector2 direction, bool right, float dt) {
         // What was being worked on can go: a tree falls and leaves its stump, and a stump or a bush comes out of the ground.
         if (gathering != null && world.Find(gathering.Id) == null) { panel.Deselect(gathering.Id); gathering = null; }
-        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || cabinApproach.Active || interactionApproach.Active) {
+        if (gathering == null || !right && !gathering.TakenWhole || direction != Vector2.Zero || cabinApproach.Active || interactionApproach.Active) {
             world.ResetGather();
-            if (!right || gathering?.IsLoose == true) gathering = null;
+            if (!right || gathering?.TakenWhole == true) gathering = null;
             return direction;
         }
         // Step in close enough for the tool to reach the model; the lake edge keeps its wider reach.
         if (!world.Near(gathering, gathering.Kind == ThingKind.Water ? 2.5f : 1.35f)) return (world.GatherAt(gathering, world.Player) - world.Player).Normalized();
-        if (gathering.IsLoose) {
+        if (gathering.TakenWhole) {
             world.Gather(gathering, dt);
             if (world.Occupied) { gathering = null; return direction; }
             if (world.Find(gathering.Id) == null) panel.Deselect(gathering.Id);
@@ -271,7 +271,8 @@ public sealed class PlayerControl {
     private void Walk(Vector2 direction, bool right, float dt) {
         // A carried barrel prevents sprinting.
         // Under 15% food or drink the player is too weak to sprint.
-        world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
+        // A player held by a find's pop-up stands still, so Shift drains nothing.
+        world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && world.Me.DiaryFinding == DiaryFind.None && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
         var wanted = world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero;
         Vector2 step;
         if (cabinApproach.Active || interactionApproach.Active) {
@@ -285,7 +286,7 @@ public sealed class PlayerControl {
         if (cabinApproach.Active) cabinApproach.Move(move.Length());
         else if (interactionApproach.Active) interactionApproach.Move(move.Length());
         else world.MovePlayer(move);
-        view.GatheringTarget = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f) ? gathering
+        view.GatheringTarget = gathering is { TakenWhole: false } && right && world.Near(gathering, 2.5f) ? gathering
             : digAttempt != 0 ? GroundHoles.AnimationTarget(world.Me) : null;
         view.Gathering = view.GatheringTarget != null;
         // A tool in hand that has left the backpack leaves the hand empty.
@@ -343,7 +344,11 @@ public sealed class PlayerControl {
         }
         // A firebug in the air takes no ground: a shovel digs the spot it hovers over.
         if (t is { Roams: true } && Mode is ClickMode.Dig) t = null;
-        if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
+        if (t?.IsResource == true || t?.IsPage == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) {
+            gathering = t;
+            // A page has no page of its own to mark.
+            if (!t.IsPage) panel.Mark(t);
+        } else gathering = null;
         lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
         if (t != null) return;
         if (Mode is ClickMode.Dig) {
@@ -409,8 +414,9 @@ public sealed class PlayerControl {
         world.SetDuty(worker, t, JobKind.Gather, true); Mode = new ClickMode.Normal(); panel.Select(worker);
     }
 
-    /// <summary>Opens a thing's page; a cabin's is the one the second press of a double click then walks into.</summary>
+    /// <summary>Opens a thing's page; a cabin's is the one the second press of a double click then walks into. A page lying in the world has none: the player walks over and picks it up.</summary>
     private void ClickThing(Thing t) {
+        if (t.IsPage) { gathering = t; return; }
         if (t.Kind == ThingKind.Hut) clickedCabin = t;
         panel.Select(t);
     }

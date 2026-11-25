@@ -96,7 +96,9 @@ public static class Terrain {
     }
 
     public static bool WaterRing(Vector2 p) => p.DistanceTo(WaterPoint(p)) <= 1.6f;
-    /// <summary>Dry valley ground inside the map, ignoring anything built or growing on it.</summary>
+    /// <summary>Metres in from the lake's shore that players, workers and wolves wade.</summary>
+    public const float Wade = 2;
+    /// <summary>Valley ground inside the map to walk on, the lake's shallows included, ignoring anything built or growing on it.</summary>
     public static bool Open(Vector2 p) =>
-        p.X >= 1 && p.Y >= 1 && p.X <= Size - 2 && p.Y <= Size - 2 && FromMountains(p) > 0 && !Sea(p) && !InLake(p);
+        p.X >= 1 && p.Y >= 1 && p.X <= Size - 2 && p.Y <= Size - 2 && FromMountains(p) > 0 && !Sea(p) && !InLake(p, -Wade);
 }

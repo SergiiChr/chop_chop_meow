@@ -13,8 +13,9 @@ public partial class WorldView {
         var blocked = new bool[Terrain.Size, Terrain.Size];
         // Decorative plants have no collision or inventory. Keep actual resources and initial buildings readable.
         foreach (var thing in World.Things) {
-            // Grass grows right up to a bush, as it does to the stump a tree leaves, and under a firebug in the air.
-            if (thing.Kind == ThingKind.Bush || thing.Roams) continue;
+            // Grass grows right up to a bush, as it does to the stump a tree leaves.
+            // It grows under a firebug in the air, and under a diary page, which shows to one player.
+            if (thing.Kind == ThingKind.Bush || !thing.TakesGround) continue;
             float radius = thing.Kind is ThingKind.Tree or ThingKind.Stump ? .45f : thing.IsResource ? .8f : 2.2f;
             for (int y = Math.Max(0, (int)(thing.Pos.Y - radius)); y <= Math.Min(Terrain.Size - 1, (int)(thing.Pos.Y + radius)); y++)
                 for (int x = Math.Max(0, (int)(thing.Pos.X - radius)); x <= Math.Min(Terrain.Size - 1, (int)(thing.Pos.X + radius)); x++)

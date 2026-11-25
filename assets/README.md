@@ -199,6 +199,10 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   under 2,600 triangles; the item's icon is the tallest sprig, 935 triangles, and a heap is made of the smallest.
   Preview nettles and firebugs with `./build.py play -- --showcase --firebugs`, by day with `--day-phase 0.3`.
 - `src/firebugs/display/FirebugShape.cs` — a firebug in the air: a dark body with a lantern over it and a soft halo.
+- `src/diary/display/PageShape.cs` — a loose diary page: one cupped sheet of aged paper written over in rows of ink,
+  built in code after the sheets of NVIDIA's SimReady "Paper" (`paper_stack_a05`, CC BY 4.0), which served only as a
+  reference; nothing of it is in the game.
+  Preview the floating, lying and falling pages with `./build.py play -- --showcase --diary --diary-fall`.
 
 - Tree3D 1.1.0 supplies the baked tree and berry-bush geometry. Preview it with `./build.py play -- --showcase --trees`.
 - `src/Tree3DShape.cs` loads shared tree and berry-bush meshes, and cutout foliage shader materials that sway in the wind (`src/Wind.cs`) and have a blended twin for fading. It also adds the stem under a tree's baked trunk that starts above the ground; a berry bush gets none.
@@ -237,6 +241,7 @@ How they are framed:
 `ui/` holds hand-written SVG icons:
 
 - Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, book, close, filter, stash and so on), tinted in code.
+- `scribble_word.svg` and `scribble_line.svg`, the scribbles a diary day shows where its writing cannot be read.
 - `fresh_water.svg`, the water a full bottle pours into a station: a blue droplet in the shape of the corner's thirst icon, used as the item icon since only stations hold it and it has no model.
 
 ## Fonts
@@ -245,8 +250,9 @@ How they are framed:
 
 - Fredoka for headings.
 - Nunito for text.
+- Caveat for the diary's handwriting.
 
-Both are variable fonts weighted in code.
+All three are variable fonts weighted in code.
 
 ## Sounds
 
@@ -306,6 +312,12 @@ Each step's loudest 400 ms of heard loudness, counting the silence after it, is 
 from just before the foot lands, with the same fades.
 Each is brought to the grass steps' -23.3 LUFS by the same measure, and plays at the same level in the mix, so a step on
 gravel is no louder than one on grass.
+
+`page_turn` is cut with ffmpeg from "Foley paper handling & page turning SFX" by lenspulse (Pixabay 584919), a
+recording supplied for this project: its three page turns, each cut into its own variant, faded at both ends and brought
+to one mean level.
+`paper_fall` is the first four seconds of "Rustling paper" by freesound_community (Pixabay 46380), a recording supplied
+for this project, faded at both ends and brought up to just under full scale.
 
 `stomach_growl` is "yet more stomach sounds" by freesound_community (Pixabay 97719, artist Darsycho on Freesound), a recording supplied for this project, with the silence cut from both ends: four seconds of three rumbles.
 

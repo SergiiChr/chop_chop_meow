@@ -15,6 +15,13 @@ public partial class Hotbar : PanelContainer {
     private readonly HeldCursor cursor;
 
     public System.Collections.Generic.List<ItemSlot> Buttons { get; } = new();
+    /// <summary>The diary's badge, shown once the player has found part of the diary, with a dot while a day waits to be read.</summary>
+    public Button DiaryBadge { get; }
+    private readonly Panel unread;
+    // Set by the find just taken here, so the badge that comes with it is stamped into the row rather than just there.
+    private bool stampDiary;
+    /// <summary>Seconds the diary's badge takes to be stamped into the row.</summary>
+    private const float StampSeconds = .45f;
     public System.Collections.Generic.List<Label> Counts { get; } = new();
 
     public Hotbar(UiKit kit, SidePanel panel, HeldCursor cursor) {
@@ -27,8 +34,28 @@ public partial class Hotbar : PanelContainer {
         slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open(Page.Craft), new Color("b08a45"), "C"));
         slots.AddChild(MenuIcon("map", "Recipe map", () => panel.Map.Open(), new Color("7d6488")));
         slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open(Page.Crew), new Color("5f8aa6"), "H"));
+        // The diary's badge waits for the player's first find.
+        DiaryBadge = MenuIcon("diary", "Diary", () => panel.Open(Page.Diary), new Color("8a6a4a"));
+        DiaryBadge.Visible = false;
+        unread = Style.Corner(new Panel { Name = "unread", MouseFilter = MouseFilterEnum.Ignore, CustomMinimumSize = new Vector2(16, 16) }, 1, 0, 2);
+        unread.AddThemeStyleboxOverride("panel", Style.Flat(Style.Brick, 8, 0, Style.Rim, 2));
+        DiaryBadge.AddChild(unread);
+        slots.AddChild(DiaryBadge);
         var divider = new ColorRect { Color = new Color(Style.Beige, .6f), CustomMinimumSize = new Vector2(3, 46), SizeFlagsVertical = SizeFlags.ShrinkCenter }; slots.AddChild(divider);
         for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
+    }
+
+    /// <summary>Stamps the diary's badge into the row once the find just taken shows in the world, if it is the player's first.</summary>
+    public void StampDiaryOnFirstFind() => stampDiary = true;
+
+    /// <summary>Brings the diary's badge down into the row like a stamp: large, tilted and faint, then hard and flat in its place with a small bounce.</summary>
+    private void Stamp() {
+        DiaryBadge.PivotOffset = DiaryBadge.CustomMinimumSize / 2;
+        DiaryBadge.Scale = Vector2.One * 2.4f; DiaryBadge.RotationDegrees = -14; DiaryBadge.Modulate = new Color(1, 1, 1, 0);
+        var tween = DiaryBadge.CreateTween().SetParallel();
+        tween.TweenProperty(DiaryBadge, "scale", Vector2.One, StampSeconds).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(DiaryBadge, "rotation_degrees", 0f, StampSeconds).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(DiaryBadge, "modulate:a", 1f, StampSeconds * .4f);
     }
 
     /// <summary>A round enamel badge with a line icon and a key cap when it has a shortcut.</summary>
@@ -100,6 +127,15 @@ public partial class Hotbar : PanelContainer {
     // What each slot shows, so a slot is redrawn only when its item, count or selection changes: redrawing builds text and styles.
     private readonly (string Id, int Count, bool Active)?[] shownSlots = new (string, int, bool)?[9];
     public void Refresh() {
+        var me = world.Me;
+        bool started = Diary.Started(me);
+        if (started != DiaryBadge.Visible) {
+            DiaryBadge.Visible = started;
+            if (started && stampDiary) Stamp();
+        }
+        if (started) stampDiary = false;
+        bool waiting = Diary.AnyUnread(me);
+        if (unread.Visible != waiting) unread.Visible = waiting;
         for (int slot = 0; slot < Buttons.Count; slot++) {
             var button = Buttons[slot];
             string id = world.HotbarItem(slot);

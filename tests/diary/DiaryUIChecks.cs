@@ -1,0 +1,97 @@
+using System.Linq;
+using System.Threading.Tasks;
+using Godot;
+using static Checks;
+using static SetupSteps;
+
+namespace ChopChopMeow;
+
+public partial class Game {
+    /// <summary>The diary in the window, in order: each check reads the days the ones before it found.</summary>
+    private async Task RunDiaryUIChecks() {
+        await TestClean(CheckAFindWaitsBehindTakeAndOpensItsDayInTheDiary);
+        await TestClean(CheckClickingAFallenPagePicksItUpAndTheBadgeMarksUnreadDays);
+        await TestClean(CheckARightClickWadesToTheLakePage);
+        await TestClean(CheckTheDiaryGoalCountsPagesAndOpensTheDiary);
+    }
+
+    private async Task CheckAFindWaitsBehindTakeAndOpensItsDayInTheDiary() {
+        await CloseWithEsc();
+        Require(!hotbar.DiaryBadge.Visible, "The diary's badge must wait for the first find.");
+        TurnUpFind(HostedMe, DiaryFind.Berries);
+        await Until(() => findPrompt.Visible, "the pop-up of a page found in a bush", 3);
+        Require(HasLabel(findPrompt, "You see a piece of paper stuck in the bush.") && findPrompt.FindChildren("*", nameof(Button), true, false).Count == 1,
+            "The pop-up must say where the page was found and offer Take alone.");
+        Require(!await PlayerWalks(), "A player with a find waiting must stay where they stand.");
+        await KeyStroke(Key.Escape); await KeyStroke(Key.Escape);
+        Require(!menu.Visible && findPrompt.Visible, "Esc must leave the pop-up up.");
+        int since = sounds.Played;
+        await Click((Button)findPrompt.FindChild("diary_take", true, false));
+        await Until(() => panel.Page == Page.Diary && sheet.Visible && sheet.Day == 40, "taking the page opening the diary on day 40", 3);
+        Require(sounds.Heard("page_turn", since), "Taking a page must turn a page.");
+        await Until(() => !findPrompt.Visible && hotbar.DiaryBadge.Visible, "the pop-up closing and the first find stamping the diary's badge into the bottom bar", 3);
+        var missing = Named("diary_day_2")!;
+        var found = Named("diary_day_40")!;
+        Require(missing.Disabled && missing.Text == "" && found.Text == "Day 40" && !found.Disabled, "The diary must show a found day's tile and an empty space for a day not found.");
+        since = sounds.Played;
+        await KeyStroke(Key.Escape);
+        Require(!sheet.Visible && panel.Page == Page.Diary && sounds.Heard("page_turn", since), "Esc must close the open day with a page turn and leave the diary open.");
+        await CloseWithEsc();
+    }
+
+    private async Task CheckClickingAFallenPagePicksItUpAndTheBadgeMarksUnreadDays() {
+        await CloseWithEsc();
+        var home = Hosted.Player;
+        int since = sounds.Played;
+        var spot = SpotsNearby().First(p => world.CanStand(p) && Uncovered(view.Screen(p)));
+        var page = DropPage(Hosted, HostedMe, spot);
+        await Until(() => view.PropOf(page.Id) is PageProp { Shown: true }, "the page off a tree showing in the window", 3);
+        Require(sounds.Heard("paper_fall", since), "A page coming off a tree in sight must rustle as it falls.");
+        await ClickOn(page);
+        await Until(() => findPrompt.Visible && HasLabel(findPrompt, "A piece of paper fell off a tree."), "a left click on the page walking the player over to pick it up", 8);
+        await Until(() => view.PropOf(page.Id) is not { Shown: true }, "the picked up page leaving the ground", 3);
+        await Click((Button)findPrompt.FindChild("diary_take", true, false));
+        await Until(() => sheet.Visible && sheet.Day == 36, "taking the tree's page opening its first day, 36", 3);
+        await KeyStroke(Key.Escape); await CloseWithEsc();
+        var unread = hotbar.DiaryBadge.GetNode<Control>("unread");
+        Require(unread.Visible, "The diary's badge must show a dot while day 37 waits to be read.");
+        await Click(hotbar.DiaryBadge);
+        await Until(() => panel.Page == Page.Diary, "the badge opening the diary", 3);
+        var day37 = Named("diary_day_37")!;
+        Require(day37.TooltipText.StartsWith("Not read yet"), "An unread day's tile must say it is not read yet.");
+        await Click(day37);
+        Require(sheet.Visible && sheet.Day == 37, "A day's tile must open the day large.");
+        await KeyStroke(Key.Escape);
+        await Until(() => !unread.Visible && !day37.TooltipText.StartsWith("Not read yet"), "reading day 37 clearing the badge's dot and its tile's mark", 3);
+        await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
+    }
+
+    /// <summary>The lake's page drifts up to 3 m in from the shore, past where the dry shore reaches, so the player wades in to it.</summary>
+    private async Task CheckARightClickWadesToTheLakePage() {
+        await CloseWithEsc();
+        var home = Hosted.Player;
+        var page = Hosted.ThingsOf(ThingKind.FloatingPage).Single();
+        var floating = Hosted.Diary.At(page);
+        Warp(Hosted, Terrain.WaterPoint(floating) + (floating - Terrain.Lake).Normalized() * 2);
+        await Until(() => view.PropOf(page.Id) is PageProp { Shown: true }, "the lake's page showing in the window", 5);
+        await RightClick(Hosted.Diary.At(page), 0);
+        await Until(() => findPrompt.Visible && HasLabel(findPrompt, "A piece of paper floating in the water."), "a right click on the lake's page wading the player out to pick it up", 12);
+        await Click((Button)findPrompt.FindChild("diary_take", true, false));
+        await Until(() => sheet.Visible && sheet.Day == 2, "taking the lake's page opening day 2", 3);
+        Require(view.PropOf(page.Id) is not { Shown: true } && Hosted.Find(page.Id) == page, "The lake's page must be gone for the player who took it and stay in the world.");
+        await KeyStroke(Key.Escape); await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
+    }
+
+    private async Task CheckTheDiaryGoalCountsPagesAndOpensTheDiary() {
+        await CloseWithEsc();
+        await KeyStroke(Key.Escape);
+        await Click(FindButton(menu, "A success story")!);
+        Require(HasLabel(menu.GoalDetails, "Find all the diary pages.") && HasLabel(menu.GoalDetails, "4 of 11 pages found"),
+            "The diary's goal must count the days the player found: 40, 36, 37 and 2.");
+        await Click((Button)menu.GoalDetails.FindChild("goal_diary", true, false));
+        Require(!menu.Visible && !menu.GoalDetails.Visible && panel.Page == Page.Diary, "The goal's diary must close the menu and open the diary, as its badge does.");
+        await CloseWithEsc();
+    }
+}
