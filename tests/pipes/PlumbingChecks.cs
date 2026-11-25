@@ -148,10 +148,10 @@ public static class PlumbingChecks {
         }
         Require(barrel.Inventory[Water.Liquid] == 50 && !barrel.ReceivingWater,
             "A full barrel cannot accept any more water.");
-        Require(world.PipeReading(EastTankTile) == (1, 100),
-            "The pipe under the full barrel should hold one liter at the pump's full pressure.");
+        Require(world.PipeReading(EastTankTile) == (1, 120),
+            "The full barrel should raise the pipe to six liters per second, above the pump's maximum.");
         world.Tick(10);
-        Require(world.PipeReading(EastTankTile) == (1, 100) && pump.Pressure == 0,
+        Require(world.PipeReading(EastTankTile) == (1, 120) && pump.Pressure == 0,
             "A full barrel must keep its pipe pressurized after the pump stops.");
     }
 

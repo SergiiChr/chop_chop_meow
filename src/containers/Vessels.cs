@@ -167,18 +167,23 @@ public sealed partial class World {
         }
     }
 
-    internal string? DrainableFrom(Thing place, string item) {
+    internal bool CanDrain(Thing place, string item, string liquid) {
+        if (!IsStation(place.Kind) || place.Inventory.Free(liquid) == 0 || Pending(place, liquid)) return false;
         foreach (var vessel in Data.Vessels)
-            if (vessel.LitersIn(item) is >= 0 and int held && held < vessel.Capacity
-                && place.Inventory[vessel.Liquid] > 0 && !Pending(place, vessel.Liquid)) return vessel.Liquid;
-        return null;
+            if (vessel.Liquid == liquid && vessel.LitersIn(item) is >= 0 and int held && held < vessel.Capacity) return true;
+        return false;
     }
 
     /// <summary>A hauler's vessels with room at a station that holds leftover liquid for them: filled there, then stored like any load.</summary>
     private bool FillsLeftover(Worker w, Thing? dest, string item, float dt) {
-        if (dest == null || DrainableFrom(dest, item) is not string liquid) return false;
+        if (w.DrainingLiquid is not string liquid) return false;
+        if (dest == null || !CanDrain(dest, item, liquid)) { w.DrainingLiquid = null; return false; }
         w.Status = Phrase("Taking ", Lower(Data.Name(liquid)), " out");
-        if (Walk(w, dest.Pos, dt)) { Carry(dest.Inventory, w.Bag, null, liquid, dest.Inventory[liquid]); w.Destination = 0; }
+        if (Walk(w, dest.Pos, dt)) {
+            Carry(dest.Inventory, w.Bag, null, liquid, dest.Inventory[liquid]);
+            w.DrainingLiquid = null;
+            w.Destination = 0;
+        }
         return true;
     }
 }

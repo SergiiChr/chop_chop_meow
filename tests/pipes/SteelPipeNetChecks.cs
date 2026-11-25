@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Godot;
 using static Checks;
 using static SteelPipeSteps;
+using static SetupSteps;
 using static PlumbingSteps;
 
 namespace ChopChopMeow;
@@ -17,15 +18,6 @@ public partial class Game {
         LayPipe(Hosted, NetPipe, shape: PipeShape.Tee);
         LayPipe(Hosted, NetPipeSouth, Mathf.Pi / 2);
         netPipePump = Hosted.Add(ThingKind.Pump, NetPipe);
-        var stood = Hosted.Player;
-        var tank = Hosted.Add(ThingKind.Barrel, NetJam);
-        var cannery = Hosted.Add(ThingKind.Cannery, NetJam + Vector2I.Right);
-        Hosted.SetRecipe(cannery, "canned_jam");
-        InstallPlumbing(Hosted, tank); InstallPlumbing(Hosted, cannery);
-        LayPipe(Hosted, NetJam); LayPipe(Hosted, NetJam + Vector2I.Right);
-        tank.Inventory.Add(BerryJam.Liquid, 12);
-        Hosted.Tick(3);
-        Hosted.Player = stood;
     }, HostSeesTheGuestMoveAPipe, GuestMovesTheHostsPipe);
 
     private async Task HostSeesTheGuestMoveAPipe(PlayerState guest) {
@@ -37,13 +29,33 @@ public partial class Game {
             "the guest taking up the south pipe and laying it east of the host's pipe", 90);
         Require(world.Backpack["steel_pipe"] == 0 && guest.Backpack["steel_pipe"] == 0,
             "The lifted pipe must go back into the ground without reaching the host's backpack.");
+        await HostShowsAGuestJamInAPipe();
+    }
+
+    private async Task HostShowsAGuestJamInAPipe() {
+        var stood = Hosted.Player;
+        var tank = Hosted.Add(ThingKind.Barrel, NetJam);
+        var cannery = Hosted.Add(ThingKind.Cannery, NetJam + Vector2I.Right);
+        Hosted.SetRecipe(cannery, "canned_jam");
+        InstallPlumbing(Hosted, tank); InstallPlumbing(Hosted, cannery);
+        LayPipe(Hosted, NetJam); LayPipe(Hosted, NetJam + Vector2I.Right);
+        tank.Inventory.Add(BerryJam.Liquid, 12);
+        Hosted.Tick(3);
+        Hosted.Player = stood;
+
+        await Signaled("guest-saw-pipe-jam");
+        stood = Hosted.Player;
+        Hosted.Player = NetJam + Vector2I.Down;
+        Require(Hosted.Construction.TakeUpPipe(NetJam) && Hosted.Construction.TakeUpPipe(NetJam + Vector2I.Right),
+            "The host should take up both test pipes after the guest sees the jam.");
+        Drop(Hosted, "steel_pipe", 2);
+        RemoveThings(Hosted, t => t == tank || t == cannery);
+        Hosted.Player = stood;
     }
 
     private async Task GuestMovesTheHostsPipe() {
         Require(world.SteelPipes.Laid(NetPipe) && world.SteelPipes.RotationAt(NetPipeSouth) == Mathf.Pi / 2,
             "Joining must bring over both steel pipes and their rotations.");
-        Require(world.PipeReading(NetJam).Liters == 1 && world.PipeLiquid(NetJam) == BerryJam.Liquid,
-            "Joining must preserve both the level and liquid in a jam-filled pipe.");
         Require(world.SteelPipes.ConnectionMask(NetPipe) == 0b0000_0100,
             "The guest must see the south pipe connected to the host's tee.");
         await Until(() => world.PipeReading(NetPipeSouth).Liters == 1,
@@ -58,5 +70,8 @@ public partial class Game {
             "the server laying the guest's pipe facing west");
         Require(world.SteelPipes.ConnectionMask(NetPipe) == 0b0000_0001,
             "Moving the pipe must move its connection from the south side to the east side.");
+        await Until(() => world.PipeReading(NetJam).Liters == 1 && world.PipeLiquid(NetJam) == BerryJam.Liquid,
+            "the guest seeing both the level and kind of liquid in the jam pipe", 20);
+        Signal("guest-saw-pipe-jam");
     }
 }

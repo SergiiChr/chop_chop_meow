@@ -64,6 +64,10 @@ public sealed class Thing {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool ReceivingWater { get; set; }
     /// <summary>Liters supplied through connected plumbing below one whole liter, carried until the next delivery.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float PipedWaterRemainder { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float PipedJamRemainder { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double PipeFeedCredit { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double PipeBalanceCredit { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int PipeBalanceTarget { get; set; }
     public float Burn { get; set; }
     /// <summary>When a berry bush fruits again or a leaf spot replaces an acorn, or zero while full.</summary>
     public float Regrow { get; set; }
@@ -211,6 +215,8 @@ public sealed class Worker : IWalker {
     /// <summary>The kind of resource the worker last said they know no more of.</summary>
     [JsonIgnore] public ThingKind? Exhausted { get; set; }
     public int Destination { get; set; }
+    /// <summary>The liquid a hauler fetched a vessel to take from this destination, or null for a delivery.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? DrainingLiquid { get; set; }
     /// <summary>When on the world's clock a load with nowhere to go looks for a place to take it again.</summary>
     [JsonIgnore] public float LookAgain { get; set; }
     public float Timer { get; set; }
@@ -1868,7 +1874,7 @@ public sealed partial class World {
     }
     private void Started(Worker w, Thing? target) {
         // Reassigning calls off a price errand, so the worker never freezes on the road.
-        w.Assignment = target?.Id ?? 0; w.Away = 0; w.WorkState = WorkerWorkState.Idle;
+        w.Assignment = target?.Id ?? 0; w.Away = 0; w.WorkState = WorkerWorkState.Idle; w.DrainingLiquid = null;
         w.Destination = 0; w.Timer = 0; w.Status = target == null ? "Available" : "Starting work";
     }
     public void Fire(Worker w) {
@@ -2629,7 +2635,7 @@ public sealed partial class World {
             if (t.Batches > 0 && t.Keep != "" && t.Keep != t.Asked) return false;
         }
         foreach (var w in save.Workers)
-            if (w == null || w.FarmWaterStop < 0 || w.FarmWaterStop >= BarrelHaul.FarmStops || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates) || !w.Bag.ValidFor(Inventory.Carrier.Worker)) return false;
+            if (w == null || w.DrainingLiquid is string liquid && Data.VesselFor(liquid) == null || w.FarmWaterStop < 0 || w.FarmWaterStop >= BarrelHaul.FarmStops || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates) || !w.Bag.ValidFor(Inventory.Carrier.Worker)) return false;
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }

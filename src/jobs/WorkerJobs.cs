@@ -72,7 +72,7 @@ public sealed partial class World {
     private bool JobUses(Worker w, string kind) {
         foreach (var d in w.Duties) {
             if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind is ThingKind.Hut or ThingKind.Barrel && BarrelHaul.Vessel(w.Tool)) return true;
-            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind == ThingKind.Farm && Bucket.Is(w.Tool)) return true;
+            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind == ThingKind.Farm && Bucket.Liters(w.Tool) >= 0) return true;
             if (Array.IndexOf(Def(d.Job).Tools, kind) >= 0) return true;
             // A woodcutter's job covers trees and stumps, so the spot it is on now counts as well as the kind it was given.
             if (d.Job == JobKind.Gather && (Uses(d.Kind) || Uses(Find(d.Thing)?.Kind))) return true;
@@ -119,7 +119,7 @@ public sealed partial class World {
     }
 
     /// <summary>Empty hands end the round.</summary>
-    internal static void Emptied(Worker w) { w.Fueling = false; w.InHand = null; }
+    internal static void Emptied(Worker w) { w.Fueling = false; w.InHand = null; w.DrainingLiquid = null; }
 
     /// <summary>
     /// Which box of a place takes a carried item now, and how many of it, or null when none does:

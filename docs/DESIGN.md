@@ -1283,7 +1283,8 @@ Building a link between lines that contain different liquids is refused.
 A barrel supplies 1 L/s plus 0.1 L/s per liter it holds. When a lake pump is off, barrels balance at the difference in their rates.
 Whole-liter transfer stops when two barrels are within one liter.
 Only a cannery set to can jam draws jam from a pipe.
-A receiver with room keeps any fraction below a liter in `Thing.PipedWaterRemainder` until it can store a whole liter.
+A receiver keeps fractions in `Thing.PipedWaterRemainder` or `Thing.PipedJamRemainder` until it can store a whole liter.
+These measurements stay separate, even when a building is moved from one line to another.
 A cooking table requests water for the next queued or marked batch.
 A batch already being worked has spent its water.
 A farm with plumbing takes its share in every crop stage.

@@ -21,10 +21,8 @@ public sealed class Plumbing(World world, Barrels barrels) {
     private sealed class Network {
         public bool Active, PumpRunning, BarrelRunning;
         public string? Liquid;
-        public int TileCount, BalanceFrom, BalanceTo;
-        public double BalanceCredit;
+        public int TileCount;
         public readonly List<Thing> Tanks = [];
-        public readonly Dictionary<int, double> FeedCredit = [];
         public double Output, Stored;
         public int Unfilled;
         public readonly Stack<int> Wet = new();
@@ -51,7 +49,7 @@ public sealed class Plumbing(World world, Barrels barrels) {
             if (network.Liquid == null || network.Liquid == liquid)
                 pressure = Math.Max(pressure, (float)(BarrelRate(barrel.Inventory.Free(liquid)) / .05));
         }
-        return ((float)world.SteelPipes.LitersAt(Terrain.TileIndex(tile)), Math.Min(100, pressure));
+        return ((float)world.SteelPipes.LitersAt(Terrain.TileIndex(tile)), pressure);
     }
 
     /// <summary>Whether a pipe would join lines that already hold different liquids.</summary>
@@ -126,12 +124,15 @@ public sealed class Plumbing(World world, Barrels barrels) {
         foreach (var tank in network.Tanks) {
             int available = tank.Inventory.Free(liquid);
             if (available == 0 || network.Receivers.Count == 0) continue;
-            feeding = true;
             double capacity = network.TileCount * SteelPipes.Capacity - network.Stored;
             foreach (var receiver in network.Receivers) capacity += Demand(receiver, liquid);
-            double credit = network.FeedCredit.GetValueOrDefault(tank.Id) + BarrelRate(available) * dt;
-            int units = (int)Math.Min(Math.Floor(capacity + 1e-8), Math.Min(available, Math.Floor(credit + 1e-8)));
-            network.FeedCredit[tank.Id] = credit - Math.Floor(credit);
+            // With less than a liter of room, keep delivering from the standing liquid.
+            if (capacity < 1) continue;
+            feeding = true;
+            double credit = tank.PipeFeedCredit + BarrelRate(available) * dt;
+            double whole = Math.Floor(credit);
+            int units = (int)Math.Min(Math.Floor(capacity), Math.Min(available, whole));
+            tank.PipeFeedCredit = credit - whole;
             if (units <= 0) continue;
             int sent = tank.Inventory.Remove(liquid, units);
             Share(network, Fill(network, Terrain.TileIndex(Terrain.TileAt(tank.Pos)), sent), liquid);
@@ -148,18 +149,16 @@ public sealed class Plumbing(World world, Barrels barrels) {
             if (liters > high && tank.Inventory.Free(liquid) > 0) { high = liters; from = tank; }
             if (liters < low && TankAccepts(tank, liquid)) { low = liters; to = tank; }
         }
-        if (from == null || to == null || high - low < 2) { network.BalanceCredit = 0; return; }
-        if (network.BalanceFrom != from.Id || network.BalanceTo != to.Id) {
-            network.BalanceCredit = 0;
-            network.BalanceFrom = from.Id;
-            network.BalanceTo = to.Id;
-        }
-        network.BalanceCredit += (BarrelRate(high) - BarrelRate(low)) * dt;
-        int units = Math.Min((high - low) / 2, Math.Min(from.Inventory.Free(liquid), (int)network.BalanceCredit));
+        if (from == null || to == null || high - low < 2) return;
+        double credit = from.PipeBalanceTarget == to.Id ? from.PipeBalanceCredit : 0;
+        from.PipeBalanceTarget = to.Id;
+        credit += (BarrelRate(high) - BarrelRate(low)) * dt;
+        double whole = Math.Floor(credit);
+        from.PipeBalanceCredit = credit - whole;
+        int units = (int)Math.Min((high - low) / 2, Math.Min(from.Inventory.Free(liquid), whole));
         if (units == 0) return;
         int put = to.Inventory.Add(liquid, units);
         from.Inventory.Remove(liquid, put);
-        network.BalanceCredit -= units;
         world.PileFilters(to);
     }
 
@@ -288,7 +287,10 @@ public sealed class Plumbing(World world, Barrels barrels) {
     /// <summary>Sprinklers can discharge their entire share even when the soil is full.</summary>
     private double Demand(Thing receiver, string liquid) =>
         receiver.Kind == ThingKind.Farm && receiver.PlumbingInstalled && liquid == Water.Liquid ? double.PositiveInfinity
-        : StorageRoom(receiver, liquid) - (double)receiver.PipedWaterRemainder;
+        : StorageRoom(receiver, liquid) - (double)Remainder(receiver, liquid);
+
+    private static float Remainder(Thing receiver, string liquid) =>
+        liquid == BerryJam.Liquid ? receiver.PipedJamRemainder : receiver.PipedWaterRemainder;
 
     /// <summary>Splits the water among buildings that are drawing it and returns any water they cannot take.</summary>
     private double Share(Network network, double water, string liquid) {
@@ -313,10 +315,12 @@ public sealed class Plumbing(World world, Barrels barrels) {
     }
 
     private void Deliver(Thing receiver, double share, string liquid) {
-        double liters = Math.Min(StorageRoom(receiver, liquid), receiver.PipedWaterRemainder + share);
+        double liters = Math.Min(StorageRoom(receiver, liquid), Remainder(receiver, liquid) + share);
         int whole = (int)liters;
         int received = whole == 0 ? 0 : Store(receiver, whole, liquid);
-        receiver.PipedWaterRemainder = received == whole ? Math.Min(MathF.BitDecrement(1), (float)(liters - whole)) : 0;
+        float kept = received == whole ? Math.Min(MathF.BitDecrement(1), (float)(liters - whole)) : 0;
+        if (liquid == BerryJam.Liquid) receiver.PipedJamRemainder = kept;
+        else receiver.PipedWaterRemainder = kept;
         receiver.ReceivingWater = liquid == Water.Liquid && share > 0 && Demand(receiver, liquid) > 0;
     }
 
@@ -328,6 +332,8 @@ public sealed class Plumbing(World world, Barrels barrels) {
     }
 
     internal static bool ValidReceiver(Thing thing) =>
-        thing.PipedWaterRemainder is >= 0 and < 1
-        && (HasPlumbing(thing.Kind) || !thing.ReceivingWater && thing.PipedWaterRemainder == 0);
+        thing.PipedWaterRemainder is >= 0 and < 1 && thing.PipedJamRemainder is >= 0 and < 1
+        && (HasPlumbing(thing.Kind) || !thing.ReceivingWater && thing.PipedWaterRemainder == 0 && thing.PipedJamRemainder == 0)
+        && thing.PipeFeedCredit is >= 0 and < 1 && thing.PipeBalanceCredit is >= 0 and < 1 && thing.PipeBalanceTarget >= 0
+        && (thing.Kind == ThingKind.Barrel || thing.PipeFeedCredit == 0 && thing.PipeBalanceCredit == 0 && thing.PipeBalanceTarget == 0);
 }

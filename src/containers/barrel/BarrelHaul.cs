@@ -23,7 +23,7 @@ internal sealed class BarrelHaul : PlaceHaul {
     internal static Vector2 FarmPourPoint(Thing farm, int stop) =>
         farm.ToWorld(FarmStands[stop] - FarmStands[stop].Normalized() * .55f);
 
-    public static bool Vessel(string item) => Bucket.Is(item) || Water.IsBottle(item);
+    public static bool Vessel(string item) => Bucket.Liters(item) >= 0 || Water.IsBottle(item);
 
     public static bool OnLadderOrRoof(Worker w, Thing target) => target.Kind == ThingKind.Hut && w.WaterTarget == target.Id
         && w.WaterAction is WorkerWaterAction.ClimbUp or WorkerWaterAction.Pour or WorkerWaterAction.ClimbDown;
@@ -59,7 +59,7 @@ internal sealed class BarrelHaul : PlaceHaul {
         return false;
     }
 
-    private static bool ToolFits(Thing target, string item) => target.Kind == ThingKind.Farm ? Bucket.Is(item) : Vessel(item);
+    private static bool ToolFits(Thing target, string item) => target.Kind == ThingKind.Farm ? Bucket.Liters(item) >= 0 : Vessel(item);
 
     private bool HaulFor(Worker w, Duty duty, float dt) {
         if (world.Find(duty.Thing) is not { Kind: ThingKind.Barrel or ThingKind.Hut or ThingKind.Farm } target || !NeedsWater(target)) return false;
@@ -217,14 +217,14 @@ internal sealed class BarrelHaul : PlaceHaul {
     }
 
     private void FillTool(Worker w, Thing source) {
-        if (world.Data.VesselOf(w.Tool) is not VesselDef v || w.ToolSlot.Free(w.Tool) == 0) return;
+        if (world.Data.VesselOf(w.Tool) is not { Liquid: Water.Liquid } v || w.ToolSlot.Free(w.Tool) == 0) return;
         int held = v.LitersIn(w.Tool);
         int added = source.Kind == ThingKind.Water ? v.Capacity - held : Barrels.TakeWater(source, v.Capacity - held);
         w.Tool = v.States[held + added];
     }
 
     private void PourTool(Worker w, Thing target) {
-        if (world.Data.VesselOf(w.Tool) is not VesselDef v || w.ToolSlot.Free(w.Tool) == 0) return;
+        if (world.Data.VesselOf(w.Tool) is not { Liquid: Water.Liquid } v || w.ToolSlot.Free(w.Tool) == 0) return;
         int held = v.LitersIn(w.Tool);
         int poured = barrels.AddWater(target, held);
         w.Tool = v.States[held - poured];

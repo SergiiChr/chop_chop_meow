@@ -5,12 +5,16 @@ using static PlumbingSteps;
 using static SetupSteps;
 using static SteelPipeSteps;
 using static WorldSteps;
+using static WorkerSteps;
 
 public static class JamPlumbingChecks {
     public static void Run(GameData data) {
         Test(CheckConnectedBarrelsEqualizeByPressure, data);
         Test(CheckJamFeedsACanneryWithoutMixingIntoWater, data);
         Test(CheckABarrelCarriesOnlyOneLiquid, data);
+        Test(CheckAFullLineSuppliesTheRestOfACannerysLiter, data);
+        Test(CheckFractionalWaterCannotBecomeJamAfterChangingLines, data);
+        Test(CheckAWorkerBringsOnlyJamToTheJamBarrel, data);
     }
 
     private static void CheckConnectedBarrelsEqualizeByPressure(GameData data) {
@@ -67,5 +71,75 @@ public static class JamPlumbingChecks {
             "A barrel holding jam must refuse water without losing anything.");
         Require(world.PickUpBarrel(barrel) && world.Backpack[Barrel.AtFill(3, BerryJam.Liquid)] == 1,
             "Picking up the barrel must preserve its contents.");
+    }
+
+    private static void CheckAFullLineSuppliesTheRestOfACannerysLiter(GameData data) {
+        var world = EmptyWorld(data);
+        var tank = world.Add(ThingKind.Barrel, PumpTile);
+        var first = world.Add(ThingKind.Cannery, JunctionTile);
+        var second = world.Add(ThingKind.Cannery, JunctionTile + Vector2I.Right);
+        foreach (var cannery in new[] { first, second }) world.SetRecipe(cannery, "canned_jam");
+        foreach (var building in new[] { tank, first, second }) {
+            InstallPlumbing(world, building);
+            LayPipe(world, building.Pos);
+        }
+        tank.Inventory.Add(BerryJam.Liquid, 30);
+        world.Tick(1);
+        Require(first.Inventory[BerryJam.Liquid] == 0 && second.Inventory[BerryJam.Liquid] == 0
+            && world.PipeReading(JunctionTile).Liters == 1 && tank.Inventory[BerryJam.Liquid] == 26,
+            "The first four liters should fill the three pipes and give each cannery half a liter.");
+        world.SetRecipe(second, "canned_meat_stew");
+        world.Tick(.125f);
+        Require(first.Inventory[BerryJam.Liquid] == 1 && second.Inventory[BerryJam.Liquid] == 0,
+            "The first cannery must be able to take its missing half-liter from the full pipe.");
+    }
+
+    private static void CheckFractionalWaterCannotBecomeJamAfterChangingLines(GameData data) {
+        var (world, pump, receiver) = PumpAndBarrel(data);
+        PumpFully(world, pump);
+        world.Tick(.90625f);
+        Require(receiver.Inventory.Count == 0 && world.PipeReading(EastTankTile).Liters == 1,
+            "The pump should fill four pipes and leave a partial delivery at the barrel.");
+        Require(world.Construction.TakeUpPipe(EastTankTile + Vector2I.Left) && world.Construction.TakeUpPipe(EastTankTile),
+            "Take up the connection and the water in the barrel's inlet.");
+        world.ClearFilters(receiver);
+        var canneryTile = EastTankTile + Vector2I.Right * 3;
+        var tank = world.Add(ThingKind.Barrel, canneryTile + Vector2I.Right);
+        var cannery = world.Add(ThingKind.Cannery, canneryTile);
+        world.SetRecipe(cannery, "canned_jam");
+        InstallPlumbing(world, tank); InstallPlumbing(world, cannery);
+        LayPipe(world, tank.Pos); LayPipe(world, cannery.Pos);
+        tank.Inventory.Add(BerryJam.Liquid, 30);
+        world.Tick(1);
+        Give(world, Water.Empty);
+        world.Player = cannery.Pos + Vector2.Down;
+        Require(world.Transfer(cannery.Inventory, world.Backpack, BerryJam.Liquid, 1) == 1, "Empty the cannery's jam input.");
+        world.Player = tank.Pos + Vector2.Down;
+        Require(world.PickUpBarrel(tank) && world.Construction.TakeUpPipe(canneryTile + Vector2I.Right),
+            "Leave only the one standing liter at the cannery.");
+        for (int i = 0; i < 3; i++) LayPipe(world, EastTankTile + Vector2I.Right * i);
+        int receiverId = receiver.Id;
+        world.Deserialize(world.Serialize());
+        world.Tick(.125f);
+        var loaded = world.Find(receiverId)!;
+        Require(loaded.Inventory.Count == 0, "A half-liter of standing jam must not combine with old water to become one liter.");
+    }
+
+    private static void CheckAWorkerBringsOnlyJamToTheJamBarrel(GameData data) {
+        var world = EmptyWorld(data);
+        var table = world.Add(ThingKind.Cooktable, PumpTile);
+        var barrel = world.Add(ThingKind.Barrel, PumpTile + Vector2I.Right * 4);
+        var chest = world.Add(ThingKind.Chest, PumpTile + Vector2I.Down * 3);
+        world.SetRecipe(table, "berry_jam");
+        table.Inventory.Add(Water.Liquid, 1);
+        table.Inventory.Add(BerryJam.Liquid, 1);
+        barrel.Inventory.Add(BerryJam.Liquid, 1);
+        chest.Inventory.Add(Water.Empty, 1);
+        world.SetFilter(chest, Water.Empty, true, true);
+        var hauler = AddWorker(world, chest.Pos + Vector2.One);
+        world.SetDuty(hauler, table, JobKind.Haul, true);
+        Work(world, 30, () => barrel.Inventory[BerryJam.Liquid] == 2);
+        Require(barrel.Inventory[BerryJam.Liquid] == 2 && table.Inventory[Water.Liquid] == 1,
+            "A worker should fill one bottle with the outgoing jam, put it in the barrel, and leave the unused water.");
     }
 }
