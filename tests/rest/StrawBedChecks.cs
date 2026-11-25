@@ -157,6 +157,8 @@ public static class StrawBedChecks {
             var palm = Palm(true);
             StrawBedView.Draw(rig, mat, StrawBedView.SecondHandOn);
             var secondPalm = Palm(false);
+            StrawBedView.Draw(rig, mat, StrawBedView.ForearmOn);
+            var brace = Elbow();
             StrawBedView.Draw(rig, mat, 0);
             var lastLeft = Palm(true); var lastRight = Palm(false);
             var lastElbow = Elbow();
@@ -171,6 +173,8 @@ public static class StrawBedChecks {
                     $"the relaxed hand should stay above the straw at {down:F3}, got {right}");
                 if (down >= StrawBedView.ForearmOn) Require(elbow.Y - StrawBedModel.Top is > .03f and < .057f,
                     $"the forearm should bear weight while the shoulder descends at {down:F3}, elbow is at {elbow}");
+                if (down is >= StrawBedView.ForearmOn and <= StrawBedView.SecondHandOff) Require(elbow.DistanceTo(brace) < .05f,
+                    $"the elbow should stay by its support point until the shoulder settles, moved {elbow.DistanceTo(brace):F3} m at {down:F3}");
                 Require(left.DistanceTo(lastLeft) < .072f && right.DistanceTo(lastRight) < .072f && elbow.DistanceTo(lastElbow) < .072f,
                     $"neither hand nor the support elbow should jump between successive frames at phase {down:F3}, " +
                     $"steps were {left.DistanceTo(lastLeft):F3}, {right.DistanceTo(lastRight):F3}, {elbow.DistanceTo(lastElbow):F3} m");
