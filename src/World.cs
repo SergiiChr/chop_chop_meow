@@ -119,6 +119,8 @@ public sealed class Thing {
     [JsonIgnore] public bool IsLoose => GatherRules.Of(Kind)?.Shape == GatherShape.Loose;
     /// <summary>A stump or a bush: digging adds up in <see cref="Progress"/> until it comes out of the ground whole.</summary>
     [JsonIgnore] public bool IsDug => GatherRules.Of(Kind)?.Shape == GatherShape.Dug;
+    /// <summary>A creature that moves about in the air: it takes no ground, so anything is built, laid or dug where it is, and no player remembers where one was.</summary>
+    [JsonIgnore] public bool Roams => GatherRules.Of(Kind)?.Roams == true;
     [JsonIgnore] public bool IsStorage => Kind is ThingKind.Chest or ThingKind.Grave or ThingKind.Crate or ThingKind.Toolstation or ThingKind.Pile or ThingKind.Barrel;
 }
 /// <summary>Batches of one recipe waiting in the hand's queue.</summary>
@@ -266,7 +268,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 20;
+    public int Version { get; set; } = 21;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -275,6 +277,10 @@ public sealed class SaveState {
     public int DensOut { get; set; }
     /// <summary>Whole hours since dusk that have had their one more wolf tonight.</summary>
     public int DenHours { get; set; }
+    /// <summary>Tonight's nettles have come up; cleared by day.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool NettlesUp { get; set; }
+    /// <summary>Firebugs let out tonight, caught or not; back to none by day.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int FirebugsOut { get; set; }
     /// <summary>A wolf has howled tonight.</summary>
     public bool Howled { get; set; }
     /// <summary>How many times players have come to a cabin's door, which numbers each arrival.</summary>
@@ -374,6 +380,8 @@ public sealed partial class World {
         Holes = new GroundHoles(this); Replaced += Holes.Reset;
         Beach = new Beach(this);
         Trees = new TreePlanting(this); Replaced += Trees.Reset;
+        Nettles = new Nettles(this);
+        Firebugs = new Firebugs(this); Replaced += Firebugs.Reset;
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         Goals = new Goals(this);
         breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset;
@@ -397,6 +405,14 @@ public sealed partial class World {
     public GroundHoles Holes { get; }
     public TreePlanting Trees { get; }
     public LeafSpots LeafSpots { get; }
+    public Nettles Nettles { get; }
+    public Firebugs Firebugs { get; }
+    /// <summary>
+    /// While set, no nettle comes up and no firebug comes out at night.
+    /// A check session sets it, since each thing takes its look from its id and things that come by themselves would
+    /// change which tree, stump or rock a later check is given.
+    /// </summary>
+    public bool QuietNights { get; set; }
     public Goals Goals { get; }
     private readonly Barrels barrels;
 
@@ -474,6 +490,21 @@ public sealed partial class World {
     public Doorway Door => S.Actor.Door;
     public bool Occupied => Downed || S.Actor.Door != Doorway.None || Sleep.Place != 0;
     public bool Sees(Vector2 p) => p.DistanceTo(Player) <= Data.SightRadius;
+    /// <summary>Whether no player can see a spot.</summary>
+    internal bool Unseen(Vector2 p) {
+        foreach (var player in S.Players) if (player.Pos.DistanceTo(p) <= Data.SightRadius) return false;
+        return true;
+    }
+    /// <summary>Random spots tried for something that comes up by itself before it goes without one.</summary>
+    private const int SpotTries = 400;
+    /// <summary>A random spot of the valley that no player sees and that <paramref name="fits"/>, or null when the tries find none.</summary>
+    internal Vector2? UnseenSpot(Random random, Predicate<Vector2> fits) {
+        for (int i = 0; i < SpotTries; i++) {
+            var p = new Vector2(random.Next(3, Terrain.Size - 3), random.Next(3, Terrain.Size - 3));
+            if (Unseen(p) && fits(p)) return p;
+        }
+        return null;
+    }
     /// <summary>Raised whenever newly seen tiles join the explored map.</summary>
     public int ExploredRevision { get; private set; }
     /// <summary>Fills <paramref name="known"/> with things as the player knows them: live within sight, as last seen elsewhere, and absent if never seen.</summary>
@@ -713,6 +744,8 @@ public sealed partial class World {
         ThingKind.LeafSpot => "rake leaves",
         ThingKind.Stump => "dig up the stump",
         ThingKind.Bush => "dig up the bush",
+        ThingKind.Nettle => "pick nettles",
+        ThingKind.Firebug => "catch firebugs",
         _ when t.IsLoose => Phrase("pick up ", Lower(Data.Name(t.Kind))),
         ThingKind.Mine => Mines.Task(t),
         _ => Phrase("mine ", t.Kind.Id())
@@ -740,11 +773,13 @@ public sealed partial class World {
 
     /// <summary>The fastest carried tool of a kind at or above <paramref name="tier"/>, or null when none is carried.</summary>
     public string? BestTool(string tool, Inventory? from = null, int tier = 0) => BestTool(tool, from ?? S.Backpack, tier, requireFree: false);
+    /// <summary>The fastest carried tool a recipe can be made with, or null when none is carried.</summary>
+    public string? BestTool(RecipeDef r, Inventory? from = null) => BestTool(r.Tool, from ?? S.Backpack, r.Tier, requireFree: false, r.MaxTier);
 
-    private string? BestTool(string tool, Inventory from, int tier, bool requireFree) {
+    private string? BestTool(string tool, Inventory from, int tier, bool requireFree, int maxTier = int.MaxValue) {
         string? best = null; float speed = 0;
         foreach (var (item, _) in from.Items) {
-            if (!Data.Items.TryGetValue(item, out var def) || def.Tool != tool || def.Tier < tier || best != null && def.Speed <= speed) continue;
+            if (!Data.Items.TryGetValue(item, out var def) || def.Tool != tool || def.Tier < tier || def.Tier > maxTier || best != null && def.Speed <= speed) continue;
             if (requireFree && from.Free(item) == 0) continue;
             best = item; speed = def.Speed;
         }
@@ -778,10 +813,12 @@ public sealed partial class World {
         if (GatherRules.Of(t.Kind)?.Needs is string kind && BestTool(kind) == null) return kind switch {
             "axe" => "An axe is required to chop a tree.",
             "shovel" => Phrase("A shovel is required to dig up the ", Lower(Data.Name(t.Kind)), "."),
+            "net" => "A bug net is required to catch a firebug.",
             _ => "A pickaxe is required to mine."
         };
-        // A stump or a bush comes out whole, so all of it has to fit.
-        if (t.IsDug && S.Backpack.Room(ResourceItem(t)) < t.Remaining) return Phrase(Phrase("No room in your backpack for ", Number(t.Remaining), " "), Lower(Data.Name(ResourceItem(t))), ".");
+        if (t.Kind == ThingKind.Firebug) return "Swing the bug net at the firebug to catch it.";
+        // A stump, a bush or a nettle comes out whole, so all of it has to fit.
+        if (GatherRules.Of(t.Kind)?.Shape is GatherShape.Dug or GatherShape.Plucked && S.Backpack.Room(ResourceItem(t)) < t.Remaining) return Phrase(Phrase("No room in your backpack for ", Number(t.Remaining), " "), Lower(Data.Name(ResourceItem(t))), ".");
         return null;
     }
     public static string ResourceItem(Thing t) => ResourceItem(t.Kind);
@@ -805,6 +842,7 @@ public sealed partial class World {
         gatherClock += dt;
         var rule = GatherRules.Of(t.Kind);
         string? tool = (rule?.Needs ?? rule?.Helps) is string kind ? BestTool(kind) : null;
+        if (rule is { Sting: > 0 } stinging && (stinging.Spares == null || BestTool(stinging.Spares) == null)) S.Health -= dt * stinging.Sting;
         if (t.IsDug) {
             t.Progress += dt * Speed(tool);
             if (DugOut(t)) Unearth(t, S.Backpack);
@@ -822,6 +860,7 @@ public sealed partial class World {
         amount = S.Backpack.Add(item, amount); t.Remaining -= amount;
         if (t.Kind == ThingKind.Tree && t.Remaining <= 0) Fell(t, Player);
         if (amount == 0) { Say("Backpack full. Store or sell some supplies."); return; }
+        if (t.Remaining <= 0 && rule?.GoneWhenSpent == true) S.Things.Remove(t);
         Chip(t, tool);
         if (t.Kind == ThingKind.LeafSpot) LeafSpots.Gather(t, S.Backpack);
         Got(item);
@@ -908,11 +947,13 @@ public sealed partial class World {
         t.Keep = recipe;
     }
     /// <summary>
-    /// Why a station's mark cannot move to a recipe now, or null: a mark turns a station to another recipe only while no batch is worked and its slots are empty.
+    /// Why a station's mark cannot move to a recipe now, or null: a mark turns a station to another recipe only while no batch is worked and its slots are empty,
+    /// and never to one whose only tool there is too hard for it (<see cref="TooHardBlock"/>), so a refused recipe leaves the station and its waiting batches as they were.
     /// Taking the mark off, and marking the recipe the station is on, are never refused.
     /// </summary>
     public string? MarkBlock(Thing t, string recipe) =>
         recipe == "" || recipe == Selected(t) ? null
+        : TooHardBlock(t, Data.Recipes[recipe]) is string tooHard ? tooHard
         : t.Processing ? Busy(t)
         : t.Inventory.Count > 0 ? $"Empty the {Lower(Data.Name(t.Kind))}'s slots first." : null;
     private string Busy(Thing t) => $"The {Lower(Data.Name(t.Kind))} has to finish its batch first.";
@@ -957,26 +998,36 @@ public sealed partial class World {
     public IEnumerable<string> RecipesAt(Thing? station) => station == null ? HandRecipes : Data.Recipes.Where(p => p.Value.Station == station.Kind).Select(p => p.Key);
     /// <summary>The tool the acting player works a recipe with: the faster of the one slotted at a station and the best one carried; null when there is none or none is needed.</summary>
     public string? ToolInUse(Thing? station, string tool, int tier) => tool == "" ? null : Faster(station == null ? null : BenchTool(station, tool, tier), BestTool(tool, null, tier));
+    /// <summary>The tool the acting player works a recipe with, as <see cref="ToolInUse(Thing?, string, int)"/> finds it among the tools the recipe can be made with.</summary>
+    public string? ToolInUse(Thing? station, RecipeDef r) => r.Tool == "" ? null : Faster(station == null ? null : BenchTool(station, r), BestTool(r));
     /// <summary>
     /// Whether the acting player has the tool a recipe needs, slotted at the station or carried, or it needs none.
     /// </summary>
-    public bool HasToolFor(Thing? station, RecipeDef r) => r.Tool == "" || ToolInUse(station, r.Tool, r.Tier) != null;
+    public bool HasToolFor(Thing? station, RecipeDef r) => r.Tool == "" || ToolInUse(station, r) != null;
     /// <summary>
-    /// Whether the acting player works a station with the tool of a kind slotted there rather than one they carry: one
+    /// Whether the acting player works a station's recipe with the tool slotted there rather than one they carry: one
     /// is slotted, and they carry none faster.
     /// </summary>
     public bool WorksWithSlotted(Thing station, string tool) => BenchTool(station, tool) is string slotted && Faster(slotted, BestTool(tool, null, 0)) == slotted;
+    /// <summary>Whether the acting player works a station's recipe with the tool slotted there for it rather than one they carry.</summary>
+    public bool WorksWithSlotted(Thing station, RecipeDef r) => BenchTool(station, r) is string slotted && Faster(slotted, BestTool(r)) == slotted;
+    /// <summary>
+    /// What a recipe says to a player whose every tool of its kind, slotted at the station or carried, is too hard for
+    /// it; null when one will do, or when they have none at all.
+    /// </summary>
+    public string? TooHardBlock(Thing? station, RecipeDef r) =>
+        r.TooHard != "" && !HasToolFor(station, r) && (station != null && BenchTool(station, r.Tool, r.Tier) != null || BestTool(r.Tool, null, r.Tier) != null) ? r.TooHard : null;
     /// <summary>
     /// The tool a station's recipe is worked with: the fastest of the one slotted and, for a batch a player queued, those carried by players working at the station.
     /// A worker brings none, so a station worked only by its crew works with the slotted tool and waits when there is none.
     /// </summary>
     private string? StationTool(Thing t, RecipeDef r) {
         if (r.Tool == "") return null;
-        string? best = BenchTool(t, r.Tool, r.Tier);
+        string? best = BenchTool(t, r);
         if (!PlayersWork(t)) return best;
         foreach (var p in S.Players)
             using (ActAs(p))
-                if (PlayerHammers(t)) best = Faster(best, BestTool(r.Tool, null, r.Tier));
+                if (PlayerHammers(t)) best = Faster(best, BestTool(r));
         return best;
     }
     /// <summary>The faster of two tools, the first when they are as fast; null when there is neither.</summary>
@@ -992,6 +1043,7 @@ public sealed partial class World {
     /// The recipe asked for gets the station's mark, so workers go on making it once the batches are done.
     /// Turning from the recipe it is on to another drops the batches still waiting and keeps in its slots the inputs the new recipe uses and the fuel it burns;
     /// the rest goes into the backpack, and only what the first batches still lack loads from it.
+    /// A recipe whose only tool there is too hard for it is refused in the recipe's own words (<see cref="TooHardBlock"/>).
     /// <see cref="SwitchBlock"/> says when it cannot.
     /// </summary>
     public void QueueBatch(Thing t, string recipe, int batches = 1) {
@@ -999,10 +1051,11 @@ public sealed partial class World {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
         if (Busy() || Forwarded(Verb.QueueBatch, t.Id, item: recipe, count: batches)) return;
         if (SwitchBlock(t, recipe) is string blocked) { Say(blocked); return; }
+        var r = Data.Recipes[recipe];
+        if (TooHardBlock(t, r) is string tooHard) { Say(tooHard); return; }
         int waiting = Waiting(t, recipe);
         if (waiting >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
         string? missing = BatchShort(t, recipe);
-        var r = Data.Recipes[recipe];
         bool switching = recipe != Selected(t);
         if (switching) Unload(t, Product(t), r);
         t.Keep = recipe;
@@ -1140,6 +1193,7 @@ public sealed partial class World {
         var cost = BatchCost(recipe);
         if (cost.Count == 0) { Say("Choose a recipe first."); return; }
         var r = Data.Recipes[recipe];
+        if (TooHardBlock(t, r) is string tooHard) { Say(tooHard); return; }
         string? fuel = null;
         if (r.Burns && (fuel = FuelFromBackpack(t, r, cost)) == null) return;
         for (int i = 0; i < batches; i++) {
@@ -1308,6 +1362,12 @@ public sealed partial class World {
             _ => ActorAction.AxeSwing
         };
         Swings.Start(action, StartSwing(action, aim), axe == null ? 1 : Speed(axe));
+    }
+    /// <summary>Swings a carried bug net along <paramref name="aim"/>, south when none is given; it catches firebugs as it lands.</summary>
+    public void SwingNet(Vector2 aim = default) {
+        if (attackClock > 0 || S.Sheltered != 0 || Busy() || Forwarded(Verb.SwingNet, at: aim)) return;
+        if (BestTool("net") == null) { Say("No bug net in your backpack."); return; }
+        Swings.Start(ActorAction.NetSwing, StartSwing(ActorAction.NetSwing, aim));
     }
     public void Die() {
         S.Actor.SleepingAt = 0;
@@ -1637,7 +1697,7 @@ public sealed partial class World {
     private CraftRefusal CraftCheck(string recipe) {
         if (!Data.Recipes.TryGetValue(recipe, out var r) || !r.Hand) return CraftRefusal.StationOnly;
         if (Occupied) return CraftRefusal.Busy;
-        if (r.Tool != "" && BestTool(r.Tool, null, r.Tier) == null) return CraftRefusal.NoTool;
+        if (r.Tool != "" && BestTool(r) == null) return CraftRefusal.NoTool;
         if (!S.Backpack.Has(r.Inputs)) return CraftRefusal.NoInputs;
         return Waiting(Crafting, recipe) >= MaxQueued ? CraftRefusal.QueueFull : CraftRefusal.None;
     }
@@ -1647,7 +1707,7 @@ public sealed partial class World {
     public string? CraftBlock(string recipe) => CraftCheck(recipe) switch {
         CraftRefusal.StationOnly => "This can only be made at a station.",
         CraftRefusal.Busy => "You are busy.",
-        CraftRefusal.NoTool => $"Needs a {Data.ToolName(Data.Recipes[recipe].Tool, Data.Recipes[recipe].Tier)} in your backpack.",
+        CraftRefusal.NoTool => $"Needs a {Data.ToolName(Data.Recipes[recipe])} in your backpack.",
         CraftRefusal.NoInputs => $"Needs {Goods(Data.Recipes[recipe].Inputs)} in your backpack.",
         CraftRefusal.QueueFull => $"{MaxQueued} of these are already queued.",
         _ => null
@@ -1673,7 +1733,7 @@ public sealed partial class World {
     /// <summary>The hand recipe being made, else the first waiting, or null.</summary>
     private RecipeDef? NextCraft => S.Making != "" ? Data.Recipes[S.Making] : S.Crafting.Count > 0 ? Data.Recipes[S.Crafting[0].Recipe] : null;
     /// <summary>How fast hand crafting progresses: the carried tool's speed, or zero while its tool is missing or nothing is queued.</summary>
-    public float CraftRate => NextCraft is not RecipeDef r || Downed || Sleep.Place != 0 ? 0 : r.Tool != "" ? BestTool(r.Tool, null, r.Tier) is string held ? Speed(held) : 0 : 1;
+    public float CraftRate => NextCraft is not RecipeDef r || Downed || Sleep.Place != 0 ? 0 : r.Tool != "" ? BestTool(r) is string held ? Speed(held) : 0 : 1;
     /// <summary>Seconds a player stands still before hand crafting goes on, so walking never crafts between steps.</summary>
     public const float CraftSettle = .25f;
     private void CraftTick(float dt) {
@@ -1692,6 +1752,8 @@ public sealed partial class World {
     public ToolSlotRule[] SlotRules(ThingKind kind) => Data.Buildings.TryGetValue(kind, out var building) ? building.ToolSlots : [];
     /// <summary>The tool of a kind slotted in a station, or null when its slot is empty or holds a tool below <paramref name="tier"/>.</summary>
     public string? BenchTool(Thing bench, string tool, int tier = 0) => bench.Tools == null ? null : BestTool(tool, bench.Tools, tier);
+    /// <summary>The tool slotted in a station that a recipe can be made with, or null.</summary>
+    public string? BenchTool(Thing bench, RecipeDef r) => bench.Tools == null ? null : BestTool(r, bench.Tools);
     /// <summary>
     /// Why a station's tool slots will not take an item: no slot takes it, or the slot that does already holds a tool;
     /// null when it goes in.
@@ -2104,7 +2166,7 @@ public sealed partial class World {
         foreach (var kind in Kinds.All) {
             if (GatherRules.Of(kind)?.JobName != job || !CanWork(w, kind)) continue;
             foreach (var t in S.Things.Of(kind)) {
-                if (t.Remaining <= 0 || TreePlanting.IsYoung(t) || !S.Remembered.ContainsKey(t.Id) || HasDuty(w, t.Id)) continue;
+                if (t.Remaining <= 0 || TreePlanting.IsYoung(t) || !S.Remembered.ContainsKey(t.Id) && !t.Roams || HasDuty(w, t.Id)) continue;
                 float distance = t.Pos.DistanceSquaredTo(from);
                 if (t.IsLoose) { if (loose == null || distance < nearestLoose) { loose = t; nearestLoose = distance; } } else if (next == null || distance < nearest) { next = t; nearest = distance; }
             }
@@ -2112,7 +2174,7 @@ public sealed partial class World {
         return next ?? loose;
     }
     /// <summary>Whether a worker can gather a kind of resource: it needs no tool, or one they have in hand or can take from a tool station.</summary>
-    internal bool CanWork(Worker w, ThingKind kind) => GatherRules.Of(kind)?.Needs is not string tool || HasTool(w, tool);
+    internal bool CanWork(Worker w, ThingKind kind) => GatherRules.Of(kind)?.WorkerNeeds is not string tool || HasTool(w, tool);
     /// <summary>Moves a worker's duties on a spent spot to the next one.</summary>
     internal static void MoveTo(Worker w, int spent, Thing next) {
         foreach (var duty in w.Duties) if (duty.Thing == spent) duty.Thing = next.Id;
@@ -2294,6 +2356,8 @@ public sealed partial class World {
         S.Things.RemoveAll(ThingKind.WolfCorpse, t => t.Remaining <= 0);
         Trees.Tick();
         LeafSpots.Tick();
+        Nettles.Tick();
+        Firebugs.Tick(dt);
         StrawBed.Expire(this);
         // Only kinds that change by themselves tick; a tick that can add or remove things walks a copy.
         // A carcass keeps its age so the death animation plays once and not again after loading.
@@ -2448,7 +2512,8 @@ public sealed partial class World {
         bool seekOre = !Remote && !Reached(Goals.OreSeen);
         // Only the look is remembered: no inventory, and no fire, heat or work, so nothing out of sight smokes or glows.
         foreach (var t in S.Things) {
-            if (!Sees(t.Pos)) continue;
+            // A firebug is never where it was last seen, so it leaves no memory.
+            if (!Sees(t.Pos) || t.Roams) continue;
             if (seekOre && t.IsDeposit && t.Remaining > 0) {
                 S.Milestones.Add(Goals.OreSeen);
                 seekOre = false;

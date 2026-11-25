@@ -681,7 +681,7 @@ public partial class WorldView : Node3D {
 
     private static string? HeldTool(string? selected, Inventory backpack) => selected switch {
         "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
-        "wood_hammer" or "steel_hammer" when backpack[selected] > 0 => selected,
+        "wood_hammer" or "steel_hammer" or "bug_net" when backpack[selected] > 0 => selected,
         _ => null
     };
 
@@ -753,7 +753,7 @@ public partial class WorldView : Node3D {
             bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking, World.Data);
-            if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
+            if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind or ActorAction.TwistRope && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch ? worker.Pos + Vector2.FromAngle(worker.LunchHeading) : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down.Rotated(assignment.Rotation)
@@ -837,14 +837,15 @@ public partial class WorldView : Node3D {
     private string? StationHammer(string? tool, Thing? station, PlayerState p) {
         if (tool != "hammer" || station?.Tools == null) return null;
         using var acting = World.ActAs(p);
-        return World.ToolInUse(station, "hammer", 0);
+        // A recipe made with a hammer names the hammers that will do; any other work at the station is shown with whichever hammer is there.
+        return World.Data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "hammer" ? World.ToolInUse(station, r) : World.ToolInUse(station, "hammer", 0);
     }
 
     /// <summary>Whether a player swinging <paramref name="tool"/> at a station swings the hammer slotted there.</summary>
     private bool SwingsSlottedHammer(string? tool, Thing? station, PlayerState p) {
         if (tool != "hammer" || station?.Tools == null) return false;
         using var acting = World.ActAs(p);
-        return World.WorksWithSlotted(station, "hammer");
+        return World.Data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "hammer" ? World.WorksWithSlotted(station, r) : World.WorksWithSlotted(station, "hammer");
     }
 
     /// <summary>Whether the acting player has the tool a station's recipe needs: slotted, carried or none.</summary>
@@ -1131,7 +1132,7 @@ public partial class WorldView : Node3D {
     private readonly List<Prop> leaving = new();
     private SaveState? builtFor;
     // How many things the world held, and the newest of them, when models were last cleared away: a tree swapped for its stump changes only the second.
-    private int thingsCounted = -1, newestThing;
+    private int thingsCounted = -1, newestThing, groundedCounted = -1, newestGrounded;
     private static readonly Vector2 Nowhere = new(-1e6f, -1e6f);
     // Where the player stood when things were last drawn.
     private Vector2 sawFrom = Nowhere;
@@ -1159,7 +1160,7 @@ public partial class WorldView : Node3D {
         // Another world, loaded or started, starts from fresh models: the old ones carry the state of things with the same ids.
         if (builtFor != World.S) {
             builtFor = World.S;
-            thingsCounted = -1;
+            thingsCounted = groundedCounted = -1;
             // Nothing in a world just loaded appeared in front of the player.
             sawFrom = Nowhere;
             foreach (var (_, old) in props) old.Root.QueueFree();
@@ -1209,7 +1210,14 @@ public partial class WorldView : Node3D {
         int newest = World.Things.Count > 0 ? World.Things[World.Things.Count - 1].Id : 0;
         if (thingsCounted != World.Things.Count || newestThing != newest) {
             (thingsCounted, newestThing) = (World.Things.Count, newest);
-            RefreshDressing();
+            // A firebug marks nothing on the ground, so the dressing is drawn again only when something else has come or gone.
+            int last = World.Things.Count - 1;
+            while (last >= 0 && World.Things[last].Roams) last--;
+            int grounded = World.Things.Count - World.ThingsOf(ThingKind.Firebug).Count, newestOnGround = last >= 0 ? World.Things[last].Id : 0;
+            if (groundedCounted != grounded || newestGrounded != newestOnGround) {
+                (groundedCounted, newestGrounded) = (grounded, newestOnGround);
+                RefreshDressing();
+            }
             gone.Clear();
             foreach (var (id, _) in props) if (!seen.Contains(id) && World.Find(id) == null) gone.Add(id);
             foreach (int id in gone) { props[id].Root.QueueFree(); props.Remove(id); }
@@ -1333,6 +1341,9 @@ public partial class WorldView : Node3D {
                 if (grew) WorldModels.ShowTreeStage(tree, t.TreeStage);
                 if (first || shaking || grew)
                     tree.Sway.Basis = TreeShake(prop.Shake).Scaled(Vector3.One * TreePlanting.BaseScale(tree.Id) * tree.GrowthScale);
+                break;
+            case FirebugProp bug:
+                FirebugShape.Fly(bug, t.Id, World.Firebugs.At(t), World.Firebugs.DartSpeed, Elapsed, dt);
                 break;
             case DugProp dug:
                 float worked = Clocked(dug.Worked, t.Progress, live, dt);

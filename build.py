@@ -117,6 +117,17 @@ def fetch_pinned(url: str, archive: Path, sha256: str) -> None:
         )
 
 
+# Patch's asset library serves each file under its SHA-256.
+PATCH_ASSETS = "https://assets.patchusercontent.com/sha256"
+
+
+def fetch_patch_asset(name: str, sha256: str, cache: Path) -> Path:
+    """Downloads a file of Patch's asset library into cache unless it is there, checks its SHA-256 and returns its path."""
+    cache.mkdir(parents=True, exist_ok=True)
+    fetch_pinned(f"{PATCH_ASSETS}/{sha256}/{name}", cache / name, sha256)
+    return cache / name
+
+
 AMBIENTCG = TOOLS / "ambientcg"
 POLYHAVEN = TOOLS / "polyhaven"
 # The Godot script that packs photoscans into the game's textures.

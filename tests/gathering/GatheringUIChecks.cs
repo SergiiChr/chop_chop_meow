@@ -279,8 +279,11 @@ public partial class Game {
         var start = Hosted.Player;
         var (wood, stone) = (world.Backpack["wood"], world.Backpack["stone"]);
         Give(Hosted, "steel_shovel", 1);
+        // Both stumps are of one named tree, a spruce 0.12 m to its bark, whatever ids the world has given out before.
+        // On a thinner trunk the blade stops within a millimetre of the ground, too near for this check to hold from run to run.
+        const int tree = 1018;
         foreach (var offset in new[] { new Vector2(1.5f, 1.5f), new Vector2(-2, -.6f) }) {
-            var (stump, press, end) = await WorkUntilBlowHeard(start, ThingKind.Stump, offset, "dig_earth", rig => rig.ShovelTip);
+            var (stump, press, end) = await WorkUntilBlowHeard(start, ThingKind.Stump, offset, "dig_earth", rig => rig.ShovelTip, tree);
             var (seat, radius) = WorldModels.Trunk(stump.OfTree != 0 ? stump.OfTree : stump.Id);
             float gap = new Vector2(end.X, end.Z).DistanceTo(stump.Pos + new Vector2(seat.X, seat.Z)) - radius;
             Require(gap is > -.02f and < .12f && end.Y < 0, $"A shovel's blade must go into the ground at the foot of the stump {offset} away, not {gap:0.00} m out from it and {end.Y:0.00} m up.");

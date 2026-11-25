@@ -47,6 +47,8 @@ public enum ThingKind {
     Pump,
     Acorn,
     Hole,
+    Nettle,
+    Firebug,
     StrawBed,
 }
 

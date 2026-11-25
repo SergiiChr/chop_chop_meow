@@ -13,8 +13,8 @@ internal class Crafting {
     public virtual bool Work(Worker w, Thing station, float dt) {
         if (!world.Data.Recipes.TryGetValue(station.Recipe, out var recipe)) { w.Status = "Nothing queued or marked to make"; return false; }
         if (!world.Worked(station)) { w.Status = "Waiting for the next load"; return false; }
-        if (station.Tools != null && recipe.Tool != "" && world.BenchTool(station, recipe.Tool, recipe.Tier) == null) {
-            w.Status = world.Phrase("Needs ", world.A(world.Data.ToolName(recipe.Tool, recipe.Tier)), " in the ", world.Lower(world.Data.Name(station.Kind)));
+        if (station.Tools != null && recipe.Tool != "" && world.BenchTool(station, recipe) == null) {
+            w.Status = world.Phrase("Needs ", world.A(world.Data.ToolName(recipe)), " in the ", world.Lower(world.Data.Name(station.Kind)));
             return false;
         }
         if (World.Stalled(station, recipe)) { w.Status = "Output slot is full"; return false; }

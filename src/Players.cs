@@ -152,6 +152,7 @@ public sealed partial class World {
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
             case Verb.Torch: UseTorch(c.At); break;
             case Verb.Attack: Attack(c.At); break;
+            case Verb.SwingNet: SwingNet(c.At); break;
             case Verb.Leave: Doorways.Leave(); break;
             case Verb.TurnKey: Doorways.TurnKey(); break;
             case Verb.Craft: Craft(c.Item, c.Count); break;

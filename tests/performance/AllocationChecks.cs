@@ -29,6 +29,7 @@ public static class AllocationChecks {
         Test(CheckHuntingWolvesAtNightAllocateNothing, data);
         Test(CheckWolvesFollowingATorchAllocateNothing, data);
         Test(CheckWolvesAtACabinsDoorAllocateNothing, data);
+        Test(CheckAFirebugDartingFromThePlayerAllocatesNothing, data);
     }
 
     private static void CheckWalkingAFreshValleyAllocatesNothing(GameData data) {
@@ -181,6 +182,12 @@ public static class AllocationChecks {
         var (indoors, hut, _) = DoorCheckSteps.ShelteredNight(data, locked: true);
         for (int i = 0; i < 2; i++) PatrolWolf(indoors, new Wolf { Pos = Doorways.DoorPoint(hut) + new Vector2(2 * i - 1, 7) });
         Check("tick: night, wolves at a cabin's door", () => { indoors.Tick(1 / 60f); Fed(indoors); }, warmup: 300);
+    }
+
+    private static void CheckAFirebugDartingFromThePlayerAllocatesNothing(GameData data) {
+        // The player keeps three metres from a firebug, which darts off and rests in turn.
+        var (meadow, bug, _) = FirebugSteps.FirebugNight(data);
+        Check("tick: night, a firebug darting from the player", () => { meadow.Player = meadow.Firebugs.At(bug) + new Vector2(-3, 0); meadow.Tick(1 / 60f); Fed(meadow); }, warmup: 600);
     }
 
     /// <summary>

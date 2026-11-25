@@ -41,7 +41,7 @@ public sealed class WolfPatrols(World world) {
         float sinceDusk = (world.DayPhase - data.DuskStarts) * data.DaySeconds;
         if (!WolvesRetreat) {
             for (int i = 0; i < Dens.Length; i++) {
-                if ((s.DensOut & 1 << i) != 0 || sinceDusk < i * DenGapSeconds || !Unseen(Dens[i].Door)) continue;
+                if ((s.DensOut & 1 << i) != 0 || sinceDusk < i * DenGapSeconds || !world.Unseen(Dens[i].Door)) continue;
                 s.DensOut |= 1 << i;
                 // Each wolf of a den sets off its own way.
                 float heading = (float)wolfRandom.NextDouble() * MathF.Tau;
@@ -77,15 +77,10 @@ public sealed class WolfPatrols(World world) {
         }
     }
     private void LetOut(Den den, float heading) => world.S.Wolves.Add(new Wolf { Pos = den.Door, Health = world.Data.WolfHealth, Heading = heading });
-    /// <summary>Whether no player can see a spot.</summary>
-    private bool Unseen(Vector2 p) {
-        foreach (var player in world.S.Players) if (player.Pos.DistanceTo(p) <= world.Data.SightRadius) return false;
-        return true;
-    }
     /// <summary>One of the dens whose door no player sees, each as likely as the next, or null when every door is watched.</summary>
     private Den? RandomUnseenDen() {
         Den? pick = null; int unseen = 0;
-        foreach (var den in Dens) if (Unseen(den.Door) && wolfRandom.Next(++unseen) == 0) pick = den;
+        foreach (var den in Dens) if (world.Unseen(den.Door) && wolfRandom.Next(++unseen) == 0) pick = den;
         return pick;
     }
     /// <summary>

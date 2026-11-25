@@ -11,8 +11,6 @@ sys.path.insert(0, str(ROOT))
 
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
-# Patch's asset library serves each model under the SHA-256 of its file.
-SOURCE = "https://assets.patchusercontent.com/sha256"
 # Kenney's name for the model and the SHA-256 of Patch's copy of it.
 MODELS = {
     "loaf-round": "702178314b09184381ffccebba4fa5c4684f63e882b58a078143e17b49bf8416",
@@ -28,17 +26,13 @@ OUTPUT = ROOT / "assets" / "models" / "food"
 def main() -> None:
     build.fetch_godot()
     build.BUILD.mkdir(exist_ok=True)
-    CACHE.mkdir(parents=True, exist_ok=True)
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    for name, sha256 in MODELS.items():
-        build.fetch_pinned(
-            f"{SOURCE}/{sha256}/{name}.glb", CACHE / f"{name}.glb", sha256
-        )
+    models = [
+        build.fetch_patch_asset(f"{name}.glb", sha256, CACHE)
+        for name, sha256 in MODELS.items()
+    ]
     build.run_tool_script(
-        BAKE_SCRIPT,
-        [OUTPUT, *(CACHE / f"{name}.glb" for name in MODELS)],
-        "MODEL-BAKE PASS",
-        timeout=300,
+        BAKE_SCRIPT, [OUTPUT, *models], "MODEL-BAKE PASS", timeout=300
     )
     print(f"Baked {len(MODELS)} models into {OUTPUT.relative_to(ROOT)}")
 

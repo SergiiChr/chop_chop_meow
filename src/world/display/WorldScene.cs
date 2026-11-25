@@ -162,6 +162,7 @@ public partial class WorldView {
         ("worker sit", ActorSkin.Worker, ActorAction.Sit), ("worker sit on rock", ActorSkin.Worker, ActorAction.Perch), ("player pick up", ActorSkin.Player, ActorAction.PickUp), ("player craft", ActorSkin.Player, ActorAction.Craft),
         ("player grind", ActorSkin.Player, ActorAction.Grind), ("worker grind", ActorSkin.Worker, ActorAction.Grind),
         ("player rake", ActorSkin.Player, ActorAction.Rake), ("worker rake", ActorSkin.Worker, ActorAction.Rake),
+        ("player net", ActorSkin.Player, ActorAction.NetSwing), ("player twist rope", ActorSkin.Player, ActorAction.TwistRope), ("worker twist rope", ActorSkin.Worker, ActorAction.TwistRope),
         ("player shovel", ActorSkin.Player, ActorAction.Dig), ("worker shovel", ActorSkin.Worker, ActorAction.Dig),
         ("player jog turns", ActorSkin.Player, ActorAction.Jog), ("player run turns", ActorSkin.Player, ActorAction.Run),
         ("player cabin", ActorSkin.Player, ActorAction.Walk), ("player jog back", ActorSkin.Player, ActorAction.Jog), ("player run back", ActorSkin.Player, ActorAction.Run),
