@@ -114,7 +114,7 @@ public partial class Hotbar : PanelContainer {
                 : count == 1 && world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
-            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}\nLMB: select · RMB or Double LMB: use";
+            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}\nLMB: select · RMB or Double LMB: use";
             // The selected slot gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.SlotWanted : Style.SlotNormal);
@@ -196,13 +196,14 @@ public partial class Hotbar : PanelContainer {
 
     /// <summary>Whether this item can be eaten, drunk, lit or swung by right-clicking open ground.</summary>
     private bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || id == "torch"
-        || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer";
+        || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer" or "net";
 
     /// <summary>Uses the item selected on the hotbar toward a point on the ground; items without a use do nothing.</summary>
     public void UseSelected(Vector2 at) {
         if (ActiveItem() is not string id || !HasUse(id)) return;
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) FromStack(ActiveStack(), () => world.Consume(id));
         else if (id == "torch") world.UseTorch(at - world.Player);
+        else if (world.ToolKind(id) == "net") world.SwingNet(at - world.Player);
         else world.Attack(at - world.Player);
     }
 }

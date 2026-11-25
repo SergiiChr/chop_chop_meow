@@ -48,7 +48,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     }
 
     /// <summary>How fast the station works a recipe with the tool the acting player would work it with.</summary>
-    private float Rate(RecipeDef recipe) => world.WorkRate(t.Kind, world.ToolInUse(t, recipe.Tool, recipe.Tier));
+    private float Rate(RecipeDef recipe) => world.WorkRate(t.Kind, world.ToolInUse(t, recipe));
 
     /// <summary>The station's rate for the recipe it is on in hundredths, which changes with the tool slotted or carried.</summary>
     public int RateCode() => world.Data.Recipes.TryGetValue(world.Selected(t), out var recipe) ? (int)MathF.Round(Rate(recipe) * 100) : 0;

@@ -353,6 +353,14 @@ public sealed class PlayerControl {
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         if (Layer == Layer.Underground) return;
         var t = view.Pick(at);
+        // With a bug net selected a right click on a firebug swings at it, as one on open ground swings toward the pointer.
+        if (t is { Kind: ThingKind.Firebug } && Mode is ClickMode.Normal && hotbar.ActiveItem() is string net && world.ToolKind(net) == "net") {
+            gathering = null; lifting = null;
+            hotbar.UseSelected(world.Firebugs.At(t));
+            return;
+        }
+        // A firebug in the air takes no ground: a shovel digs the spot it hovers over.
+        if (t is { Roams: true } && Mode is ClickMode.Dig) t = null;
         if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
         if (t != null) return;
@@ -414,7 +422,7 @@ public sealed class PlayerControl {
 
     private void AssignGather(ClickMode.Assign assign, Thing? t) {
         var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);
-        if (worker == null || t?.IsResource != true) { kit.Notify("Choose a tree, stump, bush, leaves, stone, ore, coal, berry bush or water source."); return; }
+        if (worker == null || t?.IsResource != true) { kit.Notify("Choose a tree, stump, bush, leaves, stone, ore, coal, berry bush, nettle, firebug or water source."); return; }
         if (world.GatherBlock(t, true) is string blocked) { kit.Notify(blocked); return; }
         world.SetDuty(worker, t, JobKind.Gather, true); Mode = new ClickMode.Normal(); panel.Select(worker);
     }
