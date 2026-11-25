@@ -204,7 +204,7 @@ UI and input:
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, the roof barrel and the shared sleep controls |
 | `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, accelerated time, outdoor bed expiry and salvage |
 | `src/rest/display/SleepPage.cs`, `src/rest/display/StrawBedPanel.cs` | Shared sleep controls and the straw bed’s remaining life |
-| `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The mat and a player lowering onto it or getting up, transferring weight from boots to a palm, then the hip and forearm |
+| `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The straw bed and a player lowering onto it or getting up, transferring weight from boots to a palm, then the hip and forearm |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
 | `src/workers/breaks/BreakSeats.cs` | Reserves campfire and ground seats for workers at lunch or with nothing to do, and lights the campfires they sit at |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
@@ -686,7 +686,7 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
 - `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.
 
 A player can sleep at any hour inside a cabin or on an outdoor straw bed. The cabin's Sleep button appears only inside.
-`PlayerState.SleepingAt` identifies a sleeper's place. The window draws outdoor sleep on the mat without sheltering the player.
+`PlayerState.SleepingAt` identifies a sleeper's place. The window draws outdoor sleep on the straw bed without sheltering the player.
 `SleepCycle` speeds up the clock only while everyone is asleep, once an outdoor sleeper has lain down.
 It adds normal simulation steps between frames instead of jumping over the night, up to 12× normal speed.
 The extra steps use at most 4 milliseconds of work per frame before starting no more, so a busy world can slow down.
@@ -694,7 +694,7 @@ Outside a locked cabin, a wolf within a sleeper's sight radius triggers “You h
 A locked cabin prevents both the warning and the slowdown. Sleep keeps healing the player either way.
 Hunger or thirst running out, an attack outdoors, or scratching at an unlocked cabin door wakes those affected and restores normal speed.
 Sleepers can choose Wake, and a press of W, A, S or D also wakes a straw-bed sleeper. At dawn everyone still asleep wakes.
-After an outdoor wake-up the window holds walking input through `StrawBedView.Rising`, then hands off facing the same way as the mat.
+After an outdoor wake-up the window holds walking input through `StrawBedView.Rising`, then hands off facing the same way as the straw bed.
 A straw bed takes twenty leaves, lasts three full days from `Thing.BedBuiltAt` and refunds only within one hour.
 
 #### Sprinting
@@ -761,7 +761,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   The night's first howl plays `wolf_howl`, a lone wolf, and later ones `wolf_howl_group` (`SaveState.Howled`).
   A howl is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it fades with distance from the player and pans with its direction.
   The howl calls every patrolling wolf within `HowlRadius` to where it stood (`WolfMode.Called`, `Wolf.Call`); a called wolf still smells on its way and goes back to patrolling once there.
-- **Approach.** After its howl a wolf trots at its player out of firelight until within `WolfSightRange`, then sprints (`Wolf.Chase` above zero) at `WolfChase` times `WalkSpeed` with one distant growl (`Wolf.Sprinted`), which data validation keeps above walking and below `SprintSpeed`.
+- **Approach.** After its howl a wolf trots at its player out of firelight until within `WolfSightRange`, then sprints (`Wolf.Galloping`) at `WolfChase` times `WalkSpeed` with one distant growl (`Wolf.Sprinted`), which data validation keeps above walking and below `SprintSpeed`.
   Within sight it closes in only to `WolfBodies.StandOff`, within biting reach, and backs off to it at a walk (`WolfBodies.BackOffSpeed`) from a player another wolf tugs toward it (`DoorTug.TuggedTo`).
   Wolves at a player keep their bodies apart (`WolfBodies.Body`, `WolfBodies.WolfHalfWidth`): one in another's way steps aside at `WolfBodies.SideStepSpeed`, unless it holds the player.
   A hunting wolf's body faces the way it runs, or its player while it stands, creeps or backs off (`Wolf.Heading`, `WolfHunt.Face`).

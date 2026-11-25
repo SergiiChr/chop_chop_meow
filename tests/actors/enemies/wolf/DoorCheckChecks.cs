@@ -212,13 +212,13 @@ public static class DoorCheckChecks {
         Nourished(world);
         world.Sleep.Start(hut);
         for (int i = 0; i < 120 && !told.Contains("You hear something"); i++) world.Tick(1f / 60);
-        Require(world.Day == day && world.Sleep.Place == hut.Id && told.Contains("You hear something"),
+        Require(world.Day == day && world.Sleep.SleepingAt == hut.Id && told.Contains("You hear something"),
             "a wolf coming within sight should stop the skip but leave the cabin sleeper asleep");
-        for (int i = 0; i < 240 && world.Sleep.Place != 0; i++) DoorCheckTick(world, .05f);
+        for (int i = 0; i < 240 && world.Sleep.SleepingAt != 0; i++) DoorCheckTick(world, .05f);
         // A wolf trots 3 m a second, so it covers the 20 m in about 7 seconds.
         Require(world.Time - time < 12, $"sleep should stop as the wolf reaches the door, not {world.Time - time:0} s later");
         Require(wolf.DoorCheck == DoorCheckStage.Scratching && wolf.DoorCheckTime == 0, $"sleep should stop as the wolf starts scratching, not with it {wolf.DoorCheck} for {wolf.DoorCheckTime} s");
-        Require(world.Sleep.Place == 0 && world.Sheltered == hut.Id && told.Contains("You are awakened by the noise outside."), $"the sleeper should wake inside and be told why: {string.Join(" | ", told)}");
+        Require(world.Sleep.SleepingAt == 0 && world.Sheltered == hut.Id && told.Contains("You are awakened by the noise outside."), $"the sleeper should wake inside and be told why: {string.Join(" | ", told)}");
         DoorCheckTick(world, .05f);
         Require(Heard(heard, "door_scratch") == 1, $"the sleeper should hear the scratching from its start: heard {string.Join(", ", heard)}");
     }
@@ -235,7 +235,7 @@ public static class DoorCheckChecks {
         world.Tick(1f / 60);
         Require(world.Time > time + 1f / 60 && !told.Contains("You hear something"),
             "a wolf outside a locked door should not warn the sleeper or slow time");
-        Require(world.Sleep.Place == hut.Id && world.Sheltered == hut.Id && world.Health > 60 && hut.Locked,
+        Require(world.Sleep.SleepingAt == hut.Id && world.Sheltered == hut.Id && world.Health > 60 && hut.Locked,
             "the sleeper should stay inside and heal even as the wolf scratches at the locked door");
         UntilAllAwake(world);
         Require(!told.Contains("You hear something"), "the wolf should not trigger the warning later in the same sleep");

@@ -8,12 +8,12 @@ namespace ChopChopMeow;
 internal static class StrawBedModel {
     internal const float Top = .15f;
     private const float Rim = .115f;
-    private static ArrayMesh? mat;
+    private static ArrayMesh? weave;
     private static readonly StandardMaterial3D Straw = Vertex(Surface.Flat, .94f);
 
     internal static Prop Build() {
         var prop = new Prop();
-        Add(prop.Body, mat ??= Weave(), Straw, Vector3.Zero);
+        Add(prop.Body, weave ??= Weave(), Straw, Vector3.Zero);
         for (int i = -1; i <= 1; i++)
             Add(prop.Body, LeafShape.For(i + 1), Straw, new Vector3(0, Top - .002f, i * .52f)).Scale =
                 new Vector3(.63f, .38f, .79f);

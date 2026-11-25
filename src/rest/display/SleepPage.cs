@@ -17,7 +17,7 @@ public abstract partial class SleepPage(PageTools tools, Thing subject) : ThingP
         foreach (var need in needs) gauges.AddChild(need);
 
         live.Watch(() => (world.Data.GameMinutes(world.Sleep.SecondsToDawn), (int)world.Health,
-            (int)world.Hunger, (int)world.Thirst, Barrel.In(thing.Inventory), world.Sheltered, world.Sleep.Place), _ => {
+            (int)world.Hunger, (int)world.Thirst, Barrel.In(thing.Inventory), world.Sheltered, world.Sleep.SleepingAt), _ => {
                 var (seconds, health, hunger, thirst) = world.Sleep.Preview(thing);
                 bool dawn = seconds == world.Sleep.SecondsToDawn;
                 until.Text = LiveText.Of(text => PageText.AppendGameHours(world, text.Append(dawn ? "until dawn · +" : "up to "), seconds));
@@ -36,10 +36,10 @@ public abstract partial class SleepPage(PageTools tools, Thing subject) : ThingP
     protected Button SleepButton() {
         bool straw = thing.Kind == ThingKind.StrawBed;
         var button = kit.BigButton("Sleep", Style.Enamel, () => {
-            if (world.Sleep.Place == thing.Id) world.Sleep.Wake(); else world.Sleep.Start(thing);
+            if (world.Sleep.SleepingAt == thing.Id) world.Sleep.Wake(); else world.Sleep.Start(thing);
         });
         button.Name = "sleep"; button.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
-        live.Watch(() => (world.Sleep.Place == thing.Id, world.Sleep.Block(thing), world.Sheltered), status => {
+        live.Watch(() => (world.Sleep.SleepingAt == thing.Id, world.Sleep.Block(thing), world.Sheltered), status => {
             var (asleep, blocked, sheltered) = status;
             button.Visible = straw || sheltered == thing.Id;
             button.Text = asleep ? "Wake" : "Sleep";

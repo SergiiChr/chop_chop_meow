@@ -36,6 +36,7 @@ internal static class BarrelChecks {
         Test(CheckCabinServesThirstBeforeBottlesInEntryOrder, data);
         Test(CheckCabinBarrelReplacesThirstLostWhileSleeping, data);
         Test(CheckSleepingPreviewUsesRemainingWaterOnWaking, data);
+        Test(CheckWakingEarlyLeavesAnEarlierCabinMateTheirWater, data);
         Test(CheckCabinFillsBottlesAtBedtime, data);
         Test(CheckCabinServesScarceWakeUpWaterInEntryOrder, data);
         Test(CheckAWholeLiterAtDawnServesEachOccupant, data);
@@ -456,6 +457,24 @@ internal static class BarrelChecks {
         Require(preview is > 98 and < 99 && System.Math.Abs(world.Thirst - preview) < .05f,
             $"a sleeper's forecast should leave the last liter for morning, not an awake cabin mate, forecast {preview:0.0}, actual {world.Thirst:0.0}");
         Require(guest.Backpack[Water.Empty] == 1 && guest.Thirst < 100, "an awake cabin mate should not use the morning water");
+    }
+
+    private static void CheckWakingEarlyLeavesAnEarlierCabinMateTheirWater(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var cabin = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -7));
+        cabin.Inventory.Add(Barrel.AtFill(3), 1);
+        Drop(world.Me, Water.Empty);
+        Drop(guest, Water.Empty);
+        StepInside(world, cabin, guest);
+        StepInside(world, cabin);
+        SetNeeds(guest, hunger: 100, thirst: 40);
+        SetNeeds(world, hunger: 100, thirst: 1);
+        world.Sleep.Start(cabin);
+        world.Sleep.Wake();
+        Require(cabin.Inventory[Barrel.AtFill(2)] == 1,
+            "a player who sleeps and gets up at once should leave the two liters an awake cabin mate who came in first needs");
+        world.As(guest, () => world.Sleep.Start(cabin));
+        Require(guest.Thirst == 100, $"the cabin mate who came in first should drink their fill at bedtime, got {guest.Thirst:0.0}");
     }
 
     private static void CheckCabinFillsBottlesAtBedtime(GameData data) {

@@ -509,7 +509,7 @@ public sealed partial class World {
     /// <summary>Whether the acting player is taken up by something else, downed or at a cabin door, so they can do nothing else.</summary>
     /// <summary>What the acting player is doing at a cabin's door.</summary>
     public Doorway Door => S.Actor.Door;
-    public bool Occupied => Downed || S.Actor.Door != Doorway.None || Sleep.Place != 0;
+    public bool Occupied => Downed || S.Actor.Door != Doorway.None || Sleep.SleepingAt != 0;
     public bool Sees(Vector2 p) => p.DistanceTo(Player) <= Data.SightRadius;
     /// <summary>Whether no player can see a spot.</summary>
     internal bool Unseen(Vector2 p) {
@@ -1763,7 +1763,7 @@ public sealed partial class World {
     /// <summary>The hand recipe being made, else the first waiting, or null.</summary>
     private RecipeDef? NextCraft => S.Making != "" ? Data.Recipes[S.Making] : S.Crafting.Count > 0 ? Data.Recipes[S.Crafting[0].Recipe] : null;
     /// <summary>How fast hand crafting progresses: the carried tool's speed, or zero while its tool is missing or nothing is queued.</summary>
-    public float CraftRate => NextCraft is not RecipeDef r || Downed || Sleep.Place != 0 ? 0 : r.Tool != "" ? BestTool(r) is string held ? Speed(held) : 0 : 1;
+    public float CraftRate => NextCraft is not RecipeDef r || Downed || Sleep.SleepingAt != 0 ? 0 : r.Tool != "" ? BestTool(r) is string held ? Speed(held) : 0 : 1;
     /// <summary>Seconds a player stands still before hand crafting goes on, so walking never crafts between steps.</summary>
     public const float CraftSettle = .25f;
     private void CraftTick(float dt) {
@@ -2352,8 +2352,9 @@ public sealed partial class World {
     internal const int TicksPerSecond = 60;
 
     /// <summary>
-    /// Advances the world. It runs as the world's own player, whoever's action started it, such as a guest's sleep:
-    /// wages come out of that player's backpack, and each player's own part runs as that player.
+    /// Advances the world.
+    /// It runs as the world's own player, whoever's action started it, such as a guest's skip to dawn from the recovery
+    /// screen: wages come out of that player's backpack, and each player's own part runs as that player.
     /// </summary>
     public void Tick(float dt, bool sleeping = false) {
         Step(dt, sleeping);
@@ -2463,7 +2464,7 @@ public sealed partial class World {
                     hunting.Clear();
                     foreach (var w in S.Wolves) if (w.Target == p.Id) hunting.Add(w);
                     WolfHunt.TickWolves(dt, hunting);
-                    if (Sleep.Place != 0 && (S.Health < health || S.Mauled)) Sleep.WakeActor("A wolf wakes you!");
+                    if (Sleep.SleepingAt != 0 && (S.Health < health || S.Mauled)) Sleep.WakeActor("A wolf wakes you!");
                 }
                 if (!Dead && S.Health <= 0) Die();
                 p.Still = playerBusy ? 0 : p.Still + dt;
@@ -2533,12 +2534,12 @@ public sealed partial class World {
         if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
         Holes.Work(dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
-            float drain = Sleep.Place == 0 && S.Actor.Sprinting && CanSprint ? Data.SprintDrain : 1, fed = S.Hunger;
+            float drain = Sleep.SleepingAt == 0 && S.Actor.Sprinting && CanSprint ? Data.SprintDrain : 1, fed = S.Hunger;
             Sleep.Heal(dt);
             S.Hunger = Math.Max(0, S.Hunger - dt * drain * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * drain * Data.ThirstPerSecond);
             if (S.Hunger < GameData.GrowlBelow && GrowlsBy(S.Hunger) > GrowlsBy(fed)) Play("stomach_growl", Player);
             if (S.Hunger <= 0 || S.Thirst <= 0) {
-                if (Sleep.Place != 0) Sleep.WakeActor(S.Hunger <= 0 ? "Hunger wakes you." : "Thirst wakes you.");
+                if (Sleep.SleepingAt != 0) Sleep.WakeActor(S.Hunger <= 0 ? "Hunger wakes you." : "Thirst wakes you.");
                 else S.Health -= dt * 1.4f;
             }
         }

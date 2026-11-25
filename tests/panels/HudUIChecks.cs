@@ -31,8 +31,9 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
         await Until(() => GetViewport().GuiGetHoveredControl() == dial, "the moon receiving the pointer", 2);
         string tip = dial.GetTooltip(dial.Marker);
-        Require(tip.EndsWith(world.Beach.NextTide.High ? "till high tide" : "till low tide"),
-            $"Hovering the moon should name the next tide, got '{tip}'.");
+        // The days and which tide comes next are the simulation's, checked in SandChecks; this checks the wording.
+        Require(System.Text.RegularExpressions.Regex.IsMatch(tip, @"^\d+(\.\d)? days? till (high|low) tide$"),
+            $"Hovering the moon should say how many days till the next high or low tide, got '{tip}'.");
         Require(dial.GetTooltip(Vector2.One) == "", "The forecast should only be on the moon, not the rest of the clock.");
         at = GetViewport().GetVisibleRect().GetCenter();
         Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });

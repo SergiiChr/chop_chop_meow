@@ -22,10 +22,10 @@ public partial class Game {
         foreach (Key key in new[] { Key.W, Key.A, Key.S, Key.D }) {
             await Until(() => Named("sleep") is Button { Text: "Sleep" }, "the straw bed's Sleep button", 2);
             await Click(Named("sleep")!);
-            await Until(() => world.Sleep.Place == bed.Id && Named("sleep") is Button { Text: "Wake" }, "sleeping on the straw bed", 2);
+            await Until(() => world.Sleep.SleepingAt == bed.Id && Named("sleep") is Button { Text: "Wake" }, "sleeping on the straw bed", 2);
             await Seconds(.3);
             await KeyStroke(key);
-            await Until(() => Hosted.Sleep.Place == 0 && world.Sleep.Place == 0, $"{key} waking the straw-bed sleeper", 2);
+            await Until(() => Hosted.Sleep.SleepingAt == 0 && world.Sleep.SleepingAt == 0, $"{key} waking the straw-bed sleeper", 2);
             Require(world.Player.DistanceTo(bed.Pos) < .1f, "A tap to wake should leave the player at the bed to finish rising.");
         }
         await CloseWithEsc();

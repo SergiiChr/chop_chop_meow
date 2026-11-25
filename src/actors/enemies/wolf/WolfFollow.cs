@@ -75,8 +75,8 @@ public sealed class WolfFollow(World world) {
     internal void Stop() { foreach (var wolf in world.Hunters) if (wolf.Following) wolf.Follow = FollowStage.None; }
 
     /// <summary>
-    /// Finds the wolves circling a lit campfire or following the acting player and gives each new one a way round at random. For each way it
-    /// orders its wolves by bearing and turns its evenly spread places to where they fit those wolves best.
+    /// Finds the wolves circling a lit campfire or following the acting player and gives each new one a way round at random.
+    /// For each way it orders its wolves by bearing and turns its evenly spread places to where they fit those wolves best.
     /// </summary>
     internal void Arrange(List<Wolf> hunters, Thing? fire) {
         pack = hunters;
@@ -112,7 +112,7 @@ public sealed class WolfFollow(World world) {
     /// </summary>
     internal void Follow(Wolf wolf, bool braced, float dt, float walk) {
         float near = wolf.Pos.DistanceTo(world.Player);
-        wolf.Chase = 0;
+        wolf.Galloping = false;
         // A lit campfire keeps wolves on its edge even if the player comes near that edge.
         if (campfire) { GoRound(wolf, dt, walk); return; }
         if (wolf.Follow == FollowStage.BackingOff) {
@@ -175,7 +175,7 @@ public sealed class WolfFollow(World world) {
             wolf.Pos = world.Slide(at, away * stride);
             return true;
         }
-        // Take the shorter way round the edge; on the straight line through the fire, split hunters to either side.
+        // Take the shorter way round the edge. On the straight line through the fire, split hunters to either side.
         float across = away.Cross(toward - fire.Pos);
         int way = across == 0 ? (wolf.Id & 1) == 0 ? 1 : -1 : Math.Sign(across);
         var step = new Vector2(-away.Y, away.X) * (stride * way);

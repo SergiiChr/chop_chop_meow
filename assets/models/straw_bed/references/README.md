@@ -2,15 +2,15 @@
 
 Generated with built-in ImageGen for this game. The reference sheets are not exported with it.
 
-- [Mat model](model.png) — a shallow adult-length ground mat from dried grass and autumn leaves, with a rough golden
+- [Bed model](model.png) — a shallow adult-length straw bed from dried grass and autumn leaves, with a rough golden
   straw perimeter and a pressed rust-colored center. Show the same low-poly prop in isometric, top, long-side and end views.
-- [Sleep poses](sleep-poses.png) — show one adult and the same mat in four fixed side views. Bend the knees and reach
+- [Sleep poses](sleep-poses.png) — show one adult and the same straw bed in four fixed side views. Bend the knees and reach
   down, lower into a palm-supported sit, lie lengthwise on the side with a hand near the head and knees softly bent,
   then rise through the supported sit. Keep the hands, boots and ground in view.
 
 The revised transfer uses real people as the pose reference. The photographed side-sit in [Peggy Trueblood’s floor transfer sequence](https://www.slideserve.com/robert-pickett/floor-to-stand-transfers-powerpoint-ppt-presentation) shows one hip down, knees swept together and the palms staggered. [Aurora BayCare’s bed transfer photographs](https://ahc.aurorahealthcare.org/fywb/baycare/x20530bc.pdf) show the elbow taking weight before the shoulder settles. [Sikana’s exercise mat demonstration](https://www.sikana.tv/en/sport/50-gym-exercises-for-seniors/how-to-lie-down-on-a-floor-mat) shows the same forearm-first transition close to the ground.
 
-The game starts over the middle of a narrower mat, so it uses a crouch rather than the demonstration’s approach and kneel. At 60 frames per second, the first palm lands around frame 53, the near hip reaches the straw around 64, knees turn together toward the foot of the bed, the forearm takes weight around 89 and the other hand steadies the last part of the descent. As the shoulder and head settle, the elbow can relax inward. Getting up follows the same contacts in reverse.
+The game starts over the middle of a narrower bed, so it uses a crouch rather than the demonstration’s approach and kneel. At 60 frames per second, the first palm lands around frame 53, the near hip reaches the straw around 64, knees turn together toward the foot of the bed, the forearm takes weight around 89 and the other hand steadies the last part of the descent. As the shoulder and head settle, the elbow can relax inward. Getting up follows the same contacts in reverse.
 
 ## Prompts
 

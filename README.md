@@ -161,7 +161,7 @@ meet (SSAO), and world sounds pan with their place on screen.
 The sky lights roofs and walls from above, with grass-coloured bounce from below.
 In the first-person preview, the visible sky changes colour with the time of day and shows the sun or moon.
 The picture is tonemapped with AgX, which keeps colours as light brightens.
-A burning campfire lights the circle that deters smaller wolf packs; other fixtures give light with no such safety.
+A burning campfire lights the circle that deters smaller wolf packs. Other fixtures give light with no such safety.
 The ground has grain and bump from grass and rock photoscans under its own colours: meadow over the valley with soft
 lusher and drier patches, sparse broad patches of moss over gravelly earth, and stone on the mountain slopes.
 The woods along the mountains have a photoscan of forest floor with twigs and dead leaves, and where the ground is

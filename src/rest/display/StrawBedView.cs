@@ -33,16 +33,16 @@ internal sealed class StrawBedView {
     internal void Clear() { down = 0; bed = null; }
 
     /// <summary>Walking waits for the last supported pose, but a forced move or fall may interrupt it.</summary>
-    internal bool Rising(PlayerState who) => who.SleepingAt == 0 && down > 0 && bed is Thing mat &&
-        CanPose(who) && who.Pos.DistanceSquaredTo(mat.Pos) <= .18f * .18f;
+    internal bool Rising(PlayerState who) => who.SleepingAt == 0 && down > 0 && bed is Thing shown &&
+        CanPose(who) && who.Pos.DistanceSquaredTo(shown.Pos) <= .18f * .18f;
 
     private static bool CanPose(PlayerState who) => !who.Mauled && who.RespawnIn <= 0 && who.Sheltered == 0 && who.Door == Doorway.None;
 
-    /// <summary>Draws a sleeper, then gives the standing pose the mat's bearing when the rise finishes.</summary>
+    /// <summary>Draws a sleeper, then gives the standing pose the straw bed's bearing when the rise finishes.</summary>
     internal bool Show(ActorRig rig, ActorState actor, PlayerState who, Thing? sleepingPlace, float dt) {
         if (!CanPose(who)) { Clear(); return false; }
-        if (sleepingPlace is { Kind: ThingKind.StrawBed } mat) {
-            if (bed != mat) { bed = mat; down = 0; }
+        if (sleepingPlace is { Kind: ThingKind.StrawBed } place) {
+            if (bed != place) { bed = place; down = 0; }
             down = Math.Min(1, down + dt / StrawBed.LieDownSeconds);
         } else {
             if (bed == null || !Rising(who)) { Clear(); return false; }
@@ -58,8 +58,8 @@ internal sealed class StrawBedView {
         return true;
     }
 
-    /// <summary>Draws the same support path in either direction on a mat at any allowed rotation.</summary>
-    internal static void Draw(ActorRig rig, Thing mat, float u, bool lit = false) {
+    /// <summary>Draws the same support path in either direction on a straw bed at any allowed rotation.</summary>
+    internal static void Draw(ActorRig rig, Thing bed, float u, bool lit = false) {
         int next = 1;
         while (Keys[next].At < u) next++;
         var a = Keys[next - 1]; var b = Keys[next];
@@ -69,7 +69,7 @@ internal sealed class StrawBedView {
             StrawBedModel.Top + Curve(before.Hips.Y, a.Hips.Y, b.Hips.Y, after.Hips.Y), Curve(before.Hips.Z, a.Hips.Z, b.Hips.Z, after.Hips.Z));
         float recline = Curve(before.Recline, a.Recline, b.Recline, after.Recline), turn = Curve(before.Turn, a.Turn, b.Turn, after.Turn);
         var tilt = new Basis(Vector3.Right, Mathf.DegToRad(recline)) * new Basis(Vector3.Up, Mathf.DegToRad(turn));
-        var bedFrame = new Transform3D(new Basis(Vector3.Up, -mat.Rotation), WorldView.To3(mat.Pos));
+        var bedFrame = new Transform3D(new Basis(Vector3.Up, -bed.Rotation), WorldView.To3(bed.Pos));
         var root = new Transform3D(tilt, hips - tilt * (Vector3.Up * RigHips));
         var pose = Pose.Lerp(a.Pose, b.Pose, Mathf.SmoothStep(0, 1, t)) with {
             Hips = RigHips,

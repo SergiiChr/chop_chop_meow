@@ -20,7 +20,7 @@ public static class StrawBedChecks {
         Test(CheckOnlyTheSleeperNearTheWolfHearsIt, data);
         Test(CheckMovementWaitsForTheStandingHandoff, data);
         Test(CheckCabinAndStrawBedSleepTogetherSpeedUpTime, data);
-        Test(CheckBootsStayPlantedAndClearTheMat);
+        Test(CheckBootsStayPlantedAndClearTheBed);
         Test(CheckWeightPassesSmoothlyFromThePalmToTheForearm);
         Test(CheckTheBurningTorchStaysVisibleBesideTheSleeper);
     }
@@ -29,7 +29,7 @@ public static class StrawBedChecks {
         var world = EmptyWorld(data);
         var bed = StrawBedSteps.Build(world);
         Require(world.Backpack["leaves"] == 0, "building a straw bed spends all twenty leaves");
-        Require(world.CanStand(bed.Pos), "the low mat should not block walking");
+        Require(world.CanStand(bed.Pos), "the low bed should not block walking");
         world.Tick(data.HourSeconds - 1);
         Require(world.Construction.Dismantle(bed) && world.Find(bed.Id) == null, "taking down a fresh bed should remove it");
         Require(world.Backpack["grass"] == 0 && world.Backpack["leaves"] == 20, "a bed less than an hour old returns only twenty leaves");
@@ -79,7 +79,7 @@ public static class StrawBedChecks {
         Require(world.Me.SleepingAt == 0 && world.Player == far, "Sleep should not jump the player across a clearing.");
         world.Player = bed.Pos + Vector2.Right;
         world.Sleep.Start(bed);
-        Require(world.Me.SleepingAt == bed.Id, "a player just beside the mat should be able to lie down.");
+        Require(world.Me.SleepingAt == bed.Id, "a player just beside the bed should be able to lie down.");
     }
 
     private static void CheckSoloStrawBedSleeperHasTimeToLieDownBeforeDawn(GameData data) {
@@ -119,7 +119,7 @@ public static class StrawBedChecks {
             world.Sleep.Start(bed);
             world.Tick(3);
             world.Tick(.25f);
-            Require(world.Time == time + 3.25f && world.Sleep.Place == bed.Id,
+            Require(world.Time == time + 3.25f && world.Sleep.SleepingAt == bed.Id,
                 "a wolf in sight should keep a straw-bed sleeper at normal speed, even by firelight");
             Require(Mathf.IsEqualApprox(world.Health, 60.39f), "the sleeper should keep healing at the normal rate");
             Require(messages.FindAll(message => message == "You hear something").Count == 1,
@@ -140,7 +140,7 @@ public static class StrawBedChecks {
         while (!world.Sees(wolf.Pos) && frames++ < 240) world.Tick(1f / 60);
         Require(world.Time > time + frames / 60f && world.Time < time + 9 && world.Sees(wolf.Pos),
             "time should run faster until the wolf comes into sight, then return to normal speed while it is still far away");
-        Require(world.Sleep.Place == bed.Id && world.Health > 60, "a wolf interrupting the speed-up should leave the player asleep and healing");
+        Require(world.Sleep.SleepingAt == bed.Id && world.Health > 60, "a wolf interrupting the speed-up should leave the player asleep and healing");
     }
 
     private static void CheckOnlyTheSleeperNearTheWolfHearsIt(GameData data) {
@@ -159,14 +159,14 @@ public static class StrawBedChecks {
         float time = world.Time;
         world.As(guest, () => world.Sleep.Start(hut));
         world.Tick(.25f);
-        Require(world.Sleep.Place == bed.Id && guest.SleepingAt == hut.Id && world.Time == time + .25f,
+        Require(world.Sleep.SleepingAt == bed.Id && guest.SleepingAt == hut.Id && world.Time == time + .25f,
             "one sleeper hearing a wolf should hold the shared clock at normal speed without waking either sleeper");
         Require(heard.Contains("You hear something") && !hostMessages.Contains("You hear something"),
             "only the sleeper within sight radius of the wolf should see its warning");
         int day = world.Day;
         RemoveWolves(world, w => w == wolf);
         UntilAllAwake(world);
-        Require(world.Day == day + 1 && world.Sleep.Place == 0 && guest.SleepingAt == 0,
+        Require(world.Day == day + 1 && world.Sleep.SleepingAt == 0 && guest.SleepingAt == 0,
             "once the wolf is gone, time should speed up to dawn for the two players who stayed asleep");
     }
 
@@ -178,7 +178,7 @@ public static class StrawBedChecks {
         var actor = new ActorState();
         try {
             world.Sleep.Start(bed);
-            Require(view.Show(rig, actor, world.Me, bed, StrawBed.LieDownSeconds), "a sleeper should lie down on the mat");
+            Require(view.Show(rig, actor, world.Me, bed, StrawBed.LieDownSeconds), "a sleeper should lie down on the bed");
             world.Sleep.Wake();
             Require(view.Rising(world.Me), "movement must wait as soon as the sleeper wakes");
             float stride = 1f / 60;
@@ -212,16 +212,16 @@ public static class StrawBedChecks {
             "sleeping at different kinds of bed should take both players to the next dawn");
     }
 
-    private static void CheckBootsStayPlantedAndClearTheMat() {
+    private static void CheckBootsStayPlantedAndClearTheBed() {
         var rig = new ActorRig(ActorSkin.Player);
-        var mat = new Thing { Kind = ThingKind.StrawBed, Pos = new Vector2(4, -2), Rotation = Mathf.Pi / 2 };
+        var bed = new Thing { Kind = ThingKind.StrawBed, Pos = new Vector2(4, -2), Rotation = Mathf.Pi / 2 };
         try {
-            StrawBedView.Draw(rig, mat, 0);
+            StrawBedView.Draw(rig, bed, 0);
             var left = Sole(true); var right = Sole(false);
             int frames = Mathf.CeilToInt(StrawBed.LieDownSeconds * 60);
             for (int frame = 0; frame <= frames; frame++) {
                 float down = (float)frame / frames;
-                StrawBedView.Draw(rig, mat, down);
+                StrawBedView.Draw(rig, bed, down);
                 Check(Sole(true), left, down, .10f); Check(Sole(false), right, down, .19f);
             }
         } finally { rig.Root.Free(); }
@@ -236,7 +236,7 @@ public static class StrawBedChecks {
             float sole = Math.Min(actual.Toe.Y, actual.Heel.Y) - StrawBedModel.Top;
             Require(actual.Toe.IsFinite() && actual.Heel.IsFinite() && sole >= -tolerance,
                 $"boot must not go through the straw at phase {down:F3}, got {actual}");
-            Require(sole < clearance, $"the leg should fold close to the mat rather than kicking upward, got {sole:F3} m at {down:F3}");
+            Require(sole < clearance, $"the leg should fold close to the bed rather than kicking upward, got {sole:F3} m at {down:F3}");
             if (down <= StrawBedView.BothBootsOnUntil) {
                 Require(Math.Abs(actual.Toe.Y - StrawBedModel.Top) < tolerance && Math.Abs(actual.Heel.Y - StrawBedModel.Top) < tolerance,
                     $"both boots should stand flat while bearing weight at phase {down:F3}, got {actual}");
@@ -248,21 +248,21 @@ public static class StrawBedChecks {
 
     private static void CheckWeightPassesSmoothlyFromThePalmToTheForearm() {
         var rig = new ActorRig(ActorSkin.Player);
-        var mat = new Thing { Kind = ThingKind.StrawBed, Rotation = Mathf.Pi };
+        var bed = new Thing { Kind = ThingKind.StrawBed, Rotation = Mathf.Pi };
         try {
-            StrawBedView.Draw(rig, mat, StrawBedView.HandOn);
+            StrawBedView.Draw(rig, bed, StrawBedView.HandOn);
             var palm = Palm(true);
-            StrawBedView.Draw(rig, mat, StrawBedView.SecondHandOn);
+            StrawBedView.Draw(rig, bed, StrawBedView.SecondHandOn);
             var secondPalm = Palm(false);
-            StrawBedView.Draw(rig, mat, StrawBedView.ForearmOn);
+            StrawBedView.Draw(rig, bed, StrawBedView.ForearmOn);
             var brace = Elbow();
-            StrawBedView.Draw(rig, mat, 0);
+            StrawBedView.Draw(rig, bed, 0);
             var lastLeft = Palm(true); var lastRight = Palm(false);
             var lastElbow = Elbow();
             int frames = Mathf.CeilToInt(StrawBed.LieDownSeconds * 60);
             for (int frame = 1; frame <= frames; frame++) {
                 float down = (float)frame / frames;
-                StrawBedView.Draw(rig, mat, down);
+                StrawBedView.Draw(rig, bed, down);
                 var left = Palm(true); var right = Palm(false); var elbow = Elbow();
                 if (down >= StrawBedView.HandOn) StaysPlanted(left, palm, "leading", down);
                 if (down is >= StrawBedView.SecondHandOn and <= StrawBedView.SecondHandOff) StaysPlanted(right, secondPalm, "trailing", down);
@@ -289,14 +289,14 @@ public static class StrawBedChecks {
 
     private static void CheckTheBurningTorchStaysVisibleBesideTheSleeper() {
         var rig = new ActorRig(ActorSkin.Player);
-        var mat = new Thing { Kind = ThingKind.StrawBed, Rotation = Mathf.Pi / 2 };
+        var bed = new Thing { Kind = ThingKind.StrawBed, Rotation = Mathf.Pi / 2 };
         var torch = rig.Flame.GetParent<Node3D>();
         try {
-            StrawBedView.Draw(rig, mat, .5f, lit: true);
+            StrawBedView.Draw(rig, bed, .5f, lit: true);
             var braced = TorchAt();
             Require(torch.Visible && braced.Y > 0 && braced.DistanceTo(Vector3.Zero) > .42f,
                 "the lit torch should show beside the straw while the player braces with both hands");
-            StrawBedView.Draw(rig, mat, 1, lit: true);
+            StrawBedView.Draw(rig, bed, 1, lit: true);
             Require(torch.Visible && TorchAt().DistanceTo(braced) < .005f, "the torch should stay by the bed as the player lies down");
             rig.Show(new Pose(), null, false, lit: true);
             Require(torch.Visible && TorchAt().DistanceTo(braced) > .20f, "standing again should return the lit torch to the player's hand");

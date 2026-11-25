@@ -54,8 +54,8 @@ internal sealed class BedtimeWater(World world) {
             .Select(p => (Player: p, Cabin: world.Find(p.Sheltered)))
             .Where(pair => pair.Cabin != null && pair.Player.SleepingAt == pair.Cabin.Id).Select(pair => (pair.Player, pair.Cabin!)).ToArray();
 
-    /// <summary>Drinks now, leaving earlier occupants the water they need when they turn in.</summary>
-    internal void DrinkAtBedtime(PlayerState player, Thing cabin) {
+    /// <summary>Drinks on lying down or getting up, leaving earlier occupants who are still awake the water they need.</summary>
+    internal void DrinkInTurn(PlayerState player, Thing cabin) {
         int available = Supply(cabin);
         foreach (var other in world.Players)
             if (other != player && other.Sheltered == cabin.Id && other.SleepingAt == 0

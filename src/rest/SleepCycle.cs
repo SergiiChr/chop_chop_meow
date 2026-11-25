@@ -5,8 +5,10 @@ namespace ChopChopMeow;
 
 /// <summary>Each player's sleep and the shared speed-up, which runs while all are asleep and no sleeper hears a wolf.</summary>
 public sealed class SleepCycle(World world) {
-    /// <summary>Health gained per second asleep while both needs are above the healing threshold.</summary>
-    public const float FedNeed = 45, HealPerSecond = .12f;
+    /// <summary>Hunger and thirst both above this let sleep heal.</summary>
+    public const float FedNeed = 45;
+    /// <summary>Health gained per second asleep while hunger and thirst are both above <see cref="FedNeed"/>.</summary>
+    public const float HealPerSecond = .12f;
     private const float SnapshotRoom = .15f;
     private const string Scratching = "You are awakened by the noise outside.";
     private const int TargetRate = 12;
@@ -15,8 +17,9 @@ public sealed class SleepCycle(World world) {
     private bool speedingUp;
     internal bool AdvancingTime { get; private set; }
     internal bool Recovering { get; private set; }
-    public int Place => world.S.Actor.SleepingAt;
-    internal bool OnStrawBed => world.Find(Place)?.Kind == ThingKind.StrawBed;
+    /// <summary>The place the acting player sleeps at, or zero while awake.</summary>
+    public int SleepingAt => world.S.Actor.SleepingAt;
+    internal bool OnStrawBed => world.Find(SleepingAt)?.Kind == ThingKind.StrawBed;
 
     private float Dawn => world.Day * world.Data.DaySeconds;
     public float SecondsToDawn => Dawn - world.Time;
@@ -67,14 +70,14 @@ public sealed class SleepCycle(World world) {
         p.SleepingAt = place.Id;
         p.Sprinting = p.Braking = false;
         p.SleepReadyAt = place.Kind == ThingKind.StrawBed ? world.Time + StrawBed.LieDownSeconds + SnapshotRoom : world.Time;
-        if (place.Kind == ThingKind.StrawBed) { p.Pos = place.Pos; p.Warp++; } else world.BedtimeWater.DrinkAtBedtime(p, place);
+        if (place.Kind == ThingKind.StrawBed) { p.Pos = place.Pos; p.Warp++; } else world.BedtimeWater.DrinkInTurn(p, place);
         p.HearsWolves = false;
         ListenForWolves(p);
     }
 
     /// <summary>Wakes the acting player on request.</summary>
     public void Wake() {
-        if (Place == 0 || world.Forwarded(Verb.Wake)) return;
+        if (SleepingAt == 0 || world.Forwarded(Verb.Wake)) return;
         WakeActor("You wake up.");
     }
 
@@ -86,7 +89,7 @@ public sealed class SleepCycle(World world) {
     internal void WakeActor(string reason) {
         var p = world.S.Actor;
         if (p.SleepingAt == 0) return;
-        if (world.Find(p.Sheltered) is Thing cabin) BedtimeWater.Drink(p, cabin);
+        if (world.Find(p.Sheltered) is Thing cabin) world.BedtimeWater.DrinkInTurn(p, cabin);
         p.SleepingAt = 0;
         world.Say(reason);
     }

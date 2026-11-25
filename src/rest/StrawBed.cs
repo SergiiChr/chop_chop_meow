@@ -14,7 +14,7 @@ internal static class StrawBed {
     internal static bool Valid(Thing thing, float time) =>
         thing.Kind != ThingKind.StrawBed ? thing.BedBuiltAt == 0 : thing.BedBuiltAt >= 0 && thing.BedBuiltAt <= time;
 
-    /// <summary>One can lie down from beside the mat, with no obstacle between.</summary>
+    /// <summary>One can lie down from beside the straw bed, with no obstacle between.</summary>
     internal static bool Reachable(World world, Thing bed) {
         var from = world.Player;
         if (from.DistanceSquaredTo(bed.Pos) > Reach * Reach) return false;

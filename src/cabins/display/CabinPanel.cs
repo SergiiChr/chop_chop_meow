@@ -30,7 +30,7 @@ public partial class CabinPanel(PageTools tools, Thing subject) : SleepPage(tool
             Style.SkinPill(door, entering ? Style.Mustard : Style.Sage);
             door.TooltipText = entering ? "Cancel walk to the cabin" : "";
         });
-        live.Watch(() => (world.Sheltered == thing.Id, world.Sleep.Place == thing.Id), now => {
+        live.Watch(() => (world.Sheltered == thing.Id, world.Sleep.SleepingAt == thing.Id), now => {
             var (inside, sleeping) = now;
             tag.Text = sleeping ? "asleep" : inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);

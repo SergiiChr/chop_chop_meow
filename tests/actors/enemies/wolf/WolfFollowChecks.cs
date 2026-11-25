@@ -35,7 +35,7 @@ public static class WolfFollowChecks {
         var centre = world.Player = Terrain.Spawn;
         var wolves = Enumerable.Range(0, 4).Select(i => PlaceWolf(world, new Wolf {
             Pos = centre + Vector2.Right.Rotated(i * Mathf.Tau / 4) * 3,
-            Chase = 3
+            Galloping = true
         })).ToArray();
         world.Add(ThingKind.Campfire, centre).Burn = 90;
         WolfTick(world, .4f, wolves);
@@ -112,7 +112,7 @@ public static class WolfFollowChecks {
         world.Player = centre + Vector2.Left * 8;
         var fire = world.Add(ThingKind.Campfire, centre);
         fire.Burn = 90;
-        var wolf = PlaceWolf(world, new Wolf { Pos = centre + Vector2.Right * (World.FireReach + .04f), Chase = 3 });
+        var wolf = PlaceWolf(world, new Wolf { Pos = centre + Vector2.Right * (World.FireReach + .04f), Galloping = true });
         WolfTick(world, 2, wolf);
         Require(Math.Abs(wolf.Pos.Y - centre.Y) > 1.5f,
             $"the wolf should go around the fire, not bounce along the line through it, but it only reached {wolf.Pos - centre}");

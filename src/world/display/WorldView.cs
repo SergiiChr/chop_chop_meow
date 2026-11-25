@@ -1816,7 +1816,7 @@ public partial class WorldView : Node3D {
                 && moved.Dot(hunted - wolf.Pos) < 0 && slow;
             // A scared or galloping wolf turns fast. At a walk or a trot, one that sets off far from the way it faces turns
             // round where it stands first, and only then goes after its place in the world.
-            bool fast = wolf.Aggressive || wolf.Chase > 0 || wolf.Flee > 0;
+            bool fast = wolf.Aggressive || wolf.Galloping || wolf.Flee > 0;
             bool threatening = wolf.Threaten > 0;
             bool turnsRound = running && !backing && !fast && moved.Normalized().Dot(ActorAnimation.Forward(model.Yaw)) < WolfModel.SetsOffWithin;
             // Where it is drawn away from its place in the world, after turning round or letting go of a player it tugged,
@@ -1872,7 +1872,7 @@ public partial class WorldView : Node3D {
             } else if (stepsRound) model.Move(Math.Abs(turned) * WolfModel.TurnStep, dt, false, wary);
             else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (braking) model.Brake(moved.Length(), dt);
-            else if (running) model.Move(backing ? -walked : walked, dt, (wolf.Aggressive || wolf.Chase > 0
+            else if (running) model.Move(backing ? -walked : walked, dt, (wolf.Aggressive || wolf.Galloping
                 || wolf.Follow == FollowStage.Routed) && !backing, wary);
             else if (wolf.Follow == FollowStage.Braced) model.Brace(Elapsed + wolf.Id % 7, dt);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);

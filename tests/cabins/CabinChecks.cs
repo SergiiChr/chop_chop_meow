@@ -443,9 +443,9 @@ public static class CabinChecks {
         float priorHunger = world.Hunger;
         float priorPlay = world.PlaySeconds;
         world.Sleep.Start(hut);
-        Require(world.Time == priorTime && world.Sleep.Place == hut.Id, "going to sleep should leave time to show the sleeping player");
+        Require(world.Time == priorTime && world.Sleep.SleepingAt == hut.Id, "going to sleep should leave time to show the sleeping player");
         world.Tick(1f / 60);
-        Require(world.Time > priorTime + 1f / 60 && world.Day == 1 && world.Sleep.Place == hut.Id,
+        Require(world.Time > priorTime + 1f / 60 && world.Day == 1 && world.Sleep.SleepingAt == hut.Id,
             "the first frame should advance faster than normal without jumping to dawn");
         Require(Mathf.IsEqualApprox(world.PlaySeconds, priorPlay + 1f / 60), "only real elapsed time should count as time played");
         UntilAllAwake(world);

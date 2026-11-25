@@ -34,7 +34,7 @@ public sealed class WolfCounter(World world) {
         }
         wolf.Heading = (-offset).Angle();
         wolf.Stagger = World.StaggerSeconds;
-        wolf.Chase = 0;
+        wolf.Galloping = false;
         return true;
     }
 
