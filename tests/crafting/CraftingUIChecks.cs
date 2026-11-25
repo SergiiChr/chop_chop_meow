@@ -46,6 +46,7 @@ public partial class Game {
         await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
         await TestClean(CheckItemTreeFollowsOneDirectRecipeAtATime);
         await TestClean(CheckItemTreeBackRestoresTheMainMap);
+        await TestClean(CheckItemTreeOpensFromADetailThumbnail);
         await TestClean(CheckItemTreeDistinguishesIngredientsFuelAndFixedTools);
         await TestClean(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
     }

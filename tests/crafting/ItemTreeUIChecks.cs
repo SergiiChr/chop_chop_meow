@@ -42,6 +42,16 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
+    /// <summary>An item shown in the main map's details also opens its own item tree.</summary>
+    private async Task CheckItemTreeOpensFromADetailThumbnail() {
+        await OpenRecipeMap();
+        await Click(RecipeMapCard("tin_sheet"));
+        await Click((Control)recipeMap.FindChild("use_tin_can", true, false), alt: true);
+        await ItemTreeShows("Tin can");
+        Require(ItemTreeCard("canned_jam") != null, "The detail icon should open the tin can's direct recipes.");
+        await KeyStroke(Key.Escape);
+    }
+
     /// <summary>Recipes include all direct roles, with a product listed once when it uses the item in two ways.</summary>
     private async Task CheckItemTreeDistinguishesIngredientsFuelAndFixedTools() {
         await OpenRecipeMap();

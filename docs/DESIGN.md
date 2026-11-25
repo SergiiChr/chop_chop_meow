@@ -1159,7 +1159,7 @@ A `MapNode` draws a filled icon slot for an item `World.Had` knows and a dashed 
 Chips below the card link to the required tool and to each input after the first. A click on a chip scrolls to its item
 and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details, whose button leaves the
 map through `SidePanel.ShowRecipe`.
-Alt-click on a card or chip opens the item tree within the same board.
+Alt-click on a card, chip or detail thumbnail opens that item's tree within the same board.
 `RecipeItemUse.Of` reads each recipe's inputs, accepted tools, fixed station tools and fuels to find direct uses only.
 `ItemTree` branches by station, showing an item once with every role it has in that recipe.
 Clicking a card returns to its place in the main map. Alt-clicking it opens its own item tree.

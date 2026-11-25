@@ -98,7 +98,7 @@ public partial class RecipeMap : Control {
     private void OpenItemTree(string item) {
         mainView!.Hide();
         RemoveItemTree();
-        itemTree = new ItemTree(kit, item, BackToMap, Close, ShowOnMap, OpenItemTree);
+        itemTree = new ItemTree(kit, EntryFor(item), BackToMap, Close, ShowOnMap, OpenItemTree);
         board.AddChild(itemTree);
     }
 
@@ -231,7 +231,7 @@ public partial class RecipeMap : Control {
         var recipe = data.RecipeOf(item);
         var content = new VBoxContainer(); content.AddThemeConstantOverride("separation", 9); details.AddChild(content);
         var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 12); content.AddChild(header);
-        header.AddChild(Style.Icon(Icons.Of(item), 46));
+        header.AddChild(DetailItem(item, 46, "detail_item"));
         var identity = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
         identity.AddThemeConstantOverride("separation", 2); header.AddChild(identity);
         var title = new HBoxContainer(); title.AddThemeConstantOverride("separation", 12); identity.AddChild(title);
@@ -252,18 +252,36 @@ public partial class RecipeMap : Control {
         var requires = Flow(Fact(facts, "Requires"));
         foreach (var (input, words) in needs) {
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 4);
-            pair.AddChild(Style.Icon(Icons.Of(input), 28)); pair.AddChild(Style.Text(words, 15, Style.Ink));
+            pair.AddChild(DetailItem(input, 28, $"requires_{input}"));
+            pair.AddChild(Style.Text(words, 15, Style.Ink));
             requires.AddChild(pair);
         }
         if (requires.GetChildCount() == 0) requires.AddChild(Style.Text("No ingredients", 15, Style.Tan));
         var uses = data.UsedFor(item).ToList();
         var used = Flow(Fact(facts, "Used for")); used.Name = "detail_uses";
-        foreach (string use in uses) {
-            var icon = Style.Icon(Icons.Of(use), 28); icon.Name = $"use_{use}";
-            icon.TooltipText = data.Name(use); icon.MouseFilter = MouseFilterEnum.Stop; used.AddChild(icon);
-        }
+        foreach (string use in uses) used.AddChild(DetailItem(use, 28, $"use_{use}"));
         if (uses.Count == 1) used.AddChild(Style.Text(data.Name(uses[0]), 15, Style.Ink));
         if (uses.Count == 0) used.AddChild(Style.Text("—", 15, Style.Tan));
+    }
+
+    /// <summary>A detail thumbnail keeps its icon size and also lets Alt-click follow that item.</summary>
+    private ItemSlot DetailItem(string item, int size, string name) {
+        var icon = new ItemSlot {
+            Name = name,
+            Icon = Icons.Of(item),
+            ExpandIcon = true,
+            CustomMinimumSize = new Vector2(size, size),
+            SizeFlagsVertical = SizeFlags.ShrinkCenter,
+            IconAlignment = HorizontalAlignment.Center,
+            VerticalIconAlignment = VerticalAlignment.Center,
+            FocusMode = FocusModeEnum.None,
+            MouseDefaultCursorShape = CursorShape.PointingHand,
+            TooltipText = $"{world.Data.Name(item)}\n{ItemTreeHint}",
+            RecipeLink = () => OpenItemTree(item)
+        };
+        Style.Skin(icon, Style.None, Style.None);
+        icon.AddThemeConstantOverride("icon_max_width", size);
+        return icon;
     }
 
     private static VBoxContainer Fact(HBoxContainer strip, string heading) {
