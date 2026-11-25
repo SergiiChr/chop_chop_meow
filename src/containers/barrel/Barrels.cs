@@ -3,14 +3,13 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Barrels store water loose while placed, and keep it in their item when picked up.</summary>
+/// <summary>Barrels store one liquid loose while placed and keep it in their item when picked up.</summary>
 public sealed class Barrels(World world) {
     internal static Inventory NewTank() => new() { Slots = 1, StackSize = Barrel.Capacity, Capacity = Barrel.Capacity };
 
     internal static string? PouredLiquid(GameData data, string item) =>
         data.VesselFor(item) != null ? item : data.VesselOf(item) is VesselDef v && v.LitersIn(item) > 0 ? v.Liquid : null;
 
-    internal static bool CanPour(GameData data, string item) => PouredLiquid(data, item) != null;
     internal static bool CanPourWater(GameData data, string item) => PouredLiquid(data, item) == Water.Liquid;
 
     internal static string LiquidIn(Thing barrel) => barrel.Inventory.First() ?? Water.Liquid;

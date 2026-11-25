@@ -14,6 +14,7 @@ public partial class Game {
         await TestClean(CheckCtrlPoursFromAHotbarBoundBucketIntoAPlacedBarrel);
         await TestClean(CheckHotbarShowsTheCountOfAnEmptyBucketStack);
         await TestClean(CheckReorderingBackpackClosesTheBarrel);
+        await TestClean(CheckEmptyBarrelCanBeFilteredForJam);
     }
 
     private async Task CheckReorderingBackpackClosesTheBarrel() {
@@ -106,8 +107,8 @@ public partial class Game {
         await Click(Named(waterFilter)!);
         await Until(() => Named("filter_add_in") != null, "removing the water filter from the empty barrel", 2);
         await Click(Named("filter_add_in")!);
-        Require(OnPage("filter_out") == null && Named($"pick_{Water.Liquid}") != null && Named("pick_stone") == null,
-            "An empty barrel must offer only water in its filter picker.");
+        Require(OnPage("filter_out") == null && Named($"pick_{Water.Liquid}") != null && Named($"pick_{BerryJam.Liquid}") != null
+            && Named("pick_stone") == null, "An empty barrel must offer water and jam, but no solids.");
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == barrel);
         Drop(Hosted, Water.Full, 1);
@@ -115,6 +116,31 @@ public partial class Game {
         Give(Hosted, Water.Empty, empty);
         Give(Hosted, Water.OneLiter, oneLiter);
         Give(Hosted, Water.TwoLiters, twoLiters);
+        await Frames();
+    }
+
+    private async Task CheckEmptyBarrelCanBeFilteredForJam() {
+        var barrel = Hosted.Add(ThingKind.Barrel, SpotsNearby().First(p =>
+            world.CanStand(p) && view.Pick(view.Screen(p, .4f)) == null && Uncovered(view.Screen(p, .4f))));
+        Give(Hosted, BerryJam.Bottle);
+        await Frames();
+        await ClickOn(barrel);
+        await Until(() => Named("barrel_water") != null, "the empty barrel opening");
+        await Click(Named("filters")!);
+        await Click(Named("filter_add_in")!);
+        Require(Named($"pick_{BerryJam.Liquid}") != null, "An empty barrel's picker should offer jam.");
+        await Click(Named($"pick_{BerryJam.Liquid}")!);
+        var jamFilter = $"filter_in_{BerryJam.Liquid}";
+        await Until(() => Named(jamFilter) != null, "the selected jam filter appearing", 2);
+        await Click(Named(jamFilter)!);
+        await Until(() => Named("filter_add_in") != null, "the cleared filter accepting a held item", 2);
+        await Carry(BagCellOf(BerryJam.Bottle), Named("filter_add_in")!);
+        await Until(() => Named(jamFilter) != null, "the jam bottle setting the jam filter", 2);
+        Require(barrel.Inventory.Count == 0 && world.Backpack[BerryJam.Bottle] == 1,
+            "Setting the filter must keep the bottle and jam in the backpack.");
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == barrel);
+        Drop(Hosted, BerryJam.Bottle);
         await Frames();
     }
 

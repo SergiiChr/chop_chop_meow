@@ -9,12 +9,47 @@ using static WorkerSteps;
 
 public static class JamPlumbingChecks {
     public static void Run(GameData data) {
+        Test(CheckABarrelFillsAnIdlePipeWithoutTakingItsLiquidBack, data);
+        Test(CheckABarrelTopsUpAPartlyFullPipeWithoutWastingWater, data);
         Test(CheckConnectedBarrelsEqualizeByPressure, data);
         Test(CheckJamFeedsACanneryWithoutMixingIntoWater, data);
         Test(CheckABarrelCarriesOnlyOneLiquid, data);
         Test(CheckAFullLineSuppliesTheRestOfACannerysLiter, data);
         Test(CheckFractionalWaterCannotBecomeJamAfterChangingLines, data);
         Test(CheckAWorkerBringsOnlyJamToTheJamBarrel, data);
+    }
+
+    private static void CheckABarrelFillsAnIdlePipeWithoutTakingItsLiquidBack(GameData data) {
+        var world = EmptyWorld(data);
+        var barrel = world.Add(ThingKind.Barrel, PumpTile);
+        InstallPlumbing(world, barrel);
+        LayPipe(world, PumpTile);
+        barrel.Inventory.Add(BerryJam.Liquid, 1);
+        world.Tick(.5f);
+        Require(barrel.Inventory[BerryJam.Liquid] == 1 && world.PipeReading(PumpTile).Liters == 0,
+            "Charging one liter at 1.1 L/s should take more than half a second.");
+        world.Tick(.5f);
+        Require(barrel.Inventory.Count == 0 && world.PipeReading(PumpTile).Liters == 1
+            && world.PipeLiquid(PumpTile) == BerryJam.Liquid, "A barrel should fill an idle pipe with its last liter.");
+        string saved = world.Serialize();
+        Require(world.Construction.TakeUpPipe(PumpTile), "Taking up the pipe should spill its contents.");
+        world.Deserialize(saved);
+        SafeTick(world, 3);
+        Require(world.Find(barrel.Id)!.Inventory.Count == 0 && world.PipeReading(PumpTile).Liters == 1,
+            "The charged line must keep its jam instead of sending it back to its source, even after loading.");
+    }
+
+    private static void CheckABarrelTopsUpAPartlyFullPipeWithoutWastingWater(GameData data) {
+        var (world, pump, barrel) = PumpAndBarrel(data, installed: false);
+        PumpFully(world, pump);
+        world.Tick(.75f);
+        Require(world.PipeReading(EastTankTile).Liters == .75f, "Leave three quarters of a liter in the pump's last pipe.");
+        Require(world.Construction.TakeUpPipe(EastTankTile + Vector2I.Left), "Disconnect the last pipe from the pump.");
+        InstallPlumbing(world, barrel);
+        barrel.Inventory.Add(Water.Liquid, 10);
+        world.Tick(.5f);
+        Require(world.PipeReading(EastTankTile).Liters == 1 && barrel.Inventory[Water.Liquid] == 9 && barrel.PipedWaterRemainder == .75f,
+            "With no receiver, a barrel should top up the pipe and keep the rest of the liter at its connection.");
     }
 
     private static void CheckConnectedBarrelsEqualizeByPressure(GameData data) {
@@ -25,10 +60,14 @@ public static class JamPlumbingChecks {
         LayPipe(world, PumpTile); LayPipe(world, JunctionTile);
         high.Inventory.Add(BerryJam.Liquid, 30); low.Inventory.Add(BerryJam.Liquid, 10);
         world.Tick(.5f);
-        Require(high.Inventory[BerryJam.Liquid] == 29 && low.Inventory[BerryJam.Liquid] == 11,
-            "A 2 L/s pressure difference should move one liter in half a second.");
+        Require(high.Inventory[BerryJam.Liquid] == 28 && low.Inventory[BerryJam.Liquid] == 10
+            && world.PipeReading(PumpTile).Liters == 1 && world.PipeReading(JunctionTile).Liters == 1,
+            "The fuller barrel's first two liters should fill the line.");
+        world.Tick(.0625f);
+        Require(high.Inventory[BerryJam.Liquid] == 27 && low.Inventory[BerryJam.Liquid] == 11,
+            "Only the pressure difference should move jam from the fuller barrel to the emptier one.");
         SafeTick(world, 45);
-        Require(high.Inventory[BerryJam.Liquid] == 20 && low.Inventory[BerryJam.Liquid] == 20,
+        Require(high.Inventory[BerryJam.Liquid] == 19 && low.Inventory[BerryJam.Liquid] == 19,
             "The barrels should equalize without creating or losing any jam.");
     }
 
@@ -54,6 +93,7 @@ public static class JamPlumbingChecks {
         Require(world.Construction.PlacementBlock(ThingKind.SteelPiping, join) == "Different liquids cannot share connected pipes.",
             "Laying a pipe that would connect two different liquids must be refused.");
         string saved = world.Serialize();
+        Require(world.Construction.TakeUpPipe(canningTile), "Taking up a charged pipe should remove the jam from that tile.");
         world.Deserialize(saved);
         Require(world.PipeReading(canningTile).Liters == 1 && world.PipeLiquid(canningTile) == BerryJam.Liquid,
             "Loading a save must restore both the amount and kind of liquid in its pipes.");

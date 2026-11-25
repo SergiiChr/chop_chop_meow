@@ -72,6 +72,8 @@ public sealed class Thing {
     /// <summary>Liters supplied through connected plumbing below one whole liter, carried until the next delivery.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float PipedWaterRemainder { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float PipedJamRemainder { get; set; }
+    /// <summary>The liquid last sent from this barrel into its pipe line, to stop the line draining straight back.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? PipeOutletLiquid { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double PipeFeedCredit { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public double PipeBalanceCredit { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int PipeBalanceTarget { get; set; }

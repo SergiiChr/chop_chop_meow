@@ -967,7 +967,8 @@ Taking down the building or picking up a barrel gives the installed steel pipes 
 A cabin can connect to the line before a roof barrel is mounted.
 Farm sprinklers spray whenever water arrives, even on fallow or ripe plots and when the soil reserve is full.
 Water fills the line outward from each running pump, up to 1 L per tile.
-A nonempty plumbed barrel can supply its liquid at 1 L/s plus 1 L/s for every 10 L it holds.
+A nonempty plumbed barrel supplies its liquid at 1 L/s plus 1 L/s for every 10 L it holds.
+It fills empty pipes even with no building drawing liquid. Its own pipe line does not drain straight back into it.
 When no lake pump is feeding them, connected barrels of the same liquid equalize as the fuller one feeds the emptier one.
 Water and jam need separate lines. You cannot join lines that already contain different liquids.
 Buildings that need water share the available flow evenly.

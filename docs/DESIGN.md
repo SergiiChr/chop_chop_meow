@@ -181,7 +181,7 @@ UI and input:
 | `src/PagePanel.cs` | `PagePanel`, the base of every page |
 | `src/ProcessRow.cs` | The process row every station shares and the fuel row under its bar |
 | `src/JobRow.cs` | A place's job buttons, their worker lists and what each job is called |
-| `src/FilterWindow.cs` | The filter window beside the panel |
+| `src/storage/display/FilterWindow.cs` | The filter window beside the panel |
 | `src/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-slot grids |
 | `src/ItemSlot.cs` | The cream item slot, which tells a click, a right click and a double click apart and shakes on a refusal |
@@ -1304,11 +1304,14 @@ Each pipe's liquid is saved and sent to guests separately from its shape and rot
 Taking out a pipe spills the liquid it held, while the two sides keep theirs.
 Building a link between lines that contain different liquids is refused.
 `World.PipeReading` reports a tile's standing liquid and the highest pressure from connected pumps or barrels.
-A barrel supplies 1 L/s plus 0.1 L/s per liter it holds. When a lake pump is off, barrels balance at the difference in their rates.
+A barrel supplies 1 L/s plus 0.1 L/s per liter it holds, filling its pipe line even without a receiver.
+A supply barrel keeps its liquid in the line rather than taking it back when the barrel empties.
+When a lake pump is off, barrels balance at the difference in their rates.
 Whole-liter transfer stops when two barrels are within one liter.
 Only a cannery set to can jam draws jam from a pipe.
-A receiver keeps fractions in `Thing.PipedWaterRemainder` or `Thing.PipedJamRemainder` until it can store a whole liter.
-These measurements stay separate, even when a building is moved from one line to another.
+A connection keeps fractions in `Thing.PipedWaterRemainder` or `Thing.PipedJamRemainder`.
+A receiver keeps a fraction until it can store a whole liter. A supply barrel can also leave part of a liter at its outlet.
+The measurements stay separate, even when a building is moved from one line to another.
 A cooking table requests water for the next queued or marked batch.
 A batch already being worked has spent its water.
 A farm with plumbing takes its share in every crop stage.
