@@ -190,7 +190,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | 1–9 or click a hotbar slot | Select and outline that slot. Start placement if it holds a plan or placeable container |
 | Pick up a plan or backpack item and click a hotbar slot | Assign it to that slot |
 | Layer button below the status bar | Switch between the surface and underground. Underground, click a pipe to see its water and pressure |
-| Space at a selected nearby reinforced furnace or water pump | Pump |
+| Space with a reinforced furnace or water pump selected | Walk into position if needed and pump once |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with the Goal Log, save, load, options, Controls, new game and quit |
@@ -213,8 +213,8 @@ The hotbar starts with an axe, pickaxe, chest, campfire, furnace, anvil, craftin
 
 Open **Options** from the start or pause menu and switch on **First-person preview**. Each launch starts overhead.
 Move with WASD or the arrow keys relative to where you look. Move the mouse to look around.
-Left and right click act on nearby things under the centre dot. Space swings where you look and still pumps a
-selected machine in reach.
+Left and right click act on nearby things under the centre dot.
+Space swings where you look, or walks into position and pumps once if a furnace or water pump is selected.
 Opening a panel or menu frees the pointer so you can click its controls. Close it to look around again.
 The valley is visible out to the horizon. Look down to see your body, and swing to see your arms and weapon move.
 Cabins, being downed and underground pipe work use the overhead view.
@@ -919,8 +919,9 @@ They fall again every day.
 
 Place a water pump in the freshwater lake’s shallows with its handle facing dry ground.
 It costs 4 steel bars, 10 stone and 4 wood parts.
-From the bank, select it and click **Pump** or press **Space**.
-Your character steps up to the handle before pressing it.
+Select the pump and click **Pump** or press **Space**.
+Your character walks around obstacles to the handle on the bank if needed, then pumps once.
+Moving yourself or changing the selection cancels the walk.
 Aim at the pump to select it, including its thin lever and piston.
 Aim beside it to collect water.
 You can also assign a worker the **Pump** job.

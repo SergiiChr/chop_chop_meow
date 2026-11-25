@@ -13,6 +13,7 @@ public partial class Game {
         await TestClean(CheckPumpAtTheWaterlineCanBeInspected);
         await TestClean(CheckRepeatedWaterPumpInputKeepsTheHandleMoving);
         await TestClean(CheckWaterPumpControlsMoveThePressureGauge);
+        await TestClean(CheckWaterPumpControlsWalkAroundABlockedRoute);
     }
 
     private async Task CheckPlumbingPagesRefreshWithoutAllocating() {
@@ -112,6 +113,40 @@ public partial class Game {
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == pump || t == water);
         Warp(Hosted, home); await Frames(4);
+    }
+
+    private async Task CheckWaterPumpControlsWalkAroundABlockedRoute() {
+        var home = world.Player;
+        var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
+        var pump = Hosted.Add(ThingKind.Pump, Terrain.TileAt(bank + Vector2.Down * 1.1f));
+        var stand = pump.ToWorld(World.BellowsStand);
+        var start = stand + new Vector2(4, -2);
+        var chest = Hosted.Add(ThingKind.Chest, stand.Lerp(start, .5f));
+        Warp(Hosted, stand);
+        await ClickOn(pump);
+        await Until(() => panel.Selection.Thing == pump.Id, "the water pump selected", 2);
+        Warp(Hosted, start);
+        await Until(() => world.Player.DistanceTo(start) < .02f, "the player on the far side of the chest", 2);
+        Require(!world.AtStation(Shown(pump)), "The start must be outside the pump's work reach.");
+
+        await KeyStroke(Key.Space);
+        Require(pump.Pressure == 0, "Space must not stroke the pump before the player reaches the handle.");
+        await Until(() => Hosted.Player.DistanceTo(stand) < .02f && pump.Pressure == 10,
+            "Space walking around the chest to stroke the pump once", 7);
+        await Until(() => pump.Rounds == 1 && pump.Pressure == 0, "one stroke finishing and its pressure falling", 4);
+
+        Warp(Hosted, start);
+        await Until(() => world.Player.DistanceTo(start) < .02f, "the player back on the far side of the chest", 2);
+        await Click(Named("pump")!);
+        Require(pump.Pressure == 0, "The Pump button must also wait for the player to reach the handle.");
+        await Until(() => Hosted.Player.DistanceTo(stand) < .02f && pump.Pressure == 10,
+            "the Pump button walking around the chest to stroke the pump once", 7);
+        await Until(() => pump.Rounds == 2 && pump.Pressure == 0, "the second stroke finishing without more input", 4);
+
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == pump || t == chest);
+        Warp(Hosted, home);
+        await Frames(4);
     }
 
     private async Task CheckWaterPumpControlsMoveThePressureGauge() {

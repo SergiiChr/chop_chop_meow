@@ -95,7 +95,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
             live.Watch(() => GlassBlowing.Status(world, thing), text => status.Text = text);
         }
         var pumpRow = new HBoxContainer(); pumpRow.AddThemeConstantOverride("separation", 8); column.AddChild(pumpRow);
-        var pump = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before operating the bellows."); else panel.Player.UseFurnaceBellows(thing); });
+        var pump = kit.Button("Pump", () => panel.Player.UsePump(thing));
         pump.Name = "pump"; pump.TooltipText = "Pump the bellows · Space"; pump.CustomMinimumSize = new Vector2(84, 38);
         Style.SkinPill(pump, Style.Sage);
         pumpRow.AddChild(pump); pumpRow.AddChild(Style.Pill("Space", Style.KeyPill, Style.Line, 12));

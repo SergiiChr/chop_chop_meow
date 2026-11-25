@@ -234,7 +234,7 @@ UI and input:
 | `src/menus/ControlsList.cs` | Key caps and actions on the shared Controls screen |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
 | `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things and using Space, and `ClickMode`, what the next click does |
-| `src/actors/player/BellowsApproach.cs` | The player's walk to a reinforced furnace for one stroke at the bellows |
+| `src/actors/player/InteractionApproach.cs` | The player's cancellable walk to a selected thing before using it once |
 | `src/actors/player/WalkKeys.cs` | The movement keys and Shift held by code that plays the player: the performance run and the firebug chase |
 | `src/ui/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
@@ -1196,6 +1196,7 @@ A batch below it pauses, keeps burning one coal from its fuel slot per batch len
 Once an active crew has the forge hot, it never falls below the bar while they are on duty.
 A manual bellows stroke adds 145 °C for either recipe.
 Space or Pump on a selected furnace routes the player to its bellows when out of reach, then presses once.
+`InteractionApproach` walks to the working spot and calls the requested action once, here and at a water pump.
 Movement input or a change of selection cancels the walk.
 
 `GlassBlowing` runs a glass batch in the same station slots.
@@ -1287,6 +1288,7 @@ A dotted guide marks a connection still to be made.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.
 The building's Plumbing slot accepts ten steel pipes to install its plumbing.
 Explored ground remembers the building's visible plumbing when it leaves sight.
+Space or Pump on a selected water pump walks the player to the bank-side handle if needed, then presses once.
 A worker finishes a round at the end of each pump stroke, then checks whether a higher-priority job is ready.
 A pump stroke holds pressure while the handle moves.
 Once it stops, pressure falls by ten percentage points per second.
