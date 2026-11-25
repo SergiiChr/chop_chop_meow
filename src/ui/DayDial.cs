@@ -4,12 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The sun or moon on its arc across the sky. Only the moon can be hovered.</summary>
-public partial class DayDial : Control {
-    public Func<float> Arc { get; set; } = () => 0;
-    public Func<bool> Night { get; set; } = () => false;
-    public Func<(float Light, bool Waxing)> MoonPhase { get; set; } = () => (1, false);
-    public Func<string> MoonTip { get; set; } = () => "";
-
+public partial class DayDial(World world) : Control {
     private const float IconRoom = 17, MoonRadius = 11, MoonRim = 13;
     private const int MoonSteps = 20, Rays = 12;
     private static readonly Color NightArc = new("8fa6c4"), Moon = new("e5ecf7"), MoonShadow = new("526680");
@@ -23,17 +18,26 @@ public partial class DayDial : Control {
 
     private Vector2 Centre => new(Size.X / 2, Size.Y - IconRoom);
     private float Radius => Math.Max(0, Math.Min(Size.X / 2 - IconRoom, Size.Y - 2 * IconRoom));
-    private float Angle => Mathf.Pi + Mathf.Clamp(Arc(), 0, 1) * Mathf.Pi;
+    private float Angle => Mathf.Pi + Mathf.Clamp(world.SkyArc, 0, 1) * Mathf.Pi;
     internal Vector2 Marker => Centre + Vector2.FromAngle(Angle) * Radius;
 
-    public override bool _HasPoint(Vector2 point) => Night() && point.DistanceSquaredTo(Marker) <= MoonRim * MoonRim;
-    public override string _GetTooltip(Vector2 atPosition) => _HasPoint(atPosition) ? MoonTip() : "";
+    public override bool _HasPoint(Vector2 point) => world.MoonUp && point.DistanceSquaredTo(Marker) <= MoonRim * MoonRim;
+
+    public override string _GetTooltip(Vector2 atPosition) {
+        if (!_HasPoint(atPosition)) return "";
+        var (days, high) = world.Beach.NextTide;
+        int tenths = Mathf.CeilToInt(days * 10);
+        return $"{tenths / 10f:0.#} {(tenths == 10 ? "day" : "days")} till {(high ? "high" : "low")} tide";
+    }
 
     public override void _Draw() {
-        bool night = Night();
-        DrawArc(Centre, Radius, Mathf.Pi, Mathf.Tau, 40, Style.Line, 8, true);
-        DrawArc(Centre, Radius, Mathf.Pi, Math.Max(Mathf.Pi * 1.02f, Angle), 40, night ? NightArc : Style.Mustard, 8, true);
-        if (night) DrawMoon(Marker); else DrawSun(Marker);
+        bool moonUp = world.MoonUp;
+        var centre = Centre;
+        float radius = Radius, angle = Angle;
+        DrawArc(centre, radius, Mathf.Pi, Mathf.Tau, 40, Style.Line, 8, true);
+        DrawArc(centre, radius, Mathf.Pi, Math.Max(Mathf.Pi * 1.02f, angle), 40, moonUp ? NightArc : Style.Mustard, 8, true);
+        var marker = centre + Vector2.FromAngle(angle) * radius;
+        if (moonUp) DrawMoon(marker); else DrawSun(marker);
     }
 
     private void DrawSun(Vector2 at) {
@@ -49,8 +53,7 @@ public partial class DayDial : Control {
     }
 
     private void DrawMoon(Vector2 at) {
-        var (light, waxing) = MoonPhase();
-        float side = waxing ? 1 : -1, edge = 1 - 2 * light;
+        float light = world.Moonlight, side = world.MoonWaxing ? 1 : -1, edge = 1 - 2 * light;
         DrawCircle(at, MoonRim, Style.Rim, antialiased: true);
         DrawCircle(at, MoonRadius + .8f, Style.Line, antialiased: true);
         DrawCircle(at, MoonRadius, light >= .995f ? Moon : MoonShadow, antialiased: true);

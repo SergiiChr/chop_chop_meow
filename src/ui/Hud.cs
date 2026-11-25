@@ -9,19 +9,15 @@ public partial class ClockPlate : PanelContainer {
     private readonly DayDial dial;
     private readonly Label time;
     // What the clock shows, so its text is built only when it changes: building it allocates.
-    private (int Day, int Minute, bool Night) shown = (-1, -1, false);
+    private (int Day, int Minute, bool MoonUp) shown = (-1, -1, false);
 
     public ClockPlate(World world) {
         this.world = world;
         MouseFilter = MouseFilterEnum.Ignore;
         AddThemeStyleboxOverride("panel", Style.Plate);
         var column = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore }; column.AddThemeConstantOverride("separation", 6); AddChild(column);
-        dial = new DayDial {
+        dial = new DayDial(world) {
             Name = "sky_dial",
-            Arc = () => world.SkyArc,
-            Night = () => world.MoonUp,
-            MoonPhase = () => (world.Moonlight, world.MoonWaxing),
-            MoonTip = TideTip,
             CustomMinimumSize = new Vector2(0, 84),
             MouseFilter = MouseFilterEnum.Pass,
         }; column.AddChild(dial);
@@ -29,18 +25,12 @@ public partial class ClockPlate : PanelContainer {
     }
 
     public void Refresh() {
-        var now = (world.Day, (int)(world.DayPhase * GameData.MinutesPerDay), world.MoonUp);
+        var now = (world.Day, Minute: (int)(world.DayPhase * GameData.MinutesPerDay), world.MoonUp);
         if (now == shown) return;
         shown = now;
         int hour = (int)world.Hour;
-        time.Text = $"Day {world.Day} · {hour}:{(int)(world.DayPhase * GameData.MinutesPerDay) % 60:00}";
+        time.Text = $"Day {now.Day} · {hour}:{now.Minute % 60:00}";
         dial.QueueRedraw();
-    }
-
-    private string TideTip() {
-        var (days, high) = world.Beach.NextTide;
-        int tenths = Mathf.CeilToInt(days * 10);
-        return $"{tenths / 10f:0.#} {(tenths == 10 ? "day" : "days")} till {(high ? "high" : "low")} tide";
     }
 }
 

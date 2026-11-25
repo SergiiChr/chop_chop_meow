@@ -16,10 +16,10 @@ public static class StrawBedChecks {
         Test(CheckSleepingOnStrawNeedsThePlayerBesideTheBed, data);
         Test(CheckSoloStrawBedSleeperHasTimeToLieDownBeforeDawn, data);
         Test(CheckANearbyWolfKeepsTimeAtNormalSpeedWithoutStoppingHealing, data);
-        Test(CheckAWolfComingIntoSightStopsAnOngoingSkip, data);
+        Test(CheckAWolfComingIntoSightRestoresNormalSpeed, data);
         Test(CheckOnlyTheSleeperNearTheWolfHearsIt, data);
         Test(CheckMovementWaitsForTheStandingHandoff, data);
-        Test(CheckCabinAndStrawBedSleepTogetherSkipToDawn, data);
+        Test(CheckCabinAndStrawBedSleepTogetherSpeedUpTime, data);
         Test(CheckBootsStayPlantedAndClearTheMat);
         Test(CheckWeightPassesSmoothlyFromThePalmToTheForearm);
         Test(CheckTheBurningTorchStaysVisibleBesideTheSleeper);
@@ -94,14 +94,14 @@ public static class StrawBedChecks {
         world.Sleep.Start(bed);
         world.Tick(.5f);
         Require(world.Me.SleepingAt == bed.Id && world.Time == time + .5f && world.Health > 60,
-            "a solo sleeper should start healing with time to lie down before the clock skips.");
+            "a solo sleeper should start healing with time to lie down before the clock speeds up.");
         world.Tick(StrawBed.LieDownSeconds - .5f);
         Require(world.Day == day && world.Me.SleepingAt == bed.Id, "dawn should leave time for the last frame to reach clients");
         world.Tick(.25f);
         Require(world.Day == day && world.Time > time + StrawBed.LieDownSeconds + .25f,
             "after lying down the clock should run faster, with intermediate frames still shown");
         UntilAllAwake(world);
-        Require(world.Day == day + 1 && world.Me.SleepingAt == 0, "the clock should skip automatically once the sleeper lies down.");
+        Require(world.Day == day + 1 && world.Me.SleepingAt == 0, "the clock should run faster to dawn once the sleeper lies down.");
     }
 
     private static void CheckANearbyWolfKeepsTimeAtNormalSpeedWithoutStoppingHealing(GameData data) {
@@ -127,7 +127,7 @@ public static class StrawBedChecks {
         }
     }
 
-    private static void CheckAWolfComingIntoSightStopsAnOngoingSkip(GameData data) {
+    private static void CheckAWolfComingIntoSightRestoresNormalSpeed(GameData data) {
         var world = NightWorld(data);
         world.Player = Terrain.Spawn;
         var bed = StrawBedSteps.Build(world);
@@ -139,8 +139,8 @@ public static class StrawBedChecks {
         int frames = 0;
         while (!world.Sees(wolf.Pos) && frames++ < 240) world.Tick(1f / 60);
         Require(world.Time > time + frames / 60f && world.Time < time + 9 && world.Sees(wolf.Pos),
-            "the skip should advance until the wolf comes into sight and then stop before it reaches the sleeper");
-        Require(world.Sleep.Place == bed.Id && world.Health > 60, "a wolf approaching during the skip should leave the player asleep and healing");
+            "time should run faster until the wolf comes into sight, then return to normal speed while it is still far away");
+        Require(world.Sleep.Place == bed.Id && world.Health > 60, "a wolf interrupting the speed-up should leave the player asleep and healing");
     }
 
     private static void CheckOnlyTheSleeperNearTheWolfHearsIt(GameData data) {
@@ -167,7 +167,7 @@ public static class StrawBedChecks {
         RemoveWolves(world, w => w == wolf);
         UntilAllAwake(world);
         Require(world.Day == day + 1 && world.Sleep.Place == 0 && guest.SleepingAt == 0,
-            "once the wolf is gone, two players who stayed asleep should skip to dawn");
+            "once the wolf is gone, time should speed up to dawn for the two players who stayed asleep");
     }
 
     private static void CheckMovementWaitsForTheStandingHandoff(GameData data) {
@@ -191,7 +191,7 @@ public static class StrawBedChecks {
         } finally { rig.Root.Free(); }
     }
 
-    private static void CheckCabinAndStrawBedSleepTogetherSkipToDawn(GameData data) {
+    private static void CheckCabinAndStrawBedSleepTogetherSpeedUpTime(GameData data) {
         var (world, guest, _) = Hosted(data);
         var bed = StrawBedSteps.Build(world);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -5));

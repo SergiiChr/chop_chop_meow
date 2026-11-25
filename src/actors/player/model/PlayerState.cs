@@ -88,7 +88,7 @@ public sealed class PlayerState {
     [JsonIgnore] public Vector2 Pos { get => new(PlayerX, PlayerY); set { PlayerX = value.X; PlayerY = value.Y; } }
     // Only the host's simulation uses these.
     internal float GatherClock, AttackClock, DigWork;
-    /// <summary>World time when this sleeper has finished lying down and can join a skip to dawn.</summary>
+    /// <summary>World time when this sleeper has finished lying down and time can speed up.</summary>
     internal float SleepReadyAt;
     /// <summary>A wolf is within hearing range and this sleeper is not in a locked cabin.</summary>
     internal bool HearsWolves;

@@ -4,7 +4,7 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-/// <summary>A shallow, rounded mound of pressed leaves kept together by a rim of laid grass.</summary>
+/// <summary>A shallow, rounded mound of pressed leaves kept together by a rim of folded leaves.</summary>
 internal static class StrawBedModel {
     internal const float Top = .15f;
     private const float Rim = .115f;
