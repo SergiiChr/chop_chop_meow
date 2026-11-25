@@ -100,7 +100,7 @@ public sealed class WolfSnap(World world) {
             if (wolf.Aggressive) world.WolfHunt.CircleOnMiss(wolf);
             return;
         }
-        bool pins = throat && !world.Protected(world.Player);
+        bool pins = throat && !world.FireDeters(world.Player);
         if (!pins) world.S.Health -= world.Data.WolfBite;
         if (world.DoorTug.TugOut(wolf) || !pins) world.Play("wolf_bite", mark);
         else world.WolfHunt.Pin(wolf);

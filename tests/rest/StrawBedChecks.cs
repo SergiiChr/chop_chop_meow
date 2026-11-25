@@ -15,6 +15,8 @@ public static class StrawBedChecks {
         Test(CheckSleepingOnStrawNeedsThePlayerBesideTheBed, data);
         Test(CheckSoloStrawBedSleeperHasTimeToLieDownBeforeDawn, data);
         Test(CheckCabinAndStrawBedSleepTogetherSkipToDawn, data);
+        Test(CheckBootsStayPlantedAndClearTheMat);
+        Test(CheckSupportHandStaysPlantedThroughTheWeightShift);
     }
 
     private static void CheckTakingApartAFreshBedGivesBackExactlyItsCost(GameData data) {
@@ -78,7 +80,8 @@ public static class StrawBedChecks {
         var world = EmptyWorld(data);
         var bed = StrawBedSteps.Build(world);
         RunUntilPhase(world, .72f);
-        world.Add(ThingKind.Campfire, bed.Pos + Vector2.Right * 2).Burn = data.DaySeconds;
+        world.S.Wolves.Clear();
+        ShutDens(world);
         SetNeeds(world, 100, 100, 60);
         float time = world.Time;
         int day = world.Day;
@@ -86,7 +89,9 @@ public static class StrawBedChecks {
         world.Tick(.5f);
         Require(world.Me.SleepingAt == bed.Id && world.Time == time + .5f && world.Health > 60,
             "a solo sleeper should start healing with time to lie down before the clock skips.");
-        world.Tick(1.5f);
+        world.Tick(StrawBed.LieDownSeconds - .5f);
+        Require(world.Day == day && world.Me.SleepingAt == bed.Id, "dawn should leave time for the last frame to reach clients");
+        world.Tick(.25f);
         Require(world.Day == day + 1 && world.Me.SleepingAt == 0, "the clock should skip automatically once the sleeper lies down.");
     }
 
@@ -96,15 +101,69 @@ public static class StrawBedChecks {
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -5));
         StepInside(world, hut, guest);
         world.As(guest, world.Doorways.TurnKey);
-        world.Add(ThingKind.Campfire, bed.Pos + Vector2.Right * 2).Burn = data.DaySeconds;
+        RunUntilPhase(world, data.DuskStarts + .02f);
+        world.S.Wolves.Clear();
+        ShutDens(world);
         SetNeeds(world, 100, 100, 60); SetNeeds(guest, 100, 100, 60);
         int day = world.Day;
         world.Sleep.Start(bed);
         world.Tick(10);
         Require(world.Day == day && world.Me.SleepingAt == bed.Id && Math.Abs(world.Health - 61.2f) < .02f,
-            "a daytime straw bed sleeper rests and heals while the guest stays awake");
+            "a straw bed sleeper rests and heals while the guest stays awake");
         world.As(guest, () => world.Sleep.Start(hut));
         Require(world.Day == day + 1 && world.Me.SleepingAt == 0 && guest.SleepingAt == 0,
             "sleeping at different kinds of bed should take both players to the next dawn");
+    }
+
+    private static void CheckBootsStayPlantedAndClearTheMat() {
+        var rig = new ActorRig(ActorSkin.Player);
+        var mat = new Thing { Kind = ThingKind.StrawBed, Pos = new Vector2(4, -2), Rotation = Mathf.Pi / 2 };
+        try {
+            StrawBedView.Draw(rig, mat, 0);
+            var left = Sole(true); var right = Sole(false);
+            int frames = Mathf.CeilToInt(StrawBed.LieDownSeconds * 60);
+            for (int frame = 0; frame <= frames; frame++) {
+                float down = (float)frame / frames;
+                StrawBedView.Draw(rig, mat, down);
+                Check(Sole(true), left, down); Check(Sole(false), right, down);
+            }
+        } finally { rig.Root.Free(); }
+
+        (Vector3 Toe, Vector3 Heel) Sole(bool left) {
+            var (toe, heel) = rig.BootSole(left);
+            return (rig.Root.Transform * toe, rig.Root.Transform * heel);
+        }
+
+        static void Check((Vector3 Toe, Vector3 Heel) actual, (Vector3 Toe, Vector3 Heel) start, float down) {
+            const float tolerance = .008f;
+            Require(actual.Toe.IsFinite() && actual.Heel.IsFinite() && Math.Min(actual.Toe.Y, actual.Heel.Y) >= StrawBedModel.Top - tolerance,
+                $"boot must not go through the straw at phase {down:F3}, got {actual}");
+            if (down <= StrawBedView.BothBootsOnUntil) {
+                Require(Math.Abs(actual.Toe.Y - StrawBedModel.Top) < tolerance && Math.Abs(actual.Heel.Y - StrawBedModel.Top) < tolerance,
+                    $"both boots should stand flat while bearing weight at phase {down:F3}, got {actual}");
+                Require(actual.Toe.DistanceTo(start.Toe) < tolerance && actual.Heel.DistanceTo(start.Heel) < tolerance,
+                    $"both boots should stay in place while bearing weight at phase {down:F3}, got {actual} from {start}");
+            }
+        }
+    }
+
+    private static void CheckSupportHandStaysPlantedThroughTheWeightShift() {
+        var rig = new ActorRig(ActorSkin.Player);
+        var mat = new Thing { Kind = ThingKind.StrawBed };
+        try {
+            var contact = Palm(StrawBedView.HandOn);
+            int frames = Mathf.CeilToInt((StrawBedView.HandOff - StrawBedView.HandOn) * StrawBed.LieDownSeconds * 60);
+            for (int frame = 0; frame <= frames; frame++) {
+                float down = Mathf.Lerp(StrawBedView.HandOn, StrawBedView.HandOff, (float)frame / frames);
+                var planted = Palm(down);
+                Require(Math.Abs(planted.Y - StrawBedModel.Top) < .012f && planted.DistanceTo(contact) < .012f,
+                    $"the hand should stay on the straw while it supports the weight shift at phase {down:F3}, got {planted} from {contact}");
+            }
+        } finally { rig.Root.Free(); }
+
+        Vector3 Palm(float down) {
+            StrawBedView.Draw(rig, mat, down);
+            return rig.Root.Transform * rig.HandPad(true);
+        }
     }
 }

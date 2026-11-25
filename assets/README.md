@@ -19,7 +19,7 @@ Buildings are DIY:
 - slatted wood crates
 - a market post with a mailbox
 - a fieldstone campfire
-- a low mat of pressed autumn leaves with a rough straw rim
+- a shallow, rounded bed of pressed autumn leaves with a rough straw rim
 
 Trees come in three variants chosen by object id: broadleaf oak, spruce and silver birch.
 

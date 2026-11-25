@@ -88,7 +88,7 @@ internal static class ProgressionSteps {
         GatherUntil(world, iron, "iron_ore", 22);
         GatherUntil(world, coal, "coal", 17);
         // Smelting and the first steel sale run on into the night.
-        // So the furnaces, the anvil and the trading post stand by two campfires, stocked to burn through it.
+        // The work sites stand by two campfires, stocked to burn through the night.
         foreach (var site in new[] { Site(25, 26.5f), Site(31, 28) }) {
             var fire = BuildAt(world, ThingKind.Campfire, site);
             Require(world.Transfer(world.Backpack, fire.Inventory, "wood", 3) == 3, "a campfire should take wood to burn through the night");
@@ -115,6 +115,9 @@ internal static class ProgressionSteps {
         Require(world.Backpack["steel_bar"] == 2 && world.Backpack["iron_bar"] == bars - 2,
                 "one smelt of 2 iron bars and coal should make two steel bars from real inputs");
 
+        // Keep the hand-work and trade checks about production. A complete pack now attacks through the firelight.
+        RemoveWolves(world, _ => true);
+        ShutDens(world);
         var anvil = BuildAt(world, ThingKind.Anvil, Site(28, 25));
         world.Player = anvil.Pos + Vector2.One;
         Require(world.SlotTool(anvil, "steel_hammer"), "the bought steel hammer should go into the anvil's hammer slot");

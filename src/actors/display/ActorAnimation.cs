@@ -628,7 +628,7 @@ public static class ActorAnimation {
     public const float Thigh = .38f, Shin = .37f, Sole = .07f;
     // The legs hang from this far below the hips, so the ankle is the rest of Sole above the bottom of the boot.
     // The boot's sole reaches this far ahead of the ankle to the toe and behind it to the heel, as HumanShape builds it.
-    private const float LegDrop = .02f, Toe = .155f, Heel = .065f, AboveSole = Sole - LegDrop;
+    internal const float LegDrop = .02f, Toe = .155f, Heel = .065f, AboveSole = Sole - LegDrop;
     /// <summary>How far below the hip a leg's ankle is, for a thigh swung forward and a knee folded back by these angles.</summary>
     public static float Reach(float swing, float knee, float shin = Shin) => Ankle(swing, knee, shin).Y;
 

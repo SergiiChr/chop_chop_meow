@@ -59,7 +59,7 @@ public sealed class WolfFollow(World world) {
     /// A pack closing in, a wolf that turned on its player and one running from them no longer care.
     /// </summary>
     internal void Scare(Vector2 direction) {
-        if (world.PackAround >= World.PackSize) return;
+        if (world.FullPackAt(world.Player)) return;
         foreach (var wolf in world.S.Wolves)
             if (!wolf.Aggressive && wolf.Follow is not (FollowStage.Bold or FollowStage.Routed)
                 && wolf.Pos.DistanceTo(world.Player) < World.ScareRange

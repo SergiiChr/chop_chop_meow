@@ -78,7 +78,8 @@ public sealed class WolfCounter(World world) {
     }
 
     private bool ClearGround(Vector2 from, Vector2 to) =>
-        !world.Protected(to) && world.WolfSnap.ClearTo(from, to) == to;
+        (!world.Protected(to) || world.Protected(world.Player) && world.FullPackAt(world.Player)) &&
+        world.WolfSnap.ClearTo(from, to) == to;
 
     /// <summary>A clear path may close if a player or another wolf reaches it.</summary>
     private bool Crowded(Wolf wolf, Vector2 to, float heading) {

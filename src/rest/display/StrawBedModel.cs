@@ -4,9 +4,10 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-/// <summary>Pressed autumn leaves, kept together by a low rim of laid grass.</summary>
+/// <summary>A shallow, rounded mound of pressed leaves kept together by a rim of laid grass.</summary>
 internal static class StrawBedModel {
-    internal const float Top = .075f;
+    internal const float Top = .15f;
+    private const float Rim = .115f;
     private static ArrayMesh? mat;
     private static readonly StandardMaterial3D Straw = Vertex(Surface.Flat, .94f);
 
@@ -31,11 +32,13 @@ internal static class StrawBedModel {
         var leaves = new Color("885334");
         for (int i = 0; i < outline.Length; i++) {
             var a = outline[i]; var b = outline[(i + 1) % outline.Length];
-            var lowA = On(a, .01f); var lowB = On(b, .01f);
-            var lipA = On(a, .064f); var lipB = On(b, .064f);
+            var baseA = On(a * .87f, .005f); var baseB = On(b * .87f, .005f);
+            var bodyA = On(a, .067f); var bodyB = On(b, .067f);
+            var lipA = On(a * .97f, Rim); var lipB = On(b * .97f, Rim);
             var topA = On(a * .90f, Top); var topB = On(b * .90f, Top);
-            Tri(lowA, lipA, lipB, dirt); Tri(lowA, lipB, lowB, dirt);
-            Tri(lipA, topA, topB, woven); Tri(lipA, topB, lipB, woven);
+            Band(baseA, baseB, bodyA, bodyB, dirt);
+            Band(bodyA, bodyB, lipA, lipB, woven.Darkened(.18f));
+            Band(lipA, lipB, topA, topB, woven);
             Tri(topA, topB, Vector3.Up * Top, leaves);
         }
         var rng = new Random(93711);
@@ -49,7 +52,7 @@ internal static class StrawBedModel {
                 var middle = a.Lerp(b, (i + Rand()) / blades) + across * (Rand() - .7f) * .087f;
                 var axis = along.Rotated((Rand() - .5f) * 1.25f) * (.060f + Rand() * .104f);
                 var wing = axis.Orthogonal().Normalized() * (.005f + Rand() * .012f);
-                float y = .058f + Rand() * .034f;
+                float y = Rim - .006f + Rand() * .037f;
                 var endA = On(middle - axis, y - .009f); var endB = On(middle + axis, y - .01f);
                 var left = On(middle - wing, y); var right = On(middle + wing, y);
                 var raised = On(middle, y + .014f);
@@ -63,6 +66,9 @@ internal static class StrawBedModel {
 
         float Rand() => (float)rng.NextDouble();
         static Vector3 On(Vector2 p, float y) => new(p.X, y, p.Y);
+        void Band(Vector3 a, Vector3 b, Vector3 upperA, Vector3 upperB, Color color) {
+            Tri(a, upperA, upperB, color); Tri(a, upperB, b, color);
+        }
         void Blade(Vector3 a, Vector3 b, Vector3 c, Color color) {
             if ((c - a).Cross(b - a).Y < 0) (b, c) = (c, b);
             Tri(a, b, c, color);

@@ -288,6 +288,45 @@ public sealed class ActorRig {
     /// <summary>Where a fist is from the rig's root, under the pose just shown.</summary>
     public Vector3 Fist(bool left) => FromForearm(left, new Vector3(0, -build.Forearm, Palm));
 
+    /// <summary>Where the padded end of a support hand touches, measured from the rig's root.</summary>
+    internal const float HandPadReach = .04f;
+    internal Vector3 HandPad(bool left) => FromForearm(left, new Vector3(0, -build.Forearm - HandPadReach, Palm));
+
+    /// <summary>Places the ankle and shoe from the rig's root, bending the knee toward the rig's front.</summary>
+    internal void PlaceBoot(bool left, Vector3 ankle, Basis boot) {
+        var hip = left ? legL : legR;
+        var knee = left ? kneeL : kneeR;
+        var skin = left ? footL : footR;
+        var delta = ankle - hips.Transform * hip.Position;
+        var line = delta.Normalized();
+        const float thigh = ActorAnimation.Thigh;
+        float shin = build.Shin, reach = Math.Clamp(delta.Length(), Math.Abs(thigh - shin) + .001f, thigh + shin - .0001f);
+        // The knee lies on the circle where the two leg segments meet.
+        float along = (thigh * thigh - shin * shin + reach * reach) / (2 * reach);
+        var forward = Vector3.Back.Slide(line);
+        if (forward.LengthSquared() < .0001f) forward = Vector3.Up.Slide(line);
+        var toKnee = line * along + forward.Normalized() * MathF.Sqrt(Math.Max(0, thigh * thigh - along * along));
+        var upper = -toKnee.Normalized();
+        var lower = (toKnee - line * reach).Normalized();
+        var hinge = upper.Cross(lower).Normalized();
+        var thighBasis = new Basis(hinge, upper, hinge.Cross(upper));
+        var shinBasis = new Basis(hinge, lower, hinge.Cross(lower));
+        hip.Basis = hips.Basis.Transposed() * thighBasis;
+        knee.Basis = thighBasis.Transposed() * shinBasis;
+        skin.SetBonePoseRotation(1, knee.Quaternion);
+        skin.SetBonePoseRotation(2, (shinBasis.Transposed() * boot).GetRotationQuaternion());
+    }
+
+    /// <summary>The two ends of a drawn boot sole in the rig's root frame.</summary>
+    internal (Vector3 Toe, Vector3 Heel) BootSole(bool left) {
+        var hip = left ? legL : legR;
+        var knee = left ? kneeL : kneeR;
+        var skin = left ? footL : footR;
+        var foot = hips.Transform * hip.Transform * knee.Transform * skin.GetBonePose(2);
+        return (foot * new Vector3(0, -ActorAnimation.AboveSole, ActorAnimation.Toe),
+            foot * new Vector3(0, -ActorAnimation.AboveSole, -ActorAnimation.Heel));
+    }
+
     /// <summary>Where an elbow is from the rig's root, under the pose just shown.</summary>
     public Vector3 Elbow(bool left) => FromForearm(left, Vector3.Zero);
 

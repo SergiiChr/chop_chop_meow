@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 /// <summary>A bed laid on dry ground. Its age decides how long it lasts and whether taking it apart returns anything.</summary>
 internal static class StrawBed {
     internal const float HalfWidth = .42f, HalfLength = .94f;
-    internal const float LieDownSeconds = 1.25f;
+    internal const float LieDownSeconds = 1.65f;
     private const int LifeDays = 3;
     private const float Reach = 2;
 

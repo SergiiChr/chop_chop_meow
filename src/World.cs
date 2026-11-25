@@ -1189,7 +1189,7 @@ public sealed partial class World {
     }
     /// <summary>Finished goods plus anything neither the recipe the station is on nor the kept one takes.</summary>
     public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));
-    /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
+    /// <summary>Radius of a burning campfire's light, for drawing and wolf behavior.</summary>
     public const float FireReach = 5.3f;
     public bool Protected(Vector2 p) => FireLighting(p) != null;
     /// <summary>The nearest burning campfire lighting this point, or none outside the light.</summary>
@@ -1215,14 +1215,16 @@ public sealed partial class World {
     private List<float> torchSwings => S.Actor.TorchSwings;
     /// <summary>Seconds left of the brighter flare that follows a torch swing.</summary>
     public float TorchFlare { get => S.Actor.TorchFlare; private set => S.Actor.TorchFlare = value; }
-    /// <summary>Wolves close enough to the player to count toward a pack attack.</summary>
-    public int PackAround {
-        get {
-            int around = 0;
-            foreach (var w in S.Wolves) if (w.Pos.DistanceTo(Player) < StalkDistance * 2) around++;
-            return around;
-        }
+    /// <summary>Whether enough wolves are near this point to attack through a torch or campfire.</summary>
+    internal bool FullPackAt(Vector2 at) {
+        const float range = StalkDistance * 2;
+        int around = 0;
+        foreach (var w in S.Wolves)
+            if (w.Pos.DistanceSquaredTo(at) < range * range && ++around == PackSize) return true;
+        return false;
     }
+    /// <summary>Fire deters hunting wolves unless a full pack is near their prey.</summary>
+    internal bool FireDeters(Vector2 prey) => Protected(prey) && !FullPackAt(prey);
     /// <summary>A burning torch in hand, with the player out in the open, sets how wolves behave.</summary>
     internal bool Torchlit => S.TorchLit && !Downed && S.Sheltered == 0 && !Protected(Player);
     /// <summary>

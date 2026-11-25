@@ -1737,7 +1737,7 @@ public partial class WorldView : Node3D {
                 float hop = Math.Min(1, (1 - model.Recoiling / WolfModel.RecoilSeconds) / WolfModel.HopShare);
                 model.KnockBack = model.KnockBackFrom * (1 - hop);
             } else model.KnockBack = Vector2.Zero;
-            bool fire = wolf.Target != 0 && World.Protected(hunted);
+            bool fire = wolf.Target != 0 && World.FireDeters(hunted);
             bool follows = wolf.Following || fire;
             // A circling wolf turns its head to its player now and then.
             bool glances = (wolf.Follow == FollowStage.Circling || fire) && wolf.Flee <= 0 && (Elapsed + wolf.Id * WolfModel.GlanceApart) % WolfModel.GlanceEvery < WolfModel.GlanceSeconds;

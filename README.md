@@ -69,7 +69,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --steel-vessels` | Show a cabin's ladder and roof barrel, standing and stacked barrels, and vessels on the tool rack, with `--zoom`, `--camera-turn` and `--camera-pitch` for a closer look |
 | `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door), `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm) or `takedown` (the same with a player hurt enough to go down, pinned and fed on; the scene keeps them alive); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
-| `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
+| `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `campfire` (four circle the fire until a fifth closes in), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
 | `--showcase --straw-bed sleep` | Inspect a straw bed in the clearing: `model`, `sleep` or `wake`. Add `--panel` to see its controls. |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
@@ -160,7 +160,7 @@ meet (SSAO), and world sounds pan with their place on screen.
 The sky lights roofs and walls from above, with grass-coloured bounce from below.
 In the first-person preview, the visible sky changes colour with the time of day and shows the sun or moon.
 The picture is tonemapped with AgX, which keeps colours as light brightens.
-A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
+A burning campfire lights the circle that deters smaller wolf packs; other fixtures give light with no such safety.
 The ground has grain and bump from grass and rock photoscans under its own colours: meadow over the valley with soft
 lusher and drier patches, sparse broad patches of moss over gravelly earth, and stone on the mountain slopes.
 The woods along the mountains have a photoscan of forest floor with twigs and dead leaves, and where the ground is
@@ -1137,9 +1137,9 @@ An hour before dawn every wolf gives up and heads back to the nearest den.
 
 ### Fire
 
-When you reach the light of a burning campfire, wolves stop closing in and walk in circles outside the light,
-even if a full pack was already chasing you. Like a torch swing, this stops a bite a wolf is still gathering for,
-but a wolf already in the air finishes its leap.
+Fewer than five nearby wolves stop closing in when you reach a burning campfire and circle outside its light.
+Like a torch swing, the fire stops a bite a wolf is still gathering for, but one already in the air finishes its leap.
+Once five or more wolves are nearby, they attack through the firelight just as they do against a torch.
 One log burns about 4 in-game hours.
 A campfire with no wood left burns anyway while workers sit at it.
 Cabin windows glow but do not deter wolves; a campfire whose light reaches a cabin's door keeps them off the door.

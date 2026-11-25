@@ -60,7 +60,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Arrive("Straw bed review", 2).Pos = at + Vector2.Right * 35;
             world.Sleep.Start(bed);
             if (pose == "wake") {
-                var timer = new Timer { WaitTime = 1.85, OneShot = true, Autostart = true };
+                var timer = new Timer { WaitTime = StrawBed.LieDownSeconds + .60, OneShot = true, Autostart = true };
                 timer.Timeout += world.Sleep.Wake;
                 view.AddChild(timer);
             }

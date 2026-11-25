@@ -24,11 +24,12 @@ public partial class Game {
         Require(guest.Pos.DistanceTo(NetHut + new Vector2(2, .34f)) < .18f, "the guest should enter from the rotated doorstep");
         Hosted.As(guest, Hosted.Doorways.TurnKey);
         RunUntilPhase(Hosted, .65f);
+        Hosted.S.Wolves.Clear();
+        ShutDens(Hosted);
         SetNeeds(Hosted, 100, 100, 50); SetNeeds(guest, 100, 100, 50);
         Signal("cabin-wake-ready");
         await Signaled("cabin-guest-woke");
         SetNeeds(guest, 100, 100, 50);
-        Hosted.Add(ThingKind.Campfire, NetStrawBed + Vector2.Down * 2).Burn = Hosted.Data.DaySeconds;
         var home = Hosted.Player;
         Warp(Hosted, NetStrawBed + Vector2.Right * 1.5f);
         // The earlier tree scene moves several days forward, so lay the three-day bed only now.
