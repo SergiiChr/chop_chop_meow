@@ -112,7 +112,7 @@ Simulation and data:
 | `src/pipes/Plumbing.cs` | Connected pipes, standing water and how buildings share and store the supply |
 | `src/pipes/WaterPumps.cs` | Player and worker pump strokes, pressure loss and flow per simulation tick |
 | `src/pipes/display/PipeLayerView.cs`, `src/pipes/display/PipeGround.cs` | Underground view and placement preview |
-| `src/pipes/display/PipePanel.cs` | A laid pipe's standing water and pressure |
+| `src/pipes/display/PipePanel.cs` | A laid pipe's standing liquid and available flow rate |
 | `src/pipes/display/WaterPumpPanel.cs`, `src/pipes/display/PressureGauge.cs` | Pump control, job assignment and dial |
 | `src/pipes/display/WaterPumpProp.cs` | The pump handle's movement in the world |
 | `src/pipes/display/SteelPipeShape.cs`, `src/pipes/display/WaterPumpShape.cs` | Steel pipes, hand pump and lever |
@@ -920,7 +920,7 @@ The windup and fixed bearing work as in a snap. This leap can start further away
 air for `World.LeapSeconds`.
 A miss leaves the wolf recovering on the ground. Contact knocks the player onto their back and the wolf stands over them.
 The pinned state (`SaveState.Mauled`) blocks movement and actions and drains health while the pack feeds.
-The death that follows strips food from the recovery box, as does a death with a hunting wolf within `LeapRange`, such as one bitten down behind a torch.
+The death that follows strips food from the recovery box, as does a death with a hunting wolf within `LeapRange`, such as one bitten down behind a torch. Empty jam bottles remain in the box.
 
 Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the stone furnace cooks into edible meat.
 
@@ -1303,7 +1303,7 @@ When pumps stop supplying water, consumers can still draw the water left in the 
 Each pipe's liquid is saved and sent to guests separately from its shape and rotation.
 Taking out a pipe spills the liquid it held, while the two sides keep theirs.
 Building a link between lines that contain different liquids is refused.
-`World.PipeReading` reports a tile's standing liquid and the highest pressure from connected pumps or barrels.
+`World.PipeReading` reports a tile's standing liquid and the highest available flow rate in L/s from connected pumps or barrels.
 A barrel supplies 1 L/s plus 0.1 L/s per liter it holds, filling its pipe line even without a receiver.
 A supply barrel keeps its liquid in the line rather than taking it back when the barrel empties.
 When a lake pump is off, barrels balance at the difference in their rates.
@@ -1416,7 +1416,7 @@ It stays when the pile empties, and `SetFilter` and `ClearFilters` refuse to cha
 
 `World.SetCompost` turns only an empty pile with no filter into compost.
 A compost pile (`Thing.Compost`) instead takes `Compostable` items (leaves, grass and anything with `food`) and gives `fertilizer`.
-It turns `CompostBatch` of them into one fertilizer each in-game hour.
+It turns `CompostBatch` of them into one fertilizer each in-game hour. Empty jam bottles remain in the pile.
 It keeps the player's filters rather than setting its own, and `Thing.SkipFood` keeps workers from delivering food to it.
 `DepositFor` ranks compost last for food, so harvests and berries go to storage first.
 
@@ -1617,7 +1617,7 @@ The two worker stages take `StageWorkdays` of `GameData.WorkdaySeconds`.
 The player holding a gather on the mine (`World.Gather`, standing at `Mines.WorkSpot`) adds to the same progress with a pickaxe or hammer carried (`Mines.Work`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
 
-Up to `Mine.Workers` workers can be assigned to `JobKind.Mine`. Build and Haul jobs do not count toward this limit.
+Up to `Mine.Workers` workers can be assigned to `JobKind.Mine`. Build and Haul jobs do not count toward this limit. `World.Assign` skips Mine when no slot is available and still adds Build and Haul.
 Miners work underground (`WorkerWorkState.Underground`, hidden by the view).
 Each adds one ore and one stone to the mine's two-slot `Thing.Output` every `Mine.Seconds`.
 Mining stops while either slot holds a full stack.

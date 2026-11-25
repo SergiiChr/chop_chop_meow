@@ -16,7 +16,7 @@ public partial class Game {
         await TestClean(CheckLayerButtonSitsBelowTheHealthVial);
         await TestClean(CheckLayerCanSwitchWithAShovelSelected);
         await TestClean(CheckClickingALaidPipeReturnsTheHeldStack);
-        await TestClean(CheckOpenPipeReadoutTracksWaterAndPressure);
+        await TestClean(CheckOpenPipeReadoutTracksWaterAndFlow);
         await TestClean(CheckPipeJunctionCanBeSelectedByItsArms);
         await TestClean(CheckPuttingPipesInThePlumbingSlotInstallsAndRefundsThem);
         await TestClean(CheckSprinklersFollowWaterDelivery);
@@ -204,7 +204,7 @@ public partial class Game {
     }
 
     /// <summary>An open pipe readout and its mesh follow the same pipe from empty through wet, full, settled water and drained.</summary>
-    private async Task CheckOpenPipeReadoutTracksWaterAndPressure() {
+    private async Task CheckOpenPipeReadoutTracksWaterAndFlow() {
         var home = world.Player;
         var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
         var tile = Terrain.TileAt(bank + Vector2.Down * 1.1f);
@@ -216,7 +216,7 @@ public partial class Game {
         var layerControl = (Button)ui.FindChild("layer", true, false);
         await Click(layerControl);
         await Click(view.Screen(tile, PipeGround.FloorY + .1f));
-        Require(HasLabel(panel, "Empty · 0/1 L") && HasLabel(panel, "Pressure 0%"), "A dry pipe should show no water and no pressure.");
+        Require(HasLabel(panel, "Empty · 0/1 L") && HasLabel(panel, "0 L/s"), "A dry pipe should show no water and zero available flow.");
 
         var pipe = ModelSteps.AllMeshes(view.FindChild("Underground", true, false)!)
             .Single(mesh => mesh.Position == WorldView.To3(tile));
@@ -232,11 +232,11 @@ public partial class Game {
         LayPipe(Hosted, tankTile, Mathf.Pi / 2);
         for (int i = 0; i < 10; i++) Hosted.Pump(pump);
         Hosted.Tick(.65f);
-        await Until(() => HasLabel(panel, "Full · 1/1 L") && HasLabel(panel, "Pressure 100%"),
-            "the inspected pipe filling and displaying pump pressure", 2);
+        await Until(() => HasLabel(panel, "Full · 1/1 L") && HasLabel(panel, "5 L/s"),
+            "the inspected pipe filling and displaying five liters per second", 2);
         Hosted.Tick(11);
-        await Until(() => HasLabel(panel, "Full · 1/1 L") && HasLabel(panel, "Pressure 0%"),
-            "the inspected pipe retaining its water as pressure falls", 2);
+        await Until(() => HasLabel(panel, "Full · 1/1 L") && HasLabel(panel, "0 L/s"),
+            "the inspected pipe retaining its water after its supply stops", 2);
 
         Require(pipe.MaterialOverride == wet, "Standing water should keep its blue color after pressure falls to zero.");
         PlumbingSteps.InstallPlumbing(Hosted, tank);

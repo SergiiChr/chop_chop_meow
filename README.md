@@ -189,7 +189,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | H | Open the crew overview |
 | 1–9 or click a hotbar slot | Select and outline that slot. Start placement if it holds a plan or placeable container |
 | Pick up a plan or backpack item and click a hotbar slot | Assign it to that slot |
-| Layer button below the status bar | Switch between the surface and underground. Underground, click a pipe to see its water and pressure |
+| Layer button below the status bar | Switch between the surface and underground. Underground, click a pipe to see its contents and flow rate |
 | Space with a reinforced furnace or water pump selected | Walk into position if needed and pump once |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
@@ -826,7 +826,7 @@ Piles are walkable and snap edge to edge to a pile beside them, so they line up 
 ### Compost
 
 The compost switch in the header of an empty pile with no filter makes it take leaves, grass and any food, cooked, raw or half-made, and turn 4 of them into 1 fertilizer every in-game hour.
-It keeps its own filters.
+It keeps its own filters. An empty bottle stays in the pile after its jam composts.
 
 Workers bring leaves and grass to it first, and food only when no other storage takes it.
 **Skip food delivery** stops food deliveries, while food put in by hand still composts.
@@ -976,7 +976,7 @@ A closed tap can have a full pipe at its inlet.
 When pressure falls to zero, water stays in the pipes for the next building that needs it.
 Cutting a line leaves the water in each surviving section.
 Click the round Layer button below the left side of the status bar to switch between the surface and underground.
-Click a laid pipe underground to see what it holds and its current pressure.
+Click a laid pipe underground to see what it holds and its available flow rate in L/s.
 The remove tool still switches layers with right-click and takes up a pipe or a surface object with left-click.
 
 ## Gravel paths
@@ -1148,7 +1148,7 @@ The entrance is dug at the rock face beside the cave mouth, so you and the worke
 Workers take the pickaxe and hammer from a tool station.
 
 Up to 3 workers can be assigned to Mine. They mine out of sight underground with pickaxes.
-Build and Haul jobs do not use those slots.
+Build and Haul jobs do not use those slots. Assigning a worker to a mine with all three slots taken still gives them Build and Haul.
 The cart goes underground with them, and the lantern on the frame lights the area like a torch.
 When nobody is working, the cart stands outside, loaded once there is output.
 
@@ -1291,7 +1291,7 @@ A player left inside goes on seeing the other one dragged out for a moment befor
 
 At half health or less, away from fire and shelter, a nearby wolf crouches for a longer leap at your throat.
 You can step clear of this leap too. If it catches you, the wolf pins you, the pack rushes in to feed and you die within seconds.
-A wolf kill, by a pin or a bite, destroys all food in the recovery box; after a pin the pack keeps feeding until you respawn.
+Wolves that kill you by a pin or a bite eat your food, but leave empty jam bottles in the recovery box. After a pin the pack keeps feeding until you respawn.
 
 A slain wolf falls over and leaves a carcass that lasts until it is butchered: hold right mouse on it for 4 raw meat.
 

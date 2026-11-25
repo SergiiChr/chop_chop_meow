@@ -9,6 +9,13 @@ namespace ChopChopMeow;
 /// and taken out only into vessels with room for them.
 /// </summary>
 public sealed partial class World {
+    /// <summary>Spends items, leaving each refillable vessel empty in its cell.</summary>
+    private int SpendContents(Inventory box, string item, int count) {
+        if (Data.VesselOf(item) is not VesselDef vessel || vessel.LitersIn(item) <= 0) return box.Remove(item, count);
+        int emptied = 0;
+        while (emptied < count && box.ReplaceOne(item, vessel.Empty)) emptied++;
+        return emptied;
+    }
     /// <summary>
     /// Pours up to <paramref name="vessels"/> vessels of one fill from one box into another, each all it holds while room and <paramref name="liters"/> last.
     /// Each vessel stays in its own cell, emptier; returns how many vessels poured.

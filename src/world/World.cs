@@ -448,8 +448,8 @@ public sealed partial class World {
     public Beach Beach { get; }
     public SteelPipes SteelPipes { get; }
     private readonly Plumbing plumbing;
-    /// <summary>Standing liters in a pipe and pressure from the pumps attached to its connected pipes.</summary>
-    public (float Liters, float Pressure) PipeReading(Vector2I tile) => plumbing.Reading(tile);
+    /// <summary>Standing liters in a pipe and the highest flow rate in liters per second available from its connected sources.</summary>
+    public (float Liters, float FlowRate) PipeReading(Vector2I tile) => plumbing.Reading(tile);
     public string? PipeLiquid(Vector2I tile) => Terrain.OnMap(tile) ? SteelPipes.LiquidAt(Terrain.TileIndex(tile)) : null;
     internal bool PipesWouldMix(Vector2I tile, int connections) => plumbing.WouldMix(tile, connections);
     /// <summary>Mines: marking one at a cliff, building it in stages and working it underground.</summary>
@@ -1440,7 +1440,7 @@ public sealed partial class World {
         Doorways.UnlockEmpty(cabin);
         // A wolf that pinned the player, or bit them down without a leap, eats every scrap of food.
         bool wolfKill = S.Mauled || Hunters.Any(w => w.Pos.DistanceTo(Player) < LeapRange);
-        if (wolfKill) foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
+        if (wolfKill) foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) SpendContents(box.Inventory, item, box.Inventory[item]);
         const string ate = "Wolves ate food in your backpack.";
         // A pack that pinned the player stays to feed until they respawn.
         if (S.Mauled) { Say(ate); return; }
@@ -2000,7 +2000,7 @@ public sealed partial class World {
         pile.Progress += dt;
         if (pile.Progress < Data.HourSeconds) return;
         pile.Progress = 0;
-        for (int left = CompostBatch; left > 0;) left -= pile.Inventory.Remove(pile.Inventory.Items.Keys.First(Compostable), left);
+        for (int left = CompostBatch; left > 0;) left -= SpendContents(pile.Inventory, pile.Inventory.Items.Keys.First(Compostable), left);
         pile.Inventory.Add("fertilizer", 1); Got("fertilizer");
     }
     // Only chests, piles and placed crates take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.

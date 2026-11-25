@@ -196,12 +196,16 @@ public static class WolfChecks {
         var world = TorchNight(data);
         SetNeeds(world, health: 5);
         Give(world, "berries", 3); Give(world, "wood", 4);
+        Give(world, BerryJam.Bottle); Give(world, BerryJam.Bottles[1]);
         PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
         for (int i = 0; i < 30 && !world.Dead; i++) world.Tick(.1f);
         Require(world.Dead && !world.Mauled, "a wolf's bite should kill a player on 5 health without pinning them");
         var box = world.Things.Single(t => t.Kind == ThingKind.Grave);
         Require(box.Inventory["berries"] == 0, "a wolf that bites a player to death should eat their berries");
         Require(box.Inventory["wood"] == 4, "a wolf that bites a player to death should leave the rest in the recovery box");
+        Require(box.Inventory[BerryJam.Bottle] == 0 && box.Inventory[BerryJam.Bottles[1]] == 0,
+            "wolves should eat all the jam in the recovery box");
+        Require(box.Inventory[Water.Empty] == 2, "wolves should leave a bottle for each full or partly full jam bottle they emptied");
     }
 
     private static void CheckAWolfThatFindsAPlayerInSightGoesForThemWithoutAHowl(GameData data) {

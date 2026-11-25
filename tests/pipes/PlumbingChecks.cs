@@ -62,14 +62,14 @@ public static class PlumbingChecks {
 
         PumpFully(world, pump);
         world.Tick(1);
-        Require(world.PipeReading(pumpTile) == (1, 100), "The source pipe should hold pressurized water.");
+        Require(world.PipeReading(pumpTile) == (1, 5), "The source pipe should hold pressurized water.");
         Require(world.PipeReading(barrelTile) == (0, 0) && barrel.Inventory[Water.Liquid] == 0,
             "Water and pressure should stop where the two lines meet only at a corner.");
 
         LayPipe(world, pumpTile + Vector2I.Down, Mathf.Pi, PipeShape.Tee);
         PumpFully(world, pump);
         world.Tick(1);
-        Require(world.PipeReading(barrelTile) == (1, 100) && barrel.Inventory[Water.Liquid] == 2,
+        Require(world.PipeReading(barrelTile) == (1, 5) && barrel.Inventory[Water.Liquid] == 2,
             "A turn with matching side openings should carry water and pressure to the barrel.");
     }
 
@@ -83,7 +83,7 @@ public static class PlumbingChecks {
 
         PumpFully(world, pump);
         world.Tick(1);
-        Require(barrel.Inventory[Water.Liquid] == 1 && world.PipeReading(EastTankTile) == (1, 22),
+        Require(barrel.Inventory[Water.Liquid] == 1 && world.PipeReading(EastTankTile) == (1, 1.1f),
             "An isolated nonempty barrel must keep the liter in its pipe pressurized without drawing from the pump.");
         LayPipe(world, tile, Mathf.Pi / 2);
         world.Tick(.5f);
@@ -148,10 +148,10 @@ public static class PlumbingChecks {
         }
         Require(barrel.Inventory[Water.Liquid] == 50 && !barrel.ReceivingWater,
             "A full barrel cannot accept any more water.");
-        Require(world.PipeReading(EastTankTile) == (1, 120),
+        Require(world.PipeReading(EastTankTile) == (1, 6),
             "The full barrel should raise the pipe to six liters per second, above the pump's maximum.");
         world.Tick(10);
-        Require(world.PipeReading(EastTankTile) == (1, 120) && pump.Pressure == 0,
+        Require(world.PipeReading(EastTankTile) == (1, 6) && pump.Pressure == 0,
             "A full barrel must keep its pipe pressurized after the pump stops.");
     }
 
@@ -167,7 +167,7 @@ public static class PlumbingChecks {
             "Both sections should keep their own standing water after a pipe between them is removed.");
         InstallPlumbing(world, barrel);
         world.Tick(.125f);
-        Require(barrel.Inventory[Water.Liquid] == 1 && world.PipeReading(EastTankTile) == (0, 22)
+        Require(barrel.Inventory[Water.Liquid] == 1 && world.PipeReading(EastTankTile) == (0, 1.1f)
             && world.PipeReading(JunctionTile) == (1, 0),
             "An empty barrel should take standing water only from its own pipe, then provide pressure.");
 

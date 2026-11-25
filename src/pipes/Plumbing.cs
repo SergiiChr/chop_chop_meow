@@ -36,19 +36,19 @@ public sealed class Plumbing(World world, Barrels barrels) {
     private readonly List<Network> active = [], groups = [];
     private int revision = -1, contentsRevision = -1;
 
-    internal (float Liters, float Pressure) Reading(Vector2I tile) {
+    internal (float Liters, float FlowRate) Reading(Vector2I tile) {
         RefreshNetworks();
         if (NetworkAt(tile) is not Network network) return default;
-        float pressure = 0;
+        float flow = 0;
         foreach (var pump in world.ThingsOf(ThingKind.Pump))
-            if (network.Liquid != BerryJam.Liquid && pump.Pressure > pressure && NetworkAt(Terrain.TileAt(pump.Pos)) == network)
-                pressure = pump.Pressure;
+            if (network.Liquid != BerryJam.Liquid && pump.FlowRate > flow && NetworkAt(Terrain.TileAt(pump.Pos)) == network)
+                flow = pump.FlowRate;
         foreach (var barrel in world.ThingsOf(ThingKind.Barrel)) {
             if (!barrel.PlumbingInstalled || NetworkAt(Terrain.TileAt(barrel.Pos)) != network) continue;
             if (SupplyLiquid(barrel) is string liquid && (network.Liquid == null || network.Liquid == liquid))
-                pressure = Math.Max(pressure, (float)(BarrelRate(Supply(barrel, liquid)) / .05));
+                flow = Math.Max(flow, (float)BarrelRate(Supply(barrel, liquid)));
         }
-        return ((float)world.SteelPipes.LitersAt(Terrain.TileIndex(tile)), pressure);
+        return ((float)world.SteelPipes.LitersAt(Terrain.TileIndex(tile)), flow);
     }
 
     /// <summary>Whether a pipe would join lines that already hold different liquids.</summary>

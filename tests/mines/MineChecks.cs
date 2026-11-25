@@ -20,6 +20,7 @@ public static class MineChecks {
         Test(CheckPlayerDigsAndFitsAMineWithTheirTools, data);
         Test(CheckPlayerDeliversOnlyWhatAMineStillNeeds, data);
         Test(CheckHaulAndBuildDoNotUseMiningSlots, data);
+        Test(CheckFullMineAssignsSurfaceJobs, data);
         Test(CheckMinersBringOreOutAndStopWhenOutputIsFull, data);
         Test(CheckOnlyAvailableMinersUnload, data);
         Test(CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload, data);
@@ -197,18 +198,35 @@ public static class MineChecks {
         Require(World.HasDuty(lateHauler, mine.Id, JobKind.Mine), "a hauler can also mine once a mining slot is free");
     }
 
+    private static void CheckFullMineAssignsSurfaceJobs(GameData data) {
+        var world = FundedWorld(data);
+        var mine = MarkMine(world);
+        var miners = Enumerable.Range(0, 3).Select(_ => AddWorker(world, world.Player)).ToArray();
+        foreach (var miner in miners) world.SetDuty(miner, mine, JobKind.Mine, true);
+
+        var helper = AddWorker(world, world.Player);
+        world.Assign(helper, mine);
+        Require(World.HasDuty(helper, mine.Id, JobKind.Build) && World.HasDuty(helper, mine.Id, JobKind.Haul),
+            "assigning a worker to a full mine must still give them Build and Haul");
+        Require(!World.HasDuty(helper, mine.Id, JobKind.Mine), "bulk assignment must not give a fourth worker a mining slot");
+
+        world.Assign(miners[0], mine);
+        Require(miners.All(w => World.HasDuty(w, mine.Id, JobKind.Mine)),
+            "assigning a current miner to the same full mine must preserve their mining slot");
+    }
+
     private static void CheckMinersBringOreOutAndStopWhenOutputIsFull(GameData data) {
         var world = FundedWorld(data);
         var mine = MarkMine(world);
         mine.MineStage = MineStage.Open;
         var cliff = Cliff.Nearest(mine.Pos);
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3));
-        var crew = Enumerable.Range(0, 4).Select(_ => AddWorker(world, chest.Pos + cliff.Along)).ToList();
+        var crew = Enumerable.Range(0, 3).Select(_ => AddWorker(world, chest.Pos + cliff.Along)).ToList();
         foreach (var w in crew) { w.Tool = "steel_pick"; world.Assign(w, mine); }
-        Require(crew.Take(3).All(w => w.Assignment == mine.Id) && crew[3].Assignment == 0, "a mine must take three workers and refuse a fourth");
+        Require(crew.All(w => World.HasDuty(w, mine.Id, JobKind.Mine)), "a mine must take three miners");
 
         Work(world, 20);
-        Require(crew.Take(3).All(w => w.WorkState == WorkerWorkState.Underground && !world.Sees(w)), "miners must work out of sight underground");
+        Require(crew.All(w => w.WorkState == WorkerWorkState.Underground && !world.Sees(w)), "miners must work out of sight underground");
         int ore = mine.Output!["iron_ore"];
         Require(ore > 0 && ore == mine.Output["stone"], "a mine must bring out ore and rocks together");
 

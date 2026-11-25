@@ -164,12 +164,14 @@ public sealed partial class World {
         return 0;
     }
 
-    /// <summary>Puts a worker on every job at one place, instead of whatever they did before, or takes all their jobs away.</summary>
+    /// <summary>Puts a worker on the available jobs at one place, instead of whatever they did before, or takes all their jobs away.</summary>
     public void Assign(Worker w, Thing? target) {
-        if (target != null && (TreePlanting.IsYoung(target) || NoMiningRoom(w, target))) return;
+        if (target != null && TreePlanting.IsYoung(target)) return;
         if (Busy() || Forwarded(Verb.Assign, target?.Id ?? 0, w.Id)) return;
+        bool mineFull = target != null && NoMiningRoom(w, target);
         w.Jobs.Clear(); ListChanged(w);
-        if (target != null) foreach (var job in Jobs(target)) GiveDuty(w, target, job);
+        if (target != null) foreach (var job in Jobs(target))
+            if (job != JobKind.Mine || !mineFull) GiveDuty(w, target, job);
         Started(w, target);
     }
 
