@@ -16,6 +16,7 @@ internal static class GlassJarChecks {
         Test(CheckGlassPausesOutsideTheHeatWindowAndNeedsTenSecondsInIt, data);
         Test(CheckGlassMeltsOnlyAfterMoreThanHalfASecondOfContinuousOverheat, data);
         Test(CheckGlassWorkSurvivesSaveAndLoad, data);
+        Test(CheckFullJarOutputDoesNotHoldTheBlower, data);
         Test(CheckSteelStillTakesEightHeatFromASideStroke, data);
     }
 
@@ -168,6 +169,24 @@ internal static class GlassJarChecks {
         TickGlassAt(loaded, copy, 80, 44);
         Require(copy.Inventory[GlassBlowing.Item] == 1,
             "Cooling a restored batch should let it finish without another load of sand or coal.");
+    }
+
+    private static void CheckFullJarOutputDoesNotHoldTheBlower(GameData data) {
+        var world = EmptyWorld(data);
+        var forge = GlassFurnace(world, Terrain.Spawn + new Vector2(6, 6));
+        HireAtGlassFurnace(world, forge, JobKind.Bellows);
+        world.Player = forge.ToWorld(GlassBlowing.BlowStand);
+        int full = forge.Inventory.SlotRoom(GlassBlowing.Item);
+        forge.Inventory.Add(GlassBlowing.Item, full);
+        TickGlassAt(world, forge, 80, 44);
+        Require(forge.Processing && forge.Progress == GlassBlowing.Seconds && forge.GlassBlower == 0,
+            "A completed jar should wait for output room without holding the blower in place.");
+
+        world.Player = forge.Pos + Vector2.Right * 3;
+        Require(world.Transfer(forge.Inventory, world.Backpack, GlassBlowing.Item, 1) == 1, "Take one jar from the full stack.");
+        TickGlassAt(world, forge, 80, 1);
+        Require(!forge.Processing && forge.GlassBlower == 0 && forge.Inventory[GlassBlowing.Item] == full,
+            "The completed jar should fill the freed space even after the blower walks away.");
     }
 
     public static void CheckAWorkingGlassCrewAllocatesNothing(GameData data) {

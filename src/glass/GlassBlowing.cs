@@ -45,6 +45,8 @@ internal sealed class GlassBlowing(World world) {
 
     internal void Tick(Thing forge, RecipeDef recipe, float dt, bool wasBurning) {
         if (forge.Processing && forge.Progress >= recipe.Seconds) {
+            // The jar is already formed. Let its blower go while it waits for a full output slot.
+            forge.GlassBlower = 0;
             if (world.FinishStationBatch(forge, recipe)) Finish(forge, GlassResult.Success);
             return;
         }
@@ -68,7 +70,9 @@ internal sealed class GlassBlowing(World world) {
         if (!paired) forge.GlassBlower = 0;
         if (!paired || forge.Heat < MinHeat) return;
         forge.Progress = Math.Min(recipe.Seconds, forge.Progress + dt);
-        if (forge.Progress >= recipe.Seconds && world.FinishStationBatch(forge, recipe)) Finish(forge, GlassResult.Success);
+        if (forge.Progress < recipe.Seconds) return;
+        if (world.FinishStationBatch(forge, recipe)) Finish(forge, GlassResult.Success);
+        else forge.GlassBlower = 0;
     }
 
     /// <summary>The sand and fuel are already spent. A lost batch still owes the jar that was queued.</summary>
