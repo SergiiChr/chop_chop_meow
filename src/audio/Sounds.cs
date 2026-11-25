@@ -6,13 +6,16 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// One-shot sound effects from <c>assets/sounds</c>.
-/// A sound named <c>x</c> is <c>x.mp3</c>, or the variants <c>x_1.mp3</c>, <c>x_2.mp3</c> and so on.
+/// Sound effects from <c>assets/sounds</c>.
+/// A sound named <c>x</c> is <c>x.mp3</c>, <c>x.wav</c> for a held sound, or the variants <c>x_1.mp3</c>, <c>x_2.mp3</c> and so on.
 /// Each play picks a variant other than the previous one and nudges its pitch and volume, so repeated actions do not sound mechanical.
+/// A held sound loops for as long as its source keeps holding it (<see cref="Hold"/>).
 /// Day and night music crossfade when the time of day changes, and each resumes where it last stopped.
 /// </summary>
 public partial class Sounds : Node {
     private const string Folder = "res://assets/sounds";
+    // A sound is an MP3, or a WAV for a held sound: that starts at a random moment, and an MP3 decodes from its beginning to get there, which stalls the frame by up to 9 ms.
+    private static readonly string[] Formats = ["mp3", "wav"];
     // A sound with a world position is loudest at the player and fades to silence this many metres away, whatever the zoom.
     private const float Reach = 16;
     // A sound this close to the player plays with no place, so it stays centred while they walk on.
@@ -72,6 +75,7 @@ public partial class Sounds : Node {
         ["wolf_bite"] = -3,
         ["tug_scream"] = -5,
         ["takedown_scream"] = -5,
+        ["sting_groan"] = -9,
         ["wolf_hit"] = -5.5f,
     };
     /// <summary>
@@ -126,12 +130,21 @@ public partial class Sounds : Node {
     private readonly List<AudioStreamPlayer3D> placedVoices = new();
     private const int VoiceCount = 24;
     private int nextVoice, nextPlacedVoice;
+    // Players for held sounds, kept apart from the others so a burst of one-shots never cuts a held sound off.
+    // Four of each kind: one held sound a player in a full game, with no place or placed.
+    private const int HeldVoiceCount = 4;
+    private readonly List<AudioStreamPlayer> heldVoices = new();
+    private readonly List<AudioStreamPlayer3D> heldPlacedVoices = new();
+    private readonly Dictionary<int, HeldSound> held = new();
+    // Seconds a held sound takes to fade in when it starts and out once let go, so it neither clicks on nor cuts off.
+    private const float HeldFadeSeconds = .15f;
 
     public override void _Ready() {
         for (int i = 0; i < VoiceCount; i++) { var voice = new AudioStreamPlayer(); AddChild(voice); voices.Add(voice); }
-        for (int i = 0; i < VoiceCount; i++) {
-            var voice = new AudioStreamPlayer3D { AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0, DopplerTracking = AudioStreamPlayer3D.DopplerTrackingEnum.Disabled };
-            AddChild(voice); placedVoices.Add(voice);
+        for (int i = 0; i < VoiceCount; i++) placedVoices.Add(PlacedVoice());
+        for (int i = 0; i < HeldVoiceCount; i++) {
+            var voice = new AudioStreamPlayer(); AddChild(voice); heldVoices.Add(voice);
+            heldPlacedVoices.Add(PlacedVoice());
         }
         day = new Track(this, "path_to_lake_land", "mystic_theme");
         night = new Track(this, "forest");
@@ -139,11 +152,20 @@ public partial class Sounds : Node {
         foreach (string name in Levels.Keys) Variants(name);
     }
 
-    public override void _Process(double delta) => UpdateMusic((float)delta);
+    private AudioStreamPlayer3D PlacedVoice() {
+        var voice = new AudioStreamPlayer3D { AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0, DopplerTracking = AudioStreamPlayer3D.DopplerTrackingEnum.Disabled };
+        AddChild(voice);
+        return voice;
+    }
+
+    public override void _Process(double delta) {
+        UpdateMusic((float)delta);
+        UpdateHeld((float)delta);
+    }
 
     /// <summary>Fades the track for the current time of day in and the other out.</summary>
     public void UpdateMusic(float dt) {
-        float volume = MusicDb + Mathf.LinearToDb(Math.Max(MusicVolume, .0001f));
+        float volume = MusicDb + Db(MusicVolume);
         day.Update(!World.Night, dt, volume);
         night.Update(World.Night, dt, volume);
     }
@@ -210,9 +232,9 @@ public partial class Sounds : Node {
         if (!Audible(cue.Name, at)) return;
         var streams = Variants(cue.Name);
         var place = at ?? World.Player;
-        float away = World.Player.DistanceTo(place), fade = MathF.Pow(1 - Math.Min(1, away / ReachOf(cue.Name)), 2);
-        bool placed = away > OwnSpot;
-        float volume = Levels.GetValueOrDefault(cue.Name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
+        float fade = DistanceFade(cue.Name, place);
+        bool placed = InPlace(place);
+        float volume = Levels.GetValueOrDefault(cue.Name) + Mathf.LinearToDb(fade) - Nudge();
         if (placed) {
             var source = FreeVoice(placedVoices, ref nextPlacedVoice, static voice => voice.Playing);
             source.Position = new Vector3(place.X, 0, place.Y);
@@ -223,8 +245,7 @@ public partial class Sounds : Node {
             player.Stream = streams[cue.Variant]; player.PitchScale = cue.Pitch; player.VolumeDb = volume;
             player.Play();
         }
-        recent[Played % recent.Length] = cue.Name;
-        Played++; Last = cue.Name; LastFade = fade; LastPlaced = placed;
+        Started(cue.Name, fade, placed);
     }
 
     /// <summary>The next idle player in turn; with all of them busy, the next in turn is cut off.</summary>
@@ -240,6 +261,101 @@ public partial class Sounds : Node {
         return oldest;
     }
 
+    /// <summary>The volume scale of a sound played at <paramref name="place"/>, from one at the player to zero at its reach.</summary>
+    private float DistanceFade(string name, Vector2 place) => MathF.Pow(1 - Math.Min(1, World.Player.DistanceTo(place) / ReachOf(name)), 2);
+
+    /// <summary>Whether a sound at <paramref name="place"/> plays from there, rather than with no place at the player's own spot.</summary>
+    private bool InPlace(Vector2 place) => World.Player.DistanceTo(place) > OwnSpot;
+
+    /// <summary>A volume scale in decibels, with zero as silence.</summary>
+    private static float Db(float scale) => Mathf.LinearToDb(Math.Max(scale, .0001f));
+
+    /// <summary>Decibels taken off one play, so repeats of a sound differ a little in volume.</summary>
+    private float Nudge() => (float)random.NextDouble() * 1.5f;
+
+    private void Started(string name, float fade, bool placed) {
+        recent[Played % recent.Length] = name;
+        Played++; Last = name; LastFade = fade; LastPlaced = placed;
+    }
+
+    /// <summary>
+    /// Keeps a looping sound going for <paramref name="source"/>, one sound a source; the caller holds it again every frame it
+    /// should go on, and once it stops it fades out.
+    /// It starts at a random moment of its recording, fading in, and plays from <paramref name="at"/> as
+    /// <see cref="Play(string, Vector2?, float)"/> does, or with no place when that is null or within a metre of the player.
+    /// Its recording is a WAV imported to loop, since a WAV starts anywhere in it at no cost.
+    /// </summary>
+    public void Hold(string name, int source, Vector2? at = null) {
+        if (held.TryGetValue(source, out var sound) && sound.Name == name) { sound.At = at; sound.Kept = true; return; }
+        if (sound != null) Let(source);
+        if (!Audible(name, at)) return;
+        bool inPlace = InPlace(at ?? World.Player);
+        var own = inPlace ? null : heldVoices.FirstOrDefault(Free);
+        var placed = inPlace ? heldPlacedVoices.FirstOrDefault(Free) : null;
+        if (own == null && placed == null) return;
+        var cue = Next(name);
+        var stream = Variants(name)[cue.Variant];
+        held[source] = sound = new HeldSound(name, own, placed, Nudge()) { At = at, Kept = true };
+        Place(sound);
+        sound.Start(stream, cue.Pitch, (float)(random.NextDouble() * stream.GetLength()));
+        Started(name, DistanceFade(name, at ?? World.Player), inPlace);
+    }
+
+    /// <summary>Whether a sound of this name is playing as a held sound, fading out included.</summary>
+    public bool Holding(string name) => held.Values.Any(sound => sound.Name == name);
+
+    private bool Free(Node voice) => !held.Values.Any(sound => sound.Own == voice || sound.Placed == voice);
+
+    /// <summary>Fades each held sound in while held and out once let go, and follows its source as it moves.</summary>
+    private void UpdateHeld(float dt) {
+        foreach (var (source, sound) in held) {
+            sound.Fade = Mathf.MoveToward(sound.Fade, sound.Kept ? 1 : 0, dt / HeldFadeSeconds);
+            if (!sound.Kept && sound.Fade == 0) Let(source);
+            else Place(sound);
+            sound.Kept = false;
+        }
+    }
+
+    /// <summary>Sets a held sound's volume from its fade and its distance from the player, and moves it to its source.</summary>
+    private void Place(HeldSound sound) {
+        sound.Set(Levels.GetValueOrDefault(sound.Name) + Db(sound.Fade * DistanceFade(sound.Name, sound.At ?? World.Player)) - sound.Nudge);
+    }
+
+    /// <summary>Stops a held sound at once and frees its player.</summary>
+    private void Let(int source) {
+        if (held.Remove(source, out var sound)) sound.Stop();
+    }
+
+    /// <summary>A looping sound one source holds, on a player of its own: one with no place, or one placed in the world.</summary>
+    private sealed class HeldSound(string name, AudioStreamPlayer? own, AudioStreamPlayer3D? placed, float nudge) {
+        public readonly string Name = name;
+        public readonly AudioStreamPlayer? Own = own;
+        public readonly AudioStreamPlayer3D? Placed = placed;
+        /// <summary>Decibels taken off this play, as <see cref="Sounds.Nudge"/> takes off a one-shot.</summary>
+        public readonly float Nudge = nudge;
+        /// <summary>Where the source is, or null for the player's own spot.</summary>
+        public Vector2? At;
+        /// <summary>Volume scale of the fade in and out, from zero to one.</summary>
+        public float Fade;
+        /// <summary>Held again since the last update.</summary>
+        public bool Kept;
+
+        public void Start(AudioStream stream, float pitch, float from) {
+            if (Own != null) { Own.Stream = stream; Own.PitchScale = pitch; Own.Play(from); }
+            if (Placed != null) { Placed.Stream = stream; Placed.PitchScale = pitch; Placed.Play(from); }
+        }
+
+        /// <summary>Sets the volume, and moves a placed sound to where its source is.</summary>
+        public void Set(float volume) {
+            if (Own != null) Own.VolumeDb = volume;
+            if (Placed == null) return;
+            Placed.VolumeDb = volume;
+            if (At is Vector2 at) Placed.Position = new Vector3(at.X, 0, at.Y);
+        }
+
+        public void Stop() { Own?.Stop(); Placed?.Stop(); }
+    }
+
     private bool silenced;
 
     /// <summary>
@@ -251,6 +367,8 @@ public partial class Sounds : Node {
         ProcessMode = ProcessModeEnum.Disabled;
         foreach (var player in GetChildren().OfType<AudioStreamPlayer>()) player.Stop();
         foreach (var player in placedVoices) player.Stop();
+        foreach (var player in heldPlacedVoices) player.Stop();
+        held.Clear();
     }
 
     /// <summary>
@@ -287,19 +405,23 @@ public partial class Sounds : Node {
                 at = Player.GetPlaybackPosition();
                 Player.StreamPaused = true;
             }
-            Player.VolumeDb = volume + Mathf.LinearToDb(Math.Max(level, .0001f));
+            Player.VolumeDb = volume + Db(level);
         }
     }
 
     private AudioStream[] Variants(string name) {
         if (variants.TryGetValue(name, out var cached)) return cached;
-        string single = $"{Folder}/{name}.mp3";
-        var found = ResourceLoader.Exists(single)
+        string? single = Formats.Select(format => $"{Folder}/{name}.{format}").FirstOrDefault(path => ResourceLoader.Exists(path));
+        var found = single != null
             ? new[] { single }
             : Enumerable.Range(1, 9).Select(i => $"{Folder}/{name}_{i}.mp3").TakeWhile(path => ResourceLoader.Exists(path)).ToArray();
         if (found.Length == 0) GD.PushError($"Missing sound: {name}");
         if (Loudest.TryGetValue(name, out var peaks) && peaks.Length != found.Length)
             GD.PushError($"Sound {name} has {found.Length} recordings but {peaks.Length} loudest moments");
-        return variants[name] = found.Select(path => GD.Load<AudioStream>(path)).ToArray();
+        var streams = variants[name] = found.Select(path => GD.Load<AudioStream>(path)).ToArray();
+        // A WAV is a held sound's, which loops.
+        if (streams.Any(stream => stream is AudioStreamWav { LoopMode: not AudioStreamWav.LoopModeEnum.Forward }))
+            GD.PushError($"Held sound {name} does not loop: set edit/loop_mode=2 in its .import file");
+        return streams;
     }
 }

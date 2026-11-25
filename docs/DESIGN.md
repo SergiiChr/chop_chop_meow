@@ -30,7 +30,9 @@ These came from the user; change them only after asking.
   A caught firebug is an item only: nothing is made from it and it gives no light.
 - **Nettle and firebug jobs:** a worker picks nettles with a shovel and catches firebugs with a bug net, each from a
   tool station. Workers still go home at dusk, so the firebug job waits for night work, a later change.
-  None of nettle, nettle rope, bug net and firebug is bought or sold, and none has a sound of its own yet.
+  None of nettle, nettle rope, bug net and firebug is bought or sold, and none has a sound of its own yet, apart from
+  the player's groan: a player picking a nettle with no shovel groans for as long as it stings (`sting_groan`,
+  `PlayerState.Stung`).
 - **Item text:** what the player says of an item shows on a line under its name in its tooltip and in its details on
   the recipe map.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
@@ -1724,6 +1726,19 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 
 Sound effects are one-shot MP3s in `assets/sounds`; `x_1.mp3`, `x_2.mp3` and so on are variants of one sound `x`.
 Each play picks a variant other than the previous one with a small random pitch and volume change.
+
+A held sound loops for as long as its source holds it again each frame (`Sounds.Hold`), one sound a source.
+It starts at a random moment of its recording and fades in and out over 0.15 seconds, so it neither clicks on nor cuts
+off, and it has players of its own, so a burst of one-shots never cuts it off.
+Like a one-shot, it plays from its source's place, or with no place within a metre of the player.
+Its recording is a WAV imported to loop forward (`edit/loop_mode=2` in its `.import` file, where 1 means no loop).
+A WAV starts at any moment at no cost, while an MP3 decodes from its beginning to get there: 9 ms of stall for a start
+8 seconds into the groan, against 0.05 to 0.17 ms for the WAV.
+`sting_groan` is the one held sound.
+The host marks each player whom a gather stung on that tick (`PlayerState.Stung`), and every machine holds the groan for
+each player so marked, at the player's own spot or, for another player, at theirs.
+A gather the backpack has no room for, or one out of reach, stings nobody and makes no groan.
+A world held still by a menu stings nobody either, so nobody groans.
 
 A sound with a world position is heard by its distance from the player, whatever the zoom.
 It plays at full volume at the player and fades with the square of the distance left to its reach, where it is silent: half way there it plays at a quarter.

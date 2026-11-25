@@ -264,7 +264,8 @@ Credits: Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundclou
 
 ### Sound effects
 
-`sounds/` holds the sound effects as 320 kbps MP3, converted from the supplied files and peak-normalised.
+`sounds/` holds the sound effects as 320 kbps MP3, apart from the WAV of `sting_groan`, converted from the supplied files
+and peak-normalised.
 Variants of one sound are matched in loudness, and a numbered suffix marks them.
 
 These were made with ffmpeg from Kenney's sounds:
@@ -306,6 +307,12 @@ Each step's loudest 400 ms of heard loudness, counting the silence after it, is 
 from just before the foot lands, with the same fades.
 Each is brought to the grass steps' -23.3 LUFS by the same measure, and plays at the same level in the mix, so a step on
 gravel is no louder than one on grass.
+
+`sting_groan` is "Male Groan of Pain" by DRAGON-STUDIO (Pixabay 357971), a recording supplied for this project: mixed
+to mono, since what differs between its two channels is 44 dB quieter than the groan, faded in over 10 ms and out
+over its last 60 ms so its loop does not click, and peak-normalised.
+It is a 16-bit WAV, which Godot imports compressed (QOA) and set to loop, because the game starts it at a random
+moment and an MP3 would stall the frame getting there ([DESIGN](../docs/DESIGN.md#sound-effects)).
 
 `stomach_growl` is "yet more stomach sounds" by freesound_community (Pixabay 97719, artist Darsycho on Freesound), a recording supplied for this project, with the silence cut from both ends: four seconds of three rumbles.
 
