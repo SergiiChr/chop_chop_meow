@@ -102,7 +102,8 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             // Counts turn brick while the backpack is short.
             live.Watch(() => world.Carried(item) < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
-        string noTool = r.Tool == "" ? "" : $"No {world.Data.ToolName(r)}";
+        string? fixedTool = station == null ? null : world.Data.FixedTool(station.Kind, r.Tool);
+        string noTool = r.Tool == "" ? "" : fixedTool != null ? $"No slotted {world.Lower(world.Data.Name(fixedTool))}" : $"No {world.Data.ToolName(r)}";
         // A recipe with words of its own for a tool too hard for it has them in smaller letters, so their two lines fit the card under its name.
         var lacks = Style.Text(noTool, r.TooHard == "" ? 12 : 10, Style.Brick, wrap: true); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
         // One look for the tool a refresh: the card names a missing tool in place of its inputs, and its picture fades while the recipe cannot be made from the backpack now.
@@ -235,16 +236,19 @@ public partial class RecipePopup(World world, Thing? station, RecipeDef r, float
     /// yellow when a station's slot is empty and the player carries it, which works for them but not for a worker; red when there is none.
     /// </summary>
     private void ToolLine() {
-        string? slotted = station != null ? world.BenchTool(station, r) : null, carried = world.BestTool(r);
+        string? fixedTool = station == null ? null : world.Data.FixedTool(station.Kind, r.Tool);
+        string? slotted = station != null ? world.BenchTool(station, r) : null;
+        string? carried = fixedTool == null ? world.BestTool(r) : world.Carried(fixedTool) > 0 ? fixedTool : null;
         string? ready = station != null ? slotted : carried;
-        string shown = ready ?? carried ?? world.Data.PlainestTool(r.Tool, r.Tier);
+        string shown = ready ?? carried ?? world.Data.PlainestTool(r.Tool, r.Tier, station?.Kind);
         var line = Line("Tool"); line.Name = "tool_line";
         line.AddChild(Style.Icon(Icons.Of(shown), 26));
         line.AddChild(Style.Text(world.Data.Name(shown), 14, Style.Rim));
         var state = ready != null ? Style.Text("available", 14, Style.Ready) : carried != null ? Style.Text("in your backpack", 14, Style.Held) : Style.Text("not available", 14, Style.Warn);
         state.Name = "tool_state"; line.AddChild(state);
         // A note under the line takes its whole width: who cannot use a carried tool, or how to come by a missing one that needs no tool itself.
-        string hint = ready != null ? "" : carried != null ? "Workers can't use it until it is slotted."
+        string hint = ready != null ? "" : fixedTool != null ? $"Fit one {world.Lower(world.Data.Name(fixedTool))} in the {r.Tool} slot."
+            : carried != null ? "Workers can't use it until it is slotted."
             : world.TooHardBlock(station, r) is string tooHard ? tooHard
             : world.Data.RecipeOf(shown) is { Hand: true, Tool: "" } making ? $"Make one by hand: {PageText.Cost(world, making.Inputs)}" : "";
         if (hint != "") { var note = Style.Text(hint, 12, Style.Beige); note.Name = "tool_hint"; note.CustomMinimumSize = new Vector2(250, 0); line.AddChild(note); }

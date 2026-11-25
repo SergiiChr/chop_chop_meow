@@ -236,13 +236,19 @@ public sealed partial class GameData {
             data.Items.Add(Barrel.AtFill(liters), new() { Name = $"Steel barrel ({liters} L)", Color = data.Items[Barrel.Item].Color });
         for (int liters = 1; liters <= Bucket.Capacity; liters++)
             data.Items.Add(Bucket.AtFill(liters), new() { Name = $"Steel bucket ({liters} L)", Color = data.Items[Bucket.Item].Color, Tool = Bucket.Item });
+        for (int liters = 1; liters < BerryJam.Bottles.Length; liters++)
+            data.Items.Add(BerryJam.Bottles[liters], new() { Name = $"Berry jam bottle ({liters} L)", Color = BerryJam.Color, Food = true, Hunger = BerryJam.HungerPerLiter });
+        for (int liters = 1; liters <= Bucket.Capacity; liters++)
+            data.Items.Add(BerryJam.Buckets[liters], new() { Name = $"Steel bucket ({liters} L berry jam)", Color = data.Items[Bucket.Item].Color });
+        for (int liters = 1; liters <= Barrel.Capacity; liters++)
+            data.Items.Add(BerryJam.Barrels[liters], new() { Name = $"Steel barrel ({liters} L berry jam)", Color = data.Items[Barrel.Item].Color });
         data.Validate();
         Inventory.Unstacked.Clear();
         foreach (var (id, item) in data.Items) if (item.Tool != "" && id != Bucket.Item) Inventory.Unstacked.Add(id);
         // Empty buckets stack.
         // Filled vessels and barrels each take a cell.
         foreach (var vessel in data.Vessels) foreach (string id in vessel.States) if (id != Bucket.Item) Inventory.Unstacked.Add(id);
-        foreach (string item in Barrel.Fills) if (item != Barrel.Item) Inventory.Unstacked.Add(item);
+        for (int i = 1; i <= Barrel.Capacity; i++) { Inventory.Unstacked.Add(Barrel.Fills[i]); Inventory.Unstacked.Add(BerryJam.Barrels[i]); }
         return data;
     }
     private void Validate() {
@@ -259,13 +265,16 @@ public sealed partial class GameData {
             var slots = building.Value.ToolSlots;
             var needs = Recipes.Values.Where(r => r.Station == building.Key && r.Tool != "").ToList();
             if (slots.DistinctBy(s => s.Tool).Count() != slots.Length || needs.Any(r => !slots.Any(s => s.Tool == r.Tool))
-                || slots.Any(s => !needs.Any(r => r.Tool == s.Tool) || needs.Where(r => r.Tool == s.Tool).Min(r => r.Tier) != s.Tier))
+                || slots.Any(s => !needs.Any(r => r.Tool == s.Tool) || needs.Where(r => r.Tool == s.Tool).Min(r => r.Tier) != s.Tier
+                    || s.Item is string item && (!Items.ContainsKey(item) || s.Tier != 0)))
                 throw new InvalidOperationException($"Invalid tool slots for {building.Key}: one a tool its recipes need, at the lowest tier they ask for.");
         }
         foreach (var recipe in Recipes) {
-            bool tool = recipe.Value.Tool == "" || Items.Values.Any(recipe.Value.MadeWith);
-            if (recipe.Value.Twists && (recipe.Value.Station != ThingKind.Bench || recipe.Value.Tool != "hammer")) throw new InvalidOperationException($"{recipe.Key}: only a bench recipe made with a hammer is twisted by hand between blows.");
-            if (recipe.Value.TooHard != "" != recipe.Value.MaxTier < int.MaxValue) throw new InvalidOperationException($"{recipe.Key}: a recipe with a highest tool tier says why a harder tool will not do, and no other does.");
+            var r = recipe.Value;
+            bool tool = r.Tool == "" || Items.Values.Any(r.MadeWith)
+                || !r.Hand && r.Station is ThingKind fitted && FixedTool(fitted, r.Tool) != null;
+            if (r.Twists && (r.Station != ThingKind.Bench || r.Tool != "hammer")) throw new InvalidOperationException($"{recipe.Key}: only a bench recipe made with a hammer is twisted by hand between blows.");
+            if (r.TooHard != "" != r.MaxTier < int.MaxValue) throw new InvalidOperationException($"{recipe.Key}: a recipe with a highest tool tier says why a harder tool will not do, and no other does.");
             if (!(recipe.Value.Station is ThingKind station ? Buildings.ContainsKey(station) : recipe.Value.Hand) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
             foreach (var input in recipe.Value.Inputs)
@@ -289,11 +298,15 @@ public sealed partial class GameData {
             throw new InvalidOperationException($"{misplaced}: only cooking table recipes choose whether they are worked.");
         foreach (var v in Vessels) {
             if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
-                || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Output == v.Liquid || r.Hand && r.Inputs.ContainsKey(v.Liquid)))
+                || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Hand && (r.Output == v.Liquid || r.Inputs.ContainsKey(v.Liquid))))
                 throw new InvalidOperationException($"Invalid vessel: {v.Full}. Its liquid is only poured into stations, and no hand recipe takes it.");
             vesselFor.TryAdd(v.Liquid, v);
-            if (!v.States.All(id => vesselOf.TryAdd(id, v)))
-                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Each fill belongs to one vessel.");
+            if (vesselOf.TryGetValue(v.Empty, out var same) && (same.Empty != v.Empty || same.Capacity != v.Capacity))
+                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Shared empty vessels must have the same capacity.");
+            vesselOf.TryAdd(v.Empty, v);
+            for (int fill = 1; fill < v.States.Count; fill++)
+                if (!vesselOf.TryAdd(v.States[fill], v))
+                    throw new InvalidOperationException($"Invalid vessel: {v.Full}. Every filled state belongs to only one vessel.");
         }
         ValidateMap();
     }
@@ -311,7 +324,7 @@ public sealed partial class GameData {
     private static readonly RecipeGroup[] ListedGroups = [RecipeGroup.Materials, RecipeGroup.Tools, RecipeGroup.Containers, RecipeGroup.Food];
     private static readonly List<string> Nothing = new();
     /// <summary>Container fills the recipe map leaves out because they share a slot with the base item.</summary>
-    public static bool OffTheMap(string item) => Barrel.Liters(item) > 0 || Bucket.Liters(item) > 0 || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
+    public static bool OffTheMap(string item) => Barrel.Liters(item) > 0 || Bucket.Is(item) && item != Bucket.Item || BerryJam.InBottle(item) || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
     /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
     public string? RecipeIdOf(string item) => recipeIdOf.GetValueOrDefault(item);
     /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
@@ -326,6 +339,7 @@ public sealed partial class GameData {
     public IEnumerable<string> UsedFor(string item) {
         var uses = ProductsOf(item);
         if (Items[item].Tool is { Length: > 0 }) uses = uses.Concat(Recipes.Values.Where(r => r.MadeWith(Items[item])).Select(r => r.Output));
+        uses = uses.Concat(Recipes.Values.Where(r => r.Station is ThingKind station && FixedTool(station, r.Tool) == item).Select(r => r.Output));
         return uses.Distinct();
     }
     /// <summary>The products that take an item as an input or come out of it.</summary>
@@ -406,7 +420,15 @@ public sealed partial class GameData {
     /// <summary>What the player says of an item, as a tooltip line of its own after the name, or nothing.</summary>
     public string DescriptionLine(string item) => Items.TryGetValue(item, out var def) && def.Description != "" ? "\n" + def.Description : "";
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
-    public string PlainestTool(string kind, int tier = 0) => Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
+    public string PlainestTool(string kind, int tier = 0, ThingKind? station = null) =>
+        (station is ThingKind at ? FixedTool(at, kind) : null) ?? Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
+
+    /// <summary>The exact item fitted to a tool slot that takes a part instead of a hand tool.</summary>
+    internal string? FixedTool(ThingKind station, string tool) {
+        if (!Buildings.TryGetValue(station, out var building)) return null;
+        foreach (var slot in building.ToolSlots) if (slot.Tool == tool) return slot.Item;
+        return null;
+    }
 
     /// <summary>What a recipe's tool is called.</summary>
     public string ToolName(RecipeDef r) => ToolName(r.Tool, r.Tier, r.MaxTier);

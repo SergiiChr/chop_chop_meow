@@ -14,6 +14,7 @@ public static class PileChecks {
         Test(CheckEmptiedPileKeepsItsFilterWhichChangesOnlyWhileEmpty, data);
         Test(CheckOnlyAnEmptyPileWithNoFilterTurnsIntoCompost, data);
         Test(CheckTenderFeedsCompostWithoutFood, data);
+        Test(CheckCompostKeepsTheBottlesATenderBrought, data);
         Test(CheckPileOfPackedCratesTakesOnlyTheSameGood, data);
         Test(CheckPileOfMixedCratesTakesAnyMixedCrate, data);
     }
@@ -131,6 +132,25 @@ public static class PileChecks {
         Require(compost.Inventory["leaves"] > 0, "a tender should bring leaves to the compost");
         Require(chest.Inventory["berries"] == 6, "a tender should leave food in storage when food deliveries are skipped");
         Require(compost.Inventory["berries"] == 0, "a tender should not bring food to the compost when food deliveries are skipped");
+    }
+
+    private static void CheckCompostKeepsTheBottlesATenderBrought(GameData data) {
+        var world = EmptyWorld(data);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
+        var compost = world.Add(ThingKind.Pile, new Vector2(16, 24));
+        Require(world.SetCompost(compost, true), "an empty pile should turn into compost");
+        chest.Inventory.Add(BerryJam.Bottle, 1);
+        chest.Inventory.Add(BerryJam.Bottles[2], 1);
+        chest.Inventory.Add("leaves", 2);
+        var tender = AddWorker(world, new Vector2(17, 22));
+        world.SetDuty(tender, compost, JobKind.Tend, true);
+
+        Work(world, 65, () => compost.Inventory["fertilizer"] == 1);
+        Require(compost.Inventory["fertilizer"] == 1 && compost.Inventory[BerryJam.Bottle] == 0 && compost.Inventory[BerryJam.Bottles[2]] == 0,
+            "the two bottles' jam and two leaves should make one fertilizer");
+        world.Player = compost.Pos + Vector2.Down;
+        Require(world.Transfer(compost.Inventory, world.Backpack, Water.Empty, 2) == 2,
+            "the player should be able to recover both empty bottles after the jam composts");
     }
 
     /// <summary>A pile of packed crates takes more crates of the same good, but no crate of another good.</summary>

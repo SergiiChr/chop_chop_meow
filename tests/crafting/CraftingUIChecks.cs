@@ -65,7 +65,7 @@ public partial class Game {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
         int soundsBefore = sounds.Played;
         var table = Hosted.Add(ThingKind.Cooktable, Hosted.Player + new Vector2(1.2f, 0));
-        table.Tools!.Add("mortar", 1); Give(Hosted, "berries", 8); Hosted.QueueBatch(table, "crushed_berries", 2);
+        table.Tools!.Add("mortar", 1); Give(Hosted, "berries", 20); Hosted.QueueBatch(table, "crushed_berries", 2);
         await Until(() => table.Processing && view.PlayerAnimation == ActorAction.Grind && sounds.Heard("grind_mortar", soundsBefore), "the idle player grinding at the cooking table beside it, with the pestle heard", 4);
         Require(view.PropOf(table.Id) is StoveProp { Mortar.Visible: false }, "The mortar must be off the counter while the player grinds with it.");
         RemoveThings(Hosted, t => t == table);

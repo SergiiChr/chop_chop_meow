@@ -16,6 +16,8 @@ public partial class Game {
     /// </summary>
     private async Task RunRecipeReadyChecks() {
         foreach (var (id, r) in StationRecipes) {
+            // Glass has a two-person start and a bounded heat window, covered by its own furnace checks.
+            if (id == GlassBlowing.Item) continue;
             await Test(() => CheckRecipeIsReadyToStartAfterADoubleClickWithAllItsItemsCarried(id, r), name: $"{nameof(CheckRecipeIsReadyToStartAfterADoubleClickWithAllItsItemsCarried)}({id})");
             if (r.Inputs.Values.Sum() > 1)
                 await Test(() => CheckRecipeIsNotReadyToStartAfterADoubleClickWithOneOfItsItems(id, r), name: $"{nameof(CheckRecipeIsNotReadyToStartAfterADoubleClickWithOneOfItsItems)}({id})");

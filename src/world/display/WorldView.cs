@@ -108,7 +108,9 @@ public partial class WorldView : Node3D {
     /// <summary>The village's carts no order holds, built while loading and reused for every trip.</summary>
     private readonly Stack<WorldModels.CartModel> idleCarts = new();
     private readonly Dictionary<int, float> pumping = new();
+    private readonly Dictionary<int, Thing> blowing = new();
     private readonly List<(ActorRig Rig, ActorState Actor, Thing Pump)> pumpOperators = new();
+    private readonly Dictionary<int, (ActorRig Rig, ActorState Actor)> glassBellows = new();
     private readonly Dictionary<int, float> openBungs = new();
     /// <summary>The cooking tables whose mortar is in someone's hands this frame, so it is off the counter.</summary>
     private readonly HashSet<int> grinding = new();
@@ -145,6 +147,7 @@ public partial class WorldView : Node3D {
     private static readonly Color BarFill = new Color("e5bf68");
     private static readonly Color HeatReady = new Color("f0a03c");
     private static readonly Color HeatLow = new Color("8a5a46");
+    private static readonly Color HeatHigh = new Color("ec552f");
     private static readonly Color HeatTick = new Color("f2e8cf");
     private readonly ShaderMaterial fog = new() { Shader = new Shader { Code = FogShader }, RenderPriority = (int)Material.RenderPriorityMax - 1 };
     private MeshInstance3D fogCover = null!;
@@ -694,7 +697,10 @@ public partial class WorldView : Node3D {
     }
 
     private void UpdateActors(float dt) {
-        pumping.Clear(); pumpOperators.Clear(); grinding.Clear(); swung.Clear(); openBungs.Clear();
+        pumping.Clear(); pumpOperators.Clear(); glassBellows.Clear(); grinding.Clear(); swung.Clear(); openBungs.Clear();
+        blowing.Clear();
+        foreach (var forge in World.ThingsOf(ThingKind.Reinforced))
+            if (forge.GlassBlower != 0) blowing[forge.GlassBlower] = forge;
         if (ShirtOf(World.Me) != playerShirt) {
             playerShirt = ShirtOf(World.Me); playerRig.Root.QueueFree();
             playerRig = MakePlayerRig();
@@ -710,6 +716,9 @@ public partial class WorldView : Node3D {
         Thing? worked = action == ActorAction.Idle ? StationToHammer(World.Me) : null;
         if (worked != null) { action = ActorAnimation.StationAction(worked, World.Data); target = worked.Pos; subject = worked; }
         if (World.Me.Braking && moving && !ActorAnimation.SwingsOnTheMove(action)) action = ActorAction.Brake;
+        if (blowing.TryGetValue(World.Me.Id, out var glass)) {
+            action = ActorAction.Glassblow; target = glass.Pos; subject = glass;
+        }
         if (World.Mauled) {
             bool fallsBack = FallsBack(World.Me.Id);
             mauledFrom = PinningWolf(World.Me.Id)?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
@@ -757,6 +766,9 @@ public partial class WorldView : Node3D {
             bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking, World.Data);
+            if (blowing.TryGetValue(-worker.Id, out var glassForge)) {
+                work = ActorAction.Glassblow; assignment = glassForge;
+            }
             if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind or ActorAction.TwistRope && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
@@ -765,9 +777,10 @@ public partial class WorldView : Node3D {
             bool sameAction = state.Action == work;
             state.Update(worker.Pos, work, facing, dt);
             state.Mark = Mark(assignment, state, work);
-            string? vessel = BarrelHaul.Vessel(worker.Tool) ? worker.Tool : null;
+            bool waterTool = BarrelHaul.Vessel(worker.Tool);
+            string? vessel = waterTool || BerryJam.InBottle(worker.Tool) ? worker.Tool : null;
             var waterTarget = worker.WaterAction is WorkerWaterAction.None or WorkerWaterAction.WalkFarm ? null : World.Find(worker.WaterTarget);
-            if (waterTarget != null && vessel != null) {
+            if (waterTarget != null && vessel != null && waterTool) {
                 var point = waterTarget.Kind switch {
                     ThingKind.Barrel when worker.WaterAction == WorkerWaterAction.Fill => To3(waterTarget.Pos) + VesselShape.BarrelSpout.Rotated(Vector3.Up, -waterTarget.Rotation),
                     ThingKind.Barrel => To3(waterTarget.Pos) + VesselShape.BarrelFillOpening.Rotated(Vector3.Up, -waterTarget.Rotation),
@@ -786,6 +799,7 @@ public partial class WorldView : Node3D {
             } else {
                 // A worker works a station with the hammer slotted there, never one of their own, so that is the one they swing.
                 string? slotted = ActorAnimation.Tool(work) == "hammer" && assignment?.Tools != null ? World.BenchTool(assignment, "hammer") : null;
+                if (work == ActorAction.Carry && worker.Bag.First() is string load && ContainerItem.IsBottle(load)) vessel = load;
                 Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), slotted ?? worker.Tool, assignment?.Tools),
                     barrel: work == ActorAction.Carry && Barrel.In(worker.Bag) != null,
                     vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null);
@@ -903,7 +917,9 @@ public partial class WorldView : Node3D {
             Thing? worked = action == ActorAction.Idle ? StationToHammer(p) : null;
             if (worked != null) { action = ActorAnimation.StationAction(worked, World.Data); facing = worked.Pos; subject = worked; }
             if (p.Braking && moving && !ActorAnimation.SwingsOnTheMove(action)) action = ActorAction.Brake;
+            if (blowing.TryGetValue(p.Id, out var glass)) { action = ActorAction.Glassblow; facing = glass.Pos; subject = glass; }
             if (p.Mauled) {
+                subject = null;
                 bool fallsBack = FallsBack(p.Id);
                 action = p.RespawnIn > 0 ? ActorAction.Devoured : other.DownedFor < ActorAnimation.FallBackSeconds ? ActorAction.FallBack : ActorAction.Mauled;
                 facing = fallsBack ? p.Pos - World.Doorways.OutOfDoorAt(p.DoorCabin)
@@ -960,7 +976,10 @@ public partial class WorldView : Node3D {
         float onMat = door == null && downed == 0 ? BedHeightAt(state.Position) : 0;
         var pose = tugs.PulledArms(downed > 0 ? state.Pose : StandingPose(rig, state, onMat), who, ref pull, dt);
         if (downed > 0) FallBackView.FallBack(rig, state, pose, downed, torch, who.RespawnIn > 0 ? null : HoldingOff(who.Id));
-        else ShowStanding(rig, state, pose, tool, torch, door, dt, HugsBarrel(state.Action, who.Backpack), null);
+        else {
+            string? vessel = Carries(state) && ContainerItem.IsBottle(who.Selected) && who.Backpack[who.Selected] > 0 ? who.Selected : null;
+            ShowStanding(rig, state, pose, tool, torch, door, dt, HugsBarrel(state.Action, who.Backpack), vessel);
+        }
     }
 
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null,
@@ -998,7 +1017,7 @@ public partial class WorldView : Node3D {
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
         if (barrel) rig.HugBarrel(pose, torch);
-        else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel);
+        else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel, torch);
         else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
         if (state.From == ActorAction.PumpWater && state.Action == ActorAction.Idle && state.Blend < 1 && !barrel && vessel == null)
             rig.ReleasePumpHandle(pose, 1 - Ease(state.Blend));
@@ -1040,6 +1059,7 @@ public partial class WorldView : Node3D {
             pumpOperators.Add((rig, actor, subject));
         } else if (action == ActorAction.Pump) {
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
+            if (GlassBlowing.IsRecipe(subject)) glassBellows[subject.Id] = (rig, actor);
         }
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
         // Hands close on what they gather twice a loop, and a rake rustles the leaves as it starts its pull.
@@ -1436,6 +1456,7 @@ public partial class WorldView : Node3D {
                 if (live) pump.Pump.SetPressure(t.Pressure / 100);
                 break;
             case ForgeProp forge:
+                ShowBlowing(forge, t, live, dt);
                 float heat = Clocked(forge.Heat, t.Heat, live, dt) / 100;
                 float forging = forge.Burning(t.Processing, dt);
                 // Hot coals glow on their own, as the fire over them dies down.
@@ -1447,6 +1468,16 @@ public partial class WorldView : Node3D {
                 else forge.Released += dt;
                 float lift = 18 * (1 - forge.Press * (1 - Mathf.SmoothStep(0, 1, forge.Released / ActorAnimation.BlendSeconds)));
                 forge.Lever.RotationDegrees = new Vector3(0, 0, lift);
+                if (live && glassBellows.TryGetValue(t.Id, out var bellows)) {
+                    var (rig, actor) = bellows;
+                    float weight = Mathf.SmoothStep(0, .12f, actor.Time);
+                    var pose = ActorAnimation.GlassBellows(actor.Pose, 1 - lift / 18, weight);
+                    var handle = forge.Lever.GlobalTransform;
+                    var spread = Vector3.Back * ForgeShape.BellowsGrip;
+                    rig.Show(pose, null, false);
+                    rig.HoldPumpHandle(pose, handle * (ForgeShape.BellowsHandle + spread),
+                        handle * (ForgeShape.BellowsHandle - spread), weight);
+                }
                 for (int i = 0; i < forge.Pleats.Length; i++) forge.Pleats[i].RotationDegrees = new Vector3(0, 0, lift * (i + 1) / (forge.Pleats.Length + 1));
                 Smoke(forge, forging > 0 || heat > .3f, dt, ForgeSmoke);
                 break;
@@ -1501,10 +1532,9 @@ public partial class WorldView : Node3D {
                     string kind = World.ToolKind(held);
                     foreach (var (tool, hook) in rack.Pegs[slot]) hook.Visible = tool == kind;
                     if (kind == Water.BottleTool) {
-                        int liters = Water.BottleLiters(held);
-                        if (liters == rack.BottleLiters[slot]) continue;
-                        BottleShape.SetGauge(rack.Pegs[slot][kind].GetChild<Node3D>(0), liters);
-                        rack.BottleLiters[slot] = liters;
+                        if (held == rack.BottleItems[slot]) continue;
+                        BottleShape.SetGauge(rack.Pegs[slot][kind].GetChild<Node3D>(0), held);
+                        rack.BottleItems[slot] = held;
                     }
                 }
                 break;
@@ -1597,6 +1627,19 @@ public partial class WorldView : Node3D {
     }
 
     internal static float Ease(float t) => t * t * (3 - 2 * t);
+
+    /// <summary>Finds the pose of the blower the simulation chose, or shows a melt with nobody at the pipe.</summary>
+    private void ShowBlowing(ForgeProp forge, Thing thing, bool live, float dt) {
+        int blower = thing.GlassBlower;
+        if (!live) { forge.Blowing.Hide(); return; }
+        if (blower < 0 && crew.TryGetValue(-blower, out var worker))
+            forge.Blowing.Show(thing, worker.Rig, worker.State, World.Time, dt);
+        else if (blower == World.Me.Id)
+            forge.Blowing.Show(thing, playerRig, player, World.Time, dt);
+        else if (blower > 0 && others.TryGetValue(blower, out var guest))
+            forge.Blowing.Show(thing, guest.Rig, guest.State, World.Time, dt);
+        else forge.Blowing.Unattended(thing, World.Time, dt);
+    }
 
     /// <summary>A count the server keeps as a motion shows it: run on by the window's clock in sight, as it is out of sight.</summary>
     private float Clocked(LocalClock clock, float count, bool live, float dt) => live ? clock.Follow(count, World.Time, dt) : clock.Set(count, World.Time);
@@ -2186,13 +2229,22 @@ public partial class WorldView : Node3D {
                 overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), BarTrack);
                 overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), BarFill);
             }
-        // Forge heat under each reinforced furnace, with a tick at the clear bar steel needs.
+        // Forge heat under each reinforced furnace, with ticks marking what the selected recipe needs.
         foreach (var t in World.ThingsOf(ThingKind.Reinforced)) {
             if (!World.Sees(t.Pos) || BehindCamera(t.Pos)) continue;
             var p = Screen(t.Pos) + new Vector2(-28, 18);
+            bool glass = GlassBlowing.IsRecipe(t);
+            float min = glass ? GlassBlowing.MinHeat : World.SteelHeat;
+            var fill = t.Heat < min ? HeatLow : glass && t.Heat > GlassBlowing.MaxHeat ? HeatHigh : HeatReady;
             overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), BarTrack);
-            overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? HeatReady : HeatLow);
-            overlay.DrawLine(p + new Vector2(56 * World.SteelHeat / 100, -2), p + new Vector2(56 * World.SteelHeat / 100, 7), HeatTick, 2);
+            overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), fill);
+            HeatMark(p, min);
+            if (glass) HeatMark(p, GlassBlowing.MaxHeat);
+        }
+
+        void HeatMark(Vector2 start, float limit) {
+            float mark = 56 * limit / 100;
+            overlay.DrawLine(start + new Vector2(mark, -2), start + new Vector2(mark, 7), HeatTick, 2);
         }
         if (Placing != null) return;
         // Only the hovered object is named; the side panel already names the selection.

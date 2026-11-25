@@ -35,6 +35,7 @@ public static class SimulationChecks {
         NettleRopeChecks.Run(data);
         FirebugChecks.Run(data);
         SandChecks.Run(data);
+        GlassJarChecks.Run(data);
         CraftingChecks.Run(data);
         PackingChecks.Run(data);
         LunchChecks.Run(data);

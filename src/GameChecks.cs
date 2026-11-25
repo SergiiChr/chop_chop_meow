@@ -1191,6 +1191,7 @@ public partial class Game {
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await RunGoalUIChecks(freshGame: false);
             await RunCraftingUIChecks();
+            await RunGlassJarUIChecks();
             var furnace = await Test(CheckSteelFurnaceSlotsLoadHeldStacksThenPump);
             await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));
             Test(CheckForegroundCanopyFadesOnlyOverBuildings);

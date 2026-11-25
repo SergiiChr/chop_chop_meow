@@ -33,7 +33,8 @@ internal static class VesselShape {
     public static readonly StandardMaterial3D Finish = Vertex(Surface.Metal, .53f, .37f);
 
     private static readonly TorusMesh FillSeat = new() { InnerRadius = .020f, OuterRadius = .036f, Rings = 10, RingSegments = 5 };
-    private const string Steel = "687d89", Edge = "a0abb0", Dark = "52616b", Wire = "b4bec1", Grip = "9b734d";
+    public const string Steel = "687d89", Edge = "a0abb0";
+    private const string Dark = "52616b", Wire = "b4bec1", Grip = "9b734d";
 
     public static (Node3D Vessel, Node3D Bung) AddBarrel(Node3D parent, Vector3 at) {
         var vessel = Pivot(parent, at);

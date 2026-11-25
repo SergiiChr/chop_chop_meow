@@ -19,7 +19,7 @@ internal static class WorldSteps {
 
     /// <summary>Puts in each of a station's tool slots the plainest tool that slot takes.</summary>
     public static void SlotPlainestTools(World world, Thing station) {
-        foreach (var slot in world.SlotRules(station.Kind)) station.Tools!.Add(world.Data.PlainestTool(slot.Tool, slot.Tier), 1);
+        foreach (var slot in world.SlotRules(station.Kind)) station.Tools!.Add(world.Data.PlainestTool(slot.Tool, slot.Tier, station.Kind), 1);
     }
 
     /// <summary>The player sets a chest's, placed crate's, tool station's, trading post's or compost's input filter to Everything, so workers bring it anything it holds.</summary>

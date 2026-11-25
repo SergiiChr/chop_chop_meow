@@ -38,13 +38,14 @@ internal sealed class InstalledPlumbingShape {
     private InstalledPlumbingShape(Node3D root, MeshInstance3D? spray) => (this.root, this.spray) = (root, spray);
 
     public static InstalledPlumbingShape? Build(ThingKind kind, Node3D body) {
-        if (kind is not (ThingKind.Hut or ThingKind.Barrel or ThingKind.Cooktable or ThingKind.Farm)) return null;
+        if (kind is not (ThingKind.Hut or ThingKind.Barrel or ThingKind.Cooktable or ThingKind.Cannery or ThingKind.Farm)) return null;
         var root = Pivot(body, Vector3.Zero);
         MeshInstance3D? spray = null;
         switch (kind) {
             case ThingKind.Hut: Cabin(root); break;
             case ThingKind.Barrel: Barrel(root); break;
             case ThingKind.Cooktable: Cooktable(root); break;
+            case ThingKind.Cannery: Cannery(root); break;
             case ThingKind.Farm: spray = Farm(root); break;
         }
         return new InstalledPlumbingShape(root, spray);
@@ -91,6 +92,18 @@ internal sealed class InstalledPlumbingShape {
         Post(root, .046f, .038f, .06f, valve - Vector3.Up * .029f, Brass, 8);
         Post(root, .022f, .022f, .061f, valve + Vector3.Up * .021f, Brass, 6);
         Box(root, new Vector3(.13f, .025f, .04f), valve + new Vector3(.036f, .086f, 0), Handle);
+    }
+
+    private static void Cannery(Node3D root) {
+        var footing = new Vector3(-.72f, .07f, .4f);
+        var elbow = footing with { Y = .69f };
+        var bend = new Vector3(-.31f, elbow.Y, footing.Z);
+        var feed = bend with { Z = .175f };
+        Pipe(root, Vector3.Zero, Vector3.Up * footing.Y, .038f, Steel);
+        Pipe(root, Vector3.Up * footing.Y, footing, .038f, Steel);
+        Pipe(root, footing, elbow, .038f, Steel);
+        Pipe(root, elbow, bend, .038f, Brass);
+        Pipe(root, bend, feed, .038f, Brass);
     }
 
     private static void Cooktable(Node3D root) {

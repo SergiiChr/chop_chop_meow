@@ -19,7 +19,7 @@ internal sealed class StationHaul : PlaceHaul {
             if (data.VesselFor(item) is VesselDef v) {
                 // A liquid leaves in vessels with room for it, which the hauler brings, fills here and stores.
                 if (world.DepositFor(v.Full, t.Pos, t.Id) == null || RoomySource(v, w.Pos) is not (string roomy, Thing holder)) continue;
-                Offer(ref best, new Carry { Place = t, From = holder, To = t, Item = roomy, Count = (free + v.Capacity - 1) / v.Capacity, Clears = true, Rule = full ? 2 : 4, Order = -free });
+                Offer(ref best, new Carry { Place = t, From = holder, To = t, Item = roomy, Count = (free + v.Capacity - 1) / v.Capacity, DrainLiquid = item, Rule = full ? 2 : 4, Order = -free });
             } else if (Taker(t, item, free) is (Thing store, int count)) Offer(ref best, TakeOut(t, store, CarryBox.Inventory, item, count, full));
         }
         if (recipe == null) return;

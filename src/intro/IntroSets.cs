@@ -287,7 +287,7 @@ internal static class IntroSets {
             holder.Scale = Vector3.One * scale; holder.AddChild(item);
             room.Items.Add((holder, at, new Vector3(0, gripHeight, 0)));
         }
-        Lay(BottleShape.Create(3), new Vector3(-.4f, 0, .44f), Vector3.Zero, .3f, .2f);
+        Lay(BottleShape.Create(Water.Full), new Vector3(-.4f, 0, .44f), Vector3.Zero, .3f, .2f);
         var tins = new Node3D();
         Cylinder(tins, .045f, .045f, .11f, new Vector3(0, .055f, 0), Metal("b9c2c4", .35f, .7f), sides: 10);
         Cylinder(tins, .046f, .046f, .06f, new Vector3(0, .055f, 0), Mat("b5513f", .6f), sides: 10);

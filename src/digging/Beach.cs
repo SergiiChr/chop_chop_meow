@@ -70,7 +70,7 @@ public sealed class Beach(World world) {
         float tide = Tide;
         if (!IsSand(at)) return Covered(at, tide) ? "Choose dry, open ground." : null;
         if (!SquareIs(at, tide, wet: false)) return "Wait for the tide to uncover this sand.";
-        if (Stripped(Terrain.TileAt(at))) return "The tide has not refilled this square yet.";
+        if (Stripped(Terrain.TileAt(at))) return "No more sand left.";
         return world.Backpack.Room(Sand) < SandPerSquare ? "Make room for 10 sand in your backpack." : null;
     }
 

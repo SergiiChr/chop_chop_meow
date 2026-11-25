@@ -1,6 +1,6 @@
 # Assets
 
-The world uses low-poly 3D models, with baked meshes for trees, berry bushes, the dug hole and four foods.
+The world uses low-poly 3D models, with baked meshes for trees, berry bushes, the dug hole, four foods and the glass jar.
 There are no world or character sprite sheets.
 The only 2D images are interface icons.
 
@@ -76,8 +76,8 @@ Models are assembled from code-built or baked Godot meshes.
   bushes by their own shader (`NatureShape.ScrubMaterials`). Skin, hair, fur, glass, leaf cards and flames stay flat.
   The surfaces' grain and bump textures and the scans' colour, bump and height maps are in `models/surfaces/`, packed
   by `tools/surface_textures.py`.
-- `src/rest/display/StrawBedModel.cs` — a shallow leaf bed with a folded-grass rim. Its model and sleep pose references are in [straw_bed/references](models/straw_bed/references/).
-- `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
+- `src/rest/display/StrawBedModel.cs` — a shallow leaf bed with a folded-leaf rim. Its model and sleep pose references are in [straw_bed/references](models/straw_bed/references/).
+- `src/BottleShape.cs` — refillable steel flask with a wood stopper. Icons, heaps, the tool rack and actors' hands use this model. The gauge uses blue for water and #9b2f4f for jam and stays dark when empty.
 - `src/containers/barrel/display/VesselShape.cs` — a ribbed 50 L steel barrel with a tap and a movable bung in its recessed lid,
   and a 10 L tapered steel bucket with a hollow interior and a wire bail with a wood grip.
   World props, carried props, heaps and icons use the same shapes.
@@ -86,20 +86,23 @@ Models are assembled from code-built or baked Godot meshes.
   and fill opening.
   The mounted barrel uses the ground barrel's shell turned sideways.
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons, and by heaps as six-packs. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
-- `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
+- `src/items/display/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
   The icon shows the model as built, and a heap is made of pieces of it.
   - Built in code: the acorn with its brown cap, wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a
     six-sided collar, none with a handle), steel and tin sheets (three in a loose stack, the top one with its near
-    corner bent up), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the
-    jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a
+    corner bent up), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the tied sheaves of grass and wheat, the flour sack tied with a
     ribbon, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
+  - The open glass jar shares its translucent material across the icon, heap and glassblowing pose.
+    The heap uses a lighter mesh with the same proportions and open rim.
+    The mesh comes from NVIDIA SimReady via Patch. See [glass jar credits](models/glass_jar/README.md)
+    and the [glassblowing pose and prop reference](../docs/art/glassblowing-reference.md).
   - Baked from Kenney's Food Kit and recoloured to the game's palette: bread (the round loaf), raw meat (the ham on the bone), burnt steak (the cooked steak, charred) and the bowls of meat stew and crushed berries (the bowl of soup). `tools/food_models.py` bakes them into `models/food/`; see [food/README.md](models/food/README.md).
   - Light copies of models the world already shows, for heaps alone, since their icons come from those models: the hand tools and the torch with their cylinders redrawn on six sides, the rake, the mortar turned on fewer sides, the cargo crate, the bottle lying on its back, a single berry, a log, a board, one boulder of the world's stones, one lump of its loose ore and coal, one charcoal briquette, and six cast bars stacked three across three.
   - Each good says how its heap is laid (`Lay`): neat grids for boxes, sacks, jars and six-packs; rows for logs, boards, tools and bottles, which lie the same way; loose and turned any way for stone, ore, coal, charcoal, berries, bread, meat and parts; and one mound that swells for leaves, sand, gravel and compost.
   - Gravel is a mound with the gravel path's photoscan draped over it and loose stones at its foot, in its icon and on a
     pile alike.
   - Cans heap as six-packs and bars as six-packs stacked three across three; a compost pile is a mound of soil with leaves on it and scraps poking out, whatever it holds.
-  - Cans and jars in a heap are plainer than in their icons: no rim, rib, lid, bare tin, mark or ribbon, which do not show at the game's distance.
+  - Cans in a heap are plainer than in their icons: no rim, rib, lid, bare tin or mark, which do not show at the game's distance.
   - A heap shows as many pieces as its triangles allow, so a full pile and a fully stocked packing station stay under their ceilings whatever the good.
 - `src/CharcoalShape.cs` — charcoal as three pressed briquettes: six-sided logs with a hole through the middle, two lying and one leaning on them, in one mesh that carries its own colours. The icon shows the three as built, and a heap is made of single briquettes.
 - `StockPile` in `src/PileShape.cs` — a good heaped on any model: pieces of the good on a pad, more of them the more there is, drawn in one batch.

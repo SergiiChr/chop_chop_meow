@@ -14,6 +14,7 @@ internal static class BarrelAnimationChecks {
         Test(CheckBothVesselsPourIntoTheRoofOpening);
         Test(CheckBucketPoursOntoTheFarmSoil);
         Test(CheckBottleGaugeKeepsItsFillAfterFading);
+        Test(CheckHandsShowTheSelectedFlaskLiquid);
     }
 
     private static void CheckPlayerWalksUnderTheWeightOfWater() {
@@ -119,5 +120,30 @@ internal static class BarrelAnimationChecks {
             mesh.Visible && mesh.MaterialOverride is StandardMaterial3D gauge && gauge.AlbedoColor == blue);
         Require(lit == 2, $"the bottle should still show two filled marks after the worker returns, found {lit}");
         rig.Root.Free();
+    }
+
+    private static void CheckHandsShowTheSelectedFlaskLiquid() {
+        foreach (var skin in new[] { ActorSkin.Player, ActorSkin.Worker }) {
+            var rig = new ActorRig(skin);
+            try {
+                var bottle = rig.Root.GetNode<Node3D>("CarriedBottle");
+                var jam = new Color("9b2f4f");
+                var blue = new Color("43b9e6");
+                var poses = new[] { new Pose(), ActorAnimation.PoseAt(ActorAction.Walk, .2f, true) };
+                foreach (var pose in poses) {
+                    WorkerWaterView.Carry(rig, pose, Water.TwoLiters);
+                    Require(bottle.Visible && Bars(blue) == 2 && Bars(jam) == 0, "a held water bottle must show blue");
+                    WorkerWaterView.Carry(rig, pose, BerryJam.Bottles[2]);
+                    Require(bottle.Visible && Bars(jam) == 2 && Bars(blue) == 0, "changing liquids at the same fill must change the color");
+                    Require((bottle.Transform * ActorRig.BottleGrip).DistanceTo(rig.Fist(false)) < .001f,
+                        "the flask must stay in the fist while the actor walks");
+                    WorkerWaterView.Carry(rig, pose, Water.Empty);
+                    Require(bottle.Visible && Bars(blue) == 0 && Bars(jam) == 0, "an empty flask must not retain the previous liquid's color");
+                }
+
+                int Bars(Color color) => bottle.GetChildren().OfType<MeshInstance3D>().Count(part =>
+                    part.Visible && part.MaterialOverride is StandardMaterial3D material && material.AlbedoColor.IsEqualApprox(color));
+            } finally { rig.Root.Free(); }
+        }
     }
 }

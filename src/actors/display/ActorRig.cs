@@ -26,7 +26,7 @@ public sealed class ActorRig {
     /// <summary>The right fist's grip, which turns a held tool about its own length (<see cref="Pose.Grip"/>).</summary>
     private readonly Node3D wrist;
     private readonly Node3D? barrel, bucket, bucketBail, bucketWater, bottle, stream;
-    private int bottleLiters;
+    private string? bottleItem;
     private const float BottleScale = .43f;
     internal static readonly Vector3 BottleGrip = new Vector3(-.18f, .30f, 0) * BottleScale;
     internal static readonly Vector3 BottleMouth = new Vector3(0, .76f, 0) * BottleScale;
@@ -74,11 +74,8 @@ public sealed class ActorRig {
             barrel.RotationDegrees = new Vector3(-8, 0, 0);
             barrel.Hide();
         }
-        if (skin == ActorSkin.Worker) {
-            bucket = VesselShape.AddBucket(Root, Vector3.Zero);
-            bucketBail = bucket.GetChild<Node3D>(1);
-            bucketWater = Cylinder(bucket, .135f, .135f, .012f, new Vector3(0, .21f, 0), Mat("5a9eb8", .34f), sides: 14);
-            bottle = BottleShape.Create(0, capped: false, adjustable: true);
+        if (skin is ActorSkin.Player or ActorSkin.Worker) {
+            bottle = BottleShape.Create(Water.Empty, capped: skin == ActorSkin.Player, adjustable: true);
             bottle.Name = "CarriedBottle";
             for (int index = 0; index < bottle.GetChildCount(); index++) {
                 var part = bottle.GetChild<Node3D>(index);
@@ -86,9 +83,14 @@ public sealed class ActorRig {
                 part.Scale *= BottleScale;
             }
             Root.AddChild(bottle);
+            bottle.Hide();
+        }
+        if (skin == ActorSkin.Worker) {
+            bucket = VesselShape.AddBucket(Root, Vector3.Zero);
+            bucketBail = bucket.GetChild<Node3D>(1);
+            bucketWater = Cylinder(bucket, .135f, .135f, .012f, new Vector3(0, .21f, 0), Mat("5a9eb8", .34f), sides: 14);
             stream = Cylinder(Root, .016f, .021f, 1, Vector3.Zero, Mat("67b8d1", .24f), sides: 6);
             bucket.Hide();
-            bottle.Hide();
             stream.Name = "WaterStream";
             stream.Hide();
         }
@@ -693,14 +695,14 @@ public sealed class ActorRig {
 
     /// <summary>Places the vessel in the right fist and reaches for a rung or its opposite side with the left.</summary>
     internal Vector3 HoldWater(Pose pose, string item, Transform3D held, Vector3 right, Vector3? left = null,
-        Basis? bail = null) {
+        Basis? bail = null, bool lit = false) {
         bool isBucket = Bucket.Is(item);
         var vessel = isBucket ? bucket : bottle;
         var identity = Transform3D.Identity;
         (pose, float r) = ArmReach.Reaching(pose, right, identity, elbowToward: new Vector3(-1, -1, -.3f));
         float l = 0;
         if (left is Vector3 support) (pose, l) = ArmReach.Reaching(pose, support, identity, left: true, elbowToward: new Vector3(1, -1, -.3f));
-        Show(pose, null, false);
+        Show(pose, null, false, lit: lit);
         RollArm(false, r);
         RollArm(true, l);
         if (vessel == null) return Vector3.Zero;
@@ -713,12 +715,9 @@ public sealed class ActorRig {
             var turn = bail ?? Basis.Identity;
             bucketBail.Transform = new Transform3D(turn, VesselShape.BucketHinge - turn * VesselShape.BucketHinge);
             bucketWater.Visible = Bucket.Liters(item) > 0 && held.Basis.Y.Y > .85f;
-        } else {
-            int liters = Water.BottleLiters(item);
-            if (liters != bottleLiters) {
-                BottleShape.SetGauge(vessel, liters);
-                bottleLiters = liters;
-            }
+        } else if (item != bottleItem) {
+            BottleShape.SetGauge(vessel, item);
+            bottleItem = item;
         }
         return correction;
     }

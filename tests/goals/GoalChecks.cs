@@ -83,7 +83,9 @@ public static class GoalChecks {
     private static void CheckSettlementRemembersWhatItHasHad(GameData data) {
         var fresh = new World(data);
         Require(fresh.Had("steel_axe") && fresh.Had("berries") && !fresh.Had("stone") && !fresh.Had("stone_chisel") && !fresh.Had("planks"), "a new settlement should know only what it starts with");
-        Require(fresh.Had("steel_parts") && fresh.Had("iron_ore") && fresh.Had("coal") && fresh.Had("tin_bar") && fresh.Had("tin_ore"), "what the starting axe and bottle are made of should count as had along with them");
+        Require(fresh.Had("steel_parts") && fresh.Had("steel_sheet") && fresh.Had("iron_ore") && fresh.Had("coal"),
+            "what the starting axe and bottle are made of should count as had along with them");
+        Require(!fresh.Had("tin_ore"), "the starting steel bottle must not reveal tin in the settlement's history");
         var world = EmptyWorld(data);
         var tin = world.Add(ThingKind.Tin, Site(0, 0), 400);
         world.Player = tin.Pos;

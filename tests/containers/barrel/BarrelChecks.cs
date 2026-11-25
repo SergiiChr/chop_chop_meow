@@ -28,6 +28,7 @@ internal static class BarrelChecks {
         Test(CheckWorkerFindsShoreAccessAroundACabin, data);
         Test(CheckBlockedToolSwapLetsTheWorkerDoTheirNextJob, data);
         Test(CheckWorkerSwapsABottleForAnAxe, data);
+        Test(CheckRackTakesJamButDoesNotOfferItForWatering, data);
         Test(CheckWorkerFetchesABottleFromTheRack, data);
         Test(CheckBlockedBarrelLetsTheWorkerDoTheirNextJob, data);
         Test(CheckWorkerReachesBarrelAroundAChest, data);
@@ -322,6 +323,15 @@ internal static class BarrelChecks {
         world.SetDuty(worker, tree, JobKind.Gather, true);
         Work(world, 10, () => tree.Remaining < 10);
         Require(tree.Remaining < 10 && rack.Inventory[Water.Full] == 1, "the worker puts the full bottle back and uses the axe");
+    }
+
+    private static void CheckRackTakesJamButDoesNotOfferItForWatering(GameData data) {
+        var world = EmptyWorld(data);
+        var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, world.Player + Vector2.Right));
+        Give(world, BerryJam.Bottle);
+        Require(world.Transfer(world.Backpack, rack.Inventory, BerryJam.Bottle, 1) == 1,
+            "a tool rack must take the same flask when it holds jam");
+        Require(!world.StationsHold(BarrelHaul.WaterTool), "a jam bottle is not available for a water delivery");
     }
 
     private static void CheckWorkerFetchesABottleFromTheRack(GameData data) {

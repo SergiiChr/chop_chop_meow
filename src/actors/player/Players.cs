@@ -145,8 +145,10 @@ public sealed partial class World {
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At, c.Rotation)); break;
             case Verb.PlaceBarrel: Preferring(S.Backpack, c.Count, () => PlaceBarrel(c.Item, c.At, c.Rotation)); break;
             case Verb.MoveInBarrel:
-                if ((uint)c.Target <= Barrel.Capacity)
-                    Preferring(S.Backpack, (int)c.At.X, () => MoveInBarrel(Barrel.AtFill(c.Target), c.Item, c.Count, c.Other != 0, (int)c.At.Y));
+                if ((uint)c.Target <= 2 * Barrel.Capacity) {
+                    string barrel = c.Target <= Barrel.Capacity ? Barrel.AtFill(c.Target) : Barrel.AtFill(c.Target - Barrel.Capacity, BerryJam.Liquid);
+                    Preferring(S.Backpack, (int)c.At.X, () => MoveInBarrel(barrel, c.Item, c.Count, c.Other != 0, (int)c.At.Y));
+                }
                 break;
             case Verb.MoveInCrate: MoveInCrate(c.Target, c.Item, c.Count, c.Other != 0); break;
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
@@ -337,7 +339,7 @@ public sealed partial class World {
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
         bool pile = IsSingleResourceStore(chest);
-        if (chest.Kind == ThingKind.Barrel && item != Water.Liquid) return;
+        if (chest.Kind == ThingKind.Barrel && Data.VesselFor(item) == null) return;
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate || !pile && item == Inventory.Everything) || Nests(chest, item)) return;
         if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Busy() || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         if (pile && allowed) SetPileFilter(chest, PileEntry(item));

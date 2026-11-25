@@ -90,7 +90,7 @@ Play accepts Godot arguments after `--`:
 | `--performance-run /absolute/directory` | Record a benchmark: sprinting from the sea past a staffed camp and the lake to the valley's top corner, by day and again at night with a lit torch; summarise it with `python3 tools/performance_report.py /absolute/directory` |
 | `--drive /absolute/directory` | Play the window from command files written to that directory, as keys and mouse, and save screenshots there; it keeps `playtest-` saves and settings of its own (`playtest` skill) |
 
-Other showcase flags are parsed in `src/Showcase.cs`.
+Other showcase flags are parsed in `src/showcase/Showcase.cs`.
 These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
 ```sh
@@ -190,8 +190,8 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | H | Open the crew overview |
 | 1–9 or click a hotbar slot | Select and outline that slot. Start placement if it holds a plan or placeable container |
 | Pick up a plan or backpack item and click a hotbar slot | Assign it to that slot |
-| Layer button below the status bar | Switch between the surface and underground. Underground, click a pipe to see its water and pressure |
-| Space at a selected nearby reinforced furnace or water pump | Pump |
+| Layer button below the status bar | Switch between the surface and underground. Underground, click a pipe to see its contents and flow rate |
+| Space with a reinforced furnace or water pump selected | Walk into position if needed and pump once |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with the Goal Log, save, load, options, Controls, new game and quit |
@@ -214,8 +214,8 @@ The hotbar starts with an axe, pickaxe, chest, campfire, furnace, anvil, craftin
 
 Open **Options** from the start or pause menu and switch on **First-person preview**. Each launch starts overhead.
 Move with WASD or the arrow keys relative to where you look. Move the mouse to look around.
-Left and right click act on nearby things under the centre dot. Space swings where you look and still pumps a
-selected machine in reach.
+Left and right click act on nearby things under the centre dot.
+Space swings where you look, or walks into position and pumps once if a furnace or water pump is selected.
 Opening a panel or menu frees the pointer so you can click its controls. Close it to look around again.
 The valley is visible out to the horizon. Look down to see your body, and swing to see your arms and weapon move.
 Cabins, being downed and underground pipe work use the overhead view.
@@ -301,7 +301,7 @@ Their page then says "Carrying a barrel" or "Carrying a packed crate" above thei
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
 - Double-click to eat, drink one liter, light a torch, open a crate or barrel, or select a tool in its hotbar slot or directly in hand.
   A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
-- Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
+- Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/world/model/GameTables.cs`.
 - A held stack put on storage clicked in the world, such as a chest, goes into it. An item only selected on the hotbar never does.
 - Chests, placed crates, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
   A pile's funnel opens one row naming its one resource.
@@ -359,14 +359,16 @@ Taking the hard hat off, and putting it on the recipe the station is on, always 
 A hard hat moved to another recipe drops the batches that still waited.
 
 So a station with a hard hat is always on the hard-hat recipe: once the batches you queued are done, workers go on making it.
-Only a worker works a hard-hat batch: you work only the batches you queued.
+Only a worker works a hard-hat batch at the bench, anvil or cooking table: you work only the batches you queued there.
 Click the hard hat off for a station to stop after your batches.
 It starts no batch while its slots hold something another recipe left there, such as a hauler's late delivery: haulers carry that to storage, or you take it out.
 A station page opens with the group of the recipe the station is on open.
 A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
 A bench, anvil or cooking table with a batch you queued is worked by a player standing still within 1 m of its edge, or by a worker; a packing station by either, whatever it packs.
-Pumping the reinforced furnace's bellows needs the same 1 m.
+A reinforced furnace pumps at once within reach.
+For glass, the pump position is behind the furnace.
+Press Space with the furnace selected, or click Pump, to walk to the bellows and press once if out of reach.
 
 Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
 The output slot takes back what the recipe makes from your backpack, up to a stack.
@@ -388,7 +390,7 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 | --- | --- |
 | Crafting bench, anvil, cooking table, packing station | Craft, Haul |
 | Stone furnace, canning station | Haul |
-| Reinforced furnace | Bellows, Haul |
+| Reinforced furnace | Bellows, Glass blower, Haul |
 | Water pump | Pump |
 | Mine | Build, Haul, Mine |
 | Farm plot | Farm, Haul |
@@ -411,7 +413,9 @@ With no job that can be done, a worker sits at the nearest campfire they can rea
 A worker who could not reach a fire's seats tries again once a building goes up or comes down.
 With no campfire they wait at the nearest trading post, or in the clearing without one.
 Their status says what their first job lacks.
-A worker on Bellows pumps only while the furnace smelts or holds a batch to smelt, and only one worker pumps at a time, also one holding a load nothing takes.
+A worker on Bellows pumps while the furnace works or holds a batch to make.
+Only one worker pumps at a time.
+A worker on Glass blower can work the pipe at the front.
 
 The crew button opens an overview with each worker's daily pay and the total above.
 
@@ -441,7 +445,7 @@ Taking down a cabin returns its barrel with its water.
 Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one liter, taking the same gathering time.
 Filling a bottle takes the same time as one gather action.
 Empty or filled replacements can be bought individually.
-Craft an empty bottle at a bench from one tin sheet and one wood part, with the same steel hammer used for tin cans.
+Craft an empty bottle at a bench from one steel sheet and one wood part with a steel hammer.
 A recipe that uses water, such as meat stew or dough, takes liters of it poured out.
 Drag a bottle to the station's water input or Shift-click or Ctrl-click it to pour while the bottle stays in your backpack.
 Ctrl-click also pours from vessels bound to the hotbar.
@@ -478,7 +482,7 @@ In multiplayer, every player must be downed before skipping.
 
 Fog of war covers the map in the overhead view.
 Ground you have never seen is black.
-You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
+You see live only within a circle around you (`SightRadius` in `src/world/model/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
 This circle is your line of sight: it ends where the grey fog starts.
 
 Ground you have seen before is greyed out and shows things as you last saw them: a tree felled out of sight still stands there until you look again.
@@ -659,10 +663,10 @@ It makes what the menu's chisel makes (planks, wood parts, the mallet, torches a
 
 Some recipes need a better tool:
 
-- Tin cans (1 tin sheet → 4) need a steel hammer.
+- Tin cans (1 tin sheet → 2) need a steel hammer.
 - Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
-- A tin water bottle (1 tin sheet + 1 wood part) needs a steel hammer.
+- A steel water bottle (1 steel sheet + 1 wood part) needs a steel hammer.
 
 Nettle rope (1 nettle → 1 rope) is the one recipe a better tool spoils: it is made only at the bench and only with a wooden mallet.
 The mallet may be the one in the bench's hammer slot or one in your backpack, whichever hammer the other is.
@@ -683,11 +687,31 @@ The steel hammer's speed multiplies the anvil's rate, as a tool's does at the be
 Making a steel hammer takes steel parts, so the first one is bought at a trading post.
 A small steel tool such as a hammer takes 1 steel part and a big one such as an axe, pickaxe or shovel 2, plus 1 wood part for the handle.
 
-## Furnaces and steel
+## Furnaces, steel and glass
 
 - The stone furnace smelts 2 iron ore into an iron bar and 2 tin ore into a tin bar over coal or charcoal.
 - It also burns 2 wood into 1 charcoal, sears meat and bakes bread (see Cooking) over wood, coal or charcoal.
 - The reinforced furnace smelts 2 iron bars and 2 coal into 2 steel bars, burns only coal from its fuel slot, and needs heat from manual or worker-operated bellows. Steel forms from 1450 °C; below that it keeps burning coal without making steel.
+
+### Glass jars
+
+Choose Glass jar at the reinforced furnace and fit one Steel pipe in the Glass blowing pipe slot.
+The pipe stays in the slot at the end of the batch.
+Each attempt uses 5 Sand and 1 coal from the fuel slot.
+
+Work in pairs.
+The glass blower stands in front, faces the furnace and aims the pipe at the glowing center of the chamber.
+The other person presses Space or clicks Pump to walk to the bellows and work them.
+Either job can be done by a player or a hired worker.
+Leave clear ground at both ends.
+Each player works at the closest available work spot.
+A manual stroke adds 145 °C for either furnace recipe.
+
+A jar takes 10 seconds between 1,300 and 1,600 °C.
+If the furnace cools, progress waits.
+Stop pumping above 1,600 °C.
+If it stays that hot for more than half a second, the glass melts off the pipe and falls to the ground.
+That attempt's sand and fuel are lost, and the furnace starts a fresh batch once it is in range again and supplied.
 
 ## Cooking and canning
 
@@ -695,7 +719,7 @@ Sear 2 raw meat into 2 burnt steaks at the stone furnace (Sear meat recipe, one 
 Each dough bakes into 4 bread at the stone furnace.
 
 The cooking table (2 steel bars, 6 stone, 8 planks) is a steel grill over a stone firebox with a plank counter and a mortar slot.
-With a mortar and pestle slotted and someone working it, or carried by you while you work it, it crushes 4 berries into 4 crushed berries and grinds wheat into flour.
+With a mortar and pestle slotted and someone working it, or carried by you while you work it, it crushes 10 berries into 1 serving of crushed berries and grinds wheat into flour.
 Whoever works it takes the mortar off the counter, holds the bowl in one hand and grinds with the pestle in the other.
 You can do both by hand from the crafting menu with a carried mortar.
 
@@ -705,12 +729,16 @@ Dough is kneaded by hand at the table, with no fire, and only while you or an as
 
 Its other recipes cook on their own:
 
-- 2 crushed berries → jam, over one wood, coal or charcoal
+- 2 servings of crushed berries → 1 L of berry jam, over one wood, coal or charcoal
 - 1 raw meat + 1 liter of water → meat stew, over one wood, coal or charcoal
 
-The canning station (2 steel bars, 8 planks) seals meat stew or jam into a tin can over one wood, coal or charcoal.
-Raw meat is not canned: it sells as it is, in crates.
-Canned meat stew is the best food to sell.
+Pour jam into a bottle, steel bucket or barrel. The same bottle shows pink gauge bars for jam and blue bars for water. Each can of jam takes 1 L and 1 tin can.
+The canning station (2 steel bars, 8 planks) seals jam or meat stew over one wood, coal or charcoal.
+The village buys canned jam at a base price of 80 coins per can, but does not buy loose or bottled jam.
+Raw meat sells as it is, in crates.
+
+A berry restores 5 hunger, crushed berries restore 55, a liter of jam from a bottle restores 115, and canned jam restores 120.
+Hunger stops at 100.
 
 Both stations, like the stone furnace's food recipes, take wood, coal or charcoal in their fuel slot.
 
@@ -738,22 +766,23 @@ It makes a bucket from three steel sheets, a steel part and a wood part.
 The barrel recipe takes 30 seconds of base work before the bench and hammer speed bonuses.
 Barrels stack in the bench output.
 A pile can store barrels at every fill level together.
-You can carry stacks of empty barrels alongside one barrel containing water.
+You can carry stacks of empty barrels alongside one barrel containing water or jam.
 Workers carry a single barrel in both arms and keep their tool slot free.
 Carrying a barrel prevents sprinting.
-A player carrying water in the barrel braces it and walks.
+A player carrying liquid in the barrel braces it and walks.
 Each liter makes the carry slower, down to half speed at 50 liters.
 
-Double-click a barrel in the backpack or on the hotbar to open its water slot.
+Double-click a barrel in the backpack or on the hotbar to open its liquid slot.
 Right-click also opens it from the hotbar.
 Select it on the hotbar to place it.
-Hold right-click on a placed barrel to pick it up with its water.
-Pour from a bottle or bucket into its one slot, or take water back into vessels in your backpack.
+Hold right-click on a placed barrel to pick it up without losing its contents.
+Pour from a bottle or bucket into its one slot, or take liquid back into vessels in your backpack.
+Water and jam cannot share a vessel.
 Filling from an empty stack fills one barrel in the opened cell and stores the remaining empties elsewhere in the backpack.
 The pour needs room for the split before it uses any water.
 Sorting the backpack or swapping the opened barrel's cell returns you to the backpack.
 Shift-click or Ctrl-click a vessel to pour into an open barrel, including vessels bound to the hotbar.
-A placed barrel's single filter names water, like a pile's filter names its resource.
+A placed barrel's single filter names its liquid, like a pile's filter names its resource.
 A barrel put down empty takes no water from workers until its filter names water; one put down with water in it names water at once.
 A barrel holds 50 liters.
 A steel bucket holds 10 liters and hangs by its handle on the tool rack.
@@ -800,7 +829,7 @@ Piles are walkable and snap edge to edge to a pile beside them, so they line up 
 ### Compost
 
 The compost switch in the header of an empty pile with no filter makes it take leaves, grass and any food, cooked, raw or half-made, and turn 4 of them into 1 fertilizer every in-game hour.
-It keeps its own filters.
+It keeps its own filters. An empty bottle stays in the pile after its jam composts.
 
 Workers bring leaves and grass to it first, and food only when no other storage takes it.
 **Skip food delivery** stops food deliveries, while food put in by hand still composts.
@@ -859,7 +888,7 @@ In a haul group, every carry for a chest or crate ranks with an input short of a
 
 ### Tool station
 
-The tool station (8 planks, 4 stone) is a rack with four slots for tools, buckets or bottles.
+The tool station (8 planks, 4 stone) is a rack with four slots for tools, buckets or bottles, including bottles holding jam. Workers use only water vessels for water jobs.
 Its page lists which worker has which tool out and who waits for one.
 Workers need tools for some jobs:
 
@@ -898,8 +927,9 @@ They fall again every day.
 
 Place a water pump in the freshwater lake’s shallows with its handle facing dry ground.
 It costs 4 steel bars, 10 stone and 4 wood parts.
-From the bank, select it and click **Pump** or press **Space**.
-Your character steps up to the handle before pressing it.
+Select the pump and click **Pump** or press **Space**.
+Your character walks around obstacles to the handle on the bank if needed, then pumps once.
+Moving yourself or changing the selection cancels the walk.
 Aim at the pump to select it, including its thin lever and piston.
 Aim beside it to collect water.
 You can also assign a worker the **Pump** job.
@@ -913,7 +943,7 @@ Put the hammer in the anvil’s hammer slot for a worker to use.
 In building plans, pick **Steel piping** to open the cutaway and dim the surface.
 Thin blue outlines mark the pipes, trench edges and building inlets against the exposed earth.
 Empty pipes show bare steel.
-Any water in a tile turns its pipe and inlet dark blue, even at zero pressure.
+Water turns a pipe and inlet blue, and jam turns them red, even at zero pressure.
 Left-click to lay a steel pipe.
 Right-click to take one back up.
 Press R for a quarter turn and T to cycle through straight, T-junction and cross.
@@ -929,22 +959,27 @@ You can add them in batches.
 Removing steel pipes from the slot disables the building's plumbing.
 Taking down the building or picking up a barrel gives the installed steel pipes back.
 
-| Building | What piped water supplies |
+| Building | What it takes from pipes |
 | --- | --- |
 | Placed steel barrel | Fills its 50 L tank |
 | Cabin | Fills a mounted roof barrel through a pipe up the outside wall |
 | Cooking table | A brass tap over a splash plate fills the water input for the next queued or marked batch |
-| Farm plot | Four low sprinkler heads top up the soil's 10 L reserve |
+| Farm plot | Four low sprinkler heads top up the soil's 10 L water reserve |
+| Canning station | Berry jam for the next queued or marked can of jam |
 
 A cabin can connect to the line before a roof barrel is mounted.
 Farm sprinklers spray whenever water arrives, even on fallow or ripe plots and when the soil reserve is full.
 Water fills the line outward from each running pump, up to 1 L per tile.
+A nonempty plumbed barrel supplies its liquid at 1 L/s plus 1 L/s for every 10 L it holds.
+It fills empty pipes even with no building drawing liquid. Its own pipe line does not drain straight back into it.
+When no lake pump is feeding them, connected barrels of the same liquid equalize as the fuller one feeds the emptier one.
+Water and jam need separate lines. You cannot join lines that already contain different liquids.
 Buildings that need water share the available flow evenly.
 A closed tap can have a full pipe at its inlet.
 When pressure falls to zero, water stays in the pipes for the next building that needs it.
 Cutting a line leaves the water in each surviving section.
 Click the round Layer button below the left side of the status bar to switch between the surface and underground.
-Click a laid pipe underground to see how much water it holds and its current pressure.
+Click a laid pipe underground to see what it holds and its available flow rate in L/s.
 The remove tool still switches layers with right-click and takes up a pipe or a surface object with left-click.
 
 ## Gravel paths
@@ -1010,7 +1045,7 @@ The market works like a station with six unlabeled input boxes and six output bo
 It only takes packed crates.
 The village pays for:
 
-- raw meat, burnt steak, berries, bread, berry jam, meat stew, canned jam, canned meat stew;
+- raw meat, burnt steak, berries, bread, meat stew, canned jam, canned meat stew;
 - steel axes, pickaxes, shovels and hammers.
 
 Anything else in a crate goes as a donation: the cart takes it and pays nothing for it.
@@ -1115,7 +1150,8 @@ The entrance is dug at the rock face beside the cave mouth, so you and the worke
 
 Workers take the pickaxe and hammer from a tool station.
 
-A finished mine takes up to 3 workers with pickaxes, who mine out of sight underground.
+Up to 3 workers can be assigned to Mine. They mine out of sight underground with pickaxes.
+Build and Haul jobs do not use those slots. Assigning a worker to a mine with all three slots taken still gives them Build and Haul.
 The cart goes underground with them, and the lantern on the frame lights the area like a torch.
 When nobody is working, the cart stands outside, loaded once there is output.
 
@@ -1273,7 +1309,7 @@ A player left inside goes on seeing the other one dragged out for a moment befor
 
 At half health or less, away from fire and shelter, a nearby wolf crouches for a longer leap at your throat.
 You can step clear of this leap too. If it catches you, the wolf pins you, the pack rushes in to feed and you die within seconds.
-A wolf kill, by a pin or a bite, destroys all food in the recovery box; after a pin the pack keeps feeding until you respawn.
+Wolves that kill you by a pin or a bite eat your food, but leave empty jam bottles in the recovery box. After a pin the pack keeps feeding until you respawn.
 
 A slain wolf falls over and leaves a carcass that lasts until it is butchered: hold right mouse on it for 4 raw meat.
 
@@ -1369,7 +1405,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, raking leaves, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), knocking on a cabin door, being tugged back out of one and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, raking leaves, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, glassblowing, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), knocking on a cabin door, being tugged back out of one and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 A tree is felled with strokes from the side into its trunk, while an axe swung in the air comes down from overhead.
 
@@ -1380,7 +1416,8 @@ The world reacts too:
 - deposits shrink and throw chips, and crumble into chips and dust when their last piece is mined;
 - a fire that runs out of work or fuel dies down over half a second;
 - the bellows board travels with each press, and the heat gauge tracks the forge;
-- a bar under the reinforced furnace and its panel dial mark the heat steel needs;
+- a bar under the reinforced furnace and its panel dial mark the heat needed for the selected recipe;
+- glass swells on the pipe and comes off as a clear jar when it succeeds, or sags, drops and splashes on the ground when it overheats;
 - furnaces smoke (the reinforced furnace darker and thicker), and anvils spark;
 - storage lids open on transfers, and the cabin door opens for someone stepping in or out and shuts behind them, or as far as a wolf forcing it has pushed it;
 - the market mailbox flag rises while a cart is out;

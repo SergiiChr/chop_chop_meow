@@ -141,7 +141,38 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         view.CameraPitch = Launch.Number("--camera-pitch", view.CameraPitch ?? 30);
     }
 
+    /// <summary>Stages a real glass batch just before the part of the motion to record.</summary>
+    private void GlassReview(string scene) {
+        bool manual = scene == "pump";
+        var at = Terrain.Spawn + new Vector2(5, 3);
+        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 28);
+        world.S.Time = world.Data.DaySeconds * .2f;
+        var forge = world.Add(ThingKind.Reinforced, at);
+        var post = world.Add(ThingKind.Signpost, at + new Vector2(-9, 0));
+        world.Player = post.Pos;
+        world.S.Backpack.Add(Inventory.Coins, 100);
+        if (world.Hire(post, world.Data.HireOffers[1]) is Worker worker) {
+            worker.Pos = forge.ToWorld(manual ? GlassBlowing.BlowStand : World.BellowsStand);
+            world.SetDuty(worker, forge, manual ? JobKind.BlowGlass : JobKind.Bellows, true);
+        }
+        world.Player = forge.ToWorld(manual ? World.BellowsStand : GlassBlowing.BlowStand);
+        world.SetRecipe(forge, GlassBlowing.Item);
+        forge.Tools!.Add("steel_pipe", 1);
+        forge.Inventory.Add(Beach.Sand, 5);
+        if (Launch.Has("--full-output")) forge.Inventory.Add(GlassBlowing.Item, forge.Inventory.SlotRoom(GlassBlowing.Item));
+        forge.Burner!.Add("coal", 1);
+        forge.Heat = manual ? GlassBlowing.MinHeat : World.SteelHeat;
+        float start = scene switch { "success" => 9.35f, "failure" => 8, "work" => 3, _ => 0 };
+        for (int i = 0; i < 660 && forge.Progress < start; i++) world.Tick(1f / 60);
+        if (scene == "failure") forge.Heat = GlassBlowing.MaxHeat + 4;
+        AimAt(at);
+        view.Zoom = 3.5f;
+        if (Launch.Has("--panel")) panel.Select(forge); else panel.Close();
+        if (Launch.Has("--hide-ui")) ui.Visible = false;
+    }
+
     private void Place() {
+        if (Launch.Value("--glassblowing") is string glass) { GlassReview(glass); return; }
         if (Launch.Has("--farm-watering")) { FarmWateringReview(); return; }
         if (Launch.Has("--steel-vessels")) { VesselReview(); return; }
         if (Launch.Has("--environment-review")) {
@@ -411,7 +442,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (Launch.Has("--panel")) panel.Select(rack); else panel.Close(); if (Launch.Has("--filters")) { panel.Select(rack); Press("filters"); } }
         if (Launch.Has("--tin")) { var cliff = Cliff.Of(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }
         if (Launch.Has("--pantry")) {
-            foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
+            foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", BerryJam.Bottle, "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
             panel.Open(Page.Backpack);
         }
         // Hovering a recipe shows its description below the grids and as a tooltip at the pointer.

@@ -12,22 +12,22 @@ Icons and models are committed; playing does not call an image-generation servic
 | [docs/DESIGN.md](docs/DESIGN.md) | Changing game code: source files, simulation rules, confirmed design decisions |
 | [README.md](README.md) | Changing anything the player sees: controls, rules, panels, saves |
 | [docs/ECONOMY.md](docs/ECONOMY.md) | Changing prices, wages, recipes or demand |
-| [src/GameTables.cs](src/GameTables.cs) and [src/GameData.cs](src/GameData.cs) | Tuning items, recipes, building costs and pacing |
+| [src/world/model/GameTables.cs](src/world/model/GameTables.cs) and [src/world/model/GameData.cs](src/world/model/GameData.cs) | Tuning items, recipes, building costs and pacing |
 | [assets/README.md](assets/README.md) | Changing models, icons, sounds, music or their sources |
 | [docs/RELEASE.md](docs/RELEASE.md) | Branching, checking and handing off a change |
 
 ## Source map
 
-- `src/World.cs`: authoritative simulation, independent of menus and rendering.
+- `src/world/World.cs`: authoritative simulation, independent of menus and rendering.
 - `src/world/display/WorldView.cs`: reads world state and draws it.
 - `src/Game.cs`: creates and holds the interface's parts, routes input.
 - `src/SidePanel.cs` and `src/*Panel.cs`: the side panel and its pages, one node per feature.
-- `src/GameData.cs` and `src/GameTables.cs`: items, buildings, recipes, trade and time values, checked to fit together.
+- `src/world/model/GameData.cs` and `src/world/model/GameTables.cs`: items, buildings, recipes, trade and time values, checked to fit together.
 - `src/Inventory.cs`: inventory rules, used by every worker job.
 - `src/intro/`: the intro film. `IntroMovie.cs` plays it when the game opens; `WorldIntro.cs`, `IntroSets.cs` and
   `IntroPoses.cs` draw its frames (`intro-film` skill).
 - `src/Server.cs`: the headless server every game runs on.
-- `src/Net.cs`: the connection between a server and its players.
+- `src/network/Net.cs`: the connection between a server and its players.
 - `tests/<feature>/`: every check of a feature, such as `tests/hauling/`, as a player or worker sees it.
   `tests/*Checks.cs`, `src/GameChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`: checks of features with no folder yet, and the real server checks.
 - `build.py` and `tools/`: launcher, checks and asset tools.
@@ -51,6 +51,7 @@ Icons and models are committed; playing does not call an image-generation servic
   Remove this note after upgrading.
 - For a visual change, look at a rendered screenshot (`./build.py play -- --showcase --screenshot /absolute/path.png`); headless checks cannot verify presentation.
 - To make or change a 3D model, use the [modeling skill](.agents/skills/modeling/SKILL.md).
+- When using ImageGen, use renders of existing game models as references wherever possible.
 - Two renders of one build differ slightly, from wind and edge smoothing caught at another moment. To check that a
   change leaves a view alone, compare its render with the one before by overall difference
   (`magick compare -metric RMSE before.png after.png null:`) against a second render of the same build, not pixel by
