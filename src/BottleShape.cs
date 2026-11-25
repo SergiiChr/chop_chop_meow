@@ -2,15 +2,29 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A reusable tin flask with a wood stopper and a three-liter sight gauge.</summary>
+/// <summary>A reusable steel flask with a wood stopper and a three-liter sight gauge for water or jam.</summary>
 internal static class BottleShape {
-    private static Material GaugeColor(bool filled) => ModelKit.Mat(filled ? "43b9e6" : "293e46", .3f);
-    public static Node3D Create(int liters, bool capped = true, bool adjustable = false) {
+    private enum Mark { Empty, Water, Jam }
+    private const int LooksPerBar = 3;
+
+    private static Material GaugeColor(Mark mark) => ModelKit.Mat(mark switch {
+        Mark.Water => "43b9e6",
+        Mark.Jam => BerryJam.Color,
+        _ => "293e46",
+    }, .3f);
+
+    private static (int Liters, Mark Filled) Contents(string item) {
+        int jam = BerryJam.BottleLiters(item);
+        return jam > 0 ? (jam, Mark.Jam) : (Water.BottleLiters(item), Mark.Water);
+    }
+
+    public static Node3D Create(string item, bool capped = true, bool adjustable = false) {
+        var (liters, filled) = Contents(item);
         var root = new Node3D();
-        var tin = ModelKit.Metal("bbcaca", .35f, .65f);
-        var rim = ModelKit.Metal("637878", .45f, .55f);
-        ModelKit.Cylinder(root, .20f, .20f, .48f, new(0, .28f, 0), tin, sides: 8);
-        ModelKit.Cylinder(root, .20f, .085f, .14f, new(0, .59f, 0), tin, sides: 8);
+        var steel = ModelKit.Metal(VesselShape.Steel, VesselShape.Finish.Roughness, VesselShape.Finish.Metallic);
+        var rim = ModelKit.Metal(VesselShape.Edge, VesselShape.Finish.Roughness, VesselShape.Finish.Metallic);
+        ModelKit.Cylinder(root, .20f, .20f, .48f, new(0, .28f, 0), steel, sides: 8);
+        ModelKit.Cylinder(root, .20f, .085f, .14f, new(0, .59f, 0), steel, sides: 8);
         if (capped) {
             ModelKit.Cylinder(root, .085f, .085f, .10f, new(0, .71f, 0), rim, sides: 8);
             ModelKit.Cylinder(root, .10f, .10f, .075f, new(0, .79f, 0), ModelKit.Wood("90643d"), sides: 8);
@@ -25,22 +39,23 @@ internal static class BottleShape {
         for (int i = 0; i < Water.Capacity; i++) {
             var center = new Vector3(0, .17f + i * .12f, .22f);
             var size = new Vector3(.125f, .095f, .035f);
-            bool filled = i < liters;
-            if (adjustable) {
-                // Fading keeps each mesh's original material, so an adjustable gauge changes which mesh is shown.
-                ModelKit.Box(root, size, center, GaugeColor(false)).Visible = !filled;
-                ModelKit.Box(root, size, center, GaugeColor(true)).Visible = filled;
-            } else ModelKit.Box(root, size, center, GaugeColor(filled));
+            Mark shown = i < liters ? filled : Mark.Empty;
+            // Fading keeps each mesh's original material, so an adjustable gauge changes which mesh is shown.
+            if (adjustable) for (int look = 0; look < LooksPerBar; look++)
+                ModelKit.Box(root, size, center, GaugeColor((Mark)look)).Visible = (Mark)look == shown;
+            else ModelKit.Box(root, size, center, GaugeColor(shown));
         }
         return root;
     }
 
-    /// <summary>An adjustable bottle ends with one empty and one full mesh per mark, from lowest to highest.</summary>
-    public static void SetGauge(Node3D bottle, int liters) {
-        int first = bottle.GetChildCount() - 2 * Water.Capacity;
+    /// <summary>An adjustable bottle ends with three meshes per gauge bar, one for each possible appearance.</summary>
+    public static void SetGauge(Node3D bottle, string item) {
+        var (liters, filled) = Contents(item);
+        int first = bottle.GetChildCount() - LooksPerBar * Water.Capacity;
         for (int i = 0; i < Water.Capacity; i++) {
-            bottle.GetChild<MeshInstance3D>(first + 2 * i).Visible = i >= liters;
-            bottle.GetChild<MeshInstance3D>(first + 2 * i + 1).Visible = i < liters;
+            Mark shown = i < liters ? filled : Mark.Empty;
+            for (int look = 0; look < LooksPerBar; look++)
+                bottle.GetChild<MeshInstance3D>(first + LooksPerBar * i + look).Visible = (Mark)look == shown;
         }
     }
 }

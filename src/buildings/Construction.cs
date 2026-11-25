@@ -57,6 +57,8 @@ public sealed class Construction(World world) {
             if (!Terrain.OnMap(tile)) return "Choose a tile on the map.";
             if (TooFar(tile) is string pipeFar) return pipeFar;
             if (world.SteelPipes.Laid(tile)) return "A steel pipe is already laid here.";
+            if (world.PipesWouldMix(tile, world.SteelPipes.PreviewMask(tile, rotation, pipeShape)))
+                return "Different liquids cannot share connected pipes.";
             return Unaffordable(kind);
         }
         if (WolfPatrols.NearDen(p, Den.Clearance)) return "Leave the wolf den's mouth clear.";

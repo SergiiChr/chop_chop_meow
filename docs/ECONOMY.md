@@ -1,6 +1,6 @@
 # Economy rules
 
-Prices, wages and demand live in `src/GameTables.cs`.
+Prices, wages and demand live in `src/world/model/GameTables.cs`.
 `tests/EconomyChecks.cs` runs these rules on every `./build.py check` and prints the numbers it measured as `Economy:` lines in `build/test.log`.
 
 To tune: change the data, run the tests, and read those lines before and after.
@@ -8,7 +8,7 @@ To tune: change the data, run the tests, and read those lines before and after.
 One steel bar makes one stackable steel pipe at the anvil with a steel hammer in 10 base seconds.
 A pipe tile costs one steel pipe.
 A building takes ten steel pipes in its Plumbing slot.
-The pump costs four steel bars, ten stone and four wood parts.
+The pump costs four steel bars, ten stone and four wood parts. A reusable bottle takes one steel sheet and one wood part at a bench with a steel hammer.
 
 ## 1. Prices and whole chains
 
@@ -37,12 +37,12 @@ Measured, at 18 coins a worker-day, a crate of 12 and full price:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Berries | 0.58 | 10 | 0 | 10 | 13 | 3 | | 0.6 days |
 | Bread | 0.42 | 8 | 0.8 | 8 | 30 | 22 | 3 days | 3.4 days |
-| Berry jam | 1.41 | 25 | 0 | 25 | 70 | 45 | | 1.4 days |
-| Canned jam | 1.62 | 29 | 0 | 29 | 143 | 114 | | 1.6 days |
+| Canned jam | 11.11 | 200 | 0 | 200 | 963 | 763 | | 11.1 days |
 | Steel axe, pickaxe, shovel | 1.11 | 20 | 0 | 20 | 471 | 451 | | 1.1 days |
 | Steel hammer | 0.71 | 13 | 0 | 13 | 243 | 230 | | 0.7 days |
 
 Not costed: raw meat, burnt steak, meat stew and canned meat stew.
+A crate of canned jam needs 240 berries and 6 tin ore. The village buys the cans, not loose or bottled jam.
 The `Economy:` lines print this table on every run.
 
 ## 2. Hiring
@@ -86,7 +86,7 @@ Each good the village takes has `Daily`, `Steady` and `Drop` in its `Sells` entr
 |---|---|---|---|
 | Berries | 36 (3 crates) | 36 | 5% |
 | Raw meat and burnt steak | 24 (2 crates) | 24 | 5% |
-| Bread, berry jam, meat stew, canned jam and canned meat stew | 24 (2 crates) | 24 | 5% |
+| Bread, meat stew, canned jam and canned meat stew | 24 (2 crates) | 24 | 5% |
 | Steel axe, pickaxe, shovel and hammer | 12 (1 crate) | 0 | 50% |
 
 - Food is a steady staple: its daily amount sells at the full price, and past it the price slips slowly.

@@ -16,7 +16,7 @@ public static class WaterChecks {
         Test(CheckBottleStatesAreDefinedInData, data);
         Test(CheckBottleGivesThreeLiters, data);
         Test(CheckBottleKeepsPartialStateAcrossSave, data);
-        Test(CheckBottleRecipeMakesEmptyBottleFromTinAndWood, data);
+        Test(CheckBottleRecipeMakesEmptyBottleFromSteelAndWood, data);
         Test(CheckRecipesReturnReusableBottles, data);
         Test(CheckTakingWaterOutNeedsABottleWithRoom, data);
         Test(CheckQueuedBatchPoursWaterFromBottles, data);
@@ -97,14 +97,15 @@ public static class WaterChecks {
         Require(loaded.Backpack["water_2"] == 1 && loaded.Backpack["water"] == 0, "save and load should preserve the bottle's partial state");
     }
 
-    private static void CheckBottleRecipeMakesEmptyBottleFromTinAndWood(GameData data) {
+    private static void CheckBottleRecipeMakesEmptyBottleFromSteelAndWood(GameData data) {
         var recipe = data.Recipes["water_bottle"];
         Require(recipe.Output == "empty_bottle", "the bottle recipe should create an empty bottle");
         Require(recipe.Amount == 1, "the bottle recipe should create one bottle");
+        Require(recipe.Name == "Steel water bottle", "the crafting list should call the recipe Steel water bottle");
         Require(recipe.Tool == "hammer", "the bottle recipe should need the hammer");
-        Require(recipe.Tier == 2, "the bottle recipe should need the tin-can hammer tier");
-        Require(recipe.Inputs.TryGetValue("tin_sheet", out int tin), "the bottle recipe should use tin sheet");
-        Require(tin == 1, "the bottle recipe should use one tin sheet");
+        Require(recipe.Tier == 2, "the bottle recipe should need a steel hammer");
+        Require(recipe.Inputs.TryGetValue("steel_sheet", out int steel) && steel == 1 && !recipe.Inputs.ContainsKey("tin_sheet"),
+            "the bottle recipe should use one steel sheet and no tin");
         Require(recipe.Inputs.TryGetValue("wood_parts", out int parts), "the bottle recipe should use wood parts");
         Require(parts == 1, "the bottle recipe should use one wood part");
         Require(data.Market.Buys.ContainsKey("water"), "full bottles should remain purchasable");
@@ -114,7 +115,7 @@ public static class WaterChecks {
         var world = new World(data, false);
         var bench = world.Add(ThingKind.Bench, world.Player + Vector2.Right * 1.4f);
         bench.Tools!.Add("steel_hammer", 1);
-        Give(world, "tin_sheet", 1); Give(world, "wood_parts", 1);
+        Give(world, "steel_sheet", 1); Give(world, "wood_parts", 1);
         world.QueueBatch(bench, "water_bottle");
         for (int i = 0; i < 100; i++) world.Tick(.25f, true);
         Require(bench.Inventory["empty_bottle"] == 1 && bench.Inventory["water"] == 0,

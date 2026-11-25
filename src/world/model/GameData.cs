@@ -236,13 +236,19 @@ public sealed partial class GameData {
             data.Items.Add(Barrel.AtFill(liters), new() { Name = $"Steel barrel ({liters} L)", Color = data.Items[Barrel.Item].Color });
         for (int liters = 1; liters <= Bucket.Capacity; liters++)
             data.Items.Add(Bucket.AtFill(liters), new() { Name = $"Steel bucket ({liters} L)", Color = data.Items[Bucket.Item].Color, Tool = Bucket.Item });
+        for (int liters = 1; liters < BerryJam.Bottles.Length; liters++)
+            data.Items.Add(BerryJam.Bottles[liters], new() { Name = $"Berry jam bottle ({liters} L)", Color = BerryJam.Color, Food = true, Hunger = BerryJam.HungerPerLiter });
+        for (int liters = 1; liters <= Bucket.Capacity; liters++)
+            data.Items.Add(BerryJam.Buckets[liters], new() { Name = $"Steel bucket ({liters} L berry jam)", Color = data.Items[Bucket.Item].Color });
+        for (int liters = 1; liters <= Barrel.Capacity; liters++)
+            data.Items.Add(BerryJam.Barrels[liters], new() { Name = $"Steel barrel ({liters} L berry jam)", Color = data.Items[Barrel.Item].Color });
         data.Validate();
         Inventory.Unstacked.Clear();
         foreach (var (id, item) in data.Items) if (item.Tool != "" && id != Bucket.Item) Inventory.Unstacked.Add(id);
         // Empty buckets stack.
         // Filled vessels and barrels each take a cell.
         foreach (var vessel in data.Vessels) foreach (string id in vessel.States) if (id != Bucket.Item) Inventory.Unstacked.Add(id);
-        foreach (string item in Barrel.Fills) if (item != Barrel.Item) Inventory.Unstacked.Add(item);
+        for (int i = 1; i <= Barrel.Capacity; i++) { Inventory.Unstacked.Add(Barrel.Fills[i]); Inventory.Unstacked.Add(BerryJam.Barrels[i]); }
         return data;
     }
     private void Validate() {
@@ -292,11 +298,15 @@ public sealed partial class GameData {
             throw new InvalidOperationException($"{misplaced}: only cooking table recipes choose whether they are worked.");
         foreach (var v in Vessels) {
             if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
-                || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Output == v.Liquid || r.Hand && r.Inputs.ContainsKey(v.Liquid)))
+                || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Hand && (r.Output == v.Liquid || r.Inputs.ContainsKey(v.Liquid))))
                 throw new InvalidOperationException($"Invalid vessel: {v.Full}. Its liquid is only poured into stations, and no hand recipe takes it.");
             vesselFor.TryAdd(v.Liquid, v);
-            if (!v.States.All(id => vesselOf.TryAdd(id, v)))
-                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Each fill belongs to one vessel.");
+            if (vesselOf.TryGetValue(v.Empty, out var same) && (same.Empty != v.Empty || same.Capacity != v.Capacity))
+                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Shared empty vessels must have the same capacity.");
+            vesselOf.TryAdd(v.Empty, v);
+            for (int fill = 1; fill < v.States.Count; fill++)
+                if (!vesselOf.TryAdd(v.States[fill], v))
+                    throw new InvalidOperationException($"Invalid vessel: {v.Full}. Every filled state belongs to only one vessel.");
         }
         ValidateMap();
     }
@@ -314,7 +324,7 @@ public sealed partial class GameData {
     private static readonly RecipeGroup[] ListedGroups = [RecipeGroup.Materials, RecipeGroup.Tools, RecipeGroup.Containers, RecipeGroup.Food];
     private static readonly List<string> Nothing = new();
     /// <summary>Container fills the recipe map leaves out because they share a slot with the base item.</summary>
-    public static bool OffTheMap(string item) => Barrel.Liters(item) > 0 || Bucket.Liters(item) > 0 || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
+    public static bool OffTheMap(string item) => Barrel.Liters(item) > 0 || Bucket.Is(item) && item != Bucket.Item || BerryJam.InBottle(item) || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
     /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
     public string? RecipeIdOf(string item) => recipeIdOf.GetValueOrDefault(item);
     /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>

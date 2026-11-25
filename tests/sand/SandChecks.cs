@@ -25,7 +25,10 @@ public static class SandChecks {
         DigSand(world, 2);
         Require(world.Backpack["sand"] == 10 && world.ThingsOf(ThingKind.Hole).Count == 0,
             "a sand square should give ten sand without leaving a planting hole");
+        string? message = null;
+        world.Notify = text => message = text;
         Require(!world.Holes.Begin(SandSquare, 3), "a stripped square should give no more sand");
+        Require(message == "No more sand left.", $"a stripped square should say there is no sand left, not: {message}");
         Require(world.Holes.Begin(SandSquare + Vector2.Left, 4), "digging one square should leave its neighbour intact");
     }
 

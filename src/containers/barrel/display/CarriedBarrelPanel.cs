@@ -31,7 +31,7 @@ public partial class CarriedBarrelPanel(PageTools tools, int barrelSlot) : PageP
                     world.FromHeldStack(() => world.MoveInBarrel(barrel, stack.Item, Math.Min(units, stack.Count), true, barrelSlot));
             }),
         };
-        BarrelPanel.ShowLiters(live, cell, count, () => Item is string barrel ? Barrel.Liters(barrel) : 0,
+        BarrelPanel.ShowContents(live, cell, count, () => Item is string barrel ? Barrel.LiquidOf(barrel) : Water.Liquid, () => Item is string barrel ? Barrel.Liters(barrel) : 0,
             "LMB: take 1 L · Shift or Ctrl: fill backpack vessels");
         Well(new HBoxContainer()).AddChild(cell);
         AddButton("Put it down", () => { if (Item is string barrel) panel.Player.PlaceContainer(barrel, barrelSlot); });
@@ -47,9 +47,10 @@ public partial class CarriedBarrelPanel(PageTools tools, int barrelSlot) : PageP
         if (swapsBarrel) panel.Open(Page.Backpack);
     }
 
-    private bool CanPour(string item) => item != Water.Liquid && Barrels.CanPour(world.Data, item);
+    private bool CanPour(string item) => Item is string barrel && world.Data.VesselOf(item) is VesselDef vessel
+        && vessel.LitersIn(item) > 0 && (Barrel.Liters(barrel) == 0 || Barrel.LiquidOf(barrel) == vessel.Liquid);
 
     private void Take(int liters) {
-        if (Item is string barrel) world.MoveInBarrel(barrel, Water.Liquid, liters, false, barrelSlot);
+        if (Item is string barrel) world.MoveInBarrel(barrel, Barrel.LiquidOf(barrel), liters, false, barrelSlot);
     }
 }

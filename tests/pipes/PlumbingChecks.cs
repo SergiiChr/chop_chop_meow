@@ -17,6 +17,7 @@ public static class PlumbingChecks {
         Test(CheckFractionalDeliverySurvivesLoading, data);
         Test(CheckClosedPlumbingStaysPressurizedAndFull, data);
         Test(CheckSeparatedPipesKeepTheirWaterThroughLoading, data);
+        JamPlumbingChecks.Run(data);
     }
 
     private static void CheckEachPumpFillsFromItsOwnInlet(GameData data) {
@@ -61,14 +62,14 @@ public static class PlumbingChecks {
 
         PumpFully(world, pump);
         world.Tick(1);
-        Require(world.PipeReading(pumpTile) == (1, 100), "The source pipe should hold pressurized water.");
+        Require(world.PipeReading(pumpTile) == (1, 5), "The source pipe should hold pressurized water.");
         Require(world.PipeReading(barrelTile) == (0, 0) && barrel.Inventory[Water.Liquid] == 0,
             "Water and pressure should stop where the two lines meet only at a corner.");
 
         LayPipe(world, pumpTile + Vector2I.Down, Mathf.Pi, PipeShape.Tee);
         PumpFully(world, pump);
         world.Tick(1);
-        Require(world.PipeReading(barrelTile) == (1, 100) && barrel.Inventory[Water.Liquid] == 2,
+        Require(world.PipeReading(barrelTile) == (1, 5) && barrel.Inventory[Water.Liquid] == 2,
             "A turn with matching side openings should carry water and pressure to the barrel.");
     }
 
@@ -82,12 +83,12 @@ public static class PlumbingChecks {
 
         PumpFully(world, pump);
         world.Tick(1);
-        Require(barrel.Inventory[Water.Liquid] == 2 && world.PipeReading(EastTankTile) == (0, 0),
-            "A disconnected barrel must draw the liter in its own pipe and receive no more from the pump.");
+        Require(barrel.Inventory[Water.Liquid] == 1 && world.PipeReading(EastTankTile) == (1, 1.1f),
+            "An isolated nonempty barrel must keep the liter in its pipe pressurized without drawing from the pump.");
         LayPipe(world, tile, Mathf.Pi / 2);
         world.Tick(.5f);
-        Require(barrel.Inventory[Water.Liquid] == 2 && !barrel.ReceivingWater,
-            "A pipe laid across the line must leave the barrel disconnected after its stored water is gone.");
+        Require(barrel.Inventory[Water.Liquid] == 1 && !barrel.ReceivingWater,
+            "A pipe laid across the line must leave the barrel disconnected from the pump.");
     }
 
     private static void CheckAnUnmountedCabinDoesNotTakeAShare(GameData data) {
@@ -147,11 +148,11 @@ public static class PlumbingChecks {
         }
         Require(barrel.Inventory[Water.Liquid] == 50 && !barrel.ReceivingWater,
             "A full barrel cannot accept any more water.");
-        Require(world.PipeReading(EastTankTile) == (1, 100),
-            "The pipe under the full barrel should hold one liter at the pump's full pressure.");
+        Require(world.PipeReading(EastTankTile) == (1, 6),
+            "The full barrel should raise the pipe to six liters per second, above the pump's maximum.");
         world.Tick(10);
-        Require(world.PipeReading(EastTankTile) == (1, 0),
-            "The closed pipe must retain its water as the pump's pressure drops to zero.");
+        Require(world.PipeReading(EastTankTile) == (1, 6) && pump.Pressure == 0,
+            "A full barrel must keep its pipe pressurized after the pump stops.");
     }
 
     private static void CheckSeparatedPipesKeepTheirWaterThroughLoading(GameData data) {
@@ -166,9 +167,9 @@ public static class PlumbingChecks {
             "Both sections should keep their own standing water after a pipe between them is removed.");
         InstallPlumbing(world, barrel);
         world.Tick(.125f);
-        Require(barrel.Inventory[Water.Liquid] == 1 && world.PipeReading(EastTankTile) == (0, 0)
+        Require(barrel.Inventory[Water.Liquid] == 1 && world.PipeReading(EastTankTile) == (0, 1.1f)
             && world.PipeReading(JunctionTile) == (1, 0),
-            "Demand should drain only the water in the separated section attached to the barrel.");
+            "An empty barrel should take standing water only from its own pipe, then provide pressure.");
 
         world.Deserialize(save);
         Require(world.PipeReading(EastTankTile) == (1, 0) && world.PipeReading(JunctionTile) == (1, 0),

@@ -17,9 +17,9 @@ public sealed class FilterState {
 /// The item list runs in <see cref="GameData.ListOrder"/>, with crates of goods after the items in their goods' order, and crates of mixed goods last.
 /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
 /// A plain pile has only the row of what workers bring, naming one resource, which also sets what they take.
-/// A barrel has the same single row and names water; neither offers Everything.
+/// A barrel has the same single row and names one liquid. Neither offers Everything.
 /// A placed crate's filters name no crate.
-/// Water in a full or partly filled vessel is one entry.
+/// All filled vessels for a liquid count as the same filter entry for a barrel.
 /// </summary>
 /// <param name="redraw">Draws the page again after a change to this window; the page does so itself when the filters change.</param>
 /// <param name="scrolls">Takes the item list's scroll area and the list, so the panel fits it to the screen.</param>
@@ -60,7 +60,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
                 Takes = held => held.Stack is HeldStack stack && CanName(stack.Item),
                 Put = (held, _) => {
                     var kind = World.PackedKind(held.Item!);
-                    string item = barrel ? Water.Liquid : kind.IsEmpty ? held.Item! : new string(kind);
+                    string item = barrel ? Barrels.PouredLiquid(world.Data, held.Item!)! : kind.IsEmpty ? held.Item! : new string(kind);
                     world.SetFilter(t, item, output, true); held.Release();
                 },
             };
@@ -76,7 +76,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             if (pile) crates = crates.Append(World.MixedCrate);
             var items = world.Data.ListOrder.Where(Holds);
             if (pile) items = items.Select(world.PileEntry).Distinct();
-            var choices = barrel ? new[] { Water.Liquid } : post ? crates : items.Concat(crates);
+            var choices = barrel ? items.Where(id => world.Data.VesselFor(id) != null) : post ? crates : items.Concat(crates);
             if (!single) choices = choices.Prepend(Inventory.Everything);
             foreach (var id in choices) {
                 var cell = FilterCell($"pick_{id}", id); cell.TooltipText = world.FilterName(id);
@@ -90,7 +90,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
         bool Holds(string item) => world.Holds(t, item) && !World.Nests(t, item);
 
         bool CanName(string item) {
-            if (barrel) return Barrels.CanPour(world.Data, item);
+            if (barrel) return Barrels.PouredLiquid(world.Data, item) != null;
             if (World.Nests(t, item)) return false;
             var kind = World.PackedKind(item);
             return !kind.IsEmpty && (pile || !kind.SequenceEqual(World.MixedCrate)) || !post && world.Data.Items.ContainsKey(item);

@@ -23,7 +23,7 @@ internal static class RackShape {
     /// <summary>A metal clip holds the bottle by its neck just below the peg.</summary>
     public static Node3D AddBottle(Node3D rack, int slot) {
         var hook = ModelKit.Pivot(rack, new Vector3(PegX(slot), 1.32f, .14f));
-        var bottle = BottleShape.Create(0, adjustable: true);
+        var bottle = BottleShape.Create(Water.Empty, adjustable: true);
         bottle.Position = Vector3.Down * .366f;
         bottle.Scale = Vector3.One * .48f;
         hook.AddChild(bottle);

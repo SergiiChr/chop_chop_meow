@@ -16,8 +16,10 @@ public sealed class SteelPipes(World world) {
     /// <summary>Adjacent tiles and their reciprocal ports, clockwise from east.</summary>
     internal static ReadOnlySpan<(Vector2I Offset, int Port, int Opposite)> Sides => SideDirections;
     private Dictionary<int, PipeTile>? seen;
-    private Dictionary<int, double>? seenWater;
+    private Dictionary<int, double>? seenWater, seenJam;
     private int revision, waterRevision;
+    private readonly HashSet<int> validatedTiles = [];
+    private readonly Queue<int> validateNext = [];
 
     /// <summary>A number that changes when pipes are laid or removed or the pipe layer is loaded.</summary>
     public int Revision {
@@ -32,7 +34,8 @@ public sealed class SteelPipes(World world) {
     internal int WaterRevision {
         get {
             var water = world.S.PipeWater;
-            if (!ReferenceEquals(seenWater, water)) { seenWater = water; waterRevision++; }
+            var jam = world.S.PipeJam;
+            if (!ReferenceEquals(seenWater, water) || !ReferenceEquals(seenJam, jam)) { seenWater = water; seenJam = jam; waterRevision++; }
             return waterRevision;
         }
     }
@@ -88,19 +91,48 @@ public sealed class SteelPipes(World world) {
     internal void Remove(Vector2I tile) {
         int index = Terrain.TileIndex(tile);
         if (!world.S.SteelPipes.Remove(index)) return;
-        StoreWater(index, 0);
+        if (LiquidAt(index) is string liquid) Store(index, liquid, 0);
         revision++;
     }
 
     /// <summary>Liters standing in the pipe at this map index, or zero when it is empty.</summary>
-    internal double WaterAt(int index) => world.S.PipeWater.GetValueOrDefault(index);
+    internal double LitersAt(int index) => world.S.PipeWater.GetValueOrDefault(index) + world.S.PipeJam.GetValueOrDefault(index);
 
-    internal void StoreWater(int index, double liters) {
-        var water = world.S.PipeWater;
-        int before = water.Count;
-        if (liters > 0) water[index] = liters;
-        else water.Remove(index);
-        if (water.Count != before) waterRevision++;
+    internal string? LiquidAt(int index) => world.S.PipeJam.ContainsKey(index) ? BerryJam.Liquid
+        : world.S.PipeWater.ContainsKey(index) ? Water.Liquid : null;
+
+    internal void Store(int index, string liquid, double liters) {
+        var contents = liquid == BerryJam.Liquid ? world.S.PipeJam : world.S.PipeWater;
+        int before = contents.Count;
+        if (liters > 0) contents[index] = liters;
+        else contents.Remove(index);
+        if (contents.Count != before) waterRevision++;
+    }
+
+    /// <summary>Saved and synchronized lines can hold only one kind of liquid apiece.</summary>
+    internal bool ValidContents(Dictionary<int, double>? water, Dictionary<int, double>? jam, Dictionary<int, PipeTile> layout) {
+        if (water == null || jam == null || !ValidWater(water, layout) || !ValidWater(jam, layout)) return false;
+        if (water.Count == 0 || jam.Count == 0) return true;
+        validatedTiles.Clear();
+        validateNext.Clear();
+        foreach (int start in jam.Keys) {
+            if (!validatedTiles.Add(start)) continue;
+            validateNext.Enqueue(start);
+            while (validateNext.TryDequeue(out int tile)) {
+                if (water.ContainsKey(tile)) return false;
+                var at = new Vector2I(tile % Terrain.Size, tile / Terrain.Size);
+                var pipe = layout[tile];
+                int ports = PortMask(pipe.Rotation, pipe.Shape);
+                foreach (var (offset, port, opposite) in Sides) {
+                    var next = at + offset;
+                    if ((ports & port) == 0 || !Terrain.OnMap(next)) continue;
+                    int index = Terrain.TileIndex(next);
+                    if (layout.TryGetValue(index, out var other) && (PortMask(other.Rotation, other.Shape) & opposite) != 0 && validatedTiles.Add(index))
+                        validateNext.Enqueue(index);
+                }
+            }
+        }
+        return true;
     }
 
     /// <summary>Whether stored water is in laid pipes within their capacity.</summary>

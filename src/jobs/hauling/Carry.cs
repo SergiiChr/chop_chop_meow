@@ -15,7 +15,7 @@ internal struct Carry {
     /// <summary>The load goes into the fuel slot.</summary>
     public bool Fuel;
     /// <summary>The load is vessels with room, brought to take out liquid the place's recipe no longer uses.</summary>
-    public bool Clears;
+    public string? DrainLiquid;
     /// <summary>Which of the four haul rules offers the carry, the first before the others.</summary>
     public int Rule;
     /// <summary>Its place among the carries of its rule, lowest first.</summary>
