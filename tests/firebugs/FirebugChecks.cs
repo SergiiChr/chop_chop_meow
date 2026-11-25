@@ -112,7 +112,7 @@ public static class FirebugChecks {
     private static void CheckSwingAimedAQuarterTurnAwayMissesAFirebug(GameData data) {
         var (world, bug, _) = RestingFirebug(data);
         var rest = bug.Pos;
-        SwingWithFirebugOnTheLeft(world, bug);
+        SwingAt(world, bug, aside: true);
         SafeTick(world, Step);
         Require(world.Find(bug.Id) != null && world.Backpack["firebug"] == 0 && bug.Pos != rest,
             "a swing aimed a quarter turn to the right of a firebug should miss it and send it darting");

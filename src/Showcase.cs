@@ -152,7 +152,6 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Player = at;
             world.Tick(0); view.Zoom = Launch.Number("--zoom", 1.8f);
             if (Launch.Has("--hide-ui")) ui.Visible = false;
-            // With --chase the player runs the firebugs down and nets them, played through the keys and the mouse.
             if (Launch.Has("--chase")) view.AddChild(new FirebugChase { World = world, View = view });
             panel.Close(); return;
         }

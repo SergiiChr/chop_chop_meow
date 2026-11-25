@@ -45,7 +45,7 @@ public enum ActorAction {
     FillVessel,
     PumpWater,
     Rake,
-    /// <summary>A bug net swept sideways across the front, hoop first.</summary>
+    /// <summary>A bug net brought down on a slant across the front, hoop first.</summary>
     NetSwing,
     /// <summary>Fibres twisted into rope between both hands over a bench; it takes turns with mallet blows.</summary>
     TwistRope
@@ -152,7 +152,7 @@ public static class ActorAnimation {
 
     /// <summary>
     /// Seconds into a swing at which it lands: the punch at full stretch, the torch crossing in front, the axe at the bottom of
-    /// its overhead stroke or as its sweep crosses the front; zero for anything else.
+    /// its overhead stroke or as its sweep crosses the front, the net as its hoop crosses straight ahead; zero for anything else.
     /// </summary>
     public static float Contact(ActorAction action) => action switch {
         ActorAction.Attack => .32f * Duration(action),
@@ -233,9 +233,9 @@ public static class ActorAnimation {
         (.1f, Stance with { Twist = -30, RaiseR = 48, OutR = 76, ElbowR = 82, RaiseL = 45, OutL = 28, ElbowL = 28, Grip = -45 }),
         (.22f, Stance with { Lean = -5, Twist = -55, RaiseR = 76, OutR = 85, ElbowR = 67, RaiseL = 65, OutL = 45, ElbowL = 15, Grip = -90 }),
         (.32f, Stance with { Twist = -42, RaiseR = 50, OutR = 85, ElbowR = 69, RaiseL = 60, OutL = 40, ElbowL = 20, Grip = -105 }),
-        (.4f, Stance with { Lean = 5, Twist = -22, RaiseR = 53, OutR = 37, ElbowR = 69, RaiseL = 46, OutL = 30, ElbowL = 38, Grip = -85, Hips = .803f }),
+        (NetReaches, Stance with { Lean = 5, Twist = -22, RaiseR = 53, OutR = 37, ElbowR = 69, RaiseL = 46, OutL = 30, ElbowL = 38, Grip = -85, Hips = .803f }),
         (NetCatch, Stance with { Lean = 10, RaiseR = 64, OutR = -10, ElbowR = 45, RaiseL = 28, OutL = 22, ElbowL = 58, Grip = -65, Hips = .8f }),
-        (.6f, Stance with { Lean = 16, Twist = 26, RaiseR = 36, OutR = -46, ElbowR = 51, RaiseL = 8, OutL = 24, ElbowL = 55, Grip = -35, Hips = .79f }),
+        (NetPasses, Stance with { Lean = 16, Twist = 26, RaiseR = 36, OutR = -46, ElbowR = 51, RaiseL = 8, OutL = 24, ElbowL = 55, Grip = -35, Hips = .79f }),
         (.7f, Stance with { Lean = 22, Twist = 44, RaiseR = 51, OutR = -45, ElbowR = 14, RaiseL = -14, OutL = 30, ElbowL = 42, Grip = -15, Hips = .78f }),
         (.78f, Stance with { Lean = 24, Twist = 52, RaiseR = 54, OutR = -47, ElbowR = 4, RaiseL = -20, OutL = 34, ElbowL = 36, Grip = -20, Hips = .775f }),
         (.9f, Stance with { Lean = 10, Twist = 15, RaiseR = 43, OutR = -37, ElbowR = 47, RaiseL = 8, OutL = 16, ElbowL = 40, Grip = 70, Hips = .795f }),
@@ -247,8 +247,11 @@ public static class ActorAnimation {
     /// The stroke arrives there at its full speed and stops.
     /// </summary>
     private const float ChopStrike = .52f, MineStrike = .55f, HammerStrike = .5f, AxeSwingStrike = .52f;
-    /// <summary>The share of a bug net's swing at which the hoop crosses straight ahead at the height a firebug flies.</summary>
-    private const float NetCatch = .5f;
+    /// <summary>
+    /// The shares of a bug net's swing at which the hoop comes down to the height a firebug flies at, crosses straight
+    /// ahead at that height, and goes below it.
+    /// </summary>
+    public const float NetReaches = .4f, NetCatch = .5f, NetPasses = .6f;
     /// <summary>Which of its keys an axe swung overhead in the air is brought up short at.</summary>
     private const int AxeSwingStop = 2;
 

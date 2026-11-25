@@ -179,7 +179,7 @@ public static class SwingsChecks {
         var rig = new ActorRig(ActorSkin.Player);
         foreach (var (action, windup, end, shape) in new[] {
             (ActorAction.SteelAxeSwing, .46f, .52f, Swings.Chop), (ActorAction.SteelAxeSweep, .34f, .6f, Swings.Sweep),
-            (ActorAction.TorchSwing, .2f, .45f, Swings.Torch), (ActorAction.Attack, .18f, .32f, Swings.Punch), (ActorAction.NetSwing, .4f, .6f, Swings.Net) }) {
+            (ActorAction.TorchSwing, .2f, .45f, Swings.Torch), (ActorAction.Attack, .18f, .32f, Swings.Punch), (ActorAction.NetSwing, ActorAnimation.NetReaches, ActorAnimation.NetPasses, Swings.Net) }) {
             float lands = ActorAnimation.Contact(action) / ActorAnimation.Duration(action), far = 0, left = -180, right = -180, low = float.MaxValue;
             Require(lands >= windup && lands <= end, $"{action} should land during its stroke, {windup} to {end} through, not {lands:0.00} through");
             for (float p = windup; p <= end + .001f; p += .01f) {
@@ -196,6 +196,10 @@ public static class SwingsChecks {
             Require(shape.Far - far < .25f, $"{action} should reach no more than a head's width past the {far:0.00} m its model does, not to {shape.Far} m");
             Require(shape.Left - left < 8 && shape.Right - right < 8, $"{action} should sweep from {left:0} degrees left to {right:0} right as its model does, not {shape.Left} to {shape.Right}");
         }
+        // A net's hoop is 0.17 m to its rim, and it catches at any height: it has to be at a firebug's as it lands.
+        rig.Show(ActorAnimation.PoseAt(ActorAction.NetSwing, ActorAnimation.Contact(ActorAction.NetSwing), false), ActorAnimation.Tool(ActorAction.NetSwing), false);
+        float hoop = rig.Holds(ActorRig.NetMouth).Y;
+        Require(MathF.Abs(hoop - FirebugShape.Height) < .17f, $"a net's hoop should be at the height a firebug flies at, {FirebugShape.Height} m, as it lands, not at {hoop:0.00} m");
         rig.Root.Free();
     }
 

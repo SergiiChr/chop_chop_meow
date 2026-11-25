@@ -9,13 +9,12 @@ namespace ChopChopMeow;
 /// Its colours follow the fireflies of pixelfx, Patch's pixel effects library (MIT).
 /// </summary>
 public static class FirebugShape {
-    /// <summary>Metres off the ground a firebug flies, the height a net's hoop is swept at, and how far up and down of that it bobs.</summary>
+    /// <summary>Metres off the ground a firebug flies, the height a net's hoop crosses the front at, and how far up and down of that it bobs.</summary>
     public const float Height = 1.25f, Bob = .2f;
-    /// <summary>How bright a firebug glows at rest, of a full glow, and how much brighter than that a flash is.</summary>
+    /// <summary>How opaque a firebug's lantern is at rest, which its halo follows, and how much more of that a flash adds.</summary>
     private const float Ember = .12f, FlashGain = .5f;
     /// <summary>Seconds from one flash to the next, and the seconds a flash rises, holds and fades.</summary>
     private const float FlashEvery = 10, FlashRise = .2f, FlashHold = .25f, FlashFade = .75f;
-    // The pixelfx palette's glow and its white heart.
     private static readonly Color HaloColour = new("9ad02a"), LanternColour = new("f4ffb8");
     private static readonly QuadMesh Quad = new() { Size = Vector2.One };
     private static readonly StandardMaterial3D Soft = Shine(HaloColour);
@@ -41,14 +40,14 @@ public static class FirebugShape {
         prop.Root.AddChild(prop.Fly);
         // The lantern lies over the dark body, which shows through it.
         Sphere(prop.Fly, .026f, Vector3.Zero, Mat("2a1d18"), new Vector3(1, .7f, 1.6f), 6);
-        prop.Heart = Sphere(prop.Fly, .034f, Vector3.Zero, Lantern, new Vector3(1, .8f, 1.5f), 8);
+        prop.Lantern = Sphere(prop.Fly, .034f, Vector3.Zero, Lantern, new Vector3(1, .8f, 1.5f), 8);
         prop.Halo = Add(prop.Fly, Quad, Soft, Vector3.Zero);
         NoShadows(prop.Root);
         return prop;
     }
 
     /// <summary>How far into a flash a firebug is at a time, from 0 at rest to 1: a quick rise, a hold and a slow fade, once every <see cref="FlashEvery"/> seconds at a moment of its own.</summary>
-    public static float Flash(int id, float time) {
+    private static float Flash(int id, float time) {
         float since = (time + Thing.Variation(id, 22) * FlashEvery) % FlashEvery;
         if (since < FlashRise) return since / FlashRise;
         since -= FlashRise + FlashHold;
@@ -68,7 +67,10 @@ public static class FirebugShape {
         prop.Drawn = drawn;
         prop.Fly.Position = drawn - prop.Root.Position;
         float glow = Ember * (1 + FlashGain * Flash(id, elapsed));
-        prop.Halo.Transparency = 1 - .75f * glow; prop.Heart.Transparency = 1 - glow;
+        // At rest, most of the time, nothing of the glow changes.
+        if (glow == prop.Glow) return;
+        prop.Glow = glow;
+        prop.Halo.Transparency = 1 - .75f * glow; prop.Lantern.Transparency = 1 - glow;
         prop.Halo.Scale = Vector3.One * (.5f + 1.1f * glow);
     }
 }
