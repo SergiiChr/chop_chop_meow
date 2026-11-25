@@ -458,8 +458,10 @@ public partial class Game {
         await KeyStroke(Key.Tab);
         await Carry(BagCellOf("glass_jar"), hotbar.Buttons[slot]);
         await Until(() => world.HotbarItem(slot) == "glass_jar" && !hotbar.Buttons[slot].Disabled,
-            "the glass jar appearing in an unselected hotbar slot", 2);
+            "the glass jar appearing on the hotbar", 2);
+        await KeyStroke(Key.Key1 + active);
         await CloseWithEsc();
+        Require(world.ActiveHotbar == active, "Start with the glass jar's slot inactive.");
         await Click(hotbar.Buttons[slot], alt: true);
         await Until(() => recipeMap.Visible && recipeMap.Chosen == "glass_jar" && recipeMap.NodeOf("glass_jar")!.Lit,
             "the hotbar's glass jar highlighted on the recipe map", 2);
