@@ -5,6 +5,7 @@ using Godot;
 using static Checks;
 using static CabinSteps;
 using static SetupSteps;
+using static StrawBedSteps;
 using static WorldSteps;
 
 public static class StrawBedChecks {
@@ -217,33 +218,14 @@ public static class StrawBedChecks {
         var bed = new Thing { Kind = ThingKind.StrawBed, Pos = new Vector2(4, -2), Rotation = Mathf.Pi / 2 };
         try {
             StrawBedView.Draw(rig, bed, 0);
-            var left = Sole(true); var right = Sole(false);
+            var left = Sole(rig, true); var right = Sole(rig, false);
             int frames = Mathf.CeilToInt(StrawBed.LieDownSeconds * 60);
             for (int frame = 0; frame <= frames; frame++) {
                 float down = (float)frame / frames;
                 StrawBedView.Draw(rig, bed, down);
-                Check(Sole(true), left, down, .10f); Check(Sole(false), right, down, .19f);
+                RequireBootOnStraw(Sole(rig, true), left, down, .10f); RequireBootOnStraw(Sole(rig, false), right, down, .19f);
             }
         } finally { rig.Root.Free(); }
-
-        (Vector3 Toe, Vector3 Heel) Sole(bool left) {
-            var (toe, heel) = rig.BootSole(left);
-            return (rig.Root.Transform * toe, rig.Root.Transform * heel);
-        }
-
-        static void Check((Vector3 Toe, Vector3 Heel) actual, (Vector3 Toe, Vector3 Heel) start, float down, float clearance) {
-            const float tolerance = .008f;
-            float sole = Math.Min(actual.Toe.Y, actual.Heel.Y) - StrawBedModel.Top;
-            Require(actual.Toe.IsFinite() && actual.Heel.IsFinite() && sole >= -tolerance,
-                $"boot must not go through the straw at phase {down:F3}, got {actual}");
-            Require(sole < clearance, $"the leg should fold close to the bed rather than kicking upward, got {sole:F3} m at {down:F3}");
-            if (down <= StrawBedView.BothBootsOnUntil) {
-                Require(Math.Abs(actual.Toe.Y - StrawBedModel.Top) < tolerance && Math.Abs(actual.Heel.Y - StrawBedModel.Top) < tolerance,
-                    $"both boots should stand flat while bearing weight at phase {down:F3}, got {actual}");
-                Require(actual.Toe.DistanceTo(start.Toe) < tolerance && actual.Heel.DistanceTo(start.Heel) < tolerance,
-                    $"both boots should stay in place while bearing weight at phase {down:F3}, got {actual} from {start}");
-            }
-        }
     }
 
     private static void CheckWeightPassesSmoothlyFromThePalmToTheForearm() {
@@ -251,21 +233,21 @@ public static class StrawBedChecks {
         var bed = new Thing { Kind = ThingKind.StrawBed, Rotation = Mathf.Pi };
         try {
             StrawBedView.Draw(rig, bed, StrawBedView.HandOn);
-            var palm = Palm(true);
+            var palm = Palm(rig, true);
             StrawBedView.Draw(rig, bed, StrawBedView.SecondHandOn);
-            var secondPalm = Palm(false);
+            var secondPalm = Palm(rig, false);
             StrawBedView.Draw(rig, bed, StrawBedView.ForearmOn);
-            var brace = Elbow();
+            var brace = Elbow(rig);
             StrawBedView.Draw(rig, bed, 0);
-            var lastLeft = Palm(true); var lastRight = Palm(false);
-            var lastElbow = Elbow();
+            var lastLeft = Palm(rig, true); var lastRight = Palm(rig, false);
+            var lastElbow = Elbow(rig);
             int frames = Mathf.CeilToInt(StrawBed.LieDownSeconds * 60);
             for (int frame = 1; frame <= frames; frame++) {
                 float down = (float)frame / frames;
                 StrawBedView.Draw(rig, bed, down);
-                var left = Palm(true); var right = Palm(false); var elbow = Elbow();
-                if (down >= StrawBedView.HandOn) StaysPlanted(left, palm, "leading", down);
-                if (down is >= StrawBedView.SecondHandOn and <= StrawBedView.SecondHandOff) StaysPlanted(right, secondPalm, "trailing", down);
+                var left = Palm(rig, true); var right = Palm(rig, false); var elbow = Elbow(rig);
+                if (down >= StrawBedView.HandOn) RequireHandPlanted(left, palm, "leading", down);
+                if (down is >= StrawBedView.SecondHandOn and <= StrawBedView.SecondHandOff) RequireHandPlanted(right, secondPalm, "trailing", down);
                 if (down > StrawBedView.SecondHandOff) Require(right.Y >= StrawBedModel.Top,
                     $"the relaxed hand should stay above the straw at {down:F3}, got {right}");
                 if (down >= StrawBedView.ForearmOn) Require(elbow.Y - StrawBedModel.Top is > .03f and < .057f,
@@ -278,13 +260,6 @@ public static class StrawBedChecks {
                 lastLeft = left; lastRight = right; lastElbow = elbow;
             }
         } finally { rig.Root.Free(); }
-
-        Vector3 Palm(bool left) => rig.Root.Transform * rig.HandPad(left);
-        Vector3 Elbow() => rig.Root.Transform * rig.Elbow(true);
-
-        static void StaysPlanted(Vector3 actual, Vector3 start, string hand, float down) =>
-            Require(Math.Abs(actual.Y - StrawBedModel.Top) < .012f && actual.DistanceTo(start) < .012f,
-                $"the {hand} hand should stay planted at phase {down:F3}, got {actual} from {start}");
     }
 
     private static void CheckTheBurningTorchStaysVisibleBesideTheSleeper() {
@@ -293,19 +268,13 @@ public static class StrawBedChecks {
         var torch = rig.Flame.GetParent<Node3D>();
         try {
             StrawBedView.Draw(rig, bed, .5f, lit: true);
-            var braced = TorchAt();
+            var braced = TorchAt(torch);
             Require(torch.Visible && braced.Y > 0 && braced.DistanceTo(Vector3.Zero) > .42f,
                 "the lit torch should show beside the straw while the player braces with both hands");
             StrawBedView.Draw(rig, bed, 1, lit: true);
-            Require(torch.Visible && TorchAt().DistanceTo(braced) < .005f, "the torch should stay by the bed as the player lies down");
+            Require(torch.Visible && TorchAt(torch).DistanceTo(braced) < .005f, "the torch should stay by the bed as the player lies down");
             rig.Show(new Pose(), null, false, lit: true);
-            Require(torch.Visible && TorchAt().DistanceTo(braced) > .20f, "standing again should return the lit torch to the player's hand");
+            Require(torch.Visible && TorchAt(torch).DistanceTo(braced) > .20f, "standing again should return the lit torch to the player's hand");
         } finally { rig.Root.Free(); }
-
-        Vector3 TorchAt() {
-            var point = Vector3.Zero;
-            for (Node3D? node = torch; node != null; node = node.GetParent() as Node3D) point = node.Transform * point;
-            return point;
-        }
     }
 }

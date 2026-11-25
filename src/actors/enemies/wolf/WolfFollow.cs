@@ -48,9 +48,11 @@ public sealed class WolfFollow(World world) {
     /// <summary>The followers going each way round the player, in order round them, and the bearing of each way's first place, in radians.</summary>
     private readonly List<Wolf> clockwise = new(), counter = new();
     private float firstClockwise, firstCounter;
-    private Vector2 centre;
-    private float distance;
-    private bool campfire;
+    /// <summary>The lit campfire the pack circles this tick, or none while it circles its player behind a torch.</summary>
+    private Thing? circledFire;
+    private bool campfire => circledFire != null;
+    private Vector2 centre => circledFire?.Pos ?? world.Player;
+    private float distance => campfire ? World.FireReach + Wander + .25f : World.StalkDistance;
     // Seeded, so a recording of a night plays the same every time.
     private readonly Random ways = new(3571);
 
@@ -80,9 +82,7 @@ public sealed class WolfFollow(World world) {
     /// </summary>
     internal void Arrange(List<Wolf> hunters, Thing? fire) {
         pack = hunters;
-        campfire = fire != null;
-        centre = fire?.Pos ?? world.Player;
-        distance = campfire ? World.FireReach + Wander + .25f : World.StalkDistance;
+        circledFire = fire;
         clockwise.Clear(); counter.Clear();
         foreach (var wolf in hunters) {
             if (campfire ? wolf.IgnoresFire : !wolf.Following) continue;

@@ -15,6 +15,7 @@ public sealed class SleepCycle(World world) {
     private const float SleepStep = 1f / World.TicksPerSecond;
     private static readonly TimeSpan WorkBudget = TimeSpan.FromMilliseconds(4);
     private bool speedingUp;
+    /// <summary>Whether the speed-up or the skip to dawn is running steps of its own: they stay silent and do not count as time played.</summary>
     internal bool AdvancingTime { get; private set; }
     internal bool Recovering { get; private set; }
     /// <summary>The place the acting player sleeps at, or zero while awake.</summary>

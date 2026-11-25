@@ -2361,23 +2361,23 @@ public sealed partial class World {
         if (!sleeping) Sleep.Accelerate(dt);
     }
 
-    /// <summary>Runs an ordinary simulation step without counting it as time spent playing.</summary>
-    internal void TickAcceleratedSleep(float dt) => Step(dt, sleeping: false, accelerated: true);
+    /// <summary>Runs one ordinary simulation step of the sleep speed-up, which does not count as time played.</summary>
+    internal void TickAcceleratedSleep(float dt) => Step(dt, sleeping: false);
 
-    private void Step(float dt, bool sleeping, bool accelerated = false) {
+    private void Step(float dt, bool sleeping) {
         using (ActAs(S.Players[0])) {
             int day = Day;
-            TickWorld(dt, sleeping, accelerated);
+            TickWorld(dt, sleeping);
             Sleep.AfterTick(Day != day);
         }
     }
-    private void TickWorld(float dt, bool sleeping, bool accelerated) {
+    private void TickWorld(float dt, bool sleeping) {
         bool wasDusk = Dusk, wasLunch = Lunch;
         everyone = true;
         float before = S.Time;
         S.Time += dt;
         Beach.Tick(before);
-        if (!sleeping && !accelerated) S.PlaySeconds += dt;
+        if (!sleeping && !Sleep.AdvancingTime) S.PlaySeconds += dt;
         // A wolf whose player left the game goes back to patrolling.
         foreach (var wolf in S.Wolves) if (wolf.Target != 0 && PlayerById(wolf.Target) == null) WolfPatrols.Patrol(wolf, wolf.Heading);
         acting.Clear(); acting.AddRange(S.Players);

@@ -65,18 +65,17 @@ internal sealed class StrawBedView {
         var a = Keys[next - 1]; var b = Keys[next];
         var before = Keys[Math.Max(0, next - 2)]; var after = Keys[Math.Min(Keys.Length - 1, next + 1)];
         float h = b.At - a.At, t = (u - a.At) / h;
-        var hips = new Vector3(Curve(before.Hips.X, a.Hips.X, b.Hips.X, after.Hips.X),
-            StrawBedModel.Top + Curve(before.Hips.Y, a.Hips.Y, b.Hips.Y, after.Hips.Y), Curve(before.Hips.Z, a.Hips.Z, b.Hips.Z, after.Hips.Z));
-        float recline = Curve(before.Recline, a.Recline, b.Recline, after.Recline), turn = Curve(before.Turn, a.Turn, b.Turn, after.Turn);
+        var hips = new Vector3(Curve(k => k.Hips.X), StrawBedModel.Top + Curve(k => k.Hips.Y), Curve(k => k.Hips.Z));
+        float recline = Curve(k => k.Recline), turn = Curve(k => k.Turn);
         var tilt = new Basis(Vector3.Right, Mathf.DegToRad(recline)) * new Basis(Vector3.Up, Mathf.DegToRad(turn));
         var bedFrame = new Transform3D(new Basis(Vector3.Up, -bed.Rotation), WorldView.To3(bed.Pos));
         var root = new Transform3D(tilt, hips - tilt * (Vector3.Up * RigHips));
         var pose = Pose.Lerp(a.Pose, b.Pose, Mathf.SmoothStep(0, 1, t)) with {
             Hips = RigHips,
-            Lean = Curve(before.Pose.Lean, a.Pose.Lean, b.Pose.Lean, after.Pose.Lean),
-            Sway = Curve(before.Pose.Sway, a.Pose.Sway, b.Pose.Sway, after.Pose.Sway),
-            Twist = Curve(before.Pose.Twist, a.Pose.Twist, b.Pose.Twist, after.Pose.Twist),
-            Head = Curve(before.Pose.Head, a.Pose.Head, b.Pose.Head, after.Pose.Head)
+            Lean = Curve(k => k.Pose.Lean),
+            Sway = Curve(k => k.Pose.Sway),
+            Twist = Curve(k => k.Pose.Twist),
+            Head = Curve(k => k.Pose.Head)
         };
         var fromBed = root.AffineInverse();
         var toTrunk = (tilt * ArmReach.TrunkBasis(pose)).Transposed();
@@ -98,7 +97,7 @@ internal sealed class StrawBedView {
             ArmReach.ElbowSupport? floor = left ? new(toTrunk * Vector3.Up, StrawBedModel.Top + ElbowRadius - hips.Y,
                 Mathf.SmoothStep(.59f, ForearmOn, u)) : null;
             var (raise, outward, elbow, roll) = ArmReach.ArmTo(grip, left, toTrunk * bend,
-                ActorRig.Palm, ActorRig.Forearm + ActorRig.HandPadReach, floor);
+                ActorRig.Palm, forearm: ActorRig.Forearm + ActorRig.HandPadReach, support: floor);
             float idle = left ? pose.RaiseL : pose.RaiseR;
             raise = idle + Mathf.RadToDeg(Mathf.AngleDifference(Mathf.DegToRad(idle), Mathf.DegToRad(raise)));
             pose = ArmReach.WithArm(pose, left, raise, outward, elbow, weight);
@@ -106,7 +105,9 @@ internal sealed class StrawBedView {
         }
 
         // Preserve velocity at passing keys, without overshooting the low point that takes the player's weight.
-        float Curve(float prev, float start, float end, float following) {
+        // The channels are lambdas that capture nothing, so each is made once and drawing allocates nothing.
+        float Curve(Func<Key, float> channel) {
+            float prev = channel(before), start = channel(a), end = channel(b), following = channel(after);
             float gradient = (end - start) / h;
             float enter = a.At == before.At ? 0 : Slope((start - prev) / (a.At - before.At), gradient) * h;
             float exit = b.At == after.At ? 0 : Slope(gradient, (following - end) / (after.At - b.At)) * h;

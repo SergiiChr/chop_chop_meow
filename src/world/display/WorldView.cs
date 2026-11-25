@@ -973,8 +973,8 @@ public partial class WorldView : Node3D {
     /// <summary>A player's arms follow the wolves holding them and ease free as the player stands or falls.</summary>
     private void PosePlayer(ActorRig rig, ActorState state, PlayerState who, ref (float PullL, float PullR) pull,
         float downed, string? tool, bool torch, DoorShown? door, float dt) {
-        float onMat = door == null && downed == 0 ? BedHeightAt(state.Position) : 0;
-        var pose = tugs.PulledArms(downed > 0 ? state.Pose : StandingPose(rig, state, onMat), who, ref pull, dt);
+        float bedHeight = door == null && downed == 0 ? BedHeightAt(state.Position) : 0;
+        var pose = tugs.PulledArms(downed > 0 ? state.Pose : StandingPose(rig, state, bedHeight), who, ref pull, dt);
         if (downed > 0) FallBackView.FallBack(rig, state, pose, downed, torch, who.RespawnIn > 0 ? null : HoldingOff(who.Id));
         else {
             string? vessel = Carries(state) && ContainerItem.IsBottle(who.Selected) && who.Backpack[who.Selected] > 0 ? who.Selected : null;
@@ -995,8 +995,11 @@ public partial class WorldView : Node3D {
         return state.Pose;
     }
 
+    /// <summary>How far a straw bed under this point lifts a standing player, easing in over its rim.</summary>
     private float BedHeightAt(Vector2 at) {
+        const float corner = StrawBed.HalfWidth * StrawBed.HalfWidth + StrawBed.HalfLength * StrawBed.HalfLength;
         foreach (var bed in World.ThingsOf(ThingKind.StrawBed)) {
+            if (at.DistanceSquaredTo(bed.Pos) > corner) continue;
             var offset = (at - bed.Pos).Rotated(-bed.Rotation).Abs();
             float inside = Math.Min(StrawBed.HalfWidth - offset.X, StrawBed.HalfLength - offset.Y);
             if (inside > 0) return StrawBedModel.Top * Mathf.SmoothStep(0, .07f, inside);

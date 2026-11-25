@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 /// <summary>Putting an actor's hand on a point: the arm's joint angles for it, and a pose with the arm moved there.</summary>
 public static class ArmReach {
     /// <summary>A surface the elbow is moving onto, measured in the same frame as the grip.</summary>
-    internal readonly record struct ElbowSupport(Vector3 Up, float Height, float Weight);
+    public readonly record struct ElbowSupport(Vector3 Up, float Height, float Weight);
 
     /// <summary>
     /// The arm raise, outward swing and elbow bend, in degrees, that put a fist at <paramref name="grip"/>, measured from the hips in the trunk's own frame.
@@ -32,17 +32,11 @@ public static class ArmReach {
     /// as the arm allows; <see cref="ActorRig.RollArm"/> applies the roll after the pose.
     /// <paramref name="shoulder"/> is where the shoulder is in that frame, and <paramref name="upper"/> and
     /// <paramref name="forearm"/> how long the arm is from shoulder to elbow and elbow to fist, the game's build's unless given.
+    /// With <paramref name="support"/> the elbow moves onto that surface by its weight.
     /// </summary>
     public static (float Raise, float Out, float Elbow, float Roll) ArmTo(Vector3 grip, bool left, Vector3 elbowToward, float palm = 0,
-        Vector3? shoulder = null, float upper = ActorRig.UpperArm, float forearm = ActorRig.Forearm) =>
-        Solve(grip, left, elbowToward, palm, shoulder ?? HumanShape.Standard.Shoulder(left), upper, forearm, null);
-
-    internal static (float Raise, float Out, float Elbow, float Roll) ArmTo(Vector3 grip, bool left, Vector3 elbowToward, float palm,
-        float forearm, ElbowSupport? support) =>
-        Solve(grip, left, elbowToward, palm, HumanShape.Standard.Shoulder(left), ActorRig.UpperArm, forearm, support);
-
-    private static (float Raise, float Out, float Elbow, float Roll) Solve(Vector3 grip, bool left, Vector3 elbowToward, float palm,
-        Vector3 from, float upper, float forearm, ElbowSupport? support) {
+        Vector3? shoulder = null, float upper = ActorRig.UpperArm, float forearm = ActorRig.Forearm, ElbowSupport? support = null) {
+        var from = shoulder ?? HumanShape.Standard.Shoulder(left);
         float fore = MathF.Sqrt(forearm * forearm + palm * palm);
         var reach = grip - from;
         float d = Math.Clamp(reach.Length(), Math.Abs(upper - fore) + 1e-3f, upper + fore - 1e-3f);

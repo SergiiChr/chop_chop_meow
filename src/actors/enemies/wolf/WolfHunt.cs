@@ -96,10 +96,12 @@ public sealed class WolfHunt(World world) {
         }
         var fire = world.FireLighting(world.Player);
         bool torch = world.Torchlit, pack = (fire != null || torch) && world.FullPackAt(fire?.Pos ?? world.Player);
-        bool circlingFire = fire != null && !pack, chargeThroughFire = fire != null && pack, wary = torch && !pack;
+        var packHold = fire != null ? pack ? LightHold.ChargesThrough : LightHold.CirclesFire
+            : torch && !pack ? LightHold.HeldByTorch : LightHold.None;
         if (pack && !world.S.Actor.PackAttack) world.Say("The pack has you surrounded. They attack!");
         world.S.Actor.PackAttack = pack;
-        if (circlingFire || wary) world.WolfFollow.Arrange(hunters, circlingFire ? fire : null);
+        if (packHold is LightHold.CirclesFire or LightHold.HeldByTorch)
+            world.WolfFollow.Arrange(hunters, packHold == LightHold.CirclesFire ? fire : null);
         // A wounded player invites a leap for the throat. While light holds the pack back, only a wolf that turned on them leaps.
         if (!world.Downed && world.S.Health <= World.TakedownHealth && !world.DoorTug.Tugged && !AnyLeaping(hunters)) {
             Wolf? hunter = null;
@@ -108,7 +110,8 @@ public sealed class WolfHunt(World world) {
             foreach (var wolf in hunters) {
                 float distance = wolf.Pos.DistanceSquaredTo(mark);
                 if (distance >= closest || WolfSnap.Active(wolf) || wolf.Attack > 0 || wolf.Follow == FollowStage.Routed ||
-                    !wolf.IgnoresFire && (circlingFire || wary || !chargeThroughFire && world.Protected(wolf.Pos)) ||
+                    HoldOf(wolf, packHold) is var hold && (hold is LightHold.CirclesFire or LightHold.HeldByTorch
+                        || hold == LightHold.None && world.Protected(wolf.Pos)) ||
                     wolf.Howl > 0 || wolf.HowlIn > 0 || wolf.Flee > 0 || wolf.Stagger > 0 ||
                     wolf.Threaten > 0 || wolf.Recover > 0 || wolf.Circle != 0 || WolfCounter.Active(wolf)) continue;
                 hunter = wolf; closest = distance;
@@ -121,22 +124,44 @@ public sealed class WolfHunt(World world) {
         foreach (var wolf in hunters) {
             var from = wolf.Pos;
             wolf.Attack = Math.Max(0, wolf.Attack - dt);
-            bool circles = circlingFire && !wolf.IgnoresFire, held = wary && !wolf.IgnoresFire;
-            Hunt(wolf, dt, circles, chargeThroughFire || wolf.IgnoresFire, held, speed, chase);
-            Face(wolf, from, dt, circles || held && wolf.Following);
+            var hold = HoldOf(wolf, packHold);
+            Hunt(wolf, dt, hold, speed, chase);
+            Face(wolf, from, dt, KeepsRound(wolf, hold));
         }
-        world.WolfBodies.KeepApart(hunters, dt, circlingFire);
+        world.WolfBodies.KeepApart(hunters, dt, packHold == LightHold.CirclesFire);
         if (world.S.Mauled && !world.Dead) {
             int feeding = 0;
             foreach (var w in hunters) if (w.Feeding) feeding++;
             world.S.Health -= dt * (16 + 8 * feeding);
         }
     }
+    /// <summary>What a torch or a lit campfire by its player makes a hunting wolf do this tick.</summary>
+    private enum LightHold {
+        /// <summary>No light holds it back, though it still goes round a campfire in its way.</summary>
+        None,
+        /// <summary>It circles the campfire's light at its edge.</summary>
+        CirclesFire,
+        /// <summary>The torch keeps it in follow mode or creeping in until a swing scares it off.</summary>
+        HeldByTorch,
+        /// <summary>A full pack, or a wolf that turned on its player, goes straight through the light.</summary>
+        ChargesThrough
+    }
+
+    /// <summary>
+    /// A wolf that turned on its player charges through any light.
+    /// The rest do what the light at their player makes the pack do.
+    /// </summary>
+    private static LightHold HoldOf(Wolf wolf, LightHold packHold) => wolf.IgnoresFire ? LightHold.ChargesThrough : packHold;
+
+    /// <summary>Whether the wolf goes round in follow mode: round a campfire, or round its player behind a torch.</summary>
+    private static bool KeepsRound(Wolf wolf, LightHold hold) =>
+        hold == LightHold.CirclesFire || hold == LightHold.HeldByTorch && wolf.Following;
+
     /// <summary>
     /// Moves one wolf hunting the acting player through this tick: at a doorway, howling, in the air, feeding, reeling,
     /// snapping, running off, or closing in as the light and the torch let it.
     /// </summary>
-    private void Hunt(Wolf wolf, float dt, bool circlingFire, bool chargeThroughFire, bool held, float speed, float chase) {
+    private void Hunt(Wolf wolf, float dt, LightHold hold, float speed, float chase) {
         // A wolf stands braced only for as long as follow mode keeps finding its player close.
         bool braced = wolf.Follow == FollowStage.Braced;
         if (braced) wolf.Follow = FollowStage.Circling;
@@ -153,7 +178,7 @@ public sealed class WolfHunt(World world) {
             return;
         }
         if (wolf.Howl > 0) { wolf.Howl = Math.Max(0, wolf.Howl - dt); return; }
-        if (circlingFire && WolfSnap.Winding(wolf)) wolf.Snap = wolf.Leap = 0;
+        if (hold == LightHold.CirclesFire && WolfSnap.Winding(wolf)) wolf.Snap = wolf.Leap = 0;
         if (world.S.Mauled) {
             wolf.Snap = wolf.Leap = wolf.Recover = wolf.Circle = 0;
             if (wolf.Feeding) return;
@@ -170,14 +195,14 @@ public sealed class WolfHunt(World world) {
             float pace = wolf.Aggressive || wolf.Follow == FollowStage.Routed ? chase : speed;
             wolf.Pos = world.Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * pace);
             if (wolf.Follow == FollowStage.Routed && (wolf.Flee <= 0 || !world.Sees(wolf.Pos))) world.WolfFollow.GiveUp(wolf);
-        } else if (circlingFire || held && wolf.Following) {
+        } else if (KeepsRound(wolf, hold)) {
             wolf.Circle = 0;
             world.WolfFollow.Follow(wolf, braced, dt, speed * WolfPatrols.PatrolPace);
-            if (!circlingFire) Growl(wolf);
-        } else if (!chargeThroughFire && world.WolfFollow.SkirtFire(wolf, world.WolfSnap.BitePosition(),
-            dt * (held ? speed * CreepPace : wolf.Aggressive || wolf.Galloping ? chase : speed))) {
+            if (hold != LightHold.CirclesFire) Growl(wolf);
+        } else if (hold != LightHold.ChargesThrough && world.WolfFollow.SkirtFire(wolf, world.WolfSnap.BitePosition(),
+            dt * (hold == LightHold.HeldByTorch ? speed * CreepPace : wolf.Aggressive || wolf.Galloping ? chase : speed))) {
             wolf.Circle = 0;
-        } else if (held) {
+        } else if (hold == LightHold.HeldByTorch) {
             wolf.Galloping = false;
             Close(wolf, dt * speed * CreepPace, dt);
             Growl(wolf);

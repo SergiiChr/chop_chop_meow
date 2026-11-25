@@ -10,6 +10,9 @@ namespace ChopChopMeow;
 /// or a crate cannot go somewhere, what building spends and what taking down gives back.
 /// </summary>
 public sealed class Construction(World world) {
+    /// <summary>Whether a spot is open ground a building can stand on, clear of the lake's edge.</summary>
+    internal bool DryOpen(Vector2 p) => world.CanStand(p) && !Terrain.InLake(p, .8f);
+
     /// <summary>Square yards laid out on the ground, walkable and snapping edge to edge.</summary>
     public static bool IsZone(ThingKind kind) => kind is ThingKind.Pile or ThingKind.Farm;
     private static readonly ThingKind[] Zones = { ThingKind.Pile, ThingKind.Farm };
@@ -71,7 +74,7 @@ public sealed class Construction(World world) {
         if (kind == ThingKind.Pump) {
             if (!Terrain.InLake(p)) return "Place the intake in the freshwater lake’s shallows.";
             if (!world.CanStand(p + World.BellowsStand.Rotated(rotation))) return "Turn the handle toward open ground on the bank.";
-        } else if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
+        } else if (!DryOpen(p)) return "Choose dry, open ground.";
         if (kind == ThingKind.StrawBed && !StrawBed.Fits(world, p, rotation)) return "Choose dry, open ground for the whole bed.";
         if (digging && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
@@ -79,7 +82,7 @@ public sealed class Construction(World world) {
                 return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
             var door = p + Doorways.DoorOffset.Rotated(rotation);
-            if (!world.CanStand(door) || Terrain.InLake(door, .8f) || world.S.Things.Any(t => !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
+            if (!DryOpen(door) || world.S.Things.Any(t => !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
                 return "Leave open ground in front of the door.";
             if (!world.CanStand(p + BarrelHaul.LadderApproach.Rotated(rotation))) return "Leave dry, open ground at the cabin's ladder.";
         }
@@ -122,7 +125,7 @@ public sealed class Construction(World world) {
         for (float x = -sample; x <= sample; x++)
             for (float y = -sample; y <= sample; y++) {
                 var q = p + new Vector2(x, y);
-                if (!world.CanStand(q) || Terrain.InLake(q, .8f) || Terrain.Spawn.DistanceTo(q) < 1) return "Choose dry, open ground.";
+                if (!DryOpen(q) || Terrain.Spawn.DistanceTo(q) < 1) return "Choose dry, open ground.";
             }
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in world.S.Things) {
@@ -212,7 +215,7 @@ public sealed class Construction(World world) {
 
     private void Crush(Thing t) {
         if (t.Kind == ThingKind.Hut) world.Doorways.Evacuate(t);
-        if (t.Kind is ThingKind.Hut or ThingKind.StrawBed) world.Sleep.WakeIn(t, "Your sleeping place was crushed.");
+        world.Sleep.WakeIn(t, "Your sleeping place was crushed.");
         Inventory? recovery = null;
         foreach (var box in World.Boxes(t)) {
             if (box == null) continue;
