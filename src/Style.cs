@@ -319,17 +319,39 @@ public partial class DayDial : Control {
     /// <summary>How far the sun or moon has crossed the sky, from 0 to 1.</summary>
     public Func<float> Arc { get; set; } = () => 0;
     public Func<bool> Night { get; set; } = () => false;
-    private static readonly Color NightArc = new("8fa6c4"), Moon = new("dfe6f2");
+    public Func<(float Light, bool Waxing)> MoonPhase { get; set; } = () => (1, false);
+    private static readonly Color NightArc = new("8fa6c4"), Moon = new("dfe6f2"), MoonShadow = new("495a77");
+    private const int MoonSteps = 12;
+    private readonly Vector2[] litMoon = new Vector2[2 * MoonSteps];
 
     public override void _Draw() {
         var centre = new Vector2(Size.X / 2, Size.Y - 6);
         float radius = Math.Min(Size.X / 2 - 12, Size.Y - 14), phase = Mathf.Clamp(Arc(), 0, 1);
         DrawArc(centre, radius, Mathf.Pi, Mathf.Tau, 32, Style.Line, 8, true);
-        var tint = Night() ? NightArc : Style.Mustard;
+        bool night = Night();
+        var tint = night ? NightArc : Style.Mustard;
         DrawArc(centre, radius, Mathf.Pi, Mathf.Pi + Math.Max(.02f, phase) * Mathf.Pi, 32, tint, 8, true);
         var at = centre + Vector2.FromAngle(Mathf.Pi + phase * Mathf.Pi) * radius;
         DrawCircle(at, 9, Style.Rim);
-        DrawCircle(at, 7, Night() ? Moon : Style.Mustard);
+        if (night) DrawMoon(at); else DrawCircle(at, 7, Style.Mustard);
+    }
+
+    private void DrawMoon(Vector2 at) {
+        const float radius = 7;
+        var (light, waxing) = MoonPhase();
+        DrawCircle(at, radius, light >= .995f ? Moon : MoonShadow, antialiased: true);
+        if (light <= .005f || light >= .995f) return;
+        // Trace the lit side of the rim, then the curved edge between light and shadow back to the top.
+        float side = waxing ? 1 : -1, edge = 1 - 2 * light;
+        litMoon[0] = at - Vector2.Down * radius;
+        litMoon[MoonSteps] = at + Vector2.Down * radius;
+        for (int i = 1; i < MoonSteps; i++) {
+            float angle = i * Mathf.Pi / MoonSteps;
+            float x = side * radius * Mathf.Sin(angle), y = -radius * Mathf.Cos(angle);
+            litMoon[i] = at + new Vector2(x, y);
+            litMoon[2 * MoonSteps - i] = at + new Vector2(x * edge, y);
+        }
+        DrawColoredPolygon(litMoon, Moon);
     }
 }
 

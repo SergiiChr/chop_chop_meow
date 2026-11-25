@@ -1,0 +1,22 @@
+using ChopChopMeow;
+using Godot;
+using static Checks;
+using static SetupSteps;
+
+internal static class SandSteps {
+    public static readonly Vector2 SandSquare = new(166, 170);
+
+    public static void EquipBeachShovel(World world) {
+        Give(world, "steel_shovel");
+        world.SelectInHand("steel_shovel");
+        world.Player = SandSquare + Vector2.Left;
+    }
+
+    public static void DigSand(World world, int attempt) => DigSand(world, SandSquare, attempt);
+
+    public static void DigSand(World world, Vector2 at, int attempt) {
+        Require(world.Holes.Begin(at, attempt), "the shovel should start digging the dry sand square");
+        world.Tick(6);
+        Require(world.Holes.Finish(attempt), "the completed shovel work should strip the square");
+    }
+}

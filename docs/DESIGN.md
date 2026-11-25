@@ -122,6 +122,7 @@ Simulation and data:
 | `src/nettles/Nettles.cs`, `src/nettles/display/NettleShape.cs` | Nettles coming up at nightfall, and the scanned sprigs a nettle plant and its item are made of |
 | `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs`, `src/firebugs/display/FirebugChase.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow; the showcase's player chasing firebugs for a recording |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
+| `src/digging/Beach.cs`, `src/digging/display/CoastView.cs` | Beach sand, tide, and the exposed soil after a dig |
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/packing/Packing.cs` | Packing stations |
@@ -370,7 +371,7 @@ Shared rules:
 
 An update holds only what changed since the last one the guest confirmed.
 The host keeps each recent update as one JSON entry per thing, worker, wolf, trade cart and player.
-Shared entries hold the remaining state, worker jobs, gravel paths, steel pipes and packed crates.
+Shared entries hold the remaining state, worker jobs, gravel paths, steel pipes, stripped sand and packed crates.
 Entries leave out fields at their type's default and write a fresh inventory as `{}` (`UpdateJson`).
 A field whose new object starts elsewhere is marked to be always written, which `MultiplayerChecks` enforces.
 A changed entry whose field names or order changed is sent whole.
@@ -931,6 +932,21 @@ Leaf spots show a second slot for acorns, and the lake shows a water droplet in 
   makes 4 cans at the bench.
 - The stone furnace burns 2 wood into 1 charcoal.
 
+### Sand and tides
+
+A shovel highlights the dry beach square it points at.
+The held dig uses the same reach and work as digging a planting hole.
+The server checks for dry sand and room for all 10 units of sand before starting and finishing.
+A completed dig strips a one-meter square.
+A rounded rim and sloping walls show the depth of the cut, with the compost pile's soil texture at its bottom.
+Cuts that share an edge join across a continuous floor. The remaining rim rounds turns in either direction.
+Gravel laid over a cut hides it until taken up. The tide still refills the cut while it is covered.
+The view shows less of the floor behind the near rim at shallower camera angles.
+Only the tile index is saved and shared with guests.
+The sea recedes slightly past its original waterline at the new moon and covers the sand strip at the full moon.
+The day dial shows the moon's lit side waxing and waning over the same eight-day cycle.
+The tide clears each stripped square as water covers it. The low-tide waterline bounds walking throughout the cycle.
+
 ### Replanting trees
 
 Selecting a shovel on the hotbar or double-clicking it in the backpack shows the placement outline.
@@ -939,7 +955,7 @@ Holding right mouse on open ground walks the player to the spot.
 `GroundHoles.Begin` starts digging once the player is in reach.
 The outline shows the target while held and lives in the view.
 The server counts shovel work for each hold.
-When enough work has accumulated, `GroundHoles.Finish` places a `Hole` if the player is still holding right mouse.
+When enough work has accumulated, `GroundHoles.Finish` places a `Hole` on open ground away from sand if the player is still holding right mouse.
 Releasing early discards the work.
 The hole has one empty input slot.
 Inserting an acorn spends one from the stack and replaces the hole with a selectable oak nub.

@@ -9,7 +9,11 @@
     // The ground photoscans below lie flat in world x and z, with their height along world up.
     vec3 view = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xzy);
     // Ground under the drawn water is a bed, with the meadow's work skipped where the water covers it whole.
-    vec2 bed = texture(beds, (v_vertex.xz - map_corner) / map_span).rg;
+    vec3 bed = texture(beds, (v_vertex.xz - map_corner) / map_span).rgb;
+    if (coastal_tide >= 0.0) {
+        float wet_at = bed.b * 1.5 - 0.25;
+        bed.g = max(bed.g, 1.0 - smoothstep(coastal_tide - 0.04, coastal_tide + 0.04, wet_at));
+    }
     float submerged = max(bed.r, bed.g);
     if (submerged < 1.0) {
         // Terrain3D supplies height, clipmap LOD, terrain normals and the grass and rock photoscans blended by slope.

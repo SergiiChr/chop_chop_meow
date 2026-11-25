@@ -11,7 +11,7 @@ namespace ChopChopMeow;
 /// meadow, photoscans, woods and beds drawn on it, and the point its finest detail follows.
 /// </summary>
 internal sealed class TerrainView {
-    private static readonly StringName Traffic = "traffic", Gravel = "gravel";
+    private static readonly StringName Traffic = "traffic", Gravel = "gravel", CoastalTide = "coastal_tide";
     private readonly Rid materialRid;
     private readonly Node3D target;
     // RenderingServer uniforms take RIDs, so retain the texture resources for their lifetime.
@@ -155,6 +155,8 @@ internal sealed class TerrainView {
 
     /// <summary>The ground's height: the mountains, the flat valley floor between them, and the beds under the water.</summary>
     private static float GroundHeight(Vector2 p) => Math.Max(0, MountainShape.Height(p) - .03f) - Terrain.BedDepth(p);
+
+    internal void SetCoastalTide(float tide) => RenderingServer.MaterialSetParam(materialRid, CoastalTide, tide);
 
     /// <summary>Wears footpaths into the ground where <paramref name="traffic"/>, the map of how much the ground has been walked, says.</summary>
     public void SetTraffic(Texture2D traffic) => RenderingServer.MaterialSetParam(materialRid, Traffic, traffic.GetRid());

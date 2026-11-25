@@ -63,6 +63,9 @@ Models are assembled from code-built or baked Godot meshes.
   `Scanned` draws one of the scans rock, coal, soil and gravel as it is instead, with its bumps and the engine's
   parallax, on a mesh that carries its place on the scan in world units: the stone and coal rocks, loose stones and
   coal, the farm field, the compost mound, the gravel heap and the gravel path tile.
+  The beach cut uses the same sand and soil scans in `sand_cut.gdshader`, which follows the view through the rounded
+  opening to show the sloped wall or the soil floor.
+  The four tiles at each corner shape the rim, and the view follows the same floor across joined cuts.
   Heap pieces are those meshes shrunk to a heap's size with their place on the scan kept, so a heaped stone or lump
   shows the scan finer than in the world.
   A rounded shape has the scan draped over it from the top down (`NatureShape.Draped`), so only its hidden underside
@@ -90,7 +93,7 @@ Models are assembled from code-built or baked Godot meshes.
     ribbon, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
   - Baked from Kenney's Food Kit and recoloured to the game's palette: bread (the round loaf), raw meat (the ham on the bone), burnt steak (the cooked steak, charred) and the bowls of meat stew and crushed berries (the bowl of soup). `tools/food_models.py` bakes them into `models/food/`; see [food/README.md](models/food/README.md).
   - Light copies of models the world already shows, for heaps alone, since their icons come from those models: the hand tools and the torch with their cylinders redrawn on six sides, the rake, the mortar turned on fewer sides, the cargo crate, the bottle lying on its back, a single berry, a log, a board, one boulder of the world's stones, one lump of its loose ore and coal, one charcoal briquette, and six cast bars stacked three across three.
-  - Each good says how its heap is laid (`Lay`): neat grids for boxes, sacks, jars and six-packs; rows for logs, boards, tools and bottles, which lie the same way; loose and turned any way for stone, ore, coal, charcoal, berries, bread, meat and parts; and one mound that swells for leaves, gravel and compost.
+  - Each good says how its heap is laid (`Lay`): neat grids for boxes, sacks, jars and six-packs; rows for logs, boards, tools and bottles, which lie the same way; loose and turned any way for stone, ore, coal, charcoal, berries, bread, meat and parts; and one mound that swells for leaves, sand, gravel and compost.
   - Gravel is a mound with the gravel path's photoscan draped over it and loose stones at its foot, in its icon and on a
     pile alike.
   - Cans heap as six-packs and bars as six-packs stacked three across three; a compost pile is a mound of soil with leaves on it and scraps poking out, whatever it holds.
