@@ -409,6 +409,7 @@ public sealed partial class World {
     private readonly BreakSeats breakSeats;
     /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
     public GravelPaths GravelPaths { get; }
+    /// <summary>Beach sand, shovel work on sand, and the tide that refills stripped squares.</summary>
     public Beach Beach { get; }
     public SteelPipes SteelPipes { get; }
     private readonly Plumbing plumbing;

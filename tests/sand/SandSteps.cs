@@ -1,4 +1,3 @@
-using System;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -19,12 +18,5 @@ internal static class SandSteps {
         Require(world.Holes.Begin(at, attempt), "the shovel should start digging the dry sand square");
         world.Tick(6);
         Require(world.Holes.Finish(attempt), "the completed shovel work should strip the square");
-    }
-
-    public static void RunBeachClock(World world, float time) {
-        while (world.Time < time) {
-            NourishEveryone(world);
-            world.Tick(Math.Min(15, time - world.Time), true);
-        }
     }
 }

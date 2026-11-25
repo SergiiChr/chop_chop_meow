@@ -60,7 +60,7 @@ public static class SandChecks {
         var edge = new Vector2(198, 133);
         EquipBeachShovel(world);
         world.Player = edge + Vector2.Left;
-        Require(!world.Holes.Begin(edge, 1), "the tide should prevent digging a planting hole in flooded sand");
+        Require(!world.Holes.Begin(edge, 1), "the tide should prevent digging sand while the square is flooded");
         RunUntil(world, 4 * data.DaySeconds);
 
         DigSand(world, edge, 2);

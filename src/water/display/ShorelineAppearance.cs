@@ -83,7 +83,7 @@ internal static class ShorelineAppearance {
         float[] distances = [.. LakeAppearance.Steps(-11, 90, WaterBody.Spacing), 120, 200, 400];
         var material = LakeAppearance.CreateMaterial(WaterBody.Sea, still);
         material.SetShaderParameter("shore_wander", ShoreLook.Sand.Wander);
-        var water = new Node3D { Name = "CoastalWater", Position = Vector3.Up * LakeAppearance.Level };
+        var water = new Node3D { Name = "CoastalWater" };
         parent.AddChild(water);
         LakeAppearance.AddTiles(water, "CoastalWater", sides, distances, (side, distance) => {
             var p = Terrain.Point(Terrain.Waterline(side) + distance, side);
