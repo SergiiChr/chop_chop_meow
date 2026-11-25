@@ -64,6 +64,7 @@ public sealed class SleepCycle(World world) {
         if (world.Forwarded(Verb.Sleep, place.Id)) return;
         var p = world.S.Actor;
         world.Release(); world.ResetGather(); GroundHoles.Clear(p);
+        p.Swing = null;
         p.SleepingAt = place.Id;
         p.Sprinting = p.Braking = false;
         p.SleepReadyAt = place.Kind == ThingKind.StrawBed ? world.Time + StrawBed.LieDownSeconds + SnapshotRoom : world.Time;

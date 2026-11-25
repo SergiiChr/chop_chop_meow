@@ -10,6 +10,7 @@ internal static class GlassJarChecks {
         Test(CheckGlassFurnaceNeedsAnInstalledPipe, data);
         Test(CheckPlayerBlowsGlassWithHiredBellows, data);
         Test(CheckHiredBlowerNeedsAPlayerAtTheBellows, data);
+        Test(CheckSleepingByTheBellowsDoesNotWorkTheGlass, data);
         Test(CheckTwoHiredWorkersCanBlowGlass, data);
         Test(CheckTwoPlayersCanBlowGlass, data);
         Test(CheckOneWorkerCannotDoBothGlassJobs, data);
@@ -76,6 +77,26 @@ internal static class GlassJarChecks {
         float progress = furnace.Progress;
         TickGlassAt(world, furnace, 80, 4);
         Require(furnace.Progress == progress, "When the player leaves the rear, the worker cannot keep blowing with no bellows operator.");
+    }
+
+    private static void CheckSleepingByTheBellowsDoesNotWorkTheGlass(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = GlassFurnace(world, Terrain.Spawn + new Vector2(6, 6));
+        var blower = HireAtGlassFurnace(world, furnace, JobKind.BlowGlass);
+        world.Player = furnace.Pos + Vector2.Right * 2;
+        Give(world, "leaves", 20);
+        var bed = world.Construction.Build(ThingKind.StrawBed, furnace.ToWorld(new Vector2(0, -2.3f)), 0);
+        Require(bed != null, "A straw bed should fit near the glass furnace bellows.");
+        TickGlassAt(world, furnace, 80, 4);
+        world.Player = bed.Pos;
+        world.Sleep.Start(bed);
+        TickGlassAt(world, furnace, 80, 4);
+        Require(world.Sleep.Place == bed.Id && !furnace.Processing && furnace.Burner?["coal"] == 1,
+            "A player asleep by the hot furnace must not start a glass batch with a hired blower.");
+        world.Sleep.Wake();
+        TickGlassAt(world, furnace, 80, 4);
+        Require(furnace.Processing && furnace.GlassBlower == -blower.Id,
+            "An awake player at the same spot should be able to operate the bellows.");
     }
 
     private static void CheckTwoHiredWorkersCanBlowGlass(GameData data) {
