@@ -46,6 +46,17 @@ internal static class FirebugSteps {
         Require(false, "a firebug should come to rest after its dart");
     }
 
+    /// <summary>
+    /// The player stands as far from a firebug as the hoop passes, 1.15 m, with the firebug straight to their left, and
+    /// swings the net ahead, then waits until the swing has landed.
+    /// </summary>
+    public static void SwingWithFirebugOnTheLeft(World world, Thing bug) {
+        world.Player = world.Firebugs.At(bug) + new Vector2(-1.15f, 0);
+        var aim = new Vector2(0, 1);
+        world.SwingNet(BodySide.Out(aim, BodySide.Left).X > 0 ? aim : -aim);
+        SafeTick(world, ActorAnimation.Contact(ActorAction.NetSwing) + 2 * Frame, Frame);
+    }
+
     /// <summary>The player stands where the hoop passes, 1.15 m from a firebug, and swings the net at it, then waits until the swing has landed.</summary>
     public static void SwingAt(World world, Thing bug, float from = 1.15f) {
         world.Player = world.Firebugs.At(bug) + new Vector2(-from, 0);

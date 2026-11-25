@@ -12,7 +12,7 @@ public static class FirebugShape {
     /// <summary>Metres off the ground a firebug flies, the height a net's hoop is swept at, and how far up and down of that it bobs.</summary>
     public const float Height = 1.25f, Bob = .2f;
     /// <summary>How bright a firebug glows at rest, of a full glow, and how much brighter than that a flash is.</summary>
-    private const float Ember = .12f, FlashGain = .1f;
+    private const float Ember = .12f, FlashGain = .5f;
     /// <summary>Seconds from one flash to the next, and the seconds a flash rises, holds and fades.</summary>
     private const float FlashEvery = 10, FlashRise = .2f, FlashHold = .25f, FlashFade = .75f;
     // The pixelfx palette's glow and its white heart.

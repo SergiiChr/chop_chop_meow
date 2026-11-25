@@ -17,11 +17,12 @@ public sealed class Swings(World world) {
     /// </summary>
     public static readonly SwingShape Chop = new(.5f, 1.35f, 10, 8, .7f), Sweep = new(.5f, 1.3f, 138, 62, 1.1f), Torch = new(0, 1, 52, 33, .65f), Punch = new(0, .7f, -10, 35);
     /// <summary>
-    /// What a bug net's hoop passes over, measured on the player's model: its middle goes round 1.11 to 1.24 m out,
-    /// from behind the left shoulder across the front to the right, and the hoop is 0.17 m to its rim.
-    /// It counts at any height, since a firebug flies at the height the hoop is swept at.
+    /// What a bug net's hoop passes over at the height a firebug flies, measured on the player's model.
+    /// The hoop comes down on a slant from behind the right shoulder to the ground at the left; from 50 degrees right
+    /// of the aim to 50 left its middle is 1.15 to 1.25 m out and 1.6 to 0.9 m off the ground, and the hoop is 0.17 m to its rim.
+    /// It counts at any height, since a firebug flies at the height the hoop crosses the front at.
     /// </summary>
-    public static readonly SwingShape Net = new(.9f, 1.41f, 143, 55);
+    public static readonly SwingShape Net = new(.98f, 1.42f, 55, 55);
     /// <summary>What a punch and a torch take off a wolf's health, and an axe for each unit of its speed.</summary>
     public const float PunchDamage = .5f, TorchDamage = 1, AxeDamage = 1.5f;
     /// <summary>How far either side of its damage a blow can land: each one is weaker or stronger by up to this much.</summary>

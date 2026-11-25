@@ -61,7 +61,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
 | `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
-| `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day |
+| `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
@@ -513,10 +513,10 @@ Whoever makes rope strikes two mallet blows, then twists the fibres by hand, in 
 
 Eight firebugs come out as night falls and one more after each hour of the night, at least 25 m from every building and where nobody is looking.
 All of them are gone at dawn.
-A firebug hovers about its place with a steady glow that brightens a little every 10 seconds.
+A firebug hovers about its place with a steady glow that grows half as bright again for about a second every 10 seconds.
 When you come within 4 m it darts off 6.55 m, faster than a walk and slower than a sprint, then rests for 1.6 seconds where it stops, whoever comes near.
-With the bug net selected, a right click on open ground sweeps it toward the pointer, from behind the left shoulder across the front, and a right click on a firebug sweeps it at the firebug.
-The hoop passes 0.9 to 1.4 m from you and lands 0.4 seconds after the click: it catches each firebug it passes over then, one firebug each into the backpack while it has room.
+With the bug net selected, a right click on open ground swings it toward the pointer, down on a slant from behind the right shoulder across the front to the ground at the left, and a right click on a firebug swings it at the firebug.
+The hoop crosses the front 1.0 to 1.4 m from you, within 55° either side of the pointer, and lands 0.4 seconds after the click: it catches each firebug it passes over then, one firebug each into the backpack while it has room.
 A firebug nearer or further than the hoop is missed, and a swing sends every firebug it misses within 5 m darting, resting or not.
 
 Nettles, nettle rope, bug nets and firebugs are not bought or sold, and a firebug is not made into anything yet.

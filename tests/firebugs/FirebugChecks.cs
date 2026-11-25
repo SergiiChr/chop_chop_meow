@@ -19,6 +19,7 @@ public static class FirebugChecks {
         Test(CheckNetSwingCatchesARestingFirebug, data);
         Test(CheckSwingThatLandsAfterTheRestCatchesNothing, data);
         Test(CheckMissedSwingSendsARestingFirebugDarting, data);
+        Test(CheckSwingAimedAQuarterTurnAwayMissesAFirebug, data);
         Test(CheckNetSwingNeedsANet, data);
         Test(CheckFullBackpackCatchesNoFirebug, data);
         Test(CheckHoldingOnToAFirebugCatchesNothing, data);
@@ -108,7 +109,16 @@ public static class FirebugChecks {
         Require(world.Find(bug.Id) != null && world.Backpack["firebug"] == 0, "a firebug that has rested should dart off before a late swing lands");
     }
 
-    /// <summary>The hoop goes round 0.94 to 1.41 m from the player, so a firebug half a metre off is inside its sweep, and one 3 m off beyond it.</summary>
+    private static void CheckSwingAimedAQuarterTurnAwayMissesAFirebug(GameData data) {
+        var (world, bug, _) = RestingFirebug(data);
+        var rest = bug.Pos;
+        SwingWithFirebugOnTheLeft(world, bug);
+        SafeTick(world, Step);
+        Require(world.Find(bug.Id) != null && world.Backpack["firebug"] == 0 && bug.Pos != rest,
+            "a swing aimed a quarter turn to the right of a firebug should miss it and send it darting");
+    }
+
+    /// <summary>The hoop crosses the front 0.98 to 1.42 m from the player, so a firebug half a metre off is inside its sweep, and one 3 m off beyond it.</summary>
     private static void CheckMissedSwingSendsARestingFirebugDarting(GameData data) {
         var (world, bug, _) = RestingFirebug(data);
         var rest = bug.Pos;

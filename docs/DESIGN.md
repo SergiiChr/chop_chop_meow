@@ -120,7 +120,7 @@ Simulation and data:
 | `src/resources/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/digging/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
 | `src/nettles/Nettles.cs`, `src/nettles/display/NettleShape.cs` | Nettles coming up at nightfall, and the scanned sprigs a nettle plant and its item are made of |
-| `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow |
+| `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs`, `src/firebugs/display/FirebugChase.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow; the showcase's player chasing firebugs for a recording |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
@@ -864,7 +864,7 @@ It lands on every wolf whose body touches the ground it passes over then, a `Swi
 | Overhead chop | `Swings.Chop` | 0.5 to 1.35 m ahead, 10° left to 8° right of the aim | 0.7 m | 2.2 to 3.2 with a steel axe |
 | Sideways sweep | `Swings.Sweep` | 0.5 to 1.3 m out, from 138° left of the aim round the front to 62° right | 1.1 m | 2.2 to 3.2 with a steel axe |
 | Torch | `Swings.Torch` | within 1 m, 52° left to 33° right | 0.65 m | 0.8 to 1.2 |
-| Bug net | `Swings.Net` | 0.9 to 1.41 m out, from 143° left of the aim round the front to 55° right | any height | none: it catches firebugs |
+| Bug net | `Swings.Net` | 0.98 to 1.42 m out, from 55° left of the aim to 55° right, where the hoop's slant from behind the right shoulder to the ground at the left crosses the height a firebug flies at | any height | none: it catches firebugs |
 | Punch | `Swings.Punch` | within 0.7 m, 10° to 35° right | any height | 0.4 to 0.6 |
 
 The shapes are where the player's model carries the axe head (`ActorRig.AxeHead`), the flame and the fist through each stroke, which `CheckSwingShapesFollowThePlayersModel` holds them to.
@@ -1002,6 +1002,10 @@ Its flight (`Firebugs.Flight`) is kept only while the world runs:
 - **Rest.** It then stays put for `RestSeconds`, whoever comes near.
 
 `World.SwingNet` (`Verb.SwingNet`) swings a carried net as `ActorAction.NetSwing`, with the axe's cooldown.
+The net is swung in the right hand (`ActorAnimation.NetKeys`): taken up and back to the right of a trunk turned that
+way, the left arm out ahead, then brought down on a slant across the front to the ground at the left, the wrist
+turning the hoop's mouth to lead the stroke and turning it over at the end.
+`ActorAnimation.Flow` carries the pose through those keys on one smooth curve, so the stroke does not stop at a key.
 With a net selected, a right click on a firebug swings at where it is (`PlayerControl.RightPress`) instead of walking to it.
 The swing lands like any other (`Swings.Tick`), and `Firebugs.Sweep` catches each firebug the `Swings.Net` shape
 touches, a body `BodyRadius` wide at any height, into the swinger's backpack while it has room.
@@ -1020,7 +1024,7 @@ stays, grass grows under it and the ground takes no contact shade.
 since each thing takes its look from its id.
 
 `FirebugShape` draws a firebug as a dark body, a lantern over it and a halo, and throws no light on the ground.
-It glows steadily and, every 10 seconds at a moment of its own, a tenth brighter for about a second (`FirebugShape.Flash`).
+It glows steadily and, every 10 seconds at a moment of its own, half as bright again for about a second (`FirebugShape.Flash`).
 It bobs about `FirebugShape.Height` and follows the world's position no faster than a dart, so the steps of its
 updates never show.
 
