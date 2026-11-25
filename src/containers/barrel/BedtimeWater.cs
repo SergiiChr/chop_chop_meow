@@ -52,13 +52,26 @@ internal sealed class BedtimeWater(World world) {
     internal (PlayerState Player, Thing Cabin)[] Occupants() =>
         world.S.Players.OrderBy(p => p.CabinEntry).ThenBy(p => p.Id)
             .Select(p => (Player: p, Cabin: world.Find(p.Sheltered)))
-            .Where(pair => pair.Cabin != null).Select(pair => (pair.Player, pair.Cabin!)).ToArray();
+            .Where(pair => pair.Cabin != null && pair.Player.SleepingAt == pair.Cabin.Id).Select(pair => (pair.Player, pair.Cabin!)).ToArray();
 
-    /// <summary>Serves everyone in entry order at bedtime or when they wake.</summary>
+    /// <summary>Drinks now, leaving earlier occupants the water they need when they turn in.</summary>
+    internal void DrinkAtBedtime(PlayerState player, Thing cabin) {
+        int available = Supply(cabin);
+        foreach (var other in world.Players)
+            if (other != player && other.Sheltered == cabin.Id && other.SleepingAt == 0
+                && (other.CabinEntry < player.CabinEntry || other.CabinEntry == player.CabinEntry && other.Id < player.Id))
+                available -= ThirstLiters(other.Thirst);
+        Drink(player, cabin, Math.Max(0, available));
+    }
+
+    internal static void Drink(PlayerState player, Thing cabin, int limit = int.MaxValue) {
+        if (player.Health > 0 && player.Thirst < 100 && limit > 0)
+            player.Thirst = Drank(player.Thirst, Barrels.TakeWater(cabin, Math.Min(limit, ThirstLiters(player.Thirst))));
+    }
+
+    /// <summary>Serves sleepers in entry order when they wake together.</summary>
     internal static void ServeThirst((PlayerState Player, Thing Cabin)[] occupants) {
-        foreach (var (player, cabin) in occupants)
-            if (player.Health > 0 && player.Thirst < 100)
-                player.Thirst = Drank(player.Thirst, Barrels.TakeWater(cabin, ThirstLiters(player.Thirst)));
+        foreach (var (player, cabin) in occupants) Drink(player, cabin);
     }
 
     /// <summary>Fills bottles in entry order after everyone has had their bedtime drink.</summary>

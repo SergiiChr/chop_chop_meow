@@ -210,7 +210,7 @@ public static class DoorCheckChecks {
         int day = world.Day;
         float time = world.Time;
         Nourished(world);
-        world.Sleep(hut);
+        world.Sleep.Start(hut);
         Require(world.Day == day && world.Night && world.Time > time, "sleep behind an unlocked door should stop in the night a wolf comes to it");
         // A wolf trots 3 m a second, so it covers the 20 m in about 7 seconds.
         Require(world.Time - time < 12, $"sleep should stop as the wolf reaches the door, not {world.Time - time:0} s later");
@@ -225,7 +225,7 @@ public static class DoorCheckChecks {
         PatrolWolf(world, new Wolf { Pos = Doorways.DoorPoint(hut) + new Vector2(0, 20) });
         int day = world.Day;
         Nourished(world);
-        world.Sleep(hut);
+        world.Sleep.Start(hut);
         Require(world.Day == day + 1 && !world.Night, "sleep behind a locked door should last until dawn");
         Require(world.Sheltered == hut.Id && world.Health == 100 && hut.Locked, "the sleeper should wake inside, unhurt, behind the locked door");
         Require(!heard.Contains("door_scratch") && world.Wolves.Count == 0, $"a slept night should be silent and end with the wolves gone: heard {string.Join(", ", heard)}");
@@ -286,7 +286,7 @@ public static class DoorCheckChecks {
         Require(wolf.DoorCheck == DoorCheckStage.Prying, $"a wolf should pry at an unlocked door after scratching, not {wolf.DoorCheck}");
         float time = world.Time;
         Nourished(world);
-        world.Sleep(hut);
+        world.Sleep.Start(hut);
         Require(world.Time == time && wolf.DoorCheck == DoorCheckStage.Prying, $"no time should pass in sleep while a wolf forces the door, not {world.Time - time:0} s with the wolf {wolf.DoorCheck}");
         Require(world.Sheltered == hut.Id && world.Health == 100 && told.Contains("You are awakened by the noise outside."), $"the player should stay inside, unhurt, and be told why: {string.Join(" | ", told)}");
     }

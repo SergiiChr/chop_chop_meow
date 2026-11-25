@@ -19,6 +19,7 @@ Buildings are DIY:
 - slatted wood crates
 - a market post with a mailbox
 - a fieldstone campfire
+- a low mat of pressed autumn leaves with a rough straw rim
 
 Trees come in three variants chosen by object id: broadleaf oak, spruce and silver birch.
 
@@ -75,6 +76,7 @@ Models are assembled from code-built or baked Godot meshes.
   bushes by their own shader (`NatureShape.ScrubMaterials`). Skin, hair, fur, glass, leaf cards and flames stay flat.
   The surfaces' grain and bump textures and the scans' colour, bump and height maps are in `models/surfaces/`, packed
   by `tools/surface_textures.py`.
+- `src/rest/display/StrawBedModel.cs` — a shallow leaf bed with a folded-grass rim. Its model and sleep pose references are in [straw_bed/references](models/straw_bed/references/).
 - `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
 - `src/containers/barrel/display/VesselShape.cs` — a ribbed 50 L steel barrel with a tap and a movable bung in its recessed lid,
   and a 10 L tapered steel bucket with a hollow interior and a wire bail with a wood grip.

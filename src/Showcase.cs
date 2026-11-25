@@ -31,6 +31,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
 
     /// <summary>Sets up the scene the flags ask for; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
     public void Run() {
+        if (Launch.Value("--straw-bed") is string bedPose) { StrawBedScene(bedPose); return; }
         Place();
         view.Zoom = Launch.Number("--zoom", view.Zoom);
         if (Launch.Value("--doorway") is string scene) {
@@ -40,6 +41,36 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             if (Launch.Has("--panel")) panel.Select(cabin);
         }
         if (Launch.Value("--wolf-scene") is string wolves) view.AddChild(new WolfReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = wolves });
+    }
+
+    /// <summary>A straw bed at the game camera, with a model or sleep pose to inspect.</summary>
+    private void StrawBedScene(string pose) {
+        var at = Terrain.Spawn + new Vector2(-1, 2);
+        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4f ||
+            t.Kind is ThingKind.Tree or ThingKind.Bush or ThingKind.Berries && t.Pos.DistanceTo(at) < 14f);
+        world.S.Time = world.Data.DaySeconds * .28f;
+        world.S.Backpack.Remove("steel_axe", world.S.Backpack["steel_axe"]);
+        var bed = world.Add(ThingKind.StrawBed, at);
+        world.ClearGround(bed);
+        world.Player = at + Vector2.Left * 1.6f;
+        world.S.Health = 60;
+        world.S.Hunger = world.S.Thirst = 100;
+        if (pose is "sleep" or "wake") {
+            // The other awake player keeps the clock from skipping to dawn.
+            world.Arrive("Straw bed review", 2).Pos = at + Vector2.Right * 35;
+            world.Sleep.Start(bed);
+            if (pose == "wake") {
+                var timer = new Timer { WaitTime = 1.85, OneShot = true, Autostart = true };
+                timer.Timeout += world.Sleep.Wake;
+                view.AddChild(timer);
+            }
+        }
+        view.Zoom = Launch.Number("--zoom", 3.2f);
+        view.CameraTurn = Launch.Number("--camera-turn", 0);
+        view.CameraPitch = Launch.Number("--camera-pitch", 30);
+        if (Launch.Has("--hide-ui")) ui.Visible = false;
+        world.Tick(0);
+        if (Launch.Has("--panel")) panel.Select(bed); else panel.Close();
     }
 
     private void VesselReview() {
@@ -300,7 +331,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         }
         if (Launch.Has("--cabin")) {
             // The cabin's page at bedtime, wounded but fed: what a night's sleep would leave.
-            world.S.Time = world.Data.DaySeconds * (World.SleepHour - 6 + .5f) / 24; world.S.Health = 40; world.S.Hunger = 80; world.S.Thirst = 70;
+            world.S.Time = world.Data.DaySeconds * .69f; world.S.Health = 40; world.S.Hunger = 80; world.S.Thirst = 70;
             world.Player = hut.Pos + new Vector2(1, 2); world.Tick(0); view.Zoom = 1.7f; panel.Select(hut);
         }
         if (Launch.Has("--kitchen")) {

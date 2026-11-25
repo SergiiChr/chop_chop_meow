@@ -79,6 +79,7 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<int, Prop> props = new();
     private readonly StrikePoints strikes = new();
     private readonly ActorState player = new();
+    private readonly StrawBedView playerSleep = new();
     private (float PullL, float PullR) playerArmPull;
     private ActorRig playerRig = null!;
     private string playerShirt = "";
@@ -320,6 +321,7 @@ public partial class WorldView : Node3D {
         public readonly ActorRig Rig = rig;
         public readonly string Shirt = shirt;
         public readonly ActorState State = new();
+        public readonly StrawBedView Sleep = new();
         public (float PullL, float PullR) ArmPull;
         public ActorAction Pulse;
         public Vector2 PulseTarget;
@@ -733,7 +735,8 @@ public partial class WorldView : Node3D {
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
-        PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, StationHammer(tool, worked, World.Me) ?? SelectedTool, World.S.Backpack), torch, door, dt);
+        if (!playerSleep.Show(playerRig, World.Me, World.Find(World.Me.SleepingAt), dt))
+            PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, StationHammer(tool, worked, World.Me) ?? SelectedTool, World.S.Backpack), torch, door, dt);
         if (SwingsSlottedHammer(tool, worked, World.Me)) swung.Add(worked!.Id);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
@@ -916,7 +919,8 @@ public partial class WorldView : Node3D {
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
             bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             string? tool = ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null);
-            PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, StationHammer(tool, worked, p) ?? p.Selected, p.Backpack), torch, door, dt);
+            if (!other.Sleep.Show(other.Rig, p, World.Find(p.SleepingAt), dt))
+                PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, StationHammer(tool, worked, p) ?? p.Selected, p.Backpack), torch, door, dt);
             if (SwingsSlottedHammer(tool, worked, p)) swung.Add(worked!.Id);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && DrawsAt(p.Pos);
@@ -948,7 +952,8 @@ public partial class WorldView : Node3D {
     /// <summary>A player's arms follow the wolves holding them and ease free as the player stands or falls.</summary>
     private void PosePlayer(ActorRig rig, ActorState state, PlayerState who, ref (float PullL, float PullR) pull,
         float downed, string? tool, bool torch, DoorShown? door, float dt) {
-        var pose = tugs.PulledArms(downed > 0 ? state.Pose : StandingPose(rig, state), who, ref pull, dt);
+        float onMat = door == null && downed == 0 ? BedHeightAt(state.Position) : 0;
+        var pose = tugs.PulledArms(downed > 0 ? state.Pose : StandingPose(rig, state, onMat), who, ref pull, dt);
         if (downed > 0) FallBackView.FallBack(rig, state, pose, downed, torch, who.RespawnIn > 0 ? null : HoldingOff(who.Id));
         else ShowStanding(rig, state, pose, tool, torch, door, dt, HugsBarrel(state.Action, who.Backpack), null);
     }
@@ -958,12 +963,21 @@ public partial class WorldView : Node3D {
         ShowStanding(rig, state, StandingPose(rig, state), tool, torch, door, dt, barrel, vessel);
 
     /// <summary>Places the upright rig so the pose can aim at the actor's mark in its own frame.</summary>
-    private static Pose StandingPose(ActorRig rig, ActorState state) {
-        rig.Root.Position = To3(state.Position);
+    private static Pose StandingPose(ActorRig rig, ActorState state, float rise = 0) {
+        rig.Root.Position = To3(state.Position, rise);
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
         state.MarkInRig = state.Mark is Vector3 mark ? rig.Root.Transform.AffineInverse() * mark : null;
         return state.Pose;
+    }
+
+    private float BedHeightAt(Vector2 at) {
+        foreach (var bed in World.ThingsOf(ThingKind.StrawBed)) {
+            var offset = (at - bed.Pos).Rotated(-bed.Rotation).Abs();
+            float inside = Math.Min(StrawBed.HalfWidth - offset.X, StrawBed.HalfLength - offset.Y);
+            if (inside > 0) return StrawBedModel.Top * Mathf.SmoothStep(0, .07f, inside);
+        }
+        return 0;
     }
 
     /// <summary>Draws the actor in its standing pose, settling its feet onto the steps while at a cabin door.</summary>
@@ -1723,8 +1737,10 @@ public partial class WorldView : Node3D {
                 float hop = Math.Min(1, (1 - model.Recoiling / WolfModel.RecoilSeconds) / WolfModel.HopShare);
                 model.KnockBack = model.KnockBackFrom * (1 - hop);
             } else model.KnockBack = Vector2.Zero;
-            // A following wolf walking round its player turns its head to them now and then, each at its own moments.
-            bool glances = wolf.Follow == FollowStage.Circling && wolf.Flee <= 0 && (Elapsed + wolf.Id * WolfModel.GlanceApart) % WolfModel.GlanceEvery < WolfModel.GlanceSeconds;
+            bool fire = wolf.Target != 0 && World.Protected(hunted);
+            bool follows = wolf.Following || fire;
+            // A circling wolf turns its head to its player now and then.
+            bool glances = (wolf.Follow == FollowStage.Circling || fire) && wolf.Flee <= 0 && (Elapsed + wolf.Id * WolfModel.GlanceApart) % WolfModel.GlanceEvery < WolfModel.GlanceSeconds;
             float glance = glances ? Math.Clamp(Mathf.AngleDifference(model.Yaw, ActorAnimation.Yaw(hunted - wolf.Pos, model.Yaw)), -WolfModel.MaxGlance, WolfModel.MaxGlance) : 0;
             model.Glance = Mathf.MoveToward(model.Glance, glance, dt * WolfModel.GlanceRate);
             if (wolf.Recover > model.Recover) {
@@ -1738,11 +1754,11 @@ public partial class WorldView : Node3D {
             // No faster than a wolf backs off.
             bool slow = moved.Length() <= dt * WolfBodies.BackOffSpeed + 1e-4f;
             // Easing back from its player to biting distance, a wolf steps backward still facing them.
-            bool backing = running && !wolf.Aggressive && wolf.Flee <= 0 && !wolf.Following
+            bool backing = running && !wolf.Aggressive && wolf.Flee <= 0 && !follows
                 && moved.Dot(hunted - wolf.Pos) < 0 && slow;
             // A scared or galloping wolf turns fast. At a walk or a trot, one that sets off far from the way it faces turns
             // round where it stands first, and only then goes after its place in the world.
-            bool fast = wolf.Aggressive || wolf.Chase > 0 || wolf.Flee > 0;
+            bool fast = wolf.Aggressive && !fire || wolf.Chase > 0 || wolf.Flee > 0;
             bool threatening = wolf.Threaten > 0;
             bool turnsRound = running && !backing && !fast && moved.Normalized().Dot(ActorAnimation.Forward(model.Yaw)) < WolfModel.SetsOffWithin;
             // Where it is drawn away from its place in the world, after turning round or letting go of a player it tugged,
@@ -1773,7 +1789,7 @@ public partial class WorldView : Node3D {
                 && Math.Abs(turned) > WolfModel.StepsRoundFrom * dt;
             if (stepsRound) model.Drift += (ActorAnimation.Forward(model.Yaw) - ActorAnimation.Forward(faced)) * WolfModel.HipsBehind;
             model.Root.Visible = DrawsAt(wolf.Pos);
-            bool wary = wolf.Following || HuntedTorchLit(wolf);
+            bool wary = follows || HuntedTorchLit(wolf);
             bool gathers = WolfSnap.Winding(wolf);
             float flight = WolfSnap.FlightOf(wolf), left = WolfSnap.Remaining(wolf);
             float wind = gathers ? 1 - (left - flight) / WolfSnap.Windup : 1;

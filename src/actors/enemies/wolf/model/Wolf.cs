@@ -51,7 +51,7 @@ public sealed class Wolf : IWalker {
     [JsonIgnore] public bool Growled { get; set; }
     /// <summary>The wolf has broken from a walk into a sprint at the player; it growls once as it does.</summary>
     [JsonIgnore] public bool Sprinted { get; set; }
-    /// <summary>Seconds a chasing wolf keeps following the player into firelight before it gives up; above zero the wolf gallops.</summary>
+    /// <summary>Above zero while a wolf is galloping after its player.</summary>
     public float Chase { get; set; }
     /// <summary>What a torch has made of this wolf while it hunts a player: in follow mode, turned on them, or running from them.</summary>
     public FollowStage Follow { get; set; }

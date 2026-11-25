@@ -70,6 +70,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --steel-vessels` | Show a cabin's ladder and roof barrel, standing and stacked barrels, and vessels on the tool rack, with `--zoom`, `--camera-turn` and `--camera-pitch` for a closer look |
 | `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door), `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm) or `takedown` (the same with a player hurt enough to go down, pinned and fed on; the scene keeps them alive); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
 | `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
+| `--showcase --straw-bed sleep` | Inspect a straw bed in the clearing: `model`, `sleep` or `wake`. Add `--panel` to see its controls. |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -454,9 +455,10 @@ Taking down a station fills the bottles you carry with its water, and the rest i
 These rules cover any refillable vessel the game adds (`GameData.Vessels`).
 
 Food and drink restore hunger and thirst but no health: health comes back only in sleep.
-From 10 pm you can sleep until dawn, but only if your food and water will last until morning; otherwise the sleep button explains why.
-Sleep heals while hunger and thirst both stay above 45%, about a third of your health over a full night.
-The cabin's page shows the health, hunger and thirst you would wake with under “Stats after sleep”.
+Sleep at any hour in a cabin or on a straw bed. Enter the cabin first to see its Sleep button.
+You start healing while you sleep, even if other players stay awake, as long as hunger and thirst both stay above 45%.
+A full night can restore about a third of your health. You wake at dawn, if hunger or thirst runs out, or when you choose Wake.
+Both pages forecast health, hunger and thirst under “Stats after sleep”.
 Each appears as a capsule over its icon, as in the corner.
 When a roof barrel is mounted, a note beneath the forecast says water is refilled from the roof barrel.
 The note still appears when the mounted barrel is empty.
@@ -1135,7 +1137,9 @@ An hour before dawn every wolf gives up and heads back to the nearest den.
 
 ### Fire
 
-A burning campfire keeps them away, and a wolf already chasing you follows you into its light for a few seconds.
+When you reach the light of a burning campfire, wolves stop closing in and walk in circles outside the light,
+even if a full pack was already chasing you. Like a torch swing, this stops a bite a wolf is still gathering for,
+but a wolf already in the air finishes its leap.
 One log burns about 4 in-game hours.
 A campfire with no wood left burns anyway while workers sit at it.
 Cabin windows glow but do not deter wolves; a campfire whose light reaches a cabin's door keeps them off the door.
@@ -1163,6 +1167,15 @@ Walk at one and it stops and stands braced where it is. Come within 2 metres and
 
 Once five are around you they attack together and swings no longer scare them.
 A torch that lands on a wolf burns it and sends it running for a moment.
+
+### Straw bed
+
+“Not the best sleep score.”
+
+Lay a straw bed on dry, open ground from Building plans for 2 grass and 20 leaves.
+A bed holds one sleeper and doesn't shelter them from wolves.
+It falls apart after three full in-game days, whether or not anyone slept in it.
+Taking it down less than one in-game hour after building returns 2 grass and 20 leaves. After that it returns nothing.
 
 ### Cabins
 
@@ -1260,10 +1273,10 @@ A guest that loses the connection tries to get back in on its own for up to 120 
 ### Shared world
 
 Everyone shares the world, the market and the workers.
-Sleep needs every other player inside a cabin, and everyone with enough food and water.
-Wolves patrol on through a slept night: one that comes to an unlocked door with someone inside stops the night as it starts scratching, with "You are awakened by the noise outside.", and everyone is awake to deal with it.
-While the wolf is at that door, until it has gone or let go of the player it took out, Sleep answers with the same message.
-Behind locked doors the night passes to dawn.
+The clock skips to the next dawn when everyone in the game is asleep, in cabins, on straw beds, or both.
+Workers, production, trade and needs advance during the skip, and wolves still roam.
+A wolf that starts scratching at an unlocked cabin door wakes the people sleeping there.
+Wolves can also bite and wake an outdoor sleeper. If anyone wakes before dawn, the skip stops.
 Night wolves hunt each player separately.
 
 Thirty times a second the server sends each player only what changed since the last update that player confirmed, usually a few hundred bytes, so it plays over the internet as well as at home.

@@ -27,7 +27,7 @@ public sealed partial class World {
     // While the tick runs the shared world, what it says is for everyone.
     private bool everyone;
 
-    private void SayToAll(string message) {
+    internal void SayToAll(string message) {
         bool was = everyone; everyone = true;
         Say(message); everyone = was;
     }
@@ -196,7 +196,8 @@ public sealed partial class World {
             case Verb.LoadFuel: LoadFuel(t, c.Item, c.Count); break;
             case Verb.Collect: Collect(t); break;
             case Verb.Enter: Doorways.Enter(t, c.Count == 1); break;
-            case Verb.Sleep: Sleep(t); break;
+            case Verb.Sleep: Sleep.Start(t); break;
+            case Verb.Wake: Sleep.Wake(); break;
             case Verb.Sell: Sell(t); break;
             case Verb.AutoSell: SetAutoSell(t, c.Count != 0); break;
             case Verb.SetPacking: SetPacking(t, c.Item); break;
@@ -384,6 +385,7 @@ public sealed partial class World {
         p.Door = Doorway.None;
         if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
         Forget(p);
+        p.SleepingAt = 0;
         p.Mauled = false; p.GatherTarget = 0; p.Selected = ""; p.Sprinting = p.Braking = false; p.TorchKindling = 0;
         GroundHoles.Clear(p);
         S.Players.Add(p);
@@ -404,6 +406,7 @@ public sealed partial class World {
     public void Depart(int id) {
         if (PlayerById(id) is not PlayerState p) return;
         ReleaseFor(p);
+        p.SleepingAt = 0;
         GroundHoles.Clear(p);
         S.Players.Remove(p); S.Absent[p.Key] = p;
         Doorways.UnlockEmpty(p.Sheltered);

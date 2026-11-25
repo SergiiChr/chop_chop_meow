@@ -70,6 +70,7 @@ public sealed class Construction(World world) {
             if (!Terrain.InLake(p)) return "Place the intake in the freshwater lake’s shallows.";
             if (!world.CanStand(p + World.BellowsStand.Rotated(rotation))) return "Turn the handle toward open ground on the bank.";
         } else if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
+        if (kind == ThingKind.StrawBed && !StrawBed.Fits(world, p, rotation)) return "Choose dry, open ground for the whole bed.";
         if (digging && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
             if ((!World.BuiltOver(t.Kind) || digging) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
@@ -177,6 +178,10 @@ public sealed class Construction(World world) {
         // Liquid fills the backpack's vessels, and the rest is spilled.
         string spilled = "";
         foreach (var box in World.Boxes(t)) if (box != null) spilled += world.PourOut(box);
+        if (t.Kind == ThingKind.StrawBed) world.Sleep.WakeIn(t, "Someone took down your straw bed.");
+        if (t.Kind == ThingKind.StrawBed && !StrawBed.Salvage(world, t)) {
+            RemoveBuilding(t); world.Say("The straw bed is down. Nothing could be salvaged."); return true;
+        }
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in world.Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
         foreach (var box in World.Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
@@ -205,6 +210,7 @@ public sealed class Construction(World world) {
 
     private void Crush(Thing t) {
         if (t.Kind == ThingKind.Hut) world.Doorways.Evacuate(t);
+        if (t.Kind is ThingKind.Hut or ThingKind.StrawBed) world.Sleep.WakeIn(t, "Your sleeping place was crushed.");
         Inventory? recovery = null;
         foreach (var box in World.Boxes(t)) {
             if (box == null) continue;

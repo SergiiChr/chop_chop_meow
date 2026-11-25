@@ -36,6 +36,8 @@ public sealed class PlayerState {
     public bool Mauled { get; set; }
     /// <summary>Id of the cabin the player is inside, or zero; inside, wolves back off and the player is hidden.</summary>
     public int Sheltered { get; set; }
+    /// <summary>The cabin or straw bed a player is sleeping in, or zero while awake.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int SleepingAt { get; set; }
     public int CabinEntry { get; set; }
     /// <summary>What the player is doing at a cabin's door, which <see cref="DoorCabin"/> names.</summary>
     public Doorway Door { get; set; }

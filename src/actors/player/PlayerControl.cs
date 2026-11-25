@@ -282,8 +282,8 @@ public sealed class PlayerControl {
     private void Walk(Vector2 direction, bool right, float dt) {
         // A carried barrel prevents sprinting.
         // Under 15% food or drink the player is too weak to sprint.
-        world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
-        var wanted = world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero;
+        world.Me.Sprinting = direction != Vector2.Zero && !world.Occupied && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
+        var wanted = !world.Occupied ? direction : Vector2.Zero;
         Vector2 step;
         if (cabinApproach.Active) {
             momentum = default; step = direction;

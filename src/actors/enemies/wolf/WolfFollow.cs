@@ -48,6 +48,9 @@ public sealed class WolfFollow(World world) {
     /// <summary>The followers going each way round the player, in order round them, and the bearing of each way's first place, in radians.</summary>
     private readonly List<Wolf> clockwise = new(), counter = new();
     private float firstClockwise, firstCounter;
+    private Vector2 centre;
+    private float distance;
+    private bool campfire;
     // Seeded, so a recording of a night plays the same every time.
     private readonly Random ways = new(3571);
 
@@ -72,14 +75,17 @@ public sealed class WolfFollow(World world) {
     internal void Stop() { foreach (var wolf in world.Hunters) if (wolf.Following) wolf.Follow = FollowStage.None; }
 
     /// <summary>
-    /// Finds the wolves following the acting player, gives each new one a way round them at random, and for each way
+    /// Finds the wolves circling a lit campfire or following the acting player and gives each new one a way round at random. For each way it
     /// orders its wolves by bearing and turns its evenly spread places to where they fit those wolves best.
     /// </summary>
-    internal void Arrange(List<Wolf> hunters) {
+    internal void Arrange(List<Wolf> hunters, Thing? fire) {
         pack = hunters;
+        campfire = fire != null;
+        centre = fire?.Pos ?? world.Player;
+        distance = campfire ? World.FireReach + Wander + .25f : World.StalkDistance;
         clockwise.Clear(); counter.Clear();
         foreach (var wolf in hunters) {
-            if (!wolf.Following) continue;
+            if (!campfire && !wolf.Following) continue;
             if (wolf.Round == 0) wolf.Round = ways.Next(2) == 0 ? 1 : -1;
             var ring = wolf.Round > 0 ? clockwise : counter;
             int at = ring.Count;
@@ -107,6 +113,8 @@ public sealed class WolfFollow(World world) {
     internal void Follow(Wolf wolf, bool braced, float dt, float walk) {
         float near = wolf.Pos.DistanceTo(world.Player);
         wolf.Chase = 0;
+        // A lit campfire keeps wolves on its edge even if the player comes near that edge.
+        if (campfire) { GoRound(wolf, dt, walk); return; }
         if (wolf.Follow == FollowStage.BackingOff) {
             // Any step of the player's toward the wolf is a chase.
             bool chased = (world.Player - wolf.Watched).Dot((wolf.Pos - wolf.Watched).Normalized()) > ChaseStep;
@@ -141,11 +149,24 @@ public sealed class WolfFollow(World world) {
         float time = world.S.Time, own = wolf.Id * 1.7f;
         float place = (wolf.Round > 0 ? firstClockwise : firstCounter) + ring.IndexOf(wolf) * MathF.Tau / ring.Count
             + wolf.Round * Lead * (1 + .5f * MathF.Sin(time * .7f + own * 1.4f));
-        float bearing = Bearing(wolf), radius = World.StalkDistance + wolf.Round * Lane + Drift * (.65f * MathF.Sin(time * .9f + own) + .35f * MathF.Sin(time * 2.3f + own * 1.7f));
+        float bearing = Bearing(wolf), radius = distance + wolf.Round * Lane + Drift * (.65f * MathF.Sin(time * .9f + own) + .35f * MathF.Sin(time * 2.3f + own * 1.7f));
         // It heads along the line touching its circle where it stands, so going round never takes it nearer the player.
         float round = Math.Clamp(Mathf.AngleDifference(bearing, place), -Arc, Arc);
-        var to = world.Player + Vector2.Right.Rotated(bearing + round) * (radius / MathF.Cos(round)) - wolf.Pos;
-        wolf.Pos = world.Slide(wolf.Pos, to.LimitLength(dt * Math.Min(walk, to.Length() * Keenness)));
+        var to = centre + Vector2.Right.Rotated(bearing + round) * (radius / MathF.Cos(round)) - wolf.Pos;
+        // A wolf caught between the player and the fire takes the way out that does not go at the player.
+        var away = wolf.Pos - world.Player;
+        if (campfire && wolf.Pos.DistanceSquaredTo(centre) < World.FireReach * World.FireReach && away.Dot(to) < 0) {
+            to = to.Slide(away.Normalized());
+            if (to.LengthSquared() < .001f) to = Vector2.Right.Rotated(bearing + wolf.Round * Mathf.Pi / 2) * walk;
+        }
+        var step = to.LimitLength(dt * Math.Min(walk, to.Length() * Keenness));
+        var next = world.Slide(wolf.Pos, step);
+        // An adjoining campfire may put light across the circle. Walk along its edge, not through it.
+        if (campfire && world.FireLighting(next) is Thing other && !world.Protected(wolf.Pos)) {
+            next = world.Slide(wolf.Pos, step.Slide((wolf.Pos - other.Pos).Normalized()));
+            if (world.Protected(next)) return;
+        }
+        wolf.Pos = next;
     }
 
     /// <summary>
@@ -166,7 +187,7 @@ public sealed class WolfFollow(World world) {
         if (!wolf.Shunned.Contains(player)) wolf.Shunned.Add(player);
     }
 
-    private float Bearing(Wolf wolf) => (wolf.Pos - world.Player).Angle();
+    private float Bearing(Wolf wolf) => (wolf.Pos - centre).Angle();
 
     /// <summary>How many wolves follow the acting player within their line of sight: only these count as others to one they walk at.</summary>
     private int FollowingInSight() {

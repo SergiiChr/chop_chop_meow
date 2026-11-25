@@ -123,15 +123,17 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
         await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind the player once they are inside", 3);
+        await Until(() => Named("sleep") is { Visible: true }, "the Sleep button appearing after entering", 2);
         // The door's key shows under the door's button for a player inside; a click turns it, which locks the door.
         await Until(() => Named("key") is { Visible: true }, "the cabin page showing the door's key to a player inside", 2);
         await Click(Named("key")!);
         await Until(() => world.Find(hut.Id) is { Locked: true }, "a click on the key locking the cabin's door", 2);
         RunUntilNight(Hosted); SetNeeds(Hosted, hunger: 5);
-        await Until(() => Named("sleep")?.TooltipText.Contains("too hungry") == true, "the sleep button explaining that the player is too hungry to sleep", 2);
+        await Until(() => HasLabel(panel, "up to ") && Named("sleep")?.TooltipText.Contains("Sleep now") == true,
+            "low hunger should shorten the forecast without blocking sleep", 2);
         // Under "Stats after sleep" the page shows only what a night would leave, each capsule over its icon as in the corner; a fed night heals.
         SetNeeds(Hosted, 100, 100, 40);
-        await Until(() => (panel.FindChild("health", true, false) as Control)?.TooltipText == $"Health at dawn {Hosted.HealthAtDawn():0}%" && Hosted.HealthAtDawn() > 40,
+        await Until(() => (panel.FindChild("health", true, false) as Control)?.TooltipText == $"Health at dawn {Hosted.Sleep.Preview(hut).Health:0}%" && Hosted.Sleep.Preview(hut).Health > 40,
             "the cabin page showing the health a fed night's sleep would leave", 2);
         Require(HasLabel(panel, "Stats after sleep") && panel.FindChildren("*", "", true, false).OfType<NeedGauge>().Count() == 3,
             "The cabin page must title its needs \"Stats after sleep\" and show a heart, a stomach and a droplet under them.");
@@ -152,6 +154,7 @@ public partial class Game {
         Require(later.DistanceTo(Doorways.DoorPoint(hut)) < start.DistanceTo(Doorways.DoorPoint(hut)) - .15f,
             "the player model should move toward the doorstep while leaving");
         await Until(() => world.Find(hut.Id) is { Locked: false } && Named("key") is { Visible: false }, "stepping out unlocking the door and hiding its key", 2);
+        Require(Named("sleep") is { Visible: false }, "the Sleep button must be hidden outside the cabin.");
         // With no key held the player stops where they stepped in, right by the door.
         await DoubleClick(view.Screen(hut.Pos, 1.5f));
         await Until(() => world.Sheltered == hut.Id, "a double click on the cabin taking a standing player inside", 4);

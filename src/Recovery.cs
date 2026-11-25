@@ -23,6 +23,6 @@ public sealed partial class World {
     /// <summary>Advance normal world simulation to dawn while the local player is waiting to respawn.</summary>
     public void SkipMorning() {
         if (Forwarded(Verb.SkipMorning) || !CanSkipMorning) return;
-        PassNight();
+        Sleep.FastForward(recovery: true);
     }
 }

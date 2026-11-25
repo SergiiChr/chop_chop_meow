@@ -33,7 +33,7 @@ These came from the user; change them only after asking.
   turns red under the mouse and one click takes it down, with no question. Right-click switches layers and Esc exits.
   Building pages have no take-down button.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
-- **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
+- **Survival:** food, water, day and night, wolves that fear light, sleeping in cabins or straw beds, wages, saves and recovery after death.
 - **Wolves:** the same every night, never stronger or faster with the days; three or four bites bring a healthy player to half health. After the five let out at dusk, one den picked at random lets one more out every hour.
 - **Canning:** meat stew and jam are canned; raw meat is not, and sells in crates as it is.
 - **Saves:** a save from another version is refused, and no code converts old saves; the user's own save is fixed by hand when asked.
@@ -173,7 +173,10 @@ UI and input:
 | `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
-| `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, sleep and the needs a night would leave |
+| `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, the roof barrel and the shared sleep controls |
+| `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, the shared skip to dawn, outdoor bed expiry and salvage |
+| `src/rest/display/SleepPage.cs`, `src/rest/display/StrawBedPanel.cs` | Shared sleep controls and the straw bed’s remaining life |
+| `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The mat and a player lowering onto it or getting up |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
 | `src/workers/breaks/BreakSeats.cs` | Reserves campfire and ground seats for workers at lunch or with nothing to do, and lights the campfires they sit at |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
@@ -186,7 +189,7 @@ UI and input:
 | `src/actors/enemies/wolf/WolfHunt.cs` | The pack hunting a player: howling, closing in, leaping, pinning and backing off from firelight |
 | `src/actors/enemies/wolf/WolfSnap.cs` | A wolf's bite: planting its paws, leaping on a fixed line and closing its jaws |
 | `src/actors/enemies/wolf/WolfCounter.cs` | A struck wolf's sideways hop, skid, run, bound behind the attacker and pivot |
-| `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: wolves a torch scared off circling a player, bracing when walked at, running or standing their ground |
+| `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: campfire and torch circles, and a torch follower bracing, running or standing its ground |
 | `src/actors/player/Swings.cs`, `src/actors/player/model/Swing.cs`, `src/actors/player/model/SwingShape.cs` | Players' swings at wolves: when a swing lands, the ground its blade, flame or fist passes over, and the wolves it touches |
 | `src/actors/enemies/wolf/model/Wolf.cs` | `Wolf`, a wolf as the world saves it |
 | `src/actors/enemies/wolf/model/Den.cs` | `Den`, a wolf den's mouth, door and clearance |
@@ -343,7 +346,7 @@ A host-made move such as a respawn bumps `PlayerState.Warp`, so it wins over the
 
 Shared rules:
 
-- Sleep needs every player sheltered.
+- Sleep is individual. The clock advances to dawn only when every present player is asleep.
 - Wolves each hunt one player (`Wolf.Target`).
 - Messages reach the acting player unless they concern everyone.
 
@@ -612,10 +615,9 @@ The cabin offers Haul only while a barrel is mounted.
 The window advances the visible haul phase between server updates through `LocalClock`.
 Construction keeps the ladder approach on dry ground and clear of other buildings.
 
-Before the night advances, players inside each cabin draw enough liters to fill their thirst in cabin-entry order.
-They then fill bottles in the same order.
-On waking, the players draw from any water left in the barrel.
-The sleep gate uses what a player can drink before sleep, and the dawn preview includes what they can drink on waking.
+A player who sleeps in a cabin drinks from the roof barrel, leaving water for earlier occupants who have not turned in.
+Sleepers fill bottles when a shared skip starts, or at dawn if time runs normally.
+On waking, sleepers drink from what is left, in cabin-entry order when they wake together.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
 It advances normal simulation through dawn, including needs, trades, production and wages.
@@ -645,15 +647,18 @@ The open mines and profit milestone together unlock the ending.
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
 
 - Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`) and a `Food` flag; nothing eaten heals.
-- Health comes back only in sleep, `World.SleepHeal` a second while hunger and thirst both stay above `World.FedNeed`; `World.HealthAtDawn` foretells it for the cabin's page.
+- Health comes back only in sleep, `SleepCycle.HealPerSecond` a second while hunger and thirst both stay above `SleepCycle.FedNeed`.
+  Healing is prorated to the part of the tick before either need falls below the threshold.
 - Food is what wolves eat and compost will take, cooked or not.
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.
 
-Sleeping in a cabin advances time toward dawn.
-It is allowed from `World.SleepHour` (22:00), a little before night falls.
-It is refused if hunger or thirst would run out first.
-Wolves patrol on through a slept night, and one that starts scratching at an unlocked door with someone inside stops the night there, and no night starts while it is at that door (`DoorCheck.Waking`); a tick that only skips ahead (`World.Tick` with `sleeping`) leaves wolves where they are.
+A player can sleep at any hour inside a cabin or on an outdoor straw bed. The cabin's Sleep button appears only inside.
+`PlayerState.SleepingAt` identifies a sleeper's place. The window draws outdoor sleep on the mat without sheltering the player.
+`SleepCycle` advances the simulation toward dawn only while everyone is asleep.
+Hunger or thirst running out, an attack outdoors, or scratching at an unlocked cabin door wakes those affected and stops the skip.
+Sleepers can also choose Wake. At dawn everyone still asleep wakes.
+A straw bed takes two grass and twenty leaves, lasts three full days from `Thing.BedBuiltAt` and refunds only within one hour.
 
 #### Sprinting
 
@@ -709,7 +714,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 
 - **Dens.** `WolfPatrols.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
   The outcrop is solid like a mine's (`WolfPatrols.InOutcrop`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
-  From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
+  From `GameData.DuskStarts` (20:24), each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
   After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`).
 - **Strength.** A wolf's health, bite and pace are `GameData.WolfHealth`, `WolfBite` and `WolfTrot`, the same every night: it stands two blows of a steel axe and falls to the third or fourth, and its fourth bite brings a healthy player to half health.
 - **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at `PatrolPace` (half) of the trot it stalks at, a walk, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
@@ -744,7 +749,8 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   Patrolling, going home or losing its player (who sheltered or left the game) clears the wolf’s current attack, stance and repositioning (`WolfPatrols.Calm`). It still runs if it has been hit.
 
 Campfire light repels wolves, and `CampfireHours` sets how long one log burns; a campfire with no wood left burns while workers sit at it.
-A wolf already chasing the player still follows into the light for a few seconds.
+A wolf hunting a player in campfire light uses the same orbit drawing from `WolfFollow` as a wolf scared by a torch swing.
+The orbit is centered on the fire and stays beyond its light. A windup is stopped, but a leap already in flight finishes.
 Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters go to its door (`DoorCheck.Follow`), or give up and patrol on away from a cabin they leave alone.
 
 #### Cabin doors

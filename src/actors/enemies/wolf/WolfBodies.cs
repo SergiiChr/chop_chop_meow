@@ -52,14 +52,14 @@ public sealed class WolfBodies(World world) {
     /// Wolves at the acting player crowd round them without their bodies running into each other: one that overlaps another
     /// steps aside, unless it holds the player, by the jaws or in the air.
     /// </summary>
-    public void KeepApart(List<Wolf> hunters, float dt) {
+    public void KeepApart(List<Wolf> hunters, float dt, bool aroundFire) {
         var at = world.DoorTug.Tugged ? world.DoorTug.TuggedTo : world.WolfSnap.BitePosition();
         for (int i = 0; i < hunters.Count; i++) for (int j = i + 1; j < hunters.Count; j++) {
             var a = hunters[i]; var b = hunters[j];
             bool holdsA = Holds(a), holdsB = Holds(b);
             // Bodies this far apart cannot touch.
             if (holdsA && holdsB || a.Pos.DistanceSquaredTo(b.Pos) > (2 * (WolfNose + WolfHalfWidth)) * (2 * (WolfNose + WolfHalfWidth))) continue;
-            var (aTail, aNose) = Near(a, at); var (bTail, bNose) = Near(b, at);
+            var (aTail, aNose) = Near(a, at, aroundFire); var (bTail, bNose) = Near(b, at, aroundFire);
             var (onA, onB) = Closest(aTail, aNose, bTail, bNose);
             float overlap = 2 * WolfHalfWidth - onA.DistanceTo(onB);
             if (overlap <= 0) continue;
@@ -74,8 +74,8 @@ public sealed class WolfBodies(World world) {
     /// Where the body of a wolf at a player runs: toward them for one closing in, and along its own way for one that
     /// follows them round, so two going opposite ways pass side by side.
     /// </summary>
-    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player) =>
-        wolf.Following || wolf.Circle != 0 || Holds(wolf) ? Body(wolf) : Body(wolf, player);
+    private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player, bool aroundFire) =>
+        aroundFire || wolf.Following || wolf.Circle != 0 || Holds(wolf) ? Body(wolf) : Body(wolf, player);
 
     /// <summary>
     /// Whether a wolf holds the player, reels from a hit or is committed to a move and cannot be pushed aside.

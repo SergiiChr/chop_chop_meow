@@ -14,6 +14,7 @@ public static class WolfFollowChecks {
     public static void Run(GameData data) {
         Test(CheckFollowingWolvesGoingOneWaySpreadRoundThePlayerAndKeepCircling, data);
         Test(CheckEachFollowingWolfWalksItsOwnWayRound, data);
+        Test(CheckHuntersCircleALitCampfireInsteadOfClosingIn, data);
         Test(CheckAWolfWalkedAtStandsBracedWhereItIs, data);
         Test(CheckAWolfFollowingAloneRunsOutOfSightAndLeavesThePlayerAlone, data);
         Test(CheckAmongOthersAWolfWalkedAtGrowlsThenThePackInSightTurnsOnThePlayerForGood, data);
@@ -22,6 +23,27 @@ public static class WolfFollowChecks {
         Test(CheckAWolfBackingOffAloneRunsFromAPlayerWhoComesAfterIt, data);
         Test(CheckAmongOthersAWolfBackingOffStandsItsGroundWhenThePlayerComesAfterIt, data);
         Test(CheckAWaveAtABracedWolfSendsItBackOutToItsCircle, data);
+    }
+
+    /// <summary>Even a complete pack already chasing backs out of the firelight and circles without biting.</summary>
+    private static void CheckHuntersCircleALitCampfireInsteadOfClosingIn(GameData data) {
+        var world = NightWorld(data);
+        var centre = world.Player = Terrain.Spawn;
+        var wolves = Enumerable.Range(0, 5).Select(i => PlaceWolf(world, new Wolf {
+            Pos = centre + Vector2.Right.Rotated(i * Mathf.Tau / 5) * 3,
+            Chase = 3
+        })).ToArray();
+        world.Add(ThingKind.Campfire, centre).Burn = 90;
+        WolfTick(world, .4f, wolves);
+        Require(wolves.All(w => w.Pos.DistanceTo(centre) > 3), "the lit fire should make every chaser back off at once");
+        WolfTick(world, 30, wolves);
+        Require(wolves.All(w => !world.Protected(w.Pos) && w.Pos.DistanceTo(centre) < 8),
+            "wolves should stay close enough to circle but outside the firelight");
+        var from = wolves.Select(w => (w.Pos - centre).Angle()).ToArray();
+        WolfTick(world, 3, wolves);
+        float[] turns = wolves.Select((wolf, i) => Math.Abs(Mathf.AngleDifference(from[i], (wolf.Pos - centre).Angle()))).ToArray();
+        Require(turns.All(turn => turn > .08f), $"every wolf should move around the campfire, turns were {string.Join(", ", turns)}");
+        Require(world.Health == 100, "a complete pack should not bite someone in the firelight");
     }
 
     /// <summary>A wave at wolves nearer than the 2 m where they would run or stand their ground sends them back to their circles first, one or several.</summary>
