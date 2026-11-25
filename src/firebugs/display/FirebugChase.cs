@@ -20,14 +20,15 @@ public sealed partial class FirebugChase : Node {
     public override void _Process(double delta) {
         if ((swinging -= delta) > 0) return;
         Thing? bug = null;
-        foreach (var t in World.S.Things)
-            if (t.Kind == ThingKind.Firebug && (bug == null || World.Firebugs.At(t).DistanceTo(World.Player) < World.Firebugs.At(bug).DistanceTo(World.Player))) bug = t;
+        foreach (var t in World.S.Things.Of(ThingKind.Firebug))
+            if (bug == null || World.Firebugs.At(t).DistanceTo(World.Player) < World.Firebugs.At(bug).DistanceTo(World.Player)) bug = t;
         if (bug == null) { Press(0, 0, false); return; }
         var to = World.Firebugs.At(bug) - World.Player;
         float away = to.Length();
         if (away is >= TooNear and <= InReach) {
             Press(0, 0, false);
-            var at = View.Screen(World.Firebugs.At(bug), FirebugShape.Height);
+            // A click is given in the window's units, which the window's stretch sets apart from the view's.
+            var at = GetViewport().GetFinalTransform() * View.Screen(World.Firebugs.At(bug), FirebugShape.Height);
             foreach (bool pressed in (ReadOnlySpan<bool>)[true, false])
                 Input.ParseInputEvent(new InputEventMouseButton { Position = at, GlobalPosition = at, ButtonIndex = MouseButton.Right, Pressed = pressed });
             swinging = ActorAnimation.Duration(ActorAction.NetSwing) + .15;

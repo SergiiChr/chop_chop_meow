@@ -23,7 +23,7 @@ These came from the user; change them only after asking.
 - **Bug net:** 5 nettle rope, 1 wood and 1 wood part at the bench with any hammer. It is swung toward the pointer
   like any tool, with a right click on open ground or on a firebug.
 - **Firebugs:** eight come out at nightfall and one more each night hour, away from buildings, and are gone at dawn.
-  One drifts and blinks, darts off from a player who comes near, faster than a walk and slower than a sprint, then
+  One drifts and glows, darts off from a player who comes near, faster than a walk and slower than a sprint, then
   rests; a swing lands after a moment, catches what is in its sweep, and a miss sends the bug darting.
   A caught firebug is an item only: nothing is made from it and it gives no light.
 - **Nettle and firebug jobs:** a worker picks nettles with a shovel and catches firebugs with a bug net, each from a
