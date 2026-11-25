@@ -641,6 +641,9 @@ An item first made while the map is open turns to **Made before**.
 - Click anywhere on a card to highlight it and the arrows connected to it. Its details below show how it is made,
   what it requires and what it is used for. The button opens the nearest station that makes it or the crafting menu
   for a recipe made by hand.
+- Alt-click an item on the map to open its item tree in the same window. It shows only recipes that directly use
+  the item as an ingredient, tool or fuel. Click an item to highlight it on the main map, or Alt-click it to open
+  its own item tree. The upper-left **Recipe map** button returns to the view you left.
 
 ### Crafting bench
 

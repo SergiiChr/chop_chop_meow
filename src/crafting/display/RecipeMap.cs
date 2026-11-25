@@ -21,11 +21,14 @@ public partial class RecipeMap : Control {
     private static readonly StyleBoxFlat StationBuilt = Style.Flat(Style.Beige, 10, 6, horizontal: 10);
     private static readonly StyleBoxFlat StationPlanned = Style.Flat(new Color("34495e"), 10, 6, new Color(Style.Beige, .55f), 1, 10);
     private Action? leaveGoalLog;
+    private VBoxContainer? mainView;
+    private ItemTree? itemTree;
     private ScrollContainer rows = null!;
     private PanelContainer details = null!;
     /// <summary>How long a jumped-to item stays lit, in seconds.</summary>
     public const float LitSeconds = 1.5f;
     public const string AltClickHint = "Alt-click: open the Recipe map";
+    public const string ItemTreeHint = "Alt-click: open the item tree";
 
     public RecipeMap(UiKit kit, SidePanel panel) {
         this.kit = kit; this.panel = panel; world = kit.World;
@@ -52,7 +55,7 @@ public partial class RecipeMap : Control {
         if (item != "" && !world.Data.Items.ContainsKey(item)) return;
         Clear();
         this.leaveGoalLog = leaveGoalLog;
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); board.AddChild(column);
+        var column = mainView = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); board.AddChild(column);
         column.AddChild(Header());
         column.AddChild(Stations());
         rows = new ScrollContainer { Name = "map_rows", SizeFlagsVertical = SizeFlags.ExpandFill };
@@ -91,9 +94,35 @@ public partial class RecipeMap : Control {
 
     public void Close() { Visible = false; Clear(); }
 
+    /// <summary>Replaces the map's contents with the direct recipes of another item, within the same board.</summary>
+    private void OpenItemTree(string item) {
+        mainView!.Hide();
+        RemoveItemTree();
+        itemTree = new ItemTree(kit, item, BackToMap, Close, ShowOnMap, OpenItemTree);
+        board.AddChild(itemTree);
+    }
+
+    /// <summary>Restores the main map exactly where the player left it.</summary>
+    private void BackToMap() {
+        RemoveItemTree();
+        mainView!.Show();
+    }
+
+    /// <summary>Returns to the main map and selects the corresponding item.</summary>
+    private void ShowOnMap(string item) {
+        BackToMap();
+        Choose(item);
+        JumpWhenReady(rows, item);
+    }
+
+    private void RemoveItemTree() {
+        if (itemTree == null) return;
+        board.RemoveChild(itemTree); itemTree.QueueFree(); itemTree = null;
+    }
+
     private void Clear() {
         foreach (var child in board.GetChildren()) { board.RemoveChild(child); child.QueueFree(); }
-        nodes.Clear(); Chosen = ""; leaveGoalLog = null;
+        nodes.Clear(); Chosen = ""; leaveGoalLog = null; mainView = null; itemTree = null;
     }
 
     /// <summary>The title, what the marks on the map mean, and the close button.</summary>
@@ -104,7 +133,7 @@ public partial class RecipeMap : Control {
         var intro = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         intro.AddThemeConstantOverride("separation", 1); header.AddChild(intro);
         intro.AddChild(Style.Heading("Recipe map", 30));
-        intro.AddChild(Style.Text("Follow the arrows from materials to what they make.", 15, Style.Beige));
+        intro.AddChild(Style.Text("Follow the arrows to what each item makes. Alt-click to open its item tree.", 15, Style.Beige));
         header.AddChild(Legend(new MapSlot { Known = true }, "Made before"));
         header.AddChild(Legend(new MapSlot(), "Not made yet"));
         header.AddChild(Legend(Sample(MapNode.ToolChip), "Required tool"));
@@ -169,7 +198,7 @@ public partial class RecipeMap : Control {
 
     /// <summary>Puts an item at a step and line, then what is made out of it one step on: the first on the same line, the rest on new lines below.</summary>
     private void Place(MapTree tree, string item, int step, ref int line) {
-        var node = new MapNode(world, item, Choose, Jump) { Position = new Vector2(step * MapTree.Pitch, line * MapNode.RowPitch) };
+        var node = new MapNode(world, item, Choose, Jump, OpenItemTree) { Position = new Vector2(step * MapTree.Pitch, line * MapNode.RowPitch) };
         nodes[item] = node; tree.AddChild(node); tree.Columns = Math.Max(tree.Columns, step + 1);
         var made = world.Data.MadeOutOf(item);
         for (int i = 0; i < made.Count; i++) {

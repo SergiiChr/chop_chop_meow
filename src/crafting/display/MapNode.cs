@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>An item card and its links to required tools and additional resources.</summary>
-public partial class MapNode(World world, string item, Action<string> choose, Action<string> jump) : Control {
+public partial class MapNode(World world, string item, Action<string> choose, Action<string> jump, Action<string> openItemTree) : Control {
     public const float Width = 205, Height = 59, RowPitch = 81;
     private const float SlotSide = 40, Chip = 23;
     public static readonly StyleBoxFlat ToolChip = Style.Flat(Style.SlotFill, 11, 0, Style.Mustard, 2);
@@ -42,12 +42,13 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         CustomMinimumSize = Size = new Vector2(Width, RowPitch - 3);
         MouseFilter = MouseFilterEnum.Ignore;
 
-        var card = new Button {
+        var card = new ItemSlot {
             Name = "slot",
             Size = new Vector2(Width, Height),
             FocusMode = FocusModeEnum.None,
             MouseDefaultCursorShape = CursorShape.PointingHand,
-            TooltipText = data.Name(item)
+            TooltipText = $"{data.Name(item)}\n{RecipeMap.ItemTreeHint}",
+            RecipeLink = () => openItemTree(item)
         };
         Style.Skin(card, Style.None, Hover);
         // The card's centre must be clickable even when requirement chips lap its lower edge.
@@ -99,7 +100,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         : r.Hand ? $"Hand or {data.Name(station).ToLowerInvariant()}" : data.Name(station);
 
     private Button ChipFor(string other, string kind, StyleBoxFlat look, string role) {
-        var chip = new Button {
+        var chip = new ItemSlot {
             Name = $"{kind}_{other}",
             CustomMinimumSize = new Vector2(Chip, Chip),
             Icon = Icons.Of(other),
@@ -107,7 +108,8 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
             IconAlignment = HorizontalAlignment.Center,
             FocusMode = FocusModeEnum.None,
             MouseDefaultCursorShape = CursorShape.PointingHand,
-            TooltipText = $"{role}: {world.Data.Name(other)}\nClick to find it on the map"
+            TooltipText = $"{role}: {world.Data.Name(other)}\nClick to find it on the map · {RecipeMap.ItemTreeHint}",
+            RecipeLink = () => openItemTree(other)
         };
         Style.Skin(chip, look, Style.SlotHover); chip.AddThemeConstantOverride("icon_max_width", 15);
         chip.Pressed += () => jump(other);

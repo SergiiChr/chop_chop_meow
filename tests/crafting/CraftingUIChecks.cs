@@ -44,6 +44,9 @@ public partial class Game {
         await TestClean(CheckAltClickIngredientInTheActiveCraftingRow);
         await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
         await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
+        await TestClean(CheckItemTreeFollowsOneDirectRecipeAtATime);
+        await TestClean(CheckItemTreeBackRestoresTheMainMap);
+        await TestClean(CheckItemTreeDistinguishesIngredientsFuelAndFixedTools);
         await TestClean(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
     }
 
