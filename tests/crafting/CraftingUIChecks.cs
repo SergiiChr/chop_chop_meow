@@ -452,11 +452,12 @@ public partial class Game {
 
     /// <summary>Alt-clicking an item on the hotbar shows its place on the map without selecting the slot.</summary>
     private async Task CheckAltClickHotbarItemOpensItsRecipeMapEntry() {
-        int axeSlot = Enumerable.Range(0, 9).First(i => world.HotbarItem(i) == "steel_axe");
-        bool axeWasSelected = world.ActiveHotbar == axeSlot;
-        if (axeWasSelected) await KeyStroke(Key.Key8);
-        int active = world.ActiveHotbar;
-        Require(active != axeSlot, "Start with a different slot selected so the shortcut cannot select the axe unnoticed.");
+        int active = world.ActiveHotbar, axeSlot = active == 0 ? 1 : 0;
+        string previous = world.HotbarItem(axeSlot);
+        int given = world.Carried("steel_axe") == 0 ? Give(Hosted, "steel_axe") : 0;
+        SetHotbarSlot(Hosted, axeSlot, "steel_axe");
+        await Until(() => world.HotbarItem(axeSlot) == "steel_axe" && !hotbar.Buttons[axeSlot].Disabled,
+            "the steel axe appearing in an unselected hotbar slot", 2);
         await Click(hotbar.Buttons[axeSlot], alt: true);
         await Until(() => recipeMap.Visible && recipeMap.Chosen == "steel_axe" && recipeMap.NodeOf("steel_axe")!.Lit,
             "the hotbar's steel axe highlighted on the recipe map", 2);
@@ -465,7 +466,9 @@ public partial class Game {
         await Until(() => rows.GetGlobalRect().Encloses(axe.GetGlobalRect()), "the steel axe scrolling fully into view", 2);
         Require(world.ActiveHotbar == active, "Looking up the axe must not select its hotbar slot.");
         await KeyStroke(Key.Escape);
-        if (axeWasSelected) await KeyStroke(Key.Key1 + axeSlot);
+        SetHotbarSlot(Hosted, axeSlot, previous);
+        if (given > 0) Drop(Hosted, "steel_axe", given);
+        await Frames();
     }
 
     /// <summary>Alt-clicking a crafting card shows its product without queueing the recipe.</summary>
