@@ -19,6 +19,7 @@ These came from the user; change them only after asking.
   A nettle blocks building and gravel paths until it is picked.
 - **Nettle rope:** 1 nettle makes 1 rope at the bench, with a wooden mallet only. Asked for with a steel hammer and no
   mallet, slotted or carried, the bench takes nothing and says "Steel hammer will damage the fibers."
+  Nettles put into its slots by hand still load and wait for a mallet.
   The bench keeps its one hammer slot. Making it takes turns between mallet blows and twisting by hand.
 - **Bug net:** 5 nettle rope, 1 wood and 1 wood part at the bench with any hammer. It is swung toward the pointer
   like any tool, with a right click on open ground or on a firebug.
@@ -116,7 +117,7 @@ Simulation and data:
 | `src/farms/model/FarmStage.cs` | Whether a plot is fallow, growing or ripe |
 | `src/mines/Mines.cs` | Mines: where one is marked and stands at its cliff, its three building stages, supplying it, working it underground and the end goal's working mines |
 | `src/mines/model/Cliff.cs`, `src/mines/model/MineStage.cs` | `Cliff`, the valley's ore cliffs and the mine spot at each, and `MineStage`, how far a mine is built |
-| `src/resources/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
+| `src/resources/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole, plucked whole or caught, its job, its sting and the tool that spares it |
 | `src/resources/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/digging/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
 | `src/nettles/Nettles.cs`, `src/nettles/display/NettleShape.cs` | Nettles coming up at nightfall, and the scanned sprigs a nettle plant and its item are made of |

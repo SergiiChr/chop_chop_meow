@@ -38,10 +38,11 @@ public partial class Game {
         await CloseWithEsc();
         Give(Hosted, "bug_net"); SetHotbarSlot(Hosted, 8, "bug_net");
         await KeyStroke(Key.Key9);
+        var stood = world.Player;
         await RightClick(Hosted.Firebugs.At(bug), FirebugShape.Height);
         await Until(() => view.PlayerAnimation == ActorAction.NetSwing, "the net's swing playing after a right click on the firebug", 2);
         await Until(() => bug.Pos.DistanceTo(placed) > 3, "the swing that fell short sending the firebug darting", 5);
-        Require(world.Player.DistanceTo(Hosted.Player) < .01f && !panel.Visible, "A right click on a firebug with the net selected must swing where the player stands, not walk to the firebug or open its page.");
+        Require(world.Player.DistanceTo(stood) < .01f && !panel.Visible, "A right click on a firebug with the net selected must swing where the player stands, not walk to the firebug or open its page.");
         RemoveThings(Hosted, t => t == bug); Drop(Hosted, "bug_net"); SetHotbarSlot(Hosted, 8, before);
         RunUntilMorning(Hosted); NourishEveryone(Hosted);
         await KeyStroke(Key.Key1);

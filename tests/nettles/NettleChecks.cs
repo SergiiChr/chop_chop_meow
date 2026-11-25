@@ -105,6 +105,7 @@ public static class NettleChecks {
         Require(world.Construction.Build(ThingKind.Chest, nettle.Pos) == null && world.Find(nettle.Id) != null, "a chest should not go up where a nettle stands");
         world.Construction.Build(ThingKind.GravelPath, nettle.Pos);
         Require(!world.GravelPaths.Laid(Terrain.TileAt(nettle.Pos)) && world.Backpack["gravel"] == 4, "a gravel path should not be laid where a nettle stands");
+        Require(world.Construction.PlacementBlock(ThingKind.Pile, nettle.Pos) != null, "a yard should not be marked where a nettle stands");
         HoldGather(world, nettle, 4);
         BuildAt(world, ThingKind.Chest, nettle.Pos);
     }

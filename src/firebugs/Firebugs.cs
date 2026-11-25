@@ -20,8 +20,8 @@ public sealed class Firebugs(World world) {
     public const float DartSeconds = 1.2f, RestSeconds = 1.6f;
     /// <summary>Metres a hovering firebug strays from its place at most.</summary>
     public const float HoverRadius = .35f;
-    /// <summary>Half the width of a firebug, for a net's sweep to touch.</summary>
-    public const float BodyRadius = .15f;
+    /// <summary>Half the width of a firebug's body, for a net's sweep to touch.</summary>
+    public const float BodyRadius = .03f;
     /// <summary>Metres within which a swing that misses a firebug sets it darting, resting or not.</summary>
     public const float ScareRadius = 5;
     /// <summary>How far to either side of straight away from a player a dart can head, in radians.</summary>

@@ -125,8 +125,8 @@ The game draws the film itself, so a change to a model or a shot means making th
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
 from their pinned CC0 sources, `./tools/polyhaven_textures.py` downloads the shore and ground photoscans drawn as they
-are, `./tools/water_textures.py` downloads the water's textures, and `./tools/food_models.py` bakes the committed
-food models from theirs.
+are, `./tools/water_textures.py` downloads the water's textures, `./tools/food_models.py` bakes the committed
+food models from theirs, and `./tools/nettle_models.py` the nettle and the nettle rope.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
@@ -625,7 +625,7 @@ Opening it from a goal keeps the pause menu open underneath.
 Movement controls are disabled while the map is open.
 An item first made while the map is open turns to **Made before**.
 
-- The map splits items into rows for wood, stone and coal, iron and steel, tin, food, farm and trade.
+- The map splits items into rows for wood, stone and coal, iron and steel, tin, food, farm, nettle and firebugs, and trade.
   In a row each item hangs off the one it is made out of, raw material first.
 - Every item is on the map, with where it is made or come by under its name.
 - An item the settlement has made, gathered, bought or started with has a filled slot, and so has everything that item
@@ -1137,7 +1137,7 @@ A wolf that reaches you stops at biting distance, about a metre off, and waits t
 ### Fighting
 
 A swing keeps the direction you gave it at the start.
-Right-click open ground with an axe, pickaxe, hammer or torch selected to aim at the pointer.
+Right-click open ground with an axe, pickaxe, hammer, torch or bug net selected to aim at the pointer.
 Overhead, Space aims along the held movement keys or, from a stand, the last direction you walked.
 In first person, Space aims where you look.
 You can move during the swing, and near a hunting wolf the movement keys reverse you immediately.

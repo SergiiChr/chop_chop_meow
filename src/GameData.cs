@@ -325,7 +325,7 @@ public sealed partial class GameData {
     /// <summary>What an item goes into: the products that take it as an input, then for a tool those made with it.</summary>
     public IEnumerable<string> UsedFor(string item) {
         var uses = ProductsOf(item);
-        if (Items[item].Tool is { Length: > 0 } kind) uses = uses.Concat(Recipes.Values.Where(r => r.Tool == kind && r.Tier <= Items[item].Tier).Select(r => r.Output));
+        if (Items[item].Tool is { Length: > 0 }) uses = uses.Concat(Recipes.Values.Where(r => r.MadeWith(Items[item])).Select(r => r.Output));
         return uses.Distinct();
     }
     /// <summary>The products that take an item as an input or come out of it.</summary>

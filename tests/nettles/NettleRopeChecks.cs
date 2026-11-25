@@ -17,7 +17,14 @@ public static class NettleRopeChecks {
         Test(CheckSlottedMalletMakesRopeForAPlayerCarryingASteelHammer, data);
         Test(CheckBenchWorkerMakesRopeOnlyWithAMalletSlotted, data);
         Test(CheckRopeIsNotMadeByHand, data);
+        Test(CheckOnlyTheMalletIsSaidToMakeRope, data);
         Test(CheckNettlesAndFirebugGoodsAreNotTraded, data);
+    }
+
+    private static void CheckOnlyTheMalletIsSaidToMakeRope(GameData data) {
+        Require(data.UsedFor("wood_hammer").Contains("nettle_rope"), "a wooden mallet should be said to be used for nettle rope");
+        Require(!data.UsedFor("steel_hammer").Contains("nettle_rope"), "a steel hammer should not be said to be used for nettle rope");
+        Require(data.UsedFor("steel_hammer").Contains("bug_net"), "a steel hammer should still be said to be used for a bug net");
     }
 
     private static void CheckMalletAtTheBenchMakesARopeOfANettle(GameData data) {
