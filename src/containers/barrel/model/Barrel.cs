@@ -10,11 +10,13 @@ public static class Barrel {
     public const int Capacity = 50;
     internal static readonly string[] Fills = MakeFills(Item, Capacity);
     private static readonly Dictionary<string, int> byFill = IndexFills(Fills);
+    private static readonly Dictionary<string, int> byJam = IndexFills(MakeFills(Item, Capacity, "_jam_"));
 
-    public static bool Is(string item) => item.StartsWith(Item, StringComparison.Ordinal) && byFill.ContainsKey(item);
+    public static bool Is(string item) => item.StartsWith(Item, StringComparison.Ordinal) && Liters(item) >= 0;
     public static bool IsFilled(string item) => item != Item && Is(item);
-    public static int Liters(string item) => byFill.GetValueOrDefault(item, -1);
-    public static string AtFill(int liters) => Fills[liters];
+    public static int Liters(string item) => byFill.TryGetValue(item, out int water) ? water : byJam.GetValueOrDefault(item, -1);
+    public static string LiquidOf(string item) => item != Item && byJam.ContainsKey(item) ? BerryJam.Liquid : Water.Liquid;
+    public static string AtFill(int liters, string liquid = Water.Liquid) => (liquid == BerryJam.Liquid ? BerryJam.Barrels : Fills)[liters];
     public static float Speed(string item) => 1 - .5f * Liters(item) / Capacity;
 
     public static string? In(Inventory inventory) {
@@ -27,10 +29,10 @@ public static class Barrel {
         return null;
     }
 
-    internal static string[] MakeFills(string empty, int capacity) {
+    internal static string[] MakeFills(string empty, int capacity, string marker = "_") {
         var fills = new string[capacity + 1];
         fills[0] = empty;
-        for (int i = 1; i < fills.Length; i++) fills[i] = empty + "_" + i.ToString(CultureInfo.InvariantCulture);
+        for (int i = 1; i < fills.Length; i++) fills[i] = empty + marker + i.ToString(CultureInfo.InvariantCulture);
         return fills;
     }
 

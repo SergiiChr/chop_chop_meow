@@ -12,6 +12,7 @@ public static class NeedsChecks {
         Test(CheckStomachGrowlsAsFoodRunsLow, data);
         Test(CheckSprintBurnsFood, data);
         Test(CheckFoodsFeedAndWaterByTheirDataWithoutHealing, data);
+        Test(CheckBerriesFeedMoreWhenPrepared, data);
     }
 
     private static void CheckStomachGrowlsAsFoodRunsLow(GameData data) {
@@ -39,6 +40,22 @@ public static class NeedsChecks {
         var (walking, sprinting) = (Burned(false), Burned(true));
         Require(Math.Abs(sprinting.Hunger / walking.Hunger - data.SprintDrain) < .001f && Math.Abs(sprinting.Thirst / walking.Thirst - data.SprintDrain) < .001f,
                 "sprinting must drain food and drink sprintDrain times as fast");
+    }
+
+    private static void CheckBerriesFeedMoreWhenPrepared(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, "berries", 1); Give(world, "crushed_berries", 1); Give(world, "canned_jam", 1);
+        Give(world, BerryJam.Bottle);
+        SetNeeds(world, hunger: 20);
+        world.Consume("berries");
+        Require(world.Hunger == 25, "a berry should restore five hunger");
+        world.Consume("crushed_berries");
+        Require(world.Hunger == 80, "crushed berries should restore their ten berries plus five");
+        world.Consume("canned_jam");
+        Require(world.Hunger == 100 && world.Backpack["canned_jam"] == 0, "a can of jam should fill but not overfill the hunger bar");
+        SetNeeds(world, hunger: 1);
+        world.Consume(BerryJam.Bottle);
+        Require(world.Hunger == 100 && world.Backpack[BerryJam.Bottles[2]] == 1, "drinking jam should use one liter and leave the bottle");
     }
 
     /// <summary>Foods restore the hunger and thirst their data says and no health, and raw ones only say they need cooking.</summary>

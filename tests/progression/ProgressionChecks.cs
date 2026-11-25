@@ -44,6 +44,7 @@ public static class ProgressionChecks {
                 if (have.Contains(vessel.Empty) && have.Contains(vessel.Liquid)) foreach (string fill in vessel.States) grew |= have.Add(fill);
             }
             if (have.Contains(Barrel.Item) && have.Contains(Water.Liquid)) foreach (string fill in Barrel.Fills) grew |= have.Add(fill);
+            if (have.Contains(Barrel.Item) && have.Contains(BerryJam.Liquid)) foreach (string fill in BerryJam.Barrels) grew |= have.Add(fill);
             foreach (var (id, b) in data.Buildings) if (b.Cost.Keys.All(have.Contains)) grew |= built.Add(id);
             if (built.Contains(ThingKind.Pile) && have.Any(data.IsFood)) grew |= have.Add("fertilizer");
             // Seeds are bought with berry money to start the first plot.

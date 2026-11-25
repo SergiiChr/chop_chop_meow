@@ -138,6 +138,8 @@ public sealed partial class World {
         room = dest.Kind switch {
             ThingKind.Mine => Mines.Need(dest, item),
             ThingKind.Farm => Farms.SowRoom(dest, item),
+            ThingKind.Barrel when PoursInto(dest, dest.Inventory, item) is VesselDef vessel && dest.Inventory.Accepts(vessel.Liquid)
+                => dest.Inventory.Room(vessel.Liquid),
             // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
             ThingKind.Signpost when !dest.Inventory.Accepts(item) => 0,
             ThingKind.Packer => dest.Inventory.Accepts(item) && Holds(dest, item) ? PackingRoom(dest, item) : 0,

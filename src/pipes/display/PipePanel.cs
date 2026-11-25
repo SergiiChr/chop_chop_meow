@@ -20,13 +20,14 @@ public partial class PipePanel(PageTools tools, Vector2I tile) : PagePanel(tools
         live.Watch(() => {
             var reading = world.PipeReading(tile);
             int ml = reading.Liters <= 0 ? 0 : reading.Liters >= 1 ? 1000 : Math.Clamp(Mathf.RoundToInt(reading.Liters * 1000), 1, 999);
-            return (ml, percent: Mathf.RoundToInt(reading.Pressure));
+            return (ml, jam: world.PipeLiquid(tile) == BerryJam.Liquid, percent: Mathf.RoundToInt(reading.Pressure));
         }, value => {
-            water.Text = value.ml switch {
+            string item = value.jam ? "Berry jam · " : "";
+            water.Text = item + (value.ml switch {
                 0 => "Empty · 0/1 L",
                 1000 => "Full · 1/1 L",
                 _ => FormattableString.Invariant($"Partly full · {value.ml / 1000f:0.###}/1 L")
-            };
+            });
             pressure.Text = $"Pressure {value.percent}%";
         });
     }

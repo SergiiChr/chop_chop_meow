@@ -7,8 +7,18 @@ namespace ChopChopMeow;
 public sealed class Barrels(World world) {
     internal static Inventory NewTank() => new() { Slots = 1, StackSize = Barrel.Capacity, Capacity = Barrel.Capacity };
 
-    internal static bool CanPour(GameData data, string item) =>
-        item == Water.Liquid || data.VesselOf(item) is VesselDef v && v.LitersIn(item) > 0;
+    internal static string? PouredLiquid(GameData data, string item) =>
+        data.VesselFor(item) != null ? item : data.VesselOf(item) is VesselDef v && v.LitersIn(item) > 0 ? v.Liquid : null;
+
+    internal static bool CanPour(GameData data, string item) => PouredLiquid(data, item) != null;
+    internal static bool CanPourWater(GameData data, string item) => PouredLiquid(data, item) == Water.Liquid;
+
+    internal static string LiquidIn(Thing barrel) => barrel.Inventory.First() ?? Water.Liquid;
+    internal static bool CanHold(Thing barrel, string liquid) =>
+        barrel.Inventory.Count == 0 || LiquidIn(barrel) == liquid;
+
+    internal static bool Accepts(GameData data, Thing barrel, string item) =>
+        PouredLiquid(data, item) is string liquid && CanHold(barrel, liquid);
 
     internal Thing? Place(string item, Vector2 at, Inventory source, float rotation) {
         if (source.PreferredSlot is >= 0 and int preferred &&
@@ -16,7 +26,7 @@ public sealed class Barrels(World world) {
                 cell.Item != item || source.SparesOnly && cell.Hotbar != 0)) return null;
         if (source.Remove(item, 1) != 1) return null;
         var barrel = world.Add(ThingKind.Barrel, at, rotation: rotation);
-        barrel.Inventory.Add(Water.Liquid, Barrel.Liters(item));
+        barrel.Inventory.Add(Barrel.LiquidOf(item), Barrel.Liters(item));
         world.PileFilters(barrel);
         world.ClearGround(barrel);
         world.Play("place_building", at);

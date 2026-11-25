@@ -10,12 +10,22 @@ public partial class Game {
     private static readonly Vector2I NetPipe = Terrain.TileAt(Terrain.Spawn) + new Vector2I(-2, -2);
     private static readonly Vector2I NetPipeSouth = NetPipe + Vector2I.Down, NetPipeEast = NetPipe + Vector2I.Right;
 
+    private static readonly Vector2I NetJam = NetPipe + Vector2I.Right * 5;
     private Thing? netPipePump;
 
     private NetScene SteelPipeNetScene => new("steel-pipes", () => {
         LayPipe(Hosted, NetPipe, shape: PipeShape.Tee);
         LayPipe(Hosted, NetPipeSouth, Mathf.Pi / 2);
         netPipePump = Hosted.Add(ThingKind.Pump, NetPipe);
+        var stood = Hosted.Player;
+        var tank = Hosted.Add(ThingKind.Barrel, NetJam);
+        var cannery = Hosted.Add(ThingKind.Cannery, NetJam + Vector2I.Right);
+        Hosted.SetRecipe(cannery, "canned_jam");
+        InstallPlumbing(Hosted, tank); InstallPlumbing(Hosted, cannery);
+        LayPipe(Hosted, NetJam); LayPipe(Hosted, NetJam + Vector2I.Right);
+        tank.Inventory.Add(BerryJam.Liquid, 12);
+        Hosted.Tick(3);
+        Hosted.Player = stood;
     }, HostSeesTheGuestMoveAPipe, GuestMovesTheHostsPipe);
 
     private async Task HostSeesTheGuestMoveAPipe(PlayerState guest) {
@@ -32,6 +42,8 @@ public partial class Game {
     private async Task GuestMovesTheHostsPipe() {
         Require(world.SteelPipes.Laid(NetPipe) && world.SteelPipes.RotationAt(NetPipeSouth) == Mathf.Pi / 2,
             "Joining must bring over both steel pipes and their rotations.");
+        Require(world.PipeReading(NetJam).Liters == 1 && world.PipeLiquid(NetJam) == BerryJam.Liquid,
+            "Joining must preserve both the level and liquid in a jam-filled pipe.");
         Require(world.SteelPipes.ConnectionMask(NetPipe) == 0b0000_0100,
             "The guest must see the south pipe connected to the host's tee.");
         await Until(() => world.PipeReading(NetPipeSouth).Liters == 1,

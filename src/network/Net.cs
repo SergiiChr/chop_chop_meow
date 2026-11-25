@@ -47,7 +47,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 31;
+    private const int Protocol = 32;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -587,11 +587,14 @@ public partial class Net : Node {
         }
         var pipes = Changed(entries, new EntryKey(EntryKey.Pipes, 0));
         var wet = Changed(entries, new EntryKey(EntryKey.PipeWater, 0));
-        if (pipes != null || wet != null) {
+        var jam = Changed(entries, new EntryKey(EntryKey.PipeJam, 0));
+        if (pipes != null || wet != null || jam != null) {
             var layout = pipes == null ? s.SteelPipes : WorldUpdates.Read<Dictionary<int, PipeTile>>(pipes);
             var stored = wet == null ? s.PipeWater : WorldUpdates.Read<Dictionary<int, double>>(wet);
-            if (pipes != null && !SteelPipes.ValidLayout(layout) || !SteelPipes.ValidWater(stored, layout)) throw new JsonException("Invalid steel pipe layout or water.");
-            s.SteelPipes = layout; s.PipeWater = stored;
+            var storedJam = jam == null ? s.PipeJam : WorldUpdates.Read<Dictionary<int, double>>(jam);
+            if (pipes != null && !SteelPipes.ValidLayout(layout) || !World.SteelPipes.ValidContents(stored, storedJam, layout))
+                throw new JsonException("Invalid steel pipes or their liquids.");
+            s.SteelPipes = layout; s.PipeWater = stored; s.PipeJam = storedJam;
         }
         if (Changed(entries, new EntryKey(EntryKey.Crates, 0)) is byte[] crates) s.Crates = WorldUpdates.Read<Dictionary<int, Inventory>>(crates);
         var me = World.Me;

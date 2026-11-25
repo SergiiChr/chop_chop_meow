@@ -89,7 +89,7 @@ Play accepts Godot arguments after `--`:
 | `--performance-run /absolute/directory` | Record a benchmark: sprinting from the sea past a staffed camp and the lake to the valley's top corner, by day and again at night with a lit torch; summarise it with `python3 tools/performance_report.py /absolute/directory` |
 | `--drive /absolute/directory` | Play the window from command files written to that directory, as keys and mouse, and save screenshots there; it keeps `playtest-` saves and settings of its own (`playtest` skill) |
 
-Other showcase flags are parsed in `src/Showcase.cs`.
+Other showcase flags are parsed in `src/showcase/Showcase.cs`.
 These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
 ```sh
@@ -300,7 +300,7 @@ Their page then says "Carrying a barrel" or "Carrying a packed crate" above thei
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
 - Double-click to eat, drink one liter, light a torch, open a crate or barrel, or select a tool in its hotbar slot or directly in hand.
   A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
-- Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
+- Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/world/model/GameTables.cs`.
 - A held stack put on storage clicked in the world, such as a chest, goes into it. An item only selected on the hotbar never does.
 - Chests, placed crates, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
   A pile's funnel opens one row naming its one resource.
@@ -476,7 +476,7 @@ In multiplayer, every player must be downed before skipping.
 
 Fog of war covers the map in the overhead view.
 Ground you have never seen is black.
-You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
+You see live only within a circle around you (`SightRadius` in `src/world/model/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
 This circle is your line of sight: it ends where the grey fog starts.
 
 Ground you have seen before is greyed out and shows things as you last saw them: a tree felled out of sight still stands there until you look again.
@@ -656,7 +656,7 @@ It makes what the menu's chisel makes (planks, wood parts, the mallet, torches a
 
 Some recipes need a better tool:
 
-- Tin cans (1 tin sheet → 4) need a steel hammer.
+- Tin cans (1 tin sheet → 2) need a steel hammer.
 - Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
 - A tin water bottle (1 tin sheet + 1 wood part) needs a steel hammer.
@@ -692,7 +692,7 @@ Sear 2 raw meat into 2 burnt steaks at the stone furnace (Sear meat recipe, one 
 Each dough bakes into 4 bread at the stone furnace.
 
 The cooking table (2 steel bars, 6 stone, 8 planks) is a steel grill over a stone firebox with a plank counter and a mortar slot.
-With a mortar and pestle slotted and someone working it, or carried by you while you work it, it crushes 4 berries into 4 crushed berries and grinds wheat into flour.
+With a mortar and pestle slotted and someone working it, or carried by you while you work it, it crushes 10 berries into 1 serving of crushed berries and grinds wheat into flour.
 Whoever works it takes the mortar off the counter, holds the bowl in one hand and grinds with the pestle in the other.
 You can do both by hand from the crafting menu with a carried mortar.
 
@@ -702,12 +702,16 @@ Dough is kneaded by hand at the table, with no fire, and only while you or an as
 
 Its other recipes cook on their own:
 
-- 2 crushed berries → jam, over one wood, coal or charcoal
+- 2 servings of crushed berries → 1 L of berry jam, over one wood, coal or charcoal
 - 1 raw meat + 1 liter of water → meat stew, over one wood, coal or charcoal
 
-The canning station (2 steel bars, 8 planks) seals meat stew or jam into a tin can over one wood, coal or charcoal.
-Raw meat is not canned: it sells as it is, in crates.
-Canned meat stew is the best food to sell.
+Pour jam into a bottle, steel bucket or barrel. Each can of jam takes 1 L and 1 tin can.
+The canning station (2 steel bars, 8 planks) seals jam or meat stew over one wood, coal or charcoal.
+The village buys canned jam at a base price of 80 coins per can, but does not buy loose or bottled jam.
+Raw meat sells as it is, in crates.
+
+A berry restores 5 hunger, crushed berries restore 55, a liter of jam from a bottle restores 115, and canned jam restores 120.
+Hunger stops at 100.
 
 Both stations, like the stone furnace's food recipes, take wood, coal or charcoal in their fuel slot.
 
@@ -735,22 +739,23 @@ It makes a bucket from three steel sheets, a steel part and a wood part.
 The barrel recipe takes 30 seconds of base work before the bench and hammer speed bonuses.
 Barrels stack in the bench output.
 A pile can store barrels at every fill level together.
-You can carry stacks of empty barrels alongside one barrel containing water.
+You can carry stacks of empty barrels alongside one barrel containing water or jam.
 Workers carry a single barrel in both arms and keep their tool slot free.
 Carrying a barrel prevents sprinting.
-A player carrying water in the barrel braces it and walks.
+A player carrying liquid in the barrel braces it and walks.
 Each liter makes the carry slower, down to half speed at 50 liters.
 
-Double-click a barrel in the backpack or on the hotbar to open its water slot.
+Double-click a barrel in the backpack or on the hotbar to open its liquid slot.
 Right-click also opens it from the hotbar.
 Select it on the hotbar to place it.
-Hold right-click on a placed barrel to pick it up with its water.
-Pour from a bottle or bucket into its one slot, or take water back into vessels in your backpack.
+Hold right-click on a placed barrel to pick it up without losing its contents.
+Pour from a bottle or bucket into its one slot, or take liquid back into vessels in your backpack.
+Water and jam cannot share a vessel.
 Filling from an empty stack fills one barrel in the opened cell and stores the remaining empties elsewhere in the backpack.
 The pour needs room for the split before it uses any water.
 Sorting the backpack or swapping the opened barrel's cell returns you to the backpack.
 Shift-click or Ctrl-click a vessel to pour into an open barrel, including vessels bound to the hotbar.
-A placed barrel's single filter names water, like a pile's filter names its resource.
+A placed barrel's single filter names its liquid, like a pile's filter names its resource.
 A barrel put down empty takes no water from workers until its filter names water; one put down with water in it names water at once.
 A barrel holds 50 liters.
 A steel bucket holds 10 liters and hangs by its handle on the tool rack.
@@ -910,7 +915,7 @@ Put the hammer in the anvil’s hammer slot for a worker to use.
 In building plans, pick **Steel piping** to open the cutaway and dim the surface.
 Thin blue outlines mark the pipes, trench edges and building inlets against the exposed earth.
 Empty pipes show bare steel.
-Any water in a tile turns its pipe and inlet dark blue, even at zero pressure.
+Water turns a pipe and inlet blue, and jam turns them red, even at zero pressure.
 Left-click to lay a steel pipe.
 Right-click to take one back up.
 Press R for a quarter turn and T to cycle through straight, T-junction and cross.
@@ -926,22 +931,26 @@ You can add them in batches.
 Removing steel pipes from the slot disables the building's plumbing.
 Taking down the building or picking up a barrel gives the installed steel pipes back.
 
-| Building | What piped water supplies |
+| Building | What it takes from pipes |
 | --- | --- |
 | Placed steel barrel | Fills its 50 L tank |
 | Cabin | Fills a mounted roof barrel through a pipe up the outside wall |
 | Cooking table | A brass tap over a splash plate fills the water input for the next queued or marked batch |
-| Farm plot | Four low sprinkler heads top up the soil's 10 L reserve |
+| Farm plot | Four low sprinkler heads top up the soil's 10 L water reserve |
+| Canning station | Berry jam for the next queued or marked can of jam |
 
 A cabin can connect to the line before a roof barrel is mounted.
 Farm sprinklers spray whenever water arrives, even on fallow or ripe plots and when the soil reserve is full.
 Water fills the line outward from each running pump, up to 1 L per tile.
+A nonempty plumbed barrel can supply its liquid at 1 L/s plus 1 L/s for every 10 L it holds.
+When no lake pump is feeding them, connected barrels of the same liquid equalize as the fuller one feeds the emptier one.
+Water and jam need separate lines. You cannot join lines that already contain different liquids.
 Buildings that need water share the available flow evenly.
 A closed tap can have a full pipe at its inlet.
 When pressure falls to zero, water stays in the pipes for the next building that needs it.
 Cutting a line leaves the water in each surviving section.
 Click the round Layer button below the left side of the status bar to switch between the surface and underground.
-Click a laid pipe underground to see how much water it holds and its current pressure.
+Click a laid pipe underground to see what it holds and its current pressure.
 The remove tool still switches layers with right-click and takes up a pipe or a surface object with left-click.
 
 ## Gravel paths
@@ -1007,7 +1016,7 @@ The market works like a station with six unlabeled input boxes and six output bo
 It only takes packed crates.
 The village pays for:
 
-- raw meat, burnt steak, berries, bread, berry jam, meat stew, canned jam, canned meat stew;
+- raw meat, burnt steak, berries, bread, meat stew, canned jam, canned meat stew;
 - steel axes, pickaxes, shovels and hammers.
 
 Anything else in a crate goes as a donation: the cart takes it and pays nothing for it.

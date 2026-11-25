@@ -718,7 +718,7 @@ public static class CraftingChecks {
             "a wooden mallet should not count as a hammer for tin cans");
         SwapMalletForSteelHammer(world, bench);
         SafeTick(world, data.Recipes["tin_can"].Seconds / data.BenchSpeed / data.Items["steel_hammer"].Speed + 1);
-        Require(bench.Inventory["tin_can"] == 4, "a steel hammer should turn one tin sheet into four cans");
+        Require(bench.Inventory["tin_can"] == 2, "a steel hammer should turn one tin sheet into two cans");
     }
 
     private static void CheckSteelChiselCarvesAMortarAndWorksTwiceAsFast(GameData data) {
@@ -743,21 +743,22 @@ public static class CraftingChecks {
         var world = EmptyWorld(data);
         var table = world.Add(ThingKind.Cooktable, new Vector2(20, 20));
         world.Player = table.Pos + new Vector2(1, 0);
-        Give(world, "mortar", 1); Give(world, "stone_chisel", 1); Give(world, "berries", 8);
+        Give(world, "mortar", 1); Give(world, "stone_chisel", 1); Give(world, "berries", 20);
         Require(!world.SlotTool(table, "stone_chisel"), "the cooking table should refuse a chisel");
         Require(world.SlotTool(table, "mortar"), "the cooking table should slot a mortar");
         Require(world.BenchTool(table, "mortar") == "mortar",
             "the cooking table's slotted mortar should count as its tool");
         world.SetRecipe(table, "crushed_berries");
         Require(!world.BatchCost(table).ContainsKey("wood"), "crushing berries should burn no fuel");
-        world.LoadBatch(table);
+        world.LoadBatch(table, 2);
         world.Player = new Vector2(40, 40);
         SafeTick(world, 30);
         Require(table.Inventory["crushed_berries"] == 0, "the mortar should not work without someone at it");
         var cook = AddWorker(world, table.Pos + new Vector2(0, 1));
         world.Assign(cook, table);
-        SafeTick(world, 15);
-        Require(table.Inventory["crushed_berries"] == 4, "a worker should work the mortar into crushed berries");
+        SafeTick(world, 25);
+        Require(table.Inventory["crushed_berries"] == 2 && table.Inventory["berries"] == 0,
+            "a worker should crush ten berries into one serving per batch");
         world.Assign(cook, null);
 
         world.Player = table.Pos + new Vector2(1, 0);
@@ -771,6 +772,21 @@ public static class CraftingChecks {
         Require(table.Inventory["berry_jam"] == 1 && table.Burner!["coal"] == 0, "jam should cook on its own over the fire");
         world.Player = table.Pos + new Vector2(1, 0);
         world.Collect(table);
+        Require(table.Inventory[BerryJam.Liquid] == 1 && world.Backpack[BerryJam.Liquid] == 0, "loose jam must stay at the table without a vessel");
+        Give(world, Water.Empty);
+        world.Collect(table);
+        Require(table.Inventory[BerryJam.Liquid] == 0 && world.Backpack[BerryJam.Bottles[1]] == 1, "an empty bottle should take one liter of jam");
+
+        var cannery = world.Add(ThingKind.Cannery, new Vector2(24, 20));
+        world.Player = cannery.Pos + Vector2.One;
+        world.SetRecipe(cannery, "canned_jam");
+        Give(world, "tin_can"); Give(world, "wood");
+        world.LoadBatch(cannery);
+        Require(cannery.Inventory[BerryJam.Liquid] == 1 && world.Backpack[Water.Empty] == 1, "loading a batch should pour one liter of jam and keep the bottle");
+        SafeTick(world, data.Recipes["canned_jam"].Seconds + 1);
+        Require(cannery.Inventory["canned_jam"] == 1 && cannery.Inventory.Count == 1, "the cannery should turn jam and one tin can into canned jam");
+
+        world.Player = table.Pos + Vector2.One;
         world.SetRecipe(table, "dough");
         Require(world.BatchCost(table).Keys.Order().SequenceEqual(new[] { "flour", Water.Liquid }), "dough should need no fire");
     }
@@ -796,15 +812,15 @@ public static class CraftingChecks {
         var world = EmptyWorld(data);
         var table = world.Add(ThingKind.Cooktable, new Vector2(20, 20));
         world.Player = table.Pos + new Vector2(1, 0);
-        Give(world, "mortar", 1); Give(world, "berries", 4);
+        Give(world, "mortar", 1); Give(world, "berries", 10);
         world.QueueBatch(table, "crushed_berries");
         SafeTick(world, data.Recipes["crushed_berries"].Seconds + 1);
-        Require(table.Inventory["crushed_berries"] == 4 && world.Backpack["mortar"] == 1, "the player should crush berries at the table with the mortar they carry");
+        Require(table.Inventory["crushed_berries"] == 1 && world.Backpack["mortar"] == 1, "the player should crush berries at the table with the mortar they carry");
     }
 
     private static void CheckCrushingBerriesByHandNeedsACarriedMortar(GameData data) {
         var world = EmptyWorld(data);
-        Give(world, "mortar", 1); Give(world, "berries", 4);
+        Give(world, "mortar", 1); Give(world, "berries", 10);
         Require(world.CraftBlock("crushed_berries") == null, "berries should be crushed by hand with a carried mortar");
         Drop(world, "mortar", 1);
         Require(world.CraftBlock("crushed_berries") != null, "crushing berries by hand should need the mortar");

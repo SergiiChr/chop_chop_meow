@@ -61,7 +61,8 @@ public sealed partial class World {
         t != null && to == t.Inventory && Data.VesselOf(item) is VesselDef v && v.LitersIn(item) > 0 && TakesLiquid(t, v.Liquid) ? v : null;
 
     private bool TakesLiquid(Thing t, string liquid) =>
-        t.Kind is ThingKind.Barrel or ThingKind.Farm || TreePlanting.NeedsWater(t) ? liquid == Water.Liquid : Pending(t, liquid);
+        t.Kind == ThingKind.Barrel ? Barrels.CanHold(t, liquid)
+        : t.Kind == ThingKind.Farm || TreePlanting.NeedsWater(t) ? liquid == Water.Liquid : Pending(t, liquid);
 
     /// <summary>
     /// Moves items between two boxes, by hand or by a worker; <paramref name="quantity"/> counts liters of a liquid and vessels of anything else.
@@ -73,7 +74,7 @@ public sealed partial class World {
     /// <param name="room">Most units, or liters of a liquid, that may land in <paramref name="to"/>, such as what a station's input slot has left.</param>
     private int Carry(Inventory from, Inventory to, Thing? into, string item, int quantity, int room = int.MaxValue) {
         if (into?.Kind == ThingKind.Farm && to == into.Inventory)
-            room = Math.Min(room, Barrels.CanPour(Data, item) ? Farms.WaterRoom(into) : to.SlotRoom(item));
+            room = Math.Min(room, Barrels.CanPourWater(Data, item) ? Farms.WaterRoom(into) : to.SlotRoom(item));
         if (into?.Kind == ThingKind.Packer && to == into.Inventory) room = Math.Min(room, PackingRoom(into, item));
         // Each of a station's slots holds one stack, its output slot too; a vessel pours into the stack of its liquid.
         if (into != null && IsStation(into.Kind) && to == into.Inventory) room = Math.Min(room, to.SlotRoom(PoursInto(into, to, item)?.Liquid ?? item));
@@ -166,11 +167,18 @@ public sealed partial class World {
         }
     }
 
+    internal string? DrainableFrom(Thing place, string item) {
+        foreach (var vessel in Data.Vessels)
+            if (vessel.LitersIn(item) is >= 0 and int held && held < vessel.Capacity
+                && place.Inventory[vessel.Liquid] > 0 && !Pending(place, vessel.Liquid)) return vessel.Liquid;
+        return null;
+    }
+
     /// <summary>A hauler's vessels with room at a station that holds leftover liquid for them: filled there, then stored like any load.</summary>
     private bool FillsLeftover(Worker w, Thing? dest, string item, float dt) {
-        if (dest == null || Data.VesselOf(item) is not VesselDef v || item == v.Full || dest.Inventory[v.Liquid] == 0 || Pending(dest, v.Liquid)) return false;
-        w.Status = Phrase("Taking ", Lower(Data.Name(v.Liquid)), " out");
-        if (Walk(w, dest.Pos, dt)) { Carry(dest.Inventory, w.Bag, null, v.Liquid, dest.Inventory[v.Liquid]); w.Destination = 0; }
+        if (dest == null || DrainableFrom(dest, item) is not string liquid) return false;
+        w.Status = Phrase("Taking ", Lower(Data.Name(liquid)), " out");
+        if (Walk(w, dest.Pos, dt)) { Carry(dest.Inventory, w.Bag, null, liquid, dest.Inventory[liquid]); w.Destination = 0; }
         return true;
     }
 }

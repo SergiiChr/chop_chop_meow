@@ -84,7 +84,7 @@ Models are assembled from code-built or baked Godot meshes.
   and fill opening.
   The mounted barrel uses the ground barrel's shell turned sideways.
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons, and by heaps as six-packs. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
-- `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
+- `src/items/display/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
   The icon shows the model as built, and a heap is made of pieces of it.
   - Built in code: the acorn with its brown cap, wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a
     six-sided collar, none with a handle), steel and tin sheets (three in a loose stack, the top one with its near

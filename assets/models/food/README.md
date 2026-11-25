@@ -2,7 +2,7 @@
 
 Four models of [Kenney's Food Kit](https://kenney.nl/assets/food-kit) (CC0 1.0), baked into meshes that carry their
 colours on their corners, so the game loads no texture for them and dresses them with its own materials.
-`src/ItemShape.cs` loads them, recolours them to the game's palette and shows them as item icons and pile stock.
+`src/items/display/ItemShape.cs` loads them, recolours them to the game's palette and shows them as item icons and pile stock.
 
 | Mesh | Kenney's model | Shown as |
 | --- | --- | --- |

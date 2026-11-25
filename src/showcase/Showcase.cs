@@ -368,7 +368,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (Launch.Has("--panel")) panel.Select(rack); else panel.Close(); if (Launch.Has("--filters")) { panel.Select(rack); Press("filters"); } }
         if (Launch.Has("--tin")) { var cliff = Cliff.Of(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }
         if (Launch.Has("--pantry")) {
-            foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
+            foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", BerryJam.Bottle, "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
             panel.Open(Page.Backpack);
         }
         // Hovering a recipe shows its description below the grids and as a tooltip at the pointer.

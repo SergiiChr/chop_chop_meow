@@ -105,9 +105,17 @@ internal static class EconomySteps {
         var store = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 23)));
         // Room for a whole day's tools, which take a slot each.
         store.Inventory.Slots = 60; store.Inventory.Filter(r.Output, false, true);
+        if (data.VesselFor(r.Output) is VesselDef output) {
+            supply.Inventory.Add(output.Empty, 60);
+            supply.Inventory.Filter(output.Empty, true, true);
+            for (int fill = 1; fill <= output.Capacity; fill++) store.Inventory.Filter(output.States[fill], false, true);
+        }
         Hire(world, station);
         Work(world, data.DaySeconds);
-        return store.Inventory[r.Output] + station.Inventory[r.Output];
+        int made = store.Inventory[r.Output] + station.Inventory[r.Output];
+        if (data.VesselFor(r.Output) is VesselDef carrier)
+            for (int fill = 1; fill <= carrier.Capacity; fill++) made += fill * store.Inventory[carrier.States[fill]];
+        return made;
     }
 }
 

@@ -39,13 +39,15 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     public ProcessRow Machine() {
         var recipe = world.Data.Recipes[world.Selected(t)];
         float seconds = recipe.Seconds / Math.Max(.01f, Rate(recipe));
-        var inputs = recipe.Inputs.Select(p => (Control)StationSlot(p.Key, true, $"×{p.Value}"));
+        var inputs = recipe.Inputs.Select(p => (Control)StationSlot(p.Key, true, PerBatch(p.Key, p.Value)));
         // Leftovers and inputs loaded for the kept recipe stay reachable as side outputs.
         var side = t.Inventory.Items.Keys.Where(item => Leftover(recipe, item)).Select(item => (Control)StationSlot(item, false, "", 44));
         return new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, seconds)), () => t.Processing ? t.Progress / recipe.Seconds : 0,
             recipe.Burns && t.Burner != null ? FuelSlot(recipe, seconds) : null,
-            StationSlot(recipe.Output, false, recipe.Amount > 1 ? $"×{recipe.Amount}" : "×1", 64), side.ToArray());
+            StationSlot(recipe.Output, false, PerBatch(recipe.Output, recipe.Amount), 64), side.ToArray());
     }
+
+    private string PerBatch(string item, int amount) => world.Data.VesselFor(item) != null ? $"{amount} L" : $"×{amount}";
 
     /// <summary>How fast the station works a recipe with the tool the acting player would work it with.</summary>
     private float Rate(RecipeDef recipe) => world.WorkRate(t.Kind, world.ToolInUse(t, recipe));
@@ -100,13 +102,14 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         var box = t.Inventory;
         var vessel = world.Data.VesselFor(item);
         bool product = !input && world.Product(t) == item;
-        string hint = product ? $"{SlotHint} · put {world.Lower(world.Data.Name(item))} from your backpack back here"
+        string hint = product && vessel != null ? "Fill a backpack vessel to take this liquid"
+            : product ? $"{SlotHint} · put {world.Lower(world.Data.Name(item))} from your backpack back here"
             : !input ? SlotHint : vessel != null ? $"{SlotHint} · put a filled vessel here to pour what it holds" : $"{SlotHint} · put a backpack stack here to load";
         // A liquid's input slot takes the vessels that hold some of it, at any fill.
         Func<HeldCursor, bool>? takes = input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || world.Data.VesselOf(stack.Item) is VesselDef heldVessel && heldVessel.Liquid == item && heldVessel.LitersIn(stack.Item) > 0)
-            : product ? held => held.Stack is { Box: 0 } stack && stack.Item == item : null;
+            : product && vessel == null ? held => held.Stack is { Box: 0 } stack && stack.Item == item : null;
         // The product goes back as into storage; an input loads through the station's own rules.
-        var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size, takes: takes,
+        var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}{(vessel == null ? "" : " L")}\n{hint}", size, takes: takes,
             put: product ? null : (held, units) => world.LoadInput(t, held, units));
         return Labelled(cell, perBatch);
     }

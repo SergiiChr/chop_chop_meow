@@ -25,6 +25,7 @@ internal partial class PipeLayerView : Node3D {
     private static readonly Material Blocked = ModelKit.PlacementTint(new Color("ff7467"));
     private static readonly Material RemovalTint = ModelKit.Flat(new Color("f25043"));
     private static readonly Material WetSteel = ModelKit.Vertex(Surface.Metal, .52f, .47f, "356fc6");
+    private static readonly Material JamSteel = ModelKit.Vertex(Surface.Metal, .52f, .47f, "b84663");
     private static readonly Material RiserSteel = ModelKit.Metal("93a6af", .55f, .38f);
     private int revision = -1, explored = -1, waterRevision = -1;
     private int? marked;
@@ -95,7 +96,7 @@ internal partial class PipeLayerView : Node3D {
         bool recolor = changed || water != waterRevision;
         if (recolor) {
             foreach (var (index, pipe) in meshes)
-                ShowWater(pipe, world.SteelPipes.WaterAt(index), SteelPipeShape.Finish);
+                ShowContents(pipe, world.SteelPipes.LiquidAt(index), SteelPipeShape.Finish);
             waterRevision = water;
         }
         UpdateRisers(world, known, recolor);
@@ -165,8 +166,8 @@ internal partial class PipeLayerView : Node3D {
         blend.SetShaderParameter(FootCount, footCount);
     }
 
-    private static void ShowWater(MeshInstance3D pipe, double liters, Material empty) {
-        var finish = liters > 0 ? WetSteel : empty;
+    private static void ShowContents(MeshInstance3D pipe, string? liquid, Material empty) {
+        var finish = liquid == BerryJam.Liquid ? JamSteel : liquid == Water.Liquid ? WetSteel : empty;
         if (pipe.MaterialOverride != finish) pipe.MaterialOverride = finish;
     }
 
@@ -184,7 +185,7 @@ internal partial class PipeLayerView : Node3D {
                 risers.Add(at, riser);
                 updateFinish = true;
             }
-            if (updateFinish) ShowWater(riser, world.SteelPipes.WaterAt(Terrain.TileIndex(at)), RiserSteel);
+            if (updateFinish) ShowContents(riser, world.SteelPipes.LiquidAt(Terrain.TileIndex(at)), RiserSteel);
             // Expose the foot of the pump's discharge through stones at the waterline.
             float top = thing.Kind == ThingKind.Pump ? PumpOutletHeight : 0;
             float height = top - PipeGround.FloorY - SteelPipeShape.CenterHeight;

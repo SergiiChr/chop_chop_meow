@@ -50,7 +50,7 @@ internal static class ItemShape {
         ["tin_can"] = new(f => OpenCan(f, true), Tin, .42f, Piece: f => SixPack(f, one => OpenCan(one, false))),
         ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "b83a5c", null, false))),
         ["canned_meat_stew"] = new(f => Can(f, "c07a48", "7a4a26"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "c07a48", null, false))),
-        ["berry_jam"] = new(f => Jar(f, true), Glossy, .2f, Piece: f => Jar(f, false)),
+        [BerryJam.Bottle] = new(f => Jar(f, true), Glossy, .2f, Piece: f => Jar(f, false)),
         ["grass"] = new(f => Sheaf(f, 20, .5f, .24f, false, "8fae55", "7c9c46", "a3bf63"), Plain, .32f, Rise: .7f),
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
         ["wheat_seeds"] = new(Seeds, Sacking, .36f, Rise: .8f),

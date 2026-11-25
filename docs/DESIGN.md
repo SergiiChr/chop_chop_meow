@@ -36,8 +36,8 @@ These came from the user; change them only after asking.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
-- **Plumbing:** Pumps draw from the freshwater shallows. Each connected pipe holds one liter, including standing water
-  after the pressure falls. Buildings with ten steel pipes in their Plumbing slot share water according to demand.
+- **Plumbing:** Pumps draw from the freshwater shallows. Placed barrels can also supply water or jam by pressure.
+  Each pipe holds one liter. A connected line cannot hold different liquids.
 - **Building orientation:** Plans turn in quarter turns during placement. A mine faces the cliff it fits.
 - **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, shovel for stumps and bushes, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they go to another spot of the job that they can work, loose pieces last, or wait and say so once.
 - **Transfers:** automated transfers respect input and output allowlists of storage, where empty lets nothing through and `Inventory.Everything` lets all, and prefer storage whose input filter names the item. A pile's filter names one resource, set by the player or by the first resource put in. Manual transfers bypass automation filters.
@@ -96,8 +96,8 @@ Simulation and data:
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
 | `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
-| `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
-| `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
+| `src/world/model/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
+| `src/world/model/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
 | `src/buildings/model/Removal.cs` | A removal target: a building, gravel path tile or steel pipe tile |
 | `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
@@ -129,7 +129,7 @@ Simulation and data:
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/packing/Packing.cs` | Packing stations |
 | `src/jobs/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
-| `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the bellows and fire jobs |
+| `src/jobs/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the bellows and fire jobs |
 | `src/jobs/hauling/Hauling.cs`, `src/jobs/hauling/Carry.cs` | The Haul job: the best carry across a haul job's places, the carry in hand and what a hauler says |
 | `src/jobs/hauling/PlaceHaul.cs` | The part of the Haul job each kind of place extends, and the four haul rules its carries come under |
 | `src/jobs/hauling/TakeBack.cs` | Where a worker takes a load nothing else takes: the nearest building whose output filter lets it out |
@@ -147,12 +147,12 @@ Simulation and data:
 | `src/containers/barrel/model/Bucket.cs`, `src/containers/barrel/BarrelHaul.cs` | Steel buckets, and the Haul job's water work: barrels filled and dry farm plots watered from the worker's tool slot |
 | `src/containers/barrel/model/WorkerWaterAction.cs` | The haul actions sent to the window for rendering |
 | `src/containers/barrel/BedtimeWater.cs` | Cabin water at bedtime and its effect on dawn's needs |
-| `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
-| `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
-| `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
+| `src/containers/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
+| `src/actors/player/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
+| `src/network/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
 | `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
 | `src/Session.cs` | Where a window stands with the game it started |
-| `src/WorldUpdates.cs` | World updates as entries, their differences and compression |
+| `src/network/WorldUpdates.cs` | World updates as entries, their differences and compression |
 | `src/UpdateJson.cs` | How an update's entries are written: fields at their default left out |
 
 UI and input:
@@ -184,7 +184,7 @@ UI and input:
 | `src/HotbarStacks.cs` | `World`'s hotbar slots bound to backpack stacks: binding, waiting slots and reading what a slot shows |
 | `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
 | `src/stations/display/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
-| `src/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
+| `src/stations/display/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
@@ -299,7 +299,7 @@ Checks and review tools:
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps several features' UI and network checks share, and `Game.TestClean`, which fails a UI check that leaves a mess |
 | `src/RecipeSteps.cs` | Steps that open a fresh station for a recipe, give and load its items and fuel, and expect a batch to start or be refused |
-| `src/Showcase.cs` | The review scenes behind `--showcase` |
+| `src/showcase/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
 | `src/performance/PerformanceRun.cs` | The rendered performance run's window half: sprinting the route by day and night, sampling frames, writing results |
 | `src/performance/PerformanceStage.cs`, `src/performance/PerformanceFixture.cs` | The run's server half, and the staffed camp it plays |
@@ -599,9 +599,9 @@ There are no iron tools; iron bars only go into buildings and steel.
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
 Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the lake shore is a collection target.
-A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon.
-Stations and barrels hold it loose, and a recipe asks for so many liters.
-`GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
+Stations hold water (`Water.Liquid`) and jam (`BerryJam.Liquid`) in liters, with drawn droplet icons.
+Stations and barrels hold liquids loose. The canning station uses one liter of jam and one tin can per batch.
+`GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/containers/Vessels.cs` holds the rules for all of them:
 a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
@@ -611,14 +611,14 @@ No hand recipe takes a liquid, which `GameData` checks.
 
 #### Steel barrels and buckets
 
-A barrel holds up to 50 liters of water.
+A barrel holds up to 50 liters of one liquid, water or jam.
 Its item id records its fill, so moving it between a player, a worker,
-the ground, a pile and a cabin preserves its water without a separate packed inventory.
+the ground and a pile preserves its liquid without a separate packed inventory. A cabin can only use a water barrel.
 The ground barrel uses a one-slot tank and the same filter rules as a plain pile.
 A cabin's only storage slot holds the actual barrel item.
 The Roof barrel window sits beside the cabin page in `SidePanel.Aside`, like a station's tool window.
 Refills update that item in place.
-A backpack stacks empty barrels and carries up to one barrel containing water, whose fill determines how much it slows the player.
+A backpack stacks empty barrels and carries up to one filled barrel. How full it is determines how much it slows the player.
 Pouring into an empty stack keeps the barrel being filled in its original cell and requires room for the remaining empty barrels.
 A worker with a barrel cannot carry other goods in their hands.
 
@@ -1255,7 +1255,7 @@ Pipes that only touch at a corner are separate.
 Each quarter-turn rotates the available openings.
 The underground view darkens the surface and exposes an earth bed 0.9 m below grade.
 Blueprint-blue lines mark the trench edges, pipes and inlets.
-A pipe and its vertical inlet turn dark blue while the tile holds any water, even at zero pressure.
+A pipe and its vertical inlet turn blue for water or red for jam, even at zero pressure.
 Ground remains visible under people standing over the trench.
 The Layer button below the left side of the status bar switches the view between the surface and underground.
 In the underground view, a click opens the laid pipe's page (`PipePanel`).
@@ -1276,9 +1276,13 @@ Each running pump fills its own pipe first, then the connected pipes outward fro
 Connected buildings share the remaining water evenly.
 When a tank or recipe fills, its excess goes to other buildings that can take water.
 When pumps stop supplying water, consumers can still draw the water left in the pipes.
-Each pipe's water is saved and sent to guests separately from its shape and rotation.
-Taking out a pipe spills the water it held, while the two sides of the line keep theirs.
-`World.PipeReading` reports a tile's standing water and the highest pressure of the pumps connected to it.
+Each pipe's liquid is saved and sent to guests separately from its shape and rotation.
+Taking out a pipe spills the liquid it held, while the two sides keep theirs.
+Building a link between lines that contain different liquids is refused.
+`World.PipeReading` reports a tile's standing liquid and the highest pressure from connected pumps or barrels.
+A barrel supplies 1 L/s plus 0.1 L/s per liter it holds. When a lake pump is off, barrels balance at the difference in their rates.
+Whole-liter transfer stops when two barrels are within one liter.
+Only a cannery set to can jam draws jam from a pipe.
 A receiver with room keeps any fraction below a liter in `Thing.PipedWaterRemainder` until it can store a whole liter.
 A cooking table requests water for the next queued or marked batch.
 A batch already being worked has spent its water.

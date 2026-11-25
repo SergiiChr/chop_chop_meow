@@ -3,21 +3,21 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A placed barrel's water slot, one-resource filter and hauling job.</summary>
+/// <summary>A placed barrel's liquid slot, one-resource filter and hauling job.</summary>
 public partial class BarrelPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
         headingTitle.Text = world.Data.Name(Barrel.Item);
         headingIcon.Texture = Icons.Of(Barrel.Item); headingIcon.Visible = true;
         FilterButton();
         var (cell, count) = WaterCell();
-        moves.TakeCell(cell, thing.Inventory, Water.Liquid, thing,
-            held => held.Stack is HeldStack stack && Barrels.CanPour(world.Data, stack.Item),
+        moves.TakeCell(cell, thing.Inventory, () => Barrels.LiquidIn(thing), thing,
+            held => held.Stack is HeldStack stack && Barrels.Accepts(world.Data, thing, stack.Item),
             (item, units) => moves.Store(thing.Inventory, -1)(item, units));
-        ShowLiters(live, cell, count, () => thing.Inventory[Water.Liquid], StationSlots.SlotHint);
+        ShowContents(live, cell, count, () => Barrels.LiquidIn(thing), () => thing.Inventory.Count, StationSlots.SlotHint);
         Well(new HBoxContainer()).AddChild(cell);
         var hint = Row(); hint.AddThemeConstantOverride("separation", 8);
         hint.AddChild(Style.Text("Hold", 14, Style.Beige)); hint.AddChild(Style.Glyph("line_mouse", 24, Style.Rim)); hint.AddChild(Style.Text("to pick up", 14, Style.Beige));
-        StoreBagGrid(id => Barrels.CanPour(world.Data, id));
+        StoreBagGrid(id => Barrels.Accepts(world.Data, thing, id));
         JobButtons();
     }
 
@@ -28,10 +28,17 @@ public partial class BarrelPanel(PageTools tools, Thing subject) : ThingPage(too
     }
 
     internal static void ShowLiters(LiveUpdates live, ItemSlot cell, Badge count, Func<int> liters, string takeHint) {
-        live.Watch(liters, held => {
+        ShowContents(live, cell, count, static () => Water.Liquid, liters, takeHint);
+    }
+
+    internal static void ShowContents(LiveUpdates live, ItemSlot cell, Badge count, Func<string> liquid, Func<int> liters, string takeHint) {
+        live.Watch(() => (item: liquid(), held: liters()), value => {
+            var (item, held) = value;
+            string what = item == BerryJam.Liquid ? "Berry jam" : "Water";
+            cell.Icon = Icons.Of(item);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
             count.Text = $"{held}/{Barrel.Capacity} L";
-            cell.TooltipText = $"Water · {held}/{Barrel.Capacity} L\n{takeHint}\nPut a vessel holding water here to pour";
+            cell.TooltipText = $"{what} · {held}/{Barrel.Capacity} L\n{takeHint}\nPut a filled vessel here to pour";
         });
     }
 }

@@ -12,7 +12,7 @@ Icons and models are committed; playing does not call an image-generation servic
 | [docs/DESIGN.md](docs/DESIGN.md) | Changing game code: source files, simulation rules, confirmed design decisions |
 | [README.md](README.md) | Changing anything the player sees: controls, rules, panels, saves |
 | [docs/ECONOMY.md](docs/ECONOMY.md) | Changing prices, wages, recipes or demand |
-| [src/GameTables.cs](src/GameTables.cs) and [src/GameData.cs](src/GameData.cs) | Tuning items, recipes, building costs and pacing |
+| [src/world/model/GameTables.cs](src/world/model/GameTables.cs) and [src/world/model/GameData.cs](src/world/model/GameData.cs) | Tuning items, recipes, building costs and pacing |
 | [assets/README.md](assets/README.md) | Changing models, icons, sounds, music or their sources |
 | [docs/RELEASE.md](docs/RELEASE.md) | Branching, checking and handing off a change |
 
@@ -22,12 +22,12 @@ Icons and models are committed; playing does not call an image-generation servic
 - `src/world/display/WorldView.cs`: reads world state and draws it.
 - `src/Game.cs`: creates and holds the interface's parts, routes input.
 - `src/SidePanel.cs` and `src/*Panel.cs`: the side panel and its pages, one node per feature.
-- `src/GameData.cs` and `src/GameTables.cs`: items, buildings, recipes, trade and time values, checked to fit together.
+- `src/world/model/GameData.cs` and `src/world/model/GameTables.cs`: items, buildings, recipes, trade and time values, checked to fit together.
 - `src/Inventory.cs`: inventory rules, used by every worker job.
 - `src/intro/`: the intro film. `IntroMovie.cs` plays it when the game opens; `WorldIntro.cs`, `IntroSets.cs` and
   `IntroPoses.cs` draw its frames (`intro-film` skill).
 - `src/Server.cs`: the headless server every game runs on.
-- `src/Net.cs`: the connection between a server and its players.
+- `src/network/Net.cs`: the connection between a server and its players.
 - `tests/<feature>/`: every check of a feature, such as `tests/hauling/`, as a player or worker sees it.
   `tests/*Checks.cs`, `src/GameChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`: checks of features with no folder yet, and the real server checks.
 - `build.py` and `tools/`: launcher, checks and asset tools.
