@@ -60,13 +60,20 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.UseTorch(Vector2.Zero);
             world.Tick(World.KindleSeconds);
         }
-        if (pose is "sleep" or "wake") {
+        if (pose is "sleep" or "wake" or "wake-walk") {
             // The other awake player keeps the clock from skipping to dawn.
             world.Arrive("Straw bed review", 2).Pos = at + Vector2.Right * 35;
             world.Sleep.Start(bed);
-            if (pose == "wake") {
+            if (pose is "wake" or "wake-walk") {
                 var timer = new Timer { WaitTime = StrawBed.LieDownSeconds + .60, OneShot = true, Autostart = true };
-                timer.Timeout += world.Sleep.Wake;
+                timer.Timeout += () => {
+                    world.Sleep.Wake();
+                    if (pose != "wake-walk") return;
+                    Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Pressed = true });
+                    var release = new Timer { WaitTime = StrawBed.LieDownSeconds + .45, OneShot = true, Autostart = true };
+                    release.Timeout += () => Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Pressed = false });
+                    view.AddChild(release);
+                };
                 view.AddChild(timer);
             }
         }

@@ -78,6 +78,8 @@ public sealed class Wolf : IWalker {
     public float Stagger { get; set; }
     /// <summary>Whether a player has landed a blow and the wolf now runs whenever it moves in the open.</summary>
     public bool Aggressive { get; set; }
+    /// <summary>Whether this wolf has turned on its prey and no longer backs off from a torch or campfire.</summary>
+    [JsonIgnore] internal bool IgnoresFire => Aggressive || Follow == FollowStage.Bold;
     /// <summary>The locked path after the first weapon hit: zero side means no repositioning is active.</summary>
     public int CounterSide { get; set; }
     public float CounterTime { get; set; }

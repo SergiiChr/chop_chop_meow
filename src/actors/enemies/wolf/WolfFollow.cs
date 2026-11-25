@@ -61,7 +61,7 @@ public sealed class WolfFollow(World world) {
     internal void Scare(Vector2 direction) {
         if (world.FullPackAt(world.Player)) return;
         foreach (var wolf in world.S.Wolves)
-            if (!wolf.Aggressive && wolf.Follow is not (FollowStage.Bold or FollowStage.Routed)
+            if (!wolf.IgnoresFire && wolf.Follow != FollowStage.Routed
                 && wolf.Pos.DistanceTo(world.Player) < World.ScareRange
                 && (wolf.Pos - world.Player).Normalized().Dot(direction) > .7f) {
                 // Every wave sends it back out to its circle, one already following too.
@@ -85,7 +85,7 @@ public sealed class WolfFollow(World world) {
         distance = campfire ? World.FireReach + Wander + .25f : World.StalkDistance;
         clockwise.Clear(); counter.Clear();
         foreach (var wolf in hunters) {
-            if (!campfire && !wolf.Following) continue;
+            if (campfire ? wolf.IgnoresFire : !wolf.Following) continue;
             if (wolf.Round == 0) wolf.Round = ways.Next(2) == 0 ? 1 : -1;
             var ring = wolf.Round > 0 ? clockwise : counter;
             int at = ring.Count;

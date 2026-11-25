@@ -30,16 +30,29 @@ internal sealed class StrawBedView {
         new(1, new(0, .155f, .065f), -90, 84, new Pose(Twist: 36, Head: 25, Sway: 2, RaiseR: 40, ElbowR: 67))
     ];
 
-    /// <summary>Draws a sleeper, or a player getting up from a bed they have not walked away from.</summary>
-    internal bool Show(ActorRig rig, PlayerState who, Thing? sleepingPlace, float dt) {
-        if (who.Mauled || who.RespawnIn > 0 || who.Sheltered != 0) { down = 0; bed = null; return false; }
+    internal void Clear() { down = 0; bed = null; }
+
+    /// <summary>Walking waits for the last supported pose, but a forced move or fall may interrupt it.</summary>
+    internal bool Rising(PlayerState who) => who.SleepingAt == 0 && down > 0 && bed is Thing mat &&
+        CanPose(who) && who.Pos.DistanceSquaredTo(mat.Pos) <= .18f * .18f;
+
+    private static bool CanPose(PlayerState who) => !who.Mauled && who.RespawnIn <= 0 && who.Sheltered == 0 && who.Door == Doorway.None;
+
+    /// <summary>Draws a sleeper, then gives the standing pose the mat's bearing when the rise finishes.</summary>
+    internal bool Show(ActorRig rig, ActorState actor, PlayerState who, Thing? sleepingPlace, float dt) {
+        if (!CanPose(who)) { Clear(); return false; }
         if (sleepingPlace is { Kind: ThingKind.StrawBed } mat) {
             if (bed != mat) { bed = mat; down = 0; }
             down = Math.Min(1, down + dt / StrawBed.LieDownSeconds);
         } else {
-            if (bed == null || who.Pos.DistanceSquaredTo(bed.Pos) > .18f * .18f) { down = 0; bed = null; return false; }
+            if (bed == null || !Rising(who)) { Clear(); return false; }
             down = Math.Max(0, down - dt / StrawBed.LieDownSeconds);
-            if (down == 0) { bed = null; return false; }
+            if (down == 0) {
+                actor.Yaw = -bed.Rotation;
+                actor.Turning.Hold(actor.Yaw);
+                Clear();
+                return false;
+            }
         }
         Draw(rig, bed, down, who.TorchLit);
         return true;

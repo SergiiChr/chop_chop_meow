@@ -1277,8 +1277,8 @@ public sealed partial class World {
             if (w.Pos.DistanceSquaredTo(at) < range * range && ++around == PackSize) return true;
         return false;
     }
-    /// <summary>Fire deters hunting wolves unless a full pack is near their prey.</summary>
-    internal bool FireDeters(Vector2 prey) => FireLighting(prey) is Thing fire && !FullPackAt(fire.Pos);
+    /// <summary>Campfire light deters a wary hunter until enough wolves are near its prey.</summary>
+    internal bool FireDeters(Wolf wolf, Vector2 prey) => !wolf.IgnoresFire && FireLighting(prey) is Thing fire && !FullPackAt(fire.Pos);
     /// <summary>A burning torch in hand, with the player out in the open, sets how wolves behave.</summary>
     internal bool Torchlit => S.TorchLit && !Downed && S.Sheltered == 0 && !Protected(Player);
     /// <summary>

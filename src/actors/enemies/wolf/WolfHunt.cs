@@ -42,7 +42,7 @@ public sealed class WolfHunt(World world) {
             wolf.Target = world.S.Actor.Id;
             bool outside = wolf.DoorCheck == DoorCheckStage.None && world.S.Actor.Door == Doorway.None;
             wolf.EndDoorCheck();
-            if (outside && !burnt && !world.FireDeters(world.Player) && world.WolfCounter.Start(wolf, world.Player)) {
+            if (outside && !burnt && world.WolfCounter.Start(wolf, world.Player)) {
                 wolf.Threaten = 0;
                 return true;
             }
@@ -100,16 +100,15 @@ public sealed class WolfHunt(World world) {
         if (pack && !world.S.Actor.PackAttack) world.Say("The pack has you surrounded. They attack!");
         world.S.Actor.PackAttack = pack;
         if (circlingFire || wary) world.WolfFollow.Arrange(hunters, circlingFire ? fire : null);
-        // A wounded player not held safe by a fire or cabin invites a leap for the throat.
-        // Behind a torch only a wolf that stood its ground leaps until its pack is complete.
-        if (!world.Downed && world.S.Health <= World.TakedownHealth && !circlingFire && !world.DoorTug.Tugged && !AnyLeaping(hunters)) {
+        // A wounded player invites a leap for the throat. While light holds the pack back, only a wolf that turned on them leaps.
+        if (!world.Downed && world.S.Health <= World.TakedownHealth && !world.DoorTug.Tugged && !AnyLeaping(hunters)) {
             Wolf? hunter = null;
             var mark = world.WolfSnap.BitePosition();
             float closest = World.LeapRange * World.LeapRange;
             foreach (var wolf in hunters) {
                 float distance = wolf.Pos.DistanceSquaredTo(mark);
-                if (distance >= closest || WolfSnap.Active(wolf) || wolf.Attack > 0 || Held(wolf, wary) ||
-                    wolf.Follow == FollowStage.Routed || !chargeThroughFire && world.Protected(wolf.Pos) ||
+                if (distance >= closest || WolfSnap.Active(wolf) || wolf.Attack > 0 || wolf.Follow == FollowStage.Routed ||
+                    !wolf.IgnoresFire && (circlingFire || wary || !chargeThroughFire && world.Protected(wolf.Pos)) ||
                     wolf.Howl > 0 || wolf.HowlIn > 0 || wolf.Flee > 0 || wolf.Stagger > 0 ||
                     wolf.Threaten > 0 || wolf.Recover > 0 || wolf.Circle != 0 || WolfCounter.Active(wolf)) continue;
                 hunter = wolf; closest = distance;
@@ -122,9 +121,9 @@ public sealed class WolfHunt(World world) {
         foreach (var wolf in hunters) {
             var from = wolf.Pos;
             wolf.Attack = Math.Max(0, wolf.Attack - dt);
-            bool held = Held(wolf, wary);
-            Hunt(wolf, dt, circlingFire, chargeThroughFire, held, speed, chase);
-            Face(wolf, from, dt, circlingFire || held && wolf.Following);
+            bool circles = circlingFire && !wolf.IgnoresFire, held = wary && !wolf.IgnoresFire;
+            Hunt(wolf, dt, circles, chargeThroughFire || wolf.IgnoresFire, held, speed, chase);
+            Face(wolf, from, dt, circles || held && wolf.Following);
         }
         world.WolfBodies.KeepApart(hunters, dt, circlingFire);
         if (world.S.Mauled && !world.Dead) {
@@ -143,7 +142,7 @@ public sealed class WolfHunt(World world) {
         if (braced) wolf.Follow = FollowStage.Circling;
         if (wolf.Tugging && world.DoorTug.Tug(wolf) || world.DoorTug.Hold(wolf)) return;
         if (WolfCounter.Active(wolf)) {
-            if (circlingFire || world.Downed || world.DoorTug.Tugged) WolfCounter.Clear(wolf);
+            if (world.Downed || world.DoorTug.Tugged) WolfCounter.Clear(wolf);
             else world.WolfCounter.Tick(wolf, dt);
             return;
         }
@@ -198,9 +197,6 @@ public sealed class WolfHunt(World world) {
             world.WolfSnap.Start(wolf);
         }
     }
-
-    /// <summary>Whether a torch that makes the pack <paramref name="wary"/> holds this wolf back: every one but a wolf that turned on its player.</summary>
-    private static bool Held(Wolf wolf, bool wary) => wary && !wolf.Aggressive && wolf.Follow != FollowStage.Bold;
 
     /// <summary>Takes a wolf up to <paramref name="step"/> metres toward biting distance of the acting player, round what is in its way.</summary>
     private void Close(Wolf wolf, float step, float dt) {

@@ -681,6 +681,7 @@ A player can sleep at any hour inside a cabin or on an outdoor straw bed. The ca
 `SleepCycle` advances the simulation toward dawn only while everyone is asleep, once an outdoor sleeper has lain down.
 Hunger or thirst running out, an attack outdoors, or scratching at an unlocked cabin door wakes those affected and stops the skip.
 Sleepers can also choose Wake. At dawn everyone still asleep wakes.
+After an outdoor wake-up the window holds walking input through `StrawBedView.Rising`, then hands off facing the same way as the mat.
 A straw bed takes two grass and twenty leaves, lasts three full days from `Thing.BedBuiltAt` and refunds only within one hour.
 
 #### Sprinting
@@ -764,18 +765,19 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   It takes a wide running arc into a second hop behind the line of the blow (`WolfCounter`). It lands on its forepaws first,
   slides its rear paws round them, and stands facing the player before it can start a bite.
   The wolf tries the other side if the first route is blocked. With no room, it uses its usual recoil and growl.
-  Fire, shelter, and bodies that enter the route can cut the move short. A torch burn sends the wolf running off as soon as the recoil ends.
-  A struck wolf runs thereafter (`Wolf.Aggressive`) and torch waves cease to scare it.
+  Shelter and bodies that enter the route can cut the move short. A torch burn sends the wolf running off as soon as the recoil ends.
+  A struck wolf runs thereafter (`Wolf.Aggressive`) and neither torch waves nor campfire light scare it.
   After a missed bite it holds for the usual recovery, then runs out and around the player (`Wolf.Circle`, `WolfHunt.CircleOnMiss`).
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
   A player a wolf had pinned goes free as it leaves.
   Patrolling, going home or losing its player (who sheltered or left the game) clears the wolf’s current attack, stance and repositioning (`WolfPatrols.Calm`). It still runs if it has been hit.
 
 `CampfireHours` sets how long one log burns. A campfire with no wood left burns while workers sit at it.
-Wolves hunting a player in campfire light use the same `WolfFollow` circle as wolves scared by a torch swing.
+Wary wolves hunting a player in campfire light use the same `WolfFollow` circle as wolves scared by a torch swing.
 At a campfire the circle is centered on the fire and stays beyond its light.
 A windup is stopped, but a leap already in flight finishes.
 The same `World.FullPackAt` rule applies to both lights: once five wolves are nearby, they rush in and attack through it.
+An aggressive wolf or one that stood its ground against a torch ignores either light, even without a full pack.
 Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters go to its door (`DoorCheck.Follow`), or give up and patrol on away from a cabin they leave alone.
 
 #### Cabin doors

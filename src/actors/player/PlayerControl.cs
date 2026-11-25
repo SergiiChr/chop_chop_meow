@@ -112,6 +112,11 @@ public sealed class PlayerControl {
         UpdateDigMode();
         // The recipe map covers the world, so nothing held over it walks or gathers.
         if (kit.Paused || panel.Map.Visible) { StopGroundDig(); world.Me.Sprinting = false; return; }
+        if (view.RisingFromStrawBed) {
+            momentum = default; world.Me.Sprinting = world.Me.Braking = false;
+            view.Gathering = false; view.GatheringTarget = null;
+            return;
+        }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
         var direction = cabinApproach.Active ? cabinApproach.Direction() : TowardPump(HeldDirection());
         direction = Gather(direction, right, dt);

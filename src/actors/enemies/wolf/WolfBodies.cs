@@ -75,7 +75,7 @@ public sealed class WolfBodies(World world) {
     /// follows them round, so two going opposite ways pass side by side.
     /// </summary>
     private static (Vector2 Tail, Vector2 Nose) Near(Wolf wolf, Vector2 player, bool aroundFire) =>
-        aroundFire || wolf.Following || wolf.Circle != 0 || Holds(wolf) ? Body(wolf) : Body(wolf, player);
+        aroundFire && !wolf.IgnoresFire || wolf.Following || wolf.Circle != 0 || Holds(wolf) ? Body(wolf) : Body(wolf, player);
 
     /// <summary>
     /// Whether a wolf holds the player, reels from a hit or is committed to a move and cannot be pushed aside.

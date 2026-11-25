@@ -14,6 +14,7 @@ public static class StrawBedChecks {
         Test(CheckAWolfCanWakeAStrawBedSleeper, data);
         Test(CheckSleepingOnStrawNeedsThePlayerBesideTheBed, data);
         Test(CheckSoloStrawBedSleeperHasTimeToLieDownBeforeDawn, data);
+        Test(CheckMovementWaitsForTheStandingHandoff, data);
         Test(CheckCabinAndStrawBedSleepTogetherSkipToDawn, data);
         Test(CheckBootsStayPlantedAndClearTheMat);
         Test(CheckWeightPassesSmoothlyFromThePalmToTheForearm);
@@ -94,6 +95,27 @@ public static class StrawBedChecks {
         Require(world.Day == day && world.Me.SleepingAt == bed.Id, "dawn should leave time for the last frame to reach clients");
         world.Tick(.25f);
         Require(world.Day == day + 1 && world.Me.SleepingAt == 0, "the clock should skip automatically once the sleeper lies down.");
+    }
+
+    private static void CheckMovementWaitsForTheStandingHandoff(GameData data) {
+        var (world, _, _) = Hosted(data);
+        var bed = StrawBedSteps.Build(world, Mathf.Pi / 2);
+        var rig = new ActorRig(ActorSkin.Player);
+        var view = new StrawBedView();
+        var actor = new ActorState();
+        try {
+            world.Sleep.Start(bed);
+            Require(view.Show(rig, actor, world.Me, bed, StrawBed.LieDownSeconds), "a sleeper should lie down on the mat");
+            world.Sleep.Wake();
+            Require(view.Rising(world.Me), "movement must wait as soon as the sleeper wakes");
+            float stride = 1f / 60;
+            int frames = Mathf.CeilToInt(StrawBed.LieDownSeconds / stride);
+            for (int frame = 1; frame < frames - 1; frame++)
+                Require(view.Show(rig, actor, world.Me, null, stride) && view.Rising(world.Me), "movement must wait while either boot is still getting up");
+            Require(!view.Show(rig, actor, world.Me, null, 3 * stride) && !view.Rising(world.Me),
+                "walking should be available once the standing pose takes over");
+            Require(Mathf.IsEqualApprox(actor.Yaw, -bed.Rotation), "the standing pose should take over facing the same way as the rise");
+        } finally { rig.Root.Free(); }
     }
 
     private static void CheckCabinAndStrawBedSleepTogetherSkipToDawn(GameData data) {
