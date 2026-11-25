@@ -48,13 +48,18 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var at = Terrain.Spawn + new Vector2(-1, 2);
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4f ||
             t.Kind is ThingKind.Tree or ThingKind.Bush or ThingKind.Berries && t.Pos.DistanceTo(at) < 14f);
-        world.S.Time = world.Data.DaySeconds * .28f;
+        world.S.Time = world.Data.DaySeconds * (Launch.Has("--night") ? world.Data.NightStarts + .02f : .28f);
         world.S.Backpack.Remove("steel_axe", world.S.Backpack["steel_axe"]);
         var bed = world.Add(ThingKind.StrawBed, at);
         world.ClearGround(bed);
         world.Player = at + Vector2.Left * 1.6f;
         world.S.Health = 60;
         world.S.Hunger = world.S.Thirst = 100;
+        if (Launch.Has("--torch")) {
+            world.S.Backpack.Add("torch", 1);
+            world.UseTorch(Vector2.Zero);
+            world.Tick(World.KindleSeconds);
+        }
         if (pose is "sleep" or "wake") {
             // The other awake player keeps the clock from skipping to dawn.
             world.Arrive("Straw bed review", 2).Pos = at + Vector2.Right * 35;

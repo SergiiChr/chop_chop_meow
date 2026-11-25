@@ -160,13 +160,38 @@ public sealed class WolfFollow(World world) {
             if (to.LengthSquared() < .001f) to = Vector2.Right.Rotated(bearing + wolf.Round * Mathf.Pi / 2) * walk;
         }
         var step = to.LimitLength(dt * Math.Min(walk, to.Length() * Keenness));
-        var next = world.Slide(wolf.Pos, step);
-        // An adjoining campfire may put light across the circle. Walk along its edge, not through it.
-        if (campfire && world.FireLighting(next) is Thing other && !world.Protected(wolf.Pos)) {
-            next = world.Slide(wolf.Pos, step.Slide((wolf.Pos - other.Pos).Normalized()));
-            if (world.Protected(next)) return;
+        wolf.Pos = campfire ? StepOutsideLight(wolf.Pos, step) : world.Slide(wolf.Pos, step);
+    }
+
+    /// <summary>Goes around a fire in the way of the hunt, or backs out if already caught in its light.</summary>
+    internal bool SkirtFire(Wolf wolf, Vector2 toward, float stride) {
+        var at = wolf.Pos;
+        var inside = world.FireLighting(at);
+        var fire = inside ?? world.FireLighting(at.MoveToward(toward, stride));
+        if (fire == null || world.FullPackAt(fire.Pos)) return false;
+        var away = (at - fire.Pos).Normalized();
+        if (away == Vector2.Zero) away = (at - toward).Normalized();
+        if (inside != null) {
+            wolf.Pos = world.Slide(at, away * stride);
+            return true;
         }
-        wolf.Pos = next;
+        // Take the shorter way round the edge; on the straight line through the fire, split hunters to either side.
+        float across = away.Cross(toward - fire.Pos);
+        int way = across == 0 ? (wolf.Id & 1) == 0 ? 1 : -1 : Math.Sign(across);
+        var step = new Vector2(-away.Y, away.X) * (stride * way);
+        wolf.Pos = StepOutsideLight(at, step);
+        if (wolf.Pos == at) wolf.Pos = StepOutsideLight(at, -step);
+        return true;
+    }
+
+    private Vector2 StepOutsideLight(Vector2 at, Vector2 step) {
+        var next = world.Slide(at, step);
+        // An adjoining campfire may put light across the circle. Walk along its edge, not through it.
+        if (world.FireLighting(next) is Thing other && !world.Protected(at)) {
+            next = world.Slide(at, step.Slide((at - other.Pos).Normalized()));
+            if (world.Protected(next)) return at;
+        }
+        return next;
     }
 
     /// <summary>

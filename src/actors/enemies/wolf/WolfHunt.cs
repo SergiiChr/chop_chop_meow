@@ -175,15 +175,14 @@ public sealed class WolfHunt(World world) {
             wolf.Circle = 0;
             world.WolfFollow.Follow(wolf, braced, dt, speed * WolfPatrols.PatrolPace);
             if (!circlingFire) Growl(wolf);
+        } else if (!chargeThroughFire && world.WolfFollow.SkirtFire(wolf, world.WolfSnap.BitePosition(),
+            dt * (held ? speed * CreepPace : wolf.Aggressive || wolf.Chase > 0 ? chase : speed))) {
+            wolf.Circle = 0;
         } else if (held) {
             wolf.Chase = 0;
             Close(wolf, dt * speed * CreepPace, dt);
             Growl(wolf);
             world.WolfSnap.Start(wolf);
-        } else if (!chargeThroughFire && world.Protected(wolf.Pos)) {
-            // A wolf caught in the light while its prey is outside backs out before hunting again.
-            wolf.Chase = 0; wolf.Circle = 0;
-            wolf.Pos = world.Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * (wolf.Aggressive ? chase : 3));
         } else if (wolf.Circle != 0) {
             wolf.Chase = ChaseSeconds;
             Circle(wolf, dt, chase);

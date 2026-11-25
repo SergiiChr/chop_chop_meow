@@ -14,6 +14,7 @@ internal sealed class StrawBedView {
     private static readonly Vector3 Handhold = new(.275f, StrawBedModel.Top + .009f, -.255f);
     private static readonly Vector3 SecondHandhold = new(.20f, StrawBedModel.Top + .01f, -.15f);
     private static readonly Vector3 RestingHand = new(.16f, StrawBedModel.Top + .03f, -.36f);
+    private static readonly Transform3D TorchStand = new(new Basis(Vector3.Right, -Mathf.Pi / 2), new Vector3(-.51f, .14f, -.2f));
     private static readonly Basis SideBoot = new Basis(Vector3.Right, -Mathf.Pi / 2) * new Basis(Vector3.Up, Mathf.DegToRad(84));
 
     private readonly record struct Key(float At, Vector3 Hips, float Recline, float Turn, Pose Pose);
@@ -40,12 +41,12 @@ internal sealed class StrawBedView {
             down = Math.Max(0, down - dt / StrawBed.LieDownSeconds);
             if (down == 0) { bed = null; return false; }
         }
-        Draw(rig, bed, down);
+        Draw(rig, bed, down, who.TorchLit);
         return true;
     }
 
     /// <summary>Draws the same support path in either direction on a mat at any allowed rotation.</summary>
-    internal static void Draw(ActorRig rig, Thing mat, float u) {
+    internal static void Draw(ActorRig rig, Thing mat, float u, bool lit = false) {
         int next = 1;
         while (Keys[next].At < u) next++;
         var a = Keys[next - 1]; var b = Keys[next];
@@ -73,6 +74,7 @@ internal sealed class StrawBedView {
         rig.Root.Transform = bedFrame * root;
         rig.Show(pose, null, false);
         rig.TipHead(-23 * settle);
+        if (lit) rig.SetBedTorch(fromBed * TorchStand);
         Boot(true, BothBootsOnUntil, .88f, .025f, .012f, .66f, 0);
         Boot(false, .62f, .92f, .035f, -.045f, .60f, .095f);
 

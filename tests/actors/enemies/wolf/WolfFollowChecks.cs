@@ -16,6 +16,7 @@ public static class WolfFollowChecks {
         Test(CheckEachFollowingWolfWalksItsOwnWayRound, data);
         Test(CheckHuntersCircleALitCampfireInsteadOfClosingIn, data);
         Test(CheckAFifthWolfBreaksTheCampfireCircle, data);
+        Test(CheckAHunterGoesAroundFireToReachPreyOutsideIt, data);
         Test(CheckAWolfWalkedAtStandsBracedWhereItIs, data);
         Test(CheckAWolfFollowingAloneRunsOutOfSightAndLeavesThePlayerAlone, data);
         Test(CheckAmongOthersAWolfWalkedAtGrowlsThenThePackInSightTurnsOnThePlayerForGood, data);
@@ -69,6 +70,23 @@ public static class WolfFollowChecks {
         Require(told.Count(message => message == "The pack has you surrounded. They attack!") == 1,
             "a fifth nearby wolf should start the same pack attack as a lit torch");
         Require(fire.Burn > 0 && world.Health < 100, "the pack should come through the still-lit fire and land a bite");
+    }
+
+    private static void CheckAHunterGoesAroundFireToReachPreyOutsideIt(GameData data) {
+        var world = NightWorld(data);
+        var centre = Terrain.Spawn;
+        world.Player = centre + Vector2.Left * 8;
+        var fire = world.Add(ThingKind.Campfire, centre);
+        fire.Burn = 90;
+        var wolf = PlaceWolf(world, new Wolf { Pos = centre + Vector2.Right * (World.FireReach + .04f), Chase = 3 });
+        WolfTick(world, 2, wolf);
+        Require(Math.Abs(wolf.Pos.Y - centre.Y) > 1.5f,
+            $"the wolf should go around the fire, not bounce along the line through it, but it only reached {wolf.Pos - centre}");
+        for (int i = 0; i < 120 && world.Health == 100; i++) {
+            WolfTick(world, .1f, wolf);
+            Require(!world.Protected(wolf.Pos), "a lone wolf should stay outside the light while going around it");
+        }
+        Require(fire.Burn > 0 && world.Health < 100, "a wolf should reach prey on the far side of a still-lit fire");
     }
 
     /// <summary>A wave at wolves nearer than the 2 m where they would run or stand their ground sends them back to their circles first, one or several.</summary>

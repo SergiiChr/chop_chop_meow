@@ -36,10 +36,10 @@ internal sealed class BedtimeWater(World world) {
             if (other == player || other.Sheltered != cabin.Id) continue;
             bool asleep = other.SleepingAt == cabin.Id;
             int liters = asleep ? 0 : ThirstLiters(other.Thirst);
-            if (fillBottles || asleep) total += liters + (fillBottles ? BottleRoom(other) : 0);
+            if (asleep && fillBottles) total += BottleRoom(other);
             if (Before(other, player)) {
                 aheadLiters += liters;
-                if (fillBottles || asleep) aheadAtWake += ThirstLiters(Math.Max(0, (asleep ? other.Thirst : 100) - loss));
+                if (asleep) aheadAtWake += ThirstLiters(Math.Max(0, other.Thirst - loss));
             }
         }
         float bedtime = Drank(player.Thirst, Math.Min(own, Math.Max(0, available - aheadLiters)));

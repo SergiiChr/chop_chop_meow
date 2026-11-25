@@ -17,6 +17,7 @@ public static class StrawBedChecks {
         Test(CheckCabinAndStrawBedSleepTogetherSkipToDawn, data);
         Test(CheckBootsStayPlantedAndClearTheMat);
         Test(CheckWeightPassesSmoothlyFromThePalmToTheForearm);
+        Test(CheckTheBurningTorchStaysVisibleBesideTheSleeper);
     }
 
     private static void CheckTakingApartAFreshBedGivesBackExactlyItsCost(GameData data) {
@@ -188,5 +189,27 @@ public static class StrawBedChecks {
         static void StaysPlanted(Vector3 actual, Vector3 start, string hand, float down) =>
             Require(Math.Abs(actual.Y - StrawBedModel.Top) < .012f && actual.DistanceTo(start) < .012f,
                 $"the {hand} hand should stay planted at phase {down:F3}, got {actual} from {start}");
+    }
+
+    private static void CheckTheBurningTorchStaysVisibleBesideTheSleeper() {
+        var rig = new ActorRig(ActorSkin.Player);
+        var mat = new Thing { Kind = ThingKind.StrawBed, Rotation = Mathf.Pi / 2 };
+        var torch = rig.Flame.GetParent<Node3D>();
+        try {
+            StrawBedView.Draw(rig, mat, .5f, lit: true);
+            var braced = TorchAt();
+            Require(torch.Visible && braced.Y > 0 && braced.DistanceTo(Vector3.Zero) > .42f,
+                "the lit torch should show beside the straw while the player braces with both hands");
+            StrawBedView.Draw(rig, mat, 1, lit: true);
+            Require(torch.Visible && TorchAt().DistanceTo(braced) < .005f, "the torch should stay by the bed as the player lies down");
+            rig.Show(new Pose(), null, false, lit: true);
+            Require(torch.Visible && TorchAt().DistanceTo(braced) > .20f, "standing again should return the lit torch to the player's hand");
+        } finally { rig.Root.Free(); }
+
+        Vector3 TorchAt() {
+            var point = Vector3.Zero;
+            for (Node3D? node = torch; node != null; node = node.GetParent() as Node3D) point = node.Transform * point;
+            return point;
+        }
     }
 }

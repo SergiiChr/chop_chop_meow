@@ -34,6 +34,7 @@ public sealed class ActorRig {
     /// <summary>What each tool puts in the hands, by its name: one piece, or two for a tool that fills both.</summary>
     private readonly List<(string Name, Node3D Node)> tools = new();
     private readonly Node3D torch;
+    private bool torchByBed;
     private Node3D shovel = null!, rake = null!;
     private readonly List<(Skeleton3D Skeleton, Node3D Joint)> limbs = new();
     // The leg skins, whose third bone turns the foot at the ankle.
@@ -284,6 +285,13 @@ public sealed class ActorRig {
     /// <summary>Where a point on a forearm is from the rig's root, under the pose just shown.</summary>
     private Vector3 FromForearm(bool left, Vector3 point) =>
         hips.Transform * (torso.Transform * (chest.Transform * ((left ? shoulderL : shoulderR).Transform * ((left ? elbowL : elbowR).Transform * point))));
+
+    /// <summary>Draws the player's burning torch beside the bed while both hands take weight.</summary>
+    internal void SetBedTorch(Transform3D fromRoot) {
+        var arm = hips.Transform * torso.Transform * chest.Transform * shoulderL.Transform * elbowL.Transform;
+        torch.Transform = arm.AffineInverse() * fromRoot;
+        torch.Visible = torchByBed = true;
+    }
 
     /// <summary>Where a fist is from the rig's root, under the pose just shown.</summary>
     public Vector3 Fist(bool left) => FromForearm(left, new Vector3(0, -build.Forearm, Palm));
@@ -619,7 +627,8 @@ public sealed class ActorRig {
         if (shovel.Visible) LayShovel();
         if (rake.Visible) rake.Basis = InRightFist(RakeStroke.Shaft((Fist(true) - Fist(false)).Normalized()));
         crate.Visible = carrying;
-        if (barrel?.Visible == true) torch.Transform = new Transform3D(Basis.Identity, new Vector3(0, -build.Forearm, Palm));
+        if (torchByBed || barrel?.Visible == true) torch.Transform = new Transform3D(Basis.Identity, new Vector3(0, -build.Forearm, Palm));
+        torchByBed = false;
         barrel?.Hide();
         bucket?.Hide();
         bottle?.Hide();
