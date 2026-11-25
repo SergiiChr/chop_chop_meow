@@ -224,6 +224,7 @@ public sealed partial class World {
     /// With nothing to smelt, or someone else at the bellows, there is nothing to do.
     /// </summary>
     private bool Pump(Worker w, Thing forge, float dt) {
+        if (GlassBlowing.IsRecipe(forge)) return glassBlowing.Pump(w, forge, dt);
         foreach (var other in S.Workers) if (other != w && AtBellows(other, forge)) { w.Status = "Bellows are manned"; return false; }
         if (!forge.Processing && !Stocked(forge) || Data.Recipes.TryGetValue(forge.Recipe, out var recipe) && Stalled(forge, recipe)) { w.Status = "Nothing to smelt"; return false; }
         if (!HandsFree(w, dt)) return true;

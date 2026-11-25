@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 
 /// <summary>The kinds of work a worker can be given at a place, in the order the job buttons show them.</summary>
 [JsonConverter(typeof(JobConverter))]
-public enum JobKind { Gather, Haul, Craft, Bellows, Farm, Build, Mine, Deliveries, Fuel, Stock, Tend, Pump }
+public enum JobKind { Gather, Haul, Craft, Bellows, Farm, Build, Mine, Deliveries, Fuel, Stock, Tend, Pump, BlowGlass }
 
 /// <summary>Reads and writes a job as its id, such as "haul".</summary>
 public sealed class JobConverter() : JsonStringEnumConverter<JobKind>(JsonNamingPolicy.SnakeCaseLower);
@@ -98,6 +98,7 @@ public sealed partial class World {
         new(JobKind.Craft, "Craft", "Works the station; it only makes progress while someone works it.", true, false, [],
             static (world, w, _, place, dt) => (place!.Kind == ThingKind.Packer ? world.packCraft : world.crafting).Work(w, place, dt)),
         new(JobKind.Bellows, "Bellows", "Keeps the fire hot. Only one worker pumps at a time.", true, false, [], static (world, w, _, place, dt) => world.Pump(w, place!, dt)),
+        new(JobKind.BlowGlass, "Glass blower", "Works the glass blowing pipe at the front of the furnace while another person pumps the bellows.", true, true, [], static (world, w, _, place, dt) => world.glassBlowing.Blow(w, place!, dt)),
         new(JobKind.Pump, "Pump", "Works the handle to keep water flowing.", true, false, [], static (world, w, _, place, dt) => WaterPumps.Work(world, w, place!, dt)),
         new(JobKind.Farm, "Farm", "Harvests the ripe wheat.", true, false, [], static (world, w, _, place, dt) => world.Reap(w, place!, dt)),
         new(JobKind.Build, "Build", "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.", true, false, ["pickaxe", "hammer"], static (world, w, _, place, dt) => world.Mines.Build(w, place!, dt)),
@@ -137,7 +138,7 @@ public sealed partial class World {
         ThingKind.Pile when t.Compost => TendJobs,
         _ => NoJobs
     };
-    private static readonly JobKind[] GatherJobs = [JobKind.Gather], BellowsJobs = [JobKind.Bellows, JobKind.Haul], CraftJobs = [JobKind.Craft, JobKind.Haul], HaulJobs = [JobKind.Haul],
+    private static readonly JobKind[] GatherJobs = [JobKind.Gather], BellowsJobs = [JobKind.Bellows, JobKind.BlowGlass, JobKind.Haul], CraftJobs = [JobKind.Craft, JobKind.Haul], HaulJobs = [JobKind.Haul],
         DeliveryJobs = [JobKind.Deliveries], FireJobs = [JobKind.Fuel], FarmJobs = [JobKind.Farm, JobKind.Haul], MineJobs = [JobKind.Build, JobKind.Haul, JobKind.Mine], StockJobs = [JobKind.Stock],
         TendJobs = [JobKind.Tend], PumpJobs = [JobKind.Pump], NoJobs = [];
 

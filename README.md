@@ -190,7 +190,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | 1–9 or click a hotbar slot | Select and outline that slot. Start placement if it holds a plan or placeable container |
 | Pick up a plan or backpack item and click a hotbar slot | Assign it to that slot |
 | Layer button below the status bar | Switch between the surface and underground. Underground, click a pipe to see its water and pressure |
-| Space at a selected nearby reinforced furnace or water pump | Pump |
+| Space with a reinforced furnace or water pump selected | Walk into position if needed and pump once |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with the Goal Log, save, load, options, Controls, new game and quit |
@@ -213,8 +213,8 @@ The hotbar starts with an axe, pickaxe, chest, campfire, furnace, anvil, craftin
 
 Open **Options** from the start or pause menu and switch on **First-person preview**. Each launch starts overhead.
 Move with WASD or the arrow keys relative to where you look. Move the mouse to look around.
-Left and right click act on nearby things under the centre dot. Space swings where you look and still pumps a
-selected machine in reach.
+Left and right click act on nearby things under the centre dot.
+Space swings where you look, or walks into position and pumps once if a furnace or water pump is selected.
 Opening a panel or menu frees the pointer so you can click its controls. Close it to look around again.
 The valley is visible out to the horizon. Look down to see your body, and swing to see your arms and weapon move.
 Cabins, being downed and underground pipe work use the overhead view.
@@ -358,14 +358,16 @@ Taking the hard hat off, and putting it on the recipe the station is on, always 
 A hard hat moved to another recipe drops the batches that still waited.
 
 So a station with a hard hat is always on the hard-hat recipe: once the batches you queued are done, workers go on making it.
-Only a worker works a hard-hat batch: you work only the batches you queued.
+Only a worker works a hard-hat batch at the bench, anvil or cooking table: you work only the batches you queued there.
 Click the hard hat off for a station to stop after your batches.
 It starts no batch while its slots hold something another recipe left there, such as a hauler's late delivery: haulers carry that to storage, or you take it out.
 A station page opens with the group of the recipe the station is on open.
 A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
 A bench, anvil or cooking table with a batch you queued is worked by a player standing still within 1 m of its edge, or by a worker; a packing station by either, whatever it packs.
-Pumping the reinforced furnace's bellows needs the same 1 m.
+A reinforced furnace pumps at once within reach.
+For glass, the pump position is behind the furnace.
+Press Space with the furnace selected, or click Pump, to walk to the bellows and press once if out of reach.
 
 Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
 The output slot takes back what the recipe makes from your backpack, up to a stack.
@@ -387,7 +389,7 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 | --- | --- |
 | Crafting bench, anvil, cooking table, packing station | Craft, Haul |
 | Stone furnace, canning station | Haul |
-| Reinforced furnace | Bellows, Haul |
+| Reinforced furnace | Bellows, Glass blower, Haul |
 | Water pump | Pump |
 | Mine | Build, Haul, Mine |
 | Farm plot | Farm, Haul |
@@ -410,7 +412,9 @@ With no job that can be done, a worker sits at the nearest campfire they can rea
 A worker who could not reach a fire's seats tries again once a building goes up or comes down.
 With no campfire they wait at the nearest trading post, or in the clearing without one.
 Their status says what their first job lacks.
-A worker on Bellows pumps only while the furnace smelts or holds a batch to smelt, and only one worker pumps at a time, also one holding a load nothing takes.
+A worker on Bellows pumps while the furnace works or holds a batch to make.
+Only one worker pumps at a time.
+A worker on Glass blower can work the pipe at the front.
 
 The crew button opens an overview with each worker's daily pay and the total above.
 
@@ -680,11 +684,31 @@ The steel hammer's speed multiplies the anvil's rate, as a tool's does at the be
 Making a steel hammer takes steel parts, so the first one is bought at a trading post.
 A small steel tool such as a hammer takes 1 steel part and a big one such as an axe, pickaxe or shovel 2, plus 1 wood part for the handle.
 
-## Furnaces and steel
+## Furnaces, steel and glass
 
 - The stone furnace smelts 2 iron ore into an iron bar and 2 tin ore into a tin bar over coal or charcoal.
 - It also burns 2 wood into 1 charcoal, sears meat and bakes bread (see Cooking) over wood, coal or charcoal.
 - The reinforced furnace smelts 2 iron bars and 2 coal into 2 steel bars, burns only coal from its fuel slot, and needs heat from manual or worker-operated bellows. Steel forms from 1450 °C; below that it keeps burning coal without making steel.
+
+### Glass jars
+
+Choose Glass jar at the reinforced furnace and fit one Steel pipe in the Glass blowing pipe slot.
+The pipe stays in the slot at the end of the batch.
+Each attempt uses 5 Sand and 1 coal from the fuel slot.
+
+Work in pairs.
+The glass blower stands in front, faces the furnace and aims the pipe at the glowing center of the chamber.
+The other person presses Space or clicks Pump to walk to the bellows and work them.
+Either job can be done by a player or a hired worker.
+Leave clear ground at both ends.
+Each player works at the closest available work spot.
+A manual stroke adds 145 °C for either furnace recipe.
+
+A jar takes 10 seconds between 1,300 and 1,600 °C.
+If the furnace cools, progress waits.
+Stop pumping above 1,600 °C.
+If it stays that hot for more than half a second, the glass melts off the pipe and falls to the ground.
+That attempt's sand and fuel are lost, and the furnace starts a fresh batch once it is in range again and supplied.
 
 ## Cooking and canning
 
@@ -900,8 +924,9 @@ They fall again every day.
 
 Place a water pump in the freshwater lake’s shallows with its handle facing dry ground.
 It costs 4 steel bars, 10 stone and 4 wood parts.
-From the bank, select it and click **Pump** or press **Space**.
-Your character steps up to the handle before pressing it.
+Select the pump and click **Pump** or press **Space**.
+Your character walks around obstacles to the handle on the bank if needed, then pumps once.
+Moving yourself or changing the selection cancels the walk.
 Aim at the pump to select it, including its thin lever and piston.
 Aim beside it to collect water.
 You can also assign a worker the **Pump** job.
@@ -1357,7 +1382,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, raking leaves, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), knocking on a cabin door, being tugged back out of one and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, raking leaves, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, glassblowing, crate carrying, sitting at lunch (cross-legged on the ground or on a rock), knocking on a cabin door, being tugged back out of one and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 A tree is felled with strokes from the side into its trunk, while an axe swung in the air comes down from overhead.
 
@@ -1368,7 +1393,8 @@ The world reacts too:
 - deposits shrink and throw chips, and crumble into chips and dust when their last piece is mined;
 - a fire that runs out of work or fuel dies down over half a second;
 - the bellows board travels with each press, and the heat gauge tracks the forge;
-- a bar under the reinforced furnace and its panel dial mark the heat steel needs;
+- a bar under the reinforced furnace and its panel dial mark the heat needed for the selected recipe;
+- glass swells on the pipe and comes off as a clear jar when it succeeds, or sags, drops and splashes on the ground when it overheats;
 - furnaces smoke (the reinforced furnace darker and thicker), and anvils spark;
 - storage lids open on transfers, and the cabin door opens for someone stepping in or out and shuts behind them, or as far as a wolf forcing it has pushed it;
 - the market mailbox flag rises while a cart is out;

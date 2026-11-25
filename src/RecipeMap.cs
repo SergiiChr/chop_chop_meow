@@ -197,7 +197,7 @@ public partial class RecipeMap : Control {
         var data = world.Data;
         if (data.RecipeOf(item) is not RecipeDef r) return data.Sources[item].How;
         string where = MapNode.Where(data, r), tool = r.Tool == "" ? "" : $", {data.ToolName(r)}";
-        string? plainest = r.Tool == "" ? null : data.PlainestTool(r.Tool, r.Tier);
+        string? plainest = r.Tool == "" ? null : data.PlainestTool(r.Tool, r.Tier, r.Station);
         float byHand = r.Seconds / world.WorkRate(null, plainest), there = r.Seconds / world.WorkRate(r.Station, plainest);
         string time = r.Hand && r.Station is ThingKind station && byHand != there ? $"{byHand:0.#} s by hand, {there:0.#} s at the {data.Name(station).ToLowerInvariant()}" : $"{there:0.#} s";
         return $"{where}{tool} · {time}";
@@ -311,7 +311,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         var recipe = data.RecipeOf(item);
         // Chips stand in a column beside the slot, the tool over the resources, so those of two lines never meet.
         bool tooled = recipe is { Tool.Length: > 0 };
-        if (tooled) AddChild(ChipFor(data, data.PlainestTool(recipe!.Tool, recipe.Tier), "tool", ToolChip, 1, 0, "Required tool", jump));
+        if (tooled) AddChild(ChipFor(data, data.PlainestTool(recipe!.Tool, recipe.Tier, recipe.Station), "tool", ToolChip, 1, 0, "Required tool", jump));
         var also = recipe != null ? recipe.Inputs.Keys.Skip(1) : data.Sources[item].Also;
         int across = 0;
         foreach (string other in also) AddChild(ChipFor(data, other, "also", ResourceChip, Height - Chip - 1, across++, "Additional resource", jump));

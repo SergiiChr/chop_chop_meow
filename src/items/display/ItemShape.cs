@@ -7,8 +7,8 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// One small model an item, carrying its own colours, for icons and for piles.
-/// A good that no world model shows is built here, or baked from Kenney's Food Kit in <c>assets/models/food</c> and
-/// given the game's colours: its icon shows the model as built and a pile slot shows it scaled to the slot.
+/// A good that no world model shows is built here or loaded from a baked mesh.
+/// Its icon shows the model as built and a pile slot shows it scaled to the slot.
 /// A good the world does show keeps the icon of that model, and has a lighter copy of it here for piles.
 /// </summary>
 internal static class ItemShape {
@@ -24,7 +24,7 @@ internal static class ItemShape {
     /// detailed or too small to heap; it is scaled so its longer side on the ground is <paramref name="Size"/>, or
     /// left as built at zero, and each level of the heap adds <paramref name="Rise"/> of its height.
     /// </summary>
-    private sealed record Look(Action<List<Face>> Build, StandardMaterial3D Material, float Size = 0, Lay Lay = Lay.Neat, float Rise = 1,
+    private sealed record Look(Action<List<Face>>? Build, StandardMaterial3D Material, float Size = 0, Lay Lay = Lay.Neat, float Rise = 1,
         Action<List<Face>>? Piece = null, StandardMaterial3D? Scan = null);
 
     /// <summary>A compost pile's heap: not an item, but heaped like one.</summary>
@@ -51,6 +51,7 @@ internal static class ItemShape {
         ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "b83a5c", null, false))),
         ["canned_meat_stew"] = new(f => Can(f, "c07a48", "7a4a26"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "c07a48", null, false))),
         [BerryJam.Bottle] = new(f => Jar(f, true), Glossy, .2f, Piece: f => Jar(f, false)),
+        [GlassBlowing.Item] = new(null, GlassJarShape.Finish),
         ["grass"] = new(f => Sheaf(f, 20, .5f, .24f, false, "8fae55", "7c9c46", "a3bf63"), Plain, .32f, Rise: .7f),
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
         ["wheat_seeds"] = new(Seeds, Sacking, .36f, Rise: .8f),
@@ -139,15 +140,18 @@ internal static class ItemShape {
 
     /// <summary>Builds one of the item as its icon shows it, centred on the origin.</summary>
     public static ArrayMesh Build(string item) {
-        var faces = new List<Face>(); looks[item].Build(faces);
+        if (item == GlassBlowing.Item) return GlassJarShape.Centered;
+        var look = looks[item];
+        var faces = new List<Face>(); look.Build!(faces);
         var (min, max) = Bounds(faces);
-        return Commit(faces, new Transform3D(Basis.Identity, -(min + max) / 2), looks[item]);
+        return Commit(faces, new Transform3D(Basis.Identity, -(min + max) / 2), look);
     }
 
     /// <summary>Builds the piece a heap of the item is made of, standing on the origin at the size a heap shows it.</summary>
     public static ArrayMesh Piece(string item) {
+        if (item == GlassBlowing.Item) return GlassJarShape.Pile;
         var look = looks[item];
-        var faces = new List<Face>(); (look.Piece ?? look.Build)(faces);
+        var faces = new List<Face>(); (look.Piece ?? look.Build)!(faces);
         // The game's camera looks down on a heap, so it never sees an underside.
         faces.RemoveAll(face => (face.C - face.A).Cross(face.B - face.A).Normalized().Y < -.9f);
         var (min, max) = Bounds(faces);

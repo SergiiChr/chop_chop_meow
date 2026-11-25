@@ -298,6 +298,7 @@ public static class Style {
 /// </summary>
 public partial class HeatDial : Control {
     public Func<float> Level { get; set; } = () => 0;
+    public bool Glass { get; set; }
     private const float Sweep = Mathf.Pi * 1.5f, Start = Mathf.Pi * .75f;
 
     public override void _Draw() {
@@ -307,7 +308,9 @@ public partial class HeatDial : Control {
         DrawArc(centre, radius, 0, Mathf.Tau, 48, Style.Line, 3, true);
         float track = radius - 8;
         DrawArc(centre, track, Start, Start + Sweep, 40, new Color(Style.Line, .3f), 2, true);
-        DrawArc(centre, track, Start + Sweep * World.SteelHeat / 100, Start + Sweep, 12, Style.Brick, 8, true);
+        float min = Glass ? GlassBlowing.MinHeat : World.SteelHeat, max = Glass ? GlassBlowing.MaxHeat : 100;
+        DrawArc(centre, track, Start + Sweep * min / 100, Start + Sweep * max / 100, 12, Glass ? Style.Ready : Style.Brick, 8, true);
+        if (Glass) DrawArc(centre, track, Start + Sweep * max / 100, Start + Sweep, 12, Style.Brick, 8, true);
         float heat = Mathf.Clamp(Level(), 0, 100);
         DrawLine(centre, centre + Vector2.FromAngle(Start + Sweep * heat / 100) * (track - 4), Style.Enamel, 4, true);
         DrawCircle(centre, 6, Style.Enamel);
