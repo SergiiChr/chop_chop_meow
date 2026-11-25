@@ -796,8 +796,8 @@ public sealed partial class World {
         }
         return best;
     }
-    /// <summary>Whether gathering a kind stings the acting player: it stings, and they carry no tool that spares them.</summary>
-    private bool Stings(ThingKind kind) => GatherRules.Of(kind) is { Sting: > 0 } rule && (rule.Spares == null || BestTool(rule.Spares) == null);
+    /// <summary>Health a second that gathering a kind takes from the acting player: its sting, or zero when it does not sting or a tool they carry spares them.</summary>
+    private float StingOf(ThingKind kind) => GatherRules.Of(kind) is { Sting: > 0 } rule && (rule.Spares == null || BestTool(rule.Spares) == null) ? rule.Sting : 0;
     public float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
     /// <summary>How many times faster than a recipe's own seconds work goes: a bench's speed, or 1 elsewhere and by hand, times the tool's.</summary>
     public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
@@ -857,8 +857,9 @@ public sealed partial class World {
         gatherClock += dt;
         var rule = GatherRules.Of(t.Kind);
         string? tool = (rule?.Needs ?? rule?.Helps) is string kind ? BestTool(kind) : null;
-        S.Actor.Stung = Stings(t.Kind);
-        if (S.Actor.Stung) S.Health -= dt * rule!.Value.Sting;
+        float sting = StingOf(t.Kind);
+        S.Actor.Stung = sting > 0;
+        S.Health -= dt * sting;
         if (t.IsDug) {
             t.Progress += dt * Speed(tool);
             if (DugOut(t)) Unearth(t, S.Backpack);

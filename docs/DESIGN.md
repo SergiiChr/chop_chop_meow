@@ -1724,13 +1724,14 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 
 ### Sound effects
 
-Sound effects are one-shot MP3s in `assets/sounds`; `x_1.mp3`, `x_2.mp3` and so on are variants of one sound `x`.
+Sound effects are one-shot MP3s in `assets/sounds`, apart from a held sound's looping WAV (below); `x_1.mp3`, `x_2.mp3`
+and so on are variants of one sound `x`.
 Each play picks a variant other than the previous one with a small random pitch and volume change.
 
 A held sound loops for as long as its source holds it again each frame (`Sounds.Hold`), one sound a source.
 It starts at a random moment of its recording and fades in and out over 0.15 seconds, so it neither clicks on nor cuts
 off, and it has players of its own, so a burst of one-shots never cuts it off.
-Like a one-shot, it plays from its source's place, or with no place within a metre of the player.
+It plays from its source's place, which it follows, so unlike a one-shot it keeps that place within a metre of the player.
 Its recording is a WAV imported to loop forward (`edit/loop_mode=2` in its `.import` file, where 1 means no loop).
 A WAV starts at any moment at no cost, while an MP3 decodes from its beginning to get there: 9 ms of stall for a start
 8 seconds into the groan, against 0.05 to 0.17 ms for the WAV.

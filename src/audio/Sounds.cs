@@ -131,8 +131,8 @@ public partial class Sounds : Node {
     private const int VoiceCount = 24;
     private int nextVoice, nextPlacedVoice;
     // Players for held sounds, kept apart from the others so a burst of one-shots never cuts a held sound off.
-    // Four of each kind: one held sound a player in a full game, with no place or placed.
-    private const int HeldVoiceCount = 4;
+    // One of each kind a player in a full game: a player holds at most one sound, with no place for their own and placed for another's.
+    private const int HeldVoiceCount = Net.MaxPlayers;
     private readonly List<AudioStreamPlayer> heldVoices = new();
     private readonly List<AudioStreamPlayer3D> heldPlacedVoices = new();
     private readonly Dictionary<int, HeldSound> held = new();
@@ -233,7 +233,7 @@ public partial class Sounds : Node {
         var streams = Variants(cue.Name);
         var place = at ?? World.Player;
         float fade = DistanceFade(cue.Name, place);
-        bool placed = InPlace(place);
+        bool placed = World.Player.DistanceTo(place) > OwnSpot;
         float volume = Levels.GetValueOrDefault(cue.Name) + Mathf.LinearToDb(fade) - Nudge();
         if (placed) {
             var source = FreeVoice(placedVoices, ref nextPlacedVoice, static voice => voice.Playing);
@@ -264,9 +264,6 @@ public partial class Sounds : Node {
     /// <summary>The volume scale of a sound played at <paramref name="place"/>, from one at the player to zero at its reach.</summary>
     private float DistanceFade(string name, Vector2 place) => MathF.Pow(1 - Math.Min(1, World.Player.DistanceTo(place) / ReachOf(name)), 2);
 
-    /// <summary>Whether a sound at <paramref name="place"/> plays from there, rather than with no place at the player's own spot.</summary>
-    private bool InPlace(Vector2 place) => World.Player.DistanceTo(place) > OwnSpot;
-
     /// <summary>A volume scale in decibels, with zero as silence.</summary>
     private static float Db(float scale) => Mathf.LinearToDb(Math.Max(scale, .0001f));
 
@@ -281,28 +278,28 @@ public partial class Sounds : Node {
     /// <summary>
     /// Keeps a looping sound going for <paramref name="source"/>, one sound a source; the caller holds it again every frame it
     /// should go on, and once it stops it fades out.
-    /// It starts at a random moment of its recording, fading in, and plays from <paramref name="at"/> as
-    /// <see cref="Play(string, Vector2?, float)"/> does, or with no place when that is null or within a metre of the player.
+    /// It starts at a random moment of its recording, fading in, and plays from <paramref name="at"/>, fading with distance
+    /// as <see cref="Play(string, Vector2?, float)"/> does, or with no place when that is null.
+    /// Unlike a one-shot it keeps its place even within a metre of the player, since it follows its source as it moves.
     /// Its recording is a WAV imported to loop, since a WAV starts anywhere in it at no cost.
     /// </summary>
     public void Hold(string name, int source, Vector2? at = null) {
         if (held.TryGetValue(source, out var sound) && sound.Name == name) { sound.At = at; sound.Kept = true; return; }
         if (sound != null) Let(source);
         if (!Audible(name, at)) return;
-        bool inPlace = InPlace(at ?? World.Player);
-        var own = inPlace ? null : heldVoices.FirstOrDefault(Free);
-        var placed = inPlace ? heldPlacedVoices.FirstOrDefault(Free) : null;
+        var own = at == null ? heldVoices.FirstOrDefault(Free) : null;
+        var placed = at == null ? null : heldPlacedVoices.FirstOrDefault(Free);
         if (own == null && placed == null) return;
         var cue = Next(name);
         var stream = Variants(name)[cue.Variant];
         held[source] = sound = new HeldSound(name, own, placed, Nudge()) { At = at, Kept = true };
         Place(sound);
         sound.Start(stream, cue.Pitch, (float)(random.NextDouble() * stream.GetLength()));
-        Started(name, DistanceFade(name, at ?? World.Player), inPlace);
+        Started(name, DistanceFade(name, at ?? World.Player), at != null);
     }
 
     /// <summary>Whether a sound of this name is playing as a held sound, fading out included.</summary>
-    public bool Holding(string name) => held.Values.Any(sound => sound.Name == name);
+    public bool Holding(string name) => held.Values.Any(sound => sound.Name == name && sound.Playing);
 
     private bool Free(Node voice) => !held.Values.Any(sound => sound.Own == voice || sound.Placed == voice);
 
@@ -354,6 +351,8 @@ public partial class Sounds : Node {
         }
 
         public void Stop() { Own?.Stop(); Placed?.Stop(); }
+
+        public bool Playing => Own?.Playing == true || Placed?.Playing == true;
     }
 
     private bool silenced;

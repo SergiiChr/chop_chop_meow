@@ -83,7 +83,8 @@ public partial class Game {
     private async Task CheckPickingANettleByHandGroansUntilItIsPicked() {
         await CloseWithEsc();
         int shovels = Drop(Hosted, "steel_shovel");
-        Require(await PickNettleBesideThePlayer(), "Picking a nettle by hand must groan while it stings.");
+        var (groaned, brokeOff) = await PickNettleBesideThePlayer();
+        Require(groaned && !brokeOff, $"Picking a nettle by hand must groan for as long as it stings: groaned {groaned}, broke off {brokeOff}.");
         await Until(() => !sounds.Holding("sting_groan"), "the groan fading out once the nettle is picked", 1);
         Give(Hosted, "steel_shovel", shovels);
     }
@@ -93,7 +94,8 @@ public partial class Game {
         int shovels = Drop(Hosted, "steel_shovel");
         Give(Hosted, "steel_shovel");
         int soundsBefore = sounds.Played;
-        Require(!await PickNettleBesideThePlayer() && !sounds.Heard("sting_groan", soundsBefore), "Picking a nettle with a shovel carried must make no groan, since it does not sting.");
+        var (groaned, _) = await PickNettleBesideThePlayer();
+        Require(!groaned && !sounds.Heard("sting_groan", soundsBefore), "Picking a nettle with a shovel carried must make no groan, since it does not sting.");
         Drop(Hosted, "steel_shovel"); Give(Hosted, "steel_shovel", shovels);
     }
 }
