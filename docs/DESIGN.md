@@ -18,7 +18,8 @@ These came from the user; change them only after asking.
   A carried shovel picks one in the same 3 seconds with no sting; the game and the README never say so.
   A nettle blocks building and gravel paths until it is picked.
 - **Nettle rope:** 1 nettle makes 1 rope at the bench, with a wooden mallet only. Asked for with a steel hammer and no
-  mallet, slotted or carried, the bench takes nothing and says "Steel hammer will damage the fibers."
+  mallet, slotted or carried, the bench takes nothing, stays on the recipe it was on and says "Steel hammer will damage
+  the fibers."
   Nettles put into its slots by hand still load and wait for a mallet.
   The bench keeps its one hammer slot. Making it takes turns between mallet blows and twisting by hand.
 - **Bug net:** 5 nettle rope, 1 wood and 1 wood part at the bench with any hammer. It is swung toward the pointer
@@ -989,6 +990,7 @@ Chopping out all its current wood fells the tree and leaves its stump.
 says tonight's have come, and day clears it), while fewer than `Nettles.Most` stand.
 Each comes up on a random spot no player sees (`World.UnseenSpot`) that is bare (`Nettles.Bare`): ground to stand on
 with no thing, yard, gravel path, beach, lake shore or den within 2 m.
+The spots tried are seeded by the day, so each night's are its own and a loaded game tries the same ones as a game played through.
 
 A nettle is a resource of the shape `GatherShape.Plucked`: one gather's time takes it whole and removes it
 (`GatherRule.GoneWhenSpent`), and the backpack needs room for it first, as for a stump.
@@ -1001,7 +1003,8 @@ Nothing the player reads says a shovel spares the sting; only a worker's status 
 
 Nettle rope's recipe has a `MaxTier` of 0, so only the wooden mallet makes it ([Tools](#tools)).
 `World.TooHardBlock` gives the recipe's `TooHard` words when every hammer a player has, slotted or carried, is too
-hard: `World.QueueBatch` and `World.LoadBatch` then refuse with them, and the recipe's card and tool line say them too.
+hard: `World.QueueBatch`, `World.LoadBatch` and the mark (`World.MarkBlock`) then refuse with them, so the station stays on
+its recipe with the batches that waited, and the recipe's card and tool line say them too.
 Putting nettles into the bench's slots by hand is not refused.
 A recipe marked `RecipeDef.Twists` is worked in rounds (`ActorAnimation.StationAction`): by the batch's `Thing.Progress`,
 `ActorAnimation.TwistRounds` rounds a batch, each a `TwistBlowShare` of mallet blows and then `ActorAction.TwistRope` with empty hands.
@@ -1009,6 +1012,7 @@ A recipe marked `RecipeDef.Twists` is worked in rounds (`ActorAnimation.StationA
 `Firebugs` (`src/firebugs/Firebugs.cs`) lets out `Firebugs.AtNightfall` firebugs as night falls and one more for each
 whole hour of the night since (`SaveState.FirebugsOut` counts those let out tonight, caught or not, and day sets it back), each on ground to
 stand on that no player sees, `Firebugs.BuildingRoom` from every building.
+Each firebug's spot is seeded by the day and its turn that night, so a night loaded part way lets the rest out where they would have come.
 By day it removes them all.
 A firebug is a thing of the shape `GatherShape.Caught`, kept at its place: where it is now is `Firebugs.At`, its
 place plus `Firebugs.Hover`, a slow swing by its id and the world's clock, so the host and every window agree on it
@@ -1038,6 +1042,7 @@ Held right mouse on a firebug catches nothing: `World.GatherBlock` asks for a sw
 A nettle blocks building like a berry bush.
 A firebug takes no ground (`Thing.Roams`): buildings, yards, gravel paths, holes and nettles go where one hovers, it
 stays, grass grows under it and the ground takes no contact shade.
+A right click with the shovel out goes through a firebug to the ground under it (`PlayerControl.RightPress`).
 `World.QuietNights` keeps nettles and firebugs from coming by themselves; a check session sets it (`Game.StartGame`),
 since each thing takes its look from its id.
 

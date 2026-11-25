@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
@@ -10,6 +11,7 @@ public partial class Game {
     private async Task RunFirebugUIChecks() {
         await TestClean(CheckARightClickWithTheBugNetSelectedSwingsIt);
         await TestClean(CheckARightClickOnAFirebugSwingsTheNetAtIt);
+        await TestClean(CheckAShovelDigsTheGroundAFirebugHoversOver);
     }
 
     private async Task CheckARightClickWithTheBugNetSelectedSwingsIt() {
@@ -44,6 +46,30 @@ public partial class Game {
         await Until(() => bug.Pos.DistanceTo(placed) > 3, "the swing that fell short sending the firebug darting", 5);
         Require(world.Player.DistanceTo(stood) < .01f && !panel.Visible, "A right click on a firebug with the net selected must swing where the player stands, not walk to the firebug or open its page.");
         RemoveThings(Hosted, t => t == bug); Drop(Hosted, "bug_net"); SetHotbarSlot(Hosted, 8, before);
+        RunUntilMorning(Hosted); NourishEveryone(Hosted);
+        await KeyStroke(Key.Key1);
+        await CloseWithEsc(); await Frames(4);
+    }
+
+    /// <summary>A firebug 6 m off is past where it darts from the player, and hovers between the pointer and the spot to dig.</summary>
+    private async Task CheckAShovelDigsTheGroundAFirebugHoversOver() {
+        await CloseWithEsc();
+        string before = world.HotbarItem(8);
+        var home = Hosted.Player;
+        RunUntilNight(Hosted); ShutDens(Hosted); NourishEveryone(Hosted);
+        Give(Hosted, "steel_shovel"); SetHotbarSlot(Hosted, 8, "steel_shovel");
+        await KeyStroke(Key.Key9);
+        var at = Enumerable.Range(0, 8).Select(i => (world.Player + Vector2.Right.Rotated(i * Mathf.Tau / 8) * 6).Round())
+            .First(p => world.Construction.PlacementBlock(ThingKind.Hole, p) == null && Uncovered(view.Screen(p)));
+        var bug = Hosted.Add(ThingKind.Firebug, view.ToWorld(view.Screen(at), FirebugShape.Height), 1);
+        await Until(() => view.PropOf(bug.Id) is FirebugProp { Shown: true } && view.Pick(view.Screen(at))?.Id == bug.Id, "the firebug hovering under the pointer", 5);
+        var point = RightPress(at, 0);
+        try {
+            await Until(() => view.PlayerAnimation == ActorAction.Dig, "the shovel digging the ground a firebug hovers over", 8);
+        } finally { RightRelease(point); }
+        await Until(() => view.PlayerAnimation != ActorAction.Dig, "the shovel stopping when released", 3);
+        Warp(Hosted, home);
+        RemoveThings(Hosted, t => t == bug); Drop(Hosted, "steel_shovel"); SetHotbarSlot(Hosted, 8, before);
         RunUntilMorning(Hosted); NourishEveryone(Hosted);
         await KeyStroke(Key.Key1);
         await CloseWithEsc(); await Frames(4);

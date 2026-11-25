@@ -379,7 +379,7 @@ public sealed partial class World {
         Holes = new GroundHoles(this); Replaced += Holes.Reset;
         Beach = new Beach(this);
         Trees = new TreePlanting(this); Replaced += Trees.Reset;
-        Nettles = new Nettles(this); Replaced += Nettles.Reset;
+        Nettles = new Nettles(this);
         Firebugs = new Firebugs(this); Replaced += Firebugs.Reset;
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         Goals = new Goals(this);
@@ -937,11 +937,13 @@ public sealed partial class World {
         t.Keep = recipe;
     }
     /// <summary>
-    /// Why a station's mark cannot move to a recipe now, or null: a mark turns a station to another recipe only while no batch is worked and its slots are empty.
+    /// Why a station's mark cannot move to a recipe now, or null: a mark turns a station to another recipe only while no batch is worked and its slots are empty,
+    /// and never to one whose only tool there is too hard for it (<see cref="TooHardBlock"/>), so a refused recipe leaves the station and its waiting batches as they were.
     /// Taking the mark off, and marking the recipe the station is on, are never refused.
     /// </summary>
     public string? MarkBlock(Thing t, string recipe) =>
         recipe == "" || recipe == Selected(t) ? null
+        : TooHardBlock(t, Data.Recipes[recipe]) is string tooHard ? tooHard
         : t.Processing ? Busy(t)
         : t.Inventory.Count > 0 ? $"Empty the {Lower(Data.Name(t.Kind))}'s slots first." : null;
     private string Busy(Thing t) => $"The {Lower(Data.Name(t.Kind))} has to finish its batch first.";

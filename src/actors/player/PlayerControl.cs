@@ -359,6 +359,8 @@ public sealed class PlayerControl {
             hotbar.UseSelected(world.Firebugs.At(t));
             return;
         }
+        // A firebug in the air takes no ground: a shovel digs the spot it hovers over.
+        if (t is { Roams: true } && Mode is ClickMode.Dig) t = null;
         if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
         if (t != null) return;

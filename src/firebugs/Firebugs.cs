@@ -40,10 +40,12 @@ public sealed class Firebugs(World world) {
     private readonly Dictionary<int, Flight> flights = new();
     private readonly List<Thing> caught = new();
     private const int Seed = 2203;
-    // Seeded, and started again with each world, so a recording of a night plays the same every time.
-    private Random random = new(Seed);
+    /// <summary>More than the firebugs a night lets out, so no two of any nights share a seed.</summary>
+    private const int PerNightSeeds = 64;
+    // Which way a startled firebug swerves. Seeded, and started again with each world, so a recording of a night plays the same every time.
+    private Random swerves = new(Seed);
 
-    internal void Reset() { flights.Clear(); random = new Random(Seed); }
+    internal void Reset() { flights.Clear(); swerves = new Random(Seed); }
 
     /// <summary>Where a firebug is now: its place and how far its hovering has carried it from there.</summary>
     public Vector2 At(Thing bug) => bug.Pos + Hover(bug.Id, world.Time);
@@ -71,8 +73,9 @@ public sealed class Firebugs(World world) {
         }
         if (!world.QuietNights) {
             int due = AtNightfall + (int)((world.DayPhase - world.Data.NightStarts) * 24);
+            // Each firebug's place is seeded by the day and its turn, so a night loaded part way lets the rest out where they would have come anyway, and no night repeats another.
             for (; s.FirebugsOut < due; s.FirebugsOut++)
-                if (world.UnseenSpot(random, Free) is Vector2 spot) world.Add(ThingKind.Firebug, spot, 1);
+                if (world.UnseenSpot(new Random(Seed + world.Day * PerNightSeeds + s.FirebugsOut), Free) is Vector2 spot) world.Add(ThingKind.Firebug, spot, 1);
         }
         foreach (var bug in bugs) Fly(bug, dt);
     }
@@ -124,7 +127,7 @@ public sealed class Firebugs(World world) {
     /// <summary>Sets a firebug darting away from a spot, a little to one side, whether it rests or not.</summary>
     private void Startle(Thing bug, Flight flight, Vector2 from) {
         var away = At(bug) - from;
-        flight.Heading = (away.LengthSquared() > .0001f ? away.Normalized() : Vector2.Right).Rotated(((float)random.NextDouble() * 2 - 1) * Swerve);
+        flight.Heading = (away.LengthSquared() > .0001f ? away.Normalized() : Vector2.Right).Rotated(((float)swerves.NextDouble() * 2 - 1) * Swerve);
         flight.Dart = DartSeconds; flight.Rest = 0;
     }
 

@@ -12,6 +12,7 @@ using static NettleSteps;
 public static class NettleChecks {
     public static void Run(GameData data) {
         Test(CheckThreeNettlesComeUpEachNightUntilTenStand, data);
+        Test(CheckNettlesPickedBeforeAReloadDoNotComeBackWhereTheyStood, data);
         Test(CheckNettlesComeUpOutOfSightOnGroundToStandOn, data);
         Test(CheckPickingANettleTakesThreeSecondsAndThreeHealth, data);
         Test(CheckNettleStingCanKill, data);
@@ -35,6 +36,19 @@ public static class NettleChecks {
         Require(world.ThingsOf(ThingKind.Nettle).Count == 8 && world.Backpack["nettle"] == 2, $"two picked nettles should be gone for two in the backpack: {world.ThingsOf(ThingKind.Nettle).Count} stand");
         RunUntilNight(world);
         Require(world.ThingsOf(ThingKind.Nettle).Count == 10, $"a night should bring the nettles back up to ten and no further: {world.ThingsOf(ThingKind.Nettle).Count}");
+    }
+
+    private static void CheckNettlesPickedBeforeAReloadDoNotComeBackWhereTheyStood(GameData data) {
+        var world = EmptyWorld(data);
+        RunUntilNight(world);
+        var first = world.ThingsOf(ThingKind.Nettle).Select(t => t.Pos).ToArray();
+        RemoveThings(world, t => t.Kind == ThingKind.Nettle);
+        RunUntilMorning(world);
+        world.Deserialize(world.Serialize());
+        RunUntilNight(world);
+        var second = world.ThingsOf(ThingKind.Nettle).Select(t => t.Pos).ToArray();
+        Require(first.Length == 3 && second.Length == 3 && !second.Intersect(first).Any(),
+            $"the next night's nettles should come up in new places after a reload: {string.Join(", ", first)} then {string.Join(", ", second)}");
     }
 
     private static void CheckNettlesComeUpOutOfSightOnGroundToStandOn(GameData data) {

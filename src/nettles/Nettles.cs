@@ -13,10 +13,6 @@ public sealed class Nettles(World world) {
     /// <summary>Metres a nettle keeps from anything else on the ground.</summary>
     private const float Room = 2;
     private const int Seed = 6131;
-    // Seeded, and started again with each world, so a new valley's nettles come up in the same places every time.
-    private Random random = new(Seed);
-
-    internal void Reset() => random = new Random(Seed);
 
     /// <summary>Brings up the night's nettles once night has fallen.</summary>
     internal void Tick() {
@@ -24,6 +20,8 @@ public sealed class Nettles(World world) {
         if (!world.Night) { s.NettlesUp = false; return; }
         if (s.NettlesUp || world.QuietNights) return;
         s.NettlesUp = true;
+        // Seeded by the day, so each night's nettles try places of their own, the same ones however the game came to that night, loaded or played.
+        var random = new Random(Seed + world.Day);
         for (int grown = 0; grown < PerNight && s.Things.Of(ThingKind.Nettle).Count < Most; grown++)
             if (world.UnseenSpot(random, Bare) is Vector2 spot) world.Add(ThingKind.Nettle, spot, 1);
     }

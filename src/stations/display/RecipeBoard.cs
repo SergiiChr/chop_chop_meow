@@ -159,7 +159,8 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
                 if (refusing != wait) return;
                 refusing = null;
                 // The slots may have emptied meanwhile: then the mark moves after all.
-                bool refused = world.MarkBlock(station, mark) != null;
+                // Slots in the way shake; a tool too hard for the recipe has nothing to shake.
+                bool refused = world.MarkBlock(station, mark) != null && world.TooHardBlock(station, r) == null;
                 kit.Run(() => world.SetRecipe(station, mark));
                 if (refused) occupied?.Invoke();
             };

@@ -13,6 +13,7 @@ public static class NettleRopeChecks {
     public static void Run(GameData data) {
         Test(CheckMalletAtTheBenchMakesARopeOfANettle, data);
         Test(CheckSteelHammerAloneMakesNoRope, data);
+        Test(CheckMarkingRopeWithOnlyASteelHammerLeavesTheBenchAsItWas, data);
         Test(CheckCarriedMalletMakesRopeAtABenchWithASteelHammer, data);
         Test(CheckSlottedMalletMakesRopeForAPlayerCarryingASteelHammer, data);
         Test(CheckBenchWorkerMakesRopeOnlyWithAMalletSlotted, data);
@@ -32,6 +33,21 @@ public static class NettleRopeChecks {
         Give(world, "nettle", 1);
         var bench = BenchLeftWithAMallet(world, "nettle_rope");
         Require(bench.Inventory["nettle_rope"] == 1 && bench.Inventory["nettle"] == 0 && world.Backpack["nettle"] == 0, $"one nettle should make one rope at a bench with a mallet: {bench.Inventory["nettle_rope"]}");
+    }
+
+    private static void CheckMarkingRopeWithOnlyASteelHammerLeavesTheBenchAsItWas(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, Site(0, 4), "bug_net", "steel_hammer");
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        world.QueueBatch(bench, "bug_net", 2);
+        Require(world.Waiting(bench, "bug_net") == 2, $"two bug nets should wait at the bench: {world.Waiting(bench, "bug_net")}");
+        var said = Told(world);
+        world.SetRecipe(bench, "nettle_rope");
+        Require(said.Contains("Steel hammer will damage the fibers."), $"marking rope with only a steel hammer should say why not: {string.Join(" | ", said)}");
+        Require(bench.Keep == "bug_net" && world.Waiting(bench, "bug_net") == 2, $"a refused rope should leave the bench on its recipe with its batches waiting: {bench.Keep}, {world.Waiting(bench, "bug_net")}");
+        bench.Tools!.Add("wood_hammer", 1);
+        world.SetRecipe(bench, "nettle_rope");
+        Require(bench.Keep == "nettle_rope", $"with a mallet in reach the bench should turn to rope: {bench.Keep}");
     }
 
     private static void CheckSteelHammerAloneMakesNoRope(GameData data) {

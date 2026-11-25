@@ -663,7 +663,7 @@ Some recipes need a better tool:
 
 Nettle rope (1 nettle → 1 rope) is the one recipe a better tool spoils: it is made only at the bench and only with a wooden mallet.
 The mallet may be the one in the bench's hammer slot or one in your backpack, whichever hammer the other is.
-Asked for with a steel hammer and no mallet, the bench queues and loads nothing for it and says "Steel hammer will damage the fibers.", which the recipe's card says too.
+Asked for with a steel hammer and no mallet, the bench queues and loads nothing for it, does not take its mark, keeps the batches it had waiting, and says "Steel hammer will damage the fibers.", which the recipe's card says too.
 Nettles can still be put into the bench's slots by hand, where they wait for a mallet.
 A worker needs the mallet in the slot, so a bench with one hammer slot makes either rope or what a steel hammer makes.
 

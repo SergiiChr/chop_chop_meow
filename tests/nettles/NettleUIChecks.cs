@@ -10,6 +10,7 @@ public partial class Game {
         await TestClean(CheckItemTextShowsUnderItsNameInTheBackpackAndOnTheHotbar);
         await TestClean(CheckRecipeMapShowsItemTextAndTheMalletRopeNeeds);
         await TestClean(CheckRopeCardSaysASteelHammerWillDamageTheFibers);
+        await TestClean(CheckADoubleClickOnRopeWithOnlyASteelHammerKeepsTheBenchsBatches);
     }
 
     private async Task CheckItemTextShowsUnderItsNameInTheBackpackAndOnTheHotbar() {
@@ -52,6 +53,28 @@ public partial class Game {
         bench.Tools.Add("wood_hammer", 1);
         await Until(() => !Lacks().Visible, "the rope card showing its inputs once a mallet is slotted", 2);
         RemoveThings(Hosted, t => t == bench);
+        await CloseWithEsc();
+    }
+
+    private async Task CheckADoubleClickOnRopeWithOnlyASteelHammerKeepsTheBenchsBatches() {
+        await CloseWithEsc();
+        var bench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1.5f, 0));
+        bench.Tools!.Add("steel_hammer", 1);
+        // With nothing of a bug net carried, its batches wait at a bench with empty slots, which a mark may turn.
+        int wood = world.Backpack["wood"], parts = world.Backpack["wood_parts"];
+        Drop(Hosted, "wood", wood); Drop(Hosted, "wood_parts", parts);
+        Hosted.QueueBatch(bench, "bug_net", 2);
+        Require(Hosted.Waiting(bench, "bug_net") == 2 && bench.Inventory.Count == 0, $"two bug nets should wait at an empty bench: {Hosted.Waiting(bench, "bug_net")}");
+        await Frames(4);
+        await ClickOn(bench);
+        await Until(() => Named("craft_nettle_rope") != null, "the bench's page with the rope card", 2);
+        await DoubleClick(Named("craft_nettle_rope")!);
+        // Longer than the wait for a second press, after which a refused mark is sent.
+        await Frames(40);
+        Require(bench.Keep == "bug_net" && Hosted.Waiting(bench, "bug_net") == 2,
+            $"A refused double-click on rope must leave the bench on bug nets with both batches waiting: {bench.Keep}, {Hosted.Waiting(bench, "bug_net")}.");
+        RemoveThings(Hosted, t => t == bench);
+        Give(Hosted, "wood", wood); Give(Hosted, "wood_parts", parts);
         await CloseWithEsc();
     }
 }
