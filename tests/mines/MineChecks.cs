@@ -181,18 +181,20 @@ public static class MineChecks {
         Require(miners.All(w => World.HasDuty(w, mine.Id, JobKind.Mine)), "a hauler must leave all three mining slots free");
 
         world.SetDuty(builder, mine, JobKind.Build, true);
-        world.SetDuty(builder, mine, JobKind.Haul, true);
-        Require(World.HasDuty(builder, mine.Id, JobKind.Build) && World.HasDuty(builder, mine.Id, JobKind.Haul),
-            "a full mining crew must not stop another worker from building or hauling");
-        world.SetDuty(hauler, mine, JobKind.Mine, true);
-        Require(!World.HasDuty(hauler, mine.Id, JobKind.Mine), "a haul job must not let a fourth worker take a mining slot");
+        Require(World.HasDuty(builder, mine.Id, JobKind.Build), "a full mining crew must not refuse a builder");
+        var lateHauler = AddWorker(world, chest.Pos);
+        world.SetDuty(lateHauler, mine, JobKind.Haul, true);
+        Require(World.HasDuty(lateHauler, mine.Id, JobKind.Haul), "a full mining crew must not refuse a new hauler");
+        world.SetDuty(lateHauler, mine, JobKind.Mine, true);
+        Require(!World.HasDuty(lateHauler, mine.Id, JobKind.Mine), "a haul job must not let a fourth worker take a mining slot");
 
+        world.SetDuty(hauler, mine, JobKind.Haul, false);
         Work(world, 30, () => mine.Inventory["wood"] == 12);
-        Require(mine.Inventory["wood"] == 12, "haulers must still deliver materials when the mining crew is full");
+        Require(mine.Inventory["wood"] == 12, "the new hauler must still deliver materials when the mining crew is full");
 
         world.SetDuty(miners[0], mine, JobKind.Mine, false);
-        world.SetDuty(hauler, mine, JobKind.Mine, true);
-        Require(World.HasDuty(hauler, mine.Id, JobKind.Mine), "a hauler can also mine once a mining slot is free");
+        world.SetDuty(lateHauler, mine, JobKind.Mine, true);
+        Require(World.HasDuty(lateHauler, mine.Id, JobKind.Mine), "a hauler can also mine once a mining slot is free");
     }
 
     private static void CheckMinersBringOreOutAndStopWhenOutputIsFull(GameData data) {
