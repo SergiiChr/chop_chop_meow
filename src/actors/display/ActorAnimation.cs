@@ -45,6 +45,10 @@ public enum ActorAction {
     FillVessel,
     PumpWater,
     Rake,
+    /// <summary>A bug net brought down on a slant across the front, hoop first.</summary>
+    NetSwing,
+    /// <summary>Fibres twisted into rope between both hands over a bench; it takes turns with mallet blows.</summary>
+    TwistRope,
     Glassblow
 }
 
@@ -118,7 +122,7 @@ public static class ActorAnimation {
         ActorAction.Walk or ActorAction.Carry => WalkCycle,
         ActorAction.Jog => Jogging.Cycle,
         ActorAction.Run => Sprinting.Cycle,
-        ActorAction.SteelChop or ActorAction.SteelMine or ActorAction.SteelAxeSwing or ActorAction.SteelAxeSweep => .8f,
+        ActorAction.SteelChop or ActorAction.SteelMine or ActorAction.SteelAxeSwing or ActorAction.SteelAxeSweep or ActorAction.NetSwing => .8f,
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
@@ -137,6 +141,7 @@ public static class ActorAnimation {
         ActorAction.Pack => 2.4f,
         ActorAction.Craft => 2.4f,
         ActorAction.Grind => 1.8f,
+        ActorAction.TwistRope => 1.3f,
         ActorAction.Dig => 1.1f,
         ActorAction.Rake => RakeStroke.Seconds,
         ActorAction.Glassblow => 1.45f,
@@ -149,12 +154,13 @@ public static class ActorAnimation {
 
     /// <summary>
     /// Seconds into a swing at which it lands: the punch at full stretch, the torch crossing in front, the axe at the bottom of
-    /// its overhead stroke or as its sweep crosses the front; zero for anything else.
+    /// its overhead stroke or as its sweep crosses the front, the net as its hoop crosses straight ahead; zero for anything else.
     /// </summary>
     public static float Contact(ActorAction action) => action switch {
         ActorAction.Attack => .32f * Duration(action),
         ActorAction.TorchSwing => .3f * Duration(action),
         ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep => .5f * Duration(action),
+        ActorAction.NetSwing => NetCatch * Duration(action),
         _ => 0
     };
 
@@ -183,6 +189,7 @@ public static class ActorAnimation {
         ActorAction.Grind => "mortar",
         ActorAction.Dig => "steel_shovel",
         ActorAction.Rake => "rake",
+        ActorAction.NetSwing => "bug_net",
         _ => null
     };
 
@@ -218,12 +225,35 @@ public static class ActorAnimation {
         (.6f, TwoHanded(Stance with { Lean = 4, Twist = -60, Sway = 4, RaiseR = 82, OutR = -15, ElbowR = 10, Grip = 90, Hips = .799f })),
         (.74f, TwoHanded(Stance with { Lean = 4, Twist = -55, Sway = 3, RaiseR = 80, OutR = -18, ElbowR = 16, Grip = 90, Hips = .801f })),
     };
+    // A bug net swung in the air in the right hand: taken up and back to the right of a trunk turned that way, the left
+    // arm out ahead for balance, then brought down across the front on a slant to the ground at the left, the weight
+    // going onto the front foot and the left arm drawn back, and carried back to the front.
+    // The wrist turns the hoop's mouth to lead the stroke, and turns it over at the end to close the bag.
+    private static readonly Pose NetReady = Stance with { Lean = 4, Twist = -8, RaiseR = 47, OutR = -12, ElbowR = 63, RaiseL = 18, OutL = 8, ElbowL = 35 };
+    private static readonly (float At, Pose Pose)[] NetKeys = {
+        (0, NetReady),
+        (.1f, Stance with { Twist = -30, RaiseR = 48, OutR = 76, ElbowR = 82, RaiseL = 45, OutL = 28, ElbowL = 28, Grip = -45 }),
+        (.22f, Stance with { Lean = -5, Twist = -55, RaiseR = 76, OutR = 85, ElbowR = 67, RaiseL = 65, OutL = 45, ElbowL = 15, Grip = -90 }),
+        (.32f, Stance with { Twist = -42, RaiseR = 50, OutR = 85, ElbowR = 69, RaiseL = 60, OutL = 40, ElbowL = 20, Grip = -105 }),
+        (NetReaches, Stance with { Lean = 5, Twist = -22, RaiseR = 53, OutR = 37, ElbowR = 69, RaiseL = 46, OutL = 30, ElbowL = 38, Grip = -85, Hips = .803f }),
+        (NetCatch, Stance with { Lean = 10, RaiseR = 64, OutR = -10, ElbowR = 45, RaiseL = 28, OutL = 22, ElbowL = 58, Grip = -65, Hips = .8f }),
+        (NetPasses, Stance with { Lean = 16, Twist = 26, RaiseR = 36, OutR = -46, ElbowR = 51, RaiseL = 8, OutL = 24, ElbowL = 55, Grip = -35, Hips = .79f }),
+        (.7f, Stance with { Lean = 22, Twist = 44, RaiseR = 51, OutR = -45, ElbowR = 14, RaiseL = -14, OutL = 30, ElbowL = 42, Grip = -15, Hips = .78f }),
+        (.78f, Stance with { Lean = 24, Twist = 52, RaiseR = 54, OutR = -47, ElbowR = 4, RaiseL = -20, OutL = 34, ElbowL = 36, Grip = -20, Hips = .775f }),
+        (.9f, Stance with { Lean = 10, Twist = 15, RaiseR = 43, OutR = -37, ElbowR = 47, RaiseL = 8, OutL = 16, ElbowL = 40, Grip = 70, Hips = .795f }),
+        (1, NetReady),
+    };
     private static readonly Pose MineGuard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
     /// <summary>
     /// The shares of a loop at which a felling axe bites the trunk, a pickaxe the rock and a hammer its work, and at which an axe swung overhead in the air is brought up short.
     /// The stroke arrives there at its full speed and stops.
     /// </summary>
     private const float ChopStrike = .52f, MineStrike = .55f, HammerStrike = .5f, AxeSwingStrike = .52f;
+    /// <summary>
+    /// The shares of a bug net's swing at which the hoop comes down to the height a firebug flies at, crosses straight
+    /// ahead at that height, and goes below it.
+    /// </summary>
+    public const float NetReaches = .4f, NetCatch = .5f, NetPasses = .6f;
     /// <summary>Which of its keys an axe swung overhead in the air is brought up short at.</summary>
     private const int AxeSwingStop = 2;
 
@@ -531,11 +561,28 @@ public static class ActorAnimation {
                         RaiseL: 48 + a * 9, OutL: -22 + c * 6, ElbowL: 78 + b * 16, RaiseR: 50 - b * 8, OutR: -22 - c * 5, ElbowR: 76 + a * 14,
                         Hips: .28f, TurnL: 14, TurnR: 14);
                 }
+            case ActorAction.TwistRope: {
+                    // Standing over the bench, the hands roll the fibres against each other, one forward as the other comes back, and draw apart as the twist tightens.
+                    float roll = MathF.Sin(p * Mathf.Tau * 4), draw = MathF.Sin(p * Mathf.Tau);
+                    return Stance with {
+                        Lean = 16 + draw * 2,
+                        Head = 18,
+                        Twist = roll * 3,
+                        RaiseL = 46 + roll * 8,
+                        OutL = -12 + draw * 9,
+                        ElbowL = 74 - roll * 10,
+                        RaiseR = 46 - roll * 8,
+                        OutR = -12 + draw * 9,
+                        ElbowR = 74 + roll * 10
+                    };
+                }
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
                 return moving ? Walk(p) with { Lean = carry.Lean, Head = -carry.Lean / 2, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
             case ActorAction.AxeSweep or ActorAction.SteelAxeSweep:
                 return Keys(p, SweepKeys);
+            case ActorAction.NetSwing:
+                return Flow(p, NetKeys);
             case ActorAction.AxeSwing or ActorAction.SteelAxeSwing:
                 return Keys(p, AxeSwingKeys, AxeSwingStop);
             case ActorAction.Rake:
@@ -749,7 +796,7 @@ public static class ActorAnimation {
     private static Footing? FeetOf(ActorAction action) => action switch {
         ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep
             or ActorAction.Mine or ActorAction.SteelMine or ActorAction.Pump or ActorAction.PumpWater or ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind
-            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock or ActorAction.Rake
+            or ActorAction.Attack or ActorAction.Kindle or ActorAction.TorchSwing or ActorAction.Knock or ActorAction.Rake or ActorAction.NetSwing or ActorAction.TwistRope
             or ActorAction.Glassblow => StanceFeet,
         ActorAction.Gather => SquatFeet,
         ActorAction.Craft => CraftFeet,
@@ -989,6 +1036,26 @@ public static class ActorAnimation {
         return keys[0].Pose;
     }
 
+    /// <summary>
+    /// The pose a share of the way through <paramref name="keys"/>, which run from 0 to 1, carried through each key on
+    /// one smooth curve, so the motion neither stops at a key nor turns a corner there.
+    /// </summary>
+    private static Pose Flow(float phase, (float At, Pose Pose)[] keys) {
+        int i = 0;
+        while (i + 2 < keys.Length && phase >= keys[i + 1].At) i++;
+        var (from, to) = (keys[i], keys[i + 1]);
+        // Past either end the curve is drawn as if the pose there had been held a while.
+        (float At, Pose Pose) before = i > 0 ? keys[i - 1] : (from.At - (to.At - from.At), from.Pose);
+        (float At, Pose Pose) after = i + 2 < keys.Length ? keys[i + 2] : (to.At + (to.At - from.At), to.Pose);
+        // A curve through four keys, built from blends of neighbours: each blend runs past its second pose where the moment lies beyond it.
+        var a = Pose.Lerp(before.Pose, from.Pose, (phase - before.At) / (from.At - before.At));
+        var b = Pose.Lerp(from.Pose, to.Pose, (phase - from.At) / (to.At - from.At));
+        var c = Pose.Lerp(after.Pose, to.Pose, (after.At - phase) / (after.At - to.At));
+        var early = Pose.Lerp(a, b, (phase - before.At) / (to.At - before.At));
+        var late = Pose.Lerp(b, c, (phase - from.At) / (after.At - from.At));
+        return Pose.Lerp(early, late, (phase - from.At) / (to.At - from.At));
+    }
+
     // ---------- Aiming a blow ----------
 
     /// <summary>
@@ -1204,7 +1271,7 @@ public static class ActorAnimation {
             ThingKind.Tree => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,
             ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => backpack["steel_pick"] > 0 ? ActorAction.SteelMine : ActorAction.Gather,
             ThingKind.LeafSpot when backpack["rake"] > 0 => ActorAction.Rake,
-            ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.LeafSpot => ActorAction.Gather,
+            ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.LeafSpot or ThingKind.Nettle => ActorAction.Gather,
             ThingKind.Stump or ThingKind.Bush or ThingKind.Hole => backpack["steel_shovel"] > 0 ? ActorAction.Dig : ActorAction.Idle,
             // A mine is dug with a pickaxe, then its frame and rails are hammered in.
             ThingKind.Mine => fitting ? ActorAction.Hammer : ActorAction.SteelMine,
@@ -1212,8 +1279,16 @@ public static class ActorAnimation {
         };
     }
 
+    /// <summary>
+    /// Rounds of work in a batch of something twisted by hand, and the share of each round its mallet blows take:
+    /// for rope at a bench, 10 seconds made twice as fast, two blows in 1.2 seconds and then 1.3 seconds of twisting.
+    /// </summary>
+    public const float TwistRounds = 2, TwistBlowShare = .48f;
+
     /// <summary>What someone working at a station does there.</summary>
     public static ActorAction StationAction(Thing station, GameData data) => station.Kind switch {
+        // Rope is beaten with the mallet and twisted by hand in turn, as far as the batch has come.
+        ThingKind.Bench when data.Recipes.TryGetValue(station.Recipe, out var twisted) && twisted.Twists => station.Progress / twisted.Seconds * TwistRounds % 1 < TwistBlowShare ? ActorAction.Hammer : ActorAction.TwistRope,
         ThingKind.Packer => ActorAction.Pack,
         // At a cooking table the mortar's recipes are ground, and dough is worked by hand as goods are packed.
         ThingKind.Cooktable => data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "mortar" ? ActorAction.Grind : ActorAction.Pack,

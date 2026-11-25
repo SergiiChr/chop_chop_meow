@@ -44,6 +44,7 @@ internal static class WorldSteps {
         world.Player = new Vector2(20, 20);
         RunUntilNight(world);
         ShutDens(world);
+        world.Firebugs.KeepIn();
         return world;
     }
 
@@ -65,6 +66,13 @@ internal static class WorldSteps {
         var heard = new List<string>();
         world.Sound = (name, _) => heard.Add(name);
         return heard;
+    }
+
+    /// <summary>What a world tells its player from now on, in order.</summary>
+    public static List<string> Told(World world) {
+        var said = new List<string>();
+        world.Notify = said.Add;
+        return said;
     }
 
     /// <summary>An empty world hosting one guest, and the messages that guest has heard.</summary>
@@ -209,11 +217,11 @@ internal static class WorldSteps {
     /// <summary>Ticks to the moment the next day begins, when wages fall due.</summary>
     public static void RunUntilDawn(World world) => RunUntil(world, world.Day * world.Data.DaySeconds);
 
-    /// <summary>Runs the world for a time with the player kept fed and watered.</summary>
-    public static void SafeTick(World world, float seconds) {
+    /// <summary>Runs the world for a time with the player kept fed and watered, in ticks of <paramref name="step"/> seconds.</summary>
+    public static void SafeTick(World world, float seconds, float step = Step) {
         Nourished(world);
         while (seconds > 0) {
-            float dt = Math.Min(Step, seconds);
+            float dt = Math.Min(step, seconds);
             world.Tick(dt);
             seconds -= dt;
             Nourished(world);

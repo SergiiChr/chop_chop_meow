@@ -162,6 +162,30 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             panel.Close(); ui.Visible = false; kit.HoldWhile(() => true);
             return;
         }
+        if (Launch.Has("--firebugs")) {
+            // A night meadow: three nettles in a row, one of each look, a tool station holding a bug net, and firebugs hovering at several distances from a player who carries a net.
+            // The last firebug starts near enough to the player to dart off as the scene opens.
+            var at = Terrain.Spawn + new Vector2(9, 9);
+            world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
+            world.S.NextId += (3 - world.S.NextId % 3) % 3;
+            for (int i = 0; i < 3; i++) world.Add(ThingKind.Nettle, at + new Vector2(-2.6f + i * 1.3f, 2.6f - i * 1.3f) + new Vector2(1, 1) * 1.6f, 1);
+            // By day, with --day-phase, only the nettles stand.
+            world.S.Time = world.Data.DaySeconds * Launch.Number("--day-phase", world.Data.NightStarts + .1f);
+            // No wolves and no more firebugs than these come out.
+            world.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; world.S.DenHours = 24; world.Firebugs.KeepIn();
+            foreach (var off in new Vector2[] { new(-4.5f, -1), new(-2.5f, -4.5f), new(1, -5.5f), new(4.6f, -2), new(5, 2.5f), new(-5.5f, 3), new(-1, 5.5f), new(2.4f, 1.6f) })
+                world.Add(ThingKind.Firebug, at + off, 1);
+            world.S.Backpack.Add("bug_net", 1);
+            world.S.HotbarSlots[0] = "bug_net";
+            // A tool station with a bug net on its first peg.
+            world.Add(ThingKind.Toolstation, at + new Vector2(-3.2f, -3.2f)).Inventory.Add("bug_net", 1);
+            world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear(); world.S.Wolves.Clear();
+            world.Player = at;
+            world.Tick(0); view.Zoom = Launch.Number("--zoom", 1.8f);
+            if (Launch.Has("--hide-ui")) ui.Visible = false;
+            if (Launch.Has("--chase")) view.AddChild(new FirebugChase { World = world, View = view });
+            panel.Close(); return;
+        }
         if (Launch.Has("--bushes")) {
             // A clean three-bush comparison row of berry bushes, with one picked-clean bush to show its persistent model.
             var at = Terrain.Spawn + new Vector2(9, 9);

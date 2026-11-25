@@ -309,6 +309,7 @@ public partial class Game : Node, IGameFlow {
             GetTree().SetMultiplayer(new SceneMultiplayer(), branch.GetPath());
             var main = new Node { Name = Name }; branch.AddChild(main);
             hosted = Server.Start(main, Server.Load(data, slot), net.Key);
+            hosted.World.QuietNights = true;
             hosted.Ended += StopHosted;
             JoinOwnServer(new Session.Starting(slot), hosted.Port);
             return;

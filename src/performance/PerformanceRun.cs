@@ -27,7 +27,7 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
     private double walked, stuckSince, settleStarted, campReached = double.NaN;
     private readonly List<object> events = new();
     private readonly Dictionary<int, (float Progress, int Batches)> machines = new();
-    private Key alongKey = Key.None, acrossKey = Key.None;
+    private readonly WalkKeys keys = new();
     private PerformanceSample[] samples = Array.Empty<PerformanceSample>();
     private ResidentMemory? residentMemory;
     private static readonly Performance.Monitor[] PipelineMonitors = {
@@ -75,24 +75,9 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
         return State.Running;
     }
 
-    /// <summary>
-    /// Holds exactly the movement keys <paramref name="along"/> and <paramref name="across"/> down, with Shift while either
-    /// is, pressing and letting go of each only when it changes, as a player would; none releases them all.
-    /// </summary>
-    private void HoldKeys(Key along = Key.None, Key across = Key.None) {
-        bool sprint = along != Key.None || across != Key.None;
-        if (sprint != (alongKey != Key.None || acrossKey != Key.None)) PressKey(Key.Shift, sprint);
-        if (along != alongKey) { PressKey(alongKey, false); PressKey(along, true); alongKey = along; }
-        if (across != acrossKey) { PressKey(acrossKey, false); PressKey(across, true); acrossKey = across; }
-    }
-
-    private static void PressKey(Key key, bool pressed) {
-        if (key != Key.None) Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = pressed });
-    }
-
     /// <summary>Stops the run without results, saying why.</summary>
     private State Fail(string reason) {
-        HoldKeys();
+        keys.Hold();
         residentMemory?.Dispose(); residentMemory = null;
         GD.PushError($"PERFORMANCE FAILED: {reason}");
         return State.Failed;
@@ -106,7 +91,7 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
     /// once the route is done; the name of the leg the player is stuck on, or null.
     /// </summary>
     private string? Sprint(double seconds) {
-        if (leg == PerformanceRoute.Legs.Length) { HoldKeys(); return null; }
+        if (leg == PerformanceRoute.Legs.Length) { keys.Hold(); return null; }
         var (name, stops) = PerformanceRoute.Legs[leg];
         var (along, across) = PerformanceRoute.Heading(world.Player, stops[stop]);
         if (along == 0 && across == 0) {
@@ -118,7 +103,7 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
             ResetStuck(seconds);
             return Sprint(seconds);
         }
-        HoldKeys(along > 0 ? Key.S : along < 0 ? Key.W : Key.None, across > 0 ? Key.D : across < 0 ? Key.A : Key.None);
+        keys.Hold(across, along, sprint: true);
         if (world.Player.DistanceTo(stuckFrom) > .5f) ResetStuck(seconds);
         else if (seconds - stuckSince > StuckSeconds) return name;
         return null;
@@ -144,7 +129,7 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
             ResetStuck(seconds);
             if (part == Part.Settle) {
                 settleStarted = seconds;
-                HoldKeys();
+                keys.Hold();
                 world.Player = PerformanceRoute.Start;
                 world.UseTorch(world.Player + Terrain.Sideways);
             }
@@ -198,7 +183,7 @@ internal sealed class PerformanceRun(World world, Viewport viewport, string fold
 
     private State Finish() {
         residentMemory?.Dispose(); residentMemory = null;
-        HoldKeys();
+        keys.Hold();
         using (var csv = new StreamWriter(Path.Combine(folder, "frames.csv"))) {
             csv.WriteLine("seconds,frame_ms,process_ms,render_cpu_ms,gpu_ms,allocated_total,gen0_total,gen1_total,gen2_total,resident_bytes,video_bytes,draw_calls,primitives,workers_active,machines_active,part,leg,pipelines_total");
             for (int i = 0; i < count; i++) {

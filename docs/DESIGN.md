@@ -13,6 +13,26 @@ These came from the user; change them only after asking.
 - **Animation:** every core interaction has an animation, with a dedicated one for every tool.
 - **Progression:** the player starts with a steel axe, an empty bottle, 10 berries and 6 wood, and no pickaxe; no loose iron lies about and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
 - **Shovel:** a steel shovel is made, bought and sold like the pickaxe. It digs up the stump a felled tree leaves for 3 wood and a plain bush for 36 leaves, three oak patches' worth; both are gone for good. Stumps are part of a worker's wood gathering while a shovel is to be had, and bushes are a job of their own.
+- **Nettles:** three come up each night at random where no player sees, until ten stand; one is never replanted and
+  is gone when picked. A plant is 1 nettle, picked in 3 seconds. Picking stings 1% of health a second and can kill.
+  A carried shovel picks one in the same 3 seconds with no sting; the game and the README never say so.
+  A nettle blocks building and gravel paths until it is picked.
+- **Nettle rope:** 1 nettle makes 1 rope at the bench, with a wooden mallet only. Asked for with a steel hammer and no
+  mallet, slotted or carried, the bench takes nothing, stays on the recipe it was on and says "Steel hammer will damage
+  the fibers."
+  Nettles put into its slots by hand still load and wait for a mallet.
+  The bench keeps its one hammer slot. Making it takes turns between mallet blows and twisting by hand.
+- **Bug net:** 5 nettle rope, 1 wood and 1 wood part at the bench with any hammer. It is swung toward the pointer
+  like any tool, with a right click on open ground or on a firebug.
+- **Firebugs:** eight come out at nightfall and one more each night hour, away from buildings, and are gone at dawn.
+  One drifts and glows, darts off from a player who comes near, faster than a walk and slower than a sprint, then
+  rests; a swing lands after a moment, catches what is in its sweep, and a miss sends the bug darting.
+  A caught firebug is an item only: nothing is made from it and it gives no light.
+- **Nettle and firebug jobs:** a worker picks nettles with a shovel and catches firebugs with a bug net, each from a
+  tool station. Workers still go home at dusk, so the firebug job waits for night work, a later change.
+  None of nettle, nettle rope, bug net and firebug is bought or sold, and none has a sound of its own yet.
+- **Item text:** what the player says of an item shows on a line under its name in its tooltip and in its details on
+  the recipe map.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
@@ -30,7 +50,7 @@ These came from the user; change them only after asking.
   and workers keep their routes.
   Tiles join with round ends, strips between neighbours and a slanted strip between any two tiles corner to corner, so
   every corner is cut on the slant; a square of four is filled.
-  A tile goes under buildings and buildings over tiles, but not on a tree, boulder, deposit, berry bush, leaf spot or
+  A tile goes under buildings and buildings over tiles, but not on a tree, boulder, deposit, berry bush, nettle, leaf spot or
   wolf carcass.
   A tile cannot be clicked in normal play.
 - **Taking down:** the red cross in the building plans gives the remove selector: a building or path tile in reach
@@ -103,9 +123,11 @@ Simulation and data:
 | `src/farms/model/FarmStage.cs` | Whether a plot is fallow, growing or ripe |
 | `src/mines/Mines.cs` | Mines: where one is marked and stands at its cliff, its three building stages, supplying it, working it underground and the end goal's working mines |
 | `src/mines/model/Cliff.cs`, `src/mines/model/MineStage.cs` | `Cliff`, the valley's ore cliffs and the mine spot at each, and `MineStage`, how far a mine is built |
-| `src/resources/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
+| `src/resources/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole, plucked whole or caught, its job, its sting and the tool that spares it |
 | `src/resources/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/digging/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
+| `src/nettles/Nettles.cs`, `src/nettles/display/NettleShape.cs` | Nettles coming up at nightfall, and the scanned sprigs a nettle plant and its item are made of |
+| `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs`, `src/firebugs/FirebugChase.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow; the showcase's player chasing firebugs for a recording |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
 | `src/digging/Beach.cs`, `src/digging/display/CoastView.cs` | Beach sand, tide, and the exposed soil after a dig |
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
@@ -213,6 +235,7 @@ UI and input:
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
 | `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things and using Space, and `ClickMode`, what the next click does |
 | `src/actors/player/BellowsApproach.cs` | The player's walk to a reinforced furnace for one stroke at the bellows |
+| `src/actors/player/WalkKeys.cs` | The movement keys and Shift held by code that plays the player: the performance run and the firebug chase |
 | `src/ui/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
@@ -853,6 +876,7 @@ It lands on every wolf whose body touches the ground it passes over then, a `Swi
 | Overhead chop | `Swings.Chop` | 0.5 to 1.35 m ahead, 10° left to 8° right of the aim | 0.7 m | 2.2 to 3.2 with a steel axe |
 | Sideways sweep | `Swings.Sweep` | 0.5 to 1.3 m out, from 138° left of the aim round the front to 62° right | 1.1 m | 2.2 to 3.2 with a steel axe |
 | Torch | `Swings.Torch` | within 1 m, 52° left to 33° right | 0.65 m | 0.8 to 1.2 |
+| Bug net | `Swings.Net` | 0.98 to 1.42 m out, from 55° left of the aim to 55° right, where the hoop's slant from behind the right shoulder to the ground at the left crosses the height a firebug flies at | any height | none: it catches firebugs |
 | Punch | `Swings.Punch` | within 0.7 m, 10° to 35° right | any height | 0.4 to 0.6 |
 
 The shapes are where the player's model carries the axe head (`ActorRig.AxeHead`), the flame and the fist through each stroke, which `CheckSwingShapesFollowThePlayersModel` holds them to.
@@ -968,9 +992,78 @@ When a player gathers leaves, they also take the acorns that fit in their backpa
 Leaves refill at dawn. Missing acorns refill one at a time, every ten days from the first gather that took one.
 Chopping out all its current wood fells the tree and leaves its stump.
 
+### Nettles and firebugs
+
+`Nettles` (`src/nettles/Nettles.cs`) brings up `Nettles.PerNight` nettles once night has fallen (`SaveState.NettlesUp`
+says tonight's have come, and day clears it), while fewer than `Nettles.Most` stand.
+Each comes up on a random spot no player sees (`World.UnseenSpot`) that is bare (`Nettles.Bare`): ground to stand on
+with no thing, yard, gravel path, beach, lake shore or den within 2 m.
+The spots tried are seeded by the day, so each night's are its own and a loaded game tries the same ones as a game played through.
+
+A nettle is a resource of the shape `GatherShape.Plucked`: one gather's time takes it whole and removes it
+(`GatherRule.GoneWhenSpent`), and the backpack needs room for it first, as for a stump.
+Its rule sets `ByHand` to 1.5, so the gather takes 3 seconds whatever is carried, a `Sting` of 1 health a second and
+`Spares`, the tool kind that spares the gatherer.
+`World.Gather` takes the sting off a player who carries no shovel; the death that follows is an ordinary one.
+A worker always needs the sparing tool (`GatherRule.WorkerNeeds`) and takes it from a tool station like a needed one,
+and it makes their work no faster.
+Nothing the player reads says a shovel spares the sting; only a worker's status names the tool it waits for.
+
+Nettle rope's recipe has a `MaxTier` of 0, so only the wooden mallet makes it ([Tools](#tools)).
+`World.TooHardBlock` gives the recipe's `TooHard` words when every hammer a player has, slotted or carried, is too
+hard: `World.QueueBatch`, `World.LoadBatch` and the mark (`World.MarkBlock`) then refuse with them, so the station stays on
+its recipe with the batches that waited, and the recipe's card and tool line say them too.
+Putting nettles into the bench's slots by hand is not refused.
+A recipe marked `RecipeDef.Twists` is worked in rounds (`ActorAnimation.StationAction`): by the batch's `Thing.Progress`,
+`ActorAnimation.TwistRounds` rounds a batch, each a `TwistBlowShare` of mallet blows and then `ActorAction.TwistRope` with empty hands.
+
+`Firebugs` (`src/firebugs/Firebugs.cs`) lets out `Firebugs.AtNightfall` firebugs as night falls and one more for each
+whole hour of the night since (`SaveState.FirebugsOut` counts those let out tonight, caught or not, and day sets it back), each on ground to
+stand on that no player sees, `Firebugs.BuildingRoom` from every building.
+Each firebug's spot is seeded by the day and its turn that night, so a night loaded part way lets the rest out where they would have come.
+By day it removes them all.
+A firebug is a thing of the shape `GatherShape.Caught`, kept at its place: where it is now is `Firebugs.At`, its
+place plus `Firebugs.Hover`, a slow swing by its id and the world's clock, so the host and every window agree on it
+without an update while it hovers.
+Its flight (`Firebugs.Flight`) is kept only while the world runs:
+
+- **Dart.** A player out in the open within `StartleRadius` sets it darting straight away from them, up to
+  `Swerve` to one side, at `DartSpeed` for `DartSeconds`. It turns back from ground nobody can stand on.
+- **Rest.** It then stays put for `RestSeconds`, whoever comes near.
+
+`World.SwingNet` (`Verb.SwingNet`) swings a carried net as `ActorAction.NetSwing`, with the axe's cooldown.
+The net is swung in the right hand (`ActorAnimation.NetKeys`): taken up and back to the right of a trunk turned that
+way, the left arm out ahead, then brought down on a slant across the front to the ground at the left, the wrist
+turning the hoop's mouth to lead the stroke and turning it over at the end.
+`ActorAnimation.Flow` carries the pose through those keys on one smooth curve, so the stroke does not stop at a key.
+With a net selected, a right click on a firebug swings at where it is (`PlayerControl.RightPress`) instead of walking to it.
+The swing lands like any other (`Swings.Tick`), and `Firebugs.Sweep` catches each firebug the `Swings.Net` shape
+touches, a body `BodyRadius` wide at any height, into the swinger's backpack while it has room.
+Every other firebug within `ScareRadius` darts off, resting or not, and so does one a full backpack could not take.
+`CheckSwingShapesFollowThePlayersModel` holds the net's shape to where the model carries the hoop (`ActorRig.NetMouth`).
+
+A firebug moves about, so it leaves no memory under fog (`GatherRule.Roams`), and a worker's next spot is any firebug
+out rather than one a player has seen.
+A worker with the job takes a bug net (`GatherRule.Needs`) and takes the firebug they reach at once, as a loose piece
+is taken (`GatherRule.TakenAtOnce`); no worker is on duty while firebugs are out.
+Held right mouse on a firebug catches nothing: `World.GatherBlock` asks for a swing.
+A nettle blocks building like a berry bush.
+A firebug takes no ground (`Thing.Roams`): buildings, yards, gravel paths, holes and nettles go where one hovers, it
+stays, grass grows under it and the ground takes no contact shade.
+A right click with the shovel out goes through a firebug to the ground under it (`PlayerControl.RightPress`).
+`World.QuietNights` keeps nettles and firebugs from coming by themselves; a check session sets it (`Game.StartGame`),
+since each thing takes its look from its id.
+
+`FirebugShape` draws a firebug as a dark body, a lantern over it and a halo, and throws no light on the ground.
+It glows steadily and, every 10 seconds at a moment of its own, half as bright again for about a second (`FirebugShape.Flash`).
+It bobs about `FirebugShape.Height` and follows the world's position no faster than a dart, so the steps of its
+updates never show.
+
+`ItemDef.Description` is what the player says of an item; `GameData.DescriptionLine` gives it as a tooltip line.
+
 ### Tools
 
-Tools carry a `Tool` kind (axe, pickaxe, shovel, hammer, chisel, rake, mortar), a `Speed` and a `Tier` in `GameTables`:
+Tools carry a `Tool` kind (axe, pickaxe, shovel, hammer, chisel, rake, mortar, net), a `Speed` and a `Tier` in `GameTables`:
 
 | `Tier` | Material |
 | --- | --- |
@@ -983,6 +1076,9 @@ Tier 1 is unused, since there are no iron tools.
 Recipes name the tool they need, the lowest `Tier` that will do, and whether they can be made by hand (`Hand`).
 So a steel chisel does everything a stone chisel does, faster, while the anvil, tin cans and gravel need a steel hammer
 and the mortar a steel chisel.
+A recipe may also name the highest tier that will do (`RecipeDef.MaxTier`) with the words a player is told who has only
+a harder tool (`RecipeDef.TooHard`); `RecipeDef.MadeWith` says whether an item is a tool for it, and the tool lookups
+that take a recipe (`World.BestTool`, `BenchTool`, `ToolInUse`) pass over a tool that is too hard.
 
 `GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for boulders and deposits, a shovel for stumps and bushes), one that only speeds gathering up (a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
 A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf spots.

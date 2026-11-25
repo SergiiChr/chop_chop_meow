@@ -61,6 +61,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
 | `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
+| `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
@@ -124,8 +125,8 @@ The game draws the film itself, so a change to a model or a shot means making th
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
 from their pinned CC0 sources, `./tools/polyhaven_textures.py` downloads the shore and ground photoscans drawn as they
-are, `./tools/water_textures.py` downloads the water's textures, and `./tools/food_models.py` bakes the committed
-food models from theirs.
+are, `./tools/water_textures.py` downloads the water's textures, `./tools/food_models.py` bakes the committed
+food models from theirs, and `./tools/nettle_models.py` the nettle and the nettle rope.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
@@ -506,6 +507,25 @@ Loose stones and sticks lie about the plains: each picks up the same way as 1 st
 A pickaxe hit on a rock or an ore deposit knocks a loose piece of it off one time in twenty; it flies off and lands within 2 tiles, ready to pick up.
 A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 
+### Nettles and firebugs
+
+Three nettles come up each night where nobody is looking, until ten stand in the valley.
+Hold right mouse on one to pick it: it takes 3 seconds, gives 1 nettle and stings for 1% of health a second, which can kill.
+A picked nettle is gone for good, a backpack with no room for it leaves it standing, and nothing is built or laid where one stands.
+Nettle rope is made at the crafting bench, 1 rope from 1 nettle, and a bug net from 5 rope, 1 wood and 1 wood part ([Crafting bench](#crafting-bench)).
+Whoever makes rope strikes two mallet blows, then twists the fibres by hand, in turn.
+
+Eight firebugs come out as night falls and one more after each hour of the night, at least 25 m from every building and where nobody is looking.
+All of them are gone at dawn.
+A firebug hovers about its place with a steady glow that grows half as bright again for about a second every 10 seconds.
+When you come within 4 m it darts off 6.55 m, faster than a walk and slower than a sprint, then rests for 1.6 seconds where it stops, whoever comes near.
+With the bug net selected, a right click on open ground swings it toward the pointer, down on a slant from behind the right shoulder across the front to the ground at the left, and a right click on a firebug swings it at the firebug.
+The hoop crosses the front 1.0 to 1.4 m from you, within 55° either side of the pointer, and lands 0.4 seconds after the click: it catches each firebug it passes over then, one firebug each into the backpack while it has room.
+A firebug nearer or further than the hoop is missed, and a swing sends every firebug it misses within 5 m darting, resting or not.
+
+Nettles, nettle rope, bug nets and firebugs are not bought or sold, and a firebug is not made into anything yet.
+A nettle, a bug net and a firebug each say a line under their name in tooltips and in their details on the recipe map.
+
 ### Sand and tides
 
 Select a shovel and point at the sea beach to highlight a one-meter square.
@@ -609,7 +629,7 @@ Opening it from a goal keeps the pause menu open underneath.
 Movement controls are disabled while the map is open.
 An item first made while the map is open turns to **Made before**.
 
-- The map splits items into rows for wood, stone and coal, iron and steel, tin, food, farm and trade.
+- The map splits items into rows for wood, stone and coal, iron and steel, tin, food, farm, nettle and firebugs, and trade.
   In a row each item hangs off the one it is made out of, raw material first.
 - Every item is on the map, with where it is made or come by under its name.
 - An item the settlement has made, gathered, bought or started with has a filled slot, and so has everything that item
@@ -636,6 +656,7 @@ It makes what the menu's chisel makes (planks, wood parts, the mallet, torches a
 | Steel axe, pickaxe, shovel, hammer | see Steel tools below |
 | Steel chisel | 1 steel part + 1 wood part |
 | Rake | 1 steel part + 2 wood parts |
+| Bug net | 5 nettle rope + 1 wood + 1 wood part |
 
 Some recipes need a better tool:
 
@@ -643,6 +664,12 @@ Some recipes need a better tool:
 - Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
 - A tin water bottle (1 tin sheet + 1 wood part) needs a steel hammer.
+
+Nettle rope (1 nettle → 1 rope) is the one recipe a better tool spoils: it is made only at the bench and only with a wooden mallet.
+The mallet may be the one in the bench's hammer slot or one in your backpack, whichever hammer the other is.
+Asked for with a steel hammer and no mallet, the bench queues and loads nothing for it, does not take its mark, keeps the batches it had waiting, and says "Steel hammer will damage the fibers.", which the recipe's card says too.
+Nettles can still be put into the bench's slots by hand, where they wait for a mallet.
+A worker needs the mallet in the slot, so a bench with one hammer slot makes either rope or what a steel hammer makes.
 
 A better tool always does a plainer tool's work; the steel chisel works twice as fast as the stone one.
 The stone chisel itself is only knapped by hand.
@@ -860,7 +887,8 @@ Workers need tools for some jobs:
 - an axe to chop wood;
 - a pickaxe to break boulders and mine ore and coal;
 - a shovel to dig up stumps and bushes;
-- a hammer to fit a mine.
+- a hammer to fit a mine;
+- a bug net to catch firebugs.
 
 Leaves, berries and loose pieces need no tool, though a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
@@ -876,6 +904,10 @@ With no shovel to be had they leave stumps and go on chopping.
 A worker carries one tool at a time, so they swap the axe for the shovel at a tool station and back.
 Digging up bushes is a job of its own: a worker given a bush goes on to the next known bush and never rakes leaves, and a worker raking leaves never digs up a bush.
 A dug-up bush gives 36 leaves, which a worker carries off 12 at a time.
+
+Nettles and firebugs can be given to a worker like any resource, each as a job of its own.
+A nettle picker says what tool they wait for.
+A firebug catcher takes a bug net and catches the firebug they reach, but workers leave at dusk, before firebugs come out, so a catcher finds none to catch yet.
 
 A worker on the station's Stock job brings the tools its input filter takes from other storage to the rack.
 
@@ -955,7 +987,7 @@ Tiles join into paths three quarters of a metre wide with round ends:
 
 A tile goes on any dry open ground within 5 tiles of you, also under your feet and under buildings and yards already
 there; a building or yard goes up over tiles and leaves them under it.
-It does not go on a tile where a tree, boulder, ore deposit, berry bush or leaf spot stands, picked clean or not.
+It does not go on a tile where a tree, boulder, ore deposit, berry bush, nettle or leaf spot stands, picked clean or not.
 It clears a stump or plain bush away.
 Nothing grows through gravel.
 A click on a path does what a click on open ground does.
@@ -1129,7 +1161,7 @@ A wolf that reaches you stops at biting distance, about a metre off, and waits t
 ### Fighting
 
 A swing keeps the direction you gave it at the start.
-Right-click open ground with an axe, pickaxe, hammer or torch selected to aim at the pointer.
+Right-click open ground with an axe, pickaxe, hammer, torch or bug net selected to aim at the pointer.
 Overhead, Space aims along the held movement keys or, from a stand, the last direction you walked.
 In first person, Space aims where you look.
 You can move during the swing, and near a hunting wolf the movement keys reverse you immediately.

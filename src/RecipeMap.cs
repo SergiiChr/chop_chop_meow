@@ -160,6 +160,10 @@ public partial class RecipeMap : Control {
         var naming = Column(strip, null);
         var name = Style.Text(data.Name(item), 19, Style.Ink, Style.Head); name.Name = "detail_name"; naming.AddChild(name);
         naming.AddChild(Style.Text(node.Known ? "Made before" : "Not made yet", 12, Style.Tan));
+        if (data.Items[item].Description is { Length: > 0 } said) {
+            var text = Style.Text(said, 12, Style.Ink); text.Name = "detail_text"; text.AutowrapMode = TextServer.AutowrapMode.WordSmart; text.CustomMinimumSize = new Vector2(230, 0);
+            naming.AddChild(text);
+        }
         var recipe = data.RecipeOf(item);
         var madeAt = new HBoxContainer(); madeAt.AddThemeConstantOverride("separation", 6); Column(strip, "Made at").AddChild(madeAt);
         if (recipe?.Station is ThingKind station) madeAt.AddChild(Style.Icon(Icons.Of(station.Id()), 28));
@@ -192,7 +196,7 @@ public partial class RecipeMap : Control {
     private string MadeAt(string item) {
         var data = world.Data;
         if (data.RecipeOf(item) is not RecipeDef r) return data.Sources[item].How;
-        string where = MapNode.Where(data, r), tool = r.Tool == "" ? "" : $", {data.ToolName(r.Tool, r.Tier)}";
+        string where = MapNode.Where(data, r), tool = r.Tool == "" ? "" : $", {data.ToolName(r)}";
         string? plainest = r.Tool == "" ? null : data.PlainestTool(r.Tool, r.Tier, r.Station);
         float byHand = r.Seconds / world.WorkRate(null, plainest), there = r.Seconds / world.WorkRate(r.Station, plainest);
         string time = r.Hand && r.Station is ThingKind station && byHand != there ? $"{byHand:0.#} s by hand, {there:0.#} s at the {data.Name(station).ToLowerInvariant()}" : $"{there:0.#} s";

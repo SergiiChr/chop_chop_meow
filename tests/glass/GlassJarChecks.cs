@@ -34,7 +34,11 @@ internal static class GlassJarChecks {
             "Neither worker heat nor a carried pipe should let a glass batch start without the slotted pipe.");
         Require(world.SlotBlock(furnace, "stone") == "The glass blowing pipe slot takes a steel pipe.",
             "The refusal should name the slot and the item it accepts.");
+        var jar = data.Recipes[GlassBlowing.Item];
+        Require(!world.HasToolFor(furnace, jar), "A carried steel pipe should not make the glass recipe ready.");
         Require(world.SlotTool(furnace, "steel_pipe"), "The furnace should accept a steel pipe.");
+        Require(world.HasToolFor(furnace, jar) && world.BenchTool(furnace, jar) == "steel_pipe",
+            "The recipe should see the fitted steel pipe as its tool.");
         Require(world.Backpack["steel_pipe"] == 1 && world.BenchTool(furnace, GlassBlowing.Tool) == "steel_pipe",
             "Only one pipe should leave the backpack for the glass blowing pipe slot.");
         Require(!world.SlotTool(furnace, "steel_pipe"), "A second pipe should not fit the occupied glass blowing pipe slot.");

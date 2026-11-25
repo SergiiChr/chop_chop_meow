@@ -72,7 +72,7 @@ public sealed class Construction(World world) {
         } else if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         if (digging && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
-            if ((!World.BuiltOver(t.Kind) || digging) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
+            if (!t.Roams && (!World.BuiltOver(t.Kind) || digging) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
                 return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
             var door = p + Doorways.DoorOffset.Rotated(rotation);
@@ -123,7 +123,7 @@ public sealed class Construction(World world) {
             }
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in world.S.Things) {
-            if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind)) continue;
+            if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind) || t.Roams) continue;
             if (t.Kind == ThingKind.Tree && TrunkOverlaps(p - t.Pos, kind, TreePlanting.TrunkRadius(t.Id, t.TreeStage)))
                 return "Leave room around resources and buildings.";
             float margin = IsZone(t.Kind) ? World.Footprint(t.Kind) - .05f : t.IsResource ? YardResourceRoom : World.Footprint(t.Kind) + .2f;

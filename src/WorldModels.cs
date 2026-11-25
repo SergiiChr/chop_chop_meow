@@ -212,7 +212,7 @@ public static class WorldModels {
         foreach (var kind in Kinds.All) {
             if (kind == ThingKind.Mine) continue;
             // Natural things and farm plots look different by id; buildings, crates and backpacks look the same.
-            int looks = kind == ThingKind.Acorn ? 1 : kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
+            int looks = kind is ThingKind.Acorn or ThingKind.Firebug ? 1 : kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
@@ -232,6 +232,8 @@ public static class WorldModels {
         Stage(Build(new Thing { Kind = ThingKind.Tree, TreeStage = 1 }).Root);
         foreach (var ore in Cliff.Ores) Stage(Build(new Thing { Kind = ThingKind.Mine, Pos = Cliff.Of(ore).MineSpot }).Root);
         Stage(new WolfModel().Root);
+        // The net's bag has a material of its own, seen from both sides, which no world model draws.
+        Stage(ActorRig.Tool("bug_net"));
         void Stage(Node3D root) { ModelKit.BuildShaders(root); root.Position = Vector3.Zero; stage.AddChild(root); }
         _ = BackpackShape.Details; _ = BackpackShape.Flap;
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
@@ -277,6 +279,8 @@ public static class WorldModels {
         ThingKind.Berries => new[] { new Hit(.65f, 0, 1) },
         ThingKind.Stump => new[] { new Hit(.4f, 0, .4f) },
         ThingKind.Bush => new[] { new Hit(.6f, 0, .6f) },
+        ThingKind.Nettle => [new Hit(.35f, 0, .8f)],
+        ThingKind.Firebug => [new Hit(.5f, FirebugShape.Height - .5f, FirebugShape.Height + .5f)],
         ThingKind.Water => new[] { new Hit(1.2f, 0, .5f) },
         ThingKind.Furnace => new[] { new Hit(.72f, 0, 1.15f) },
         ThingKind.Reinforced => new[] { new Hit(.95f, 0, 1.45f) },
@@ -311,6 +315,8 @@ public static class WorldModels {
             case ThingKind.Hole: prop = new Prop(); TreePlantingShape.Hole(prop.Body); break;
             case ThingKind.Stump: prop = Stump(t.OfTree != 0 ? t.OfTree : t.Id, t.TreeStage); break;
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
+            case ThingKind.Nettle: prop = new Prop(); Add(prop.Body, NettleShape.Plant(t.Id), NettleShape.Leaves, Vector3.Zero); break;
+            case ThingKind.Firebug: prop = FirebugShape.Build(); break;
             case ThingKind.Stone: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero); break;
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case ThingKind.Coal: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.CoalRock, Vector3.Zero); break;
@@ -392,7 +398,7 @@ public static class WorldModels {
         if (data.VesselFor(id) != null) return null;
         switch (ContainerItem.Base(id)) {
             case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
-            case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
+            case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer" or "bug_net": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);

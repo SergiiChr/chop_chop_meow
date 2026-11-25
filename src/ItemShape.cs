@@ -56,6 +56,11 @@ internal static class ItemShape {
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
         ["wheat_seeds"] = new(Seeds, Sacking, .36f, Rise: .8f),
         ["acorn"] = new(Acorn, Plain, .25f, Lay.Loose),
+        ["nettle"] = new(f => NettleSprig(f, "tall_a"), Plain, .5f, Lay.Rows, .5f, Piece: f => NettleSprig(f, "small_b", new Basis(Vector3.Right, Mathf.DegToRad(-60))),
+            Scan: NettleShape.Leaves),
+        ["nettle_rope"] = new(f => Baked(f, "rope_bundle_A", Swap(("ab9a89", RopeGreen)), folder: "nettle"), Plain, .5f, Lay.Rows, .8f, Piece: RopeBundle),
+        ["bug_net"] = Held("bug_net"),
+        ["firebug"] = new(f => Firebug(f, true), Glossy, .2f, Lay.Loose, .7f, Piece: f => Firebug(f, false)),
         ["fertilizer"] = new(f => Sack(f, "b89b66", "9a8052", null, ("4a3524", "6b5233")), Sacking, .36f, Rise: .8f),
         ["flour"] = new(f => Sack(f, "f2ece0", "d6cdbb", "8fa3b8", null), Sacking, .36f, Rise: .8f),
         ["dough"] = new(Dough, Plain, .36f, Lay.Loose, .8f),
@@ -240,11 +245,11 @@ internal static class ItemShape {
 
     /// <summary>
     /// A baked mesh's triangles, each in the colour <paramref name="recolour"/> gives for its own, the mesh stretched
-    /// by <paramref name="stretch"/> where one is given.
+    /// by <paramref name="stretch"/> where one is given. The mesh is in the food folder unless <paramref name="folder"/> names another.
     /// </summary>
-    private static void Baked(List<Face> faces, string name, Func<Color, Color> recolour, Vector3? stretch = null) {
+    private static void Baked(List<Face> faces, string name, Func<Color, Color> recolour, Vector3? stretch = null, string folder = "food") {
         int first = faces.Count;
-        Copy(faces, GD.Load<Mesh>($"res://assets/models/food/{name}.res"), new Transform3D(Basis.FromScale(stretch ?? Vector3.One), Vector3.Zero), Colors.White);
+        Copy(faces, GD.Load<Mesh>($"res://assets/models/{folder}/{name}.res"), new Transform3D(Basis.FromScale(stretch ?? Vector3.One), Vector3.Zero), Colors.White);
         for (int i = first; i < faces.Count; i++) faces[i] = faces[i] with { Tint = recolour(faces[i].Tint) };
     }
 
@@ -509,6 +514,59 @@ internal static class ItemShape {
             Vector3 narrow = along * .007f * size, wide = along * .017f * size;
             Quad(faces, knot - narrow, knot + narrow, shoulder + wide, shoulder - wide, Front + Vector3.Up, new Color(Ribbon));
             Quad(faces, shoulder - wide, shoulder + wide, end + wide, end - wide, Front, new Color(Ribbon).Darkened(.15f));
+        }
+    }
+
+    /// <summary>A scanned nettle sprig at the game's size, its leaves cut out of the sprigs' texture, standing or as <paramref name="pose"/> turns it.</summary>
+    private static void NettleSprig(List<Face> faces, string name, Basis? pose = null) =>
+        Copy(faces, NettleShape.Sprig(name), new Transform3D((pose ?? Basis.Identity) * Basis.FromScale(Vector3.One * NettleShape.Scale), Vector3.Zero), Colors.White, draped: true);
+
+    // Nettle fibre green, in a lighter and a darker strand.
+    private const string RopeGreen = "7c9a48", RopeShade = "66803a";
+
+    /// <summary>
+    /// A bundle of rope light enough to heap: two long loops, one on the other, bound round the middle.
+    /// The icon shows KayKit's rope bundle instead.
+    /// </summary>
+    private static void RopeBundle(List<Face> faces) {
+        const float half = .34f, bend = .13f, thick = .034f;
+        const int turns = 4;
+        for (int loop = 0; loop < 2; loop++) {
+            // Each loop runs down one side, round the end, back up the other and round again.
+            var path = new List<Vector3>();
+            float wide = bend * (loop == 0 ? 1 : .86f);
+            for (int end = 0; end < 2; end++)
+                for (int i = 0; i <= turns; i++) {
+                    float angle = (end - .5f) * MathF.PI + MathF.PI * i / turns;
+                    path.Add(new Vector3((end == 0 ? half : -half) + MathF.Cos(angle) * wide, thick + loop * thick * 1.5f, MathF.Sin(angle) * wide));
+                }
+            for (int i = 0; i < path.Count; i++) Bar(faces, path[i], path[(i + 1) % path.Count], thick, thick, 4, new Color(loop == 0 ? RopeGreen : RopeShade));
+        }
+        var across = new Transform3D(new Basis(Vector3.Forward, MathF.PI / 2), new Vector3(-.03f, thick * 1.7f, 0));
+        Lathe(faces, across, new Ring[] { (bend * 1.25f, 0, RopeShade), (bend * 1.25f, .07f, RopeGreen) }, 6, square: 0);
+    }
+
+    /// <summary>
+    /// A firebug lying along z, head toward +z: a dark head and wing covers over a tail that glows yellow-green.
+    /// With <paramref name="detail"/> it has feelers and six legs, which a heap leaves out.
+    /// </summary>
+    private static void Firebug(List<Face> faces, bool detail) {
+        // The body is turned about its length and pressed flat.
+        var lying = new Transform3D(new Basis(Vector3.Right, MathF.PI / 2) * Basis.FromScale(new Vector3(1, 1, .62f)), new Vector3(0, .06f, -.17f));
+        Lathe(faces, lying, [
+            (0, 0, "f4ffb8"), (.05f, .015f, "f4ffb8"), (.078f, .06f, "d6ff5a"), (.085f, .11f, "b6e63c"),
+            (.088f, .115f, "3a2a22"), (.092f, .2f, "46332a"), (.08f, .255f, "3a2a22"), (.062f, .262f, "8a3b24"),
+            (.058f, .3f, "9c452a"), (.04f, .31f, "2a1d18"), (.036f, .34f, "2a1d18"), (0, .352f, "1d1411")
+        ], detail ? 10 : 6, (row, side) => row is 4 or 5 && side % (detail ? 5 : 3) == 0 ? "2a1d18" : null);
+        if (!detail) return;
+        var dark = new Color("1d1411");
+        foreach (float side in new[] { -1f, 1f }) {
+            Bar(faces, new Vector3(side * .02f, .075f, .17f), new Vector3(side * .08f, .13f, .27f), .006f, .003f, 3, dark);
+            foreach (float z in new[] { .1f, .03f, -.04f }) {
+                var knee = new Vector3(side * .13f, .07f, z + .02f);
+                Bar(faces, new Vector3(side * .06f, .045f, z), knee, .007f, .006f, 3, dark);
+                Bar(faces, knee, new Vector3(side * .17f, 0, z - .02f), .006f, .003f, 3, dark);
+            }
         }
     }
 

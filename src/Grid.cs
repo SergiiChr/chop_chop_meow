@@ -102,7 +102,7 @@ public partial class PagePanel {
             if (wanted != null) cell.AddThemeColorOverride(ItemSlot.IconNormal, stack == null || takes ? Colors.White : Style.Faded);
             // A backpack stack bound to the hotbar has the selected hotbar slot's rim.
             cell.AddThemeStyleboxOverride("normal", takes || bound ? Style.SlotWanted : Style.SlotNormal);
-            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}\n{hint}" : "";
+            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}\n{hint}" : "";
         }
     }
 

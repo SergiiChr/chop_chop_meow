@@ -85,6 +85,10 @@ public sealed partial class GameData {
         [Barrel.Item] = new() { Name = "Steel barrel", Color = "657e92" },
         [Bucket.Item] = new() { Name = "Steel bucket", Color = "8a9ca5", Tool = Bucket.Item },
         ["crate"] = new() { Name = "Wood crate", Color = "c9a46e" },
+        ["nettle"] = new() { Name = "Nettle", Color = "5f8f3e", Description = "It stings but my grandma used to make ropes out of it." },
+        ["nettle_rope"] = new() { Name = "Nettle rope", Color = "b9b27a" },
+        ["bug_net"] = new() { Name = "Bug net", Color = "f4f6f6", Tool = "net", Description = "I can catch all kinds of bugs with this." },
+        ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Glows even after death." },
         ["coins"] = new() { Name = "Coins", Color = "e3b94a" },
     };
     public Dictionary<ThingKind, BuildingDef> Buildings { get; } = new() {
@@ -128,6 +132,8 @@ public sealed partial class GameData {
         [Water.Full] = new() { How = "Fill at the lake", From = new() { Water.Empty } },
         [Water.Liquid] = new() { How = "Pour from a water bottle", From = new() { Water.Full } },
         ["fertilizer"] = new() { How = "Compost pile", From = new() { "leaves", "grass" } },
+        ["nettle"] = new() { How = "Pick; more come up each night" },
+        ["firebug"] = new() { How = "Catch with a bug net after dark" },
         ["wheat"] = new() { How = "Farm plot", From = new() { "wheat_seeds" }, Also = new() { "fertilizer", Water.Liquid } },
     };
     public List<VesselDef> Vessels { get; } = new() {
@@ -141,6 +147,7 @@ public sealed partial class GameData {
         new() { Title = "Tin", Roots = new() { "tin_ore" } },
         new() { Title = "Food", Roots = new() { "berries", "raw_meat" } },
         new() { Title = "Farm", Roots = new() { "leaves", "grass", "wheat_seeds" } },
+        new() { Title = "Nettle and firebugs", Roots = new() { "nettle", "firebug" } },
         new() { Title = "Trade", Roots = new() { Inventory.Coins } },
     };
     public Dictionary<string, RecipeDef> Recipes { get; } = new() {
@@ -172,6 +179,8 @@ public sealed partial class GameData {
         ["steel_chisel"] = new() { Name = "Steel chisel", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 1, ["wood_parts"] = 1 }, Output = "steel_chisel", Amount = 1, Seconds = 10 },
         ["rake"] = new() { Name = "Rake", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 1, ["wood_parts"] = 2 }, Output = "rake", Amount = 1, Seconds = 10 },
         ["mortar"] = new() { Name = "Mortar and pestle", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = true, Tool = "chisel", Tier = 2, Inputs = new() { ["stone"] = 3 }, Output = "mortar", Amount = 1, Seconds = 10 },
+        ["nettle_rope"] = new() { Name = "Nettle rope", Group = RecipeGroup.Materials, Station = ThingKind.Bench, Hand = false, Tool = "hammer", MaxTier = 0, TooHard = "Steel hammer will damage the fibers.", Twists = true, Inputs = new() { ["nettle"] = 1 }, Output = "nettle_rope", Amount = 1, Seconds = 10 },
+        ["bug_net"] = new() { Name = "Bug net", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["nettle_rope"] = 5, ["wood"] = 1, ["wood_parts"] = 1 }, Output = "bug_net", Amount = 1, Seconds = 10 },
         ["bread"] = new() { Name = "Bake bread", Group = RecipeGroup.Food, Station = ThingKind.Furnace, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["dough"] = 1 }, Output = "bread", Amount = 4, Seconds = 8 },
         ["crushed_berries"] = new() { Name = "Crush berries", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Worked = true, Hand = true, Tool = "mortar", Inputs = new() { ["berries"] = 4 }, Output = "crushed_berries", Amount = 4, Seconds = 10 },
         ["flour"] = new() { Name = "Grind flour", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Worked = true, Hand = true, Tool = "mortar", Inputs = new() { ["wheat"] = 1 }, Output = "flour", Amount = 1, Seconds = 10 },
