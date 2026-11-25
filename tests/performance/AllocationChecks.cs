@@ -18,6 +18,7 @@ public static class AllocationChecks {
         Test(CheckWalkingAGravelPathAllocatesNothing, data);
         Test(PlumbingAllocationChecks.CheckPumpingIntoTwoBarrelsStaysWithinAllocationBudget, data);
         Test(CheckAWorkingSettlementStaysWithinItsBudget, data);
+        Test(GlassJarChecks.CheckAWorkingGlassCrewAllocatesNothing, data);
         Test(CheckAChestHaulerWithNothingToCarryAllocatesNothing, data);
         Test(CheckIdleWorkersSittingAtACampfireAllocateNothing, data);
         Test(CheckAWorkerHoldingALoadNothingTakesAllocatesNothing, data);

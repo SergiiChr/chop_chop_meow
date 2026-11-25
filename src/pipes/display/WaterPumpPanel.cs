@@ -16,7 +16,7 @@ public partial class WaterPumpPanel(PageTools tools, Thing subject) : ThingPage(
         column.AddChild(Style.Heading("Pressure", 20));
         var row = new HBoxContainer();
         column.AddChild(row);
-        var handle = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before pumping."); else panel.Player.UseWaterPump(thing); });
+        var handle = kit.Button("Pump", () => panel.Player.UsePump(thing));
         handle.Name = "pump"; handle.TooltipText = "Pump the handle · Space";
         Style.SkinPill(handle, Style.Sage);
         row.AddChild(handle);

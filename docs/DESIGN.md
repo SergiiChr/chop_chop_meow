@@ -36,6 +36,10 @@ These came from the user; change them only after asking.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
+- **Glass jars:** need 5 sand, coal fuel, one steel pipe fitted to the reinforced furnace, and two operators.
+  Keep the furnace at 1,300–1,600 °C for 10 seconds.
+  Cold pauses the batch.
+  More than half a second continuously above range melts the batch off the pipe.
 - **Plumbing:** Pumps draw from the freshwater shallows. Each connected pipe holds one liter, including standing water
   after the pressure falls. Buildings with ten steel pipes in their Plumbing slot share water according to demand.
 - **Building orientation:** Plans turn in quarter turns during placement. A mine faces the cliff it fits.
@@ -102,6 +106,7 @@ Simulation and data:
 | `src/buildings/model/Removal.cs` | A removal target: a building, gravel path tile or steel pipe tile |
 | `src/paths/GravelPaths.cs` | Gravel path tiles: where one may go, laying and taking one up, and how much faster walkers are on gravel |
 | `src/paths/WalkSearch.cs` | Finds routes around water and building footprints |
+| `src/glass/GlassBlowing.cs` | Glass batches, worker readiness, temperature, and melting |
 | `src/pipes/SteelPipes.cs` | Steel pipe tiles beneath the surface, their shapes, rotations and shared connections |
 | `src/pipes/model/PipeShape.cs`, `src/pipes/model/PipeTile.cs` | Straight, tee and cross shapes, and tile rotation |
 | `src/pipes/Plumbing.cs` | Connected pipes, standing water and how buildings share and store the supply |
@@ -229,6 +234,7 @@ UI and input:
 | `src/menus/ControlsList.cs` | Key caps and actions on the shared Controls screen |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
 | `src/actors/player/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, the remove selector, clicking things and using Space, and `ClickMode`, what the next click does |
+| `src/actors/player/InteractionApproach.cs` | The player's cancellable walk to a selected thing before using it once |
 | `src/actors/player/WalkKeys.cs` | The movement keys and Shift held by code that plays the player: the performance run and the firebug chase |
 | `src/ui/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
@@ -255,6 +261,8 @@ Rendering and sound:
 | `src/water/model/ShoreLook.cs`, `src/water/model/WaterBody.cs` | The shore photoscans' looks, and the sea's and the lake's waves and colours |
 | `src/paint_filter/display/PaintFilter.cs` | The paint filter over the drawn world ([assets/environment/paint_filter](../assets/environment/paint_filter/README.md)) |
 | `src/WorldModels.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
+| `src/glass/display/GlassBlowingView.cs` | The glass blowing pipe, its grip and aim, and the molten glass and finished jar in motion |
+| `src/glass/display/GlassJarShape.cs` | Open glass jar meshes and translucent finish for the icon, hands, and heaps |
 | `src/actors/display/ActorRig.cs`, `src/actors/display/HumanShape.cs` | The person model, its joints and the shapes of its body (see [assets/README.md](../assets/README.md)) |
 | `src/actors/display/Outfit.cs`, `src/actors/display/BodyBuild.cs` | The colours a person is drawn in, and the game's and the slim build of a body |
 | `src/actors/display/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
@@ -1177,7 +1185,7 @@ It hammers a steel bar into a steel part or two steel sheets, and a tin bar into
 The containers are made of sheets.
 A smith stays with a running batch and fetches the next load once it is done.
 
-#### Furnaces and steel
+#### Furnaces, steel and glass
 
 The stone furnace smelts ore over coal or charcoal, and cooks and makes charcoal over wood, coal or charcoal.
 The reinforced furnace (`reinforced`) burns coal only.
@@ -1186,6 +1194,21 @@ Steel recipes consume iron bars and coal.
 Steel only progresses while the heat is at or above the clear bar (`World.SteelHeat`, shown as 1450 °C through `World.Celsius`).
 A batch below it pauses, keeps burning one coal from its fuel slot per batch length while cold, and resumes when reheated, with no failure.
 Once an active crew has the forge hot, it never falls below the bar while they are on duty.
+A manual bellows stroke adds 145 °C for either recipe.
+Space or Pump on a selected furnace routes the player to its bellows when out of reach, then presses once.
+`InteractionApproach` walks to the working spot and calls the requested action once, here and at a water pump.
+Movement input or a change of selection cancels the walk.
+
+`GlassBlowing` runs a glass batch in the same station slots.
+The Glass blowing pipe slot accepts exactly one steel pipe, which stays stackable outside the slot.
+One player or worker works from each end of the furnace.
+The glass blower faces the furnace and aims the pipe at the glowing center of the chamber.
+At the rear a player pumps manually or a worker keeps the heat near 1,450 °C.
+No progress is made with either operator missing or outside the working range.
+A cooldown below 1,300 °C does not spend another coal.
+After more than half a second above 1,600 °C, a batch loses the sand and coal it already spent, keeps the pipe and retries with fresh materials when the furnace is ready.
+The server sends the glass blower's id, overheat time and batch result to each view.
+The view uses those values to pose the hands and mouth, set the jar on success or drop the molten glass on failure.
 
 ### Taking buildings down
 
@@ -1265,6 +1288,7 @@ A dotted guide marks a connection still to be made.
 A pump or a building in `Plumbing.HasPlumbing` attaches to the pipe under its center.
 The building's Plumbing slot accepts ten steel pipes to install its plumbing.
 Explored ground remembers the building's visible plumbing when it leaves sight.
+Space or Pump on a selected water pump walks the player to the bank-side handle if needed, then presses once.
 A worker finishes a round at the end of each pump stroke, then checks whether a higher-priority job is ready.
 A pump stroke holds pressure while the handle moves.
 Once it stops, pressure falls by ten percentage points per second.
@@ -1493,7 +1517,9 @@ With none known they say so once, carry off what they hold and go on to their ot
 A worker with no duties sits at the nearest campfire, or with none waits at the nearest trading post.
 
 Only one worker ever pumps a reinforced furnace: the bellows job has nothing to do while another worker has it in hand (`World.Pump`).
-It also has nothing to do while the furnace neither smelts nor holds a batch to smelt, so a worker with both jobs hauls then.
+It also has nothing to do while the furnace neither works nor holds a batch to make, so a worker with both jobs hauls then.
+A worker on Glass blower goes to the front only for the glass recipe, and leaves the pipe to a player standing there.
+A glass worker who stops says what is missing or what is in the way.
 
 #### Worker tools
 

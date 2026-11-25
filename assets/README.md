@@ -1,6 +1,6 @@
 # Assets
 
-The world uses low-poly 3D models, with baked meshes for trees, berry bushes, the dug hole and four foods.
+The world uses low-poly 3D models, with baked meshes for trees, berry bushes, the dug hole, four foods and the glass jar.
 There are no world or character sprite sheets.
 The only 2D images are interface icons.
 
@@ -91,6 +91,10 @@ Models are assembled from code-built or baked Godot meshes.
     corner bent up), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the
     jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a
     ribbon, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
+  - The open glass jar shares its translucent material across the icon, heap and glassblowing pose.
+    The heap uses a lighter mesh with the same proportions and open rim.
+    The mesh comes from NVIDIA SimReady via Patch. See [glass jar credits](models/glass_jar/README.md)
+    and the [glassblowing pose and prop reference](../docs/art/glassblowing-reference.md).
   - Baked from Kenney's Food Kit and recoloured to the game's palette: bread (the round loaf), raw meat (the ham on the bone), burnt steak (the cooked steak, charred) and the bowls of meat stew and crushed berries (the bowl of soup). `tools/food_models.py` bakes them into `models/food/`; see [food/README.md](models/food/README.md).
   - Light copies of models the world already shows, for heaps alone, since their icons come from those models: the hand tools and the torch with their cylinders redrawn on six sides, the rake, the mortar turned on fewer sides, the cargo crate, the bottle lying on its back, a single berry, a log, a board, one boulder of the world's stones, one lump of its loose ore and coal, one charcoal briquette, and six cast bars stacked three across three.
   - Each good says how its heap is laid (`Lay`): neat grids for boxes, sacks, jars and six-packs; rows for logs, boards, tools and bottles, which lie the same way; loose and turned any way for stone, ore, coal, charcoal, berries, bread, meat and parts; and one mound that swells for leaves, sand, gravel and compost.

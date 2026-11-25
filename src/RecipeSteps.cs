@@ -21,7 +21,7 @@ public partial class Game {
     private async Task<Thing> OpenStationFor(RecipeDef r) {
         await CloseWithEsc();
         EmptyBackpack(Hosted);
-        if (r.Tool != "") Give(Hosted, world.Data.PlainestTool(r.Tool, r.Tier));
+        if (r.Tool != "") Give(Hosted, world.Data.PlainestTool(r.Tool, r.Tier, r.Station));
         var station = Hosted.Add(r.Station!.Value, world.Player + new Vector2(1, 0));
         await ClickOn(station); await Frames(3);
         if (station.Kind == ThingKind.Reinforced) {
@@ -64,7 +64,7 @@ public partial class Game {
     /// </summary>
     private async Task ExpectStartsForTheHardHat(Thing station, string recipe, RecipeDef r, string how) {
         if (!Hosted.Worked(station)) { await ExpectStarts(station, recipe, how); return; }
-        if (r.Tool != "") Require(Hosted.SlotTool(station, world.Data.PlainestTool(r.Tool, r.Tier)), $"The {r.Tool} {recipe} takes should fit the station's slot.");
+        if (r.Tool != "") Require(Hosted.SlotTool(station, world.Data.PlainestTool(r.Tool, r.Tier, station.Kind)), $"The {r.Tool} {recipe} takes should fit the station's slot.");
         var crafter = AddWorker(Hosted, station.Pos + new Vector2(0, 1.2f)); Hosted.Assign(crafter, station);
         await ExpectStarts(station, recipe, $"{how}, with a worker at it");
         Hosted.Fire(crafter);

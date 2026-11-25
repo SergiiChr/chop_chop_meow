@@ -1,8 +1,9 @@
 namespace ChopChopMeow;
 
 /// <summary>
-/// What one of a station's tool slots takes: a tool of <see cref="Tool"/>'s kind at <see cref="Tier"/> or better.
+/// What a station's tool slot takes: a named <see cref="Item"/>, or a tool of its kind at its tier or better.
 /// </summary>
-public readonly record struct ToolSlotRule(string Tool, int Tier = 0) {
-    public bool Takes(ItemDef tool) => tool.Tool == Tool && tool.Tier >= Tier;
+public readonly record struct ToolSlotRule(string Tool, int Tier = 0, string? Item = null) {
+    public bool Matches(string id, ItemDef tool) => Item is string item ? item == id : tool.Tool == Tool;
+    public bool Takes(string id, ItemDef tool) => Matches(id, tool) && (Item != null || tool.Tier >= Tier);
 }

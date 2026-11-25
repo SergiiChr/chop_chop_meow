@@ -49,7 +49,11 @@ public static class ProgressionChecks {
             // Seeds are bought with berry money to start the first plot.
             if (built.Contains(ThingKind.Farm) && data.Farm.Sow.Keys.All(id => have.Contains(id) || data.Market.Buys.ContainsKey(id))) foreach (var item in data.Farm.Yield.Keys) grew |= have.Add(item);
             foreach (var r in data.Recipes.Values) {
-                bool where = r.Hand && (r.Tool == "" || have.Any(id => r.MadeWith(data.Items[id]))) || r.Station is ThingKind station && built.Contains(station) && (data.Buildings[station].ToolSlots.Length == 0 || r.Tool == "" || have.Any(id => r.MadeWith(data.Items[id])));
+                bool hasTool = r.Tool == "" || have.Any(id => r.MadeWith(data.Items[id]));
+                bool byHand = r.Hand && hasTool;
+                bool atStation = r.Station is ThingKind station && built.Contains(station)
+                    && (data.FixedTool(station, r.Tool) is string item ? have.Contains(item) : data.Buildings[station].ToolSlots.Length == 0 || hasTool);
+                bool where = byHand || atStation;
                 if (where && r.Inputs.Keys.All(have.Contains)) grew |= have.Add(r.Output);
             }
         }

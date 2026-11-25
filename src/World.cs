@@ -54,6 +54,13 @@ public sealed class Thing {
     /// <summary>Units of work finished here since the world loaded: batches made, pieces mined, harvests and building stages; a worker reads their job list again after each.</summary>
     [JsonIgnore] public int Rounds { get; set; }
     public float Heat { get; set; }
+    /// <summary>The actor holding the glass blowing pipe, a player by positive id or a worker by negative id.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int GlassBlower { get; set; }
+    /// <summary>How long glass on the pipe has stayed above its working range without cooling.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float GlassOverheat { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public GlassResult GlassResult { get; set; }
+    /// <summary>Time left in the end of the blowing action, after finishing or losing the batch.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float GlassResultLeft { get; set; }
     /// <summary>Pressure built up at a water pump, from empty at zero to full at 100.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Pressure { get; set; }
     /// <summary>Water the pump can supply at its current pressure, in liters per second.</summary>
@@ -162,7 +169,7 @@ public sealed class QueueJson : JsonConverter<List<Queued>> {
         writer.WriteEndArray();
     }
 }
-public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting, Digging, Underground, Perching }
+public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting, Digging, Underground, Perching, Blowing }
 
 public sealed class Worker : IWalker {
     public int Id { get; set; }
@@ -266,7 +273,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 20;
+    public int Version { get; set; } = 21;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -362,6 +369,8 @@ public sealed partial class World {
     public const float SteelHeat = 80;
     /// <summary>Heat as degrees Celsius for display: the steel line sits where steel forms, 1450 °C.</summary>
     public static int Celsius(float heat) => (int)MathF.Round(heat * 1450 / SteelHeat / 10) * 10;
+    /// <summary>Degrees Celsius converted to the furnace's internal heat scale without display rounding.</summary>
+    internal static float FurnaceHeat(float celsius) => celsius * SteelHeat / 1450;
     private float gatherClock { get => S.Actor.GatherClock; set => S.Actor.GatherClock = value; }
     private float attackClock { get => S.Actor.AttackClock; set => S.Actor.AttackClock = value; }
     private bool asleep;
@@ -369,6 +378,7 @@ public sealed partial class World {
     private readonly HashSet<int> stillBurning = new();
     // Set by walking, gathering or pumping and cleared at the end of each tick: a busy player is not hammering.
     private bool playerBusy { get => S.Actor.Busy; set => S.Actor.Busy = value; }
+    private readonly GlassBlowing glassBlowing;
     public World(GameData data, bool generate = true) {
         Data = data;
         Doorways = new Doorways(this); DoorTug = new DoorTug(this); DoorCheck = new DoorCheck(this); WolfBodies = new WolfBodies(this);
@@ -382,7 +392,7 @@ public sealed partial class World {
         Nettles = new Nettles(this);
         Firebugs = new Firebugs(this); Replaced += Firebugs.Reset;
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
-        Goals = new Goals(this);
+        Goals = new Goals(this); glassBlowing = new GlassBlowing(this);
         breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
@@ -870,7 +880,8 @@ public sealed partial class World {
     public const float WorkReach = 1;
     /// <summary>Whether the player stands within <see cref="WorkReach"/> of a station's edge.</summary>
     public bool AtStation(Thing t) => Near(t, Footprint(t.Kind) + WorkReach)
-        || t.Kind == ThingKind.Pump && Near(t, WorkReach, t.ToWorld(BellowsStand));
+        || t.Kind == ThingKind.Pump && Near(t, WorkReach, t.ToWorld(BellowsStand))
+        || t.Kind == ThingKind.Reinforced && GlassBlowing.AtPump(this, t);
     /// <summary>Stations that can need someone working at them.</summary>
     public static bool Worked(ThingKind kind) => kind is ThingKind.Anvil or ThingKind.Bench or ThingKind.Cooktable or ThingKind.Packer;
     public static readonly ThingKind[] WorkedKinds = Array.FindAll(Kinds.All, Worked);
@@ -909,9 +920,10 @@ public sealed partial class World {
     }
     public void Pump(Thing t) {
         if (t.Kind is not (ThingKind.Reinforced or ThingKind.Pump) || !AtStation(t) || Busy() || Forwarded(Verb.Pump, t.Id)) return;
+        if (GlassBlowing.IsRecipe(t) && !GlassBlowing.AtPump(this, t)) { Say("Stand behind the furnace to pump the bellows."); return; }
         playerBusy = true;
         if (t.Kind == ThingKind.Pump) WaterPumps.Stroke(t);
-        else t.Heat = Math.Min(100, t.Heat + 24);
+        else t.Heat = Math.Min(100, t.Heat + FurnaceHeat(145));
         PlayerActed?.Invoke(ActorAction.Pump, t.Pos);
     }
     public void FuelFire(Thing t) {
@@ -1784,9 +1796,13 @@ public sealed partial class World {
     /// <summary>The tool slots a station has, each with the tool it takes; none for anything that is not a building.</summary>
     public ToolSlotRule[] SlotRules(ThingKind kind) => Data.Buildings.TryGetValue(kind, out var building) ? building.ToolSlots : [];
     /// <summary>The tool of a kind slotted in a station, or null when its slot is empty or holds a tool below <paramref name="tier"/>.</summary>
-    public string? BenchTool(Thing bench, string tool, int tier = 0) => bench.Tools == null ? null : BestTool(tool, bench.Tools, tier);
+    public string? BenchTool(Thing bench, string tool, int tier = 0, int maxTier = int.MaxValue) {
+        if (bench.Tools == null) return null;
+        return Data.FixedTool(bench.Kind, tool) is string item ? (bench.Tools[item] == 1 ? item : null)
+            : BestTool(tool, bench.Tools, tier, requireFree: false, maxTier);
+    }
     /// <summary>The tool slotted in a station that a recipe can be made with, or null.</summary>
-    public string? BenchTool(Thing bench, RecipeDef r) => bench.Tools == null ? null : BestTool(r, bench.Tools);
+    public string? BenchTool(Thing bench, RecipeDef r) => BenchTool(bench, r.Tool, r.Tier, r.MaxTier);
     /// <summary>
     /// Why a station's tool slots will not take an item: no slot takes it, or the slot that does already holds a tool;
     /// null when it goes in.
@@ -1794,10 +1810,16 @@ public sealed partial class World {
     public string? SlotBlock(Thing station, string item) {
         var def = Data.Items.GetValueOrDefault(item);
         var slots = SlotRules(station.Kind);
-        int at = def == null ? -1 : Array.FindIndex(slots, slot => slot.Takes(def));
-        if (at < 0) return $"The {Lower(Data.Name(station.Kind))} has slots for {Listed(slots.Select(slot => A(Data.ToolName(slot.Tool, slot.Tier))).ToList(), "and")}.";
+        int at = def == null ? -1 : Array.FindIndex(slots, slot => slot.Takes(item, def));
+        if (at < 0) {
+            if (slots is [{ Item: string accepted } fixedSlot])
+                return $"The {fixedSlot.Tool} slot takes {A(Lower(Data.Name(accepted)))}.";
+            return $"The {Lower(Data.Name(station.Kind))} has slots for {Listed(slots.Select(slot => A(Data.ToolName(slot.Tool, slot.Tier))).ToList(), "and")}.";
+        }
         string tool = slots[at].Tool;
-        return BenchTool(station, tool) != null ? $"The {tool} slot is taken. Take that {tool} out first." : null;
+        if (BenchTool(station, tool) == null) return null;
+        string fitted = slots[at].Item == null ? tool : Lower(Data.Name(item));
+        return $"The {tool} slot is taken. Take that {fitted} out first.";
     }
     /// <summary>
     /// Puts a tool from the backpack into the station's empty slot for its kind, when <see cref="SlotBlock"/> allows it.
@@ -1805,7 +1827,7 @@ public sealed partial class World {
     /// </summary>
     public bool SlotTool(Thing bench, string item) {
         if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {Lower(Data.Name(bench.Kind))}."); return false; }
-        if (Data.Items.GetValueOrDefault(item) is ItemDef def && Array.Exists(SlotRules(bench.Kind), slot => slot.Tool == def.Tool && !slot.Takes(def))) return false;
+        if (Data.Items.GetValueOrDefault(item) is ItemDef def && Array.Exists(SlotRules(bench.Kind), slot => slot.Matches(item, def) && !slot.Takes(item, def))) return false;
         if (SlotBlock(bench, item) is string block) { Say(block); return false; }
         if (Busy() || Forwarded(Verb.SlotTool, bench.Id, item: item)) return false;
         return S.Backpack.TransferTo(bench.Tools, item, 1) == 1;
@@ -2408,7 +2430,7 @@ public sealed partial class World {
         // Once a working crew has the forge hot, they keep it at or above the clear bar between strokes.
         // A crew that is striking or stuck on a blocked path is not working, so the forge cools.
         // So is a crew that has signed out or is at lunch.
-        foreach (var t in S.Things.Of(ThingKind.Reinforced)) t.Heat = Math.Max(Crewed(t) && t.Heat >= SteelHeat ? SteelHeat : 0, t.Heat - dt * 3.2f);
+        foreach (var t in S.Things.Of(ThingKind.Reinforced)) t.Heat = Math.Max(!GlassBlowing.IsRecipe(t) && Crewed(t) && t.Heat >= SteelHeat ? SteelHeat : 0, t.Heat - dt * 3.2f);
         foreach (var kind in stationKinds) foreach (var t in Ticking(kind)) StationTick(t, dt);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) CraftTick(dt);
@@ -2448,21 +2470,17 @@ public sealed partial class World {
     }
     /// <summary>Starts, fuels and finishes the batches of a station's recipe.</summary>
     private void StationTick(Thing t, float dt) {
-        if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) return;
         bool wasBurning = stillBurning.Remove(t.Id);
+        if (t.GlassResult != GlassResult.None && glassBlowing.Resolve(t, dt)) return;
+        if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) return;
+        if (GlassBlowing.IsRecipe(t)) { glassBlowing.Tick(t, recipe, dt, wasBurning); return; }
         bool hot = t.Kind != ThingKind.Reinforced || t.Heat >= SteelHeat;
         bool atAnvil = !Worked(t) || Hammered(t);
         // A recipe at a station with tool slots needs its tool slotted or carried by a player working a queued batch there, and the tool's speed sets the pace.
         string? tool = atAnvil ? StationTool(t, recipe) : null;
         if (t.Tools != null && recipe.Tool != "" && tool == null) atAnvil = false;
         float rate = WorkRate(t.Kind, tool);
-        if (!t.Processing && hot && atAnvil && Stocked(t)) {
-            // The next batch is a queued one while batches wait.
-            t.Inventory.Spend(BatchCost(t)); t.Making = t.Recipe; t.Batch = t.Batches > 0 ? BatchFor.Queue : BatchFor.Mark; t.Progress = 0;
-            if (t.Batches > 0) t.Batches--;
-            if (FuelOf(t) is string fuel) t.Burner!.Remove(fuel, 1);
-            if (recipe.Burns && !wasBurning) Play("start_fire", t.Pos);
-        }
+        if (!t.Processing && hot && atAnvil && Stocked(t)) StartStationBatch(t, recipe, wasBurning);
         if (t.Processing && !hot) {
             // A cold forge mid-batch keeps burning coal from its slot at the batch fuel rate, but the steel waits for heat.
             // Burn is the campfire's fuel clock, reused here to time the next coal.
@@ -2471,14 +2489,21 @@ public sealed partial class World {
         }
         if (t.Processing && hot && atAnvil) {
             t.Progress = Math.Min(recipe.Seconds, t.Progress + dt * rate);
-            if (t.Progress >= recipe.Seconds) {
-                // Manual loading or another hauler can fill the station while a batch cooks.
-                // Retain the completed batch until the one-stack output slot has room rather than discarding output.
-                if (t.Inventory.SlotRoom(recipe.Output) < recipe.Amount) return;
-                t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Making = ""; t.Progress = 0; t.Rounds++; stillBurning.Add(t.Id);
-                S.Milestones.Add(recipe.Output);
-            }
+            if (t.Progress >= recipe.Seconds) FinishStationBatch(t, recipe);
         }
+    }
+    /// <summary>Spends one station batch's ingredients and fuel and starts it for the queue while batches wait.</summary>
+    internal void StartStationBatch(Thing t, RecipeDef recipe, bool wasBurning) {
+        t.Inventory.Spend(BatchCost(t)); t.Making = t.Recipe; t.Batch = t.Batches > 0 ? BatchFor.Queue : BatchFor.Mark; t.Progress = 0;
+        if (t.Batches > 0) t.Batches--;
+        if (FuelOf(t) is string fuel) t.Burner!.Remove(fuel, 1);
+        if (recipe.Burns && !wasBurning) Play("start_fire", t.Pos);
+    }
+    /// <summary>Moves a finished batch into its output slot once there is room.</summary>
+    internal void FinishStationBatch(Thing t, RecipeDef recipe) {
+        if (t.Inventory.SlotRoom(recipe.Output) < recipe.Amount) return;
+        t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Making = ""; t.Progress = 0; t.Rounds++; stillBurning.Add(t.Id);
+        S.Milestones.Add(recipe.Output);
     }
     private List<Thing> Ticking(ThingKind kind) {
         ticking.Clear();
@@ -2606,7 +2631,7 @@ public sealed partial class World {
             if (!(t.Pressure >= 0 && t.Pressure <= 100 && t.PumpStrokeLeft >= 0 && t.PumpStrokeLeft <= WaterPumps.StrokeSeconds)
                 || t.Kind != ThingKind.Pump && (t.Pressure != 0 || t.PumpStrokeLeft != 0)) return false;
             if (t.Kind == ThingKind.Hole && !GroundHoles.Valid(t)) return false;
-            if (!Plumbing.ValidReceiver(t)) return false;
+            if (!Plumbing.ValidReceiver(t) || !GlassBlowing.Valid(t)) return false;
             if (t.Kind == ThingKind.Hut && (t.Inventory.Slots != 1 || t.Inventory.StackSize != 1 || t.Inventory.Count > 1
                 || t.Inventory.Count == 1 && Barrel.In(t.Inventory) == null)) return false;
             // A building has the boxes its kind is made with.
