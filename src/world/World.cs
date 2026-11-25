@@ -1844,10 +1844,10 @@ public sealed partial class World {
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
         S.Workers.Add(w); Play("hire_sign", sign.Pos); Say($"New worker {name} is ready for a job."); Made?.Invoke(S.Actor.Id, w.Id); return w;
     }
-    /// <summary>Workers with any job at a place.</summary>
-    public int Crew(Thing t) {
+    /// <summary>Counts workers assigned to a particular job at a place.</summary>
+    private int Crew(Thing t, JobKind job) {
         int crew = 0;
-        foreach (var w in S.Workers) if (HasDuty(w, t.Id)) crew++;
+        foreach (var w in S.Workers) if (HasDuty(w, t.Id, job)) crew++;
         return crew;
     }
     /// <summary>The place a worker's job is at: the place itself, or for a gather job whose spot is gone, a stand-in of its kind.</summary>

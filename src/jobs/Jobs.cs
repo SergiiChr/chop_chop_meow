@@ -165,7 +165,7 @@ public sealed partial class World {
 
     /// <summary>Puts a worker on every job at one place, instead of whatever they did before, or takes all their jobs away.</summary>
     public void Assign(Worker w, Thing? target) {
-        if (target != null && (TreePlanting.IsYoung(target) || NoRoomAt(w, target))) return;
+        if (target != null && (TreePlanting.IsYoung(target) || NoMiningRoom(w, target))) return;
         if (Busy() || Forwarded(Verb.Assign, target?.Id ?? 0, w.Id)) return;
         w.Jobs.Clear(); ListChanged(w);
         if (target != null) foreach (var job in Jobs(target)) GiveDuty(w, target, job);
@@ -175,7 +175,7 @@ public sealed partial class World {
     /// <summary>Gives a worker one job at a place, at the end of their list, or takes it away wherever it is, keeping their other jobs.</summary>
     public void SetDuty(Worker w, Thing target, JobKind job, bool on) {
         if (on == HasDuty(w, target.Id, job) || on && Array.IndexOf(Jobs(target), job) < 0) return;
-        if (on && NoRoomAt(w, target)) return;
+        if (on && job == JobKind.Mine && NoMiningRoom(w, target)) return;
         if (Busy() || Forwarded(Verb.Duty, target.Id, w.Id, job.Id(), on ? 1 : 0)) return;
         if (on) GiveDuty(w, target, job);
         else {
@@ -187,10 +187,10 @@ public sealed partial class World {
         if (first || !on && w.Assignment == target.Id && !HasDuty(w, target.Id)) Started(w, Find(FirstPlace(w)));
     }
 
-    /// <summary>Whether a place is a mine with a full crew that the worker is not in, which the player is told.</summary>
-    private bool NoRoomAt(Worker w, Thing place) {
-        if (place.Kind != ThingKind.Mine || HasDuty(w, place.Id) || Crew(place) < Data.Mine.Workers) return false;
-        Say($"A mine has room for {Data.Mine.Workers} workers.");
+    /// <summary>Whether all mining jobs at this place are taken and this worker does not have one.</summary>
+    private bool NoMiningRoom(Worker w, Thing place) {
+        if (place.Kind != ThingKind.Mine || HasDuty(w, place.Id, JobKind.Mine) || Crew(place, JobKind.Mine) < Data.Mine.Workers) return false;
+        Say($"This mine already has {Data.Mine.Workers} miners.");
         return true;
     }
 

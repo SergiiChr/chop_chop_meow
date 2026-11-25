@@ -92,7 +92,7 @@ Simulation and data:
 
 | File | Owns |
 | --- | --- |
-| `src/World.cs` | The `World` simulation and `SaveState` |
+| `src/world/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
 | `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
@@ -128,7 +128,7 @@ Simulation and data:
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/packing/Packing.cs` | Packing stations |
-| `src/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
+| `src/jobs/Jobs.cs` | The jobs and their table, a worker's job list with its haul groups, and adding, moving and grouping its entries |
 | `src/WorkerJobs.cs` | A worker's job list read top down, the round each job is done for, deliveries, and the bellows and fire jobs |
 | `src/jobs/hauling/Hauling.cs`, `src/jobs/hauling/Carry.cs` | The Haul job: the best carry across a haul job's places, the carry in hand and what a hauler says |
 | `src/jobs/hauling/PlaceHaul.cs` | The part of the Haul job each kind of place extends, and the four haul rules its carries come under |
@@ -941,6 +941,7 @@ A shovel highlights the dry beach square it points at.
 The held dig uses the same reach and work as digging a planting hole.
 The server checks for dry sand and room for all 10 units of sand before starting and finishing.
 A completed dig strips a one-meter square.
+Digging it again before it refills says "No more sand left."
 A rounded rim and sloping walls show the depth of the cut, with the compost pile's soil texture at its bottom.
 Cuts that share an edge join across a continuous floor. The remaining rim rounds turns in either direction.
 Gravel laid over a cut hides it until taken up. The tide still refills the cut while it is covered.
@@ -1582,7 +1583,8 @@ The two worker stages take `StageWorkdays` of `GameData.WorkdaySeconds`.
 The player holding a gather on the mine (`World.Gather`, standing at `Mines.WorkSpot`) adds to the same progress with a pickaxe or hammer carried (`Mines.Work`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
 
-Up to `Mine.Workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).
+Up to `Mine.Workers` workers can be assigned to `JobKind.Mine`. Build and Haul jobs do not count toward this limit.
+Miners work underground (`WorkerWorkState.Underground`, hidden by the view).
 Each adds one ore and one stone to the mine's two-slot `Thing.Output` every `Mine.Seconds`.
 Mining stops while either slot holds a full stack.
 A miner then carries a load of it to the nearest place that takes it (`Mines.Mine`), and with none the mine reports once that it is full and the mine job has nothing to do.

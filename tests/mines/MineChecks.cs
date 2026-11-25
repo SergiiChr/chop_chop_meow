@@ -19,6 +19,7 @@ public static class MineChecks {
         Test(CheckWorkerTakesTheFreeHammerFromTheRack, data);
         Test(CheckPlayerDigsAndFitsAMineWithTheirTools, data);
         Test(CheckPlayerDeliversOnlyWhatAMineStillNeeds, data);
+        Test(CheckHaulAndBuildDoNotUseMiningSlots, data);
         Test(CheckMinersBringOreOutAndStopWhenOutputIsFull, data);
         Test(CheckOnlyAvailableMinersUnload, data);
         Test(CheckAMinerFetchesNoPickaxeForAFullMineWithNowhereToUnload, data);
@@ -163,6 +164,35 @@ public static class MineChecks {
         Require(other.Inventory["stone"] == 10,
             "delivering from the backpack must hand over only the stone the mine still needs");
         Require(world.Backpack["wood"] == 10, "delivering from the backpack must leave the spare wood with the player");
+    }
+
+    private static void CheckHaulAndBuildDoNotUseMiningSlots(GameData data) {
+        var world = FundedWorld(data);
+        var mine = MarkMine(world);
+        mine.MineStage = MineStage.Dug;
+        var cliff = Cliff.Nearest(mine.Pos);
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3));
+        chest.Inventory.Add("wood", 12);
+        var miners = Enumerable.Range(0, 3).Select(_ => AddWorker(world, chest.Pos + cliff.Along)).ToArray();
+        var hauler = AddWorker(world, chest.Pos);
+        var builder = AddWorker(world, chest.Pos);
+        world.SetDuty(hauler, mine, JobKind.Haul, true);
+        foreach (var miner in miners) world.SetDuty(miner, mine, JobKind.Mine, true);
+        Require(miners.All(w => World.HasDuty(w, mine.Id, JobKind.Mine)), "a hauler must leave all three mining slots free");
+
+        world.SetDuty(builder, mine, JobKind.Build, true);
+        world.SetDuty(builder, mine, JobKind.Haul, true);
+        Require(World.HasDuty(builder, mine.Id, JobKind.Build) && World.HasDuty(builder, mine.Id, JobKind.Haul),
+            "a full mining crew must not stop another worker from building or hauling");
+        world.SetDuty(hauler, mine, JobKind.Mine, true);
+        Require(!World.HasDuty(hauler, mine.Id, JobKind.Mine), "a haul job must not let a fourth worker take a mining slot");
+
+        Work(world, 30, () => mine.Inventory["wood"] == 12);
+        Require(mine.Inventory["wood"] == 12, "haulers must still deliver materials when the mining crew is full");
+
+        world.SetDuty(miners[0], mine, JobKind.Mine, false);
+        world.SetDuty(hauler, mine, JobKind.Mine, true);
+        Require(World.HasDuty(hauler, mine.Id, JobKind.Mine), "a hauler can also mine once a mining slot is free");
     }
 
     private static void CheckMinersBringOreOutAndStopWhenOutputIsFull(GameData data) {

@@ -1112,7 +1112,8 @@ The entrance is dug at the rock face beside the cave mouth, so you and the worke
 
 Workers take the pickaxe and hammer from a tool station.
 
-A finished mine takes up to 3 workers with pickaxes, who mine out of sight underground.
+Up to 3 workers can be assigned to Mine. They mine out of sight underground with pickaxes.
+Build and Haul jobs do not use those slots.
 The cart goes underground with them, and the lantern on the frame lights the area like a torch.
 When nobody is working, the cart stands outside, loaded once there is output.
 
