@@ -85,7 +85,7 @@ public sealed partial class GameData {
         ["crate"] = new() { Name = "Wood crate", Color = "c9a46e" },
         ["nettle"] = new() { Name = "Nettle", Color = "5f8f3e", Description = "It stings but my grandma used to make ropes out of it." },
         ["nettle_rope"] = new() { Name = "Nettle rope", Color = "b9b27a" },
-        ["bug_net"] = new() { Name = "Bug net", Color = "d8d2b0", Tool = "net", Description = "I can catch all kinds of bugs with this." },
+        ["bug_net"] = new() { Name = "Bug net", Color = "f4f6f6", Tool = "net", Description = "I can catch all kinds of bugs with this." },
         ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Glows even after death." },
         ["coins"] = new() { Name = "Coins", Color = "e3b94a" },
     };

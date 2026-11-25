@@ -176,8 +176,9 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 - Nettle rope's icon is KayKit's Rope bundle A, baked like the food models and recoloured nettle green; its heaps are
   made of a lighter bundle built in code (`ItemShape.RopeBundle`).
   The bundle has 1,248 triangles, over the ceiling for an item model.
-- The bug net (`ActorRig.Tool`) is a wood handle gripped part way down, a hoop of bent wood and a cloth bag; the icon,
-  the heap and the player's hand show the same model.
+- The bug net (`ActorRig.Tool`) is a steel handle of two tubes gripped by its black rubber grip, a brass collar, a wire
+  hoop and a long bag of white netting, seen through, that narrows to a rounded end; the icon, the heap and the
+  player's hand show the same model.
 - The firebug item (`ItemShape.Firebug`) is a beetle with dark wing covers and a yellow-green tail.
 
 - `BackpackShape` — dropped inventory. The body reuses the player's cached six-ring canvas backpack profile through `ActorShape.Backpack`, laid on its back in a ground pose. `BackpackShape` adds ground-resting webbing: slack shoulder straps, a carry loop, a fitted dark opening and a separate curved access flap. The flap animates as the storage lid and has a fog-memory guard.
@@ -191,9 +192,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   A plant in the world is a clump of three sprigs at 3.4 times their scanned size, in one of three looks by its id,
   under 2,600 triangles; the item's icon is the tallest sprig, 935 triangles, and a heap is made of the smallest.
   Preview nettles and firebugs with `./build.py play -- --showcase --firebugs`, by day with `--day-phase 0.3`.
-- `src/firebugs/display/FirebugShape.cs` — a firebug in the air, in two looks on trial: a dark body with a lantern,
-  a halo and a trail of light, or the pixel firefly of pixelfx as a sprite, `models/firebug/firebug_sprite.png`,
-  eight glow levels across and two wing beats down.
+- `src/firebugs/display/FirebugShape.cs` — a firebug in the air: a dark body with a lantern over it and a soft halo.
 
 - Tree3D 1.1.0 supplies the baked tree and berry-bush geometry. Preview it with `./build.py play -- --showcase --trees`.
 - `src/Tree3DShape.cs` loads shared tree and berry-bush meshes, and cutout foliage shader materials that sway in the wind (`src/Wind.cs`) and have a blended twin for fading. It also adds the stem under a tree's baked trunk that starts above the ground; a berry bush gets none.
@@ -366,9 +365,8 @@ The meshes and the texture in `models/nettle/` are baked from two CC0 1.0 models
 [Nettle Plant](https://polyhaven.com/a/nettle_plant) by Rob Tuytel and Rico Cilliers (Poly Haven), at its lightest level of detail, and
 [Rope bundle A](https://kaylousberg.itch.io/rpg-tools-bits) by Kay Lousberg (KayKit RPG Tools Bits).
 `tools/nettle_models.py` downloads the pinned files and checks their SHA-256; `tools/bake_cards.gd` bakes each nettle sprig with its place on the shared texture, saved at 512 px, and `tools/bake_models.gd` bakes the rope bundle's palette colours into its corners.
-A firebug's glow rhythm, light trail and colours, and the sprite in `models/firebug/`, come from the fireflies effect of
-[pixelfx](https://patch.gg/patch/pixel-effects), Patch's pixel effects library, which adapts Sprite Fusion's open-source
-fireflies by Hugo Duprez; both are under the MIT licence in `models/firebug/LICENSE`.
+A firebug's glow colours follow the fireflies effect of [pixelfx](https://patch.gg/patch/pixel-effects), Patch's pixel
+effects library (MIT), which adapts Sprite Fusion's open-source fireflies by Hugo Duprez (MIT).
 The dug hole comes from Kenney's Pirate Kit under CC0 1.0. [Kenney's Pirate Kit](https://kenney.nl/assets/pirate-kit)
 Patch supplies the GLB. [Hole asset page](https://patch.gg/create/toolbox/assets/kenney:pirate-kit/hole.glb)
 `tools/bake_models.gd` bakes its palette and 286 triangles into `models/hole.res`.

@@ -412,34 +412,50 @@ public sealed class ActorRig {
     }
 
     /// <summary>How long a bug net's handle is, the hoop's radius, and how far the bag hangs behind the hoop.</summary>
-    private const float NetHandle = .95f, NetHoop = .17f, NetBag = .34f;
-    private static readonly TorusMesh NetRim = new() { InnerRadius = NetHoop - .012f, OuterRadius = NetHoop + .012f, Rings = 10, RingSegments = 4 };
+    private const float NetHandle = .95f, NetHoop = .17f, NetBag = .5f;
     /// <summary>How far down from the handle's free end the fist holds a bug net, so the hoop clears the ground at a hanging arm's end.</summary>
     private const float NetGrip = .42f;
-    // Seen from both sides, since the hoop shows the inside of the bag.
-    private static readonly StandardMaterial3D NetCloth = TwoSided(Cloth("d8d2b0"));
-    private static StandardMaterial3D TwoSided(StandardMaterial3D material) {
-        var copy = (StandardMaterial3D)material.Duplicate();
-        copy.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
-        return copy;
+    /// <summary>How much of the handle, from its free end, the rubber grip covers, and how much of the rest is the thicker of the shaft's two tubes.</summary>
+    private const float NetRubber = .46f, NetTube = .27f;
+    /// <summary>The radius of the bag's narrow end, and how long the rounding that closes it is.</summary>
+    private const float NetTip = .064f, NetEnd = .05f;
+    private static readonly TorusMesh NetRim = new() { InnerRadius = NetHoop - .007f, OuterRadius = NetHoop + .007f, Rings = 16, RingSegments = 4 };
+    // The bag is open at the hoop and closed at its narrow end.
+    private static readonly CylinderMesh NetCone = new() { TopRadius = NetHoop, BottomRadius = NetTip, Height = NetBag - NetEnd, RadialSegments = 12, Rings = 1, CapTop = false, CapBottom = false };
+    private static readonly CylinderMesh NetClose = new() { TopRadius = NetTip, BottomRadius = NetTip * .45f, Height = NetEnd, RadialSegments = 12, Rings = 1, CapTop = false };
+    // Fine white netting: seen through, and from both sides, since the hoop shows the inside of the bag.
+    private static readonly StandardMaterial3D NetCloth = Netting();
+    private static StandardMaterial3D Netting() {
+        var netting = (StandardMaterial3D)Cloth("f4f6f6").Duplicate();
+        netting.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        netting.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+        netting.AlbedoColor = new Color(netting.AlbedoColor, .6f);
+        return netting;
     }
     /// <summary>The middle of a bug net's hoop, measured from the grip.</summary>
     public static readonly Vector3 NetMouth = new(0, NetGrip - NetHandle - NetHoop, 0);
 
     /// <summary>
-    /// A bug net gripped at the origin, part way down its handle: the wood handle runs down along -Y to a hoop of bent
-    /// wood that opens toward -Z, and a bag of knotted nettle rope hangs behind it.
+    /// A bug net gripped at the origin, on the rubber grip of its handle: a steel shaft of two tubes runs down along -Y
+    /// to a brass collar and a wire hoop that opens toward -Z, and a long bag of white netting narrows behind it to a
+    /// rounded end.
     /// </summary>
     private static Node3D BugNet() {
         var tool = new Node3D();
-        var wood = Wood("8a5a32", .7f);
-        Cylinder(tool, .018f, .02f, NetHandle, new Vector3(0, NetGrip - NetHandle / 2, 0), wood, sides: 6);
-        // A rope lashing where the hoop meets the handle.
-        Cylinder(tool, .026f, .026f, .07f, new Vector3(0, NetGrip - NetHandle + .03f, 0), Cloth("9c955f"), sides: 6);
+        var rubber = Mat("1d1d1f", .9f);
+        var steel = Metal("c9d3d8", .35f, .85f);
+        float end = NetGrip - NetHandle, thin = NetHandle - NetRubber - NetTube;
+        // The grip thickens toward a flared cap at the free end.
+        Cylinder(tool, .016f, .02f, NetRubber, new Vector3(0, NetGrip - NetRubber / 2, 0), rubber, sides: 8);
+        Cylinder(tool, .02f, .025f, .03f, new Vector3(0, NetGrip - .015f, 0), rubber, sides: 8);
+        Cylinder(tool, .012f, .012f, NetTube, new Vector3(0, NetGrip - NetRubber - NetTube / 2, 0), steel, sides: 6);
+        Cylinder(tool, .009f, .009f, thin, new Vector3(0, end + thin / 2, 0), steel, sides: 6);
+        Cylinder(tool, .015f, .015f, .05f, new Vector3(0, end + .02f, 0), Metal("b08c51", .5f, .5f), sides: 6);
         // The rim is turned to stand in the plane the handle lies in.
-        Add(tool, NetRim, wood, NetMouth, new Vector3(90, 0, 0));
-        // The bag narrows to a blunt end behind the hoop.
-        Cylinder(tool, NetHoop, NetHoop * .28f, NetBag, NetMouth + new Vector3(0, 0, NetBag / 2), NetCloth, new Vector3(-90, 0, 0), 8);
+        Add(tool, NetRim, Metal("e3e8ea", .4f, .6f), NetMouth, new Vector3(90, 0, 0));
+        // Turned so the cone's wide top is at the hoop and its narrow end behind it.
+        Add(tool, NetCone, NetCloth, NetMouth + new Vector3(0, 0, (NetBag - NetEnd) / 2), new Vector3(-90, 0, 0));
+        Add(tool, NetClose, NetCloth, NetMouth + new Vector3(0, 0, NetBag - NetEnd / 2), new Vector3(-90, 0, 0));
         return tool;
     }
 

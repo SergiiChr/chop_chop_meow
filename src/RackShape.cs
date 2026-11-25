@@ -80,8 +80,8 @@ internal static class RackShape {
             case "net": {
                     // The hoop hangs face out below the handle, the bag's cloth filling it.
                     Vector2[] Ring(float radius) => Enumerable.Range(0, 8).Select(i => new Vector2(MathF.Cos(-i * MathF.Tau / 8), MathF.Sin(-i * MathF.Tau / 8)) * radius + new Vector2(0, -.72f - .13f)).ToArray();
-                    Prism(s, Ring(.15f), .02f, "8a5a32");
-                    Prism(s, Ring(.125f), .03f, "d8d2b0", new Vector3(0, 0, .004f));
+                    Prism(s, Ring(.15f), .02f, "aebabc");
+                    Prism(s, Ring(.135f), .03f, "f4f6f6", new Vector3(0, 0, .004f));
                     break;
                 }
             case "shovel":

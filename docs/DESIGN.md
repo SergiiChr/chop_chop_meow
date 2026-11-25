@@ -120,7 +120,7 @@ Simulation and data:
 | `src/resources/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/digging/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
 | `src/nettles/Nettles.cs`, `src/nettles/display/NettleShape.cs` | Nettles coming up at nightfall, and the scanned sprigs a nettle plant and its item are made of |
-| `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model in its two trial looks, its glow, light and trail |
+| `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
@@ -1019,11 +1019,10 @@ stays, grass grows under it and the ground takes no contact shade.
 `World.QuietNights` keeps nettles and firebugs from coming by themselves; a check session sets it (`Game.StartGame`),
 since each thing takes its look from its id.
 
-`FirebugShape` draws a firebug in one of two looks on trial, picked with `--firebug-look`: the game's own glow (a dark
-body, a lantern, a halo that grows with the flash and a trail of dots that stretches behind a dart), or the pixel
-firefly of pixelfx as a `Sprite3D`.
-Both glow on `FirebugShape.Glow`, the rhythm of pixelfx's fireflies, throw a light on the ground, bob about
-`FirebugShape.Height` and follow the world's position no faster than a dart, so the steps of its updates never show.
+`FirebugShape` draws a firebug as a dark body, a lantern over it and a halo, and throws no light on the ground.
+It glows steadily and, every 10 seconds at a moment of its own, a tenth brighter for about a second (`FirebugShape.Flash`).
+It bobs about `FirebugShape.Height` and follows the world's position no faster than a dart, so the steps of its
+updates never show.
 
 `ItemDef.Description` is what the player says of an item; `GameData.DescriptionLine` gives it as a tooltip line.
 
