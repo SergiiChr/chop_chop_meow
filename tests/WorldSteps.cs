@@ -29,8 +29,10 @@ internal static class WorldSteps {
         return store;
     }
 
-    /// <summary>A world without its starting map, with a fed and healthy player on the first morning.</summary>
-    /// <summary>An empty map where gathering turns up no diary page (<see cref="Diary.Quiet"/>).</summary>
+    /// <summary>
+    /// A world without its starting map, with a fed and healthy player on the first morning, where gathering turns up no
+    /// diary page (<see cref="Diary.Quiet"/>).
+    /// </summary>
     public static World EmptyWorld(GameData data) => new(data, false) { Diary = { Quiet = true } };
 
     /// <summary>An empty map with coins enough to pay every wage, so no worker strikes.</summary>

@@ -128,7 +128,7 @@ Simulation and data:
 | `src/digging/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
 | `src/nettles/Nettles.cs`, `src/nettles/display/NettleShape.cs` | Nettles coming up at nightfall, and the scanned sprigs a nettle plant and its item are made of |
 | `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs`, `src/firebugs/FirebugChase.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow; the showcase's player chasing firebugs for a recording |
-| `src/diary/model/Diary.cs`, `src/diary/model/DiaryDay.cs`, `src/diary/model/DiaryFind.cs` | The diary: its days and their text, where each part of it turns up, each player's finds and read days, and who sees a page lying in the world |
+| `src/diary/model/Diary.cs`, `src/diary/model/DiaryDay.cs`, `src/diary/model/DiaryFind.cs`, `src/diary/model/DiaryFindDef.cs` | The diary: its days and their text, where each part of it turns up, each player's finds and read days, and who sees a page lying in the world |
 | `src/diary/display/PageShape.cs`, `src/diary/display/PageProp.cs` | A loose page's model, floating on the lake or fluttering down off a tree |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
 | `src/digging/Beach.cs`, `src/digging/display/CoastView.cs` | Beach sand, tide, and the exposed soil after a dig |
