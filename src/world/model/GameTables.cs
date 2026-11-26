@@ -115,7 +115,7 @@ public sealed partial class GameData {
         [ThingKind.Signpost] = new() { Name = "Trading post", Cost = new() { ["wood"] = 10, ["stone"] = 4 }, Description = "Trade by cart. Hire and manage neighboring villagers." },
     };
     public Dictionary<string, SourceDef> Sources { get; } = new() {
-        [Inventory.Coins] = new() { How = "Sell goods at the trading post" },
+        [Inventory.Coins] = new() { How = "Sell goods for money" },
         ["wood"] = new() { How = "Chop trees" },
         ["acorn"] = new() { How = "Chop trees or gather leaves" },
         ["stone"] = new() { How = "Pick up or mine" },
