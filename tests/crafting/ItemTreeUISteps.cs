@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
@@ -12,6 +13,10 @@ public partial class Game {
 
     private Control RecipeMapCard(string item) => (Control)recipeMap.NodeOf(item)!.FindChild("slot", true, false);
     private Control? ItemTreeCard(string item) => recipeMap.FindChild($"tree_item_{item}", true, false) as Control;
+
+    private string[] ItemTreeActionsShown() =>
+        recipeMap.FindChild("item_tree_role_Actions", true, false)?.FindChildren("*", "Label", true, false)
+            .OfType<Label>().Select(label => label.Text).Where(text => text != "Actions").ToArray() ?? [];
 
     private async Task ItemTreeShows(string item) =>
         await Until(() => recipeMap.FindChild("item_tree", true, false) is Control tree && tree.IsVisibleInTree() &&

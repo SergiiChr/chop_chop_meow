@@ -680,11 +680,10 @@ public partial class WorldView : Node3D {
         : held is "wood_hammer" or "steel_hammer" ? held
         : carried != null && carried["wood_hammer"] > 0 && carried["steel_hammer"] == 0 ? "wood_hammer" : "steel_hammer";
 
-    private static string? HeldTool(string? selected, Inventory backpack) => selected switch {
-        "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
-        "wood_hammer" or "steel_hammer" or "bug_net" when backpack[selected] > 0 => selected,
-        _ => null
-    };
+    private static string? HeldTool(string? selected, Inventory backpack) =>
+        selected != null && backpack[selected] > 0 &&
+        (selected is "steel_axe" or "steel_pick" or "bug_net" || WeaponSwing.ForItem(selected)?.CarriesUpright == true)
+            ? selected : null;
 
     private void AddFooting(ActorRig rig) {
         if (rig.Root.Visible) surfacePeople.Add(rig.Root.GlobalPosition);
@@ -825,8 +824,8 @@ public partial class WorldView : Node3D {
     /// action that put it away, such as knocking on a door.
     /// </summary>
     private static bool Carries(ActorState state) =>
-        state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run
-        && (state.Blend >= 1 || state.From is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run || ActorAnimation.Tool(state.From) != null);
+        state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake
+        && (state.Blend >= 1 || state.From is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake || ActorAnimation.Tool(state.From) != null);
 
     /// <summary>
     /// A worked station near a player that is processing a batch a player queued with nobody of the crew working it, for an idle player to work at.
@@ -998,9 +997,16 @@ public partial class WorldView : Node3D {
         state.HipHeight = pose.HipHeight;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
-        if (barrel) rig.HugBarrel(pose, torch);
+        if (WeaponSwing.Of(state.Action) is WeaponSwing weapon) {
+            if (weapon.CarriesUpright && state.Blend < 1) pose = weapon.FollowGrip(pose, state.Time);
+            rig.Show(pose, null, false, lit: torch);
+            rig.ShowWeapon(weapon, state.Time);
+        } else if (barrel) rig.HugBarrel(pose, torch);
         else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel, torch);
-        else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
+        else if (tool != null && Carries(state) && WeaponSwing.ForItem(tool) is { CarriesUpright: true } ready) {
+            rig.Show(ready.FollowGrip(pose, 0), null, false, lit: torch);
+            rig.ShowWeapon(ready, 0);
+        } else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
         if (state.From == ActorAction.PumpWater && state.Action == ActorAction.Idle && state.Blend < 1 && !barrel && vessel == null)
             rig.ReleasePumpHandle(pose, 1 - Ease(state.Blend));
         if (jamb is Vector3 frame) DoorwayView.HandOnFrame(rig, pose, frame, door!.Value.Grip, tool, torch);

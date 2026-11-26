@@ -82,7 +82,7 @@ Play accepts Godot arguments after `--`:
 | `--animation-review --animation-clip "worker bucket roof"` | Follow a worker carrying a bucket up the ladder to pour and back down, with `"worker bottle roof"` for a bottle and `"player barrel"` or `"worker barrel"` for carrying a barrel |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
-| `--animation-target 1.3` | Stand what the close-up's blow works, a tree, rock, anvil or stump, this many metres from the actor |
+| `--animation-target 1.3` | Stand what the close-up's blow works, a tree, rock, anvil, stump or wolf, this many metres from the actor |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
 | `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
 | `--render-intro /absolute/directory --intro-dance` | Save only the solo dance of the catgirl on the hero's screen, as tall as the picture |
@@ -645,10 +645,17 @@ An item discovered while the map is open reveals its name and icon without reope
   menu for a recipe made by hand.
 - Alt-click a discovered card to open its Item tree in the same window. Direct recipe products appear under **Fuel**,
   **Ingredient** or **Tool**, and can appear under more than one use. **Buildings** shows what primarily costs this
-  material. **Actions** shows what the item can do. A shovel shows **Dig up things.** for stumps, bushes and beach
-  sand, separately from **Dig holes** on open ground. Items the village buys say **Can be sold for profit.**
-  A station's tree shows what it makes. Empty branches are hidden. Click a card to highlight it on the main map, or Alt-click a discovered card to
-  open its tree. The upper-left **Recipe map** button returns to the view you left.
+  material. **Actions** shows what the item is for. A shovel separates **Dig up things.** for stumps, bushes and
+  beach sand from **Dig holes** on open ground. The pickaxe lists **Mine ores** for extracting resources.
+  The pickaxe and hammers share **Building a mine** for preparing it.
+  All bottle fills share a single **Bottle** card. Bottle and Steel bucket both show **Transport liquids**.
+  Water shows **Drink** and Berry jam shows **Food**. Routine container handling is not listed.
+  When a tree has one result, it connects the item and result on a straight line.
+  Tools that can strike wolves show **Weapon**, including Torch and Steel bucket. Torch also shows **Source of light**.
+  Mortar and pestle is a recipe tool only.
+  Items the village buys say **Can be sold for profit.**
+  A station's tree shows what it makes. Empty branches are hidden. Click a card to highlight it on the main map, or
+  Alt-click a discovered card to open its tree. The upper-left **Recipe map** button returns to the view you left.
 
 ### Crafting bench
 
@@ -1181,9 +1188,11 @@ A wolf that reaches you stops at biting distance, about a metre off, and waits t
 ### Fighting
 
 A swing keeps the direction you gave it at the start.
-Right-click open ground with an axe, pickaxe, hammer, torch or bug net selected to aim at the pointer.
+Right-click open ground with a weapon selected to aim at the pointer. A shovel still digs and a bug net still catches
+firebugs with right-click. Press Space to attack with either tool, or with any other selected weapon.
 Overhead, Space aims along the held movement keys or, from a stand, the last direction you walked.
-In first person, Space aims where you look.
+In first person, Space aims where you look. With no weapon selected, Space swings the best axe in the backpack, or a
+bare fist if you have no axe.
 You can move during the swing, and near a hunting wolf the movement keys reverse you immediately.
 Starting a doorway action interrupts a swing before it lands.
 A steel axe lands 0.4 seconds into its swing and hits every wolf the blade reaches.
@@ -1194,6 +1203,10 @@ Axe swings take turns:
   It passes over a wolf on the ground, and lands on every wolf in its way that is in the air, leaping for your throat, or reared up on someone's arm.
 
 A steel axe takes 2.2 to 3.2 of a wolf's 8 health a blow, a torch 0.8 to 1.2 and a punch 0.4 to 0.6.
+Each other weapon hits with its working end, such as a pickaxe's point or a hammer's face. The rake and Steel bucket
+swing overhead and come straight down. The bucket takes longer to wind up and follow through, and clangs only on a hit.
+When selected, chisels and hammers stay upright while standing or moving and tip forward to strike.
+A miss and a late swing do not hurt the wolf.
 A torch and a fist reach only a wolf at biting distance: the flame 1 metre, swung low with you bent over, and the fist 0.7 metres and a little to your right.
 A wolf winces, hops sideways and skids if it survives a weapon blow on its first hit. With room, it runs wide and takes a
 second hop behind you, lands on its forepaws and slides its hindquarters round to face you. Only then can it bite again.

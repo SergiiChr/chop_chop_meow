@@ -33,25 +33,23 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         root.SizeFlagsVertical = SizeFlags.ShrinkCenter;
         diagram.AddChild(root); diagram.SetRoot(root);
 
-        var uses = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        var uses = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter };
         uses.AddThemeConstantOverride("separation", 20); diagram.AddChild(uses);
         uses.ItemRectChanged += diagram.QueueRedraw;
         var data = kit.World.Data;
         if (data.TryBuilding(item, out var kind)) {
-            AddBranch("Recipes", data.Recipes.Values.Where(recipe => recipe.Station == kind).Select(recipe => Card(recipe.Output, "Recipes")));
+            AddBranch("Recipes", data.Recipes.Values.Where(recipe => recipe.Station == kind)
+                .Select(recipe => data.MapEntryOf(recipe.Output)).Distinct().Select(output => Card(output, "Recipes")));
         } else {
             foreach (var group in RecipeItemUse.Of(data, item).GroupBy(use => use.Role).OrderBy(group => group.Key)) {
                 string role = group.Key.ToString();
-                AddBranch(role, group.Select(use => Card(use.Recipe.Output, role)));
+                AddBranch(role, group.Select(use => data.MapEntryOf(use.Recipe.Output)).Distinct().Select(output => Card(output, role)));
             }
             AddBranch("Buildings", MapBuilding.All(data).Where(building => building.MainMaterial == item)
                 .Select(building => Card(building.Id, "Buildings")));
-            AddBranch("Actions", ItemTreeActions.Of(kit.World, item).Distinct().Select(ActionCard));
+            AddBranch("Actions", ItemTreeActions.Of(kit.World, item).Select(ActionCard));
         }
-        if (uses.GetChildCount() == 0) {
-            uses.AddChild(Style.Text("No direct uses.", 17, Style.Beige));
-            uses.SizeFlagsVertical = SizeFlags.ShrinkCenter;
-        }
+        if (uses.GetChildCount() == 0) uses.AddChild(Style.Text("No direct uses.", 17, Style.Beige));
 
         void AddBranch(string role, IEnumerable<Control> cards) {
             var leaves = cards.ToArray();

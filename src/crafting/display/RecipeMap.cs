@@ -53,7 +53,7 @@ public partial class RecipeMap : Control {
 
     /// <summary>Opens at the item's map entry, leaving any open panel or Goal Log underneath.</summary>
     public void OpenAt(string item, Action? leaveGoalLog = null) {
-        item = EntryFor(item);
+        item = world.Data.MapEntryOf(item);
         if (item != "" && !world.Data.Items.ContainsKey(item) && !world.Data.IsBuilding(item)) return;
         Clear();
         this.leaveGoalLog = leaveGoalLog;
@@ -93,19 +93,11 @@ public partial class RecipeMap : Control {
         opened.Modulate = Colors.White;
     }
 
-    /// <summary>Uses the map entry for a carried container whose exact contents or fill are not separate entries.</summary>
-    private static string EntryFor(string item) {
-        if (World.IsPacked(item)) return "crate";
-        if (BerryJam.InBottle(item)) return BerryJam.Liquid;
-        if (GameData.OffTheMap(item) && Water.IsBottle(item)) return Water.Full;
-        return ContainerItem.Base(item);
-    }
-
     public void Close() { Visible = false; Clear(); }
 
     /// <summary>Shows a discovered item's direct recipes within the same board.</summary>
     private void OpenItemTree(string item) {
-        item = EntryFor(item);
+        item = world.Data.MapEntryOf(item);
         if (!MapItemLink.KnownTo(world, item)) return;
         mainView!.Hide();
         RemoveItemTree();
@@ -271,7 +263,7 @@ public partial class RecipeMap : Control {
         header.AddChild(DetailItem(item, 46, "detail_item"));
         var identity = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
         identity.AddThemeConstantOverride("separation", 3); header.AddChild(identity);
-        var name = Style.Text(data.Name(item), 23, Style.Ink, Style.Head, wrap: true);
+        var name = Style.Text(data.NameOnMap(item), 23, Style.Ink, Style.Head, wrap: true);
         name.Name = "detail_name"; identity.AddChild(name);
         var known = Style.Pill(building == null ? "Made before" : "Built before", Style.Tag(Style.Sage), Style.SlotFill, 12);
         known.SizeFlagsHorizontal = SizeFlags.ShrinkBegin; identity.AddChild(known);
@@ -289,12 +281,13 @@ public partial class RecipeMap : Control {
             ? costs.Select(p => (p.Key, $"{p.Value} "))
             : data.Sources[item].From.Concat(data.Sources[item].Also).Select(input => (input, ""));
         var requires = Fact(details, building == null ? "Requires" : "Build cost");
-        foreach (var (input, amount) in needs) {
+        foreach (var (required, amount) in needs) {
+            string input = data.MapEntryOf(required);
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 4);
             var icon = DetailItem(input, 28, $"requires_{input}");
             pair.AddChild(icon);
-            var label = Style.Text(icon.Known ? amount + data.Name(input) : amount.TrimEnd(), 15, Style.Ink, wrap: true);
-            icon.Discovered += () => label.Text = amount + data.Name(input);
+            var label = Style.Text(icon.Known ? amount + data.NameOnMap(input) : amount.TrimEnd(), 15, Style.Ink, wrap: true);
+            icon.Discovered += () => label.Text = amount + data.NameOnMap(input);
             label.SizeFlagsHorizontal = SizeFlags.ExpandFill; pair.AddChild(label);
             requires.AddChild(pair);
         }
@@ -302,13 +295,14 @@ public partial class RecipeMap : Control {
             requires.AddChild(Style.Text(building == null ? "No ingredients" : "No materials", 15, Style.Tan));
         var uses = (building is MapBuilding at
             ? data.Recipes.Values.Where(r => r.Station == at.Kind).Select(r => r.Output)
-            : data.UsedFor(item).Concat(buildings[item].Select(product => product.Id))).ToList();
+            : data.UsedFor(item).Concat(buildings[item].Select(product => product.Id)))
+            .Select(data.MapEntryOf).Where(use => use != item).Distinct().ToList();
         var used = Flow(Fact(details, building == null ? "Used for" : "Recipes")); used.Name = "detail_uses";
         foreach (string use in uses) {
             var icon = DetailItem(use, 28, $"use_{use}");
             used.AddChild(icon);
             if (uses.Count != 1) continue;
-            void AddName() => used.AddChild(Style.Text(data.Name(use), 15, Style.Ink));
+            void AddName() => used.AddChild(Style.Text(data.NameOnMap(use), 15, Style.Ink));
             if (icon.Known) AddName(); else icon.Discovered += AddName;
         }
         if (uses.Count == 0) used.AddChild(Style.Text("—", 15, Style.Tan));

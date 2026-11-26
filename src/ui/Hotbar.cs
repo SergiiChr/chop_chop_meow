@@ -197,8 +197,11 @@ public partial class Hotbar : PanelContainer {
     }
 
     /// <summary>Whether this item can be eaten, drunk, lit or swung by right-clicking open ground.</summary>
-    private bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || id == World.TorchItem
-        || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer" or "net";
+    private bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || world.IsWeapon(id);
+
+    /// <summary>The selected carried weapon, if there is one.</summary>
+    public string? ActiveWeapon() =>
+        ActiveItem() is string item && world.Backpack[item] > 0 && world.IsWeapon(item) ? item : null;
 
     /// <summary>Uses the item selected on the hotbar toward a point on the ground; items without a use do nothing.</summary>
     public void UseSelected(Vector2 at) {
@@ -206,6 +209,6 @@ public partial class Hotbar : PanelContainer {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) FromStack(ActiveStack(), () => world.Consume(id));
         else if (id == World.TorchItem) world.UseTorch(at - world.Player);
         else if (world.ToolKind(id) == "net") world.SwingNet(at - world.Player);
-        else world.Attack(at - world.Player);
+        else world.Attack(at - world.Player, id);
     }
 }

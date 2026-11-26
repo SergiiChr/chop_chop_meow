@@ -25,7 +25,7 @@ internal partial class MapItemLink(World world, string item, string hint = "", s
     private void ShowIdentity(bool known) {
         Known = known;
         SetProcess(!known);
-        string name = known ? world.Data.Name(item) : QuestionMark;
+        string name = known ? world.Data.NameOnMap(item) : QuestionMark;
         var icon = known ? Icons.Of(item) : null;
         TooltipText = role == null ? name : $"{name}\n{role}";
         if (hint != "") TooltipText += $"\n{hint}";

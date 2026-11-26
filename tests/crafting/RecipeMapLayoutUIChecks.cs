@@ -112,45 +112,123 @@ public partial class Game {
         await Click(RecipeMapCard("steel_axe"), alt: true);
         await ItemTreeShows("steel_axe");
         actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
-        Require(actions != null && HasLabel(actions, "Chop trees") && HasLabel(actions, "Fight wolves"),
+        Require(actions != null && HasLabel(actions, "Chop trees") && HasLabel(actions, "Weapon") && !HasLabel(actions, "Fight wolves"),
             "An axe must show both gathering and combat actions.");
         await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
         await Click(RecipeMapCard(World.TorchItem), alt: true);
         await ItemTreeShows(World.TorchItem);
-        actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
-        Require(actions != null && HasLabel(actions, "Light torch") && HasLabel(actions, "Wave torch at wolves"),
-            "An item need not be a tool to show its direct actions.");
+        Require(ItemTreeActionsShown().SequenceEqual(new[] { "Source of light", "Weapon" }),
+            "Torch must show only Source of light and Weapon.");
         await KeyStroke(Key.Escape);
     }
 
-    /// <summary>Containers keep their specific uses, but packing does not appear as an action.</summary>
-    private async Task CheckItemTreeShowsContainerActionsWithoutPacking() {
-        Achieve(Hosted, Bucket.Item, Barrel.Item, "crate", "stone"); await Frames();
+    /// <summary>Mining for resources and building a mine are separate uses shared by the relevant tools.</summary>
+    private async Task CheckItemTreeGroupsMiningAndMineConstruction() {
+        Achieve(Hosted, "steel_pick", "steel_hammer", "wood_hammer"); await Frames();
+        await OpenRecipeMap();
+        await Click(RecipeMapCard("steel_pick"), alt: true);
+        await ItemTreeShows("steel_pick");
+        Require(ItemTreeActionsShown().SequenceEqual(new[] {
+            "Mine ores", "Building a mine", "Weapon", "Can be sold for profit." }),
+            "The pickaxe must group extracting resources separately from preparing a mine.");
+        foreach (string hammer in new[] { "wood_hammer", "steel_hammer" }) {
+            await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+            await Click(RecipeMapCard(hammer), alt: true);
+            await ItemTreeShows(hammer);
+            var actions = ItemTreeActionsShown();
+            Require(actions.Contains("Building a mine") && actions.Contains("Weapon") &&
+                !actions.Contains("Mine ores") && !actions.Contains("Fit mine frames and rails"),
+                "A hammer must share Building a mine with the pickaxe without taking its extraction action.");
+        }
+        await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>Water and Berry jam keep their recipes and show their consumption use, not filling a vessel.</summary>
+    private async Task CheckLiquidItemTreesShowWhatCanBeConsumed() {
+        Achieve(Hosted, Water.Liquid, BerryJam.Liquid, "meat_stew", "canned_jam"); await Frames();
+        await OpenRecipeMap();
+        await Click(RecipeMapCard(Water.Liquid), alt: true);
+        await ItemTreeShows(Water.Liquid);
+        Require(ItemTreeActionsShown().SequenceEqual(new[] { "Drink" }) &&
+            ItemTreeCard("meat_stew") != null && ItemTreeCard("dough") != null,
+            "Water must show Drink and its cooking recipes, without Fill containers.");
+        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        await Click(RecipeMapCard(BerryJam.Liquid), alt: true);
+        await ItemTreeShows(BerryJam.Liquid);
+        Require(ItemTreeActionsShown().SequenceEqual(new[] { "Food" }) && ItemTreeCard("canned_jam") != null,
+            "Berry jam must show Food and its canning recipe, without generic container actions.");
+        await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>A tree with one result connects the root, branch caption and card on one horizontal line.</summary>
+    private async Task CheckSingleResultItemTreeUsesAStraightLine() {
+        Achieve(Hosted, "fertilizer"); await Frames();
+        await OpenRecipeMap();
+        await Click(RecipeMapCard("fertilizer"), alt: true);
+        await ItemTreeShows("fertilizer");
+        var root = (Control)recipeMap.FindChild("item_tree_root_fertilizer", true, false);
+        var branch = recipeMap.FindChild("item_tree_role_Actions", true, false);
+        var labels = branch.FindChildren("*", "Label", true, false).OfType<Label>().ToDictionary(label => label.Text);
+        float y = root.GetGlobalRect().GetCenter().Y;
+        float caption = labels["Actions"].GetGlobalRect().GetCenter().Y;
+        float result = ((Control)labels["Sow wheat"].GetParent()).GetGlobalRect().GetCenter().Y;
+        Require(Mathf.Abs(y - caption) < 1 && Mathf.Abs(y - result) < 1,
+            $"A single result must line up with the root and caption. Got {y}, {caption}, {result}.");
+        await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>Containers show their uses without listing routine handling.</summary>
+    private async Task CheckItemTreeShowsContainerUsesWithoutHandling() {
+        Achieve(Hosted, Bucket.Item, Barrel.Item, Water.Empty, "crate", "stone"); await Frames();
         await OpenRecipeMap();
         await Click(RecipeMapCard(Bucket.Item), alt: true);
         await ItemTreeShows(Bucket.Item);
-        var actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
-        Require(actions != null && HasLabel(actions, "Collect water at the lake") &&
-            HasLabel(actions, "Pour into stations") && HasLabel(actions, "Water farm plots"),
-            "The Steel bucket must show direct actions at all fills because it shares one card.");
+        var bucketActions = ItemTreeActionsShown();
+        Require(bucketActions.SequenceEqual(new[] { "Transport liquids", "Weapon" }),
+            "The Steel bucket must show Transport liquids once, plus Weapon.");
+        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        await Click(RecipeMapCard(Water.Empty), alt: true);
+        await ItemTreeShows(Water.Empty);
+        Require(ItemTreeActionsShown().SequenceEqual(new[] { "Transport liquids" }) &&
+            HasLabel(recipeMap.FindChild("item_tree_root_empty_bottle", true, false), "Bottle"),
+            "Bottle must share the bucket's liquid action, without Weapon.");
         await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
         await Click(RecipeMapCard(Barrel.Item), alt: true);
         await ItemTreeShows(Barrel.Item);
-        actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
-        Require(actions != null && HasLabel(actions, "Mount on a cabin roof"),
-            "The Steel barrel must show its cabin use.");
+        Require(ItemTreeActionsShown().SequenceEqual(new[] { "Store water or jam", "Mount on a cabin roof" }),
+            "The Steel barrel must show storage and its cabin use, without Open or Place.");
         await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
         await Click(RecipeMapCard("crate"), alt: true);
         await ItemTreeShows("crate");
-        actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
-        Require(actions != null && HasLabel(actions, "Place crate") && HasLabel(actions, "Open crate") && !HasLabel(actions, "Pack"),
-            "The crate must keep its container actions without listing packing.");
+        Require(ItemTreeActionsShown().SequenceEqual(new[] { "Store and transport goods" }),
+            "The Wood crate must show storage and transport, without Open, Place or Pack.");
         await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
         await Click(RecipeMapCard("stone"), alt: true);
         await ItemTreeShows("stone");
         Require(recipeMap.FindChild("item_tree_role_Actions", true, false) == null,
             "Stone must show neither a packing action nor a sale the village does not take.");
         await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>Looking up any bottle fill in the backpack opens the same Bottle entry without moving it.</summary>
+    private async Task CheckBottleFillsShareOneRecipeMapEntry() {
+        string[] fills = [Water.Full, Water.TwoLiters, Water.OneLiter, BerryJam.Bottle];
+        foreach (string fill in fills) Give(Hosted, fill);
+        await Frames();
+        await KeyStroke(Key.Tab);
+        foreach (string fill in fills) {
+            int count = world.Carried(fill);
+            await Click(BagCellOf(fill), alt: true);
+            await Until(() => recipeMap.Visible && recipeMap.Chosen == Water.Empty, "the Bottle card highlighted", 2);
+            var details = recipeMap.FindChild("map_details", true, false);
+            Require(HasLabel(details, "Bottle") && world.Carried(fill) == count && cursor.Empty,
+                "A fill must open Bottle without changing the inventory.");
+            Require(fills.All(item => recipeMap.NodeOf(item) == null) && recipeMap.NodeOf(Water.Liquid) != null,
+                "Bottle fills must have no cards of their own, and Water must remain on the map.");
+            await KeyStroke(Key.Escape);
+        }
+        foreach (string fill in fills) Drop(Hosted, fill, 1);
+        await CloseWithEsc();
     }
 
     /// <summary>Undiscovered entries remain anonymous and do not open an Item tree until discovered.</summary>
@@ -189,7 +267,7 @@ public partial class Game {
         var bottle = ItemTreeCard("empty_bottle")!;
         Require(HasLabel(product, "?") && !product.TooltipText.Contains("Steel barrel") &&
             !product.FindChildren("*", "TextureRect", true, false).OfType<TextureRect>().Any(icon => icon.Texture != null) &&
-            HasLabel(bottle, "Empty bottle"), "The Item tree must distinguish undiscovered products from known ones.");
+            HasLabel(bottle, "Bottle"), "The Item tree must distinguish undiscovered products from known ones.");
         var tree = recipeMap.FindChild("item_tree", true, false);
         await Click(product, alt: true);
         Require(recipeMap.FindChild("item_tree", true, false) == tree,

@@ -1374,7 +1374,7 @@ public sealed partial class World {
     /// and the next has to wait. Returns the way it goes, a unit vector.
     /// </summary>
     private Vector2 StartSwing(ActorAction action, Vector2 aim) {
-        attackClock = Swings.Cooldown;
+        attackClock = WeaponSwing.Of(action) is WeaponSwing weapon ? weapon.Duration : Swings.Cooldown;
         Vector2 direction = aim == Vector2.Zero ? Vector2.Down : aim.Normalized();
         PlayerActed?.Invoke(action, direction); Play("tool_air_swing", Player);
         return direction;
@@ -1413,15 +1413,25 @@ public sealed partial class World {
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
         WolfFollow.Stop();
     }
-    internal const string AttackTool = "axe";
+    private const string AttackTool = "axe";
+
+    /// <summary>Whether a carried item's kind has a swing that can strike a wolf.</summary>
+    internal bool IsWeapon(string item) => item == TorchItem || WeaponSwing.ForItem(item) != null || ToolKind(item) == AttackTool;
 
     /// <summary>
-    /// Swings the best axe carried, or a fist without one, along <paramref name="aim"/>, south when none is given.
+    /// Swings the carried weapon named by the player. With none selected, swings the best axe or a bare fist.
     /// Axe swings take turns: the overhead chop, then the sideways sweep.
     /// </summary>
-    public void Attack(Vector2 aim = default) {
-        if (attackClock > 0 || S.Sheltered != 0 || Busy() || Forwarded(Verb.Attack, at: aim)) return;
-        string? axe = BestTool(AttackTool);
+    public void Attack(Vector2 aim = default, string? selected = null) {
+        if (selected == TorchItem) { UseTorch(aim); return; }
+        if (attackClock > 0 || S.Sheltered != 0 || Busy() || Forwarded(Verb.Attack, item: selected ?? "", at: aim)) return;
+        if (selected != null && S.Backpack.Free(selected) == 0) return;
+        if (selected != null && WeaponSwing.ForItem(selected) is WeaponSwing weapon) {
+            Swings.Start(weapon.Action, StartSwing(weapon.Action, aim));
+            return;
+        }
+        if (selected != null && ToolKind(selected) != AttackTool) return;
+        string? axe = selected ?? BestTool(AttackTool);
         bool sweep = axe != null && S.Actor.SweepNext;
         S.Actor.SweepNext = axe != null && !sweep;
         ActorAction action = (axe, sweep) switch {

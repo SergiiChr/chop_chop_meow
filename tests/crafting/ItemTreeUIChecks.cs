@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
@@ -84,6 +85,8 @@ public partial class Game {
         var tool = recipeMap.FindChild("item_tree_role_Tool", true, false);
         Require(tool != null && HasLabel(tool, "Tool") && tool.FindChild("tree_item_glass_jar", true, false) != null,
             "Glass jars must appear under Tool when a steel pipe is the one fitted to the furnace.");
+        Require(ItemTreeActionsShown().SequenceEqual(new[] { "Install plumbing" }),
+            "The steel pipe must show plumbing without repeating its glassblowing use or adding Weapon.");
         await KeyStroke(Key.Escape);
     }
 }

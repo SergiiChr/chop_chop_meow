@@ -73,6 +73,7 @@ public partial class Sounds : Node {
         ["tug_scream"] = -5,
         ["takedown_scream"] = -5,
         ["wolf_hit"] = -5.5f,
+        ["bucket_hit"] = -6,
     };
     /// <summary>
     /// Seconds into each variant at which it is loudest, for sounds whose loudest moment is timed onto what makes it, such

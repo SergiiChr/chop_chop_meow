@@ -227,6 +227,7 @@ UI and input:
 | `src/actors/enemies/wolf/WolfCounter.cs` | A struck wolf's sideways hop, skid, run, bound behind the attacker and pivot |
 | `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: wolves a torch scared off circling a player, bracing when walked at, running or standing their ground |
 | `src/actors/player/Swings.cs`, `src/actors/player/model/Swing.cs`, `src/actors/player/model/SwingShape.cs` | Players' swings at wolves: when a swing lands, the ground its blade, flame or fist passes over, and the wolves it touches |
+| `src/actors/player/model/WeaponSwing.cs` | The motions and contact shapes of tool strikes, including the bucket's loose bail |
 | `src/actors/enemies/wolf/model/Wolf.cs` | `Wolf`, a wolf as the world saves it |
 | `src/actors/enemies/wolf/model/Den.cs` | `Den`, a wolf den's mouth, door and clearance |
 | `src/actors/model/IWalker.cs` | `IWalker`, anything that walks the map on its own, along a route around what blocks it |
@@ -879,7 +880,10 @@ The slam's sound and a chest's or crate's `close_chest` start as far ahead of th
 #### Swings
 
 `Swings` (`src/actors/player/Swings.cs`) runs a player's swings at wolves.
-`World.Attack` swings the best axe carried, or a fist without one, and `World.UseTorch` a lit torch, along the aim the player gives, with `Swings.Cooldown` between swings.
+`World.Attack` swings the selected carried weapon, or the best axe or a fist with no weapon selected.
+The attack command names the weapon, which the host checks against the backpack.
+`World.UseTorch` lights the torch or swings it once lit.
+Space attacks with the selected tool. The shovel and bug net keep their normal jobs on right-click.
 The swing lands `ActorAnimation.Contact` into its animation (`PlayerState.Swing`, a `Swing` counting down), not when it starts, and a player who went down or indoors meanwhile lands nothing.
 It lands on every wolf whose body touches the ground it passes over then, a `SwingShape` seen from above, and that stands as tall as the swing comes low (`SwingShape.Low`):
 
@@ -891,7 +895,12 @@ It lands on every wolf whose body touches the ground it passes over then, a `Swi
 | Bug net | `Swings.Net` | 0.98 to 1.42 m out, from 55° left of the aim to 55° right, where the hoop's slant from behind the right shoulder to the ground at the left crosses the height a firebug flies at | any height | none: it catches firebugs |
 | Punch | `Swings.Punch` | within 0.7 m, 10° to 35° right | any height | 0.4 to 0.6 |
 
-The shapes are where the player's model carries the axe head (`ActorRig.AxeHead`), the flame and the fist through each stroke, which `CheckSwingShapesFollowThePlayersModel` holds them to.
+Those shapes are where the player's model carries the axe head (`ActorRig.AxeHead`), flame and fist through each
+stroke. For the other weapons, `WeaponSwing` moves the grip and turns the tool through a path shared by drawing and
+hit detection. The tool's working end traces a short sweep across the wolf's body between ticks, excluding the handle
+and the wind-up. A wolf reacts at first touch and can be hit only once per swing. The rake and bucket come down from
+overhead. The bucket's body trails the held bail, swings past it, then settles. A confirmed bucket hit plays
+`bucket_hit`, once per wolf struck. Chisels and hammers start and finish on the same upright grip used while carried.
 A wolf's body is `Swings.Touches`' line of round sections from the root of its tail to its nose, the way it faces (`WolfBodies.Body`), as tall as `WolfBodies.Top`: `WolfBodies.StandingTop` on the ground, up to `WolfBodies.LeapRise` more through a leap for the throat, and `WolfBodies.RearedTop` reared up with an arm in its jaws, as its model stands.
 So the sweep passes over a wolf on the ground and catches one in the air or reared up.
 Each wolf touched takes its own roll of the damage, the swing's own give or take its spread (`Swings.AxeDamage` times the axe's speed, `AxeSpread`), and is knocked back and left reeling (`World.Strike`).
@@ -1173,8 +1182,17 @@ Alt-click on a discovered item's card, chip or detail thumbnail opens its Item t
 `RecipeItemUse.Of` reads each recipe's inputs, accepted tools, fixed station tools and fuels to find direct uses only.
 `ItemTree` groups recipe products under Fuel, Ingredient and Tool branches. It omits empty branches and shows a
 product under each role the selected item plays in that recipe. The same tree branches to buildings that primarily
-cost that material and lists the item's direct actions. Packing is not listed. `GatherShape.Dug` and digging beach
-sand share one resource-gathering action. Digging a hole stays a separate action because it yields nothing.
+cost that material and lists the item's direct actions. Packing is not listed. `GatherRules` gives the gathering
+actions one name for each kind of work. Digging up stumps, bushes and beach sand shares **Dig up things.**
+Digging a hole stays a separate action because it yields nothing. Surface deposits and open mines share **Mine ores**.
+Digging an entrance and fitting a mine's frame and rails share **Building a mine**.
+`GameData.MapEntryOf` resolves every container fill to its base entry, so every fill of a bottle links to **Bottle**.
+`ItemTreeActions` uses the vessel table to give Bottle and Steel bucket the same **Transport liquids** action.
+Liquids list **Drink** or **Food** based on what their filled vessels provide, not how to fill them.
+Crates and barrels list their uses, not opening or placing. The branch column centers vertically with the root,
+so a single result needs no bend in its line.
+**Weapon** marks the tools that can strike wolves, including Torch and Steel bucket.
+Mortar and pestle appears only as a tool for its recipes.
 A station's Recipes branch reads the recipes assigned to it.
 Clicking a card returns to its place in the main map. Alt-clicking it opens its own item tree.
 The Back button restores the main map at its previous selection and scroll position.
@@ -1184,7 +1202,7 @@ Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or fo
 Everything such an item is made of is known with it (`GameData.EndsUpIn`), so no ingredient looks unmade beside its product: a new settlement's steel axe and bottle make their whole chains known. A filled vessel also makes the liquid it holds known.
 A save written before `Obtained` existed loads with it empty, so a raw resource it made nothing of shows as not made until it is gathered again.
 `GameData.MadeFrom` gives the item another is made out of: its recipe's first input, or the first `From` of its entry in `GameData.Sources` when no recipe makes it.
-`GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item is on the map once.
+`GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item with its own map entry is on the map once.
 
 #### Tool slots
 

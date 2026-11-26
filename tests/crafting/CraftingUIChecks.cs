@@ -43,7 +43,11 @@ public partial class Game {
         await TestClean(CheckUndiscoveredMapItemsStayAnonymous);
         await TestClean(CheckBuildingsBranchFromTheirMainMaterialAndShowRecipes);
         await TestClean(CheckItemTreeShowsDirectActions);
-        await TestClean(CheckItemTreeShowsContainerActionsWithoutPacking);
+        await TestClean(CheckItemTreeGroupsMiningAndMineConstruction);
+        await TestClean(CheckItemTreeShowsContainerUsesWithoutHandling);
+        await TestClean(CheckLiquidItemTreesShowWhatCanBeConsumed);
+        await TestClean(CheckSingleResultItemTreeUsesAStraightLine);
+        await TestClean(CheckBottleFillsShareOneRecipeMapEntry);
         await TestClean(CheckAltClickBackpackItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickHotbarItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickRecipeShowsTheProductWithoutQueueing);
@@ -441,7 +445,7 @@ public partial class Game {
         await Click(map!);
         Require(recipeMap.Visible && !panel.Visible && !bag.Visible, "The icon must open the recipe map directly from the world.");
         Require(recipeMap.FindChild("map_stations", true, false) == null, "The map must open without the station-cost row.");
-        Require(world.Data.Items.Keys.Where(id => !GameData.OffTheMap(id)).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
+        Require(world.Data.Items.Keys.Where(id => world.Data.MapEntryOf(id) == id).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
         Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as undiscovered.");
         Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources"), "The map must label the marks for tools and resources.");
         await KeyStroke(Key.Escape);

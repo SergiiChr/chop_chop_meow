@@ -57,7 +57,7 @@ public sealed class Swings(World world) {
         ActorAction.NetSwing => (0, 0),
         ActorAction.Attack => (PunchDamage, PunchSpread),
         ActorAction.TorchSwing => (TorchDamage, TorchSpread),
-        _ => (AxeDamage, AxeSpread)
+        _ => WeaponSwing.Of(action) is WeaponSwing weapon ? (weapon.Damage, .2f) : (AxeDamage, AxeSpread)
     };
 
     /// <summary>
@@ -66,16 +66,25 @@ public sealed class Swings(World world) {
     /// </summary>
     internal void Start(ActorAction action, Vector2 aim, float strength = 1) {
         var (damage, spread) = Blow(action);
-        world.S.Actor.Swing = new Swing(action, aim, damage * strength, spread, ActorAnimation.Contact(action));
+        world.S.Actor.SwingHits.Clear();
+        world.S.Actor.Swing = new Swing(action, aim, damage * strength, spread, 0);
     }
 
     /// <summary>Counts the acting player's swing down and lands it; one who went down or indoors meanwhile lands nothing.</summary>
     internal void Tick(float dt) {
         if (world.S.Actor.Swing is not Swing swing) return;
         if (world.Downed || world.S.Sheltered != 0) { world.S.Actor.Swing = null; return; }
-        if (swing.In > dt) { world.S.Actor.Swing = swing with { In = swing.In - dt }; return; }
-        world.S.Actor.Swing = null;
-        Land(swing);
+        float elapsed = swing.Elapsed + dt;
+        var weapon = WeaponSwing.Of(swing.Action);
+        if (weapon != null) {
+            if (elapsed >= weapon.ActiveFrom) Land(swing, weapon, elapsed);
+            world.S.Actor.Swing = elapsed < weapon.ActiveUntil ? swing with { Elapsed = elapsed } : null;
+        } else if (elapsed < ActorAnimation.Contact(swing.Action)) {
+            world.S.Actor.Swing = swing with { Elapsed = elapsed };
+        } else {
+            world.S.Actor.Swing = null;
+            Land(swing, null, elapsed);
+        }
     }
 
     /// <summary>
@@ -83,7 +92,7 @@ public sealed class Swings(World world) {
     /// A torch leaves alone a wolf in the air in a throat leap or feeding, and sends the ones it burns running for a
     /// moment.
     /// </summary>
-    private void Land(Swing swing) {
+    private void Land(Swing swing, WeaponSwing? weapon, float elapsed) {
         if (swing.Action == ActorAction.NetSwing) { world.Firebugs.Sweep(swing.Aim); return; }
         var shape = Shape(swing.Action);
         bool torch = swing.Action == ActorAction.TorchSwing;
@@ -91,8 +100,13 @@ public sealed class Swings(World world) {
         // A wolf that falls leaves the list, so it is walked from its end.
         for (int i = wolves.Count - 1; i >= 0; i--) {
             var wolf = wolves[i];
-            if (torch && (wolf.Leap > 0 && WolfSnap.InAir(wolf) || wolf.Feeding) || !Touches(shape, world.Player,
-                swing.Aim, wolf)) continue;
+            if (torch && (wolf.Leap > 0 && WolfSnap.InAir(wolf) || wolf.Feeding)) continue;
+            if (weapon != null) {
+                var hits = world.S.Actor.SwingHits;
+                if (hits.Contains(wolf.Id) || !weapon.TouchesDuring(world.Player, swing.Aim, wolf, swing.Elapsed, elapsed)) continue;
+                hits.Add(wolf.Id);
+                if (weapon.IsBucket) world.Play("bucket_hit", wolf.Pos);
+            } else if (!Touches(shape, world.Player, swing.Aim, wolf)) continue;
             world.Strike(wolf, swing.Damage + ((float)rolls.NextDouble() * 2 - 1) * swing.Spread, burnt: torch);
             if (torch) wolf.Flee = World.FleeSeconds;
         }
