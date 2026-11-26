@@ -1182,14 +1182,15 @@ A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that 
 
 The Recipe map badge on the bottom bar opens `RecipeMap` over the running game.
 `UiKit.LinkRecipeMap` lets Alt-click on an item slot or recipe card look up its item through `RecipeMap.OpenAt` without
-running the slot's usual action. An item link in the Goal Log uses the same entry point with the game still paused.
+running the slot's usual action, including adding or removing a filter entry.
+An item link in the Goal Log uses the same entry point with the game still paused.
 Closing the map returns to the panel or goal details underneath.
 `PlayerControl.Update` moves nobody while it shows, and a card reveals its name and icon when `World.Had` knows its item or `World.Reached` records its building.
 `RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
 and the rest go on lines below. When a recipe takes a spare root in the same category as a second ingredient, the
 first column can hold that root beside the product, and the main ingredient connects from above.
 `MapBuilding` attaches each building to the material it costs most, including the staged costs of a mine. When
-materials tie, the first one listed is used.
+materials tie, the first one listed is used. Marking a mine reveals its plan without marking it as built.
 `MapTree` draws arrows to the products and highlights those connected to the chosen card.
 A `MapNode` draws a filled icon slot for a discovered item and a question mark in a dashed slot otherwise.
 `MapItemLink` also hides undiscovered names and icons in the Item tree, chips, thumbnails and tooltips.
@@ -1219,6 +1220,7 @@ The Back button restores the main map at its previous selection and scroll posit
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
 `SaveState.Obtained` holds every item the settlement has gathered, grown, bought or started with; with what it made, which is among `SaveState.Milestones`, those are the items the recipe map shows as known (`World.Had`).
 Everything such an item is made of is known with it (`GameData.EndsUpIn`), so no ingredient looks unmade beside its product: a new settlement's steel axe and bottle make their whole chains known. A filled vessel also makes the liquid it holds known.
+Plumbing records the liquid when it reaches storage, and drawing liquid into a vessel also records it.
 A save written before `Obtained` existed loads with it empty, so a raw resource it made nothing of shows as not made until it is gathered again.
 `GameData.MadeFrom` gives the item another is made out of: its recipe's first input, or the first `From` of its entry in `GameData.Sources` when no recipe makes it.
 `GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item with its own map entry is on the map once.

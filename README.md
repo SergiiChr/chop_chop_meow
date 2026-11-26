@@ -629,8 +629,8 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 
 The recipe map icon next to Crafting on the bottom bar opens the map over the whole screen.
 Esc or its close button closes it.
-Alt-click an item slot or recipe card to open the map at that item. The map scrolls to the item, highlights it and
-opens its details. Closing the map returns to the panel you came from.
+Alt-click an item slot, recipe card or item in a storage filter to open the map without acting on the item.
+The map scrolls to the item, highlights it and opens its details. Closing the map returns to the panel you came from.
 Opening it from the bottom bar or by Alt-clicking lets the game run underneath.
 Opening it from a goal keeps the pause menu open underneath.
 Movement controls are disabled while the map is open.
@@ -638,7 +638,7 @@ An item discovered while the map is open reveals its name and icon without reope
 
 - The map groups items by category. Coal and the iron, steel and tin chains are in **Metals**. The wheat chain is in
   **Food**. Follow the arrows from a material to what it makes. A building branches from the material it costs most.
-  Discovered cards name where the item is made or found.
+  Discovered cards name where the item is made or found. Marking a mine site reveals its plan.
 - Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
   Undiscovered items and buildings show as question marks. You can select them on the main map, and the details panel
   shows the same dashed question-mark badge. Their details and Item trees stay hidden until discovery.

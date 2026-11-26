@@ -1482,7 +1482,7 @@ public sealed partial class World {
     private static Inventory NewWageSlot() => new() { Slots = 1, CoinStack = Inventory.UnlimitedCoins, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins, and a tool slot only the tools its rules take.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
-        box == t.PlumbingSlot ? (item == "steel_pipe" ? null : "The Plumbing slot only takes steel pipes.") :
+        box == t.PlumbingSlot ? (item == Plumbing.InstallMaterial ? null : "The Plumbing slot only takes steel pipes.") :
         Barrel.Is(item) && box != t.Inventory && BoxIndex(t, box) >= 0 ? $"Barrel does not fit in {Lower(Data.Name(t.Kind))}." :
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
@@ -1711,7 +1711,7 @@ public sealed partial class World {
         if (HeldByOthers(barrel)) return false;
         S.Backpack.Add(item, 1);
         if (barrel.PlumbingSlot is Inventory plumbingSlot && plumbingSlot.Count > 0)
-            Construction.GiveBack(new Dictionary<string, int> { ["steel_pipe"] = plumbingSlot[Plumbing.InstallMaterial] }, barrel.Pos);
+            Construction.GiveBack(new Dictionary<string, int> { [Plumbing.InstallMaterial] = plumbingSlot[Plumbing.InstallMaterial] }, barrel.Pos);
         S.Things.Remove(barrel);
         Play("wood_rocks_inventory", barrel.Pos);
         PlayerActed?.Invoke(ActorAction.PickUp, barrel.Pos);
@@ -2583,7 +2583,7 @@ public sealed partial class World {
             if (!Downed && S.Torch > 0) { S.TorchLit = true; Play("start_fire", Player); Say($"Torch lit: {S.Torch / Data.DaySeconds * 24:0.#} hours of light left."); }
         }
         // Burning out uses the torch up; moving it out of the backpack puts it out, and it goes as a fresh one.
-        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); S.Backpack.Remove("torch", 1); Say("Your torch burned out."); } else if (S.Torch > 0 && S.Backpack["torch"] == 0) { bool lit = S.TorchLit || S.TorchKindling > 0; S.Torch = 0; PutOutTorch(); if (lit) Say("Your torch went out as it left the backpack."); }
+        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); S.Backpack.Remove(TorchItem, 1); Say("Your torch burned out."); } else if (S.Torch > 0 && S.Backpack[TorchItem] == 0) { bool lit = S.TorchLit || S.TorchKindling > 0; S.Torch = 0; PutOutTorch(); if (lit) Say("Your torch went out as it left the backpack."); }
     }
     /// <summary>Explores the tiles in every player's sight and replaces the memory of everything there with its current state.</summary>
     public void Look() { foreach (var p in S.Players) using (ActAs(p)) LookAround(); }

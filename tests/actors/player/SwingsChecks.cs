@@ -15,6 +15,7 @@ public static class SwingsChecks {
         Test(CheckAToolAttackSwingsTheSelectedTool, data);
         Test(CheckMortarAndPestleDoesNotAttack, data);
         Test(CheckNewWeaponsReachTheAimedWolfWithTheirWorkingEnd, data);
+        Test(CheckOneSwingHitsEveryWolfInItsPath, data);
         Test(CheckBucketOnlyRingsWhenItHits, data);
         Test(CheckRakeAndBucketComeDownFromOverhead);
         Test(CheckHammerAndChiselSwingsKeepTheirWorkingEndsUp);
@@ -77,6 +78,20 @@ public static class SwingsChecks {
             Require(behind.Health == data.WolfHealth && far.Health == data.WolfHealth,
                 $"{tool} must miss wolves behind the player and beyond the working end.");
         }
+    }
+
+    /// <summary>Even before receiving network IDs, two wolves in the same swing each take one hit.</summary>
+    private static void CheckOneSwingHitsEveryWolfInItsPath(GameData data) {
+        var world = AxeNight(data);
+        Give(world, Bucket.Item);
+        var first = StillWolf(world, new Vector2(1.16f, -.08f));
+        var second = StillWolf(world, new Vector2(1.16f, .08f));
+        int clangs = 0;
+        world.Sound += (name, _) => { if (name == "bucket_hit") clangs++; };
+        world.Attack(Vector2.Right, Bucket.Item);
+        SnapTick(world, 1.3f);
+        Require(first.Health < data.WolfHealth && second.Health < data.WolfHealth && clangs == 2,
+            $"Each of the two wolves must take one clang. Got {first.Health}, {second.Health} health and {clangs} clangs.");
     }
 
     /// <summary>The steel bucket makes its own clang exactly once on a hit, never on a swing that misses.</summary>

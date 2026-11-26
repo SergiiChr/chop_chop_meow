@@ -8,6 +8,44 @@ using static SetupSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
+    /// <summary>Alt-click can look up a filter entry in either list without adding or removing it.</summary>
+    private async Task CheckAltClickFilterItemsLooksThemUpWithoutEditingFilters() {
+        var chest = await OpenFilters(ThingKind.Chest);
+        await Click(Named("filter_add_in")!);
+        var original = chest.Inventory.InputFilter.ToArray();
+        await Click(Named("pick_stone")!, alt: true);
+        Require(recipeMap.Visible && recipeMap.Chosen == "stone" && original.SequenceEqual(chest.Inventory.InputFilter),
+            "Alt-clicking Stone in the picker must open the Recipe map without changing the input filter.");
+        await KeyStroke(Key.Escape);
+        await Click(Named("pick_stone")!);
+        await Until(() => Named("filter_in_stone") != null, "Stone added to the filter", 2);
+        await Click(Named("filter_in_stone")!, alt: true);
+        Require(recipeMap.Visible && recipeMap.Chosen == "stone" && chest.Inventory.InputFilter.Contains("stone"),
+            "Alt-clicking the listed Stone must open the Recipe map without taking it off the filter.");
+        await KeyStroke(Key.Escape);
+        await Click(Named("filters_close")!);
+        RemoveThings(Hosted, t => t == chest);
+        await CloseWithEsc();
+    }
+
+    /// <summary>The map can reveal a marked mine without claiming the settlement has built it.</summary>
+    private async Task CheckMarkedMineIsDiscoveredWithoutBeingBuilt() {
+        var start = Hosted.Player;
+        var cliff = await StandAtIronCliff();
+        var mine = Hosted.Construction.Build(ThingKind.Mine, cliff.MineSpot)!;
+        await Frames();
+        await OpenRecipeMap();
+        await Click(RecipeMapCard(mine.Kind.Id()));
+        var details = recipeMap.FindChild("map_details", true, false);
+        Require(HasLabel(details, "Mine") && HasLabel(details, "Discovered") && !HasLabel(details, "Built before"),
+            "A marked site should reveal Mine without saying it was built.");
+        await KeyStroke(Key.Escape);
+        RemoveThings(Hosted, t => t == mine);
+        Warp(Hosted, start);
+        await CloseWithEsc();
+        await Frames();
+    }
+
     /// <summary>Selecting charcoal shows its details in a vertical panel alongside the map.</summary>
     private async Task CheckRecipeMapDetailsAreStackedOnTheRight() {
         Achieve(Hosted, "charcoal"); await Frames();

@@ -103,8 +103,8 @@ public sealed class Swings(World world) {
             if (torch && (wolf.Leap > 0 && WolfSnap.InAir(wolf) || wolf.Feeding)) continue;
             if (weapon != null) {
                 var hits = world.S.Actor.SwingHits;
-                if (hits.Contains(wolf.Id) || !weapon.TouchesDuring(world.Player, swing.Aim, wolf, swing.Elapsed, elapsed)) continue;
-                hits.Add(wolf.Id);
+                if (hits.Contains(wolf) || !weapon.TouchesDuring(world.Player, swing.Aim, wolf, swing.Elapsed, elapsed)) continue;
+                hits.Add(wolf);
                 if (weapon.IsBucket) world.Play("bucket_hit", wolf.Pos);
             } else if (!Touches(shape, world.Player, swing.Aim, wolf)) continue;
             world.Strike(wolf, swing.Damage + ((float)rolls.NextDouble() * 2 - 1) * swing.Spread, burnt: torch);

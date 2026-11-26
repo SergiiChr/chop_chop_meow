@@ -29,7 +29,7 @@ public partial class RecipeMap : Control {
     /// <summary>How long a jumped-to item stays lit, in seconds.</summary>
     public const float LitSeconds = 1.5f;
     public const string AltClickHint = "Alt-click: open the Recipe map";
-    public const string ItemTreeHint = "Alt-click: open the item tree";
+    public const string ItemTreeHint = "Alt-click: open the Item tree";
 
     public RecipeMap(UiKit kit, SidePanel panel) {
         this.kit = kit; this.panel = panel; world = kit.World;
@@ -265,7 +265,9 @@ public partial class RecipeMap : Control {
         identity.AddThemeConstantOverride("separation", 3); header.AddChild(identity);
         var name = Style.Text(data.NameOnMap(item), 23, Style.Ink, Style.Head, wrap: true);
         name.Name = "detail_name"; identity.AddChild(name);
-        var known = Style.Pill(building == null ? "Made before" : "Built before", Style.Tag(Style.Sage), Style.SlotFill, 12);
+        // Marking a mine reveals its plan before the entrance, frame and rails are built.
+        string status = building?.Kind == ThingKind.Mine ? "Discovered" : building == null ? "Made before" : "Built before";
+        var known = Style.Pill(status, Style.Tag(Style.Sage), Style.SlotFill, 12);
         known.SizeFlagsHorizontal = SizeFlags.ShrinkBegin; identity.AddChild(known);
         var description = building is MapBuilding plan ? data.Buildings[plan.Kind].Description : data.Items[item].Description;
         if (description is { Length: > 0 } said) {

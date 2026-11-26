@@ -103,7 +103,7 @@ public sealed class PlayerState {
     /// <summary>The next axe swing is the sideways sweep: it takes turns with the overhead chop.</summary>
     internal bool SweepNext;
     internal readonly List<float> TorchSwings = new();
-    internal readonly List<int> SwingHits = new(16);
+    internal readonly List<Wolf> SwingHits = new(16);
     /// <summary>Server: the inventory and slot the held stack lies in; the slot keeps its identity when a swap or a sort moves it.</summary>
     internal Inventory? HeldBox;
     internal Inventory.Slot? HeldSlot;

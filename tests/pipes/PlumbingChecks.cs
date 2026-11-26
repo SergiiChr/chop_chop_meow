@@ -8,6 +8,7 @@ using static WorldSteps;
 
 public static class PlumbingChecks {
     public static void Run(GameData data) {
+        Test(CheckPumpedWaterBecomesKnownWhenStored, data);
         Test(CheckEachPumpFillsFromItsOwnInlet, data);
         Test(CheckBranchesShareByReceiver, data);
         Test(CheckWaterNeedsConnectedSidesToTurnACorner, data);
@@ -18,6 +19,16 @@ public static class PlumbingChecks {
         Test(CheckClosedPlumbingStaysPressurizedAndFull, data);
         Test(CheckSeparatedPipesKeepTheirWaterThroughLoading, data);
         JamPlumbingChecks.Run(data);
+    }
+
+    /// <summary>A settlement discovers water when the pump first sends it somewhere it can be used.</summary>
+    private static void CheckPumpedWaterBecomesKnownWhenStored(GameData data) {
+        var (world, pump, barrel) = PumpAndBarrel(data);
+        Require(!world.Had(Water.Liquid), "Water should be undiscovered before the pump runs.");
+        PumpFully(world, pump);
+        world.Tick(1);
+        Require(barrel.Inventory[Water.Liquid] > 0 && world.Had(Water.Liquid),
+            "Pumped water must be discovered once it arrives in the barrel.");
     }
 
     private static void CheckEachPumpFillsFromItsOwnInlet(GameData data) {

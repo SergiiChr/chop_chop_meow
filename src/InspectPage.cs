@@ -126,9 +126,9 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     protected void BagGridWithPlumbingSlot(Action<string> move, string hint, Func<string, bool>? wanted) {
         if (thing.PlumbingSlot is not Inventory plumbingSlot) { BagGrid(move, hint, wanted: wanted); return; }
         BagGrid(item => {
-            if (item == "steel_pipe") moves.Stack(world.S.Backpack, plumbingSlot, item, thing);
+            if (item == Plumbing.InstallMaterial) moves.Stack(world.S.Backpack, plumbingSlot, item, thing);
             else move(item);
-        }, hint, wanted: item => item == "steel_pipe" ? plumbingSlot.Room(item) > 0 : wanted?.Invoke(item) == true);
+        }, hint, wanted: item => item == Plumbing.InstallMaterial ? plumbingSlot.Room(item) > 0 : wanted?.Invoke(item) == true);
     }
 
     /// <summary>The backpack drawer, where Shift and Ctrl load this station.</summary>

@@ -109,7 +109,7 @@ internal sealed class WeaponSwing(string item, ActorAction action, float duratio
     public static WeaponSwing? Of(ActorAction action) => ByAction.GetValueOrDefault(action);
 
     public static WeaponSwing? ForItem(string item) {
-        if (Bucket.Is(item)) return Swings[^1];
+        if (Bucket.Is(item)) item = Bucket.Item;
         foreach (var swing in Swings) if (swing.Item == item) return swing;
         return null;
     }

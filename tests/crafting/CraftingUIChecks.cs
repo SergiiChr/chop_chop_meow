@@ -38,6 +38,8 @@ public partial class Game {
         await TestClean(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
         await TestClean(CheckCraftingLeavesTheRecipeMapOnTheBottomBar);
         await TestClean(CheckRecipeMapOpensFromTheBottomBarAndShowsEveryItemOnce);
+        await TestClean(CheckAltClickFilterItemsLooksThemUpWithoutEditingFilters);
+        await TestClean(CheckMarkedMineIsDiscoveredWithoutBeingBuilt);
         await TestClean(CheckRecipeMapDetailsAreStackedOnTheRight);
         await TestClean(CheckRecipeMapGroupsCoalAndWheatWithTheirChains);
         await TestClean(CheckUndiscoveredMapItemsStayAnonymous);
