@@ -18,9 +18,17 @@ Files named `backup-*`, `net-check-*`, `server-check-*`, `performance-*` and `pl
 
 1. Fast-forward main as [docs/RELEASE.md](../../../docs/RELEASE.md) says, and read its version:
    `git grep -h -o "int Version { get; set; } = [0-9]*" main -- src`.
-2. Read each slot's `Version` and the time it was written.
+2. Make a test worktree of main and work from it, so that the scratch files and the test servers stay out of the main
+   checkout:
+
+   ```sh
+   git worktree add --detach ../worktrees/chop_chop_meow-saves main
+   ln -s "$PWD/.tools" ../worktrees/chop_chop_meow-saves/.tools
+   ```
+
+3. Read each slot's `Version` and the time it was written.
    Leave slots already at main's version alone.
-3. Copy each slot to convert to `backup-<slot>-v<old>-before-v<new>-<yyyymmdd>.json` beside it.
+4. Copy each slot to convert to `backup-<slot>-v<old>-before-v<new>-<yyyymmdd>.json` beside it.
    Never write over an existing backup, and never write over a slot that is newer than its backup.
    Always convert from the backup, so a second try never starts from a half-converted file.
 
@@ -47,13 +55,14 @@ For each raise, compare the merge with its first parent:
   A new rule can refuse an old building that lacks a new part.
   For example, the reinforced furnace gained a one-slot holder for the glassblowing pipe, so older furnaces had none.
 
-Write the conversion as a throwaway Python script in the worktree's `tmp/saves/`, run it with `python3 -I`, and give
-it one step per change.
+Write the conversion as a throwaway Python script in the test worktree's `tmp/saves/`, run it with `python3 -I`, and
+give it one step per change.
 Name copies of C# code saved there `*.cs.txt`: the build compiles every `.cs` file in the worktree, `tmp/` included.
 
 ## Test each slot on a headless server
 
-Load each converted slot in a worktree, never in the main checkout.
+Load each converted slot in the test worktree, never in the main checkout or in the merged branch's worktree, which
+may lack main's other changes.
 A worktree's `./build.py play` copies the player's saves in first, so a server's autosave never reaches the real slots.
 
 ```sh
@@ -92,7 +101,19 @@ A refusal while the JSON is read names the field instead, such as `could not be 
 Path: $.Things[410].Kind`.
 Fix the cause in the conversion script, convert again from the backup and test again, until every slot loads.
 
+## Clean up
+
+Once every slot loads:
+
+1. Stop any server still running: `pgrep -a ChopChopMeow`, then `kill` its process id.
+2. Remove the test worktree with its scratch files: `git worktree remove ../worktrees/chop_chop_meow-saves`.
+3. Remove the merged branch's worktree and its local branch.
+   `git worktree remove` refuses a worktree with changes, and `git branch -d` a branch that is not merged into main:
+   stop and ask when either refuses, never force them.
+   Remove only the worktree and branch of the merge this run is for, never another session's.
+4. Keep the backups beside the slots.
+
 ## Report
 
 For each slot, give its version before and after, each change made to it, and its backup's file name.
-Name any slot left alone and why.
+Name any slot left alone and why, and what the clean up removed.
