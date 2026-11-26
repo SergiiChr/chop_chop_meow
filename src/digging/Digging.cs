@@ -59,9 +59,10 @@ public partial class World {
         return Construction.IsZone(t.Kind) ? Math.Abs(p.X - t.Pos.X) < reach && Math.Abs(p.Y - t.Pos.Y) < reach : p.DistanceTo(t.Pos) < reach;
     }
 
-    /// <summary>Clears away the stumps and bushes under a new building, yard or crate.</summary>
+    /// <summary>Clears away the stumps, bushes and pages fallen off trees under a new building, yard or crate.</summary>
     internal void ClearGround(Thing built) {
         foreach (var kind in ClearedKinds) S.Things.RemoveAll(kind, t => Clears(built, t.Pos));
+        Diary.ClearUnder(built);
     }
     /// <summary>Clears away a stump or bush standing on a tile a gravel path is laid on.</summary>
     internal void ClearTile(Vector2I tile) {

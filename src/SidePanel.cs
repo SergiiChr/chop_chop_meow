@@ -97,6 +97,8 @@ public partial class SidePanel : MovableWindow {
     public PanelContainer Aside { get; }
     private readonly VBoxContainer asideContent;
     private bool asideShown;
+    /// <summary>Room right of and below a page for the pills that sit on its slots' corners.</summary>
+    public const int PillRoom = 8;
     /// <summary>The gap between the panel and the window beside it.</summary>
     private const float AsideGap = 12;
     /// <summary>The player's control of the world, which also needs this panel, so the game sets it once both exist.</summary>
@@ -121,6 +123,8 @@ public partial class SidePanel : MovableWindow {
         tools = new PageTools(this, kit, moves, new PageMemory(), cursor);
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top; Visible = false;
+        // A page wider than the panel, such as the Diary's four pages a row, widens it to the left, so its right edge stays on the screen.
+        GrowHorizontal = GrowDirection.Begin;
         Bag = new BackpackDrawer(kit, this);
         AddChild(DoorKey);
         Aside = new PanelContainer { Name = "aside", Visible = false }; Aside.AddThemeStyleboxOverride("panel", Style.Board);
@@ -136,8 +140,7 @@ public partial class SidePanel : MovableWindow {
         HeadingTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill; heading.AddChild(HeadingTitle);
         heading.AddChild(kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "close"));
         scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
-        // Room for the pills that sit on the slots' corners.
-        inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);
+        inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", PillRoom); inset.AddThemeConstantOverride("margin_bottom", PillRoom); scroll.AddChild(inset);
         content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddChild(content);
         world.Replaced += () => { Selection = default; awaited = 0; Close(); };
     }

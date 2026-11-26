@@ -9,6 +9,8 @@ namespace ChopChopMeow;
 /// On the lake it floats and bobs; off a tree it flutters down, swinging from side to side and tipping into each swing.
 /// </summary>
 public static class PageShape {
+    /// <summary>The name of the page's icon, rendered from this model, that the Diary's cells show.</summary>
+    public const string Icon = "diary_page";
     /// <summary>The sheet's width and length in metres, the size of the reference's sheets.</summary>
     private const float Width = .25f, Length = .34f;
     /// <summary>How far its sides curl up above its middle.</summary>

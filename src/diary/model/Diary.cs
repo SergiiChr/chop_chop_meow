@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -97,6 +98,15 @@ public sealed class Diary(World world) {
         var page = world.Add(ThingKind.FallenPage, at, 1);
         p.FallenPage = page.Id;
         return page;
+    }
+
+    /// <summary>Takes away each page fallen off a tree that a new building, yard or crate covers, so a later chop can drop its player's page again.</summary>
+    internal void ClearUnder(Thing built) {
+        foreach (var p in world.S.Players.Concat(world.S.Absent.Values))
+            if (p.FallenPage != 0 && world.Find(p.FallenPage) is Thing page && World.Clears(built, page.Pos)) {
+                world.S.Things.Remove(page);
+                p.FallenPage = 0;
+            }
     }
 
     /// <summary>Floats the lake's page at a spot of its own in the shallows, as a new world starts.</summary>

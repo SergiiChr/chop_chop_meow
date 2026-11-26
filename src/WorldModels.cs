@@ -411,6 +411,7 @@ public static class WorldModels {
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
             case "leaves": return Build(new Thing { Kind = ThingKind.LeafSpot }).Root;
+            case PageShape.Icon: return PageShape.Build().Root;
             case "crate": return Build(new Thing { Kind = ThingKind.Crate }).Root;
             // Loose iron left the world, but its lump still makes the iron ore icon.
             case "iron_ore": { var lump = new Node3D(); LooseOre(lump, "loose_iron", 0, "a35a2e", "8b4f2b"); return lump; }

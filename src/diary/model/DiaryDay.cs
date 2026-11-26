@@ -3,12 +3,17 @@ using System;
 namespace ChopChopMeow;
 
 /// <summary>One day the diary's writer wrote about: the day's number and its paragraphs.</summary>
-/// <param name="Lines">Paragraphs in order; <see cref="Illegible"/> inside one stands for a word nobody can read, and a paragraph that is only <see cref="Scribbles"/> for a line of scribbles.</param>
+/// <param name="Lines">
+/// Paragraphs in order: <see cref="Illegible"/> inside one stands for a word nobody can read, <see cref="FallsApart"/> for where the writing starts to fall apart,
+/// and a paragraph that is only <see cref="Scribbles"/> for a line of scribbles.
+/// </param>
 public sealed record DiaryDay(int Number, params string[] Lines) {
     /// <summary>Marks a word in a paragraph that is drawn as a scribble.</summary>
     public const string Illegible = "[illegible]";
     /// <summary>A paragraph drawn as a line of scribbles.</summary>
     public const string Scribbles = "[scribbles]";
+    /// <summary>Marks where the writing in a paragraph starts to fall apart, as if written in the dark, getting worse to the paragraph's end.</summary>
+    public const string FallsApart = "[falls apart]";
 
     private static readonly DiaryDay[] all = [
         new(1,
@@ -34,7 +39,7 @@ public sealed record DiaryDay(int Number, params string[] Lines) {
         new(42, "Oh well. I got lost in the caves. I have some supplies (yeah, it's just berries) to last me a few days and wolves don't seem to bother me here, so it's not all bad. Fire keeps me warm."),
         new(45,
             "I guess that's it. I keep going in circles. One way is a dead end. I hear growling from the other tunnel so I'm not going there.",
-            "My last log is almost done burning and I'm definitely not getting out in the dark. I miss my " + Illegible,
+            "My last log is almost done burning and I'm definitely not getting out in the dark. " + FallsApart + "I miss my " + Illegible,
             Scribbles),
     ];
 

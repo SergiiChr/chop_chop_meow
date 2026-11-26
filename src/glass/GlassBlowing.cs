@@ -188,8 +188,8 @@ internal sealed class GlassBlowing(World world) {
         if (forge.GlassResult == GlassResult.Melted) return "Glass melted. Starting again with a fresh batch.";
         if (forge.GlassResult == GlassResult.Success) return "Glass jar finished";
         if (forge.Tools?["steel_pipe"] != 1) return "Put one steel pipe in the Glass blowing pipe slot.";
-        if (forge.GlassBlower == 0 && !world.CanStand(forge.ToWorld(BlowStand))) return "Clear ground in front of the furnace for the glass blower.";
-        if (forge.GlassBlower == 0 && !world.CanStand(forge.ToWorld(World.BellowsStand))) return "Clear ground behind the furnace for the bellows.";
+        if (forge.GlassBlower == 0 && !world.CanStandDry(forge.ToWorld(BlowStand))) return "Clear ground in front of the furnace for the glass blower.";
+        if (forge.GlassBlower == 0 && !world.CanStandDry(forge.ToWorld(World.BellowsStand))) return "Clear ground behind the furnace for the bellows.";
         if (forge.Heat > MaxHeat) return "Too hot · stop pumping";
         if (forge.Heat < MinHeat) return "Too cold · pump the bellows";
         return forge.GlassBlower == 0 ? "Needs a glass blower and a bellows operator." : "Blowing glass";

@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// One diary day opened large in the middle of the screen: a sheet of paper with the day written on it by hand,
-/// scribbles where the writing cannot be read. The close button, Esc or a click beside the sheet closes it.
+/// falling apart where it was written in the dark and scribbles where it cannot be read. The close button, Esc or a click beside the sheet closes it.
 /// Opening a day marks it read.
 /// </summary>
 public partial class ReadingSheet : Control {
@@ -15,9 +15,13 @@ public partial class ReadingSheet : Control {
     private readonly UiKit kit;
     private readonly Label title;
     private readonly RichTextLabel text;
+    /// <summary>The scale the scribbles' drawings are imported at, so they stay sharp on a large screen.</summary>
+    private const int ScribbleScale = 2;
 
     /// <summary>The number of the day open, or zero while closed.</summary>
     public int Day { get; private set; }
+    /// <summary>The words of the open day as the player reads them, without the drawings.</summary>
+    public string Reading => text.GetParsedText();
 
     public ReadingSheet(UiKit kit) {
         this.kit = kit;
@@ -30,6 +34,7 @@ public partial class ReadingSheet : Control {
         text.AddThemeFontOverride("normal_font", Style.Hand); text.AddThemeFontSizeOverride("normal_font_size", 30);
         text.AddThemeColorOverride("default_color", Style.DiaryInk);
         text.AddThemeConstantOverride("paragraph_separation", 14);
+        text.CustomEffects = [new FallingApart()];
         column.AddChild(text);
         kit.World.Replaced += () => { Visible = false; Day = 0; };
     }
@@ -50,14 +55,18 @@ public partial class ReadingSheet : Control {
         Visible = false; Day = 0;
     }
 
-    /// <summary>A day's paragraphs as the sheet's text, with a scribble drawn in for each word or line nobody can read.</summary>
+    /// <summary>A day's paragraphs as the sheet's text, falling apart where they say so, with a scribble drawn in for each word or line nobody can read.</summary>
     private static string Written(DiaryDay day) {
         var written = new StringBuilder();
         foreach (var paragraph in day.Lines) {
             if (written.Length > 0) written.Append('\n');
-            if (paragraph == DiaryDay.Scribbles) { written.Append($"[img height=34]{ScribbleLine.ResourcePath}[/img]"); continue; }
-            written.Append(paragraph.Replace(DiaryDay.Illegible, $"[img height=26]{ScribbleWord.ResourcePath}[/img]"));
+            if (paragraph == DiaryDay.Scribbles) { written.Append(Drawn(ScribbleLine)); continue; }
+            var line = paragraph.Replace(DiaryDay.Illegible, Drawn(ScribbleWord));
+            written.Append(line.Contains(DiaryDay.FallsApart) ? line.Replace(DiaryDay.FallsApart, "[falling_apart]") + "[/falling_apart]" : line);
         }
         return written.ToString();
     }
+
+    /// <summary>A scribble's drawing in the text, at the size it was drawn.</summary>
+    private static string Drawn(Texture2D scribble) => $"[img height={scribble.GetHeight() / ScribbleScale}]{scribble.ResourcePath}[/img]";
 }

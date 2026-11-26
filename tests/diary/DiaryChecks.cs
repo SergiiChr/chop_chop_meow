@@ -8,7 +8,10 @@ using static WorldSteps;
 using static SandSteps;
 using static DiarySteps;
 
-/// <summary>Checks of the diary: where its pages turn up, who sees a page lying in the world, the pop-up a find waits behind, reading, saves and its goal.</summary>
+/// <summary>
+/// Checks of the diary: where its pages turn up, who sees a page lying in the world, the pop-up a find waits behind, reading, saves and its goal,
+/// and the lake's shallows, where people wade but nothing is built.
+/// </summary>
 public static class DiaryChecks {
     public static void Run(GameData data) {
         Test(CheckChoppingDropsAPageBesideTheTreeForTheChopperAlone, data);
@@ -19,6 +22,8 @@ public static class DiaryChecks {
         Test(CheckEveryoneWadesTwoMetresIntoTheLake, data);
         Test(CheckOpeningADayMarksItRead, data);
         Test(CheckAFallenPageWaitsForItsPlayerToComeBack, data);
+        Test(CheckBuildingOverAFallenPageClearsItForAnotherChop, data);
+        Test(CheckBuildingsAreWorkedFromDryGroundOnly, data);
         Test(CheckFindsAndReadDaysComeBackFromASave, data);
         Test(CheckTheDiaryGoalCountsEachPlayersOwnPages, data);
     }
@@ -147,6 +152,33 @@ public static class DiaryChecks {
         Require(world.Find(page.Id) == page, "a page off a tree should stay where it fell when its player leaves");
         var back = world.Arrive("guest", 9);
         Require(Diary.ShowsTo(back, page) && !Diary.ShowsTo(world.Me, page), "a player back in the game should find their page where it fell");
+    }
+
+    private static void CheckBuildingOverAFallenPageClearsItForAnotherChop(GameData data) {
+        var world = DiaryWorld(data);
+        var guest = world.Arrive("guest", 2);
+        Give(guest, "steel_axe");
+        var page = DropPage(world, guest, world.Player + new Vector2(3, 0));
+        world.Depart(guest.Id);
+        Give(world, "wood", 6); Give(world, "stone", 4);
+        Require(world.Construction.Build(ThingKind.Campfire, page.Pos) != null, "the host should build a campfire over a page they cannot see");
+        Require(world.Find(page.Id) == null, "a building over a fallen page should clear the page away");
+        var back = world.Arrive("guest", 9);
+        var tree = world.Add(ThingKind.Tree, Terrain.Spawn + new Vector2(10, -10), 1000);
+        world.As(back, () => ChopUntilAPageFalls(world, tree));
+    }
+
+    private static void CheckBuildingsAreWorkedFromDryGroundOnly(GameData data) {
+        var world = EmptyWorld(data);
+        var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
+        var intake = (Vector2)Terrain.TileAt(bank + Vector2.Down * 1.1f);
+        world.Player = intake + new Vector2(0, -3);
+        Give(world, "steel_bar", 4); Give(world, "stone", 10); Give(world, "wood_parts", 4);
+        // Turned along the shore, the pump's handle comes in the shallows, where people wade.
+        var handle = intake + World.BellowsStand.Rotated(Mathf.Pi / 2);
+        Require(world.CanStand(handle) && Terrain.InLake(handle), "a handle turned along the shore should come in the shallows");
+        Require(world.Construction.PlacementBlock(ThingKind.Pump, intake, rotation: Mathf.Pi / 2) == "Turn the handle toward open ground on the bank.",
+            "a pump's handle should be worked from dry ground, not the shallows");
     }
 
     private static void CheckFindsAndReadDaysComeBackFromASave(GameData data) {

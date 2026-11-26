@@ -13,6 +13,7 @@ public partial class Game {
         await TestClean(CheckClickingAFallenPagePicksItUpAndTheBadgeMarksUnreadDays);
         await TestClean(CheckARightClickWadesToTheLakePage);
         await TestClean(CheckTheDiaryGoalCountsPagesAndOpensTheDiary);
+        await TestClean(CheckTheLastDaysWritingFallsApartWithNoMarkupShowing);
     }
 
     private async Task CheckAFindWaitsBehindTakeAndOpensItsDayInTheDiary() {
@@ -32,7 +33,8 @@ public partial class Game {
         await Until(() => !findPrompt.Visible && hotbar.DiaryBadge.Visible, "the pop-up closing and the first find stamping the diary's badge into the bottom bar", 3);
         var missing = Named("diary_day_2")!;
         var found = Named("diary_day_40")!;
-        Require(missing.Disabled && missing.Text == "" && found.Text == "Day 40" && !found.Disabled, "The diary must show a found day's tile and an empty space for a day not found.");
+        Require(missing.Disabled && HasLabel(missing, "?"), "A day not found must show a question mark on its page and not open.");
+        Require(!found.Disabled && HasLabel(found, "9"), "A found day's page must show its place in the diary, day 40 being the ninth.");
         since = sounds.Played;
         await KeyStroke(Key.Escape);
         Require(!sheet.Visible && panel.Page == Page.Diary && sounds.Heard("page_turn", since), "Esc must close the open day with a page turn and leave the diary open.");
@@ -93,5 +95,16 @@ public partial class Game {
         await Click((Button)menu.GoalDetails.FindChild("goal_diary", true, false));
         Require(!menu.Visible && !menu.GoalDetails.Visible && panel.Page == Page.Diary, "The goal's diary must close the menu and open the diary, as its badge does.");
         await CloseWithEsc();
+    }
+
+    private async Task CheckTheLastDaysWritingFallsApartWithNoMarkupShowing() {
+        await CloseWithEsc();
+        TakeEveryFind(HostedMe);
+        await Click(hotbar.DiaryBadge);
+        await Until(() => panel.Page == Page.Diary, "the badge opening the diary", 3);
+        await Click(Named("diary_day_45")!);
+        Require(sheet.Visible && sheet.Day == 45 && sheet.Reading.Contains("in the dark. I miss my") && !sheet.Reading.Contains('['),
+            $"Day 45 must read on to where its writing falls apart, with no markup showing: \"{sheet.Reading}\".");
+        await KeyStroke(Key.Escape); await CloseWithEsc();
     }
 }

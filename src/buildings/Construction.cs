@@ -70,7 +70,7 @@ public sealed class Construction(World world) {
             return "Leave your feet and the arrival point clear.";
         if (kind == ThingKind.Pump) {
             if (!Terrain.InLake(p)) return "Place the intake in the freshwater lake’s shallows.";
-            if (!world.CanStand(p + World.BellowsStand.Rotated(rotation))) return "Turn the handle toward open ground on the bank.";
+            if (!world.CanStandDry(p + World.BellowsStand.Rotated(rotation))) return "Turn the handle toward open ground on the bank.";
         } else if (!world.CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         if (digging && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
@@ -80,7 +80,7 @@ public sealed class Construction(World world) {
             var door = p + Doorways.DoorOffset.Rotated(rotation);
             if (!world.CanStand(door) || Terrain.InLake(door, .8f) || world.S.Things.Any(t => t.TakesGround && !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
                 return "Leave open ground in front of the door.";
-            if (!world.CanStand(p + BarrelHaul.LadderApproach.Rotated(rotation))) return "Leave dry, open ground at the cabin's ladder.";
+            if (!world.CanStandDry(p + BarrelHaul.LadderApproach.Rotated(rotation))) return "Leave dry, open ground at the cabin's ladder.";
         }
         foreach (var hut in world.S.Things.Of(ThingKind.Hut)) {
             if (Doorways.DoorPoint(hut).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";

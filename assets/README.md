@@ -222,7 +222,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 The hotbar prefers them over everything else.
 Rerun the command after changing a model.
 
-They cover every item, every building and the workers' hard hat.
+They cover every item, every building, the workers' hard hat and the loose diary page the Diary's cells show.
 
 How they are framed:
 
@@ -241,7 +241,10 @@ How they are framed:
 `ui/` holds hand-written SVG icons:
 
 - Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, book, close, filter, stash and so on), tinted in code.
-- `scribble_word.svg` and `scribble_line.svg`, the scribbles a diary day shows where its writing cannot be read.
+- `scribble_word.svg` and `scribble_line.svg`, the scribbles a diary day shows where its writing cannot be read: cursive
+  loops and arches drawn by a one-off script, whose line, size and spacing go further wrong letter by letter, as
+  writing in the dark does, ending in a stroke trailing down the page.
+  They are imported at twice their size so they stay sharp.
 - `fresh_water.svg`, the water a full bottle pours into a station: a blue droplet in the shape of the corner's thirst icon, used as the item icon since only stations hold it and it has no model.
 
 ## Fonts
