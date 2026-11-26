@@ -609,8 +609,8 @@ public partial class Game {
         Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
         Require(Named("output_steel_parts") != null, "A new anvil must show a slot for steel parts.");
         var slot = panel.Aside.FindChild("tool_hammer", true, false) as ItemSlot;
-        Require(panel.Aside.Visible && slot != null && slot.TooltipText == "Steel hammer slot.",
-            $"A new anvil must show an empty slot beside its page named \"Steel hammer slot.\", not \"{slot?.TooltipText}\".");
+        Require(panel.Aside.Visible && slot != null && slot.TooltipText == "Steel hammer slot.\nAlt-click: open the Recipe map",
+            $"A new anvil's empty steel hammer slot must name the tool and offer the map lookup, not \"{slot?.TooltipText}\".");
         Require(view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null }, "A new anvil must have no hammer lying on its stand.");
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Wooden mallet"))));
         await Frames(3);
