@@ -88,7 +88,7 @@ public partial class Sounds : Node {
     };
     private const float MusicDb = -14;
     public const float MusicFadeSeconds = 4;
-    private Track day = null!, night = null!;
+    private Playlist day = null!, night = null!;
     private readonly Dictionary<string, AudioStream[]> variants = new();
     private readonly Dictionary<string, int> previous = new();
     private Random random = new();
@@ -118,6 +118,7 @@ public partial class Sounds : Node {
     public float MusicVolume = 1;
     public bool DayMusicPlaying => day.Player.Playing;
     public string DayMusicTrack => day.Name;
+    public float DayMusicPosition => day.Position;
     /// <summary>Jumps the current day track to its last moment, so it plays to its end without the wait.</summary>
     public void SkipToDayTrackEnd() => day.SkipToTrackEnd();
     public bool NightMusicPlaying => night.Player.Playing;
@@ -149,8 +150,9 @@ public partial class Sounds : Node {
             var voice = new AudioStreamPlayer(); AddChild(voice); heldVoices.Add(voice);
             heldPlacedVoices.Add(PlacedVoice());
         }
-        day = new Track(this, "path_to_lake_land", "mystic_theme", "jazz_jazz_music", "jazz_bar", "lofi_soul", "groove_soul");
-        night = new Track(this, "forest", "soft_jazz");
+        day = new Playlist(this, "path_to_lake_land", "mystic_theme",
+            "jazz_jazz_music", "jazz_bar", "lofi_soul", "groove_soul");
+        night = new Playlist(this, "forest", "soft_jazz");
         // Loading a sound on its first play would stall that frame.
         foreach (string name in Levels.Keys) Variants(name);
     }
@@ -378,7 +380,7 @@ public partial class Sounds : Node {
     /// Its tracks play in order and wrap to the first after the last; a single track loops seamlessly.
     /// It pauses rather than stopping because starting an MP3 partway through decodes it from the beginning, which stalls the frame for longer the further in it starts.
     /// </summary>
-    private sealed class Track {
+    private sealed class Playlist {
         public readonly AudioStreamPlayer Player;
         private readonly AudioStreamMP3[] streams;
         private float level, at;
@@ -387,7 +389,7 @@ public partial class Sounds : Node {
         public string Name => System.IO.Path.GetFileNameWithoutExtension(Player.Stream.ResourcePath);
         public float Position => Player.Playing ? Player.GetPlaybackPosition() : at;
 
-        public Track(Node parent, params string[] names) {
+        public Playlist(Node parent, params string[] names) {
             streams = names.Select(name => GD.Load<AudioStreamMP3>($"res://assets/music/{name}.mp3")).ToArray();
             streams[0].Loop = streams.Length == 1;
             Player = new AudioStreamPlayer { Stream = streams[0] };
