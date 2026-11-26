@@ -81,7 +81,17 @@ public sealed partial class Inventory {
     /// </summary>
     [JsonInclude, JsonPropertyName("Items")] internal Dictionary<string, int> SavedItems { get => items; set { if (!ReferenceEquals(value, items)) { items.Clear(); foreach (var pair in value) items[pair.Key] = pair.Value; } } }
     /// <summary>Physical stack positions; <see cref="Items"/> holds each item's total across them.</summary>
-    public List<Slot> Layout { get; set; } = new();
+    public List<Slot> Layout {
+        get {
+            if (layout != null) return layout;
+            layout = new List<Slot>(Slots);
+            PadLayout();
+            return layout;
+        }
+        set => layout = value;
+    }
+    // Most world things never hold anything. Their empty inventory does not need to make slots until used.
+    private List<Slot>? layout;
     /// <summary>What workers bring here, in the order it was named, or <see cref="Everything"/> alone; see <see cref="Gated"/> for an empty one.</summary>
     public FilterList InputFilter { get; set; } = new();
     /// <summary>What workers take from here, in the order it was named, or <see cref="Everything"/> alone; see <see cref="Gated"/> for an empty one.</summary>
@@ -112,7 +122,7 @@ public sealed partial class Inventory {
     private int Takeable(Slot s) => SparesOnly && s.Hotbar != 0 ? 0 : s.Free;
     private readonly Dictionary<string, int> layoutRemainder = new();
     public const string Coins = "coins";
-    public Inventory() { Items = new ItemTotals(items); PadLayout(); }
+    public Inventory() => Items = new ItemTotals(items);
     /// <summary>Called whenever the items held or the filters change, for an owner that keeps a count of them up to date.</summary>
     public Action? Changed;
     public int Count {
@@ -150,7 +160,7 @@ public sealed partial class Inventory {
         return free;
     }
     /// <summary>Empty with the settings of a new inventory, so it saves the same as one.</summary>
-    [JsonIgnore] public bool Fresh => items.Count == 0 && CarriedBy == Carrier.None && slots == NewSlots && stackSize == NewStackSize && CoinStack == NewCoinStack && Capacity == 0 && !Gated && InputFilter.Count == 0 && OutputFilter.Count == 0 && Layout.Count == NewSlots && UsedSlots == 0;
+    [JsonIgnore] public bool Fresh => items.Count == 0 && CarriedBy == Carrier.None && slots == NewSlots && stackSize == NewStackSize && CoinStack == NewCoinStack && Capacity == 0 && !Gated && InputFilter.Count == 0 && OutputFilter.Count == 0 && (layout == null || layout.Count == NewSlots && UsedSlots == 0);
 
     /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Unstacked = new();
@@ -243,7 +253,7 @@ public sealed partial class Inventory {
     /// Surviving stacks keep their cells, new units fill empty cells, and stacks beyond the slot count move into free cells.
     /// </summary>
     public void RebuildStacks() {
-        Layout ??= new();
+        if (layout == null && items.Count == 0) return;
         PadLayout();
         // Holds end, as after loading nobody holds anything.
         foreach (var s in Layout) { s.Held = 0; s.HeldBy = 0; s.FirebugExpiries?.Sort(); }

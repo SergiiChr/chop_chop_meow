@@ -526,7 +526,8 @@ A firebug nearer or further than the hoop is missed, and a swing sends every fir
 Caught firebugs live for three in-game days, then disappear one by one.
 Hover over a stack to see its average time left.
 
-Nettles, nettle rope, bug nets and firebugs are not bought or sold, and a firebug is not made into anything yet.
+Nettles, nettle rope, bug nets and firebugs are not bought or sold.
+Caught firebugs give a [lantern](#lantern) its light.
 A nettle, a bug net and a firebug each say a line under their name in tooltips and in their details on the recipe map.
 
 ### Sand and tides

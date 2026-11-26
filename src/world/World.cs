@@ -1546,7 +1546,13 @@ public sealed partial class World {
     }
     /// <summary>Sends the cart once every market slot holds a crate, for a post set to sell on its own.</summary>
     private void AutoSell(Thing sign) {
-        if (sign.AutoSell && sign.Inventory.Room(PackedPrefix) == 0 && S.Orders.Count < Carts) Ship(sign);
+        if (sign.AutoSell && sign.Inventory.Room(PackedPrefix) == 0 && S.Orders.Count < Carts && OutboundCrates(sign) == sign.Inventory.Slots) Ship(sign);
+    }
+    /// <summary>Crates with goods that can still be sent to the village.</summary>
+    internal int OutboundCrates(Thing sign) {
+        int count = 0;
+        foreach (string item in sign.Inventory.Items.Keys) if (CanSell(item)) count++;
+        return count;
     }
     /// <summary>Sets whether the post sends the cart by itself once its market slots are full.</summary>
     public void SetAutoSell(Thing sign, bool on) {

@@ -116,6 +116,7 @@ public sealed partial class Inventory {
 
     /// <summary>Every saved caught firebug has one valid, finite expiry in its own stack.</summary>
     internal bool ValidFirebugs() {
+        if (layout == null) return this[Firebugs.Item] == 0;
         int found = 0;
         foreach (var slot in Layout) {
             if (slot.Item != Firebugs.Item) { if (slot.FirebugExpiries != null) return false; continue; }
@@ -128,6 +129,7 @@ public sealed partial class Inventory {
 
     /// <summary>Changes a packed crate's item name after something in it expires, preserving its cell and any hold on it.</summary>
     internal void RenamePackedCrate(int id, string name) {
+        if (items.Count == 0) return;
         bool changed = false;
         foreach (var slot in Layout) {
             if (slot.Item == name || World.PackedId(slot.Item) != id) continue;

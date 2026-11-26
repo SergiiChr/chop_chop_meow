@@ -13,6 +13,17 @@ public partial class Game {
         await TestClean(CheckARightClickOnAFirebugSwingsTheNetAtIt);
         await TestClean(CheckAShovelDigsTheGroundAFirebugHoversOver);
         await TestClean(CheckFirebugStackShowsAverageRemainingLife);
+        await TestClean(CheckRecipeMapShowsHowToCatchFirebugsAndHowLongTheyLive);
+    }
+
+    private async Task CheckRecipeMapShowsHowToCatchFirebugsAndHowLongTheyLive() {
+        await Click((Button)hotbar.FindChild("map", true, false));
+        await Click((Control)recipeMap.NodeOf(Firebugs.Item)!.FindChild("slot", true, false));
+        var details = recipeMap.FindChild("map_details", true, false);
+        Require(((Label)recipeMap.FindChild("detail_text", true, false)).Text == "Lives for three days after being caught."
+            && HasLabel(details, "Catch with a bug net after dark"), "the firebug's recipe map entry should say how to catch it and how long it lives");
+        await KeyStroke(Key.Escape);
+        await CloseWithEsc();
     }
 
     private async Task CheckFirebugStackShowsAverageRemainingLife() {

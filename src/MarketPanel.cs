@@ -46,7 +46,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         live.Tick(auto, () => thing.AutoSell, on => world.SetAutoSell(thing, on));
         outbound.AddChild(auto);
         var revenue = Style.Text("", 14, Style.Ink); outbound.AddChild(revenue);
-        live.Watch(() => thing.Inventory.Count, _ => {
+        live.Watch(() => world.OutboundCrates(thing), _ => {
             int value = SaleWorth();
             revenue.Text = value > 0 ? $"Approximate revenue: {value}" : "";
             revenue.Visible = value > 0;
