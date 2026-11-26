@@ -136,7 +136,7 @@ Simulation and data:
 | `src/firebugs/model/CaughtFirebugs.cs` | The lifetime of each caught firebug, its stack, and moving it without changing its life |
 | `src/lanterns/Lanterns.cs`, `src/lanterns/display/LanternPanel.cs` | Portable lanterns, filling and placing them, and the page that opens a carried or placed lantern |
 | `src/lanterns/display/LanternShape.cs`, `src/lanterns/display/LanternModel.cs`, `src/lanterns/display/LanternProp.cs` | The jar, wooden frame, steel lid and handle, visible firebugs and green light |
-| `src/lanterns/display/LanternWear.cs` | Lanterns hanging off the player’s hand or belt |
+| `src/lanterns/display/LanternWear.cs` | Lanterns hanging from the player’s hand, belt, backpack or shoulders |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
 | `src/digging/Beach.cs`, `src/digging/display/CoastView.cs` | Beach sand, tide, and the exposed soil after a dig |
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
@@ -1031,7 +1031,8 @@ With one tenth of a full lantern's light per bug, ten bugs give 120% of torch en
 The green light has no part in wolf behavior.
 
 A double click takes it in hand. Work requiring the hand hangs it temporarily on the belt, still lit.
-Every lantern bound to a hotbar slot hangs on the belt regardless of the selected slot.
+Hotbar slots 1–6 hang their lanterns from the belt, slot 7 from the backpack, and slots 8 and 9 from the shoulders.
+All light regardless of the selected slot when they contain firebugs. Held and worn lanterns swing about their grips.
 The same lantern shows only once if it is both bound and held in hand.
 Right-click a lantern in the backpack, hotbar or world to see the firebug slot and access placement or pickup.
 

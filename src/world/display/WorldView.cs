@@ -983,11 +983,11 @@ public partial class WorldView : Node3D {
                 bool barrel = HugsBarrel(state.Action, who.Backpack);
                 holdLantern = equipped != null && who.Health > 0 && who.Sheltered == 0 && !torch && !barrel && vessel == null
                     && door == null && pull.PullL <= 0 && Carries(state);
-                if (holdLantern) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
+                if (holdLantern) pose = pose with { RaiseL = 30, OutL = 18, ElbowL = 60 };
                 ShowStanding(rig, state, pose, tool, torch, door, dt, barrel, vessel);
             }
         }
-        rig.Lanterns?.Sync(World, who, equipped, holdLantern ? rig.Fist(left: true) : null, ActorRig.TorchLightEnergy(night));
+        rig.Lanterns?.Sync(World, who, equipped, holdLantern ? rig.Fist(left: true) : null, ActorRig.TorchLightEnergy(night), state);
     }
 
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null,

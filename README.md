@@ -1255,7 +1255,8 @@ A full lantern is 20% brighter than a torch, with a green hue. Lanterns do not s
 
 Double-click a lantern to take it in hand and put out any lit torch. Double-click it again to stow it.
 You can still select tools. While your hands are needed for work, the lantern hangs from your belt and keeps shining.
-Every lantern bound to a hotbar slot hangs from your belt and lights the way without having to select it.
+Hotbar lanterns light the way even when they are not selected. Slots 1–6 hang from your belt, slot 7 from your backpack,
+and slots 8 and 9 from your shoulders. Held and worn lanterns are the same size and swing more as you run.
 A lantern tucked away in the backpack or storage does not light the way, but its firebugs still age.
 Open a carried lantern and choose **Put it down** to place it, or open a placed one and choose **Pick up**.
 

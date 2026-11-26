@@ -189,11 +189,12 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   player's hand show the same model.
 - The firebug item (`ItemShape.Firebug`) is a beetle with dark wing covers and a yellow-green tail.
 - `LanternShape` adds a wooden foot and grip, and steel lid and handle to the glass jar.
-  Its icon, ground and hand models share the jar mesh. Belt and heap models use a lighter version of the same profile.
+  Its icon, ground and hand models share the jar mesh. Worn and heap models use a lighter version of the same profile.
   The firebugs light the inside of the jar. When placed, the wooden foot blocks direct light beneath it.
   Its green light has the reach of a torch, with each live firebug supplying 12% of the torch's baseline light energy.
   Preview it using `./build.py play -- --showcase --lantern`, with `--night` or `--dark`.
-  Append `held` or `belt` directly after `--lantern` to inspect it on the player.
+  Append `held` or `full-wear` directly after `--lantern` to inspect the lanterns on the player.
+  Add `--lantern-motion` to see the lanterns swing while the player starts, jogs, sprints and stops.
 
 - `BackpackShape` — dropped inventory. The body reuses the player's cached six-ring canvas backpack profile through `ActorShape.Backpack`, laid on its back in a ground pose. `BackpackShape` adds ground-resting webbing: slack shoulder straps, a carry loop, a fitted dark opening and a separate curved access flap. The flap animates as the storage lid and has a fog-memory guard.
 - `CartShape` — caches the courier cart's hollow tapered tray with a folded rim, continuous pull frame and hand grip, fitted bed supports and axle, dished wheels and handled payment case. Cart loads reuse a `CrateShape.Cargo` version of the slatted crate, omitting hidden interiors and small hardware at this scale. The six crate slots, loose-goods/cash visibility, wheel pivots and courier animation are independent. The courier uses the shared human rig.

@@ -101,7 +101,7 @@ public sealed class ActorRig {
         switch (skin) {
             case ActorSkin.Player:
                 Pack = BuildPlayerDetails(worn.Skin, worn.Hair);
-                Lanterns = new LanternWear(Root, hips);
+                Lanterns = new LanternWear(Root, hips, torso);
                 break;
             case ActorSkin.Worker:
                 BuildWorkerDetails(worn.Skin, worn.Hair, worn.Hips);

@@ -35,9 +35,9 @@ public partial class Game {
         await KeyStroke(Key.Key9);
         await ClickGround(MouseButton.Right);
         await Until(() => view.PlayerAnimation == ActorAction.NetSwing && !wear.Hand.Light.IsVisibleInTree()
-            && wear.Belt.Any(lamp => lamp.Light.IsVisibleInTree()), "the unbound lantern lighting the way from the belt during the net swing", 3);
+            && wear.Worn.Any(lamp => lamp.Light.IsVisibleInTree()), "the unbound lantern lighting the way from the belt during the net swing", 3);
         await Until(() => view.PlayerAnimation != ActorAction.NetSwing && wear.Hand.Light.IsVisibleInTree()
-            && !wear.Belt.Any(lamp => lamp.Light.IsVisibleInTree()), "the lantern returning to the hand after the net swing", 3);
+            && !wear.Worn.Any(lamp => lamp.Light.IsVisibleInTree()), "the lantern returning to the hand after the net swing", 3);
         await KeyStroke(Key.Tab);
         await DoubleClick(BagCellOf(lantern));
         await Until(() => world.Me.LanternInHand == 0 && !wear.Hand.Light.IsVisibleInTree(), "the second double-click stowing the lantern", 3);

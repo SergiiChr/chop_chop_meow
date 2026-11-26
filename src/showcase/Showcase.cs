@@ -185,10 +185,11 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             return item;
         }
         string? scene = Launch.Value("--lantern");
-        bool carried = scene is "held" or "belt" or "full-belt" or "backpack" or "torch";
+        bool carried = scene is "held" or "belt" or "full-wear" or "backpack" or "torch";
         world.Player = carried ? at : at + new Vector2(-2.2f, -2.2f);
-        if (scene is "belt" or "full-belt") {
+        if (scene is "belt" or "full-wear") {
             for (int i = 0; i < (scene == "belt" ? 2 : 9); i++) world.SetHotbar(i, GiveLantern(i == 0 ? 10 : 4));
+            if (Launch.Has("--lantern-motion")) world.Lanterns.ToggleInHand(Lanterns.Id(GiveLantern(10)));
         } else if (scene == "held") world.Lanterns.ToggleInHand(Lanterns.Id(GiveLantern(10)));
         else if (scene == "backpack") {
             GiveLantern(0);
@@ -196,9 +197,25 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         } else if (scene == "torch") { world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); } else _ = world.Lanterns.Place(GiveLantern(scene == "partial" ? 4 : Launch.Has("--dark") ? 0 : 10), at) ?? throw new InvalidOperationException("The lantern review needs open ground.");
         world.Tick(scene == "torch" ? World.KindleSeconds : 0);
         AimAt(at);
+        if (carried && Launch.Has("--lantern-motion")) ReviewLanternMotion();
         view.Zoom = carried ? 3.25f : night ? 1.6f : 4;
         panel.Close();
         ui.Visible = scene == "backpack" && !Launch.Has("--hide-ui");
+    }
+
+    /// <summary>Records the held and worn lanterns from standing through a jog, a sprint and a stop.</summary>
+    private void ReviewLanternMotion() {
+        view.CameraOn = null;
+        var motion = view.CreateTween();
+        motion.TweenInterval(.30);
+        motion.TweenCallback(Callable.From(() => KeyPress(Key.D, true)));
+        motion.TweenInterval(.85);
+        motion.TweenCallback(Callable.From(() => KeyPress(Key.Shift, true)));
+        motion.TweenInterval(.85);
+        motion.TweenCallback(Callable.From(() => { KeyPress(Key.D, false); KeyPress(Key.Shift, false); }));
+
+        static void KeyPress(Key key, bool down) => Input.ParseInputEvent(
+            new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = down });
     }
 
     private void Place() {

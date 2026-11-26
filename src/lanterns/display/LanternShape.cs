@@ -66,7 +66,7 @@ internal static class LanternShape {
         }
     }
 
-    /// <summary>The jar's profile without its hidden lip, floor or inside wall, for small lanterns on a belt or in a heap.</summary>
+    /// <summary>The jar's profile without its hidden lip, floor or inside wall, for worn lanterns and heaps.</summary>
     private static ArrayMesh CompactGlass() {
         const int sides = 8;
         var surface = new SurfaceTool(); surface.Begin(Mesh.PrimitiveType.Triangles);
