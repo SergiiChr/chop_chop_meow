@@ -1173,7 +1173,9 @@ Alt-click on a discovered item's card, chip or detail thumbnail opens its Item t
 `RecipeItemUse.Of` reads each recipe's inputs, accepted tools, fixed station tools and fuels to find direct uses only.
 `ItemTree` groups recipe products under Fuel, Ingredient and Tool branches. It omits empty branches and shows a
 product under each role the selected item plays in that recipe. The same tree branches to buildings that primarily
-cost that material and lists the item's direct actions. A station's Recipes branch reads the recipes assigned to it.
+cost that material and lists the item's direct actions. Packing is not listed. `GatherShape.Dug` and digging beach
+sand share one resource-gathering action. Digging a hole stays a separate action because it yields nothing.
+A station's Recipes branch reads the recipes assigned to it.
 Clicking a card returns to its place in the main map. Alt-clicking it opens its own item tree.
 The Back button restores the main map at its previous selection and scroll position.
 

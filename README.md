@@ -645,8 +645,9 @@ An item discovered while the map is open reveals its name and icon without reope
   menu for a recipe made by hand.
 - Alt-click a discovered card to open its Item tree in the same window. Direct recipe products appear under **Fuel**,
   **Ingredient** or **Tool**, and can appear under more than one use. **Buildings** shows what primarily costs this
-  material. **Actions** shows what the item can do, such as digging with a shovel. A station's tree shows what it
-  makes. Empty branches are hidden. Click a card to highlight it on the main map, or Alt-click a discovered card to
+  material. **Actions** shows what the item can do. A shovel shows **Dig up things.** for stumps, bushes and beach
+  sand, separately from **Dig holes** on open ground. Items the village buys say **Can be sold for profit.**
+  A station's tree shows what it makes. Empty branches are hidden. Click a card to highlight it on the main map, or Alt-click a discovered card to
   open its tree. The upper-left **Recipe map** button returns to the view you left.
 
 ### Crafting bench

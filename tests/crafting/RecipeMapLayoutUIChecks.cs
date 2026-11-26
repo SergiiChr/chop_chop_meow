@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
@@ -99,9 +100,14 @@ public partial class Game {
         await Click(RecipeMapCard("steel_shovel"), alt: true);
         await ItemTreeShows("steel_shovel");
         var actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
-        Require(actions != null && new[] { "Dig ground", "Dig beach sand", "Dig up stumps", "Dig up bushes", "Gather nettles without stings" }
-            .All(action => HasLabel(actions, action)) && !HasLabel(actions, "Chop trees"),
-            "A shovel must show each way it digs or gathers and must not take the axe's actions.");
+        var digging = actions?.FindChildren("*", "Label", true, false).OfType<Label>()
+            .Select(label => label.Text).Where(text => text.StartsWith("Dig", StringComparison.Ordinal)).Order().ToArray();
+        Require(digging != null && digging.SequenceEqual(new[] { "Dig holes", "Dig up things." }),
+            "A shovel must list digging for resources once and digging holes separately.");
+        Require(HasLabel(actions!, "Gather nettles without stings") && !HasLabel(actions!, "Chop trees"),
+            "The shovel must keep its distinct gathering use without taking the axe's actions.");
+        Require(HasLabel(actions!, "Can be sold for profit.") && !HasLabel(actions!, "Pack"),
+            "A shovel can be sold for profit, but packing is not an Item tree action.");
         await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
         await Click(RecipeMapCard("steel_axe"), alt: true);
         await ItemTreeShows("steel_axe");
@@ -117,9 +123,9 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
-    /// <summary>A bucket card represents all of its fills, and packing is independent of what the village buys.</summary>
-    private async Task CheckItemTreeShowsContainerAndPackingActions() {
-        Achieve(Hosted, Bucket.Item, Barrel.Item, "stone"); await Frames();
+    /// <summary>Containers keep their specific uses, but packing does not appear as an action.</summary>
+    private async Task CheckItemTreeShowsContainerActionsWithoutPacking() {
+        Achieve(Hosted, Bucket.Item, Barrel.Item, "crate", "stone"); await Frames();
         await OpenRecipeMap();
         await Click(RecipeMapCard(Bucket.Item), alt: true);
         await ItemTreeShows(Bucket.Item);
@@ -134,11 +140,16 @@ public partial class Game {
         Require(actions != null && HasLabel(actions, "Mount on a cabin roof"),
             "The Steel barrel must show its cabin use.");
         await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        await Click(RecipeMapCard("crate"), alt: true);
+        await ItemTreeShows("crate");
+        actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
+        Require(actions != null && HasLabel(actions, "Place crate") && HasLabel(actions, "Open crate") && !HasLabel(actions, "Pack"),
+            "The crate must keep its container actions without listing packing.");
+        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
         await Click(RecipeMapCard("stone"), alt: true);
         await ItemTreeShows("stone");
-        actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
-        Require(actions != null && HasLabel(actions, "Pack into a crate") && !HasLabel(actions, "Sell in a crate"),
-            "Stone can be packed even though the village does not buy it.");
+        Require(recipeMap.FindChild("item_tree_role_Actions", true, false) == null,
+            "Stone must show neither a packing action nor a sale the village does not take.");
         await KeyStroke(Key.Escape);
     }
 

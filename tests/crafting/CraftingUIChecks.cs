@@ -43,7 +43,7 @@ public partial class Game {
         await TestClean(CheckUndiscoveredMapItemsStayAnonymous);
         await TestClean(CheckBuildingsBranchFromTheirMainMaterialAndShowRecipes);
         await TestClean(CheckItemTreeShowsDirectActions);
-        await TestClean(CheckItemTreeShowsContainerAndPackingActions);
+        await TestClean(CheckItemTreeShowsContainerActionsWithoutPacking);
         await TestClean(CheckAltClickBackpackItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickHotbarItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickRecipeShowsTheProductWithoutQueueing);

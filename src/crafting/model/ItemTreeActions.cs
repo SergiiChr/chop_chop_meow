@@ -23,8 +23,7 @@ internal static class ItemTreeActions {
         if (def.Hunger > 0) yield return "Eat";
         else if (def.Thirst > 0) yield return "Drink";
         foreach (string action in ContainerActions(data, item)) yield return action;
-        if (world.Packable(item)) yield return "Pack into a crate";
-        if (data.Market.Sells.ContainsKey(item)) yield return "Sell in a crate";
+        if (data.Market.Sells.ContainsKey(item)) yield return "Can be sold for profit.";
         if (item == Inventory.Coins) {
             yield return "Buy goods";
             yield return "Hire workers";
@@ -33,10 +32,10 @@ internal static class ItemTreeActions {
     }
 
     private static IEnumerable<string> ToolActions(string tool) {
-        if (tool == GroundHoles.Tool) {
-            yield return "Dig ground";
-            yield return "Dig beach sand";
-        }
+        // The ground-digging tool can leave a hole inland or gather sand at the beach.
+        bool digsGround = tool == GroundHoles.Tool;
+        if (digsGround) yield return "Dig holes";
+        if (digsGround || GatherRules.DigsUpThings(tool)) yield return "Dig up things.";
         foreach (string action in GatherRules.ActionsFor(tool)) yield return action;
         if (tool == World.AttackTool) yield return "Fight wolves";
         if (tool == Mines.DiggingTool) {
@@ -51,7 +50,6 @@ internal static class ItemTreeActions {
             yield return "Place crate";
             yield return "Open crate";
             yield return "Store and transport goods";
-            yield return "Pack goods at a packing station";
         }
         if (Barrel.Is(item)) {
             yield return "Place barrel";
