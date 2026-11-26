@@ -498,8 +498,8 @@ The world is a fixed 216×216-tile valley.
 It opens onto the sea at the bottom of the screen, which cannot be drunk and is the map's edge.
 Impassable mountain ranges close in from the left and right toward the valley's inland end, and a lake lies in the middle.
 You can wade 2 metres into the lake's shallows, and so can workers and wolves.
-Things can fall into the shallows, but nothing is built there: a building, a pump's handle, a cabin's ladder and the
-spots a furnace or packing table is worked from need dry ground.
+Things can fall into the shallows, but nothing is built there apart from a pump's intake: a building, a pump's handle,
+a cabin's ladder and the spots a furnace or packing table is worked from need dry ground.
 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
 Click a resource to see what it yields in read-only item slots with a count for each item.
@@ -644,10 +644,10 @@ Until you take it you are busy: you cannot walk, gather or act.
 Taking it turns a page and opens the Diary on the day it holds, the first of them when it holds two.
 Your first find stamps the diary's badge into the bottom bar.
 
-The Diary shows a cell for each of the diary's 11 days, in order.
-A day you have found is a sheet of paper torn along one edge, with a loose page on it and its place in the diary, 1 to
-11, written faintly over the middle.
-A day you have not found is a faint question mark, with no paper.
+The Diary shows a cell for each of the diary's 11 days, in order, four to a row.
+Each cell is a scrap of paper torn along one edge, with a loose page lying straight on it.
+A day you have found has its place in the diary, 1 to 11, written faintly over the page, and a day you have not found a
+faint question mark.
 A day you have not read yet has a brick rim, and the badge shows a red dot while one waits.
 Click a sheet to open the day large, handwritten on a sheet of paper; the close button, Esc or a click beside the sheet
 closes it.

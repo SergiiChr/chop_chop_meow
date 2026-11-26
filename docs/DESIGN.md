@@ -1090,7 +1090,8 @@ updates never show.
 `DiaryRead`, the days opened; `DiaryFinding`, a find whose pop-up waits; and `FallenPage`, the page that fell off a tree
 for them and still lies there.
 `DiaryDay` holds the 11 days and their text, with `DiaryDay.Illegible` and `DiaryDay.Scribbles` where the writing is
-drawn as scribbles and `DiaryDay.FallsApart` where it starts to fall apart, and `DiaryFindDef` the line of each find's pop-up and the days it holds.
+drawn as scribbles and `DiaryDay.FallsApart` where it starts to fall apart, and `DiaryFindDef` the line of each find's
+pop-up and the days it holds.
 `GameData` checks that every day is in exactly one find.
 `DiaryFind.Book`, the diary itself, and `DiaryFind.Ashes`, the page in a cave's ashes, wait for the caves: nothing gives
 them out yet.
@@ -1126,8 +1127,8 @@ find's first day.
 `Hotbar.StampDiaryOnFirstFind` has the diary's badge, which shows once the player has a find, stamped into the row when
 it comes with that Take: it drops in large, tilted and faint, and settles with a small bounce.
 The badge shows a dot while a found day is unread (`Diary.AnyUnread`).
-`DiaryPage` lays out a `PaperTile` for each day in order: a torn sheet with the page's icon and its place in the
-diary for a day found, a brick edge for one not read, and a question mark alone for one not found.
+`DiaryPage` lays out a `PaperTile` for each day in order, four to a row: a torn sheet with the page's icon on it, and
+over the icon the day's place in the diary once found or a question mark until then, with a brick edge for one not read.
 `ReadingSheet` writes the day in Caveat on a paper-coloured sheet, with the scribble glyphs in place of what cannot
 be read.
 From `DiaryDay.FallsApart` to the paragraph's end, `FallingApart` moves each letter further off the line than the last,

@@ -23,6 +23,7 @@ public static class DiaryChecks {
         Test(CheckEveryoneWadesTwoMetresIntoTheLake, data);
         Test(CheckOpeningADayMarksItRead, data);
         Test(CheckAFallenPageWaitsForItsPlayerToComeBack, data);
+        Test(CheckAGuestHeldByAFindIsNotToldTheyAreBusy, data);
         Test(CheckBuildingOverAFallenPageClearsItForAnotherChop, data);
         Test(CheckBuildingsAreWorkedFromDryGroundOnly, data);
         Test(CheckFindsAndReadDaysComeBackFromASave, data);
@@ -154,6 +155,20 @@ public static class DiaryChecks {
         Require(world.Find(page.Id) == page, "a page off a tree should stay where it fell when its player leaves");
         var back = world.Arrive("guest", 9);
         Require(Diary.ShowsTo(back, page) && !Diary.ShowsTo(world.Me, page), "a player back in the game should find their page where it fell");
+    }
+
+    /// <summary>A guest's window keeps sending the gather they hold until the host's word of their find reaches it, and the host lets that go quietly.</summary>
+    private static void CheckAGuestHeldByAFindIsNotToldTheyAreBusy(GameData data) {
+        var world = DiaryWorld(data);
+        var guest = world.Arrive("guest", 2);
+        var bush = world.Add(ThingKind.Berries, Terrain.Spawn + new Vector2(10, -10), 10000);
+        guest.Pos = bush.Pos + Vector2.Right;
+        TurnUpFind(guest, DiaryFind.Berries);
+        guest.GatherTarget = bush.Id;
+        int told = 0;
+        world.Relay += (to, message) => { if (to == guest && message == "You are busy.") told++; };
+        world.Tick(.1f);
+        Require(told == 0, $"a guest whose find waits should not be told they are busy by the gather their window still sends: told {told} times");
     }
 
     private static void CheckBuildingOverAFallenPageClearsItForAnotherChop(GameData data) {

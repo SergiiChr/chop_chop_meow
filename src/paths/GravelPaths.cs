@@ -59,7 +59,7 @@ public sealed class GravelPaths(World world) {
     /// </summary>
     public string? Block(Vector2I tile) {
         if (world.Construction.TooFar(tile) is string far) return far;
-        if (!World.Open(tile) || Terrain.InLake(tile, .8f)) return "Choose dry, open ground.";
+        if (!World.Open(tile) || Terrain.InLake(tile, Construction.ShoreRoom)) return "Choose dry, open ground.";
         if (Laid(tile)) return "Gravel is already laid here.";
         foreach (var t in world.S.Things)
             if (t.IsResource && !t.IsLoose && t.TakesGround && !World.BuiltOver(t.Kind) && t.Kind != ThingKind.Water && Terrain.TileAt(t.Pos) == tile) return "A resource is in the way.";

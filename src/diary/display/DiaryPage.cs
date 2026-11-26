@@ -4,7 +4,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The diary's page in the side panel: a sheet of paper for each of its days, in order, that opens the day large to read again.
-/// A day the player has not found leaves a space with a question mark, and one they have not opened yet stands out.
+/// A day the player has not found shows a question mark on its page, and one they have not opened yet stands out.
 /// </summary>
 public partial class DiaryPage(PageTools tools) : PagePanel(tools) {
     public static readonly Texture2D Glyph = GD.Load<Texture2D>("res://assets/ui/line_diary.svg");

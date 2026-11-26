@@ -2564,7 +2564,8 @@ public sealed partial class World {
         attackClock = Math.Max(0, attackClock - dt);
         Swings.Tick(dt);
         if (S.Actor.Id != LocalId) {
-            if (Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
+            // A guest's window sends the gather they hold until word that they are busy, such as with a find's pop-up, reaches it: until then it stops without a word.
+            if (!Occupied && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
             else S.Actor.Stung = false;
         }
         Holes.Work(dt);
