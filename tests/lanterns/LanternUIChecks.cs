@@ -26,6 +26,12 @@ public partial class Game {
         var dark = BagCell(c => c.TooltipText.StartsWith(Lanterns.EmptyName, System.StringComparison.Ordinal)).GetNode<Badge>("count");
         Require(full.Text == "3" && dark.Text == "0" && full.GetThemeColor("font_color") == Style.FirebugGreen
             && hotbar.Counts[8].GetThemeColor("font_color") == Style.FirebugGreen, "firebug badges should be green even though each lantern is a single item");
+        foreach (var badge in new[] { full, dark, hotbar.Counts[8] }) {
+            var icon = (Control)badge.GetParent();
+            Vector2 center = badge.GetRect().GetCenter();
+            Require(center.X > icon.Size.X / 2 && center.Y < icon.Size.Y / 2,
+                "a green firebug count should sit at the upper right of its lantern icon");
+        }
         Require(!BagCellOf("steel_axe").GetNode<Badge>("count").Visible, "a single tool should not show a quantity badge");
         await CloseWithEsc();
         Drop(Hosted, empty); Drop(Hosted, charged); SetHotbarSlot(Hosted, 8, previous);
