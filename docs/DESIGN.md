@@ -425,6 +425,7 @@ Meshes and materials are cached by parameters, so repeated objects share resourc
 `WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, and `WorldView` draws them behind the ground for its first frames, so a building, crate, carcass or wolf that first appears mid-game builds no mesh, material, shader or pipeline; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
 The default camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
+It keeps the player in the middle of the screen, a little below it, and stays put when a side panel opens, so a double click lands on the building the first click picked.
 The first-person preview switches the same camera to a perspective at eye level.
 `FirstPersonCamera` turns the camera from mouse motion and rotates walking directions to match.
 `WorldView` casts the same picking rays from the eye, and shows the sky, distant terrain and live objects without fog.
@@ -800,7 +801,7 @@ Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters
 
 `Doorways` (`src/cabins/Doorways.cs`) runs a cabin's door, which lets one player through at a time into a cabin that holds `Doorways.Places`, and `DoorTug` (`src/actors/enemies/wolf/DoorTug.cs`) a wolf tugging a player out of it; `World` holds one of each (`World.Doorways`, `World.DoorTug`) and ticks the doorway with the acting player.
 A double click on a cabin, or its page's Enter button, starts a `CabinApproach` to `Doorways.DoorPoint`, using the same grid routes workers use to avoid obstacles.
-The click's first press opens the page, which moves the world aside and can put the page's windows under the pointer, so `Game._Input` hands the second press to `PlayerControl.WalkIntoClickedCabin` before the interface sees it.
+The click's first press opens the page, which can put the page's windows under the pointer, so `Game._Input` hands the second press to `PlayerControl.WalkIntoClickedCabin` before the interface sees it.
 `WalkSearch` checks nearby building footprints and spreads long searches across frames.
 If a failed search saw a layout that has changed, the approach tries again with the current buildings.
 The panel highlights Enter while finding a path and during the walk.

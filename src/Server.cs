@@ -24,9 +24,16 @@ public partial class Server : Node {
     /// <summary>The game is over: the owner left or nobody came.</summary>
     public event Action? Ended;
 
-    /// <summary>The world a game starts from: the one in save slot <paramref name="slot"/>, or a new one when that is negative, or a performance run's camp.</summary>
-    public static World Load(GameData data, int slot) => Launch.Has(PerformanceFlag) ? PerformanceFixture.Create(data)
-        : slot >= 0 ? Saves.Read(data, slot).World ?? throw new InvalidOperationException($"Cannot load slot {slot}.") : new World(data);
+    /// <summary>
+    /// The world a game starts from: the one in save slot <paramref name="slot"/>, or a new one when that is negative, or a performance run's camp.
+    /// A slot that cannot load throws, saying why.
+    /// </summary>
+    public static World Load(GameData data, int slot) {
+        if (Launch.Has(PerformanceFlag)) return PerformanceFixture.Create(data);
+        if (slot < 0) return new World(data);
+        var (world, error) = Saves.Read(data, slot);
+        return world ?? throw new InvalidOperationException($"Cannot load slot {slot}. {error}");
+    }
 
     /// <summary>
     /// Serves a world under <paramref name="parent"/> on the first free port.
