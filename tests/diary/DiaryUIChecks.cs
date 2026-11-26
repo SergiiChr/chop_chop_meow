@@ -12,6 +12,7 @@ public partial class Game {
         await TestClean(CheckAFindWaitsBehindTakeAndOpensItsDayInTheDiary);
         await TestClean(CheckClickingAFallenPagePicksItUpAndTheBadgeMarksUnreadDays);
         await TestClean(CheckARightClickWadesToTheLakePage);
+        await TestClean(CheckAStickInTheShallowsRestsOnTheLakeBedWhileAPageFloats);
         await TestClean(CheckTheDiaryGoalCountsPagesAndOpensTheDiary);
         await TestClean(CheckTheLastDaysWritingFallsApartWithNoMarkupShowing);
     }
@@ -83,6 +84,22 @@ public partial class Game {
         await Until(() => sheet.Visible && sheet.Day == 2, "taking the lake's page opening day 2", 3);
         Require(view.PropOf(page.Id) is not { Shown: true } && Hosted.Find(page.Id) == page, "The lake's page must be gone for the player who took it and stay in the world.");
         await KeyStroke(Key.Escape); await CloseWithEsc();
+        Warp(Hosted, home); await Frames(4);
+    }
+
+    private async Task CheckAStickInTheShallowsRestsOnTheLakeBedWhileAPageFloats() {
+        await CloseWithEsc();
+        var home = Hosted.Player;
+        var shore = Terrain.WaterPoint(Hosted.Diary.At(Hosted.ThingsOf(ThingKind.FloatingPage).Single()));
+        var inward = (Terrain.Lake - shore).Normalized();
+        var stick = Hosted.Add(ThingKind.Stick, shore + inward * 1.5f, 1);
+        var page = DropPage(Hosted, HostedMe, shore + inward * 1.5f + inward.Orthogonal());
+        Warp(Hosted, shore - inward * 2);
+        await Until(() => view.PropOf(stick.Id) is { Shown: true } && view.PropOf(page.Id) is PageProp { Shown: true }, "the stick and the page in the shallows showing in the window", 5);
+        float stickAt = view.PropOf(stick.Id)!.Root.Position.Y, pageAt = view.PropOf(page.Id)!.Root.Position.Y;
+        Require(stickAt < -.05f, $"A stick in the shallows must rest on the lake bed under the water, not at {stickAt:0.000}.");
+        Require(pageAt == 0, $"A page in the shallows must float on the water, not lie at {pageAt:0.000}.");
+        Hosted.S.Things.Remove(stick); Hosted.S.Things.Remove(page);
         Warp(Hosted, home); await Frames(4);
     }
 

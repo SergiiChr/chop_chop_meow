@@ -86,6 +86,8 @@ public sealed class Thing {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int LeafAcornsTaken { get; set; }
     /// <summary>The tree that left this stump or leaf spot. Stumps use its species and size to match the trunk.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OfTree { get; set; }
+    /// <summary>The player a page fallen off a tree lies for, by their key in the save, which stays theirs when they come back: the only one it shows to.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? PageFor { get; set; }
     /// <summary>The way a stump's tree fell across the ground, away from whoever landed the last blow on it, in radians from the x axis toward y.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float FellToward { get; set; }
     /// <summary>A signpost's market output: bought goods arrive here with the returning cart.</summary>
@@ -2730,7 +2732,7 @@ public sealed partial class World {
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage) || !TreePlanting.ValidStage(t) || t.Rotation != 0 && (t.Kind is not (ThingKind.Crate or ThingKind.Barrel) && !Data.Buildings.ContainsKey(t.Kind) || !Construction.ValidRotation(t.Kind, t.Rotation)))) throw new InvalidOperationException("Unsupported or incomplete save.");
         if (loaded.Wolves.Any(w => w == null || !WolfCounter.ValidSavedPath(w) || !WolfHunt.ValidSavedReaction(w)))
             throw new InvalidOperationException("This save holds an invalid wolf movement.");
-        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates) || !Diary.Valid(p, loaded.Things)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
+        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !Diary.Valid(loaded) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;

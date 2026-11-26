@@ -188,6 +188,12 @@ public partial class WorldView : Node3D {
 
     internal static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
 
+    /// <summary>
+    /// Where a thing's model stands: on the lake bed for one lying in the shallows, and on the ground everywhere else.
+    /// A page floats on the water instead, a firebug flies above it and a pump's intake is built into it.
+    /// </summary>
+    private static Vector3 RestsAt(Thing t) => To3(t.Pos, t.IsPage || t.Roams || t.Kind == ThingKind.Pump ? 0 : -Terrain.BedDepth(t.Pos));
+
     public override void _Ready() {
         World.Replaced += () => {
             worldReplaced = true; Footpaths.Clear(); counterHits.Clear(); playerSleep.Clear();
@@ -1225,7 +1231,7 @@ public partial class WorldView : Node3D {
             var look = (t.Pos, t.Remaining, t.Kind is ThingKind.Tree or ThingKind.LeafSpot ? t.TreeStage : t.Kind is ThingKind.Mine or ThingKind.WolfCorpse || t.IsDug ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
             if (!live && prop.Seen && prop.Look == look) continue;
             Show(prop, true);
-            if (prop.Look.Pos != t.Pos) prop.Root.Position = To3(t.Pos);
+            if (prop.Look.Pos != t.Pos) prop.Root.Position = RestsAt(t);
             // A change plays out only where the player was already watching, not on a thing first seen or seen again this frame.
             bool watched = live && prop.Seen && prop.Look.Live;
             // Preview distant shapes and positions without replacing the small details the overhead view remembers.
@@ -1282,16 +1288,16 @@ public partial class WorldView : Node3D {
         prop = WorldModels.Build(t);
         scene.AddChild(prop.Root);
         props[t.Id] = prop;
-        prop.Root.Position = To3(t.Pos);
+        prop.Root.Position = RestsAt(t);
         // A fresh carcass keeps the heading of the wolf model it replaces.
         // It also waits for the killing blow to land, and is thrown back from where the wolf stood.
         if (prop is CarcassProp carcass && Dying(t.Pos) is { } dying) {
             prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
-            carcass.From = dying.Root.Position - To3(t.Pos); carcass.HitIn = SwingLands(dying.Last + dying.KnockBack).In;
+            carcass.From = dying.Root.Position - prop.Root.Position; carcass.HitIn = SwingLands(dying.Last + dying.KnockBack).In;
             carcass.Wolf.FallFrom(dying);
         }
         // A chip that appears in front of the player was knocked off the rock beside it, and flies from there.
-        if (prop is LooseProp chip && appeared && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
+        if (prop is LooseProp chip && appeared && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - prop.Root.Position + Vector3.Up * .7f; chip.Flight = 0; }
         // A page that appears in front of its player has just come off the tree beside it, and flutters down from its crown.
         if (prop is PageProp page && t.Kind == ThingKind.FallenPage && appeared) { page.Fall = 0; Sounds?.Play("paper_fall", t.Pos); }
         return prop;

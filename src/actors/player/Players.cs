@@ -428,7 +428,7 @@ public sealed partial class World {
 
     /// <summary>Server: the machine starting this world takes it over, with the player of the machine that saved it unless it has one here already.</summary>
     public void Claim(string key) {
-        if (key != S.Owner && !S.Absent.ContainsKey(key) && S.Absent.Remove(S.Owner, out var p)) { p.Key = key; S.Absent[key] = p; }
+        if (key != S.Owner && !S.Absent.ContainsKey(key) && S.Absent.Remove(S.Owner, out var p)) { p.Key = key; S.Absent[key] = p; Diary.Rekey(S.Owner, key); }
         S.Owner = key;
     }
 

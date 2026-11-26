@@ -1087,8 +1087,8 @@ updates never show.
 ### Diary
 
 `Diary` (`src/diary/model/Diary.cs`) keeps each player's diary in their `PlayerState`: `DiaryFinds`, the finds taken;
-`DiaryRead`, the days opened; `DiaryFinding`, a find whose pop-up waits; and `FallenPage`, the page that fell off a tree
-for them and still lies there.
+`DiaryRead`, the days opened; and `DiaryFinding`, a find whose pop-up waits.
+A page that fell off a tree for a player names them itself, in `Thing.PageFor`.
 `DiaryDay` holds the 11 days and their text, with `DiaryDay.Illegible` and `DiaryDay.Scribbles` where the writing is
 drawn as scribbles and `DiaryDay.FallsApart` where it starts to fall apart, and `DiaryFindDef` the line of each find's
 pop-up and the days it holds.
@@ -1110,13 +1110,15 @@ them out yet.
   check that gathers would stop with it.
 
 `Diary.ShowsTo` says who sees a page lying in the world: the lake's to every player who has neither taken it nor has its
-pop-up up, and a fallen one to the player whose `FallenPage` it is.
+pop-up up, and a fallen one to the player its `Thing.PageFor` names.
 `World.CollectKnown`, which drawing and picking go through, leaves out the pages hidden from the window's player.
 A page leaves no memory under fog, is not one of `World.Structures`, and takes no ground (`Thing.TakesGround`): grass
 grows under it and its coming and going leaves the ground dressing alone.
 A fallen page keeps its place while its player is away, and they find it there when they come back.
-A building, yard or crate put over it clears it away with the stumps and bushes under it (`Diary.ClearUnder`), which
-frees its player's `FallenPage`, so a later chop can drop their page again.
+A building, yard or crate put over it clears it away with the stumps and bushes under it (`Diary.ClearUnder`), so a
+later chop can drop their page again.
+A save is refused when a fallen page names no saved player, a second page for one player or a player who has that page
+already (`Diary.Valid`).
 A left or a right click on a page walks the player over to it, as to a loose piece (`Thing.TakenWhole`), and
 `Verb.PickUp` brings up its pop-up (`Diary.PickUp`); a fallen page leaves the ground then.
 `World.Occupied` holds while `DiaryFinding` is set, so the player is busy.
@@ -1145,9 +1147,11 @@ side to side less and less and tipping into each swing, to land flat where it li
 
 The lake's shallows can be waded: `Terrain.Open` counts ground up to `Terrain.Wade` metres in from the shore, so
 players, workers and wolves walk there, and their feet go down to the lake's bed (`Terrain.BedDepth`).
-Loose pieces and pages can land there, but building cannot: a building keeps `Construction.ShoreRoom` back from the
-shore, and the spots it is worked from (`Construction.WorkSpots`) need `World.CanStandDry`: a pump's handle, a cabin's
-ladder, a furnace's glass blower and bellows spots and a packing table's packer spot.
+Loose pieces and pages can land there: `WorldView` draws everything lying in the shallows on the lake's bed, except a
+page, which floats, a firebug, which flies, and a pump, whose intake is built into the water.
+Building cannot go there: a building keeps `Construction.ShoreRoom` back from the shore, and the spots it is worked
+from (`Construction.WorkSpots`) need `World.CanStandDry`: a pump's handle, a cabin's ladder, a furnace's glass blower
+and bellows spots and a packing table's packer spot.
 
 ### Tools
 
