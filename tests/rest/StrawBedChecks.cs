@@ -14,6 +14,7 @@ public static class StrawBedChecks {
         Test(CheckAnHourOldBedReturnsNothing, data);
         Test(CheckABedDisappearsAfterThreeDaysEvenWithoutUse, data);
         Test(CheckAWolfCanWakeAStrawBedSleeper, data);
+        Test(CheckLyingDownCancelsAnUnfinishedSwing, data);
         Test(CheckSleepingOnStrawNeedsThePlayerBesideTheBed, data);
         Test(CheckSoloStrawBedSleeperHasTimeToLieDownBeforeDawn, data);
         Test(CheckANearbyWolfKeepsTimeAtNormalSpeedWithoutStoppingHealing, data);
@@ -70,6 +71,23 @@ public static class StrawBedChecks {
         WolfSteps.SnapTick(world, .8f);
         Require(world.Me.SleepingAt == 0 && world.Health < 100 && wolf.Target == world.Me.Id,
             "a wolf can bite a straw bed sleeper and wake them");
+    }
+
+    private static void CheckLyingDownCancelsAnUnfinishedSwing(GameData data) {
+        foreach (bool sleep in new[] { false, true }) {
+            var world = WolfSteps.AxeNight(data);
+            world.Player = Terrain.Spawn;
+            var bed = StrawBedSteps.Build(world);
+            world.Player = bed.Pos;
+            var wolf = WolfSteps.StillWolf(world, Vector2.Right * 1.1f);
+            if (sleep) world.Player = Terrain.Spawn;
+            world.Attack(Vector2.Right);
+            if (sleep) world.Sleep.Start(bed);
+            world.Tick(.5f);
+            if (sleep) Require(world.Sleep.SleepingAt == bed.Id && wolf.Health == data.WolfHealth,
+                "A swing started before lying down must not hit anything from the bed.");
+            else Require(wolf.Health < data.WolfHealth, "The same swing while awake should reach the wolf from here.");
+        }
     }
 
     private static void CheckSleepingOnStrawNeedsThePlayerBesideTheBed(GameData data) {

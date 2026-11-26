@@ -687,6 +687,7 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
 
 A player can sleep at any hour inside a cabin or on an outdoor straw bed. The cabin's Sleep button appears only inside.
 `PlayerState.SleepingAt` identifies a sleeper's place. The window draws outdoor sleep on the straw bed without sheltering the player.
+Lying down cancels an unfinished swing. A sleeper beside a glass furnace does not count as an operator.
 `SleepCycle` speeds up the clock only while everyone is asleep, once an outdoor sleeper has lain down.
 It adds normal simulation steps between frames instead of jumping over the night, up to 12× normal speed.
 The extra steps use at most 4 milliseconds of work per frame before starting no more, so a busy world can slow down.
