@@ -27,6 +27,8 @@
 4. Review the branch against `main` with the `self-review` skill and apply what improves it.
 5. Run `./build.py build` before opening the pull request.
 6. Open a pull request against `main`. Describe what changed, how it was checked and what was not checked. CI runs `./build.py check` on it.
+7. Once it is merged, if it raised the save version, bring the player's saves forward with the `update-saves` skill
+   (`.agents/skills/update-saves`).
 
 ## Release bundle
 

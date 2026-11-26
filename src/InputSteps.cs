@@ -232,8 +232,15 @@ public partial class Game {
     private IEnumerable<Vector2> SpotsNearby() =>
         Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()));
 
-    /// <summary>The first of <see cref="SpotsNearby"/> the player can stand on that shows clear of the panels and of anything a click would pick: where a check puts something to click.</summary>
-    private Vector2 ClearSpotNearby() => SpotsNearby().First(p => world.CanStand(p) && Uncovered(view.Screen(p, .5f)) && view.Pick(view.Screen(p, .5f)) == null);
+    /// <summary>
+    /// The first of <see cref="SpotsNearby"/> the player can stand on whose point <paramref name="height"/> above the ground shows clear of the panels and of anything a click would pick:
+    /// where a check puts something to click.
+    /// </summary>
+    private Vector2 ClearSpotNearby(float height = .5f) {
+        var spots = SpotsNearby().Where(p => world.CanStand(p) && Uncovered(view.Screen(p, height)) && view.Pick(view.Screen(p, height)) == null).Take(1).ToArray();
+        Require(spots.Length > 0, $"No spot near the player at {world.Player} is free, on screen and clear of the panels.");
+        return spots[0];
+    }
 
     /// <summary>Holds D until the player moves, so it shows the world is not held.</summary>
     private async Task<bool> PlayerWalks() {
