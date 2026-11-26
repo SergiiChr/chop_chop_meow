@@ -27,7 +27,7 @@ internal static class StrawBed {
         for (int x = -1; x <= 1; x += 2)
             for (int y = -1; y <= 1; y += 2) {
                 var corner = at + new Vector2(x * HalfWidth, y * HalfLength).Rotated(rotation);
-                if (!world.Construction.DryOpen(corner)) return false;
+                if (!world.CanStandDry(corner, Construction.ShoreRoom)) return false;
             }
         return true;
     }

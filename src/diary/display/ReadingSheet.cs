@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 /// Opening a day marks it read.
 /// </summary>
 public partial class ReadingSheet : Control {
-    private static readonly StyleBoxFlat Paper = Style.Flat(new Color("f3ead2"), 6, 34, new Color("cdbf9c"), 2);
+    private static readonly StyleBoxFlat Paper = Style.Flat(Style.DiaryPaper, 6, 34, new Color("cdbf9c"), 2);
     // Loaded with the game and kept, so the text that draws them by path finds them in the cache rather than loading them as a day opens.
     private static readonly Texture2D ScribbleWord = GD.Load<Texture2D>("res://assets/ui/scribble_word.svg"), ScribbleLine = GD.Load<Texture2D>("res://assets/ui/scribble_line.svg");
     private readonly UiKit kit;
@@ -63,7 +63,7 @@ public partial class ReadingSheet : Control {
             if (written.Length > 0) written.Append('\n');
             if (paragraph == DiaryDay.Scribbles) { written.Append(Drawn(ScribbleLine)); continue; }
             var line = paragraph.Replace(DiaryDay.Illegible, Drawn(ScribbleWord));
-            written.Append(line.Contains(DiaryDay.FallsApart) ? line.Replace(DiaryDay.FallsApart, "[falling_apart]") + "[/falling_apart]" : line);
+            written.Append(line.Contains(DiaryDay.FallsApart) ? line.Replace(DiaryDay.FallsApart, $"[{FallingApart.Tag}]") + $"[/{FallingApart.Tag}]" : line);
         }
         return written.ToString();
     }

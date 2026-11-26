@@ -186,7 +186,7 @@ public static class DiaryChecks {
         world.Player = furnace + new Vector2(3, -1);
         var bellows = furnace + World.BellowsStand.Rotated(Mathf.Pi);
         Require(world.CanStand(bellows) && Terrain.InLake(bellows), "a furnace's bellows turned toward the lake should come in the shallows");
-        Require(world.Construction.PlacementBlock(ThingKind.Reinforced, furnace, rotation: Mathf.Pi) == "Leave dry, open ground at the furnace's bellows and in front of it.",
+        Require(world.Construction.PlacementBlock(ThingKind.Reinforced, furnace, rotation: Mathf.Pi) == "Leave dry, open ground at the furnace's bellows.",
             "a furnace's bellows should be worked from dry ground, not the shallows");
     }
 

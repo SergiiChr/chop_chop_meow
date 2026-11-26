@@ -11,7 +11,7 @@ namespace ChopChopMeow;
 public partial class PaperTile : Button {
     public enum Look { Missing, Read, Unread }
     private static readonly Texture2D PagePicture = Icons.Of(PageShape.Icon)!;
-    private static readonly Color Sheet = new("f3ead2"), Shadow = new(0, 0, 0, .28f);
+    private static readonly Color Shadow = new(0, 0, 0, .28f);
     /// <summary>How far in from the cell's edges the sheet lies, leaving room for its shadow and edge.</summary>
     private const float Inset = 5;
     /// <summary>Pixels between the points of the torn edge, and how far each strays in or out.</summary>
@@ -31,7 +31,6 @@ public partial class PaperTile : Button {
     public PaperTile(int place, Action open) {
         this.place = place.ToString();
         CustomMinimumSize = new Vector2(112, 140);
-        MouseDefaultCursorShape = CursorShape.PointingHand;
         Style.Skin(this, Style.None, Style.None);
         Pressed += open;
         // Each scrap is crooked and torn its own way.
@@ -43,25 +42,18 @@ public partial class PaperTile : Button {
     }
 
     public override void _Ready() {
-        var picture = new TextureRect {
-            Name = "page_picture",
-            Texture = PagePicture,
-            MouseFilter = MouseFilterEnum.Ignore,
-            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
-            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
-        };
+        var picture = Style.Icon(PagePicture, 0);
         picture.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         picture.OffsetLeft = picture.OffsetTop = 9; picture.OffsetRight = picture.OffsetBottom = -9;
         AddChild(picture);
-        var number = Style.Text(place, 34, new Color(Style.DiaryInk, .45f));
-        number.Name = "counter";
-        number.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        number.HorizontalAlignment = HorizontalAlignment.Center; number.VerticalAlignment = VerticalAlignment.Center;
+        counter = Style.Text(place, 34, new Color(Style.DiaryInk, .45f));
+        counter.Name = "counter";
+        counter.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        counter.HorizontalAlignment = HorizontalAlignment.Center; counter.VerticalAlignment = VerticalAlignment.Center;
         // A rim of paper keeps the number apart from the writing on the page under it.
-        number.AddThemeColorOverride("font_outline_color", Sheet);
-        number.AddThemeConstantOverride("outline_size", 10);
-        AddChild(number);
-        counter = number;
+        counter.AddThemeColorOverride("font_outline_color", Style.DiaryPaper);
+        counter.AddThemeConstantOverride("outline_size", 10);
+        AddChild(counter);
         Resized += Shape;
         ShowAs(look);
     }
@@ -83,7 +75,7 @@ public partial class PaperTile : Button {
         DrawSetTransform(new Vector2(2, 3));
         DrawColoredPolygon(sheet, Shadow);
         DrawSetTransform(Vector2.Zero);
-        DrawColoredPolygon(sheet, Sheet);
+        DrawColoredPolygon(sheet, Style.DiaryPaper);
         var (color, width) = !Disabled && IsHovered() ? (Style.Mustard, 3f) : look == Look.Unread ? (Style.Brick, 4f) : (Style.Line, 2f);
         DrawPolyline(edge, color, width, true);
     }

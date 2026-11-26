@@ -1144,8 +1144,9 @@ side to side less and less and tipping into each swing, to land flat where it li
 
 The lake's shallows can be waded: `Terrain.Open` counts ground up to `Terrain.Wade` metres in from the shore, so
 players, workers and wolves walk there, and their feet go down to the lake's bed (`Terrain.BedDepth`).
-Loose pieces and pages can land there, but building cannot: a building keeps off the lake, and the spots it is worked
-from, a pump's handle, a cabin's ladder and a furnace's glass blower and bellows spots, need `World.CanStandDry`.
+Loose pieces and pages can land there, but building cannot: a building keeps `Construction.ShoreRoom` back from the
+shore, and the spots it is worked from (`Construction.WorkSpots`) need `World.CanStandDry`: a pump's handle, a cabin's
+ladder, a furnace's glass blower and bellows spots and a packing table's packer spot.
 
 ### Tools
 

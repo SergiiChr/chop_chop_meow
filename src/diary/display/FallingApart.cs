@@ -9,9 +9,11 @@ namespace ChopChopMeow;
 /// It writes the text between <c>[falling_apart]</c> and <c>[/falling_apart]</c> in a <see cref="RichTextLabel"/>, and every letter keeps its place from frame to frame.
 /// </summary>
 public partial class FallingApart : RichTextEffect {
+    /// <summary>The tag that marks the writing in the label's text.</summary>
+    public const string Tag = "falling_apart";
     // The label finds the effect's tag in a member of this name.
 #pragma warning disable IDE1006
-    public string bbcode = "falling_apart";
+    public string bbcode = Tag;
 #pragma warning restore IDE1006
     /// <summary>Letters it takes the writing to fall apart fully.</summary>
     private const float Letters = 9;

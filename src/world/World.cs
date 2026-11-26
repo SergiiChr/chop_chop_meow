@@ -740,8 +740,11 @@ public sealed partial class World {
     }
     /// <summary>Whether a player, worker or wolf can stand on a spot: walkable ground with nothing built in the way.</summary>
     public bool CanStand(Vector2 p) => CanStand(p, null);
-    /// <summary>Ground to stand on out of the lake's shallows, where the spots a building is worked from must be: only walking reaches into the water.</summary>
-    public bool CanStandDry(Vector2 p) => CanStand(p) && !Terrain.InLake(p);
+    /// <summary>
+    /// Ground to stand on at least <paramref name="shore"/> metres back from the lake's shore, out of its shallows:
+    /// a building keeps <see cref="Construction.ShoreRoom"/> back, and the spots it is worked from need only be out of the water.
+    /// </summary>
+    public bool CanStandDry(Vector2 p, float shore = 0) => CanStand(p) && !Terrain.InLake(p, shore);
 
     internal bool CanStand(Vector2 p, Thing? except) {
         if (!Open(p)) return false;

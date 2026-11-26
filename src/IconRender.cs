@@ -76,10 +76,15 @@ public partial class IconRender : Node {
     /// <summary>Looks at tools from the side and at everything else from the game camera's angle, lit the way the game lights it, and fits the model, or for a tool its head end.</summary>
     private void Frame(Node3D holder, string id) {
         bool tool = id is "steel_axe" or "steel_pick" or "steel_shovel" or "rake" or "torch" or "wood_hammer" or "steel_hammer" or "stone_chisel" or "steel_chisel" or "bug_net";
-        // Fallen leaves lie flat, so they are seen from higher up.
-        // A page is seen from straight above, upright as a sheet in the Diary's cells, its top away from the camera.
-        // The hard hat is seen from nearly level, where its brim and crown show apart.
-        var back = tool ? Direction(15, 70) : id == "hardhat" ? Direction(12, 30) : id == PageShape.Icon ? Direction(89, 0) : Direction(id == "leaves" ? 60 : GamePitch, 45);
+        var back = tool ? Direction(15, 70) : id switch {
+            // The hard hat is seen from nearly level, where its brim and crown show apart.
+            "hardhat" => Direction(12, 30),
+            // A page is seen from straight above, upright as a sheet in the Diary's cells, its top away from the camera.
+            PageShape.Icon => Direction(89, 0),
+            // Fallen leaves lie flat, so they are seen from higher up.
+            "leaves" => Direction(60, 45),
+            _ => Direction(GamePitch, 45),
+        };
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
         // The sun keeps the place it has relative to the game camera: high on the left.
         var gameCamera = Basis.LookingAt(-Direction(GamePitch, 45), Vector3.Up);

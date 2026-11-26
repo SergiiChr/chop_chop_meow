@@ -31,7 +31,7 @@ public partial class DiaryPage(PageTools tools) : PagePanel(tools) {
             long looks = 0;
             for (int i = 0; i < tiles.Length; i++) {
                 int day = DiaryDay.All[i].Number;
-                var look = !Diary.Has(me, day) ? PaperTile.Look.Missing : me.DiaryRead.Contains(day) ? PaperTile.Look.Read : PaperTile.Look.Unread;
+                var look = !Diary.Has(me, day) ? PaperTile.Look.Missing : Diary.Unread(me, day) ? PaperTile.Look.Unread : PaperTile.Look.Read;
                 looks |= (long)look << (2 * i);
             }
             return looks;
