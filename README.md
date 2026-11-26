@@ -653,7 +653,8 @@ An item discovered while the map is open reveals its name and icon without reope
   beach sand from **Dig holes** on open ground. The pickaxe lists **Mine ores** for extracting resources.
   The pickaxe and hammers share **Building a mine** for preparing it.
   All bottle fills share a single **Bottle** card. Bottle and Steel bucket both show **Transport liquids**.
-  Water shows **Drink** and Berry jam shows **Food**. Routine container handling is not listed.
+  Water shows **Drink**, **Water farm plots** and **Water saplings**. Berry jam shows **Food**.
+  Routine container handling is not listed.
   When a tree has one result, it connects the item and result on a straight line.
   Tools that can strike wolves show **Weapon**, including Torch and Steel bucket. Torch also shows **Source of light**.
   Mortar and pestle is a recipe tool only.

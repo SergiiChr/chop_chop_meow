@@ -580,11 +580,13 @@ public partial class WorldView {
         for (int i = 0; i < ReviewClips.Length; i++) {
             var action = ReviewClips[i].Action;
             reviewRigs[i].Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
-            var pose = ActorAnimation.PoseAt(action, Elapsed, action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Carry);
+            var weapon = WeaponSwing.Of(action);
+            float time = weapon == null ? Elapsed : Elapsed % weapon.Duration;
+            var pose = ActorAnimation.PoseAt(action, time, action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Carry);
             if (ReviewClips[i].Name.EndsWith(" barrel")) reviewRigs[i].HugBarrel(pose);
-            else if (WeaponSwing.Of(action) is WeaponSwing weapon) {
+            else if (weapon != null) {
                 reviewRigs[i].Show(pose, null, false);
-                reviewRigs[i].ShowWeapon(weapon, Elapsed % weapon.Duration);
+                reviewRigs[i].ShowWeapon(weapon, time);
             } else reviewRigs[i].Show(pose, ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch);
         }
     }

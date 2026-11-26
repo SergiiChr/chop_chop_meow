@@ -47,13 +47,15 @@ public partial class Game {
         await TestClean(CheckItemTreeShowsDirectActions);
         await TestClean(CheckItemTreeGroupsMiningAndMineConstruction);
         await TestClean(CheckItemTreeShowsContainerUsesWithoutHandling);
-        await TestClean(CheckLiquidItemTreesShowWhatCanBeConsumed);
+        await TestClean(CheckLiquidItemTreesShowDirectUses);
         await TestClean(CheckSingleResultItemTreeUsesAStraightLine);
         await TestClean(CheckBottleFillsShareOneRecipeMapEntry);
         await TestClean(CheckAltClickBackpackItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickHotbarItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickRecipeShowsTheProductWithoutQueueing);
         await TestClean(CheckAltClickIngredientInTheActiveCraftingRow);
+        await TestClean(CheckAltClickTheFuelShownInAnEmptyBurner);
+        await TestClean(CheckAltClickTheToolShownInAnEmptyToolSlot);
         await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
         await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
         await TestClean(CheckItemTreeFollowsOneDirectRecipeAtATime);
@@ -522,6 +524,30 @@ public partial class Game {
         await Until(() => world.Carried("stone_chisel") == chisels + 1, "the chisel finishing without queueing another", 2);
         Drop(Hosted, "stone_chisel", 1);
         await CloseWithEsc();
+    }
+
+    /// <summary>The empty iron-smelting burner shows Coal and opens its map entry.</summary>
+    private async Task CheckAltClickTheFuelShownInAnEmptyBurner() {
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(-1, 0));
+        await ClickOn(furnace);
+        await Until(() => Named("fuel") is ItemSlot { Icon: not null }, "the empty burner showing Coal", 2);
+        await Click(Named("fuel")!, alt: true);
+        Require(recipeMap.Visible && recipeMap.Chosen == "coal" && furnace.Burner!.Count == 0,
+            "Alt-clicking Coal in the empty burner must open the Recipe map without loading the burner.");
+        await KeyStroke(Key.Escape);
+        RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
+    }
+
+    /// <summary>The empty chisel slot shows Stone chisel and opens its map entry.</summary>
+    private async Task CheckAltClickTheToolShownInAnEmptyToolSlot() {
+        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
+        await ClickOn(workbench);
+        var slot = (ItemSlot)panel.Aside.FindChild("tool_chisel", true, false);
+        await Click(slot, alt: true);
+        Require(recipeMap.Visible && recipeMap.Chosen == "stone_chisel" && workbench.Tools!.Count == 0,
+            "Alt-clicking Stone chisel in the empty tool slot must open the Recipe map without slotting a tool.");
+        await KeyStroke(Key.Escape);
+        RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
     }
 
     /// <summary>On the recipe map a click on a chip goes to its item and lights it up for a moment, a click on an item shows its details, and Show leaves the map for where it is made.</summary>

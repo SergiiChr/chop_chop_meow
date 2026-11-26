@@ -19,6 +19,10 @@ internal static class ItemTreeActions {
         if (def.Hunger > 0) yield return "Eat";
         else if (def.Thirst > 0) yield return "Drink";
         foreach (string action in ContainerActions(data, item)) yield return action;
+        if (item == Water.Liquid) {
+            yield return "Water farm plots";
+            yield return "Water saplings";
+        }
         if (world.IsWeapon(item)) yield return "Weapon";
         if (data.Market.Sells.ContainsKey(item)) yield return "Can be sold for profit.";
         if (item == Inventory.Coins) {

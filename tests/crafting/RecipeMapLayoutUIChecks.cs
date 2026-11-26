@@ -181,21 +181,22 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
-    /// <summary>Water and Berry jam keep their recipes and show their consumption use, not filling a vessel.</summary>
-    private async Task CheckLiquidItemTreesShowWhatCanBeConsumed() {
+    /// <summary>Water and Berry jam keep their recipes and direct uses, without filling a vessel.</summary>
+    private async Task CheckLiquidItemTreesShowDirectUses() {
         Achieve(Hosted, Water.Liquid, BerryJam.Liquid, "meat_stew", "canned_jam"); await Frames();
         await OpenRecipeMap();
         await Click(RecipeMapCard(Water.Liquid), alt: true);
         await ItemTreeShows(Water.Liquid);
-        Require(ItemTreeActionsShown().SequenceEqual(new[] { "Drink" }) &&
+        Require(ItemTreeActionsShown().SequenceEqual(new[] { "Drink", "Water farm plots", "Water saplings" }) &&
             ItemTreeCard("meat_stew") != null && ItemTreeCard("dough") != null,
-            "Water must show Drink and its cooking recipes, without Fill containers.");
+            "Water must show Drink, its watering uses and its cooking recipes, without Fill containers.");
         await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
         await Click(RecipeMapCard(BerryJam.Liquid), alt: true);
         await ItemTreeShows(BerryJam.Liquid);
         Require(ItemTreeActionsShown().SequenceEqual(new[] { "Food" }) && ItemTreeCard("canned_jam") != null,
             "Berry jam must show Food and its canning recipe, without generic container actions.");
         await KeyStroke(Key.Escape);
+        await CloseWithEsc();
     }
 
     /// <summary>A tree with one result connects the root, branch caption and card on one horizontal line.</summary>

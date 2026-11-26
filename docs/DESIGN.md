@@ -1183,6 +1183,7 @@ A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that 
 The Recipe map badge on the bottom bar opens `RecipeMap` over the running game.
 `UiKit.LinkRecipeMap` lets Alt-click on an item slot or recipe card look up its item through `RecipeMap.OpenAt` without
 running the slot's usual action, including adding or removing a filter entry.
+A station's fuel or tool slot links to the item it pictures even when that slot is empty.
 An item link in the Goal Log uses the same entry point with the game still paused.
 Closing the map returns to the panel or goal details underneath.
 `PlayerControl.Update` moves nobody while it shows, and a card reveals its name and icon when `World.Had` knows its item or `World.Reached` records its building.
@@ -1209,6 +1210,7 @@ Digging an entrance and fitting a mine's frame and rails share **Building a mine
 `GameData.MapEntryOf` resolves every container fill to its base entry, so every fill of a bottle links to **Bottle**.
 `ItemTreeActions` uses the vessel table to give Bottle and Steel bucket the same **Transport liquids** action.
 Liquids list **Drink** or **Food** based on what their filled vessels provide, not how to fill them.
+Water also lists watering farm plots and saplings.
 Crates and barrels list their uses, not opening or placing. The branch column centers vertically with the root,
 so a single result needs no bend in its line.
 **Weapon** marks the tools that can strike wolves, including Torch and Steel bucket.
