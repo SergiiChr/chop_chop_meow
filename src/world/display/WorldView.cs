@@ -354,7 +354,8 @@ public partial class WorldView : Node3D {
 
     // ---------- Camera and picking ----------
 
-    public Vector2 Center => GetViewport().GetVisibleRect().Size * new Vector2(PanelOpen ? .38f : .5f, .52f);
+    /// <summary>How far below the middle of the screen the player stands, as a share of the screen's height.</summary>
+    private const float BelowMiddle = .02f;
 
     /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
     private void SyncCamera() {
@@ -374,7 +375,6 @@ public partial class WorldView : Node3D {
             camera.CullMask |= FirstPersonCamera.HeadLayer;
             SetFirstPersonBackground(false);
         }
-        var size = GetViewport().GetVisibleRect().Size;
         camera.Size = (AnimationReview ? (ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : WaterReview != null ? 3.4f : 11) / ReviewZoom : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(AnimationReview ? ReviewPitch : CameraPitch ?? Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         float turn = AnimationReview && WaterReview != null ? CameraTurn - ReviewTurn : CameraTurn;
@@ -384,9 +384,8 @@ public partial class WorldView : Node3D {
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
         camera.Position = target + back * (EnvironmentReview ? EnvironmentCameraDistance : 60);
         if (EnvironmentReview && EnvironmentCameraDistance > 60) sun.DirectionalShadowMaxDistance = EnvironmentCameraDistance + 40;
-        float unitsPerPixel = camera.Size / Math.Max(1, size.Y);
-        camera.HOffset = (.5f - Center.X / Math.Max(1, size.X)) * size.X * unitsPerPixel;
-        camera.VOffset = (Center.Y / Math.Max(1, size.Y) - .5f) * size.Y * unitsPerPixel;
+        camera.HOffset = 0;
+        camera.VOffset = BelowMiddle * camera.Size;
     }
 
     private void SetFirstPersonBackground(bool show) {
