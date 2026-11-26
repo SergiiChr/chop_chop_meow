@@ -12,6 +12,8 @@ namespace ChopChopMeow;
 public sealed class Construction(World world) {
     /// <summary>How far back from the lake's shore a building, a yard and a cabin's door keep.</summary>
     internal const float ShoreRoom = .8f;
+    /// <summary>Ground a building, a yard or a cabin's door can go on: open, and <see cref="ShoreRoom"/> back from the lake's shore.</summary>
+    internal bool DryOpen(Vector2 p) => world.CanStand(p) && !Terrain.InLake(p, ShoreRoom);
     /// <summary>
     /// The spots each kind of building is worked from, relative to it as placed unturned, each with what refuses a placement that leaves it off dry, open ground:
     /// only walking reaches into the lake's shallows.
@@ -83,7 +85,7 @@ public sealed class Construction(World world) {
             return "Leave your feet and the arrival point clear.";
         if (kind == ThingKind.Pump) {
             if (!Terrain.InLake(p)) return "Place the intake in the freshwater lake’s shallows.";
-        } else if (!world.CanStandDry(p, ShoreRoom)) return "Choose dry, open ground.";
+        } else if (!DryOpen(p)) return "Choose dry, open ground.";
         if (kind == ThingKind.StrawBed && !StrawBed.Fits(world, p, rotation)) return "Choose dry, open ground for the whole bed.";
         if (digging && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
@@ -91,7 +93,7 @@ public sealed class Construction(World world) {
                 return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
             var door = p + Doorways.DoorOffset.Rotated(rotation);
-            if (!world.CanStandDry(door, ShoreRoom) || world.S.Things.Any(t => t.TakesGround && !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
+            if (!DryOpen(door) || world.S.Things.Any(t => t.TakesGround && !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
                 return "Leave open ground in front of the door.";
         }
         if (WorkSpots.TryGetValue(kind, out var spots))
@@ -135,7 +137,7 @@ public sealed class Construction(World world) {
         for (float x = -sample; x <= sample; x++)
             for (float y = -sample; y <= sample; y++) {
                 var q = p + new Vector2(x, y);
-                if (!world.CanStandDry(q, ShoreRoom) || Terrain.Spawn.DistanceTo(q) < 1) return "Choose dry, open ground.";
+                if (!DryOpen(q) || Terrain.Spawn.DistanceTo(q) < 1) return "Choose dry, open ground.";
             }
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in world.S.Things) {

@@ -94,18 +94,13 @@ public sealed class Diary(World world) {
     /// <summary>
     /// One gather by the acting player of what hides <paramref name="find"/>, <paramref name="at"/> a spot: one time in twenty, it turns up.
     /// A page off a tree falls beside the trunk for the player to pick up; any other comes up in its pop-up at once.
+    /// Nothing turns up while another find waits in its pop-up, so that one is never replaced.
     /// </summary>
     internal void Roll(DiaryFind find, Vector2 at) {
         var p = world.S.Actor;
-        if (Quiet || !Missing(p, find) || rolls.NextDouble() >= FindChance) return;
+        if (Quiet || p.DiaryFinding != DiaryFind.None || !Missing(p, find) || rolls.NextDouble() >= FindChance) return;
         if (find != DiaryFind.Tree) { p.DiaryFinding = find; return; }
-        for (int tries = 0; tries < 8; tries++) {
-            float angle = (float)(rolls.NextDouble() * Math.Tau), distance = FallNear + (FallFar - FallNear) * (float)rolls.NextDouble();
-            var spot = at + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * distance;
-            if (!world.CanStand(spot)) continue;
-            Drop(p, spot);
-            return;
-        }
+        if (world.StandSpotNear(rolls, at, FallNear, FallFar) is Vector2 spot) Drop(p, spot);
     }
 
     /// <summary>Lays a page fallen off a tree at a spot for a player, the only one it shows to.</summary>
@@ -113,13 +108,6 @@ public sealed class Diary(World world) {
         var page = world.Add(ThingKind.FallenPage, at, 1);
         p.FallenPage = page.Id;
         return page;
-    }
-
-    /// <summary>Takes away each page fallen off a tree that a new building, yard or crate covers, so a later chop can drop its player's page again.</summary>
-    internal void ClearUnder(Thing built) {
-        var pages = world.S.Things.Of(ThingKind.FallenPage);
-        for (int i = pages.Count - 1; i >= 0; i--)
-            if (World.Clears(built, pages[i].Pos)) world.S.Things.Remove(pages[i]);
     }
 
     /// <summary>Floats the lake's page at a spot of its own in the shallows, as a new world starts.</summary>
@@ -140,8 +128,8 @@ public sealed class Diary(World world) {
         return Terrain.Lake + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (Terrain.Shore(angle) - inward);
     }
 
-    /// <summary>Where a page is now: the lake's where it has drifted to, any other where it lies.</summary>
-    public Vector2 At(Thing page) => page.Kind == ThingKind.FloatingPage ? FloatAt(page, world.Time) : page.Pos;
+    /// <summary>Where a thing is now: the lake's page where it has drifted to, anything else where it lies.</summary>
+    public Vector2 At(Thing t) => t.Kind == ThingKind.FloatingPage ? FloatAt(t, world.Time) : t.Pos;
 
     /// <summary>The acting player picks up a page in their reach that shows to them, which brings up its pop-up.</summary>
     internal void PickUp(Thing page) {

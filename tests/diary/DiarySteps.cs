@@ -29,6 +29,13 @@ internal static class DiarySteps {
         return world.ThingsOf(ThingKind.FallenPage)[0];
     }
 
+    /// <summary>The player picks berries off a bush until a page turns up in it, waiting in its pop-up, and gives the bush.</summary>
+    public static Thing FindAPageInABush(World world) {
+        var bush = world.Add(ThingKind.Berries, Terrain.Spawn + new Vector2(10, -10), 10000);
+        GatherUntilFound(world, bush, DiaryFind.Berries);
+        return bush;
+    }
+
     /// <summary>The player gathers a resource until a page turns up in it.</summary>
     public static void GatherUntilFound(World world, Thing resource, DiaryFind find) {
         world.Player = world.GatherAt(resource, resource.Pos + Vector2.Right);
@@ -43,12 +50,17 @@ internal static class DiarySteps {
     /// <summary>How far from a page a player stands to pick it up, in <see cref="PickUpPage"/>.</summary>
     public const float PageReach = 1;
 
-    /// <summary>The player walks within reach of a page lying in the world, from the lake's shore for the one floating there, and picks it up.</summary>
+    /// <summary>
+    /// The player walks within reach of a page lying in the world, from the lake's shore for the one floating there, and picks it up,
+    /// which brings up its pop-up.
+    /// </summary>
     public static void PickUpPage(World world, Thing page) {
         var at = world.GatherAt(page, world.Player);
         var away = page.Kind == ThingKind.FloatingPage ? at - Terrain.Lake : world.Player - at;
         world.Player = at + away.Normalized() * PageReach;
         Require(world.CanStand(world.Player), $"a player should be able to stand within reach of a page: {world.Player}");
         world.Gather(page, 0);
+        var find = page.Kind == ThingKind.FloatingPage ? DiaryFind.Lake : DiaryFind.Tree;
+        Require(world.Me.DiaryFinding == find, $"picking up a page should bring up its pop-up, {find}: {world.Me.DiaryFinding}");
     }
 }

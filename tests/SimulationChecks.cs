@@ -16,7 +16,7 @@ public static class SimulationChecks {
         HotbarStackChecks.Run(data);
         ChopChopMeow.Tests.WaterChecks.Run(data);
         ChopChopMeow.Tests.BarrelChecks.Run(data);
-        Test(LakeChecks.Run, data);
+        LakeChecks.Run(data);
         EconomyChecks.Run(data);
         AnimationChecks.Run(data);
         PropMotionChecks.Run();

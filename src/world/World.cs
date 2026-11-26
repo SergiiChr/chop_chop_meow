@@ -543,7 +543,7 @@ public sealed partial class World {
     public void CollectKnown(List<Thing> known) {
         known.Clear();
         var me = Me;
-        foreach (var t in S.Things) if (Sees(t.Pos) && Diary.ShowsTo(me, t)) known.Add(t);
+        foreach (var t in S.Things) if (Sees(Diary.At(t)) && Diary.ShowsTo(me, t)) known.Add(t);
         foreach (var t in S.Remembered.Values) if (!Sees(t.Pos)) known.Add(t);
     }
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
@@ -747,10 +747,19 @@ public sealed partial class World {
     /// <summary>Whether a player, worker or wolf can stand on a spot: walkable ground with nothing built in the way.</summary>
     public bool CanStand(Vector2 p) => CanStand(p, null);
     /// <summary>
-    /// Ground to stand on at least <paramref name="shore"/> metres back from the lake's shore, out of its shallows:
-    /// a building keeps <see cref="Construction.ShoreRoom"/> back, and the spots it is worked from need only be out of the water.
+    /// A spot to stand on <paramref name="near"/> to <paramref name="far"/> metres from <paramref name="at"/>, in a direction and at a
+    /// distance drawn from <paramref name="rolls"/>, or null when eight tries find none.
     /// </summary>
-    public bool CanStandDry(Vector2 p, float shore = 0) => CanStand(p) && !Terrain.InLake(p, shore);
+    internal Vector2? StandSpotNear(Random rolls, Vector2 at, float near, float far) {
+        for (int tries = 0; tries < 8; tries++) {
+            float angle = (float)(rolls.NextDouble() * Math.Tau), distance = near + (far - near) * (float)rolls.NextDouble();
+            var spot = at + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * distance;
+            if (CanStand(spot)) return spot;
+        }
+        return null;
+    }
+    /// <summary>Ground to stand on out of the lake's shallows, as the spots a building is worked from need.</summary>
+    public bool CanStandDry(Vector2 p) => CanStand(p) && !Terrain.InLake(p);
 
     internal bool CanStand(Vector2 p, Thing? except) {
         if (!Open(p)) return false;
@@ -759,7 +768,7 @@ public sealed partial class World {
                 if (t != except && Blocks(t, p)) return false;
         return true;
     }
-    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their outcrops.</summary>
+    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water but for the lake's shallows, and clear of cliff walls and their outcrops.</summary>
     internal static bool Open(Vector2 p) {
         if (!Terrain.Open(p)) return false;
         foreach (var c in Cliff.All) if (c.DistanceTo(p) < Cliff.Depth) return false;

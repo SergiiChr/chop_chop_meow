@@ -30,7 +30,7 @@ public sealed class FeedingSpots(IReadOnlyDictionary<Wolf, WolfModel> wolves) {
         bool legs = along < LegsEnd;
         float yaw = ActorAnimation.Yaw(-outward, 0);
         var at = WorldView.To3(near + outward * (legs ? LegSide : TrunkSide), legs ? LegTop : TrunkTop) - new Basis(Vector3.Up, yaw) * WolfModel.FeedingBite;
-        return (at with { Y = 0 }, yaw);
+        return (WorldView.StandsAt(new Vector2(at.X, at.Z)), yaw);
     }
 
     /// <summary>

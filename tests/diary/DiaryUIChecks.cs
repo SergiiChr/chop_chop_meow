@@ -12,7 +12,7 @@ public partial class Game {
         await TestClean(CheckAFindWaitsBehindTakeAndOpensItsDayWithTheBadgeStampedAfter);
         await TestClean(CheckClickingAFallenPagePicksItUpAndTheBadgeMarksUnreadDays);
         await TestClean(CheckARightClickWadesToTheLakePage);
-        await TestClean(CheckAStickInTheShallowsRestsOnTheLakeBedWhileAPageFloats);
+        await TestClean(CheckAPageInTheShallowsFloatsOnTheWater);
         await TestClean(CheckTheDiaryGoalCountsPagesAndOpensTheDiary);
         await TestClean(CheckTheLastDaysWritingFallsApartWithNoMarkupShowing);
     }
@@ -28,8 +28,8 @@ public partial class Game {
         await KeyStroke(Key.Escape); await KeyStroke(Key.Escape);
         Require(!menu.Visible && findPrompt.Visible, "Esc must leave the pop-up up.");
         int since = sounds.Played;
-        await Click((Button)findPrompt.FindChild("diary_take", true, false));
-        await Until(() => sheet.Visible && sheet.Day == 40 && !findPrompt.Visible && Diary.Started(world.Me), "taking the page opening day 40 large", 3);
+        await TakeFind(40);
+        await Until(() => !findPrompt.Visible && Diary.Started(world.Me), "taking the page closing its pop-up and starting the diary", 3);
         Require(sounds.Heard("page_turn", since), "Taking a page must turn a page.");
         await Frames(4);
         Require(!panel.Visible && !hotbar.DiaryBadge.Visible, "Taking the first page must open only its day, with the diary and its badge waiting behind it.");
@@ -60,19 +60,18 @@ public partial class Game {
         await ClickOn(page);
         await Until(() => findPrompt.Visible && HasLabel(findPrompt, "A piece of paper fell off a tree."), "a left click on the page walking the player over to pick it up", 8);
         await Until(() => view.PropOf(page.Id) is not { Shown: true }, "the picked up page leaving the ground", 3);
-        await Click((Button)findPrompt.FindChild("diary_take", true, false));
-        await Until(() => sheet.Visible && sheet.Day == 36, "taking the tree's page opening its first day, 36", 3);
+        await TakeFind(36);
         await KeyStroke(Key.Escape); await CloseWithEsc();
         var unread = hotbar.DiaryBadge.GetNode<Control>("unread");
         Require(unread.Visible, "The diary's badge must show a dot while day 37 waits to be read.");
         await Click(hotbar.DiaryBadge);
         await Until(() => panel.Page == Page.Diary, "the badge opening the diary", 3);
         var day37 = Named("diary_day_37")!;
-        Require(day37.TooltipText.StartsWith("Not read yet"), "An unread day's tile must say it is not read yet.");
+        Require(day37.TooltipText.StartsWith("Not read yet"), "An unread day's cell must say it is not read yet.");
         await Click(day37);
-        Require(sheet.Visible && sheet.Day == 37, "A day's tile must open the day large.");
+        Require(sheet.Visible && sheet.Day == 37, "A day's cell must open the day large.");
         await KeyStroke(Key.Escape);
-        await Until(() => !unread.Visible && !day37.TooltipText.StartsWith("Not read yet"), "reading day 37 clearing the badge's dot and its tile's mark", 3);
+        await Until(() => !unread.Visible && !day37.TooltipText.StartsWith("Not read yet"), "reading day 37 clearing the badge's dot and its cell's mark", 3);
         await CloseWithEsc();
         Warp(Hosted, home); await Frames(4);
     }
@@ -87,26 +86,23 @@ public partial class Game {
         await Until(() => view.PropOf(page.Id) is PageProp { Shown: true }, "the lake's page showing in the window", 5);
         await RightClick(Hosted.Diary.At(page), 0);
         await Until(() => findPrompt.Visible && HasLabel(findPrompt, "A piece of paper floating in the water."), "a right click on the lake's page wading the player out to pick it up", 12);
-        await Click((Button)findPrompt.FindChild("diary_take", true, false));
-        await Until(() => sheet.Visible && sheet.Day == 2, "taking the lake's page opening day 2", 3);
+        await TakeFind(2);
         Require(view.PropOf(page.Id) is not { Shown: true } && Hosted.Find(page.Id) == page, "The lake's page must be gone for the player who took it and stay in the world.");
         await KeyStroke(Key.Escape); await CloseWithEsc();
         Warp(Hosted, home); await Frames(4);
     }
 
-    private async Task CheckAStickInTheShallowsRestsOnTheLakeBedWhileAPageFloats() {
+    private async Task CheckAPageInTheShallowsFloatsOnTheWater() {
         await CloseWithEsc();
         var home = Hosted.Player;
         var shore = Terrain.WaterPoint(Hosted.Diary.At(Hosted.ThingsOf(ThingKind.FloatingPage).Single()));
         var inward = (Terrain.Lake - shore).Normalized();
-        var stick = Hosted.Add(ThingKind.Stick, shore + inward * 1.5f, 1);
-        var page = DropPage(Hosted, HostedMe, shore + inward * 1.5f + inward.Orthogonal());
+        var page = DropPage(Hosted, HostedMe, shore + inward * 1.5f);
         Warp(Hosted, shore - inward * 2);
-        await Until(() => view.PropOf(stick.Id) is { Shown: true } && view.PropOf(page.Id) is PageProp { Shown: true }, "the stick and the page in the shallows showing in the window", 5);
-        float stickAt = view.PropOf(stick.Id)!.Root.Position.Y, pageAt = view.PropOf(page.Id)!.Root.Position.Y;
-        Require(stickAt < -.05f, $"A stick in the shallows must rest on the lake bed under the water, not at {stickAt:0.000}.");
+        await Until(() => view.PropOf(page.Id) is PageProp { Shown: true }, "the page in the shallows showing in the window", 5);
+        float pageAt = view.PropOf(page.Id)!.Root.Position.Y;
         Require(pageAt == 0, $"A page in the shallows must float on the water, not lie at {pageAt:0.000}.");
-        RemoveThings(Hosted, t => t == stick || t == page);
+        RemoveThings(Hosted, t => t == page);
         Warp(Hosted, home); await Frames(4);
     }
 

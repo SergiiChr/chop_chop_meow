@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 /// A found day's page is bright, with its place in the diary written in black over its middle, and one not read yet is edged in brick.
 /// A day not found yet is greyed out, scrap and page alike, with a faint question mark.
 /// </summary>
-public partial class PaperTile : Button {
+public partial class DiaryCell : Button {
     public enum Look { Missing, Read, Unread }
     private static readonly Texture2D PagePicture = Icons.Of(PageShape.Icon)!;
     private static readonly Color Shadow = new(0, 0, 0, .28f);
@@ -16,7 +16,7 @@ public partial class PaperTile : Button {
     private static readonly Color BrightPage = new(1.6f, 1.6f, 1.6f), DullPage = new(.8f, .8f, .8f, .7f);
     /// <summary>The scrap under a day not found, and its question mark.</summary>
     private static readonly Color GreyPaper = Style.DiaryPaper.Lerp(new Color(.62f, .62f, .62f), .7f), Unknown = new(.25f, .25f, .25f, .45f);
-    /// <summary>How far in from the cell's edges the sheet lies, leaving room for its shadow and edge.</summary>
+    /// <summary>How far in from the cell's edges the scrap lies, leaving room for its shadow and edge.</summary>
     private const float Inset = 5;
     /// <summary>Pixels between the points of the torn edge, and how far each strays in or out.</summary>
     private const float TearStep = 7, TearDepth = 3;
@@ -28,13 +28,13 @@ public partial class PaperTile : Button {
     private TextureRect? picture;
     private Label? counter;
     private readonly string place;
-    // The sheet's outline, and the same closed back on its first point for drawing its edge, for the cell's size when they were made.
-    private Vector2[] sheet = [], edge = [];
+    // The scrap's outline, and the same closed back on its first point for drawing its edge, for the cell's size when they were made.
+    private Vector2[] scrap = [], edge = [];
     private Vector2 shaped;
     private Look look = Look.Missing;
 
     /// <param name="place">The cell's place in the diary, counted from one.</param>
-    public PaperTile(int place, Action open) {
+    public DiaryCell(int place, Action open) {
         this.place = place.ToString();
         CustomMinimumSize = new Vector2(112, 140);
         Style.Skin(this, Style.None, Style.None);
@@ -82,9 +82,9 @@ public partial class PaperTile : Button {
         // A cell may get its size before it is first drawn, or never be resized after, so its outline follows the size it is drawn at.
         if (Size != shaped) Shape();
         DrawSetTransform(new Vector2(2, 3));
-        DrawColoredPolygon(sheet, Shadow);
+        DrawColoredPolygon(scrap, Shadow);
         DrawSetTransform(Vector2.Zero);
-        DrawColoredPolygon(sheet, look == Look.Missing ? GreyPaper : Style.DiaryPaper);
+        DrawColoredPolygon(scrap, look == Look.Missing ? GreyPaper : Style.DiaryPaper);
         var (color, width) = !Disabled && IsHovered() ? (Style.Mustard, 3f) : look == Look.Unread ? (Style.Brick, 4f) : (Style.Line, 2f);
         DrawPolyline(edge, color, width, true);
     }
@@ -93,12 +93,12 @@ public partial class PaperTile : Button {
     private void Shape() {
         float left = Inset + Crooked, top = Inset + Crooked, right = Size.X - Inset - Crooked, bottom = Size.Y - Inset - Crooked;
         int points = Math.Min(tear.Length, (int)((bottom - top) / TearStep));
-        sheet = new Vector2[points + 4];
-        sheet[0] = new Vector2(left, top) + corners[0]; sheet[1] = new Vector2(right, top) + corners[1];
-        sheet[2] = new Vector2(right, bottom) + corners[2]; sheet[3] = new Vector2(left, bottom) + corners[3];
+        scrap = new Vector2[points + 4];
+        scrap[0] = new Vector2(left, top) + corners[0]; scrap[1] = new Vector2(right, top) + corners[1];
+        scrap[2] = new Vector2(right, bottom) + corners[2]; scrap[3] = new Vector2(left, bottom) + corners[3];
         // The torn edge runs from the bottom left corner up to the top left one.
-        for (int i = 1; i <= points; i++) sheet[3 + i] = sheet[3].Lerp(sheet[0], i / (points + 1f)) + new Vector2(TearDepth + tear[i - 1], 0);
-        edge = [.. sheet, sheet[0]];
+        for (int i = 1; i <= points; i++) scrap[3 + i] = scrap[3].Lerp(scrap[0], i / (points + 1f)) + new Vector2(TearDepth + tear[i - 1], 0);
+        edge = [.. scrap, scrap[0]];
         shaped = Size;
     }
 }

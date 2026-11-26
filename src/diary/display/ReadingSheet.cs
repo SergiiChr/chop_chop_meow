@@ -20,8 +20,9 @@ public partial class ReadingSheet : Control {
     /// <summary>The scale the scribbles' drawings are imported at, so they stay sharp on a large screen.</summary>
     private const int ScribbleScale = 2;
 
+    private int day;
     /// <summary>The number of the day open, or zero while closed.</summary>
-    public int Day { get; private set; }
+    public int Day => Visible ? day : 0;
     /// <summary>The words of the open day as the player reads them, without the drawings.</summary>
     public string Reading => text.GetParsedText();
 
@@ -38,13 +39,13 @@ public partial class ReadingSheet : Control {
         text.AddThemeConstantOverride("paragraph_separation", 14);
         text.CustomEffects = [new FallingApart()];
         column.AddChild(text);
-        kit.World.Replaced += () => { Visible = false; Day = 0; };
+        kit.World.Replaced += () => Visible = false;
     }
 
     /// <summary>Opens a day large, turning a page unless <paramref name="quiet"/>, and marks it read.</summary>
     public void Open(int day, bool quiet = false) {
         if (!quiet) kit.Sounds.Play("page_turn");
-        Day = day;
+        this.day = day;
         title.Text = $"Day {day}";
         text.Text = Written(DiaryDay.Of(day));
         Visible = true;
@@ -54,7 +55,7 @@ public partial class ReadingSheet : Control {
     public void Close() {
         if (!Visible) return;
         kit.Sounds.Play("page_turn");
-        Visible = false; Day = 0;
+        Visible = false;
     }
 
     /// <summary>A day's paragraphs as the sheet's text, falling apart where they say so, with a scribble drawn in for each word or line nobody can read.</summary>

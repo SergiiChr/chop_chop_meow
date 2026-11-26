@@ -10,8 +10,7 @@ using static SandSteps;
 using static DiarySteps;
 
 /// <summary>
-/// Checks of the diary: where its pages turn up, who sees a page lying in the world, the pop-up a find waits behind, reading, saves and its goal,
-/// and the lake's shallows, where people wade but nothing is built.
+/// Checks of the diary: where its pages turn up, who sees a page lying in the world, the pop-up a find waits behind, reading, saves and its goal.
 /// </summary>
 public static class DiaryChecks {
     public static void Run(GameData data) {
@@ -20,13 +19,11 @@ public static class DiaryChecks {
         Test(CheckBerriesLeavesAndSandEachTurnUpTheirPageAtOnce, data);
         Test(CheckWorkersTurnUpNoPage, data);
         Test(CheckTheLakePageFloatsWithinWadingReachAndStaysForOthers, data);
-        Test(CheckEveryoneWadesTwoMetresIntoTheLake, data);
         Test(CheckOpeningADayMarksItRead, data);
         Test(CheckAFallenPageWaitsForItsPlayerToComeBack, data);
         Test(CheckASaveOpenedOnAnotherComputerKeepsItsOwnersFallenPage, data);
         Test(CheckAGuestHeldByAFindIsNotToldTheyAreBusy, data);
         Test(CheckBuildingOverAFallenPageClearsItForAnotherChop, data);
-        Test(CheckBuildingsAreWorkedFromDryGroundOnly, data);
         Test(CheckFindsAndReadDaysComeBackFromASave, data);
         Test(CheckASaveWithABrokenDiaryIsRefused, data);
         Test(CheckTheDiaryGoalCountsEachPlayersOwnPages, data);
@@ -50,7 +47,7 @@ public static class DiaryChecks {
         var tree = world.Add(ThingKind.Tree, Terrain.Spawn + new Vector2(10, -10), 1000);
         var page = ChopUntilAPageFalls(world, tree);
         PickUpPage(world, page);
-        Require(world.Me.DiaryFinding == DiaryFind.Tree && world.Find(page.Id) == null, "picking up a fallen page should bring up its pop-up and take it off the ground");
+        Require(world.Find(page.Id) == null, "picking up a fallen page should take it off the ground");
         var stood = world.Player;
         world.MovePlayer(Vector2.Right);
         Require(world.Player == stood && world.Occupied, "a player with a pop-up up should be busy and stay where they stand");
@@ -65,8 +62,7 @@ public static class DiaryChecks {
 
     private static void CheckBerriesLeavesAndSandEachTurnUpTheirPageAtOnce(GameData data) {
         var world = DiaryWorld(data);
-        var bush = world.Add(ThingKind.Berries, Terrain.Spawn + new Vector2(10, -10), 10000);
-        GatherUntilFound(world, bush, DiaryFind.Berries);
+        var bush = FindAPageInABush(world);
         Require(world.Occupied, "a page found in a bush should stop the player at once with its pop-up");
         world.Diary.Take();
         var leaves = world.Add(ThingKind.LeafSpot, Terrain.Spawn + new Vector2(16, -10), 10000);
@@ -115,7 +111,6 @@ public static class DiaryChecks {
         }
         Require(Diary.ShowsTo(world.Me, page) && Diary.ShowsTo(guest, page), "the lake's page should show to every player who has not taken it");
         PickUpPage(world, page);
-        Require(world.Me.DiaryFinding == DiaryFind.Lake, "picking up the lake's page should bring up its pop-up");
         world.Diary.Take();
         Require(Diary.Has(world.Me, 2) && world.Find(page.Id) == page, "the lake's page should hold day 2 and stay on the lake for the others");
         Require(!Diary.ShowsTo(world.Me, page) && Diary.ShowsTo(guest, page), "the lake's page should be gone for the player who took it alone");
@@ -123,20 +118,9 @@ public static class DiaryChecks {
         Require(world.Me.DiaryFinding == DiaryFind.None, "a player who took the lake's page should not pick it up again");
     }
 
-    private static void CheckEveryoneWadesTwoMetresIntoTheLake(GameData data) {
-        var world = EmptyWorld(data);
-        foreach (float angle in new[] { 0f, 1.7f, 3.4f, 5.1f }) {
-            var way = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
-            float shore = Terrain.Shore(angle);
-            Require(world.CanStand(Terrain.Lake + way * (shore - Terrain.Wade + .1f)), $"anyone should stand in the shallows {Terrain.Wade} m in from the shore");
-            Require(!world.CanStand(Terrain.Lake + way * (shore - Terrain.Wade - .1f)), $"nobody should wade further than {Terrain.Wade} m in");
-        }
-    }
-
     private static void CheckOpeningADayMarksItRead(GameData data) {
         var world = DiaryWorld(data);
-        var bush = world.Add(ThingKind.Berries, Terrain.Spawn + new Vector2(10, -10), 10000);
-        GatherUntilFound(world, bush, DiaryFind.Berries);
+        FindAPageInABush(world);
         world.Diary.Read(40);
         world.Diary.Take();
         Require(Diary.Unread(world.Me, 40), "a day opened while it still waited in its pop-up should be unread once taken");
@@ -199,30 +183,9 @@ public static class DiaryChecks {
         loaded.As(back, () => ChopUntilAPageFalls(loaded, tree));
     }
 
-    private static void CheckBuildingsAreWorkedFromDryGroundOnly(GameData data) {
-        var world = EmptyWorld(data);
-        var bank = Terrain.WaterPoint(Terrain.Lake + Vector2.Up * 25);
-        var intake = (Vector2)Terrain.TileAt(bank + Vector2.Down * 1.1f);
-        world.Player = intake + new Vector2(0, -3);
-        Give(world, "steel_bar", 4); Give(world, "stone", 10); Give(world, "wood_parts", 4);
-        // Turned along the shore, the pump's handle comes in the shallows, where people wade.
-        var handle = intake + World.BellowsStand.Rotated(Mathf.Pi / 2);
-        Require(world.CanStand(handle) && Terrain.InLake(handle), "a handle turned along the shore should come in the shallows");
-        Require(world.Construction.PlacementBlock(ThingKind.Pump, intake, rotation: Mathf.Pi / 2) == "Turn the handle toward open ground on the bank.",
-            "a pump's handle should be worked from dry ground, not the shallows");
-        // A furnace on dry ground just up the bank, turned with its bellows toward the lake.
-        var furnace = bank + Vector2.Up;
-        world.Player = furnace + new Vector2(3, -1);
-        var bellows = furnace + World.BellowsStand.Rotated(Mathf.Pi);
-        Require(world.CanStand(bellows) && Terrain.InLake(bellows), "a furnace's bellows turned toward the lake should come in the shallows");
-        Require(world.Construction.PlacementBlock(ThingKind.Reinforced, furnace, rotation: Mathf.Pi) == "Leave dry, open ground at the furnace's bellows.",
-            "a furnace's bellows should be worked from dry ground, not the shallows");
-    }
-
     private static void CheckFindsAndReadDaysComeBackFromASave(GameData data) {
         var world = DiaryWorld(data);
-        var bush = world.Add(ThingKind.Berries, Terrain.Spawn + new Vector2(10, -10), 10000);
-        GatherUntilFound(world, bush, DiaryFind.Berries);
+        FindAPageInABush(world);
         world.Diary.Take();
         world.Diary.Read(40);
         var tree = world.Add(ThingKind.Tree, Terrain.Spawn + new Vector2(16, -10), 1000);
@@ -246,8 +209,7 @@ public static class DiaryChecks {
     /// </summary>
     private static void CheckASaveWithABrokenDiaryIsRefused(GameData data) {
         var world = DiaryWorld(data);
-        var bush = world.Add(ThingKind.Berries, Terrain.Spawn + new Vector2(10, -10), 10000);
-        GatherUntilFound(world, bush, DiaryFind.Berries);
+        var bush = FindAPageInABush(world);
         world.Diary.Take();
         world.Diary.Read(40);
         var page = DropPage(world, world.Me, Terrain.Spawn + new Vector2(3, 3));
@@ -276,8 +238,7 @@ public static class DiaryChecks {
     private static void CheckTheDiaryGoalCountsEachPlayersOwnPages(GameData data) {
         var world = DiaryWorld(data);
         Require(world.Goals.Status(GoalId.Diary) == GoalStatus.Hidden, "the diary's goal should stay hidden until a page is found");
-        var bush = world.Add(ThingKind.Berries, Terrain.Spawn + new Vector2(10, -10), 10000);
-        GatherUntilFound(world, bush, DiaryFind.Berries);
+        FindAPageInABush(world);
         Require(world.Goals.Status(GoalId.Diary) == GoalStatus.Hidden, "a page still in its pop-up should not show the goal yet");
         world.Diary.Take();
         Require(world.Goals.Status(GoalId.Diary) == GoalStatus.Active && Diary.FoundDays(world.Me) == 1, "taking the first page should show the diary's goal with one of its pages found");

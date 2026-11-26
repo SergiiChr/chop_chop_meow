@@ -3,7 +3,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The diary's page in the side panel: a sheet of paper for each of its days, in order, that opens the day large to read again.
+/// The diary's page in the side panel: a cell for each of its days, in order, that opens the day large to read again.
 /// A day the player has not found shows a question mark on its page, and one they have not opened yet stands out.
 /// </summary>
 public partial class DiaryPage(PageTools tools) : PagePanel(tools) {
@@ -18,25 +18,12 @@ public partial class DiaryPage(PageTools tools) : PagePanel(tools) {
         AddChild(room);
         var grid = NewGrid(4);
         room.AddChild(grid);
-        var tiles = new PaperTile[DiaryDay.All.Length];
-        for (int i = 0; i < tiles.Length; i++) {
+        for (int i = 0; i < DiaryDay.All.Length; i++) {
             int day = DiaryDay.All[i].Number;
-            var tile = new PaperTile(i + 1, () => panel.Sheet.Open(day)) { Name = $"diary_day_{day}" };
-            grid.AddChild(tile);
-            tiles[i] = tile;
+            var cell = new DiaryCell(i + 1, () => panel.Sheet.Open(day)) { Name = $"diary_day_{day}" };
+            grid.AddChild(cell);
+            // A cell draws again only when its day is found or read.
+            live.Watch(() => !Diary.Has(world.Me, day) ? DiaryCell.Look.Missing : Diary.Unread(world.Me, day) ? DiaryCell.Look.Unread : DiaryCell.Look.Read, cell.ShowAs);
         }
-        // Each day's look in two bits, so the tiles draw again only when one is found or read.
-        live.Watch(() => {
-            var me = world.Me;
-            long looks = 0;
-            for (int i = 0; i < tiles.Length; i++) {
-                int day = DiaryDay.All[i].Number;
-                var look = !Diary.Has(me, day) ? PaperTile.Look.Missing : Diary.Unread(me, day) ? PaperTile.Look.Unread : PaperTile.Look.Read;
-                looks |= (long)look << (2 * i);
-            }
-            return looks;
-        }, looks => {
-            for (int i = 0; i < tiles.Length; i++) tiles[i].ShowAs((PaperTile.Look)(looks >> (2 * i) & 3));
-        });
     }
 }

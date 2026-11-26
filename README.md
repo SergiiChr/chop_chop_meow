@@ -651,7 +651,7 @@ Each cell is a scrap of paper torn along one edge, with a loose page lying strai
 A day you have found is bright, with its place in the diary, 1 to 11, written in black over the page.
 A day you have not found is greyed out, with a faint question mark.
 A day you have not read yet has a brick rim, and the badge shows a red dot while one waits.
-Click a sheet to open the day large, handwritten on a white sheet shaped like the pages you find.
+Click a cell to open the day large, handwritten on a white sheet shaped like the pages you find.
 The close button, Esc or a click beside the sheet closes it.
 The last day was written in the dark: its writing falls apart into scribbles.
 Opening or closing a day turns a page.

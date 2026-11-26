@@ -62,7 +62,8 @@ public partial class World {
     /// <summary>Clears away the stumps, bushes and pages fallen off trees under a new building, yard or crate.</summary>
     internal void ClearGround(Thing built) {
         foreach (var kind in ClearedKinds) S.Things.RemoveAll(kind, t => Clears(built, t.Pos));
-        Diary.ClearUnder(built);
+        // A page cleared away can fall for its player again from a later chop.
+        S.Things.RemoveAll(ThingKind.FallenPage, t => Clears(built, t.Pos));
     }
     /// <summary>Clears away a stump or bush standing on a tile a gravel path is laid on.</summary>
     internal void ClearTile(Vector2I tile) {
