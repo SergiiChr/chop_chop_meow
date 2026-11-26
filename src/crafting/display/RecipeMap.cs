@@ -194,32 +194,41 @@ public partial class RecipeMap : Control {
         return lane;
     }
 
-    /// <summary>Places an item's products one step to the right, or below it for a chain that joins a root.</summary>
+    /// <summary>Places a card on its line, then its products one step to the right.</summary>
     private void Place(MapTree tree, string item, int step, ref int line, HashSet<string> unplacedRoots) {
-        var node = new MapNode(world, item, Choose, Jump, OpenItemTree) { Position = new Vector2(step * MapTree.Pitch, line * MapNode.RowPitch) };
-        nodes[item] = node; tree.AddChild(node); tree.Columns = Math.Max(tree.Columns, step + 1);
-        var made = world.Data.MadeOutOf(item).Concat(buildings[item].Select(building => building.Id));
-        bool first = true;
-        foreach (string product in made) {
-            string? other = JoiningRoot(product, step, unplacedRoots);
-            if (!first || other != null) line++;
-            first = false;
-            if (other != null) {
-                unplacedRoots.Remove(other);
-                Place(tree, other, 0, ref line, unplacedRoots);
-            }
-            Place(tree, product, other == null ? step + 1 : step, ref line, unplacedRoots);
-            tree.Link(node, nodes[product]);
-            if (other != null) tree.Link(nodes[other], nodes[product]);
-        }
+        var node = PlaceCard(tree, item, step, line);
+        PlaceProducts(tree, node, item, step, ref line, unplacedRoots, firstOnSameLine: true);
     }
 
-    /// <summary>A root ingredient can join a product from the left when the other ingredient is one step to its right.</summary>
-    private string? JoiningRoot(string product, int step, HashSet<string> unplacedRoots) {
-        var data = world.Data;
-        return step == 1 && data.RecipeOf(product) is RecipeDef recipe
-            ? recipe.Inputs.Keys.Skip(1).FirstOrDefault(root => unplacedRoots.Contains(root) && data.MadeOutOf(root).Count == 0 && !buildings.Contains(root))
-            : null;
+    private MapNode PlaceCard(MapTree tree, string item, int step, int line) {
+        var node = new MapNode(world, item, Choose, Jump, OpenItemTree) { Position = new Vector2(step * MapTree.Pitch, line * MapNode.RowPitch) };
+        nodes[item] = node; tree.AddChild(node); tree.Columns = Math.Max(tree.Columns, step + 1);
+        return node;
+    }
+
+    private void PlaceProducts(MapTree tree, MapNode node, string item, int step, ref int line,
+        HashSet<string> unplacedRoots, bool firstOnSameLine) {
+        var made = world.Data.MadeOutOf(item).Concat(buildings[item].Select(building => building.Id));
+        bool onSameLine = firstOnSameLine;
+        foreach (string product in made) {
+            // A second root can feed the product from the left if its first ingredient connects from above.
+            string? other = step == 1 && world.Data.RecipeOf(product) is RecipeDef recipe
+                ? recipe.Inputs.Keys.Skip(1).FirstOrDefault(unplacedRoots.Contains)
+                : null;
+            if (!onSameLine || other != null) line++;
+            onSameLine = false;
+            MapNode? joining = null;
+            if (other != null) {
+                unplacedRoots.Remove(other);
+                joining = PlaceCard(tree, other, 0, line);
+            }
+            Place(tree, product, joining == null ? step + 1 : step, ref line, unplacedRoots);
+            tree.Link(node, nodes[product]);
+            if (other != null && joining != null) {
+                tree.Link(joining, nodes[product]);
+                PlaceProducts(tree, joining, other, 0, ref line, unplacedRoots, firstOnSameLine: false);
+            }
+        }
     }
 
     /// <summary>Scrolls to an item and lights it up for a moment.</summary>
@@ -284,7 +293,7 @@ public partial class RecipeMap : Control {
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 4);
             var icon = DetailItem(input, 28, $"requires_{input}");
             pair.AddChild(icon);
-            var label = Style.Text(icon.Known ? amount + data.Name(input) : amount + MapItemLink.QuestionMark, 15, Style.Ink, wrap: true);
+            var label = Style.Text(icon.Known ? amount + data.Name(input) : amount.TrimEnd(), 15, Style.Ink, wrap: true);
             icon.Discovered += () => label.Text = amount + data.Name(input);
             label.SizeFlagsHorizontal = SizeFlags.ExpandFill; pair.AddChild(label);
             requires.AddChild(pair);
@@ -308,7 +317,7 @@ public partial class RecipeMap : Control {
 
     /// <summary>A detail thumbnail keeps its icon size and also lets Alt-click follow that item.</summary>
     private MapItemLink DetailItem(string item, int size, string name) {
-        var icon = new MapItemLink(world, item) {
+        var icon = new MapItemLink(world, item, "Click to find it on the map") {
             Name = name,
             ExpandIcon = true,
             CustomMinimumSize = new Vector2(size, size),
@@ -321,10 +330,24 @@ public partial class RecipeMap : Control {
         };
         Style.Skin(icon, Style.None, Style.None);
         icon.AddThemeConstantOverride("icon_max_width", size);
-        Style.InkText(icon);
-        icon.AddThemeFontOverride("font", Style.Head);
+        var hidden = UndiscoveredBadge(size);
+        hidden.Name = "undiscovered_badge";
+        hidden.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        icon.AddChild(hidden);
+        icon.PresentIdentity = (_, texture) => {
+            icon.Icon = texture;
+            hidden.Visible = !icon.Known;
+        };
+        icon.Pressed += () => Jump(item);
         return icon;
     }
+
+    private static MapSlot UndiscoveredBadge(int size) => new() {
+        OverLight = true,
+        MarkSize = size <= 28 ? 12 : 16,
+        CustomMinimumSize = new Vector2(size, size),
+        MouseFilter = MouseFilterEnum.Ignore
+    };
 
     private static VBoxContainer Fact(VBoxContainer sidebar, string heading) {
         var column = new VBoxContainer();

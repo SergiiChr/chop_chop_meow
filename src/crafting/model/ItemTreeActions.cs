@@ -23,7 +23,8 @@ internal static class ItemTreeActions {
         if (def.Hunger > 0) yield return "Eat";
         else if (def.Thirst > 0) yield return "Drink";
         foreach (string action in ContainerActions(data, item)) yield return action;
-        if (data.Market.Sells.ContainsKey(item)) yield return "Pack for sale";
+        if (world.Packable(item)) yield return "Pack into a crate";
+        if (data.Market.Sells.ContainsKey(item)) yield return "Sell in a crate";
         if (item == Inventory.Coins) {
             yield return "Buy goods";
             yield return "Hire workers";
@@ -48,21 +49,27 @@ internal static class ItemTreeActions {
     private static IEnumerable<string> ContainerActions(GameData data, string item) {
         if (World.IsCrate(item)) {
             yield return "Place crate";
+            yield return "Open crate";
             yield return "Store and transport goods";
+            yield return "Pack goods at a packing station";
         }
         if (Barrel.Is(item)) {
             yield return "Place barrel";
             yield return "Open barrel";
             yield return "Store water or jam";
+            if (Barrel.LiquidOf(item) == Water.Liquid) yield return "Mount on a cabin roof";
         }
         if (data.Vessels.Any(v => v.LitersIn(item) is >= 0 and int fill && fill < v.Capacity))
             yield return "Fill from stations";
         if (Water.BottleLiters(item) is >= 0 and int water && water < Water.Capacity ||
             Bucket.Liters(item) is >= 0 and < Bucket.Capacity) yield return "Collect water at the lake";
-        if (data.VesselOf(item) is VesselDef filled && filled.LitersIn(item) > 0) {
+        if (BarrelHaul.Vessel(item)) yield return "Haul water";
+        string? liquid = Barrels.PouredLiquid(data, item);
+        // The bucket card stands for its filled states too; bottles and their contents have separate cards.
+        if (liquid != null && data.VesselFor(item) == null || Bucket.Is(item)) {
             yield return "Pour into stations";
             yield return "Pour into barrels";
-            if (filled.Liquid == Water.Liquid) {
+            if (liquid == Water.Liquid || Bucket.Liters(item) >= 0) {
                 yield return "Water saplings";
                 yield return "Water farm plots";
             }

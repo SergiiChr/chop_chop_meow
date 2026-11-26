@@ -117,6 +117,31 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
+    /// <summary>A bucket card represents all of its fills, and packing is independent of what the village buys.</summary>
+    private async Task CheckItemTreeShowsContainerAndPackingActions() {
+        Achieve(Hosted, Bucket.Item, Barrel.Item, "stone"); await Frames();
+        await OpenRecipeMap();
+        await Click(RecipeMapCard(Bucket.Item), alt: true);
+        await ItemTreeShows(Bucket.Item);
+        var actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
+        Require(actions != null && HasLabel(actions, "Collect water at the lake") &&
+            HasLabel(actions, "Pour into stations") && HasLabel(actions, "Water farm plots"),
+            "The Steel bucket must show direct actions at all fills because it shares one card.");
+        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        await Click(RecipeMapCard(Barrel.Item), alt: true);
+        await ItemTreeShows(Barrel.Item);
+        actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
+        Require(actions != null && HasLabel(actions, "Mount on a cabin roof"),
+            "The Steel barrel must show its cabin use.");
+        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        await Click(RecipeMapCard("stone"), alt: true);
+        await ItemTreeShows("stone");
+        actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
+        Require(actions != null && HasLabel(actions, "Pack into a crate") && !HasLabel(actions, "Sell in a crate"),
+            "Stone can be packed even though the village does not buy it.");
+        await KeyStroke(Key.Escape);
+    }
+
     /// <summary>Undiscovered entries remain anonymous and do not open an Item tree until discovered.</summary>
     private async Task CheckUndiscoveredMapItemsStayAnonymous() {
         await OpenRecipeMap();
@@ -138,8 +163,12 @@ public partial class Game {
         var sheet = RecipeMapCard("steel_sheet");
         await Click(sheet);
         var thumbnail = (ItemSlot)details.FindChild("use_steel_barrel", true, false);
-        Require(thumbnail.Text == "?" && thumbnail.Icon == null && !thumbnail.TooltipText.Contains("Steel barrel"),
-            "A detail thumbnail must not reveal an undiscovered product.");
+        Require(thumbnail.Icon == null && thumbnail.FindChild("undiscovered_badge", true, false) is MapSlot { Visible: true } &&
+            !thumbnail.TooltipText.Contains("Steel barrel"),
+            "A detail thumbnail must show the question-mark badge without revealing an undiscovered product.");
+        await Click(thumbnail);
+        Require(recipeMap.NodeOf("steel_barrel")!.Lit,
+            "A regular click on an undiscovered detail thumbnail must still find it on the main map.");
         await Click(thumbnail, alt: true);
         Require(recipeMap.FindChild("item_tree", true, false) == null,
             "Alt-clicking an undiscovered thumbnail must stay on the main map.");
