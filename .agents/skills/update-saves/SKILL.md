@@ -1,6 +1,6 @@
 ---
 name: update-saves
-description: Bring the player's own save slots up to the save version on main and fix whatever stops them loading, testing each on a headless server. Use after merging a branch that raises the save version, or when the player's save will not load on main.
+description: Bring the player's own save slots up to the save version on main and fix whatever stops them loading, testing each on a server of its own. Use after merging a branch that raises the save version, or when the player's save will not load on main.
 ---
 
 # Update saves
@@ -15,6 +15,8 @@ Do it without asking first, and never commit the conversion.
 The player's slots are in the main checkout's user data, `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/`:
 `autosave.json` is slot 0, `settlement.json` slot 1, and `settlement-<n>.json` slot n.
 Files named `backup-*`, `net-check-*`, `server-check-*`, `performance-*` and `playtest-*` are not the player's slots.
+
+Run every command from the main checkout until the test worktree is made, and the clean up from it again.
 
 1. Fast-forward main as [docs/RELEASE.md](../../../docs/RELEASE.md) says, and read its version:
    `git grep -h -o "int Version { get; set; } = [0-9]*" main -- src`.
@@ -57,9 +59,9 @@ For each raise, compare the merge with its first parent:
 
 Write the conversion as a throwaway Python script in the test worktree's `tmp/saves/`, run it with `python3 -I`, and
 give it one step per change.
-Name copies of C# code saved there `*.cs.txt`: the build compiles every `.cs` file in the worktree, `tmp/` included.
+Name copies of C# code saved there `*.cs.txt`: the build compiles every C# file in the worktree, `tmp/` included.
 
-## Test each slot on a headless server
+## Test each slot on a server
 
 Load each converted slot in the test worktree, never in the main checkout or in the merged branch's worktree, which
 may lack main's other changes.
@@ -71,12 +73,13 @@ rm -f tmp/port.txt
 timeout 300 bash -c 'until [ -s tmp/port.txt ] || grep -q "ERROR\|Exception" tmp/server.log; do sleep 1; done'
 ```
 
+The server runs in a game window that stays empty.
 The slot loaded once the server writes its port to `tmp/port.txt`.
-`Cannot load slot <n>` in the log means a load check refused it.
-Let a server that loaded run for about ten seconds, check its log for errors, then stop it by the process id that
-`pgrep -a ChopChopMeow` shows.
+`Cannot load slot <n>.` in the log means the slot was refused, and the rest of that line says why.
+Let a server that loaded run for about ten seconds and check its log for errors.
+Either way, stop it by the process id that `pgrep -a ChopChopMeow` shows before starting the next one.
 
-When a slot is refused, find the check that refused it.
+When the reason is `This save holds unknown items or values out of range`, find the check that refused it.
 Temporarily make every `return false` in the load checks print its line, run the server again, then put
 `src/world/World.cs` back and confirm `git status` is clean:
 
@@ -99,6 +102,8 @@ cp tmp/World.cs.clean src/world/World.cs
 
 A refusal while the JSON is read names the field instead, such as `could not be converted to ChopChopMeow.ThingKind.
 Path: $.Things[410].Kind`.
+`Unsupported or incomplete save` and `invalid wolf movement` come from the conditions in `World.Deserialize` itself,
+which the script above leaves alone: compare the fields they require with the save.
 Fix the cause in the conversion script, convert again from the backup and test again, until every slot loads.
 
 ## Clean up

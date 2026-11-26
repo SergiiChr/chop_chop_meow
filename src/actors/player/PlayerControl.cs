@@ -361,7 +361,7 @@ public sealed class PlayerControl {
 
     /// <summary>
     /// The second press of a double click on a cabin walks the player to its door and in, wherever the pointer is.
-    /// The first press opened the cabin's page, which moves the world aside under the pointer and can put the page's windows over it.
+    /// The first press opened the cabin's page, which can put the page's windows under the pointer.
     /// So the game hands every left press here before the interface: one that is not such a second press returns false and goes on as usual.
     /// </summary>
     public bool WalkIntoClickedCabin(InputEventMouseButton mouse) {

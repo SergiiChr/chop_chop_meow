@@ -69,7 +69,8 @@ public partial class Game {
 
     /// <summary>Opening a building's page leaves the world where it shows on screen, so the second click of a double click lands on the same building.</summary>
     private async Task CheckOpeningAPageLeavesTheViewStill() {
-        var chest = Hosted.Add(ThingKind.Chest, Hosted.Player + new Vector2(0, 3));
+        var at = SpotsNearby().First(p => world.CanStand(p) && Uncovered(view.Screen(p, .5f)) && view.Pick(view.Screen(p, .5f)) == null);
+        var chest = Hosted.Add(ThingKind.Chest, at);
         var shut = view.Screen(chest.Pos);
         await ClickOn(chest);
         await Until(() => Shows(chest), "the chest page after a click on the chest", 2);
