@@ -36,6 +36,7 @@ public sealed class ActorRig {
     private readonly Node3D torch;
     private readonly Dictionary<ActorAction, Node3D>? weaponModels;
     private Node3D? weaponShown;
+    private bool torchByBed;
     private Node3D shovel = null!, rake = null!;
     private readonly List<(Skeleton3D Skeleton, Node3D Joint)> limbs = new();
     // The leg skins, whose third bone turns the foot at the ankle.
@@ -290,11 +291,60 @@ public sealed class ActorRig {
     private Vector3 FromForearm(bool left, Vector3 point) =>
         hips.Transform * (torso.Transform * (chest.Transform * ((left ? shoulderL : shoulderR).Transform * ((left ? elbowL : elbowR).Transform * point))));
 
+    /// <summary>Draws the player's burning torch beside the bed while both hands take weight.</summary>
+    internal void SetBedTorch(Transform3D fromRoot) {
+        var arm = hips.Transform * torso.Transform * chest.Transform * shoulderL.Transform * elbowL.Transform;
+        torch.Transform = arm.AffineInverse() * fromRoot;
+        torch.Visible = torchByBed = true;
+    }
+
     /// <summary>Where a fist is from the rig's root, under the pose just shown.</summary>
     public Vector3 Fist(bool left) => FromForearm(left, new Vector3(0, -build.Forearm, Palm));
 
+    /// <summary>Where the padded end of a support hand touches, measured from the rig's root.</summary>
+    internal const float HandPadReach = .04f;
+    internal Vector3 HandPad(bool left) => FromForearm(left, new Vector3(0, -build.Forearm - HandPadReach, Palm));
+
+    /// <summary>Places the ankle and shoe from the rig's root, bending the knee toward the rig's front.</summary>
+    internal void PlaceBoot(bool left, Vector3 ankle, Basis boot) {
+        var hip = left ? legL : legR;
+        var knee = left ? kneeL : kneeR;
+        var skin = left ? footL : footR;
+        var delta = ankle - hips.Transform * hip.Position;
+        var line = delta.Normalized();
+        const float thigh = ActorAnimation.Thigh;
+        float shin = build.Shin, reach = Math.Clamp(delta.Length(), Math.Abs(thigh - shin) + .001f, thigh + shin - .0001f);
+        // The knee lies on the circle where the two leg segments meet.
+        float along = (thigh * thigh - shin * shin + reach * reach) / (2 * reach);
+        var forward = Vector3.Back.Slide(line);
+        if (forward.LengthSquared() < .0001f) forward = Vector3.Up.Slide(line);
+        var toKnee = line * along + forward.Normalized() * MathF.Sqrt(Math.Max(0, thigh * thigh - along * along));
+        var upper = -toKnee.Normalized();
+        var lower = (toKnee - line * reach).Normalized();
+        var hinge = upper.Cross(lower).Normalized();
+        var thighBasis = new Basis(hinge, upper, hinge.Cross(upper));
+        var shinBasis = new Basis(hinge, lower, hinge.Cross(lower));
+        hip.Basis = hips.Basis.Transposed() * thighBasis;
+        knee.Basis = thighBasis.Transposed() * shinBasis;
+        skin.SetBonePoseRotation(1, knee.Quaternion);
+        skin.SetBonePoseRotation(2, (shinBasis.Transposed() * boot).GetRotationQuaternion());
+    }
+
+    /// <summary>The two ends of a drawn boot sole in the rig's root frame.</summary>
+    internal (Vector3 Toe, Vector3 Heel) BootSole(bool left) {
+        var hip = left ? legL : legR;
+        var knee = left ? kneeL : kneeR;
+        var skin = left ? footL : footR;
+        var foot = hips.Transform * hip.Transform * knee.Transform * skin.GetBonePose(2);
+        return (foot * new Vector3(0, -ActorAnimation.AboveSole, ActorAnimation.Toe),
+            foot * new Vector3(0, -ActorAnimation.AboveSole, -ActorAnimation.Heel));
+    }
+
     /// <summary>Where an elbow is from the rig's root, under the pose just shown.</summary>
     public Vector3 Elbow(bool left) => FromForearm(left, Vector3.Zero);
+
+    /// <summary>Tilts the head toward the shoulder after posing the rest of the body.</summary>
+    internal void TipHead(float roll) => head.RotationDegrees += Vector3.Back * roll;
 
     /// <summary>Where the middle of the axe's head is from the rig's root, under the pose just shown.</summary>
     public Vector3 AxeHead => Holds(AxeHeadPoint);
@@ -609,7 +659,8 @@ public sealed class ActorRig {
         if (shovel.Visible) LayShovel();
         if (rake.Visible) rake.Basis = InRightFist(RakeStroke.Shaft((Fist(true) - Fist(false)).Normalized()));
         crate.Visible = carrying;
-        if (barrel?.Visible == true) torch.Transform = new Transform3D(Basis.Identity, new Vector3(0, -build.Forearm, Palm));
+        if (torchByBed || barrel?.Visible == true) torch.Transform = new Transform3D(Basis.Identity, new Vector3(0, -build.Forearm, Palm));
+        torchByBed = false;
         barrel?.Hide();
         bucket?.Hide();
         bottle?.Hide();

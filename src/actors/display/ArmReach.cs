@@ -5,6 +5,9 @@ namespace ChopChopMeow;
 
 /// <summary>Putting an actor's hand on a point: the arm's joint angles for it, and a pose with the arm moved there.</summary>
 public static class ArmReach {
+    /// <summary>A surface the elbow is moving onto, measured in the same frame as the grip.</summary>
+    public readonly record struct ElbowSupport(Vector3 Up, float Height, float Weight);
+
     /// <summary>
     /// The arm raise, outward swing and elbow bend, in degrees, that put a fist at <paramref name="grip"/>, measured from the hips in the trunk's own frame.
     /// With <paramref name="palm"/> it is what the fist holds that goes there, that far ahead of the forearm's line; with
@@ -29,9 +32,10 @@ public static class ArmReach {
     /// as the arm allows; <see cref="ActorRig.RollArm"/> applies the roll after the pose.
     /// <paramref name="shoulder"/> is where the shoulder is in that frame, and <paramref name="upper"/> and
     /// <paramref name="forearm"/> how long the arm is from shoulder to elbow and elbow to fist, the game's build's unless given.
+    /// With <paramref name="support"/> the elbow moves onto that surface by its weight.
     /// </summary>
     public static (float Raise, float Out, float Elbow, float Roll) ArmTo(Vector3 grip, bool left, Vector3 elbowToward, float palm = 0,
-        Vector3? shoulder = null, float upper = ActorRig.UpperArm, float forearm = ActorRig.Forearm) {
+        Vector3? shoulder = null, float upper = ActorRig.UpperArm, float forearm = ActorRig.Forearm, ElbowSupport? support = null) {
         var from = shoulder ?? HumanShape.Standard.Shoulder(left);
         float fore = MathF.Sqrt(forearm * forearm + palm * palm);
         var reach = grip - from;
@@ -41,7 +45,10 @@ public static class ArmReach {
         float toCentre = (upper * upper - fore * fore + d * d) / (2 * d), radius = MathF.Sqrt(Math.Max(0, upper * upper - toCentre * toCentre));
         var toward = elbowToward - along * elbowToward.Dot(along);
         if (toward.LengthSquared() < 1e-8f) toward = Vector3.Down - along * Vector3.Down.Dot(along);
-        var elbowAt = from + along * toCentre + toward.Normalized() * radius;
+        var centre = from + along * toCentre;
+        var bendToward = toward.Normalized();
+        if (support is { Weight: > 0 } floor) bendToward = TowardSurface(centre, along, radius, bendToward, floor);
+        var elbowAt = centre + bendToward * radius;
         var hand = from + along * d;
         Vector3 down = (elbowAt - from).Normalized(), lower = (hand - elbowAt).Normalized();
         // The forearm bends toward the shoulder's +Z; the fist sits a palm ahead of the forearm's line.
@@ -55,6 +62,18 @@ public static class ArmReach {
         float elbow = Mathf.RadToDeg(MathF.Acos(Math.Clamp(down.Dot(lower), -1, 1)) - MathF.Atan2(palm, forearm));
         float outward = Mathf.RadToDeg(euler.Z);
         return (-Mathf.RadToDeg(euler.X), left ? outward : -outward, elbow, Mathf.RadToDeg(euler.Y));
+    }
+
+    /// <summary>Finds where the elbow's circle meets the surface without moving the hand.</summary>
+    private static Vector3 TowardSurface(Vector3 centre, Vector3 along, float radius, Vector3 natural, ElbowSupport floor) {
+        var up = floor.Up.Slide(along);
+        if (up.LengthSquared() < .001f || radius < .001f) return natural;
+        float altitude = Math.Clamp((floor.Height - centre.Dot(floor.Up)) / (radius * up.Length()), -1, 1);
+        var vertical = up.Normalized();
+        var across = vertical.Cross(along);
+        if (natural.Dot(across) < 0) across = -across;
+        float lift = Mathf.Lerp(Math.Max(altitude, natural.Dot(vertical)), altitude, floor.Weight);
+        return vertical * lift + across * Mathf.Sqrt(Math.Max(0, 1 - lift * lift));
     }
 
     /// <summary>

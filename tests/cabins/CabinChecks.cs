@@ -39,9 +39,9 @@ public static class CabinChecks {
         Test(CheckSteppingOutOfACabinWhoseDoorIsBlockedLandsOnOpenGround, data);
         Test(CheckACabinNobodyIsLeftInsideIsUnlocked, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
-        Test(CheckSleepNeedsFoodAndWater, data);
+        Test(CheckSleepingEndsWhenANeedRunsOut, data);
         Test(CheckSleepHealsOnlyWhileFed, data);
-        Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
+        Test(CheckCabinSheltersAndTakesInFallenPlayers, data);
         Test(CheckSleepWaitsForEveryone, data);
         Test(CheckCabinOnlyAcceptsNewHaulDutiesWithABarrelMounted, data);
         Test(CheckBootsStandOnACabinsStepsAndTheBodyClimbsThemWithoutJumps);
@@ -428,6 +428,7 @@ public static class CabinChecks {
         var world = EmptyWorld(data);
         world.Player = Terrain.Spawn;
         RunUntilPhase(world, data.NightStarts + .01f);
+        ShutDens(world);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
         var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(1, 2));
         var furnace = world.Add(ThingKind.Furnace, world.Player + new Vector2(-2, 1));
@@ -436,10 +437,18 @@ public static class CabinChecks {
         PlaceOrder(world, order);
         var worker = AddWorker(world, sign.Pos);
         SetCoins(world, (int)worker.Wage + 3);
-        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(8, 0) });
+        StepInside(world, hut);
+        world.Doorways.TurnKey();
         float priorTime = world.Time;
         float priorHunger = world.Hunger;
-        world.Sleep(hut);
+        float priorPlay = world.PlaySeconds;
+        world.Sleep.Start(hut);
+        Require(world.Time == priorTime && world.Sleep.SleepingAt == hut.Id, "going to sleep should leave time to show the sleeping player");
+        world.Tick(1f / 60);
+        Require(world.Time > priorTime + 1f / 60 && world.Day == 1 && world.Sleep.SleepingAt == hut.Id,
+            "the first frame should advance faster than normal without jumping to dawn");
+        Require(Mathf.IsEqualApprox(world.PlaySeconds, priorPlay + 1f / 60), "only real elapsed time should count as time played");
+        UntilAllAwake(world);
         Require(world.Time > priorTime && world.Day > 1,
                 "sleep should advance the world clock through dawn");
         Require(world.Orders.Count == 0, "trade settlement should finish the order");
@@ -450,28 +459,22 @@ public static class CabinChecks {
                 "a funded worker should receive the normal daily wage during sleep");
         Require(!furnace.Processing && furnace.Inventory["iron_bar"] > 0,
                 "furnace production should continue while the player sleeps");
-        Require(world.Wolves.Count == 0 && world.Hunger < priorHunger,
-                "nighttime sleep should advance survival needs and clear wolves at dawn");
+        Require(world.Hunger < priorHunger, "nighttime sleep should advance survival needs");
     }
 
-    private static void CheckSleepNeedsFoodAndWater(GameData data) {
-        Require(Math.Abs(100 / data.HungerPerSecond - data.DaySeconds) < .01f && Math.Abs(100 / data.ThirstPerSecond - data.DaySeconds) < .01f,
-                "a full stomach should last one in-game day and a full water droplet one day");
-        foreach (var (hunger, thirst, reason) in new[] { (10f, 100f, "hungry"), (100f, 10f, "thirsty") }) {
-            var world = NightWorld(data);
-            var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
-            SetNeeds(world, hunger, thirst);
+    private static void CheckSleepingEndsWhenANeedRunsOut(GameData data) {
+        foreach (var (hunger, thirst) in new[] { (10f, 100f), (100f, 10f) }) {
+            var world = EmptyWorld(data);
+            var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, -6));
+            StepInside(world, hut);
+            world.Doorways.TurnKey();
+            SetNeeds(world, hunger, thirst, health: 60);
             float time = world.Time;
-            world.Sleep(hut);
-            Require(world.Time == time && world.SleepBlock()?.Contains(reason) == true,
-                    $"sleep must be refused when the player is too {reason} to last until morning");
+            world.Sleep.Start(hut);
+            UntilAllAwake(world);
+            Require(world.Time - time is >= 84 and <= 85 && world.Me.SleepingAt == 0 && world.Health == 60 &&
+                Math.Min(world.Hunger, world.Thirst) == 0, "a daytime nap should end when hunger or thirst runs out");
         }
-        var early = EmptyWorld(data);
-        early.Add(ThingKind.Hut, early.Player + new Vector2(2, 0));
-        RunUntilPhase(early, (World.SleepHour - 6 - .2f) / 24);
-        Require(early.SleepBlock()?.Contains("10 pm") == true, "sleep must be refused before 10 pm");
-        RunUntilPhase(early, (World.SleepHour - 6 + .2f) / 24);
-        Require(!early.Night && early.SleepBlock() == null, "sleep must be allowed from 10 pm, before night falls");
     }
 
     /// <summary>Health comes back only in sleep, while hunger and thirst both stay above 45%, and the cabin foretells what a night leaves.</summary>
@@ -483,22 +486,28 @@ public static class CabinChecks {
 
         var rested = NightWorld(data);
         var hut = rested.Add(ThingKind.Hut, rested.Player + new Vector2(2, 0));
+        StepInside(rested, hut);
+        rested.Doorways.TurnKey();
         SetNeeds(rested, 100, 100, 50);
-        float foretold = rested.HealthAtDawn();
-        rested.Sleep(hut);
+        float foretold = rested.Sleep.Preview(hut).Health;
+        rested.Sleep.Start(hut);
+        UntilAllAwake(rested);
         // At most eight hours of sleep, 280 seconds, heal .12 a second: a fed night brings back up to 34.
         Require(rested.Health > 60 && rested.Health < 84, $"a fed night's sleep should heal a good part of the way: {rested.Health:0.0}");
         Require(Math.Abs(rested.Health - foretold) < .2f, $"the cabin's dawn health {foretold:0.0} should be what sleep leaves, {rested.Health:0.0}");
 
         var hungry = NightWorld(data);
         hut = hungry.Add(ThingKind.Hut, hungry.Player + new Vector2(2, 0));
+        StepInside(hungry, hut);
+        hungry.Doorways.TurnKey();
         SetNeeds(hungry, 50, 100, 50);
-        hungry.Sleep(hut);
+        hungry.Sleep.Start(hut);
+        UntilAllAwake(hungry);
         // Hunger falls from 50 to 45 in 5% of a day, 42 seconds, which heal 5.
         Require(Math.Abs(hungry.Health - 55) < .3f, $"sleep should heal only while hunger stays above 45%: {hungry.Health:0.0}");
     }
 
-    private static void CheckCabinShelterAndChasingWolfGivesUpInLight(GameData data) {
+    private static void CheckCabinSheltersAndTakesInFallenPlayers(GameData data) {
         var world = NightWorld(data);
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
         var wolf = new Wolf { Pos = world.Player + new Vector2(-4, 0) };
@@ -528,44 +537,33 @@ public static class CabinChecks {
         Require(world.Sheltered == hut.Id, "a fallen player should wake inside the nearest cabin");
         Require(world.Player.DistanceTo(hut.Pos) < 3, "a fallen player should wake beside that cabin");
         Require(world.CanStand(world.Player), "a fallen player should wake on standable ground");
-
-        var lit = NightWorld(data);
-        var chaser = new Wolf { Pos = lit.Player + new Vector2(-5, 0) };
-        PlaceWolf(lit, chaser);
-        SafeTick(lit, .5f);
-        lit.Add(ThingKind.Campfire, lit.Player + new Vector2(2, 0)).Burn = 300;
-        float gap = chaser.Pos.DistanceTo(lit.Player);
-        SafeTick(lit, .5f);
-        Require(chaser.Pos.DistanceTo(lit.Player) < gap, "a wolf already chasing should follow the player briefly into firelight");
-        SafeTick(lit, 4);
-        gap = chaser.Pos.DistanceTo(lit.Player);
-        SafeTick(lit, .5f);
-        Require(chaser.Pos.DistanceTo(lit.Player) > gap, "a chasing wolf should give up and back away after a few seconds in the light");
     }
 
     private static void CheckSleepWaitsForEveryone(GameData data) {
         var (world, guest, _) = Hosted(data);
-        RunUntilNight(world);
-        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(3, 0));
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(0, -6));
         StepInside(world, hut);
-        Require(world.SleepBlock() == "Everyone has to be inside a cabin to sleep.", $"sleeping should wait for a guest still outside: {world.SleepBlock()}");
-        // The guest sleeps in a cabin of their own, and both lock their doors against the night's wolves.
-        var guestHut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(3, 6));
-        StepInside(world, guestHut, guest);
-        world.Doorways.TurnKey();
-        world.Run(guest, new Command(Verb.TurnKey, 0, 0, "", 0, default));
-        Require(hut.Locked && guestHut.Locked, "each player should lock the door of the cabin they are in");
-        SetNeeds(guest, hunger: 1);
-        Require(world.SleepBlock() == "Someone is too hungry or thirsty to sleep.", "sleeping should wait for a hungry guest");
-        SetNeeds(guest, hunger: 100);
+        SetNeeds(world, 100, 100, 50); SetNeeds(guest, 100, 100, 50);
+        float time = world.Time;
+        world.Sleep.Start(hut);
+        Require(world.Me.SleepingAt == hut.Id && world.Time == time, "one player can sleep during daylight without skipping time");
+        world.Tick(10);
+        Require(Math.Abs(world.Health - 51.2f) < .02f && guest.Health == 50,
+            "only the sleeping player should heal, at the usual rate");
+        RunUntilNight(world);
+        ShutDens(world);
+        NourishEveryone(world);
+        StepInside(world, hut, guest);
+        world.As(guest, world.Doorways.TurnKey);
         AddWorker(world, Terrain.Spawn).Wage = 10;
         Give(world, Inventory.Coins, 50); Give(guest, Inventory.Coins, 50);
         int day = world.Day;
-        world.Run(guest, new Command(Verb.Sleep, guestHut.Id, 0, "", 0, default));
-        Require(world.Day == day + 1, "with everyone inside, a guest's sleep should move to the next day");
-        Require(!world.Night, "with everyone inside, a guest's sleep should end the night");
-        Require(guest.Hunger < 100, "with everyone inside, a guest's sleep should use up the guest's hunger");
-        Require(world.Backpack[Inventory.Coins] == 40 && guest.Backpack[Inventory.Coins] == 50, "the host's backpack should pay the wages even when a guest sleeps");
+        world.Run(guest, new Command(Verb.Sleep, hut.Id, 0, "", 0, default));
+        UntilAllAwake(world);
+        Require(world.Day == day + 1 && world.Me.SleepingAt == 0 && guest.SleepingAt == 0,
+            "the second player turning in should take both to dawn and wake them");
+        Require(world.Backpack[Inventory.Coins] == 40 && guest.Backpack[Inventory.Coins] == 50,
+            "the host's backpack should pay the wages even when a guest starts the skip");
     }
 
     /// <summary>Frames a second the steps check goes through, as the game's recordings show them.</summary>

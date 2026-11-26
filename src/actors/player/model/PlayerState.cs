@@ -36,6 +36,8 @@ public sealed class PlayerState {
     public bool Mauled { get; set; }
     /// <summary>Id of the cabin the player is inside, or zero; inside, wolves back off and the player is hidden.</summary>
     public int Sheltered { get; set; }
+    /// <summary>The cabin or straw bed a player is sleeping in, or zero while awake.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int SleepingAt { get; set; }
     public int CabinEntry { get; set; }
     /// <summary>What the player is doing at a cabin's door, which <see cref="DoorCabin"/> names.</summary>
     public Doorway Door { get; set; }
@@ -63,6 +65,8 @@ public sealed class PlayerState {
     public int DoorQueued { get; set; }
     /// <summary>The resource the player is working on, so other machines can show it.</summary>
     public int GatherTarget { get; set; }
+    /// <summary>A nettle or anything else that stings took health from the player while they picked it this tick; carried so every machine hears them groan.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Stung { get; set; }
     /// <summary>The held dig, numbered by the window that started it, or zero when idle.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int DigAttempt { get; set; }
     /// <summary>The tile being dug, one plus its index in the map's rows.</summary>
@@ -86,6 +90,10 @@ public sealed class PlayerState {
     [JsonIgnore] public Vector2 Pos { get => new(PlayerX, PlayerY); set { PlayerX = value.X; PlayerY = value.Y; } }
     // Only the host's simulation uses these.
     internal float GatherClock, AttackClock, DigWork;
+    /// <summary>World time when this sleeper has finished lying down and time can speed up.</summary>
+    internal float SleepReadyAt;
+    /// <summary>A wolf is within hearing range and this sleeper is not in a locked cabin.</summary>
+    internal bool HearsWolves;
     internal Thing? DigSubject;
     /// <summary>Seconds since the player last moved or gathered; hand crafting only goes on while they stand still.</summary>
     internal float Still;

@@ -407,6 +407,7 @@ public partial class Game : Node, IGameFlow {
                 case Key.F5: saves.QuickSave(startMenu); break;
                 case Key.F9: saves.QuickLoad(startMenu); break;
                 case >= Key.Key1 and <= Key.Key9: hotbar.Select((int)(key.PhysicalKeycode - Key.Key1)); break;
+                case Key.W or Key.A or Key.S or Key.D when world.Sleep.OnStrawBed: world.Sleep.Wake(); break;
                 case Key.Space: player.Swing(); break;
             }
         }

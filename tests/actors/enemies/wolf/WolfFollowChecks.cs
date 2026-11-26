@@ -14,6 +14,11 @@ public static class WolfFollowChecks {
     public static void Run(GameData data) {
         Test(CheckFollowingWolvesGoingOneWaySpreadRoundThePlayerAndKeepCircling, data);
         Test(CheckEachFollowingWolfWalksItsOwnWayRound, data);
+        Test(CheckHuntersCircleALitCampfireInsteadOfClosingIn, data);
+        Test(CheckAStruckWolfBitesThroughTheFireWhileTheOthersCircle, data);
+        Test(CheckABoldWolfCanPinThroughTheFire, data);
+        Test(CheckAFifthWolfBreaksTheCampfireCircle, data);
+        Test(CheckAHunterGoesAroundFireToReachPreyOutsideIt, data);
         Test(CheckAWolfWalkedAtStandsBracedWhereItIs, data);
         Test(CheckAWolfFollowingAloneRunsOutOfSightAndLeavesThePlayerAlone, data);
         Test(CheckAmongOthersAWolfWalkedAtGrowlsThenThePackInSightTurnsOnThePlayerForGood, data);
@@ -22,6 +27,100 @@ public static class WolfFollowChecks {
         Test(CheckAWolfBackingOffAloneRunsFromAPlayerWhoComesAfterIt, data);
         Test(CheckAmongOthersAWolfBackingOffStandsItsGroundWhenThePlayerComesAfterIt, data);
         Test(CheckAWaveAtABracedWolfSendsItBackOutToItsCircle, data);
+    }
+
+    /// <summary>Four wolves already chasing back out of the firelight and circle without biting.</summary>
+    private static void CheckHuntersCircleALitCampfireInsteadOfClosingIn(GameData data) {
+        var world = NightWorld(data);
+        var centre = world.Player = Terrain.Spawn;
+        var wolves = Enumerable.Range(0, 4).Select(i => PlaceWolf(world, new Wolf {
+            Pos = centre + Vector2.Right.Rotated(i * Mathf.Tau / 4) * 3,
+            Galloping = true
+        })).ToArray();
+        world.Add(ThingKind.Campfire, centre).Burn = 90;
+        WolfTick(world, .4f, wolves);
+        Require(wolves.All(w => w.Pos.DistanceTo(centre) > 3), "the lit fire should make every chaser back off at once");
+        WolfTick(world, 30, wolves);
+        Require(wolves.All(w => !world.Protected(w.Pos) && w.Pos.DistanceTo(centre) < 8),
+            "wolves should stay close enough to circle but outside the firelight");
+        var from = wolves.Select(w => (w.Pos - centre).Angle()).ToArray();
+        WolfTick(world, 3, wolves);
+        float[] turns = wolves.Select((wolf, i) => Math.Abs(Mathf.AngleDifference(from[i], (wolf.Pos - centre).Angle()))).ToArray();
+        Require(turns.All(turn => turn > .08f), $"every wolf should move around the campfire, turns were {string.Join(", ", turns)}");
+        Require(world.Health == 100, "four wolves should not bite someone in the firelight");
+    }
+
+    private static void CheckAStruckWolfBitesThroughTheFireWhileTheOthersCircle(GameData data) {
+        var world = AxeNight(data);
+        var centre = Terrain.Spawn;
+        world.Player = centre + Vector2.Right * (World.FireReach - .1f);
+        var fire = world.Add(ThingKind.Campfire, centre);
+        fire.Burn = 90;
+        var struck = StillWolf(world, Vector2.Right * 1.1f);
+        var wary = PlaceWolf(world, new Wolf { Pos = centre + Vector2.Left * 6.3f });
+        world.Attack(Vector2.Right);
+        SnapTick(world, .5f);
+        Require(struck.Health < data.WolfHealth && WolfCounter.Active(struck),
+            "a hit from just inside the light should start the wolf's usual counter");
+        for (int i = 0; i < 50 && world.Health == 100; i++) {
+            WolfTick(world, .1f, struck, wary);
+            Require(!world.Protected(wary.Pos) && !WolfSnap.Active(wary), "an unstruck wolf should still circle outside the light");
+        }
+        Require(fire.Burn > 0 && world.Protected(world.Player) && world.Health < 100,
+            "the wolf that was hit should bite without waiting for a full pack or for the fire to go out");
+    }
+
+    private static void CheckABoldWolfCanPinThroughTheFire(GameData data) {
+        var world = NightWorld(data);
+        world.Player = Terrain.Spawn;
+        world.Add(ThingKind.Campfire, world.Player).Burn = 90;
+        var wolf = PlaceWolf(world, new Wolf { Pos = world.Player + Vector2.Right * 2, Follow = FollowStage.Bold });
+        SetNeeds(world, health: World.TakedownHealth);
+        SnapTick(world, .02f);
+        Require(wolf.Leap > 0, "the wolf that turned on the player should wind up for a throat leap inside the light");
+        SnapTick(world, 1);
+        Require(wolf.Pinning && world.Mauled, "the campfire should not prevent a bold wolf from pinning the player");
+    }
+
+    /// <summary>A fifth nearby wolf makes the same circle give way to an attack through the firelight.</summary>
+    private static void CheckAFifthWolfBreaksTheCampfireCircle(GameData data) {
+        var world = NightWorld(data);
+        var centre = Terrain.Spawn;
+        // Near the edge of the light, two of the circlers are more than 9 m from the player but still near the same fire.
+        world.Player = centre + Vector2.Right * 4;
+        var fire = world.Add(ThingKind.Campfire, centre);
+        fire.Burn = 90;
+        var wolves = Enumerable.Range(0, 5).Select(i => PlaceWolf(world, new Wolf {
+            Pos = centre + Vector2.Right.Rotated(i * Mathf.Tau / 5) * (i == 4 ? 12 : 6.5f),
+            Howl = i == 4 ? 5 : 0
+        })).ToArray();
+        var told = new System.Collections.Generic.List<string>();
+        world.Notify += told.Add;
+        WolfTick(world, .4f, wolves);
+        Require(!told.Contains("The pack has you surrounded. They attack!"), "a distant fifth wolf should not count yet");
+        wolves[4].Pos = centre + new Vector2(-5, -4);
+        wolves[4].Howl = 0;
+        WolfTick(world, 3, wolves);
+        Require(told.Count(message => message == "The pack has you surrounded. They attack!") == 1,
+            "a fifth nearby wolf should start the same pack attack as a lit torch");
+        Require(fire.Burn > 0 && world.Health < 100, "the pack should come through the still-lit fire and land a bite");
+    }
+
+    private static void CheckAHunterGoesAroundFireToReachPreyOutsideIt(GameData data) {
+        var world = NightWorld(data);
+        var centre = Terrain.Spawn;
+        world.Player = centre + Vector2.Left * 8;
+        var fire = world.Add(ThingKind.Campfire, centre);
+        fire.Burn = 90;
+        var wolf = PlaceWolf(world, new Wolf { Pos = centre + Vector2.Right * (World.FireReach + .04f), Galloping = true });
+        WolfTick(world, 2, wolf);
+        Require(Math.Abs(wolf.Pos.Y - centre.Y) > 1.5f,
+            $"the wolf should go around the fire, not bounce along the line through it, but it only reached {wolf.Pos - centre}");
+        for (int i = 0; i < 120 && world.Health == 100; i++) {
+            WolfTick(world, .1f, wolf);
+            Require(!world.Protected(wolf.Pos), "a lone wolf should stay outside the light while going around it");
+        }
+        Require(fire.Burn > 0 && world.Health < 100, "a wolf should reach prey on the far side of a still-lit fire");
     }
 
     /// <summary>A wave at wolves nearer than the 2 m where they would run or stand their ground sends them back to their circles first, one or several.</summary>

@@ -11,6 +11,8 @@ public partial class Game {
         await TestClean(CheckRecipeMapShowsItemTextAndTheMalletRopeNeeds);
         await TestClean(CheckRopeCardSaysASteelHammerWillDamageTheFibers);
         await TestClean(CheckADoubleClickOnRopeWithOnlyASteelHammerKeepsTheBenchsBatches);
+        await TestClean(CheckPickingANettleByHandGroansUntilItIsPicked);
+        await TestClean(CheckPickingANettleWithAShovelMakesNoGroan);
     }
 
     private async Task CheckItemTextShowsUnderItsNameInTheBackpackAndOnTheHotbar() {
@@ -77,5 +79,24 @@ public partial class Game {
         RemoveThings(Hosted, t => t == bench);
         Give(Hosted, "wood", wood); Give(Hosted, "wood_parts", parts);
         await CloseWithEsc();
+    }
+
+    private async Task CheckPickingANettleByHandGroansUntilItIsPicked() {
+        await CloseWithEsc();
+        int shovels = Drop(Hosted, "steel_shovel");
+        var (groaned, brokeOff) = await PickNettleBesideThePlayer();
+        Require(groaned && !brokeOff, $"Picking a nettle by hand must groan for as long as it stings: groaned {groaned}, broke off {brokeOff}.");
+        await Until(() => !sounds.Holding("sting_groan"), "the groan fading out once the nettle is picked", 1);
+        Give(Hosted, "steel_shovel", shovels);
+    }
+
+    private async Task CheckPickingANettleWithAShovelMakesNoGroan() {
+        await CloseWithEsc();
+        int shovels = Drop(Hosted, "steel_shovel");
+        Give(Hosted, "steel_shovel");
+        int soundsBefore = sounds.Played;
+        var (groaned, _) = await PickNettleBesideThePlayer();
+        Require(!groaned && !sounds.Heard("sting_groan", soundsBefore), "Picking a nettle with a shovel carried must make no groan, since it does not sting.");
+        Drop(Hosted, "steel_shovel"); Give(Hosted, "steel_shovel", shovels);
     }
 }

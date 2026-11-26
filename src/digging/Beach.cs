@@ -17,6 +17,15 @@ public sealed class Beach(World world) {
     /// <summary>How far the tide has risen, from 0 at the new moon to 1 at the full moon.</summary>
     internal float Tide => world.Moonlight;
 
+    /// <summary>Days until the next tidal extreme, and whether it is high rather than low.</summary>
+    public (float Days, bool High) NextTide {
+        get {
+            float phase = world.MoonPhaseAt(world.Time);
+            bool high = phase >= .5f;
+            return (((high ? 1 : .5f) - phase) * world.Data.MoonCycleDays, high);
+        }
+    }
+
     /// <summary>Distance the coast's waterline has moved inland at this point across the valley.</summary>
     private static float Shift(float across, float tide) =>
         Mathf.Lerp(Terrain.LowTideShift, HighTideShift(across), tide);
