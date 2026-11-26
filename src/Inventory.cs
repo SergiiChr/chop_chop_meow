@@ -106,12 +106,16 @@ public sealed partial class Inventory {
     /// <summary>A debug chest has room for as many stacks as are put in it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool UnlimitedSlots { get; set; }
     /// <summary>Number of cells. Changing it adds empty cells or moves stacks out of removed ones.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
+    [JsonIgnore] public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
     /// <summary>Most units of one item per cell. Changing it splits or merges stacks to fit.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int StackSize { get => stackSize; set { if (value == stackSize) return; stackSize = value; RebuildStacks(); } }
+    [JsonIgnore] public int StackSize { get => stackSize; set { if (value == stackSize) return; stackSize = value; RebuildStacks(); } }
+    // Saves and updates carry the layout with its sizes. Applying them must not rebuild it or end its holds.
+    [JsonInclude, JsonPropertyName(nameof(Slots)), JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    internal int SavedSlots { get => slots; set => slots = value; }
+    [JsonInclude, JsonPropertyName(nameof(StackSize)), JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    internal int SavedStackSize { get => stackSize; set => stackSize = value; }
     /// <summary>
     /// Most coins per cell: 1000, or <see cref="UnlimitedCoins"/> in a trading post's wage slot.
-    /// Read first, so the stacks that setting <see cref="Slots"/> rebuilds on load keep a wage slot's coins in its one cell.
     /// </summary>
     [JsonPropertyOrder(-1), JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int CoinStack { get; set; } = NewCoinStack;
     /// <summary>Most units the inventory holds across all its stacks, or 0 for no limit beyond its slots.</summary>
@@ -176,11 +180,12 @@ public sealed partial class Inventory {
     }
     /// <summary>One of this box's lanterns, preferring one that is not held.</summary>
     internal string? FirstLantern(bool free = false, bool withdrawal = false) {
+        if (items.Count == 0) return null;
         string? held = null;
-        foreach (var pair in items) {
-            if (!Lanterns.IsItem(pair.Key) || withdrawal && !AllowsWithdrawal(pair.Key)) continue;
-            if (Free(pair.Key) > 0) return pair.Key;
-            held ??= pair.Key;
+        foreach (var slot in Layout) {
+            if (!Lanterns.IsItem(slot.Item) || withdrawal && !AllowsWithdrawal(slot.Item)) continue;
+            if (slot.Free > 0) return slot.Item;
+            held ??= slot.Item;
         }
         return free ? null : held;
     }

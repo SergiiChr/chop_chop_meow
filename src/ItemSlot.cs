@@ -17,6 +17,7 @@ public partial class Badge : Label {
     internal void SetCount(string value, bool firebugs = false) {
         float corner = firebugs ? 0 : 1;
         if (AnchorTop != corner) Style.Corner(this, 1, corner);
+        AddThemeStyleboxOverride("normal", firebugs ? Style.FirebugCountPill : Style.CountPill);
         AddThemeColorOverride("font_color", firebugs ? Style.FirebugGreen : Style.Rim);
         Text = value;
     }

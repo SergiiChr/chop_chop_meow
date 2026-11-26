@@ -35,7 +35,11 @@ public partial class LanternPanel(PageTools tools, int lantern, Thing? placed = 
         if (placed == null) AddButton("Put it down", () => { if (Item is string item) panel.Player.PlaceContainer(item); });
         else AddButton("Pick up", () => world.Lanterns.PickUp(placed));
         BagGrid(item => {
-            if (item == Firebugs.Item) world.Lanterns.Refill(lantern, placed, ItemMoves.Amount(world.S.Backpack, item));
+            if (item != Firebugs.Item) return;
+            int amount = ItemMoves.Amount(world.S.Backpack, item);
+            // Ctrl draws from several stacks, so it takes the oldest firebugs across those stacks, not the clicked stack first.
+            if (Input.IsKeyPressed(Key.Ctrl)) panel.Hotbar.FromStack(-1, () => world.Lanterns.Refill(lantern, placed, amount));
+            else world.Lanterns.Refill(lantern, placed, amount);
         }, $"{BagHint}\nShift: add a stack of firebugs · Ctrl in the backpack: add firebugs not on the hotbar");
     }
 

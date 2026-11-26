@@ -2,7 +2,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static PlayerSteps;
 using static SetupSteps;
+using static WorldSteps;
 
 namespace ChopChopMeow;
 
@@ -10,6 +12,7 @@ public partial class Game {
     private async Task RunLanternUIChecks() {
         await TestClean(CheckLanternBadgesShowLiveFirebugsInsteadOfStackSize);
         await TestClean(CheckThePackingStationSeparatesFirebugsFromLanternQuantity);
+        await TestClean(CheckCtrlRefillUsesOlderFirebugsAcrossStacks);
         await TestClean(CheckADoubleClickTakesTheLanternInHandAndPutsOutTheTorch);
         await TestClean(CheckAPlacedLanternOpensWithRightClickAndTakesFirebugsGradually);
     }
@@ -32,6 +35,8 @@ public partial class Game {
             Vector2 center = badge.GetRect().GetCenter();
             Require(center.X > icon.Size.X / 2 && center.Y < icon.Size.Y / 2,
                 "a green firebug count should sit at the upper right of its lantern icon");
+            Require(badge.GetThemeStylebox("normal") is StyleBoxFlat ring && ring.BorderColor == Style.FirebugGreen,
+                "the firebug count should also have a green outline, distinct from the ordinary count badge");
         }
         Require(!BagCellOf("steel_axe").GetNode<Badge>("count").Visible, "a single tool should not show a quantity badge");
         await CloseWithEsc();
@@ -61,8 +66,34 @@ public partial class Game {
         await Until(() => quantity.Visible && quantity.Text == "2", "the separate quantity of two lanterns", 4);
         Require(firebugs!.Text == "4" && firebugs.GetRect().GetCenter().Y < quantity.GetRect().GetCenter().Y,
             "the first lantern's firebug count should stay above the lantern quantity");
+        await PickUp(slot);
+        Require(cursor.Stack?.Item == charged, "the station should hand out the lantern whose firebug count it shows");
+        await Until(() => firebugs.Text == "0", "the free second lantern showing once the first is on the cursor", 3);
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == packer);
+        await Frames();
+    }
+
+    private async Task CheckCtrlRefillUsesOlderFirebugsAcrossStacks() {
+        float caught = Hosted.Time;
+        Require(GiveFirebugs(Hosted, 1) == 1, "an older firebug should fit in the backpack");
+        RunUntil(Hosted, caught + Hosted.Data.DaySeconds);
+        Hosted.Hold(Hosted.Backpack, SlotOf(Hosted.Backpack, Firebugs.Item), 1);
+        Require(GiveFirebugs(Hosted, 1) == 1, "holding the older stack should leave the younger firebug in a separate stack");
+        Hosted.Release();
+        string lantern = Hosted.Lanterns.FillForReview(Hosted.Lanterns.NewEmpty(), 9);
+        Give(Hosted, lantern);
+        await KeyStroke(Key.Tab);
+        await RightClick(BagCellOf(lantern));
+        var young = BagCell(c => c.TooltipText.Contains("Average life left: 71 h") || c.TooltipText.Contains("Average life left: 72 h"));
+        await Holding(Key.Ctrl, () => Click(young));
+        await Until(() => world.Backpack[Firebugs.Item] == 1 && panel.HeadingTitle.Text == "Lantern"
+            && OnPage("lantern_firebug_count") is Label { Text: "10/10" }, "the lantern filling with one bug from the batch", 3);
+        string life = BagCellOf(Firebugs.Item).TooltipText;
+        Require(life.Contains("Average life left: 71 h") || life.Contains("Average life left: 72 h"),
+            "Ctrl-refill should take the oldest eligible firebug and leave the younger one, even when the younger one was clicked");
+        await CloseWithEsc();
+        Drop(Hosted, Hosted.Lanterns.Carried(Lanterns.Id(lantern))!); Drop(Hosted, Firebugs.Item);
         await Frames();
     }
 

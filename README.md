@@ -1252,7 +1252,7 @@ Put firebugs onto its slot to add as many as fit, or right-click the slot while 
 It takes up to ten, shortest lives first. Putting a firebug in a lantern does not reset its life.
 The jar glows from inside. Its light dims as firebugs die, and you can add more at any time as long as there is room.
 A full lantern is 20% brighter than a torch, with a green hue. Lanterns do not scare wolves.
-The green number at the upper right of a lantern's icon shows how many live firebugs are inside.
+A green badge at the upper right of a lantern's icon shows how many live firebugs are inside.
 Where a station shows several lanterns in one slot, the green number is for the lantern you can take next.
 
 Double-click a lantern to take it in hand and put out any lit torch. Double-click it again to stow it.
