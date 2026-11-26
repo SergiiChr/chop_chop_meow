@@ -747,6 +747,7 @@ public partial class WorldView : Node3D {
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject, playerRig);
+        Groan(World.Me, null);
         UpdateOthers(dt);
         foreach (var worker in World.Workers) {
             if (!crew.TryGetValue(worker.Id, out var entry)) {
@@ -938,6 +939,7 @@ public partial class WorldView : Node3D {
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && DrawsAt(p.Pos);
             Work(state, subject, other.Rig);
+            Groan(p, p.Pos);
         }
         foreach (var (id, other) in others)
             if (!HasPlayer(id)) { other.Rig.Root.QueueFree(); others.Remove(id); }
@@ -1013,6 +1015,15 @@ public partial class WorldView : Node3D {
         ThingKind.WolfCorpse => "butcher_carcass",
         _ => null
     };
+
+    /// <summary>
+    /// A player stung by what they pick groans for as long as it stings, at their own spot or, for another player, at
+    /// <paramref name="at"/>.
+    /// A world held still by a menu keeps the last tick's sting, but stings nobody, so nobody groans.
+    /// </summary>
+    private void Groan(PlayerState player, Vector2? at) {
+        if (!Paused && player.Stung) Sounds?.Hold("sting_groan", player.Id, at);
+    }
 
     /// <summary>Whether working on a thing hammers in a mine's frame and rails rather than digging.</summary>
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
