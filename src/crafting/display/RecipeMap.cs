@@ -24,7 +24,9 @@ public partial class RecipeMap : Control {
     private VBoxContainer? mainView;
     private ItemTree? itemTree;
     private ScrollContainer rows = null!;
-    private PanelContainer details = null!;
+    private ScrollContainer detailsScroll = null!;
+    private VBoxContainer details = null!;
+    private const int DetailsWidth = 340;
     /// <summary>How long a jumped-to item stays lit, in seconds.</summary>
     public const float LitSeconds = 1.5f;
     public const string AltClickHint = "Alt-click: open the Recipe map";
@@ -58,13 +60,19 @@ public partial class RecipeMap : Control {
         var column = mainView = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); board.AddChild(column);
         column.AddChild(Header());
         column.AddChild(Stations());
-        rows = new ScrollContainer { Name = "map_rows", SizeFlagsVertical = SizeFlags.ExpandFill };
+        var body = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
+        body.AddThemeConstantOverride("separation", 10); column.AddChild(body);
+        rows = new ScrollContainer { Name = "map_rows", SizeFlagsHorizontal = SizeFlags.ExpandFill };
         var lanes = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         lanes.AddThemeConstantOverride("separation", 8); rows.AddChild(lanes);
         foreach (var row in world.Data.MapRows) lanes.AddChild(Lane(row));
-        column.AddChild(rows);
-        details = new PanelContainer { Name = "map_details" };
-        details.AddThemeStyleboxOverride("panel", Style.Well); column.AddChild(details);
+        body.AddChild(rows);
+        var sidebar = new PanelContainer { Name = "map_details", CustomMinimumSize = new Vector2(DetailsWidth, 0) };
+        sidebar.AddThemeStyleboxOverride("panel", Style.Well); body.AddChild(sidebar);
+        detailsScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        sidebar.AddChild(detailsScroll);
+        details = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        details.AddThemeConstantOverride("separation", 16); detailsScroll.AddChild(details);
         Choose(item);
         Visible = true;
         if (item != "") JumpWhenReady(rows, item);
@@ -215,53 +223,53 @@ public partial class RecipeMap : Control {
         node.Light(LitSeconds);
     }
 
-    /// <summary>Shows an item's details in the strip under the map and rings it; an empty item shows what a click does.</summary>
+    /// <summary>Shows an item's details beside the map and rings it; an empty item shows what a click does.</summary>
     private void Choose(string item) {
         if (nodes.TryGetValue(Chosen, out var before)) before.Chosen = false;
+        if (item != Chosen) detailsScroll.ScrollVertical = 0;
         Chosen = item;
         foreach (var child in details.GetChildren()) { details.RemoveChild(child); child.QueueFree(); }
         if (!nodes.TryGetValue(item, out var node)) {
             details.AddChild(Style.Text("Click an item for its recipe. Click a small ingredient or tool icon to find it on the map.",
-                16, Style.Ink));
+                16, Style.Ink, wrap: true));
             return;
         }
 
         node.Chosen = true;
         var data = world.Data;
         var recipe = data.RecipeOf(item);
-        var content = new VBoxContainer(); content.AddThemeConstantOverride("separation", 9); details.AddChild(content);
-        var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 12); content.AddChild(header);
+        var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 12); details.AddChild(header);
         header.AddChild(DetailItem(item, 46, "detail_item"));
         var identity = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
-        identity.AddThemeConstantOverride("separation", 2); header.AddChild(identity);
-        var title = new HBoxContainer(); title.AddThemeConstantOverride("separation", 12); identity.AddChild(title);
-        var name = Style.Text(data.Name(item), 23, Style.Ink, Style.Head); name.Name = "detail_name"; title.AddChild(name);
+        identity.AddThemeConstantOverride("separation", 3); header.AddChild(identity);
+        var name = Style.Text(data.Name(item), 23, Style.Ink, Style.Head, wrap: true);
+        name.Name = "detail_name"; identity.AddChild(name);
         var known = Style.Pill(node.Known ? "Made before" : "Not made yet", Style.Tag(node.Known ? Style.Sage : Style.Tan), Style.SlotFill, 12);
-        known.SizeFlagsVertical = SizeFlags.ShrinkCenter; title.AddChild(known);
+        known.SizeFlagsHorizontal = SizeFlags.ShrinkBegin; identity.AddChild(known);
         if (data.Items[item].Description is { Length: > 0 } said) {
-            var text = Style.Text(said, 14, Style.Ink, wrap: true); text.Name = "detail_text"; identity.AddChild(text);
+            var text = Style.Text(said, 14, Style.Ink, wrap: true); text.Name = "detail_text"; details.AddChild(text);
         }
-        if (recipe != null) header.AddChild(ShowButton(item, recipe));
 
-        var facts = new HBoxContainer(); facts.AddThemeConstantOverride("separation", 26); content.AddChild(facts);
-        var madeAt = Fact(facts, recipe == null ? "Source" : "Made at");
+        var madeAt = Fact(details, recipe == null ? "Source" : "Made at");
         madeAt.AddChild(Style.Text(MadeAt(item), 16, Style.Ink, wrap: true));
         var needs = recipe != null
             ? recipe.Inputs.Select(p => (p.Key, $"{p.Value} {data.Name(p.Key)}"))
             : data.Sources[item].From.Concat(data.Sources[item].Also).Select(input => (input, data.Name(input)));
-        var requires = Flow(Fact(facts, "Requires"));
+        var requires = Fact(details, "Requires");
         foreach (var (input, words) in needs) {
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 4);
             pair.AddChild(DetailItem(input, 28, $"requires_{input}"));
-            pair.AddChild(Style.Text(words, 15, Style.Ink));
+            var label = Style.Text(words, 15, Style.Ink, wrap: true);
+            label.SizeFlagsHorizontal = SizeFlags.ExpandFill; pair.AddChild(label);
             requires.AddChild(pair);
         }
-        if (requires.GetChildCount() == 0) requires.AddChild(Style.Text("No ingredients", 15, Style.Tan));
+        if (requires.GetChildCount() == 1) requires.AddChild(Style.Text("No ingredients", 15, Style.Tan));
         var uses = data.UsedFor(item).ToList();
-        var used = Flow(Fact(facts, "Used for")); used.Name = "detail_uses";
+        var used = Flow(Fact(details, "Used for")); used.Name = "detail_uses";
         foreach (string use in uses) used.AddChild(DetailItem(use, 28, $"use_{use}"));
         if (uses.Count == 1) used.AddChild(Style.Text(data.Name(uses[0]), 15, Style.Ink));
         if (uses.Count == 0) used.AddChild(Style.Text("—", 15, Style.Tan));
+        if (recipe != null) details.AddChild(ShowButton(item, recipe));
     }
 
     /// <summary>A detail thumbnail keeps its icon size and also lets Alt-click follow that item.</summary>
@@ -284,9 +292,9 @@ public partial class RecipeMap : Control {
         return icon;
     }
 
-    private static VBoxContainer Fact(HBoxContainer strip, string heading) {
-        var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        column.AddThemeConstantOverride("separation", 2); strip.AddChild(column);
+    private static VBoxContainer Fact(VBoxContainer sidebar, string heading) {
+        var column = new VBoxContainer();
+        column.AddThemeConstantOverride("separation", 2); sidebar.AddChild(column);
         column.AddChild(Style.Text(heading, 14, Style.Tan, Style.Head));
         return column;
     }

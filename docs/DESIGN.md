@@ -195,8 +195,8 @@ UI and input:
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout, station strip and item details |
-| `src/crafting/display/ItemTree.cs` | The Recipe map's item tree, with direct recipes grouped by station |
-| `src/crafting/display/ItemTreeBranches.cs` | The lines from the root item to each station's branch |
+| `src/crafting/display/ItemTree.cs` | The Recipe map's item tree, with a separate branch to each recipe product |
+| `src/crafting/display/ItemTreeBranches.cs` | The lines from the root item to each recipe product |
 | `src/crafting/model/RecipeItemUse.cs` | The ingredient, tool and fuel relationships between an item and a recipe |
 | `src/crafting/display/MapTree.cs` | The arrows from materials to products in a category |
 | `src/crafting/display/MapNode.cs` | An item card with its icon, source and links to required tools and additional resources |
@@ -1157,11 +1157,11 @@ Closing the map returns to the panel or goal details underneath.
 and the rest go on lines below. `MapTree` draws arrows to the products and highlights those connected to the chosen card.
 A `MapNode` draws a filled icon slot for an item `World.Had` knows and a dashed one otherwise.
 Chips below the card link to the required tool and to each input after the first. A click on a chip scrolls to its item
-and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details, whose button leaves the
-map through `SidePanel.ShowRecipe`.
+and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details in a vertical panel to
+the right of the map. The panel's button leaves the map through `SidePanel.ShowRecipe`.
 Alt-click on a card, chip or detail thumbnail opens that item's tree within the same board.
 `RecipeItemUse.Of` reads each recipe's inputs, accepted tools, fixed station tools and fuels to find direct uses only.
-`ItemTree` branches by station, showing an item once with every role it has in that recipe.
+`ItemTree` draws a separate branch to each recipe product and labels every role the selected item plays in that recipe.
 Clicking a card returns to its place in the main map. Alt-clicking it opens its own item tree.
 The Back button restores the main map at its previous selection and scroll position.
 

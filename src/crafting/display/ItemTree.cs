@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -31,26 +30,18 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         var rootColumn = new VBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkBegin };
         rootColumn.AddThemeConstantOverride("separation", 7); diagram.AddChild(rootColumn);
         rootColumn.AddChild(Style.Text("Selected item", 16, Style.Beige, Style.Head));
-        var data = kit.World.Data;
-        string source = data.RecipeOf(item) is RecipeDef recipe ? MapNode.Where(data, recipe) : data.Sources[item].How;
-        var root = Card(item, source, root: true);
+        var root = Card(item);
         rootColumn.AddChild(root); diagram.SetRoot(root);
 
         var uses = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        uses.AddThemeConstantOverride("separation", 14); diagram.AddChild(uses);
-        foreach (var group in RecipeItemUse.Of(data, item).GroupBy(use => use.Recipe.Station)) {
-            var branch = new VBoxContainer(); branch.AddThemeConstantOverride("separation", 7); uses.AddChild(branch);
-            var title = Style.Text(group.Key is ThingKind station ? data.Name(station) : "By hand", 19, Style.Rim, Style.Head);
-            branch.AddChild(title); diagram.BranchTo(branch, title);
-            var cards = new HFlowContainer(); cards.AddThemeConstantOverride("h_separation", 8);
-            cards.AddThemeConstantOverride("v_separation", 8); branch.AddChild(cards);
-            foreach (var use in group) {
-                string role = use.Label();
-                if (use.Recipe is { Hand: true, Station: not null }) role += " · Also by hand";
-                cards.AddChild(Card(use.Recipe.Output, role));
-            }
+        uses.AddThemeConstantOverride("separation", 7); diagram.AddChild(uses);
+        uses.ItemRectChanged += diagram.QueueRedraw;
+        uses.AddChild(Style.Text("Direct recipes", 16, Style.Beige, Style.Head));
+        foreach (var use in RecipeItemUse.Of(kit.World.Data, item)) {
+            var product = Card(use.Recipe.Output, use.Label());
+            uses.AddChild(product); diagram.BranchTo(product);
         }
-        if (uses.GetChildCount() == 0) uses.AddChild(Style.Text("No recipe uses this item directly.", 17, Style.Beige));
+        if (uses.GetChildCount() == 1) uses.AddChild(Style.Text("No recipe uses this item directly.", 17, Style.Beige));
     }
 
     private HBoxContainer Header() {
@@ -66,14 +57,17 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         return header;
     }
 
-    private ItemSlot Card(string id, string note, bool root = false) {
-        var data = kit.World.Data;
+    private ItemSlot Card(string id, string? role = null) {
+        bool root = role == null;
+        string nameText = kit.World.Data.Name(id);
+        string tooltip = role == null ? nameText : $"{nameText}\n{role}";
         var card = new ItemSlot {
             Name = root ? "item_tree_root" : $"tree_item_{id}",
             CustomMinimumSize = new Vector2(root ? 252 : 226, 66),
+            SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
             FocusMode = FocusModeEnum.None,
             MouseDefaultCursorShape = CursorShape.PointingHand,
-            TooltipText = $"{data.Name(id)}\n{note}\nClick to find it on the map · {RecipeMap.ItemTreeHint}",
+            TooltipText = $"{tooltip}\nClick to find it on the map · {RecipeMap.ItemTreeHint}",
             RecipeLink = () => openItemTree(id)
         };
         card.Pressed += () => showOnMap(id);
@@ -89,11 +83,10 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
             MouseFilter = MouseFilterEnum.Ignore
         };
         words.AddThemeConstantOverride("separation", 1); face.AddChild(words);
-        var name = Style.Text(data.Name(id), 18, Style.Rim, Style.Head);
+        var name = Style.Text(nameText, 18, Style.Rim, Style.Head);
         if (root) name.Name = "item_tree_name";
         name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis; words.AddChild(name);
-        var source = Style.Text(note, 13, Style.Beige);
-        source.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis; words.AddChild(source);
+        if (role != null) words.AddChild(Style.Text(role, 13, Style.Beige));
         return card;
     }
 }

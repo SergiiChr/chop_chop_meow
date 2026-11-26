@@ -38,6 +38,7 @@ public partial class Game {
         await TestClean(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
         await TestClean(CheckCraftingLeavesTheRecipeMapOnTheBottomBar);
         await TestClean(CheckRecipeMapOpensFromTheBottomBarAndShowsEveryItemOnce);
+        await TestClean(CheckRecipeMapDetailsAreStackedOnTheRight);
         await TestClean(CheckAltClickBackpackItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickHotbarItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickRecipeShowsTheProductWithoutQueueing);
@@ -45,6 +46,7 @@ public partial class Game {
         await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
         await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
         await TestClean(CheckItemTreeFollowsOneDirectRecipeAtATime);
+        await TestClean(CheckItemTreeBranchesToEachRecipeProduct);
         await TestClean(CheckItemTreeBackRestoresTheMainMap);
         await TestClean(CheckItemTreeOpensFromADetailThumbnail);
         await TestClean(CheckItemTreeDistinguishesIngredientsFuelAndFixedTools);
