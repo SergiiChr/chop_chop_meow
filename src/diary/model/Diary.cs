@@ -65,6 +65,18 @@ public sealed class Diary(World world) {
         return false;
     }
 
+    /// <summary>
+    /// Whether a saved player's diary holds only known finds, each once and none also waiting in its pop-up,
+    /// reads only days it has found, and points only at a page fallen off a tree that lies in <paramref name="things"/>.
+    /// </summary>
+    internal static bool Valid(PlayerState p, ThingList things) {
+        if (p.DiaryFinds == null || p.DiaryRead == null || !Enum.IsDefined(p.DiaryFinding) || p.DiaryFinds.Contains(p.DiaryFinding)) return false;
+        foreach (var find in p.DiaryFinds) if (find == DiaryFind.None || !Enum.IsDefined(find)) return false;
+        if (p.DiaryFinds.Distinct().Count() != p.DiaryFinds.Count || p.DiaryRead.Distinct().Count() != p.DiaryRead.Count) return false;
+        foreach (int day in p.DiaryRead) if (!Has(p, day)) return false;
+        return p.FallenPage == 0 || things.Find(p.FallenPage)?.Kind == ThingKind.FallenPage;
+    }
+
     /// <summary>Whether a page lying in the world shows to a player and they can pick it up.</summary>
     public static bool ShowsTo(PlayerState p, Thing t) => t.Kind switch {
         ThingKind.FloatingPage => Missing(p, DiaryFind.Lake),

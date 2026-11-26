@@ -61,7 +61,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
 | `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
-| `--showcase --diary` | Show the player on the lake's shore beside its floating page, with a page lying on the ground and three finds in the diary, two of their days unread; `--diary-fall` drops a page off the oak beside them a second in, `--panel` opens the Diary, `--diary-day 45` opens that day large and `--diary-find` shows the pop-up of a page found in leaves |
+| `--showcase --diary` | Show the player on the lake's shore beside its floating page, with a page lying on the ground and three finds in the diary, two of their days unread; `--diary-fall` drops that page off the oak beside them a second in instead, `--panel` opens the Diary, `--diary-day 45` opens that day large and `--diary-find` shows the pop-up of a page found in leaves |
 | `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |

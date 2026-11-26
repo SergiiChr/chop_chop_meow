@@ -20,11 +20,12 @@ public partial class PaperTile : Button {
     private const float Crooked = 5;
     private readonly float[] tear;
     private readonly Vector2[] corners = new Vector2[4];
-    private readonly Label counter;
+    // The faint number, built once the cell is in the tree.
+    private Label? counter;
     private readonly string place;
     // The sheet's outline, and the same closed back on its first point for drawing its edge.
     private Vector2[] sheet = [], edge = [];
-    private Look look = Look.Read;
+    private Look look = Look.Missing;
 
     /// <param name="place">The cell's place in the diary, counted from one.</param>
     public PaperTile(int place, Action open) {
@@ -39,6 +40,9 @@ public partial class PaperTile : Button {
         tear = new float[32];
         for (int i = 0; i < tear.Length; i++) tear[i] = Stray(TearDepth);
         for (int i = 0; i < corners.Length; i++) corners[i] = new Vector2(Stray(Crooked), Stray(Crooked));
+    }
+
+    public override void _Ready() {
         var picture = new TextureRect {
             Name = "page_picture",
             Texture = PagePicture,
@@ -49,16 +53,17 @@ public partial class PaperTile : Button {
         picture.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         picture.OffsetLeft = picture.OffsetTop = 9; picture.OffsetRight = picture.OffsetBottom = -9;
         AddChild(picture);
-        counter = Style.Text(this.place, 34, new Color(Style.DiaryInk, .45f));
-        counter.Name = "counter";
-        counter.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        counter.HorizontalAlignment = HorizontalAlignment.Center; counter.VerticalAlignment = VerticalAlignment.Center;
+        var number = Style.Text(place, 34, new Color(Style.DiaryInk, .45f));
+        number.Name = "counter";
+        number.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        number.HorizontalAlignment = HorizontalAlignment.Center; number.VerticalAlignment = VerticalAlignment.Center;
         // A rim of paper keeps the number apart from the writing on the page under it.
-        counter.AddThemeColorOverride("font_outline_color", Sheet);
-        counter.AddThemeConstantOverride("outline_size", 10);
-        AddChild(counter);
+        number.AddThemeColorOverride("font_outline_color", Sheet);
+        number.AddThemeConstantOverride("outline_size", 10);
+        AddChild(number);
+        counter = number;
         Resized += Shape;
-        ShowAs(Look.Missing);
+        ShowAs(look);
     }
 
     /// <summary>Draws the cell as a day found and read, found and not read yet, or not found.</summary>
@@ -68,11 +73,13 @@ public partial class PaperTile : Button {
         Disabled = !found;
         MouseDefaultCursorShape = found ? CursorShape.PointingHand : CursorShape.Arrow;
         TooltipText = shown switch { Look.Unread => "Not read yet · click to read", Look.Read => "Click to read again", _ => "" };
-        counter.Text = found ? place : "?";
+        if (counter != null) counter.Text = found ? place : "?";
         QueueRedraw();
     }
 
     public override void _Draw() {
+        // The outline comes with the cell's first size.
+        if (sheet.Length == 0) return;
         DrawSetTransform(new Vector2(2, 3));
         DrawColoredPolygon(sheet, Shadow);
         DrawSetTransform(Vector2.Zero);

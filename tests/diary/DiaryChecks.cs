@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.Json.Nodes;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -25,6 +26,7 @@ public static class DiaryChecks {
         Test(CheckBuildingOverAFallenPageClearsItForAnotherChop, data);
         Test(CheckBuildingsAreWorkedFromDryGroundOnly, data);
         Test(CheckFindsAndReadDaysComeBackFromASave, data);
+        Test(CheckASaveWithABrokenDiaryIsRefused, data);
         Test(CheckTheDiaryGoalCountsEachPlayersOwnPages, data);
     }
 
@@ -179,6 +181,13 @@ public static class DiaryChecks {
         Require(world.CanStand(handle) && Terrain.InLake(handle), "a handle turned along the shore should come in the shallows");
         Require(world.Construction.PlacementBlock(ThingKind.Pump, intake, rotation: Mathf.Pi / 2) == "Turn the handle toward open ground on the bank.",
             "a pump's handle should be worked from dry ground, not the shallows");
+        // A furnace on dry ground just up the bank, turned with its bellows toward the lake.
+        var furnace = bank + Vector2.Up;
+        world.Player = furnace + new Vector2(3, -1);
+        var bellows = furnace + World.BellowsStand.Rotated(Mathf.Pi);
+        Require(world.CanStand(bellows) && Terrain.InLake(bellows), "a furnace's bellows turned toward the lake should come in the shallows");
+        Require(world.Construction.PlacementBlock(ThingKind.Reinforced, furnace, rotation: Mathf.Pi) == "Leave dry, open ground at the furnace's bellows and in front of it.",
+            "a furnace's bellows should be worked from dry ground, not the shallows");
     }
 
     private static void CheckFindsAndReadDaysComeBackFromASave(GameData data) {
@@ -200,6 +209,29 @@ public static class DiaryChecks {
         Require(me.DiaryFinds.SequenceEqual([DiaryFind.Berries]) && me.DiaryRead.SequenceEqual([40]), "a load should bring back the finds taken and the days read");
         Require(me.DiaryFinding == DiaryFind.Leaves && loaded.Occupied, "a load should bring back a pop-up still waiting");
         Require(loaded.Find(page.Id) is { Kind: ThingKind.FallenPage } && Diary.ShowsTo(me, loaded.Find(page.Id)!), "a load should bring back the page lying where it fell, for its player");
+    }
+
+    /// <summary>A save whose diary holds an unknown find, a day read but not found or a fallen page that is not there is refused with a clear reason instead of failing mid-game.</summary>
+    private static void CheckASaveWithABrokenDiaryIsRefused(GameData data) {
+        var world = DiaryWorld(data);
+        var bush = world.Add(ThingKind.Berries, Terrain.Spawn + new Vector2(10, -10), 10000);
+        GatherUntilFound(world, bush, DiaryFind.Berries);
+        world.Diary.Take();
+        world.Diary.Read(40);
+        string save = world.Serialize();
+        DiaryWorld(data).Deserialize(save);
+        foreach (var (field, broken) in new (string, JsonNode?)[] {
+            ("DiaryFinds", null), ("DiaryFinds", new JsonArray(99)), ("DiaryFinds", new JsonArray((int)DiaryFind.Berries, (int)DiaryFind.Berries)),
+            ("DiaryRead", new JsonArray(2)), ("DiaryFinding", (int)DiaryFind.Berries), ("FallenPage", 99999),
+        }) {
+            var edited = JsonNode.Parse(save)!;
+            var player = edited["Party"]!.AsObject().First().Value!;
+            Require(player[field] != null || field is "DiaryFinding" or "FallenPage", $"save fixture field {field} is missing");
+            player[field] = broken;
+            bool refused = false;
+            try { DiaryWorld(data).Deserialize(edited.ToJsonString()); } catch (InvalidOperationException error) { refused = error.Message.Contains("out of range"); }
+            Require(refused, $"a save whose diary has {field} set to {broken?.ToJsonString() ?? "null"} should be refused with a clear reason");
+        }
     }
 
     private static void CheckTheDiaryGoalCountsEachPlayersOwnPages(GameData data) {

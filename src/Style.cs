@@ -159,9 +159,9 @@ public static class Style {
     /// <summary>Dark text on a check box that sits on a beige well.</summary>
     public static void InkCheck(CheckBox box) => InkText(box);
 
-    /// <summary>Dark text on a button that sits on a beige well, in every state: ink, or another dark colour.</summary>
-    public static void InkText(Button button, Color? color = null) {
-        foreach (var state in CheckStates) button.AddThemeColorOverride(state, color ?? Ink);
+    /// <summary>Dark text on a button that sits on a beige well, in every state.</summary>
+    public static void InkText(Button button) {
+        foreach (var state in CheckStates) button.AddThemeColorOverride(state, Ink);
     }
     private static readonly string[] CheckStates = { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color" };
 

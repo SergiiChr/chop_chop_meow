@@ -5,7 +5,8 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// One diary day opened large in the middle of the screen: a sheet of paper with the day written on it by hand,
-/// falling apart where it was written in the dark and scribbles where it cannot be read. The close button, Esc or a click beside the sheet closes it.
+/// falling apart where it was written in the dark and scribbles where it cannot be read.
+/// The close button, Esc or a click beside the sheet closes it.
 /// Opening a day marks it read.
 /// </summary>
 public partial class ReadingSheet : Control {

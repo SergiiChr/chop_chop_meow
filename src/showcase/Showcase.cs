@@ -8,8 +8,8 @@ namespace ChopChopMeow;
 public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit) {
     /// <summary>
     /// Diary review: the player on the lake's shore by its floating page, with a page lying on the ground beside them and three finds in their diary, two of whose days are unread.
-    /// <c>--diary-fall</c> drops another page off the oak beside them a second in, <c>--panel</c> opens the diary,
-    /// <c>--diary-day N</c> opens day N large and <c>--diary-find</c> shows the pop-up of a page found in leaves.
+    /// <c>--diary-fall</c> drops that page off the oak beside them a second in instead, since a player has one fallen page at a time.
+    /// <c>--panel</c> opens the diary, <c>--diary-day N</c> opens day N large and <c>--diary-find</c> shows the pop-up of a page found in leaves.
     /// </summary>
     private void DiaryReview() {
         var me = world.Me;
@@ -22,11 +22,10 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear(); world.S.Wolves.Clear();
         world.Player = shore + inland * .6f;
         var tree = world.Add(ThingKind.Tree, shore + inland * 4.5f + inland.Orthogonal() * 2, World.TreeWood);
-        world.Diary.Drop(me, world.Player + inland.Orthogonal() * 1.4f + inland * .8f);
         me.DiaryFinds.AddRange([DiaryFind.Sand, DiaryFind.Berries, DiaryFind.Tree]);
         me.DiaryRead.AddRange([6, 36]);
-        if (Launch.Has("--diary-fall"))
-            view.GetTree().CreateTimer(1).Timeout += () => world.Diary.Drop(me, tree.Pos - inland * 1.2f);
+        if (Launch.Has("--diary-fall")) view.GetTree().CreateTimer(1).Timeout += () => world.Diary.Drop(me, tree.Pos - inland * 1.2f);
+        else world.Diary.Drop(me, world.Player + inland.Orthogonal() * 1.4f + inland * .8f);
         if (Launch.Has("--diary-find")) me.DiaryFinding = DiaryFind.Leaves;
         world.Tick(0); view.Zoom = Launch.Number("--zoom", 1.8f);
         if (Launch.Has("--panel")) panel.Open(Page.Diary); else panel.Close();

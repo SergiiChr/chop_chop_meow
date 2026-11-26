@@ -86,6 +86,8 @@ public sealed class Construction(World world) {
                 return "Leave open ground in front of the door.";
             if (!world.CanStandDry(p + BarrelHaul.LadderApproach.Rotated(rotation))) return "Leave dry, open ground at the cabin's ladder.";
         }
+        if (kind == ThingKind.Reinforced && !(world.CanStandDry(p + World.BellowsStand.Rotated(rotation)) && world.CanStandDry(p + GlassBlowing.BlowStand.Rotated(rotation))))
+            return "Leave dry, open ground at the furnace's bellows and in front of it.";
         foreach (var hut in world.S.Things.Of(ThingKind.Hut)) {
             if (Doorways.DoorPoint(hut).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
             if (hut.ToWorld(BarrelHaul.LadderApproach).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's ladder clear.";
