@@ -21,6 +21,7 @@ public static class StrawBedChecks {
         Test(CheckOnlyTheSleeperNearTheWolfHearsIt, data);
         Test(CheckMovementWaitsForTheStandingHandoff, data);
         Test(CheckCabinAndStrawBedSleepTogetherSpeedUpTime, data);
+        Test(CheckExtraStepsOfFasterTimeStaySilent, data);
         Test(CheckBootsStayPlantedAndClearTheBed);
         Test(CheckWeightPassesSmoothlyFromThePalmToTheForearm);
         Test(CheckTheBurningTorchStaysVisibleBesideTheSleeper);
@@ -211,6 +212,28 @@ public static class StrawBedChecks {
         UntilAllAwake(world);
         Require(world.Day == day + 1 && world.Me.SleepingAt == 0 && guest.SleepingAt == 0,
             "sleeping at different kinds of bed should take both players to the next dawn");
+    }
+
+    /// <summary>While time runs faster only each frame's own step makes sounds, so they do not pile up at the faster rate.</summary>
+    private static void CheckExtraStepsOfFasterTimeStaySilent(GameData data) {
+        var world = EmptyWorld(data);
+        var bed = StrawBedSteps.Build(world);
+        var heard = Listen(world);
+        world.Sleep.Start(bed);
+        world.Tick(StrawBed.LieDownSeconds + 1);
+        const float frame = 1f / World.TicksPerSecond;
+        float step = data.HungerPerSecond * frame;
+        // Hunger drops below the growl line in the frame's third step, one of the extra ones.
+        SetNeeds(world, hunger: GameData.GrowlBelow + 2.5f * step, thirst: 100);
+        float time = world.Time;
+        heard.Clear();
+        world.Tick(frame);
+        Require(world.Time > time + 2.5f * frame && world.Hunger < GameData.GrowlBelow, "the frame should run extra steps past the growl line");
+        Require(!heard.Contains("stomach_growl"), "a growl in an extra step of faster time should stay silent");
+        world.Sleep.Wake();
+        SetNeeds(world, hunger: GameData.GrowlBelow + .5f * step);
+        world.Tick(frame);
+        Require(heard.Contains("stomach_growl"), "the same growl should sound at normal speed");
     }
 
     private static void CheckBootsStayPlantedAndClearTheBed() {
