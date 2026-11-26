@@ -9,6 +9,7 @@ namespace ChopChopMeow;
 public partial class Game {
     private async Task RunLanternUIChecks() {
         await TestClean(CheckLanternBadgesShowLiveFirebugsInsteadOfStackSize);
+        await TestClean(CheckThePackingStationSeparatesFirebugsFromLanternQuantity);
         await TestClean(CheckADoubleClickTakesTheLanternInHandAndPutsOutTheTorch);
         await TestClean(CheckAPlacedLanternOpensWithRightClickAndTakesFirebugsGradually);
     }
@@ -35,6 +36,33 @@ public partial class Game {
         Require(!BagCellOf("steel_axe").GetNode<Badge>("count").Visible, "a single tool should not show a quantity badge");
         await CloseWithEsc();
         Drop(Hosted, empty); Drop(Hosted, charged); SetHotbarSlot(Hosted, 8, previous);
+        await Frames();
+    }
+
+    private async Task CheckThePackingStationSeparatesFirebugsFromLanternQuantity() {
+        var at = SpotsNearby().First(p => p.DistanceTo(world.Player) < 3.2f && Uncovered(view.Screen(p, .3f))
+            && world.Construction.PlacementBlock(ThingKind.Lantern, p) == null);
+        var packer = Hosted.Add(ThingKind.Packer, at);
+        Hosted.SetPacking(packer, Lanterns.Item);
+        string empty = Hosted.Lanterns.NewEmpty(), charged = Hosted.Lanterns.NewEmpty();
+        Give(Hosted, empty); Give(Hosted, charged); GiveFirebugs(Hosted, 4);
+        Require(Hosted.Lanterns.Refill(Lanterns.Id(charged), count: 4), "four firebugs should fit in the lantern");
+        charged = Hosted.Lanterns.Carried(Lanterns.Id(charged))!;
+        Require(Hosted.LoadInput(packer, charged, 1) == 1, "the filled lantern should go into the packing station");
+        await Until(() => view.Pick(view.Screen(at, .3f))?.Id == packer.Id, "the packing station being visible", 4);
+        await Click(view.Screen(at, .3f));
+        var slot = OnPage("input_lantern")!;
+        var quantity = slot.GetNode<Badge>("count");
+        var firebugs = slot.GetNodeOrNull<Badge>("firebug_count");
+        Require(!quantity.Visible && firebugs is { Text: "4", Visible: true }
+            && firebugs.GetThemeColor("font_color") == Style.FirebugGreen,
+            "a single lantern at the packing station should show only its green firebug count");
+        Require(Hosted.LoadInput(packer, empty, 1) == 1, "the empty lantern should join the filled lantern");
+        await Until(() => quantity.Visible && quantity.Text == "2", "the separate quantity of two lanterns", 4);
+        Require(firebugs!.Text == "4" && firebugs.GetRect().GetCenter().Y < quantity.GetRect().GetCenter().Y,
+            "the first lantern's firebug count should stay above the lantern quantity");
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == packer);
         await Frames();
     }
 

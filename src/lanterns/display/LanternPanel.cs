@@ -36,7 +36,7 @@ public partial class LanternPanel(PageTools tools, int lantern, Thing? placed = 
         else AddButton("Pick up", () => world.Lanterns.PickUp(placed));
         BagGrid(item => {
             if (item == Firebugs.Item) world.Lanterns.Refill(lantern, placed, ItemMoves.Amount(world.S.Backpack, item));
-        }, $"{BagHint}\nShift: add a stack of firebugs · Ctrl: add all firebugs");
+        }, $"{BagHint}\nShift: add a stack of firebugs · Ctrl in the backpack: add firebugs not on the hotbar");
     }
 
     private bool CanDeposit() => world.Lanterns.BugCount(Item) < Lanterns.Capacity && (placed == null || world.Reaches(placed));

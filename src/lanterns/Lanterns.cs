@@ -12,7 +12,7 @@ public sealed class Lanterns(World world) {
     public const int Capacity = 10;
     private const string Prefix = Item + "_";
     private const int NumberLength = 8;
-    private const int HeaderLength = 8 + NumberLength;
+    private static readonly int HeaderLength = Prefix.Length + NumberLength;
 
     /// <summary>Names the lantern by its permanent number, followed by the times its firebugs die.</summary>
     private static string WithFirebugs(int id, ReadOnlySpan<float> expires) {

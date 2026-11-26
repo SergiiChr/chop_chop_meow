@@ -18,10 +18,17 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         cell.Icon = Icons.Of(item);
         if ((look ?? (input ? null : Style.SlotWanted)) is StyleBoxFlat rim) cell.AddThemeStyleboxOverride("normal", rim);
         moves.TakeCell(cell, box, item, t, takes, put);
-        // Redrawn only when the amount held changes or a stack's firebugs are a minute closer to expiry.
-        live.Watch(() => (Held: box[item], Life: item == Firebugs.Item && box[item] > 0 ? world.Firebugs.AverageMinutes(box) : -1), shown => {
+        // Redrawn only when the amount held or the firebugs' count or time left changes.
+        bool lantern = Lanterns.IsItem(item);
+        live.Watch(() => {
+            int held = box[item];
+            int life = item == Firebugs.Item && held > 0 ? world.Firebugs.AverageMinutes(box) : -1;
+            int bugs = lantern && held > 0 ? world.Lanterns.BugCount(item) : -1;
+            return (Held: held, Life: life, Bugs: bugs);
+        }, shown => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, shown.Held > 0 ? Colors.White : Style.Ghost);
-            count.Text = shown.Held > 0 ? shown.Held.ToString() : "";
+            if (lantern) count.SetStack(shown.Held, shown.Bugs);
+            else count.Text = shown.Held > 0 ? shown.Held.ToString() : "";
             string hint = tooltip(shown.Held);
             cell.TooltipText = shown.Life < 0 ? hint : hint + "\n" + PageText.FirebugLife(shown.Life);
         });
@@ -120,15 +127,20 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     private VBoxContainer LanternSlot(bool input, string perBatch, float size) {
         var box = t.Inventory;
         var (cell, count) = ItemSlot.Create($"{(input ? "input" : "output")}_{Lanterns.Item}", size);
+        var firebugs = ItemSlot.CountBadge(1, 0);
+        firebugs.Name = "firebug_count";
+        cell.AddChild(firebugs);
         cell.Icon = Icons.Of(Lanterns.Item);
         if (!input) cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
         moves.TakeCell(cell, box, () => box.FirstLantern(), t,
             held => held.Stack is { Box: 0 } stack && Lanterns.IsItem(stack.Item),
             input ? (item, units) => world.LoadInput(t, item, units) : null);
-        live.Watch(() => (Count: box.LanternCount(), Name: box.FirstLantern() is string item ? world.Describe(item) : world.Data.Name(Lanterns.Item)), now => {
+        live.Watch(() => (Count: box.LanternCount(), Bugs: box.FirstLantern() is string item ? world.Lanterns.BugCount(item) : -1), now => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, now.Count > 0 ? Colors.White : Style.Ghost);
-            count.Text = now.Count > 0 ? now.Count.ToString() : "";
-            cell.TooltipText = $"{now.Name} · {now.Count}\n{SlotHint}{world.Data.DescriptionLine(Lanterns.Item)}";
+            count.SetStack(now.Count, -1);
+            firebugs.SetStack(0, now.Bugs);
+            string name = now.Bugs == 0 ? Lanterns.EmptyName : world.Data.Name(Lanterns.Item);
+            cell.TooltipText = $"{name} · {now.Count}{world.Data.DescriptionLine(Lanterns.Item)}\n{SlotHint}";
         });
         return Labelled(cell, perBatch);
     }
