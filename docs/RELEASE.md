@@ -20,6 +20,7 @@
      the same files.
    - `./build.py play` in a worktree first replaces its save slots, autosave and settings with the main checkout's.
      The game opens on the player's own saves that way, and what it saves in the worktree is gone on the next launch.
+     For a separate copy prepared with your settings and supplies, use the [my-playtest skill](../.agents/skills/my-playtest/SKILL.md).
    - Each run of the checks claims a block of game ports of its own, past the ones a played game takes.
      So checks can run while a game is played or while another checkout runs its own.
 2. Make the change and update the docs it affects in the same commit.
