@@ -6,6 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>Moves one kind of liquid at a time through connected steel pipes.</summary>
 public sealed class Plumbing(World world, Barrels barrels) {
+    internal const string InstallMaterial = "steel_pipe";
     public const int InstallCost = 10;
     private static readonly ThingKind[] Consumers = Array.FindAll(Kinds.All, HasPlumbing);
 

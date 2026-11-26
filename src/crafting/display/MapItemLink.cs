@@ -6,14 +6,18 @@ namespace ChopChopMeow;
 /// <summary>An item link that keeps its name and icon hidden until the settlement discovers it.</summary>
 internal partial class MapItemLink(World world, string item, string hint = "", string? role = null) : ItemSlot {
     public const string QuestionMark = "?";
-    public bool Known { get; private set; } = world.Had(item);
+    public bool Known { get; private set; } = KnownTo(world, item);
     public Action<string, Texture2D?>? PresentIdentity { get; set; }
     public event Action? Discovered;
 
-    public override void _Ready() => ShowIdentity(world.Had(item));
+    /// <summary>Building plans are discovered by building them, and items by having them.</summary>
+    public static bool KnownTo(World world, string item) => world.Data.IsBuilding(item) ? world.Reached(item)
+        : world.Data.Items.ContainsKey(item) && world.Had(item);
+
+    public override void _Ready() => ShowIdentity(KnownTo(world, item));
 
     public override void _Process(double delta) {
-        if (!world.Had(item)) return;
+        if (!KnownTo(world, item)) return;
         ShowIdentity(true);
         Discovered?.Invoke();
     }

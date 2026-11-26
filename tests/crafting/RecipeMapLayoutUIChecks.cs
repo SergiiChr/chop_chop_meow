@@ -58,6 +58,65 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
+    /// <summary>Buildings join their main construction material, and stations link to what they make.</summary>
+    private async Task CheckBuildingsBranchFromTheirMainMaterialAndShowRecipes() {
+        Achieve(Hosted, "stone", "furnace"); await Frames();
+        await OpenRecipeMap();
+        Require(world.Data.Buildings.Keys.All(kind => recipeMap.FindChildren($"map_{kind.Id()}", "", true, false).Count == 1),
+            "Each building must have exactly one card on the main map.");
+        var stone = recipeMap.NodeOf("stone")!;
+        var furnace = recipeMap.NodeOf("furnace")!;
+        var planks = recipeMap.NodeOf("planks")!;
+        var cookingTable = recipeMap.NodeOf("cooktable")!;
+        Require(stone.GetParent() == furnace.GetParent() && stone.Position.X + MapTree.Pitch == furnace.Position.X &&
+            planks.GetParent() == cookingTable.GetParent() && planks.Position.X + MapTree.Pitch == cookingTable.Position.X,
+            "The furnace belongs under Stone, and the cooking table under Wood planks even though they are listed last in its cost.");
+        await Click(RecipeMapCard("wood"), alt: true);
+        await ItemTreeShows("wood");
+        Require(ItemTreeCard("furnace") == null, "Wood must not repeat the furnace that belongs to Stone.");
+        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        await Click(RecipeMapCard("stone"), alt: true);
+        await ItemTreeShows("stone");
+        var buildings = recipeMap.FindChild("item_tree_role_Buildings", true, false);
+        Require(buildings?.FindChild("tree_item_furnace", true, false) != null, "Stone must show the furnace under Buildings.");
+        await Click(ItemTreeCard("furnace")!);
+        var details = recipeMap.FindChild("map_details", true, false);
+        Require(recipeMap.Chosen == "furnace" && HasLabel(details, "16 Stone") && HasLabel(details, "6 Wood"),
+            "A click on the furnace must highlight it and show its complete construction cost.");
+        await Click(RecipeMapCard("furnace"), alt: true);
+        await ItemTreeShows("furnace");
+        var recipes = recipeMap.FindChild("item_tree_role_Recipes", true, false);
+        Require(recipes != null && new[] { "charcoal", "iron_bar", "tin_bar", "burnt_steak", "bread" }
+            .All(item => recipes.FindChild($"tree_item_{item}", true, false) != null) && ItemTreeCard("steel_bar") == null,
+            "The Stone furnace must show the recipes it makes, not those of the Reinforced furnace.");
+        await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>The Item tree lists all direct actions the player can take with a tool, even when it is not used in recipes.</summary>
+    private async Task CheckItemTreeShowsDirectActions() {
+        Achieve(Hosted, "steel_shovel", World.TorchItem); await Frames();
+        await OpenRecipeMap();
+        await Click(RecipeMapCard("steel_shovel"), alt: true);
+        await ItemTreeShows("steel_shovel");
+        var actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
+        Require(actions != null && new[] { "Dig ground", "Dig beach sand", "Dig up stumps", "Dig up bushes", "Gather nettles without stings" }
+            .All(action => HasLabel(actions, action)) && !HasLabel(actions, "Chop trees"),
+            "A shovel must show each way it digs or gathers and must not take the axe's actions.");
+        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        await Click(RecipeMapCard("steel_axe"), alt: true);
+        await ItemTreeShows("steel_axe");
+        actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
+        Require(actions != null && HasLabel(actions, "Chop trees") && HasLabel(actions, "Fight wolves"),
+            "An axe must show both gathering and combat actions.");
+        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        await Click(RecipeMapCard(World.TorchItem), alt: true);
+        await ItemTreeShows(World.TorchItem);
+        actions = recipeMap.FindChild("item_tree_role_Actions", true, false);
+        Require(actions != null && HasLabel(actions, "Light torch") && HasLabel(actions, "Wave torch at wolves"),
+            "An item need not be a tool to show its direct actions.");
+        await KeyStroke(Key.Escape);
+    }
+
     /// <summary>Undiscovered entries remain anonymous and do not open an Item tree until discovered.</summary>
     private async Task CheckUndiscoveredMapItemsStayAnonymous() {
         await OpenRecipeMap();
@@ -69,7 +128,7 @@ public partial class Game {
             "An undiscovered recipe must not expose ingredients as map chips.");
         await Click(barrel);
         var details = recipeMap.FindChild("map_details", true, false);
-        Require(details.FindChild("detail_item", true, false) is Button { Text: "?", Icon: null } &&
+        Require(details.FindChild("detail_item", true, false) is MapSlot { Known: false } && HasLabel(details, "?") &&
             !HasLabel(details, "Made at") && details.FindChild("map_show", true, false) == null,
             "Selecting the question mark must not reveal the undiscovered item's recipe.");
         await Click(barrel, alt: true);

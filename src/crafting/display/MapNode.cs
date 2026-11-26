@@ -57,6 +57,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         card.AddChild(icon);
 
         var recipe = data.RecipeOf(item);
+        MapBuilding? building = data.TryBuilding(item, out var kind) ? MapBuilding.Of(data, kind) : null;
         var name = Style.Text("", 16, Style.Rim, Style.Head);
         name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         card.AddChild(name);
@@ -72,18 +73,19 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
             name.HorizontalAlignment = Known ? HorizontalAlignment.Left : HorizontalAlignment.Center;
             name.Position = Known ? new Vector2(56, 4) : ItemIcon.Position;
             name.Size = Known ? new Vector2(Width - 64, 22) : ItemIcon.Size;
-            if (Known) source.Text = recipe != null ? Where(data, recipe) : data.Sources[item].How;
+            if (Known) source.Text = building != null ? "Build" : recipe != null ? Where(data, recipe) : data.Sources[item].How;
             source.Visible = Known;
             QueueRedraw();
         };
         card.Discovered += RefreshDetails;
         AddChild(card);
-        if (Known) AddChips(recipe); else card.Discovered += () => AddChips(recipe);
+        if (Known) AddChips(recipe, building); else card.Discovered += () => AddChips(recipe, building);
     }
 
-    private void AddChips(RecipeDef? recipe) {
+    private void AddChips(RecipeDef? recipe, MapBuilding? building) {
         var data = world.Data;
-        var also = recipe != null ? recipe.Inputs.Keys.Skip(1) : data.Sources[item].Also;
+        var also = building is MapBuilding construction ? construction.Materials.Keys.Where(key => key != construction.MainMaterial)
+            : recipe != null ? recipe.Inputs.Keys.Skip(1) : data.Sources[item].Also;
         var chips = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Position = new Vector2(10, Height - 4) };
         chips.AddThemeConstantOverride("separation", 3);
         if (recipe is { Tool.Length: > 0 }) {

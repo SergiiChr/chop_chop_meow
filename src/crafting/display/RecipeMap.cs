@@ -17,6 +17,7 @@ public partial class RecipeMap : Control {
     private readonly SidePanel panel;
     private readonly PanelContainer board;
     private readonly Dictionary<string, MapNode> nodes = new();
+    private readonly ILookup<string?, MapBuilding> buildings;
     private static readonly StyleBoxFlat LaneBack = Style.Flat(new Color("283c50"), 14, 12, horizontal: 14);
     private Action? leaveGoalLog;
     private VBoxContainer? mainView;
@@ -32,6 +33,7 @@ public partial class RecipeMap : Control {
 
     public RecipeMap(UiKit kit, SidePanel panel) {
         this.kit = kit; this.panel = panel; world = kit.World;
+        buildings = MapBuilding.All(world.Data).ToLookup(building => building.MainMaterial);
         Name = "recipe_map"; Visible = false;
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         // The dimmed backdrop takes clicks, so none falls through to the world behind the map.
@@ -52,7 +54,7 @@ public partial class RecipeMap : Control {
     /// <summary>Opens at the item's map entry, leaving any open panel or Goal Log underneath.</summary>
     public void OpenAt(string item, Action? leaveGoalLog = null) {
         item = EntryFor(item);
-        if (item != "" && !world.Data.Items.ContainsKey(item)) return;
+        if (item != "" && !world.Data.Items.ContainsKey(item) && !world.Data.IsBuilding(item)) return;
         Clear();
         this.leaveGoalLog = leaveGoalLog;
         var column = mainView = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); board.AddChild(column);
@@ -63,6 +65,8 @@ public partial class RecipeMap : Control {
         var lanes = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         lanes.AddThemeConstantOverride("separation", 8); rows.AddChild(lanes);
         foreach (var row in world.Data.MapRows) lanes.AddChild(Lane(row));
+        if (buildings.Contains(null))
+            lanes.AddChild(Lane(new MapRowDef { Title = "Buildings", Roots = buildings[null].Select(building => building.Id).ToList() }));
         body.AddChild(rows);
         var sidebar = new PanelContainer { Name = "map_details", CustomMinimumSize = new Vector2(DetailsWidth, 0) };
         sidebar.AddThemeStyleboxOverride("panel", Style.Well); body.AddChild(sidebar);
@@ -102,7 +106,7 @@ public partial class RecipeMap : Control {
     /// <summary>Shows a discovered item's direct recipes within the same board.</summary>
     private void OpenItemTree(string item) {
         item = EntryFor(item);
-        if (!world.Had(item)) return;
+        if (!MapItemLink.KnownTo(world, item)) return;
         mainView!.Hide();
         RemoveItemTree();
         itemTree = new ItemTree(kit, item, BackToMap, Close, ShowOnMap, OpenItemTree);
@@ -194,11 +198,12 @@ public partial class RecipeMap : Control {
     private void Place(MapTree tree, string item, int step, ref int line, HashSet<string> unplacedRoots) {
         var node = new MapNode(world, item, Choose, Jump, OpenItemTree) { Position = new Vector2(step * MapTree.Pitch, line * MapNode.RowPitch) };
         nodes[item] = node; tree.AddChild(node); tree.Columns = Math.Max(tree.Columns, step + 1);
-        var made = world.Data.MadeOutOf(item);
-        for (int i = 0; i < made.Count; i++) {
-            string product = made[i];
+        var made = world.Data.MadeOutOf(item).Concat(buildings[item].Select(building => building.Id));
+        bool first = true;
+        foreach (string product in made) {
             string? other = JoiningRoot(product, step, unplacedRoots);
-            if (i > 0 || other != null) line++;
+            if (!first || other != null) line++;
+            first = false;
             if (other != null) {
                 unplacedRoots.Remove(other);
                 Place(tree, other, 0, ref line, unplacedRoots);
@@ -213,7 +218,7 @@ public partial class RecipeMap : Control {
     private string? JoiningRoot(string product, int step, HashSet<string> unplacedRoots) {
         var data = world.Data;
         return step == 1 && data.RecipeOf(product) is RecipeDef recipe
-            ? recipe.Inputs.Keys.Skip(1).FirstOrDefault(root => unplacedRoots.Contains(root) && data.MadeOutOf(root).Count == 0)
+            ? recipe.Inputs.Keys.Skip(1).FirstOrDefault(root => unplacedRoots.Contains(root) && data.MadeOutOf(root).Count == 0 && !buildings.Contains(root))
             : null;
     }
 
@@ -238,33 +243,43 @@ public partial class RecipeMap : Control {
 
         node.Chosen = true;
         if (!node.Known) {
-            var undiscovered = DetailItem(item, 46, "detail_item");
-            undiscovered.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
-            details.AddChild(undiscovered);
+            details.AddChild(new MapSlot {
+                Name = "detail_item",
+                OverLight = true,
+                MarkSize = 16,
+                CustomMinimumSize = new Vector2(40, 40),
+                SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
+                MouseFilter = MouseFilterEnum.Ignore
+            });
             details.AddChild(Style.Text("Discover this item to see its details.", 16, Style.Ink, wrap: true));
             return;
         }
 
         var data = world.Data;
         var recipe = data.RecipeOf(item);
+        MapBuilding? building = data.TryBuilding(item, out var kind) ? MapBuilding.Of(data, kind) : null;
         var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 12); details.AddChild(header);
         header.AddChild(DetailItem(item, 46, "detail_item"));
         var identity = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
         identity.AddThemeConstantOverride("separation", 3); header.AddChild(identity);
         var name = Style.Text(data.Name(item), 23, Style.Ink, Style.Head, wrap: true);
         name.Name = "detail_name"; identity.AddChild(name);
-        var known = Style.Pill("Made before", Style.Tag(Style.Sage), Style.SlotFill, 12);
+        var known = Style.Pill(building == null ? "Made before" : "Built before", Style.Tag(Style.Sage), Style.SlotFill, 12);
         known.SizeFlagsHorizontal = SizeFlags.ShrinkBegin; identity.AddChild(known);
-        if (data.Items[item].Description is { Length: > 0 } said) {
+        var description = building is MapBuilding plan ? data.Buildings[plan.Kind].Description : data.Items[item].Description;
+        if (description is { Length: > 0 } said) {
             var text = Style.Text(said, 14, Style.Ink, wrap: true); text.Name = "detail_text"; details.AddChild(text);
         }
 
-        var madeAt = Fact(details, recipe == null ? "Source" : "Made at");
-        madeAt.AddChild(Style.Text(MadeAt(item), 16, Style.Ink, wrap: true));
-        var needs = recipe != null
-            ? recipe.Inputs.Select(p => (p.Key, $"{p.Value} "))
+        if (building == null) {
+            var madeAt = Fact(details, recipe == null ? "Source" : "Made at");
+            madeAt.AddChild(Style.Text(MadeAt(item), 16, Style.Ink, wrap: true));
+        }
+        var costs = building?.Materials ?? recipe?.Inputs;
+        var needs = costs != null
+            ? costs.Select(p => (p.Key, $"{p.Value} "))
             : data.Sources[item].From.Concat(data.Sources[item].Also).Select(input => (input, ""));
-        var requires = Fact(details, "Requires");
+        var requires = Fact(details, building == null ? "Requires" : "Build cost");
         foreach (var (input, amount) in needs) {
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 4);
             var icon = DetailItem(input, 28, $"requires_{input}");
@@ -274,9 +289,12 @@ public partial class RecipeMap : Control {
             label.SizeFlagsHorizontal = SizeFlags.ExpandFill; pair.AddChild(label);
             requires.AddChild(pair);
         }
-        if (requires.GetChildCount() == 1) requires.AddChild(Style.Text("No ingredients", 15, Style.Tan));
-        var uses = data.UsedFor(item).ToList();
-        var used = Flow(Fact(details, "Used for")); used.Name = "detail_uses";
+        if (requires.GetChildCount() == 1)
+            requires.AddChild(Style.Text(building == null ? "No ingredients" : "No materials", 15, Style.Tan));
+        var uses = (building is MapBuilding at
+            ? data.Recipes.Values.Where(r => r.Station == at.Kind).Select(r => r.Output)
+            : data.UsedFor(item).Concat(buildings[item].Select(product => product.Id))).ToList();
+        var used = Flow(Fact(details, building == null ? "Used for" : "Recipes")); used.Name = "detail_uses";
         foreach (string use in uses) {
             var icon = DetailItem(use, 28, $"use_{use}");
             used.AddChild(icon);

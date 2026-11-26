@@ -6,17 +6,24 @@ namespace ChopChopMeow;
 /// <summary>A slot as the map draws it: filled for an item made before, a dashed outline for an undiscovered one.</summary>
 public partial class MapSlot : Control {
     public bool Known { get; set; }
+    public bool OverLight { get; init; }
+    public int MarkSize { get; init; } = 12;
+    private static readonly StyleBoxFlat OnLight = Style.Flat(Style.Line, 12, 0);
     private static readonly StyleBoxFlat Unknown = Style.Flat(new Color(Style.SlotFill, .14f), 12, 0);
 
     public override void _Ready() {
         if (Known) return;
-        var mark = Style.Text(MapItemLink.QuestionMark, 12, Style.Rim, Style.Head);
+        var mark = Style.Text(MapItemLink.QuestionMark, MarkSize, Style.Rim, Style.Head);
         mark.HorizontalAlignment = HorizontalAlignment.Center;
         mark.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(mark);
     }
 
-    public override void _Draw() => Paint(this, new Rect2(Vector2.Zero, Size), Known);
+    public override void _Draw() {
+        var rect = new Rect2(Vector2.Zero, Size);
+        if (OverLight && !Known) DrawStyleBox(OnLight, rect);
+        Paint(this, rect, Known);
+    }
 
     /// <summary>Paints a slot on any control.</summary>
     public static void Paint(Control on, Rect2 rect, bool known) {

@@ -633,19 +633,21 @@ Movement controls are disabled while the map is open.
 An item discovered while the map is open reveals its name and icon without reopening the map.
 
 - The map groups items by category. Coal and the iron, steel and tin chains are in **Metals**. The wheat chain is in
-  **Food**. Follow the arrows from a material to what it makes. Discovered cards name where the item is made or found.
+  **Food**. Follow the arrows from a material to what it makes. A building branches from the material it costs most.
+  Discovered cards name where the item is made or found.
 - Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
-  Undiscovered items show as question marks without names or icons in both views. You can select them on the main map,
-  but their recipe details and Item trees stay hidden until they are discovered.
+  Undiscovered items and buildings show as question marks. You can select them on the main map, and the details panel
+  shows the same dashed question-mark badge. Their details and Item trees stay hidden until discovery.
 - Small icons at the foot of a discovered card show a required tool (gold rim) or an additional resource (blue rim).
   Click one to find that item on the map and light it up briefly.
 - Click anywhere on a card to highlight it and the arrows connected to it. The details panel on the right shows how it
   is made, what it requires and what it is used for. The button opens the nearest station that makes it or the crafting
   menu for a recipe made by hand.
-- Alt-click a discovered item on the map to open its Item tree in the same window. It shows only recipes that directly use
-  the item. The products are grouped under **Fuel**, **Ingredient** or **Tool**. Empty branches are hidden, and a
-  product can appear under more than one use. Click an item to highlight it on the main map, or Alt-click it to
-  open its own Item tree if it has been discovered. The upper-left **Recipe map** button returns to the view you left.
+- Alt-click a discovered card to open its Item tree in the same window. Direct recipe products appear under **Fuel**,
+  **Ingredient** or **Tool**, and can appear under more than one use. **Buildings** shows what primarily costs this
+  material. **Actions** shows what the item can do, such as digging with a shovel. A station's tree shows what it
+  makes. Empty branches are hidden. Click a card to highlight it on the main map, or Alt-click a discovered card to
+  open its tree. The upper-left **Recipe map** button returns to the view you left.
 
 ### Crafting bench
 

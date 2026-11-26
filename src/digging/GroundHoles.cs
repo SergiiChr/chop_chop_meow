@@ -4,12 +4,13 @@ namespace ChopChopMeow;
 
 /// <summary>Tracks a held dig until it leaves a planting hole or strips a square of beach sand.</summary>
 public sealed class GroundHoles(World world) {
+    internal const string Tool = "shovel";
     internal const float Reach = 1.35f;
 
     private string? SelectedShovel {
         get {
             string item = world.InHand != "" ? world.InHand : world.HotbarItem(world.ActiveHotbar);
-            if (world.ToolKind(item) != "shovel") return null;
+            if (world.ToolKind(item) != Tool) return null;
             int count = world.InHand != "" ? world.Backpack[item] : world.HotbarCount(world.ActiveHotbar);
             return count > 0 ? item : null;
         }

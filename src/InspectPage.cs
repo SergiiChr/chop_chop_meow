@@ -64,15 +64,15 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 8);
             window.AddChild(Style.InWell(row));
-            var slot = stationSlots.Slot(plumbingSlot, "steel_pipe", true,
+            var slot = stationSlots.Slot(plumbingSlot, Plumbing.InstallMaterial, true,
                 count => $"Plumbing · {count}/{Plumbing.InstallCost} steel pipes\n{StationSlots.SlotHint}",
-                takes: held => held.Stack?.Item == "steel_pipe");
+                takes: held => held.Stack?.Item == Plumbing.InstallMaterial);
             slot.Name = "plumbing_slot";
             row.AddChild(slot);
             var label = Style.Text("", 13, Style.Ink, wrap: true);
             label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             row.AddChild(label);
-            live.Watch(() => plumbingSlot["steel_pipe"], count => label.Text =
+            live.Watch(() => plumbingSlot[Plumbing.InstallMaterial], count => label.Text =
                 count == Plumbing.InstallCost ? "Installed" : $"{count}/{Plumbing.InstallCost} pipes");
         }
         RedrawOnChange(() => (thing.Packs, world.Selected(thing), thing.Compost, FilterCode()));

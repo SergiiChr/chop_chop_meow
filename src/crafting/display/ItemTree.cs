@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>One item at the root of the recipes that directly use it as an ingredient, tool or fuel.</summary>
+/// <summary>The direct uses of an item, or the recipes that run at a building.</summary>
 internal partial class ItemTree(UiKit kit, string item, Action back, Action close,
     Action<string> showOnMap, Action<string> openItemTree) : VBoxContainer {
     private static readonly StyleBoxFlat Canvas = Style.Flat(new Color("283c50"), 14, 20);
@@ -35,8 +36,26 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         var uses = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         uses.AddThemeConstantOverride("separation", 20); diagram.AddChild(uses);
         uses.ItemRectChanged += diagram.QueueRedraw;
-        foreach (var group in RecipeItemUse.Of(kit.World.Data, item).GroupBy(use => use.Role).OrderBy(group => group.Key)) {
-            var role = group.Key.ToString();
+        var data = kit.World.Data;
+        if (data.TryBuilding(item, out var kind)) {
+            AddBranch("Recipes", data.Recipes.Values.Where(recipe => recipe.Station == kind).Select(recipe => Card(recipe.Output, "Recipes")));
+        } else {
+            foreach (var group in RecipeItemUse.Of(data, item).GroupBy(use => use.Role).OrderBy(group => group.Key)) {
+                string role = group.Key.ToString();
+                AddBranch(role, group.Select(use => Card(use.Recipe.Output, role)));
+            }
+            AddBranch("Buildings", MapBuilding.All(data).Where(building => building.MainMaterial == item)
+                .Select(building => Card(building.Id, "Buildings")));
+            AddBranch("Actions", ItemTreeActions.Of(kit.World, item).Distinct().Select(ActionCard));
+        }
+        if (uses.GetChildCount() == 0) {
+            uses.AddChild(Style.Text("No direct uses.", 17, Style.Beige));
+            uses.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+        }
+
+        void AddBranch(string role, IEnumerable<Control> cards) {
+            var leaves = cards.ToArray();
+            if (leaves.Length == 0) return;
             var branch = new HBoxContainer { Name = $"item_tree_role_{role}" };
             branch.AddThemeConstantOverride("separation", 42); uses.AddChild(branch);
             branch.ItemRectChanged += diagram.QueueRedraw;
@@ -46,14 +65,16 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
             caption.SizeFlagsVertical = SizeFlags.ShrinkCenter; branch.AddChild(caption);
             var products = new VBoxContainer();
             products.AddThemeConstantOverride("separation", 6); branch.AddChild(products);
-            foreach (var use in group) products.AddChild(Card(use.Recipe.Output, role));
+            foreach (var leaf in leaves) products.AddChild(leaf);
             diagram.BranchTo(caption, products);
         }
-        if (uses.GetChildCount() == 0) {
-            var empty = Style.Text("No recipe uses this item directly.", 17, Style.Beige);
-            uses.AddChild(empty);
-            uses.SizeFlagsVertical = SizeFlags.ShrinkCenter;
-        }
+    }
+
+    private static PanelContainer ActionCard(string action) {
+        var card = new PanelContainer { CustomMinimumSize = new Vector2(264, 46), MouseFilter = MouseFilterEnum.Ignore };
+        card.AddThemeStyleboxOverride("panel", ItemCard);
+        card.AddChild(Style.Text(action, 17, Style.Rim, Style.Head, wrap: true));
+        return card;
     }
 
     private HBoxContainer Header() {
@@ -64,7 +85,7 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         var words = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         words.AddThemeConstantOverride("separation", 1); header.AddChild(words);
         words.AddChild(Style.Heading("Item tree", 30));
-        words.AddChild(Style.Text("Click to find an item on the map. Alt-click a discovered item to follow its direct recipes.", 15, Style.Beige));
+        words.AddChild(Style.Text("Click to find an item on the map. Alt-click a discovered item to follow its direct uses.", 15, Style.Beige));
         header.AddChild(kit.HeaderButton("close", "Close · Esc", close, Style.CloseRound, "map_close"));
         return header;
     }

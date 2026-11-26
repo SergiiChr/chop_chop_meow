@@ -195,14 +195,16 @@ UI and input:
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout and item details |
-| `src/crafting/display/MapItemLink.cs` | An item link that hides its identity until discovery |
-| `src/crafting/display/ItemTree.cs` | The Recipe map's item tree, with recipe products grouped by role |
-| `src/crafting/display/ItemTreeBranches.cs` | The lines from the root item to each role and its recipe products |
+| `src/crafting/display/MapItemLink.cs` | A link to an item or building that hides its identity until discovery |
+| `src/crafting/display/ItemTree.cs` | The Recipe map's Item tree, with branches for direct uses and station recipes |
+| `src/crafting/display/ItemTreeBranches.cs` | The lines from the selected card to each branch and its cards |
 | `src/crafting/model/RecipeItemUse.cs` | The direct roles an item plays in a recipe |
+| `src/crafting/model/MapBuilding.cs` | Buildings, their costs and the material their cards branch from |
+| `src/crafting/model/ItemTreeActions.cs` | The direct actions an item enables outside crafting and construction |
 | `src/crafting/model/RecipeItemRole.cs` | The roles and the order of their branches |
 | `src/crafting/display/MapTree.cs` | The arrows from materials to products in a category |
 | `src/crafting/display/MapNode.cs` | An item card with its icon, source and links to required tools and additional resources |
-| `src/crafting/display/MapSlot.cs` | The filled or dashed icon slot shared by the cards and the legend |
+| `src/crafting/display/MapSlot.cs` | The filled or dashed icon slot shared by cards, the details panel and the legend |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/trade/display/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
@@ -1154,21 +1156,24 @@ The Recipe map badge on the bottom bar opens `RecipeMap` over the running game.
 `UiKit.LinkRecipeMap` lets Alt-click on an item slot or recipe card look up its item through `RecipeMap.OpenAt` without
 running the slot's usual action. An item link in the Goal Log uses the same entry point with the game still paused.
 Closing the map returns to the panel or goal details underneath.
-`PlayerControl.Update` moves nobody while it shows, and an item link shows its name and icon as soon as `World.Had` knows its item.
+`PlayerControl.Update` moves nobody while it shows, and a card reveals its name and icon when `World.Had` knows its item or `World.Reached` records its building.
 `RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
 and the rest go on lines below. When a recipe takes a spare root in the same category as a second ingredient, the
 first column can hold that root beside the product, and the main ingredient connects from above.
+`MapBuilding` attaches each building to the material it costs most, including the staged costs of a mine. When
+materials tie, the first one listed is used.
 `MapTree` draws arrows to the products and highlights those connected to the chosen card.
 A `MapNode` draws a filled icon slot for a discovered item and a question mark in a dashed slot otherwise.
 `MapItemLink` also hides undiscovered names and icons in the Item tree, chips, thumbnails and tooltips.
-Undiscovered entries can still be found on the main map, but neither their recipe details nor their Item trees open until discovery.
-Chips below a discovered card link to the required tool and to each input after the first. A click on a chip scrolls to its item
+Undiscovered entries can still be found on the main map, but neither their details nor their Item trees open until discovery. The details panel shares the dashed badge.
+Chips below a discovered card link to the required tool and extra ingredients or construction materials. A click on a chip scrolls to its item
 and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details in a vertical panel to
 the right of the map. The panel's button leaves the map through `SidePanel.ShowRecipe`.
 Alt-click on a discovered item's card, chip or detail thumbnail opens its Item tree within the same board.
 `RecipeItemUse.Of` reads each recipe's inputs, accepted tools, fixed station tools and fuels to find direct uses only.
 `ItemTree` groups recipe products under Fuel, Ingredient and Tool branches. It omits empty branches and shows a
-product under each role the selected item plays in that recipe.
+product under each role the selected item plays in that recipe. The same tree branches to buildings that primarily
+cost that material and lists the item's direct actions. A station's Recipes branch reads the recipes assigned to it.
 Clicking a card returns to its place in the main map. Alt-clicking it opens its own item tree.
 The Back button restores the main map at its previous selection and scroll position.
 
