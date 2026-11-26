@@ -194,7 +194,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         else if (scene == "backpack") {
             GiveLantern(0);
             world.SetHotbar(0, GiveLantern(4));
-            world.Firebugs.GiveForReview(world.S.Backpack, Lanterns.Capacity);
+            world.Firebugs.Catch(world.S.Backpack, Lanterns.Capacity);
         } else if (scene == "torch") { world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); } else _ = world.Lanterns.Place(GiveLantern(scene == "partial" ? 4 : Launch.Has("--dark") ? 0 : 10), at) ?? throw new InvalidOperationException("The lantern review needs open ground.");
         world.Tick(scene == "torch" ? World.KindleSeconds : 0);
         AimAt(at);
@@ -408,7 +408,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             for (int i = 0; i < goods.Length; i++) {
                 var pile = world.Add(ThingKind.Pile, Spot(i));
                 int amount = Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share));
-                if (goods[i] == Firebugs.Item) world.Firebugs.GiveForReview(pile.Inventory, amount);
+                if (goods[i] == Firebugs.Item) world.Firebugs.Catch(pile.Inventory, amount);
                 else if (goods[i] == Lanterns.Item) for (int n = 0; n < amount; n++) pile.Inventory.Add(world.Lanterns.NewEmpty(), 1);
                 else pile.Inventory.Add(goods[i], amount);
             }

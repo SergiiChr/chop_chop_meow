@@ -20,7 +20,7 @@ internal static class SetupSteps {
     public static int Give(World world, string item, int count = 1) => Give(world.S.Actor, item, count);
 
     /// <summary>Puts freshly caught firebugs in the backpack, without finding and catching each at night.</summary>
-    public static int GiveFirebugs(World world, int count) => world.Firebugs.GiveForReview(world.S.Backpack, count);
+    public static int GiveFirebugs(World world, int count) => world.Firebugs.Catch(world.S.Backpack, count);
 
     /// <summary>Puts goods in one player's backpack, for the same reason.</summary>
     public static int Give(PlayerState player, string item, int count = 1) => player.Backpack.Add(item, count);
@@ -29,7 +29,7 @@ internal static class SetupSteps {
     public static void Give(World world, IReadOnlyDictionary<string, int> goods) { foreach (var (item, count) in goods) Give(world, item, count); }
 
     /// <summary>Puts newly caught firebugs in a guest's backpack for a network check of what happens after a catch.</summary>
-    public static int GiveFirebugs(World world, PlayerState player, int count) => world.Firebugs.GiveForReview(player.Backpack, count);
+    public static int GiveFirebugs(World world, PlayerState player, int count) => world.Firebugs.Catch(player.Backpack, count);
 
     /// <summary>Takes goods out of the backpack to clear the ground for the next check: the game can only move them somewhere else.</summary>
     public static int Drop(World world, string item, int count = int.MaxValue) => Drop(world.S.Actor, item, count);

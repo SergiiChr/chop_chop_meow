@@ -444,7 +444,10 @@ public sealed partial class Inventory {
         return false;
     }
 
-    public int Add(string item, int quantity) => item == Firebugs.Item ? 0 : Add(item, quantity, default);
+    /// <summary>Adds up to <paramref name="quantity"/> units of an item and returns how many fit.</summary>
+    /// <exception cref="ArgumentException">For firebugs, which need their lives: add those with <see cref="Firebugs.Catch"/> or <see cref="TransferTo"/>.</exception>
+    public int Add(string item, int quantity) =>
+        item == Firebugs.Item ? throw new ArgumentException("Firebugs need their lives: add them with Firebugs.Catch or TransferTo.", nameof(item)) : Add(item, quantity, default);
 
     private int Add(string item, int quantity, ReadOnlySpan<float> firebugs) {
         int amount = Math.Min(Math.Max(0, quantity), Room(item));

@@ -29,8 +29,6 @@ public sealed class Firebugs(World world) {
         return to.AddFirebugs(expires);
     }
 
-    internal int GiveForReview(Inventory to, int number) => Catch(to, number);
-
     /// <summary>Average game minutes left among the firebugs in one stack, or the whole box when no slot is named.</summary>
     internal int AverageMinutes(Inventory box, int slot = -1) =>
         MinutesLeft(slot < 0 ? box.AverageFirebugExpiry() : box.AverageFirebugExpiry(slot));
