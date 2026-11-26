@@ -24,12 +24,13 @@ public partial class LanternPanel(PageTools tools, int lantern, Thing? placed = 
         var hint = Style.Wrapped("Put a held firebug stack here. Right-click to add one.", 15);
         hint.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         fill.AddChild(hint);
-        live.Watch(() => world.Lanterns.BugCount(Item), held => {
-            headingTitle.Text = Item is string item ? world.Describe(item) : world.Data.Name(Lanterns.Item);
-            count.Text = $"{held}/{Lanterns.Capacity}";
-            cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
-            cell.TooltipText = held >= Lanterns.Capacity ? "The lantern is full."
+        live.Watch(() => world.Lanterns.FirebugStack(Item), bugs => {
+            headingTitle.Text = bugs.Count == 0 ? Lanterns.EmptyName : world.Data.Name(Lanterns.Item);
+            count.Text = $"{bugs.Count}/{Lanterns.Capacity}";
+            cell.AddThemeColorOverride(ItemSlot.IconNormal, bugs.Count > 0 ? Colors.White : Style.Ghost);
+            string deposit = bugs.Count == Lanterns.Capacity ? "The lantern is full."
                 : "Left click to add the held stack · Right click to add one";
+            cell.TooltipText = bugs.Count > 0 ? $"{PageText.FirebugLife(bugs.AverageMinutes)}\n{deposit}" : deposit;
         });
         if (placed == null) AddButton("Put it down", () => { if (Item is string item) panel.Player.PlaceContainer(item); });
         else AddButton("Pick up", () => world.Lanterns.PickUp(placed));

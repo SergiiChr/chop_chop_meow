@@ -608,11 +608,7 @@ public partial class Net : Node {
             if (World.PlayerById(id) is PlayerState target && target != me && goals.Remove(target, out var at))
                 Place(target, at);
         if (!joining && me.Warp == own.Warp) me.Pos = own.Pos;
-        if (!joining) {
-            string hand = Lanterns.Id(own.InHand) is int lantern and > 0 && me.Backpack[own.InHand] == 0
-                ? Lanterns.Carried(me.Backpack, lantern) ?? "" : own.InHand;
-            (me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting, me.Braking) = (own.ActiveHotbar, hand, own.GatherTarget, own.Selected, own.Sprinting, own.Braking);
-        }
+        if (!joining) (me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting, me.Braking) = (own.ActiveHotbar, own.InHand, own.GatherTarget, own.Selected, own.Sprinting, own.Braking);
         gone.Clear();
         foreach (var o in goals.Keys) if (o is Worker w ? !s.Workers.Contains(w) : o is Wolf wolf ? !s.Wolves.Contains(wolf) : o is PlayerState p && !s.Players.Contains(p)) gone.Add(o);
         foreach (var o in gone) goals.Remove(o);

@@ -1381,7 +1381,7 @@ public sealed partial class World {
         S.Wolves.Remove(wolf); Add(ThingKind.WolfCorpse, wolf.Pos, WolfMeat);
         Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
     }
-    private void PutOutTorch() {
+    internal void PutOutTorch() {
         if (S.TorchLit) Play("torch_out", Player);
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
         WolfFollow.Stop();
@@ -2577,6 +2577,7 @@ public sealed partial class World {
     /// </summary>
     private void NeedsTick(float dt) {
         attackClock = Math.Max(0, attackClock - dt);
+        Lanterns.KeepInHand(S.Actor);
         Swings.Tick(dt);
         if (S.Actor.Id != LocalId) {
             if (Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
@@ -2712,8 +2713,8 @@ public sealed partial class World {
     private void TidyHotbar(PlayerState p) {
         p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
-        if (Lanterns.Id(p.InHand) is int lantern and > 0) p.InHand = Lanterns.Carried(p.Backpack, lantern) ?? "";
-        else if (!(Data.Items.TryGetValue(p.InHand ?? "", out var def) && def.Tool != "")) p.InHand = "";
+        if (!(Data.Items.TryGetValue(p.InHand ?? "", out var def) && def.Tool != "")) p.InHand = "";
+        Lanterns.KeepInHand(p);
         TidyBindings(p);
     }
     private bool Hand(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand;

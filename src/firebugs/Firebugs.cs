@@ -32,8 +32,10 @@ public sealed class Firebugs(World world) {
     internal int GiveForReview(Inventory to, int number) => Catch(to, number);
 
     /// <summary>Average game minutes left among the firebugs in one stack, or the whole box when no slot is named.</summary>
-    internal int AverageMinutes(Inventory box, int slot = -1) => (int)MathF.Ceiling(Math.Max(0,
-        (slot < 0 ? box.AverageFirebugExpiry() : box.AverageFirebugExpiry(slot)) - world.Time) / world.Data.HourSeconds * 60);
+    internal int AverageMinutes(Inventory box, int slot = -1) =>
+        MinutesLeft(slot < 0 ? box.AverageFirebugExpiry() : box.AverageFirebugExpiry(slot));
+
+    internal int MinutesLeft(float expiry) => (int)MathF.Ceiling(Math.Max(0, expiry - world.Time) / world.Data.HourSeconds * 60);
 
     /// <summary>Clears dead bugs from the inventories that can hold them when the next catch expires.</summary>
     internal void Age() {

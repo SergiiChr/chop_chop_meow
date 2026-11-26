@@ -98,7 +98,7 @@ public partial class Hotbar : PanelContainer {
     }
 
     // What each slot shows, so a slot is redrawn only when its item, count or selection changes: redrawing builds text and styles.
-    private readonly (string Id, int Count, bool Active, int Life, bool Dark)?[] shownSlots = new (string, int, bool, int, bool)?[9];
+    private readonly (string Id, int Count, bool Active, int Life, bool Dark, int PackedCount)?[] shownSlots = new (string, int, bool, int, bool, int)?[9];
     public void Refresh() {
         for (int slot = 0; slot < Buttons.Count; slot++) {
             var button = Buttons[slot];
@@ -106,7 +106,7 @@ public partial class Hotbar : PanelContainer {
             int count = world.HotbarCount(slot);
             bool active = world.InHand == "" && world.ActiveHotbar == slot;
             int life = id == Firebugs.Item && count > 0 ? world.Firebugs.AverageMinutes(world.S.Backpack, world.HotbarStack(slot)) : -1;
-            var shown = (id, count, active, life, Lanterns.IsItem(id) && world.Lanterns.BugCount(id) == 0);
+            var shown = (id, count, active, life, Lanterns.IsItem(id) && world.Lanterns.BugCount(id) == 0, world.Packed(id)?.Count ?? 0);
             if (shownSlots[slot] == shown) continue;
             shownSlots[slot] = shown;
             bool building = world.Data.IsBuilding(id);
@@ -115,7 +115,7 @@ public partial class Hotbar : PanelContainer {
                 : count == 1 && world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
-            string clicks = Lanterns.IsItem(id) ? "LMB: select · RMB: open for refill · Double LMB: take in hand" : "LMB: select · RMB or Double LMB: use";
+            string clicks = Lanterns.IsItem(id) ? "LMB: select · RMB: open for refill · Double LMB: take in hand or stow" : "LMB: select · RMB or Double LMB: use";
             string expiry = life < 0 ? "" : "\n" + PageText.FirebugLife(life);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Describe(id)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}{expiry}\n{clicks}";
             // The selected slot gets an orange rim.
@@ -166,7 +166,7 @@ public partial class Hotbar : PanelContainer {
         else if (id == "torch" && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
         else if (Lanterns.IsItem(id)) {
             panel.Player.Mode = new ClickMode.Normal();
-            world.SelectInHand(id); panel.Close(); kit.Refresh();
+            world.Lanterns.ToggleInHand(Lanterns.Id(id)); panel.Close(); kit.Refresh();
         } else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
         else if (Barrel.Is(id)) panel.OpenBarrel(stack >= 0 ? stack : world.S.Backpack.PreferredSlot);
         else return false;

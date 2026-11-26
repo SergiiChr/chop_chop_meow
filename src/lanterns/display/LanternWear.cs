@@ -41,9 +41,6 @@ internal sealed class LanternWear {
         return root;
     }
 
-    internal static string? InHand(PlayerState who) =>
-        Lanterns.IsItem(who.InHand) && who.Backpack[who.InHand] > 0 ? who.InHand : null;
-
     /// <summary>Each hotbar lantern hangs from its own hook, except for the one currently on the fist.</summary>
     internal void Sync(World world, PlayerState who, string? equipped, Vector3? fist, float energy) {
         bool hand = equipped != null && fist.HasValue;

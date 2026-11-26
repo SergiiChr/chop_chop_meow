@@ -16,7 +16,9 @@ internal static class LanternChecks {
         float caught = world.Time;
         string item = world.Lanterns.NewEmpty();
         Give(world, item); GiveFirebugs(world, 2);
+        world.Lanterns.ToggleInHand(Lanterns.Id(item));
         var placed = world.Lanterns.Place(item, world.Player + Vector2.Right * 2)!;
+        Require(world.Me.LanternInHand == 0, "setting a lantern on the ground should unequip it");
         Require(placed != null && world.Lanterns.Refill(Lanterns.Id(item), placed, 2), "an empty lantern can be placed and filled with two bugs");
         RunUntil(world, caught + 840);
         GiveFirebugs(world, 3);
@@ -44,16 +46,18 @@ internal static class LanternChecks {
         Give(world, empty); GiveFirebugs(world, 3);
         RunUntil(world, caught + 840);
         GiveFirebugs(world, 9);
-        world.SelectInHand(empty);
+        world.Lanterns.ToggleInHand(id);
         Require(world.Lanterns.Refill(id, count: 4) && world.Backpack[Firebugs.Item] == 8,
             "four bugs should go into the lantern instead of taking the whole stack");
-        Require(world.Lanterns.Refill(id, count: 8) && world.Backpack[Firebugs.Item] == 2 && world.Lanterns.BugCount(world.InHand) == 10,
+        Require(world.Lanterns.FirebugStack(Lanterns.InHand(world.Me)) == (4, 54 * 60),
+            "three firebugs with 48 hours left and one with 72 should average 54 hours inside the lantern");
+        Require(world.Lanterns.Refill(id, count: 8) && world.Backpack[Firebugs.Item] == 2 && world.Lanterns.BugCount(Lanterns.InHand(world.Me)) == 10,
             "a refill should take only what fits and the same lantern should stay in hand");
         Require(!world.Lanterns.Refill(id), "a full lantern has no more room");
         RunUntil(world, caught + 2520);
-        Require(world.Lanterns.BugCount(world.InHand) == 7 && world.Backpack[Firebugs.Item] == 2,
+        Require(world.Lanterns.BugCount(Lanterns.InHand(world.Me)) == 7 && world.Backpack[Firebugs.Item] == 2,
             "the oldest bugs go into the lantern first and die first");
-        Require(world.Lanterns.Refill(id) && world.Lanterns.BugCount(world.InHand) == 9 && world.Backpack[Firebugs.Item] == 0,
+        Require(world.Lanterns.Refill(id) && world.Lanterns.BugCount(Lanterns.InHand(world.Me)) == 9 && world.Backpack[Firebugs.Item] == 0,
             "a lantern that loses a few bugs can be topped up straight away");
     }
 }

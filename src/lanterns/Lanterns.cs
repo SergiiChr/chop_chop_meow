@@ -53,6 +53,15 @@ public sealed class Lanterns(World world) {
     public int BugCount(string? item) => Living(item, default);
     public int BugCount(Thing lantern) => BugCount(lantern.LanternItem);
 
+    /// <summary>The stack of living firebugs in this lantern, with their average game minutes left.</summary>
+    internal (int Count, int AverageMinutes) FirebugStack(string? item) {
+        Span<float> dates = stackalloc float[Capacity];
+        int count = Living(item, dates);
+        double total = 0;
+        foreach (float date in dates[..count]) total += date;
+        return (count, count == 0 ? 0 : world.Firebugs.MinutesLeft((float)(total / count)));
+    }
+
     private int Living(string? item, Span<float> copy) {
         if (!IsItem(item)) return 0;
         int count = 0;
@@ -83,12 +92,29 @@ public sealed class Lanterns(World world) {
         return null;
     }
 
+    /// <summary>The lantern the player took in hand, regardless of the tool selected or its current charge.</summary>
+    internal static string? InHand(PlayerState player) => Carried(player.Backpack, player.LanternInHand);
+
+    internal static void KeepInHand(PlayerState player) {
+        if (player.LanternInHand != 0 && InHand(player) == null) player.LanternInHand = 0;
+    }
+
+    /// <summary>Takes the carried lantern in hand or puts it back if it is already equipped.</summary>
+    internal void ToggleInHand(int id) {
+        if (id == 0 || Carried(id) == null || world.Busy() || world.Forwarded(Verb.ToggleLanternInHand, id)) return;
+        var player = world.S.Actor;
+        bool stow = player.LanternInHand == id;
+        player.LanternInHand = stow ? 0 : id;
+        if (!stow && (player.TorchLit || player.TorchKindling > 0)) world.PutOutTorch();
+    }
+
     /// <summary>Puts down the lantern without changing how long its firebugs have left.</summary>
     public Thing? Place(string item, Vector2 at, float rotation = 0) {
         if (!IsItem(item)) return null;
         if (world.Construction.PlacementBlock(ThingKind.Lantern, at, item, rotation) is string blocked) { world.Say(blocked); return null; }
         if (world.Busy() || world.Forwarded(Verb.PlaceLantern, item: item, count: world.S.Backpack.PreferredSlot, at: at, rotation: rotation)) return null;
         if ((world.MarkedSource ?? world.S.Backpack).Remove(item, 1) != 1) return null;
+        KeepInHand(world.S.Actor);
         var lantern = world.Add(ThingKind.Lantern, at, rotation: rotation);
         lantern.LanternItem = item;
         world.ClearGround(lantern);
@@ -128,10 +154,7 @@ public sealed class Lanterns(World world) {
         expires.Sort();
         var filled = WithFirebugs(id, expires);
         if (placed != null) placed.LanternItem = filled;
-        else {
-            bag.Replace(item, filled);
-            if (world.S.Actor.InHand == item) world.S.Actor.InHand = filled;
-        }
+        else bag.Replace(item, filled);
         return true;
     }
 }

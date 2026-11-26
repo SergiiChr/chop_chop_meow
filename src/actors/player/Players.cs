@@ -111,13 +111,9 @@ public sealed partial class World {
 
     /// <summary>Selects a carried tool in hand without a hotbar slot, or with "" empties the hand; the server keeps it, so a save has it.</summary>
     public void SelectInHand(string tool) {
-        int lantern = Lanterns.Id(tool);
-        if (lantern != 0) {
-            if (Lanterns.Carried(lantern) is not string carried) return;
-            tool = carried;
-        } else if (tool != "" && (!(Data.Items.TryGetValue(tool, out var def) && def.Tool != "") || S.Backpack[tool] == 0)) return;
+        if (tool != "" && (!(Data.Items.TryGetValue(tool, out var def) && def.Tool != "") || S.Backpack[tool] == 0)) return;
         S.InHand = tool;
-        if (!Forwarded(Verb.SelectInHand, item: tool) && lantern != 0) PutOutTorch();
+        Forwarded(Verb.SelectInHand, item: tool);
     }
 
     /// <summary>Remembers in the save that its owner has seen the ending.</summary>
@@ -147,6 +143,7 @@ public sealed partial class World {
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
             case Verb.TakeUpPipe: Construction.TakeUpPipe(Terrain.TileAt(c.At)); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At, c.Rotation)); break;
+            case Verb.ToggleLanternInHand: Lanterns.ToggleInHand(c.Target); break;
             case Verb.PlaceLantern: Preferring(S.Backpack, c.Count, () => Lanterns.Place(c.Item, c.At, c.Rotation)); break;
             case Verb.RefillLantern: if (c.Target == 0 || t != null) Preferring(S.Backpack, (int)c.At.X, () => Lanterns.Refill(c.Other, t, c.Count)); break;
             case Verb.PlaceBarrel: Preferring(S.Backpack, c.Count, () => PlaceBarrel(c.Item, c.At, c.Rotation)); break;

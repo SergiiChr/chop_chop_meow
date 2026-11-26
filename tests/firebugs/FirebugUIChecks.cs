@@ -13,6 +13,7 @@ public partial class Game {
         await TestClean(CheckARightClickOnAFirebugSwingsTheNetAtIt);
         await TestClean(CheckAShovelDigsTheGroundAFirebugHoversOver);
         await TestClean(CheckFirebugStackShowsAverageRemainingLife);
+        await TestClean(CheckPackedCrateShowsTheCountAfterOnlySomeFirebugsDie);
         await TestClean(CheckRecipeMapShowsHowToCatchFirebugsAndHowLongTheyLive);
     }
 
@@ -38,6 +39,28 @@ public partial class Game {
             $"two firebugs with 48 hours left and two with 72 should average 60 hours, got {hint}");
         await CloseWithEsc();
         Drop(Hosted, Firebugs.Item); await Frames();
+    }
+
+    private async Task CheckPackedCrateShowsTheCountAfterOnlySomeFirebugsDie() {
+        float caught = Hosted.Time;
+        Give(Hosted, "crate"); GiveFirebugs(Hosted, 1);
+        RunUntil(Hosted, caught + Hosted.Data.DaySeconds);
+        GiveFirebugs(Hosted, 1);
+        var packedBefore = world.Backpack.Items.Keys.Where(World.IsPacked).ToHashSet();
+        Require(Hosted.MoveInCrate(0, Firebugs.Item, 2, true) == 2, "both firebugs should fit in the same crate");
+        string packed = Hosted.Backpack.Items.Keys.Single(item => World.IsPacked(item) && !packedBefore.Contains(item));
+        await KeyStroke(Key.Tab);
+        await Until(() => bag.Visible && world.Backpack[packed] == 1, "the packed crate entering the backpack");
+        string bug = world.Data.Name(Firebugs.Item);
+        var cell = BagCell(c => c.TooltipText.StartsWith(world.Data.Name("crate") + " of ", System.StringComparison.Ordinal)
+            && c.TooltipText.Contains($"2 {bug}"));
+        Require(cell.TooltipText.Contains($"2 {bug}"), "the unopened crate should report both firebugs");
+        RunUntil(Hosted, caught + 3 * Hosted.Data.DaySeconds);
+        await Until(() => cell.TooltipText.Contains($"1 {bug}"), "the unopened crate reporting only the living firebug", 3);
+        Require(world.Backpack[packed] == 1, "the crate should keep the same item identity until its last firebug dies");
+        await CloseWithEsc();
+        Require(Hosted.MoveInCrate(World.PackedId(packed), Firebugs.Item, 1, false) == 1, "the surviving bug should unpack");
+        Drop(Hosted, Firebugs.Item); Drop(Hosted, "crate", 1);
     }
 
     private async Task CheckARightClickWithTheBugNetSelectedSwingsIt() {

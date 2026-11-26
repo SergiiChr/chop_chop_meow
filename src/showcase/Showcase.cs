@@ -189,7 +189,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.Player = carried ? at : at + new Vector2(-2.2f, -2.2f);
         if (scene is "belt" or "full-belt") {
             for (int i = 0; i < (scene == "belt" ? 2 : 9); i++) world.SetHotbar(i, GiveLantern(i == 0 ? 10 : 4));
-        } else if (scene == "held") world.SelectInHand(GiveLantern(10));
+        } else if (scene == "held") world.Lanterns.ToggleInHand(Lanterns.Id(GiveLantern(10)));
         else if (scene == "backpack") {
             GiveLantern(0);
             world.Firebugs.GiveForReview(world.S.Backpack, Lanterns.Capacity);

@@ -22,6 +22,10 @@ public partial class Game {
         Signal("lantern-filled");
         await Until(() => Hosted.Find(placed.Id) == null && guest.Backpack.Items.Any(p => Hosted.Lanterns.BugCount(p.Key) == 3),
             "the guest lifting the lantern with its three firebugs");
+        await Until(() => Lanterns.InHand(guest) is string held && Lanterns.Id(held) == Lanterns.Id(empty)
+            && Hosted.Me.LanternInHand == 0, "only the guest taking their lantern in hand");
+        Signal("lantern-held");
+        await Until(() => guest.LanternInHand == 0, "the guest stowing their lantern");
     }
 
     private async Task GuestPlacesAndFillsALantern() {
@@ -45,5 +49,13 @@ public partial class Game {
         await Click(FindButton(panel, "Pick up")!);
         await Until(() => world.Lanterns.Carried(Lanterns.Id(item)) is string packed && world.Lanterns.BugCount(packed) == 3 && !panel.Visible,
             "the guest taking the filled lantern back into the backpack");
+        string carried = world.Lanterns.Carried(Lanterns.Id(item))!;
+        await KeyStroke(Key.Tab);
+        await DoubleClick(BagCellOf(carried));
+        await Until(() => Lanterns.InHand(world.Me) == carried, "the guest seeing their lantern in hand");
+        await Signaled("lantern-held");
+        await KeyStroke(Key.Tab);
+        await DoubleClick(BagCellOf(carried));
+        await Until(() => world.Me.LanternInHand == 0, "the guest seeing their lantern stowed");
     }
 }

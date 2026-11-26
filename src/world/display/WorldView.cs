@@ -971,7 +971,7 @@ public partial class WorldView : Node3D {
     /// <summary>A player's arms follow the wolves holding them and ease free as the player stands or falls.</summary>
     private void PosePlayer(ActorRig rig, ActorState state, PlayerState who, ref (float PullL, float PullR) pull,
         float downed, string? tool, DoorShown? door, StrawBedView sleep, float dt) {
-        string? equipped = LanternWear.InHand(who);
+        string? equipped = Lanterns.InHand(who);
         bool holdLantern = false;
         if (!sleep.Show(rig, state, who, World.Find(who.SleepingAt), dt)) {
             float bedHeight = door == null && downed == 0 ? BedHeightAt(state.Position) : 0;

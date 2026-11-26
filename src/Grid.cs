@@ -69,7 +69,7 @@ public partial class PagePanel {
         }
         // What each slot last drew: its stack, the inventory's total of that item and whether the stack is bound to the hotbar. A slot is redrawn only when they change.
         var current = new System.Collections.Generic.List<(string Item, int Count)>();
-        var drawn = new (string? Item, int Count, int Total, bool Bound, int Life, bool Dark)[cells.Length];
+        var drawn = new (string? Item, int Count, int Total, bool Bound, int Life, bool Dark, int PackedCount)[cells.Length];
         live.Add(() => {
             var held = inventory();
             held.FillStacks(current);
@@ -79,8 +79,8 @@ public partial class PagePanel {
                 stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
                 bool bound = i < held.Layout.Count && held.Layout[i].Hotbar != 0;
                 var looks = stacks[i] is (string item, int n)
-                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) && world.Lanterns.BugCount(item) == 0)
-                    : ((string?)null, 0, 0, false, -1, false);
+                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) && world.Lanterns.BugCount(item) == 0, world.Packed(item)?.Count ?? 0)
+                    : ((string?)null, 0, 0, false, -1, false, 0);
                 if (first || looks != drawn[i]) {
                     drawn[i] = looks;
                     Redraw(cell, count, stacks[i], held, bound, drawn[i].Life);
@@ -106,7 +106,7 @@ public partial class PagePanel {
             // A backpack stack bound to the hotbar has the selected hotbar slot's rim.
             cell.AddThemeStyleboxOverride("normal", takes || bound ? Style.SlotWanted : Style.SlotNormal);
             string clicks = open != null && stack is (string itemToOpen, _) && Lanterns.IsItem(itemToOpen)
-                ? "LMB: pick up · RMB: open for refill · Double LMB: take in hand" : hint;
+                ? "LMB: pick up · RMB: open for refill · Double LMB: take in hand or stow" : hint;
             string expiry = life < 0 ? "" : "\n" + PageText.FirebugLife(life);
             cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}{expiry}\n{clicks}" : "";
         }

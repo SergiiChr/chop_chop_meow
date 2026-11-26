@@ -75,15 +75,15 @@ internal static class LanternModelChecks {
             Require(wear.Belt[0].BugsShown == 10 && wear.Belt[1].BugsShown == 4
                 && Mathf.IsEqualApprox(wear.Belt[0].Light.LightEnergy, 1.2f) && Mathf.IsEqualApprox(wear.Belt[1].Light.LightEnergy, .48f),
                 "each belt lantern should only shine with its own firebugs");
-            world.SelectInHand(first);
+            world.Lanterns.ToggleInHand(Lanterns.Id(first));
             rig.Show(new Pose(RaiseL: 30, OutL: 4, ElbowL: 60), null, false);
             Vector3 fist = rig.Fist(left: true);
-            wear.Sync(world, world.Me, LanternWear.InHand(world.Me), fist, 1);
+            wear.Sync(world, world.Me, Lanterns.InHand(world.Me), fist, 1);
             Require(wear.Hand.Node.Visible && wear.Hand.Light.Visible && (wear.Hand.Node.Transform * (Vector3.Up * LanternShape.GripHeight)).IsEqualApprox(fist),
                 "the lantern in the left hand should light and hang directly from the fist");
             Require(!((Node3D)wear.Belt[0].Node.GetParent()).Visible && ((Node3D)wear.Belt[1].Node.GetParent()).Visible,
                 "the lantern in hand should no longer hang from its hotbar hook but the other should");
-            wear.Sync(world, world.Me, LanternWear.InHand(world.Me), null, 1);
+            wear.Sync(world, world.Me, Lanterns.InHand(world.Me), null, 1);
             Require(!wear.Hand.Node.Visible && ((Node3D)wear.Belt[0].Node.GetParent()).Visible && wear.Belt[0].Light.Visible,
                 "when the hand is busy the lantern should keep its light at the belt");
         } finally { rig.Root.Free(); }
@@ -99,12 +99,12 @@ internal static class LanternModelChecks {
         world.Tick(0);
         string extra = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 10);
         Give(world, extra);
-        world.SelectInHand(extra);
+        world.Lanterns.ToggleInHand(Lanterns.Id(extra));
         var rig = new ActorRig(ActorSkin.Player);
         var wear = rig.Lanterns!;
         try {
             rig.Show(new Pose(), null, false);
-            wear.Sync(world, world.Me, LanternWear.InHand(world.Me), null, 1);
+            wear.Sync(world, world.Me, Lanterns.InHand(world.Me), null, 1);
             Require(wear.Belt.Count(lantern => ((Node3D)lantern.Node.GetParent()).Visible && lantern.Light.Visible) == 10,
                 "using that hand should hang its lantern next to the nine hotbar lanterns without turning any off");
             int triangles = LanternModelSteps.VisibleTriangles(rig.Root);

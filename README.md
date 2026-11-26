@@ -1253,8 +1253,8 @@ It takes up to ten, shortest lives first. Putting a firebug in a lantern does no
 The jar glows from inside. Its light dims as firebugs die, and you can add more at any time as long as there is room.
 A full lantern is 20% brighter than a torch, with a green hue. Lanterns do not scare wolves.
 
-Double-click a lantern to take it in hand. This puts out any lit torch.
-While your hands are needed for work, the lantern hangs from your belt and keeps shining.
+Double-click a lantern to take it in hand and put out any lit torch. Double-click it again to stow it.
+You can still select tools. While your hands are needed for work, the lantern hangs from your belt and keeps shining.
 Every lantern bound to a hotbar slot hangs from your belt and lights the way without having to select it.
 A lantern tucked away in the backpack or storage does not light the way, but its firebugs still age.
 Open a carried lantern and choose **Put it down** to place it, or open a placed one and choose **Pick up**.

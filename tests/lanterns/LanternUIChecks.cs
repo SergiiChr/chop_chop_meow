@@ -22,12 +22,27 @@ public partial class Game {
         await Until(() => world.TorchLit, "the torch being lit before the lantern is taken in hand", 5);
         await KeyStroke(Key.Tab);
         await RightClick(BagCellOf(lantern));
-        Require(panel.Page == Page.Lantern && world.InHand == "" && world.TorchLit,
+        Require(panel.Page == Page.Lantern && world.Me.LanternInHand == 0 && world.TorchLit,
             "right-clicking a lantern in the backpack should only open its refill page");
         await DoubleClick(BagCellOf(lantern));
-        await Until(() => world.InHand == lantern && !world.TorchLit && !panel.Visible && !bag.Visible,
-            "the lantern in hand replacing the lit torch", 3);
+        var wear = view.PlayerRig.Lanterns!;
+        await Until(() => Lanterns.InHand(world.Me) == lantern && !world.TorchLit && !panel.Visible && !bag.Visible
+            && wear.Hand.Light.IsVisibleInTree(), "the lantern in hand replacing the lit torch", 3);
         Require(world.Backpack["torch"] >= torch, "taking the lantern in hand should put out the torch without consuming it");
+
+        string previous = world.HotbarItem(8);
+        Give(Hosted, "bug_net"); SetHotbarSlot(Hosted, 8, "bug_net");
+        await KeyStroke(Key.Key9);
+        await ClickGround(MouseButton.Right);
+        await Until(() => view.PlayerAnimation == ActorAction.NetSwing && !wear.Hand.Light.IsVisibleInTree()
+            && wear.Belt.Any(lamp => lamp.Light.IsVisibleInTree()), "the unbound lantern lighting the way from the belt during the net swing", 3);
+        await Until(() => view.PlayerAnimation != ActorAction.NetSwing && wear.Hand.Light.IsVisibleInTree()
+            && !wear.Belt.Any(lamp => lamp.Light.IsVisibleInTree()), "the lantern returning to the hand after the net swing", 3);
+        await KeyStroke(Key.Tab);
+        await DoubleClick(BagCellOf(lantern));
+        await Until(() => world.Me.LanternInHand == 0 && !wear.Hand.Light.IsVisibleInTree(), "the second double-click stowing the lantern", 3);
+
+        Drop(Hosted, "bug_net"); SetHotbarSlot(Hosted, 8, previous);
         await KeyStroke(Key.Key1);
         Drop(Hosted, lantern); Drop(Hosted, "torch", torch);
         await Frames();
@@ -56,6 +71,8 @@ public partial class Game {
         Require(heldBefore >= 12, "the cursor should hold enough firebugs for a fill and an overflow");
         await RightClick(slot);
         await Until(() => world.Lanterns.BugCount(lantern) == 1 && panel.HeadingTitle.Text == "Lantern", "the first firebug filling and renaming the lantern", 4);
+        Require(slot.TooltipText.StartsWith("Average life left", System.StringComparison.Ordinal),
+            "checking the lantern's firebug stack should show its average remaining life");
         await RightClick(slot);
         await Until(() => world.Lanterns.BugCount(lantern) == 2 && OnPage("lantern_firebug_count") is Label { Text: "2/10" }, "the second firebug updating the count", 4);
         await Click(slot);
