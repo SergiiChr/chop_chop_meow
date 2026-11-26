@@ -270,13 +270,13 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    /// <summary>Undiscovered entries remain anonymous and do not open an Item tree until discovered.</summary>
+    /// <summary>Undiscovered entries on the map and in its details remain anonymous and do not open an Item tree.</summary>
     private async Task CheckUndiscoveredMapItemsStayAnonymous() {
         await OpenRecipeMap();
         var barrel = (ItemSlot)RecipeMapCard("steel_barrel");
-        Require(HasLabel(barrel, "?") && !HasLabel(barrel, "Steel barrel") &&
-            !barrel.FindChildren("*", "TextureRect", true, false).OfType<TextureRect>().Any(icon => icon.Texture != null) &&
-            !barrel.TooltipText.Contains("Steel barrel"), "An undiscovered entry must show a question mark without a name or icon.");
+        Require(HasLabel(barrel, "?") && !HasLabel(barrel, "Steel barrel") && !ShowsIcon(barrel) &&
+            !barrel.TooltipText.Contains("Steel barrel"),
+            "An undiscovered entry must show a question mark without a name or icon.");
         Require(recipeMap.NodeOf("steel_barrel")!.FindChild("also_steel_parts", true, false) == null,
             "An undiscovered recipe must not expose ingredients as map chips.");
         await Click(barrel);
@@ -300,24 +300,30 @@ public partial class Game {
         await Click(thumbnail, alt: true);
         Require(recipeMap.FindChild("item_tree", true, false) == null,
             "Alt-clicking an undiscovered thumbnail must stay on the main map.");
-        await Click(sheet, alt: true);
+        await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>An open Item tree hides an undiscovered product and shows it once the product is discovered.</summary>
+    private async Task CheckDiscoveryRevealsAProductInTheOpenItemTree() {
+        await OpenRecipeMap();
+        await Click(RecipeMapCard("steel_sheet"), alt: true);
         await ItemTreeShows("steel_sheet");
         var product = (ItemSlot)ItemTreeCard("steel_barrel")!;
         var bottle = ItemTreeCard("empty_bottle")!;
-        Require(HasLabel(product, "?") && !product.TooltipText.Contains("Steel barrel") &&
-            !product.FindChildren("*", "TextureRect", true, false).OfType<TextureRect>().Any(icon => icon.Texture != null) &&
-            HasLabel(bottle, "Bottle"), "The Item tree must distinguish undiscovered products from known ones.");
+        Require(HasLabel(product, "?") && !product.TooltipText.Contains("Steel barrel") && !ShowsIcon(product) &&
+            HasLabel(bottle, "Bottle"),
+            "The Item tree must distinguish undiscovered products from known ones.");
         var tree = recipeMap.FindChild("item_tree", true, false);
         await Click(product, alt: true);
         Require(recipeMap.FindChild("item_tree", true, false) == tree,
             "Alt-clicking an undiscovered product must stay in the current Item tree.");
         Achieve(Hosted, "steel_barrel");
-        await Until(() => HasLabel(product, "Steel barrel") &&
-            product.FindChildren("*", "TextureRect", true, false).OfType<TextureRect>().Any(icon => icon.Texture != null),
+        await Until(() => HasLabel(product, "Steel barrel") && ShowsIcon(product),
             "the newly discovered barrel showing its name and icon in the open Item tree", 2);
         await Click(product, alt: true);
         await ItemTreeShows("steel_barrel");
         await Click((Control)recipeMap.FindChild("item_tree_root_steel_barrel", true, false));
+        var details = recipeMap.FindChild("map_details", true, false);
         await Until(() => recipeMap.Chosen == "steel_barrel" && HasLabel(details, "Steel barrel") && HasLabel(details, "Made at"),
             "the discovered barrel's recipe appearing in the main map", 2);
         Require(recipeMap.NodeOf("steel_barrel")!.FindChild("also_steel_parts", true, false) is Button { Icon: not null },

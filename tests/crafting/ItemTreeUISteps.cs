@@ -14,6 +14,9 @@ public partial class Game {
     private Control RecipeMapCard(string item) => (Control)recipeMap.NodeOf(item)!.FindChild("slot", true, false);
     private Control? ItemTreeCard(string item) => recipeMap.FindChild($"tree_item_{item}", true, false) as Control;
 
+    private static bool ShowsIcon(Control card) =>
+        card.FindChildren("*", "TextureRect", true, false).OfType<TextureRect>().Any(icon => icon.Texture != null);
+
     private string[] ItemTreeActionsShown() =>
         recipeMap.FindChild("item_tree_role_Actions", true, false)?.FindChildren("*", "Label", true, false)
             .OfType<Label>().Select(label => label.Text).Where(text => text != "Actions").ToArray() ?? [];

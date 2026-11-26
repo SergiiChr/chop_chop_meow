@@ -57,7 +57,7 @@ internal static class ItemTreeActions {
         if (World.IsCrate(item)) yield return "Store and transport goods";
         if (Barrel.Is(item)) {
             yield return "Store water or jam";
-            if (Barrel.LiquidOf(item) == Water.Liquid) yield return "Mount on a cabin roof";
+            yield return "Mount on a cabin roof";
         }
         if (data.VesselOf(item) != null) yield return "Transport liquids";
         if (data.VesselFor(item) == null) yield break;
