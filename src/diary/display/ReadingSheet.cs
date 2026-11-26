@@ -4,13 +4,14 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// One diary day opened large in the middle of the screen: a sheet of paper with the day written on it by hand,
+/// One diary day opened large in the middle of the screen: a white sheet shaped like the page model, with the day written on it by hand,
 /// falling apart where it was written in the dark and scribbles where it cannot be read.
 /// The close button, Esc or a click beside the sheet closes it.
 /// Opening a day marks it read.
 /// </summary>
 public partial class ReadingSheet : Control {
-    private static readonly StyleBoxFlat Paper = Style.Flat(Style.DiaryPaper, 6, 34, new Color("cdbf9c"), 2);
+    private static readonly StyleBoxFlat Paper = Style.Flat(Colors.White, 0, 34);
+    private const float Width = 620;
     // Loaded with the game and kept, so the text that draws them by path finds them in the cache rather than loading them as a day opens.
     private static readonly Texture2D ScribbleWord = GD.Load<Texture2D>("res://assets/ui/scribble_word.svg"), ScribbleLine = GD.Load<Texture2D>("res://assets/ui/scribble_line.svg");
     private readonly UiKit kit;
@@ -28,7 +29,7 @@ public partial class ReadingSheet : Control {
         this.kit = kit;
         Name = "diary_sheet"; Visible = false;
         title = Style.Text("", 44, Style.DiaryInk, Style.HandBold);
-        var (shade, column) = kit.Window(this, 620, Paper, title, Close, "diary_sheet_close", 14);
+        var (shade, column) = kit.Window(this, Width, Paper, title, Close, "diary_sheet_close", 14, Width * PageShape.Tallness);
         // A turn of the mouse wheel is no click beside the sheet.
         shade.GuiInput += ev => { if (ev is InputEventMouseButton { Pressed: true, ButtonIndex: not (MouseButton.WheelUp or MouseButton.WheelDown or MouseButton.WheelLeft or MouseButton.WheelRight) }) Close(); };
         text = new RichTextLabel { BbcodeEnabled = true, FitContent = true, ScrollActive = false, SelectionEnabled = false, MouseFilter = MouseFilterEnum.Ignore };

@@ -13,6 +13,8 @@ public static class PageShape {
     public const string Icon = "diary_page";
     /// <summary>The sheet's width and length in metres, the size of the reference's sheets.</summary>
     private const float Width = .25f, Length = .34f;
+    /// <summary>How many times taller than wide the sheet is, which a day opened large is too.</summary>
+    public const float Tallness = Length / Width;
     /// <summary>How far its sides curl up above its middle.</summary>
     private const float Cup = .018f;
     private const int Across = 5, Along = 6;
@@ -30,7 +32,7 @@ public static class PageShape {
     private const float Tilt = 35;
 
     private static readonly StandardMaterial3D Paper = TwoSided(Cloth("ece3c8", .9f));
-    private static readonly StandardMaterial3D Ink = TwoSided(Mat("3f4a5e", .7f));
+    private static readonly StandardMaterial3D Ink = TwoSided(Mat(Style.DiaryInk.ToHtml(false), .7f));
     private static ArrayMesh? sheet, writing;
 
     /// <summary>A copy of a shared material seen from both sides, leaving the shared one as it was.</summary>

@@ -81,16 +81,16 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
     }
 
     /// <summary>
-    /// Makes <paramref name="screen"/> a window over the dimmed screen: a box at least <paramref name="width"/> wide in the
+    /// Makes <paramref name="screen"/> a window over the dimmed screen: a box at least <paramref name="width"/> wide and <paramref name="height"/> tall in the
     /// middle, holding a header of <paramref name="title"/> with a close button, over a column for what the window shows.
     /// Gives the shade, which a press beside the box lands on, and the column.
     /// </summary>
-    public (ColorRect Shade, VBoxContainer Column) Window(Control screen, float width, StyleBox box, Label title, Action close, string closeName, int separation) {
+    public (ColorRect Shade, VBoxContainer Column) Window(Control screen, float width, StyleBox box, Label title, Action close, string closeName, int separation, float height = 0) {
         screen.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         var shade = new ColorRect { Color = new Color(Style.Line, .55f) };
         shade.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); screen.AddChild(shade);
         var center = new CenterContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; center.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); screen.AddChild(center);
-        var board = new PanelContainer { CustomMinimumSize = new Vector2(width, 0) };
+        var board = new PanelContainer { CustomMinimumSize = new Vector2(width, height) };
         board.AddThemeStyleboxOverride("panel", box); center.AddChild(board);
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", separation); board.AddChild(column);
         var header = new HBoxContainer(); column.AddChild(header);

@@ -42,8 +42,8 @@ public static class Style {
     /// <summary>Handwriting, for the diary.</summary>
     public static readonly Font Hand = Weighted("res://assets/fonts/Caveat.ttf", 500), HandBold = Weighted("res://assets/fonts/Caveat.ttf", 700);
     /// <summary>The diary's ink.</summary>
-    public static readonly Color DiaryInk = new("33405a");
-    /// <summary>The colour of the diary's paper, in its cells and on a day opened large.</summary>
+    public static readonly Color DiaryInk = new("3f4a5e");
+    /// <summary>The colour of the diary's paper in its cells.</summary>
     public static readonly Color DiaryPaper = new("f3ead2");
 
     private static Font Weighted(string path, int weight) {
