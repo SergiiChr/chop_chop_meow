@@ -356,10 +356,10 @@ public static class WolfChecks {
         SafeTick(world, smeller.HowlLength - .3f);
         Require(smeller.Pos == at, "a howling wolf should stand still");
         SafeTick(world, .5f);
-        Require(smeller.Pos.DistanceTo(world.Player) < at.DistanceTo(world.Player) && smeller.Chase <= 0, "after its howl a wolf should close in without sprinting while the player is out of its sight");
+        Require(smeller.Pos.DistanceTo(world.Player) < at.DistanceTo(world.Player) && !smeller.Galloping, "after its howl a wolf should close in without sprinting while the player is out of its sight");
         for (int i = 0; i < 100 && smeller.Pos.DistanceTo(world.Player) > data.WolfSightRange - .5f; i++) { SafeTick(world, .1f); SetNeeds(world, health: 100); }
         SafeTick(world, .1f);
-        Require(smeller.Chase > 0, "a wolf should sprint once it can see the player");
+        Require(smeller.Galloping, "a wolf should sprint once it can see the player");
         Require(heard.Count(name => name == "wolf_growl_distance") == 1, "a wolf should growl once as it breaks into a sprint");
         for (int i = 0; i < 400 && called.Target == 0; i++) { SafeTick(world, .1f); SetNeeds(world, health: 100); }
         Require(called.Target == world.Me.Id, $"a wolf answering a howl should smell the player on its way and go after them too");
@@ -396,9 +396,9 @@ public static class WolfChecks {
                 "a wolf whose player took shelter should drop its howl and flight and patrol");
         // A wolf whose player left the game lets go of them; out of sight of the one still playing, it howls before it hunts them.
         var gone = NightWorld(data);
-        var feeder = PlaceWolf(gone, new Wolf { Pos = gone.Player + new Vector2(20, 0), Target = 999, Feeding = true, Pinning = true, Leap = 1, Chase = 3 });
+        var feeder = PlaceWolf(gone, new Wolf { Pos = gone.Player + new Vector2(20, 0), Target = 999, Feeding = true, Pinning = true, Leap = 1, Galloping = true });
         SafeTick(gone, .1f);
-        Require(feeder.Target != 999 && !feeder.Feeding && !feeder.Pinning && feeder.Leap == 0 && feeder.Chase == 0,
+        Require(feeder.Target != 999 && !feeder.Feeding && !feeder.Pinning && feeder.Leap == 0 && !feeder.Galloping,
                 "a wolf whose player left should stop feeding, leaping and chasing");
         // A pinned player goes free when the wolf heads home before dawn.
         var dawn = NightWorld(data);

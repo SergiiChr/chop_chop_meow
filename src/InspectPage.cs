@@ -14,6 +14,7 @@ public static class InspectPage {
             null => new NothingSelectedPage(tools),
             { Kind: ThingKind.Hole } t => new HolePanel(tools, t),
             { IsResource: true } t => new ResourcePanel(tools, t),
+            { Kind: ThingKind.StrawBed } bed => new StrawBedPanel(tools, bed),
             { Kind: ThingKind.Hut } t => new CabinPanel(tools, t),
             { Kind: ThingKind.Signpost } t => new MarketPanel(tools, t),
             { Kind: ThingKind.Mine } t => new MinePanel(tools, t),

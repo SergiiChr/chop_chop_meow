@@ -7,11 +7,11 @@ namespace ChopChopMeow;
 /// <summary>
 /// Developer review fixture for <c>--wolf-scene</c>: wolves by a cabin at dusk, moved by a script and run by the game's own
 /// rules, for a look at how they turn on a patrol, turn to a player they smell and howl, feed on one they brought down,
-/// follow one who waved a torch at them, and fight one with an axe.
+/// follow one who waved a torch at them, charge through a campfire as a pack, and fight one with an axe.
 /// </summary>
 public sealed partial class WolfReview : Node {
     /// <summary>The scenes <c>--wolf-scene</c> takes.</summary>
-    public static readonly string[] Scenes = { "patrol", "howl", "feast", "follow", "rout", "stand", "fight" };
+    public static readonly string[] Scenes = { "patrol", "howl", "feast", "follow", "campfire", "rout", "stand", "fight" };
     public World World = null!;
     public WorldView View = null!;
     public Thing Cabin = null!;
@@ -49,6 +49,7 @@ public sealed partial class WolfReview : Node {
                 (0, () => { Torch(open); Hunters(new Vector2(7, 1), new Vector2(7.5f, -1), new Vector2(8, 2.5f)); }),
                 (.8f, () => World.UseTorch(Vector2.Right)),
             },
+            "campfire" => new (float, Action)[] { (0, () => Campfire(open)) },
             // One wolf follows a player with a torch; they walk at it, it stands braced, and at 2 m it runs out of their sight.
             "rout" => new (float, Action)[] {
                 (0, () => { Torch(open); Hunters(new Vector2(6, 0)); }),
@@ -81,6 +82,14 @@ public sealed partial class WolfReview : Node {
 
     /// <summary>Puts wolves that hunt the player at spots from where the player stands.</summary>
     private void Hunters(params Vector2[] from) { foreach (var spot in from) World.S.Wolves.Add(new Wolf { Pos = World.Player + spot, Target = World.Me.Id }); }
+
+    /// <summary>Four hunters circle a fire while a fifth closes on the ring from farther out.</summary>
+    private void Campfire(Vector2 open) {
+        World.Player = open;
+        World.Add(ThingKind.Campfire, open + new Vector2(.9f, -.65f)).Burn = World.Data.CampfireSeconds;
+        World.S.Backpack.Remove("steel_axe", World.S.Backpack["steel_axe"]);
+        Hunters(new(-5.8f, 1), new(-2.7f, -5.6f), new(5.7f, -2), new(2.6f, 5.7f), new(-4, 15));
+    }
 
     /// <summary>Stands the player at a spot with a lit torch in hand.</summary>
     private void Torch(Vector2 at) { World.Player = at; World.S.Backpack.Add("torch", 1); World.UseTorch(Vector2.Zero); World.Tick(World.KindleSeconds); }

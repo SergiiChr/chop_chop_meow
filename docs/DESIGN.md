@@ -62,7 +62,7 @@ These came from the user; change them only after asking.
   turns red under the mouse and one click takes it down, with no question. Right-click switches layers and Esc exits.
   Building pages have no take-down button.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
-- **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
+- **Survival:** food, water, day and night, wolves that fear light, sleeping in cabins or straw beds, wages, saves and recovery after death.
 - **Wolves:** the same every night, never stronger or faster with the days; three or four bites bring a healthy player to half health. After the five let out at dusk, one den picked at random lets one more out every hour.
 - **Canning:** meat stew and jam are canned; raw meat is not, and sells in crates as it is.
 - **Saves:** a save from another version is refused, and no code converts old saves; the user's own save is fixed by hand when asked.
@@ -180,10 +180,11 @@ UI and input:
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
+| `src/ui/DayDial.cs` | The sun and moon on the clock's arc, with the next tide forecast on the moon |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/mines/display/MinePanel.cs` | The mine's building steps, miners and outputs |
-| `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream slots, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
+| `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream slots, brick for what is active or wanted, Fredoka and Nunito) and the heat and cart-road dials |
 | `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what outlasts a page |
 | `src/BackpackDrawer.cs` | The backpack drawer above the hotbar |
 | `src/InspectPage.cs` | Picks the page for the selected thing or worker, and `ThingPage`, the base of a page about one thing |
@@ -209,7 +210,10 @@ UI and input:
 | `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
-| `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, sleep and the needs a night would leave |
+| `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, the roof barrel and the shared sleep controls |
+| `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, accelerated time, outdoor bed expiry and salvage |
+| `src/rest/display/SleepPage.cs`, `src/rest/display/StrawBedPanel.cs` | Shared sleep controls and the straw bed’s remaining life |
+| `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The straw bed and a player lowering onto it or getting up, transferring weight from boots to a palm, then the hip and forearm |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
 | `src/workers/breaks/BreakSeats.cs` | Reserves campfire and ground seats for workers at lunch or with nothing to do, and lights the campfires they sit at |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
@@ -222,7 +226,7 @@ UI and input:
 | `src/actors/enemies/wolf/WolfHunt.cs` | The pack hunting a player: howling, closing in, leaping, pinning and backing off from firelight |
 | `src/actors/enemies/wolf/WolfSnap.cs` | A wolf's bite: planting its paws, leaping on a fixed line and closing its jaws |
 | `src/actors/enemies/wolf/WolfCounter.cs` | A struck wolf's sideways hop, skid, run, bound behind the attacker and pivot |
-| `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: wolves a torch scared off circling a player, bracing when walked at, running or standing their ground |
+| `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: campfire and torch circles, and a torch follower bracing, running or standing its ground |
 | `src/actors/player/Swings.cs`, `src/actors/player/model/Swing.cs`, `src/actors/player/model/SwingShape.cs` | Players' swings at wolves: when a swing lands, the ground its blade, flame or fist passes over, and the wolves it touches |
 | `src/actors/enemies/wolf/model/Wolf.cs` | `Wolf`, a wolf as the world saves it |
 | `src/actors/enemies/wolf/model/Den.cs` | `Den`, a wolf den's mouth, door and clearance |
@@ -323,7 +327,7 @@ Checks and review tools:
 | `src/performance/PerformanceRoute.cs` | The run's sprint from the beach past the camp and the lake to the valley's top corner |
 | `src/performance/ResidentMemory.cs`, `src/performance/model/PerformanceSample.cs` | Reading resident memory without allocating, and one sampled frame |
 | `src/cabins/DoorwayReview.cs` | The `--doorway` scenes: two players and wolves at a cabin's door, outside it or inside behind it, moved by a script and run by the game's rules |
-| `src/actors/enemies/wolf/WolfReview.cs` | The `--wolf-scene` scenes: wolves turning on a patrol, turning to a player they smell and howling, feeding on one they brought down, following one with a torch, and fighting one with an axe |
+| `src/actors/enemies/wolf/WolfReview.cs` | The `--wolf-scene` scenes: wolves turning on a patrol, turning to a player they smell and howling, feeding on one they brought down, following one with a torch, assembling a pack at a campfire, and fighting one with an axe |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
 | `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
 | `src/intro/display/CatgirlPage.cs` | The web page on the hero's screen in the film: three catgirls dancing inside a browser window |
@@ -383,7 +387,7 @@ A host-made move such as a respawn bumps `PlayerState.Warp`, so it wins over the
 
 Shared rules:
 
-- Sleep needs every player sheltered.
+- Sleep is individual. The clock runs faster only while every present player is asleep and no sleeper outside a locked cabin hears a wolf.
 - Wolves each hunt one player (`Wolf.Target`).
 - Messages reach the acting player unless they concern everyone.
 
@@ -413,7 +417,7 @@ The welcome is a guest's first update, with the fog uncovered so far.
 - An action's result comes back with a later update. A window checks what it can before sending, and `Net.Made` names a new mine or worker so the panel opens on it. Panels refresh with every update while `Net.AwaitingAnswer` holds, and a page draws itself again when what sets its layout changes (`PagePanel.RedrawOnChange`), since drawing it right after an action would show the world before the answer.
 - Leaving waits for the server to confirm before the line closes, so actions still in flight arrive; the owner's server closes instead, and the line going is the confirmation.
 - Joining another game from your own autosaves it and leaves with `Game.StepAway`, which keeps its server up: a failed or cancelled join goes back to it, and after a good one it ends with nobody in it, 30 seconds later.
-- A window applies updates thirty times a second and draws more often, so a motion the view drives from a count the server keeps runs on its own clock in between (`LocalClock`): a stump or bush leaning as it is dug, a thrown wolf carcass, a mine's hole and frame, a forge's heat and gauge, a cart's trip and the time of day the sun and light show. The clock moves every drawn frame at the rate the count last ran at against the world's clock; an update makes up a small difference over the next frames without turning the motion back, and a big one, such as a pump of the bellows or a sleep that skips the night, is taken at once.
+- A window applies updates thirty times a second and draws more often, so a motion the view drives from a count the server keeps runs on its own clock in between (`LocalClock`): a stump or bush leaning as it is dug, a thrown wolf carcass, a mine's hole and frame, a forge's heat and gauge, a cart's trip and the time of day the sun and light show. The clock moves every drawn frame at the rate the count last ran at against the world's clock; an update makes up a small difference over the next frames without turning the motion back, and a big one, such as a pump of the bellows or skipping to dawn from the recovery screen, is taken at once.
 - A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key. It goes on trying while the server says the game is not open yet, as after the host loads a save.
 - Until the owner opens the game, the server refuses peers that are not on this computer. Only the owner can save; any player can hold the world, and it stands still while all of them do.
 - The server's welcome says whether the player owns the game, from their machine's key, so an owner who types their own game's address into the join popup still owns it.
@@ -652,10 +656,9 @@ The cabin offers Haul only while a barrel is mounted.
 The window advances the visible haul phase between server updates through `LocalClock`.
 Construction keeps the ladder approach on dry ground and clear of other buildings.
 
-Before the night advances, players inside each cabin draw enough liters to fill their thirst in cabin-entry order.
-They then fill bottles in the same order.
-On waking, the players draw from any water left in the barrel.
-The sleep gate uses what a player can drink before sleep, and the dawn preview includes what they can drink on waking.
+A player who sleeps in a cabin drinks from the roof barrel, leaving water for earlier occupants who have not turned in.
+Sleepers fill bottles when the clock speeds up, or at dawn if time runs normally.
+On waking, sleepers drink from what is left, in cabin-entry order when they wake together.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
 It advances normal simulation through dawn, including needs, trades, production and wages.
@@ -685,15 +688,24 @@ The open mines and profit milestone together unlock the ending.
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
 
 - Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`) and a `Food` flag; nothing eaten heals.
-- Health comes back only in sleep, `World.SleepHeal` a second while hunger and thirst both stay above `World.FedNeed`; `World.HealthAtDawn` foretells it for the cabin's page.
+- Health comes back only in sleep, `SleepCycle.HealPerSecond` a second while hunger and thirst both stay above `SleepCycle.FedNeed`.
+  Healing is prorated to the part of the tick before either need falls below the threshold.
 - Food is what wolves eat and compost will take, cooked or not.
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.
 
-Sleeping in a cabin advances time toward dawn.
-It is allowed from `World.SleepHour` (22:00), a little before night falls.
-It is refused if hunger or thirst would run out first.
-Wolves patrol on through a slept night, and one that starts scratching at an unlocked door with someone inside stops the night there, and no night starts while it is at that door (`DoorCheck.Waking`); a tick that only skips ahead (`World.Tick` with `sleeping`) leaves wolves where they are.
+A player can sleep at any hour inside a cabin or on an outdoor straw bed. The cabin's Sleep button appears only inside.
+`PlayerState.SleepingAt` identifies a sleeper's place. The window draws outdoor sleep on the straw bed without sheltering the player.
+Lying down cancels an unfinished swing. A sleeper beside a glass furnace does not count as an operator.
+`SleepCycle` speeds up the clock only while everyone is asleep, once an outdoor sleeper has lain down.
+It adds normal simulation steps between frames instead of jumping over the night, up to 12× normal speed.
+The extra steps use at most 4 milliseconds of work per frame before starting no more, so a busy world can slow down.
+Outside a locked cabin, a wolf within a sleeper's sight radius triggers “You hear something” and restores normal speed, regardless of lighting.
+A locked cabin prevents both the warning and the slowdown. Sleep keeps healing the player either way.
+Hunger or thirst running out, an attack outdoors, or scratching at an unlocked cabin door wakes those affected and restores normal speed.
+Sleepers can choose Wake, and a press of W, A, S or D also wakes a straw-bed sleeper. At dawn everyone still asleep wakes.
+After an outdoor wake-up the window holds walking input through `StrawBedView.Rising`, then hands off facing the same way as the straw bed.
+A straw bed takes twenty leaves, lasts three full days from `Thing.BedBuiltAt` and refunds only within one hour.
 
 #### Sprinting
 
@@ -749,7 +761,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 
 - **Dens.** `WolfPatrols.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
   The outcrop is solid like a mine's (`WolfPatrols.InOutcrop`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
-  From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
+  From `GameData.DuskStarts` (20:24), each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
   After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`).
 - **Strength.** A wolf's health, bite and pace are `GameData.WolfHealth`, `WolfBite` and `WolfTrot`, the same every night: it stands two blows of a steel axe and falls to the third or fourth, and its fourth bite brings a healthy player to half health.
 - **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at `PatrolPace` (half) of the trot it stalks at, a walk, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
@@ -759,7 +771,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   The night's first howl plays `wolf_howl`, a lone wolf, and later ones `wolf_howl_group` (`SaveState.Howled`).
   A howl is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it fades with distance from the player and pans with its direction.
   The howl calls every patrolling wolf within `HowlRadius` to where it stood (`WolfMode.Called`, `Wolf.Call`); a called wolf still smells on its way and goes back to patrolling once there.
-- **Approach.** After its howl a wolf trots at its player out of firelight until within `WolfSightRange`, then sprints (`Wolf.Chase` above zero) at `WolfChase` times `WalkSpeed` with one distant growl (`Wolf.Sprinted`), which data validation keeps above walking and below `SprintSpeed`.
+- **Approach.** After its howl a wolf trots at its player out of firelight until within `WolfSightRange`, then sprints (`Wolf.Galloping`) at `WolfChase` times `WalkSpeed` with one distant growl (`Wolf.Sprinted`), which data validation keeps above walking and below `SprintSpeed`.
   Within sight it closes in only to `WolfBodies.StandOff`, within biting reach, and backs off to it at a walk (`WolfBodies.BackOffSpeed`) from a player another wolf tugs toward it (`DoorTug.TuggedTo`).
   Wolves at a player keep their bodies apart (`WolfBodies.Body`, `WolfBodies.WolfHalfWidth`): one in another's way steps aside at `WolfBodies.SideStepSpeed`, unless it holds the player.
   A hunting wolf's body faces the way it runs, or its player while it stands, creeps or backs off (`Wolf.Heading`, `WolfHunt.Face`).
@@ -776,15 +788,19 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
   It takes a wide running arc into a second hop behind the line of the blow (`WolfCounter`). It lands on its forepaws first,
   slides its rear paws round them, and stands facing the player before it can start a bite.
   The wolf tries the other side if the first route is blocked. With no room, it uses its usual recoil and growl.
-  Fire, shelter, and bodies that enter the route can cut the move short. A torch burn sends the wolf running off as soon as the recoil ends.
-  A struck wolf runs thereafter (`Wolf.Aggressive`) and torch waves cease to scare it.
+  Shelter and bodies that enter the route can cut the move short. A torch burn sends the wolf running off as soon as the recoil ends.
+  A struck wolf runs thereafter (`Wolf.Aggressive`) and neither torch waves nor campfire light scare it.
   After a missed bite it holds for the usual recovery, then runs out and around the player (`Wolf.Circle`, `WolfHunt.CircleOnMiss`).
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
   A player a wolf had pinned goes free as it leaves.
   Patrolling, going home or losing its player (who sheltered or left the game) clears the wolf’s current attack, stance and repositioning (`WolfPatrols.Calm`). It still runs if it has been hit.
 
-Campfire light repels wolves, and `CampfireHours` sets how long one log burns; a campfire with no wood left burns while workers sit at it.
-A wolf already chasing the player still follows into the light for a few seconds.
+`CampfireHours` sets how long one log burns. A campfire with no wood left burns while workers sit at it.
+Wary wolves hunting a player in campfire light use the same `WolfFollow` circle as wolves scared by a torch swing.
+At a campfire the circle is centered on the fire and stays beyond its light.
+A windup is stopped, but a leap already in flight finishes.
+The same `World.FullPackAt` rule applies to both lights: once five wolves are nearby, they rush in and attack through it.
+An aggressive wolf or one that stood its ground against a torch ignores either light, even without a full pack.
 Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters go to its door (`DoorCheck.Follow`), or give up and patrol on away from a cabin they leave alone.
 
 #### Cabin doors
@@ -967,6 +983,7 @@ The view shows less of the floor behind the near rim at shallower camera angles.
 Only the tile index is saved and shared with guests.
 The sea recedes slightly past its original waterline at the new moon and covers the sand strip at the full moon.
 The day dial shows the moon's lit side waxing and waning over the same eight-day cycle.
+Hovering over the moon icon shows the days to `Beach.NextTide`, high at full moon or low at new moon, whichever comes next.
 The tide clears each stripped square as water covers it. The low-tide waterline bounds walking throughout the cycle.
 
 ### Replanting trees
@@ -1780,7 +1797,7 @@ A sound within a metre of the player plays with no place too, so a long one such
 
 Sounds come from three places:
 
-- The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
+- The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment). Extra sleep steps do not play sped-up sounds.
 - The view plays sounds tied to animation timing: footsteps by ground type (`Footsteps.Sound`: gravel paths, water, rock, grass), axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
@@ -1794,7 +1811,7 @@ Both play lower and slower the taller the tree, from a tenth above their recorde
 
 ### Music
 
-Music in `assets/music` crossfades over four seconds between the day music and the night music when night falls or dawn breaks, including a sleep that skips to morning.
+Music in `assets/music` crossfades over four seconds between the day music and the night music when night falls or dawn breaks, including during sleep.
 The day plays its tracks one after another and the night loops one.
 
 Each keeps its place for the running session, so music longer than its part of the day carries on next time.
