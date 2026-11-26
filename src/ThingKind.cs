@@ -49,6 +49,7 @@ public enum ThingKind {
     Hole,
     Nettle,
     Firebug,
+    Lantern,
 }
 
 /// <summary>Converts kinds to and from the ids that hotbar slots, icons and sounds use.</summary>

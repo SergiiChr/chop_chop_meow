@@ -23,6 +23,7 @@ public static class InspectPage {
             { Kind: ThingKind.Packer } t => new PackerPanel(tools, t),
             { Kind: ThingKind.Crate } t => new CratePanel(tools, t),
             { Kind: ThingKind.Barrel } t => new BarrelPanel(tools, t),
+            { Kind: ThingKind.Lantern } t => new LanternPanel(tools, Lanterns.Id(t.LanternItem), t),
             { Kind: ThingKind.Grave } t => new RecoveryBoxPanel(tools, t),
             { Kind: ThingKind.Toolstation } t => new ToolRackPanel(tools, t),
             { Kind: ThingKind.Pile } t => new PilePanel(tools, t),

@@ -216,6 +216,7 @@ public static class WorldModels {
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
+                if (prop is LanternProp lantern) lantern.Model.Sync(Lanterns.Capacity, 0);
                 if (prop is ForgeProp forge) forge.Blowing.Warm();
                 if (prop is FarmProp farm) {
                     farm.Crops[0].Visible = id != 0;
@@ -234,6 +235,8 @@ public static class WorldModels {
         Stage(new WolfModel().Root);
         // The net's bag has a material of its own, seen from both sides, which no world model draws.
         Stage(ActorRig.Tool("bug_net"));
+        Stage(LanternWear.Hook());
+        Stage(LanternShape.Build(out _, compact: true));
         void Stage(Node3D root) { ModelKit.BuildShaders(root); root.Position = Vector3.Zero; stage.AddChild(root); }
         _ = BackpackShape.Details; _ = BackpackShape.Flap;
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
@@ -288,6 +291,7 @@ public static class WorldModels {
         ThingKind.Barrel => new[] { new Hit(.34f, 0, VesselShape.BarrelHeight) },
         ThingKind.Chest => new[] { new Hit(.5f, 0, .65f) },
         ThingKind.Crate => new[] { new Hit(.4f, 0, .55f) },
+        ThingKind.Lantern => [new Hit(.2f, 0, .52f)],
         ThingKind.Bench => new[] { new Hit(.6f, 0, .95f) },
         ThingKind.Cooktable => new[] { new Hit(.7f, 0, .9f) },
         ThingKind.Cannery => new[] { new Hit(.6f, 0, 1f) },
@@ -345,6 +349,7 @@ public static class WorldModels {
             case ThingKind.Grave: prop = DroppedBackpack(); break;
             case ThingKind.Anvil: prop = Anvil(); break;
             case ThingKind.Crate: prop = Crate(); break;
+            case ThingKind.Lantern: prop = new LanternProp(); break;
             case ThingKind.Bench: prop = Workbench(); break;
             case ThingKind.Cooktable: prop = CookingTable(); break;
             case ThingKind.Cannery: prop = Cannery(); break;
@@ -400,6 +405,7 @@ public static class WorldModels {
             case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
             case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer" or "bug_net": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
+            case Lanterns.Item: return LanternShape.Build(out _);
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }

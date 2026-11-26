@@ -111,9 +111,13 @@ public sealed partial class World {
 
     /// <summary>Selects a carried tool in hand without a hotbar slot, or with "" empties the hand; the server keeps it, so a save has it.</summary>
     public void SelectInHand(string tool) {
-        if (tool != "" && (!(Data.Items.TryGetValue(tool, out var def) && def.Tool != "") || S.Backpack[tool] == 0)) return;
+        int lantern = Lanterns.Id(tool);
+        if (lantern != 0) {
+            if (Lanterns.Carried(lantern) is not string carried) return;
+            tool = carried;
+        } else if (tool != "" && (!(Data.Items.TryGetValue(tool, out var def) && def.Tool != "") || S.Backpack[tool] == 0)) return;
         S.InHand = tool;
-        Forwarded(Verb.SelectInHand, item: tool);
+        if (!Forwarded(Verb.SelectInHand, item: tool) && lantern != 0) PutOutTorch();
     }
 
     /// <summary>Remembers in the save that its owner has seen the ending.</summary>
@@ -143,6 +147,8 @@ public sealed partial class World {
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
             case Verb.TakeUpPipe: Construction.TakeUpPipe(Terrain.TileAt(c.At)); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At, c.Rotation)); break;
+            case Verb.PlaceLantern: Preferring(S.Backpack, c.Count, () => Lanterns.Place(c.Item, c.At, c.Rotation)); break;
+            case Verb.RefillLantern: if (c.Target == 0 || t != null) Preferring(S.Backpack, (int)c.At.X, () => Lanterns.Refill(c.Other, t, c.Count)); break;
             case Verb.PlaceBarrel: Preferring(S.Backpack, c.Count, () => PlaceBarrel(c.Item, c.At, c.Rotation)); break;
             case Verb.MoveInBarrel:
                 if ((uint)c.Target <= 2 * Barrel.Capacity) {
@@ -204,6 +210,7 @@ public sealed partial class World {
             case Verb.AutoSell: SetAutoSell(t, c.Count != 0); break;
             case Verb.SetPacking: SetPacking(t, c.Item); break;
             case Verb.Buy: Buy(t, c.Item, Math.Min(c.Count, 5)); break;
+            case Verb.PickUpLantern: Lanterns.PickUp(t); break;
             case Verb.PickUpBarrel: PickUpBarrel(t); break;
             case Verb.PickUpCrate: PickUpCrate(t); break;
             case Verb.Dismantle: Construction.Dismantle(t); break;
@@ -337,6 +344,7 @@ public sealed partial class World {
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
+        if (Lanterns.IsItem(item)) item = Lanterns.Item;
         bool pile = IsSingleResourceStore(chest);
         if (chest.Kind == ThingKind.Barrel && Data.VesselFor(item) == null) return;
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate || !pile && item == Inventory.Everything) || Nests(chest, item)) return;

@@ -34,6 +34,9 @@ public static class SimulationChecks {
         NettleChecks.Run(data);
         NettleRopeChecks.Run(data);
         FirebugChecks.Run(data);
+        LanternChecks.Run(data);
+        LanternCraftChecks.Run(data);
+        LanternModelChecks.Run(data);
         SandChecks.Run(data);
         GlassJarChecks.Run(data);
         CraftingChecks.Run(data);

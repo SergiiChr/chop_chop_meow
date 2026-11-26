@@ -523,6 +523,8 @@ When you come within 4 m it darts off 6.55 m, faster than a walk and slower than
 With the bug net selected, a right click on open ground swings it toward the pointer, down on a slant from behind the right shoulder across the front to the ground at the left, and a right click on a firebug swings it at the firebug.
 The hoop crosses the front 1.0 to 1.4 m from you, within 55° either side of the pointer, and lands 0.4 seconds after the click: it catches each firebug it passes over then, one firebug each into the backpack while it has room.
 A firebug nearer or further than the hoop is missed, and a swing sends every firebug it misses within 5 m darting, resting or not.
+Caught firebugs live for three in-game days, then disappear one by one.
+Hover over a stack to see its average time left.
 
 Nettles, nettle rope, bug nets and firebugs are not bought or sold, and a firebug is not made into anything yet.
 A nettle, a bug net and a firebug each say a line under their name in tooltips and in their details on the recipe map.
@@ -665,6 +667,7 @@ Some recipes need a better tool:
 - Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
 - A steel water bottle (1 steel sheet + 1 wood part) needs a steel hammer.
+- An empty lantern (1 glass jar + 1 steel sheet + 1 wood part) needs a steel hammer.
 
 Nettle rope (1 nettle → 1 rope) is the one recipe a better tool spoils: it is made only at the bench and only with a wooden mallet.
 The mallet may be the one in the bench's hammer slot or one in your backpack, whichever hammer the other is.
@@ -1233,6 +1236,21 @@ Walk at one and it stops and stands braced where it is. Come within 2 metres and
 Once five are around you they attack together and swings no longer scare them.
 A torch that lands on a wolf burns it and sends it running for a moment.
 
+### Lantern
+
+Finally a sustainable source of light. The crafting bench makes an empty lantern.
+Right-click a lantern in the backpack, on the hotbar or on the ground to open it.
+Put firebugs onto its slot to add as many as fit, or right-click the slot while holding a stack to add one.
+It takes up to ten, shortest lives first. Putting a firebug in a lantern does not reset its life.
+The light dims as firebugs die, and you can add more at any time as long as there is room.
+A full lantern is 20% brighter than a torch, with a green hue. Lanterns do not scare wolves.
+
+Double-click a lantern to take it in hand. This puts out any lit torch.
+While your hands are needed for work, the lantern hangs from your belt and keeps shining.
+Every lantern bound to a hotbar slot hangs from your belt and lights the way without having to select it.
+A lantern tucked away in the backpack or storage does not light the way, but its firebugs still age.
+Open a carried lantern and choose **Put it down** to place it, or open a placed one and choose **Pick up**.
+
 ### Cabins
 
 A click on a cabin opens its page.
@@ -1378,7 +1396,7 @@ There are three tree types (oak, spruce, birch), from short trees to ones two th
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.
 The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset.
 Daylight shadows meet the ground at boots, tree trunks and the feet of buildings.
-The moon takes the same path at night and waxes and wanes over a cycle of `MoonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by.
+The moon takes the same path at night and waxes and wanes over a cycle of `MoonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches, lanterns and cabin windows to see by.
 Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows.
 Trees in front of the player, a worker or a structure turn see-through.
 

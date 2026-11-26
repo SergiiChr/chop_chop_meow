@@ -418,7 +418,9 @@ public sealed partial class GameData {
     public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>What the player says of an item, as a tooltip line of its own after the name, or nothing.</summary>
-    public string DescriptionLine(string item) => Items.TryGetValue(item, out var def) && def.Description != "" ? "\n" + def.Description : "";
+    public string DescriptionLine(string item) => ItemDefinition(item) is { Description.Length: > 0 } def ? "\n" + def.Description : "";
+    /// <summary>An item or, for a lantern with a charge of its own, the shared recipe item.</summary>
+    private ItemDef? ItemDefinition(string item) => Items.GetValueOrDefault(Lanterns.IsItem(item) ? Lanterns.Item : item);
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
     public string PlainestTool(string kind, int tier = 0, ThingKind? station = null) =>
         (station is ThingKind at ? FixedTool(at, kind) : null) ?? Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
@@ -447,7 +449,7 @@ public sealed partial class GameData {
     /// <summary>Whether an id, such as a hotbar slot's, names a building plan, and which.</summary>
     public bool TryBuilding(string id, out ThingKind kind) => Kinds.TryParse(id, out kind) && Buildings.ContainsKey(kind);
     public bool IsBuilding(string id) => TryBuilding(id, out _);
-    public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' ');
+    public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : ItemDefinition(id)?.Name ?? (Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' '));
     public string Name(ThingKind kind) {
         if (Items.TryGetValue(kind.Id(), out var item)) return item.Name;
         if (Buildings.TryGetValue(kind, out var building)) return building.Name;

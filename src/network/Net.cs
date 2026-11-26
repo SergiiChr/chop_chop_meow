@@ -47,7 +47,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 34;
+    private const int Protocol = 35;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -454,7 +454,7 @@ public partial class Net : Node {
         int made = echoes;
         World.Run(p, new Command((Verb)verb, target, other, item, count, at, held, spares, rotation, (PipeShape)pipeShape));
         // Only moving items by hand sounds like them: not what placing things spends, or picking them up off the ground gives.
-        bool placing = (Verb)verb is Verb.Build or Verb.PlaceCrate or Verb.PickUp or Verb.PickUpCrate or Verb.PlaceBarrel or Verb.PickUpBarrel;
+        bool placing = (Verb)verb is Verb.Build or Verb.PlaceCrate or Verb.PickUp or Verb.PickUpCrate or Verb.PlaceBarrel or Verb.PickUpBarrel or Verb.PlaceLantern or Verb.PickUpLantern;
         if (!placing && echoes == made && MostMoved(before, p.Backpack) is string moved) RpcId(p.Id, MethodName.Hear, Sounds.ForItem(moved), p.Pos);
     }
 
@@ -608,7 +608,11 @@ public partial class Net : Node {
             if (World.PlayerById(id) is PlayerState target && target != me && goals.Remove(target, out var at))
                 Place(target, at);
         if (!joining && me.Warp == own.Warp) me.Pos = own.Pos;
-        if (!joining) (me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting, me.Braking) = (own.ActiveHotbar, own.InHand, own.GatherTarget, own.Selected, own.Sprinting, own.Braking);
+        if (!joining) {
+            string hand = Lanterns.Id(own.InHand) is int lantern and > 0 && me.Backpack[own.InHand] == 0
+                ? Lanterns.Carried(me.Backpack, lantern) ?? "" : own.InHand;
+            (me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting, me.Braking) = (own.ActiveHotbar, hand, own.GatherTarget, own.Selected, own.Sprinting, own.Braking);
+        }
         gone.Clear();
         foreach (var o in goals.Keys) if (o is Worker w ? !s.Workers.Contains(w) : o is Wolf wolf ? !s.Wolves.Contains(wolf) : o is PlayerState p && !s.Players.Contains(p)) gone.Add(o);
         foreach (var o in gone) goals.Remove(o);

@@ -18,11 +18,12 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         cell.Icon = Icons.Of(item);
         if ((look ?? (input ? null : Style.SlotWanted)) is StyleBoxFlat rim) cell.AddThemeStyleboxOverride("normal", rim);
         moves.TakeCell(cell, box, item, t, takes, put);
-        // Redrawn only when the amount held changes.
-        live.Watch(() => box[item], held => {
-            cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
-            count.Text = held > 0 ? held.ToString() : "";
-            cell.TooltipText = tooltip(held);
+        // Redrawn only when the amount held changes or a stack's firebugs are a minute closer to expiry.
+        live.Watch(() => (Held: box[item], Life: item == Firebugs.Item && box[item] > 0 ? world.Firebugs.AverageMinutes(box) : -1), shown => {
+            cell.AddThemeColorOverride(ItemSlot.IconNormal, shown.Held > 0 ? Colors.White : Style.Ghost);
+            count.Text = shown.Held > 0 ? shown.Held.ToString() : "";
+            string hint = tooltip(shown.Held);
+            cell.TooltipText = shown.Life < 0 ? hint : hint + "\n" + PageText.FirebugLife(shown.Life);
         });
         return cell;
     }
@@ -56,7 +57,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     public int RateCode() => world.Data.Recipes.TryGetValue(world.Selected(t), out var recipe) ? (int)MathF.Round(Rate(recipe) * 100) : 0;
 
     /// <summary>Whether an item a station holds is neither an input nor the product of a recipe.</summary>
-    private static bool Leftover(RecipeDef recipe, string item) => !recipe.Inputs.ContainsKey(item) && item != recipe.Output;
+    private static bool Leftover(RecipeDef recipe, string item) => !recipe.Inputs.ContainsKey(item) && !World.IsProduct(recipe.Output, item);
 
     /// <summary>A number that changes with which leftovers the station holds beside its recipe's inputs and product, built without allocating.</summary>
     public int SideCode() {
@@ -99,6 +100,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     /// The output slot of the recipe the station is on takes back what that recipe makes, and side slots take nothing.
     /// </summary>
     public VBoxContainer StationSlot(string item, bool input, string perBatch, float size = 52) {
+        if (item == Lanterns.Item) return LanternSlot(input, perBatch, size);
         var box = t.Inventory;
         var vessel = world.Data.VesselFor(item);
         bool product = !input && world.Product(t) == item;
@@ -111,6 +113,23 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         // The product goes back as into storage; an input loads through the station's own rules.
         var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}{(vessel == null ? "" : " L")}\n{hint}", size, takes: takes,
             put: product ? null : (held, units) => world.LoadInput(t, held, units));
+        return Labelled(cell, perBatch);
+    }
+
+    /// <summary>Shows lanterns together but takes one at a time, keeping the charge of each lantern.</summary>
+    private VBoxContainer LanternSlot(bool input, string perBatch, float size) {
+        var box = t.Inventory;
+        var (cell, count) = ItemSlot.Create($"{(input ? "input" : "output")}_{Lanterns.Item}", size);
+        cell.Icon = Icons.Of(Lanterns.Item);
+        if (!input) cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
+        moves.TakeCell(cell, box, () => box.FirstLantern(), t,
+            held => held.Stack is { Box: 0 } stack && Lanterns.IsItem(stack.Item),
+            input ? (item, units) => world.LoadInput(t, item, units) : null);
+        live.Watch(() => (Count: box.LanternCount(), Name: box.FirstLantern() is string item ? world.Describe(item) : world.Data.Name(Lanterns.Item)), now => {
+            cell.AddThemeColorOverride(ItemSlot.IconNormal, now.Count > 0 ? Colors.White : Style.Ghost);
+            count.Text = now.Count > 0 ? now.Count.ToString() : "";
+            cell.TooltipText = $"{now.Name} · {now.Count}\n{SlotHint}{world.Data.DescriptionLine(Lanterns.Item)}";
+        });
         return Labelled(cell, perBatch);
     }
 }

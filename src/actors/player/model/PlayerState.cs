@@ -18,7 +18,7 @@ public sealed class PlayerState {
     public Inventory Backpack { get; set; } = new() { Slots = 24, CarriedBy = Inventory.Carrier.Player };
     public List<string> HotbarSlots { get; set; } = new() { "steel_axe", "steel_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", Water.Full };
     public int ActiveHotbar { get; set; }
-    /// <summary>A tool selected in hand from the backpack without a hotbar slot, or empty; while one is, no hotbar slot is selected.</summary>
+    /// <summary>A tool or lantern selected in hand from the backpack without a hotbar slot, or empty; while one is, no hotbar slot is selected.</summary>
     public string InHand { get; set; } = "";
     /// <summary>Recipes waiting in the personal crafting menu, one entry per recipe in the order first queued; their inputs are already taken from the backpack.</summary>
     [JsonConverter(typeof(QueueJson))] public List<Queued> Crafting { get; set; } = new();

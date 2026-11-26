@@ -49,7 +49,9 @@ internal class Gathering {
             bool atOnce = rule?.TakenAtOnce == true;
             if (!atOnce && w.Timer < world.GatherTime(spot.Kind, tool)) return true;
             w.Timer = 0;
-            int took = w.Bag.Add(item, atOnce ? spot.Remaining : Math.Min(spot.Remaining, World.GatherYield(spot.Kind))); spot.Remaining -= took;
+            int amount = atOnce ? spot.Remaining : Math.Min(spot.Remaining, World.GatherYield(spot.Kind));
+            int took = item == Firebugs.Item ? world.Firebugs.Catch(w.Bag, amount) : w.Bag.Add(item, amount);
+            spot.Remaining -= took;
             if (took > 0) { world.Got(item); world.Chip(spot, tool); }
         }
         w.Loading = w.Bag.Room(item) > 0;

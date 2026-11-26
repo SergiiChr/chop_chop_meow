@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 namespace ChopChopMeow;
 
 /// <summary>Item quantities and explicit automation access rules. Player access is independent of automation filters.</summary>
-public sealed class Inventory {
+public sealed partial class Inventory {
     public enum Carrier { None, Player, Worker }
 
     /// <summary>A player's empty barrels stack beside one filled barrel, and a worker with a barrel or a packed crate carries nothing else in their hands.</summary>
@@ -51,6 +51,8 @@ public sealed class Inventory {
     public sealed class Slot {
         public string Item { get; set; } = "";
         public int Count { get; set; }
+        /// <summary>When each caught firebug in the stack dies, with the held units first.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<float>? FirebugExpiries { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Held { get; set; }
         /// <summary>The id of the player holding <see cref="Held"/>, or 0.</summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int HeldBy { get; set; }
@@ -59,7 +61,7 @@ public sealed class Inventory {
         /// <summary>Units in the cell that no player holds.</summary>
         [JsonIgnore] public int Free => Count - Held;
         /// <summary>Empties the cell, which ends its hotbar binding.</summary>
-        public void Empty() { Item = ""; Count = 0; Hotbar = 0; }
+        public void Empty() { Item = ""; Count = 0; Hotbar = 0; FirebugExpiries = null; }
         /// <summary>Whether a player other than <paramref name="player"/> holds units here.</summary>
         public bool HeldByOther(int player) => HeldBy != 0 && HeldBy != player;
     }
@@ -152,8 +154,24 @@ public sealed class Inventory {
 
     /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Unstacked = new();
-    /// <summary>Coins stack to the container's coin stack, packed crates and tools never stack; every other item uses the container's stack size.</summary>
-    public int StackOf(string item) => item == Coins ? CoinStack : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) ? 1 : StackSize;
+    /// <summary>Coins use the container's coin stack, while packed crates, tools and lanterns each take a cell.</summary>
+    public int StackOf(string item) => item == Coins ? CoinStack : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) || item == Lanterns.Item || Lanterns.IsItem(item) ? 1 : StackSize;
+    /// <summary>Lanterns of every charge in this box.</summary>
+    internal int LanternCount() {
+        int count = 0;
+        foreach (var pair in items) if (Lanterns.IsItem(pair.Key)) count += pair.Value;
+        return count;
+    }
+    /// <summary>One of this box's lanterns, preferring one that is not held.</summary>
+    internal string? FirstLantern(bool free = false, bool withdrawal = false) {
+        string? held = null;
+        foreach (var pair in items) {
+            if (!Lanterns.IsItem(pair.Key) || withdrawal && !AllowsWithdrawal(pair.Key)) continue;
+            if (Free(pair.Key) > 0) return pair.Key;
+            held ??= pair.Key;
+        }
+        return free ? null : held;
+    }
     /// <summary>
     /// Units of an item that still fit in the one stack a station's input slot holds, as far as the box has room.
     /// Below zero when the box holds more than a stack of it.
@@ -167,7 +185,7 @@ public sealed class Inventory {
         for (int i = 0; i < Math.Min(Slots, Layout.Count); i++) {
             var slot = Layout[i];
             if (slot.Item == "") room += stack;
-            else { used++; if (slot.Item == item) room += Math.Max(0, stack - slot.Count); }
+            else { used++; if (slot.Item == item && (item != Firebugs.Item || slot.Held == 0)) room += Math.Max(0, stack - slot.Count); }
         }
         room = Math.Max(0, room);
         if (Capacity > 0 && !replacing) room = Math.Min(room, Math.Max(0, Capacity - Count));
@@ -181,7 +199,7 @@ public sealed class Inventory {
         foreach (var (item, count) in goods) {
             if (count > CarryRoom(item)) return false;
             int stack = StackOf(item), spare = 0;
-            for (int i = 0; i < limit; i++) if (Layout[i].Item == item) spare += stack - Layout[i].Count;
+            for (int i = 0; i < limit; i++) if (Layout[i].Item == item && (item != Firebugs.Item || Layout[i].Held == 0)) spare += stack - Layout[i].Count;
             empty -= (Math.Max(0, count - spare) + stack - 1) / stack;
         }
         int limited = CarriedBy == Carrier.None ? 0 : goods.Where(pair => CountsTowardCarryLimit(pair.Key)).Sum(pair => pair.Value);
@@ -228,14 +246,21 @@ public sealed class Inventory {
         Layout ??= new();
         PadLayout();
         // Holds end, as after loading nobody holds anything.
-        foreach (var s in Layout) { s.Held = 0; s.HeldBy = 0; }
+        foreach (var s in Layout) { s.Held = 0; s.HeldBy = 0; s.FirebugExpiries?.Sort(); }
         heldUnits = 0;
+        List<float>? overflowFirebugs = null;
+        int nextExpiry = 0;
         var remaining = layoutRemainder; remaining.Clear(); foreach (var pair in items) remaining[pair.Key] = pair.Value;
         for (int i = 0; i < Layout.Count; i++) {
             var s = Layout[i];
             if (s.Item == "") { s.Empty(); continue; }
             if (s.Count <= 0 || !remaining.TryGetValue(s.Item, out int qty)) { s.Empty(); continue; }
             s.Count = Math.Min(Math.Min(s.Count, qty), StackOf(s.Item)); remaining[s.Item] = qty - s.Count;
+            if (s.FirebugExpiries is { } dates && dates.Count > s.Count) {
+                overflowFirebugs ??= new List<float>();
+                for (int n = s.Count; n < dates.Count; n++) overflowFirebugs.Add(dates[n]);
+                dates.RemoveRange(s.Count, dates.Count - s.Count);
+            }
             if (s.Count == 0) s.Empty();
         }
         foreach (var (item, qty) in remaining) for (int left = qty; left > 0;) {
@@ -244,6 +269,10 @@ public sealed class Inventory {
             if (empty < 0) { Layout.Add(new Slot()); empty = Layout.Count - 1; }
             int n = Math.Min(StackOf(item), left);
             Layout[empty].Item = item; Layout[empty].Count = n;
+            if (item == Firebugs.Item && overflowFirebugs != null && nextExpiry + n <= overflowFirebugs.Count) {
+                AddFirebugExpiries(Layout[empty], System.Runtime.InteropServices.CollectionsMarshal.AsSpan(overflowFirebugs).Slice(nextExpiry, n));
+                nextExpiry += n;
+            }
             left -= n;
         }
         int active = Math.Min(Slots, Layout.Count);
@@ -293,6 +322,7 @@ public sealed class Inventory {
             int moved = Math.Min(Math.Min(quantity, a.Count), destination.MergeRoom(b, a.Item, this));
             if (moved > 0) {
                 if (b.Item == "") b.Item = a.Item;
+                MoveFirebugExpiries(a, b, moved);
                 b.Count = targetCount + moved; a.Count -= moved;
                 // A whole stack moved onto another in the same inventory takes its hotbar slot along.
                 if (a.Count == 0) { if (same && a.Hotbar != 0) b.Hotbar = a.Hotbar; a.Empty(); }
@@ -344,7 +374,9 @@ public sealed class Inventory {
         for (int i = 0; i < Layout.Count - 1;) {
             var a = Layout[i]; var b = Layout[i + 1];
             if (a.Item == b.Item && a.Count < StackOf(a.Item) && a.Held == 0 && b.Held == 0) {
-                int n = Math.Min(StackOf(a.Item) - a.Count, b.Count); a.Count += n; b.Count -= n;
+                int n = Math.Min(StackOf(a.Item) - a.Count, b.Count);
+                MoveFirebugExpiries(b, a, n);
+                a.Count += n; b.Count -= n;
                 // The stack merged in takes its hotbar slot along, as a stack moved onto another does.
                 if (b.Count == 0) { if (b.Hotbar != 0) a.Hotbar = b.Hotbar; Layout.RemoveAt(i + 1); } else i++;
             } else i++;
@@ -371,22 +403,37 @@ public sealed class Inventory {
     /// <summary>Whether the input filter names any item, which a chest's hauler fills it with; <see cref="Everything"/> names none.</summary>
     public bool NamesItems => InputFilter.Count > 0 && !InputFilter.Contains(Everything);
     private bool Passes(FilterList filter, string item) => (Gated ? filter.Contains(Everything) : filter.Count == 0) || Names(filter, item);
-    /// <summary>A filter names an item itself, or for a packed crate the kind of crate it is (<see cref="World.CrateOf"/>).</summary>
+    /// <summary>A filter names an item itself, a lantern of any charge, or a packed crate of its named good.</summary>
     private static bool Names(FilterList filter, string item) {
-        if (filter.Contains(item)) return true;
+        if (filter.Contains(item) || Lanterns.IsItem(item) && filter.Contains(Lanterns.Item)) return true;
         var kind = World.PackedKind(item);
         if (kind.IsEmpty) return false;
         foreach (string named in filter) if (kind.SequenceEqual(named)) return true;
         return false;
     }
 
-    public int Add(string item, int quantity) {
+    public int Add(string item, int quantity) => item == Firebugs.Item ? 0 : Add(item, quantity, default);
+
+    private int Add(string item, int quantity, ReadOnlySpan<float> firebugs) {
         int amount = Math.Min(Math.Max(0, quantity), Room(item));
         if (amount > 0) {
             items[item] = this[item] + amount; var left = amount;
             int limit = Math.Min(Slots, Layout.Count);
-            for (int i = 0; i < limit; i++) { var s = Layout[i]; if (s.Item == item && s.Count < StackOf(item)) { int n = Math.Min(left, StackOf(item) - s.Count); s.Count += n; left -= n; if (left == 0) break; } }
-            for (int i = 0; i < limit && left > 0; i++) if (Layout[i].Item == "") { int n = Math.Min(left, StackOf(item)); Layout[i].Item = item; Layout[i].Count = n; left -= n; }
+            int size = StackOf(item);
+            for (int i = 0; i < limit && left > 0; i++) {
+                var slot = Layout[i];
+                if (slot.Item != item || slot.Count >= size || !firebugs.IsEmpty && slot.Held > 0) continue;
+                int n = Math.Min(left, size - slot.Count);
+                if (!firebugs.IsEmpty) AddFirebugExpiries(slot, firebugs.Slice(amount - left, n));
+                slot.Count += n; left -= n;
+            }
+            for (int i = 0; i < limit && left > 0; i++) {
+                var slot = Layout[i];
+                if (slot.Item != "") continue;
+                int n = Math.Min(left, size);
+                if (!firebugs.IsEmpty) AddFirebugExpiries(slot, firebugs.Slice(amount - left, n));
+                slot.Item = item; slot.Count = n; left -= n;
+            }
             Changed?.Invoke();
         }
         return amount;
@@ -403,6 +450,7 @@ public sealed class Inventory {
 
     /// <summary>Takes out units nobody holds, from <see cref="PreferredSlot"/> first; a bound stack <paramref name="spent"/> to nothing is noted in <see cref="UsedUp"/>.</summary>
     private int Take(string item, int quantity, bool spent) {
+        if (item == Firebugs.Item) return TakeFirebugs(quantity, default, spent);
         int amount = Math.Min(Math.Max(0, quantity), Free(item));
         if (amount == this[item]) items.Remove(item);
         else items[item] -= amount;
@@ -424,6 +472,7 @@ public sealed class Inventory {
     /// <summary>Changes the first matching stack to another item while keeping that exact cell and its quantity.</summary>
     public bool Replace(string oldItem, string newItem) {
         if (oldItem == newItem) return this[oldItem] > 0;
+        if (oldItem == Firebugs.Item || newItem == Firebugs.Item) return false;
         int slotIndex = (uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == oldItem && Layout[PreferredSlot].Held == 0 ? PreferredSlot : -1;
         if (slotIndex < 0) for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item == oldItem && Layout[i].Held == 0) { slotIndex = i; break; }
         if (slotIndex < 0) return false;
@@ -520,6 +569,11 @@ public sealed class Inventory {
     public int TransferTo(Inventory destination, string item, int quantity, bool automated = false) {
         if (automated && (!AllowsWithdrawal(item) || !destination.Accepts(item))) return 0;
         int amount = Math.Min(Free(item), Math.Min(Math.Max(0, quantity), destination.Room(item)));
+        if (item == Firebugs.Item) {
+            Span<float> expires = amount <= 64 ? stackalloc float[amount] : new float[amount];
+            int taken = TakeFirebugs(expires);
+            return destination.AddFirebugs(expires[..taken]);
+        }
         Take(item, amount, false);
         return destination.Add(item, amount);
     }

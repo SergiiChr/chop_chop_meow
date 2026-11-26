@@ -1,0 +1,90 @@
+using System.Linq;
+using ChopChopMeow;
+using Godot;
+using static Checks;
+using static SetupSteps;
+
+internal static class LanternModelChecks {
+    public static void Run(GameData data) {
+        Test(CheckLanternBrightnessRisesWithLiveFirebugs, data);
+        Test(CheckHotbarAndHandLanternsKeepTheirOwnLight, data);
+        Test(CheckFullBeltHasRoomForTheHandLantern, data);
+    }
+
+    private static void CheckLanternBrightnessRisesWithLiveFirebugs(GameData data) {
+        var prop = (LanternProp)WorldModels.Build(new Thing { Kind = ThingKind.Lantern });
+        var icon = WorldModels.IconModel(Lanterns.Item, false, data)!;
+        var (torch, _, light) = ActorRig.Torch();
+        try {
+            Require(ModelSteps.AllMeshes(icon).Any(part => part.Mesh == GlassJarShape.Pile),
+                "the lantern icon should use the existing glass jar");
+            Require(ModelSteps.Triangles(icon) < 1000 && ModelSteps.Triangles(prop.Root) < 1000,
+                "the icon and placed lantern should stay under the item triangle ceiling");
+            prop.Model.Sync(10, 1.6f);
+            var green = prop.Model.Light;
+            Require(green.Visible && green.OmniRange == light.OmniRange && green.OmniAttenuation == light.OmniAttenuation
+                && Mathf.IsEqualApprox(green.LightEnergy, 1.92f) && green.LightColor.G > green.LightColor.R && green.LightColor.G > green.LightColor.B,
+                "a full lantern should shine in green over the same area as a torch, 20% brighter");
+            Require(prop.Model.BugsShown == 10, "a full lantern should show ten firebugs inside");
+            prop.Model.Sync(4, 1.6f);
+            Require(prop.Model.BugsShown == 4 && Mathf.IsEqualApprox(green.LightEnergy, .768f),
+                "a lantern with four live firebugs shows and lights with only those four");
+            prop.Model.Sync(0, 1.6f);
+            Require(!green.Visible && prop.Model.Node.Visible && prop.Model.BugsShown == 0,
+                "the light and firebugs should go out without hiding the lantern");
+        } finally { prop.Root.Free(); icon.Free(); torch.Free(); }
+    }
+
+    private static void CheckHotbarAndHandLanternsKeepTheirOwnLight(GameData data) {
+        var world = new World(data, false);
+        string first = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 10),
+            second = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 4);
+        Give(world, first); Give(world, second);
+        world.SetHotbar(0, first); world.SetHotbar(1, second); world.Tick(0);
+        var rig = new ActorRig(ActorSkin.Player);
+        var wear = rig.Lanterns!;
+        try {
+            wear.Sync(world, world.Me, null, null, 1);
+            Require(wear.Belt.Take(2).All(lantern => ((Node3D)lantern.Node.GetParent()).Visible && lantern.Light.Visible),
+                "every equipped hotbar lantern should cast its own light from the belt");
+            Require(wear.Belt[0].BugsShown == 10 && wear.Belt[1].BugsShown == 4
+                && Mathf.IsEqualApprox(wear.Belt[0].Light.LightEnergy, 1.2f) && Mathf.IsEqualApprox(wear.Belt[1].Light.LightEnergy, .48f),
+                "each belt lantern should only shine with its own firebugs");
+            world.SelectInHand(first);
+            rig.Show(new Pose(RaiseL: 30, OutL: 4, ElbowL: 60), null, false);
+            Vector3 fist = rig.Fist(left: true);
+            wear.Sync(world, world.Me, LanternWear.InHand(world.Me), fist, 1);
+            Require(wear.Hand.Node.Visible && wear.Hand.Light.Visible && (wear.Hand.Node.Transform * (Vector3.Up * LanternShape.GripHeight)).IsEqualApprox(fist),
+                "the lantern in the left hand should light and hang directly from the fist");
+            Require(!((Node3D)wear.Belt[0].Node.GetParent()).Visible && ((Node3D)wear.Belt[1].Node.GetParent()).Visible,
+                "the lantern in hand should no longer hang from its hotbar hook but the other should");
+            wear.Sync(world, world.Me, LanternWear.InHand(world.Me), null, 1);
+            Require(!wear.Hand.Node.Visible && ((Node3D)wear.Belt[0].Node.GetParent()).Visible && wear.Belt[0].Light.Visible,
+                "when the hand is busy the lantern should keep its light at the belt");
+        } finally { rig.Root.Free(); }
+    }
+
+    private static void CheckFullBeltHasRoomForTheHandLantern(GameData data) {
+        var world = new World(data, false);
+        for (int slot = 0; slot < 9; slot++) {
+            string item = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 10);
+            Give(world, item);
+            world.SetHotbar(slot, item);
+        }
+        world.Tick(0);
+        string extra = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 10);
+        Give(world, extra);
+        world.SelectInHand(extra);
+        var rig = new ActorRig(ActorSkin.Player);
+        var wear = rig.Lanterns!;
+        try {
+            rig.Show(new Pose(), null, false);
+            wear.Sync(world, world.Me, LanternWear.InHand(world.Me), null, 1);
+            Require(wear.Belt.Count(lantern => ((Node3D)lantern.Node.GetParent()).Visible && lantern.Light.Visible) == 10,
+                "using that hand should hang its lantern next to the nine hotbar lanterns without turning any off");
+            int triangles = LanternModelSteps.VisibleTriangles(rig.Root);
+            Require(triangles <= 5000, $"even with a full belt the player should stay within 5000 visible triangles, got {triangles}");
+        } finally { rig.Root.Free(); }
+    }
+
+}

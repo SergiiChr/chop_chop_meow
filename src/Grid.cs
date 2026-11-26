@@ -30,7 +30,7 @@ public partial class PagePanel {
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// With <paramref name="wanted"/>, stacks it names are rimmed in orange and the rest fade, so what the open page takes stands out.
     /// </summary>
-    protected GridContainer NewInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52, Action<string>? use = null, Action<int, string, int>? put = null) {
+    protected GridContainer NewInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52, Action<string>? use = null, Action<int, string, int>? put = null, Func<string, bool>? open = null) {
         var grid = NewGrid(columns);
         if (size < 52) { grid.AddThemeConstantOverride("h_separation", 8); grid.AddThemeConstantOverride("v_separation", 8); }
         var stacks = new (string Item, int Count)?[inventory().Slots];
@@ -53,6 +53,7 @@ public partial class PagePanel {
                 Put = (_, units) => kit.Run(() => moves.PutDown(inventory(), slot, units, container, put == null ? null : (item, count) => put(slot, item, count))),
                 Batch = On(batch),
                 Use = On(use),
+                Open = open == null ? null : () => stacks[slot] is (string id, _) && open(id),
             };
             grid.AddChild(cell);
         }
@@ -68,7 +69,7 @@ public partial class PagePanel {
         }
         // What each slot last drew: its stack, the inventory's total of that item and whether the stack is bound to the hotbar. A slot is redrawn only when they change.
         var current = new System.Collections.Generic.List<(string Item, int Count)>();
-        var drawn = new (string? Item, int Count, int Total, bool Bound)[cells.Length];
+        var drawn = new (string? Item, int Count, int Total, bool Bound, int Life, bool Dark)[cells.Length];
         live.Add(() => {
             var held = inventory();
             held.FillStacks(current);
@@ -77,10 +78,12 @@ public partial class PagePanel {
                 var (cell, count) = cells[i];
                 stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
                 bool bound = i < held.Layout.Count && held.Layout[i].Hotbar != 0;
-                var looks = stacks[i] is (string item, int n) ? (item, n, held[item], bound) : ((string?)null, 0, 0, false);
+                var looks = stacks[i] is (string item, int n)
+                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) && world.Lanterns.BugCount(item) == 0)
+                    : ((string?)null, 0, 0, false, -1, false);
                 if (first || looks != drawn[i]) {
                     drawn[i] = looks;
-                    Redraw(cell, count, stacks[i], held, bound);
+                    Redraw(cell, count, stacks[i], held, bound, drawn[i].Life);
                 }
                 if (shown[i] == i < visible && !first) continue;
                 shown[i] = i < visible;
@@ -90,7 +93,7 @@ public partial class PagePanel {
             first = false;
         });
         return grid;
-        void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held, bool bound) {
+        void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held, bool bound, int life) {
             cell.Icon = stack is (string id, _) ? Icons.Of(id) : null;
             var contents = stack is (string crate, _) ? world.Packed(crate) : null;
             var badge = cell.GetNode<TextureRect>("badge");
@@ -102,7 +105,10 @@ public partial class PagePanel {
             if (wanted != null) cell.AddThemeColorOverride(ItemSlot.IconNormal, stack == null || takes ? Colors.White : Style.Faded);
             // A backpack stack bound to the hotbar has the selected hotbar slot's rim.
             cell.AddThemeStyleboxOverride("normal", takes || bound ? Style.SlotWanted : Style.SlotNormal);
-            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}\n{hint}" : "";
+            string clicks = open != null && stack is (string itemToOpen, _) && Lanterns.IsItem(itemToOpen)
+                ? "LMB: pick up · RMB: open for refill · Double LMB: take in hand" : hint;
+            string expiry = life < 0 ? "" : "\n" + PageText.FirebugLife(life);
+            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}{expiry}\n{clicks}" : "";
         }
     }
 

@@ -12,6 +12,21 @@ public partial class Game {
         await TestClean(CheckARightClickWithTheBugNetSelectedSwingsIt);
         await TestClean(CheckARightClickOnAFirebugSwingsTheNetAtIt);
         await TestClean(CheckAShovelDigsTheGroundAFirebugHoversOver);
+        await TestClean(CheckFirebugStackShowsAverageRemainingLife);
+    }
+
+    private async Task CheckFirebugStackShowsAverageRemainingLife() {
+        float caught = Hosted.Time;
+        GiveFirebugs(Hosted, 2);
+        RunUntil(Hosted, caught + 840);
+        GiveFirebugs(Hosted, 2);
+        await KeyStroke(Key.Tab);
+        await Until(() => world.Backpack[Firebugs.Item] == 4 && bag.Visible, "the backpack showing four caught firebugs", 3);
+        string hint = BagCellOf(Firebugs.Item).TooltipText;
+        Require(hint.Contains("Average life left: 60 h 0 min") || hint.Contains("Average life left: 59 h 59 min"),
+            $"two firebugs with 48 hours left and two with 72 should average 60 hours, got {hint}");
+        await CloseWithEsc();
+        Drop(Hosted, Firebugs.Item); await Frames();
     }
 
     private async Task CheckARightClickWithTheBugNetSelectedSwingsIt() {
