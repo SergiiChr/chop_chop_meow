@@ -1160,7 +1160,7 @@ and the rest go on lines below. `MapTree` draws arrows to the products and highl
 A `MapNode` draws a filled icon slot for a discovered item and a question mark in a dashed slot otherwise.
 `MapItemLink` also hides undiscovered names and icons in the Item tree, chips, thumbnails and tooltips.
 Undiscovered entries can still be followed, but the right-hand panel hides their recipes until discovery.
-Chips below the card link to the required tool and to each input after the first. A click on a chip scrolls to its item
+Chips below a discovered card link to the required tool and to each input after the first. A click on a chip scrolls to its item
 and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details in a vertical panel to
 the right of the map. The panel's button leaves the map through `SidePanel.ShowRecipe`.
 Alt-click on a card, chip or detail thumbnail opens that item's tree within the same board.
@@ -1172,7 +1172,7 @@ The Back button restores the main map at its previous selection and scroll posit
 
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
 `SaveState.Obtained` holds every item the settlement has gathered, grown, bought or started with; with what it made, which is among `SaveState.Milestones`, those are the items the recipe map shows as known (`World.Had`).
-Everything such an item is made of is known with it (`GameData.EndsUpIn`), so no ingredient looks unmade beside its product: a new settlement's steel axe and bottle make their whole chains known.
+Everything such an item is made of is known with it (`GameData.EndsUpIn`), so no ingredient looks unmade beside its product: a new settlement's steel axe and bottle make their whole chains known. A filled vessel also makes the liquid it holds known.
 A save written before `Obtained` existed loads with it empty, so a raw resource it made nothing of shows as not made until it is gathered again.
 `GameData.MadeFrom` gives the item another is made out of: its recipe's first input, or the first `From` of its entry in `GameData.Sources` when no recipe makes it.
 `GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item is on the map once.

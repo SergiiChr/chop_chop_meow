@@ -438,7 +438,7 @@ public partial class Game {
         Require(recipeMap.Visible && !panel.Visible && !bag.Visible, "The icon must open the recipe map directly from the world.");
         Require(recipeMap.FindChild("map_stations", true, false) == null, "The map must open without the station-cost row.");
         Require(world.Data.Items.Keys.Where(id => !GameData.OffTheMap(id)).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
-        Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as not made yet.");
+        Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as undiscovered.");
         Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources"), "The map must label the marks for tools and resources.");
         await KeyStroke(Key.Escape);
         Require(!recipeMap.Visible && !panel.Visible && !bag.Visible, "Escape must close the map and return to the world.");
@@ -543,7 +543,7 @@ public partial class Game {
         await KeyStroke(Key.C);
         await Click((Button)hotbar.FindChild("map", true, false));
         var stew = recipeMap.NodeOf("canned_meat_stew")!;
-        Require(!stew.Known, "Canned stew nobody has made must be drawn as not made yet.");
+        Require(!stew.Known, "Canned stew nobody has made must be drawn as undiscovered.");
         float opened = world.Time;
         await Until(() => !view.Paused && world.Time > opened + .2f, "time passing under the open map", 2);
         await Click((Control)stew.FindChild("slot", true, false));

@@ -637,7 +637,7 @@ An item discovered while the map is open reveals its name and icon without reope
 - Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
   Undiscovered items show as question marks without names or icons in both views. You can follow their links, but
   their recipe details stay hidden until they are discovered.
-- Small icons at the foot of a card show a required tool (gold rim) or an additional resource (blue rim).
+- Small icons at the foot of a discovered card show a required tool (gold rim) or an additional resource (blue rim).
   Click one to find that item on the map and light it up briefly.
 - Click anywhere on a card to highlight it and the arrows connected to it. The details panel on the right shows how it
   is made, what it requires and what it is used for. The button opens the nearest station that makes it or the crafting

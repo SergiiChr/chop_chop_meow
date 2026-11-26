@@ -587,11 +587,17 @@ public sealed partial class World {
     public bool Reached(string milestone) => S.Milestones.Contains(milestone);
     /// <summary>
     /// Whether the settlement has ever made, gathered, bought or started with an item, or with anything the item ends up in:
-    /// whoever has had an iron bar counts as having had the ore.
+    /// whoever has had an iron bar counts as having had the ore. A filled vessel also reveals the liquid it holds.
     /// </summary>
     public bool Had(string item) {
         if (HadItself(item)) return true;
         foreach (string product in Data.EndsUpIn(item)) if (HadItself(product)) return true;
+        if (Data.VesselFor(item) == null) return false;
+        foreach (var vessel in Data.Vessels) {
+            if (vessel.Liquid != item) continue;
+            for (int fill = 1; fill < vessel.States.Count; fill++)
+                if (HadItself(vessel.States[fill])) return true;
+        }
         return false;
     }
     /// <summary>Whether the settlement has had this item itself.</summary>

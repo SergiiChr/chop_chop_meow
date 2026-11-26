@@ -37,6 +37,8 @@ public partial class Game {
         Require(HasLabel(barrel, "?") && !HasLabel(barrel, "Steel barrel") &&
             !barrel.FindChildren("*", "TextureRect", true, false).OfType<TextureRect>().Any(icon => icon.Texture != null) &&
             !barrel.TooltipText.Contains("Steel barrel"), "An undiscovered entry must show a question mark without a name or icon.");
+        Require(recipeMap.NodeOf("steel_barrel")!.FindChild("also_steel_parts", true, false) == null,
+            "An undiscovered recipe must not expose ingredients as map chips.");
         await Click(barrel);
         var details = recipeMap.FindChild("map_details", true, false);
         Require(details.FindChild("detail_item", true, false) is Button { Text: "?", Icon: null } &&
@@ -67,6 +69,8 @@ public partial class Game {
         await Click(product);
         await Until(() => recipeMap.Chosen == "steel_barrel" && HasLabel(details, "Steel barrel") && HasLabel(details, "Made at"),
             "the discovered barrel's recipe appearing in the main map", 2);
+        Require(recipeMap.NodeOf("steel_barrel")!.FindChild("also_steel_parts", true, false) is Button { Icon: not null },
+            "Discovery must also reveal the recipe's additional resources on the map card.");
         await KeyStroke(Key.Escape);
     }
 

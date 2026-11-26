@@ -247,7 +247,7 @@ public partial class RecipeMap : Control {
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 4);
             var icon = DetailItem(input, 28, $"requires_{input}");
             pair.AddChild(icon);
-            var label = Style.Text(icon.Known ? amount + data.Name(input) : amount + MapItemLink.Unknown, 15, Style.Ink, wrap: true);
+            var label = Style.Text(icon.Known ? amount + data.Name(input) : amount + MapItemLink.QuestionMark, 15, Style.Ink, wrap: true);
             icon.Discovered += () => label.Text = amount + data.Name(input);
             label.SizeFlagsHorizontal = SizeFlags.ExpandFill; pair.AddChild(label);
             requires.AddChild(pair);
@@ -306,7 +306,11 @@ public partial class RecipeMap : Control {
         if (data.RecipeOf(item) is not RecipeDef r) return data.Sources[item].How;
         string where = MapNode.Where(data, r);
         string? plainest = r.Tool == "" ? null : data.PlainestTool(r.Tool, r.Tier, r.Station);
-        string tool = plainest == null ? "" : $", {(world.Had(plainest) ? data.ToolName(r) : MapItemLink.Unknown)}";
+        string tool = "";
+        if (plainest != null) {
+            string toolName = data.ToolName(r);
+            tool = $", {(toolName == r.Tool || world.Had(plainest) ? toolName : MapItemLink.QuestionMark)}";
+        }
         float byHand = r.Seconds / world.WorkRate(null, plainest), there = r.Seconds / world.WorkRate(r.Station, plainest);
         string time = r.Hand && r.Station is ThingKind station && byHand != there ? $"{byHand:0.#} s by hand, {there:0.#} s at the {data.Name(station).ToLowerInvariant()}" : $"{there:0.#} s";
         return $"{where}{tool} · {time}";

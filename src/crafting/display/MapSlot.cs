@@ -10,7 +10,7 @@ public partial class MapSlot : Control {
 
     public override void _Ready() {
         if (Known) return;
-        var mark = Style.Text(MapItemLink.Unknown, 12, Style.Rim, Style.Head);
+        var mark = Style.Text(MapItemLink.QuestionMark, 12, Style.Rim, Style.Head);
         mark.HorizontalAlignment = HorizontalAlignment.Center;
         mark.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(mark);

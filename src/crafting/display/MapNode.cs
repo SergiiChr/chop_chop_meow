@@ -78,7 +78,11 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         };
         card.Discovered += RefreshDetails;
         AddChild(card);
+        if (Known) AddChips(recipe); else card.Discovered += () => AddChips(recipe);
+    }
 
+    private void AddChips(RecipeDef? recipe) {
+        var data = world.Data;
         var also = recipe != null ? recipe.Inputs.Keys.Skip(1) : data.Sources[item].Also;
         var chips = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Position = new Vector2(10, Height - 4) };
         chips.AddThemeConstantOverride("separation", 3);
@@ -108,7 +112,9 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
             MouseDefaultCursorShape = CursorShape.PointingHand,
             RecipeLink = () => openItemTree(other)
         };
-        Style.Skin(chip, look, Style.SlotHover); chip.AddThemeConstantOverride("icon_max_width", 15);
+        Style.Skin(chip, look, Style.SlotHover); Style.InkText(chip);
+        chip.AddThemeFontOverride("font", Style.Head);
+        chip.AddThemeConstantOverride("icon_max_width", 15);
         chip.Pressed += () => jump(other);
         return chip;
     }
