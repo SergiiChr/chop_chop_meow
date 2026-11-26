@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 internal static class LanternShape {
     private const float JarScale = 1.8f, JarBase = .032f, LidHeight = .367f;
     internal const float GripHeight = .478f;
-    /// <summary>The foot and lid block the lantern's own point light. The glass and trim do not.</summary>
+    /// <summary>When placed, the foot and lid block the lantern's own point light. The glass and trim do not.</summary>
     internal const uint TrimLayer = 1 << 13, EndsLayer = 1 << 14;
     internal static readonly Vector3 LightCenter = Vector3.Up * .212f;
     internal static readonly Color LightColor = new("adff76");

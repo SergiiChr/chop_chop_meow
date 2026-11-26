@@ -26,6 +26,11 @@ internal static class LanternModelChecks {
             prop.Model.Sync(10, 1.6f);
             Require(glass.MaterialOverride is StandardMaterial3D { EmissionEnabled: true, EmissionEnergyMultiplier: > 0 },
                 "a full lantern should light the glass from inside");
+            float fullGlow = ((StandardMaterial3D)glass.MaterialOverride).EmissionEnergyMultiplier;
+            prop.Model.Sync(4, 1.6f);
+            Require(glass.MaterialOverride is StandardMaterial3D { EmissionEnabled: true } partial
+                && Mathf.IsEqualApprox(partial.EmissionEnergyMultiplier, .4f * fullGlow),
+                "four live firebugs should give two fifths of the full glass glow");
             prop.Model.Sync(0, 1.6f);
             Require(glass.MaterialOverride is StandardMaterial3D { EmissionEnabled: false }, "an empty jar should have no interior glow");
         } finally { prop.Root.Free(); }
