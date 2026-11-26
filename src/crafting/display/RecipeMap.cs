@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The Recipe map shows item chains by category, with arrows from materials to what they make.
-/// Stations stand in a strip on top with what they cost. A click on an item shows how it is made and what it is used for;
+/// A click on an item shows how it is made and what it is used for;
 /// a click on a chip for a required tool or an additional resource goes to that item and lights it up for a moment.
 /// The map is drawn afresh each time it opens. It keeps the game or Goal Log underneath.
 /// </summary>
@@ -18,8 +18,6 @@ public partial class RecipeMap : Control {
     private readonly PanelContainer board;
     private readonly Dictionary<string, MapNode> nodes = new();
     private static readonly StyleBoxFlat LaneBack = Style.Flat(new Color("283c50"), 14, 12, horizontal: 14);
-    private static readonly StyleBoxFlat StationBuilt = Style.Flat(Style.Beige, 10, 6, horizontal: 10);
-    private static readonly StyleBoxFlat StationPlanned = Style.Flat(new Color("34495e"), 10, 6, new Color(Style.Beige, .55f), 1, 10);
     private Action? leaveGoalLog;
     private VBoxContainer? mainView;
     private ItemTree? itemTree;
@@ -59,7 +57,6 @@ public partial class RecipeMap : Control {
         this.leaveGoalLog = leaveGoalLog;
         var column = mainView = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); board.AddChild(column);
         column.AddChild(Header());
-        column.AddChild(Stations());
         var body = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
         body.AddThemeConstantOverride("separation", 10); column.AddChild(body);
         rows = new ScrollContainer { Name = "map_rows", SizeFlagsHorizontal = SizeFlags.ExpandFill };
@@ -160,24 +157,6 @@ public partial class RecipeMap : Control {
         sample.CustomMinimumSize = new Vector2(18, 18); sample.SizeFlagsVertical = SizeFlags.ShrinkCenter; entry.AddChild(sample);
         entry.AddChild(Style.Text(words, 14, Style.Beige));
         return entry;
-    }
-
-    /// <summary>The stations that make something, in the order the building plans list them, each with its cost; one not built yet is outlined.</summary>
-    private HBoxContainer Stations() {
-        var strip = new HBoxContainer { Name = "map_stations" }; strip.AddThemeConstantOverride("separation", 8);
-        foreach (var (kind, def) in world.Data.Buildings) {
-            if (!world.Data.Recipes.Values.Any(r => r.Station == kind)) continue;
-            bool built = world.Reached(kind.Id());
-            var chip = new PanelContainer { Name = $"station_{kind.Id()}", SizeFlagsHorizontal = SizeFlags.ExpandFill };
-            chip.AddThemeStyleboxOverride("panel", built ? StationBuilt : StationPlanned);
-            var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 8); chip.AddChild(row);
-            var icon = Style.Icon(Icons.Of(kind.Id()), 38); icon.Modulate = built ? Colors.White : Style.Unready; row.AddChild(icon);
-            var words = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center }; words.AddThemeConstantOverride("separation", 0); row.AddChild(words);
-            words.AddChild(Style.Text(def.Name, 15, built ? Style.Ink : Style.Rim, Style.Head));
-            words.AddChild(Style.Text(PageText.Cost(world, def.Cost), 12, built ? Style.Tan : Style.Beige, wrap: true));
-            strip.AddChild(chip);
-        }
-        return strip;
     }
 
     /// <summary>One category's row: its name, then its items on a grid of steps, each on the line of the item it is made out of or on a line of its own below.</summary>

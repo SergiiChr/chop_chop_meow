@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -24,21 +25,35 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         AddChild(scroll);
         var canvas = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
         canvas.AddThemeStyleboxOverride("panel", Canvas); scroll.AddChild(canvas);
-        var diagram = new ItemTreeBranches();
+        var diagram = new ItemTreeBranches { SizeFlagsVertical = SizeFlags.ShrinkBegin };
         diagram.AddThemeConstantOverride("separation", 42); canvas.AddChild(diagram);
 
         var root = Card(item);
-        root.SizeFlagsVertical = SizeFlags.ShrinkBegin;
+        root.SizeFlagsVertical = SizeFlags.ShrinkCenter;
         diagram.AddChild(root); diagram.SetRoot(root);
 
         var uses = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        uses.AddThemeConstantOverride("separation", 7); diagram.AddChild(uses);
+        uses.AddThemeConstantOverride("separation", 20); diagram.AddChild(uses);
         uses.ItemRectChanged += diagram.QueueRedraw;
-        foreach (var use in RecipeItemUse.Of(kit.World.Data, item)) {
-            var product = Card(use.Recipe.Output, use.Label());
-            uses.AddChild(product); diagram.BranchTo(product);
+        foreach (var group in RecipeItemUse.Of(kit.World.Data, item).GroupBy(use => use.Role).OrderBy(group => group.Key)) {
+            var role = group.Key.ToString();
+            var branch = new HBoxContainer { Name = $"item_tree_role_{role}" };
+            branch.AddThemeConstantOverride("separation", 42); uses.AddChild(branch);
+            branch.ItemRectChanged += diagram.QueueRedraw;
+            var caption = Style.Text(role, 17, Style.Rim, Style.Head);
+            caption.CustomMinimumSize = new Vector2(104, 0);
+            caption.HorizontalAlignment = HorizontalAlignment.Center;
+            caption.SizeFlagsVertical = SizeFlags.ShrinkCenter; branch.AddChild(caption);
+            var products = new VBoxContainer();
+            products.AddThemeConstantOverride("separation", 6); branch.AddChild(products);
+            foreach (var use in group) products.AddChild(Card(use.Recipe.Output, role));
+            diagram.BranchTo(caption, products);
         }
-        if (uses.GetChildCount() == 0) uses.AddChild(Style.Text("No recipe uses this item directly.", 17, Style.Beige));
+        if (uses.GetChildCount() == 0) {
+            var empty = Style.Text("No recipe uses this item directly.", 17, Style.Beige);
+            uses.AddChild(empty);
+            uses.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+        }
     }
 
     private HBoxContainer Header() {
@@ -60,7 +75,7 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         string tooltip = role == null ? nameText : $"{nameText}\n{role}";
         var card = new ItemSlot {
             Name = root ? "item_tree_root" : $"tree_item_{id}",
-            CustomMinimumSize = new Vector2(root ? 252 : 226, 66),
+            CustomMinimumSize = new Vector2(root ? 252 : 226, root ? 66 : 46),
             SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
             FocusMode = FocusModeEnum.None,
             MouseDefaultCursorShape = CursorShape.PointingHand,
@@ -70,20 +85,15 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         card.Pressed += () => showOnMap(id);
         Style.Skin(card, root ? RootCard : ItemCard, root ? RootCard : ItemHover);
         var face = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
-        face.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 9);
+        face.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, root ? 9 : 6);
         face.AddThemeConstantOverride("separation", 8); card.AddChild(face);
-        var icon = Style.Icon(Icons.Of(id), 36);
+        var icon = Style.Icon(Icons.Of(id), root ? 36 : 30);
         icon.SizeFlagsVertical = SizeFlags.ShrinkCenter; face.AddChild(icon);
-        var words = new VBoxContainer {
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            Alignment = BoxContainer.AlignmentMode.Center,
-            MouseFilter = MouseFilterEnum.Ignore
-        };
-        words.AddThemeConstantOverride("separation", 1); face.AddChild(words);
         var name = Style.Text(nameText, 18, Style.Rim, Style.Head);
         if (root) name.Name = "item_tree_name";
-        name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis; words.AddChild(name);
-        if (role != null) words.AddChild(Style.Text(role, 13, Style.Beige));
+        name.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        face.AddChild(name);
         return card;
     }
 }

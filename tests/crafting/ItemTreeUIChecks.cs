@@ -52,19 +52,33 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
-    /// <summary>Recipes include all direct roles, with a product listed once when it uses the item in two ways.</summary>
+    /// <summary>Coal appears under both of its uses in steel bars, and a fixed tool has its own branch.</summary>
     private async Task CheckItemTreeDistinguishesIngredientsFuelAndFixedTools() {
         await OpenRecipeMap();
         await Click(RecipeMapCard("coal"), alt: true);
         await ItemTreeShows("Coal");
-        Require(HasLabel(ItemTreeCard("steel_bar")!, "Ingredient · Fuel") && HasLabel(ItemTreeCard("iron_bar")!, "Fuel"),
-            "Steel bars use coal as an ingredient and fuel, while iron bars burn it only as fuel.");
-        Require(recipeMap.FindChildren("tree_item_steel_bar", "", true, false).Count == 1,
-            "A recipe with two roles for the item must appear only once.");
-        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        var fuel = recipeMap.FindChild("item_tree_role_Fuel", true, false) as Control;
+        var ingredient = recipeMap.FindChild("item_tree_role_Ingredient", true, false) as Control;
+        Require(fuel != null && ingredient != null && recipeMap.FindChild("item_tree_role_Tool", true, false) == null,
+            "Coal must show Fuel and Ingredient branches, without an empty Tool branch.");
+        Require(fuel!.GetGlobalRect().End.Y <= ingredient!.GetGlobalRect().Position.Y,
+            "Fuel and Ingredient must be laid out as separate branches.");
+        Require(HasLabel(fuel, "Fuel") && HasLabel(ingredient, "Ingredient"), "Each branch must name its use.");
+        Require(fuel.FindChild("tree_item_steel_bar", true, false) != null &&
+            ingredient.FindChild("tree_item_steel_bar", true, false) != null &&
+            fuel.FindChild("tree_item_iron_bar", true, false) != null &&
+            ingredient.FindChild("tree_item_iron_bar", true, false) == null,
+            "Steel bars must appear under both uses of coal, and iron bars only under Fuel.");
+        Require(recipeMap.FindChildren("tree_item_steel_bar", "", true, false).Count == 2,
+            "Steel bars must appear exactly once on each of the two branches.");
+        await Click((Control)ingredient.FindChild("tree_item_steel_bar", true, false));
+        await Until(() => recipeMap.Chosen == "steel_bar" && recipeMap.NodeOf("steel_bar")!.Lit,
+            "the map highlighting Steel bar after a click on the Ingredient branch", 2);
         await Click(RecipeMapCard("steel_pipe"), alt: true);
         await ItemTreeShows("Steel pipe");
-        Require(HasLabel(ItemTreeCard("glass_jar")!, "Tool"), "Glass jars use a steel pipe fitted to the furnace as a tool.");
+        var tool = recipeMap.FindChild("item_tree_role_Tool", true, false);
+        Require(tool != null && HasLabel(tool, "Tool") && tool.FindChild("tree_item_glass_jar", true, false) != null,
+            "Glass jars must appear under Tool when a steel pipe is the one fitted to the furnace.");
         await KeyStroke(Key.Escape);
     }
 }

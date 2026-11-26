@@ -435,6 +435,7 @@ public partial class Game {
         Require(map != null, "The bottom bar must offer a recipe map icon.");
         await Click(map!);
         Require(recipeMap.Visible && !panel.Visible && !bag.Visible, "The icon must open the recipe map directly from the world.");
+        Require(recipeMap.FindChild("map_stations", true, false) == null, "The map must open without the station-cost row.");
         Require(world.Data.Items.Keys.Where(id => !GameData.OffTheMap(id)).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
         Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as not made yet.");
         Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources") && HasLabel(recipeMap, "Hunt animals"), "The map must name its marks and where raw meat comes from.");

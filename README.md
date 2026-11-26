@@ -635,16 +635,16 @@ An item first made while the map is open turns to **Made before**.
 - The map groups items by category, from wood and stone to food and trade. Follow the arrows from a material to what
   it makes. Each card names where the item is made or found.
 - Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
-  Other items have dashed icon outlines. The stations along the top show their costs and are outlined until first built.
+  Other items have dashed icon outlines.
 - Small icons at the foot of a card show a required tool (gold rim) or an additional resource (blue rim).
   Click one to find that item on the map and light it up briefly.
 - Click anywhere on a card to highlight it and the arrows connected to it. The details panel on the right shows how it
   is made, what it requires and what it is used for. The button opens the nearest station that makes it or the crafting
   menu for a recipe made by hand.
 - Alt-click an item on the map to open its item tree in the same window. It shows only recipes that directly use
-  the item as an ingredient, tool or fuel, with a separate branch to each product. Click an item to highlight it
-  on the main map, or Alt-click it to open its own item tree. The upper-left **Recipe map** button returns to the view
-  you left.
+  the item. The products are grouped under **Fuel**, **Ingredient** or **Tool**. Empty branches are hidden, and a
+  product can appear under more than one use. Click an item to highlight it on the main map, or Alt-click it to
+  open its own item tree. The upper-left **Recipe map** button returns to the view you left.
 
 ### Crafting bench
 

@@ -194,10 +194,11 @@ UI and input:
 | `src/stations/display/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
-| `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout, station strip and item details |
-| `src/crafting/display/ItemTree.cs` | The Recipe map's item tree, with a separate branch to each recipe product |
-| `src/crafting/display/ItemTreeBranches.cs` | The lines from the root item to each recipe product |
-| `src/crafting/model/RecipeItemUse.cs` | The ingredient, tool and fuel relationships between an item and a recipe |
+| `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout and item details |
+| `src/crafting/display/ItemTree.cs` | The Recipe map's item tree, with recipe products grouped by role |
+| `src/crafting/display/ItemTreeBranches.cs` | The lines from the root item to each role and its recipe products |
+| `src/crafting/model/RecipeItemUse.cs` | The direct roles an item plays in a recipe |
+| `src/crafting/model/RecipeItemRole.cs` | The roles and the order of their branches |
 | `src/crafting/display/MapTree.cs` | The arrows from materials to products in a category |
 | `src/crafting/display/MapNode.cs` | An item card with its icon, source and links to required tools and additional resources |
 | `src/crafting/display/MapSlot.cs` | The filled or dashed icon slot shared by the cards and the legend |
@@ -1161,7 +1162,8 @@ and lights it briefly (`MapNode.Light`). A click on a card highlights it and sho
 the right of the map. The panel's button leaves the map through `SidePanel.ShowRecipe`.
 Alt-click on a card, chip or detail thumbnail opens that item's tree within the same board.
 `RecipeItemUse.Of` reads each recipe's inputs, accepted tools, fixed station tools and fuels to find direct uses only.
-`ItemTree` draws a separate branch to each recipe product and labels every role the selected item plays in that recipe.
+`ItemTree` groups recipe products under Fuel, Ingredient and Tool branches. It omits empty branches and shows a
+product under each role the selected item plays in that recipe.
 Clicking a card returns to its place in the main map. Alt-clicking it opens its own item tree.
 The Back button restores the main map at its previous selection and scroll position.
 
