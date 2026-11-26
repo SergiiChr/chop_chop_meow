@@ -188,7 +188,7 @@ public static class WolfSnapChecks {
         Require(wolf.Pos == landing, "the missed bite should still leave the wolf planted for a moment");
         SnapTick(world, .5f);
         var rounded = wolf.Pos - world.Player;
-        Require(rounded.Length() > landed.Length() + .45f && MathF.Abs(landed.AngleTo(rounded)) > .25f && wolf.Chase > 0,
+        Require(rounded.Length() > landed.Length() + .45f && MathF.Abs(landed.AngleTo(rounded)) > .25f && wolf.Galloping,
             "the wolf should run outward and around the player before closing in again");
         for (int i = 0; i < 100 && !WolfSnap.Winding(wolf); i++) SnapTick(world, .02f);
         Require(WolfSnap.Winding(wolf), "the run around the player should lead to another committed bite");
