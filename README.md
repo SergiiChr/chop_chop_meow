@@ -1477,4 +1477,8 @@ Music credits:
 
 - Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov))
 - Augmentality (Brandon Morris)
-- Andrii Hroza, Aurec, ZephiraMusic, The_Mountain and AtlasAudio on Pixabay ([track credits](assets/README.md#music)).
+- [Jazz - Jazz Music](https://pixabay.com/music/traditional-jazz-jazz-jazz-music-630211/) by Andrii Hroza (andriih)
+- [Jazz Bar](https://pixabay.com/music/traditional-jazz-jazz-bar-592657/) by Aurec
+- [Lofi Soul](https://pixabay.com/music/lofi-lofi-soul-588903/) by ZephiraMusic
+- [Groove Soul](https://pixabay.com/music/funk-groove-soul-317798/) by The_Mountain
+- [Soft Jazz](https://pixabay.com/music/smooth-jazz-soft-jazz-621606/) by AtlasAudio
