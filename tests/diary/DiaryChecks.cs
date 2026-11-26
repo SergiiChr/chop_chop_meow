@@ -192,9 +192,11 @@ public static class DiaryChecks {
         Give(world, "wood", 6); Give(world, "stone", 4);
         Require(world.Construction.Build(ThingKind.Campfire, page.Pos) != null, "the host should build a campfire over a page they cannot see");
         Require(world.Find(page.Id) == null, "a building over a fallen page should clear the page away");
-        var back = world.Arrive("guest", 9);
-        var tree = world.Add(ThingKind.Tree, Terrain.Spawn + new Vector2(10, -10), 1000);
-        world.As(back, () => ChopUntilAPageFalls(world, tree));
+        var loaded = DiaryWorld(data);
+        loaded.Deserialize(world.Serialize());
+        var back = loaded.Arrive("guest", 9);
+        var tree = loaded.Add(ThingKind.Tree, Terrain.Spawn + new Vector2(10, -10), 1000);
+        loaded.As(back, () => ChopUntilAPageFalls(loaded, tree));
     }
 
     private static void CheckBuildingsAreWorkedFromDryGroundOnly(GameData data) {
@@ -239,8 +241,8 @@ public static class DiaryChecks {
     }
 
     /// <summary>
-    /// A save whose diary holds an unknown find or a day read but not found, or whose page fallen off a tree lies for nobody,
-    /// twice for one player or for one who has that page already, is refused with a clear reason instead of failing mid-game.
+    /// A save whose diary holds an unknown find or a day read but not found, or points at something else as a page fallen
+    /// off a tree or at one its player has already, is refused with a clear reason instead of failing mid-game.
     /// </summary>
     private static void CheckASaveWithABrokenDiaryIsRefused(GameData data) {
         var world = DiaryWorld(data);
@@ -248,24 +250,23 @@ public static class DiaryChecks {
         GatherUntilFound(world, bush, DiaryFind.Berries);
         world.Diary.Take();
         world.Diary.Read(40);
-        DropPage(world, world.Me, Terrain.Spawn + new Vector2(3, 3));
+        var page = DropPage(world, world.Me, Terrain.Spawn + new Vector2(3, 3));
         string save = world.Serialize();
         DiaryWorld(data).Deserialize(save);
-        foreach (var (broken, edit) in new (string, Action<JsonNode, JsonNode>)[] {
-            ("no list of finds", (player, _) => player["DiaryFinds"] = null),
-            ("an unknown find", (player, _) => player["DiaryFinds"] = new JsonArray(99)),
-            ("a find taken twice", (player, _) => player["DiaryFinds"] = new JsonArray((int)DiaryFind.Berries, (int)DiaryFind.Berries)),
-            ("a day read but not found", (player, _) => player["DiaryRead"] = new JsonArray(2)),
-            ("a find taken and still waiting in its pop-up", (player, _) => player["DiaryFinding"] = (int)DiaryFind.Berries),
-            ("a fallen page for nobody", (_, page) => page["PageFor"] = "nobody"),
-            ("two fallen pages for one player", (_, page) => { var copy = page.DeepClone(); copy["Id"] = 99999; page.Parent!.AsArray().Add(copy); }),
-            ("a fallen page for a player who took it already", (player, _) => player["DiaryFinds"]!.AsArray().Add((int)DiaryFind.Tree)),
+        foreach (var (broken, edit) in new (string, Action<JsonNode>)[] {
+            ("no list of finds", player => player["DiaryFinds"] = null),
+            ("an unknown find", player => player["DiaryFinds"] = new JsonArray(99)),
+            ("a find taken twice", player => player["DiaryFinds"] = new JsonArray((int)DiaryFind.Berries, (int)DiaryFind.Berries)),
+            ("a day read but not found", player => player["DiaryRead"] = new JsonArray(2)),
+            ("a find taken and still waiting in its pop-up", player => player["DiaryFinding"] = (int)DiaryFind.Berries),
+            ("a berry bush for its fallen page", player => player["FallenPage"] = bush.Id),
+            ("an id not given out yet for its fallen page", player => player["FallenPage"] = 99999),
+            ("a fallen page for a player who took it already", player => player["DiaryFinds"]!.AsArray().Add((int)DiaryFind.Tree)),
         }) {
             var edited = JsonNode.Parse(save)!;
             var player = edited["Party"]!.AsObject().First().Value!;
-            var page = edited["Things"]!.AsArray().Single(t => (string?)t!["Kind"] == "fallen_page")!;
-            Require(player["DiaryFinds"] != null && player["DiaryRead"] != null && (string?)page["PageFor"] == world.Me.Key, "the save fixture should hold the player's diary and their fallen page");
-            edit(player, page);
+            Require(player["DiaryFinds"] != null && player["DiaryRead"] != null && (int?)player["FallenPage"] == page.Id, "the save fixture should hold the player's diary and their fallen page");
+            edit(player);
             bool refused = false;
             try { DiaryWorld(data).Deserialize(edited.ToJsonString()); } catch (InvalidOperationException error) { refused = error.Message.Contains("out of range"); }
             Require(refused, $"a save with {broken} should be refused with a clear reason");

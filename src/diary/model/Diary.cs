@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -67,40 +66,30 @@ public sealed class Diary(World world) {
     }
 
     /// <summary>
-    /// Whether a save's diaries hold only known finds, each once and none also waiting in its pop-up, and read only days found,
-    /// and each page fallen off a tree lies for a saved player who has not found it otherwise, one page a player at most.
+    /// Whether a saved player's diary holds only known finds, each once and none also waiting in its pop-up, and reads only days it has found,
+    /// and whether what it points at as fallen for it is an id given out already, and is such a page and not one it has already, if it still lies there.
     /// </summary>
-    internal static bool Valid(SaveState save) {
-        foreach (var p in save.Absent.Values) {
-            if (p.DiaryFinds == null || p.DiaryRead == null || !Enum.IsDefined(p.DiaryFinding) || p.DiaryFinds.Contains(p.DiaryFinding)) return false;
-            foreach (var find in p.DiaryFinds) if (find == DiaryFind.None || !Enum.IsDefined(find)) return false;
-            if (p.DiaryFinds.Distinct().Count() != p.DiaryFinds.Count || p.DiaryRead.Distinct().Count() != p.DiaryRead.Count) return false;
-            foreach (int day in p.DiaryRead) if (!Has(p, day)) return false;
-        }
-        var owners = new HashSet<string>();
-        foreach (var page in save.Things.Of(ThingKind.FallenPage))
-            if (page.PageFor == null || !save.Absent.TryGetValue(page.PageFor, out var p) || !owners.Add(page.PageFor) || Holds(p, DiaryFind.Tree)) return false;
-        return true;
+    internal static bool Valid(PlayerState p, SaveState save) {
+        if (p.DiaryFinds == null || p.DiaryRead == null || !Enum.IsDefined(p.DiaryFinding) || p.DiaryFinds.Contains(p.DiaryFinding)) return false;
+        foreach (var find in p.DiaryFinds) if (find == DiaryFind.None || !Enum.IsDefined(find)) return false;
+        if (p.DiaryFinds.Distinct().Count() != p.DiaryFinds.Count || p.DiaryRead.Distinct().Count() != p.DiaryRead.Count) return false;
+        foreach (int day in p.DiaryRead) if (!Has(p, day)) return false;
+        if (p.FallenPage < 0 || p.FallenPage >= save.NextId) return false;
+        return save.Things.Find(p.FallenPage) is not Thing page || page.Kind == ThingKind.FallenPage && !Holds(p, DiaryFind.Tree);
     }
 
     /// <summary>Whether a page lying in the world shows to a player and they can pick it up.</summary>
     public static bool ShowsTo(PlayerState p, Thing t) => t.Kind switch {
         ThingKind.FloatingPage => !Holds(p, DiaryFind.Lake),
-        ThingKind.FallenPage => t.PageFor == p.Key,
+        ThingKind.FallenPage => p.FallenPage == t.Id,
         _ => true,
     };
 
     /// <summary>Whether a find is still to come for a player: not taken, not waiting in its pop-up and not lying where it fell.</summary>
-    private bool Missing(PlayerState p, DiaryFind find) => !Holds(p, find) && (find != DiaryFind.Tree || !LiesFor(p));
+    private bool Missing(PlayerState p, DiaryFind find) => !Holds(p, find) && (find != DiaryFind.Tree || world.Find(p.FallenPage) == null);
 
     /// <summary>Whether a player has taken a find or has it waiting in its pop-up.</summary>
     private static bool Holds(PlayerState p, DiaryFind find) => p.DiaryFinds.Contains(find) || p.DiaryFinding == find;
-
-    /// <summary>Whether a page fallen off a tree lies in the world for a player.</summary>
-    private bool LiesFor(PlayerState p) {
-        foreach (var page in world.S.Things.Of(ThingKind.FallenPage)) if (page.PageFor == p.Key) return true;
-        return false;
-    }
 
     /// <summary>
     /// One gather by the acting player of what hides <paramref name="find"/>, <paramref name="at"/> a spot: one time in twenty, it turns up.
@@ -122,7 +111,7 @@ public sealed class Diary(World world) {
     /// <summary>Lays a page fallen off a tree at a spot for a player, the only one it shows to.</summary>
     public Thing Drop(PlayerState p, Vector2 at) {
         var page = world.Add(ThingKind.FallenPage, at, 1);
-        page.PageFor = p.Key;
+        p.FallenPage = page.Id;
         return page;
     }
 
@@ -131,11 +120,6 @@ public sealed class Diary(World world) {
         var pages = world.S.Things.Of(ThingKind.FallenPage);
         for (int i = pages.Count - 1; i >= 0; i--)
             if (World.Clears(built, pages[i].Pos)) world.S.Things.Remove(pages[i]);
-    }
-
-    /// <summary>Hands the page fallen off a tree for a player to them under the new key a machine claiming the save gave them.</summary>
-    internal void Rekey(string from, string to) {
-        foreach (var page in world.S.Things.Of(ThingKind.FallenPage)) if (page.PageFor == from) page.PageFor = to;
     }
 
     /// <summary>Floats the lake's page at a spot of its own in the shallows, as a new world starts.</summary>

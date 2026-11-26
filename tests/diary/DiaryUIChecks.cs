@@ -99,7 +99,7 @@ public partial class Game {
         float stickAt = view.PropOf(stick.Id)!.Root.Position.Y, pageAt = view.PropOf(page.Id)!.Root.Position.Y;
         Require(stickAt < -.05f, $"A stick in the shallows must rest on the lake bed under the water, not at {stickAt:0.000}.");
         Require(pageAt == 0, $"A page in the shallows must float on the water, not lie at {pageAt:0.000}.");
-        Hosted.S.Things.Remove(stick); Hosted.S.Things.Remove(page);
+        RemoveThings(Hosted, t => t == stick || t == page);
         Warp(Hosted, home); await Frames(4);
     }
 

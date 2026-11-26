@@ -1087,8 +1087,10 @@ updates never show.
 ### Diary
 
 `Diary` (`src/diary/model/Diary.cs`) keeps each player's diary in their `PlayerState`: `DiaryFinds`, the finds taken;
-`DiaryRead`, the days opened; and `DiaryFinding`, a find whose pop-up waits.
-A page that fell off a tree for a player names them itself, in `Thing.PageFor`.
+`DiaryRead`, the days opened; `DiaryFinding`, a find whose pop-up waits; and `FallenPage`, the page that fell off a tree
+for them.
+No thing's id is given out twice, so once that page is picked up or cleared away, `FallenPage` names nothing and needs no
+reset.
 `DiaryDay` holds the 11 days and their text, with `DiaryDay.Illegible` and `DiaryDay.Scribbles` where the writing is
 drawn as scribbles and `DiaryDay.FallsApart` where it starts to fall apart, and `DiaryFindDef` the line of each find's
 pop-up and the days it holds.
@@ -1110,15 +1112,15 @@ them out yet.
   check that gathers would stop with it.
 
 `Diary.ShowsTo` says who sees a page lying in the world: the lake's to every player who has neither taken it nor has its
-pop-up up, and a fallen one to the player its `Thing.PageFor` names.
+pop-up up, and a fallen one to the player whose `FallenPage` it is.
 `World.CollectKnown`, which drawing and picking go through, leaves out the pages hidden from the window's player.
 A page leaves no memory under fog, is not one of `World.Structures`, and takes no ground (`Thing.TakesGround`): grass
 grows under it and its coming and going leaves the ground dressing alone.
 A fallen page keeps its place while its player is away, and they find it there when they come back.
 A building, yard or crate put over it clears it away with the stumps and bushes under it (`Diary.ClearUnder`), so a
 later chop can drop their page again.
-A save is refused when a fallen page names no saved player, a second page for one player or a player who has that page
-already (`Diary.Valid`).
+A save is refused when a player's `FallenPage` is an id not given out yet, names a thing that is not such a page, or
+names one while they have its find already (`Diary.Valid`).
 A left or a right click on a page walks the player over to it, as to a loose piece (`Thing.TakenWhole`), and
 `Verb.PickUp` brings up its pop-up (`Diary.PickUp`); a fallen page leaves the ground then.
 `World.Occupied` holds while `DiaryFinding` is set, so the player is busy.
