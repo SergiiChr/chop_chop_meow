@@ -712,35 +712,6 @@ public partial class Game {
         Require(damageEdges.Strength >= .15f, "Food under 15% must keep the screen edges glowing.");
         SetNeeds(Hosted, hunger: fed);
     }
-    /// <summary>Sounds rotate through variants, a howl plays as long as a wolf holds it, and music hands over and crossfades by time of day.</summary>
-    private async Task CheckSoundsRotateAndMusicCrossfades() {
-        Require(Sounds.Names.All(name => sounds.VariantCount(name) > 0), "Every sound must load.");
-        Require(sounds.VariantCount("footsteps_default") == 6, "Numbered footstep files must group as six variants.");
-        Require(sounds.VariantCount("chop_tree") == 1, "A single chop file must count as one variant.");
-        Require(Math.Abs(sounds.Length("wolf_howl") - world.Data.LoneHowlSeconds) < .1 && Math.Abs(sounds.Length("wolf_howl_group") - world.Data.PackHowlSeconds) < .1,
-            "A wolf must hold its howl as long as the howl recording plays.");
-        // Random picks can keep to two of the three variants, about once in a thousand runs: a seed makes them the same every run.
-        sounds.Reseed(1);
-        var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
-        Require(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
-        sounds.UpdateMusic(Sounds.MusicFadeSeconds);
-        Require(sounds.DayMusicPlaying && !sounds.NightMusicPlaying, "Daytime must play the day music only.");
-        sounds.SkipToDayTrackEnd();
-        await Until(() => sounds.DayMusicPlaying && sounds.DayMusicIndex == 1, "a day track that plays to its end handing over to the next one", 5);
-        sounds.SkipToDayTrackEnd();
-        await Until(() => sounds.DayMusicPlaying && sounds.DayMusicIndex == 0, "the last day track wrapping to the first", 5);
-        RunUntilNight(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds / 2);
-        Require(sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Nightfall must crossfade the day music into the night music.");
-        sounds.UpdateMusic(Sounds.MusicFadeSeconds); await Seconds(.5f);
-        Require(!sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Day music must stop once faded out.");
-        RunUntilMorning(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2); float stoppedAt = sounds.NightMusicPosition;
-        Require(!sounds.NightMusicPlaying, "Dawn must stop the night music.");
-        Require(sounds.DayMusicPlaying, "Dawn must bring the day music back.");
-        Require(stoppedAt > .2f, "Dawn must keep the night music's position.");
-        RunUntilNight(Hosted); await Frames(1); sounds.UpdateMusic(.1f);
-        Require(sounds.NightMusicPlaying && sounds.NightMusicPosition >= stoppedAt, "The next night must resume the music where it stopped.");
-        RunUntilMorning(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2);
-    }
     /// <summary>A sound is loudest at the player and fades to silence over its reach, whatever the zoom.</summary>
     private async Task CheckSoundsFadeWithDistanceFromThePlayerAtAnyZoom() {
         float zoom = view.Zoom;
@@ -1150,7 +1121,7 @@ public partial class Game {
             await TestClean(CheckMessagesStackFadeAndKeepClearOfHud);
             await RunPanelUIChecks();
             await TestClean(CheckLowFoodGlowsScreenEdges);
-            await TestClean(CheckSoundsRotateAndMusicCrossfades);
+            await RunAudioUIChecks();
             await TestClean(CheckSoundsFadeWithDistanceFromThePlayerAtAnyZoom);
             await RunGatheringUIChecks();
             await RunReplantingUIChecks();

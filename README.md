@@ -1429,7 +1429,8 @@ Repeated sounds rotate between variants.
 A sound is loudest at your character and fades with distance, to silence 16 metres away, whatever the zoom.
 A wolf's growl as it breaks into its sprint carries 30 metres, and a howl 80.
 
-Day and night have their own music, which crossfades as the time changes and picks up where it stopped last time.
+Day and night each have their own music playlist.
+The music crossfades when the time changes, and each playlist picks up where it left off and wraps after its last track.
 
 ## Limitations
 
@@ -1454,3 +1455,4 @@ Music credits:
 
 - Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov))
 - Augmentality (Brandon Morris)
+- Andrii Hroza, Aurec, ZephiraMusic, The_Mountain and AtlasAudio on Pixabay ([track credits](assets/README.md#music)).

@@ -254,13 +254,22 @@ Both are variable fonts weighted in code.
 
 `music/` holds the ambient music as 192 kbps MP3.
 
-- `path_to_lake_land.mp3` and `mystic_theme.mp3` play in turn during the day.
-- `forest.mp3` plays at night.
+- Daytime plays `path_to_lake_land.mp3`, `mystic_theme.mp3`, `jazz_jazz_music.mp3`, `jazz_bar.mp3`, `lofi_soul.mp3` and
+  `groove_soul.mp3` in order.
+- Night plays `forest.mp3` and `soft_jazz.mp3` in order.
 
 Every ambient track is normalised to -18 LUFS integrated loudness with true peaks below -1 dBTP, so tracks switch without a jump in volume.
 Measure a new track with ffmpeg's `ebur128` filter, then apply the gain that brings it to the target.
 
 Credits: Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov)) and Augmentality (Brandon Morris).
+
+The following tracks are used under the [Pixabay Content License](https://pixabay.com/service/license-summary/).
+
+- `jazz_jazz_music.mp3` is [Jazz - Jazz Music](https://pixabay.com/music/traditional-jazz-jazz-jazz-music-630211/) by Andrii Hroza (andriih).
+- `jazz_bar.mp3` is [Jazz Bar](https://pixabay.com/music/traditional-jazz-jazz-bar-592657/) by Aurec.
+- `lofi_soul.mp3` is [Lofi Soul](https://pixabay.com/music/lofi-lofi-soul-588903/) by ZephiraMusic.
+- `groove_soul.mp3` is [Groove Soul](https://pixabay.com/music/funk-groove-soul-317798/) by The_Mountain.
+- `soft_jazz.mp3` is [Soft Jazz](https://pixabay.com/music/smooth-jazz-soft-jazz-621606/) by AtlasAudio.
 
 ### Sound effects
 

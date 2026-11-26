@@ -119,9 +119,12 @@ public partial class Sounds : Node {
     public bool DayMusicPlaying => day.Player.Playing;
     public int DayMusicIndex => day.Index;
     /// <summary>Jumps the current day track to its last moment, so it plays to its end without the wait.</summary>
-    public void SkipToDayTrackEnd() => day.Player.Seek((float)day.Player.Stream.GetLength() - .1f);
+    public void SkipToDayTrackEnd() => day.SkipToTrackEnd();
     public bool NightMusicPlaying => night.Player.Playing;
+    public int NightMusicIndex => night.Index;
     public float NightMusicPosition => night.Position;
+    /// <summary>Jumps the current night track to its last moment, so it plays to its end without the wait.</summary>
+    public void SkipToNightTrackEnd() => night.SkipToTrackEnd();
 
     // Players made while loading and reused in turn, so a sound instantiates nothing mid-game.
     private readonly List<AudioStreamPlayer> voices = new();
@@ -146,8 +149,8 @@ public partial class Sounds : Node {
             var voice = new AudioStreamPlayer(); AddChild(voice); heldVoices.Add(voice);
             heldPlacedVoices.Add(PlacedVoice());
         }
-        day = new Track(this, "path_to_lake_land", "mystic_theme");
-        night = new Track(this, "forest");
+        day = new Track(this, "path_to_lake_land", "mystic_theme", "jazz_jazz_music", "jazz_bar", "lofi_soul", "groove_soul");
+        night = new Track(this, "forest", "soft_jazz");
         // Loading a sound on its first play would stall that frame.
         foreach (string name in Levels.Keys) Variants(name);
     }
@@ -389,6 +392,8 @@ public partial class Sounds : Node {
             Player = new AudioStreamPlayer { Stream = streams[0] };
             parent.AddChild(Player);
         }
+
+        public void SkipToTrackEnd() => Player.Seek((float)Player.Stream.GetLength() - .1f);
 
         public void Update(bool wanted, float dt, float volume) {
             level = Mathf.MoveToward(level, wanted ? 1 : 0, dt / MusicFadeSeconds);
