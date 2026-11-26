@@ -1156,14 +1156,16 @@ running the slot's usual action. An item link in the Goal Log uses the same entr
 Closing the map returns to the panel or goal details underneath.
 `PlayerControl.Update` moves nobody while it shows, and an item link shows its name and icon as soon as `World.Had` knows its item.
 `RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
-and the rest go on lines below. `MapTree` draws arrows to the products and highlights those connected to the chosen card.
+and the rest go on lines below. When a recipe takes a spare root in the same category as a second ingredient, the
+first column can hold that root beside the product, and the main ingredient connects from above.
+`MapTree` draws arrows to the products and highlights those connected to the chosen card.
 A `MapNode` draws a filled icon slot for a discovered item and a question mark in a dashed slot otherwise.
 `MapItemLink` also hides undiscovered names and icons in the Item tree, chips, thumbnails and tooltips.
-Undiscovered entries can still be followed, but the right-hand panel hides their recipes until discovery.
+Undiscovered entries can still be found on the main map, but neither their recipe details nor their Item trees open until discovery.
 Chips below a discovered card link to the required tool and to each input after the first. A click on a chip scrolls to its item
 and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details in a vertical panel to
 the right of the map. The panel's button leaves the map through `SidePanel.ShowRecipe`.
-Alt-click on a card, chip or detail thumbnail opens that item's tree within the same board.
+Alt-click on a discovered item's card, chip or detail thumbnail opens its Item tree within the same board.
 `RecipeItemUse.Of` reads each recipe's inputs, accepted tools, fixed station tools and fuels to find direct uses only.
 `ItemTree` groups recipe products under Fuel, Ingredient and Tool branches. It omits empty branches and shows a
 product under each role the selected item plays in that recipe.

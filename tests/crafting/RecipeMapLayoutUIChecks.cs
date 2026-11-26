@@ -30,7 +30,35 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
-    /// <summary>Undiscovered entries can be followed in the map, but only reveal their identity once discovered.</summary>
+    /// <summary>Coal sits beside the Steel bar it helps make, and Food contains the wheat chain.</summary>
+    private async Task CheckRecipeMapGroupsCoalAndWheatWithTheirChains() {
+        await OpenRecipeMap();
+        var ore = recipeMap.NodeOf("iron_ore")!;
+        var iron = recipeMap.NodeOf("iron_bar")!;
+        var coal = recipeMap.NodeOf("coal")!;
+        var steel = recipeMap.NodeOf("steel_bar")!;
+        var metals = recipeMap.FindChild("lane_Metals", true, false);
+        Require(new[] { ore, iron, coal, steel }.All(metals.IsAncestorOf),
+            "Iron ore, Iron bar, Coal and Steel bar must all be in Metals.");
+        Require(ore.Position.Y == iron.Position.Y && ore.Position.X < iron.Position.X &&
+            coal.Position.X == ore.Position.X && steel.Position.X == iron.Position.X &&
+            coal.Position.Y == steel.Position.Y && coal.Position.Y > ore.Position.Y,
+            "Coal and Steel bar must sit under Iron ore and Iron bar, on their own line together.");
+        Require(recipeMap.NodeOf("steel_parts")!.Position.X > steel.Position.X &&
+            recipeMap.NodeOf("steel_parts")!.Position.Y >= steel.Position.Y,
+            "Steel products must branch to the right of the relocated Steel bar.");
+        Require(new[] { "tin_ore", "tin_bar", "tin_sheet", "tin_can" }.All(item => metals.IsAncestorOf(recipeMap.NodeOf(item))),
+            "The entire tin chain must be in Metals.");
+        var rocks = recipeMap.FindChild("lane_Big rocks and small rocks", true, false);
+        Require(new[] { "stone", Beach.Sand }.All(item => rocks.IsAncestorOf(recipeMap.NodeOf(item))),
+            "Stone and sand must stay together in Big rocks and small rocks.");
+        var food = recipeMap.FindChild("lane_Food", true, false);
+        Require(new[] { "wheat_seeds", "wheat", "flour", "dough", "bread" }.All(item => food.IsAncestorOf(recipeMap.NodeOf(item))),
+            "The entire wheat chain must be in Food.");
+        await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>Undiscovered entries remain anonymous and do not open an Item tree until discovered.</summary>
     private async Task CheckUndiscoveredMapItemsStayAnonymous() {
         await OpenRecipeMap();
         var barrel = (ItemSlot)RecipeMapCard("steel_barrel");
@@ -45,16 +73,17 @@ public partial class Game {
             !HasLabel(details, "Made at") && details.FindChild("map_show", true, false) == null,
             "Selecting the question mark must not reveal the undiscovered item's recipe.");
         await Click(barrel, alt: true);
-        await ItemTreeShows("steel_barrel");
-        var unknownRoot = recipeMap.FindChild("item_tree_root_steel_barrel", true, false);
-        Require(HasLabel(unknownRoot, "?") && !HasLabel(unknownRoot, "Steel barrel"),
-            "Following an undiscovered item must not reveal its name in the Item tree.");
-        await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
+        Require(recipeMap.FindChild("item_tree", true, false) == null && recipeMap.Chosen == "steel_barrel",
+            "Alt-clicking an undiscovered card must stay on the main map.");
+        Require(!barrel.TooltipText.Contains(RecipeMap.ItemTreeHint), "An undiscovered card must not offer the Item tree.");
         var sheet = RecipeMapCard("steel_sheet");
         await Click(sheet);
         var thumbnail = (ItemSlot)details.FindChild("use_steel_barrel", true, false);
         Require(thumbnail.Text == "?" && thumbnail.Icon == null && !thumbnail.TooltipText.Contains("Steel barrel"),
             "A detail thumbnail must not reveal an undiscovered product.");
+        await Click(thumbnail, alt: true);
+        Require(recipeMap.FindChild("item_tree", true, false) == null,
+            "Alt-clicking an undiscovered thumbnail must stay on the main map.");
         await Click(sheet, alt: true);
         await ItemTreeShows("steel_sheet");
         var product = (ItemSlot)ItemTreeCard("steel_barrel")!;
@@ -62,11 +91,17 @@ public partial class Game {
         Require(HasLabel(product, "?") && !product.TooltipText.Contains("Steel barrel") &&
             !product.FindChildren("*", "TextureRect", true, false).OfType<TextureRect>().Any(icon => icon.Texture != null) &&
             HasLabel(bottle, "Empty bottle"), "The Item tree must distinguish undiscovered products from known ones.");
+        var tree = recipeMap.FindChild("item_tree", true, false);
+        await Click(product, alt: true);
+        Require(recipeMap.FindChild("item_tree", true, false) == tree,
+            "Alt-clicking an undiscovered product must stay in the current Item tree.");
         Achieve(Hosted, "steel_barrel");
         await Until(() => HasLabel(product, "Steel barrel") &&
             product.FindChildren("*", "TextureRect", true, false).OfType<TextureRect>().Any(icon => icon.Texture != null),
             "the newly discovered barrel showing its name and icon in the open Item tree", 2);
-        await Click(product);
+        await Click(product, alt: true);
+        await ItemTreeShows("steel_barrel");
+        await Click((Control)recipeMap.FindChild("item_tree_root_steel_barrel", true, false));
         await Until(() => recipeMap.Chosen == "steel_barrel" && HasLabel(details, "Steel barrel") && HasLabel(details, "Made at"),
             "the discovered barrel's recipe appearing in the main map", 2);
         Require(recipeMap.NodeOf("steel_barrel")!.FindChild("also_steel_parts", true, false) is Button { Icon: not null },

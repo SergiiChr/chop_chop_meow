@@ -632,20 +632,20 @@ Opening it from a goal keeps the pause menu open underneath.
 Movement controls are disabled while the map is open.
 An item discovered while the map is open reveals its name and icon without reopening the map.
 
-- The map groups items by category, from wood and stone to food and trade. Follow the arrows from a material to what
-  it makes. Discovered cards name where the item is made or found.
+- The map groups items by category. Coal and the iron, steel and tin chains are in **Metals**. The wheat chain is in
+  **Food**. Follow the arrows from a material to what it makes. Discovered cards name where the item is made or found.
 - Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
-  Undiscovered items show as question marks without names or icons in both views. You can follow their links, but
-  their recipe details stay hidden until they are discovered.
+  Undiscovered items show as question marks without names or icons in both views. You can select them on the main map,
+  but their recipe details and Item trees stay hidden until they are discovered.
 - Small icons at the foot of a discovered card show a required tool (gold rim) or an additional resource (blue rim).
   Click one to find that item on the map and light it up briefly.
 - Click anywhere on a card to highlight it and the arrows connected to it. The details panel on the right shows how it
   is made, what it requires and what it is used for. The button opens the nearest station that makes it or the crafting
   menu for a recipe made by hand.
-- Alt-click an item on the map to open its item tree in the same window. It shows only recipes that directly use
+- Alt-click a discovered item on the map to open its Item tree in the same window. It shows only recipes that directly use
   the item. The products are grouped under **Fuel**, **Ingredient** or **Tool**. Empty branches are hidden, and a
   product can appear under more than one use. Click an item to highlight it on the main map, or Alt-click it to
-  open its own item tree. The upper-left **Recipe map** button returns to the view you left.
+  open its own Item tree if it has been discovered. The upper-left **Recipe map** button returns to the view you left.
 
 ### Crafting bench
 

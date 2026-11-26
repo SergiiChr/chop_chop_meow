@@ -39,6 +39,7 @@ public partial class Game {
         await TestClean(CheckCraftingLeavesTheRecipeMapOnTheBottomBar);
         await TestClean(CheckRecipeMapOpensFromTheBottomBarAndShowsEveryItemOnce);
         await TestClean(CheckRecipeMapDetailsAreStackedOnTheRight);
+        await TestClean(CheckRecipeMapGroupsCoalAndWheatWithTheirChains);
         await TestClean(CheckUndiscoveredMapItemsStayAnonymous);
         await TestClean(CheckAltClickBackpackItemOpensItsRecipeMapEntry);
         await TestClean(CheckAltClickHotbarItemOpensItsRecipeMapEntry);

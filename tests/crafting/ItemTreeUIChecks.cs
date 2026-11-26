@@ -8,6 +8,7 @@ namespace ChopChopMeow;
 public partial class Game {
     /// <summary>Each item opens its own direct recipes, and an ordinary click goes back to that item's place on the map.</summary>
     private async Task CheckItemTreeFollowsOneDirectRecipeAtATime() {
+        Achieve(Hosted, "steel_hammer", "tin_can"); await Frames();
         await OpenRecipeMap();
         await Click(RecipeMapCard("steel_hammer"), alt: true);
         await ItemTreeShows("steel_hammer");
@@ -28,6 +29,7 @@ public partial class Game {
 
     /// <summary>The Back button keeps the selection and scroll position the player left on the main map.</summary>
     private async Task CheckItemTreeBackRestoresTheMainMap() {
+        Achieve(Hosted, "wood_hammer"); await Frames();
         await OpenRecipeMap();
         var mallet = RecipeMapCard("wood_hammer");
         await Click(mallet);
@@ -45,7 +47,7 @@ public partial class Game {
 
     /// <summary>An item shown in the main map's details also opens its own item tree.</summary>
     private async Task CheckItemTreeOpensFromADetailThumbnail() {
-        Achieve(Hosted, "tin_sheet"); await Frames();
+        Achieve(Hosted, "tin_can"); await Frames();
         await OpenRecipeMap();
         await Click(RecipeMapCard("tin_sheet"));
         await Click((Control)recipeMap.FindChild("use_tin_can", true, false), alt: true);
@@ -56,6 +58,7 @@ public partial class Game {
 
     /// <summary>Coal appears under both of its uses in steel bars, and a fixed tool has its own branch.</summary>
     private async Task CheckItemTreeDistinguishesIngredientsFuelAndFixedTools() {
+        Achieve(Hosted, "steel_pipe"); await Frames();
         await OpenRecipeMap();
         await Click(RecipeMapCard("coal"), alt: true);
         await ItemTreeShows("coal");

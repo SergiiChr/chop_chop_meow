@@ -143,11 +143,10 @@ public sealed partial class GameData {
     };
     public List<MapRowDef> MapRows { get; } = new() {
         new() { Title = "Wood", Roots = new() { "wood", "acorn" } },
-        new() { Title = "Stone, coal and sand", Roots = new() { "stone", "coal", Beach.Sand } },
-        new() { Title = "Iron and steel", Roots = new() { "iron_ore" } },
-        new() { Title = "Tin", Roots = new() { "tin_ore" } },
-        new() { Title = "Food", Roots = new() { "berries", "raw_meat" } },
-        new() { Title = "Farm", Roots = new() { "leaves", "grass", "wheat_seeds" } },
+        new() { Title = "Big rocks and small rocks", Roots = new() { "stone", Beach.Sand } },
+        new() { Title = "Metals", Roots = new() { "iron_ore", "coal", "tin_ore" } },
+        new() { Title = "Food", Roots = new() { "berries", "raw_meat", "wheat_seeds" } },
+        new() { Title = "Farm", Roots = new() { "leaves", "grass" } },
         new() { Title = "Nettle and firebugs", Roots = new() { "nettle", "firebug" } },
         new() { Title = "Trade", Roots = new() { Inventory.Coins } },
     };

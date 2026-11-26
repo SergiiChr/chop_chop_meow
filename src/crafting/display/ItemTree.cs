@@ -64,14 +64,14 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         var words = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         words.AddThemeConstantOverride("separation", 1); header.AddChild(words);
         words.AddChild(Style.Heading("Item tree", 30));
-        words.AddChild(Style.Text("Click to find an item on the map. Alt-click to follow its direct recipes.", 15, Style.Beige));
+        words.AddChild(Style.Text("Click to find an item on the map. Alt-click a discovered item to follow its direct recipes.", 15, Style.Beige));
         header.AddChild(kit.HeaderButton("close", "Close · Esc", close, Style.CloseRound, "map_close"));
         return header;
     }
 
     private ItemSlot Card(string id, string? role = null) {
         bool root = role == null;
-        var card = new MapItemLink(kit.World, id, $"Click to find it on the map · {RecipeMap.ItemTreeHint}", role) {
+        var card = new MapItemLink(kit.World, id, "Click to find it on the map", role) {
             Name = root ? $"item_tree_root_{id}" : $"tree_item_{id}",
             CustomMinimumSize = new Vector2(root ? 252 : 226, root ? 66 : 46),
             SizeFlagsHorizontal = SizeFlags.ShrinkBegin,

@@ -42,7 +42,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         CustomMinimumSize = Size = new Vector2(Width, RowPitch - 3);
         MouseFilter = MouseFilterEnum.Ignore;
 
-        card = new MapItemLink(world, item, RecipeMap.ItemTreeHint) {
+        card = new MapItemLink(world, item) {
             Name = "slot",
             Size = new Vector2(Width, Height),
             FocusMode = FocusModeEnum.None,
@@ -103,7 +103,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         : r.Hand ? $"Hand or {data.Name(station).ToLowerInvariant()}" : data.Name(station);
 
     private MapItemLink ChipFor(string other, string kind, StyleBoxFlat look, string role) {
-        var chip = new MapItemLink(world, other, $"Click to find it on the map · {RecipeMap.ItemTreeHint}", role) {
+        var chip = new MapItemLink(world, other, "Click to find it on the map", role) {
             Name = $"{kind}_{other}",
             CustomMinimumSize = new Vector2(Chip, Chip),
             ExpandIcon = true,

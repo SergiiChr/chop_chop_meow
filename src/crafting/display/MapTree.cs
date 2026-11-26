@@ -32,6 +32,11 @@ public partial class MapTree : Control {
         }
         foreach (var (from, to) in links) {
             if ((from.Chosen || to.Chosen) != highlighted) continue;
+            if (from.Position.X == to.Position.X) {
+                DrawArrow(from.Position + new Vector2(MapNode.Width / 2, MapNode.Height),
+                    to.Position + new Vector2(MapNode.Width / 2, 0), color, stroke);
+                continue;
+            }
             Vector2 start = Exit(from), end = Entry(to);
             float trunk = to.Position.X - Gap / 2;
             if (start.Y != end.Y) {
@@ -44,8 +49,10 @@ public partial class MapTree : Control {
     }
 
     private void DrawArrow(Vector2 start, Vector2 end, Color color, float stroke) {
-        DrawLine(start, end - new Vector2(6, 0), color, stroke, true);
-        DrawColoredPolygon([end, end - new Vector2(7, 4), end - new Vector2(7, -4)], color);
+        Vector2 direction = (end - start).Normalized();
+        Vector2 baseCenter = end - direction * 7, wing = direction.Orthogonal() * 4;
+        DrawLine(start, end - direction * 6, color, stroke, true);
+        DrawColoredPolygon([end, baseCenter + wing, baseCenter - wing], color);
     }
 
     private static Vector2 Exit(MapNode node) => node.Position + new Vector2(MapNode.Width, MapNode.Height / 2);
