@@ -65,6 +65,8 @@ public sealed class PlayerState {
     public int DoorQueued { get; set; }
     /// <summary>The resource the player is working on, so other machines can show it.</summary>
     public int GatherTarget { get; set; }
+    /// <summary>A nettle or anything else that stings took health from the player while they picked it this tick; carried so every machine hears them groan.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Stung { get; set; }
     /// <summary>The held dig, numbered by the window that started it, or zero when idle.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int DigAttempt { get; set; }
     /// <summary>The tile being dug, one plus its index in the map's rows.</summary>

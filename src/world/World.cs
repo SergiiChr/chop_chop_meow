@@ -806,6 +806,8 @@ public sealed partial class World {
         }
         return best;
     }
+    /// <summary>Health a second that gathering a kind takes from the acting player: its sting, or zero when it does not sting or a tool they carry spares them.</summary>
+    private float StingOf(ThingKind kind) => GatherRules.Of(kind) is { Sting: > 0 } rule && (rule.Spares == null || BestTool(rule.Spares) == null) ? rule.Sting : 0;
     public float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
     /// <summary>How many times faster than a recipe's own seconds work goes: a bench's speed, or 1 elsewhere and by hand, times the tool's.</summary>
     public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
@@ -850,6 +852,8 @@ public sealed partial class World {
         // A loose piece is a single pick-up; anything else the host works on for as long as the player holds on to it.
         if (Busy()) { ResetGather(); return; }
         if (t.IsLoose ? Forwarded(Verb.PickUp, t.Id) : Remote) { S.Actor.GatherTarget = t.IsLoose ? 0 : t.Id; return; }
+        // Set again below only while this gather stings.
+        S.Actor.Stung = false;
         // A felled tree or a dug up bush is no longer there to work on.
         if (Find(t.Id) != t) { ResetGather(); return; }
         S.Actor.GatherTarget = t.Id;
@@ -863,7 +867,9 @@ public sealed partial class World {
         gatherClock += dt;
         var rule = GatherRules.Of(t.Kind);
         string? tool = (rule?.Needs ?? rule?.Helps) is string kind ? BestTool(kind) : null;
-        if (rule is { Sting: > 0 } stinging && (stinging.Spares == null || BestTool(stinging.Spares) == null)) S.Health -= dt * stinging.Sting;
+        float sting = StingOf(t.Kind);
+        S.Actor.Stung = sting > 0;
+        S.Health -= dt * sting;
         if (t.IsDug) {
             t.Progress += dt * Speed(tool);
             if (DugOut(t)) Unearth(t, S.Backpack);
@@ -893,7 +899,11 @@ public sealed partial class World {
         if (t.Remaining <= 0) S.Things.Remove(t);
         Got(item); Play("wood_rocks_inventory", t.Pos); PlayerActed?.Invoke(ActorAction.PickUp, t.Pos);
     }
-    public void ResetGather() { gatherClock = 0; S.Actor.GatherTarget = 0; }
+    /// <summary>Stops the acting player's gather; only the host clears their sting, which a guest's copy shows as the host sends it.</summary>
+    public void ResetGather() {
+        gatherClock = 0; S.Actor.GatherTarget = 0;
+        if (!Remote) S.Actor.Stung = false;
+    }
     /// <summary>The player hammers an anvil while standing by it with nothing else to do.</summary>
     /// <remarks>Input calls <see cref="MovePlayer"/> and <see cref="Gather"/> before each tick, so a tick without them counts as standing still.</remarks>
     public bool PlayerHammers(Thing anvil) => !playerBusy && AtStation(anvil);
@@ -2531,7 +2541,10 @@ public sealed partial class World {
     private void NeedsTick(float dt) {
         attackClock = Math.Max(0, attackClock - dt);
         Swings.Tick(dt);
-        if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
+        if (S.Actor.Id != LocalId) {
+            if (Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
+            else S.Actor.Stung = false;
+        }
         Holes.Work(dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
             float drain = Sleep.SleepingAt == 0 && S.Actor.Sprinting && CanSprint ? Data.SprintDrain : 1, fed = S.Hunger;

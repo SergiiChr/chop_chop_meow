@@ -513,6 +513,7 @@ A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 
 Three nettles come up each night where nobody is looking, until ten stand in the valley.
 Hold right mouse on one to pick it: it takes 3 seconds, gives 1 nettle and stings for 1% of health a second, which can kill.
+The player groans in pain for as long as it stings, and other players hear the groan from where the picker stands.
 A picked nettle is gone for good, a backpack with no room for it leaves it standing, and nothing is built or laid where one stands.
 Nettle rope is made at the crafting bench, 1 rope from 1 nettle, and a bug net from 5 rope, 1 wood and 1 wood part ([Crafting bench](#crafting-bench)).
 Whoever makes rope strikes two mallet blows, then twists the fibres by hand, in turn.
