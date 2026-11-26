@@ -114,7 +114,8 @@ public partial class NeedsPlate : PanelContainer {
         bankSlot = slot; bankCount = count;
         Style.Skin(slot, Style.SlotBank, Style.Round(Style.SlotFill, 28).Item2);
         slot.Icon = Icons.Of(Inventory.Coins);
-        slot.TooltipText = "Coins kept at the trading posts for wages; sales land here.\nAt a trading post · LMB: pick up all · RMB: half · put coins here to bank them";
+        kit.LinkRecipeMap(slot, () => Inventory.Coins);
+        slot.TooltipText = $"Coins kept at the trading posts for wages; sales land here.\nAt a trading post · LMB: pick up all · RMB: half · put coins here to bank them\n{RecipeMap.AltClickHint}";
         slot.Controls = new SlotInput(cursor) {
             Pick = () => NearPost() is Thing post && post.Wages!.Layout[0].Item != "" ? (post.Wages, 0) : null,
             Takes = held => held.Stack is { Box: 0, Item: Inventory.Coins },

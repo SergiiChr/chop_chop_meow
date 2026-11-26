@@ -99,7 +99,7 @@ public partial class ReviewDrive : Node {
         cursor = at;
     }
 
-    /// <summary>`click|down|up X Y [left|right] [ctrl] [shift] [double]`.</summary>
+    /// <summary>`click|down|up X Y [left|right] [ctrl] [shift] [alt] [double]`.</summary>
     private void Click(string[] p, bool pressed) {
         var at = new Vector2(Number(p[1]), Number(p[2]));
         var rest = p.AsSpan(3);
@@ -114,6 +114,7 @@ public partial class ReviewDrive : Node {
             ButtonMask = buttons,
             CtrlPressed = rest.Contains("ctrl"),
             ShiftPressed = rest.Contains("shift"),
+            AltPressed = rest.Contains("alt") || held.Contains(Godot.Key.Alt),
         });
     }
 

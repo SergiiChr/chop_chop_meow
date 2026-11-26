@@ -284,6 +284,10 @@ These were made with ffmpeg from Kenney's sounds:
 
 `wolf_hit`, `place_building`, `rail_clink` and `buy_coins` are Kenney's punch and wood impacts, metal clinks and coins as they are.
 
+`bucket_hit` is freefire66's [Bucket Hit](https://freesound.org/people/freefire66/sounds/175948/) from Freesound
+(CC0 1.0), also released on [Pixabay](https://pixabay.com/sound-effects/film-special-effects-bucket-hit-89027/).
+The Freesound preview is mixed to mono, trimmed to the hit and its decay, faded at both ends and peak-normalised.
+
 `dig_earth`, `dig_toss` and `dig_up` are cut with ffmpeg from "Digging with shovel" by freesound_community (Pixabay 63069), a recording supplied for this project: four cuts of the blade going into soil, four of soil thrown off it and one heavy heave of earth for a stump or bush coming out.
 Each cut is faded at both ends, and the cuts of one sound are brought to one mean level.
 

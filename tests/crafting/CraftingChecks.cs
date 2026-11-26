@@ -688,7 +688,7 @@ public static class CraftingChecks {
     private static void CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf(GameData data) {
         Require(data.MadeFrom("wood") == null && data.MadeFrom("coal") == null, "gathered resources should start a chain");
         Require(data.MadeFrom("rake") == "steel_parts" && data.MadeFrom("meat_stew") == "raw_meat" && data.MadeFrom("steel_bar") == "iron_bar", "a product should hang under its first input");
-        Require(data.MadeFrom("water") == "empty_bottle" && data.MadeFrom("wheat") == "wheat_seeds" && data.MadeFrom("fertilizer") == "leaves", "what no recipe makes should hang under what it comes out of");
+        Require(data.MadeFrom(Water.Liquid) == Water.Empty && data.MadeFrom("wheat") == "wheat_seeds" && data.MadeFrom("fertilizer") == "leaves", "what no recipe makes should hang under what it comes out of");
         Require(data.MadeOutOf("steel_parts").Order().SequenceEqual(new[] { "rake", "steel_axe", "steel_chisel", "steel_hammer", "steel_pick", "steel_shovel" }), "steel parts should lead to the six steel tools");
         Require(data.MadeOutOf("wood").SequenceEqual(new[] { "planks", "wood_parts", "torch", "charcoal" }), "the longest chains out of an item should come first");
         Require(data.RecipeOf("crate")?.Group == RecipeGroup.Containers && data.RecipeOf("stone_chisel")?.Group == RecipeGroup.Tools && data.RecipeOf("planks")?.Group == RecipeGroup.Materials && data.RecipeOf("bread")?.Group == RecipeGroup.Food, "recipes should be grouped by what they make");

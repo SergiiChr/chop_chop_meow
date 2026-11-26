@@ -305,7 +305,7 @@ public sealed class PlayerControl {
         else if (GlassBlowing.PumpAtPlayer(world) is Thing glass) world.Pump(glass);
         else {
             var aim = view.FirstPerson ? view.FirstPersonForward : HeldDirection();
-            world.Attack(aim == Vector2.Zero ? walked : aim);
+            world.Attack(aim == Vector2.Zero ? walked : aim, hotbar.ActiveWeapon());
         }
     }
 

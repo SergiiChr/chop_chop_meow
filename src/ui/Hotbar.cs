@@ -66,6 +66,7 @@ public partial class Hotbar : PanelContainer {
             Batch = () => Store(slot),
             RightClick = () => Use(slot),
         };
+        kit.LinkRecipeMap(button, () => world.HotbarItem(slot));
         button.CustomMinimumSize = new Vector2(56, 56);
         Style.Skin(button, Style.SlotNormal, Style.SlotHover, Style.SlotPressed);
         button.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
@@ -115,6 +116,7 @@ public partial class Hotbar : PanelContainer {
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}\nLMB: select · RMB or Double LMB: use";
+            if (!building && id.Length > 0) button.TooltipText += $"\n{RecipeMap.AltClickHint}";
             // The selected slot gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.SlotWanted : Style.SlotNormal);
@@ -160,7 +162,7 @@ public partial class Hotbar : PanelContainer {
     /// </summary>
     public bool UseItem(string id, int stack = -1) {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Run(() => { if (stack >= 0) FromStack(stack, () => world.Consume(id)); else world.Consume(id); });
-        else if (id == "torch" && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
+        else if (id == World.TorchItem && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
         else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
         else if (Barrel.Is(id)) panel.OpenBarrel(stack >= 0 ? stack : world.S.Backpack.PreferredSlot);
         else return false;
@@ -172,7 +174,7 @@ public partial class Hotbar : PanelContainer {
         for (int slot = 0; slot < 9; slot++) if (world.HotbarItem(slot) == tool) { Select(slot); return; }
         panel.Player.Mode = new ClickMode.Normal();
         world.SelectInHand(tool);
-        if (world.InHand == tool && world.ToolKind(tool) == "shovel") SelectDigging();
+        if (world.InHand == tool && world.ToolKind(tool) == GroundHoles.Tool) SelectDigging();
         kit.Refresh();
     }
 
@@ -185,7 +187,7 @@ public partial class Hotbar : PanelContainer {
         if (string.IsNullOrEmpty(id)) kit.Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
         else if (world.Data.TryBuilding(id, out var kind)) { panel.Player.Mode = new ClickMode.Build(kind); panel.Close(); } else if (id == "crate") panel.Player.PlaceContainer(id);
         else if (Barrel.Is(id) && world.HotbarStack(slot) is int barrelSlot and >= 0) panel.Player.PlaceContainer(id, barrelSlot);
-        else if (world.ToolKind(id) == "shovel" && world.HotbarCount(slot) > 0) SelectDigging();
+        else if (world.ToolKind(id) == GroundHoles.Tool && world.HotbarCount(slot) > 0) SelectDigging();
         kit.Refresh();
     }
 
@@ -195,15 +197,18 @@ public partial class Hotbar : PanelContainer {
     }
 
     /// <summary>Whether this item can be eaten, drunk, lit or swung by right-clicking open ground.</summary>
-    private bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || id == "torch"
-        || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer" or "net";
+    private bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || world.IsWeapon(id);
+
+    /// <summary>The selected carried weapon, if there is one.</summary>
+    public string? ActiveWeapon() =>
+        ActiveItem() is string item && world.Backpack[item] > 0 && world.IsWeapon(item) ? item : null;
 
     /// <summary>Uses the item selected on the hotbar toward a point on the ground; items without a use do nothing.</summary>
     public void UseSelected(Vector2 at) {
         if (ActiveItem() is not string id || !HasUse(id)) return;
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) FromStack(ActiveStack(), () => world.Consume(id));
-        else if (id == "torch") world.UseTorch(at - world.Player);
+        else if (id == World.TorchItem) world.UseTorch(at - world.Player);
         else if (world.ToolKind(id) == "net") world.SwingNet(at - world.Player);
-        else world.Attack(at - world.Player);
+        else world.Attack(at - world.Player, id);
     }
 }

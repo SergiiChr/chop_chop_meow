@@ -3,14 +3,6 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The pill on a slot's corner: it shows only while it has something to count.</summary>
-public partial class Badge : Label {
-    public new string Text {
-        get => base.Text;
-        set { base.Text = value; Visible = value != ""; }
-    }
-}
-
 /// <summary>An icon button for an item: an item slot when <see cref="Controls"/> is set, else a plain button.</summary>
 public partial class ItemSlot : Button {
     public static readonly StringName IconNormal = "icon_normal_color";
@@ -48,6 +40,8 @@ public partial class ItemSlot : Button {
     public SlotInput? Controls { get; set; }
     /// <summary>Runs on the second press of a double click, besides the press itself.</summary>
     public Action? DoubleClicked { get; set; }
+    /// <summary>Opens the map at the item this slot shows, when it shows one.</summary>
+    public Action? RecipeLink { get; set; }
     /// <summary>Runs on a right click on a plain button.</summary>
     public Action? RightClicked { get; set; }
     /// <summary>Builds a richer tooltip than plain text; the tooltip text must still be non-empty for Godot to show it.</summary>
@@ -65,9 +59,18 @@ public partial class ItemSlot : Button {
 
     // The button pressed on this item slot, which acts once it is let go: an action on the press could redraw the page and take the slot away under the mouse.
     private MouseButton down = MouseButton.None;
+    private bool recipeClick;
 
     public override void _GuiInput(InputEvent ev) {
         if (ev is not InputEventMouseButton click) return;
+        if (click.ButtonIndex == MouseButton.Left && RecipeLink != null
+            && (click.Pressed ? click.AltPressed : recipeClick)) {
+            recipeClick = click.Pressed;
+            lastPress = 0;
+            AcceptEvent();
+            if (!recipeClick && new Rect2(Vector2.Zero, Size).HasPoint(click.Position)) RecipeLink();
+            return;
+        }
         if (!click.Pressed) {
             if (Controls == null || click.ButtonIndex != down) return;
             down = MouseButton.None;
@@ -76,6 +79,7 @@ public partial class ItemSlot : Button {
             AcceptEvent();
             return;
         }
+        if (click.ButtonIndex == MouseButton.Left) recipeClick = false;
         bool second = false;
         if (click.ButtonIndex == MouseButton.Left) {
             ulong now = Time.GetTicksMsec();
