@@ -11,7 +11,7 @@ public partial class Game {
 
     private async Task CheckQuarterTurnedForgeEmitsFromItsFlueAndMouth() {
         var home = world.Player;
-        var at = SpotsNearby().First(p => world.CanStand(p) && Uncovered(view.Screen(p, .5f)) && view.Pick(view.Screen(p, .5f)) == null);
+        var at = ClearSpotNearby();
         var forge = Hosted.Add(ThingKind.Reinforced, at, rotation: Mathf.Pi / 2);
         forge.Heat = 65;
         await Frames();

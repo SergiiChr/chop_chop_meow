@@ -155,6 +155,15 @@ public partial class WorldView {
     {
         ("player jog", ActorSkin.Player, ActorAction.Jog), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop), ("player axe swing", ActorSkin.Player, ActorAction.SteelAxeSwing), ("player axe sweep", ActorSkin.Player, ActorAction.SteelAxeSweep), ("player torch swing", ActorSkin.Player, ActorAction.TorchSwing),
         ("player pick", ActorSkin.Player, ActorAction.Mine), ("player steel pick", ActorSkin.Player, ActorAction.SteelMine), ("player gather", ActorSkin.Player, ActorAction.Gather),
+        ("player pickaxe strike", ActorSkin.Player, ActorAction.PickStrike),
+        ("player shovel strike", ActorSkin.Player, ActorAction.ShovelStrike),
+        ("player steel hammer strike", ActorSkin.Player, ActorAction.SteelHammerStrike),
+        ("player mallet strike", ActorSkin.Player, ActorAction.MalletStrike),
+        ("player stone chisel strike", ActorSkin.Player, ActorAction.StoneChiselStrike),
+        ("player steel chisel strike", ActorSkin.Player, ActorAction.SteelChiselStrike),
+        ("player rake strike", ActorSkin.Player, ActorAction.RakeStrike),
+        ("player net strike", ActorSkin.Player, ActorAction.NetStrike),
+        ("player bucket strike", ActorSkin.Player, ActorAction.BucketStrike),
         ("player hammer", ActorSkin.Player, ActorAction.Hammer), ("player pump", ActorSkin.Player, ActorAction.Pump), ("player punch", ActorSkin.Player, ActorAction.Attack),
         ("player idle", ActorSkin.Player, ActorAction.Idle), ("worker walk", ActorSkin.Worker, ActorAction.Walk), ("worker axe", ActorSkin.Worker, ActorAction.Chop),
         ("worker pick", ActorSkin.Worker, ActorAction.Mine), ("worker carry", ActorSkin.Worker, ActorAction.Carry), ("worker gather", ActorSkin.Worker, ActorAction.Gather),
@@ -216,6 +225,8 @@ public partial class WorldView {
     private static readonly float ReviewTargetAt = Launch.Number("--animation-target", 1.3f);
     /// <summary>What the close-up's blow works, and its model, built once the clip starts.</summary>
     private (Thing Thing, Prop Prop)? reviewTarget;
+    private (Wolf Model, WolfModel Rig)? reviewWeaponTarget;
+    private float? reviewWeaponHitAt;
     /// <summary>The close-up clip's actor, moved and posed the way the game moves and poses everyone.</summary>
     private readonly ActorState reviewActor = new();
 
@@ -261,6 +272,13 @@ public partial class WorldView {
                 review.AddChild(prop.Root);
                 reviewTarget = (target, prop);
             }
+            if (Launch.Has("--animation-target") && WeaponSwing.Of(action) != null) {
+                var toward = new Vector2(ScreenRight.X, ScreenRight.Z).Rotated(-Mathf.DegToRad(ReviewTurn));
+                var wolf = new Wolf { Pos = toward * ReviewTargetAt, Heading = (-toward).Angle() };
+                var wolfRig = new WolfModel();
+                review.AddChild(wolfRig.Root);
+                reviewWeaponTarget = (wolf, wolfRig);
+            }
         }
         if (ReviewClips[ReviewClip].Name == "player cabin") { ReviewCabin(dt); return; }
         if (ReviewClips[ReviewClip].Name.EndsWith(" back")) {
@@ -288,6 +306,10 @@ public partial class WorldView {
             if (action == ActorAction.Rake) Work(reviewActor, worked, reviewRigs[0]);
             return;
         }
+        if (reviewWeaponTarget is { } pair && WeaponSwing.Of(action) is WeaponSwing weapon) {
+            ReviewWeaponStrike(weapon, pair.Model, pair.Rig, dt);
+            return;
+        }
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);
         float speed = ReviewClips[ReviewClip].Name == "player barrel"
@@ -299,6 +321,25 @@ public partial class WorldView {
             barrel: ReviewClips[ReviewClip].Name.EndsWith(" barrel"));
         reviewRigs[0].Flame.Visible = action == ActorAction.TorchSwing;
         reviewRigs[0].Root.Rotation += new Vector3(0, Mathf.DegToRad(ReviewTurn), 0);
+    }
+
+    /// <summary>Shows a weapon landing only when it touches the review wolf through the combat hitbox.</summary>
+    private void ReviewWeaponStrike(WeaponSwing weapon, Wolf target, WolfModel model, float dt) {
+        var toward = target.Pos.Normalized();
+        reviewActor.Update(Vector2.Zero, weapon.Action, target.Pos, dt, swingAim: toward);
+        Pose(reviewRigs[0], reviewActor, weapon.Item);
+        if (reviewWeaponHitAt == null &&
+            weapon.TouchesDuring(Vector2.Zero, toward, target, Math.Max(0, reviewActor.PreviousTime), reviewActor.Time)) {
+            reviewWeaponHitAt = reviewActor.Time;
+            if (weapon.IsBucket) Sounds?.Play("bucket_hit");
+        }
+        float since = reviewActor.Time - (reviewWeaponHitAt ?? float.PositiveInfinity);
+        bool hit = since >= 0;
+        float recoil = hit ? Mathf.SmoothStep(0, .35f, since) * .42f : 0;
+        model.Root.Position = To3(target.Pos + toward * recoil);
+        model.Root.Rotation = new Vector3(0, ActorAnimation.Yaw(-toward, 0), 0);
+        if (hit && since < WolfModel.RecoilSeconds) model.Recoil(since / WolfModel.RecoilSeconds, dt);
+        else model.Stand(Elapsed, dt, false);
     }
 
     /// <summary>The id the close-up's target is built with, which picks its look: a tree of middling height, and a rock and a stump like it.</summary>
@@ -539,9 +580,14 @@ public partial class WorldView {
         for (int i = 0; i < ReviewClips.Length; i++) {
             var action = ReviewClips[i].Action;
             reviewRigs[i].Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
-            var pose = ActorAnimation.PoseAt(action, Elapsed, action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Carry);
+            var weapon = WeaponSwing.Of(action);
+            float time = weapon == null ? Elapsed : Elapsed % weapon.Duration;
+            var pose = ActorAnimation.PoseAt(action, time, action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Carry);
             if (ReviewClips[i].Name.EndsWith(" barrel")) reviewRigs[i].HugBarrel(pose);
-            else reviewRigs[i].Show(pose, ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch);
+            else if (weapon != null) {
+                reviewRigs[i].Show(pose, null, false);
+                reviewRigs[i].ShowWeapon(weapon, time);
+            } else reviewRigs[i].Show(pose, ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch);
         }
     }
 

@@ -58,6 +58,8 @@ Icons and models are committed; playing does not call an image-generation servic
   pixel.
   For motion, record a movie at a fixed frame rate with `./build.py record` (`animation` skill), which reuses the last export while the sources are unchanged.
 - To play the real window with keyboard and mouse, use the `playtest` skill (`.agents/skills/playtest`).
+- After merging a branch that raises the save version, bring the player's saves forward with the `update-saves` skill
+  (`.agents/skills/update-saves`).
 - After a scripted rename, run `python3 tools/compare_strings.py <base>`: checks do not read most text, and a rename can reach into it.
   It does not see names in code: also search the diff for the old and the new word (`git diff <base> | grep -nw -e Old -e New`) and read each hit, since a rename by word also renames unrelated things that share it, such as a test helper.
 - `./build.py icons` renders every icon again, each with slightly different bytes.

@@ -12,6 +12,10 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         chosen.Icon = thing.Packs == "" ? null : Icons.Of(thing.Packs);
         chosen.Text = thing.Packs == "" ? "?" : "";
         chosen.TooltipText = "Choose what to pack";
+        if (thing.Packs != "") {
+            kit.LinkRecipeMap(chosen, () => thing.Packs);
+            chosen.TooltipText += $"\n{RecipeMap.AltClickHint}";
+        }
         chosen.Pressed += () => { memory.PackPicking = !memory.PackPicking; Redraw(); };
         pick.AddChild(chosen);
         var packs = Style.Wrapped(thing.Packs == "" ? "Choose what to pack" : $"Packs {world.Data.Name(thing.Packs).ToLowerInvariant()}", 16);
@@ -31,7 +35,9 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         var picker = new GridContainer { Columns = 7 }; picker.AddThemeConstantOverride("h_separation", 6); picker.AddThemeConstantOverride("v_separation", 6);
         Well(new VBoxContainer()).AddChild(picker);
         foreach (var (id, def) in world.Data.Items.Where(p => world.Packable(p.Key)).OrderBy(p => p.Value.Name)) {
-            var (cell, _) = ItemSlot.Create($"pack_{id}", 44); cell.Icon = Icons.Of(id); cell.TooltipText = def.Name;
+            var (cell, _) = ItemSlot.Create($"pack_{id}", 44); cell.Icon = Icons.Of(id);
+            kit.LinkRecipeMap(cell, () => id);
+            cell.TooltipText = $"{def.Name}\n{RecipeMap.AltClickHint}";
             if (id == thing.Packs) cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
             cell.Pressed += () => { world.SetPacking(thing, id); memory.PackPicking = false; Redraw(); };
             picker.AddChild(cell);
@@ -46,11 +52,13 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
         cell.Icon = Icons.Of("crate");
         moves.TakeCell(cell, output, output.First, thing);
+        kit.LinkRecipeMap(cell, () => "crate");
         column.AddChild(cell);
         var fill = Style.PerBatch(""); column.AddChild(fill);
         live.Watch(() => output.First() is string crate && world.Packed(crate) is Inventory contents ? contents.Count : -1, packed => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, packed >= 0 ? Colors.White : Style.Ghost);
             cell.TooltipText = packed < 0 ? "The crate being packed shows here" : $"{(packed == world.Data.CrateCapacity ? "Full crate" : "Crate being packed")}\n{StationSlots.SlotHint}";
+            cell.TooltipText += $"\n{RecipeMap.AltClickHint}";
             fill.Text = $"{Math.Max(0, packed)} / {world.Data.CrateCapacity}";
         });
         return column;

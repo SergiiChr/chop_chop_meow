@@ -973,7 +973,9 @@ def main() -> int:
                 f"Playing the optimized release export {game.relative_to(ROOT)}",
                 flush=True,
             )
-            forwarded = ["--", *game_args] if game_args else []
+            # A server runs without a window, as the game starts its own (Game.RunServer).
+            engine = ["--headless"] if "--server" in game_args else []
+            forwarded = [*engine, "--", *game_args] if game_args else []
             # Relative paths in the game's flags start from the project folder, as Godot's --path made them.
             os.chdir(ROOT)
             os.execve(game, [str(game), *forwarded], env)

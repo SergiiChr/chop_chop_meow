@@ -27,7 +27,8 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
     private void StockSlot(HBoxContainer stock, string item, Func<int>? amount) {
         var (slot, count) = ItemSlot.Create($"resource_{item}");
         slot.Icon = Icons.Of(item);
-        slot.MouseFilter = MouseFilterEnum.Ignore;
+        kit.LinkRecipeMap(slot, () => item);
+        slot.TooltipText = $"{world.Data.Name(item)}\n{RecipeMap.AltClickHint}";
         stock.AddChild(slot);
         if (amount != null) live.Watch(amount, units => count.Text = units.ToString());
     }

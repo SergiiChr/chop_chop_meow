@@ -102,7 +102,7 @@ public sealed class Thing {
         get => Plumbing.HasPlumbing(Kind) ? field ??= new Inventory { Slots = 1, StackSize = Plumbing.InstallCost, Capacity = Plumbing.InstallCost } : field;
         set;
     }
-    [JsonIgnore] public bool PlumbingInstalled => PlumbingSlot?["steel_pipe"] == Plumbing.InstallCost;
+    [JsonIgnore] public bool PlumbingInstalled => PlumbingSlot?[Plumbing.InstallMaterial] == Plumbing.InstallCost;
     /// <summary>Installed plumbing last seen on an explored building, without remembering its inventory or live flow.</summary>
     [JsonInclude, JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] internal bool RememberedPlumbing { get; set; }
     internal bool ShowsPlumbing => RememberedPlumbing || PlumbingInstalled;
@@ -602,11 +602,17 @@ public sealed partial class World {
     public bool Reached(string milestone) => S.Milestones.Contains(milestone);
     /// <summary>
     /// Whether the settlement has ever made, gathered, bought or started with an item, or with anything the item ends up in:
-    /// whoever has had an iron bar counts as having had the ore.
+    /// whoever has had an iron bar counts as having had the ore. A filled vessel also reveals the liquid it holds.
     /// </summary>
     public bool Had(string item) {
         if (HadItself(item)) return true;
         foreach (string product in Data.EndsUpIn(item)) if (HadItself(product)) return true;
+        if (Data.VesselFor(item) == null) return false;
+        foreach (var vessel in Data.Vessels) {
+            if (vessel.Liquid != item) continue;
+            for (int fill = 1; fill < vessel.States.Count; fill++)
+                if (HadItself(vessel.States[fill])) return true;
+        }
         return false;
     }
     /// <summary>Whether the settlement has had this item itself.</summary>
@@ -981,9 +987,10 @@ public sealed partial class World {
         else t.Heat = Math.Min(100, t.Heat + FurnaceHeat(145));
         PlayerActed?.Invoke(ActorAction.Pump, t.Pos);
     }
+    internal const string CampfireFuel = "wood";
     public void FuelFire(Thing t) {
         if (!Reaches(t) || Busy() || Forwarded(Verb.FuelFire, t.Id)) return;
-        int n = S.Backpack.Remove("wood", 1);
+        int n = S.Backpack.Remove(CampfireFuel, 1);
         if (n == 0) { Say("You need wood to feed the fire."); return; }
         if (t.Burn <= 0) Play("start_fire", t.Pos);
         t.Burn += Data.CampfireSeconds; Say($"Campfire fed: +{Data.CampfireHours:0} hours of light.");
@@ -1338,6 +1345,8 @@ public sealed partial class World {
     internal bool FireDeters(Wolf wolf, Vector2 prey) => !wolf.IgnoresFire && FireLighting(prey) is Thing fire && !FullPackAt(fire.Pos);
     /// <summary>A burning torch in hand, with the player out in the open, sets how wolves behave.</summary>
     internal bool Torchlit => S.TorchLit && !Downed && S.Sheltered == 0 && !Protected(Player);
+    internal const string TorchItem = "torch";
+
     /// <summary>
     /// Lights a torch from the backpack, which stays there while it burns, or swings it once it burns.
     /// A torch put out before, by wild swinging, lights again with the burn time it had left.
@@ -1345,7 +1354,7 @@ public sealed partial class World {
     public void UseTorch(Vector2 aim) {
         if (S.Sheltered != 0 || S.TorchKindling > 0 || Busy() || Forwarded(Verb.Torch, at: aim)) return;
         if (S.TorchLit) { SwingTorch(aim); return; }
-        if (S.Backpack["torch"] == 0) { Say("No torch in your backpack."); return; }
+        if (S.Backpack[TorchItem] == 0) { Say("No torch in your backpack."); return; }
         if (S.Torch <= 0) S.Torch = Data.CampfireSeconds;
         S.TorchKindling = KindleSeconds; PlayerActed?.Invoke(ActorAction.Kindle, Player);
     }
@@ -1363,7 +1372,7 @@ public sealed partial class World {
     /// and the next has to wait. Returns the way it goes, a unit vector.
     /// </summary>
     private Vector2 StartSwing(ActorAction action, Vector2 aim) {
-        attackClock = Swings.Cooldown;
+        attackClock = WeaponSwing.Of(action) is WeaponSwing weapon ? weapon.Duration : Swings.Cooldown;
         Vector2 direction = aim == Vector2.Zero ? Vector2.Down : aim.Normalized();
         PlayerActed?.Invoke(action, direction); Play("tool_air_swing", Player);
         return direction;
@@ -1402,13 +1411,25 @@ public sealed partial class World {
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
         WolfFollow.Stop();
     }
+    private const string AttackTool = "axe";
+
+    /// <summary>Whether a carried item's kind has a swing that can strike a wolf.</summary>
+    internal bool IsWeapon(string item) => item == TorchItem || WeaponSwing.ForItem(item) != null || ToolKind(item) == AttackTool;
+
     /// <summary>
-    /// Swings the best axe carried, or a fist without one, along <paramref name="aim"/>, south when none is given.
+    /// Swings the carried weapon named by the player. With none selected, swings the best axe or a bare fist.
     /// Axe swings take turns: the overhead chop, then the sideways sweep.
     /// </summary>
-    public void Attack(Vector2 aim = default) {
-        if (attackClock > 0 || S.Sheltered != 0 || Busy() || Forwarded(Verb.Attack, at: aim)) return;
-        string? axe = BestTool("axe");
+    public void Attack(Vector2 aim = default, string? selected = null) {
+        if (selected == TorchItem) { UseTorch(aim); return; }
+        if (attackClock > 0 || S.Sheltered != 0 || Busy() || Forwarded(Verb.Attack, item: selected ?? "", at: aim)) return;
+        if (selected != null && S.Backpack.Free(selected) == 0) return;
+        if (selected != null && WeaponSwing.ForItem(selected) is WeaponSwing weapon) {
+            Swings.Start(weapon.Action, StartSwing(weapon.Action, aim));
+            return;
+        }
+        if (selected != null && ToolKind(selected) != AttackTool) return;
+        string? axe = selected ?? BestTool(AttackTool);
         bool sweep = axe != null && S.Actor.SweepNext;
         S.Actor.SweepNext = axe != null && !sweep;
         ActorAction action = (axe, sweep) switch {
@@ -1483,7 +1504,7 @@ public sealed partial class World {
     private static Inventory NewWageSlot() => new() { Slots = 1, CoinStack = Inventory.UnlimitedCoins, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins, and a tool slot only the tools its rules take.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
-        box == t.PlumbingSlot ? (item == "steel_pipe" ? null : "The Plumbing slot only takes steel pipes.") :
+        box == t.PlumbingSlot ? (item == Plumbing.InstallMaterial ? null : "The Plumbing slot only takes steel pipes.") :
         Barrel.Is(item) && box != t.Inventory && BoxIndex(t, box) >= 0 ? $"Barrel does not fit in {Lower(Data.Name(t.Kind))}." :
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
@@ -1712,7 +1733,7 @@ public sealed partial class World {
         if (HeldByOthers(barrel)) return false;
         S.Backpack.Add(item, 1);
         if (barrel.PlumbingSlot is Inventory plumbingSlot && plumbingSlot.Count > 0)
-            Construction.GiveBack(new Dictionary<string, int> { ["steel_pipe"] = plumbingSlot["steel_pipe"] }, barrel.Pos);
+            Construction.GiveBack(new Dictionary<string, int> { [Plumbing.InstallMaterial] = plumbingSlot[Plumbing.InstallMaterial] }, barrel.Pos);
         S.Things.Remove(barrel);
         Play("wood_rocks_inventory", barrel.Pos);
         PlayerActed?.Invoke(ActorAction.PickUp, barrel.Pos);
@@ -2585,7 +2606,7 @@ public sealed partial class World {
             if (!Downed && S.Torch > 0) { S.TorchLit = true; Play("start_fire", Player); Say($"Torch lit: {S.Torch / Data.DaySeconds * 24:0.#} hours of light left."); }
         }
         // Burning out uses the torch up; moving it out of the backpack puts it out, and it goes as a fresh one.
-        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); S.Backpack.Remove("torch", 1); Say("Your torch burned out."); } else if (S.Torch > 0 && S.Backpack["torch"] == 0) { bool lit = S.TorchLit || S.TorchKindling > 0; S.Torch = 0; PutOutTorch(); if (lit) Say("Your torch went out as it left the backpack."); }
+        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); S.Backpack.Remove(TorchItem, 1); Say("Your torch burned out."); } else if (S.Torch > 0 && S.Backpack[TorchItem] == 0) { bool lit = S.TorchLit || S.TorchKindling > 0; S.Torch = 0; PutOutTorch(); if (lit) Say("Your torch went out as it left the backpack."); }
     }
     /// <summary>Explores the tiles in every player's sight and replaces the memory of everything there with its current state.</summary>
     public void Look() { foreach (var p in S.Players) using (ActAs(p)) LookAround(); }
@@ -2669,7 +2690,7 @@ public sealed partial class World {
                 || t.Inventory.Count > Barrel.Capacity)) return false;
             if (t.PlumbingSlot is Inventory plumbingSlot && (!Plumbing.HasPlumbing(t.Kind) || plumbingSlot.Slots != 1
                 || plumbingSlot.Capacity != Plumbing.InstallCost || plumbingSlot.StackSize != Plumbing.InstallCost
-                || plumbingSlot.Count > Plumbing.InstallCost || plumbingSlot.Count != plumbingSlot["steel_pipe"])) return false;
+                || plumbingSlot.Count > Plumbing.InstallCost || plumbingSlot.Count != plumbingSlot[Plumbing.InstallMaterial])) return false;
             if (t.Kind == ThingKind.Farm && !Farms.ValidWater(t) || !TreePlanting.ValidGrowth(t) || !LeafSpots.Valid(t)) return false;
             if (!(t.Pressure >= 0 && t.Pressure <= 100 && t.PumpStrokeLeft >= 0 && t.PumpStrokeLeft <= WaterPumps.StrokeSeconds)
                 || t.Kind != ThingKind.Pump && (t.Pressure != 0 || t.PumpStrokeLeft != 0)) return false;

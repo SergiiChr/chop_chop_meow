@@ -7,6 +7,8 @@ namespace ChopChopMeow;
 
 public sealed class ItemDef {
     public string Name { get; set; } = "";
+    /// <summary>The name on the Recipe map if the inventory name describes a fill state.</summary>
+    public string? MapName { get; set; }
     public string Color { get; set; } = "ffffff";
     /// <summary>The kind of tool this item is (axe, pickaxe, shovel, hammer, chisel, rake or mortar), or empty for materials.</summary>
     public string Tool { get; set; } = "";
@@ -328,8 +330,10 @@ public sealed partial class GameData {
     // The recipe groups in the order lists of items show them, after the items no recipe makes.
     private static readonly RecipeGroup[] ListedGroups = [RecipeGroup.Materials, RecipeGroup.Tools, RecipeGroup.Containers, RecipeGroup.Food];
     private static readonly List<string> Nothing = new();
-    /// <summary>Container fills the recipe map leaves out because they share a slot with the base item.</summary>
-    public static bool OffTheMap(string item) => Barrel.Liters(item) > 0 || Bucket.Is(item) && item != Bucket.Item || BerryJam.InBottle(item) || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
+    /// <summary>The Recipe map groups packed crates and container fills with their base item.</summary>
+    public string MapEntryOf(string item) => World.IsPacked(item) ? "crate" : VesselOf(item)?.Empty ?? ContainerItem.Base(item);
+    /// <summary>The name of the item's Recipe map entry.</summary>
+    public string NameOnMap(string item) => Items.TryGetValue(item, out var def) && def.MapName is string name ? name : Name(item);
     /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
     public string? RecipeIdOf(string item) => recipeIdOf.GetValueOrDefault(item);
     /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
@@ -342,10 +346,8 @@ public sealed partial class GameData {
     public int ChainLength(string item) => MadeOutOf(item).Count == 0 ? 0 : 1 + MadeOutOf(item).Max(ChainLength);
     /// <summary>What an item goes into: the products that take it as an input, then for a tool those made with it.</summary>
     public IEnumerable<string> UsedFor(string item) {
-        var uses = ProductsOf(item);
-        if (Items[item].Tool is { Length: > 0 }) uses = uses.Concat(Recipes.Values.Where(r => r.MadeWith(Items[item])).Select(r => r.Output));
-        uses = uses.Concat(Recipes.Values.Where(r => r.Station is ThingKind station && FixedTool(station, r.Tool) == item).Select(r => r.Output));
-        return uses.Distinct();
+        var tools = RecipeItemUse.Of(this, item).Where(use => use.Role == RecipeItemRole.Tool).Select(use => use.Recipe.Output);
+        return ProductsOf(item).Concat(tools).Distinct();
     }
     /// <summary>The products that take an item as an input or come out of it.</summary>
     private IEnumerable<string> ProductsOf(string item) => Recipes.Values.Where(r => r.Inputs.ContainsKey(item)).Select(r => r.Output).Concat(Sources.Where(p => p.Value.From.Contains(item) || p.Value.Also.Contains(item)).Select(p => p.Key));
@@ -353,7 +355,7 @@ public sealed partial class GameData {
     public string[] EndsUpIn(string item) => endsUpIn[item];
     /// <summary>
     /// Every item in the order a list of items such as the filter window's shows them: what is gathered, grown or bought, then materials, tools, containers and food.
-    /// An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel container at any fill stands with the container, and a part-drunk bottle with the full one.
+    /// An item no recipe makes goes with the item it comes out of, and containers at every fill go with the base item.
     /// Each group runs from the fewest making steps to the most, in recipe map order where they tie.
     /// </summary>
     public IReadOnlyList<string> ListOrder { get; private set; } = [];
@@ -365,7 +367,7 @@ public sealed partial class GameData {
             if (!Items.ContainsKey(item) || recipeIdOf.ContainsKey(item) || source.How == "" || source.From.Concat(source.Also).Any(other => !Items.ContainsKey(other)))
                 throw new InvalidOperationException($"Invalid source for {item}.");
         foreach (string item in Items.Keys) {
-            if (OffTheMap(item)) continue;
+            if (MapEntryOf(item) != item) continue;
             if (!recipeIdOf.ContainsKey(item) && !Sources.ContainsKey(item)) throw new InvalidOperationException($"{item} has neither a recipe nor a source for the recipe map.");
             if (MadeFrom(item) is string parent) { if (!madeOutOf.TryGetValue(parent, out var children)) madeOutOf[parent] = children = new(); children.Add(item); }
         }
@@ -392,10 +394,12 @@ public sealed partial class GameData {
         foreach (var (item, source) in Sources)
             foreach (string other in source.From.Skip(1))
                 if (!placed.TryGetValue(other, out var row) || row != placed.GetValueOrDefault(item)) throw new InvalidOperationException($"{other} and {item} must share a recipe map row.");
-        if (Items.Keys.FirstOrDefault(item => !OffTheMap(item) && !placed.ContainsKey(item)) is string missing) throw new InvalidOperationException($"{missing} is not on the recipe map.");
+        if (Items.Keys.FirstOrDefault(item => MapEntryOf(item) == item && !placed.ContainsKey(item)) is string missing) throw new InvalidOperationException($"{missing} is not on the recipe map.");
+        var fills = Items.Keys.Where(item => MapEntryOf(item) != item).ToLookup(MapEntryOf);
         foreach (string item in Items.Keys) {
             var reached = new HashSet<string>(); var open = new Stack<string>(); open.Push(item);
-            while (open.TryPop(out var at)) foreach (string product in ProductsOf(at)) if (reached.Add(product)) open.Push(product);
+            while (open.TryPop(out var at))
+                foreach (string product in ProductsOf(at).Concat(fills[at])) if (reached.Add(product)) open.Push(product);
             endsUpIn[item] = reached.ToArray();
         }
         SetListOrder(mapOrder);
@@ -413,11 +417,11 @@ public sealed partial class GameData {
                 ? source.From.Concat(source.Also.Where(input => input != Water.Liquid)) : []);
             return steps[item] = inputs.Select(input => 1 + Steps(input)).DefaultIfEmpty(0).Max();
         }
-        // A steel container at any fill stands with the container, and a part-drunk bottle with the full one.
-        string Standing(string item) => ContainerItem.Base(item) != item ? ContainerItem.Base(item) : VesselOf(item) is VesselDef v && OffTheMap(item) ? v.Full : item;
         // The group of the recipe that makes an item or the item it comes out of; 0 for what is gathered, grown or bought.
         int Group(string item) => RecipeOf(item) is RecipeDef r ? 1 + Array.IndexOf(ListedGroups, r.Group) : MadeFrom(item) is string from ? Group(from) : 0;
-        ListOrder = Items.Keys.OrderBy(item => Group(Standing(item))).ThenBy(item => Steps(Standing(item))).ThenBy(item => mapOrder.GetValueOrDefault(Standing(item), mapOrder.Count)).ToArray();
+        ListOrder = Items.Keys.Select(item => (Item: item, Entry: MapEntryOf(item)))
+            .OrderBy(item => Group(item.Entry)).ThenBy(item => Steps(item.Entry))
+            .ThenBy(item => mapOrder.GetValueOrDefault(item.Entry, mapOrder.Count)).Select(item => item.Item).ToArray();
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
     public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
