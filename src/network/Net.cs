@@ -47,7 +47,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 34;
+    private const int Protocol = 36;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -440,7 +440,7 @@ public partial class Net : Node {
         // An action on the other channel may have overtaken this report and already put the guest further along.
         if (order < heard.GetValueOrDefault(p.Id)) return;
         heard[p.Id] = order;
-        Stand(p, at, warp);
+        if (!Stand(p, at, warp) || p.SleepingAt != 0) return;
         p.GatherTarget = gathering; p.Selected = selected; p.Sprinting = sprinting && Barrel.In(p.Backpack) == null; p.Braking = braking;
     }
 

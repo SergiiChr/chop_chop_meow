@@ -11,8 +11,6 @@ namespace ChopChopMeow;
 /// </summary>
 public partial class Server : Node {
     private const float AutosaveSeconds = 300, LonelySeconds = 30;
-    /// <summary>A steady rate, so the simulation's steps do not depend on how the engine paces a process with no window.</summary>
-    private const int TicksPerSecond = 60;
     /// <summary>Ports to try; the first is the one guests expect, and the rest let a second game run on this computer.</summary>
     private const int GamePorts = 16;
     /// <summary>Plays a performance run's camp, for a window recording one.</summary>
@@ -59,7 +57,7 @@ public partial class Server : Node {
 
     /// <summary>Runs as the whole process, started by a window with the arguments <see cref="Arguments"/> makes, and tells it the port it took.</summary>
     public static void Run(Node main, GameData data) {
-        Engine.MaxFps = TicksPerSecond;
+        Engine.MaxFps = World.TicksPerSecond;
         var server = Start(main, Load(data, int.Parse(Launch.Value("--slot") ?? "-1")), Launch.Value("--owner") ?? "");
         server.Ended += () => main.GetTree().Quit();
         if (Launch.Has(PerformanceFlag)) main.AddChild(new PerformanceStage(server.World));

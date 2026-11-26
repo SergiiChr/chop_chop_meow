@@ -49,6 +49,7 @@ public enum ThingKind {
     Hole,
     Nettle,
     Firebug,
+    StrawBed,
     FloatingPage,
     FallenPage,
 }

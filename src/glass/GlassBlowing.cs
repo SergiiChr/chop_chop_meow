@@ -154,7 +154,7 @@ internal sealed class GlassBlowing(World world) {
     private int PlayerAt(Thing forge, Vector2 offset, bool still) {
         Vector2 spot = forge.ToWorld(offset);
         foreach (var p in world.Players) {
-            if (p.Sheltered != 0 || p.Door != Doorway.None || p.RespawnIn != 0 || p.Mauled) continue;
+            if (p.SleepingAt != 0 || p.Sheltered != 0 || p.Door != Doorway.None || p.RespawnIn != 0 || p.Mauled) continue;
             bool canBlow = !p.Busy && p.Still >= World.CraftSettle;
             if (still && !canBlow) continue;
             var pos = new Vector2(p.PlayerX, p.PlayerY);

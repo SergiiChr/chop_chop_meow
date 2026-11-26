@@ -71,7 +71,8 @@ Play accepts Godot arguments after `--`:
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --steel-vessels` | Show a cabin's ladder and roof barrel, standing and stacked barrels, and vessels on the tool rack, with `--zoom`, `--camera-turn` and `--camera-pitch` for a closer look |
 | `--showcase --doorway queue` | Play two players at a cabin's door under the game's rules: `queue` (both walk up, one steps in, the other follows and knocks), `occupied` (one knocks while the other is inside, then stands aside as the other steps out and goes in), `wolf` (wolves tug each out of the doorway at dusk), `wounded` (a badly hurt player tugged out and pinned), `locked` (a wolf scratches at the locked door of a cabin with a player inside and goes away), `forced` (a wolf forces the unlocked door and takes the player out), `pair` (the same with two players inside, seen by the one left inside) `pack` (three wolves, two waiting behind the one at the door), `sides` (three wolves at a player stepping in: one tugs them out and one takes each arm) or `takedown` (the same with a player hurt enough to go down, pinned and fed on; the scene keeps them alive); `--panel` opens the cabin's page beside the scene; `--zoom` brings the camera closer and `--camera-turn 90` turns it that many degrees round the player, and `--camera-pitch 89` looks down from that angle |
-| `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
+| `--showcase --wolf-scene patrol` | Play wolves by a cabin at dusk under the game's rules, with the camera on them: `patrol` (one turns four times on its patrol), `howl` (two turn to a player who steps out and howl), `feast` (four bring a hurt player down and feed), `follow` (three a torch scared off spread round the player and circle), `campfire` (four circle the fire until a fifth closes in), `rout` (one following alone runs when the player walks at it), `stand` (one of two growls, and both turn on the player who walks at it) or `fight` (two snap at a player who swings an axe at them); every scene but the first two keeps its player alive; takes `--zoom`, `--camera-turn` and `--camera-pitch` as `--doorway` does |
+| `--showcase --straw-bed sleep` | Inspect a straw bed in the clearing: `model`, `sleep`, `wake` or `wake-walk` (hold a movement key as the sleeper wakes). Add `--panel` for its controls, or `--night --torch` for the sleeper by torchlight. |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
@@ -161,7 +162,7 @@ meet (SSAO), and world sounds pan with their place on screen.
 The sky lights roofs and walls from above, with grass-coloured bounce from below.
 In the first-person preview, the visible sky changes colour with the time of day and shows the sun or moon.
 The picture is tonemapped with AgX, which keeps colours as light brightens.
-A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
+A burning campfire lights the circle that deters smaller wolf packs. Other fixtures give light with no such safety.
 The ground has grain and bump from grass and rock photoscans under its own colours: meadow over the valley with soft
 lusher and drier patches, sparse broad patches of moss over gravelly earth, and stone on the mountain slopes.
 The woods along the mountains have a photoscan of forest floor with twigs and dead leaves, and where the ground is
@@ -461,9 +462,10 @@ Taking down a station fills the bottles you carry with its water, and the rest i
 These rules cover any refillable vessel the game adds (`GameData.Vessels`).
 
 Food and drink restore hunger and thirst but no health: health comes back only in sleep.
-From 10 pm you can sleep until dawn, but only if your food and water will last until morning; otherwise the sleep button explains why.
-Sleep heals while hunger and thirst both stay above 45%, about a third of your health over a full night.
-The cabin's page shows the health, hunger and thirst you would wake with under “Stats after sleep”.
+Sleep at any hour in a cabin or on a straw bed. Enter the cabin first to see its Sleep button.
+You start healing while you sleep, even if other players stay awake, as long as hunger and thirst both stay above 45%.
+A full night can restore about a third of your health. You wake at dawn, if hunger or thirst runs out, or when you choose Wake.
+Both pages forecast health, hunger and thirst under “Stats after sleep”.
 Each appears as a capsule over its icon, as in the corner.
 When a roof barrel is mounted, a note beneath the forecast says water is refilled from the roof barrel.
 The note still appears when the mounted barrel is empty.
@@ -516,6 +518,7 @@ A pale grey cliff further inland holds tin. Mine it with a pickaxe.
 
 Three nettles come up each night where nobody is looking, until ten stand in the valley.
 Hold right mouse on one to pick it: it takes 3 seconds, gives 1 nettle and stings for 1% of health a second, which can kill.
+The player groans in pain for as long as it stings, and other players hear the groan from where the picker stands.
 A picked nettle is gone for good, a backpack with no room for it leaves it standing, and nothing is built or laid where one stands.
 Nettle rope is made at the crafting bench, 1 rope from 1 nettle, and a bug net from 5 rope, 1 wood and 1 wood part ([Crafting bench](#crafting-bench)).
 Whoever makes rope strikes two mallet blows, then twists the fibres by hand, in turn.
@@ -537,6 +540,7 @@ Select a shovel and point at the sea beach to highlight a one-meter square.
 Hold right mouse to dig the square. It gives 10 sand and leaves a shallow, rounded cut with dark soil at the bottom.
 Cuts that share an edge join into one excavation.
 The sea reaches high tide at each full moon, once every eight in-game days, and replaces the sand as it covers each square.
+Hover over the moon on the clock to see how many in-game days remain until the next high or low tide.
 You can dig the square again once it is clear of water.
 You can walk out to the low-tide edge of the beach even when the tide is in.
 
@@ -1245,7 +1249,11 @@ An hour before dawn every wolf gives up and heads back to the nearest den.
 
 ### Fire
 
-A burning campfire keeps them away, and a wolf already chasing you follows you into its light for a few seconds.
+With fewer than five wolves nearby, wary hunters stop closing in when you reach a burning campfire and circle outside its light.
+They go round the firelight to reach someone standing on the other side.
+Like a torch swing, the fire stops a bite a wolf is still gathering for, but one already in the air finishes its leap.
+Once five or more wolves are near the fire, they attack through its light just as they do against a torch.
+A wolf that you hit or that has already turned on you ignores both kinds of light and keeps attacking, even on its own.
 One log burns about 4 in-game hours.
 A campfire with no wood left burns anyway while workers sit at it.
 Cabin windows glow but do not deter wolves; a campfire whose light reaches a cabin's door keeps them off the door.
@@ -1273,6 +1281,17 @@ Walk at one and it stops and stands braced where it is. Come within 2 metres and
 
 Once five are around you they attack together and swings no longer scare them.
 A torch that lands on a wolf burns it and sends it running for a moment.
+
+### Straw bed
+
+“Not the best sleep score.”
+
+Lay a straw bed on dry, open ground from Building plans for 20 leaves.
+A bed holds one sleeper and doesn't shelter them from wolves.
+Press W, A, S or D, or click Wake, to get up. You finish standing before you can walk away.
+If you already have a burning torch, it stands beside the bed while you sleep.
+It falls apart after three full in-game days, whether or not anyone slept in it.
+Taking it down less than one in-game hour after building returns 20 leaves. After that it returns nothing.
 
 ### Cabins
 
@@ -1370,10 +1389,14 @@ A guest that loses the connection tries to get back in on its own for up to 120 
 ### Shared world
 
 Everyone shares the world, the market and the workers.
-Sleep needs every other player inside a cabin, and everyone with enough food and water.
-Wolves patrol on through a slept night: one that comes to an unlocked door with someone inside stops the night as it starts scratching, with "You are awakened by the noise outside.", and everyone is awake to deal with it.
-While the wolf is at that door, until it has gone or let go of the player it took out, Sleep answers with the same message.
-Behind locked doors the night passes to dawn.
+Time runs faster toward dawn when everyone in the game is asleep, in cabins, on straw beds, or both.
+The clock waits for the last straw-bed sleeper to finish lying down before speeding up.
+Workers, production, trade, needs and wolves all keep running in ordinary simulation steps.
+Outside a locked cabin, a wolf within your usual sight radius triggers “You hear something” and returns time to normal speed, even in darkness.
+You keep sleeping and healing. Time speeds up again when no sleeper hears a wolf.
+A locked cabin prevents both the warning and the slowdown. Its sleepers still wake at dawn.
+A wolf that starts scratching at an unlocked cabin door wakes the people sleeping there.
+Wolves can also bite and wake an outdoor sleeper. If anyone wakes before dawn, time goes back to normal speed.
 Night wolves hunt each player separately.
 
 Thirty times a second the server sends each player only what changed since the last update that player confirmed, usually a few hundred bytes, so it plays over the internet as well as at home.

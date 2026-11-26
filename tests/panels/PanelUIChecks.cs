@@ -26,7 +26,13 @@ public partial class Game {
         var fire = Hosted.Add(ThingKind.Campfire, at + new Vector2(0, -2)); fire.Burn = 120;
         var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(4, -3));
         var sign = Hosted.Add(ThingKind.Signpost, at + new Vector2(-4, -3));
-        var farm = Hosted.Add(ThingKind.Farm, at + new Vector2(5, 3));
+        // A tree inside the plot crushes it when the tree's next day of growth comes due.
+        // So the plot goes where no tree stands.
+        var farmAt = new[] { new Vector2(5, 3), new Vector2(7, 3), new Vector2(5, 6), new Vector2(7, 6), new Vector2(3, 6) }
+            .Select(offset => at + offset)
+            .First(spot => !world.Things.Any(t => t.Kind == ThingKind.Tree
+                && (t.Pos - spot).Abs() is { X: < Farms.HalfSize + 1, Y: < Farms.HalfSize + 1 }));
+        var farm = Hosted.Add(ThingKind.Farm, farmAt);
         var packer = Hosted.Add(ThingKind.Packer, at + new Vector2(-5, 4)); Hosted.SetPacking(packer, "berries"); packer.Inventory.Add("berries", 6); packer.Inventory.Add("crate", 2);
         var tree = world.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(at))!;
         var worker = AddWorker(Hosted, at + Vector2.One); worker.Name = "Panel Check"; worker.Wage = 5;

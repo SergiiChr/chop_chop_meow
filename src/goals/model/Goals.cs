@@ -14,7 +14,7 @@ public sealed class Goals(World world) {
     internal const string OreSeen = "ore_seen";
 
     private static readonly Goal[] entries = [
-        new(GoalId.Campfire, "Light in the dark", "Build and light a campfire. Fire keeps wolves away."),
+        new(GoalId.Campfire, "Light in the dark", "Build and light a campfire. Fire keeps wolves back until five or more are near."),
         new(GoalId.Cabin, "Safe place", "Build a cabin for a peace of mind."),
         new(GoalId.Bench, "A start", "Build a crafting bench."),
         new(GoalId.Furnace, "Stone and embers", "Build a stone furnace."),

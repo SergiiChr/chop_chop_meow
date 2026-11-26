@@ -108,7 +108,7 @@ public sealed class WolfPatrols(World world) {
     /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
     private static void Calm(Wolf wolf) {
         wolf.Target = wolf.Round = 0; wolf.Follow = FollowStage.None;
-        wolf.Howl = wolf.HowlIn = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
+        wolf.Howl = wolf.HowlIn = wolf.Flee = wolf.Stagger = 0; wolf.Galloping = false;
         wolf.Leap = wolf.Snap = wolf.Recover = wolf.Attack = 0;
         wolf.Threaten = wolf.Circle = 0; WolfCounter.Clear(wolf);
         wolf.Feeding = wolf.Pinning = wolf.Tugging = wolf.Growled = wolf.Sprinted = false; wolf.LungeFrom = Vector2.Zero; wolf.Route.Clear();

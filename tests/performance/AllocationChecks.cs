@@ -29,6 +29,8 @@ public static class AllocationChecks {
         Test(CheckPatrollingWolvesAtDuskAllocateNothing, data);
         Test(CheckHuntingWolvesAtNightAllocateNothing, data);
         Test(CheckWolvesFollowingATorchAllocateNothing, data);
+        Test(CheckWolvesCirclingACampfireAllocateNothing, data);
+        Test(CheckSleepWhileTimeRunsFasterAllocatesNothing, data);
         Test(CheckWolvesAtACabinsDoorAllocateNothing, data);
         Test(CheckAFirebugDartingFromThePlayerAllocatesNothing, data);
     }
@@ -176,6 +178,26 @@ public static class AllocationChecks {
         // Wolves a torch scared off circle the player in follow mode, each given its way round on the first tick.
         var (torchlit, _) = WolfSteps.Followed(data, 3);
         Check("tick: night, wolves following a torch", () => { torchlit.Tick(1 / 60f); Fed(torchlit); }, warmup: 600);
+    }
+
+    private static void CheckWolvesCirclingACampfireAllocateNothing(GameData data) {
+        // Hunters keep to the edge of the lit campfire the player stands by, each given its way round on the first tick.
+        var night = NightWorld(data);
+        var centre = night.Player = Terrain.Spawn;
+        night.Add(ThingKind.Campfire, centre).Burn = 90;
+        for (int i = 0; i < 3; i++) PlaceWolf(night, new Wolf { Pos = centre + Vector2.Right.Rotated(i * 2.1f) * 7 });
+        Check("tick: night, wolves circling a campfire", () => { night.Tick(1 / 60f); Fed(night); }, warmup: 600);
+    }
+
+    private static void CheckSleepWhileTimeRunsFasterAllocatesNothing(GameData data) {
+        // The only player sleeps on a straw bed by day, so every frame runs the extra steps of faster time.
+        var world = EmptyWorld(data);
+        var bed = StrawBedSteps.Build(world);
+        world.Sleep.Start(bed);
+        world.Tick(StrawBed.LieDownSeconds + 1);
+        float time = world.Time;
+        Check("tick: day, everyone asleep while time runs faster", () => { world.Tick(1 / 60f); Fed(world); });
+        Require(world.Me.SleepingAt == bed.Id && world.Time - time > 2 * 660 / 60f, "the measured frames should have run faster time");
     }
 
     private static void CheckWolvesAtACabinsDoorAllocateNothing(GameData data) {

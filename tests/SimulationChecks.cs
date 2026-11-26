@@ -60,6 +60,7 @@ public static class SimulationChecks {
         WolfPatrolsChecks.Run(data);
         BankChecks.Run(data);
         CabinChecks.Run(data);
+        StrawBedChecks.Run(data);
         GravelPathChecks.Run(data);
         MovementChecks.Run(data);
         DoorTugChecks.Run(data);

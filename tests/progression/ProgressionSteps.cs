@@ -84,11 +84,15 @@ internal static class ProgressionSteps {
     /// hammers steel parts at the anvil for a steel pickaxe at the bench, which also makes two more crates.
     /// </summary>
     public static void MakeSteelToolsFromMinedOre(World world, Thing stone, Thing iron, Thing coal, Thing bench) {
+        // Isolate the production steps from combat. Campfires no longer stop a complete pack.
+        if (!world.Dusk) RunUntilPhase(world, world.Data.DuskStarts + .01f);
+        RemoveWolves(world, _ => true);
+        ShutDens(world);
         GatherUntil(world, stone, "stone", 52);
         GatherUntil(world, iron, "iron_ore", 22);
         GatherUntil(world, coal, "coal", 17);
         // Smelting and the first steel sale run on into the night.
-        // So the furnaces, the anvil and the trading post stand by two campfires, stocked to burn through it.
+        // The work sites stand by two campfires, stocked to burn through the night.
         foreach (var site in new[] { Site(25, 26.5f), Site(31, 28) }) {
             var fire = BuildAt(world, ThingKind.Campfire, site);
             Require(world.Transfer(world.Backpack, fire.Inventory, "wood", 3) == 3, "a campfire should take wood to burn through the night");

@@ -115,6 +115,11 @@ public sealed class PlayerControl {
         UpdateDigMode();
         // The recipe map covers the world, so nothing held over it walks or gathers.
         if (kit.Paused || panel.Map.Visible) { StopGroundDig(); world.Me.Sprinting = false; return; }
+        if (view.RisingFromStrawBed) {
+            momentum = default; world.Me.Sprinting = world.Me.Braking = false;
+            view.Gathering = false; view.GatheringTarget = null;
+            return;
+        }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
         var direction = cabinApproach.Active ? cabinApproach.Direction()
             : interactionApproach.Direction(world.Door == Doorway.None ? HeldDirection() : Vector2.Zero, panel.Selection.Thing);
@@ -271,9 +276,8 @@ public sealed class PlayerControl {
     private void Walk(Vector2 direction, bool right, float dt) {
         // A carried barrel prevents sprinting.
         // Under 15% food or drink the player is too weak to sprint.
-        // A player held by a find's pop-up stands still, so Shift drains nothing.
-        world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && world.Me.DiaryFinding == DiaryFind.None && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
-        var wanted = world.Door == Doorway.None && !world.Downed ? direction : Vector2.Zero;
+        world.Me.Sprinting = direction != Vector2.Zero && !world.Occupied && world.CanSprint && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
+        var wanted = !world.Occupied ? direction : Vector2.Zero;
         Vector2 step;
         if (cabinApproach.Active || interactionApproach.Active) {
             momentum = default; step = direction;
