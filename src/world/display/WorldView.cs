@@ -384,7 +384,6 @@ public partial class WorldView : Node3D {
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
         camera.Position = target + back * (EnvironmentReview ? EnvironmentCameraDistance : 60);
         if (EnvironmentReview && EnvironmentCameraDistance > 60) sun.DirectionalShadowMaxDistance = EnvironmentCameraDistance + 40;
-        camera.HOffset = 0;
         camera.VOffset = BelowMiddle * camera.Size;
     }
 
