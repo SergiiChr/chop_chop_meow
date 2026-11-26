@@ -29,30 +29,29 @@ public partial class Game {
     /// <summary>Both playlists advance and wrap, crossfade at nightfall, and resume when their time of day returns.</summary>
     private async Task CheckMusicRotatesCrossfadesAndResumes() {
         sounds.UpdateMusic(Sounds.MusicFadeSeconds);
-        Require(sounds.DayMusicPlaying && !sounds.NightMusicPlaying, "Daytime must play the day music only.");
-        for (int index = 1; index < 6; index++) {
+        Require(sounds.DayMusicPlaying && !sounds.NightMusicPlaying && sounds.DayMusicTrack == "path_to_lake_land",
+            "Daytime must start with Path to Lake Land and no night music.");
+        foreach (string name in new[] { "mystic_theme", "jazz_jazz_music", "jazz_bar", "lofi_soul", "groove_soul", "path_to_lake_land" }) {
             sounds.SkipToDayTrackEnd();
-            await Until(() => sounds.DayMusicPlaying && sounds.DayMusicIndex == index, $"day music advancing to track {index + 1}", 5);
+            await Until(() => sounds.DayMusicPlaying && sounds.DayMusicTrack == name, $"day music advancing to {name}", 5);
         }
-        sounds.SkipToDayTrackEnd();
-        await Until(() => sounds.DayMusicPlaying && sounds.DayMusicIndex == 0, "the last day track wrapping to the first", 5);
         RunUntilNight(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds / 2);
         Require(sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Nightfall must crossfade the day music into the night music.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds);
         Require(!sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Day music must stop once faded out.");
-        Require(sounds.NightMusicIndex == 0, "Night music must start with its first track.");
+        Require(sounds.NightMusicTrack == "forest", "Night music must start with Forest.");
         sounds.SkipToNightTrackEnd();
-        await Until(() => sounds.NightMusicPlaying && sounds.NightMusicIndex == 1, "night music advancing to its second track", 5);
-        await Until(() => sounds.NightMusicPosition > .2f, "the second night track playing long enough to resume", 5);
+        await Until(() => sounds.NightMusicPlaying && sounds.NightMusicTrack == "soft_jazz", "Soft Jazz following Forest", 5);
+        await Until(() => sounds.NightMusicPosition > .2f, "Soft Jazz playing long enough to resume", 5);
         RunUntilMorning(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2); float stoppedAt = sounds.NightMusicPosition;
         Require(!sounds.NightMusicPlaying, "Dawn must stop the night music.");
         Require(sounds.DayMusicPlaying, "Dawn must bring the day music back.");
         Require(stoppedAt > .2f, "Dawn must keep the night music's position.");
         RunUntilNight(Hosted); await Frames(1); sounds.UpdateMusic(.1f);
-        Require(sounds.NightMusicPlaying && sounds.NightMusicIndex == 1 && sounds.NightMusicPosition >= stoppedAt,
+        Require(sounds.NightMusicPlaying && sounds.NightMusicTrack == "soft_jazz" && sounds.NightMusicPosition >= stoppedAt,
             "The next night must resume the same track where it stopped.");
         sounds.SkipToNightTrackEnd();
-        await Until(() => sounds.NightMusicPlaying && sounds.NightMusicIndex == 0, "the last night track wrapping to the first", 5);
+        await Until(() => sounds.NightMusicPlaying && sounds.NightMusicTrack == "forest", "night music wrapping from Soft Jazz to Forest", 5);
         RunUntilMorning(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2);
     }
 }

@@ -117,11 +117,11 @@ public partial class Sounds : Node {
     /// <summary>Music loudness from the options, 0 to 1.</summary>
     public float MusicVolume = 1;
     public bool DayMusicPlaying => day.Player.Playing;
-    public int DayMusicIndex => day.Index;
+    public string DayMusicTrack => day.Name;
     /// <summary>Jumps the current day track to its last moment, so it plays to its end without the wait.</summary>
     public void SkipToDayTrackEnd() => day.SkipToTrackEnd();
     public bool NightMusicPlaying => night.Player.Playing;
-    public int NightMusicIndex => night.Index;
+    public string NightMusicTrack => night.Name;
     public float NightMusicPosition => night.Position;
     /// <summary>Jumps the current night track to its last moment, so it plays to its end without the wait.</summary>
     public void SkipToNightTrackEnd() => night.SkipToTrackEnd();
@@ -383,7 +383,8 @@ public partial class Sounds : Node {
         private readonly AudioStreamMP3[] streams;
         private float level, at;
         private bool started;
-        public int Index { get; private set; }
+        private int index;
+        public string Name => System.IO.Path.GetFileNameWithoutExtension(Player.Stream.ResourcePath);
         public float Position => Player.Playing ? Player.GetPlaybackPosition() : at;
 
         public Track(Node parent, params string[] names) {
@@ -402,7 +403,7 @@ public partial class Sounds : Node {
                 else if (!Player.Playing) {
                     // A player that has started and is neither playing nor paused has reached the end of its track, so the next one follows.
                     // The player's own finished signal comes too late for this: it fires after this update has already started the track again.
-                    if (started) { Index = (Index + 1) % streams.Length; Player.Stream = streams[Index]; }
+                    if (started) { index = (index + 1) % streams.Length; Player.Stream = streams[index]; }
                     Player.Play(); started = true;
                 }
             } else if (Player.Playing) {
