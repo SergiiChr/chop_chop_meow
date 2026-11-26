@@ -3,10 +3,18 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A slot as the map draws it: filled for an item made before, a dashed outline for one not made yet.</summary>
+/// <summary>A slot as the map draws it: filled for an item made before, a dashed outline for an undiscovered one.</summary>
 public partial class MapSlot : Control {
     public bool Known { get; set; }
     private static readonly StyleBoxFlat Unknown = Style.Flat(new Color(Style.SlotFill, .14f), 12, 0);
+
+    public override void _Ready() {
+        if (Known) return;
+        var mark = Style.Text(MapItemLink.Unknown, 12, Style.Rim, Style.Head);
+        mark.HorizontalAlignment = HorizontalAlignment.Center;
+        mark.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        AddChild(mark);
+    }
 
     public override void _Draw() => Paint(this, new Rect2(Vector2.Zero, Size), Known);
 

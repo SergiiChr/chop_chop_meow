@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static SetupSteps;
 
 namespace ChopChopMeow;
 
@@ -9,13 +10,13 @@ public partial class Game {
     private async Task CheckItemTreeFollowsOneDirectRecipeAtATime() {
         await OpenRecipeMap();
         await Click(RecipeMapCard("steel_hammer"), alt: true);
-        await ItemTreeShows("Steel hammer");
+        await ItemTreeShows("steel_hammer");
         Require(ItemTreeCard("tin_can") != null && ItemTreeCard("steel_parts") != null,
             "The steel hammer tree should show every direct recipe, including tin cans and steel parts.");
         Require(ItemTreeCard("canned_jam") == null && ItemTreeCard("nettle_rope") == null,
             "The tree should leave out the next step and recipes whose tool may not be steel.");
         await Click(ItemTreeCard("tin_can")!, alt: true);
-        await ItemTreeShows("Tin can");
+        await ItemTreeShows("tin_can");
         await Click(ItemTreeCard("canned_jam")!);
         await Until(() => recipeMap.Chosen == "canned_jam" && recipeMap.NodeOf("canned_jam")!.Lit,
             "the main map showing canned jam highlighted", 2);
@@ -33,7 +34,7 @@ public partial class Game {
         var rows = (ScrollContainer)recipeMap.FindChild("map_rows", true, false);
         int scroll = rows.ScrollVertical;
         await Click(mallet, alt: true);
-        await ItemTreeShows("Wooden mallet");
+        await ItemTreeShows("wood_hammer");
         Require(ItemTreeCard("nettle_rope") != null && ItemTreeCard("tin_can") == null,
             "The mallet should make nettle rope but not the tin cans that take a steel hammer.");
         await Click((Control)recipeMap.FindChild("item_tree_back", true, false));
@@ -44,10 +45,11 @@ public partial class Game {
 
     /// <summary>An item shown in the main map's details also opens its own item tree.</summary>
     private async Task CheckItemTreeOpensFromADetailThumbnail() {
+        Achieve(Hosted, "tin_sheet"); await Frames();
         await OpenRecipeMap();
         await Click(RecipeMapCard("tin_sheet"));
         await Click((Control)recipeMap.FindChild("use_tin_can", true, false), alt: true);
-        await ItemTreeShows("Tin can");
+        await ItemTreeShows("tin_can");
         Require(ItemTreeCard("canned_jam") != null, "The detail icon should open the tin can's direct recipes.");
         await KeyStroke(Key.Escape);
     }
@@ -56,7 +58,7 @@ public partial class Game {
     private async Task CheckItemTreeDistinguishesIngredientsFuelAndFixedTools() {
         await OpenRecipeMap();
         await Click(RecipeMapCard("coal"), alt: true);
-        await ItemTreeShows("Coal");
+        await ItemTreeShows("coal");
         var fuel = recipeMap.FindChild("item_tree_role_Fuel", true, false) as Control;
         var ingredient = recipeMap.FindChild("item_tree_role_Ingredient", true, false) as Control;
         Require(fuel != null && ingredient != null && recipeMap.FindChild("item_tree_role_Tool", true, false) == null,
@@ -75,7 +77,7 @@ public partial class Game {
         await Until(() => recipeMap.Chosen == "steel_bar" && recipeMap.NodeOf("steel_bar")!.Lit,
             "the map highlighting Steel bar after a click on the Ingredient branch", 2);
         await Click(RecipeMapCard("steel_pipe"), alt: true);
-        await ItemTreeShows("Steel pipe");
+        await ItemTreeShows("steel_pipe");
         var tool = recipeMap.FindChild("item_tree_role_Tool", true, false);
         Require(tool != null && HasLabel(tool, "Tool") && tool.FindChild("tree_item_glass_jar", true, false) != null,
             "Glass jars must appear under Tool when a steel pipe is the one fitted to the furnace.");

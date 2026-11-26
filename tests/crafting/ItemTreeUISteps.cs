@@ -15,6 +15,6 @@ public partial class Game {
 
     private async Task ItemTreeShows(string item) =>
         await Until(() => recipeMap.FindChild("item_tree", true, false) is Control tree && tree.IsVisibleInTree() &&
-            tree.FindChild("item_tree_name", true, false) is Label name && name.Text == item,
+            tree.FindChild($"item_tree_root_{item}", true, false) is Control,
             $"the item tree rooted at {item}", 2);
 }

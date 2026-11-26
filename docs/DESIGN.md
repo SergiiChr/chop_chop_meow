@@ -195,6 +195,7 @@ UI and input:
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout and item details |
+| `src/crafting/display/MapItemLink.cs` | An item link that hides its identity until discovery |
 | `src/crafting/display/ItemTree.cs` | The Recipe map's item tree, with recipe products grouped by role |
 | `src/crafting/display/ItemTreeBranches.cs` | The lines from the root item to each role and its recipe products |
 | `src/crafting/model/RecipeItemUse.cs` | The direct roles an item plays in a recipe |
@@ -1153,10 +1154,12 @@ The Recipe map badge on the bottom bar opens `RecipeMap` over the running game.
 `UiKit.LinkRecipeMap` lets Alt-click on an item slot or recipe card look up its item through `RecipeMap.OpenAt` without
 running the slot's usual action. An item link in the Goal Log uses the same entry point with the game still paused.
 Closing the map returns to the panel or goal details underneath.
-`PlayerControl.Update` moves nobody while it shows, and a `MapNode` turns to made before as soon as `World.Had` knows its item.
+`PlayerControl.Update` moves nobody while it shows, and an item link shows its name and icon as soon as `World.Had` knows its item.
 `RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
 and the rest go on lines below. `MapTree` draws arrows to the products and highlights those connected to the chosen card.
-A `MapNode` draws a filled icon slot for an item `World.Had` knows and a dashed one otherwise.
+A `MapNode` draws a filled icon slot for a discovered item and a question mark in a dashed slot otherwise.
+`MapItemLink` also hides undiscovered names and icons in the Item tree, chips, thumbnails and tooltips.
+Undiscovered entries can still be followed, but the right-hand panel hides their recipes until discovery.
 Chips below the card link to the required tool and to each input after the first. A click on a chip scrolls to its item
 and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details in a vertical panel to
 the right of the map. The panel's button leaves the map through `SidePanel.ShowRecipe`.

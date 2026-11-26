@@ -71,15 +71,12 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
 
     private ItemSlot Card(string id, string? role = null) {
         bool root = role == null;
-        string nameText = kit.World.Data.Name(id);
-        string tooltip = role == null ? nameText : $"{nameText}\n{role}";
-        var card = new ItemSlot {
-            Name = root ? "item_tree_root" : $"tree_item_{id}",
+        var card = new MapItemLink(kit.World, id, $"Click to find it on the map · {RecipeMap.ItemTreeHint}", role) {
+            Name = root ? $"item_tree_root_{id}" : $"tree_item_{id}",
             CustomMinimumSize = new Vector2(root ? 252 : 226, root ? 66 : 46),
             SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
             FocusMode = FocusModeEnum.None,
             MouseDefaultCursorShape = CursorShape.PointingHand,
-            TooltipText = $"{tooltip}\nClick to find it on the map · {RecipeMap.ItemTreeHint}",
             RecipeLink = () => openItemTree(id)
         };
         card.Pressed += () => showOnMap(id);
@@ -87,13 +84,18 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         var face = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         face.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, root ? 9 : 6);
         face.AddThemeConstantOverride("separation", 8); card.AddChild(face);
-        var icon = Style.Icon(Icons.Of(id), root ? 36 : 30);
+        var icon = Style.Icon(null, root ? 36 : 30);
         icon.SizeFlagsVertical = SizeFlags.ShrinkCenter; face.AddChild(icon);
-        var name = Style.Text(nameText, 18, Style.Rim, Style.Head);
-        if (root) name.Name = "item_tree_name";
+        var name = Style.Text("", 18, Style.Rim, Style.Head);
         name.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         face.AddChild(name);
+        card.PresentIdentity = (caption, texture) => {
+            icon.Texture = texture;
+            icon.Visible = card.Known;
+            name.Text = caption;
+            name.HorizontalAlignment = card.Known ? HorizontalAlignment.Left : HorizontalAlignment.Center;
+        };
         return card;
     }
 }

@@ -18,12 +18,12 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
     private static readonly Color SourceText = new("d5dfdf");
     private static readonly Rect2 ItemIcon = new(8, (Height - SlotSide) / 2, SlotSide, SlotSide);
 
-    private TextureRect icon = null!;
+    private MapItemLink card = null!;
     private bool chosen;
     private SceneTreeTimer? light;
 
     /// <summary>Whether the settlement has had this item before.</summary>
-    public bool Known { get; private set; } = world.Had(item);
+    public bool Known => card.Known;
     public bool Lit => light != null;
 
     public bool Chosen {
@@ -42,73 +42,70 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         CustomMinimumSize = Size = new Vector2(Width, RowPitch - 3);
         MouseFilter = MouseFilterEnum.Ignore;
 
-        var card = new ItemSlot {
+        card = new MapItemLink(world, item, RecipeMap.ItemTreeHint) {
             Name = "slot",
             Size = new Vector2(Width, Height),
             FocusMode = FocusModeEnum.None,
             MouseDefaultCursorShape = CursorShape.PointingHand,
-            TooltipText = $"{data.Name(item)}\n{RecipeMap.ItemTreeHint}",
             RecipeLink = () => openItemTree(item)
         };
         Style.Skin(card, Style.None, Hover);
         // The card's centre must be clickable even when requirement chips lap its lower edge.
         card.Pressed += () => choose(item);
-        AddChild(card);
-        icon = Style.Icon(Icons.Of(item), 34);
+        var icon = Style.Icon(null, 34);
         icon.Position = ItemIcon.GetCenter() - new Vector2(17, 17); icon.Size = new Vector2(34, 34);
         card.AddChild(icon);
 
         var recipe = data.RecipeOf(item);
-        var name = Style.Text(data.Name(item), 16, Style.Rim, Style.Head);
-        name.Position = new Vector2(56, 4); name.Size = new Vector2(Width - 64, 22);
+        var name = Style.Text("", 16, Style.Rim, Style.Head);
         name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
         card.AddChild(name);
-        var source = Style.Text(recipe != null ? Where(data, recipe) : data.Sources[item].How, 13, SourceText, wrap: true);
+        var source = Style.Text("", 13, SourceText, wrap: true);
         source.Name = "source"; source.Position = new Vector2(56, 23); source.Size = new Vector2(Width - 64, 33);
         source.VerticalAlignment = VerticalAlignment.Top;
         source.MaxLinesVisible = 2;
         source.AddThemeConstantOverride("line_spacing", 0);
         card.AddChild(source);
+        card.PresentIdentity = (caption, texture) => {
+            icon.Texture = texture;
+            name.Text = caption;
+            name.HorizontalAlignment = Known ? HorizontalAlignment.Left : HorizontalAlignment.Center;
+            name.Position = Known ? new Vector2(56, 4) : ItemIcon.Position;
+            name.Size = Known ? new Vector2(Width - 64, 22) : ItemIcon.Size;
+            if (Known) source.Text = recipe != null ? Where(data, recipe) : data.Sources[item].How;
+            source.Visible = Known;
+            QueueRedraw();
+        };
+        card.Discovered += RefreshDetails;
+        AddChild(card);
 
         var also = recipe != null ? recipe.Inputs.Keys.Skip(1) : data.Sources[item].Also;
         var chips = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore, Position = new Vector2(10, Height - 4) };
         chips.AddThemeConstantOverride("separation", 3);
         if (recipe is { Tool.Length: > 0 }) {
             string tool = data.PlainestTool(recipe.Tool, recipe.Tier, recipe.Station);
-            chips.AddChild(ChipFor(tool, "tool", ToolChip, "Required tool"));
+            var toolChip = ChipFor(tool, "tool", ToolChip, "Required tool");
+            toolChip.Discovered += RefreshDetails;
+            chips.AddChild(toolChip);
         }
         foreach (string other in also) chips.AddChild(ChipFor(other, "also", ResourceChip, "Additional resource"));
         if (chips.GetChildCount() > 0) AddChild(chips); else chips.Free();
-        ShowKnown();
     }
 
-    /// <summary>Turns the item to made before as soon as the settlement has had it, in its details too when they show.</summary>
-    public override void _Process(double delta) {
-        if (!world.Had(item)) return;
-        Known = true; ShowKnown();
-        if (chosen) choose(item);
-    }
-
-    private void ShowKnown() {
-        SetProcess(!Known);
-        icon.Modulate = Known ? Colors.White : new Color(1, 1, 1, .76f);
-        QueueRedraw();
-    }
+    private void RefreshDetails() { if (chosen) choose(item); }
 
     /// <summary>Where a recipe is made, in a few words.</summary>
     public static string Where(GameData data, RecipeDef r) => r.Station is not ThingKind station ? "By hand"
         : r.Hand ? $"Hand or {data.Name(station).ToLowerInvariant()}" : data.Name(station);
 
-    private Button ChipFor(string other, string kind, StyleBoxFlat look, string role) {
-        var chip = new ItemSlot {
+    private MapItemLink ChipFor(string other, string kind, StyleBoxFlat look, string role) {
+        var chip = new MapItemLink(world, other, $"Click to find it on the map · {RecipeMap.ItemTreeHint}", role) {
             Name = $"{kind}_{other}",
             CustomMinimumSize = new Vector2(Chip, Chip),
-            Icon = Icons.Of(other),
             ExpandIcon = true,
             IconAlignment = HorizontalAlignment.Center,
             FocusMode = FocusModeEnum.None,
             MouseDefaultCursorShape = CursorShape.PointingHand,
-            TooltipText = $"{role}: {world.Data.Name(other)}\nClick to find it on the map · {RecipeMap.ItemTreeHint}",
             RecipeLink = () => openItemTree(other)
         };
         Style.Skin(chip, look, Style.SlotHover); chip.AddThemeConstantOverride("icon_max_width", 15);

@@ -630,12 +630,13 @@ opens its details. Closing the map returns to the panel you came from.
 Opening it from the bottom bar or by Alt-clicking lets the game run underneath.
 Opening it from a goal keeps the pause menu open underneath.
 Movement controls are disabled while the map is open.
-An item first made while the map is open turns to **Made before**.
+An item discovered while the map is open reveals its name and icon without reopening the map.
 
 - The map groups items by category, from wood and stone to food and trade. Follow the arrows from a material to what
-  it makes. Each card names where the item is made or found.
+  it makes. Discovered cards name where the item is made or found.
 - Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
-  Other items have dashed icon outlines.
+  Undiscovered items show as question marks without names or icons in both views. You can follow their links, but
+  their recipe details stay hidden until they are discovered.
 - Small icons at the foot of a card show a required tool (gold rim) or an additional resource (blue rim).
   Click one to find that item on the map and light it up briefly.
 - Click anywhere on a card to highlight it and the arrows connected to it. The details panel on the right shows how it

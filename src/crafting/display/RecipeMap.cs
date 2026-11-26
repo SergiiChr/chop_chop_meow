@@ -140,7 +140,7 @@ public partial class RecipeMap : Control {
         intro.AddChild(Style.Heading("Recipe map", 30));
         intro.AddChild(Style.Text("Follow the arrows to what each item makes. Alt-click to open its item tree.", 15, Style.Beige));
         header.AddChild(Legend(new MapSlot { Known = true }, "Made before"));
-        header.AddChild(Legend(new MapSlot(), "Not made yet"));
+        header.AddChild(Legend(new MapSlot(), "Undiscovered"));
         header.AddChild(Legend(Sample(MapNode.ToolChip), "Required tool"));
         header.AddChild(Legend(Sample(MapNode.ResourceChip), "Additional resources"));
         header.AddChild(kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "map_close"));
@@ -215,6 +215,14 @@ public partial class RecipeMap : Control {
         }
 
         node.Chosen = true;
+        if (!node.Known) {
+            var undiscovered = DetailItem(item, 46, "detail_item");
+            undiscovered.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
+            details.AddChild(undiscovered);
+            details.AddChild(Style.Text("Discover this item to see its details.", 16, Style.Ink, wrap: true));
+            return;
+        }
+
         var data = world.Data;
         var recipe = data.RecipeOf(item);
         var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 12); details.AddChild(header);
@@ -223,7 +231,7 @@ public partial class RecipeMap : Control {
         identity.AddThemeConstantOverride("separation", 3); header.AddChild(identity);
         var name = Style.Text(data.Name(item), 23, Style.Ink, Style.Head, wrap: true);
         name.Name = "detail_name"; identity.AddChild(name);
-        var known = Style.Pill(node.Known ? "Made before" : "Not made yet", Style.Tag(node.Known ? Style.Sage : Style.Tan), Style.SlotFill, 12);
+        var known = Style.Pill("Made before", Style.Tag(Style.Sage), Style.SlotFill, 12);
         known.SizeFlagsHorizontal = SizeFlags.ShrinkBegin; identity.AddChild(known);
         if (data.Items[item].Description is { Length: > 0 } said) {
             var text = Style.Text(said, 14, Style.Ink, wrap: true); text.Name = "detail_text"; details.AddChild(text);
@@ -232,30 +240,36 @@ public partial class RecipeMap : Control {
         var madeAt = Fact(details, recipe == null ? "Source" : "Made at");
         madeAt.AddChild(Style.Text(MadeAt(item), 16, Style.Ink, wrap: true));
         var needs = recipe != null
-            ? recipe.Inputs.Select(p => (p.Key, $"{p.Value} {data.Name(p.Key)}"))
-            : data.Sources[item].From.Concat(data.Sources[item].Also).Select(input => (input, data.Name(input)));
+            ? recipe.Inputs.Select(p => (p.Key, $"{p.Value} "))
+            : data.Sources[item].From.Concat(data.Sources[item].Also).Select(input => (input, ""));
         var requires = Fact(details, "Requires");
-        foreach (var (input, words) in needs) {
+        foreach (var (input, amount) in needs) {
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 4);
-            pair.AddChild(DetailItem(input, 28, $"requires_{input}"));
-            var label = Style.Text(words, 15, Style.Ink, wrap: true);
+            var icon = DetailItem(input, 28, $"requires_{input}");
+            pair.AddChild(icon);
+            var label = Style.Text(icon.Known ? amount + data.Name(input) : amount + MapItemLink.Unknown, 15, Style.Ink, wrap: true);
+            icon.Discovered += () => label.Text = amount + data.Name(input);
             label.SizeFlagsHorizontal = SizeFlags.ExpandFill; pair.AddChild(label);
             requires.AddChild(pair);
         }
         if (requires.GetChildCount() == 1) requires.AddChild(Style.Text("No ingredients", 15, Style.Tan));
         var uses = data.UsedFor(item).ToList();
         var used = Flow(Fact(details, "Used for")); used.Name = "detail_uses";
-        foreach (string use in uses) used.AddChild(DetailItem(use, 28, $"use_{use}"));
-        if (uses.Count == 1) used.AddChild(Style.Text(data.Name(uses[0]), 15, Style.Ink));
+        foreach (string use in uses) {
+            var icon = DetailItem(use, 28, $"use_{use}");
+            used.AddChild(icon);
+            if (uses.Count != 1) continue;
+            void AddName() => used.AddChild(Style.Text(data.Name(use), 15, Style.Ink));
+            if (icon.Known) AddName(); else icon.Discovered += AddName;
+        }
         if (uses.Count == 0) used.AddChild(Style.Text("—", 15, Style.Tan));
         if (recipe != null) details.AddChild(ShowButton(item, recipe));
     }
 
     /// <summary>A detail thumbnail keeps its icon size and also lets Alt-click follow that item.</summary>
-    private ItemSlot DetailItem(string item, int size, string name) {
-        var icon = new ItemSlot {
+    private MapItemLink DetailItem(string item, int size, string name) {
+        var icon = new MapItemLink(world, item, ItemTreeHint) {
             Name = name,
-            Icon = Icons.Of(item),
             ExpandIcon = true,
             CustomMinimumSize = new Vector2(size, size),
             SizeFlagsVertical = SizeFlags.ShrinkCenter,
@@ -263,11 +277,12 @@ public partial class RecipeMap : Control {
             VerticalIconAlignment = VerticalAlignment.Center,
             FocusMode = FocusModeEnum.None,
             MouseDefaultCursorShape = CursorShape.PointingHand,
-            TooltipText = $"{world.Data.Name(item)}\n{ItemTreeHint}",
             RecipeLink = () => OpenItemTree(item)
         };
         Style.Skin(icon, Style.None, Style.None);
         icon.AddThemeConstantOverride("icon_max_width", size);
+        Style.InkText(icon);
+        icon.AddThemeFontOverride("font", Style.Head);
         return icon;
     }
 
@@ -289,8 +304,9 @@ public partial class RecipeMap : Control {
     private string MadeAt(string item) {
         var data = world.Data;
         if (data.RecipeOf(item) is not RecipeDef r) return data.Sources[item].How;
-        string where = MapNode.Where(data, r), tool = r.Tool == "" ? "" : $", {data.ToolName(r)}";
+        string where = MapNode.Where(data, r);
         string? plainest = r.Tool == "" ? null : data.PlainestTool(r.Tool, r.Tier, r.Station);
+        string tool = plainest == null ? "" : $", {(world.Had(plainest) ? data.ToolName(r) : MapItemLink.Unknown)}";
         float byHand = r.Seconds / world.WorkRate(null, plainest), there = r.Seconds / world.WorkRate(r.Station, plainest);
         string time = r.Hand && r.Station is ThingKind station && byHand != there ? $"{byHand:0.#} s by hand, {there:0.#} s at the {data.Name(station).ToLowerInvariant()}" : $"{there:0.#} s";
         return $"{where}{tool} · {time}";
