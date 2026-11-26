@@ -2651,7 +2651,9 @@ public sealed partial class World {
         return true;
     }
     /// <summary>Whether a box exists and holds only positive counts of known items or of packed crates in <paramref name="crates"/>.</summary>
-    private bool ValidInventory([NotNullWhen(true)] Inventory? box, Dictionary<int, Inventory> crates) => box?.Items != null && ValidCounts(box.Items, crates) && box.ValidFirebugs();
+    private bool ValidInventory([NotNullWhen(true)] Inventory? box, Dictionary<int, Inventory> crates, bool canGrow = false) =>
+        box?.Items != null && (!box.UnlimitedSlots || canGrow && box.Capacity == 0 && box.CarriedBy == Inventory.Carrier.None)
+        && ValidCounts(box.Items, crates) && box.ValidFirebugs();
     /// <summary>Whether each packed crate holds positive counts of known items, no other crates, and no more than a crate fits.</summary>
     private bool ValidCrates(Dictionary<int, Inventory> crates) {
         foreach (var box in crates.Values) if (!ValidInventory(box, NoCrates) || box.Count > Data.CrateCapacity || Barrel.In(box) != null) return false;
@@ -2678,7 +2680,8 @@ public sealed partial class World {
     private bool ValidSettlement(SaveState save) {
         foreach (var t in save.Things) {
             if (t?.Inventory == null || !StrawBed.Valid(t, save.Time)) return false;
-            foreach (var box in Boxes(t)) if (box != null && !ValidInventory(box, save.Crates)) return false;
+            foreach (var box in Boxes(t))
+                if (box != null && !ValidInventory(box, save.Crates, t.Kind == ThingKind.Chest && box == t.Inventory)) return false;
             if (t.Kind == ThingKind.Barrel && (t.Inventory.Slots != 1 || t.Inventory.StackSize != Barrel.Capacity
                 || t.Inventory.Capacity != Barrel.Capacity || t.Inventory.Count != t.Inventory[Water.Liquid] && t.Inventory.Count != t.Inventory[BerryJam.Liquid]
                 || t.Inventory.Count > Barrel.Capacity)) return false;

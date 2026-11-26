@@ -1424,6 +1424,7 @@ Both are boxes a player in reach of the worker (`World.Reaches`) picks up from a
 #### Chests
 
 Chests have separate item allowlists for input and output.
+A debug chest in a playtest save sets the inventory's `UnlimitedSlots` and adds a spare cell whenever the last one fills.
 Storage with a filter window has `Inventory.Gated` set: there an empty list lets nothing through and `Inventory.Everything`, shown as an "A" cell, lets every item through.
 `Inventory.Filter` keeps `Everything` alone in its row.
 `World.Add` gives a chest and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; every crate's contents get the chest's lists when made (`World.NewCrate`), packed or not.

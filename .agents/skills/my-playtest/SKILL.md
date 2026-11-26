@@ -1,6 +1,6 @@
 ---
 name: my-playtest
-description: Prepare a playable copy of the user's latest Chop Chop Meow save and settings for testing a change. Put a chest beside their player with full stacks of the direct supplies and enough ingredients and tools to make any underlying parts.
+description: Prepare a playable copy of the user's latest Chop Chop Meow save and settings for testing a change. Put a single unlimited debug chest beside their player with full stacks of the direct supplies and enough ingredients and tools to make any underlying parts.
 ---
 
 # My playtest
@@ -20,18 +20,19 @@ Use the worktree that contains the change being tested. Keep the original save a
   Port only the copy by hand, including any changed fields, IDs or item formats. Do not just change the version number
   without checking those differences. If the target cannot load the copy, report why instead of starting an empty game.
 
-## Stock the chest
+## Stock the debug chest
 
-- Place a chest on open ground next to the player selected by the copied settings, within reach and off any doorway or path.
-  Use the target build's chest and inventory rules and a fresh thing ID. Close both worker filters so supplies stay put.
+- Use one debug chest on open ground next to the player selected by the copied settings, within reach and off a doorway or path.
+  Reuse the debug chest if this is another run of the same copy. Otherwise use a chest with a fresh thing ID.
+- In its saved inventory set `UnlimitedSlots` to true and leave `Capacity` at 0. Keep each item in its normal stack size
+  and give the layout a spare slot at the end. Leave both worker filters closed so supplies stay put.
 - Read the changed recipes, construction costs and use rules in the target build.
   Stock one full in-game stack of each direct resource, using that item's real stack limit, and one of each required tool.
 - For a complex item, follow the recipes for its parts down to the raw supplies. Alongside the ready-made parts, include
   enough of each underlying ingredient, tool, fuel and consumable to make one complete set of parts, counting shared
   ingredients and batch yields. Make sure the required stations in the copied settlement are available for that chain.
-  If the supplies do not fit, keep the direct supplies together where possible and put the rest in an adjoining chest.
-  Use the target's item state for things like live firebugs. Don't put in the finished item as a substitute for its inputs.
-- Verify in the target build that the copy loads as the saved player, the chest is within reach, and its contents match
+  Use the target's item state for things like live firebugs. Include finished items when the player asks to test using them.
+- Verify in the target build that the copy loads as the saved player, the debug chest is within reach, and its contents match
   the test. Keep the prepared files in ignored game data and tell the user what to try first and what is in the chest.
 
 Launch from the target worktree and choose **Continue**.

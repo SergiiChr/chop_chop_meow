@@ -193,13 +193,14 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         } else if (scene == "held") world.Lanterns.ToggleInHand(Lanterns.Id(GiveLantern(10)));
         else if (scene == "backpack") {
             GiveLantern(0);
+            world.SetHotbar(0, GiveLantern(4));
             world.Firebugs.GiveForReview(world.S.Backpack, Lanterns.Capacity);
         } else if (scene == "torch") { world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); } else _ = world.Lanterns.Place(GiveLantern(scene == "partial" ? 4 : Launch.Has("--dark") ? 0 : 10), at) ?? throw new InvalidOperationException("The lantern review needs open ground.");
         world.Tick(scene == "torch" ? World.KindleSeconds : 0);
         AimAt(at);
         if (carried && Launch.Has("--lantern-motion")) ReviewLanternMotion();
         view.Zoom = carried ? 3.25f : night ? 1.6f : 4;
-        panel.Close();
+        if (scene == "backpack") panel.Open(Page.Backpack); else panel.Close();
         ui.Visible = scene == "backpack" && !Launch.Has("--hide-ui");
     }
 

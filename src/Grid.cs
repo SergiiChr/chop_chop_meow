@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -33,13 +34,18 @@ public partial class PagePanel {
     protected GridContainer NewInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52, Action<string>? use = null, Action<int, string, int>? put = null, Func<string, bool>? open = null) {
         var grid = NewGrid(columns);
         if (size < 52) { grid.AddThemeConstantOverride("h_separation", 8); grid.AddThemeConstantOverride("v_separation", 8); }
-        var stacks = new (string Item, int Count)?[inventory().Slots];
-        var cells = Enumerable.Range(0, stacks.Length).Select(i => ItemSlot.Create($"slot_{i}", size)).ToArray();
-        var shown = new bool[cells.Length];
+        var stacks = new List<(string Item, int Count)?>();
+        var cells = new List<(ItemSlot Cell, Badge Count)>();
+        var shown = new List<bool>();
         bool first = true;
-        for (int i = 0; i < cells.Length; i++) {
-            int slot = i;
-            var cell = cells[i].Cell;
+        for (int i = 0; i < inventory().Slots; i++) AddSlot();
+
+        void AddSlot() {
+            int slot = cells.Count;
+            var made = ItemSlot.Create($"slot_{slot}", size);
+            var cell = made.Cell;
+            cells.Add(made); stacks.Add(null); shown.Add(false);
+            cell.Hide();
             // A click on a stack acts on that very slot when the item lies in several.
             Action? On(Action<string>? act) => act == null ? null : () => {
                 if (stacks[slot] is not (string id, _)) return;
@@ -68,22 +74,24 @@ public partial class PagePanel {
             kit.Notify(dry); return false;
         }
         // What each slot last drew: its stack, the inventory's total of that item and whether the stack is bound to the hotbar. A slot is redrawn only when they change.
-        var current = new System.Collections.Generic.List<(string Item, int Count)>();
-        var drawn = new (string? Item, int Count, int Total, bool Bound, int Life, bool Dark, int PackedCount)[cells.Length];
+        var current = new List<(string Item, int Count)>();
+        var drawn = new List<(string? Item, int Count, int Total, bool Bound, int Life, int Bugs, int PackedCount)>();
         live.Add(() => {
             var held = inventory();
             held.FillStacks(current);
             int visible = held.ShownSlots, changed = 0;
-            for (int i = 0; i < cells.Length; i++) {
+            while (cells.Count < visible) AddSlot();
+            while (drawn.Count < cells.Count) drawn.Add(default);
+            for (int i = 0; i < cells.Count; i++) {
                 var (cell, count) = cells[i];
                 stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
                 bool bound = i < held.Layout.Count && held.Layout[i].Hotbar != 0;
                 var looks = stacks[i] is (string item, int n)
-                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) && world.Lanterns.BugCount(item) == 0, world.Packed(item)?.Count ?? 0)
-                    : ((string?)null, 0, 0, false, -1, false, 0);
+                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) ? world.Lanterns.BugCount(item) : -1, world.Packed(item)?.Count ?? 0)
+                    : ((string?)null, 0, 0, false, -1, -1, 0);
                 if (first || looks != drawn[i]) {
                     drawn[i] = looks;
-                    Redraw(cell, count, stacks[i], held, bound, drawn[i].Life);
+                    Redraw(cell, count, stacks[i], held, bound, drawn[i].Life, drawn[i].Bugs);
                 }
                 if (shown[i] == i < visible && !first) continue;
                 shown[i] = i < visible;
@@ -93,14 +101,17 @@ public partial class PagePanel {
             first = false;
         });
         return grid;
-        void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held, bool bound, int life) {
+        void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held, bool bound, int life, int bugs) {
             cell.Icon = stack is (string id, _) ? Icons.Of(id) : null;
             var contents = stack is (string crate, _) ? world.Packed(crate) : null;
             var badge = cell.GetNode<TextureRect>("badge");
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = Icons.Of(contents.Items.OrderByDescending(p => p.Value).First().Key);
-            count.Text = stack is (string barrel, 1) && Barrel.Is(barrel) ? $"{Barrel.Liters(barrel)}/{Barrel.Capacity} L"
-                : stack is (string bottle, 1) && world.Data.VesselOf(bottle) is VesselDef vessel ? $"{vessel.LitersIn(bottle)}/{vessel.Capacity}" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
+            if (stack is (string barrel, 1) && Barrel.Is(barrel)) count.SetCount($"{Barrel.Liters(barrel)}/{Barrel.Capacity} L");
+            else if (stack is (string bottle, 1) && world.Data.VesselOf(bottle) is VesselDef vessel)
+                count.SetCount($"{vessel.LitersIn(bottle)}/{vessel.Capacity}");
+            else if (contents != null) count.SetCount(contents.Count.ToString());
+            else count.SetStack(stack?.Count ?? 0, bugs);
             bool takes = wanted != null && stack is (string item, _) && wanted(item);
             if (wanted != null) cell.AddThemeColorOverride(ItemSlot.IconNormal, stack == null || takes ? Colors.White : Style.Faded);
             // A backpack stack bound to the hotbar has the selected hotbar slot's rim.

@@ -74,6 +74,7 @@ public static class SimulationChecks {
         CrateChecks.Run(data);
         ToolStationChecks.Run(data);
         PileChecks.Run(data);
+        DebugChestChecks.Run(data);
         FarmChecks.Run(data);
         TradeChecks.Run(data);
         GoalChecks.Run(data);

@@ -8,8 +8,28 @@ namespace ChopChopMeow;
 
 public partial class Game {
     private async Task RunLanternUIChecks() {
+        await TestClean(CheckLanternBadgesShowLiveFirebugsInsteadOfStackSize);
         await TestClean(CheckADoubleClickTakesTheLanternInHandAndPutsOutTheTorch);
         await TestClean(CheckAPlacedLanternOpensWithRightClickAndTakesFirebugsGradually);
+    }
+
+    private async Task CheckLanternBadgesShowLiveFirebugsInsteadOfStackSize() {
+        string empty = Hosted.Lanterns.NewEmpty(), charged = Hosted.Lanterns.NewEmpty();
+        Give(Hosted, empty); Give(Hosted, charged); GiveFirebugs(Hosted, 3);
+        Require(Hosted.Lanterns.Refill(Lanterns.Id(charged), count: 3), "three live firebugs should fit in the lantern");
+        charged = Hosted.Lanterns.Carried(Lanterns.Id(charged))!;
+        string previous = world.HotbarItem(8);
+        SetHotbarSlot(Hosted, 8, charged);
+        await KeyStroke(Key.Tab);
+        await Until(() => bag.Visible && hotbar.Counts[8].Text == "3", "the hotbar showing three live firebugs", 3);
+        var full = BagCellOf(charged).GetNode<Badge>("count");
+        var dark = BagCell(c => c.TooltipText.StartsWith(Lanterns.EmptyName, System.StringComparison.Ordinal)).GetNode<Badge>("count");
+        Require(full.Text == "3" && dark.Text == "0" && full.GetThemeColor("font_color") == Style.FirebugGreen
+            && hotbar.Counts[8].GetThemeColor("font_color") == Style.FirebugGreen, "firebug badges should be green even though each lantern is a single item");
+        Require(!BagCellOf("steel_axe").GetNode<Badge>("count").Visible, "a single tool should not show a quantity badge");
+        await CloseWithEsc();
+        Drop(Hosted, empty); Drop(Hosted, charged); SetHotbarSlot(Hosted, 8, previous);
+        await Frames();
     }
 
     private async Task CheckADoubleClickTakesTheLanternInHandAndPutsOutTheTorch() {

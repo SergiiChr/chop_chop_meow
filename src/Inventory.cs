@@ -103,6 +103,8 @@ public sealed partial class Inventory {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Gated { get; set; }
     /// <summary>The filter entry that names every item; it stands alone in its row.</summary>
     public const string Everything = "everything";
+    /// <summary>A debug chest has room for as many stacks as are put in it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool UnlimitedSlots { get; set; }
     /// <summary>Number of cells. Changing it adds empty cells or moves stacks out of removed ones.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
     /// <summary>Most units of one item per cell. Changing it splits or merges stacks to fit.</summary>
@@ -160,7 +162,7 @@ public sealed partial class Inventory {
         return free;
     }
     /// <summary>Empty with the settings of a new inventory, so it saves the same as one.</summary>
-    [JsonIgnore] public bool Fresh => items.Count == 0 && CarriedBy == Carrier.None && slots == NewSlots && stackSize == NewStackSize && CoinStack == NewCoinStack && Capacity == 0 && !Gated && InputFilter.Count == 0 && OutputFilter.Count == 0 && (layout == null || layout.Count == NewSlots && UsedSlots == 0);
+    [JsonIgnore] public bool Fresh => items.Count == 0 && CarriedBy == Carrier.None && slots == NewSlots && stackSize == NewStackSize && CoinStack == NewCoinStack && Capacity == 0 && !UnlimitedSlots && !Gated && InputFilter.Count == 0 && OutputFilter.Count == 0 && (layout == null || layout.Count == NewSlots && UsedSlots == 0);
 
     /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Unstacked = new();
@@ -191,6 +193,7 @@ public sealed partial class Inventory {
     public int Room(string item) => Room(item, replacing: false);
 
     private int Room(string item, bool replacing) {
+        if (UnlimitedSlots) return int.MaxValue - Count;
         int stack = StackOf(item), room = 0, used = 0;
         for (int i = 0; i < Math.Min(Slots, Layout.Count); i++) {
             var slot = Layout[i];
@@ -204,6 +207,11 @@ public sealed partial class Inventory {
 
     /// <summary>Whether these goods, counted by item, all fit in this inventory at once: each item tops up its own stacks, and the rest takes empty slots.</summary>
     public bool Fits(Dictionary<string, int> goods) {
+        if (UnlimitedSlots) {
+            long extra = 0;
+            foreach (int count in goods.Values) extra += count;
+            return extra <= int.MaxValue - Count;
+        }
         int limit = Math.Min(Slots, Layout.Count), empty = 0;
         for (int i = 0; i < limit; i++) if (Layout[i].Item == "") empty++;
         foreach (var (item, count) in goods) {
@@ -295,9 +303,17 @@ public sealed partial class Inventory {
         }
         // Empty cells past the slots, such as those of a smaller inventory made from a default one, are dropped.
         while (Layout.Count > Slots && Layout[^1].Item == "") Layout.RemoveAt(Layout.Count - 1);
+        KeepSpareSlot();
     }
 
     private void PadLayout() { while (Layout.Count < Slots) Layout.Add(new Slot()); }
+
+    /// <summary>Leaves a cell to drop the next stack into, without moving any stack already in the debug chest.</summary>
+    private void KeepSpareSlot() {
+        if (!UnlimitedSlots) return;
+        if (Layout.Count == 0 || Layout[^1].Item != "") Layout.Add(new Slot());
+        slots = Layout.Count;
+    }
 
     /// <summary>Removes every item.</summary>
     public void Clear() {
@@ -347,6 +363,7 @@ public sealed partial class Inventory {
 
     private void SyncAggregate() {
         items.Clear(); foreach (var s in Layout) if (s.Item != "") items[s.Item] = items.GetValueOrDefault(s.Item) + s.Count;
+        KeepSpareSlot();
         Changed?.Invoke();
     }
 
@@ -437,13 +454,15 @@ public sealed partial class Inventory {
                 if (!firebugs.IsEmpty) AddFirebugExpiries(slot, firebugs.Slice(amount - left, n));
                 slot.Count += n; left -= n;
             }
-            for (int i = 0; i < limit && left > 0; i++) {
+            for (int i = 0; left > 0 && (i < limit || UnlimitedSlots); i++) {
+                if (i == Layout.Count) Layout.Add(new Slot());
                 var slot = Layout[i];
                 if (slot.Item != "") continue;
                 int n = Math.Min(left, size);
                 if (!firebugs.IsEmpty) AddFirebugExpiries(slot, firebugs.Slice(amount - left, n));
                 slot.Item = item; slot.Count = n; left -= n;
             }
+            KeepSpareSlot();
             Changed?.Invoke();
         }
         return amount;

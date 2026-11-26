@@ -15,7 +15,7 @@ public partial class Hotbar : PanelContainer {
     private readonly HeldCursor cursor;
 
     public System.Collections.Generic.List<ItemSlot> Buttons { get; } = new();
-    public System.Collections.Generic.List<Label> Counts { get; } = new();
+    public System.Collections.Generic.List<Badge> Counts { get; } = new();
 
     public Hotbar(UiKit kit, SidePanel panel, HeldCursor cursor) {
         this.kit = kit; world = kit.World; this.panel = panel; this.cursor = cursor;
@@ -89,8 +89,7 @@ public partial class Hotbar : PanelContainer {
         number.AddThemeColorOverride("font_color", Style.Tan);
         button.AddChild(number);
         // The count sits on a pill at the slot's corner, as on every other slot.
-        var count = Style.Corner(Style.Pill("", Style.CountPill, Style.Rim, 12), 1, 1);
-        count.Visible = false;
+        var count = ItemSlot.CountBadge();
         button.AddChild(count);
         Counts.Add(count);
         Buttons.Add(button);
@@ -98,7 +97,7 @@ public partial class Hotbar : PanelContainer {
     }
 
     // What each slot shows, so a slot is redrawn only when its item, count or selection changes: redrawing builds text and styles.
-    private readonly (string Id, int Count, bool Active, int Life, bool Dark, int PackedCount)?[] shownSlots = new (string, int, bool, int, bool, int)?[9];
+    private readonly (string Id, int Count, bool Active, int Life, int Bugs, int PackedCount)?[] shownSlots = new (string, int, bool, int, int, int)?[9];
     public void Refresh() {
         for (int slot = 0; slot < Buttons.Count; slot++) {
             var button = Buttons[slot];
@@ -106,13 +105,17 @@ public partial class Hotbar : PanelContainer {
             int count = world.HotbarCount(slot);
             bool active = world.InHand == "" && world.ActiveHotbar == slot;
             int life = id == Firebugs.Item && count > 0 ? world.Firebugs.AverageMinutes(world.S.Backpack, world.HotbarStack(slot)) : -1;
-            var shown = (id, count, active, life, Lanterns.IsItem(id) && world.Lanterns.BugCount(id) == 0, world.Packed(id)?.Count ?? 0);
+            int bugs = count > 0 && Lanterns.IsItem(id) ? world.Lanterns.BugCount(id) : -1;
+            var shown = (id, count, active, life, bugs, world.Packed(id)?.Count ?? 0);
             if (shownSlots[slot] == shown) continue;
             shownSlots[slot] = shown;
             bool building = world.Data.IsBuilding(id);
-            Counts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? ""
-                : count == 1 && Barrel.Is(id) ? $"{Barrel.Liters(id)}/{Barrel.Capacity} L"
-                : count == 1 && world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
+            var badge = Counts[slot];
+            if (building || count == 0) badge.SetCount("");
+            else if (count == 1 && Barrel.Is(id)) badge.SetCount($"{Barrel.Liters(id)}/{Barrel.Capacity} L");
+            else if (count == 1 && world.Data.VesselOf(id) is VesselDef vessel)
+                badge.SetCount($"{vessel.LitersIn(id)}/{vessel.Capacity}");
+            else badge.SetStack(count, bugs);
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             string clicks = Lanterns.IsItem(id) ? "LMB: select · RMB: open for refill · Double LMB: take in hand or stow" : "LMB: select · RMB or Double LMB: use";
@@ -121,7 +124,6 @@ public partial class Hotbar : PanelContainer {
             // The selected slot gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.SlotWanted : Style.SlotNormal);
-            Counts[slot].Visible = Counts[slot].Text != "";
         }
     }
 

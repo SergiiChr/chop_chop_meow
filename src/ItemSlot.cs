@@ -9,6 +9,15 @@ public partial class Badge : Label {
         get => base.Text;
         set { base.Text = value; Visible = value != ""; }
     }
+
+    /// <summary>A stack's quantity, or the number of live firebugs when the slot holds a lantern.</summary>
+    internal void SetStack(int quantity, int bugs) =>
+        SetCount(bugs >= 0 ? bugs.ToString() : quantity > 1 ? quantity.ToString() : "", bugs >= 0);
+
+    internal void SetCount(string value, bool firebugs = false) {
+        AddThemeColorOverride("font_color", firebugs ? Style.FirebugGreen : Style.Rim);
+        Text = value;
+    }
 }
 
 /// <summary>An icon button for an item: an item slot when <see cref="Controls"/> is set, else a plain button.</summary>
@@ -38,7 +47,7 @@ public partial class ItemSlot : Button {
 
     /// <summary>A count pill for a corner of a slot: 0 or 1 for left or right, top or bottom.</summary>
     public static Badge CountBadge(float x = 1, float y = 1) {
-        var count = new Badge { MouseFilter = MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center, Visible = false };
+        var count = new Badge { Name = "count", MouseFilter = MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center, Visible = false };
         count.AddThemeStyleboxOverride("normal", Style.CountPill);
         count.AddThemeFontOverride("font", Style.Bold); count.AddThemeFontSizeOverride("font_size", 12); count.AddThemeColorOverride("font_color", Style.Rim);
         return Style.Corner(count, x, y);

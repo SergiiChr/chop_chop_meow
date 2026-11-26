@@ -14,15 +14,15 @@ public partial class Game {
         await TestClean(CheckAShovelDigsTheGroundAFirebugHoversOver);
         await TestClean(CheckFirebugStackShowsAverageRemainingLife);
         await TestClean(CheckPackedCrateShowsTheCountAfterOnlySomeFirebugsDie);
-        await TestClean(CheckRecipeMapShowsHowToCatchFirebugsAndHowLongTheyLive);
+        await TestClean(CheckRecipeMapShowsTheFirebugDescriptionAndHowToCatchIt);
     }
 
-    private async Task CheckRecipeMapShowsHowToCatchFirebugsAndHowLongTheyLive() {
+    private async Task CheckRecipeMapShowsTheFirebugDescriptionAndHowToCatchIt() {
         await Click((Button)hotbar.FindChild("map", true, false));
         await Click((Control)recipeMap.NodeOf(Firebugs.Item)!.FindChild("slot", true, false));
         var details = recipeMap.FindChild("map_details", true, false);
-        Require(((Label)recipeMap.FindChild("detail_text", true, false)).Text == "Lives for three days after being caught."
-            && HasLabel(details, "Catch with a bug net after dark"), "the firebug's recipe map entry should say how to catch it and how long it lives");
+        Require(((Label)recipeMap.FindChild("detail_text", true, false)).Text == "Short but bright life"
+            && HasLabel(details, "Catch with a bug net after dark"), "the firebug's recipe map entry should show its description and say how to catch it");
         await KeyStroke(Key.Escape);
         await CloseWithEsc();
     }
