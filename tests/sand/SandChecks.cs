@@ -9,6 +9,7 @@ public static class SandChecks {
     public static void Run(GameData data) {
         Test(CheckShovelDigsTenSandFromOneSquare, data);
         Test(CheckSandStaysStrippedUntilTheNextHighTideEvenAcrossASave, data);
+        Test(CheckTideCountdownAlternatesAtTheMoonExtremes, data);
         Test(CheckSandAtTheInlandEdgeIsDugAndRefilled, data);
         Test(CheckTheWholeSandYieldMustFit, data);
         Test(CheckWalkReachesTheSandExposedAtLowTide, data);
@@ -72,6 +73,18 @@ public static class SandChecks {
             "digging at the inland end of the beach should still strip sand");
         RunUntil(world, 8 * data.DaySeconds);
         Require(!world.Beach.Stripped(tile), "high tide should reach and refill the inland end of the beach");
+    }
+
+    private static void CheckTideCountdownAlternatesAtTheMoonExtremes(GameData data) {
+        var world = EmptyWorld(data);
+        foreach (var (elapsed, remaining, high) in new[] {
+            (2f, 2f, false), (3.75f, .25f, false), (4f, 4f, true), (7.25f, .75f, true), (8f, 4f, false)
+        }) {
+            RunUntil(world, elapsed * data.DaySeconds);
+            var next = world.Beach.NextTide;
+            Require(next.High == high && Mathf.IsEqualApprox(next.Days, remaining),
+                $"at day {elapsed}, the next extreme should be {(high ? "high" : "low")} tide in {remaining} days, got {next}");
+        }
     }
 
     private static void CheckTheWholeSandYieldMustFit(GameData data) {

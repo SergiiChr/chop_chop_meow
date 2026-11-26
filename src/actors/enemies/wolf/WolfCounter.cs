@@ -34,7 +34,7 @@ public sealed class WolfCounter(World world) {
         }
         wolf.Heading = (-offset).Angle();
         wolf.Stagger = World.StaggerSeconds;
-        wolf.Chase = 0;
+        wolf.Galloping = false;
         return true;
     }
 
@@ -77,8 +77,7 @@ public sealed class WolfCounter(World world) {
         if (end >= DoneAt) Clear(wolf);
     }
 
-    private bool ClearGround(Vector2 from, Vector2 to) =>
-        !world.Protected(to) && world.WolfSnap.ClearTo(from, to) == to;
+    private bool ClearGround(Vector2 from, Vector2 to) => world.WolfSnap.ClearTo(from, to) == to;
 
     /// <summary>A clear path may close if a player or another wolf reaches it.</summary>
     private bool Crowded(Wolf wolf, Vector2 to, float heading) {

@@ -104,7 +104,7 @@ public sealed class Doorways(World world) {
     /// </summary>
     public void TurnKey() {
         var s = world.S;
-        if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None) return;
+        if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None || world.Sleep.SleepingAt != 0) return;
         if (world.DoorCheck.Forcing(cabin.Id)) return;
         if (world.Forwarded(Verb.TurnKey)) return;
         cabin.Locked = !cabin.Locked; world.Play("door_lock", DoorPoint(cabin));
@@ -127,7 +127,7 @@ public sealed class Doorways(World world) {
     /// </summary>
     public void Leave() {
         var s = world.S;
-        if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None) return;
+        if (world.Find(s.Sheltered) is not Thing cabin || s.Actor.Door != Doorway.None || world.Sleep.SleepingAt != 0) return;
         if (world.DoorCheck.AtDoor(cabin.Id) != null) return;
         if (world.Forwarded(Verb.Leave)) return;
         if (cabin.Locked) { cabin.Locked = false; world.Play("door_lock", DoorPoint(cabin)); }
