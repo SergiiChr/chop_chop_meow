@@ -61,7 +61,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
 | `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
-| `--showcase --diary` | Show the player on the lake's shore beside its floating page, with a page lying on the ground and three finds in the diary, two of their days unread; `--diary-fall` drops that page off the oak beside them a second in instead, `--panel` opens the Diary, `--diary-day 45` opens that day large and `--diary-find` shows the pop-up of a page found in leaves |
+| `--showcase --diary` | Show the player on the lake's shore beside its floating page, with a page lying on the ground and three finds in the diary, two of their days unread; `--diary-fall` drops that page off the oak beside them a second in instead, `--panel` opens the Diary, `--diary-day 45` opens that day large, `--diary-find` shows the pop-up of a page found in leaves and `--diary-first` leaves the diary empty and no page on the ground, so the next find is the first |
 | `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
@@ -642,13 +642,13 @@ A page that fell for you waits where it landed, even while you are out of the ga
 Anything built over it clears it away, and a later chop can knock it off a tree again.
 A find comes up in a pop-up that says where you found it, with a Take button and nothing else.
 Until you take it you are busy: you cannot walk, gather or act.
-Taking it turns a page and opens the Diary on the day it holds, the first of them when it holds two.
-Your first find stamps the diary's badge into the bottom bar.
+Taking it turns a page and opens the day it holds large, the first of them when it holds two.
+After your first find, closing that day stamps the diary's badge into the bottom bar, to show where the Diary is kept.
 
 The Diary shows a cell for each of the diary's 11 days, in order, four to a row.
 Each cell is a scrap of paper torn along one edge, with a loose page lying straight on it.
-A day you have found has its place in the diary, 1 to 11, written faintly over the page, and a day you have not found a
-faint question mark.
+A day you have found is bright, with its place in the diary, 1 to 11, written in black over the page.
+A day you have not found is greyed out, with a faint question mark.
 A day you have not read yet has a brick rim, and the badge shows a red dot while one waits.
 Click a sheet to open the day large, handwritten on a sheet of paper; the close button, Esc or a click beside the sheet
 closes it.

@@ -1126,13 +1126,15 @@ A left or a right click on a page walks the player over to it, as to a loose pie
 `World.Occupied` holds while `DiaryFinding` is set, so the player is busy.
 
 `FindPrompt` shows the find's line and a Take button alone; Esc leaves it up.
-Take (`Verb.TakePage`) turns a page, puts the find in the diary, and opens `Page.Diary` and the `ReadingSheet` on the
-find's first day.
-`Hotbar.StampDiaryOnFirstFind` has the diary's badge, which shows once the player has a find, stamped into the row when
-it comes with that Take: it drops in large, tilted and faint, and settles with a small bounce.
+Take (`Verb.TakePage`) turns a page, puts the find in the diary, and opens the `ReadingSheet` on the find's first day,
+with the Diary left closed.
+`Hotbar.StampDiaryOnFirstFind` holds back the diary's badge, which shows once the player has a find, while the day the
+first find opened is open, and stamps it into the row as that day closes, so the stamp shows where the Diary is kept: it
+drops in large, tilted and faint, and settles with a small bounce.
 The badge shows a dot while a found day is unread (`Diary.AnyUnread`).
-`DiaryPage` lays out a `PaperTile` for each day in order, four to a row: a torn sheet with the page's icon on it, and
-over the icon the day's place in the diary once found or a question mark until then, with a brick edge for one not read.
+`DiaryPage` lays out a `PaperTile` for each day in order, four to a row: a torn sheet with the page's icon on it.
+A found day is bright, with its place in the diary in black over the icon and a brick edge while it is not read.
+A day not found is greyed out, sheet and icon, with a faint question mark.
 `ReadingSheet` writes the day in Caveat on a paper-coloured sheet, with the scribble glyphs in place of what cannot
 be read.
 From `DiaryDay.FallsApart` to the paragraph's end, `FallingApart` moves each letter further off the line than the last,

@@ -36,8 +36,10 @@ public partial class Game {
         await Until(() => findPrompt.Visible && HasLabel(findPrompt, "A piece of paper fell off a tree."), "the guest walking over to the page and its pop-up coming up", 20);
         await Click((Button)findPrompt.FindChild("diary_take", true, false));
         await Until(() => sheet.Visible && sheet.Day == 36, "taking the page opening day 36 in the guest's diary", 5);
-        await Until(() => hotbar.DiaryBadge.Visible && !findPrompt.Visible, "the host's answer showing the guest's diary badge", 15);
-        await KeyStroke(Key.Escape); await CloseWithEsc();
+        await Until(() => !findPrompt.Visible && Diary.Started(world.Me), "the host's answer putting the page in the guest's diary", 15);
+        await KeyStroke(Key.Escape);
+        await Until(() => !sheet.Visible && hotbar.DiaryBadge.Visible, "closing the first page showing the guest's diary badge", 3);
+        await CloseWithEsc();
         Signal("diary-taken");
         await Signaled("diary-over");
     }

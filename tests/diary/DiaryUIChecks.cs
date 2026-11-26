@@ -9,7 +9,7 @@ namespace ChopChopMeow;
 public partial class Game {
     /// <summary>The diary in the window, in order: each check reads the days the ones before it found.</summary>
     private async Task RunDiaryUIChecks() {
-        await TestClean(CheckAFindWaitsBehindTakeAndOpensItsDayInTheDiary);
+        await TestClean(CheckAFindWaitsBehindTakeAndOpensItsDayWithTheBadgeStampedAfter);
         await TestClean(CheckClickingAFallenPagePicksItUpAndTheBadgeMarksUnreadDays);
         await TestClean(CheckARightClickWadesToTheLakePage);
         await TestClean(CheckAStickInTheShallowsRestsOnTheLakeBedWhileAPageFloats);
@@ -17,7 +17,7 @@ public partial class Game {
         await TestClean(CheckTheLastDaysWritingFallsApartWithNoMarkupShowing);
     }
 
-    private async Task CheckAFindWaitsBehindTakeAndOpensItsDayInTheDiary() {
+    private async Task CheckAFindWaitsBehindTakeAndOpensItsDayWithTheBadgeStampedAfter() {
         await CloseWithEsc();
         Require(!hotbar.DiaryBadge.Visible, "The diary's badge must wait for the first find.");
         TurnUpFind(HostedMe, DiaryFind.Berries);
@@ -29,13 +29,20 @@ public partial class Game {
         Require(!menu.Visible && findPrompt.Visible, "Esc must leave the pop-up up.");
         int since = sounds.Played;
         await Click((Button)findPrompt.FindChild("diary_take", true, false));
-        await Until(() => panel.Page == Page.Diary && sheet.Visible && sheet.Day == 40, "taking the page opening the diary on day 40", 3);
+        await Until(() => sheet.Visible && sheet.Day == 40 && !findPrompt.Visible && Diary.Started(world.Me), "taking the page opening day 40 large", 3);
         Require(sounds.Heard("page_turn", since), "Taking a page must turn a page.");
-        await Until(() => !findPrompt.Visible && hotbar.DiaryBadge.Visible, "the pop-up closing and the first find stamping the diary's badge into the bottom bar", 3);
+        await Frames(4);
+        Require(!panel.Visible && !hotbar.DiaryBadge.Visible, "Taking the first page must open only its day, with the diary and its badge waiting behind it.");
+        await KeyStroke(Key.Escape);
+        await Until(() => !sheet.Visible && hotbar.DiaryBadge.Visible && hotbar.DiaryBadge.Scale.X > 1.5f, "closing the first page stamping the diary's badge into the bottom bar from large", 2);
+        Require(!panel.Visible, "Closing the first page must leave the diary closed, for its badge to lead the way.");
+        await Click(hotbar.DiaryBadge);
         var missing = Named("diary_day_2")!;
         var found = Named("diary_day_40")!;
         Require(missing.Disabled && HasLabel(missing, "?"), "A day not found must show a question mark on its page and not open.");
         Require(!found.Disabled && HasLabel(found, "9"), "A found day's page must show its place in the diary, day 40 being the ninth.");
+        await Click(found);
+        await Until(() => sheet.Visible && sheet.Day == 40, "a click on a found day's page opening it large", 3);
         since = sounds.Played;
         await KeyStroke(Key.Escape);
         Require(!sheet.Visible && panel.Page == Page.Diary && sounds.Heard("page_turn", since), "Esc must close the open day with a page turn and leave the diary open.");
