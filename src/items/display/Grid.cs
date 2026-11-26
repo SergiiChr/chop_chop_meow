@@ -61,6 +61,7 @@ public partial class PagePanel {
                 Use = On(use),
                 Open = open == null ? null : () => stacks[slot] is (string id, _) && open(id),
             };
+            kit.LinkRecipeMap(cell, () => stacks[slot]?.Item);
             grid.AddChild(cell);
         }
         bool Accepts(string item) {
@@ -119,7 +120,7 @@ public partial class PagePanel {
             string clicks = open != null && stack is (string itemToOpen, _) && Lanterns.IsItem(itemToOpen)
                 ? "LMB: pick up · RMB: open for refill · Double LMB: take in hand or stow" : hint;
             string expiry = life < 0 ? "" : "\n" + PageText.FirebugLife(life);
-            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}{expiry}\n{clicks}" : "";
+            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}{expiry}\n{clicks} · {RecipeMap.AltClickHint}" : "";
         }
     }
 

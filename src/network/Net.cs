@@ -490,7 +490,7 @@ public partial class Net : Node {
         if (!Hosting) return;
         echoes++;
         // A first hit can finish its brief wince between snapshots.
-        if (sound == "wolf_hit") Rpc(MethodName.HearReliably, sound, at);
+        if (sound is "wolf_hit" or "bucket_hit") Rpc(MethodName.HearReliably, sound, at);
         else Rpc(MethodName.Hear, sound, at);
     }
 

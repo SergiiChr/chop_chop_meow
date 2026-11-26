@@ -131,7 +131,20 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
             row.AddThemeConstantOverride("separation", 6); rows.AddChild(row);
             // Goods sold by the crate show its size beside the icon, so every row keeps the same height and columns.
             var goods = new HBoxContainer { CustomMinimumSize = new Vector2(GoodsColumn, 0) }; goods.AddThemeConstantOverride("separation", 2); row.AddChild(goods);
-            goods.AddChild(Style.Icon(Icons.Of(id), 32));
+            var item = new ItemSlot {
+                Name = $"price_item_{id}",
+                Icon = Icons.Of(id),
+                ExpandIcon = true,
+                CustomMinimumSize = new Vector2(32, 32),
+                SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+                IconAlignment = HorizontalAlignment.Center,
+                FocusMode = Control.FocusModeEnum.None,
+                MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+                TooltipText = $"{row.TooltipText}\n{RecipeMap.AltClickHint}"
+            };
+            Style.Skin(item, Style.None, Style.None);
+            kit.LinkRecipeMap(item, () => id);
+            goods.AddChild(item);
             if (world.Lot(id) > 1) { var lot = Style.Text($"×{world.Lot(id)}", 13, Style.Tan, Style.Head); lot.VerticalAlignment = VerticalAlignment.Center; goods.AddChild(lot); }
             var sellColumn = new HBoxContainer { CustomMinimumSize = new Vector2(PriceColumn, 0), Alignment = BoxContainer.AlignmentMode.Center }; sellColumn.AddThemeConstantOverride("separation", 4); row.AddChild(sellColumn);
             var sellPrice = Style.Text("", 17, Style.Ink, Style.Head); sellPrice.CustomMinimumSize = new Vector2(40, 0); sellPrice.HorizontalAlignment = HorizontalAlignment.Right; sellColumn.AddChild(sellPrice);

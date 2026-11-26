@@ -6,6 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>Moves one kind of liquid at a time through connected steel pipes.</summary>
 public sealed class Plumbing(World world, Barrels barrels) {
+    internal const string InstallMaterial = "steel_pipe";
     public const int InstallCost = 10;
     private static readonly ThingKind[] Consumers = Array.FindAll(Kinds.All, HasPlumbing);
 
@@ -344,6 +345,7 @@ public sealed class Plumbing(World world, Barrels barrels) {
         double liters = Math.Min(StorageRoom(receiver, liquid), Remainder(receiver, liquid) + share);
         int whole = (int)liters;
         int received = whole == 0 ? 0 : Store(receiver, whole, liquid);
+        if (received > 0) world.Got(liquid);
         SetRemainder(receiver, liquid, received == whole ? liters - whole : 0);
         receiver.ReceivingWater = liquid == Water.Liquid && share > 0 && Demand(receiver, liquid) > 0;
     }

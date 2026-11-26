@@ -38,8 +38,32 @@ public partial class Game {
         await TestClean(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
         await TestClean(CheckCraftingLeavesTheRecipeMapOnTheBottomBar);
         await TestClean(CheckRecipeMapOpensFromTheBottomBarAndShowsEveryItemOnce);
+        await TestClean(CheckAltClickFilterItemsLooksThemUpWithoutEditingFilters);
+        await TestClean(CheckMarkedMineIsDiscoveredWithoutBeingBuilt);
+        await TestClean(CheckRecipeMapDetailsAreStackedOnTheRight);
+        await TestClean(CheckRecipeMapGroupsCoalAndWheatWithTheirChains);
+        await TestClean(CheckUndiscoveredMapItemsStayAnonymous);
+        await TestClean(CheckDiscoveryRevealsAProductInTheOpenItemTree);
+        await TestClean(CheckBuildingsBranchFromTheirMainMaterialAndShowRecipes);
+        await TestClean(CheckItemTreeShowsDirectActions);
+        await TestClean(CheckItemTreeGroupsMiningAndMineConstruction);
+        await TestClean(CheckItemTreeShowsContainerUsesWithoutHandling);
+        await TestClean(CheckLiquidItemTreesShowDirectUses);
+        await TestClean(CheckSingleResultItemTreeUsesAStraightLine);
+        await TestClean(CheckBottleFillsShareOneRecipeMapEntry);
+        await TestClean(CheckAltClickBackpackItemOpensItsRecipeMapEntry);
+        await TestClean(CheckAltClickHotbarItemOpensItsRecipeMapEntry);
+        await TestClean(CheckAltClickRecipeShowsTheProductWithoutQueueing);
+        await TestClean(CheckAltClickIngredientInTheActiveCraftingRow);
+        await TestClean(CheckAltClickTheFuelShownInAnEmptyBurner);
+        await TestClean(CheckAltClickTheToolShownInAnEmptyToolSlot);
         await TestClean(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
         await TestClean(CheckGameGoesOnUnderTheOpenRecipeMap);
+        await TestClean(CheckItemTreeFollowsOneDirectRecipeAtATime);
+        await TestClean(CheckItemTreeBranchesToEachRecipeProduct);
+        await TestClean(CheckItemTreeBackRestoresTheMainMap);
+        await TestClean(CheckItemTreeOpensFromADetailThumbnail);
+        await TestClean(CheckItemTreeDistinguishesIngredientsFuelAndFixedTools);
         await TestClean(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
     }
 
@@ -425,17 +449,113 @@ public partial class Game {
         Require(map != null, "The bottom bar must offer a recipe map icon.");
         await Click(map!);
         Require(recipeMap.Visible && !panel.Visible && !bag.Visible, "The icon must open the recipe map directly from the world.");
-        Require(world.Data.Items.Keys.Where(id => !GameData.OffTheMap(id)).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
-        Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as not made yet.");
-        Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources") && HasLabel(recipeMap, "Hunt animals"), "The map must name its marks and where raw meat comes from.");
+        Require(recipeMap.FindChild("map_stations", true, false) == null, "The map must open without the station-cost row.");
+        Require(world.Data.Items.Keys.Where(id => world.Data.MapEntryOf(id) == id).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
+        Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as undiscovered.");
+        Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources"), "The map must label the marks for tools and resources.");
         await KeyStroke(Key.Escape);
         Require(!recipeMap.Visible && !panel.Visible && !bag.Visible, "Escape must close the map and return to the world.");
+    }
+
+    /// <summary>Alt-clicking the backpack's wood opens its details without picking it up and returns to the backpack on Escape.</summary>
+    private async Task CheckAltClickBackpackItemOpensItsRecipeMapEntry() {
+        Give(Hosted, "wood", 1); await Frames();
+        await KeyStroke(Key.Tab);
+        int count = world.Carried("wood");
+        await Click(BagCellOf("wood"), alt: true);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "wood", "the backpack's wood highlighted on the recipe map", 2);
+        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "Chop trees") && cursor.Empty && world.Carried("wood") == count,
+            "The map should explain how to get wood without picking up or moving the stack.");
+        await KeyStroke(Key.Escape);
+        Require(!recipeMap.Visible && bag.Visible, "Escape should return to the open backpack.");
+        Drop(Hosted, "wood", 1); await CloseWithEsc();
+    }
+
+    /// <summary>Alt-clicking an item on the hotbar shows its place on the map without selecting the slot.</summary>
+    private async Task CheckAltClickHotbarItemOpensItsRecipeMapEntry() {
+        int active = world.ActiveHotbar, slot = active == 0 ? 1 : 0;
+        string previous = world.HotbarItem(slot);
+        Give(Hosted, "glass_jar"); await Frames();
+        await KeyStroke(Key.Tab);
+        await Carry(BagCellOf("glass_jar"), hotbar.Buttons[slot]);
+        await Until(() => world.HotbarItem(slot) == "glass_jar" && !hotbar.Buttons[slot].Disabled,
+            "the glass jar appearing on the hotbar", 2);
+        await KeyStroke(Key.Key1 + active);
+        await CloseWithEsc();
+        Require(world.ActiveHotbar == active, "Start with the glass jar's slot inactive.");
+        await Click(hotbar.Buttons[slot], alt: true);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "glass_jar" && recipeMap.NodeOf("glass_jar")!.Lit,
+            "the hotbar's glass jar highlighted on the recipe map", 2);
+        var rows = (ScrollContainer)recipeMap.FindChild("map_rows", true, false);
+        var jar = recipeMap.NodeOf("glass_jar")!;
+        await Until(() => rows.GetGlobalRect().Encloses(jar.GetGlobalRect()), "the glass jar scrolling fully into view", 2);
+        Require(world.ActiveHotbar == active, "Looking up the jar must not select its hotbar slot.");
+        await KeyStroke(Key.Escape);
+        SetHotbarSlot(Hosted, slot, previous);
+        Drop(Hosted, "glass_jar", 1);
+        await Frames();
+    }
+
+    /// <summary>Alt-clicking a crafting card shows its product without queueing the recipe.</summary>
+    private async Task CheckAltClickRecipeShowsTheProductWithoutQueueing() {
+        Give(Hosted, "stone", 2); await Frames();
+        await KeyStroke(Key.C);
+        int stone = world.Carried("stone");
+        int chisels = world.Carried("stone_chisel");
+        await Click((Control)Named("craft_stone_chisel")!, alt: true);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "stone_chisel", "the stone chisel highlighted on the recipe map", 2);
+        Require(world.Waiting(null, "stone_chisel") == 0 && world.Carried("stone") == stone && world.Carried("stone_chisel") == chisels,
+            "Looking up a recipe must not craft it.");
+        await KeyStroke(Key.Escape);
+        Require(ShownPage() == "Crafting", "Closing the map must return to crafting.");
+        Drop(Hosted, "stone", 2); await CloseWithEsc();
+    }
+
+    /// <summary>Alt-clicking the stone in the active crafting row shows the stone rather than the chisel being made.</summary>
+    private async Task CheckAltClickIngredientInTheActiveCraftingRow() {
+        Give(Hosted, "stone", 2); await Frames();
+        await KeyStroke(Key.C);
+        int chisels = world.Carried("stone_chisel");
+        await Click(Named("craft_stone_chisel")!);
+        await Until(() => Named("queue_input_stone") != null && world.Making == "stone_chisel", "the chisel's ingredient slot appearing", 2);
+        await Click(Named("queue_input_stone")!, alt: true);
+        await Until(() => recipeMap.Visible && recipeMap.Chosen == "stone", "the active recipe's stone highlighted on the recipe map", 2);
+        await KeyStroke(Key.Escape);
+        Hosted.Tick(8);
+        await Until(() => world.Carried("stone_chisel") == chisels + 1, "the chisel finishing without queueing another", 2);
+        Drop(Hosted, "stone_chisel", 1);
+        await CloseWithEsc();
+    }
+
+    /// <summary>The empty iron-smelting burner shows Coal and opens its map entry.</summary>
+    private async Task CheckAltClickTheFuelShownInAnEmptyBurner() {
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(-1, 0));
+        await ClickOn(furnace);
+        await Until(() => Named("fuel") is ItemSlot { Icon: not null }, "the empty burner showing Coal", 2);
+        await Click(Named("fuel")!, alt: true);
+        Require(recipeMap.Visible && recipeMap.Chosen == "coal" && furnace.Burner!.Count == 0,
+            "Alt-clicking Coal in the empty burner must open the Recipe map without loading the burner.");
+        await KeyStroke(Key.Escape);
+        RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
+    }
+
+    /// <summary>The empty chisel slot shows Stone chisel and opens its map entry.</summary>
+    private async Task CheckAltClickTheToolShownInAnEmptyToolSlot() {
+        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
+        await ClickOn(workbench);
+        var slot = (ItemSlot)panel.Aside.FindChild("tool_chisel", true, false);
+        await Click(slot, alt: true);
+        Require(recipeMap.Visible && recipeMap.Chosen == "stone_chisel" && workbench.Tools!.Count == 0,
+            "Alt-clicking Stone chisel in the empty tool slot must open the Recipe map without slotting a tool.");
+        await KeyStroke(Key.Escape);
+        RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
     }
 
     /// <summary>On the recipe map a click on a chip goes to its item and lights it up for a moment, a click on an item shows its details, and Show leaves the map for where it is made.</summary>
     private async Task CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation() {
         await CloseWithEsc();
         var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
+        Achieve(Hosted, "crate", "tin_can", "steel_hammer"); await Frames();
         await Click((Button)hotbar.FindChild("map", true, false));
         var coal = recipeMap.NodeOf("coal")!;
         await Click((Control)recipeMap.NodeOf("steel_bar")!.FindChild("also_coal", true, false));
@@ -460,12 +580,12 @@ public partial class Game {
         await KeyStroke(Key.C);
         await Click((Button)hotbar.FindChild("map", true, false));
         var stew = recipeMap.NodeOf("canned_meat_stew")!;
-        Require(!stew.Known, "Canned stew nobody has made must be drawn as not made yet.");
+        Require(!stew.Known, "Canned stew nobody has made must be drawn as undiscovered.");
         float opened = world.Time;
         await Until(() => !view.Paused && world.Time > opened + .2f, "time passing under the open map", 2);
-        Achieve(Hosted, "canned_meat_stew");
-        await Until(() => stew.Known, "the stew turning to made before on the open map", 2);
         await Click((Control)stew.FindChild("slot", true, false));
+        Achieve(Hosted, "canned_meat_stew");
+        await Until(() => stew.Known, "the selected stew turning to made before on the open map", 2);
         Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "Made before"), "The stew's details must say it was made before.");
         var stood = world.Player;
         await Holding(Key.D, () => Seconds(.3));
@@ -490,8 +610,8 @@ public partial class Game {
         Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
         Require(Named("output_steel_parts") != null, "A new anvil must show a slot for steel parts.");
         var slot = panel.Aside.FindChild("tool_hammer", true, false) as ItemSlot;
-        Require(panel.Aside.Visible && slot != null && slot.TooltipText == "Steel hammer slot.",
-            $"A new anvil must show an empty slot beside its page named \"Steel hammer slot.\", not \"{slot?.TooltipText}\".");
+        Require(panel.Aside.Visible && slot != null && slot.TooltipText == "Steel hammer slot.\nAlt-click: open the Recipe map",
+            $"A new anvil's empty steel hammer slot must name the tool and offer the map lookup, not \"{slot?.TooltipText}\".");
         Require(view.PropOf(anvil.Id) is AnvilProp { Hammer.Shown: null }, "A new anvil must have no hammer lying on its stand.");
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Wooden mallet"))));
         await Frames(3);

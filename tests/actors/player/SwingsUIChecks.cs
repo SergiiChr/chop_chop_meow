@@ -17,6 +17,8 @@ public partial class Game {
     /// <summary>The UI checks of a player's swings: a punch with Space and a torch with right-click.</summary>
     private async Task RunSwingsUIChecks() {
         await TestClean(CheckSpaceWithoutAnAxeThrowsAPunchTheWayThePlayerLastWalked);
+        await TestClean(CheckSpaceSwingsTheSelectedBucket);
+        await TestClean(CheckSelectedChiselsAndHammersAreCarriedUpright);
         await TestClean(CheckRightClickLightsAndSwingsATorch);
     }
 
@@ -52,6 +54,47 @@ public partial class Game {
         RemoveWolves(Hosted, w => w == wolf); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
         await Until(() => view.PlayerAnimation != ActorAction.Attack, "the unarmed attack finishing", 3);
         Warp(Hosted, home); await Frames(4);
+    }
+
+    /// <summary>Space uses a bucket selected on the hotbar instead of an axe also carried in the backpack.</summary>
+    private async Task CheckSpaceSwingsTheSelectedBucket() {
+        int active = world.ActiveHotbar;
+        string previous = world.HotbarItem(8);
+        Give(Hosted, Bucket.Item); Give(Hosted, "steel_axe");
+        SetHotbarSlot(Hosted, 8, Bucket.Item);
+        await KeyStroke(Key.Key9);
+        await Until(() => world.HotbarItem(8) == Bucket.Item && world.ActiveHotbar == 8 && world.Carried(Bucket.Item) > 0,
+            "the bucket selected on the hotbar", 2);
+        await KeyStroke(Key.Space);
+        await Until(() => view.PlayerAnimation == ActorAction.BucketStrike && view.PlayerRig.ToolShown == Bucket.Item,
+            "the player swinging the selected bucket, not their axe", 2);
+        await Until(() => view.PlayerAnimation != ActorAction.BucketStrike, "the bucket swing finishing", 3);
+        SetHotbarSlot(Hosted, 8, previous);
+        Drop(Hosted, Bucket.Item, 1); Drop(Hosted, "steel_axe", 1);
+        // Restore the hotbar highlight without arming the previous slot's building plan.
+        world.SelectHotbar(active); await Frames();
+    }
+
+    /// <summary>The selected chisel or hammer stays visible and points up even before any attack.</summary>
+    private async Task CheckSelectedChiselsAndHammersAreCarriedUpright() {
+        int active = world.ActiveHotbar;
+        string previous = world.HotbarItem(8);
+        foreach (var (item, action) in new[] { ("stone_chisel", ActorAction.StoneChiselStrike),
+            ("steel_chisel", ActorAction.SteelChiselStrike), ("wood_hammer", ActorAction.MalletStrike),
+            ("steel_hammer", ActorAction.SteelHammerStrike) }) {
+            Give(Hosted, item);
+            SetHotbarSlot(Hosted, 8, item);
+            await Until(() => world.HotbarItem(8) == item && world.Carried(item) > 0, $"the carried {item} in slot nine", 2);
+            await KeyStroke(Key.Key9);
+            await Until(() => view.PlayerRig.ToolShown == item, $"the selected {item} in hand at rest", 2);
+            var tool = view.PlayerRig.Root.GetNode<Node3D>($"WeaponModels/{action}");
+            Require(tool.Visible && tool.GlobalBasis.Y.Y < -.85f,
+                $"The selected {item} must point up at rest without swinging.");
+            Drop(Hosted, item, 1);
+        }
+        SetHotbarSlot(Hosted, 8, previous);
+        // Restore the selection without arming the previous slot's building plan.
+        world.SelectHotbar(active); await Frames();
     }
 
     /// <summary>A torch in the backpack is lit by a right-click after the kindling animation, and swung by the next right-click, standing still or walking.</summary>

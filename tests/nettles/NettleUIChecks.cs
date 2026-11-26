@@ -30,6 +30,7 @@ public partial class Game {
 
     private async Task CheckRecipeMapShowsTheMalletRopeNeeds() {
         await CloseWithEsc();
+        Achieve(Hosted, "firebug", "nettle_rope", "wood_hammer"); await Frames();
         await Click((Button)hotbar.FindChild("map", true, false));
         var details = (Node)recipeMap.FindChild("map_details", true, false);
         await Click((Control)recipeMap.NodeOf("nettle_rope")!.FindChild("slot", true, false));

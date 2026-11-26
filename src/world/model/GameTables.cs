@@ -58,7 +58,7 @@ public sealed partial class GameData {
         [Water.Full] = new() { Name = "Water bottle", Color = "88cbe0", Thirst = 33.333336f },
         [Water.TwoLiters] = new() { Name = "Water bottle (2 liters)", Color = "88cbe0", Thirst = 33.333336f },
         [Water.OneLiter] = new() { Name = "Water bottle (1 liter)", Color = "88cbe0", Thirst = 33.333336f },
-        [Water.Empty] = new() { Name = "Empty bottle", Color = "a8bdc3" },
+        [Water.Empty] = new() { Name = "Empty bottle", MapName = "Bottle", Color = "a8bdc3" },
         [Water.Liquid] = new() { Name = "Water", Color = "88cbe0" },
         ["raw_meat"] = new() { Name = "Raw meat", Color = "c4524a", Food = true },
         ["burnt_steak"] = new() { Name = "Burnt steak", Color = "5e3b25", Food = true, Hunger = 40 },
@@ -117,7 +117,7 @@ public sealed partial class GameData {
         [ThingKind.Signpost] = new() { Name = "Trading post", Cost = new() { ["wood"] = 10, ["stone"] = 4 }, Description = "Trade by cart. Hire and manage neighboring villagers." },
     };
     public Dictionary<string, SourceDef> Sources { get; } = new() {
-        [Inventory.Coins] = new() { How = "Sell goods at the trading post" },
+        [Inventory.Coins] = new() { How = "Sell goods for money" },
         ["wood"] = new() { How = "Chop trees" },
         ["acorn"] = new() { How = "Chop trees or gather leaves" },
         ["stone"] = new() { How = "Pick up or mine" },
@@ -130,8 +130,7 @@ public sealed partial class GameData {
         ["leaves"] = new() { How = "Under oaks or bushes" },
         ["grass"] = new() { How = "From harvest" },
         ["wheat_seeds"] = new() { How = "Buy, or from harvest" },
-        [Water.Full] = new() { How = "Fill at the lake", From = new() { Water.Empty } },
-        [Water.Liquid] = new() { How = "Pour from a water bottle", From = new() { Water.Full } },
+        [Water.Liquid] = new() { How = "Pour from a bottle", From = new() { Water.Empty } },
         ["fertilizer"] = new() { How = "Compost pile", From = new() { "leaves", "grass" } },
         ["nettle"] = new() { How = "Pick; more come up each night" },
         ["firebug"] = new() { How = "Catch with a bug net after dark" },
@@ -145,11 +144,10 @@ public sealed partial class GameData {
     };
     public List<MapRowDef> MapRows { get; } = new() {
         new() { Title = "Wood", Roots = new() { "wood", "acorn" } },
-        new() { Title = "Stone, coal and sand", Roots = new() { "stone", "coal", Beach.Sand } },
-        new() { Title = "Iron and steel", Roots = new() { "iron_ore" } },
-        new() { Title = "Tin", Roots = new() { "tin_ore" } },
-        new() { Title = "Food", Roots = new() { "berries", "raw_meat" } },
-        new() { Title = "Farm", Roots = new() { "leaves", "grass", "wheat_seeds" } },
+        new() { Title = "Big rocks and small rocks", Roots = new() { "stone", Beach.Sand } },
+        new() { Title = "Metals", Roots = new() { "iron_ore", "coal", "tin_ore" } },
+        new() { Title = "Food", Roots = new() { "berries", "raw_meat", "wheat_seeds" } },
+        new() { Title = "Farm", Roots = new() { "leaves", "grass" } },
         new() { Title = "Nettle and firebugs", Roots = new() { "nettle", "firebug" } },
         new() { Title = "Trade", Roots = new() { Inventory.Coins } },
     };

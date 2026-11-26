@@ -94,6 +94,7 @@ public sealed partial class World {
                 moved += takes ? PourLiters(from, to, vessel, Math.Min(quantity, room) - moved) : Fill(from, to, vessel, quantity - moved);
                 if (moved >= quantity || takes && moved >= room) break;
             }
+            if (!takes && moved > 0) Got(item);
             return moved;
         }
         if (PoursInto(into, to, item) is VesselDef poured) return PourVessels(from, item, to, poured, quantity, room);

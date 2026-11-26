@@ -83,7 +83,7 @@ Play accepts Godot arguments after `--`:
 | `--animation-review --animation-clip "worker bucket roof"` | Follow a worker carrying a bucket up the ladder to pour and back down, with `"worker bottle roof"` for a bottle and `"player barrel"` or `"worker barrel"` for carrying a barrel |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
-| `--animation-target 1.3` | Stand what the close-up's blow works, a tree, rock, anvil or stump, this many metres from the actor |
+| `--animation-target 1.3` | Stand what the close-up's blow works, a tree, rock, anvil, stump or wolf, this many metres from the actor |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
 | `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
 | `--render-intro /absolute/directory --intro-dance` | Save only the solo dance of the catgirl on the hero's screen, as tall as the picture |
@@ -197,6 +197,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with the Goal Log, save, load, options, Controls, new game and quit |
 | Mouse wheel | Zoom in the overhead view |
 | LMB on an item slot | Pick up the entire stack or put down the held stack |
+| Alt-click an item slot or recipe card | Open the Recipe map at that item without moving, using or crafting it |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
 | Double LMB on a cabin | Open its page and walk around obstacles to its door and inside |
@@ -631,23 +632,38 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 
 The recipe map icon next to Crafting on the bottom bar opens the map over the whole screen.
 Esc or its close button closes it.
-Opening it from the bottom bar lets the game run underneath.
+Alt-click an item slot, recipe card or item in a storage filter to open the map without acting on the item.
+The map scrolls to the item, highlights it and opens its details. Closing the map returns to the panel you came from.
+Opening it from the bottom bar or by Alt-clicking lets the game run underneath.
 Opening it from a goal keeps the pause menu open underneath.
 Movement controls are disabled while the map is open.
-An item first made while the map is open turns to **Made before**.
+An item discovered while the map is open reveals its name and icon without reopening the map.
 
-- The map splits items into rows for wood, stone and coal, iron and steel, tin, food, farm, nettle and firebugs, and trade.
-  In a row each item hangs off the one it is made out of, raw material first.
-- Every item is on the map, with where it is made or come by under its name.
-- An item the settlement has made, gathered, bought or started with has a filled slot, and so has everything that item
-  is made of.
-  Other items have dashed outlines.
-  The stations along the top, with their costs, are outlined until first built.
-- Chips beside an item's slot show the tool its recipe requires (yellow rim) and each additional resource it takes
-  (dark rim).
-  A click on a chip scrolls to that item and lights it up for a moment.
-- A click on an item shows how it is made, what it requires and what it is used for, with a button that opens
-  the nearest station that makes it, or the crafting menu for a recipe made by hand.
+- The map groups items by category. Coal and the iron, steel and tin chains are in **Metals**. The wheat chain is in
+  **Food**. Follow the arrows from a material to what it makes. A building branches from the material it costs most.
+  Discovered cards name where the item is made or found. Marking a mine site reveals its plan.
+- Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
+  Undiscovered items and buildings show as question marks. You can select them on the main map, and the details panel
+  shows the same dashed question-mark badge. Their details and Item trees stay hidden until discovery.
+- Small icons at the foot of a discovered card show a required tool (gold rim) or an additional resource (blue rim).
+  Click one to find that item on the map and light it up briefly.
+- Click anywhere on a card to highlight it and the arrows connected to it. The details panel on the right shows how it
+  is made, what it requires and what it is used for. The button opens the nearest station that makes it or the crafting
+  menu for a recipe made by hand.
+- Alt-click a discovered card to open its Item tree in the same window. Direct recipe products appear under **Fuel**,
+  **Ingredient** or **Tool**, and can appear under more than one use. **Buildings** shows what primarily costs this
+  material. **Actions** shows what the item is for. A shovel separates **Dig up things.** for stumps, bushes and
+  beach sand from **Dig holes** on open ground. The pickaxe lists **Mine ores** for extracting resources.
+  The pickaxe and hammers share **Building a mine** for preparing it.
+  All bottle fills share a single **Bottle** card. Bottle and Steel bucket both show **Transport liquids**.
+  Water shows **Drink**, **Water farm plots** and **Water saplings**. Berry jam shows **Food**.
+  Routine container handling is not listed.
+  When a tree has one result, it connects the item and result on a straight line.
+  Tools that can strike wolves show **Weapon**, including Torch and Steel bucket. Torch also shows **Source of light**.
+  Mortar and pestle is a recipe tool only.
+  Items the village buys say **Can be sold for profit.**
+  A station's tree shows what it makes. Empty branches are hidden. Click a card to highlight it on the main map, or
+  Alt-click a discovered card to open its tree. The upper-left **Recipe map** button returns to the view you left.
 
 ### Crafting bench
 
@@ -1181,9 +1197,11 @@ A wolf that reaches you stops at biting distance, about a metre off, and waits t
 ### Fighting
 
 A swing keeps the direction you gave it at the start.
-Right-click open ground with an axe, pickaxe, hammer, torch or bug net selected to aim at the pointer.
+Right-click open ground with a weapon selected to aim at the pointer. A shovel still digs and a bug net still catches
+firebugs with right-click. Press Space to attack with either tool, or with any other selected weapon.
 Overhead, Space aims along the held movement keys or, from a stand, the last direction you walked.
-In first person, Space aims where you look.
+In first person, Space aims where you look. With no weapon selected, Space swings the best axe in the backpack, or a
+bare fist if you have no axe.
 You can move during the swing, and near a hunting wolf the movement keys reverse you immediately.
 Starting a doorway action interrupts a swing before it lands.
 A steel axe lands 0.4 seconds into its swing and hits every wolf the blade reaches.
@@ -1194,6 +1212,10 @@ Axe swings take turns:
   It passes over a wolf on the ground, and lands on every wolf in its way that is in the air, leaping for your throat, or reared up on someone's arm.
 
 A steel axe takes 2.2 to 3.2 of a wolf's 8 health a blow, a torch 0.8 to 1.2 and a punch 0.4 to 0.6.
+Each other weapon hits with its working end, such as a pickaxe's point or a hammer's face. The rake and Steel bucket
+swing overhead and come straight down. The bucket takes longer to wind up and follow through, and clangs only on a hit.
+When selected, chisels and hammers stay upright while standing or moving and tip forward to strike.
+A miss and a late swing do not hurt the wolf.
 A torch and a fist reach only a wolf at biting distance: the flame 1 metre, swung low with you bent over, and the fist 0.7 metres and a little to your right.
 A wolf winces, hops sideways and skids if it survives a weapon blow on its first hit. With room, it runs wide and takes a
 second hop behind you, lands on its forepaws and slides its hindquarters round to face you. Only then can it bite again.

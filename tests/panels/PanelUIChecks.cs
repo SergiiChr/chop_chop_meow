@@ -11,6 +11,7 @@ public partial class Game {
     private async Task RunPanelUIChecks() {
         await TestClean(CheckPanelPagesRefreshWithoutAllocating);
         await TestClean(CheckMouseWheelOverPanelDoesNotZoom);
+        await TestClean(CheckOpeningAPageLeavesTheViewStill);
     }
 
     /// <summary>
@@ -64,5 +65,16 @@ public partial class Game {
         await Wheel(GetViewport().GetVisibleRect().GetCenter());
         Require(view.Zoom < zoom, "The mouse wheel over the world must still zoom.");
         await Wheel(GetViewport().GetVisibleRect().GetCenter(), MouseButton.WheelUp);
+    }
+
+    /// <summary>Opening a building's page leaves the world where it shows on screen, so the second click of a double click lands on the same building.</summary>
+    private async Task CheckOpeningAPageLeavesTheViewStill() {
+        var chest = Hosted.Add(ThingKind.Chest, ClearSpotNearby());
+        var shut = view.Screen(chest.Pos);
+        await ClickOn(chest);
+        await Until(() => Shows(chest), "the chest page after a click on the chest", 2);
+        Require(view.Screen(chest.Pos).DistanceTo(shut) < 1, "Opening a page must leave the world where it shows on screen.");
+        RemoveThings(Hosted, t => t == chest);
+        await CloseWithEsc();
     }
 }

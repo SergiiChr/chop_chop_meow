@@ -94,7 +94,7 @@ public partial class Game : Node, IGameFlow {
             };
             AddChild(view);
             paintFilter = new PaintFilter { Visible = Settings.PaintFilter }; AddChild(paintFilter);
-            kit = new UiKit(world, sounds, Notify, RefreshLive);
+            kit = new UiKit(world, sounds, Notify, RefreshLive, item => recipeMap.OpenAt(item));
             net = new Net { Name = "Net", World = world, Key = Settings.MachineKey }; AddChild(net);
             saves = new Saves(kit, net, this);
             world.Sound = PlayWorldSound;

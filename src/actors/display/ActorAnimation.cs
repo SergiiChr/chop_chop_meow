@@ -49,7 +49,16 @@ public enum ActorAction {
     NetSwing,
     /// <summary>Fibres twisted into rope between both hands over a bench; it takes turns with mallet blows.</summary>
     TwistRope,
-    Glassblow
+    Glassblow,
+    PickStrike,
+    ShovelStrike,
+    SteelHammerStrike,
+    MalletStrike,
+    StoneChiselStrike,
+    SteelChiselStrike,
+    RakeStrike,
+    NetStrike,
+    BucketStrike
 }
 
 /// <summary>
@@ -145,7 +154,7 @@ public static class ActorAnimation {
         ActorAction.Dig => 1.1f,
         ActorAction.Rake => RakeStroke.Seconds,
         ActorAction.Glassblow => 1.45f,
-        _ => 1
+        _ => WeaponSwing.Of(action)?.Duration ?? 1
     };
 
     /// <summary>How far an action's clock moves on: a walk's, jog's or run's by the ground covered, so its planted feet keep their place, and the rest by the time passed.</summary>
@@ -161,11 +170,12 @@ public static class ActorAnimation {
         ActorAction.TorchSwing => .3f * Duration(action),
         ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep => .5f * Duration(action),
         ActorAction.NetSwing => NetCatch * Duration(action),
-        _ => 0
+        _ => WeaponSwing.Of(action)?.Contact ?? 0
     };
 
     /// <summary>Seconds left until a swing with <paramref name="remaining"/> seconds still to play lands; zero once it has.</summary>
-    public static float UntilContact(ActorAction action, float remaining) => Math.Max(0, Contact(action) - (Duration(action) - remaining));
+    public static float UntilContact(ActorAction action, float remaining) =>
+        Math.Max(0, (WeaponSwing.Of(action)?.ActiveFrom ?? Contact(action)) - (Duration(action) - remaining));
 
     /// <summary>Position within the current loop, from 0 inclusive to 1 exclusive.</summary>
     public static float Phase(ActorAction action, float elapsed) {
@@ -190,7 +200,7 @@ public static class ActorAnimation {
         ActorAction.Dig => "steel_shovel",
         ActorAction.Rake => "rake",
         ActorAction.NetSwing => "bug_net",
-        _ => null
+        _ => WeaponSwing.Of(action)?.Item
     };
 
     // Standing to work with the left boot ahead and the right behind (StanceFeet), and squatting low on the balls of both feet (SquatFeet).
@@ -531,8 +541,10 @@ public static class ActorAnimation {
         if (moving && SwingsOnTheMove(action)) {
             // The swing keeps its own clock, which keeps the jog's pace at the player's speed.
             var legs = PoseAt(ActorAction.Jog, elapsed, true);
-            return Posed(action, elapsed, false, null).WithLegs(legs.Leg(true), legs.Leg(false))
-                with { Sway = legs.Sway, Hips = legs.Hips, SplayL = legs.SplayL, SplayR = legs.SplayR };
+            var upper = Posed(action, elapsed, false, null).WithLegs(legs.Leg(true), legs.Leg(false));
+            // The new weapon paths are anchored to the same grip height even while the legs jog.
+            return WeaponSwing.Of(action) != null ? upper with { SplayL = legs.SplayL, SplayR = legs.SplayR }
+                : upper with { Sway = legs.Sway, Hips = legs.Hips, SplayL = legs.SplayL, SplayR = legs.SplayR };
         }
         var pose = Posed(action, elapsed, moving, aim);
         return FeetOf(action) is Footing feet ? OnFeet(pose, feet) : pose;
@@ -540,6 +552,7 @@ public static class ActorAnimation {
 
     /// <summary>An action's pose before its boots are stood on the ground; an action with a <see cref="Footing"/> gives only its hip height for the legs.</summary>
     private static Pose Posed(ActorAction action, float elapsed, bool moving, BlowAim? aim) {
+        if (WeaponSwing.Of(action) is WeaponSwing weapon) return weapon.PoseAt(elapsed);
         float p = Phase(action, elapsed);
         float wave = MathF.Sin(p * Mathf.Tau);
         if (BlowOf(action)?.Swung is ToolSwing swung)
@@ -802,7 +815,7 @@ public static class ActorAnimation {
         ActorAction.Craft => CraftFeet,
         ActorAction.Perch => PerchFeet,
         ActorAction.PickUp => TogetherFeet,
-        _ => null
+        _ => WeaponSwing.Of(action) != null ? StanceFeet : null
     };
 
     // A standing leg keeps its knee bent at least this much, and its shin leans at most this far over the foot, as far as an ankle bends under the body's weight.

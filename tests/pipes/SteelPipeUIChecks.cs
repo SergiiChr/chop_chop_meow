@@ -281,7 +281,7 @@ public partial class Game {
     }
 
     private async Task CheckPuttingPipesInThePlumbingSlotInstallsAndRefundsThem() {
-        var spot = SpotsNearby().First(p => world.CanStand(p) && Uncovered(view.Screen(p, .4f)) && view.Pick(view.Screen(p, .4f)) == null);
+        var spot = ClearSpotNearby(.4f);
         var table = Hosted.Add(ThingKind.Cooktable, spot);
         Give(Hosted, "steel_pipe", 12);
         await ClickOn(table);

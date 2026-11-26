@@ -9,6 +9,9 @@ namespace ChopChopMeow;
 /// </summary>
 public enum GatherShape { Patch, Deposit, Loose, Dug, Plucked, Caught }
 
+/// <summary>A gathering action shared by resources taken with the same kind of work.</summary>
+public enum GatherAction { DigUpThings, ChopTrees, MineOres, RakeLeaves, GatherNettles, CatchFirebugs }
+
 /// <summary>How one kind of resource is gathered.</summary>
 /// <param name="Item">What gathering it yields.</param>
 /// <param name="Needs">The tool kind gathering it takes, or null when bare hands do.</param>
@@ -19,8 +22,9 @@ public enum GatherShape { Patch, Deposit, Loose, Dug, Plucked, Caught }
 /// <param name="Job">The gathering job it belongs to when that is not every spot yielding its item, or null.</param>
 /// <param name="Sting">Health a second that gathering it takes from a player who carries no tool of the <paramref name="Spares"/> kind.</param>
 /// <param name="Spares">The tool kind that keeps a gatherer from being stung, or null: a player may do without it, and a worker always takes one.</param>
+/// <param name="ToolAction">The direct action that a required, helpful or protective tool enables.</param>
 public readonly record struct GatherRule(string Item, string? Needs = null, string? Helps = null, float ByHand = 1, ThingKind? Chip = null, GatherShape Shape = GatherShape.Patch, string? Job = null,
-    float Sting = 0, string? Spares = null) {
+    float Sting = 0, string? Spares = null, GatherAction? ToolAction = null) {
     /// <summary>The job a gatherer of this resource does: they move on only to spots of the same job.</summary>
     public string JobName => Job ?? Item;
     /// <summary>The tool kind a worker has to hold to gather it, or null when bare hands do.</summary>
@@ -43,15 +47,15 @@ public static class GatherRules {
     public const float DigSeconds = 6;
 
     private static readonly Dictionary<ThingKind, GatherRule> All = new() {
-        [ThingKind.Tree] = new("wood", Needs: "axe", Chip: ThingKind.Acorn),
-        [ThingKind.Stone] = new("stone", Needs: "pickaxe", Chip: ThingKind.LooseStone),
-        [ThingKind.LeafSpot] = new("leaves", Helps: "rake", ByHand: 3),
+        [ThingKind.Tree] = new("wood", Needs: "axe", Chip: ThingKind.Acorn, ToolAction: GatherAction.ChopTrees),
+        [ThingKind.Stone] = new("stone", Needs: "pickaxe", Chip: ThingKind.LooseStone, ToolAction: GatherAction.MineOres),
+        [ThingKind.LeafSpot] = new("leaves", Helps: "rake", ByHand: 3, ToolAction: GatherAction.RakeLeaves),
         [ThingKind.Berries] = new("berries"),
         [ThingKind.Water] = new(Water.Full),
         [ThingKind.WolfCorpse] = new("raw_meat"),
-        [ThingKind.Iron] = new("iron_ore", Needs: "pickaxe", Chip: ThingKind.IronChip, Shape: GatherShape.Deposit),
-        [ThingKind.Coal] = new("coal", Needs: "pickaxe", Chip: ThingKind.LooseCoal, Shape: GatherShape.Deposit),
-        [ThingKind.Tin] = new("tin_ore", Needs: "pickaxe", Chip: ThingKind.TinChip, Shape: GatherShape.Deposit),
+        [ThingKind.Iron] = new("iron_ore", Needs: "pickaxe", Chip: ThingKind.IronChip, Shape: GatherShape.Deposit, ToolAction: GatherAction.MineOres),
+        [ThingKind.Coal] = new("coal", Needs: "pickaxe", Chip: ThingKind.LooseCoal, Shape: GatherShape.Deposit, ToolAction: GatherAction.MineOres),
+        [ThingKind.Tin] = new("tin_ore", Needs: "pickaxe", Chip: ThingKind.TinChip, Shape: GatherShape.Deposit, ToolAction: GatherAction.MineOres),
         [ThingKind.LooseStone] = new("stone", Shape: GatherShape.Loose),
         [ThingKind.Stick] = new("wood", Shape: GatherShape.Loose),
         [ThingKind.Acorn] = new("acorn", Shape: GatherShape.Loose),
@@ -59,12 +63,12 @@ public static class GatherRules {
         [ThingKind.IronChip] = new("iron_ore", Shape: GatherShape.Loose),
         [ThingKind.TinChip] = new("tin_ore", Shape: GatherShape.Loose),
         // A woodcutter with a shovel to hand digs up stumps too, while bushes are a job apart from raking leaves.
-        [ThingKind.Stump] = new("wood", Needs: "shovel", Shape: GatherShape.Dug),
-        [ThingKind.Bush] = new("leaves", Needs: "shovel", Shape: GatherShape.Dug, Job: "bushes"),
+        [ThingKind.Stump] = new("wood", Needs: GroundHoles.Tool, Shape: GatherShape.Dug, ToolAction: GatherAction.DigUpThings),
+        [ThingKind.Bush] = new("leaves", Needs: GroundHoles.Tool, Shape: GatherShape.Dug, Job: "bushes", ToolAction: GatherAction.DigUpThings),
         // A nettle takes 3 seconds to pick, whatever is carried.
-        [ThingKind.Nettle] = new("nettle", ByHand: 1.5f, Shape: GatherShape.Plucked, Sting: 1, Spares: "shovel"),
+        [ThingKind.Nettle] = new("nettle", ByHand: 1.5f, Shape: GatherShape.Plucked, Sting: 1, Spares: GroundHoles.Tool, ToolAction: GatherAction.GatherNettles),
         // A player catches a firebug with a swing of the net; a worker with a net takes the one they reach.
-        [ThingKind.Firebug] = new("firebug", Needs: "net", Shape: GatherShape.Caught),
+        [ThingKind.Firebug] = new("firebug", Needs: "net", Shape: GatherShape.Caught, ToolAction: GatherAction.CatchFirebugs),
     };
 
     // The same rules by kind, since every resource check in the tick and the view asks for one.
@@ -74,6 +78,13 @@ public static class GatherRules {
         var byKind = new GatherRule?[Kinds.All.Length];
         foreach (var (kind, rule) in rules) byKind[(int)kind] = rule;
         return byKind;
+    }
+
+    /// <summary>Gathering actions a tool enables, speeds up or makes safer.</summary>
+    internal static IEnumerable<GatherAction> ActionsFor(string tool) {
+        foreach (var rule in All.Values)
+            if (rule.ToolAction is GatherAction action && (rule.Needs == tool || rule.Helps == tool || rule.Spares == tool))
+                yield return action;
     }
 
     /// <summary>The rule for gathering a kind, or null for anything that is not gathered.</summary>

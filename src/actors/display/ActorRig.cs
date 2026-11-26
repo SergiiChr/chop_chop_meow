@@ -34,6 +34,8 @@ public sealed class ActorRig {
     /// <summary>What each tool puts in the hands, by its name: one piece, or two for a tool that fills both.</summary>
     private readonly List<(string Name, Node3D Node)> tools = new();
     private readonly Node3D torch;
+    private readonly Dictionary<ActorAction, Node3D>? weaponModels;
+    private Node3D? weaponShown;
     private bool torchByBed;
     private Node3D shovel = null!, rake = null!;
     private readonly List<(Skeleton3D Skeleton, Node3D Joint)> limbs = new();
@@ -102,6 +104,7 @@ public sealed class ActorRig {
             case ActorSkin.Player:
                 Pack = BuildPlayerDetails(worn.Skin, worn.Hair);
                 Lanterns = new LanternWear(Root, hips, torso);
+                weaponModels = BuildWeaponModels();
                 break;
             case ActorSkin.Worker:
                 BuildWorkerDetails(worn.Skin, worn.Hair, worn.Hips);
@@ -604,6 +607,31 @@ public sealed class ActorRig {
         return sign;
     }
 
+    private Dictionary<ActorAction, Node3D> BuildWeaponModels() {
+        var models = new Dictionary<ActorAction, Node3D>();
+        var holder = new Node3D { Name = "WeaponModels" };
+        Root.AddChild(holder);
+        foreach (var move in WeaponSwing.All) {
+            var model = move.IsBucket ? VesselShape.AddBucket(holder, Vector3.Zero) : Tool(move.Item);
+            if (!move.IsBucket) holder.AddChild(model);
+            model.Hide();
+            model.Name = move.Action.ToString();
+            models.Add(move.Action, model);
+        }
+        return models;
+    }
+
+    /// <summary>Shows the swing's working end in the same place the contact check uses.</summary>
+    internal void ShowWeapon(WeaponSwing move, float time) {
+        if (weaponModels == null) return;
+        ToolShown = move.Item;
+        var model = weaponShown = weaponModels[move.Action];
+        model.Transform = move.Held(move.At(time), Fist(false), out var bail);
+        if (move.IsBucket) model.GetChild<Node3D>(1).Transform =
+            new Transform3D(bail, VesselShape.BucketHinge - bail * VesselShape.BucketHinge);
+        model.Show();
+    }
+
     /// <summary>The tool the rig shows in hand, or null for none.</summary>
     public string? ToolShown { get; private set; }
 
@@ -628,6 +656,8 @@ public sealed class ActorRig {
         hips.Position = new Vector3(0, pose.HipHeightFor(build.Shin), pose.HipShift);
         rock.Visible = onRock;
         if (pose.Grip != grip) { grip = pose.Grip; wrist.RotationDegrees = new Vector3(0, grip, 0); }
+        weaponShown?.Hide();
+        weaponShown = null;
         foreach (var (name, node) in tools) node.Visible = name == tool;
         ToolShown = tool;
         if (shovel.Visible) LayShovel();

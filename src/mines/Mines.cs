@@ -9,6 +9,7 @@ namespace ChopChopMeow;
 /// ore and rocks that never run out.
 /// </summary>
 public sealed class Mines(World world) {
+    internal const string DiggingTool = "pickaxe", FittingTool = "hammer";
     /// <summary>How far from a cliff a mine plan still snaps to it.</summary>
     private const float Reach = 10;
     /// <summary>How far behind a mine's spot its cliff's rock face stands, with the cave mouth in it.</summary>
@@ -131,9 +132,9 @@ public sealed class Mines(World world) {
 
     /// <summary>Why the player cannot work on a mine now, or null: a pickaxe digs the entrance and a hammer fits the frame and rails.</summary>
     internal string? BuildBlock(Thing mine) => mine.MineStage switch {
-        MineStage.Marked => world.BestTool("pickaxe") == null ? "A pickaxe is required to dig the entrance." : null,
+        MineStage.Marked => world.BestTool(DiggingTool) == null ? "A pickaxe is required to dig the entrance." : null,
         MineStage.Dug => world.Phrase("Deliver ", materials, " first."),
-        MineStage.Supplied => world.BestTool("hammer") == null ? "A hammer is required to fit the frame and rails." : null,
+        MineStage.Supplied => world.BestTool(FittingTool) == null ? "A hammer is required to fit the frame and rails." : null,
         _ => "The mine is open. Workers with pickaxes mine it."
     };
     /// <summary>Adds digging or fitting, by the player or a worker, to the stage's one shared progress.</summary>
@@ -163,7 +164,7 @@ public sealed class Mines(World world) {
     internal bool Build(Worker w, Thing mine, float dt) {
         if (mine.MineStage is not (MineStage.Marked or MineStage.Supplied)) { w.Status = mine.MineStage == MineStage.Dug ? Wants(mine) : "The mine is open"; return false; }
         bool digging = mine.MineStage == MineStage.Marked;
-        switch (world.Equip(w, digging ? "pickaxe" : "hammer", mine, dt)) {
+        switch (world.Equip(w, digging ? DiggingTool : FittingTool, mine, dt)) {
             case World.Kit.Busy: return true;
             case World.Kit.Lacking: return false;
         }
@@ -190,7 +191,7 @@ public sealed class Mines(World world) {
             if (fullReported.Add(mine.Id)) world.Say($"The {Name(mine)} is full with no output available.");
             return false;
         }
-        switch (world.Equip(w, "pickaxe", mine, dt)) {
+        switch (world.Equip(w, DiggingTool, mine, dt)) {
             case World.Kit.Busy: return true;
             case World.Kit.Lacking: return false;
         }

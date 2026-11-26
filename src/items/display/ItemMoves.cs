@@ -78,8 +78,13 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole, HeldCursor cursor)
     /// </summary>
     public void TakeCell(ItemSlot cell, Inventory box, string item, Thing near, Func<HeldCursor, bool>? takes = null, Action<string, int>? put = null) => TakeCell(cell, box, () => item, near, takes, put);
 
-    /// <summary>The same for a slot whose item changes; <paramref name="item"/> is null while it has nothing to give.</summary>
-    public void TakeCell(ItemSlot cell, Inventory box, Func<string?> item, Thing near, Func<HeldCursor, bool>? takes = null, Action<string, int>? put = null) {
+    /// <summary>
+    /// The same for a slot whose item changes. <paramref name="item"/> is null while the slot has nothing to give.
+    /// <paramref name="shown"/> includes an item pictured while the slot is empty, which can still be looked up.
+    /// </summary>
+    public void TakeCell(ItemSlot cell, Inventory box, Func<string?> item, Thing near, Func<HeldCursor, bool>? takes = null,
+        Action<string, int>? put = null, Func<string?>? shown = null) {
+        kit.LinkRecipeMap(cell, shown ?? item);
         cell.Controls = new SlotInput(cursor) {
             Pick = () => item() is string id && box.Layout.FindIndex(s => s.Item == id) is int at and >= 0 ? (box, at) : null,
             Takes = takes,

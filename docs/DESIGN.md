@@ -192,20 +192,32 @@ UI and input:
 | `src/ProcessRow.cs` | The process row every station shares and the fuel row under its bar |
 | `src/JobRow.cs` | A place's job buttons, their worker lists and what each job is called |
 | `src/storage/display/FilterWindow.cs` | The filter window beside the panel |
-| `src/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
-| `src/Grid.cs` | Draws the icon-slot grids |
-| `src/ItemSlot.cs` | The cream item slot, which tells a click, a right click and a double click apart and shakes on a refusal |
-| `src/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse, and `SlotInput`, what each click does on an item slot |
+| `src/items/display/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
+| `src/items/display/Grid.cs` | Draws the icon-slot grids |
+| `src/items/display/Badge.cs` | The count pill on an item slot, green with the firebug count on a lantern's slot |
+| `src/items/display/ItemSlot.cs` | The cream item slot, which tells plain, right, double and Alt-clicks apart and shakes on a refusal |
+| `src/items/display/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse |
+| `src/items/display/SlotInput.cs` | What a click does on an item slot |
 | `src/HotbarStacks.cs` | `World`'s hotbar slots bound to backpack stacks: binding, waiting slots and reading what a slot shows |
 | `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
 | `src/stations/display/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
 | `src/stations/display/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
-| `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
+| `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout and item details |
+| `src/crafting/display/MapItemLink.cs` | A link to an item or building that hides its identity until discovery |
+| `src/crafting/display/ItemTree.cs` | The Recipe map's Item tree, with branches for direct uses and station recipes |
+| `src/crafting/display/ItemTreeBranches.cs` | The lines from the selected card to each branch and its cards |
+| `src/crafting/model/RecipeItemUse.cs` | The direct roles an item plays in a recipe |
+| `src/crafting/model/MapBuilding.cs` | Buildings, their costs and the material their cards branch from |
+| `src/crafting/model/ItemTreeActions.cs` | The direct actions an item enables outside crafting and construction |
+| `src/crafting/model/RecipeItemRole.cs` | The roles and the order of their branches |
+| `src/crafting/display/MapTree.cs` | The arrows from materials to products in a category |
+| `src/crafting/display/MapNode.cs` | An item card with its icon, source and links to required tools and additional resources |
+| `src/crafting/display/MapSlot.cs` | The filled or dashed icon slot shared by cards, the details panel and the legend |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
-| `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
+| `src/trade/display/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel, with their hands and tool slot |
 | `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
@@ -228,6 +240,7 @@ UI and input:
 | `src/actors/enemies/wolf/WolfCounter.cs` | A struck wolf's sideways hop, skid, run, bound behind the attacker and pivot |
 | `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: campfire and torch circles, and a torch follower bracing, running or standing its ground |
 | `src/actors/player/Swings.cs`, `src/actors/player/model/Swing.cs`, `src/actors/player/model/SwingShape.cs` | Players' swings at wolves: when a swing lands, the ground its blade, flame or fist passes over, and the wolves it touches |
+| `src/actors/player/model/WeaponSwing.cs` | The motions and contact shapes of tool strikes, including the bucket's loose bail |
 | `src/actors/enemies/wolf/model/Wolf.cs` | `Wolf`, a wolf as the world saves it |
 | `src/actors/enemies/wolf/model/Den.cs` | `Den`, a wolf den's mouth, door and clearance |
 | `src/actors/model/IWalker.cs` | `IWalker`, anything that walks the map on its own, along a route around what blocks it |
@@ -240,8 +253,8 @@ UI and input:
 | `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |
-| `src/PackerPanel.cs` | The packing station panel and its good picker |
-| `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
+| `src/packing/display/PackerPanel.cs` | The packing station panel and its good picker |
+| `src/ui/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/menus/StartMenu.cs` | The main menu and its save, load, options, join and Controls screens |
 | `src/menus/ControlsList.cs` | Key caps and actions on the shared Controls screen |
@@ -321,7 +334,7 @@ Checks and review tools:
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps several features' UI and network checks share, and `Game.TestClean`, which fails a UI check that leaves a mess |
 | `src/RecipeSteps.cs` | Steps that open a fresh station for a recipe, give and load its items and fuel, and expect a batch to start or be refused |
 | `src/showcase/Showcase.cs` | The review scenes behind `--showcase` |
-| `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
+| `src/playtest/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
 | `src/performance/PerformanceRun.cs` | The rendered performance run's window half: sprinting the route by day and night, sampling frames, writing results |
 | `src/performance/PerformanceStage.cs`, `src/performance/PerformanceFixture.cs` | The run's server half, and the staffed camp it plays |
 | `src/performance/PerformanceRoute.cs` | The run's sprint from the beach past the camp and the lake to the valley's top corner |
@@ -432,6 +445,7 @@ Meshes and materials are cached by parameters, so repeated objects share resourc
 `WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, and `WorldView` draws them behind the ground for its first frames, so a building, crate, carcass or wolf that first appears mid-game builds no mesh, material, shader or pipeline; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
 The default camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
+It keeps the player in the middle of the screen, a little below it, and stays put when a side panel opens, so a double click lands on the building the first click picked.
 The first-person preview switches the same camera to a perspective at eye level.
 `FirstPersonCamera` turns the camera from mouse motion and rotates walking directions to match.
 `WorldView` casts the same picking rays from the eye, and shows the sky, distant terrain and live objects without fog.
@@ -807,7 +821,7 @@ Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters
 
 `Doorways` (`src/cabins/Doorways.cs`) runs a cabin's door, which lets one player through at a time into a cabin that holds `Doorways.Places`, and `DoorTug` (`src/actors/enemies/wolf/DoorTug.cs`) a wolf tugging a player out of it; `World` holds one of each (`World.Doorways`, `World.DoorTug`) and ticks the doorway with the acting player.
 A double click on a cabin, or its page's Enter button, starts a `CabinApproach` to `Doorways.DoorPoint`, using the same grid routes workers use to avoid obstacles.
-The click's first press opens the page, which moves the world aside and can put the page's windows under the pointer, so `Game._Input` hands the second press to `PlayerControl.WalkIntoClickedCabin` before the interface sees it.
+The click's first press opens the page, which can put the page's windows under the pointer, so `Game._Input` hands the second press to `PlayerControl.WalkIntoClickedCabin` before the interface sees it.
 `WalkSearch` checks nearby building footprints and spreads long searches across frames.
 If a failed search saw a layout that has changed, the approach tries again with the current buildings.
 The panel highlights Enter while finding a path and during the walk.
@@ -892,7 +906,10 @@ The slam's sound and a chest's or crate's `close_chest` start as far ahead of th
 #### Swings
 
 `Swings` (`src/actors/player/Swings.cs`) runs a player's swings at wolves.
-`World.Attack` swings the best axe carried, or a fist without one, and `World.UseTorch` a lit torch, along the aim the player gives, with `Swings.Cooldown` between swings.
+`World.Attack` swings the selected carried weapon, or the best axe or a fist with no weapon selected.
+The attack command names the weapon, which the host checks against the backpack.
+`World.UseTorch` lights the torch or swings it once lit.
+Space attacks with the selected tool. The shovel and bug net keep their normal jobs on right-click.
 The swing lands `ActorAnimation.Contact` into its animation (`PlayerState.Swing`, a `Swing` counting down), not when it starts, and a player who went down or indoors meanwhile lands nothing.
 It lands on every wolf whose body touches the ground it passes over then, a `SwingShape` seen from above, and that stands as tall as the swing comes low (`SwingShape.Low`):
 
@@ -904,7 +921,12 @@ It lands on every wolf whose body touches the ground it passes over then, a `Swi
 | Bug net | `Swings.Net` | 0.98 to 1.42 m out, from 55° left of the aim to 55° right, where the hoop's slant from behind the right shoulder to the ground at the left crosses the height a firebug flies at | any height | none: it catches firebugs |
 | Punch | `Swings.Punch` | within 0.7 m, 10° to 35° right | any height | 0.4 to 0.6 |
 
-The shapes are where the player's model carries the axe head (`ActorRig.AxeHead`), the flame and the fist through each stroke, which `CheckSwingShapesFollowThePlayersModel` holds them to.
+Those shapes are where the player's model carries the axe head (`ActorRig.AxeHead`), flame and fist through each
+stroke. For the other weapons, `WeaponSwing` moves the grip and turns the tool through a path shared by drawing and
+hit detection. The tool's working end traces a short sweep across the wolf's body between ticks, excluding the handle
+and the wind-up. A wolf reacts at first touch and can be hit only once per swing. The rake and bucket come down from
+overhead. The bucket's body trails the held bail, swings past it, then settles. A confirmed bucket hit plays
+`bucket_hit`, once per wolf struck. Chisels and hammers start and finish on the same upright grip used while carried.
 A wolf's body is `Swings.Touches`' line of round sections from the root of its tail to its nose, the way it faces (`WolfBodies.Body`), as tall as `WolfBodies.Top`: `WolfBodies.StandingTop` on the ground, up to `WolfBodies.LeapRise` more through a leap for the throat, and `WolfBodies.RearedTop` reared up with an arm in its jaws, as its model stands.
 So the sweep passes over a wolf on the ground and catches one in the air or reared up.
 Each wolf touched takes its own roll of the damage, the swing's own give or take its spread (`Swings.AxeDamage` times the axe's speed, `AxeSpread`), and is knocked back and left reeling (`World.Strike`).
@@ -1185,20 +1207,52 @@ The panel keeps the list's place while the page draws again, so a click on a rec
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 
-The recipe map badge on the bottom bar opens `RecipeMap` over the running game.
-An item link in the Goal Log opens it through `RecipeMap.OpenAt` with that item highlighted and the game still paused.
-Closing the map returns to the goal details.
-`PlayerControl.Update` moves nobody while it shows, and a `MapNode` turns to made before as soon as `World.Had` knows its item.
-`RecipeMap.Place` puts an item on a grid of steps across and lines down: what is made out of it goes one step on, the first on the same line and the rest on lines below, and `MapTree` draws the lines between them.
-A `MapNode` draws a filled slot for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.
-A click on a chip scrolls to that item and lights it (`MapNode.Light`); a click on a slot shows its details, whose button leaves the map through `SidePanel.ShowRecipe`.
+The Recipe map badge on the bottom bar opens `RecipeMap` over the running game.
+`UiKit.LinkRecipeMap` lets Alt-click on an item slot or recipe card look up its item through `RecipeMap.OpenAt` without
+running the slot's usual action, including adding or removing a filter entry.
+A station's fuel or tool slot links to the item it pictures even when that slot is empty.
+An item link in the Goal Log uses the same entry point with the game still paused.
+Closing the map returns to the panel or goal details underneath.
+`PlayerControl.Update` moves nobody while it shows, and a card reveals its name and icon when `World.Had` knows its item or `World.Reached` records its building.
+`RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
+and the rest go on lines below. When a recipe takes a spare root in the same category as a second ingredient, the
+first column can hold that root beside the product, and the main ingredient connects from above.
+`MapBuilding` attaches each building to the material it costs most, including the staged costs of a mine. When
+materials tie, the first one listed is used. Marking a mine reveals its plan without marking it as built.
+`MapTree` draws arrows to the products and highlights those connected to the chosen card.
+A `MapNode` draws a filled icon slot for a discovered item and a question mark in a dashed slot otherwise.
+`MapItemLink` also hides undiscovered names and icons in the Item tree, chips, thumbnails and tooltips.
+Undiscovered entries can still be found on the main map, but neither their details nor their Item trees open until discovery. The details panel shares the dashed badge.
+Chips below a discovered card link to the required tool and extra ingredients or construction materials. A click on a chip scrolls to its item
+and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details in a vertical panel to
+the right of the map. The panel's button leaves the map through `SidePanel.ShowRecipe`.
+Alt-click on a discovered item's card, chip or detail thumbnail opens its Item tree within the same board.
+`RecipeItemUse.Of` reads each recipe's inputs, accepted tools, fixed station tools and fuels to find direct uses only.
+`ItemTree` groups recipe products under Fuel, Ingredient and Tool branches. It omits empty branches and shows a
+product under each role the selected item plays in that recipe. The same tree branches to buildings that primarily
+cost that material and lists the item's direct actions. Packing is not listed. `GatherRules` gives the gathering
+actions one name for each kind of work. Digging up stumps, bushes and beach sand shares **Dig up things.**
+Digging a hole stays a separate action because it yields nothing. Surface deposits and open mines share **Mine ores**.
+Digging an entrance and fitting a mine's frame and rails share **Building a mine**.
+`GameData.MapEntryOf` resolves every container fill to its base entry, so every fill of a bottle links to **Bottle**.
+`ItemTreeActions` uses the vessel table to give Bottle and Steel bucket the same **Transport liquids** action.
+Liquids list **Drink** or **Food** based on what their filled vessels provide, not how to fill them.
+Water also lists watering farm plots and saplings.
+Crates and barrels list their uses, not opening or placing. The branch column centers vertically with the root,
+so a single result needs no bend in its line.
+**Weapon** marks the tools that can strike wolves, including Torch and Steel bucket.
+Mortar and pestle appears only as a tool for its recipes.
+A station's Recipes branch reads the recipes assigned to it.
+Clicking a card returns to its place in the main map. Alt-clicking it opens its own item tree.
+The Back button restores the main map at its previous selection and scroll position.
 
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
 `SaveState.Obtained` holds every item the settlement has gathered, grown, bought or started with; with what it made, which is among `SaveState.Milestones`, those are the items the recipe map shows as known (`World.Had`).
-Everything such an item is made of is known with it (`GameData.EndsUpIn`), so no ingredient looks unmade beside its product: a new settlement's steel axe and bottle make their whole chains known.
+Everything such an item is made of is known with it (`GameData.EndsUpIn`), so no ingredient looks unmade beside its product: a new settlement's steel axe and bottle make their whole chains known. A filled vessel also makes the liquid it holds known.
+Plumbing records the liquid when it reaches storage, and drawing liquid into a vessel also records it.
 A save written before `Obtained` existed loads with it empty, so a raw resource it made nothing of shows as not made until it is gathered again.
 `GameData.MadeFrom` gives the item another is made out of: its recipe's first input, or the first `From` of its entry in `GameData.Sources` when no recipe makes it.
-`GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item is on the map once.
+`GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item with its own map entry is on the map once.
 
 #### Tool slots
 
