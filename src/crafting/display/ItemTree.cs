@@ -27,21 +27,18 @@ internal partial class ItemTree(UiKit kit, string item, Action back, Action clos
         var diagram = new ItemTreeBranches();
         diagram.AddThemeConstantOverride("separation", 42); canvas.AddChild(diagram);
 
-        var rootColumn = new VBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkBegin };
-        rootColumn.AddThemeConstantOverride("separation", 7); diagram.AddChild(rootColumn);
-        rootColumn.AddChild(Style.Text("Selected item", 16, Style.Beige, Style.Head));
         var root = Card(item);
-        rootColumn.AddChild(root); diagram.SetRoot(root);
+        root.SizeFlagsVertical = SizeFlags.ShrinkBegin;
+        diagram.AddChild(root); diagram.SetRoot(root);
 
         var uses = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         uses.AddThemeConstantOverride("separation", 7); diagram.AddChild(uses);
         uses.ItemRectChanged += diagram.QueueRedraw;
-        uses.AddChild(Style.Text("Direct recipes", 16, Style.Beige, Style.Head));
         foreach (var use in RecipeItemUse.Of(kit.World.Data, item)) {
             var product = Card(use.Recipe.Output, use.Label());
             uses.AddChild(product); diagram.BranchTo(product);
         }
-        if (uses.GetChildCount() == 1) uses.AddChild(Style.Text("No recipe uses this item directly.", 17, Style.Beige));
+        if (uses.GetChildCount() == 0) uses.AddChild(Style.Text("No recipe uses this item directly.", 17, Style.Beige));
     }
 
     private HBoxContainer Header() {

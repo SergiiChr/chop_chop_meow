@@ -46,6 +46,9 @@ public partial class Game {
         var tree = recipeMap.FindChild("item_tree", true, false);
         Require(!HasLabel(tree, "Crafting bench") && !HasLabel(tree, "Anvil") && HasLabel(tree, "Ingredient"),
             "The item tree should name how the item is used but not where it is made.");
+        var labels = tree.FindChildren("*", "Label", true, false).OfType<Label>();
+        Require(!labels.Any(label => label.Text is "Selected item" or "Direct recipes"),
+            "The Item tree must show its cards without column captions.");
         await KeyStroke(Key.Escape);
     }
 }
