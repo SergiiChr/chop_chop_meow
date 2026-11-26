@@ -1243,7 +1243,7 @@ Finally a sustainable source of light. The crafting bench makes an empty lantern
 Right-click a lantern in the backpack, on the hotbar or on the ground to open it.
 Put firebugs onto its slot to add as many as fit, or right-click the slot while holding a stack to add one.
 It takes up to ten, shortest lives first. Putting a firebug in a lantern does not reset its life.
-The light dims as firebugs die, and you can add more at any time as long as there is room.
+The jar glows from inside. Its light dims as firebugs die, and you can add more at any time as long as there is room.
 A full lantern is 20% brighter than a torch, with a green hue. Lanterns do not scare wolves.
 
 Double-click a lantern to take it in hand. This puts out any lit torch.

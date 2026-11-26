@@ -4,5 +4,5 @@ namespace ChopChopMeow;
 internal sealed class LanternProp : Prop {
     internal readonly LanternModel Model;
 
-    internal LanternProp() => Model = new LanternModel(Body);
+    internal LanternProp() => Model = new LanternModel(Body, placed: true);
 }

@@ -1008,7 +1008,8 @@ Chopping out all its current wood fells the tree and leaves its stump.
 A lantern has a permanent number and carries its firebugs' expiry times with it as an item, including in a save or an update.
 The placed lantern stores that same item in `Thing.LanternItem` and keeps it when picked up.
 `Lanterns.Refill` moves as many firebugs as fit, shortest life first, without changing any expiry time.
-Only live firebugs show through the glass. With one tenth of a full lantern's light per bug, ten bugs give 120% of torch energy.
+Only live firebugs show through the glass. Their glow and the point light sit inside the jar, above its shadow-casting foot.
+With one tenth of a full lantern's light per bug, ten bugs give 120% of torch energy.
 The green light has no part in wolf behavior.
 
 A double click takes it in hand. Work requiring the hand hangs it temporarily on the belt, still lit.

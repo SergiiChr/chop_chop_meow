@@ -6,9 +6,29 @@ using static SetupSteps;
 
 internal static class LanternModelChecks {
     public static void Run(GameData data) {
+        Test(CheckLanternLightComesFromInsideTheJar);
         Test(CheckLanternBrightnessRisesWithLiveFirebugs, data);
         Test(CheckHotbarAndHandLanternsKeepTheirOwnLight, data);
         Test(CheckFullBeltHasRoomForTheHandLantern, data);
+    }
+
+    private static void CheckLanternLightComesFromInsideTheJar() {
+        var prop = (LanternProp)WorldModels.Build(new Thing { Kind = ThingKind.Lantern });
+        try {
+            var parts = ModelSteps.AllMeshes(prop.Model.Node);
+            var foot = parts.Single(part => part.Mesh is BoxMesh && Mathf.IsEqualApprox(part.Position.Y, .024f));
+            var glass = parts.Single(part => part.Mesh == GlassJarShape.Pile);
+            var light = prop.Model.Light;
+            var jar = glass.Transform * glass.GetAabb();
+            Require(jar.HasPoint(light.Position), "the light should sit inside the glass jar");
+            Require((light.ShadowCasterMask & foot.Layers) != 0 && foot.CastShadow != GeometryInstance3D.ShadowCastingSetting.Off,
+                "the wood foot should block the lantern's light from shining straight down onto the ground");
+            prop.Model.Sync(10, 1.6f);
+            Require(glass.MaterialOverride is StandardMaterial3D { EmissionEnabled: true, EmissionEnergyMultiplier: > 0 },
+                "a full lantern should light the glass from inside");
+            prop.Model.Sync(0, 1.6f);
+            Require(glass.MaterialOverride is StandardMaterial3D { EmissionEnabled: false }, "an empty jar should have no interior glow");
+        } finally { prop.Root.Free(); }
     }
 
     private static void CheckLanternBrightnessRisesWithLiveFirebugs(GameData data) {

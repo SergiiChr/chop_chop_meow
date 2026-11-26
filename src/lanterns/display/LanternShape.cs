@@ -7,8 +7,9 @@ namespace ChopChopMeow;
 internal static class LanternShape {
     private const float JarScale = 1.8f, JarBase = .032f, LidHeight = .367f;
     internal const float GripHeight = .478f;
-    /// <summary>The lantern's own frame casts sun shadows, but not shadows across the light the frame holds.</summary>
-    internal const uint Layer = 1 << 13;
+    /// <summary>The foot and lid block the lantern's own point light. The glass and trim do not.</summary>
+    internal const uint TrimLayer = 1 << 13, EndsLayer = 1 << 14;
+    internal static readonly Vector3 LightCenter = Vector3.Up * .212f;
     internal static readonly Color LightColor = new("adff76");
     private static readonly StandardMaterial3D FrameWood = Wood("805333", .83f);
     private static readonly StandardMaterial3D Hardware = Metal("647075", .5f, .7f);
@@ -27,11 +28,11 @@ internal static class LanternShape {
     };
     private static ArrayMesh? bugs, compactGlass, heap;
 
-    internal static Node3D Build(out MultiMeshInstance3D firebugs, bool compact = false) {
+    internal static Node3D Build(out MultiMeshInstance3D firebugs, out MeshInstance3D glass, bool compact = false) {
         var root = new Node3D();
-        Box(root, new(.227f, .048f, .227f), Vector3.Up * .024f, FrameWood);
-        if (compact) Add(root, compactGlass ??= CompactGlass(), GlassJarShape.Finish, Vector3.Zero);
-        else Add(root, GlassJarShape.Pile, GlassJarShape.Finish, Vector3.Up * JarBase, scale: Vector3.One * JarScale);
+        var foot = Box(root, new(.227f, .048f, .227f), Vector3.Up * .024f, FrameWood);
+        glass = compact ? Add(root, compactGlass ??= CompactGlass(), GlassJarShape.Finish, Vector3.Zero)
+            : Add(root, GlassJarShape.Pile, GlassJarShape.Finish, Vector3.Up * JarBase, scale: Vector3.One * JarScale);
         foreach (float side in new[] { -1f, 1f }) {
             if (!compact) {
                 Box(root, new(.025f, .25f, .035f), new(side * .096f, .15f, 0), FrameWood);
@@ -40,10 +41,13 @@ internal static class LanternShape {
                 Brace(new(side * .076f, .436f, 0), new(side * .042f, GripHeight, 0));
             } else Brace(new(side * .083f, LidHeight, 0), new(side * .042f, GripHeight, 0));
         }
-        if (compact) Add(root, CompactLid, Hardware, Vector3.Up * LidHeight);
-        else Cylinder(root, .096f, .092f, .026f, Vector3.Up * LidHeight, Hardware, sides: 10);
+        var lid = compact ? Add(root, CompactLid, Hardware, Vector3.Up * LidHeight)
+            : Cylinder(root, .096f, .092f, .026f, Vector3.Up * LidHeight, Hardware, sides: 10);
         Box(root, new(.093f, .026f, .027f), Vector3.Up * GripHeight, FrameWood);
-        for (int i = 0; i < root.GetChildCount(); i++) root.GetChild<MeshInstance3D>(i).Layers = Layer;
+        for (int i = 0; i < root.GetChildCount(); i++) {
+            var part = root.GetChild<MeshInstance3D>(i);
+            part.Layers = part == foot || part == lid ? EndsLayer : TrimLayer;
+        }
         var dots = new MultiMesh {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
             Mesh = bugs ??= Bug(),
@@ -106,7 +110,7 @@ internal static class LanternShape {
     internal static ArrayMesh Heap => heap ??= BuildHeap();
 
     private static ArrayMesh BuildHeap() {
-        var model = Build(out _, compact: true);
+        var model = Build(out _, out _, compact: true);
         try {
             var mesh = new ArrayMesh();
             Merge(FrameWood);

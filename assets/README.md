@@ -186,8 +186,9 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   hoop and a long bag of white netting, seen through, that narrows to a rounded end; the icon, the heap and the
   player's hand show the same model.
 - The firebug item (`ItemShape.Firebug`) is a beetle with dark wing covers and a yellow-green tail.
-- `LanternShape` adds a wooden foot and grip, and steel lid and handle to the glass jar. Its live firebugs glow.
+- `LanternShape` adds a wooden foot and grip, and steel lid and handle to the glass jar.
   Its icon, ground and hand models share the jar mesh. Belt and heap models use a lighter version of the same profile.
+  The firebugs light the inside of the jar, and the wooden foot blocks direct light beneath it.
   Its green light has the reach of a torch, with each live firebug supplying 12% of the torch's baseline light energy.
   Preview it using `./build.py play -- --showcase --lantern`, with `--night` or `--dark`.
   Append `held` or `belt` directly after `--lantern` to inspect it on the player.

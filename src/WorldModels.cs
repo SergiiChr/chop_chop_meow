@@ -236,7 +236,9 @@ public static class WorldModels {
         // The net's bag has a material of its own, seen from both sides, which no world model draws.
         Stage(ActorRig.Tool("bug_net"));
         Stage(LanternWear.Hook());
-        Stage(LanternShape.Build(out _, compact: true));
+        var compactLantern = new Node3D();
+        new LanternModel(compactLantern, compact: true).Sync(Lanterns.Capacity, 0);
+        Stage(compactLantern);
         void Stage(Node3D root) { ModelKit.BuildShaders(root); root.Position = Vector3.Zero; stage.AddChild(root); }
         _ = BackpackShape.Details; _ = BackpackShape.Flap;
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
@@ -405,7 +407,7 @@ public static class WorldModels {
             case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
             case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer" or "bug_net": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
-            case Lanterns.Item: return LanternShape.Build(out _);
+            case Lanterns.Item: return LanternShape.Build(out _, out _);
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
