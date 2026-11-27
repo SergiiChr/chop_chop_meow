@@ -11,7 +11,7 @@ public static class NeedsChecks {
     public static void Run(GameData data) {
         Test(CheckStomachGrowlsAsFoodRunsLow, data);
         Test(CheckSprintBurnsFood, data);
-        Test(CheckFoodsFeedAndWaterByTheirDataWithoutHealing, data);
+        Test(CheckStewQuenchesThirstAndRawWheatCannotBeEaten, data);
         Test(CheckBerriesFeedMoreWhenPrepared, data);
     }
 
@@ -58,16 +58,14 @@ public static class NeedsChecks {
         Require(world.Hunger == 100 && world.Backpack[BerryJam.Bottles[2]] == 1, "drinking jam should use one liter and leave the bottle");
     }
 
-    /// <summary>Foods restore the hunger and thirst their data says and no health, and raw ones only say they need cooking.</summary>
-    private static void CheckFoodsFeedAndWaterByTheirDataWithoutHealing(GameData data) {
+    /// <summary>Stew still restores thirst, and raw wheat only says it needs cooking.</summary>
+    private static void CheckStewQuenchesThirstAndRawWheatCannotBeEaten(GameData data) {
         var world = EmptyWorld(data);
         SetNeeds(world, 20, 20, 50);
         Give(world, "meat_stew", 1); Give(world, "wheat", 1);
         world.Consume("meat_stew");
         var stew = data.Items["meat_stew"];
-        Require(world.Hunger == 20 + stew.Hunger, "meat stew should feed by its data");
         Require(world.Thirst == 20 + stew.Thirst, "meat stew should water by its data");
-        Require(world.Health == 50, "meat stew should not heal: only sleep does");
         Require(world.Backpack["meat_stew"] == 0, "meat stew should be used up");
         world.Consume("wheat");
         Require(world.Backpack["wheat"] == 1, "raw wheat should not be eaten as it is");

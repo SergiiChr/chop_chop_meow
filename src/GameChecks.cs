@@ -1176,6 +1176,7 @@ public partial class Game {
             await TestClean(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
             await RunMineUIChecks();
             await RunHudUIChecks();
+            await RunFoodEffectUIChecks();
             await RunHotbarUIChecks();
             var chest = await RunBuildingPlacementUIChecks();
             await Test(() => CheckChestMovesSplitsAndFiltersStacks(chest));

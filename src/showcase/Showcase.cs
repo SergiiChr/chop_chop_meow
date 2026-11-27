@@ -63,6 +63,10 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     public void Run() {
         if (Launch.Value("--straw-bed") is string bedPose) { StrawBedScene(bedPose); return; }
         Place();
+        if (Launch.Has("--food-effects")) {
+            world.S.Backpack.Add("meat_stew", 1); world.Consume("meat_stew");
+            world.S.Backpack.Add("canned_jam", 1); world.Consume("canned_jam");
+        }
         view.Zoom = Launch.Number("--zoom", view.Zoom);
         if (Launch.Value("--doorway") is string scene) {
             var cabin = world.Things.First(t => t.Kind == ThingKind.Hut);
