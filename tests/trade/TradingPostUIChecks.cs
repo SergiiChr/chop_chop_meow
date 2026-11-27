@@ -12,6 +12,7 @@ public partial class Game {
     private async Task RunTradingPostUIChecks() {
         await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
         await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
+        await TestClean(CheckPriceSheetKeepsItsPlaceWhenFiltersOpen);
     }
 
     private async Task CheckTradingPostSendsOnlyCratesOffOnACart() {
@@ -88,5 +89,28 @@ public partial class Game {
         Require(hired!.Away > 0, "Fetching must send the assigned worker to the village.");
         Hosted.Fire(hired); Hosted.Tick(world.Data.TradeSeconds); RemoveThings(Hosted, t => t == sign || t.Kind == ThingKind.Grave); Drop(Hosted, Inventory.Coins, 999);
         await CloseWithEsc();
+    }
+
+    private async Task CheckPriceSheetKeepsItsPlaceWhenFiltersOpen() {
+        var resolution = GetWindow().ContentScaleSize;
+        // At the smallest supported size, the sheet has more prices than fit at once.
+        ApplyResolution(StartMenu.Resolutions[0]);
+        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
+        await ClickOn(sign);
+        await Click(Named("coins")!);
+        var rows = (ScrollContainer)OnPage("price_rows")!;
+        await Until(() => rows.GetVScrollBar().Visible, "the price sheet becoming scrollable", 2);
+        await Wheel(rows.GetGlobalTransformWithCanvas() * (rows.Size / 2));
+        int offset = rows.ScrollVertical;
+        Require(offset > 0, "Scrolling the price sheet must move the prices before opening Filters.");
+        await Click(Named("filters")!);
+        await Until(() => OnPage("price_rows") is ScrollContainer open && open.ScrollVertical == offset,
+            "the price sheet retaining its scroll position with Filters open", 2);
+        await Click(Named("filters_close")!);
+        await Until(() => OnPage("price_rows") is ScrollContainer closed && closed.ScrollVertical == offset,
+            "the price sheet retaining its scroll position after closing Filters", 2);
+        RemoveThings(Hosted, t => t == sign);
+        await CloseWithEsc();
+        ApplyResolution(resolution);
     }
 }

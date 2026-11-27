@@ -78,6 +78,7 @@ public partial class SidePanel : MovableWindow {
     /// <summary>The price rows' scroll area, sized like the panel's to the room there is.</summary>
     private ScrollContainer? sheetScroll;
     private Control? sheetRows;
+    private (int Offset, float Height) sheetPlace;
     // The board's height apart from its scroll area, or null to measure it as it is.
     private float? sheetRest;
     // Whether the board's list hides the backpack drawer and reaches down where it was.
@@ -165,8 +166,9 @@ public partial class SidePanel : MovableWindow {
         page.Refresh(); Bag.Refresh();
     }
 
-    /// <summary>Empties what a page fills around its body: the header, the side board and the backpack drawer.</summary>
-    public void ClearFrame() {
+    /// <summary>Empties what a page fills around its body. A redraw keeps the side board's place in its list.</summary>
+    public void ClearFrame(bool redrawing = false) {
+        sheetPlace = redrawing && sheetScroll != null ? (sheetScroll.ScrollVertical, sheetScroll.CustomMinimumSize.Y) : default;
         while (heading.GetChildCount() > 3) { var extra = heading.GetChild(2); heading.RemoveChild(extra); extra.QueueFree(); }
         HeadingIcon.Texture = null; HeadingIcon.Visible = false; HeadingIcon.TooltipText = ""; HeadingIcon.SelfModulate = Colors.White;
         HeadingTitle.Text = Pages[(int)Page].Title;
@@ -294,7 +296,11 @@ public partial class SidePanel : MovableWindow {
 
     /// <summary>Hands over the board's long list, so <see cref="Fit"/> sizes its scroll area to the room left; without <paramref name="rest"/> the rest of the board is measured.</summary>
     /// <param name="hidesDrawer">Hides the backpack drawer while the list shows, so the board reaches down to the hotbar, for a list picked from by click.</param>
-    public void ShowSheetRows(ScrollContainer scrollArea, Control rows, float? rest = null, bool hidesDrawer = false) { sheetScroll = scrollArea; sheetRows = rows; sheetRest = rest; sheetHidesDrawer = hidesDrawer; }
+    public void ShowSheetRows(ScrollContainer scrollArea, Control rows, float? rest = null, bool hidesDrawer = false) {
+        sheetScroll = scrollArea; sheetRows = rows; sheetRest = rest; sheetHidesDrawer = hidesDrawer;
+        scrollArea.CustomMinimumSize = new Vector2(0, sheetPlace.Height);
+        RestoreScroll(scrollArea, sheetPlace.Offset);
+    }
 
     /// <summary>Shows the window beside the panel and gives the column a page fills it with.</summary>
     public VBoxContainer ShowAside(float width) {
@@ -306,11 +312,14 @@ public partial class SidePanel : MovableWindow {
     /// Hands over the page's own long list, such as a recipe board's, so <see cref="Fit"/> lets it scroll in the room the rest of the page leaves rather than push that out of view.
     /// A list handed over when the page draws again takes the height of the one before it at once, and its place a frame later, once its rows have their size; it is hidden until then.
     /// </summary>
-    public async void ShowPageRows(ScrollContainer scrollArea, Control rows) {
+    public void ShowPageRows(ScrollContainer scrollArea, Control rows) {
         pageScroll = scrollArea; pageRows = rows;
-        int offset = pageOffset;
         scrollArea.CustomMinimumSize = new Vector2(0, pageHeight);
+        RestoreScroll(scrollArea, pageOffset);
         scrollArea.GetVScrollBar().ValueChanged += at => pageOffset = (int)at;
+    }
+
+    private async void RestoreScroll(ScrollContainer scrollArea, int offset) {
         if (offset == 0) return;
         // Until its rows have their size the list cannot scroll, so it stays out of sight rather than show from the top for a frame.
         scrollArea.Modulate = Colors.Transparent;

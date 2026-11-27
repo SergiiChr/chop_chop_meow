@@ -207,7 +207,7 @@ public static class WorldModels {
     public const uint MarkLayer = 1 << 12;
 
     /// <summary>
-    /// Builds one model of every kind in each of its looks, a mine at every ore and a wolf under <paramref name="stage"/> while the world loads, so their meshes, materials, shaders and faded copies are made.
+    /// Builds one model of every kind in each of its looks, a mine at every ore, a wolf and the worker's hard hat under <paramref name="stage"/> while the world loads, so their meshes, materials, shaders and faded copies are made.
     /// The view draws the stage once, which builds what drawing needs, so a building, crate, carcass, dropped backpack or wolf that first appears mid-game only adds nodes over what is ready.
     /// </summary>
     public static void Warm(Node3D stage) {
@@ -235,6 +235,7 @@ public static class WorldModels {
         Stage(Build(new Thing { Kind = ThingKind.Tree, TreeStage = 1 }).Root);
         foreach (var ore in Cliff.Ores) Stage(Build(new Thing { Kind = ThingKind.Mine, Pos = Cliff.Of(ore).MineSpot }).Root);
         Stage(new WolfModel().Root);
+        var hardHat = new Node3D(); ActorRig.HardHat(hardHat); Stage(hardHat);
         foreach (var instrument in CampfireInstrumentShape.All)
             Stage(CampfireInstrumentShape.Create(instrument, ActorRig.OutfitOf(ActorSkin.Worker).Skin));
         // The net's bag has a material of its own, seen from both sides, which no world model draws.
