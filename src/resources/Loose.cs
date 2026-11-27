@@ -30,7 +30,7 @@ public partial class World {
     }
 
     /// <summary>Whether a worker has a tool of a kind in hand or can take one from a tool station.</summary>
-    internal bool HasTool(Worker w, string kind) => w.Tool != "" && Data.Items[w.Tool].Tool == kind || StationsHold(kind);
+    internal bool HasTool(Worker w, string kind) => w.Tool != "" && Data.Items[Item.KindOf(w.Tool)].Tool == kind || StationsHold(kind);
 
     /// <summary>
     /// Sends a gatherer who cannot work a spot to the nearest known spot of the same job that they can, and tells whether there was one:

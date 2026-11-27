@@ -806,7 +806,10 @@ public partial class WorldView : Node3D {
             } else {
                 // A worker works a station with the hammer slotted there, never one of their own, so that is the one they swing.
                 string? slotted = ActorAnimation.Tool(work) == "hammer" && assignment?.Tools != null ? World.BenchTool(assignment, "hammer") : null;
-                if (work == ActorAction.Carry && worker.Bag.First() is string load && ContainerItem.IsBottle(load)) vessel = load;
+                if (work == ActorAction.Carry && worker.Bag.First() is string load && Water.IsBottle(load)) {
+                    vessel = Vessels.LookOf(World.Data, worker.Bag, load);
+                    filled = Vessels.LitersIn(worker.Bag.Object(load)) > 0;
+                }
                 Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), slotted ?? worker.Tool, assignment?.Tools),
                     barrel: work == ActorAction.Carry && Barrel.In(worker.Bag) != null,
                     vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null, filled: filled);

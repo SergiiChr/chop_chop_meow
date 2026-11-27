@@ -812,11 +812,13 @@ public static class WorldModels {
     /// A pile heaps up the good it holds, more of it the fuller the pile is; a compost pile shows one mound of soil that swells with all it holds.
     /// </summary>
     public static void SyncPile(PileProp prop, Thing t, GameData data) {
-        string item = t.Compost ? ItemShape.Compost : ""; int count = 0, room = 0;
+        string item = t.Compost ? ItemShape.Compost : "", kind = ""; int count = 0, room = 0;
         foreach (var (id, held) in t.Inventory.Items) {
-            if (t.Compost) { count += held; room = t.Inventory.Slots * t.Inventory.StackSize; }
+            if (t.Compost) { count += held; room = t.Inventory.Slots * t.Inventory.StackSize; continue; }
+            // Objects of one kind, such as barrels of water, each in a cell of its own, heap together.
+            if (Item.KindOf(id) == kind) { count += held; continue; }
             // A pile holds one good; should it ever hold more, the most plentiful shows.
-            else if (held > count) { item = id; count = held; room = t.Inventory.Slots * t.Inventory.StackOf(id); }
+            if (held > count) { item = id; kind = Item.KindOf(id); count = held; room = t.Inventory.Slots * t.Inventory.StackOf(id); }
         }
         prop.Stock.Fill(item, room > 0 ? count / (float)room : 0, data);
     }

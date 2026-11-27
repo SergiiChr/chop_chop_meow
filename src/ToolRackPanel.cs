@@ -17,7 +17,7 @@ public partial class ToolRackPanel(PageTools tools, Thing subject) : ThingPage(t
     }
 
     private int SpareTools(string item) {
-        string kind = world.Data.Items[item].Tool;
+        string kind = world.Data.Items[ChopChopMeow.Item.KindOf(item)].Tool;
         if (kind == "") return 0;
         return world.Backpack[item] - (world.BestTool(kind) == item ? 1 : 0);
     }

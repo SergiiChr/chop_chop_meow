@@ -991,7 +991,8 @@ public sealed partial class World {
     public void Consume(string item) {
         if (!Data.HasItem(item) || Data.Items.GetValueOrDefault(item)?.FullOf != null || Busy() || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
         if (Water.IsBottle(item)) { EatFromBottle(item); return; }
-        var def = Data.Items[item];
+        // A key of another object, such as a lantern sent by a guest, names nothing eaten.
+        if (!Data.Items.TryGetValue(item, out var def)) return;
         if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
         if (S.Backpack.Remove(item, 1) == 0) { Say($"No {def.Name} in your backpack."); return; }
         FoodEffects.Eat(def);
@@ -2179,7 +2180,7 @@ public sealed partial class World {
             foreach (var t in S.Things.Of(kind)) {
                 if (t.Id == exclude) continue;
                 // Compost names every food in its filter, but takes food only when nothing else will, so harvests and picked berries are not left to rot.
-                int rank = t.Compost && Data.IsFood(item) ? 2 : kind == ThingKind.Packer || t.Inventory.Wants(item, unit) ? 0 : 1;
+                int rank = t.Compost && (Data.IsFood(item) || FoodVessel(item, unit)) ? 2 : kind == ThingKind.Packer || t.Inventory.Wants(item, unit) ? 0 : 1;
                 if (askersOnly && rank > 0 || Intake(t, item, false, unit) == null) continue;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || rank < bestRank || rank == bestRank && distance < bestDistance) { best = t; bestRank = rank; bestDistance = distance; }
@@ -2350,7 +2351,8 @@ public sealed partial class World {
         foreach (var kind in Stores)
             foreach (var t in S.Things.Of(kind))
                 foreach (var pair in t.Inventory.Items) {
-                    if (!Data.Items.TryGetValue(pair.Key, out var def) || def.Tool == "" || !t.Inventory.AllowsWithdrawal(pair.Key) || !rack.Inventory.Accepts(pair.Key) || rack.Inventory.Room(pair.Key) == 0) continue;
+                    // A bucket holding something is a tool too, found by its key.
+                    if (!Data.Items.TryGetValue(Item.KindOf(pair.Key), out var def) || def.Tool == "" || !t.Inventory.AllowsWithdrawal(pair.Key) || !rack.Inventory.Accepts(pair.Key, t.Inventory.Object(pair.Key)) || rack.Inventory.Room(pair.Key) == 0) continue;
                     if (!HandsFree(w, dt)) return true;
                     w.Status = Phrase("Fetching ", A(Lower(def.Name)), " for the rack");
                     if (Walk(w, t.Pos, dt)) { t.Inventory.TransferTo(w.Bag, pair.Key, 1, true); w.Destination = rack.Id; }
@@ -2535,12 +2537,14 @@ public sealed partial class World {
         foreach (var (item, quantity) in goods) {
             // A full vessel the village sells, such as a water bottle, comes as the vessel holding its liquid.
             if (Data.Items.GetValueOrDefault(item)?.FullOf is string liquid && Data.VesselFor(liquid) is VesselDef full) {
+                // The ones that do not fit wait together in one box, as other goods do.
+                Thing? spare = null;
                 for (int i = 0; i < quantity; i++) {
                     var bottle = Vessels.Holding(full.Empty, S.NextId++, full.Capacity, liquid, full.Capacity);
                     if (output.Add(bottle)) continue;
-                    var box = Add(ThingKind.Grave, sign?.Pos + Vector2.One ?? Terrain.Spawn);
-                    box.Inventory.Slots = 1;
-                    box.Inventory.Add(bottle);
+                    spare ??= Add(ThingKind.Grave, sign?.Pos + Vector2.One ?? Terrain.Spawn);
+                    spare.Inventory.Slots = spare.Inventory.UsedSlots + 1;
+                    spare.Inventory.Add(bottle);
                 }
                 continue;
             }
@@ -2891,7 +2895,7 @@ public sealed partial class World {
     private void TidyHotbar(PlayerState p) {
         p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
-        if (!(Data.Items.TryGetValue(p.InHand ?? "", out var def) && def.Tool != "")) p.InHand = "";
+        if (!(Data.Items.TryGetValue(Item.KindOf(p.InHand ?? ""), out var def) && def.Tool != "")) p.InHand = "";
         Lanterns.KeepInHand(p);
         TidyBindings(p);
     }

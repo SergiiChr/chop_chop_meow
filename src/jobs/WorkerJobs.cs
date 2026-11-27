@@ -145,7 +145,7 @@ public sealed partial class World {
             // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
             ThingKind.Signpost when !dest.Inventory.Accepts(item, unit) => 0,
             ThingKind.Packer => dest.Inventory.Accepts(item, unit) && Holds(dest, item, unit) ? PackingRoom(dest, item) : 0,
-            _ when dest.Compost && dest.SkipFood && Data.IsFood(item) => 0,
+            _ when dest.Compost && dest.SkipFood && (Data.IsFood(item) || FoodVessel(item, unit)) => 0,
             _ when Nests(dest, item) => 0,
             _ => dest.Inventory.Accepts(item, unit) && Holds(dest, item, unit) ? dest.Inventory.Room(item) : 0
         };

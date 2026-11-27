@@ -27,7 +27,8 @@ internal sealed class WaterGathering : Gathering {
         if (world.DepositFor(full.Key, w.Pos, unit: full) == null) { w.Status = "Needs storage for filled bottles"; return false; }
         if (!world.HandsFree(w, dt)) return true;
         w.Status = "Fetching empty bottles";
-        if (world.Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, item, Worker.BagStack, true); w.Loading = w.Bag.Count > 0; }
+        // Part-filled bottles each have a cell of their own: the ones holding as much as the first go along with it.
+        if (world.Walk(w, source.Pos, dt)) { world.TransferLike(source.Inventory, w.Bag, item, Worker.BagStack, true); w.Loading = w.Bag.Count > 0; }
         return true;
     }
 }

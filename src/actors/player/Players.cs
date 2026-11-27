@@ -111,7 +111,7 @@ public sealed partial class World {
 
     /// <summary>Selects a carried tool in hand without a hotbar slot, or with "" empties the hand; the server keeps it, so a save has it.</summary>
     public void SelectInHand(string tool) {
-        if (tool != "" && (!(Data.Items.TryGetValue(tool, out var def) && def.Tool != "") || S.Backpack[tool] == 0)) return;
+        if (tool != "" && (!(Data.Items.TryGetValue(ChopChopMeow.Item.KindOf(tool), out var def) && def.Tool != "") || S.Backpack[tool] == 0)) return;
         S.InHand = tool;
         Forwarded(Verb.SelectInHand, item: tool);
     }
