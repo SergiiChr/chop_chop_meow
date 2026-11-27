@@ -16,6 +16,8 @@ public static class FirebugChecks {
         Test(CheckEightClustersComeOutAtNightfallAndOneMoreEachHour, data);
         Test(CheckAQuarterOfClustersHaveThreeFirebugsAndTheRestTwoOrOneAtEvenOdds, data);
         Test(CheckFirebugsComeOutAwayFromBuildingsAndOutOfSight, data);
+        Test(CheckClusterFirebugNearABuildingIsLeftOut, data);
+        Test(CheckClusterFirebugComesOutWhereAPlayerSeesIt, data);
         Test(CheckFirebugHoversWhereItIsUntilAPlayerComesNear, data);
         Test(CheckFirebugDartsFromAPlayerThenRests, data);
         Test(CheckNetSwingCatchesARestingFirebug, data);
@@ -49,40 +51,73 @@ public static class FirebugChecks {
         RunUntilPhase(world, data.NightStarts - .01f);
         Require(world.ThingsOf(ThingKind.Firebug).Count == 0, "no firebug should be out before dark");
         RunUntilNight(world);
-        Require(ClusterSizes(world).Count == 8, $"8 clusters of firebugs should come out at nightfall: {string.Join(", ", ClusterSizes(world))}");
-        for (int hour = 1; hour <= 7; hour++) HourlyCluster(world, hour);
-        int afterSeventh = world.ThingsOf(ThingKind.Firebug).Count;
+        Require(Clusters(world).Count == 8, $"8 clusters of firebugs should come out at nightfall: {SizesText(Clusters(world))}");
+        RunUntilPhase(world, data.NightStarts + 1.1f / 24);
+        Require(Clusters(world).Count == 9, $"a ninth cluster should come out an hour into the night: {SizesText(Clusters(world))}");
+        RunUntilPhase(world, data.NightStarts + 2.1f / 24);
+        Require(Clusters(world).Count == 10, $"a tenth cluster should come out two hours into the night: {SizesText(Clusters(world))}");
         RunUntilPhase(world, .999f);
-        Require(world.ThingsOf(ThingKind.Firebug).Count == afterSeventh, "no more firebugs should come out after the seventh hour of the night");
+        Require(Clusters(world).Count == 15, $"15 clusters should be out by the end of the night: {SizesText(Clusters(world))}");
         RunUntilDawn(world);
         SafeTick(world, Step);
         Require(world.ThingsOf(ThingKind.Firebug).Count == 0, "every firebug should be gone at dawn");
     }
 
-    /// <summary>Sixteen nights let out 112 clusters on the hour: about 28 of three, 42 of two and 42 of one.</summary>
+    /// <summary>Eight nights let out 120 clusters, the nightfall ones included: about 30 of three, 45 of two and 45 of one.</summary>
     private static void CheckAQuarterOfClustersHaveThreeFirebugsAndTheRestTwoOrOneAtEvenOdds(GameData data) {
         var world = EmptyWorld(data);
         var sizes = new List<int>();
-        for (int night = 0; night < 16; night++) {
-            for (int hour = 1; hour <= 7; hour++) sizes.Add(HourlyCluster(world, hour).Count);
-            RunUntilDawn(world);
+        var nightfall = new List<int>();
+        for (int night = 0; night < 8; night++) {
+            RunUntilNight(world);
+            nightfall.AddRange(Clusters(world).Select(cluster => cluster.Count));
+            RunUntilPhase(world, .999f);
+            sizes.AddRange(Clusters(world).Select(cluster => cluster.Count));
         }
         int threes = sizes.Count(n => n == 3), twos = sizes.Count(n => n == 2), ones = sizes.Count(n => n == 1);
-        Require(threes is >= 16 and <= 40 && twos is >= 28 and <= 56 && ones is >= 28 and <= 56,
-            $"of 112 clusters about 28 should have three firebugs, 42 two and 42 one: {threes} of three, {twos} of two, {ones} of one");
+        Require(sizes.Count == 120 && threes is >= 18 and <= 42 && twos is >= 30 and <= 60 && ones is >= 30 and <= 60,
+            $"of 120 clusters about 30 should have three firebugs, 45 two and 45 one: {sizes.Count} clusters, {threes} of three, {twos} of two, {ones} of one");
+        Require(nightfall.Count(n => n == 1) is >= 12 and <= 36,
+            $"of the 64 clusters at nightfall about 24 should have one firebug: {string.Join(", ", nightfall)}");
     }
 
     private static void CheckFirebugsComeOutAwayFromBuildingsAndOutOfSight(GameData data) {
         var world = EmptyWorld(data);
         var chest = world.Add(ThingKind.Chest, world.Player + new Vector2(60, 0));
         var fire = world.Add(ThingKind.Campfire, world.Player + new Vector2(0, 60));
-        RunUntilNight(world);
-        foreach (var bug in world.ThingsOf(ThingKind.Firebug)) {
-            // A cluster's first firebug comes out where no player sees it, and the others within a metre of it.
-            Require(bug.Pos.DistanceTo(world.Player) > data.SightRadius - Firebugs.ClusterRadius, $"a firebug should come out where no player sees its cluster's first one, not {bug.Pos.DistanceTo(world.Player):0.0} m off");
-            Require(bug.Pos.DistanceTo(chest.Pos) >= 25 && bug.Pos.DistanceTo(fire.Pos) >= 25, $"a firebug should come out at least 25 m from every building: {bug.Pos}");
-            Require(world.CanStand(bug.Pos), $"a firebug should come out over ground to stand on: {bug.Pos}");
+        RunUntilPhase(world, .999f);
+        foreach (var cluster in Clusters(world)) {
+            Require(cluster[0].Pos.DistanceTo(world.Player) > data.SightRadius, $"a cluster's first firebug should come out where no player sees it, not {cluster[0].Pos.DistanceTo(world.Player):0.0} m off");
+            foreach (var bug in cluster) {
+                Require(bug.Pos.DistanceTo(chest.Pos) >= 25 && bug.Pos.DistanceTo(fire.Pos) >= 25, $"a firebug should come out at least 25 m from every building: {bug.Pos}");
+                Require(world.CanStand(bug.Pos), $"a firebug should come out over ground to stand on: {bug.Pos}");
+            }
         }
+    }
+
+    /// <summary>A chest 25.01 m from a cluster's first firebug, toward another of the cluster, brings that other one within 25 m of it.</summary>
+    private static void CheckClusterFirebugNearABuildingIsLeftOut(GameData data) {
+        var (hour, first, other) = HourlyPair(data);
+        var world = EmptyWorld(data);
+        RunUntilPhase(world, data.NightStarts + (hour - .1f) / 24);
+        var chest = world.Add(ThingKind.Chest, first + (other - first).Normalized() * 25.01f);
+        RunUntilPhase(world, data.NightStarts + (hour + .1f) / 24);
+        var cluster = Clusters(world)[^1];
+        Require(cluster[0].Pos == first, $"the cluster's first firebug should still come out at {first}, 25.01 m from the chest: {cluster[0].Pos}");
+        Require(cluster.All(bug => bug.Pos != other && bug.Pos.DistanceTo(chest.Pos) >= 25),
+            $"a cluster's firebug that would come out within 25 m of a chest should be left out: {string.Join(", ", cluster.Select(bug => bug.Pos.DistanceTo(chest.Pos).ToString("0.00")))} m off");
+    }
+
+    /// <summary>A guest just out of sight of a cluster's first firebug, toward another of the cluster, sees where that other one comes out.</summary>
+    private static void CheckClusterFirebugComesOutWhereAPlayerSeesIt(GameData data) {
+        var (hour, first, other) = HourlyPair(data);
+        var (world, guest, _) = Hosted(data);
+        RunUntilPhase(world, data.NightStarts + (hour - .1f) / 24);
+        guest.Pos = first + (other - first).Normalized() * (data.SightRadius + .01f);
+        RunUntilPhase(world, data.NightStarts + (hour + .1f) / 24);
+        var cluster = Clusters(world)[^1];
+        Require(cluster[0].Pos == first && cluster.Any(bug => bug.Pos == other),
+            $"a cluster's firebug should come out even where the guest sees it, {other.DistanceTo(guest.Pos):0.0} m off: {string.Join(", ", cluster.Select(bug => bug.Pos))}");
     }
 
     private static void CheckFirebugHoversWhereItIsUntilAPlayerComesNear(GameData data) {

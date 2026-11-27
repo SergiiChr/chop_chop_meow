@@ -10,9 +10,9 @@ namespace ChopChopMeow;
 /// A swing of a bug net catches those in its sweep and sends the others near it darting.
 /// </summary>
 public sealed class Firebugs(World world) {
-    /// <summary>Clusters of firebugs that come out as night falls; one more follows after each hour of the night.</summary>
+    /// <summary>Clusters of firebugs that come out as night falls, with one more after each hour of the night.</summary>
     public const int AtNightfall = 8;
-    /// <summary>The chance a cluster has three firebugs; otherwise it has two or one at even odds.</summary>
+    /// <summary>The chance a cluster has three firebugs, or else two or one at even odds.</summary>
     public const float ThreeChance = .25f;
     /// <summary>Metres from a cluster's first firebug within which the others come out.</summary>
     public const float ClusterRadius = 1;

@@ -303,7 +303,7 @@ public sealed class SaveState {
     public int DenHours { get; set; }
     /// <summary>Tonight's nettles have come up; cleared by day.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool NettlesUp { get; set; }
-    /// <summary>Clusters of firebugs let out tonight, caught or not; back to none by day.</summary>
+    /// <summary>Clusters of firebugs let out tonight, caught or not, back to none by day.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int FirebugsOut { get; set; }
     /// <summary>A wolf has howled tonight.</summary>
     public bool Howled { get; set; }

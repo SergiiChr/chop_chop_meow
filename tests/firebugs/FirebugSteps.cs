@@ -59,38 +59,34 @@ internal static class FirebugSteps {
     }
 
     /// <summary>
-    /// The sizes of the clusters of firebugs out now: firebugs that came out within two metres of another of a cluster belong to it.
-    /// Fails when one is larger than three.
-    /// Two clusters that come out within about four metres of each other count as one, so it is only for a few clusters at once.
+    /// The clusters of firebugs out now, in the order they came out, each with its first firebug first.
+    /// A firebug within a metre of the cluster that came out just before it belongs to that cluster, while it has fewer than three.
     /// </summary>
-    public static List<int> ClusterSizes(World world) {
-        var left = world.ThingsOf(ThingKind.Firebug).ToList();
-        var sizes = new List<int>();
-        while (left.Count > 0) {
-            var cluster = new List<Thing> { left[0] };
-            left.RemoveAt(0);
-            for (int i = 0; i < cluster.Count; i++) {
-                cluster.AddRange(left.Where(bug => bug.Pos.DistanceTo(cluster[i].Pos) <= 2));
-                left.RemoveAll(cluster.Contains);
-            }
-            Require(cluster.Count <= 3, $"a cluster should have at most 3 firebugs: {cluster.Count} came out near {cluster[0].Pos}");
-            sizes.Add(cluster.Count);
+    public static List<List<Thing>> Clusters(World world) {
+        var clusters = new List<List<Thing>>();
+        foreach (var bug in world.ThingsOf(ThingKind.Firebug).OrderBy(bug => bug.Id)) {
+            if (clusters.Count > 0 && clusters[^1].Count < 3 && bug.Pos.DistanceTo(clusters[^1][0].Pos) <= 1) clusters[^1].Add(bug);
+            else clusters.Add([bug]);
         }
-        return sizes;
+        return clusters;
     }
 
+    /// <summary>The sizes of <see cref="Clusters"/>, written out for a failure message.</summary>
+    public static string SizesText(List<List<Thing>> clusters) => string.Join(", ", clusters.Select(cluster => cluster.Count));
+
     /// <summary>
-    /// Ticks across the moment a whole hour of the night comes and gives the firebugs that came out then.
-    /// Fails unless they are one cluster: one to three firebugs within two metres of each other.
+    /// Runs a night of an empty world and gives the first cluster with more than one firebug that comes out on the hour:
+    /// the hour, its first firebug's place and another's.
+    /// Fails when no such cluster comes out.
     /// </summary>
-    public static List<Thing> HourlyCluster(World world, int hour) {
-        RunUntilPhase(world, world.Data.NightStarts + (hour - .1f) / 24);
-        var before = world.ThingsOf(ThingKind.Firebug).Select(bug => bug.Id).ToHashSet();
-        RunUntilPhase(world, world.Data.NightStarts + (hour + .1f) / 24);
-        var cluster = world.ThingsOf(ThingKind.Firebug).Where(bug => !before.Contains(bug.Id)).ToList();
-        Require(cluster.Count is >= 1 and <= 3, $"one to three firebugs should come out {hour} hours into the night: {cluster.Count}");
-        Require(cluster.All(bug => cluster.All(other => bug.Pos.DistanceTo(other.Pos) <= 2)),
-            $"the firebugs that come out {hour} hours into the night should be within 2 m of each other: {string.Join(", ", cluster.Select(bug => bug.Pos))}");
-        return cluster;
+    public static (int Hour, Vector2 First, Vector2 Other) HourlyPair(GameData data) {
+        var world = EmptyWorld(data);
+        for (int hour = 1; hour <= 7; hour++) {
+            RunUntilPhase(world, data.NightStarts + (hour + .1f) / 24);
+            var last = Clusters(world)[^1];
+            if (last.Count > 1) return (hour, last[0].Pos, last[1].Pos);
+        }
+        Require(false, "a cluster of two or three firebugs should come out on one of the night's hours");
+        return default;
     }
 }
