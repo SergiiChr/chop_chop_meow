@@ -576,7 +576,10 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
     }
 
-    /// <summary>The game goes on under the open recipe map: time passes and an item first made meanwhile turns to made before, while a held walking key leaves the player in place.</summary>
+    /// <summary>
+    /// The game goes on under the open recipe map: time passes, an undiscovered item or a building not built yet that is
+    /// first made or built meanwhile says so, and a held walking key leaves the player in place.
+    /// </summary>
     private async Task CheckGameGoesOnUnderTheOpenRecipeMap() {
         await CloseWithEsc();
         await KeyStroke(Key.C);
@@ -588,7 +591,15 @@ public partial class Game {
         await Click((Control)stew.FindChild("slot", true, false));
         Achieve(Hosted, "canned_meat_stew");
         await Until(() => stew.State == MapState.Made, "the selected stew turning to made before on the open map", 2);
-        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "Made before"), "The stew's details must say it was made before.");
+        var details = (Node)recipeMap.FindChild("map_details", true, false);
+        Require(HasLabel(details, "Made before"), "The stew's details must say it was made before.");
+        var furnace = recipeMap.NodeOf("reinforced")!;
+        Require(furnace.State == MapState.NotMade, "A reinforced furnace nobody has built must be drawn as not built yet.");
+        await Click((Control)furnace.FindChild("slot", true, false));
+        Require(HasLabel(details, "Not built yet"), "The reinforced furnace's details must say it is not built yet.");
+        Achieve(Hosted, "reinforced");
+        await Until(() => furnace.State == MapState.Made && HasLabel(details, "Built before"),
+            "the selected reinforced furnace turning from not built yet to built before on the open map", 2);
         var stood = world.Player;
         await Holding(Key.D, () => Seconds(.3));
         Require(world.Player.DistanceTo(stood) < .01f, "A walking key held under the map must not move the player.");

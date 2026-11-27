@@ -12,7 +12,7 @@ internal partial class MapItemLink(World world, string item, string hint = "", s
     private static readonly Color NotMadeTint = new(.78f, .78f, .78f, .75f);
     // Every look a chip's icon takes, so a chip not made yet stays grey while hovered or pressed.
     private static readonly StringName[] IconColors = [
-        "icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_hover_pressed_color", "icon_focus_color",
+        IconNormal, "icon_hover_color", "icon_pressed_color", "icon_hover_pressed_color", "icon_focus_color",
     ];
     public MapState State { get; private set; } = world.MapDiscovery.Of(item);
     public bool Shown => State != MapState.Undiscovered;

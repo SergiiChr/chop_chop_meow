@@ -1333,7 +1333,7 @@ The Recipe map badge on the bottom bar opens `RecipeMap` over the running game.
 `UiKit.LinkRecipeMap` lets Alt-click on an item slot or recipe card look up its item through `RecipeMap.OpenAt` without
 running the slot's usual action, including adding or removing a filter entry.
 A station's fuel or tool slot links to the item it pictures even when that slot is empty.
-An item link in the Goal Log uses the same entry point with the game still paused.
+A building or item link in the Goal Log uses the same entry point with the game still paused.
 Closing the map returns to the panel or goal details underneath.
 `PlayerControl.Update` moves nobody while it shows.
 `MapDiscovery.Of` gives each entry one of three `MapState`s.

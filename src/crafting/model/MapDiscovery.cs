@@ -12,7 +12,9 @@ public enum MapState { Undiscovered, NotMade, Made }
 public sealed class MapDiscovery {
     private readonly World world;
     private readonly HashSet<string> stationChains = new();
-    /// <summary>The goals whose chain holds each entry, so an entry shows once any of them is in the Goal Log.</summary>
+    /// <summary>
+    /// The goals whose chain holds each entry, so an entry shows once any of them is in the Goal Log.
+    /// </summary>
     private readonly Dictionary<string, List<GoalId>> goalChains = new();
 
     public MapDiscovery(World world) {
@@ -28,6 +30,9 @@ public sealed class MapDiscovery {
         }
     }
 
+    /// <summary>
+    /// Whether the settlement has made the entry, has been shown it by a station or a goal, or has yet to discover it.
+    /// </summary>
     public MapState Of(string item) =>
         Made(item) ? MapState.Made : InShownChain(item) ? MapState.NotMade : MapState.Undiscovered;
 
@@ -43,7 +48,9 @@ public sealed class MapDiscovery {
         return false;
     }
 
-    /// <summary>Adds an entry and, followed all the way down, the build cost, ingredients, fuels and tool it takes.</summary>
+    /// <summary>
+    /// Adds an entry and, followed all the way down, the build cost, ingredients, fuels and tool it takes.
+    /// </summary>
     private void AddChain(string item, HashSet<string> chain) {
         var data = world.Data;
         item = data.MapEntryOf(item);
