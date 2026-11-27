@@ -1861,7 +1861,9 @@ A track that plays to its end hands over to the next, and the last wraps back to
 The options screen sets the music volume, stored in the settings file.
 
 Each campfire song and solo starts at a time on the world's clock, so a player approaching a fire or joining a game hears
-the recording already in progress. The campfire song takes over the soundtrack inside firelight and fades with distance.
+the recording already in progress. Playback near the start uses the full recording, and audible poses follow playback.
+The campfire song takes over the soundtrack inside firelight and fades with distance. When the world pauses, so does the
+campfire song, and the soundtrack returns until play resumes.
 Songs are Ogg Vorbis so they can start partway through without decoding from the beginning. Solos are shorter MP3 clips.
 The music volume applies to both. `CampfireBeats` times the trio and listeners against measured beats, including tempo
 changes. Solo strikes and strums follow their clips' measured contacts, and a harmonica stays at the lips while it sounds.

@@ -66,8 +66,9 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         bool wholeVisit = Launch.Has("--campfire-visit");
         for (int i = 0; i < 600; i++) {
             world.Tick(1f / 60);
-            if (trio) { if (world.CampfireMusic.SongAt(fire.Id).Track != 0) break; }
-            else {
+            if (trio) {
+                if (world.CampfireMusic.SongAt(fire.Id).Track != 0) break;
+            } else {
                 var seat = world.CampfireMusic.SeatOf(world.Workers[0]);
                 if (wholeVisit ? seat.Fire != 0 : seat.Solo != 0) break;
             }

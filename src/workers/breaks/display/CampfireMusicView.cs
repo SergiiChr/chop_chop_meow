@@ -21,7 +21,7 @@ internal readonly record struct CampfireMusicView(CampfireInstrument Instrument,
             return song.Plays(worker.Id) ? new(seat.Instrument, weight, Beat: beat) : new(seat.Instrument, Nodding: weight, Beat: beat);
         }
         if (seat.Solo == 0) return new(seat.Instrument);
-        float soloTime = world.Time - seat.SoloAt;
+        float soloTime = sounds?.CampfireSoloTime(worker.Id, seat) ?? world.Time - seat.SoloAt;
         var clip = CampfireScore.Solo(seat.Instrument, seat.Solo);
         if (seat.Instrument == CampfireInstrument.Harmonica) {
             float weight = Mathf.SmoothStep(-.18f, 0, soloTime) * Mathf.SmoothStep(0, .07f, clip.Duration - soloTime);

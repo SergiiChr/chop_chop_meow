@@ -9,6 +9,8 @@ internal sealed class CampfireMusicAudio {
     // Normal updates arrive thirty times a second. A world that has held still this long is waiting or paused.
     private const float HoldAfter = .15f;
     private const float SeekDrift = .2f;
+    // Normal snapshot and physics delays must not make playback skip the attack of a kick or strum.
+    private const float StartWindow = .08f;
     private const float SoloDb = -3;
     private readonly float reach;
     private readonly float outputLatency;
@@ -73,7 +75,7 @@ internal sealed class CampfireMusicAudio {
             }
             voice.Follow(cue, time - cue.StartsAt, speed, paused);
         }
-        return 1 - loudestSong;
+        return paused ? 1 : 1 - loudestSong;
     }
 
     private bool PlayingSong(CampfireSong song) =>
@@ -86,13 +88,17 @@ internal sealed class CampfireMusicAudio {
         return true;
     }
 
-    public float SongTime(World world, int fire, CampfireSong song) {
-        float offset = world.Time - song.StartsAt;
-        if (song.Track > 0 && offset >= 0 && playing.TryGetValue(new Source(fire, true), out var voice) &&
-            voice.Matches(songs[song.Track].Stream, song.StartsAt) && voice.Heard) {
-            float audio = voice.HeardAt(outputLatency);
-            if (Math.Abs(offset - audio) <= SeekDrift) return audio;
-        }
+    public float SongTime(World world, int fire, CampfireSong song) => TimeHeard(world, new Source(fire, true), songs[song.Track], song.StartsAt);
+
+    public float SoloTime(World world, int worker, CampfireSeatMusic seat) =>
+        TimeHeard(world, new Source(worker, false), solos[(seat.Instrument, seat.Solo)], seat.SoloAt);
+
+    private float TimeHeard(World world, Source source, Clip clip, float startsAt) {
+        float offset = world.Time - startsAt;
+        if (offset < 0 || !playing.TryGetValue(source, out var voice) || !voice.Matches(clip.Stream, startsAt)) return offset;
+        if (!voice.Heard) return voice.WaitingForOnset && offset < SeekDrift ? 0 : offset;
+        float audio = voice.HeardAt(outputLatency);
+        if (Math.Abs(offset - audio) <= SeekDrift) return audio;
         return offset;
     }
 
@@ -113,6 +119,7 @@ internal sealed class CampfireMusicAudio {
     private sealed class Voice(AudioStreamPlayer3D player) {
         private AudioStream? stream;
         private float startedAt, seekAt;
+        public bool WaitingForOnset { get; private set; }
         public bool Heard => player.Playing && !player.StreamPaused && player.HasStreamPlayback();
         private float Position => player.GetPlaybackPosition() + (float)AudioServer.GetTimeSinceLastMix() * player.PitchScale;
 
@@ -131,11 +138,16 @@ internal sealed class CampfireMusicAudio {
                 player.Stream = stream = cue.Stream;
                 startedAt = cue.StartsAt;
                 seekAt = offset;
-                player.Play(offset);
+                WaitingForOnset = offset <= StartWindow;
+                player.Play(WaitingForOnset ? 0 : offset);
             } else {
                 // A placed voice starts on the next physics frame. Give it time to mix before correcting its clock.
-                if (Math.Abs(offset - seekAt) > SeekDrift && player.HasStreamPlayback() &&
-                    Math.Abs(Position - offset) > SeekDrift) { seekAt = offset; player.Seek(offset); }
+                if (player.HasStreamPlayback()) {
+                    WaitingForOnset = false;
+                    if (Math.Abs(offset - seekAt) > SeekDrift && Math.Abs(Position - offset) > SeekDrift) {
+                        seekAt = offset; player.Seek(offset);
+                    }
+                }
                 player.StreamPaused = false;
             }
         }

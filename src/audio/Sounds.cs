@@ -181,6 +181,9 @@ public partial class Sounds : Node {
     /// <summary>How far into the song the player hears, or how far the world's clock has reached outside its sound.</summary>
     internal float CampfireSongTime(int fire, CampfireSong song) => campfireMusic.SongTime(World, fire, song);
 
+    /// <summary>How far into the solo the player hears, or how far the world's clock has reached outside its sound.</summary>
+    internal float CampfireSoloTime(int worker, CampfireSeatMusic seat) => campfireMusic.SoloTime(World, worker, seat);
+
     /// <summary>The inventory sound for moving an item by hand.</summary>
     public static string ForItem(string item) => item switch {
         Inventory.Coins => "move_coins_inventory",
