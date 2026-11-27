@@ -313,8 +313,9 @@ public partial class Game {
         Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
         Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
         await Until(() => !furnace.Processing && furnace.Inventory["tin_bar"] == 1, "the tin bar coming out", 2);
-        // An idle page refreshes a few times a second; one that drew itself again without its slots would never show the bar's count.
-        await Until(() => Named("output_tin_bar")?.GetChildren().OfType<Badge>().First().Text == "1", "the furnace that has run out of batches still showing the bar in its slot", 2);
+        // An idle page refreshes a few times a second; one that drew itself again without its slots would never light the bar.
+        await Until(() => Named("output_tin_bar") is ItemSlot bar && bar.GetThemeColor(ItemSlot.IconNormal) == Colors.White, "the furnace that has run out of batches still showing the bar in its slot", 2);
+        Require(!((ItemSlot)Named("output_tin_bar")!).GetChildren().OfType<Badge>().First().Visible, "A station slot holding one bar must not count it.");
         await DoubleClick(Named("craft_charcoal")!);
         await Until(() => furnace.Recipe == "charcoal" && world.Backpack["tin_bar"] == 1 && furnace.Inventory["wood"] == 2 && Named("input_wood") != null,
             "a double-click on charcoal taking the bar into the backpack and turning the furnace to charcoal, loaded with its wood", 2);

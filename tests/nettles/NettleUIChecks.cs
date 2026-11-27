@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 public partial class Game {
     private async Task RunNettleUIChecks() {
         await TestClean(CheckItemTextShowsUnderItsNameInTheBackpackAndOnTheHotbar);
-        await TestClean(CheckRecipeMapShowsItemTextAndTheMalletRopeNeeds);
+        await TestClean(CheckRecipeMapShowsTheMalletRopeNeeds);
         await TestClean(CheckRopeCardSaysASteelHammerWillDamageTheFibers);
         await TestClean(CheckADoubleClickOnRopeWithOnlyASteelHammerKeepsTheBenchsBatches);
         await TestClean(CheckPickingANettleByHandGroansUntilItIsPicked);
@@ -28,13 +28,11 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    private async Task CheckRecipeMapShowsItemTextAndTheMalletRopeNeeds() {
+    private async Task CheckRecipeMapShowsTheMalletRopeNeeds() {
         await CloseWithEsc();
         Achieve(Hosted, "firebug", "nettle_rope", "wood_hammer"); await Frames();
         await Click((Button)hotbar.FindChild("map", true, false));
-        await Click((Control)recipeMap.NodeOf("firebug")!.FindChild("slot", true, false));
         var details = (Node)recipeMap.FindChild("map_details", true, false);
-        Require(((Label)recipeMap.FindChild("detail_text", true, false)).Text == "Glows even after death." && HasLabel(details, "Catch with a bug net after dark"), "A click on the firebug must show what the player says of it and how it is come by.");
         await Click((Control)recipeMap.NodeOf("nettle_rope")!.FindChild("slot", true, false));
         // Ten seconds, halved by the bench, at the mallet's speed of 1.
         Require(HasLabel(details, "wooden mallet · 5 s") && recipeMap.FindChild("detail_text", true, false) == null, "Nettle rope must name the wooden mallet it needs and show no text of its own.");

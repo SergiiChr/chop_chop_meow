@@ -82,7 +82,7 @@ public abstract partial class PagePanel : VBoxContainer {
             if (Input.IsKeyPressed(Key.Ctrl) && !PoursFromBag(id)) world.FromSpares(() => batch(id));
             else batch(id);
         };
-        panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, spared, hint, takes, wanted, BagColumns, use: UseFromBag, put: put));
+        panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, spared, hint, takes, wanted, BagColumns, use: UseFromBag, put: put, open: panel.OpenLantern));
         panel.Bag.Visible = !panel.Bag.Dismissed;
         if (StoresFromHotbar) panel.Bag.Store = batch;
     }

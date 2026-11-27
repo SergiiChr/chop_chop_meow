@@ -64,7 +64,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                 var fill = new ColorRect { Color = Style.Mustard, Size = new Vector2(0, 8) }; track.AddChild(fill); bars[i] = fill;
                 rates[i] = Style.Text("", 13, Style.Tan); pair.AddChild(rates[i]);
                 live.Watch(() => thing.Output![item], drawn => {
-                    count.Text = drawn > 0 ? drawn.ToString() : "";
+                    count.SetStack(drawn, -1);
                     float full = (float)drawn / thing.Output!.StackSize;
                     fill.Size = new Vector2(64 * full, 8); fill.Color = full > .85f ? Style.Brick : Style.Mustard;
                     cell.TooltipText = $"{world.Data.Name(item)} · {drawn}/{thing.Output!.StackSize}\nClick to take · mining stops when either is full";

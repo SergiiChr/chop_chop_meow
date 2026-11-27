@@ -40,6 +40,7 @@ public sealed partial class GameData {
         ["steel_pipe"] = new() { Name = "Steel pipe", Color = "9cabb3" },
         [GlassBlowing.Item] = new() { Name = "Glass jar", Color = "d5e6e9" },
         ["torch"] = new() { Name = "Torch", Color = "e8913a" },
+        [Lanterns.Item] = new() { Name = "Lantern", Color = "adff76", Description = "Finally a sustainable source of light" },
         ["stone_chisel"] = new() { Name = "Stone chisel", Color = "9aa29f", Tool = "chisel" },
         ["iron_ore"] = new() { Name = "Iron ore", Color = "cc8a60" },
         ["coal"] = new() { Name = "Coal", Color = "81818c" },
@@ -87,7 +88,7 @@ public sealed partial class GameData {
         ["nettle"] = new() { Name = "Nettle", Color = "5f8f3e", Description = "It stings but my grandma used to make ropes out of it." },
         ["nettle_rope"] = new() { Name = "Nettle rope", Color = "b9b27a" },
         ["bug_net"] = new() { Name = "Bug net", Color = "f4f6f6", Tool = "net", Description = "I can catch all kinds of bugs with this." },
-        ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Glows even after death." },
+        ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Short but bright life" },
         ["coins"] = new() { Name = "Coins", Color = "e3b94a" },
     };
     public Dictionary<ThingKind, BuildingDef> Buildings { get; } = new() {
@@ -180,6 +181,7 @@ public sealed partial class GameData {
         ["rake"] = new() { Name = "Rake", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 1, ["wood_parts"] = 2 }, Output = "rake", Amount = 1, Seconds = 10 },
         ["mortar"] = new() { Name = "Mortar and pestle", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = true, Tool = "chisel", Tier = 2, Inputs = new() { ["stone"] = 3 }, Output = "mortar", Amount = 1, Seconds = 10 },
         ["nettle_rope"] = new() { Name = "Nettle rope", Group = RecipeGroup.Materials, Station = ThingKind.Bench, Hand = false, Tool = "hammer", MaxTier = 0, TooHard = "Steel hammer will damage the fibers.", Twists = true, Inputs = new() { ["nettle"] = 1 }, Output = "nettle_rope", Amount = 1, Seconds = 10 },
+        [Lanterns.Item] = new() { Name = "Lantern", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Tool = "hammer", Tier = 2, Inputs = new() { [GlassBlowing.Item] = 1, ["steel_sheet"] = 1, ["wood_parts"] = 1 }, Output = Lanterns.Item, Amount = 1, Seconds = 10 },
         ["bug_net"] = new() { Name = "Bug net", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["nettle_rope"] = 5, ["wood"] = 1, ["wood_parts"] = 1 }, Output = "bug_net", Amount = 1, Seconds = 10 },
         ["bread"] = new() { Name = "Bake bread", Group = RecipeGroup.Food, Station = ThingKind.Furnace, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["dough"] = 1 }, Output = "bread", Amount = 4, Seconds = 8 },
         ["crushed_berries"] = new() { Name = "Crush berries", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Worked = true, Hand = true, Tool = "mortar", Inputs = new() { ["berries"] = BerryJam.BerriesPerCrush }, Output = "crushed_berries", Amount = 1, Seconds = 10 },

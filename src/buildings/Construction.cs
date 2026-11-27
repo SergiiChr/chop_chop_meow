@@ -60,7 +60,7 @@ public sealed class Construction(World world) {
     /// Why a building, a container, or a hole cannot go here.
     /// </summary>
     public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null, float rotation = 0, PipeShape pipeShape = PipeShape.Straight) {
-        bool portable = kind is ThingKind.Crate or ThingKind.Barrel;
+        bool portable = kind is ThingKind.Crate or ThingKind.Barrel or ThingKind.Lantern;
         bool digging = kind == ThingKind.Hole;
         if (!portable && !digging && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
         if (!ValidRotation(kind, rotation)) return "That building cannot go up at this angle.";
@@ -107,7 +107,11 @@ public sealed class Construction(World world) {
         if (digging) return null;
         if (!portable) return Unaffordable(kind);
         if (item == null || (world.MarkedSource ?? world.S.Backpack)[item] > 0) return null;
-        return kind == ThingKind.Crate ? "That crate is no longer in your backpack." : "That barrel is no longer available.";
+        return kind switch {
+            ThingKind.Crate => "That crate is no longer in your backpack.",
+            ThingKind.Lantern => "That lantern is no longer available.",
+            _ => "That barrel is no longer available."
+        };
     }
     /// <summary>
     /// What refuses a building the acting player's backpack does not hold the cost of, or null when it does.
@@ -201,9 +205,11 @@ public sealed class Construction(World world) {
         }
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in world.Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
-        foreach (var box in World.Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
         RemoveBuilding(t);
-        world.Say((GiveBack(back, t.Pos) ? $"The {world.Lower(def.Name)} is down. Everything is back in your backpack." : $"The {world.Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
+        Inventory? rest = null;
+        GiveBack(back, t.Pos, ref rest);
+        foreach (var box in World.Boxes(t)) if (box != null) GiveBack(box, t.Pos, ref rest);
+        world.Say((rest == null ? $"The {world.Lower(def.Name)} is down. Everything is back in your backpack." : $"The {world.Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
         return true;
     }
 
@@ -232,8 +238,8 @@ public sealed class Construction(World world) {
         foreach (var box in World.Boxes(t)) {
             if (box == null) continue;
             world.ReleaseIn(box);
-            foreach (var (item, count) in box.Items)
-                if (world.Data.VesselFor(item) == null) Recover(ref recovery, t.Pos, item, count);
+            foreach (string item in box.Items.Keys.ToArray())
+                if (world.Data.VesselFor(item) == null) Recover(ref recovery, t.Pos, box, item);
         }
         RemoveBuilding(t);
         world.Say($"A growing tree crushed the {world.Lower(world.Data.Name(t.Kind))}.");
@@ -290,18 +296,35 @@ public sealed class Construction(World world) {
     /// </summary>
     internal bool GiveBack(Dictionary<string, int> items, Vector2 at) {
         Inventory? rest = null;
-        foreach (var (item, amount) in items) {
-            int left = amount - world.S.Backpack.Add(item, amount);
-            if (left <= 0) continue;
-            Recover(ref rest, at, item, left);
-        }
+        GiveBack(items, at, ref rest);
         return rest == null;
     }
 
-    private void Recover(ref Inventory? box, Vector2 at, string item, int count) {
+    private void GiveBack(Dictionary<string, int> items, Vector2 at, ref Inventory? rest) {
+        foreach (var (item, amount) in items) {
+            int left = amount - world.S.Backpack.Add(item, amount);
+            if (left > 0) RecoveryRoom(ref rest, at, item, left).Add(item, left);
+        }
+    }
+
+    /// <summary>Moves everything a box holds into the backpack and what does not fit into the recovery box, each firebug keeping its life.</summary>
+    private void GiveBack(Inventory box, Vector2 at, ref Inventory? rest) {
+        foreach (string item in box.Items.Keys.ToArray()) {
+            box.TransferTo(world.S.Backpack, item, box[item]);
+            Recover(ref rest, at, box, item);
+        }
+    }
+
+    /// <summary>Moves what a box still holds of an item into the recovery box, each firebug keeping its life.</summary>
+    private void Recover(ref Inventory? rest, Vector2 at, Inventory box, string item) {
+        int count = box[item];
+        if (count > 0) box.TransferTo(RecoveryRoom(ref rest, at, item, count), item, count);
+    }
+
+    private Inventory RecoveryRoom(ref Inventory? box, Vector2 at, string item, int count) {
         if (box == null) { box = world.Add(ThingKind.Grave, at).Inventory; box.Slots = 0; }
         int stack = box.StackOf(item);
         box.Slots += (count + stack - 1) / stack;
-        box.Add(item, count);
+        return box;
     }
 }
