@@ -17,6 +17,7 @@ public static class FoodEffectChecks {
         Test(VitaminsProtectThePlayerAndDoNotTakeAwayHealthBelowOneHundred, data);
         Test(HealingRefillsSpentBonusHealth, data);
         Test(VitaminsExpireAfterOneDay, data);
+        Test(LongEffectsKeepCountingDownInSmallSteps, data);
         Test(SavingAndLoadingKeepsTheEffectsAndTheirTimeLeft, data);
     }
 
@@ -74,6 +75,7 @@ public static class FoodEffectChecks {
             Give(world, item); world.Consume(item);
             Require(world.Hunger == 150 && world.FoodEffects.SecondsLeft(FoodEffect.ProteinRecovery) == 140,
                 $"{item} should fill hunger straight to 150% and give the same recovery as steak");
+            Require(world.Health == 50, $"{item} should start gradual Protein recovery without an immediate heal");
             Require(Math.Abs(world.FoodEffects.SecondsLeft(FoodEffect.WellFed) - 420) < .01f,
                 "a full second lap should last half a day at normal pace");
             Give(world, "bread"); world.Consume("bread");
@@ -148,6 +150,17 @@ public static class FoodEffectChecks {
         RunUntil(world, world.Time + 2);
         Require(world.Health == 100 && world.BonusHealth == 0 && world.FoodEffects.SecondsLeft(FoodEffect.Vitamins) == 0,
             "expiration should trim health above 100");
+    }
+
+    private static void LongEffectsKeepCountingDownInSmallSteps(GameData data) {
+        var world = EmptyWorld(data);
+        for (int serving = 0; serving < 625; serving++) {
+            Give(world, "canned_jam"); world.Consume("canned_jam");
+        }
+        double before = world.FoodEffects.SecondsLeft(FoodEffect.Vitamins);
+        for (int frame = 0; frame < 60; frame++) world.Tick(1f / 60, sleeping: true);
+        double elapsed = before - world.FoodEffects.SecondsLeft(FoodEffect.Vitamins);
+        Require(Math.Abs(elapsed - 1) < .01, $"a long duration should count down one second in 60 steps, not {elapsed}");
     }
 
     private static void SavingAndLoadingKeepsTheEffectsAndTheirTimeLeft(GameData data) {

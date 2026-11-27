@@ -16,9 +16,9 @@ public sealed class PlayerState {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Hunger { get; set; } = 100;
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Thirst { get; set; } = 100;
     /// <summary>Seconds left of each timed food effect.</summary>
-    public float CarbLoadLeft { get; set; }
-    public float ProteinRecoveryLeft { get; set; }
-    public float VitaminsLeft { get; set; }
+    public double CarbLoadLeft { get; set; }
+    public double ProteinRecoveryLeft { get; set; }
+    public double VitaminsLeft { get; set; }
     /// <summary>The part of <see cref="Health"/> that Vitamins lets damage spend first.</summary>
     public float BonusHealth { get; set; }
     public Inventory Backpack { get; set; } = new() { Slots = 24, CarriedBy = Inventory.Carrier.Player };

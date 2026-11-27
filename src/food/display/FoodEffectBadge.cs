@@ -30,24 +30,22 @@ public partial class FoodEffectBadge : PanelContainer {
 
     public override GodotObject _MakeCustomTooltip(string forText) => new Countdown(world, Effect, detail);
 
-    private sealed partial class Countdown(World world, FoodEffect effect, (string Name, string Description) detail) : PanelContainer {
-        private Label text = null!;
+    private sealed partial class Countdown(World world, FoodEffect effect, (string Name, string Description) detail) : Label {
         private double shown = -1;
 
         public override void _Ready() {
-            AddThemeStyleboxOverride("panel", Style.Tooltip);
-            text = Style.Text("", 14, Style.Rim);
-            text.Name = "food_effect_countdown";
-            AddChild(text);
+            AddThemeFontOverride("font", Style.Bold);
+            AddThemeFontSizeOverride("font_size", 14);
+            AddThemeColorOverride("font_color", Style.Rim);
             _Process(0);
         }
 
         public override void _Process(double delta) {
-            double minutes = Math.Ceiling(world.FoodEffects.SecondsLeft(effect) / (double)world.Data.HourSeconds * 60 - .0001);
+            double minutes = Math.Ceiling(world.FoodEffects.SecondsLeft(effect) / world.Data.HourSeconds * 60 - .0001);
             if (minutes == shown) return;
             shown = minutes;
             string left = effect == FoodEffect.WellFed ? "at this pace" : "left";
-            text.Text = $"{detail.Name}\n{detail.Description}\n{Math.Floor(minutes / 60):0} h {minutes % 60:0} min {left}";
+            Text = $"{detail.Name}\n{detail.Description}\n{Math.Floor(minutes / 60):0} h {minutes % 60:0} min {left}";
             ResetSize();
         }
     }

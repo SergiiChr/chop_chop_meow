@@ -317,11 +317,12 @@ public sealed class WorldUpdates {
     private static class Numbers<T> where T : class {
         public delegate void Setter(T target, ref Utf8JsonReader value);
         public static readonly (byte[] Name, Setter Set)[] All = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.SetMethod is { IsPublic: true } && (p.PropertyType == typeof(float) || p.PropertyType == typeof(int)))
+            .Where(p => p.SetMethod is { IsPublic: true } && (p.PropertyType == typeof(float) || p.PropertyType == typeof(double) || p.PropertyType == typeof(int)))
             .Select(p => (Encoding.UTF8.GetBytes(p.Name), Make(p))).ToArray();
 
         private static Setter Make(PropertyInfo property) {
             if (property.PropertyType == typeof(float)) { var set = property.SetMethod!.CreateDelegate<Action<T, float>>(); return (T target, ref Utf8JsonReader value) => set(target, value.GetSingle()); }
+            if (property.PropertyType == typeof(double)) { var set = property.SetMethod!.CreateDelegate<Action<T, double>>(); return (T target, ref Utf8JsonReader value) => set(target, value.GetDouble()); }
             var whole = property.SetMethod!.CreateDelegate<Action<T, int>>();
             return (T target, ref Utf8JsonReader value) => whole(target, value.GetInt32());
         }

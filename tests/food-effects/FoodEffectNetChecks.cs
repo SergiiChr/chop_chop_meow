@@ -6,7 +6,7 @@ using static SetupSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    private NetScene FoodEffectNetScene => new("food-effects", null, HostSeesOnlyTheGuestGetFoodEffects, GuestEatsCannedStew);
+    private NetScene FoodEffectNetScene => new("food-effects", null, HostSeesOnlyTheGuestGetFoodEffects, GuestEatsCannedStewAndJam);
 
     private async Task HostSeesOnlyTheGuestGetFoodEffects(PlayerState guest) {
         Give(guest, "canned_meat_stew"); Give(guest, "canned_jam");
@@ -17,14 +17,14 @@ public partial class Game {
             "the host's own player should not get the guest's food effects");
     }
 
-    private async Task GuestEatsCannedStew() {
+    private async Task GuestEatsCannedStewAndJam() {
         await CloseWithEsc();
         await Until(() => world.Backpack["canned_meat_stew"] == 1, "the guest receiving the stew");
         await KeyStroke(Key.Tab);
         await DoubleClick(BagCellOf("canned_meat_stew"));
         await Until(() => world.Hunger > 145 && foodEffectRow.Visible && world.FoodEffects.SecondsLeft(FoodEffect.ProteinRecovery) > 0,
             "both effects showing in the guest's own window");
-        float left = world.FoodEffects.SecondsLeft(FoodEffect.ProteinRecovery);
+        double left = world.FoodEffects.SecondsLeft(FoodEffect.ProteinRecovery);
         await Until(() => world.FoodEffects.SecondsLeft(FoodEffect.ProteinRecovery) < left, "the timer counting down after the first update");
         await DoubleClick(BagCellOf("canned_jam"));
         await Until(() => world.BonusHealth == 50 && needsPlate.Health.Bonus == 50,

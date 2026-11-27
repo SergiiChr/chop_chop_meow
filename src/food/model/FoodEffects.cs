@@ -21,7 +21,7 @@ public sealed class FoodEffects(World world) {
     };
 
     /// <summary>Seconds left at the current pace, or zero if the acting player has no such effect.</summary>
-    public float SecondsLeft(FoodEffect effect) {
+    public double SecondsLeft(FoodEffect effect) {
         var p = world.S.Actor;
         if (world.Dead) return 0;
         return effect switch {
@@ -58,7 +58,7 @@ public sealed class FoodEffects(World world) {
 
     /// <summary>Health and its bonus after healing for part of the interval, under the limit in force at its end.</summary>
     internal static (float Health, float Bonus) HealthAfter(PlayerState p, float seconds, float sleepHealingSeconds) {
-        float recovery = Math.Min(seconds, p.ProteinRecoveryLeft);
+        float recovery = (float)Math.Min(seconds, p.ProteinRecoveryLeft);
         // Either sleep or Protein recovery can heal at any given moment, but they do not heal twice.
         float health = Math.Min(HealthLimitAt(p, seconds), p.Health + Math.Max(sleepHealingSeconds, recovery) * SleepCycle.HealPerSecond);
         if (p.VitaminsLeft <= seconds) return (health, 0);
@@ -82,7 +82,7 @@ public sealed class FoodEffects(World world) {
         p.Hunger = Math.Min(p.Hunger, NormalLimit);
     }
 
-    private static bool ValidTime(float left) => float.IsFinite(left) && left >= 0;
+    private static bool ValidTime(double left) => double.IsFinite(left) && left >= 0;
 
     internal static bool Valid(PlayerState p) =>
         ValidTime(p.CarbLoadLeft) && ValidTime(p.ProteinRecoveryLeft) && ValidTime(p.VitaminsLeft)

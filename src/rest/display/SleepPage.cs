@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace ChopChopMeow;
@@ -17,8 +18,8 @@ public abstract partial class SleepPage(PageTools tools, Thing subject) : ThingP
         foreach (var need in needs) gauges.AddChild(need);
 
         live.Watch(() => (world.Data.GameMinutes(world.Sleep.SecondsToDawn), (int)world.Health,
-            (int)world.Hunger, (int)world.Thirst, (int)world.BonusHealth, world.Data.GameMinutes(world.FoodEffects.SecondsLeft(FoodEffect.ProteinRecovery)),
-            world.Data.GameMinutes(world.FoodEffects.SecondsLeft(FoodEffect.Vitamins)), Barrel.In(thing.Inventory), world.Sheltered, world.Sleep.SleepingAt), _ => {
+            (int)world.Hunger, (int)world.Thirst, (int)world.BonusHealth, EffectMinutesBeforeDawn(FoodEffect.ProteinRecovery),
+            EffectMinutesBeforeDawn(FoodEffect.Vitamins), Barrel.In(thing.Inventory), world.Sheltered, world.Sleep.SleepingAt), _ => {
                 var (seconds, health, hunger, thirst, bonus) = world.Sleep.Preview(thing);
                 bool dawn = seconds == world.Sleep.SecondsToDawn;
                 until.Text = LiveText.Of(text => PageText.AppendGameHours(world, text.Append(dawn ? "until dawn · +" : "up to "), seconds));
@@ -33,6 +34,9 @@ public abstract partial class SleepPage(PageTools tools, Thing subject) : ThingP
             });
         return well;
     }
+
+    private int EffectMinutesBeforeDawn(FoodEffect effect) =>
+        world.Data.GameMinutes((float)Math.Min(world.Sleep.SecondsToDawn, world.FoodEffects.SecondsLeft(effect)));
 
     protected Button SleepButton() {
         bool straw = thing.Kind == ThingKind.StrawBed;
