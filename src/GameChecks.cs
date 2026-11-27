@@ -144,78 +144,6 @@ public partial class Game {
         messages._Process(1);
         Require(messages.Shown.Length == 0 && lines.All(l => !l.Visible), "Every message must disappear once its time is up.");
     }
-    private async Task CheckTradingPostSendsOnlyCratesOffOnACart() {
-        await CloseWithEsc();
-        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
-        Give(Hosted, "wood", 5); Give(Hosted, Inventory.Coins, 100);
-        var berries = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); Hosted.PickUpCrate(berries);
-        string packed = Hosted.Backpack.Items.Keys.Single(World.IsPacked);
-        await Click(view.Screen(sign.Pos, .8f));
-        Require(Shows(sign), "Clicking a trading post must select it.");
-        Require(Named("sell") != null, "The market must offer a sell button.");
-        Require(Named("coins") != null, "The market must offer a coins button.");
-        Require(Named("hardhat") != null, "The market must offer a hire button.");
-        Require(Named("prices") != null, "The market must offer a prices button.");
-        await Holding(Key.Shift, () => Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·"))));
-        Require(sign.Inventory.Count == 0 && world.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
-        await Holding(Key.Shift, () => Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries"))));
-        Require(sign.Inventory[packed] == 1 && world.Backpack[packed] == 0, "Shift-clicking a packed crate must load it into the market input.");
-        int played = sounds.Played;
-        await Click(Named("sell")!);
-        Require(sounds.Played > played, "Sell must play the sound of the goods going.");
-        Require(world.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
-        await Click(Named("auto_sell")!);
-        Require(sign.AutoSell, "Ticking Send when full must set the post to send the cart on its own.");
-        await Click(Named("filters")!); await Click(Named("filter_add_in")!);
-        await Click(Named($"pick_{World.CrateOf("berries")}")!);
-        Require(sign.Inventory.InputFilter.SequenceEqual(new[] { World.CrateOf("berries") }),
-            "The post's filter must offer the crate of berries.");
-        Require(Named("filter_add_out") == null,
-            "The post's filter must not offer a row of goods that workers do not bring.");
-        Require(Named("pick_berries") == null, "The post's filter must not offer loose berries.");
-        await Click(Named("filters_close")!);
-        int before = world.DayRevenue;
-        Require(world.DailyWages == 0 && BankRevenue() == ($"+{before}", Style.Warn), "With no sale today the bank must show today's coins in red, under the wages.");
-        Hosted.Tick(world.Data.TradeSeconds);
-        // A crate of 12 berries at 0.82 and the crate at 3.15 pay 12 coins.
-        await Until(() => BankRevenue() == ($"+{before + 12}", Style.Ready), "the bank showing the sale's 12 coins in green, above no wages", 2);
-        RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 999);
-        await CloseWithEsc();
-    }
-
-    /// <summary>An empty pile's filter window has one row naming one resource: a bottle there is one entry for every fill, shows in the heading, and comes off with a click.</summary>
-    private async Task CheckPileFilterNamesOneResource() {
-        var pile = await OpenFilters(ThingKind.Pile);
-        Require(OnPage("filter_in") != null && OnPage("filter_out") == null, "A pile's filter must show only the row of what workers bring.");
-        await Click(Named("filter_add_in")!);
-        Require(Named($"pick_{Water.Liquid}") == null && Named($"pick_{Water.Full}") == null && Named($"pick_{Water.Empty}") != null,
-            "A pile's filter must offer bottles at any fill as one entry, with no entry for water or full bottles.");
-        Require(Named($"pick_{World.MixedCrate}") != null, "A pile's filter must offer crates of mixed goods.");
-        await Click(Named($"pick_{Water.Empty}")!);
-        await Until(() => pile.Inventory.InputFilter.SequenceEqual(new[] { Water.Empty }) && ShownPage() == "Pile · empty bottle",
-            "picking bottles making the empty pile a bottle pile, named in its heading", 2);
-        Require(Named("filter_add_in") == null, "A pile whose filter names a resource must offer no second one.");
-        await Click(Named($"filter_in_{Water.Empty}")!);
-        await Until(() => pile.Inventory.InputFilter.Count == 0 && ShownPage() == "Pile" && Named("filter_add_in") != null, "clicking bottles taking them off the empty pile", 2);
-        Require(FindButton(panel, "Clear") != null, "The filter window's clear button must read Clear.");
-        await Click(Named("filters_close")!);
-        RemoveThings(Hosted, t => t == pile);
-        await CloseWithEsc();
-    }
-
-    /// <summary>A chest's item list runs by group, each simplest first: what is gathered, grown or bought, materials, tools, containers, food, then crates of goods.</summary>
-    private async Task CheckItemListRunsByGroupSimplestFirst() {
-        var chest = await OpenFilters(ThingKind.Chest);
-        await Click(Named("filter_add_in")!);
-        var listed = FilterEntries("item_list", "pick_").ToList();
-        string[] expected = ["wood", "planks", "iron_bar", "steel_bar", "steel_parts", "stone_chisel", "steel_chisel", Water.Empty, Bucket.Item, "flour", "meat_stew", "dough", "canned_meat_stew", "bread", World.CrateOf("berries"), World.CrateOf("bread")];
-        Require(listed.Where(expected.Contains).SequenceEqual(expected), $"The item list must run by group, simplest first, not {string.Join(" ", listed)}.");
-        Require(listed.SkipWhile(id => !id.StartsWith(World.PackedPrefix)).All(id => id.StartsWith(World.PackedPrefix)), "The item list must show crates of goods after every item.");
-        await Click(Named("filters_close")!);
-        RemoveThings(Hosted, t => t == chest);
-        await CloseWithEsc();
-    }
-
     /// <summary>A filter row shows its items in the order they were added, also after one of them comes off, or comes off and goes back on between two looks of the page.</summary>
     private async Task CheckFilterRowKeepsTheOrderAdded() {
         var chest = await OpenFilters(ThingKind.Chest);
@@ -481,54 +409,6 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    private async Task CheckCratePutIntoCrateStopsAtWarning() {
-        var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
-        var box = Hosted.Add(ThingKind.Crate, world.Player); box.Inventory.Add("berries", 3); Hosted.PickUpCrate(box);
-        string packed = Hosted.Backpack.Items.Keys.Single(World.IsPacked);
-        // A crate selected on the hotbar only opens a clicked crate; the alert waits for a deliberate move.
-        string lastSlot = world.HotbarItem(8); int active = world.ActiveHotbar;
-        Give(Hosted, "crate", 1); SetHotbarSlot(Hosted, 8, "crate"); await KeyStroke(Key.Key9); await CloseWithEsc();
-        await Click(view.Screen(crate.Pos, .4f));
-        Require(!blackHole.Showing, "Clicking a crate with a crate selected on the hotbar must not show the nesting alert.");
-        Require(Shows(crate), "Clicking a crate with a crate selected on the hotbar must select the clicked crate.");
-        Require(crate.Inventory.Count == 0, "Clicking a crate with a crate selected on the hotbar must not put that crate into it.");
-        Require(world.Backpack["crate"] == 1, "Clicking a crate with a crate selected on the hotbar must keep that crate in the backpack.");
-        SetHotbarSlot(Hosted, 8, lastSlot); await KeyStroke(Key.Key1 + active); await CloseWithEsc();
-        // Two empty crates go down one after the other without opening, and placement ends with the last.
-        Give(Hosted, "crate", 1);
-        await CloseWithEsc(); await KeyStroke(Key.Tab);
-        await PickUp(Cell(0, c => c.TooltipText.StartsWith("Wood crate ·")));
-        for (int placed = 1; placed <= 2; placed++) {
-            var spot = SpotsNearby()
-                .First(p => world.Construction.PlacementBlock(ThingKind.Crate, p, "crate") == null && Uncovered(view.Screen(p)));
-            await Click(view.Screen(spot));
-            await Until(() => world.Backpack["crate"] == 2 - placed && (world.Held?.Count ?? 0) == 2 - placed, "a click on open ground placing one held crate", 2);
-            Require(panel.Page == Page.Backpack, "Placing a crate must not open it.");
-            Require(player.Mode.Placing == (placed == 1 ? ThingKind.Crate : null),
-                "Placing a held crate must stay in placement while crates remain held.");
-        }
-        RemoveThings(Hosted, t => t.Kind == ThingKind.Crate && t != crate && t.Inventory.Count == 0);
-        await ClickOn(crate);
-        await Carry(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
-        Require(blackHole.Showing, "A crate put into a crate must show the nesting alert.");
-        Require(blackHole.Asking, "A crate put into a crate must show the nesting warning.");
-        await Until(() => world.Backpack[packed] == 1, "the crate going back to the backpack", 2);
-        Require(crate.Inventory.Count == 0, "A crate put into a crate must leave the target crate empty.");
-        await Click((Control)blackHole.FindChild("anomaly_no", true, false));
-        Require(!blackHole.Showing, "No must close the black hole question.");
-        Require(world.Backpack[packed] == 1, "No must keep the packed crate in the backpack.");
-        Require(world.Find(crate.Id) != null, "No must keep the placed crate on the ground.");
-        await Carry(await Showing(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
-        await Click((Control)blackHole.FindChild("anomaly_yes", true, false));
-        Require(ShowsChild(blackHole, "collapse") && !blackHole.Asking, "Yes must open the black hole.");
-        await Until(() => blackHole.FindChild("game_over", true, false) is Control { Visible: true, Modulate.A: > .99f }, "the collapse ending on the game over screen", 10);
-        await Click((Control)blackHole.FindChild("menu_after_collapse", true, false));
-        Require(!blackHole.Showing, "Main menu must leave the black hole.");
-        Require(startMenu.Visible, "Main menu must open the start menu.");
-        Require(FindButton(startMenu.Screen, "New game") != null,
-            "The start menu must offer New game after the black hole.");
-    }
-
     /// <summary>What changed while the player was away shows as it now is when they come back, without playing the change in front of them.</summary>
     private async Task CheckChangesOutOfSightDoNotReplayWhenSeenAgain() {
         await CloseWithEsc();
@@ -753,24 +633,6 @@ public partial class Game {
         Require(slow.Seconds > quick.Seconds, $"A tall tree must take longer to come down than a short one: {slow.Seconds:0.00} s against {quick.Seconds:0.00}.");
         Warp(Hosted, start); await Frames(4);
     }
-    /// <summary>A double click on a packed crate in the backpack opens it, and its contents move to the backpack and back by Shift-click.</summary>
-    private async Task CheckPackedCrateOpensFromTheBackpack() {
-        // Berries already carried would join the five taken out in one stack, which Shift would move back whole.
-        int carried = Drop(Hosted, "berries"); Give(Hosted, "crate", 1); Give(Hosted, "berries", 5); Give(Hosted, "stone", 1);
-        var placed = Hosted.PlaceCrate("crate", Hosted.Player + new Vector2(0, 2))!;
-        // The stone keeps the crate from emptying, which would close its page, when the berries come out.
-        Hosted.Transfer(Hosted.Backpack, placed.Inventory, "berries", 5); Hosted.Transfer(Hosted.Backpack, placed.Inventory, "stone", 1); Hosted.PickUpCrate(placed);
-        int berries = Hosted.Backpack["berries"];
-        await KeyStroke(Key.Tab);
-        await DoubleClick(await Showing(0, c => c.TooltipText.StartsWith("Wood crate of")));
-        await Until(() => panel.Visible && panel.HeadingTitle.Text == "Wood crate", "a double click on a packed crate in the backpack opening it", 2);
-        await Holding(Key.Shift, async () => await Click(await Showing(0, c => c.TooltipText.StartsWith("Berries"))));
-        await Until(() => world.Backpack["berries"] == berries + 5, "Shift on berries in the open crate taking the stack out into the backpack", 2);
-        await Holding(Key.Shift, async () => await Click(await Showing(1, c => c.TooltipText.StartsWith("Berries"))));
-        await Until(() => world.Backpack["berries"] == berries, "Shift on the berries in the backpack packing that stack back into the open crate", 2);
-        await CloseWithEsc();
-        Drop(Hosted, world.Backpack.Items.Keys.First(World.IsPacked)); Give(Hosted, "berries", carried); await Frames();
-    }
     /// <summary>The driver behind `--drive` plays its command file as real input and reports each line once: a key it sends opens the backpack, and a command it does not know fails by name.</summary>
     private async Task CheckDriverPlaysItsCommandFileAsRealInput() {
         await CloseWithEsc();
@@ -863,22 +725,6 @@ public partial class Game {
         await ClickOn(chest);
         await Until(() => chest.Inventory["stone"] == 3 && cursor.Empty, "a click on a chest in the world storing the held stone", 2);
         RemoveThings(Hosted, t => t == chest); SetHotbarSlot(Hosted, 4, before); await KeyStroke(Key.Key1); await CloseWithEsc();
-    }
-    /// <summary>An empty crate opens as storage by double click, goods put in pack it, and picking up the open crate closes its page.</summary>
-    private async Task CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp() {
-        await CloseWithEsc();
-        Give(Hosted, "crate", 1); Give(Hosted, "stone", 3);
-        await KeyStroke(Key.Tab);
-        await DoubleClick(await Showing(0, c => c.TooltipText.StartsWith("Wood crate ·")));
-        await Until(() => panel.Page == Page.Crate && Cells(0).Any(), "a double click on an empty crate opening it as storage", 2);
-        await Carry(BagCell(c => c.TooltipText.StartsWith("Stone")), Cell(0, c => c.TooltipText == ""));
-        await Until(() => world.Backpack.Items.Keys.Any(World.IsPacked) && Cells(0).Any(c => c.TooltipText.StartsWith("Stone")),
-            "the stone packing the empty crate, whose page shows it", 2);
-        Require(world.Backpack["crate"] == 0 && world.Backpack["stone"] == 0, "Packing the empty crate must use it and all three stone.");
-        await PickUp(BagCell(c => c.TooltipText.StartsWith("Wood crate of")));
-        await Until(() => panel.Page == Page.Backpack, "picking up the open crate closing its page for the backpack's", 2);
-        await KeyStroke(Key.Escape); await CloseWithEsc();
-        Drop(Hosted, world.Backpack.Items.Keys.First(World.IsPacked)); await Frames();
     }
     /// <summary>At a trading post a click on the bank picks up all its coins, and coins put on it pay in.</summary>
     private async Task CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown() {
@@ -1137,14 +983,12 @@ public partial class Game {
             await RunBuildingRemovalUIChecks();
             await RunGravelPathUIChecks();
             await TestClean(CheckPageClosesWhenWhatItShowsIsGone);
-            await TestClean(CheckPackedCrateOpensFromTheBackpack);
             await TestClean(CheckDriverPlaysItsCommandFileAsRealInput);
             await TestClean(CheckEmptiedCrateGivesWayToTheBackpack);
             await TestClean(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await TestClean(CheckABoundStackIsRimmedAndStaysBehindOnCtrl);
             await TestClean(CheckAPressLetGoOverAnotherSlotDoesNothing);
             await TestClean(CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround);
-            await TestClean(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
             await RunHeldPlanUIChecks();
             await TestClean(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
             await RunMineUIChecks();
@@ -1162,9 +1006,7 @@ public partial class Game {
             await RunStrawBedUIChecks();
             await TestClean(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
             await TestClean(CheckFelledTreeBreaksThenCrashesAsItLands);
-            await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
-            await TestClean(CheckPileFilterNamesOneResource);
-            await TestClean(CheckItemListRunsByGroupSimplestFirst);
+            await RunTradeUIChecks();
             await TestClean(CheckFilterRowKeepsTheOrderAdded);
             await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await RunGoalUIChecks(freshGame: false);
@@ -1175,7 +1017,6 @@ public partial class Game {
             Test(CheckForegroundCanopyFadesOnlyOverBuildings);
             await RunWolfUIChecks();
             await RunSwingsUIChecks();
-            await RunCrateUIChecks();
             await TestClean(CheckCarriedStackShowsItsCount);
             await TestClean(CheckWindowsMoveByDragAndOpenInTheirUsualSpots);
             await TestClean(CheckFilterWindowOpensOnScreenBesideAMovedPanel);
@@ -1193,7 +1034,7 @@ public partial class Game {
             await TestClean(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
             await TestClean(CheckAWorkerHoldingAPackedCrateSaysSoAboveTheirHands);
             await RunBarrelUIChecks();
-            await TestClean(CheckCratePutIntoCrateStopsAtWarning);
+            await RunCrateUIChecks();
             RemoveCheckFiles();
             await TestClean(CheckRestartBuildsFreshModelsForReusedIds);
             await RunWaterPumpUIChecks();

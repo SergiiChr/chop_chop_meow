@@ -13,6 +13,17 @@ public static class CrateChecks {
         Test(CheckPlayerMovesItemsInAndOutOfACarriedCrate, data);
         Test(CheckCratesShowOneSlotPerItemTheyCanHold, data);
         Test(CheckAPackedCrateKeepsItsFiltersWhenPutDownAgain, data);
+        Test(CheckAnEmptyCratePacksOnlyTheHeldUnits, data);
+    }
+
+    private static void CheckAnEmptyCratePacksOnlyTheHeldUnits(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, "crate", 1); Give(world, "wood", 10);
+        world.Hold(world.Backpack, SlotOf(world.Backpack, "wood"), 5);
+        world.FromHeldStack(() => world.MoveInCrate(0, "wood", int.MaxValue, true));
+        string packed = world.Backpack.Items.Keys.Single(World.IsPacked);
+        Require(world.Packed(packed)!["wood"] == 5 && world.Backpack["wood"] == 5 && world.Held == null,
+            "five held wood put on an empty crate should pack just those five");
     }
 
     private static void CheckPlayerMovesItemsInAndOutOfACarriedCrate(GameData data) {

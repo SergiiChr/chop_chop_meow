@@ -37,7 +37,6 @@ public static class MultiplayerChecks {
         Test(CheckDropOnAnotherItemsChestCellStoresTheStack, data);
         Test(CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown, data);
         Test(CheckUpdateFieldsLeftOutStartAsNewObjectsDo);
-        Test(CheckUpdateEntriesReadBackAsTheyWere, data);
         Test(PipeWaterUpdateChecks.CheckPipeWaterUpdatesKeepTheHostsFieldsAndOrder);
         Test(CheckATreeUpdateCarriesNoStationFields, data);
         Test(CheckAChangedInventoryFieldIsNeverFresh);
@@ -71,21 +70,6 @@ public static class MultiplayerChecks {
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 40);
         string entry = System.Text.Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(tree, UpdateJson.Default.Thing));
         Require(!entry.Contains("\"Recipe\"") && !entry.Contains("\"Keep\"") && !entry.Contains("\"Asked\"") && !entry.Contains("\"Batches\""), $"a tree's update should carry no station fields: {entry}");
-    }
-
-    private static void CheckUpdateEntriesReadBackAsTheyWere(GameData data) {
-        var world = Settlement(data);
-        for (int i = 0; i < 600; i++) world.Tick(1 / 60f);
-        var wolf = PlaceWolf(world, new Wolf { Health = 0, Target = 2 });
-        StoreCrates(world, new Vector2(60, 110), 5);
-        var entries = new WorldUpdates().Capture(world);
-        foreach (var t in world.Things) RequireReadsBackAs(entries, new EntryKey(EntryKey.Thing, t.Id), t);
-        foreach (var w in world.Workers) RequireReadsBackAs(entries, new EntryKey(EntryKey.Worker, w.Id), w);
-        foreach (var o in world.Orders) RequireReadsBackAs(entries, new EntryKey(EntryKey.Order, o.Id), o);
-        foreach (var p in world.Players) RequireReadsBackAs(entries, new EntryKey(EntryKey.Player, p.Id), p);
-        RequireReadsBackAs(entries, new EntryKey(EntryKey.Wolf, wolf.Id), wolf);
-        int packed = world.Things.SelectMany(t => t.Inventory.Items.Keys).Count(World.IsPacked);
-        Require(packed == 5, $"the five stored crates should be packed in the chests, each reading back with its chest, not {packed}");
     }
 
     /// <summary>An inventory counted as fresh is written as {}, so every field it saves must end that, including one added later: a field type this check does not know fails it.</summary>

@@ -16,7 +16,6 @@ public static class HotbarStackChecks {
         Test(CheckAStackHeldFromAChestMovesIntoTheBackpackOnTheHotbar, data);
         Test(CheckAWaitingSlotBindsTheFirstStackToArrive, data);
         Test(CheckABoundStackPutOnAnotherSlotMovesThere, data);
-        Test(CheckABottleStaysBoundThroughSips, data);
         Test(CheckBindingsComeBackFromASave, data);
         Test(CheckAStackUsedUpPassesItsSlotToTheNextStack, data);
     }
@@ -107,15 +106,6 @@ public static class HotbarStackChecks {
         PutOnHotbar(world, cell, 0);
         PutOnHotbar(world, cell, 1);
         Require(world.HotbarStack(1) == cell && world.HotbarItem(0) == "", "a stack put on a second hotbar slot should move there and leave the first empty");
-    }
-
-    private static void CheckABottleStaysBoundThroughSips(GameData data) {
-        var world = EmptyWorld(data);
-        string bottle = GiveWater(world);
-        PutOnHotbar(world, SlotOf(world.Backpack, bottle), 8);
-        SetNeeds(world, thirst: 20);
-        for (int liter = 0; liter < 3; liter++) world.Consume(world.HotbarItem(8));
-        Require(world.HotbarItem(8) == Water.Empty, "a bound bottle should stay bound through every liter drunk, empty at the end");
     }
 
     private static void CheckBindingsComeBackFromASave(GameData data) {

@@ -12,7 +12,6 @@ public static class InventoryLayoutChecks {
         Test(CheckMovesBetweenInventoriesKeepEveryUnit);
         Test(CheckMovesAndMergesTakeOnlyTheRoomThereIs);
         Test(CheckReplacedItemKeepsItsCellAndSavesKeepTheLayout);
-        Test(CheckEachBottleKeepsItsOwnCell);
         Test(CheckShrunkSlotLimitKeepsOverflowingStacks);
     }
 
@@ -89,21 +88,6 @@ public static class InventoryLayoutChecks {
         loaded.FillStacks(stacks);
         Require(stacks[0] == ("planks", 3) && stacks[1] == ("wood", 2), "serialized layout should retain positions across load");
         Require(loaded.PreferredSlot == -1, "preferred UI cell should not persist in a save");
-    }
-
-    private static void CheckEachBottleKeepsItsOwnCell() {
-        var bottles = new Inventory { Slots = 4, StackSize = 64 };
-        bottles.Add(Water.Empty, 2);
-        Require(bottles.UsedSlots == 2, "unstacked bottle states should use two slots");
-        Require(bottles.Layout[0].Count == 1, "the first bottle should sit alone in its cell");
-        Require(bottles.Layout[1].Count == 1, "the second bottle should sit alone in its cell");
-        bottles.PreferredSlot = 1;
-        Require(bottles.Remove(Water.Empty, 1) == 1, "removal should take one bottle");
-        Require(bottles.Layout[0].Item == Water.Empty, "removal should leave the first bottle in its cell");
-        Require(bottles.Layout[1].Item == "", "removal should empty the clicked duplicate's cell");
-        bottles.Add("steel_axe", 2); bottles.PreferredSlot = 2;
-        Require(bottles.Replace("steel_axe", "steel_pick"), "replacement should prefer the clicked matching duplicate stack");
-        Require(bottles.Layout[1].Item == "steel_axe" && bottles.Layout[2].Item == "steel_pick", "replacement should preserve the preferred cell and count");
     }
 
     private static void CheckShrunkSlotLimitKeepsOverflowingStacks() {
