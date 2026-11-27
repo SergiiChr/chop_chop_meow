@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
@@ -12,7 +13,8 @@ using static FirebugSteps;
 public static class FirebugChecks {
     public static void Run(GameData data) {
         Test(CheckRopeWoodAndAWoodPartMakeABugNetWithEitherHammer, data);
-        Test(CheckEightFirebugsComeOutAtNightfallAndOneMoreEachHour, data);
+        Test(CheckEightClustersComeOutAtNightfallAndOneMoreEachHour, data);
+        Test(CheckAQuarterOfClustersHaveThreeFirebugsAndTheRestTwoOrOneAtEvenOdds, data);
         Test(CheckFirebugsComeOutAwayFromBuildingsAndOutOfSight, data);
         Test(CheckFirebugHoversWhereItIsUntilAPlayerComesNear, data);
         Test(CheckFirebugDartsFromAPlayerThenRests, data);
@@ -41,22 +43,33 @@ public static class FirebugChecks {
         Require(bench.Inventory["bug_net"] == 2, "a steel hammer should make a bug net as well");
     }
 
-    /// <summary>Night lasts 7.2 hours, so seven more come out after the first eight.</summary>
-    private static void CheckEightFirebugsComeOutAtNightfallAndOneMoreEachHour(GameData data) {
+    /// <summary>Night lasts 7.2 hours, so seven more clusters come out after the first eight.</summary>
+    private static void CheckEightClustersComeOutAtNightfallAndOneMoreEachHour(GameData data) {
         var world = EmptyWorld(data);
         RunUntilPhase(world, data.NightStarts - .01f);
         Require(world.ThingsOf(ThingKind.Firebug).Count == 0, "no firebug should be out before dark");
         RunUntilNight(world);
-        Require(world.ThingsOf(ThingKind.Firebug).Count == 8, $"8 firebugs should come out at nightfall: {world.ThingsOf(ThingKind.Firebug).Count}");
-        RunUntilPhase(world, data.NightStarts + 1.1f / 24);
-        Require(world.ThingsOf(ThingKind.Firebug).Count == 9, $"a ninth firebug should come out an hour into the night: {world.ThingsOf(ThingKind.Firebug).Count}");
-        RunUntilPhase(world, data.NightStarts + 2.1f / 24);
-        Require(world.ThingsOf(ThingKind.Firebug).Count == 10, $"a tenth firebug should come out two hours into the night: {world.ThingsOf(ThingKind.Firebug).Count}");
+        Require(ClusterSizes(world).Count == 8, $"8 clusters of firebugs should come out at nightfall: {string.Join(", ", ClusterSizes(world))}");
+        for (int hour = 1; hour <= 7; hour++) HourlyCluster(world, hour);
+        int afterSeventh = world.ThingsOf(ThingKind.Firebug).Count;
         RunUntilPhase(world, .999f);
-        Require(world.ThingsOf(ThingKind.Firebug).Count == 15, $"15 firebugs should be out by the end of the night: {world.ThingsOf(ThingKind.Firebug).Count}");
+        Require(world.ThingsOf(ThingKind.Firebug).Count == afterSeventh, "no more firebugs should come out after the seventh hour of the night");
         RunUntilDawn(world);
         SafeTick(world, Step);
         Require(world.ThingsOf(ThingKind.Firebug).Count == 0, "every firebug should be gone at dawn");
+    }
+
+    /// <summary>Sixteen nights let out 112 clusters on the hour: about 28 of three, 42 of two and 42 of one.</summary>
+    private static void CheckAQuarterOfClustersHaveThreeFirebugsAndTheRestTwoOrOneAtEvenOdds(GameData data) {
+        var world = EmptyWorld(data);
+        var sizes = new List<int>();
+        for (int night = 0; night < 16; night++) {
+            for (int hour = 1; hour <= 7; hour++) sizes.Add(HourlyCluster(world, hour).Count);
+            RunUntilDawn(world);
+        }
+        int threes = sizes.Count(n => n == 3), twos = sizes.Count(n => n == 2), ones = sizes.Count(n => n == 1);
+        Require(threes is >= 16 and <= 40 && twos is >= 28 and <= 56 && ones is >= 28 and <= 56,
+            $"of 112 clusters about 28 should have three firebugs, 42 two and 42 one: {threes} of three, {twos} of two, {ones} of one");
     }
 
     private static void CheckFirebugsComeOutAwayFromBuildingsAndOutOfSight(GameData data) {
@@ -65,7 +78,8 @@ public static class FirebugChecks {
         var fire = world.Add(ThingKind.Campfire, world.Player + new Vector2(0, 60));
         RunUntilNight(world);
         foreach (var bug in world.ThingsOf(ThingKind.Firebug)) {
-            Require(bug.Pos.DistanceTo(world.Player) > data.SightRadius, $"a firebug should come out where no player sees it, not {bug.Pos.DistanceTo(world.Player):0.0} m off");
+            // A cluster's first firebug comes out where no player sees it, and the others within a metre of it.
+            Require(bug.Pos.DistanceTo(world.Player) > data.SightRadius - Firebugs.ClusterRadius, $"a firebug should come out where no player sees its cluster's first one, not {bug.Pos.DistanceTo(world.Player):0.0} m off");
             Require(bug.Pos.DistanceTo(chest.Pos) >= 25 && bug.Pos.DistanceTo(fire.Pos) >= 25, $"a firebug should come out at least 25 m from every building: {bug.Pos}");
             Require(world.CanStand(bug.Pos), $"a firebug should come out over ground to stand on: {bug.Pos}");
         }
@@ -189,10 +203,12 @@ public static class FirebugChecks {
     private static void CheckFirebugsAndNettlesComeBackFromASave(GameData data) {
         var world = EmptyWorld(data);
         RunUntilNight(world);
+        int bugs = world.ThingsOf(ThingKind.Firebug).Count;
+        Require(bugs >= 8, $"at least 8 firebugs should be out to save at night: {bugs}");
         var loaded = EmptyWorld(data);
         loaded.Deserialize(world.Serialize());
-        Require(loaded.ThingsOf(ThingKind.Firebug).Count == 8 && loaded.ThingsOf(ThingKind.Nettle).Count == 3, $"a save made at night should keep its 8 firebugs and 3 nettles: {loaded.ThingsOf(ThingKind.Firebug).Count}, {loaded.ThingsOf(ThingKind.Nettle).Count}");
+        Require(loaded.ThingsOf(ThingKind.Firebug).Count == bugs && loaded.ThingsOf(ThingKind.Nettle).Count == 3, $"a save made at night should keep its {bugs} firebugs and 3 nettles: {loaded.ThingsOf(ThingKind.Firebug).Count}, {loaded.ThingsOf(ThingKind.Nettle).Count}");
         SafeTick(loaded, 5);
-        Require(loaded.ThingsOf(ThingKind.Firebug).Count == 8 && loaded.ThingsOf(ThingKind.Nettle).Count == 3, "a loaded night should bring out no second lot of firebugs or nettles");
+        Require(loaded.ThingsOf(ThingKind.Firebug).Count == bugs && loaded.ThingsOf(ThingKind.Nettle).Count == 3, "a loaded night should bring out no second lot of firebugs or nettles");
     }
 }

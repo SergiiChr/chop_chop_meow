@@ -528,7 +528,9 @@ A picked nettle is gone for good, a backpack with no room for it leaves it stand
 Nettle rope is made at the crafting bench, 1 rope from 1 nettle, and a bug net from 5 rope, 1 wood and 1 wood part ([Crafting bench](#crafting-bench)).
 Whoever makes rope strikes two mallet blows, then twists the fibres by hand, in turn.
 
-Eight firebugs come out as night falls and one more after each hour of the night, at least 25 m from every building and where nobody is looking.
+Firebugs come out in clusters of one to three, eight clusters as night falls and one more after each hour of the night, at least 25 m from every building and where nobody is looking.
+A quarter of the clusters have three firebugs, and the rest two or one at even odds, all within 1 m of the first one.
+A cluster that comes out by water or near a building can be smaller, and one at the edge of sight can show its others coming out.
 All of them are gone at dawn.
 A firebug hovers about its place with a steady glow that grows half as bright again for about a second every 10 seconds.
 When you come within 4 m it darts off 6.55 m, faster than a walk and slower than a sprint, then rests for 1.6 seconds where it stops, whoever comes near.
