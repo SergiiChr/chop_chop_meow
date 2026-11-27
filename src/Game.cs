@@ -38,6 +38,8 @@ public partial class Game : Node, IGameFlow {
     private BlackHole blackHole = null!;
     private ItemMoves moves = null!;
     private RecoveryPrompt recovery = null!;
+    private FindPrompt findPrompt = null!;
+    private ReadingSheet sheet = null!;
     /// <summary>The intro film while it plays; it frees itself when it ends.</summary>
     private IntroMovie? intro;
     private PlayerControl player = null!;
@@ -175,8 +177,16 @@ public partial class Game : Node, IGameFlow {
         };
         ui.AddChild(needsPlate); ui.AddChild(layerButton); ui.AddChild(damageEdges);
         recipeMap = new RecipeMap(kit, panel); panel.Map = recipeMap;
+        sheet = new ReadingSheet(kit); panel.ReadingSheet = sheet;
+        // A find taken opens the day it holds large, the first of them when it holds several, and leaves the diary itself closed.
+        findPrompt = new FindPrompt(kit, find => {
+            hotbar.StampDiaryOnFirstFind();
+            sheet.Open(DiaryFindDef.Of(find).Days[0], quiet: true);
+        });
         startMenu = new StartMenu(kit, saves, net, panel, () => menu.Close(), this);
-        menu = new PauseMenu(kit, net, startMenu, this, recipeMap);
+        menu = new PauseMenu(kit, net, startMenu, this, recipeMap, () => panel.Open(Page.Diary));
+        // Over the side panel's diary, and under the menus, which cover a find's pop-up while they are open.
+        ui.AddChild(sheet); ui.AddChild(findPrompt);
         ui.AddChild(menu); ui.AddChild(menu.GoalDetails); ui.AddChild(recipeMap);
         ending = new EndingScreen(kit, panel.Close, this); ui.AddChild(ending);
         ui.AddChild(startMenu);
@@ -191,7 +201,7 @@ public partial class Game : Node, IGameFlow {
     }
     private void RefreshLive() {
         if (recovery == null) return;
-        corner.Refresh(); deathLabel.Refresh(); modeLabel.Refresh(); recovery.Refresh();
+        corner.Refresh(); deathLabel.Refresh(); modeLabel.Refresh(); recovery.Refresh(); findPrompt.Refresh();
         float messagesTop = Math.Max(56, modeLabel.OffsetTop + modeLabel.GetCombinedMinimumSize().Y + 10);
         if (messages.OffsetTop != messagesTop) messages.OffsetTop = messagesTop;
         menu.RefreshGoalLog(); goalPopup.Refresh();
@@ -314,7 +324,7 @@ public partial class Game : Node, IGameFlow {
             GetTree().SetMultiplayer(new SceneMultiplayer(), branch.GetPath());
             var main = new Node { Name = Name }; branch.AddChild(main);
             hosted = Server.Start(main, Server.Load(data, slot), net.Key);
-            hosted.World.QuietNights = true;
+            hosted.World.QuietNights = true; hosted.World.Diary.Quiet = true;
             hosted.Ended += StopHosted;
             JoinOwnServer(new Session.Starting(slot), hosted.Port);
             return;
@@ -395,6 +405,7 @@ public partial class Game : Node, IGameFlow {
         if (startMenu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) startMenu.Back(); return; }
         if (recipeMap.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) recipeMap.Close(); return; }
         if (menu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) menu.Back(); return; }
+        if (sheet.Visible && ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) { sheet.Close(); return; }
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
                 case Key.Escape:

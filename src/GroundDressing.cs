@@ -102,12 +102,13 @@ public partial class WorldView {
 
     /// <summary>Contact shade and bare soil under one world object; a stump keeps the dark ring its tree had at the trunk.</summary>
     private void ShadeThing(Thing t) {
+        if (!t.TakesGround) return;
         if (t.IsDeposit) { ShadeObject(t.Pos, .9f, .7f); BareSoil(t.Pos, 1.6f); return; }
         switch (t.Kind) {
             case ThingKind.Stone: ShadeObject(t.Pos, .7f, .7f); BareSoil(t.Pos, 1.3f); break;
             case ThingKind.Tree or ThingKind.Stump: ShadeObject(t.Pos, .55f, .7f); break;
             case ThingKind.Berries or ThingKind.Bush: ShadeObject(t.Pos, .6f, .6f); break;
-            case ThingKind.Water or ThingKind.LeafSpot or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine or ThingKind.Firebug: break;
+            case ThingKind.Water or ThingKind.LeafSpot or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine: break;
             default:
                 if (t.IsLoose) ShadeObject(t.Pos, .3f, .6f);
                 else if (!Construction.IsZone(t.Kind)) ShadeObject(t.Pos, World.Footprint(t.Kind) + .25f, .5f);
@@ -124,7 +125,7 @@ public partial class WorldView {
             for (float d = -3; d < 2; d += .75f) Stamp(disturbed, at + outwards * d, 2.6f, .95f);
         }
         foreach (var t in World.Things) {
-            if (t.IsResource || t.Kind is ThingKind.Crate or ThingKind.Grave) continue;
+            if (t.IsResource || !t.TakesGround || t.Kind is ThingKind.Crate or ThingKind.Grave) continue;
             if (t.Kind == ThingKind.Farm) { ClearFarm(t.Pos); continue; }
             // A hole sits between four texel centres. Clear all four to keep grass out of the hole after filtering.
             float radius = t.Kind switch { ThingKind.Hut or ThingKind.Pile => 3.4f, ThingKind.Mine => 3, ThingKind.Campfire => 2.3f, ThingKind.Hole => 1.25f, _ => 1.8f };

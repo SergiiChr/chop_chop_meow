@@ -6,6 +6,36 @@ namespace ChopChopMeow;
 
 /// <summary>The review fixtures behind <c>--showcase</c> and its flags: settled scenes for screenshots, separate from a playable game.</summary>
 public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit, GoalPopup goalPopup) {
+    /// <summary>
+    /// Diary review: the player on the lake's shore by its floating page, with a page lying on the ground beside them and three finds in their diary, two of whose days are unread.
+    /// <c>--diary-fall</c> drops that page off the oak beside them a second in instead, since a player has one fallen page at a time.
+    /// <c>--panel</c> opens the diary, <c>--diary-day N</c> opens day N large and <c>--diary-find</c> shows the pop-up of a page found in leaves.
+    /// <c>--diary-first</c> leaves the diary empty and no page on the ground, so the lake's page is the player's first find.
+    /// </summary>
+    private void DiaryReview() {
+        var me = world.Me;
+        world.S.Time = world.Data.DaySeconds * Launch.Number("--day-phase", .2f);
+        var page = world.ThingsOf(ThingKind.FloatingPage)[0];
+        var floating = Diary.FloatAt(page, world.Time);
+        var shore = Terrain.WaterPoint(floating);
+        var inland = (shore - Terrain.Lake).Normalized();
+        world.S.Things.RemoveAll(t => !t.IsPage && t.Pos.DistanceTo(shore) < 8 && t.Kind != ThingKind.Water);
+        world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear(); world.S.Wolves.Clear();
+        world.Player = shore + inland * .6f;
+        var tree = world.Add(ThingKind.Tree, shore + inland * 4.5f + inland.Orthogonal() * 2, World.TreeWood);
+        if (!Launch.Has("--diary-first")) {
+            me.DiaryFinds.AddRange([DiaryFind.Sand, DiaryFind.Berries, DiaryFind.Tree]);
+            me.DiaryRead.AddRange([6, 36]);
+            if (Launch.Has("--diary-fall")) view.GetTree().CreateTimer(1).Timeout += () => world.Diary.Drop(me, tree.Pos - inland * 1.2f);
+            else world.Diary.Drop(me, world.Player + inland.Orthogonal() * 1.4f + inland * .8f);
+        }
+        if (Launch.Has("--diary-find")) me.DiaryFinding = DiaryFind.Leaves;
+        world.Tick(0); view.Zoom = Launch.Number("--zoom", 1.8f);
+        if (Launch.Has("--panel")) panel.Open(Page.Diary); else panel.Close();
+        if (Launch.Value("--diary-day") is string day) panel.ReadingSheet.Open(int.Parse(day), quiet: true);
+        if (Launch.Has("--hide-ui")) ui.Visible = false;
+    }
+
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
         var stage = int.TryParse(Launch.Value("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
@@ -215,6 +245,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             panel.Close(); ui.Visible = false; kit.HoldWhile(() => true);
             return;
         }
+        if (Launch.Has("--diary")) { DiaryReview(); return; }
         if (Launch.Has("--firebugs")) {
             // A night meadow: three nettles in a row, one of each look, a tool station holding a bug net, and firebugs hovering at several distances from a player who carries a net.
             // The last firebug starts near enough to the player to dart off as the scene opens.
@@ -240,15 +271,13 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             panel.Close(); return;
         }
         if (Launch.Has("--bushes")) {
-            // A clean three-bush comparison row of berry bushes, with one picked-clean bush to show its persistent model.
+            // A row of berry bushes in their five stages, from full to picked clean, with all three variants.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Bush variants are selected from the id; start the row at variant zero and include all three.
             world.S.NextId += (3 - world.S.NextId % 3) % 3;
-            world.Add(ThingKind.Berries, at + new Vector2(-2.25f, 2.25f), 24);
-            world.Add(ThingKind.Berries, at + new Vector2(-.75f, .75f), 24);
-            world.Add(ThingKind.Berries, at + new Vector2(.75f, -.75f), 24);
-            world.Add(ThingKind.Berries, at + new Vector2(2.25f, -2.25f), 0);
+            for (int stage = WorldModels.BerryStages; stage >= 0; stage--)
+                world.Add(ThingKind.Berries, at + new Vector2(-1.5f, 1.5f) * (stage - 2), stage * World.BushBerries / WorldModels.BerryStages);
             // In front of them, three plain bushes, the last half dug out, and a stump beside one half dug out.
             for (int i = 0; i < 3; i++) world.Add(ThingKind.Bush, at + new Vector2(-.5f + i * 1.6f, 3.4f - i * 1.6f), World.BushLeaves).Progress = i == 2 ? GatherRules.DigSeconds * .7f : 0;
             for (int i = 0; i < 2; i++) world.Add(ThingKind.Stump, at + new Vector2(3.4f + i * 1.2f, -.4f - i * 1.2f), World.StumpWood).Progress = i * GatherRules.DigSeconds * .7f;
@@ -257,7 +286,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.S.Backpack.Add("steel_shovel", 1);
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
-            world.Player = at + new Vector2(-1, -.5f);
+            world.Player = at + new Vector2(-1.5f, -1.2f);
             world.Tick(0); view.Zoom = 1.8f;
             panel.Close(); return;
         }

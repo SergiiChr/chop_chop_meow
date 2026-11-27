@@ -67,6 +67,8 @@ public partial class Sounds : Node {
         ["torch_out"] = -16,
         ["buy_coins"] = -2,
         ["hire_sign"] = -7,
+        ["page_turn"] = -6,
+        ["paper_fall"] = -4,
         ["payment_from_village_arrives"] = -6,
         ["wolf_growl_distance"] = -11,
         ["wolf_howl"] = -11,

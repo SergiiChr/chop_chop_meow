@@ -211,11 +211,11 @@ public static class WorkerJobChecks {
         bool stayedOutOfLake = true;
         for (int i = 0; i < 700 && chest.Inventory["wood"] == 0; i++) {
             SafeTick(world, Step);
-            stayedOutOfLake &= !Terrain.InLake(worker.Pos);
+            stayedOutOfLake &= !Terrain.InLake(worker.Pos, -Terrain.Wade);
         }
 
         Require(stayedOutOfLake,
-                "worker pathing should route around the lake without entering its blocked radius");
+                "worker pathing should route around the lake, wading no further than its shallows");
         Require(chest.Inventory["wood"] >= worker.Bag.StackSize && worker.Bag["wood"] == 0,
                 "worker assigned across the lake should eventually gather wood and deliver it to accepting storage");
     }

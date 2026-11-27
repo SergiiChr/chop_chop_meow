@@ -78,7 +78,9 @@ public sealed class DugProp : Prop {
 }
 
 public sealed class BushProp : Prop {
-    public Node3D Fruit = null!;
+    public MeshInstance3D Fruit = null!;
+    /// <summary>The fruit mesh for each berry stage with berries, from <see cref="WorldModels.BerryStage"/>, stage 1 first; a picked-clean bush hides its fruit.</summary>
+    public Mesh[] Stages = null!;
 }
 
 public sealed class CarcassProp : Prop {
@@ -212,7 +214,7 @@ public static class WorldModels {
         foreach (var kind in Kinds.All) {
             if (kind == ThingKind.Mine) continue;
             // Natural things and farm plots look different by id; buildings, crates and backpacks look the same.
-            int looks = kind is ThingKind.Acorn or ThingKind.Firebug ? 1 : kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
+            int looks = kind is ThingKind.Acorn or ThingKind.Firebug or ThingKind.FloatingPage or ThingKind.FallenPage ? 1 : kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
             for (int id = 0; id < looks; id++) {
                 var prop = Build(new Thing { Id = id, Kind = kind });
                 if (prop is HutProp hut) hut.RoofBarrel.Visible = true;
@@ -245,8 +247,15 @@ public static class WorldModels {
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => t.Remaining / (float)World.DepositOre,
         ThingKind.WolfCorpse => t.Remaining / (float)World.WolfMeat,
         ThingKind.LeafSpot => t.Remaining / (float)World.LeavesPerSpot,
+        ThingKind.Berries => t.Remaining / (float)World.BushBerries,
         _ => 1
     };
+
+    /// <summary>How many stages a berry bush shows berries in; a picked-clean bush shows none.</summary>
+    public const int BerryStages = 4;
+
+    /// <summary>Which stage a berry bush shows, from 0 when picked clean to <see cref="BerryStages"/> when full, each stage a quarter of a full bush's berries rounded up.</summary>
+    public static int BerryStage(Thing t) => Math.Clamp((int)MathF.Ceiling(Fullness(t) * BerryStages), 0, BerryStages);
 
     /// <summary>How many looks a tree has: every species in every variant.</summary>
     public const int TreeLooks = World.TreeSpecies * NatureShape.Variants;
@@ -281,6 +290,7 @@ public static class WorldModels {
         ThingKind.Bush => new[] { new Hit(.6f, 0, .6f) },
         ThingKind.Nettle => [new Hit(.35f, 0, .8f)],
         ThingKind.Firebug => [new Hit(.5f, FirebugShape.Height - .5f, FirebugShape.Height + .5f)],
+        ThingKind.FloatingPage or ThingKind.FallenPage => [new Hit(.3f, 0, .2f)],
         ThingKind.Water => new[] { new Hit(1.2f, 0, .5f) },
         ThingKind.Furnace => new[] { new Hit(.72f, 0, 1.15f) },
         ThingKind.Reinforced => new[] { new Hit(.95f, 0, 1.45f) },
@@ -318,6 +328,7 @@ public static class WorldModels {
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
             case ThingKind.Nettle: prop = new Prop(); Add(prop.Body, NettleShape.Plant(t.Id), NettleShape.Leaves, Vector3.Zero); break;
             case ThingKind.Firebug: prop = FirebugShape.Build(); break;
+            case ThingKind.FloatingPage or ThingKind.FallenPage: prop = PageShape.Build(); break;
             case ThingKind.Stone: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero); break;
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case ThingKind.Coal: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.CoalRock, Vector3.Zero); break;
@@ -411,6 +422,7 @@ public static class WorldModels {
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
             case "leaves": return Build(new Thing { Kind = ThingKind.LeafSpot }).Root;
+            case PageShape.Icon: return PageShape.Build().Root;
             case "crate": return Build(new Thing { Kind = ThingKind.Crate }).Root;
             // Loose iron left the world, but its lump still makes the iron ore icon.
             case "iron_ore": { var lump = new Node3D(); LooseOre(lump, "loose_iron", 0, "a35a2e", "8b4f2b"); return lump; }
@@ -548,9 +560,9 @@ public static class WorldModels {
         var prop = new BushProp();
         int variant = id % NatureShape.Variants;
         var leaves = Tree3DShape.Add(prop.Body, Tree3DShape.Bush, variant);
-        var fruit = Pivot(prop.Body, Vector3.Zero);
-        Add(fruit, NatureShape.CardBerries(leaves, variant), NatureShape.Glossy, Vector3.Zero);
-        prop.Fruit = fruit;
+        prop.Stages = new Mesh[BerryStages];
+        for (int stage = 1; stage <= BerryStages; stage++) prop.Stages[stage - 1] = NatureShape.CardBerries(leaves, variant, stage * NatureShape.BerryClusters / BerryStages);
+        prop.Fruit = Add(prop.Body, prop.Stages[BerryStages - 1], NatureShape.Glossy, Vector3.Zero);
         return prop;
     }
 

@@ -23,7 +23,7 @@ public sealed class PageMemory {
 public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory, HeldCursor Cursor);
 
 /// <summary>The pages of the side panel.</summary>
-public enum Page { None, Welcome, Build, Backpack, Crew, Craft, Inspect, Crate, Barrel }
+public enum Page { None, Welcome, Build, Backpack, Crew, Craft, Inspect, Crate, Barrel, Diary }
 
 /// <summary>What the side panel inspects: a thing, a worker, a pipe or nothing.</summary>
 public readonly record struct Selection {
@@ -55,6 +55,7 @@ public partial class SidePanel : MovableWindow {
         ("Inspect", InspectPage.For),
         ("Wood crate", (tools, _) => new CarriedCratePanel(tools, tools.Memory.CarriedCrate)),
         ("Steel barrel", (tools, _) => new CarriedBarrelPanel(tools, tools.Memory.CarriedBarrelSlot)),
+        ("Diary", (tools, _) => new DiaryPanel(tools)),
     };
     private readonly World world;
     private readonly UiKit kit;
@@ -96,12 +97,16 @@ public partial class SidePanel : MovableWindow {
     public PanelContainer Aside { get; }
     private readonly VBoxContainer asideContent;
     private bool asideShown;
+    /// <summary>Room right of and below a page for the pills that sit on its slots' corners.</summary>
+    public const int PillRoom = 8;
     /// <summary>The gap between the panel and the window beside it.</summary>
     private const float AsideGap = 12;
     /// <summary>The player's control of the world, which also needs this panel, so the game sets it once both exist.</summary>
     public PlayerControl Player { get; set; } = null!;
     /// <summary>The recipe map, which also needs this panel, so the game sets it once both exist.</summary>
     public RecipeMap Map { get; set; } = null!;
+    /// <summary>The diary day opened large, which the game sets once it exists.</summary>
+    public ReadingSheet ReadingSheet { get; set; } = null!;
     /// <summary>The open page, or nothing while the panel is closed.</summary>
     public Page Page { get; private set; }
     public Selection Selection { get; private set; }
@@ -118,6 +123,8 @@ public partial class SidePanel : MovableWindow {
         tools = new PageTools(this, kit, moves, new PageMemory(), cursor);
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top; Visible = false;
+        // A page wider than the panel, such as the Diary's four pages a row, widens it to the left, so its right edge stays on the screen.
+        GrowHorizontal = GrowDirection.Begin;
         Bag = new BackpackDrawer(kit, this);
         AddChild(DoorKey);
         Aside = new PanelContainer { Name = "aside", Visible = false }; Aside.AddThemeStyleboxOverride("panel", Style.Board);
@@ -133,8 +140,7 @@ public partial class SidePanel : MovableWindow {
         HeadingTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill; heading.AddChild(HeadingTitle);
         heading.AddChild(kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "close"));
         scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
-        // Room for the pills that sit on the slots' corners.
-        inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);
+        inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", PillRoom); inset.AddThemeConstantOverride("margin_bottom", PillRoom); scroll.AddChild(inset);
         content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddChild(content);
         world.Replaced += () => { Selection = default; awaited = 0; Close(); };
     }

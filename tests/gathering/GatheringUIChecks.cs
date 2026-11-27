@@ -21,7 +21,7 @@ public partial class Game {
         await TestClean(CheckRightClickGathersTreeAndHarvestsFarm);
         await TestClean(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
         await TestClean(CheckOneRightClickWalksOverAndPicksUpAWholeLoosePiece);
-        await TestClean(CheckBerryBushHidesOnlyItsFruitWhenPicked);
+        await TestClean(CheckBerryBushThinsItsFruitAsItIsPickedAndHidesOnlyTheFruitWhenClean);
         await TestClean(CheckLeavesAreRakedWithACarriedRake);
         await TestClean(CheckATreeCrownKeepsALoosePieceBehindItClickable);
         await TestClean(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
@@ -97,8 +97,8 @@ public partial class Game {
         Warp(Hosted, home); await Frames(4);
     }
 
-    /// <summary>Picking a bush clean hides only its fruit, which shows again once it is replenished.</summary>
-    private async Task CheckBerryBushHidesOnlyItsFruitWhenPicked() {
+    /// <summary>A bush shows fewer berries as it loses them, in five stages, and picking it clean hides only its fruit, which shows again once it is replenished.</summary>
+    private async Task CheckBerryBushThinsItsFruitAsItIsPickedAndHidesOnlyTheFruitWhenClean() {
         // Exercise the rendered bush's independent fruit handle through real gathering input.
         var home = Hosted.Player;
         var berryBush = Hosted.Add(ThingKind.Berries, world.Player + new Vector2(1, -1), 4);
@@ -106,6 +106,21 @@ public partial class Game {
         await Frames(2);
         var bushProp = (BushProp)view.PropOf(berryBush.Id)!;
         Require(bushProp.Fruit is { Visible: true }, "A ripe berry bush must display its fruit.");
+        // A full bush holds 24 berries in 16 clusters, and every 6 berries picked take 4 clusters away.
+        // Every cluster is drawn with the same triangles, so the shown fruit's share of a full bush's triangles counts its clusters.
+        berryBush.Remaining = 24; await Frames(2);
+        int fullBush = Triangles(bushProp.Fruit);
+        var fullSpread = bushProp.Fruit.Mesh.GetAabb().Size;
+        foreach (var (berries, clusters) in new[] { (19, 16), (18, 12), (13, 12), (12, 8), (7, 8), (6, 4), (1, 4) }) {
+            berryBush.Remaining = berries; await Frames(2);
+            int shown = Triangles(bushProp.Fruit) * 16 / fullBush;
+            Require(bushProp.Fruit.Visible && shown == clusters, $"A bush with {berries} berries should show {clusters} berry clusters, not {shown}.");
+        }
+        berryBush.Remaining = 4; await Frames(2);
+        // The berries left are spread all around the bush, not kept to one side.
+        var quarterSpread = bushProp.Fruit.Mesh.GetAabb().Size;
+        Require(quarterSpread.X > fullSpread.X * .6f && quarterSpread.Z > fullSpread.Z * .6f,
+            $"A quarter-full bush's berries should spread across most of the full bush's {fullSpread.X:0.00} by {fullSpread.Z:0.00}, not {quarterSpread.X:0.00} by {quarterSpread.Z:0.00}.");
         var point = view.Screen(berryBush.Pos, .35f);
         Require(view.Pick(point)?.Id == berryBush.Id, "The bush foliage must select its berry resource.");
         await Click(point);

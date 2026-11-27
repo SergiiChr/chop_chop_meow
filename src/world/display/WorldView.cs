@@ -188,6 +188,15 @@ public partial class WorldView : Node3D {
 
     internal static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
 
+    /// <summary>Where someone or something at <paramref name="p"/> stands, <paramref name="rise"/> above the ground: on the lake bed in its shallows.</summary>
+    internal static Vector3 StandsAt(Vector2 p, float rise = 0) => To3(p, rise - Terrain.BedDepth(p));
+
+    /// <summary>
+    /// Where a thing's model stands: on the lake bed for one lying in the shallows, and on the ground everywhere else.
+    /// A page floats on the water instead, a firebug flies above it and a pump's intake is built into it.
+    /// </summary>
+    private static Vector3 RestsAt(Thing t) => t.IsPage || t.Roams || t.Kind == ThingKind.Pump ? To3(t.Pos) : StandsAt(t.Pos);
+
     public override void _Ready() {
         World.Replaced += () => {
             worldReplaced = true; Footpaths.Clear(); counterHits.Clear(); playerSleep.Clear();
@@ -554,7 +563,7 @@ public partial class WorldView : Node3D {
             bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, drawn, out float d)
                 : t.Kind == ThingKind.Pump && PropOf(drawn.Id) is WaterPumpProp pump
                     ? RayPump(origin, direction, drawn, pump.Pump, out d)
-                    : RayHits(origin, direction, t.Pos, hits, out d);
+                    : RayHits(origin, direction, World.Diary.At(t), hits, out d);
             if (hit && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
@@ -987,7 +996,7 @@ public partial class WorldView : Node3D {
 
     /// <summary>Places the upright rig so the pose can aim at the actor's mark in its own frame.</summary>
     private static Pose StandingPose(ActorRig rig, ActorState state, float rise = 0) {
-        rig.Root.Position = To3(state.Position, rise);
+        rig.Root.Position = StandsAt(state.Position, rise);
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
         state.MarkInRig = state.Mark is Vector3 mark ? rig.Root.Transform.AffineInverse() * mark : null;
@@ -1194,7 +1203,8 @@ public partial class WorldView : Node3D {
     private void CollectDrawnThings(List<Thing> into, bool everything) {
         if (!everything) { World.CollectKnown(into); return; }
         into.Clear();
-        foreach (var thing in World.Things) into.Add(thing);
+        var me = World.Me;
+        foreach (var thing in World.Things) if (Diary.ShowsTo(me, thing)) into.Add(thing);
     }
 
     private void SyncThings(float dt) {
@@ -1227,7 +1237,7 @@ public partial class WorldView : Node3D {
             var look = (t.Pos, t.Remaining, t.Kind is ThingKind.Tree or ThingKind.LeafSpot ? t.TreeStage : t.Kind is ThingKind.Mine or ThingKind.WolfCorpse || t.IsDug ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
             if (!live && prop.Seen && prop.Look == look) continue;
             Show(prop, true);
-            if (prop.Look.Pos != t.Pos) prop.Root.Position = To3(t.Pos);
+            if (prop.Look.Pos != t.Pos) prop.Root.Position = RestsAt(t);
             // A change plays out only where the player was already watching, not on a thing first seen or seen again this frame.
             bool watched = live && prop.Seen && prop.Look.Live;
             // Preview distant shapes and positions without replacing the small details the overhead view remembers.
@@ -1252,10 +1262,12 @@ public partial class WorldView : Node3D {
         int newest = World.Things.Count > 0 ? World.Things[World.Things.Count - 1].Id : 0;
         if (thingsCounted != World.Things.Count || newestThing != newest) {
             (thingsCounted, newestThing) = (World.Things.Count, newest);
-            // A firebug marks nothing on the ground, so the dressing is drawn again only when something else has come or gone.
+            // A firebug or a diary page marks nothing on the ground, so the dressing is drawn again only when something else has come or gone.
             int last = World.Things.Count - 1;
-            while (last >= 0 && World.Things[last].Roams) last--;
-            int grounded = World.Things.Count - World.ThingsOf(ThingKind.Firebug).Count, newestOnGround = last >= 0 ? World.Things[last].Id : 0;
+            while (last >= 0 && !World.Things[last].TakesGround) last--;
+            int grounded = 0;
+            foreach (var t in World.Things) if (t.TakesGround) grounded++;
+            int newestOnGround = last >= 0 ? World.Things[last].Id : 0;
             if (groundedCounted != grounded || newestGrounded != newestOnGround) {
                 (groundedCounted, newestGrounded) = (grounded, newestOnGround);
                 RefreshDressing();
@@ -1282,16 +1294,18 @@ public partial class WorldView : Node3D {
         prop = WorldModels.Build(t);
         scene.AddChild(prop.Root);
         props[t.Id] = prop;
-        prop.Root.Position = To3(t.Pos);
+        prop.Root.Position = RestsAt(t);
         // A fresh carcass keeps the heading of the wolf model it replaces.
         // It also waits for the killing blow to land, and is thrown back from where the wolf stood.
         if (prop is CarcassProp carcass && Dying(t.Pos) is { } dying) {
             prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
-            carcass.From = dying.Root.Position - To3(t.Pos); carcass.HitIn = SwingLands(dying.Last + dying.KnockBack).In;
+            carcass.From = dying.Root.Position - prop.Root.Position; carcass.HitIn = SwingLands(dying.Last + dying.KnockBack).In;
             carcass.Wolf.FallFrom(dying);
         }
         // A chip that appears in front of the player was knocked off the rock beside it, and flies from there.
-        if (prop is LooseProp chip && appeared && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
+        if (prop is LooseProp chip && appeared && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - prop.Root.Position + Vector3.Up * .7f; chip.Flight = 0; }
+        // A page that appears in front of its player has just come off the tree beside it, and flutters down from its crown.
+        if (prop is PageProp page && t.Kind == ThingKind.FallenPage && appeared) { page.Fall = 0; Sounds?.Play("paper_fall", t.Pos); }
         return prop;
     }
 
@@ -1396,6 +1410,13 @@ public partial class WorldView : Node3D {
                 prop.Body.RotationDegrees = new Vector3(loose * 16 + wobble * 5, dug.Yaw, wobble * 3);
                 prop.Body.Position = dug.Seat + new Vector3(wobble * .02f, loose * .07f, 0);
                 break;
+            case PageProp page when t.Kind == ThingKind.FloatingPage:
+                prop.Root.Position = To3(World.Diary.At(t));
+                PageShape.Float(page, t.Id, Elapsed);
+                break;
+            case PageProp page when page.Fall < PageShape.FallSeconds:
+                PageShape.Fly(page, t.Id, dt);
+                break;
             case LooseProp chip when chip.Flight < WorldModels.ChipFlight + WorldModels.ChipSettle:
                 // An arc under gravity from the rock, spinning steadily round its middle, then a short skid to a stop where it lies.
                 chip.Flight += dt;
@@ -1451,7 +1472,9 @@ public partial class WorldView : Node3D {
                 break;
             case BushProp bush:
                 if (still) break;
-                bush.Fruit.Visible = t.Remaining > 0;
+                int berryStage = WorldModels.BerryStage(t);
+                bush.Fruit.Visible = berryStage > 0;
+                if (berryStage > 0) bush.Fruit.Mesh = bush.Stages[berryStage - 1];
                 prop.Body.Scale = new Vector3(1 + wobble * .04f, 1 - wobble * .03f, 1 + wobble * .04f);
                 break;
             case FurnaceProp furnace:
@@ -1894,7 +1917,8 @@ public partial class WorldView : Node3D {
                 || wolf.Follow == FollowStage.Routed) && !backing, wary);
             else if (wolf.Follow == FollowStage.Braced) model.Brace(Elapsed + wolf.Id % 7, dt);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
-            var place = To3(wolf.Pos + model.KnockBack + model.Drift, rise);
+            var stands = wolf.Pos + model.KnockBack + model.Drift;
+            var place = StandsAt(stands, rise);
             if (wolf.Pinning) place = AtTheThroat(model, hunted);
             else model.Toward = Vector2.Zero;
             if (wolf.Feeding && !wolf.Pinning && Fallen(wolf) is var (lying, lyingRig)) place = feeding.Place(wolf, model, lying, lyingRig, dt);
@@ -1918,7 +1942,7 @@ public partial class WorldView : Node3D {
         model.KnockBack = model.Drift = Vector2.Zero;
         model.Struck = false; model.Recoiling = model.Recover = 0; model.Stagger = wolf.Stagger;
         model.Root.Visible = DrawsAt(wolf.Pos);
-        model.Root.Position = To3(wolf.Pos, WolfCounter.Height(wolf));
+        model.Root.Position = StandsAt(wolf.Pos, WolfCounter.Height(wolf));
         model.Yaw = ActorAnimation.Yaw(Vector2.FromAngle(wolf.Heading), model.Yaw);
         model.Turning.Hold(model.Yaw); model.Glance = 0;
         model.Root.Rotation = new Vector3(0, model.Yaw, 0);
@@ -1981,7 +2005,7 @@ public partial class WorldView : Node3D {
     private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted) {
         if (model.Pinned > ActorAnimation.FallBackSeconds) return model.Root.Position;
         var held = FallBackView.Throat(hunted, model.Toward, model.Pinned) - model.Root.Basis * model.Bite;
-        return held with { Y = 0 };
+        return StandsAt(new Vector2(held.X, held.Z));
     }
 
     /// <summary>
@@ -2270,7 +2294,8 @@ public partial class WorldView : Node3D {
         if (hovered != null) {
             float top = 0;
             foreach (var hit in HitsOf(hovered)) top = Math.Max(top, hit.Top);
-            Tag(Screen(hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(Mouse)) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
+            var at = hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(Mouse)) : World.Diary.At(hovered);
+            Tag(Screen(at, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
         }
         foreach (var w in World.Workers) {
             if (!World.Sees(w) || w.Id != HoverWorker && w.Id != Selection.Worker) continue;
