@@ -451,7 +451,9 @@ public sealed partial class World {
     /// </summary>
     public bool QuietNights { get; set; }
     public Goals Goals { get; }
-    /// <summary>Which recipe map entries the settlement has made, has been shown by a station or a goal, or has yet to discover.</summary>
+    /// <summary>
+    /// Which recipe map entries the settlement has made, has been shown by a station or a goal, or has yet to discover.
+    /// </summary>
     public MapDiscovery MapDiscovery { get; }
     /// <summary>What idle workers play when they sit together at a campfire.</summary>
     public CampfireMusic CampfireMusic { get; } = new();

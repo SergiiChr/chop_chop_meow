@@ -7,7 +7,9 @@ public enum GoalId { Campfire, Cabin, Bench, Furnace, Worker, Profit, Trade, Ste
 
 public enum GoalStatus { Hidden, Active, Completed }
 
-/// <summary>A goal and the buildings and items its text names, buildings first, shown as icons that open the recipe map.</summary>
+/// <summary>
+/// A goal and the buildings and items its text names, buildings first, shown as icons that open the recipe map.
+/// </summary>
 public sealed record Goal(GoalId Id, string Title, string Description, params string[] Items);
 
 /// <summary>The settlement's goal log, read from what its players have seen, built, made and traded; the diary's goal is each player's own.</summary>

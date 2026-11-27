@@ -10,7 +10,7 @@ using static PlayerSteps;
 using static WorkerSteps;
 using static EconomySteps;
 
-/// <summary>Checks of crafting: recipes at stations and by hand, the mark, the queue and batches, the tools a recipe needs, and the workers who craft or pump a station.</summary>
+/// <summary>Checks of crafting: recipes at stations and by hand, the mark, the queue and batches, the tools a recipe needs, the workers who craft or pump a station, and the stations the recipe map shows.</summary>
 public static class CraftingChecks {
     public static void Run(GameData data) {
         Test(CheckMarkFollowsTheRecipeAskedFor, data);
@@ -38,6 +38,7 @@ public static class CraftingChecks {
         Test(CheckFinishedBatchWaitsForOutputRoom, data);
         Test(CheckStationBatchesAndMarkSurviveALoad, data);
         Test(CheckStationLoadsMidBatchAndFinishesIt, data);
+        Test(CheckStationsShowWithTheirWholeBuildCostOnTheRecipeMap, data);
         Test(CheckHandCraftingNeedsChiselAndTakesTime, data);
         Test(CheckBenchWorksWithACarriedOrSlottedToolWhicheverIsFaster, data);
         Test(CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf, data);
@@ -940,5 +941,19 @@ public static class CraftingChecks {
         foreach (var w in world.Workers.ToList()) world.Fire(w);
         SafeTick(world, 5);
         Require(furnace.Heat < World.SteelHeat, "without a crew the forge should cool below the clear bar");
+    }
+
+    /// <summary>A new settlement sees every station on the map, with its build cost followed down to ingredients and fuel.</summary>
+    private static void CheckStationsShowWithTheirWholeBuildCostOnTheRecipeMap(GameData data) {
+        var world = EmptyWorld(data);
+        foreach (string station in new[] { "bench", "furnace", "reinforced", "anvil", "cooktable", "cannery" })
+            Require(world.MapDiscovery.Of(station) == MapState.NotMade, $"the {station} station should show on the map before anyone builds it");
+        Require(world.MapDiscovery.Of("steel_bar") == MapState.NotMade, "the cooking table's steel bar cost should show on the map");
+        Require(world.MapDiscovery.Of("iron_ore") == MapState.NotMade, "the iron ore that steel bars are made from should show on the map");
+        Require(world.MapDiscovery.Of("charcoal") == MapState.NotMade, "charcoal, a fuel for smelting iron, should show on the map");
+        Require(world.MapDiscovery.Of("canned_jam") == MapState.Undiscovered, "canned jam, which no station or goal needs, should stay undiscovered");
+        Require(world.MapDiscovery.Of("pump") == MapState.Undiscovered, "a building that makes nothing and no goal names should stay undiscovered");
+        Achieve(world, "furnace");
+        Require(world.MapDiscovery.Of("furnace") == MapState.Made, "a station once built should show as built");
     }
 }

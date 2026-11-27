@@ -269,8 +269,8 @@ public partial class RecipeMap : Control {
         // Marking a mine reveals its plan before the entrance, frame and rails are built.
         string status = node.State == MapState.NotMade ? (building == null ? "Not made yet" : "Not built yet")
             : building?.Kind == ThingKind.Mine ? "Discovered" : building == null ? "Made before" : "Built before";
-        var known = Style.Pill(status, Style.Tag(node.State == MapState.Made ? Style.Sage : Style.Tan), Style.SlotFill, 12);
-        known.SizeFlagsHorizontal = SizeFlags.ShrinkBegin; identity.AddChild(known);
+        var pill = Style.Pill(status, Style.Tag(node.State == MapState.Made ? Style.Sage : Style.Tan), Style.SlotFill, 12);
+        pill.SizeFlagsHorizontal = SizeFlags.ShrinkBegin; identity.AddChild(pill);
         var description = building is MapBuilding plan ? data.Buildings[plan.Kind].Description : data.DescriptionOf(item);
         if (building == null && FoodDescription.Of(data, item) is ItemDef food)
             details.AddChild(FoodDescription.Body(item, food, 14, Style.Ink));

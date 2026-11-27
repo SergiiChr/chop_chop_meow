@@ -3,7 +3,10 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A slot as the map draws it: filled for an item made before, faded for one not made yet, a dashed outline for an undiscovered one.</summary>
+/// <summary>
+/// A slot as the map draws it: filled for an item made before, faded for one not made yet, a dashed outline for an
+/// undiscovered one.
+/// </summary>
 public partial class MapSlot : Control {
     public MapState State { get; set; }
     public bool OverLight { get; init; }

@@ -28,12 +28,15 @@ public sealed class MapDiscovery {
         }
     }
 
-    public MapState Of(string item) => Made(item) ? MapState.Made : Shown(item) ? MapState.NotMade : MapState.Undiscovered;
+    public MapState Of(string item) =>
+        Made(item) ? MapState.Made : InShownChain(item) ? MapState.NotMade : MapState.Undiscovered;
 
     /// <summary>Building plans count as made once built, and items once had.</summary>
-    private bool Made(string item) => world.Data.IsBuilding(item) ? world.Reached(item) : world.Data.Items.ContainsKey(item) && world.Had(item);
+    private bool Made(string item) =>
+        world.Data.IsBuilding(item) ? world.Reached(item) : world.Data.Items.ContainsKey(item) && world.Had(item);
 
-    private bool Shown(string item) {
+    /// <summary>Whether a station's chain or the chain of a goal in the Goal Log holds the entry.</summary>
+    private bool InShownChain(string item) {
         if (stationChains.Contains(item)) return true;
         if (!goalChains.TryGetValue(item, out var goals)) return false;
         foreach (var goal in goals) if (world.Goals.Status(goal) != GoalStatus.Hidden) return true;
