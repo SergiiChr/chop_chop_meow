@@ -322,7 +322,7 @@ public partial class SidePanel : MovableWindow {
 
     /// <summary>
     /// Hands over the page's own long list, such as a recipe board's, so <see cref="Fit"/> lets it scroll in the room the rest of the page leaves rather than push that out of view.
-    /// A list handed over when the page draws again takes the height of the one before it at once, and its place a frame later, once its rows have their size; it is hidden until then.
+    /// A list handed over when the page draws again takes the height of the one before it at once, and its place once its rows have their size; it is hidden until then.
     /// </summary>
     public void ShowPageRows(ScrollContainer scrollArea, Control rows) {
         pageScroll = scrollArea; pageRows = rows;
@@ -333,12 +333,20 @@ public partial class SidePanel : MovableWindow {
 
     private async void RestoreScroll(ScrollContainer scrollArea, int offset) {
         if (offset == 0) return;
-        // Until its rows have their size the list cannot scroll, so it stays out of sight rather than show from the top for a frame.
+        // Until its rows and the room around them have their size the list cannot scroll that far, so it stays out of sight
+        // for those few frames rather than show from the top.
         scrollArea.Modulate = Colors.Transparent;
-        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        if (!IsInstanceValid(scrollArea)) return;
+        var bar = scrollArea.GetVScrollBar();
+        for (int frame = 0; frame < RestoreFrames; frame++) {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            if (!IsInstanceValid(scrollArea)) return;
+            if (bar.MaxValue - bar.Page >= offset) break;
+        }
         scrollArea.ScrollVertical = offset; scrollArea.Modulate = Colors.White;
     }
+
+    /// <summary>The most frames a list redrawn with its place kept waits for its size before it scrolls back there.</summary>
+    private const int RestoreFrames = 10;
 
     /// <summary>Sizes the panel's scroll area to what it shows, up to the room between the clock and the hotbar.</summary>
     public void Fit() {
