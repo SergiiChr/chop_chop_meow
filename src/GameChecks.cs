@@ -1143,6 +1143,7 @@ public partial class Game {
             await TestClean(CheckPaintFilterSwitchDrawsTheFilter);
             await TestClean(CheckInterfaceTextIsDrawnAtTheSizeItShows);
             await TestClean(CheckNewGameStartsTheWelcomePage);
+            await RunCampfireMusicUIChecks();
             await RunControlsMenuUIChecks(inGame: true);
             await RunPauseMenuUIChecks();
             await RunGoalUIChecks(freshGame: true);
@@ -1177,6 +1178,7 @@ public partial class Game {
             await TestClean(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
             await RunMineUIChecks();
             await RunHudUIChecks();
+            await RunFoodEffectUIChecks();
             await RunHotbarUIChecks();
             var chest = await RunBuildingPlacementUIChecks();
             await Test(() => CheckChestMovesSplitsAndFiltersStacks(chest));

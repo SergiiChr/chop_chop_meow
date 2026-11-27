@@ -33,6 +33,7 @@ public sealed class ActorState {
     public ActorAction From;
     public float FromTime;
     public bool FromMoving;
+    private float eatingWeight = 1, fromEatingWeight = 1;
     public float Blend = 1;
     /// <summary>Where a blow lands its tool's working end, a point in the world, or null when the action strikes nothing.</summary>
     public Vector3? Mark;
@@ -45,7 +46,7 @@ public sealed class ActorState {
     private ActorAnimation.BlowAim aim = new(), fromAim = new();
     /// <summary>Moves and poses the actor for a frame; it faces where it moves, or <paramref name="facingTarget"/> while standing or <paramref name="backing"/> away from it.</summary>
     public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt, bool backing = false,
-        Vector2? swingAim = null) {
+        Vector2? swingAim = null, bool eating = true) {
         float moved = position.DistanceTo(Position);
         bool moving = moved > .001f;
         float yaw = ActorAnimation.Yaw(moving && !backing ? position - Position : facingTarget - position, Yaw);
@@ -55,17 +56,22 @@ public sealed class ActorState {
             Turning.Hold(Yaw);
         } else Turning.Step(ref Yaw, yaw, dt > 0 ? Math.Min(moved / dt, 8) : 0, dt, action == ActorAction.Run);
         Position = position;
+        float wantsEating = eating ? 1 : 0;
         if (Action != action) {
             From = Action; FromTime = Time; FromMoving = Moving; Blend = 0;
+            fromEatingWeight = eatingWeight; eatingWeight = wantsEating;
             (aim, fromAim) = (fromAim, aim);
             aim.Mark = fromAim.Mark;
             Action = action; Time = 0; PreviousTime = -1;
-        } else { PreviousTime = Time; Time += ActorAnimation.Advance(action, dt, moved); }
+        } else {
+            PreviousTime = Time; Time += ActorAnimation.Advance(action, dt, moved);
+            eatingWeight = Mathf.MoveToward(eatingWeight, wantsEating, dt / ActorAnimation.BlendSeconds);
+        }
         FromTime += ActorAnimation.Advance(From, dt, moved);
         Blend = Math.Min(1, Blend + dt / ActorAnimation.BlendSeconds);
         Moving = moving;
     }
-    public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend, aim, fromAim);
+    public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend, aim, fromAim, eatingWeight, fromEatingWeight);
 
     /// <summary>True on the frame an action loop passes its impact moment.</summary>
     public bool Struck(float at) {

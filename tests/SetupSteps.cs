@@ -19,6 +19,14 @@ internal static class SetupSteps {
     /// <summary>Puts goods in the backpack: gathering or buying each would take a day of ticks, and many goods are not sold.</summary>
     public static int Give(World world, string item, int count = 1) => Give(world.S.Actor, item, count);
 
+    /// <summary>Reveals map entries without crafting a chain and returns how to remove only these fixture discoveries.</summary>
+    public static Action TemporarilyDiscover(World world, params string[] items) {
+        var known = world.S.Obtained;
+        var added = new List<string>(items.Length);
+        foreach (string item in items) if (known.Add(item)) added.Add(item);
+        return () => { foreach (string item in added) known.Remove(item); };
+    }
+
     /// <summary>Puts freshly caught firebugs in the backpack, without finding and catching each at night.</summary>
     public static int GiveFirebugs(World world, int count) => world.Firebugs.Catch(world.S.Backpack, count);
 
@@ -146,7 +154,7 @@ internal static class SetupSteps {
     /// <summary>Sets exact market values, so a load that restores them cannot pass on a default.</summary>
     public static void SetMarket(World world, string item, float price, float demand) { world.S.Prices[item] = price; world.S.Demand[item] = demand; }
 
-    /// <summary>Moves the clock without ticks: two real days would refill the market a check is watching, so only the age of the news changes.</summary>
+    /// <summary>Moves the clock without running the settlement, so a check can start at a chosen time.</summary>
     public static void SkipClock(World world, float seconds) => world.S.Time += seconds;
 
     /// <summary>Eats or drinks an item from one backpack cell, as a hotbar slot bound to that stack does.</summary>

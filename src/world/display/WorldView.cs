@@ -775,12 +775,13 @@ public partial class WorldView : Node3D {
                 work = ActorAction.Glassblow; assignment = glassForge;
             }
             if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind or ActorAction.TwistRope && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
+            var campfire = work is ActorAction.Sit or ActorAction.Perch ? CampfireMusicView.At(World, Sounds, worker) : default;
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch ? worker.Pos + Vector2.FromAngle(worker.LunchHeading) : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down.Rotated(assignment.Rotation)
                 : assignment is { Kind: ThingKind.Mine } mine ? Mines.Facing(mine, worker.Pos) : assignment?.Pos ?? worker.Pos;
             bool sameAction = state.Action == work;
-            state.Update(worker.Pos, work, facing, dt);
+            state.Update(worker.Pos, work, facing, dt, eating: campfire.Eating);
             state.Mark = Mark(assignment, state, work);
             bool waterTool = BarrelHaul.Vessel(worker.Tool);
             string? vessel = waterTool || BerryJam.InBottle(worker.Tool) ? worker.Tool : null;
@@ -810,6 +811,7 @@ public partial class WorldView : Node3D {
                     vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null);
                 if (slotted != null) swung.Add(assignment!.Id);
             }
+            entry.Rig.AnimateCampfireMusic(campfire.Instrument, campfire.Playing, campfire.Nodding, campfire.Beat);
             entry.Rig.Root.Visible = DrawsWorker(worker);
             Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest

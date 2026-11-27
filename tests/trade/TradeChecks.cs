@@ -234,8 +234,7 @@ public static class TradeChecks {
         var bought = sign.Output!.Items.Keys.Where(World.IsCrate).ToList();
         Require(bought.Count == 2 && bought.All(id => world.Packed(id)?["canned_meat_stew"] == 12), "each bought crate should arrive packed with one purchase");
         SetNeeds(world, hunger: 30); Give(world, "canned_meat_stew", 1); world.Consume("canned_meat_stew");
-        // A can of meat stew feeds 60.
-        Require(world.Hunger == 90, "canned meat stew should be eaten from the can");
+        Require(world.Backpack["canned_meat_stew"] == 0 && world.Hunger == 150, "canned meat stew should be eaten from the can");
         Require(world.Had("canned_meat_stew"), "what the cart brings back should count as had");
         Require(world.KnownPrice("raw_meat") > 0 && !world.Priced("wheat_seeds"), "the price sheet only tracks goods the village buys");
         Require(!data.Items.ContainsKey("canned_food") && data.Recipes.Values.All(r => !r.Inputs.ContainsKey("raw_meat") || r.Station != ThingKind.Cannery), "raw meat should sell in crates and never go into a can");

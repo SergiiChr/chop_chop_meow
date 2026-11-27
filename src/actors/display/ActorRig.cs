@@ -36,6 +36,8 @@ public sealed class ActorRig {
     private readonly Node3D torch;
     private readonly Dictionary<ActorAction, Node3D>? weaponModels;
     private Node3D? weaponShown;
+    private readonly Dictionary<CampfireInstrument, Node3D>? campfireInstruments;
+    private Node3D? campfireInstrumentShown;
     private bool torchByBed;
     private Node3D shovel = null!, rake = null!;
     private readonly List<(Skeleton3D Skeleton, Node3D Joint)> limbs = new();
@@ -109,6 +111,13 @@ public sealed class ActorRig {
             case ActorSkin.Worker:
                 BuildWorkerDetails(worn.Skin, worn.Hair, worn.Hips);
                 HardHat(head);
+                campfireInstruments = new(3);
+                foreach (var instrument in CampfireInstrumentShape.All) {
+                    var prop = CampfireInstrumentShape.Create(instrument, worn.Skin);
+                    prop.Hide();
+                    Root.AddChild(prop);
+                    campfireInstruments.Add(instrument, prop);
+                }
                 break;
             case ActorSkin.Courier:
                 BuildFace(worn.Skin, worn.Hair);
@@ -680,6 +689,50 @@ public sealed class ActorRig {
     /// <summary>Lowers the hands from where they last held the pump into the next action's arm pose.</summary>
     internal void ReleasePumpHandle(Pose pose, float weight) {
         if (lastPumpGrip is { } grip) ReachPumpGrip(pose, grip.Left, grip.Right, weight);
+    }
+
+    /// <summary>Adds a held instrument and the music's motion over the seated pose, without moving its hips or feet.</summary>
+    internal void AnimateCampfireMusic(CampfireInstrument instrument, float playing, float nodding, float beat) {
+        if (campfireInstruments == null) return;
+        var prop = instrument == CampfireInstrument.None ? null : campfireInstruments[instrument];
+        if (prop != campfireInstrumentShown) {
+            campfireInstrumentShown?.Hide();
+            campfireInstrumentShown = prop;
+            prop?.Show();
+        }
+        if (prop == null && nodding == 0) return;
+
+        float glance = instrument switch {
+            CampfireInstrument.Harmonica => -3 * playing,
+            CampfireInstrument.Guitar => 4 + 5 * playing,
+            CampfireInstrument.Drum => 3 + 7 * playing,
+            _ => 0
+        };
+        head.RotationDegrees += Vector3.Right * (glance + CampfirePerformance.Nod(beat) * nodding);
+        if (prop == null) return;
+        var body = hips.Transform * torso.Transform * chest.Transform;
+        var hold = instrument switch {
+            CampfireInstrument.Guitar => CampfirePerformance.Guitar(hips.Position, rock.Visible, playing, beat),
+            CampfireInstrument.Drum => CampfirePerformance.Drum(hips.Position, rock.Visible, playing, beat),
+            _ => CampfirePerformance.Harmonica(hips.Position, body * head.Transform, playing, beat)
+        };
+        prop.Transform = hold.Prop;
+        var fromRoot = body.AffineInverse();
+        Reach(true, fromRoot * hold.Left);
+        Reach(false, fromRoot * hold.Right, hold.RightPad ? HandPadReach : 0);
+        foreach (var (skeleton, joint) in limbs)
+            skeleton.SetBonePoseRotation(1, joint.Quaternion);
+
+        void Reach(bool left, Vector3 at, float pastFist = 0) {
+            // The guitar's neck is reached from below. The strumming elbow comes round the front of the soundboard.
+            var elbowToward = instrument != CampfireInstrument.Guitar ? new Vector3(left ? .8f : -.8f, -1, -.3f)
+                : left ? new Vector3(1, -.65f, -.1f) : new Vector3(-1, .75f, 1.8f);
+            var (raise, outward, bend, roll) = ArmReach.ArmTo(at, left, elbowToward, Palm,
+                build.Shoulder(left), build.UpperArm, build.Forearm + pastFist);
+            (left ? shoulderL : shoulderR).RotationDegrees = new Vector3(-raise, 0, left ? outward : -outward);
+            (left ? elbowL : elbowR).RotationDegrees = new Vector3(-bend, 0, 0);
+            RollArm(left, roll);
+        }
     }
 
     private void ReachPumpGrip(Pose pose, Vector3 leftGrip, Vector3 rightGrip, float weight) {

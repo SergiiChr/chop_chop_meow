@@ -44,6 +44,7 @@ public partial class NeedGauge : Control {
 public partial class Vial : Control {
     public Color Fill { get; set; }
     public float Level { get; set; } = 100;
+    public float Bonus { get; set; }
     /// <summary>Rims the capsule in brick: the level runs out.</summary>
     public bool Warn { get; set; }
 
@@ -52,9 +53,24 @@ public partial class Vial : Control {
     public override void _Draw() {
         var rect = new Rect2(Vector2.Zero, Size);
         DrawStyleBox(Warn ? WarnBox : Box, rect);
-        float inner = Size.Y - 6, height = inner * Math.Clamp(Level, 0, 100) / 100;
-        if (height > 1) DrawStyleBox(FillBox(Fill), new Rect2(3, 3 + inner - height, Size.X - 6, height));
+        float normal = Math.Clamp(Level, 0, 100);
+        float bonus = Math.Clamp(Math.Max(Bonus, Level - 100), 0, 100);
+        float firstLap = Math.Min(100 - normal, bonus);
+        Color brighter = Fill.Lightened(.4f);
+        float scale = (Size.Y - 6) / 100;
+        if (normal > 0) DrawFill(Fill, 0, normal + firstLap);
+        DrawFill(brighter, normal, firstLap, joinsBottom: normal > 0);
+        DrawFill(brighter, 0, bonus - firstLap);
+
+        void DrawFill(Color color, float start, float amount, bool joinsBottom = false) {
+            float height = amount * scale;
+            if (height > 1) DrawStyleBox(FillBox(color, joinsBottom),
+                new Rect2(3, Size.Y - 3 - start * scale - height, Size.X - 6, height));
+        }
     }
+
+    internal static string LevelText(string name, float total, float bonus = 0) =>
+        bonus > 0 ? $"{name}: {total - bonus:0}% + {bonus:0}% bonus." : $"{name} {total:0}%";
 
     private static readonly StyleBoxFlat Box = Round(Style.SlotFill, Style.Line), WarnBox = Round(Style.SlotFill, Style.Brick);
     private static StyleBoxFlat Round(Color bg, Color edge) {
@@ -62,10 +78,13 @@ public partial class Vial : Control {
         box.SetCornerRadiusAll(11); box.SetBorderWidthAll(2);
         return box;
     }
-    // One box per colour, made the first time it is drawn.
-    private static readonly System.Collections.Generic.Dictionary<Color, StyleBoxFlat> fills = new();
-    private static StyleBoxFlat FillBox(Color color) {
-        if (!fills.TryGetValue(color, out var box)) { fills[color] = box = new StyleBoxFlat { BgColor = color, AntiAliasing = true }; box.SetCornerRadiusAll(8); }
+    // The brighter fill can end on a flat edge where it meets the normal fill.
+    private static readonly System.Collections.Generic.Dictionary<(Color, bool), StyleBoxFlat> fills = new();
+    private static StyleBoxFlat FillBox(Color color, bool joinsBottom) {
+        if (fills.TryGetValue((color, joinsBottom), out var box)) return box;
+        fills[(color, joinsBottom)] = box = new StyleBoxFlat { BgColor = color, AntiAliasing = true };
+        box.SetCornerRadiusAll(8);
+        if (joinsBottom) { box.CornerRadiusBottomLeft = 0; box.CornerRadiusBottomRight = 0; }
         return box;
     }
 }
@@ -153,14 +172,16 @@ public partial class NeedsPlate : PanelContainer {
     }
 
     // The rounded values the tooltips show, so their text is built only when one changes.
-    private (int Health, int Hunger, int Thirst) shownNeeds = (-1, -1, -1);
+    private (int Health, int Hunger, int Thirst, int BonusHealth) shownNeeds = (-1, -1, -1, -1);
     private (int Bank, int Due, int Revenue) shownBank = (-1, -1, -1);
     public void Refresh() {
-        var needs = ((int)MathF.Round(world.Health, MidpointRounding.AwayFromZero), (int)MathF.Round(world.Hunger, MidpointRounding.AwayFromZero), (int)MathF.Round(world.Thirst, MidpointRounding.AwayFromZero));
+        var needs = ((int)MathF.Round(world.Health, MidpointRounding.AwayFromZero), (int)MathF.Round(world.Hunger, MidpointRounding.AwayFromZero), (int)MathF.Round(world.Thirst, MidpointRounding.AwayFromZero), (int)MathF.Round(world.BonusHealth, MidpointRounding.AwayFromZero));
         if (needs != shownNeeds) {
             shownNeeds = needs;
-            Health.TooltipText = $"Health {world.Health:0}%"; Hunger.TooltipText = $"Hunger {world.Hunger:0}%"; Thirst.TooltipText = $"Thirst {world.Thirst:0}%";
-            Health.Level = world.Health; Hunger.Level = world.Hunger; Thirst.Level = world.Thirst;
+            Health.TooltipText = Vial.LevelText("Health", world.Health, world.BonusHealth);
+            Hunger.TooltipText = $"Hunger {world.Hunger:0}%"; Thirst.TooltipText = $"Thirst {world.Thirst:0}%";
+            Health.Level = world.Health - world.BonusHealth; Health.Bonus = world.BonusHealth;
+            Hunger.Level = world.Hunger; Thirst.Level = world.Thirst;
             Health.Warn = world.Health <= 25; Hunger.Warn = world.Hunger <= 25; Thirst.Warn = world.Thirst <= 25;
             Health.QueueRedraw(); Hunger.QueueRedraw(); Thirst.QueueRedraw();
         }

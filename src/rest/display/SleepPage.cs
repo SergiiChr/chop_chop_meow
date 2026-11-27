@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace ChopChopMeow;
@@ -17,21 +18,25 @@ public abstract partial class SleepPage(PageTools tools, Thing subject) : ThingP
         foreach (var need in needs) gauges.AddChild(need);
 
         live.Watch(() => (world.Data.GameMinutes(world.Sleep.SecondsToDawn), (int)world.Health,
-            (int)world.Hunger, (int)world.Thirst, Barrel.In(thing.Inventory), world.Sheltered, world.Sleep.SleepingAt), _ => {
-                var (seconds, health, hunger, thirst) = world.Sleep.Preview(thing);
+            (int)world.Hunger, (int)world.Thirst, (int)world.BonusHealth, EffectMinutesBeforeDawn(FoodEffect.ProteinRecovery),
+            EffectMinutesBeforeDawn(FoodEffect.Vitamins), Barrel.In(thing.Inventory), world.Sheltered, world.Sleep.SleepingAt), _ => {
+                var (seconds, health, hunger, thirst, bonus) = world.Sleep.Preview(thing);
                 bool dawn = seconds == world.Sleep.SecondsToDawn;
                 until.Text = LiveText.Of(text => PageText.AppendGameHours(world, text.Append(dawn ? "until dawn · +" : "up to "), seconds));
-                Show(0, "Health", health); Show(1, "Hunger", hunger); Show(2, "Thirst", thirst);
+                Show(0, "Health", health, bonus); Show(1, "Hunger", hunger); Show(2, "Thirst", thirst);
 
-                void Show(int i, string need, float level) {
+                void Show(int i, string need, float level, float bonus = 0) {
                     var vial = needs[i].Vial;
-                    vial.Level = level; vial.Warn = level <= 25;
-                    vial.TooltipText = $"{need} {(dawn ? "at dawn" : "on waking")} {level:0}%";
+                    vial.Level = level - bonus; vial.Bonus = bonus; vial.Warn = level <= 25;
+                    vial.TooltipText = Vial.LevelText($"{need} {(dawn ? "at dawn" : "on waking")}", level, bonus);
                     vial.QueueRedraw();
                 }
             });
         return well;
     }
+
+    private int EffectMinutesBeforeDawn(FoodEffect effect) =>
+        world.Data.GameMinutes((float)Math.Min(world.Sleep.SecondsToDawn, world.FoodEffects.SecondsLeft(effect)));
 
     protected Button SleepButton() {
         bool straw = thing.Kind == ThingKind.StrawBed;
