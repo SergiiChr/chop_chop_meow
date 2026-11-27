@@ -162,7 +162,7 @@ public partial class Game : Node, IGameFlow {
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
         // The menus and pages added after it cover it.
         goalPopup = new GoalPopup(world, sounds, OpenGoalFromPopup, () => findPrompt.Visible || sheet.Visible); ui.AddChild(goalPopup);
-        ui.AddChild(panel.Aside); ui.AddChild(panel); ui.AddChild(bag);
+        ui.AddChild(panel.ToolsWindow); ui.AddChild(panel); ui.AddChild(bag);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         layerButton = kit.HeaderButton("layers", "Layer · Switch between the surface and underground", player.ToggleLayer, Style.TabRound, "layer");
@@ -427,7 +427,7 @@ public partial class Game : Node, IGameFlow {
                 case Key.R when player.PlacingPipe:
                 case Key.V: player.RotatePlacement(1, OverInterface); break;
                 case Key.T: player.CyclePipeShape(OverInterface); break;
-                case Key.Tab: panel.Toggle(Page.Backpack); break;
+                case Key.Tab: panel.ToggleBackpack(); break;
                 case Key.F5: saves.QuickSave(startMenu); break;
                 case Key.F9: saves.QuickLoad(startMenu); break;
                 case >= Key.Key1 and <= Key.Key9: hotbar.Select((int)(key.PhysicalKeycode - Key.Key1)); break;

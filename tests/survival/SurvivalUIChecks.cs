@@ -109,7 +109,7 @@ public partial class Game {
         Give(Hosted, Water.TwoLiters, 1);
         var table = Hosted.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
         Hosted.SetRecipe(table, "dough");
-        await ClickOn(table); await Frames(3);
+        await ClickOn(table); await Frames(3); await ShowBackpack();
         await Holding(Key.Shift, () => Click(BagCellOf(Water.TwoLiters)));
         await Until(() => table.Inventory[Water.Liquid] == 2, "Shift on a two-liter bottle pouring two liters of water", 2);
         Require(world.Backpack[Water.Empty] == 1 && world.Backpack[Water.TwoLiters] == 0, "The poured bottle must stay in the backpack, empty.");

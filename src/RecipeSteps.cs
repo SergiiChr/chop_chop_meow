@@ -89,6 +89,7 @@ public partial class Game {
     /// then each input carried from the backpack onto its input slot.
     /// </summary>
     private async Task LoadByHand(Thing station, string id, RecipeDef r) {
+        await ShowBackpack();
         if (station.Recipe != id) {
             await Click(Named($"craft_{id}")!);
             await Until(() => station.Recipe == id && Named($"input_{r.Inputs.Keys.First()}") != null, $"a click on {id} turning the station to it", 2);

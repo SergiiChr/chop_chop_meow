@@ -11,7 +11,7 @@ public partial class Game {
 
     /// <summary>Opens the barrel with the given fill from its backpack cell.</summary>
     private async Task OpenBackpackBarrel(string item) {
-        if (panel.Page != Page.Backpack) await KeyStroke(Key.Tab);
+        await ShowBackpack();
         await DoubleClick(BagCellOf(item));
         await Until(() => panel.Page == Page.Barrel && Named("barrel_water")?.TooltipText.Contains($"{Barrel.Liters(item)}/{Barrel.Capacity} L") == true,
             $"the {world.Data.Name(item)} opening in the backpack", 2);

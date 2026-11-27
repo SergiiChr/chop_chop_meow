@@ -151,7 +151,7 @@ public partial class Game {
         await RightClick(spot, .25f);
         Require(panel.Selection.Thing == lantern.Id && panel.HeadingTitle.Text == "Empty lantern", "a right click on a placed empty lantern should show its panel");
         var slot = Named("lantern_firebugs")!;
-        await PickUp(BagCellOf(Firebugs.Item));
+        await ShowBackpack(); await PickUp(BagCellOf(Firebugs.Item));
         int heldBefore = cursor.Stack?.Count ?? 0;
         Require(heldBefore >= 12, "the cursor should hold enough firebugs for a fill and an overflow");
         await RightClick(slot);

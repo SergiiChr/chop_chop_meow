@@ -54,6 +54,7 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
 
     public override bool Current => world.Find(thing.Id) == thing;
     protected override bool StoresFromHotbar => true;
+    public override bool OpensBackpack => thing.IsStorage;
     protected override bool PoursFromBag(string item) => world.PoursInto(thing, thing.Inventory, item) != null;
 
     protected override void Build() {
@@ -61,7 +62,7 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         Reach();
         Body();
         if (thing.PlumbingSlot is Inventory plumbingSlot) {
-            var window = panel.ShowAside(190);
+            var window = panel.ShowTools(190);
             window.AddChild(Style.Heading("Plumbing", 19));
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 8);

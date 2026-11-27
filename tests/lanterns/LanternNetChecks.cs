@@ -41,7 +41,7 @@ public partial class Game {
         await Click(view.Screen(at));
         await Until(() => world.ThingsOf(ThingKind.Lantern).Any(t => t.Pos == at && view.Pick(view.Screen(at, .25f))?.Id == t.Id),
             "the placed lantern becoming clickable in the guest's window");
-        await RightClick(at, .25f);
+        await RightClick(at, .25f); await ShowBackpack();
         await Carry(BagCellOf(Firebugs.Item), Named("lantern_firebugs")!);
         await Signaled("lantern-filled");
         await Until(() => world.Find(panel.Selection.Thing) is Thing t && world.Lanterns.BugCount(t.LanternItem) == 3,

@@ -96,14 +96,13 @@ public partial class SidePanel : MovableWindow {
     private PagePanel? page;
 
     public BackpackDrawer Bag { get; }
-    /// <summary>A small window of its own beside the panel and level with its top, which a page fills through <see cref="ShowAside"/>; it follows the panel.</summary>
-    public PanelContainer Aside { get; }
-    private readonly VBoxContainer asideContent;
-    private bool asideShown;
+    /// <summary>The Tools window beside the panel, level with the top of the page under its title, which a page fills through <see cref="ShowTools"/>; it follows the panel.</summary>
+    public ToolsWindow ToolsWindow { get; }
+    private bool toolsShown;
     /// <summary>Room right of and below a page for the pills that sit on its slots' corners.</summary>
     public const int PillRoom = 8;
-    /// <summary>The gap between the panel and the window beside it.</summary>
-    private const float AsideGap = 12;
+    /// <summary>The gap between the panel and the Tools window.</summary>
+    private const float ToolsGap = 12;
     /// <summary>The player's control of the world, which also needs this panel, so the game sets it once both exist.</summary>
     public PlayerControl Player { get; set; } = null!;
     /// <summary>The recipe map, which also needs this panel, so the game sets it once both exist.</summary>
@@ -130,8 +129,7 @@ public partial class SidePanel : MovableWindow {
         GrowHorizontal = GrowDirection.Begin;
         Bag = new BackpackDrawer(kit, this);
         AddChild(DoorKey);
-        Aside = new PanelContainer { Name = "aside", Visible = false }; Aside.AddThemeStyleboxOverride("panel", Style.Board);
-        asideContent = new VBoxContainer(); asideContent.AddThemeConstantOverride("separation", 12); Aside.AddChild(asideContent);
+        ToolsWindow = new ToolsWindow(kit);
         var frame = new HBoxContainer(); frame.AddThemeConstantOverride("separation", 20); AddChild(frame);
         // Boxes on the panel pass a press on their own surface on, so it moves the panel.
         board = new PanelContainer { Visible = false, SizeFlagsVertical = SizeFlags.ShrinkBegin, MouseFilter = MouseFilterEnum.Pass }; frame.AddChild(board);
@@ -154,14 +152,16 @@ public partial class SidePanel : MovableWindow {
         shownInspect = Selection;
         Visible = true; view.PanelOpen = true;
         if (same && page is { Current: true }) { page.Redraw(); return; }
-        // A different page or building leaves the backpack drawer's close button behind, and opens both windows where they open first.
-        if (!same) { Bag.Dismissed = false; ResetPlace(); Bag.ResetPlace(); }
+        // A different page or building opens both windows where they open first, and its Tools window rolled up.
+        if (!same) { ResetPlace(); Bag.ResetPlace(); ToolsWindow.RollUp(); }
         Page = name; pageOffset = 0; pageHeight = 0;
         foreach (var child in content.GetChildren()) { content.RemoveChild(child); child.QueueFree(); }
         ClearFrame();
         page = Pages[(int)name].Make(tools, Selection);
+        // A new page that opens the backpack does so before it builds, so it builds the drawer showing.
+        if (!same && page.OpensBackpack) Bag.Opened = true;
         content.AddChild(page);
-        if (!asideShown) Aside.Visible = false;
+        if (!toolsShown) ToolsWindow.Visible = false;
         page.Refresh(); Bag.Refresh();
     }
 
@@ -172,9 +172,9 @@ public partial class SidePanel : MovableWindow {
         HeadingTitle.Text = Pages[(int)Page].Title;
         foreach (var child in sheet.GetChildren()) { sheet.RemoveChild(child); child.QueueFree(); }
         board.Visible = false; sheet.Visible = false; sheetScroll = null; pageScroll = null;
-        // The window beside the panel stays up while a page that fills it draws again; Fit hides it once no page does.
-        foreach (var child in asideContent.GetChildren()) { asideContent.RemoveChild(child); child.QueueFree(); }
-        asideShown = false;
+        // The Tools window stays up while a page that fills it draws again; Fit hides it once no page does.
+        ToolsWindow.Clear();
+        toolsShown = false;
         OffsetLeft = LeftEdge; scroll.ScrollVertical = 0;
         Bag.Clear();
     }
@@ -186,12 +186,17 @@ public partial class SidePanel : MovableWindow {
     public bool Shows(PagePanel shown) => page == shown;
 
     /// <summary>Leaves only the backpack drawer on screen, so the camera keeps the player centred.</summary>
-    public void DrawerOnly() { Visible = false; Aside.Visible = false; view.PanelOpen = false; }
+    public void DrawerOnly() { Visible = false; ToolsWindow.Visible = false; view.PanelOpen = false; }
+
+    /// <summary>Shows or hides the backpack under a page that works with it, and keeps the page; elsewhere opens or closes the backpack's own page.</summary>
+    public void ToggleBackpack() {
+        if (Visible && Bag.Filled) Bag.Opened = !Bag.Opened; else Toggle(Page.Backpack);
+    }
 
     /// <summary>Opens a page, or closes it if it is the one showing.</summary>
     public void Toggle(Page name) { if (Page == name) Close(); else Open(name); }
 
-    public void Close() { cursor.Release(); Visible = false; Bag.Visible = false; Aside.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
+    public void Close() { cursor.Release(); Visible = false; Bag.Opened = false; ToolsWindow.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
 
     /// <summary>Whether the open page shows something that has gone, and so closes or gives way on the next refresh.</summary>
     public bool SubjectGone => page is { Current: false };
@@ -296,10 +301,10 @@ public partial class SidePanel : MovableWindow {
     /// <param name="hidesDrawer">Hides the backpack drawer while the list shows, so the board reaches down to the hotbar, for a list picked from by click.</param>
     public void ShowSheetRows(ScrollContainer scrollArea, Control rows, float? rest = null, bool hidesDrawer = false) { sheetScroll = scrollArea; sheetRows = rows; sheetRest = rest; sheetHidesDrawer = hidesDrawer; }
 
-    /// <summary>Shows the window beside the panel and gives the column a page fills it with.</summary>
-    public VBoxContainer ShowAside(float width) {
-        asideShown = true; asideContent.CustomMinimumSize = new Vector2(width, 0);
-        return asideContent;
+    /// <summary>Shows the Tools window and gives the column a page fills it with.</summary>
+    public VBoxContainer ShowTools(float width) {
+        toolsShown = true; ToolsWindow.Content.CustomMinimumSize = new Vector2(width, 0);
+        return ToolsWindow.Content;
     }
 
     /// <summary>
@@ -322,13 +327,14 @@ public partial class SidePanel : MovableWindow {
     /// <summary>Sizes the panel's scroll area to what it shows, up to the room between the clock and the hotbar.</summary>
     public void Fit() {
         if (!Visible) return;
-        Aside.Visible = asideShown;
-        if (asideShown) {
-            if (Aside.Size != Aside.GetCombinedMinimumSize()) Aside.ResetSize();
-            // Left of the panel, or right of it where the panel stands too near the screen's left edge.
-            float left = Position.X - Aside.Size.X - AsideGap;
-            var at = new Vector2(left >= 0 ? left : Position.X + Size.X + AsideGap, Position.Y);
-            if (Aside.Position != at) Aside.Position = at;
+        ToolsWindow.Visible = toolsShown;
+        if (toolsShown) {
+            ToolsWindow.Fit();
+            // Left of the panel, or right of it where the panel stands too near the screen's left edge for it unrolled, so it keeps its side while it unrolls.
+            bool fitsLeft = Position.X - ToolsWindow.UnrolledWidth - ToolsGap >= 0;
+            // Its top is level with the page's under the title.
+            var at = new Vector2(fitsLeft ? Position.X - ToolsWindow.Size.X - ToolsGap : Position.X + Size.X + ToolsGap, Position.Y + scroll.GlobalPosition.Y - GlobalPosition.Y);
+            if (ToolsWindow.Position != at) ToolsWindow.Position = at;
         }
         float room = Math.Max(160, ui.Size.Y - Position.Y - 120);
         if (pageScroll != null) {
@@ -337,10 +343,9 @@ public partial class SidePanel : MovableWindow {
             if (Math.Abs(pageScroll.CustomMinimumSize.Y - pageHeight) > .5f) pageScroll.CustomMinimumSize = new Vector2(0, pageHeight);
         }
         float want = Math.Min(inset.GetCombinedMinimumSize().Y, room);
+        Bag.Crowded = sheet.Visible && sheetScroll != null && sheetHidesDrawer;
         if (sheet.Visible && sheetScroll != null) {
             // The board reaches further left than the panel, over the backpack drawer, so it stops above the drawer.
-            // The page shows the drawer after the list is handed over, so the list hides it here.
-            if (sheetHidesDrawer && Bag.Visible) Bag.Visible = false;
             float clear = Bag.Visible && Bag.Position.Y > Position.Y ? Bag.Position.Y - Position.Y - 40 : room;
             float rest = sheetRest ?? sheet.GetCombinedMinimumSize().Y - sheetScroll.CustomMinimumSize.Y + 60;
             float rows = Math.Max(60, Math.Min(sheetRows!.GetCombinedMinimumSize().Y, Math.Min(room, clear) - rest));

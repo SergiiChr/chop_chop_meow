@@ -83,9 +83,11 @@ public abstract partial class PagePanel : VBoxContainer {
             else batch(id);
         };
         panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, spared, hint, takes, wanted, BagColumns, use: UseFromBag, put: put, open: panel.OpenLantern));
-        panel.Bag.Visible = !panel.Bag.Dismissed;
+        panel.Bag.ShowIfOpened();
         if (StoresFromHotbar) panel.Bag.Store = batch;
     }
+    /// <summary>Whether opening this page opens the backpack under it: only the backpack's own page and storage, such as a chest or an opened crate, do.</summary>
+    public virtual bool OpensBackpack => false;
     /// <summary>Whether a Ctrl- or Shift-click on the hotbar moves items here as one in the backpack drawer does: true on pages about a building or an opened crate.</summary>
     protected virtual bool StoresFromHotbar => false;
     /// <summary>Whether the page takes the contents of a vessel while the vessel stays in the backpack.</summary>
