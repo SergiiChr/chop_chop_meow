@@ -368,16 +368,19 @@ Keep rendering and input separate from state transitions, so headless checks can
 Health, hunger and thirst are HUD icons.
 Coins are a backpack item that stacks to 1000.
 
-Every page that works with the backpack shows it in one place, a drawer above the hotbar (`PagePanel.BagGrid`), while
-the player has the backpack open (`BackpackDrawer.Opened`).
-`Opened` is the only state the game sets: the drawer shows while it is set and the page fills the drawer, unless a
-list picked from by click takes the drawer's room (`BackpackDrawer.Crowded`).
+Every page shows the backpack in one place, a drawer above the hotbar, while the player has it open
+(`BackpackDrawer.Opened`).
+A page that works with the backpack fills the drawer with its own grid (`PagePanel.BagGrid`), and any other gets a plain
+one, so the backpack works the same under every page.
+`Opened` is the only state that says whether the player wants it: the drawer shows while it is set and the page fills
+the drawer, unless a list picked from by click takes the drawer's room (`BackpackDrawer.Crowded`).
 A new page opens the backpack when `PagePanel.OpensBackpack` says so: only the backpack's own page, storage
 (`Thing.IsStorage`) and a crate or barrel opened from the backpack.
 So a click on a station or a worker, or the crafting menu, leaves the backpack as it was, and a click on a chest
 opens it.
-Tab shows or hides the drawer under a page that fills it and keeps the page (`SidePanel.ToggleBackpack`).
-Elsewhere it opens or closes the backpack's own page.
+Tab shows or hides the drawer under the open page and keeps the page (`SidePanel.ToggleBackpack`).
+Over a list that hid the drawer, Tab shows it again and the list makes room above it.
+With no page open, Tab opens or closes the backpack's own page.
 Closing the panel closes the backpack.
 On a page about a building or an opened crate (`PagePanel.StoresFromHotbar`), the drawer's Ctrl- and Shift-click (`BackpackDrawer.Store`) also runs for one on a hotbar slot.
 The stacks that page takes are rimmed in brick and the rest are faded.

@@ -14,6 +14,7 @@ public partial class Game {
         await TestClean(CheckOpeningAPageLeavesTheViewStill);
         await TestClean(CheckBuildingClicksLeaveTheBackpackAsItWas);
         await TestClean(CheckToolsWindowUnrollsFromItsRoll);
+        await TestClean(CheckTabShowsTheBackpackOverAFilterList);
     }
 
     /// <summary>A click on a building or a worker, or the crafting menu, leaves the backpack open or closed as it was, storage opens it, and Tab shows or hides it under the open page.</summary>
@@ -38,6 +39,10 @@ public partial class Game {
         Require(Shows(chest) && bag.Visible, "A chest's page must open the backpack.");
         await ClickOn(bench);
         Require(Shows(bench) && bag.Visible, "A station opened while the backpack is open must keep it open.");
+        await KeyStroke(Key.H);
+        Require(panel.Page == Page.Crew && bag.Visible, "The crew page, which moves no items, must keep the backpack open under it.");
+        await KeyStroke(Key.Tab);
+        Require(panel.Page == Page.Crew && !bag.Visible, "Tab must hide the backpack under the crew page and keep the page open.");
         RemoveThings(Hosted, t => t == bench || t == chest); await CloseWithEsc();
     }
 
@@ -60,6 +65,17 @@ public partial class Game {
         await Until(() => Shows(second) && window.Visible, "the second station's page opening", 2);
         Require(!window.Unrolled && window.Size.X <= ToolsRolledWidth, "The next station must open its Tools window rolled up.");
         RemoveThings(Hosted, t => t == first || t == second); await CloseWithEsc();
+    }
+
+    /// <summary>A chest's item list hides the backpack, and Tab shows it again with the list made shorter to end above it, keeping the filter window open.</summary>
+    private async Task CheckTabShowsTheBackpackOverAFilterList() {
+        var chest = await OpenFilters(ThingKind.Chest);
+        await Click(Named("filter_add_in")!);
+        await Until(() => OnPage("item_list") != null && !bag.Visible, "the chest's item list opening and hiding the backpack", 2);
+        await KeyStroke(Key.Tab);
+        await Until(() => bag.Visible && OnPage("item_list") is Control list && list.GetGlobalRect().End.Y <= bag.GetGlobalRect().Position.Y,
+            "Tab showing the backpack with the item list ending above it", 2);
+        RemoveThings(Hosted, t => t == chest); await CloseWithEsc();
     }
 
     /// <summary>

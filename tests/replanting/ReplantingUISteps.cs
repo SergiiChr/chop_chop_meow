@@ -50,8 +50,8 @@ public partial class Game {
         await ShowBackpack();
         await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(bucket))), OnPage($"input_{Water.Liquid}")!);
         await Until(() => ShowsTreeStatus("Growing") && world.Backpack[Bucket.Item] > 0
-            && OnPage($"input_{Water.Liquid}") == null && !bag.Visible,
-            "the tree showing Growing and closing its watering controls after the bucket is poured", 4);
+            && OnPage($"input_{Water.Liquid}") == null && bag.Visible,
+            "the tree showing Growing and closing its watering controls after the bucket is poured, with the backpack still open under it", 4);
         Require(!HasLabel(panel, "/10 days"), "the tree panel should leave out the day count");
         return tree;
     }

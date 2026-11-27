@@ -23,7 +23,13 @@ public abstract partial class PagePanel : VBoxContainer {
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
     }
 
-    public override void _Ready() => Build();
+    public override void _Ready() => BuildWithBackpack();
+
+    /// <summary>Builds the page, and under a page that has no backpack grid of its own a plain one, so the backpack works the same under every page.</summary>
+    private void BuildWithBackpack() {
+        Build();
+        if (!panel.Bag.Filled) BagGrid(null, BagHint);
+    }
 
     /// <summary>Fills the page from the world and what it keeps; runs when it opens and whenever it is drawn again.</summary>
     protected abstract void Build();
@@ -43,7 +49,7 @@ public abstract partial class PagePanel : VBoxContainer {
         live.Clear();
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
         panel.ClearFrame();
-        Build();
+        BuildWithBackpack();
         Refresh(); panel.Bag.Refresh();
     }
 

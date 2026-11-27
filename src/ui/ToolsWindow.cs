@@ -30,7 +30,7 @@ public partial class ToolsWindow : Control {
     /// <summary>How wide the window is once fully unrolled, with what it showed when last fitted.</summary>
     public float UnrolledWidth { get; private set; }
 
-    public ToolsWindow(UiKit kit) {
+    public ToolsWindow() {
         Name = "tools_window"; Visible = false; MouseFilter = MouseFilterEnum.Ignore;
         // The board lies in a strip that widens as the roll moves left, cut off at the strip's left edge, so it appears from under the roll.
         clip = new Control { Name = "tools_strip", ClipContents = true, MouseFilter = MouseFilterEnum.Ignore }; AddChild(clip);
@@ -42,7 +42,7 @@ public partial class ToolsWindow : Control {
         Content = new VBoxContainer(); Content.AddThemeConstantOverride("separation", 12); inner.AddChild(Content);
         // The roll comes after the strip, so it lies over the board's edge and takes clicks there.
         roll = new Roll("Tools") { Name = "tools_roll" };
-        roll.Pressed += () => kit.Run(() => { Unrolled = !Unrolled; });
+        roll.Pressed += () => Unrolled = !Unrolled;
         AddChild(roll);
     }
 

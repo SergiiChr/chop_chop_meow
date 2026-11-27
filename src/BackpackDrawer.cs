@@ -4,7 +4,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The backpack as a drawer above the hotbar, under a page that works with it while the player has it open.
-/// Each new page opens it there, wherever the player moved it before.
+/// Each new page puts it back there, wherever the player moved it before.
 /// </summary>
 public partial class BackpackDrawer : MovableWindow {
     /// <summary>Bottom of the drawer, measured up from the bottom of the screen, just above the hotbar.</summary>

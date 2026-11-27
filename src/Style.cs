@@ -57,7 +57,7 @@ public static class Style {
     private static readonly Texture2D EnamelTexture = MakeEnamel();
     /// <summary>The enamel board every panel sits on: a cream rim with a dark outline around speckled enamel.</summary>
     public static readonly StyleBoxTexture Board = EnamelBox(20, 18);
-    /// <summary>The Tools window's board, snug around its bar so the window folds narrow.</summary>
+    /// <summary>The Tools window's board, snug around what it shows so the window stays narrow beside the page.</summary>
     public static readonly StyleBoxTexture ToolsBoard = EnamelBox(6, 6);
     /// <summary>The HUD's smaller enamel plates.</summary>
     public static readonly StyleBoxTexture Plate = EnamelBox(14, 10);
