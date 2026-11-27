@@ -123,8 +123,9 @@ public partial class Game {
         await CloseWithEsc();
         Require(messages.GetGlobalRect().Position.X > needsPlate.GetGlobalRect().End.X && messages.GetGlobalRect().End.X < ui.Size.X - needsPlate.GetGlobalRect().End.X + 1,
             "Messages must keep clear of the needs plate and stay centred.");
+        var shut = messages.GetGlobalRect();
         await KeyStroke(Key.C);
-        Require(messages.GetGlobalRect().End.X < panel.GetGlobalRect().Position.X, "Messages must keep to the left of an open side panel.");
+        Require(messages.GetGlobalRect() == shut, "Messages must stay put when a side panel opens, as the view does.");
         await CloseWithEsc();
         messages._Process(60);
         Require(messages.Shown.Length == 0, "Old messages must be gone before the message check.");
