@@ -98,9 +98,13 @@ public partial class ItemSlot : Button {
 
     /// <summary>Whether the slot is shaking now.</summary>
     public bool Shaking => shake != null && shake.IsValid();
+    /// <summary>How many shakes have begun, so a check can tell one ran even when a slow frame has already ended it.</summary>
+    public int Shakes { get; private set; }
 
     /// <summary>Shakes the slot side to side, as a refusal.</summary>
     public void Shake() {
-        if (!Shaking) shake = Shaker.Shake(this, this);
+        if (Shaking) return;
+        shake = Shaker.Shake(this, this);
+        Shakes++;
     }
 }

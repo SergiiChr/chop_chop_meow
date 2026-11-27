@@ -307,8 +307,9 @@ public partial class Game {
         await ClickOn(furnace);
         await DoubleClick(Named("craft_tin_bar")!);
         await Until(() => furnace.Processing && Named("input_tin_ore") != null, "the furnace starting the tin a double-click asked for", 2);
+        int shakes = WorkRow().Shakes;
         await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
-        Require(WorkRow().Shaking, "Queueing another recipe while a batch is worked must shake the boxes.");
+        Require(WorkRow().Shakes > shakes, "Queueing another recipe while a batch is worked must shake the boxes.");
         await Until(() => !WorkRow().Shaking, "the boxes coming to rest", 2);
         Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
         Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
@@ -333,13 +334,15 @@ public partial class Game {
         // Stone in every free slot leaves no room for the furnace's wood.
         int stone = Give(Hosted, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
         await ClickOn(furnace);
+        int shakes = WorkRow().Shakes;
         await DoubleClick(Named("craft_iron_bar")!);
-        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the slots.");
+        Require(WorkRow().Shakes > shakes, "A double-click refused for a full backpack must shake the slots.");
         Require(furnace.Recipe == "charcoal" && furnace.Keep == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0,
             "A furnace whose slots the backpack has no room for must stay on its recipe with its wood and its mark.");
         await Until(() => !WorkRow().Shaking, "the slots coming to rest", 2);
+        shakes = WorkRow().Shakes;
         await Click(Named("craft_iron_bar")!);
-        await Until(() => WorkRow().Shaking, "a click on another recipe shaking the slots of a furnace that holds wood", 2);
+        await Until(() => WorkRow().Shakes > shakes, "a click on another recipe shaking the slots of a furnace that holds wood", 2);
         Require(furnace.Keep == "charcoal", "A furnace that holds something must keep its mark where it is.");
         RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "stone", stone); await CloseWithEsc();
     }

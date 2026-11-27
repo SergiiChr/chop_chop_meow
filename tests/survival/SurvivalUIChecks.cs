@@ -127,8 +127,9 @@ public partial class Game {
         Hosted.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 1);
         await ClickOn(table); await Frames(3);
         var slot = (ItemSlot)ui.FindChild($"input_{Water.Liquid}", true, false);
+        int shakes = slot.Shakes;
         await Holding(Key.Shift, () => Click(slot)); await Frames(3);
-        Require(slot.Shaking, "A refused Shift on the water input slot must shake it.");
+        Require(slot.Shakes > shakes, "A refused Shift on the water input slot must shake it.");
         Require(messages.Shown.Contains("You need an empty water vessel."), "A refused Shift on the water input slot must say it needs an empty vessel.");
         Require(table.Inventory[Water.Liquid] == 1 && world.Backpack.Count == 0, "Refused water must stay on the table.");
         await Until(() => !slot.Shaking, "the water input slot coming to rest", 2);

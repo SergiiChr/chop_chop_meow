@@ -75,9 +75,9 @@ public partial class Game {
     /// and several ticks later it has begun no batch.
     /// </summary>
     private async Task ExpectRefusedDoubleClick(Thing station, string id, string how, params string[] missing) {
-        int posted = messages.Posted;
+        int posted = messages.Posted, shakes = WorkRow().Shakes;
         await DoubleClick(Named($"craft_{id}")!);
-        Require(WorkRow().Shaking, $"A double-click on {id} {how} must shake the slots.");
+        Require(WorkRow().Shakes > shakes, $"A double-click on {id} {how} must shake the slots.");
         await Until(() => messages.Posted > posted && messages.Last.StartsWith("Missing ", StringComparison.Ordinal) && missing.All(messages.Last.Contains),
             $"a message that {id} is missing {string.Join(", ", missing)} {how}", 2);
         await Frames(12);

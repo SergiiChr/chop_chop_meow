@@ -16,10 +16,14 @@ public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, s
 
     /// <summary>Whether the slots are shaking now.</summary>
     public bool Shaking => shake != null && shake.IsValid();
+    /// <summary>How many shakes have begun, so a check can tell one ran even when a slow frame has already ended it.</summary>
+    public int Shakes { get; private set; }
 
     /// <summary>Shakes the input and output slots from side to side and back to rest, to show they are taken; a shake under way goes on as it is.</summary>
     public void Shake() {
-        if (!Shaking) shake = Shaker.Shake(this, left, right);
+        if (Shaking) return;
+        shake = Shaker.Shake(this, left, right);
+        Shakes++;
     }
 
     public override void _Ready() {
