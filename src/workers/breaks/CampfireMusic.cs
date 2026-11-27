@@ -59,7 +59,7 @@ public sealed class CampfireMusic {
         return available[(int)(roll / InstrumentChance * count)];
     }
 
-    /// <summary>Starts one song for each new trio and schedules solos at fires without all three instruments.</summary>
+    /// <summary>Starts one song for each new trio and schedules solos at fires without all three instruments or past their song.</summary>
     internal void Finish(float at) {
         AssignInstruments(at);
         foreach (var (fire, _) in State.Songs)
@@ -67,7 +67,7 @@ public sealed class CampfireMusic {
         foreach (var (fire, trio) in trios) {
             if (!trio.Complete) continue;
             var song = SongAt(fire);
-            // Keep the song chosen for this gathering, including after it finishes, until the instruments break up.
+            // Keep the song chosen for this gathering after it finishes, so it plays once until the instruments break up.
             if (song.Track == 0)
                 State.Songs[fire] = new(random.Next(1, CampfireScore.SongCount + 1), at + Lead, trio.Harmonica, trio.Guitar, trio.Drum);
             else if (song.Harmonica != trio.Harmonica || song.Guitar != trio.Guitar || song.Drum != trio.Drum)
@@ -75,7 +75,7 @@ public sealed class CampfireMusic {
         }
         foreach (var (id, seat) in State.Seats) {
             if (seat.Instrument == CampfireInstrument.None) continue;
-            if (State.Songs.ContainsKey(seat.Fire)) {
+            if (State.Songs.TryGetValue(seat.Fire, out var song) && at < song.StartsAt + CampfireScore.Song(song.Track).Duration) {
                 if (seat.Solo != 0) State.Seats[id] = seat with { Solo = 0, SoloAt = 0 };
                 soloAgain.Remove(id);
                 continue;

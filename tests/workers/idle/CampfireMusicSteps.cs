@@ -25,6 +25,11 @@ internal static class CampfireMusicSteps {
     public static Worker AddAtFire(World world, Thing fire, int seat) =>
         AddWorker(world, fire.Pos + Vector2.FromAngle(seat * Mathf.Tau / BreakSeats.FireSeats) * BreakSeats.FireRadius);
 
+    /// <summary>Whether any of the three musicians is playing a solo clip now.</summary>
+    public static bool AnySolo(World world, Worker first, Worker second, Worker third) =>
+        world.CampfireMusic.SeatOf(first).Solo > 0 || world.CampfireMusic.SeatOf(second).Solo > 0 ||
+        world.CampfireMusic.SeatOf(third).Solo > 0;
+
     /// <summary>Seats a newcomer whose visit roll would choose guitar with all three instruments available.</summary>
     public static Worker SeatOnTheSameSuccessfulRoll(World world, Thing fire, int seat) {
         world.CampfireMusic.Seed(16);

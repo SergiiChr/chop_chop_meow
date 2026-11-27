@@ -420,7 +420,7 @@ Each time an idle worker takes a seat at the fire, they have a 25% chance of bri
 The choice is even among instruments not already there. If the fire already has all three, the worker sits without one.
 With fewer than all three instruments, each musician plays a short sound now and then, with at least five seconds between their clips.
 When all three instruments are at the same fire, one worker on each instrument plays a song and the other idle workers seated there nod to the beat.
-The group plays one song and then sits quietly until the trio breaks up.
+The group plays one song, then each musician goes back to playing short sounds now and then, with no second song until the trio breaks up.
 Workers sitting for lunch do not play or nod.
 A worker who could not reach a fire's seats tries again once a building goes up or comes down.
 With no campfire they wait at the nearest trading post, or in the clearing without one.

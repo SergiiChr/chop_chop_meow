@@ -59,10 +59,12 @@ internal static class CampfireMusicChecks {
         Require(song.Track is 1 or 2 && song.Plays(guitar.Id) && song.Plays(drum.Id) && song.Plays(harmonica.Id),
             "the three workers should start one of the two campfire songs together");
         Require(music.SeatOf(listener).Fire == fire.Id && !song.Plays(listener.Id), "the fourth idle worker should listen without playing");
-        Work(world, 134);
+        float songEnds = song.StartsAt + CampfireScore.Song(song.Track).Duration;
+        Work(world, 135, () => AnySolo(world, guitar, drum, harmonica) || world.Time >= songEnds);
+        Require(!AnySolo(world, guitar, drum, harmonica) && world.Time >= songEnds, "the trio should play no solos during their song");
+        Work(world, 15, () => AnySolo(world, guitar, drum, harmonica));
+        Require(AnySolo(world, guitar, drum, harmonica), "the trio should go back to playing solos after their song");
         Require(music.SongAt(fire.Id) == song, "the fire should not start another song while the trio remains seated");
-        Require(music.SeatOf(guitar).Solo == 0 && music.SeatOf(drum).Solo == 0 && music.SeatOf(harmonica).Solo == 0,
-            "the trio should sit quietly after the song instead of playing solos");
         world.Fire(drum);
         Work(world, .5f);
         Require(music.SongAt(fire.Id).Track == 0, "an incomplete trio should end the gathering");

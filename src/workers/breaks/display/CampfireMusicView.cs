@@ -12,10 +12,9 @@ internal readonly record struct CampfireMusicView(CampfireInstrument Instrument,
         var seat = music.SeatOf(worker);
         if (seat.Fire == 0) return default;
         var song = music.SongAt(seat.Fire);
-        if (song.Track > 0) {
-            float elapsed = sounds?.CampfireSongTime(seat.Fire, song) ?? world.Time - song.StartsAt;
+        float elapsed = song.Track > 0 ? sounds?.CampfireSongTime(seat.Fire, song) ?? world.Time - song.StartsAt : 0;
+        if (song.Track > 0 && elapsed < CampfireScore.Song(song.Track).Duration) {
             var beats = CampfireBeats.ForSong(song.Track);
-            if (elapsed >= CampfireScore.Song(song.Track).Duration) return new(seat.Instrument);
             float weight = Mathf.SmoothStep(beats[0] - .20f, beats[0], elapsed) * (1 - Mathf.SmoothStep(beats[^1], beats[^1] + .30f, elapsed));
             float beat = BeatAt(beats, elapsed);
             return song.Plays(worker.Id) ? new(seat.Instrument, weight, Beat: beat) : new(seat.Instrument, Nodding: weight, Beat: beat);

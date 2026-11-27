@@ -1754,7 +1754,8 @@ A campfire holds at most one guitar, one harmonica and one drum.
 A listener who stays seated does not roll when a musician leaves.
 Each instrumentalist at an incomplete trio's fire waits at least five seconds between solo clips.
 When a fire has all three instruments, one worker on each plays one randomly picked song and its other idle workers nod.
-The gathering stays quiet after the song until it no longer has all three instruments.
+After the song, each of the three plays solo clips as at an incomplete fire, with no second song until the fire no longer
+has all three instruments.
 Lunch and ground seats do not take part. Songs, solos and visit rolls travel in the live network update, not in saves.
 The guitarist supports the neck from underneath, curls their fingers onto the fretboard and arcs the strumming hand
 away from the body at either end of a stroke.
