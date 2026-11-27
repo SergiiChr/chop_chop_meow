@@ -430,12 +430,8 @@ public sealed class ActorRig {
         (right ? elbowR : elbowL).AddChild(item);
     }
 
-    /// <summary>A worker's hard hat on a head: a shell with a ridge from front to back, over a round brim. The icon renderer shows it on its own.</summary>
-    public static void HardHat(Node3D head) {
-        Sphere(head, .14f, new Vector3(0, .2f, 0), Mat("e8b323", .5f), new Vector3(1, .62f, 1.08f), 16);
-        Sphere(head, .14f, new Vector3(0, .204f, 0), Mat("c9981a", .5f), new Vector3(.2f, .66f, 1.1f), 16);
-        Cylinder(head, .17f, .17f, .02f, new Vector3(0, .17f, .02f), Mat("e8b323", .5f), null, 20);
-    }
+    /// <summary>Fits the same hard hat to the worker's head and to the icon renderer's mount.</summary>
+    public static void HardHat(Node3D head) => HardHatShape.Wear(head);
 
     /// <summary>How long an axe's or a pickaxe's handle is, how far along it from the grip its head sits, and how far toward its edge the middle of an axe's head is.</summary>
     private const float ToolLength = .72f, HeadAt = .06f - ToolLength, AxeHeadOut = -.1f;

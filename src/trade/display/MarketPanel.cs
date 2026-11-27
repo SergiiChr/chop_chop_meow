@@ -11,9 +11,9 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
 
     protected override void Body() {
         headingTitle.Text = "Trading post";
-        Tab("cart", "coins", "Ship", () => memory.Hiring = false, !memory.Hiring);
-        Tab("crew", "hardhat", "Hire", () => memory.Hiring = true, memory.Hiring);
-        Tab("book", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
+        Tab("trade_cart", "coins", "Ship", () => memory.Hiring = false, !memory.Hiring);
+        Tab("line_crew", "hardhat", "Hire", () => memory.Hiring = true, memory.Hiring, Style.Rim);
+        Tab("prices", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
         FilterButton();
         // The filters and the price sheet share the board beside the panel, so the sheet waits while the filters are open.
         if (memory.SheetOpen && !FiltersOpen) PriceSheet();
@@ -23,9 +23,11 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
     }
 
     /// <summary>A round tab in the header, lit while its page is shown.</summary>
-    private void Tab(string glyph, string name, string tooltip, Action action, bool active) {
-        var tab = HeaderAction(glyph, tooltip, () => { action(); Redraw(); }, active ? Style.TabActive : Style.TabRound, name);
+    private void Tab(string icon, string name, string tooltip, Action action, bool active, Color? tint = null) {
+        var tab = kit.HeaderButton(Icons.Of(icon), tooltip, () => { action(); Redraw(); }, active ? Style.TabActive : Style.TabRound, name, tint);
         tab.CustomMinimumSize = new Vector2(44, 44);
+        if (tint == null) tab.AddThemeConstantOverride("icon_max_width", 28);
+        panel.AddToHeader(tab);
     }
 
     private void Shipping() {
@@ -36,10 +38,9 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         ship.AddChild(NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), $"{StationSlots.SlotHint}\nPut a packed crate here to sell it", held => held.Stack is { Box: 0 } stack && world.CanSell(stack.Item), columns: 3));
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
         var sell = kit.Button("", () => { var load = thing.Inventory.Items.Keys.Where(World.IsCrate).OrderByDescending(id => thing.Inventory[id]).FirstOrDefault(); if (world.Sell(thing) && load != null) kit.Sounds.Play(Sounds.ForItem(load)); });
-        sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = Icons.Of("line_cart"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
+        sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = Icons.Of("trade_cart"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
         sell.AddThemeConstantOverride("icon_max_width", 32); sell.CustomMinimumSize = new Vector2(0, 56); sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; sell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         Style.SkinPill(sell, Style.Brick);
-        sell.AddThemeColorOverride("icon_normal_color", Style.Rim); sell.AddThemeColorOverride("icon_hover_color", Style.Rim);
         ship.AddChild(sell);
         var auto = new CheckBox { Text = "Send when full", ButtonPressed = thing.AutoSell, FocusMode = Control.FocusModeEnum.None, Name = "auto_sell", TooltipText = "Send the cart by itself once every slot holds a crate" };
         Style.InkCheck(auto);
@@ -55,7 +56,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         var inbound = Well(new VBoxContainer()); inbound.AddThemeConstantOverride("separation", 8);
         inbound.AddChild(Style.WellLabel("Inbound"));
         var mail = new HBoxContainer(); mail.AddThemeConstantOverride("separation", 14); inbound.AddChild(mail);
-        var glyph = Style.Glyph("line_mail", 30, Style.Ink); glyph.MouseFilter = Control.MouseFilterEnum.Pass; glyph.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(glyph);
+        var mailbox = Style.Icon(Icons.Of("mailbox"), 30); mailbox.MouseFilter = Control.MouseFilterEnum.Pass; mailbox.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(mailbox);
         mail.AddChild(NewInventoryGrid(() => output, thing, id => moves.Stack(output, world.S.Backpack, id, thing), StationSlots.SlotHint, _ => false, columns: 5));
         BagGrid(id => { if (world.CanSell(id)) moves.Stack(world.S.Backpack, thing.Inventory, id, thing); else kit.Notify("Pack goods in a crate to send them to the village."); }, $"{BagHint}\nShift or Ctrl: put a packed crate on the cart", wanted: world.CanSell);
     }
@@ -73,7 +74,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         strip.AddChild(pad);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 10); pad.AddChild(row);
         row.AddChild(Style.Icon(Icons.Of("signpost"), 26));
-        var road = new CartRoad { Name = "cart", Cart = Icons.Of("line_cart"), CustomMinimumSize = new Vector2(0, 30), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Pass };
+        var road = new CartRoad { Name = "cart", Cart = Icons.Of("trade_cart"), CustomMinimumSize = new Vector2(0, 30), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Pass };
         row.AddChild(road);
         row.AddChild(Style.Glyph("line_village", 26, Style.Rim));
         var left = Style.Heading("", 15); left.CustomMinimumSize = new Vector2(40, 0); left.HorizontalAlignment = HorizontalAlignment.Right; row.AddChild(left);

@@ -61,6 +61,11 @@ public static class PileModelChecks {
         foreach (string item in goods.Append("hardhat"))
             Require(Icons.Of(item)?.ResourcePath.EndsWith(".png", StringComparison.Ordinal) == true,
                 $"{item} must have an icon rendered from its model");
+        var hardHat = WorldModels.IconModel("hardhat", false, data);
+        Require(hardHat != null, "the icon renderer should have the worker's hard hat");
+        try {
+            Require(ModelSteps.Triangles(hardHat) <= 1000, "the hard hat should fit the icon model triangle ceiling");
+        } finally { hardHat.Free(); }
         foreach (var vessel in data.Vessels)
             Require(ResourceLoader.Exists($"res://assets/ui/{vessel.Liquid}.svg"), $"{vessel.Liquid} must have a drawn icon");
         PileShape.Warm(data);

@@ -426,7 +426,7 @@ The crew button opens an overview with each worker's daily pay and the total abo
 
 ### Taking buildings down
 
-The building plans (B) end with a red cross: click it for the remove selector.
+The building plans (B) end with a red trash can. Click it for the remove selector.
 A plan held on the cursor is let go of by that click.
 With it, the building under the mouse turns red when it is within reach, 15 metres, and a click takes it down at once,
 without asking.
@@ -1231,6 +1231,7 @@ The entrance is dug at the rock face beside the cave mouth, so you and the worke
 Workers take the pickaxe and hammer from a tool station.
 
 Up to 3 workers can be assigned to Mine. They mine out of sight underground with pickaxes.
+The mine panel lights a hard hat for each worker underground. Hover a lit hat to see the worker's name.
 Build and Haul jobs do not use those slots. Assigning a worker to a mine with all three slots taken still gives them Build and Haul.
 The cart goes underground with them, and the lantern on the frame lights the area like a torch.
 When nobody is working, the cart stands outside, loaded once there is output.

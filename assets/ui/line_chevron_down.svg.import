@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dlrw3c2bqb3u5"
-path="res://.godot/imported/line_cart.svg-98f6c88966354eb07044db09f7ef1bb5.ctex"
+uid="uid://dfxg5u20pm7gl"
+path="res://.godot/imported/line_chevron_down.svg-c060a9c6aedbfc887a1da7abf7c5b49d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/line_cart.svg"
-dest_files=["res://.godot/imported/line_cart.svg-98f6c88966354eb07044db09f7ef1bb5.ctex"]
+source_file="res://assets/ui/line_chevron_down.svg"
+dest_files=["res://.godot/imported/line_chevron_down.svg-c060a9c6aedbfc887a1da7abf7c5b49d.ctex"]
 
 [params]
 

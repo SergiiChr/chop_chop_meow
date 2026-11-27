@@ -262,6 +262,9 @@ public static class Style {
         return icon;
     }
 
+    /// <summary>The chevron points down beside an open group and right beside a closed one.</summary>
+    public static string DisclosureGlyph(bool open) => open ? "line_chevron_down" : "line_chevron_right";
+
     /// <summary>Lays a control on a parent's corner: <paramref name="x"/> and <paramref name="y"/> are 0 or 1 for the side, the offset pushes it past the edge.</summary>
     public static T Corner<T>(T control, float x, float y, float offset = 6) where T : Control {
         control.AnchorLeft = control.AnchorRight = x; control.AnchorTop = control.AnchorBottom = y;
@@ -346,7 +349,7 @@ public partial class CartRoad : Control {
         foreach (float trip in Trips) {
             // A cart drives out over the first half of its trip and back over the second.
             float along = trip < .5f ? trip * 2 : 2 - trip * 2;
-            DrawTextureRect(Cart, new Rect2((Size.X - 30) * along, y - 15, 30, 30), false, Style.Mustard);
+            DrawTextureRect(Cart, new Rect2((Size.X - 30) * along, y - 15, 30, 30), false);
         }
     }
 }

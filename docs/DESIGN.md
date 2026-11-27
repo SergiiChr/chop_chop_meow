@@ -58,7 +58,7 @@ These came from the user; change them only after asking.
   A tile goes under buildings and buildings over tiles, but not on a tree, boulder, deposit, berry bush, nettle, leaf spot or
   wolf carcass.
   A tile cannot be clicked in normal play.
-- **Taking down:** the red cross in the building plans gives the remove selector: a building or path tile in reach
+- **Taking down:** the red trash can in the building plans gives the remove selector: a building or path tile in reach
   turns red under the mouse and one click takes it down, with no question. Right-click switches layers and Esc exits.
   Building pages have no take-down button.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
@@ -292,7 +292,7 @@ Rendering and sound:
 | `src/WorldModels.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/glass/display/GlassBlowingView.cs` | The glass blowing pipe, its grip and aim, and the molten glass and finished jar in motion |
 | `src/glass/display/GlassJarShape.cs` | Open glass jar meshes and translucent finish for the icon, hands, and heaps |
-| `src/actors/display/ActorRig.cs`, `src/actors/display/HumanShape.cs` | The person model, its joints and the shapes of its body (see [assets/README.md](../assets/README.md)) |
+| `src/actors/display/ActorRig.cs`, `src/actors/display/HumanShape.cs`, `src/actors/display/HardHatShape.cs` | The person model, its joints and the shapes of its body and hard hat (see [assets/README.md](../assets/README.md)) |
 | `src/actors/display/Outfit.cs`, `src/actors/display/BodyBuild.cs` | The colours a person is drawn in, and the game's and the slim build of a body |
 | `src/actors/display/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
 | `src/actors/display/RakeStroke.cs` | The rake's ground stroke and both hands' grips |
@@ -1814,6 +1814,7 @@ Workers fetch the pickaxe or hammer a stage needs from a tool station, like any 
 
 Up to `Mine.Workers` workers can be assigned to `JobKind.Mine`. Build and Haul jobs do not count toward this limit. `World.Assign` skips Mine when no slot is available and still adds Build and Haul.
 Miners work underground (`WorkerWorkState.Underground`, hidden by the view).
+`MinePanel` lights the hard hats for workers underground at that mine and names them on hover. Empty slots stay dim.
 Each adds one ore and one stone to the mine's two-slot `Thing.Output` every `Mine.Seconds`.
 Mining stops while either slot holds a full stack.
 A miner then carries a load of it to the nearest place that takes it (`Mines.Mine`), and with none the mine reports once that it is full and the mine job has nothing to do.
