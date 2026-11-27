@@ -24,7 +24,9 @@ These came from the user; change them only after asking.
   The bench keeps its one hammer slot. Making it takes turns between mallet blows and twisting by hand.
 - **Bug net:** 5 nettle rope, 1 wood and 1 wood part at the bench with any hammer. It is swung toward the pointer
   like any tool, with a right click on open ground or on a firebug.
-- **Firebugs:** eight come out at nightfall and one more each night hour, away from buildings, and are gone at dawn.
+- **Firebugs:** eight clusters come out at nightfall and one more each night hour, away from buildings, and are gone at
+  dawn.
+  A quarter of the clusters have three firebugs, and the rest two or one at even odds, all within 1 m of the first.
   One drifts and glows, darts off from a player who comes near, faster than a walk and slower than a sprint, then
   rests; a swing lands after a moment, catches what is in its sweep, and a miss sends the bug darting.
   A caught firebug lives for three in-game days. It lights a lantern while inside it and disappears when it dies.
@@ -1100,10 +1102,16 @@ Putting nettles into the bench's slots by hand is not refused.
 A recipe marked `RecipeDef.Twists` is worked in rounds (`ActorAnimation.StationAction`): by the batch's `Thing.Progress`,
 `ActorAnimation.TwistRounds` rounds a batch, each a `TwistBlowShare` of mallet blows and then `ActorAction.TwistRope` with empty hands.
 
-`Firebugs` (`src/firebugs/Firebugs.cs`) lets out `Firebugs.AtNightfall` firebugs as night falls and one more for each
-whole hour of the night since (`SaveState.FirebugsOut` counts those let out tonight, caught or not, and day sets it back), each on ground to
-stand on that no player sees, `Firebugs.BuildingRoom` from every building.
-Each firebug's spot is seeded by the day and its turn that night, so a night loaded part way lets the rest out where they would have come.
+`Firebugs` (`src/firebugs/Firebugs.cs`) lets out `Firebugs.AtNightfall` clusters of firebugs as night falls and one
+more for each whole hour of the night since.
+`SaveState.FirebugsOut` counts the clusters let out tonight, caught or not, and day sets it back.
+A cluster's first firebug comes out on ground to stand on that no player sees, `Firebugs.BuildingRoom` from every
+building.
+At `Firebugs.ThreeChance` it has two more, and otherwise one more or none at even odds (`Firebugs.LetOut`).
+Each comes out at a random spot within `Firebugs.ClusterRadius` of the first, even where a player sees it.
+One whose spot has no ground to stand on or is within `Firebugs.BuildingRoom` of a building is left out.
+Each cluster is seeded by the day and its turn that night, so a night loaded part way lets the rest out where they would
+have come.
 By day it removes them all.
 A firebug is a thing of the shape `GatherShape.Caught`, kept at its place: where it is now is `Firebugs.At`, its
 place plus `Firebugs.Hover`, a slow swing by its id and the world's clock, so the host and every window agree on it
