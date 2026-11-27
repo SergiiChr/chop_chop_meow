@@ -235,6 +235,8 @@ public static class WorldModels {
         Stage(Build(new Thing { Kind = ThingKind.Tree, TreeStage = 1 }).Root);
         foreach (var ore in Cliff.Ores) Stage(Build(new Thing { Kind = ThingKind.Mine, Pos = Cliff.Of(ore).MineSpot }).Root);
         Stage(new WolfModel().Root);
+        foreach (var instrument in CampfireInstrumentShape.All)
+            Stage(CampfireInstrumentShape.Create(instrument, ActorRig.OutfitOf(ActorSkin.Worker).Skin));
         // The net's bag has a material of its own, seen from both sides, which no world model draws.
         Stage(ActorRig.Tool("bug_net"));
         Stage(LanternWear.Hook());

@@ -47,7 +47,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 38;
+    private const int Protocol = 39;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -314,7 +314,7 @@ public partial class Net : Node {
         }
         World.Arrive(key, id); windows[id] = window;
         // The welcome is the guest's first update, which later ones build on.
-        var entries = Remember(updates.Capture(World));
+        var entries = Remember(updates.Capture(World, Held));
         acked[id] = sequence;
         var world = updates.Delta(entries, null).ToArray();
         var fog = WorldUpdates.Pack(new Fog { Explored = World.S.Explored, Remembered = World.S.Remembered });
@@ -527,7 +527,7 @@ public partial class Net : Node {
     /// <summary>Server: sends each player what changed since the last update they confirmed.</summary>
     public void SendUpdates() {
         if (World.Players.Count == 0) return;
-        var entries = Remember(updates.Capture(World));
+        var entries = Remember(updates.Capture(World, Held));
         // Guests that confirmed the same update get the same changes.
         int builtOn = -1; byte[] delta = [];
         foreach (var p in World.Players) {
@@ -579,6 +579,11 @@ public partial class Net : Node {
         Sync(s.Wolves, EntryKey.Wolf, static w => w.Id, entries, true, null);
         Sync(s.Orders, EntryKey.Order, static o => o.Id, entries, false, null);
         if (Changed(entries, new EntryKey(EntryKey.Work, 0)) is byte[] working) work = WorldUpdates.Read<Dictionary<int, WorkerWorkState>>(working);
+        if (Changed(entries, new EntryKey(EntryKey.CampfireMusic, 0)) is byte[] campfireMusic) {
+            var playing = WorldUpdates.Read<CampfireMusicState>(campfireMusic);
+            if (!playing.Valid()) throw new JsonException("Invalid campfire music.");
+            World.CampfireMusic.State = playing;
+        }
         if (Changed(entries, new EntryKey(EntryKey.Paths, 0)) is byte[] paths) s.GravelPaths = WorldUpdates.Read<List<int>>(paths);
         if (Changed(entries, new EntryKey(EntryKey.Sand, 0)) is byte[] sand) {
             var squares = WorldUpdates.Read<HashSet<int>>(sand);

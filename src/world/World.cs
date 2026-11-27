@@ -321,7 +321,11 @@ public sealed class SaveState {
     public HashSet<string> Obtained { get; set; } = new();
     [JsonIgnore] public float PlayerX { get => Actor.PlayerX; set => Actor.PlayerX = value; }
     [JsonIgnore] public float PlayerY { get => Actor.PlayerY; set => Actor.PlayerY = value; }
-    public float Time { get; set; } = 55;
+    private double time = 55;
+    /// <summary>World seconds as stored in a save or sent in an update.</summary>
+    public float Time { get => (float)time; set => time = value; }
+    /// <summary>Keeps small steps from losing part of their elapsed time in an old settlement.</summary>
+    internal void AdvanceTime(float seconds) => time += seconds;
     [JsonIgnore] public float Health { get => Actor.Health; set => Actor.Health = value; }
     [JsonIgnore] public float Hunger { get => Actor.Hunger; set => Actor.Hunger = value; }
     [JsonIgnore] public float Thirst { get => Actor.Thirst; set => Actor.Thirst = value; }
@@ -416,7 +420,7 @@ public sealed partial class World {
         Lanterns = new Lanterns(this);
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         Goals = new Goals(this); glassBlowing = new GlassBlowing(this);
-        breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset;
+        breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset; Replaced += CampfireMusic.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
         barrelHaul = new BarrelHaul(this, barrels); BedtimeWater = new BedtimeWater(this); Sleep = new SleepCycle(this);
@@ -448,6 +452,8 @@ public sealed partial class World {
     /// </summary>
     public bool QuietNights { get; set; }
     public Goals Goals { get; }
+    /// <summary>What idle workers play when they sit together at a campfire.</summary>
+    public CampfireMusic CampfireMusic { get; } = new();
     private readonly Barrels barrels;
 
     private readonly BarrelHaul barrelHaul;
@@ -2478,7 +2484,7 @@ public sealed partial class World {
         bool wasDusk = Dusk, wasLunch = Lunch;
         everyone = true;
         float before = S.Time;
-        S.Time += dt;
+        S.AdvanceTime(dt);
         Firebugs.Age();
         Beach.Tick(before);
         if (!sleeping && !Sleep.AdvancingTime) S.PlaySeconds += dt;
@@ -2544,8 +2550,10 @@ public sealed partial class World {
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) CraftTick(dt);
         breakSeats.Prepare();
+        CampfireMusic.Begin();
         crew.Clear(); crew.AddRange(S.Workers);
         foreach (var w in crew) WorkerTick(w, dt);
+        CampfireMusic.Finish(S.Time);
         for (int i = 0; i < S.Workers.Count; i++) for (int j = i + 1; j < S.Workers.Count; j++) {
             var a = S.Workers[i]; var b = S.Workers[j]; var offset = a.Pos - b.Pos;
             // Miners underground are inside the hill, so they never crowd anyone at the entrance; workers on the walk to or from the village keep to their way.

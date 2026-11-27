@@ -281,11 +281,36 @@ Measure a new track with ffmpeg's `ebur128` filter, then apply the gain that bri
 
 Credits: Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov)) and Augmentality (Brandon Morris).
 
+The campfire songs are [American Western Country](https://pixabay.com/music/modern-country-american-western-country-576992/)
+and [Country Music](https://pixabay.com/music/traditional-country-country-music-576986/), both by Monume on Pixabay.
+The full songs are Ogg Vorbis so they can start partway through when a listener comes within earshot.
+Both are normalised to -18 LUFS integrated loudness.
+
 ### Sound effects
 
 `sounds/` holds the sound effects as 320 kbps MP3, apart from the WAV of `sting_groan`, converted from the supplied files
 and peak-normalised.
 Variants of one sound are matched in loudness, and a numbered suffix marks them.
+
+The campfire's solo sounds are mono MP3s with the leading silence cut and short fades at the ends.
+The loudest 400 ms of each cut is brought to -22 LUFS.
+The originals come from Pixabay under the [Pixabay Content License](https://pixabay.com/service/license-summary/):
+
+- `campfire_drum_1` and `campfire_drum_2` are a single kick and the four-kick loop from LazyChillZone's
+  [Simple Drum Kick Loop](https://pixabay.com/sound-effects/musical-simple-drum-kick-loop-230756/).
+- `campfire_drum_3` is the whole [Drum Beat 02](https://pixabay.com/sound-effects/musical-drum-beat-02-36276/)
+  from freesound_community. `campfire_drum_4` is IFM123's
+  [Awesome Kick Drum](https://pixabay.com/sound-effects/musical-awesome-kick-drum-41824/).
+- `campfire_guitar_1` and `campfire_guitar_2` are u_op8btczor7's
+  [Guitar F Strum](https://pixabay.com/sound-effects/musical-guitar-f-strum-508252/) and
+  [Guitar C Strum](https://pixabay.com/sound-effects/musical-guitar-c-strum-504874/).
+- `campfire_guitar_3` and `campfire_guitar_4` are SOUND_GARAGE's
+  [Em Guitar Chord Strum 1](https://pixabay.com/sound-effects/musical-em-guitar-chord-strum-1-309534/) and
+  [Em Guitar Chord Strum 8](https://pixabay.com/sound-effects/musical-em-guitar-chord-strum-8-309539/).
+- `campfire_harmonica_1` through `campfire_harmonica_23` are individual chords from Samuel_Copier_Country's
+  [Cowboy with a Diatonic Harmonica](https://pixabay.com/sound-effects/musical-cowboy-with-a-diatonic-harmonica-267513/).
+  `campfire_harmonica_24` through `campfire_harmonica_35` are chords from the same artist's
+  [Wild West Harmonica](https://pixabay.com/sound-effects/musical-wild-west-harmonica-267552/).
 
 These were made with ffmpeg from Kenney's sounds:
 
