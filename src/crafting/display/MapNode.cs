@@ -22,8 +22,8 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
     private bool chosen;
     private SceneTreeTimer? light;
 
-    /// <summary>Whether the settlement has had this item before.</summary>
-    public bool Known => card.Known;
+    /// <summary>Whether the settlement has made this item, has yet to, or has yet to discover it.</summary>
+    public MapState State => card.State;
     public bool Lit => light != null;
 
     public bool Chosen {
@@ -68,18 +68,20 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         source.AddThemeConstantOverride("line_spacing", 0);
         card.AddChild(source);
         card.PresentIdentity = (caption, texture) => {
+            bool shown = card.Shown;
             icon.Texture = texture;
+            icon.SelfModulate = State == MapState.NotMade ? MapSlot.NotMadeTint : Colors.White;
             name.Text = caption;
-            name.HorizontalAlignment = Known ? HorizontalAlignment.Left : HorizontalAlignment.Center;
-            name.Position = Known ? new Vector2(56, 4) : ItemIcon.Position;
-            name.Size = Known ? new Vector2(Width - 64, 22) : ItemIcon.Size;
-            if (Known) source.Text = building != null ? "Build" : recipe != null ? Where(data, recipe) : data.Sources[item].How;
-            source.Visible = Known;
+            name.HorizontalAlignment = shown ? HorizontalAlignment.Left : HorizontalAlignment.Center;
+            name.Position = shown ? new Vector2(56, 4) : ItemIcon.Position;
+            name.Size = shown ? new Vector2(Width - 64, 22) : ItemIcon.Size;
+            if (shown) source.Text = building != null ? "Build" : recipe != null ? Where(data, recipe) : data.Sources[item].How;
+            source.Visible = shown;
             QueueRedraw();
         };
-        card.Discovered += RefreshDetails;
+        card.Changed += RefreshDetails;
         AddChild(card);
-        if (Known) AddChips(recipe, building); else card.Discovered += () => AddChips(recipe, building);
+        if (card.Shown) AddChips(recipe, building); else card.Discovered += () => AddChips(recipe, building);
     }
 
     private void AddChips(RecipeDef? recipe, MapBuilding? building) {
@@ -91,7 +93,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         if (recipe is { Tool.Length: > 0 }) {
             string tool = data.PlainestTool(recipe.Tool, recipe.Tier, recipe.Station);
             var toolChip = ChipFor(tool, "tool", ToolChip, "Required tool");
-            toolChip.Discovered += RefreshDetails;
+            toolChip.Changed += RefreshDetails;
             chips.AddChild(toolChip);
         }
         foreach (string other in also) chips.AddChild(ChipFor(other, "also", ResourceChip, "Additional resource"));
@@ -135,7 +137,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
     public override void _Draw() {
         var card = new Rect2(0, 0, Width, Height);
         if (Lit) DrawStyleBox(LitRing, card.Grow(3));
-        DrawStyleBox(Chosen ? ChosenCard : Known ? KnownCard : UnknownCard, card);
-        MapSlot.Paint(this, ItemIcon, Known);
+        DrawStyleBox(Chosen ? ChosenCard : State == MapState.Made ? KnownCard : UnknownCard, card);
+        MapSlot.Paint(this, ItemIcon, State);
     }
 }

@@ -7,6 +7,7 @@ public enum GoalId { Campfire, Cabin, Bench, Furnace, Worker, Profit, Trade, Ste
 
 public enum GoalStatus { Hidden, Active, Completed }
 
+/// <summary>A goal and the buildings and items its text names, buildings first, shown as icons that open the recipe map.</summary>
 public sealed record Goal(GoalId Id, string Title, string Description, params string[] Items);
 
 /// <summary>The settlement's goal log, read from what its players have seen, built, made and traded; the diary's goal is each player's own.</summary>
@@ -14,17 +15,17 @@ public sealed class Goals(World world) {
     internal const string OreSeen = "ore_seen";
 
     private static readonly Goal[] entries = [
-        new(GoalId.Campfire, "Light in the dark", "Build and light a campfire. Fire keeps wolves back until five or more are near."),
-        new(GoalId.Cabin, "Safe place", "Build a cabin for a peace of mind."),
-        new(GoalId.Bench, "A start", "Build a crafting bench."),
-        new(GoalId.Furnace, "Stone and embers", "Build a stone furnace."),
-        new(GoalId.Worker, "More hands on deck", "Hire a worker at the trading post and assign a job."),
+        new(GoalId.Campfire, "Light in the dark", "Build and light a campfire. Fire keeps wolves back until five or more are near.", ThingKind.Campfire.Id()),
+        new(GoalId.Cabin, "Safe place", "Build a cabin for a peace of mind.", ThingKind.Hut.Id()),
+        new(GoalId.Bench, "A start", "Build a crafting bench.", ThingKind.Bench.Id()),
+        new(GoalId.Furnace, "Stone and embers", "Build a stone furnace.", ThingKind.Furnace.Id()),
+        new(GoalId.Worker, "More hands on deck", "Hire a worker at the trading post and assign a job.", ThingKind.Signpost.Id()),
         new(GoalId.Profit, "NEET", "", Inventory.Coins),
-        new(GoalId.Trade, "Road to riches", "Build a trading post and sell a crate of goods.", "crate"),
-        new(GoalId.SteelBar, "Hotter than fire", "Build a reinforced furnace and produce your first steel bar.", "steel_bar"),
-        new(GoalId.SteelTools, "Steel tools", "Purchase a hammer and a pickaxe from the trading post.", "steel_hammer", "steel_pick"),
-        new(GoalId.SteelParts, "Too soft", "Build an anvil and produce your first steel parts.", "steel_parts"),
-        new(GoalId.Mines, "Infinite power", "", Cliff.Ores.Select(World.ResourceItem).ToArray()),
+        new(GoalId.Trade, "Road to riches", "Build a trading post and sell a crate of goods.", ThingKind.Signpost.Id(), "crate"),
+        new(GoalId.SteelBar, "Hotter than fire", "Build a reinforced furnace and produce your first steel bar.", ThingKind.Reinforced.Id(), "steel_bar"),
+        new(GoalId.SteelTools, "Steel tools", "Purchase a hammer and a pickaxe from the trading post.", ThingKind.Signpost.Id(), "steel_hammer", "steel_pick"),
+        new(GoalId.SteelParts, "Too soft", "Build an anvil and produce your first steel parts.", ThingKind.Anvil.Id(), "steel_parts"),
+        new(GoalId.Mines, "Infinite power", "", [ThingKind.Mine.Id(), .. Cliff.Ores.Select(World.ResourceItem)]),
         new(GoalId.Diary, "A success story", "Find all the diary pages."),
     ];
     public static ReadOnlySpan<Goal> Entries => entries;

@@ -98,7 +98,7 @@ public partial class RecipeMap : Control {
     /// <summary>Shows a discovered item's direct recipes within the same board.</summary>
     private void OpenItemTree(string item) {
         item = world.Data.MapEntryOf(item);
-        if (!MapItemLink.KnownTo(world, item)) return;
+        if (world.MapDiscovery.Of(item) == MapState.Undiscovered) return;
         mainView!.Hide();
         RemoveItemTree();
         itemTree = new ItemTree(kit, item, BackToMap, Close, ShowOnMap, OpenItemTree);
@@ -137,7 +137,8 @@ public partial class RecipeMap : Control {
         intro.AddThemeConstantOverride("separation", 1); header.AddChild(intro);
         intro.AddChild(Style.Heading("Recipe map", 30));
         intro.AddChild(Style.Text("Follow the arrows to what each item makes. Alt-click a discovered item to open its tree.", 15, Style.Beige));
-        header.AddChild(Legend(new MapSlot { Known = true }, "Made before"));
+        header.AddChild(Legend(new MapSlot { State = MapState.Made }, "Made before"));
+        header.AddChild(Legend(new MapSlot { State = MapState.NotMade }, "Not made yet"));
         header.AddChild(Legend(new MapSlot(), "Undiscovered"));
         header.AddChild(Legend(Sample(MapNode.ToolChip), "Required tool"));
         header.AddChild(Legend(Sample(MapNode.ResourceChip), "Additional resources"));
@@ -243,7 +244,7 @@ public partial class RecipeMap : Control {
         }
 
         node.Chosen = true;
-        if (!node.Known) {
+        if (node.State == MapState.Undiscovered) {
             details.AddChild(new MapSlot {
                 Name = "detail_item",
                 OverLight = true,
@@ -266,8 +267,9 @@ public partial class RecipeMap : Control {
         var name = Style.Text(data.NameOnMap(item), 23, Style.Ink, Style.Head, wrap: true);
         name.Name = "detail_name"; identity.AddChild(name);
         // Marking a mine reveals its plan before the entrance, frame and rails are built.
-        string status = building?.Kind == ThingKind.Mine ? "Discovered" : building == null ? "Made before" : "Built before";
-        var known = Style.Pill(status, Style.Tag(Style.Sage), Style.SlotFill, 12);
+        string status = node.State == MapState.NotMade ? (building == null ? "Not made yet" : "Not built yet")
+            : building?.Kind == ThingKind.Mine ? "Discovered" : building == null ? "Made before" : "Built before";
+        var known = Style.Pill(status, Style.Tag(node.State == MapState.Made ? Style.Sage : Style.Tan), Style.SlotFill, 12);
         known.SizeFlagsHorizontal = SizeFlags.ShrinkBegin; identity.AddChild(known);
         var description = building is MapBuilding plan ? data.Buildings[plan.Kind].Description : data.DescriptionOf(item);
         if (building == null && FoodDescription.Of(data, item) is ItemDef food)
@@ -290,7 +292,7 @@ public partial class RecipeMap : Control {
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 4);
             var icon = DetailItem(input, 28, $"requires_{input}");
             pair.AddChild(icon);
-            var label = Style.Text(icon.Known ? amount + data.NameOnMap(input) : amount.TrimEnd(), 15, Style.Ink, wrap: true);
+            var label = Style.Text(icon.Shown ? amount + data.NameOnMap(input) : amount.TrimEnd(), 15, Style.Ink, wrap: true);
             icon.Discovered += () => label.Text = amount + data.NameOnMap(input);
             label.SizeFlagsHorizontal = SizeFlags.ExpandFill; pair.AddChild(label);
             requires.AddChild(pair);
@@ -307,7 +309,7 @@ public partial class RecipeMap : Control {
             used.AddChild(icon);
             if (uses.Count != 1) continue;
             void AddName() => used.AddChild(Style.Text(data.NameOnMap(use), 15, Style.Ink));
-            if (icon.Known) AddName(); else icon.Discovered += AddName;
+            if (icon.Shown) AddName(); else icon.Discovered += AddName;
         }
         if (uses.Count == 0) used.AddChild(Style.Text("—", 15, Style.Tan));
         if (recipe != null) details.AddChild(ShowButton(item, recipe));
@@ -334,7 +336,8 @@ public partial class RecipeMap : Control {
         icon.AddChild(hidden);
         icon.PresentIdentity = (_, texture) => {
             icon.Icon = texture;
-            hidden.Visible = !icon.Known;
+            icon.SelfModulate = icon.State == MapState.NotMade ? MapSlot.NotMadeTint : Colors.White;
+            hidden.Visible = !icon.Shown;
         };
         icon.Pressed += () => Jump(item);
         return icon;
@@ -370,7 +373,7 @@ public partial class RecipeMap : Control {
         string tool = "";
         if (plainest != null) {
             string toolName = data.ToolName(r);
-            tool = $", {(toolName == r.Tool || world.Had(plainest) ? toolName : MapItemLink.QuestionMark)}";
+            tool = $", {(toolName == r.Tool || world.MapDiscovery.Of(plainest) != MapState.Undiscovered ? toolName : MapItemLink.QuestionMark)}";
         }
         float byHand = r.Seconds / world.WorkRate(null, plainest), there = r.Seconds / world.WorkRate(r.Station, plainest);
         string time = r.Hand && r.Station is ThingKind station && byHand != there ? $"{byHand:0.#} s by hand, {there:0.#} s at the {data.Name(station).ToLowerInvariant()}" : $"{there:0.#} s";

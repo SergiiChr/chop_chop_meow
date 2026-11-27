@@ -14,6 +14,8 @@ public static class GoalChecks {
         Test(CheckSteelToolsGoalWaitsForBothAHammerAndAPickaxe, data);
         Test(CheckGoalsUnlockAndCompleteIndependently, data);
         Test(CheckSettlementRemembersWhatItHasHad, data);
+        Test(CheckStationsShowWithTheirWholeBuildCostOnTheRecipeMap, data);
+        Test(CheckAGoalInTheLogShowsWhatItNamesAndEverythingNeededToMakeIt, data);
     }
 
     /// <summary>
@@ -104,5 +106,30 @@ public static class GoalChecks {
         world.Player = loose.Pos; world.Gather(loose, Step);
         var loaded = new World(data, false); loaded.Deserialize(save);
         Require(world.Had("coal") && loaded.Had("tin_ore") && !loaded.Had("coal"), "a save should keep what the settlement had when it was written");
+    }
+
+    /// <summary>A new settlement sees every station on the map, with its build cost followed down to ingredients and fuel.</summary>
+    private static void CheckStationsShowWithTheirWholeBuildCostOnTheRecipeMap(GameData data) {
+        var world = EmptyWorld(data);
+        foreach (string station in new[] { "bench", "furnace", "reinforced", "anvil", "cooktable", "cannery" })
+            Require(world.MapDiscovery.Of(station) == MapState.NotMade, $"the {station} station should show on the map before anyone builds it");
+        Require(world.MapDiscovery.Of("steel_bar") == MapState.NotMade, "the cooking table's steel bar cost should show on the map");
+        Require(world.MapDiscovery.Of("iron_ore") == MapState.NotMade, "the iron ore that steel bars are made from should show on the map");
+        Require(world.MapDiscovery.Of("charcoal") == MapState.NotMade, "charcoal, a fuel for smelting iron, should show on the map");
+        Require(world.MapDiscovery.Of("canned_jam") == MapState.Undiscovered, "canned jam, which no station or goal needs, should stay undiscovered");
+        Require(world.MapDiscovery.Of("pump") == MapState.Undiscovered, "a building that makes nothing and no goal names should stay undiscovered");
+        Achieve(world, "furnace");
+        Require(world.MapDiscovery.Of("furnace") == MapState.Made, "a station once built should show as built");
+    }
+
+    /// <summary>A goal that appears in the Goal Log shows its buildings and items on the map, with what they are made of and the tools they take.</summary>
+    private static void CheckAGoalInTheLogShowsWhatItNamesAndEverythingNeededToMakeIt(GameData data) {
+        var world = EmptyWorld(data);
+        Require(world.MapDiscovery.Of("signpost") == MapState.NotMade, "the trading post that a starting goal names should show on the map");
+        Require(world.MapDiscovery.Of("steel_parts") == MapState.Undiscovered && world.MapDiscovery.Of("steel_hammer") == MapState.Undiscovered,
+            "steel parts and the steel hammer should stay undiscovered while no goal in the log needs them");
+        Achieve(world, "steel_bar");
+        Require(world.MapDiscovery.Of("steel_parts") == MapState.NotMade, "Too soft appearing should show the steel parts it names");
+        Require(world.MapDiscovery.Of("steel_hammer") == MapState.NotMade, "the steel hammer that steel parts are made with should show with them");
     }
 }

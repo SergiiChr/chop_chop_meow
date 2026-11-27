@@ -280,7 +280,7 @@ public partial class Game {
             "An undiscovered recipe must not expose ingredients as map chips.");
         await Click(barrel);
         var details = recipeMap.FindChild("map_details", true, false);
-        Require(details.FindChild("detail_item", true, false) is MapSlot { Known: false } && HasLabel(details, "?") &&
+        Require(details.FindChild("detail_item", true, false) is MapSlot { State: MapState.Undiscovered } && HasLabel(details, "?") &&
             !HasLabel(details, "Made at") && details.FindChild("map_show", true, false) == null,
             "Selecting the question mark must not reveal the undiscovered item's recipe.");
         await Click(barrel, alt: true);

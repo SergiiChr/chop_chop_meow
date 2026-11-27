@@ -179,7 +179,7 @@ UI and input:
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
 | `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
-| `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
+| `src/goals/display/GoalLog.cs` | The active and completed goals, their details and building and item links to the recipe map |
 | `src/goals/display/GoalPopup.cs` | The popup at the top of the screen when a goal appears or is completed, with its chime |
 | `src/diary/display/DiaryPanel.cs`, `src/diary/display/DiaryCell.cs`, `src/diary/display/ReadingSheet.cs`, `src/diary/display/FallingApart.cs`, `src/diary/display/FindPrompt.cs` | The Diary panel of paper cells, a day opened large to read with its writing falling apart where it says so, and the pop-up a find waits behind |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
@@ -211,7 +211,8 @@ UI and input:
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout and item details |
-| `src/crafting/display/MapItemLink.cs` | A link to an item or building that hides its identity until discovery |
+| `src/crafting/display/MapItemLink.cs` | A link to an item or building that hides its identity until discovery and greys it until made |
+| `src/crafting/model/MapDiscovery.cs` | Which map entries are made, shown by a station or goal but not made yet, or undiscovered |
 | `src/crafting/display/ItemTree.cs` | The Recipe map's Item tree, with branches for direct uses and station recipes |
 | `src/crafting/display/ItemTreeBranches.cs` | The lines from the selected card to each branch and its cards |
 | `src/crafting/model/RecipeItemUse.cs` | The direct roles an item plays in a recipe |
@@ -220,7 +221,7 @@ UI and input:
 | `src/crafting/model/RecipeItemRole.cs` | The roles and the order of their branches |
 | `src/crafting/display/MapTree.cs` | The arrows from materials to products in a category |
 | `src/crafting/display/MapNode.cs` | An item card with its icon, source and links to required tools and additional resources |
-| `src/crafting/display/MapSlot.cs` | The filled or dashed icon slot shared by cards, the details panel and the legend |
+| `src/crafting/display/MapSlot.cs` | The filled, faded or dashed icon slot shared by cards, the details panel and the legend |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/trade/display/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
@@ -703,7 +704,8 @@ The first time a player sees a mineable ore deposit, the server records the disc
 Steel tools appears for the settlement.
 Finding loose ore on the ground leaves that goal hidden.
 
-Infinite power lists a mine and links to its item for each ore in `Cliff.Ores`.
+Each goal's `Goal.Items` holds the buildings and items its text names, buildings first, and its details link each to the recipe map.
+Infinite power links to the mine and to the item of each ore in `Cliff.Ores`, and lists a mine for each ore.
 It is complete when a mine is open for every ore in that list.
 NEET is complete after `GoalsDef.ProfitDays` consecutive days of at least `GoalsDef.DailyProfit` profit.
 `SaveState.DayRevenue` collects returned sale coins.
@@ -1332,14 +1334,19 @@ running the slot's usual action, including adding or removing a filter entry.
 A station's fuel or tool slot links to the item it pictures even when that slot is empty.
 An item link in the Goal Log uses the same entry point with the game still paused.
 Closing the map returns to the panel or goal details underneath.
-`PlayerControl.Update` moves nobody while it shows, and a card reveals its name and icon when `World.Had` knows its item or `World.Reached` records its building.
+`PlayerControl.Update` moves nobody while it shows.
+`MapDiscovery.Of` gives each entry one of three `MapState`s.
+It is made when `World.Had` knows its item or `World.Reached` records its building.
+Otherwise it is not made yet when a station's chain or the chain of a goal in the Goal Log holds it, and undiscovered when none does.
+A chain is the entry and, followed all the way down, its build cost, recipe ingredients, fuels and plainest tool, or the `From` and `Also` items of its source.
+Every station some recipe is made at has its chain shown from a new game.
 `RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
 and the rest go on lines below. When a recipe takes a spare root in the same category as a second ingredient, the
 first column can hold that root beside the product, and the main ingredient connects from above.
 `MapBuilding` attaches each building to the material it costs most, including the staged costs of a mine. When
 materials tie, the first one listed is used. Marking a mine reveals its plan without marking it as built.
 `MapTree` draws arrows to the products and highlights those connected to the chosen card.
-A `MapNode` draws a filled icon slot for a discovered item and a question mark in a dashed slot otherwise.
+A `MapNode` draws a filled icon slot for a made item, a faded slot with a greyed picture for one not made yet, and a question mark in a dashed slot for an undiscovered one.
 `MapItemLink` also hides undiscovered names and icons in the Item tree, chips, thumbnails and tooltips.
 Undiscovered entries can still be found on the main map, but neither their details nor their Item trees open until discovery. The details panel shares the dashed badge.
 Chips below a discovered card link to the required tool and extra ingredients or construction materials. A click on a chip scrolls to its item
