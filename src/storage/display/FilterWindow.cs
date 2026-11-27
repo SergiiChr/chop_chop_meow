@@ -93,7 +93,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             if (barrel) return Barrels.PouredLiquid(world.Data, item) != null;
             if (World.Nests(t, item)) return false;
             var kind = World.PackedKind(item);
-            return !kind.IsEmpty && (pile || !kind.SequenceEqual(World.MixedCrate)) || !post && (world.Data.Items.ContainsKey(item) || Lanterns.IsItem(item));
+            return !kind.IsEmpty && (pile || !kind.SequenceEqual(World.MixedCrate)) || !post && world.Data.IsItem(item);
         }
     }
 

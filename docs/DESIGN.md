@@ -104,7 +104,7 @@ Simulation and data:
 | `src/world/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, the lifetime of each caught firebug in its stack, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
 | `src/world/model/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/world/model/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
@@ -135,7 +135,6 @@ Simulation and data:
 | `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs`, `src/firebugs/FirebugChase.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow; the showcase's player chasing firebugs for a recording |
 | `src/diary/model/Diary.cs`, `src/diary/model/DiaryDay.cs`, `src/diary/model/DiaryFind.cs`, `src/diary/model/DiaryFindDef.cs` | The diary: its days and their text, where each part of it turns up, each player's finds and read days, and who sees a page lying in the world |
 | `src/diary/display/PageShape.cs`, `src/diary/display/PageProp.cs` | A loose page's model, floating on the lake or fluttering down off a tree |
-| `src/firebugs/model/CaughtFirebugs.cs` | The lifetime of each caught firebug, its stack, and moving it without changing its life |
 | `src/lanterns/Lanterns.cs`, `src/lanterns/display/LanternPanel.cs` | Portable lanterns, filling and placing them, and the page that opens a carried or placed lantern |
 | `src/lanterns/display/LanternShape.cs`, `src/lanterns/display/LanternModel.cs`, `src/lanterns/display/LanternProp.cs` | The jar, wooden frame, steel lid and handle, visible firebugs and green light |
 | `src/lanterns/display/LanternWear.cs` | Lanterns hanging from the player’s hand, belt, backpack or shoulders |

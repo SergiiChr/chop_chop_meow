@@ -120,9 +120,9 @@ public partial class Game {
         await KeyStroke(Key.Key9);
         await ClickGround(MouseButton.Right);
         await Until(() => view.PlayerAnimation == ActorAction.NetSwing && !wear.Hand.Light.IsVisibleInTree()
-            && wear.Worn.Any(lamp => lamp.Light.IsVisibleInTree()), "the unbound lantern lighting the way from the belt during the net swing", 3);
+            && wear.Worn.Any(lamp => lamp?.Light.IsVisibleInTree() == true), "the unbound lantern lighting the way from the belt during the net swing", 3);
         await Until(() => view.PlayerAnimation != ActorAction.NetSwing && wear.Hand.Light.IsVisibleInTree()
-            && !wear.Worn.Any(lamp => lamp.Light.IsVisibleInTree()), "the lantern returning to the hand after the net swing", 3);
+            && !wear.Worn.Any(lamp => lamp?.Light.IsVisibleInTree() == true), "the lantern returning to the hand after the net swing", 3);
         await KeyStroke(Key.Tab);
         await DoubleClick(BagCellOf(lantern));
         await Until(() => world.Me.LanternInHand == 0 && !wear.Hand.Light.IsVisibleInTree(), "the second double-click stowing the lantern", 3);
@@ -155,16 +155,16 @@ public partial class Game {
         int heldBefore = cursor.Stack?.Count ?? 0;
         Require(heldBefore >= 12, "the cursor should hold enough firebugs for a fill and an overflow");
         await RightClick(slot);
-        await Until(() => world.Lanterns.BugCount(lantern) == 1 && panel.HeadingTitle.Text == "Lantern", "the first firebug filling and renaming the lantern", 4);
+        await Until(() => world.Lanterns.BugCount(lantern.LanternItem) == 1 && panel.HeadingTitle.Text == "Lantern", "the first firebug filling and renaming the lantern", 4);
         Require(slot.TooltipText.StartsWith("Average life left", System.StringComparison.Ordinal),
             "checking the lantern's firebug stack should show its average remaining life");
         await RightClick(slot);
-        await Until(() => world.Lanterns.BugCount(lantern) == 2 && OnPage("lantern_firebug_count") is Label { Text: "2/10" }, "the second firebug updating the count", 4);
+        await Until(() => world.Lanterns.BugCount(lantern.LanternItem) == 2 && OnPage("lantern_firebug_count") is Label { Text: "2/10" }, "the second firebug updating the count", 4);
         await Click(slot);
-        await Until(() => world.Lanterns.BugCount(lantern) == 10 && world.Backpack[Firebugs.Item] == bugsBefore + 2 && OnPage("lantern_firebug_count") is Label { Text: "10/10" },
+        await Until(() => world.Lanterns.BugCount(lantern.LanternItem) == 10 && world.Backpack[Firebugs.Item] == bugsBefore + 2 && OnPage("lantern_firebug_count") is Label { Text: "10/10" },
             "depositing eight more firebugs and leaving the surplus in the backpack", 4);
         await Click(slot);
-        Require(world.Lanterns.BugCount(lantern) == 10 && cursor.Stack?.Count == heldBefore - 10, "the full lantern should reject the remaining held firebugs");
+        Require(world.Lanterns.BugCount(lantern.LanternItem) == 10 && cursor.Stack?.Count == heldBefore - 10, "the full lantern should reject the remaining held firebugs");
         await Click(FindButton(panel, "Pick up")!);
         await Until(() => world.Find(lantern.Id) == null && world.Lanterns.Carried(Lanterns.Id(item)) != null && !panel.Visible,
             "picking up the filled lantern from its ground panel", 4);

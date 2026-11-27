@@ -1200,7 +1200,7 @@ public sealed partial class World {
     /// <summary>What the recipe a station is on makes, or empty for a thing that makes nothing.</summary>
     internal string Product(Thing t) => Data.Recipes.TryGetValue(Selected(t), out var r) ? r.Output : "";
     /// <summary>Whether an item is a recipe's product, including a lantern with its own charge.</summary>
-    internal static bool IsProduct(string product, string item) => item == product || product == Lanterns.Item && Lanterns.IsItem(item);
+    internal static bool IsProduct(string product, string item) => item == product || Lanterns.Kind(item) == product;
     private void Unload(Inventory box, Func<string, bool> leaves) { foreach (string item in box.Items.Keys.ToArray()) if (leaves(item)) Carry(box, S.Backpack, null, item, box[item]); }
     private static readonly Dictionary<string, int> NoCost = new();
     /// <summary>
@@ -1685,14 +1685,16 @@ public sealed partial class World {
     internal static string PackedName(Inventory contents, int id) {
         string? good = null;
         foreach (var pair in contents.Items) {
-            string kind = Lanterns.IsItem(pair.Key) ? Lanterns.Item : pair.Key;
+            string kind = Lanterns.Kind(pair.Key);
             if (good != null && good != kind) return PackedPrefix + id;
             good = kind;
         }
         return good == null ? "crate" : $"{PackedPrefix}{good}_{id}";
     }
     /// <summary>An item's name, with what a packed crate holds.</summary>
-    public string Describe(string item) => Packed(item) is Inventory contents ? $"{Data.Name("crate")} of {Goods(contents.Items)}" : Lanterns.IsItem(item) && Lanterns.BugCount(item) == 0 ? Lanterns.EmptyName : Data.Name(item);
+    public string Describe(string item) => Packed(item) is Inventory contents ? $"{Data.Name("crate")} of {Goods(contents.Items)}" : Lanterns.IsItem(item) ? LanternName(Lanterns.BugCount(item)) : Data.Name(item);
+    /// <summary>A lantern's name, which says when it holds no living firebugs.</summary>
+    internal string LanternName(int bugs) => bugs == 0 ? Lanterns.EmptyName : Data.Name(Lanterns.Item);
     /// <summary>The packed crate with this number in the acting player's backpack, or null once it has gone or been emptied.</summary>
     public string? CarriedCrate(int id) {
         foreach (var pair in S.Backpack.Items) if (PackedId(pair.Key) == id) return pair.Key;

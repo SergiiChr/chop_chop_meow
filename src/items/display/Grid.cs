@@ -119,8 +119,7 @@ public partial class PagePanel {
             cell.AddThemeStyleboxOverride("normal", takes || bound ? Style.SlotWanted : Style.SlotNormal);
             string clicks = open != null && stack is (string itemToOpen, _) && Lanterns.IsItem(itemToOpen)
                 ? "LMB: pick up · RMB: open for refill · Double LMB: take in hand or stow" : hint;
-            string expiry = life < 0 ? "" : "\n" + PageText.FirebugLife(life);
-            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}{expiry}\n{clicks} · {RecipeMap.AltClickHint}" : "";
+            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}{PageText.FirebugLifeLine(life)}\n{clicks} · {RecipeMap.AltClickHint}" : "";
         }
     }
 

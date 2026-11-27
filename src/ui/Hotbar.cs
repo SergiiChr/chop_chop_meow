@@ -83,7 +83,7 @@ public partial class Hotbar : PanelContainer {
     private ItemSlot HotbarButton(int slot) {
         var button = new ItemSlot { FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand };
         button.Controls = new SlotInput(cursor) {
-            Takes = held => held.Item is string id && (world.Data.Items.ContainsKey(id) || Lanterns.IsItem(id) || world.Data.IsBuilding(id)),
+            Takes = held => held.Item is string id && (world.Data.IsItem(id) || world.Data.IsBuilding(id)),
             // A held stack binds itself to the slot (World.BindHeld); a plan is only named there.
             Put = (held, _) => {
                 if (held.Stack is HeldStack stack) world.FromHeldStack(() => world.SetHotbar(slot, stack.Item));
@@ -146,8 +146,9 @@ public partial class Hotbar : PanelContainer {
             int count = world.HotbarCount(slot);
             bool active = world.InHand == "" && world.ActiveHotbar == slot;
             int life = id == Firebugs.Item && count > 0 ? world.Firebugs.AverageMinutes(world.S.Backpack, world.HotbarStack(slot)) : -1;
-            int bugs = count > 0 && Lanterns.IsItem(id) ? world.Lanterns.BugCount(id) : -1;
-            var shown = (id, count, active, life, bugs, world.Packed(id)?.Count ?? 0);
+            bool lantern = Lanterns.IsItem(id);
+            int bugs = count > 0 && lantern ? world.Lanterns.BugCount(id) : -1;
+            var shown = (id, count, active, life, bugs, World.IsCrate(id) ? world.Packed(id)?.Count ?? 0 : 0);
             if (shownSlots[slot] == shown) continue;
             shownSlots[slot] = shown;
             bool building = world.Data.IsBuilding(id);
@@ -159,9 +160,8 @@ public partial class Hotbar : PanelContainer {
             else badge.SetStack(count, bugs);
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
-            string clicks = Lanterns.IsItem(id) ? "LMB: select · RMB: open for refill · Double LMB: take in hand or stow" : "LMB: select · RMB or Double LMB: use";
-            string expiry = life < 0 ? "" : "\n" + PageText.FirebugLife(life);
-            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Describe(id)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}{expiry}\n{clicks}";
+            string clicks = lantern ? "LMB: select · RMB: open for refill · Double LMB: take in hand or stow" : "LMB: select · RMB or Double LMB: use";
+            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Describe(id)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}{PageText.FirebugLifeLine(life)}\n{clicks}";
             if (!building && id.Length > 0) button.TooltipText += $"\n{RecipeMap.AltClickHint}";
             // The selected slot gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
@@ -172,7 +172,7 @@ public partial class Hotbar : PanelContainer {
     /// <summary>The item selected: the tool in hand, or else the item on the selected hotbar slot; null for none.</summary>
     public string? ActiveItem() {
         string id = world.InHand != "" ? world.InHand : world.HotbarItem(world.ActiveHotbar);
-        return world.Data.Items.ContainsKey(id) || Lanterns.IsItem(id) ? id : null;
+        return world.Data.IsItem(id) ? id : null;
     }
 
     /// <summary>The backpack cell the item selected is used from: the stack bound to the selected hotbar slot, or -1 for the tool in hand or a slot bound to none.</summary>

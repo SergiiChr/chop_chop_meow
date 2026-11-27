@@ -344,7 +344,7 @@ public sealed partial class World {
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
-        if (Lanterns.IsItem(item)) item = Lanterns.Item;
+        item = Lanterns.Kind(item);
         bool pile = IsSingleResourceStore(chest);
         if (chest.Kind == ThingKind.Barrel && Data.VesselFor(item) == null) return;
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate || !pile && item == Inventory.Everything) || Nests(chest, item)) return;

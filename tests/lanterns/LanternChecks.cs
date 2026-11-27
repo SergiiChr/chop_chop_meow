@@ -22,20 +22,20 @@ internal static class LanternChecks {
         Require(placed != null && world.Lanterns.Refill(Lanterns.Id(item), placed, 2), "an empty lantern can be placed and filled with two bugs");
         RunUntil(world, caught + 840);
         GiveFirebugs(world, 3);
-        Require(world.Lanterns.Refill(Lanterns.Id(item), placed, 3) && world.Lanterns.BugCount(placed) == 5,
+        Require(world.Lanterns.Refill(Lanterns.Id(item), placed, 3) && world.Lanterns.BugCount(placed.LanternItem) == 5,
             "added bugs should join those still alive in a lit lantern");
         string saved = world.Serialize();
         RunUntil(world, caught + 2520);
-        Require(world.Lanterns.BugCount(placed) == 3, "only the first catch should die after its third day");
+        Require(world.Lanterns.BugCount(placed.LanternItem) == 3, "only the first catch should die after its third day");
         world.Deserialize(saved);
         var restored = world.Find(placed.Id)!;
-        Require(world.Lanterns.BugCount(restored) == 5, "loading should restore the saved bugs and their ages");
+        Require(world.Lanterns.BugCount(restored.LanternItem) == 5, "loading should restore the saved bugs and their ages");
         RunUntil(world, caught + 2519);
-        Require(world.Lanterns.BugCount(restored) == 5, "the first catch should live for three full in-game days");
+        Require(world.Lanterns.BugCount(restored.LanternItem) == 5, "the first catch should live for three full in-game days");
         world.Tick(1);
-        Require(world.Lanterns.BugCount(restored) == 3, "the first catch should still die before the second after a load");
+        Require(world.Lanterns.BugCount(restored.LanternItem) == 3, "the first catch should still die before the second after a load");
         RunUntil(world, caught + 3360);
-        Require(world.Lanterns.BugCount(restored) == 0 && world.Find(restored.Id) != null,
+        Require(world.Lanterns.BugCount(restored.LanternItem) == 0 && world.Find(restored.Id) != null,
             "the last bugs die on their own third day and leave a reusable dark lantern");
     }
 

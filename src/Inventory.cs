@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 namespace ChopChopMeow;
 
 /// <summary>Item quantities and explicit automation access rules. Player access is independent of automation filters.</summary>
-public sealed partial class Inventory {
+public sealed class Inventory {
     public enum Carrier { None, Player, Worker }
 
     /// <summary>A player's empty barrels stack beside one filled barrel, and a worker with a barrel or a packed crate carries nothing else in their hands.</summary>
@@ -171,11 +171,11 @@ public sealed partial class Inventory {
     /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Unstacked = new();
     /// <summary>Coins use the container's coin stack, while packed crates, tools and lanterns each take a cell.</summary>
-    public int StackOf(string item) => item == Coins ? CoinStack : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) || item == Lanterns.Item || Lanterns.IsItem(item) ? 1 : StackSize;
-    /// <summary>Lanterns of every charge in this box.</summary>
-    internal int LanternCount() {
+    public int StackOf(string item) => item == Coins ? CoinStack : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) || Lanterns.Kind(item) == Lanterns.Item ? 1 : StackSize;
+    /// <summary>Units of an item in this box, counting a lantern of any charge as a lantern.</summary>
+    internal int CountOfKind(string kind) {
         int count = 0;
-        foreach (var pair in items) if (Lanterns.IsItem(pair.Key)) count += pair.Value;
+        foreach (var pair in items) if (Lanterns.Kind(pair.Key) == kind) count += pair.Value;
         return count;
     }
     /// <summary>One of this box's lanterns, preferring one that is not held.</summary>
@@ -203,7 +203,7 @@ public sealed partial class Inventory {
         for (int i = 0; i < Math.Min(Slots, Layout.Count); i++) {
             var slot = Layout[i];
             if (slot.Item == "") room += stack;
-            else { used++; if (slot.Item == item && (item != Firebugs.Item || slot.Held == 0)) room += Math.Max(0, stack - slot.Count); }
+            else { used++; if (TopsUp(slot, item)) room += Math.Max(0, stack - slot.Count); }
         }
         room = Math.Max(0, room);
         if (Capacity > 0 && !replacing) room = Math.Min(room, Math.Max(0, Capacity - Count));
@@ -222,7 +222,7 @@ public sealed partial class Inventory {
         foreach (var (item, count) in goods) {
             if (count > CarryRoom(item)) return false;
             int stack = StackOf(item), spare = 0;
-            for (int i = 0; i < limit; i++) if (Layout[i].Item == item && (item != Firebugs.Item || Layout[i].Held == 0)) spare += stack - Layout[i].Count;
+            for (int i = 0; i < limit; i++) if (TopsUp(Layout[i], item)) spare += stack - Layout[i].Count;
             empty -= (Math.Max(0, count - spare) + stack - 1) / stack;
         }
         int limited = CarriedBy == Carrier.None ? 0 : goods.Where(pair => CountsTowardCarryLimit(pair.Key)).Sum(pair => pair.Value);
@@ -272,7 +272,7 @@ public sealed partial class Inventory {
         foreach (var s in Layout) { s.Held = 0; s.HeldBy = 0; s.FirebugExpiries?.Sort(); }
         heldUnits = 0;
         List<float>? overflowFirebugs = null;
-        int nextExpiry = 0;
+        int nextOverflow = 0;
         var remaining = layoutRemainder; remaining.Clear(); foreach (var pair in items) remaining[pair.Key] = pair.Value;
         for (int i = 0; i < Layout.Count; i++) {
             var s = Layout[i];
@@ -292,9 +292,9 @@ public sealed partial class Inventory {
             if (empty < 0) { Layout.Add(new Slot()); empty = Layout.Count - 1; }
             int n = Math.Min(StackOf(item), left);
             Layout[empty].Item = item; Layout[empty].Count = n;
-            if (item == Firebugs.Item && overflowFirebugs != null && nextExpiry + n <= overflowFirebugs.Count) {
-                AddFirebugExpiries(Layout[empty], System.Runtime.InteropServices.CollectionsMarshal.AsSpan(overflowFirebugs).Slice(nextExpiry, n));
-                nextExpiry += n;
+            if (item == Firebugs.Item && overflowFirebugs != null && nextOverflow + n <= overflowFirebugs.Count) {
+                AddFirebugExpiries(Layout[empty], System.Runtime.InteropServices.CollectionsMarshal.AsSpan(overflowFirebugs).Slice(nextOverflow, n));
+                nextOverflow += n;
             }
             left -= n;
         }
@@ -433,11 +433,14 @@ public sealed partial class Inventory {
     /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over one taking everything.</summary>
     public bool Wants(string item) => Names(InputFilter, item);
     /// <summary>Whether the input filter names any item, which a chest's hauler fills it with; <see cref="Everything"/> names none.</summary>
+    /// <summary>Whether a stack takes more of an item: a stack of it, unless it is firebugs a player holds part of, whose lives must stay in order behind the held ones.</summary>
+    private static bool TopsUp(Slot slot, string item) => slot.Item == item && (item != Firebugs.Item || slot.Held == 0);
+
     public bool NamesItems => InputFilter.Count > 0 && !InputFilter.Contains(Everything);
     private bool Passes(FilterList filter, string item) => (Gated ? filter.Contains(Everything) : filter.Count == 0) || Names(filter, item);
     /// <summary>A filter names an item itself, a lantern of any charge, or a packed crate of its named good.</summary>
     private static bool Names(FilterList filter, string item) {
-        if (filter.Contains(item) || Lanterns.IsItem(item) && filter.Contains(Lanterns.Item)) return true;
+        if (filter.Contains(item) || filter.Contains(Lanterns.Kind(item))) return true;
         var kind = World.PackedKind(item);
         if (kind.IsEmpty) return false;
         foreach (string named in filter) if (kind.SequenceEqual(named)) return true;
@@ -457,7 +460,7 @@ public sealed partial class Inventory {
             int size = StackOf(item);
             for (int i = 0; i < limit && left > 0; i++) {
                 var slot = Layout[i];
-                if (slot.Item != item || slot.Count >= size || !firebugs.IsEmpty && slot.Held > 0) continue;
+                if (!TopsUp(slot, item) || slot.Count >= size) continue;
                 int n = Math.Min(left, size - slot.Count);
                 if (!firebugs.IsEmpty) AddFirebugExpiries(slot, firebugs.Slice(amount - left, n));
                 slot.Count += n; left -= n;
@@ -613,6 +616,139 @@ public sealed partial class Inventory {
         }
         Take(item, amount, false);
         return destination.Add(item, amount);
+    }
+
+    /// <summary>Adds caught firebugs with the world time each one dies, without extending the life of any in the stack.</summary>
+    internal int AddFirebugs(ReadOnlySpan<float> expires) => Add(Firebugs.Item, expires.Length, expires);
+
+    internal float AverageFirebugExpiry(int slot) {
+        return (uint)slot < (uint)Layout.Count && Layout[slot].FirebugExpiries is { } dates
+            ? Firebugs.Average(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(dates)) : 0;
+    }
+
+    /// <summary>The average expiry over all the firebug stacks in the box, such as a station's one input.</summary>
+    internal float AverageFirebugExpiry() {
+        double total = 0;
+        int count = 0;
+        foreach (var slot in Layout) if (slot.FirebugExpiries is { } dates) {
+            foreach (float date in dates) total += date;
+            count += dates.Count;
+        }
+        return count == 0 ? 0 : (float)(total / count);
+    }
+
+    /// <summary>Takes the shortest-lived free firebugs first, starting with the slot the player clicked.</summary>
+    internal int TakeFirebugs(Span<float> taken) => TakeFirebugs(taken.Length, taken, false);
+
+    private int TakeFirebugs(int quantity, Span<float> taken, bool spent) {
+        if (quantity <= 0 || this[Firebugs.Item] == 0) return 0;
+        int removed = 0;
+        if ((uint)PreferredSlot < (uint)Layout.Count) {
+            var preferred = Layout[PreferredSlot];
+            if (preferred.Item == Firebugs.Item) TakeFirebugsFrom(preferred, Math.Min(quantity, Takeable(preferred)), taken, ref removed, spent);
+        }
+        while (removed < quantity) {
+            Slot? oldest = null;
+            float expires = float.PositiveInfinity;
+            foreach (var slot in Layout) {
+                if (slot.Item != Firebugs.Item || Takeable(slot) <= 0 || slot.FirebugExpiries![slot.Held] >= expires) continue;
+                oldest = slot;
+                expires = slot.FirebugExpiries[slot.Held];
+            }
+            if (oldest == null) break;
+            TakeFirebugsFrom(oldest, 1, taken, ref removed, spent);
+        }
+        if (removed > 0) {
+            int left = this[Firebugs.Item] - removed;
+            if (left == 0) items.Remove(Firebugs.Item); else items[Firebugs.Item] = left;
+            Changed?.Invoke();
+        }
+        return removed;
+    }
+
+    private void TakeFirebugsFrom(Slot slot, int count, Span<float> taken, ref int removed, bool spent) {
+        if (count == 0) return;
+        var dates = slot.FirebugExpiries!;
+        if (!taken.IsEmpty) for (int i = 0; i < count; i++) taken[removed + i] = dates[slot.Held + i];
+        dates.RemoveRange(slot.Held, count);
+        removed += count;
+        RemoveFromSlot(slot, count, spent);
+    }
+
+    private static void AddFirebugExpiries(Slot slot, ReadOnlySpan<float> expires) {
+        if (expires.IsEmpty) return;
+        var dates = slot.FirebugExpiries ??= new List<float>();
+        foreach (float date in expires) dates.Add(date);
+        // The held units are reserved at the front. Anything that joins the stack while held sorts behind them.
+        dates.Sort(slot.Held, dates.Count - slot.Held, null);
+    }
+
+    /// <summary>Moves the oldest units from an unheld stack when two cells merge.</summary>
+    private static void MoveFirebugExpiries(Slot from, Slot to, int count) {
+        if (from.FirebugExpiries is not { } dates) return;
+        AddFirebugExpiries(to, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(dates)[..count]);
+        dates.RemoveRange(0, count);
+    }
+
+    /// <summary>Removes dead firebugs, returning the next time any in this inventory dies.</summary>
+    internal float ExpireFirebugs(float now) {
+        if (this[Firebugs.Item] == 0) return float.PositiveInfinity;
+        int removed = 0;
+        float next = float.PositiveInfinity;
+        foreach (var slot in Layout) {
+            if (slot.FirebugExpiries is not { } dates) continue;
+            int keep = 0, held = 0;
+            for (int i = 0; i < dates.Count; i++) {
+                float expiry = dates[i];
+                if (expiry <= now) continue;
+                dates[keep++] = expiry;
+                if (i < slot.Held) held++;
+                next = Math.Min(next, expiry);
+            }
+            int dead = dates.Count - keep;
+            if (dead == 0) continue;
+            heldUnits -= slot.Held - held;
+            slot.Held = held;
+            if (held == 0) slot.HeldBy = 0;
+            dates.RemoveRange(keep, dead);
+            slot.Count -= dead;
+            removed += dead;
+            if (slot.Count == 0) {
+                if (slot.Hotbar != 0) (UsedUp ??= new()).Add((slot.Hotbar, slot.Item));
+                slot.Empty();
+            }
+        }
+        if (removed > 0) {
+            int left = this[Firebugs.Item] - removed;
+            if (left == 0) items.Remove(Firebugs.Item); else items[Firebugs.Item] = left;
+            Changed?.Invoke();
+        }
+        return next;
+    }
+
+    /// <summary>Every saved caught firebug has one valid, finite expiry in its own stack.</summary>
+    internal bool ValidFirebugs() {
+        if (layout == null) return this[Firebugs.Item] == 0;
+        int found = 0;
+        foreach (var slot in Layout) {
+            if (slot.Item != Firebugs.Item) { if (slot.FirebugExpiries != null) return false; continue; }
+            if (slot.FirebugExpiries is not { } dates || dates.Count != slot.Count) return false;
+            foreach (float date in dates) if (!float.IsFinite(date) || date <= 0) return false;
+            found += slot.Count;
+        }
+        return found == this[Firebugs.Item];
+    }
+
+    /// <summary>Changes a packed crate's item name after something in it expires, preserving its cell and any hold on it.</summary>
+    internal void RenamePackedCrate(int id, string name) {
+        if (items.Count == 0) return;
+        bool changed = false;
+        foreach (var slot in Layout) {
+            if (slot.Item == name || World.PackedId(slot.Item) != id) continue;
+            slot.Item = name;
+            changed = true;
+        }
+        if (changed) SyncAggregate();
     }
 }
 

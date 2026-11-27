@@ -205,9 +205,11 @@ public sealed class Construction(World world) {
         }
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in world.Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
-        foreach (var box in World.Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
         RemoveBuilding(t);
-        world.Say((GiveBack(back, t.Pos, t) ? $"The {world.Lower(def.Name)} is down. Everything is back in your backpack." : $"The {world.Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
+        Inventory? rest = null;
+        GiveBack(back, t.Pos, ref rest);
+        foreach (var box in World.Boxes(t)) if (box != null) GiveBack(box, t.Pos, ref rest);
+        world.Say((rest == null ? $"The {world.Lower(def.Name)} is down. Everything is back in your backpack." : $"The {world.Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
         return true;
     }
 
@@ -236,9 +238,8 @@ public sealed class Construction(World world) {
         foreach (var box in World.Boxes(t)) {
             if (box == null) continue;
             world.ReleaseIn(box);
-            foreach (var (item, count) in box.Items)
-                if (item != Firebugs.Item && world.Data.VesselFor(item) == null) Recover(ref recovery, t.Pos, item, count);
-            RecoverFirebugs(ref recovery, t.Pos, box);
+            foreach (string item in box.Items.Keys.ToArray())
+                if (world.Data.VesselFor(item) == null) Recover(ref recovery, t.Pos, box, item);
         }
         RemoveBuilding(t);
         world.Say($"A growing tree crushed the {world.Lower(world.Data.Name(t.Kind))}.");
@@ -293,29 +294,31 @@ public sealed class Construction(World world) {
     /// Puts items into the acting player's backpack and what does not fit into a recovery box at <paramref name="at"/>;
     /// true when all of it fitted.
     /// </summary>
-    internal bool GiveBack(Dictionary<string, int> items, Vector2 at, Thing? source = null) {
+    internal bool GiveBack(Dictionary<string, int> items, Vector2 at) {
         Inventory? rest = null;
-        foreach (var (item, amount) in items) {
-            if (item == Firebugs.Item && source != null) {
-                foreach (var box in World.Boxes(source)) if (box != null && box[Firebugs.Item] > 0) {
-                    box.TransferTo(world.S.Backpack, Firebugs.Item, box[Firebugs.Item]);
-                    RecoverFirebugs(ref rest, at, box);
-                }
-                continue;
-            }
-            int left = amount - world.S.Backpack.Add(item, amount);
-            if (left <= 0) continue;
-            Recover(ref rest, at, item, left);
-        }
+        GiveBack(items, at, ref rest);
         return rest == null;
     }
 
-    private void Recover(ref Inventory? box, Vector2 at, string item, int count) => RecoveryRoom(ref box, at, item, count).Add(item, count);
+    private void GiveBack(Dictionary<string, int> items, Vector2 at, ref Inventory? rest) {
+        foreach (var (item, amount) in items) {
+            int left = amount - world.S.Backpack.Add(item, amount);
+            if (left > 0) RecoveryRoom(ref rest, at, item, left).Add(item, left);
+        }
+    }
 
-    /// <summary>Moves the remaining firebugs into the recovery box with their original lifetimes.</summary>
-    private void RecoverFirebugs(ref Inventory? rest, Vector2 at, Inventory source) {
-        int count = source[Firebugs.Item];
-        if (count > 0) source.TransferTo(RecoveryRoom(ref rest, at, Firebugs.Item, count), Firebugs.Item, count);
+    /// <summary>Moves everything a box holds into the backpack and what does not fit into the recovery box, each firebug keeping its life.</summary>
+    private void GiveBack(Inventory box, Vector2 at, ref Inventory? rest) {
+        foreach (string item in box.Items.Keys.ToArray()) {
+            box.TransferTo(world.S.Backpack, item, box[item]);
+            Recover(ref rest, at, box, item);
+        }
+    }
+
+    /// <summary>Moves what a box still holds of an item into the recovery box, each firebug keeping its life.</summary>
+    private void Recover(ref Inventory? rest, Vector2 at, Inventory box, string item) {
+        int count = box[item];
+        if (count > 0) box.TransferTo(RecoveryRoom(ref rest, at, item, count), item, count);
     }
 
     private Inventory RecoveryRoom(ref Inventory? box, Vector2 at, string item, int count) {

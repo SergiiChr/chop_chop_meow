@@ -30,8 +30,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
             if (lantern) count.SetStack(shown.Held, shown.Bugs);
             else count.Text = shown.Held > 0 ? shown.Held.ToString() : "";
             string hint = tooltip(shown.Held);
-            if (shown.Life >= 0) hint += "\n" + PageText.FirebugLife(shown.Life);
-            cell.TooltipText = $"{hint}\n{RecipeMap.AltClickHint}";
+            cell.TooltipText = $"{hint}{PageText.FirebugLifeLine(shown.Life)}\n{RecipeMap.AltClickHint}";
         });
         return cell;
     }
@@ -139,11 +138,11 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         moves.TakeCell(cell, box, () => box.FirstLantern(), t,
             held => held.Stack is { Box: 0 } stack && Lanterns.IsItem(stack.Item),
             input ? (item, units) => world.LoadInput(t, item, units) : null);
-        live.Watch(() => (Count: box.LanternCount(), Bugs: box.FirstLantern() is string item ? world.Lanterns.BugCount(item) : -1), now => {
+        live.Watch(() => (Count: box.CountOfKind(Lanterns.Item), Bugs: box.FirstLantern() is string item ? world.Lanterns.BugCount(item) : -1), now => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, now.Count > 0 ? Colors.White : Style.Ghost);
             count.SetStack(now.Count, -1);
             firebugs.SetStack(0, now.Bugs);
-            string name = now.Bugs == 0 ? Lanterns.EmptyName : world.Data.Name(Lanterns.Item);
+            string name = world.LanternName(now.Bugs);
             cell.TooltipText = $"{name} · {now.Count}{world.Data.DescriptionLine(Lanterns.Item)}\n{SlotHint}";
         });
         return Labelled(cell, perBatch);

@@ -38,6 +38,8 @@ public sealed class Lanterns(World world) {
     }
 
     internal static bool IsItem(string? item) => Id(item) != 0;
+    /// <summary>The shared lantern item for a lantern of any charge, or the item itself.</summary>
+    internal static string Kind(string item) => IsItem(item) ? Item : item;
     internal static bool ValidItem(string? item) {
         if (!IsItem(item)) return false;
         float previous = 0;
@@ -51,15 +53,12 @@ public sealed class Lanterns(World world) {
 
     internal static bool Valid(Thing t) => t.Kind == ThingKind.Lantern ? ValidItem(t.LanternItem) : t.LanternItem == null;
     public int BugCount(string? item) => Living(item, default);
-    public int BugCount(Thing lantern) => BugCount(lantern.LanternItem);
 
     /// <summary>The stack of living firebugs in this lantern, with their average game minutes left.</summary>
     internal (int Count, int AverageMinutes) FirebugStack(string? item) {
         Span<float> dates = stackalloc float[Capacity];
         int count = Living(item, dates);
-        double total = 0;
-        foreach (float date in dates[..count]) total += date;
-        return (count, count == 0 ? 0 : world.Firebugs.MinutesLeft((float)(total / count)));
+        return (count, count == 0 ? 0 : world.Firebugs.MinutesLeft(Firebugs.Average(dates[..count])));
     }
 
     private int Living(string? item, Span<float> copy) {

@@ -13,11 +13,11 @@ public partial class Game {
         string empty = Hosted.Lanterns.NewEmpty();
         Give(guest, empty);
         GiveFirebugs(Hosted, guest, 3);
-        await Until(() => Hosted.ThingsOf(ThingKind.Lantern).Any(t => Hosted.Lanterns.BugCount(t) == 3), "the guest filling the placed lantern");
-        var placed = Hosted.ThingsOf(ThingKind.Lantern).Single(t => Hosted.Lanterns.BugCount(t) == 3);
+        await Until(() => Hosted.ThingsOf(ThingKind.Lantern).Any(t => Hosted.Lanterns.BugCount(t.LanternItem) == 3), "the guest filling the placed lantern");
+        var placed = Hosted.ThingsOf(ThingKind.Lantern).Single(t => Hosted.Lanterns.BugCount(t.LanternItem) == 3);
         Require(guest.Backpack[Firebugs.Item] == 0 && Lanterns.Id(placed.LanternItem) == Lanterns.Id(empty),
             "the guest should use their own three firebugs to fill the same lantern");
-        await Until(() => world.Find(placed.Id) is Thing seen && world.Lanterns.BugCount(seen) == 3,
+        await Until(() => world.Find(placed.Id) is Thing seen && world.Lanterns.BugCount(seen.LanternItem) == 3,
             "the host's window showing the guest's three firebugs in the placed lantern");
         Signal("lantern-filled");
         await Until(() => Hosted.Find(placed.Id) == null && guest.Backpack.Items.Any(p => Hosted.Lanterns.BugCount(p.Key) == 3),
@@ -44,7 +44,7 @@ public partial class Game {
         await RightClick(at, .25f);
         await Carry(BagCellOf(Firebugs.Item), Named("lantern_firebugs")!);
         await Signaled("lantern-filled");
-        await Until(() => world.Find(panel.Selection.Thing) is Thing t && world.Lanterns.BugCount(t) == 3,
+        await Until(() => world.Find(panel.Selection.Thing) is Thing t && world.Lanterns.BugCount(t.LanternItem) == 3,
             "the guest's window showing all three firebugs in the lantern");
         await Click(FindButton(panel, "Pick up")!);
         await Until(() => world.Lanterns.Carried(Lanterns.Id(item)) is string packed && world.Lanterns.BugCount(packed) == 3 && !panel.Visible,

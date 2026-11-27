@@ -9,40 +9,53 @@ internal sealed class LanternWear {
     private const float WearScale = .8f, BeltRadius = .33f, BeltY = .105f, ShoulderX = .124f;
     private static readonly float[] BeltAngles = [43, -43, 89, -89, 136, -136];
     private static readonly Vector3 Grip = Vector3.Up * LanternShape.GripHeight;
-    internal readonly LanternModel Hand;
-    internal readonly LanternModel[] Worn = new LanternModel[HotbarSlots + 1];
-    private readonly Node3D[] hooks = new Node3D[HotbarSlots + 1];
-    private readonly Node3D hips, torso;
+    /// <summary>The lantern in the fist, built the first time the player holds one.</summary>
+    internal LanternModel Hand => hand ??= HandModel();
+    /// <summary>The lantern on each hook, built with its hook the first time a lantern hangs there, so a player who carries none costs nothing.</summary>
+    internal readonly LanternModel?[] Worn = new LanternModel?[HotbarSlots + 1];
+    private readonly Node3D?[] hooks = new Node3D?[HotbarSlots + 1];
+    private readonly (Node3D Parent, Vector3 At, float Yaw)[] mounts = new (Node3D, Vector3, float)[HotbarSlots + 1];
+    private readonly Node3D root, hips, torso;
+    private LanternModel? hand;
     private bool handShown;
     private int hooksShown;
 
     internal LanternWear(Node3D root, Node3D hips, Node3D torso) {
+        this.root = root;
         this.hips = hips;
         this.torso = torso;
-        Hand = new LanternModel(root);
-        Suspend(Hand, Vector3.Zero, Basis.Identity);
-        Hand.Node.Hide();
         for (int i = 0; i < BeltSlots; i++) MountBelt(i, BeltAngles[i]);
-        Mount(BeltSlots, torso, new Vector3(0, .465f, -.397f), 180);
-        Mount(BeltSlots + 1, torso, new Vector3(BodySide.Left * ShoulderX, .526f, .271f), 0);
-        Mount(BeltSlots + 2, torso, new Vector3(BodySide.Right * ShoulderX, .526f, .271f), 0);
+        mounts[BeltSlots] = (torso, new Vector3(0, .465f, -.397f), 180);
+        mounts[BeltSlots + 1] = (torso, new Vector3(BodySide.Left * ShoulderX, .526f, .271f), 0);
+        mounts[BeltSlots + 2] = (torso, new Vector3(BodySide.Right * ShoulderX, .526f, .271f), 0);
         MountBelt(SpareBeltHook, 180);
 
         void MountBelt(int index, float yaw) {
             float angle = Mathf.DegToRad(yaw);
-            Mount(index, hips, new Vector3(Mathf.Sin(angle) * BeltRadius, BeltY, Mathf.Cos(angle) * BeltRadius), yaw);
+            mounts[index] = (hips, new Vector3(Mathf.Sin(angle) * BeltRadius, BeltY, Mathf.Cos(angle) * BeltRadius), yaw);
         }
+    }
 
-        void Mount(int index, Node3D parent, Vector3 at, float yaw) {
-            var hook = Hook();
-            parent.AddChild(hook);
-            hook.Position = at;
-            hook.RotationDegrees = Vector3.Up * yaw;
-            hooks[index] = hook;
-            Worn[index] = new LanternModel(hook, compact: true);
-            Suspend(Worn[index], Vector3.Zero, Basis.Identity);
-            hook.Hide();
-        }
+    private LanternModel HandModel() {
+        var model = new LanternModel(root);
+        Suspend(model, Vector3.Zero, Basis.Identity);
+        model.Node.Hide();
+        return model;
+    }
+
+    /// <summary>The lantern on a hook, building the hook and its lantern the first time.</summary>
+    private LanternModel WornModel(int index) {
+        if (Worn[index] is LanternModel built) return built;
+        var (parent, at, yaw) = mounts[index];
+        var hook = Hook();
+        parent.AddChild(hook);
+        hook.Position = at;
+        hook.RotationDegrees = Vector3.Up * yaw;
+        hook.Hide();
+        hooks[index] = hook;
+        var model = new LanternModel(hook, compact: true);
+        Suspend(model, Vector3.Zero, Basis.Identity);
+        return Worn[index] = model;
     }
 
     internal static Node3D Hook() {
@@ -75,10 +88,10 @@ internal sealed class LanternWear {
 
     /// <summary>Shows each hotbar lantern once and keeps an occupied hand's lantern lit on the belt.</summary>
     internal void Sync(World world, PlayerState who, string? equipped, Vector3? fist, float energy, ActorState stride) {
-        bool hand = equipped != null && fist.HasValue;
-        if (handShown != hand) Hand.Node.Visible = handShown = hand;
+        bool held = equipped != null && fist.HasValue;
+        if (handShown != held) Hand.Node.Visible = handShown = held;
         Basis? swing = null;
-        if (hand) {
+        if (held) {
             Suspend(Hand, fist.GetValueOrDefault(), GaitSwing());
             Hand.Sync(world.Lanterns.BugCount(equipped), energy);
         }
@@ -88,17 +101,17 @@ internal sealed class LanternWear {
             foreach (var cell in who.Backpack.Layout) {
                 if (cell.Hotbar is < 1 or > HotbarSlots || !Lanterns.IsItem(cell.Item)) continue;
                 if (cell.Item == equipped) {
-                    if (!hand && cell.Hotbar <= BeltSlots) equippedHook = cell.Hotbar - 1;
+                    if (!held && cell.Hotbar <= BeltSlots) equippedHook = cell.Hotbar - 1;
                     continue;
                 }
                 Hang(cell.Hotbar - 1, cell.Item);
             }
-            if (equipped != null && !hand) Hang(equippedHook, equipped);
+            if (equipped != null && !held) Hang(equippedHook, equipped);
         }
         int changed = hooksShown ^ shown;
         if (changed != 0) {
             for (int i = 0; i < Worn.Length; i++)
-                if ((changed & (1 << i)) != 0) hooks[i].Visible = (shown & (1 << i)) != 0;
+                if ((changed & (1 << i)) != 0 && hooks[i] is Node3D hook) hook.Visible = (shown & (1 << i)) != 0;
             hooksShown = shown;
         }
 
@@ -106,8 +119,8 @@ internal sealed class LanternWear {
 
         void Hang(int index, string item) {
             shown |= 1 << index;
-            var lantern = Worn[index];
-            var heading = hooks[index].Basis;
+            var lantern = WornModel(index);
+            var heading = hooks[index]!.Basis;
             var body = index < BeltSlots || index == SpareBeltHook ? hips.Basis : hips.Basis * torso.Basis;
             // The hook follows the body, but the lantern hangs down rather than leaning with the torso.
             Suspend(lantern, Vector3.Zero, (body * heading).Transposed() * GaitSwing() * heading);
