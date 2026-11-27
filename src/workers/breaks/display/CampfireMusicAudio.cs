@@ -9,7 +9,10 @@ internal sealed class CampfireMusicAudio {
     private const float SeekDrift = .2f;
     // Normal snapshot and physics delays must not make playback skip the attack of a kick or strum.
     private const float StartWindow = .08f;
-    private const float SoloDb = -3;
+    // A solo plays a little above the music volume, so a short clip carries over the soundtrack.
+    private const float SoloDb = .8f;
+    // A guitar strum is heard half again as loud as the other solos, so it is not lost under the soundtrack.
+    private const float GuitarDb = 5.8f;
     private readonly float reach;
     private readonly float outputLatency;
     private readonly Clip[] songs = new Clip[CampfireScore.SongCount + 1];
@@ -62,8 +65,9 @@ internal sealed class CampfireMusicAudio {
                     state.Songs.TryGetValue(seat.Fire, out var song) && PlayingSong(song)) continue;
                 var at = worker.Pos;
                 float fraction = Math.Max(0, 1 - listener.DistanceTo(at) / reach);
+                float soloVolume = volume + SoloDb + (seat.Instrument == CampfireInstrument.Guitar ? GuitarDb : 0);
                 if (fraction > 0) Add(new Source(worker.Id, false), solos[(seat.Instrument, seat.Solo)], seat.SoloAt, at,
-                    fraction * fraction, volume + SoloDb);
+                    fraction * fraction, soloVolume);
             }
         }
         foreach (var (source, voice) in playing) if (!audible.ContainsKey(source)) Release(source, voice);

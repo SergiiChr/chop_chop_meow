@@ -87,7 +87,7 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
         row.AddThemeConstantOverride("separation", 8);
         var slot = stationSlots.Slot(thing.Inventory, Water.Liquid, true,
             held => $"Water · {held}/{Farms.LitersPerDay} L\n{StationSlots.SlotHint} · put a filled vessel here to pour",
-            takes: held => held.Stack is { Box: 0 } stack && Barrels.CanPourWater(world.Data, stack.Item));
+            takes: held => held.Stack is { Box: 0 } stack && Barrels.CanPourWater(world.Data, stack.Item, world.S.Backpack.Object(stack.Item)));
         row.AddChild(slot);
         var level = new VBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkCenter, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         level.AddChild(Style.Text($"{Farms.LitersPerDay} L per day", 13, Style.Ink));

@@ -47,8 +47,9 @@ public sealed partial class World {
         if (TransferSlot(from, bag, at, cell, item, heldCount) > 0) Bind(slot, cell);
     }
 
-    /// <summary>Whether a backpack stack of <paramref name="item"/> is what a hotbar slot waiting for <paramref name="waiting"/> takes: the item itself, or any bottle for a bottle.</summary>
-    private static bool Waits(string waiting, string item) => item == waiting || Water.IsBottle(item) && Water.IsBottle(waiting);
+    /// <summary>Whether a backpack stack of <paramref name="item"/> is what a hotbar slot waiting for <paramref name="waiting"/> takes: the item itself, or any empty bottle or bottle of water for a bottle or a water bottle.</summary>
+    private static bool Waits(Inventory box, string waiting, string item) =>
+        item == waiting || Water.IsBottle(item) && (Water.IsBottle(waiting) || waiting == Water.Full) && Water.BottleLiters(box, item) >= 0;
 
     /// <summary>
     /// Server: binds each hotbar slot that waits for an item to the first unbound backpack stack of it, once one is there.
@@ -65,7 +66,7 @@ public sealed partial class World {
                 if (waiting == "" || Data.IsBuilding(waiting)) continue;
                 if (Bound(p, slot)) { p.HotbarSlots[slot] = ""; continue; }
                 foreach (var s in p.Backpack.Layout) {
-                    if (s.Hotbar != 0 || s.Item == "" || !Waits(waiting, s.Item)) continue;
+                    if (s.Hotbar != 0 || s.Item == "" || !Waits(p.Backpack, waiting, s.Item)) continue;
                     s.Hotbar = slot + 1; p.HotbarSlots[slot] = "";
                     break;
                 }

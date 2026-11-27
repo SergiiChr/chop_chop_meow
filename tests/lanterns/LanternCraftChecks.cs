@@ -25,15 +25,15 @@ internal static class LanternCraftChecks {
         Require(bench.Rounds == 2, "the bench should make both lanterns with a steel hammer and no firebugs");
         world.Collect(bench);
         string[] lanterns = world.Backpack.Items.Keys.Where(id => Lanterns.Id(id) > 0).ToArray();
-        Require(lanterns.Length == 2 && lanterns.All(id => world.Lanterns.BugCount(id) == 0), "both lanterns should have their own empty slot");
+        Require(lanterns.Length == 2 && lanterns.All(id => Lanterns.BugCount(world.Backpack, id) == 0), "both lanterns should have their own empty slot");
         Require(world.Backpack["glass_jar"] == 1 && world.Backpack["steel_sheet"] == 1 && world.Backpack["wood_parts"] == 1,
             "two lanterns should use two jars, two sheets and two wood parts");
     }
 
     private static void CheckPackingTwoLanternsKeepsThemSeparate(GameData data) {
         var world = EmptyWorld(data);
-        string first = world.Lanterns.NewEmpty(), second = world.Lanterns.NewEmpty();
-        Require(Give(world, first) == 1 && Give(world, second) == 1 && Give(world, "crate") == 1, "two lanterns and a crate should fit");
+        string first = GiveLantern(world), second = GiveLantern(world);
+        Require(Give(world, "crate") == 1, "a crate should fit beside the two lanterns");
         var packer = world.Add(ThingKind.Packer, world.Player + Vector2.Down);
         world.SetPacking(packer, "lantern");
         Require(world.LoadInput(packer, "crate", 1) == 1 && world.LoadInput(packer, first, 1) == 1 && world.LoadInput(packer, second, 1) == 1,
@@ -41,7 +41,7 @@ internal static class LanternCraftChecks {
         Work(world, 20, () => packer.Output!.First() is string crate && world.Packed(crate)?.Count == 2);
         string packed = packer.Output!.First() ?? "";
         var box = world.Packed(packed);
-        Require(box != null && box[first] == 1 && box[second] == 1 && World.PackedKind(packed).SequenceEqual("crate_lantern"),
+        Require(box != null && box[first] == 1 && box[second] == 1 && world.FilterEntryOf(packed) == World.CrateOf(Lanterns.Item),
             "two empty lanterns should pack as one kind of good without losing their individual items");
     }
 }

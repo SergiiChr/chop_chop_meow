@@ -172,11 +172,11 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var at = Terrain.Spawn;
         foreach (var t in world.Things.Where(t => t.Pos.DistanceTo(at) < 9).ToArray()) world.S.Things.Remove(t);
         var cabin = world.Add(ThingKind.Hut, at);
-        cabin.Inventory.Add(Barrel.AtFill(20), 1);
+        cabin.Inventory.Add(Vessels.Holding(Barrel.Item, world.S.NextId++, Barrel.Capacity, Water.Liquid, 20));
         var rack = world.Add(ThingKind.Toolstation, at + new Vector2(3.1f, -.8f));
         rack.Inventory.Add(Bucket.Item, 2);
         rack.Inventory.Add("steel_axe", 1);
-        rack.Inventory.Add(Water.Full, 1);
+        rack.Inventory.Add(Vessels.Holding(Water.Empty, world.S.NextId++, Water.Capacity, Water.Liquid, Water.Capacity));
         var barrel = world.Add(ThingKind.Barrel, at + new Vector2(.8f, 2.35f));
         barrel.Inventory.Add(Water.Liquid, 25);
         var pile = world.Add(ThingKind.Pile, at + new Vector2(-2.7f, 1.8f));
@@ -263,9 +263,10 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; world.S.DenHours = 24; world.Firebugs.KeepIn();
         world.SelectHotbar(1);
         string GiveLantern(int count) {
-            string item = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), count);
-            world.S.Backpack.Add(item, 1);
-            return item;
+            var lantern = world.Lanterns.NewEmpty();
+            world.Lanterns.FillForReview(lantern, count);
+            world.S.Backpack.Add(lantern);
+            return lantern.Key;
         }
         string? scene = Launch.Value("--lantern");
         bool carried = scene is "held" or "belt" or "full-wear" or "backpack" or "torch";
@@ -404,7 +405,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var bellows = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
         var chest = world.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 3)); world.SetFilter(chest, Inventory.Everything, false, true); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
         var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(4, 4)); anvil.Tools!.Add("steel_hammer", 1); var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(-1, 4));
-        world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add(Water.Full, 4); world.S.Backpack.Add("steel_pick", 1);
+        world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; for (int i = 0; i < 4; i++) world.S.Backpack.Add(Vessels.Holding(Water.Empty, world.S.NextId++, Water.Capacity, Water.Liquid, Water.Capacity)); world.S.Backpack.Add("steel_pick", 1);
         var bench = world.Add(ThingKind.Bench, Terrain.Spawn + new Vector2(-4, 1.5f)); world.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
         var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); world.SetFilter(rack, Inventory.Everything, false, true); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1); rack.Inventory.Add("steel_shovel", 1);
         world.Add(ThingKind.LeafSpot, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeavesPerSpot);
@@ -418,12 +419,12 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         // Three packed crates leave on the cart, so it should show three crates.
         foreach (var goods in new[] { "steel_axe", "berries", "raw_meat" }) {
             var box = world.Add(ThingKind.Crate, world.Player); box.Inventory.Add(goods, goods == "steel_axe" ? 2 : 12); world.PickUpCrate(box);
-            world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1);
+            world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(World.IsPacked), 1);
         }
         world.Sell(sign); world.Orders[0].Elapsed = 4;
         world.S.Making = "planks"; world.S.Crafting.Add(new Queued { Recipe = "wood_parts", Count = 3 }); world.S.CraftTime = 6;
         var meat = world.Add(ThingKind.Crate, world.Player); meat.Inventory.Add("burnt_steak", 12); world.PickUpCrate(meat);
-        world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
+        world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(World.IsPacked), 1); sign.Output!.Add(Inventory.Coins, 36);
         if (Launch.Has("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         // --day-phase sets the time of day from 0 at dawn, for comparing the light across the day.
         if (Launch.Value("--day-phase") is string phase) world.S.Time = world.Data.DaySeconds * float.Parse(phase, System.Globalization.CultureInfo.InvariantCulture);
@@ -482,7 +483,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             const int perRow = 8;
             var at = Terrain.Spawn + new Vector2(-3, 9);
             string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins
-                && ContainerItem.Base(item) == item).ToArray();
+                && ChopChopMeow.Item.KindOf(item) == item).ToArray();
             float share = Launch.Number("--goods-share", .6f); int look = (int)Launch.Number("--goods-pile", 0);
             Vector2 Spot(int pile) => at + new Vector2(pile % perRow * 3.2f, pile / perRow * 3.2f);
             world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + perRow * 3.2f + 4 && t.Pos.Y > at.Y - 4 && t.Pos.Y < at.Y + (goods.Length / perRow + 1) * 3.2f + 4);
@@ -491,7 +492,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
                 var pile = world.Add(ThingKind.Pile, Spot(i));
                 int amount = Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share));
                 if (goods[i] == Firebugs.Item) world.Firebugs.Catch(pile.Inventory, amount);
-                else if (goods[i] == Lanterns.Item) for (int n = 0; n < amount; n++) pile.Inventory.Add(world.Lanterns.NewEmpty(), 1);
+                else if (goods[i] == Lanterns.Item) for (int n = 0; n < amount; n++) pile.Inventory.Add(world.Lanterns.NewEmpty());
                 else pile.Inventory.Add(goods[i], amount);
             }
             var compost = world.Add(ThingKind.Pile, Spot(goods.Length)); compost.Compost = true;
@@ -576,7 +577,8 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (Launch.Has("--panel")) panel.Select(rack); else panel.Close(); if (Launch.Has("--filters")) { panel.Select(rack); Press("filters"); } }
         if (Launch.Has("--tin")) { var cliff = Cliff.Of(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }
         if (Launch.Has("--pantry")) {
-            foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", BerryJam.Bottle, "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
+            foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
+            for (int i = 0; i < 3; i++) world.S.Backpack.Add(Vessels.Holding(Water.Empty, world.S.NextId++, Water.Capacity, BerryJam.Liquid, Water.Capacity));
             panel.Open(Page.Backpack);
         }
         // Hovering a recipe shows its description below the grids and as a tooltip at the pointer.

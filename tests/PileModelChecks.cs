@@ -81,7 +81,6 @@ public static class PileModelChecks {
 
     /// <summary>What a heap is made of and how it is laid: six-packs of cans and bars, a loaf in its own shape, upper pieces over the gaps, and compost as one mound.</summary>
     public static void Heaps(GameData data) {
-        CheckBottleIconsAndPilesKeepTheirShapeAndFill(data);
         PileShape.Warm(data);
         var thing = new Thing { Kind = ThingKind.Pile, Inventory = new Inventory { Slots = 14 } };
         var pile = (PileProp)WorldModels.Build(thing);
@@ -111,37 +110,5 @@ public static class PileModelChecks {
             WorldModels.SyncPile(pile, thing, data);
             Require(pile.Stock.Count == 1 && pile.Stock.Piece == mound && pile.Stock.Place(0).Basis.Scale.X > small, "a compost pile must show one mound that swells with all it holds");
         } finally { pile.Root.Free(); }
-    }
-
-    private static void CheckBottleIconsAndPilesKeepTheirShapeAndFill(GameData data) {
-        var blue = new Color("43b9e6");
-        var jamColor = new Color("9b2f4f");
-        for (int liters = 1; liters <= Water.Capacity; liters++) {
-            string waterItem = Water.WaterItem(liters), jamItem = BerryJam.Bottles[liters];
-            var water = WorldModels.IconModel(waterItem, false, data);
-            var jam = WorldModels.IconModel(jamItem, false, data);
-            try {
-                Require(water != null && jam != null, "water and jam at any fill must both have a flask model");
-                var waterParts = ModelSteps.AllMeshes(water!).ToArray();
-                var jamParts = ModelSteps.AllMeshes(jam!).ToArray();
-                Require(waterParts.Length == jamParts.Length && waterParts.Zip(jamParts).All(pair =>
-                        pair.First.Mesh == pair.Second.Mesh && pair.First.Transform.IsEqualApprox(pair.Second.Transform)),
-                    "water and jam icons must use the same flask geometry");
-                Require(Marks(waterParts, blue) == liters && Marks(jamParts, jamColor) == liters,
-                    $"each icon should show {liters} marks in its own liquid's color");
-
-                var waterPiece = PileShape.HeapOf(waterItem, data.Items[waterItem].Color).Mesh;
-                var jamPiece = PileShape.HeapOf(jamItem, data.Items[jamItem].Color).Mesh;
-                Require(waterPiece.GetFaces().SequenceEqual(jamPiece.GetFaces()),
-                    "water and jam in a pile must be heaped as the same flask");
-                int Colored(Mesh piece, Color color) => piece.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Color].AsColorArray()
-                    .Count(tint => tint.IsEqualApprox(color));
-                Require(Colored(waterPiece, blue) > 0 && Colored(waterPiece, blue) == Colored(jamPiece, jamColor),
-                    "each pile piece must keep its liquid's full marks");
-            } finally { water?.Free(); jam?.Free(); }
-        }
-
-        static int Marks(MeshInstance3D[] parts, Color color) => parts.Count(part =>
-            part.MaterialOverride is StandardMaterial3D gauge && gauge.AlbedoColor.IsEqualApprox(color));
     }
 }

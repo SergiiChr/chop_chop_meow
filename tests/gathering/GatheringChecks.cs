@@ -518,20 +518,20 @@ public static class GatheringChecks {
         SetBackpackSlots(world, 1);
         Give(world, "empty_bottle", 1);
         Require(Water.CollectWater(world, lake) == WaterCollectResult.RefilledBottle, "gathering with an empty bottle should refill it");
-        Require(world.Backpack["water"] == 1, "refilling should give one full bottle");
+        Require(Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 3) == 1, "refilling should give one full bottle");
         Require(world.Backpack.Count == 1, "refilling should not create bottles");
         Require(world.Backpack.UsedSlots == 1, "refilling should reuse its slot");
         Require(Water.CollectWater(world, lake) == WaterCollectResult.NoChange, "a full bottle should not refill into an extra bottle");
 
         var priority = new World(data, false);
-        Give(priority, "water_1", 1);
+        GiveWater(priority, 1);
         Give(priority, "empty_bottle", 1);
         Water.CollectWater(priority, lake);
-        Require(priority.Backpack["water"] == 1, "an empty bottle should refill first");
-        Require(priority.Backpack["water_1"] == 1, "the partial bottle should stay partial");
+        Require(Vessels.Count(priority.Backpack, Water.Empty, Water.Liquid, 3) == 1, "an empty bottle should refill first");
+        Require(Vessels.Count(priority.Backpack, Water.Empty, Water.Liquid, 1) == 1, "the partial bottle should stay partial");
         Require(priority.Backpack["empty_bottle"] == 0, "no empty bottle should remain after the refill");
 
-        Drop(world, "water", 1);
+        DropVessels(world, Water.Empty, Water.Liquid, Water.Capacity);
         SetNeeds(world, thirst: 25);
         Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceLiter, "gathering without a bottle should drink directly from the source");
         Require(world.Thirst > 58.32f, "a direct source liter should restore at least one third thirst");

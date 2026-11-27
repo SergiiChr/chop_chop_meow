@@ -39,7 +39,7 @@ public partial class IconRender : Node {
         DirAccess.MakeDirRecursiveAbsolute(Folder);
         var ids = new List<(string Id, bool Building)>();
         foreach (var id in Data.Items.Keys)
-            if (ContainerItem.Base(id) == id) ids.Add((id, false));
+            if (ChopChopMeow.Item.KindOf(id) == id) ids.Add((id, false));
         foreach (var kind in Data.Buildings.Keys) ids.Add((kind.Id(), true));
         // The workers' hard hat marks them in the panels.
         ids.Add(("hardhat", false));

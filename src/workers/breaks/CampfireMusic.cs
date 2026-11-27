@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>Instruments brought out by idle workers and what they play at each campfire.</summary>
 public sealed class CampfireMusic {
-    private const float SoloGap = 5, SoloGapRange = 5, Lead = .2f;
+    private const float SoloGap = 2, SoloGapRange = 1, Lead = .2f;
     private const double InstrumentChance = .25;
     private Random random = new();
     private readonly Dictionary<int, int> seated = new();

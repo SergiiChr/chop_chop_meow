@@ -38,11 +38,14 @@ public sealed class FoodEffects(World world) {
 
     internal float SprintMultiplier => world.S.Actor.CarbLoadLeft > 0 ? 1 + SprintBoost : 1;
 
-    internal void Eat(ItemDef food) {
+    internal void Eat(ItemDef food) => Eat(food.Hunger, food.FoodEffects);
+
+    /// <summary>Eats what restores so much hunger and has these effects, such as a liter of jam from its bottle.</summary>
+    internal void Eat(float hunger, FoodEffect[] effects) {
         var p = world.S.Actor;
         // Other food still stops at a full bar, but does not remove hunger already past it.
-        p.Hunger = Math.Max(p.Hunger, Math.Min(NormalLimit, p.Hunger + food.Hunger));
-        foreach (var effect in food.FoodEffects) {
+        p.Hunger = Math.Max(p.Hunger, Math.Min(NormalLimit, p.Hunger + hunger));
+        foreach (var effect in effects) {
             switch (effect) {
                 case FoodEffect.CarbLoad: p.CarbLoadLeft += CarbLoadHours * world.Data.HourSeconds; break;
                 case FoodEffect.ProteinRecovery: p.ProteinRecoveryLeft += ProteinRecoveryHours * world.Data.HourSeconds; break;

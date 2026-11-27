@@ -57,9 +57,7 @@ public sealed partial class GameData {
         ["steel_pick"] = new() { Name = "Steel pickaxe", Color = "e7c978", Tool = "pickaxe", Speed = 1.8f, Tier = 2 },
         ["steel_shovel"] = new() { Name = "Steel shovel", Color = "e7c978", Tool = "shovel", Speed = 1.8f, Tier = 2 },
         ["berries"] = new() { Name = "Berries", Color = "e49488", Food = true, Hunger = BerryJam.BerryHunger },
-        [Water.Full] = new() { Name = "Water bottle", Color = "88cbe0", Thirst = 33.333336f },
-        [Water.TwoLiters] = new() { Name = "Water bottle (2 liters)", Color = "88cbe0", Thirst = 33.333336f },
-        [Water.OneLiter] = new() { Name = "Water bottle (1 liter)", Color = "88cbe0", Thirst = 33.333336f },
+        [Water.Full] = new() { Name = "Water bottle", Color = "88cbe0", Thirst = Water.LiterThirst, FullOf = Water.Liquid },
         [Water.Empty] = new() { Name = "Empty bottle", MapName = "Bottle", Color = "a8bdc3" },
         [Water.Liquid] = new() { Name = "Water", Color = "88cbe0" },
         ["raw_meat"] = new() { Name = "Raw meat", Color = "c4524a", Food = true },
@@ -90,7 +88,7 @@ public sealed partial class GameData {
         ["nettle"] = new() { Name = "Nettle", Color = "5f8f3e", Description = "It stings but my grandma used to make ropes out of it." },
         ["nettle_rope"] = new() { Name = "Nettle rope", Color = "b9b27a" },
         ["bug_net"] = new() { Name = "Bug net", Color = "f4f6f6", Tool = "net", Description = "I can catch all kinds of bugs with this." },
-        ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Short but bright life" },
+        ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Short but bright life", LifeDays = 3 },
         ["coins"] = new() { Name = "Coins", Color = "e3b94a" },
     };
     public Dictionary<ThingKind, BuildingDef> Buildings { get; } = new() {
@@ -139,10 +137,10 @@ public sealed partial class GameData {
         ["wheat"] = new() { How = "Farm plot", From = new() { "wheat_seeds" }, Also = new() { "fertilizer", Water.Liquid } },
     };
     public List<VesselDef> Vessels { get; } = new() {
-        new() { States = new(Water.BottleItems), Liquid = Water.Liquid },
-        new() { States = new(Bucket.Fills), Liquid = Water.Liquid },
-        new() { States = new(BerryJam.Bottles), Liquid = BerryJam.Liquid },
-        new() { States = new(BerryJam.Buckets), Liquid = BerryJam.Liquid },
+        new() { Empty = Water.Empty, Liquid = Water.Liquid, Capacity = Water.Capacity, Looks = new(Water.Looks), Names = ["", "Water bottle (1 liter)", "Water bottle (2 liters)", "Water bottle"], Thirst = Water.LiterThirst },
+        new() { Empty = Bucket.Item, Liquid = Water.Liquid, Capacity = Bucket.Capacity, Named = "Steel bucket ({0} L)" },
+        new() { Empty = Water.Empty, Liquid = BerryJam.Liquid, Capacity = Water.Capacity, Looks = new(BerryJam.Looks), Named = "Berry jam bottle ({0} L)", Hunger = BerryJam.HungerPerLiter },
+        new() { Empty = Bucket.Item, Liquid = BerryJam.Liquid, Capacity = Bucket.Capacity, Named = "Steel bucket ({0} L berry jam)" },
     };
     public List<MapRowDef> MapRows { get; } = new() {
         new() { Title = "Wood", Roots = new() { "wood", "acorn" } },

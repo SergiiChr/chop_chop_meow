@@ -14,6 +14,7 @@ public static class SimulationChecks {
         InventoryLayoutChecks.Run(data);
         HeldStackChecks.Run(data);
         HotbarStackChecks.Run(data);
+        HotbarChecks.Run(data);
         ChopChopMeow.Tests.WaterChecks.Run(data);
         ChopChopMeow.Tests.BarrelChecks.Run(data);
         LakeChecks.Run(data);
@@ -25,6 +26,7 @@ public static class SimulationChecks {
         NatureModelChecks.Run();
         Test(PileModelChecks.Run, data);
         Test(PileModelChecks.Goods, data);
+        WaterModelChecks.Run(data);
         Test(PileModelChecks.Heaps, data);
         Test(MineRockChecks.Run);
         WorkerJobChecks.Run(data);
@@ -88,6 +90,7 @@ public static class SimulationChecks {
         ProductionChainChecks.Run(data);
         ProgressionChecks.Run(data);
         MultiplayerChecks.Run(data);
+        WorldUpdateChecks.Run(data);
         AllocationChecks.Run(data);
         GD.Print("SELF-TEST PASS");
     }

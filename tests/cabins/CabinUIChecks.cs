@@ -71,8 +71,7 @@ public partial class Game {
     private async Task CheckCabinHasABarrelWindowAndOffersHaulWhileABarrelIsMounted() {
         var home = Hosted.Player;
         var cabin = Hosted.Add(ThingKind.Hut, home + new Vector2(0, 4));
-        string item = Barrel.AtFill(20);
-        Require(Give(Hosted, item) == 1, "the player starts with a barrel to mount");
+        string item = GiveVessel(Hosted, Barrel.Item, Water.Liquid, 20);
         await Until(() => world.Backpack[item] == 1, "the player carrying a barrel with twenty liters", 2);
         await DoubleClickOn(cabin);
         await Until(() => Shows(cabin) && world.Sheltered == cabin.Id && world.Door == Doorway.None, "the cabin page after entering", 5);
@@ -82,7 +81,7 @@ public partial class Game {
         Require(panel.Aside.GetGlobalRect().End.X <= panel.GetGlobalRect().Position.X, "The barrel window must stand left of the cabin page.");
         Require(Named("job_haul") == null, "A cabin without a barrel must not offer Haul.");
 
-        await Carry(BagCell(cell => cell.TooltipText.StartsWith(world.Data.Name(item))), slot!);
+        await Carry(BagCellOf(item), slot!);
         await Until(() => cursor.Empty && world.Find(cabin.Id)?.Inventory[item] == 1 && Named("job_haul") is { Visible: true },
             "the cabin offering Haul as soon as the barrel goes in", 3);
         Require(HasLabel(panel.Aside, "Steel barrel") && HasLabel(panel.Aside, "20/50 L"),

@@ -48,7 +48,7 @@ public partial class CarriedCratePanel(PageTools tools, int crate) : PagePanel(t
     protected override bool StoresFromHotbar => true;
 
     /// <summary>What the crate holds now, an empty crate's room for an empty one, or nothing once it has gone.</summary>
-    private Inventory Contents => world.CarriedCrate(crate) is string item && world.Packed(item) is Inventory held ? held : crate == 0 ? empty ??= world.NewCrate() : gone;
+    private Inventory Contents => world.CarriedCrate(crate) is string item && world.S.Backpack.Object(item)?.Contents is Inventory held ? held : crate == 0 ? empty ??= world.NewCrate() : gone;
     private readonly Inventory gone = new() { Slots = 1, Capacity = 1 };
     private Inventory? empty;
 

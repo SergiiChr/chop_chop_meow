@@ -14,8 +14,7 @@ public partial class Game {
     private async Task CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest() {
         var farm = Hosted.Add(ThingKind.Farm, world.Player + new Vector2(-3, 3));
         farm.FarmStage = FarmStage.Growing; farm.Progress = Hosted.Farms.GrowSeconds - 2.5f * world.Data.DaySeconds;
-        string bucket = Bucket.AtFill(5);
-        Give(Hosted, bucket);
+        string bucket = GiveVessel(Hosted, Bucket.Item, Water.Liquid, 5);
         var nearCorner = farm.Pos + new Vector2(2.5f, 2.5f);
         await Frames();
         await Click(view.Screen(nearCorner, .03f));
@@ -40,7 +39,7 @@ public partial class Game {
         Require(water.Icon == Icons.Of(Water.Liquid) && level.Value == 0, "the farm starts with an empty water bar and droplet slot");
         var earth = view.PropOf(farm.Id)!.Root.FindChild("TilledSoil", true, false) as MeshInstance3D;
         Require(earth != null && earth.MaterialOverride.NextPass == null, "The dry tilled rows should show their original earth.");
-        await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(bucket))), water);
+        await Carry(BagCellOf(bucket), water);
         await Until(() => level.Value > 4.9 && world.Backpack[Bucket.Item] > 0, "pouring the bucket into the plot fills its water bar", 2);
         await Until(() => earth!.MaterialOverride.NextPass is ShaderMaterial wet
             && Mathf.IsEqualApprox(wet.GetShaderParameter("water_fraction").AsSingle(), .5f),

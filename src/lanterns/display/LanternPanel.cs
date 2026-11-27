@@ -4,7 +4,9 @@ namespace ChopChopMeow;
 
 /// <summary>A lantern opened from the backpack or the ground, with a slot for adding firebugs.</summary>
 public partial class LanternPanel(PageTools tools, int lantern, Thing? placed = null) : PagePanel(tools) {
-    private string? Item => placed?.LanternItem ?? world.Lanterns.Carried(lantern);
+    private string? Item => placed?.Lantern?.Key ?? world.Lanterns.Carried(lantern);
+    /// <summary>The lantern itself, wherever it is now.</summary>
+    private ChopChopMeow.Item? Jar => placed?.Lantern ?? (Item is string item ? world.S.Backpack.Object(item) : null);
     public override bool Current => placed != null ? world.Find(placed.Id) == placed : Item is string item && world.Held?.Item != item;
     public override Page GivesWayTo => placed == null ? Page.Backpack : Page.None;
     protected override bool StoresFromHotbar => true;
@@ -24,7 +26,7 @@ public partial class LanternPanel(PageTools tools, int lantern, Thing? placed = 
         var hint = Style.Wrapped("Put a held firebug stack here. Right-click to add one.", 15);
         hint.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         fill.AddChild(hint);
-        live.Watch(() => world.Lanterns.FirebugStack(Item), bugs => {
+        live.Watch(() => world.Lanterns.FirebugStack(Jar), bugs => {
             headingTitle.Text = world.Lanterns.Name(bugs.Count);
             count.Text = $"{bugs.Count}/{Lanterns.Capacity}";
             cell.AddThemeColorOverride(ItemSlot.IconNormal, bugs.Count > 0 ? Colors.White : Style.Ghost);
@@ -43,5 +45,5 @@ public partial class LanternPanel(PageTools tools, int lantern, Thing? placed = 
         }, $"{BagHint}\nShift: add a stack of firebugs · Ctrl in the backpack: add firebugs not on the hotbar");
     }
 
-    private bool CanDeposit() => world.Lanterns.BugCount(Item) < Lanterns.Capacity && (placed == null || world.Reaches(placed));
+    private bool CanDeposit() => Lanterns.BugCount(Jar) < Lanterns.Capacity && (placed == null || world.Reaches(placed));
 }

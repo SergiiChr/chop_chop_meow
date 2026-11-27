@@ -105,13 +105,18 @@ public static class FoodEffectChecks {
     }
 
     private static void JamHealsAndFillsTheRaisedLimit(GameData data) {
-        foreach (string item in new[] { BerryJam.Bottle, "canned_jam" }) {
+        // A liter from a bottle of jam and a can of jam.
+        foreach (bool bottle in new[] { true, false }) {
             var hurt = EmptyWorld(data);
             SetNeeds(hurt, health: 10);
-            Give(hurt, item); hurt.Consume(item);
+            string item = bottle ? GiveVessel(hurt, Water.Empty, BerryJam.Liquid, Water.Capacity) : "canned_jam";
+            if (!bottle) Give(hurt, item);
+            hurt.Consume(item);
             Require(hurt.Health == 70, "jam at 10 health should heal 10 and give 50 bonus health");
             var healthy = EmptyWorld(data);
-            Give(healthy, item); healthy.Consume(item);
+            item = bottle ? GiveVessel(healthy, Water.Empty, BerryJam.Liquid, Water.Capacity) : "canned_jam";
+            if (!bottle) Give(healthy, item);
+            healthy.Consume(item);
             Require(healthy.Health == 150, "jam at 100 health should give 50 bonus health without healing above the normal limit");
         }
     }
@@ -158,7 +163,7 @@ public static class FoodEffectChecks {
 
     private static void VitaminsExpireAfterOneDay(GameData data) {
         var world = EmptyWorld(data);
-        Give(world, BerryJam.Bottle); world.Consume(BerryJam.Bottle);
+        world.Consume(GiveVessel(world, Water.Empty, BerryJam.Liquid, Water.Capacity));
         RunUntil(world, world.Time + 839);
         Require(world.Health == 150 && world.FoodEffects.SecondsLeft(FoodEffect.Vitamins) == 1, "the extra limit should last one in-game day");
         RunUntil(world, world.Time + 2);

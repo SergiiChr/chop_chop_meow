@@ -33,7 +33,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         var outbound = Well(new VBoxContainer()); outbound.AddThemeConstantOverride("separation", 8);
         outbound.AddChild(Style.WellLabel("Outbound"));
         var ship = new HBoxContainer(); ship.AddThemeConstantOverride("separation", 14); outbound.AddChild(ship);
-        ship.AddChild(NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), $"{StationSlots.SlotHint}\nPut a packed crate here to sell it", held => held.Stack is { Box: 0 } stack && world.CanSell(stack.Item), columns: 3));
+        ship.AddChild(NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), $"{StationSlots.SlotHint}\nPut a packed crate here to sell it", held => held.Stack is { Box: 0 } stack && World.CanSell(stack.Item), columns: 3));
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
         var sell = kit.Button("Sell goods", () => { var load = thing.Inventory.Items.Keys.Where(World.IsCrate).OrderByDescending(id => thing.Inventory[id]).FirstOrDefault(); if (world.Sell(thing) && load != null) kit.Sounds.Play(Sounds.ForItem(load)); });
         sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates";
@@ -56,13 +56,13 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         var mail = new HBoxContainer(); mail.AddThemeConstantOverride("separation", 14); inbound.AddChild(mail);
         var mailbox = Style.Icon(Icons.Of("mailbox"), 30); mailbox.MouseFilter = Control.MouseFilterEnum.Pass; mailbox.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(mailbox);
         mail.AddChild(NewInventoryGrid(() => output, thing, id => moves.Stack(output, world.S.Backpack, id, thing), StationSlots.SlotHint, _ => false, columns: 5));
-        BagGrid(id => { if (world.CanSell(id)) moves.Stack(world.S.Backpack, thing.Inventory, id, thing); else kit.Notify("Pack goods in a crate to send them to the village."); }, $"{BagHint}\nShift or Ctrl: put a packed crate on the cart", wanted: world.CanSell);
+        BagGrid(id => { if (World.CanSell(id)) moves.Stack(world.S.Backpack, thing.Inventory, id, thing); else kit.Notify("Pack goods in a crate to send them to the village."); }, $"{BagHint}\nShift or Ctrl: put a packed crate on the cart", wanted: World.CanSell);
     }
 
     /// <summary>What the crates waiting at the post would fetch at the last known prices.</summary>
     private int SaleWorth() {
-        var crates = thing.Inventory.Items.Keys.Where(world.CanSell).ToList();
-        return (int)world.SaleValue(world.Contents(crates), crates.Count, world.KnownPrice);
+        var crates = thing.Inventory.Items.Keys.Where(World.CanSell).ToList();
+        return (int)world.SaleValue(World.Contents(thing.Inventory, crates), crates.Count, world.KnownPrice);
     }
 
     /// <summary>The road to the village with every cart from this post drawn where it is.</summary>

@@ -4,6 +4,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static SetupSteps;
 using static WorldSteps;
 using static PlayerSteps;
 using static WorkerSteps;
@@ -64,7 +65,7 @@ internal static class EconomySteps {
         chest.Inventory.Slots = 600; chest.Inventory.Add(Water.Empty, 500); chest.Inventory.Filter(Water.Empty, true, true);
         Hire(world, lake);
         Work(world, data.DaySeconds);
-        return chest.Inventory[Water.Full] * data.Vessels[0].Capacity;
+        return Vessels.Count(chest.Inventory, Water.Empty, Water.Liquid, 3) * data.Vessels[0].Capacity;
     }
 
     /// <summary>Crates of a good one worker packs in a day at a packing station between a supply chest of the good and empty crates, and a chest for full crates.</summary>
@@ -99,8 +100,9 @@ internal static class EconomySteps {
         supply.Inventory.Slots = 300;
         foreach (var item in BatchCost(world, recipe).Keys) {
             // A liquid comes in full vessels.
-            string stocked = data.VesselFor(item)?.Full ?? item;
-            supply.Inventory.Add(stocked, stocked == item ? 600 : 200); supply.Inventory.Filter(stocked, true, true);
+            if (data.VesselFor(item) is VesselDef input) StockVessel(world, supply.Inventory, input.Empty, input.Liquid, input.Capacity, 200);
+            else supply.Inventory.Add(item, 600);
+            supply.Inventory.Filter(data.VesselFor(item) is VesselDef full ? World.HoldingOf(full.Empty, full.Liquid) : item, true, true);
         }
         var store = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 23)));
         // Room for a whole day's tools, which take a slot each.
@@ -108,13 +110,13 @@ internal static class EconomySteps {
         if (data.VesselFor(r.Output) is VesselDef output) {
             supply.Inventory.Add(output.Empty, 60);
             supply.Inventory.Filter(output.Empty, true, true);
-            for (int fill = 1; fill <= output.Capacity; fill++) store.Inventory.Filter(output.States[fill], false, true);
+            store.Inventory.Filter(World.HoldingOf(output.Empty, output.Liquid), false, true);
         }
         Hire(world, station);
         Work(world, data.DaySeconds);
         int made = store.Inventory[r.Output] + station.Inventory[r.Output];
         if (data.VesselFor(r.Output) is VesselDef carrier)
-            for (int fill = 1; fill <= carrier.Capacity; fill++) made += fill * store.Inventory[carrier.States[fill]];
+            for (int fill = 1; fill <= carrier.Capacity; fill++) made += fill * Vessels.Count(store.Inventory, carrier.Empty, carrier.Liquid, fill);
         return made;
     }
 }

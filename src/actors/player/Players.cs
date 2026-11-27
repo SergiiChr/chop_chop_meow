@@ -111,7 +111,7 @@ public sealed partial class World {
 
     /// <summary>Selects a carried tool in hand without a hotbar slot, or with "" empties the hand; the server keeps it, so a save has it.</summary>
     public void SelectInHand(string tool) {
-        if (tool != "" && (!(Data.Items.TryGetValue(tool, out var def) && def.Tool != "") || S.Backpack[tool] == 0)) return;
+        if (tool != "" && (Data.ItemDefinition(tool)?.Tool is null or "" || S.Backpack[tool] == 0)) return;
         S.InHand = tool;
         Forwarded(Verb.SelectInHand, item: tool);
     }
@@ -148,8 +148,8 @@ public sealed partial class World {
             case Verb.RefillLantern: if (c.Target == 0 || t != null) Preferring(S.Backpack, (int)c.At.X, () => Lanterns.Refill(c.Other, t, c.Count)); break;
             case Verb.PlaceBarrel: Preferring(S.Backpack, c.Count, () => PlaceBarrel(c.Item, c.At, c.Rotation)); break;
             case Verb.MoveInBarrel:
-                if ((uint)c.Target <= 2 * Barrel.Capacity) {
-                    string barrel = c.Target <= Barrel.Capacity ? Barrel.AtFill(c.Target) : Barrel.AtFill(c.Target - Barrel.Capacity, BerryJam.Liquid);
+                if (c.Target >= 0) {
+                    string barrel = c.Target == 0 ? Barrel.Item : Item.KeyOf(Barrel.Item, c.Target);
                     Preferring(S.Backpack, (int)c.At.X, () => MoveInBarrel(barrel, c.Item, c.Count, c.Other != 0, (int)c.At.Y));
                 }
                 break;
@@ -226,7 +226,7 @@ public sealed partial class World {
     /// </summary>
     public int Locate(Inventory inventory) {
         if (inventory == S.Backpack) return 0;
-        foreach (var pair in S.Crates) if (pair.Value == inventory && CarriedCrate(pair.Key) != null) return CrateCode - pair.Key;
+        foreach (var slot in S.Backpack.Layout) if (slot.Units is [{ Kind: Crate } crate] && crate.Contents == inventory) return CrateCode - crate.Id;
         foreach (var w in S.Workers) if (inventory == w.Bag || inventory == w.ToolSlot) return w.Id * BoxCodes + (inventory == w.Bag ? 1 : 2);
         foreach (var t in S.Things) if (BoxIndex(t, inventory) is int box and >= 0) return t.Id * BoxCodes + box + 1;
         return -1;
@@ -243,7 +243,7 @@ public sealed partial class World {
         for (int i = 0; i < BoxCodes - 1; i++) if (Box(t, i) == inventory) return i;
         return -1;
     }
-    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : at <= CrateCode ? (CarriedCrate(CrateCode - at) != null ? S.Crates.GetValueOrDefault(CrateCode - at) : null)
+    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : at <= CrateCode ? (CarriedCrate(CrateCode - at) is string crate ? S.Backpack.Object(crate)?.Contents : null)
         : Find(at / BoxCodes) is Thing t ? Box(t, at % BoxCodes - 1) : Carrier(at) is Worker w ? (at % BoxCodes == 1 ? w.Bag : at % BoxCodes == 2 ? w.ToolSlot : null) : null;
 
     /// <summary>The worker a number from <see cref="Locate"/> names the hands or the tool slot of, or null.</summary>
@@ -322,7 +322,7 @@ public sealed partial class World {
         }
         // A drop on another item's cell in another inventory still stores the stack wherever it fits, and so does a liquid or a vessel that pours.
         int moved;
-        if (from != to && (Data.VesselFor(item) != null || PoursInto(into, to, item) != null || into?.Kind == ThingKind.Farm)) {
+        if (from != to && (Data.VesselFor(item) != null || PoursInto(into, to, item, from.Object(item)) != null || into?.Kind == ThingKind.Farm)) {
             from.PreferredSlot = sourceSlot;
             try { moved = Carry(from, to, into, item, quantity); } finally { from.PreferredSlot = -1; }
         } else if (from != to && to.Layout[targetSlot].Item is var there && there != "" && there != item) {
@@ -344,10 +344,11 @@ public sealed partial class World {
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
-        item = Lanterns.Kind(item);
+        item = ChopChopMeow.Item.KindOf(FilterEntryOf(item));
         bool pile = IsSingleResourceStore(chest);
         if (chest.Kind == ThingKind.Barrel && Data.VesselFor(item) == null) return;
-        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate || !pile && item == Inventory.Everything) || Nests(chest, item)) return;
+        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || HoldingIn(item) != null || pile && item == MixedCrate || !pile && item == Inventory.Everything) || Nests(chest, item)
+            || chest.Kind != ThingKind.Barrel && (Data.VesselFor(item) != null || Data.Items.GetValueOrDefault(item)?.FullOf != null)) return;
         if (pile && (!PileFilterChanges(chest, allowed) || !allowed && PileFilter(chest) != PileEntry(item)) || Busy() || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         if (pile && allowed) SetPileFilter(chest, PileEntry(item));
         else if (pile) chest.Inventory.ClearFilters();

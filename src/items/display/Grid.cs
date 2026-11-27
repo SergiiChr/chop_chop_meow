@@ -87,12 +87,14 @@ public partial class PagePanel {
                 var (cell, count) = cells[i];
                 stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
                 bool bound = i < held.Layout.Count && held.Layout[i].Hotbar != 0;
+                // An object lies alone in the cell its key names.
+                var unit = stacks[i] is (string key, _) && ChopChopMeow.Item.IsKey(key) ? held.Layout[i].Units![0] : null;
                 var looks = stacks[i] is (string item, int n)
-                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) ? world.Lanterns.BugCount(item) : -1, world.Packed(item)?.Count ?? 0)
+                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) ? Lanterns.BugCount(unit) : -1, unit?.Contents?.Count ?? 0)
                     : ((string?)null, 0, 0, false, -1, -1, 0);
                 if (first || looks != drawn[i]) {
                     drawn[i] = looks;
-                    Redraw(cell, count, stacks[i], held, bound, drawn[i].Life, drawn[i].Bugs);
+                    Redraw(cell, count, stacks[i], unit, held, bound, drawn[i].Life, drawn[i].Bugs);
                 }
                 if (shown[i] == i < visible && !first) continue;
                 shown[i] = i < visible;
@@ -102,15 +104,15 @@ public partial class PagePanel {
             first = false;
         });
         return grid;
-        void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held, bool bound, int life, int bugs) {
-            cell.Icon = stack is (string id, _) ? Icons.Of(id) : null;
-            var contents = stack is (string crate, _) ? world.Packed(crate) : null;
+        void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, ChopChopMeow.Item? unit, Inventory held, bool bound, int life, int bugs) {
+            cell.Icon = stack is (string shows, _) ? Icons.Of(Vessels.LookOf(world.Data, shows, unit)) : null;
+            var contents = stack is (string crate, _) && World.IsPacked(crate) ? unit?.Contents : null;
             var badge = cell.GetNode<TextureRect>("badge");
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = Icons.Of(contents.Items.OrderByDescending(p => p.Value).First().Key);
-            if (stack is (string barrel, 1) && Barrel.Is(barrel)) count.SetCount($"{Barrel.Liters(barrel)}/{Barrel.Capacity} L");
+            if (stack is (string barrel, 1) && Barrel.Is(barrel)) count.SetCount($"{Vessels.LitersIn(unit)}/{Barrel.Capacity} L");
             else if (stack is (string bottle, 1) && world.Data.VesselOf(bottle) is VesselDef vessel)
-                count.SetCount($"{vessel.LitersIn(bottle)}/{vessel.Capacity}");
+                count.SetCount($"{Vessels.LitersIn(unit)}/{vessel.Capacity}");
             else if (contents != null) count.SetCount(contents.Count.ToString());
             else count.SetStack(stack?.Count ?? 0, bugs);
             bool takes = wanted != null && stack is (string item, _) && wanted(item);
@@ -121,8 +123,8 @@ public partial class PagePanel {
                 ? "LMB: pick up · RMB: open for refill · Double LMB: take in hand or stow" : hint;
             cell.Popup = null;
             if (stack is not (string named, _)) { cell.TooltipText = ""; return; }
-            string title = contents != null ? world.Describe(named) : $"{world.Describe(named)} · {held[named]} total";
-            if (FoodDescription.Of(world.Data, named) is ItemDef food) FoodDescription.SetTooltip(cell, title, named, food);
+            string title = contents != null ? world.Describe(named, unit) : $"{world.Describe(named, unit)} · {held[named]} total";
+            if (FoodDescription.Of(world.Data, named, unit) is ItemDef food) FoodDescription.SetTooltip(cell, title, FoodDescription.Eaten(named, unit), food);
             else cell.TooltipText = $"{title}{world.Data.DescriptionLine(named)}{PageText.FirebugLifeLine(life)}\n{clicks} · {RecipeMap.AltClickHint}";
         }
     }

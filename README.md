@@ -423,7 +423,8 @@ A round is a delivery, a crafted batch, a crate packed full, a furnace batch at 
 With no job that can be done, a worker sits at the nearest campfire they can reach, as at lunch: six to a fire, the rest on the ground nearby in groups of up to three.
 Each time an idle worker takes a seat at the fire, they have a 25% chance of bringing a guitar, harmonica or drum.
 The choice is even among instruments not already there. If the fire already has all three, the worker sits without one.
-With fewer than all three instruments, each musician plays a short sound now and then, with at least five seconds between their clips.
+With fewer than all three instruments, each musician plays a short sound, then waits two to three seconds after it has finished before the next.
+These sounds play a little above the music volume, and guitar strums a good deal louder.
 When all three instruments are at the same fire, one worker on each instrument plays a song and the other idle workers seated there nod to the beat.
 The group plays one song, then each musician goes back to playing short sounds now and then, with no second song until the trio breaks up.
 Workers sitting for lunch do not play or nod.
@@ -871,7 +872,7 @@ A crafting bench with a steel hammer makes a barrel from five steel sheets and t
 It makes a bucket from three steel sheets, a steel part and a wood part.
 The barrel recipe takes 30 seconds of base work before the bench and hammer speed bonuses.
 Barrels stack in the bench output.
-A pile can store barrels at every fill level together.
+A pile stores empty barrels together, or barrels of one liquid at any fill, such as "Steel barrel of water".
 You can carry stacks of empty barrels alongside one barrel containing water or jam.
 Workers carry a single barrel in both arms and keep their tool slot free.
 Carrying a barrel prevents sprinting.
@@ -927,7 +928,7 @@ Set the filter on an empty pile, or put a first resource in by hand and the filt
 From then on workers store and take only that, and anything else is refused, by hand too: "This is a wood pile."
 The filter stays when the pile is emptied.
 It can be taken off or changed only while the pile is empty, and a new resource goes on only once the old one is off.
-Water is one resource at any fill, so a water pile holds full and part-full bottles; empty bottles go on a pile of their own.
+A bottle, bucket or barrel of one liquid is one resource at any fill, so a "Bottle of water" pile holds full and part-full bottles; empty bottles go on a pile of their own.
 Crates of one good are one resource per good, and crates of mixed goods are one resource, "Mixed crate".
 
 Piles are walkable and snap edge to edge to a pile beside them, so they line up in neat grids.
@@ -951,7 +952,9 @@ A trading post with A asks for every kind of packed crate, and compost with A ta
 Piles and barrels name one resource and have no A.
 A row shows its items in the order they were added.
 The item list that **+** opens shows items in groups, each simplest first: what is gathered, grown or bought, then materials, tools, containers and food, and last crates of goods.
-Bottles, buckets and barrels come among containers at any fill.
+Bottles, buckets and barrels come among containers twice: empty, which takes only empty ones, and holding each liquid, such as "Steel bucket of water", which takes them at any fill.
+No storage names a bare liquid such as water: placed barrels and stations take liquids.
+A tool station holds buckets and bottles only empty: a worker done with one that still holds something stores it like a load.
 **Clear** takes everything off both rows, so nothing goes in or out.
 Manual inventory transfers ignore these automation filters, and so does a page's Store all button.
 

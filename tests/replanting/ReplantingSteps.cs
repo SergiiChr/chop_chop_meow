@@ -28,10 +28,11 @@ internal static class ReplantingSteps {
         return world.ThingsOf(ThingKind.Tree).Single();
     }
 
-    public static void PourIntoTree(World world, Thing tree, string vessel, string left) {
-        Give(world, vessel, 1);
-        Require(world.Transfer(world.Backpack, tree.Inventory, vessel, 1) == 1 && world.Backpack[left] > 0,
-            $"the tree should take water and leave {world.Data.Name(left)} in the backpack");
+    /// <summary>Pours a container holding so many liters of water into a tree, which leaves it in the backpack holding <paramref name="left"/> liters.</summary>
+    public static void PourIntoTree(World world, Thing tree, string container, int liters, int left) {
+        string vessel = GiveVessel(world, container, Water.Liquid, liters);
+        Require(world.Transfer(world.Backpack, tree.Inventory, vessel, 1) == 1 && (left > 0 ? Vessels.LitersIn(world.Backpack, vessel) == left : world.Backpack[container] > 0),
+            $"the tree should take water and leave the {world.Data.Name(container)} in the backpack holding {left} L");
     }
 
     /// <summary>Loads a tree due to grow in two seconds, with a building just outside its trunk.</summary>

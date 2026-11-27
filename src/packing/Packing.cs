@@ -21,17 +21,15 @@ public sealed partial class World {
     }
 
     /// <summary>Whether the crate on a station still takes its good: a crate of that good with room left.</summary>
-    public bool OpenCrate(Thing t, string crate) {
-        var kind = PackedKind(crate);
-        return t.Packs != "" && kind.Length == PackedPrefix.Length + t.Packs.Length && kind.EndsWith(t.Packs) && Packed(crate)?.Room(t.Packs) > 0;
-    }
+    public static bool OpenCrate(Thing t, string crate) =>
+        t.Packs != "" && t.Output!.Object(crate) is { } packed && PackedGood(packed) == t.Packs && packed.Contents!.Room(t.Packs) > 0;
 
     /// <summary>Whether the station has a good and somewhere to put it: an open crate, or an empty one to start.</summary>
     public bool CanPack(Thing t) =>
         PackingItem(t) != null && (t.Output!.First() is string crate ? OpenCrate(t, crate) : t.Inventory.Free("crate") > 0);
 
     /// <summary>The good ready to pack, which may be a particular lantern from the input.</summary>
-    private static string? PackingItem(Thing t) => t.Packs == Lanterns.Item ? t.Inventory.FirstLantern(free: true)
+    private static string? PackingItem(Thing t) => t.Packs == Lanterns.Item ? t.Inventory.FirstOfKind(Lanterns.Item, free: true)
         : t.Packs != "" && t.Inventory.Free(t.Packs) > 0 ? t.Packs : null;
 
     /// <summary>
@@ -46,13 +44,13 @@ public sealed partial class World {
         t.Progress = 0;
         string item = PackingItem(t)!;
         string? crate = t.Output!.First();
-        var box = crate == null ? NewCrate() : Packed(crate)!;
+        var box = crate == null ? NewCrate() : t.Output.Object(crate)!.Contents!;
         if (t.Inventory.TransferTo(box, item, 1) == 0) return;
         if (crate != null) {
             if (!OpenCrate(t, crate)) t.Rounds++;
         } else {
             t.Inventory.Remove("crate", 1);
-            t.Output.Add(Pack(box), 1);
+            t.Output.Add(Pack(box));
         }
     }
 }

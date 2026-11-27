@@ -24,7 +24,7 @@ public static class InspectPage {
             { Kind: ThingKind.Packer } t => new PackerPanel(tools, t),
             { Kind: ThingKind.Crate } t => new CratePanel(tools, t),
             { Kind: ThingKind.Barrel } t => new BarrelPanel(tools, t),
-            { Kind: ThingKind.Lantern } t => new LanternPanel(tools, Lanterns.Id(t.LanternItem), t),
+            { Kind: ThingKind.Lantern } t => new LanternPanel(tools, t.Lantern?.Id ?? 0, t),
             { Kind: ThingKind.Grave } t => new RecoveryBoxPanel(tools, t),
             { Kind: ThingKind.Toolstation } t => new ToolRackPanel(tools, t),
             { Kind: ThingKind.Pile } t => new PilePanel(tools, t),
@@ -54,7 +54,7 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
 
     public override bool Current => world.Find(thing.Id) == thing;
     protected override bool StoresFromHotbar => true;
-    protected override bool PoursFromBag(string item) => world.PoursInto(thing, thing.Inventory, item) != null;
+    protected override bool PoursFromBag(string item) => world.PoursInto(thing, thing.Inventory, item, world.S.Backpack.Object(item)) != null;
 
     protected override void Build() {
         Headline();

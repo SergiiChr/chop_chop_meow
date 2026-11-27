@@ -9,7 +9,7 @@ using static WorldSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    private async Task RunTradingPostUIChecks() {
+    private async Task RunTradeUIChecks() {
         await TestClean(CheckTradingPostSendsOnlyCratesOffOnACart);
         await TestClean(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
         await TestClean(CheckPriceSheetKeepsItsPlaceWhenFiltersOpen);
@@ -20,7 +20,7 @@ public partial class Game {
         var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
         Give(Hosted, "wood", 5); Give(Hosted, Inventory.Coins, 100);
         var berries = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); Hosted.PickUpCrate(berries);
-        string packed = Hosted.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        string packed = Hosted.Backpack.Items.Keys.Single(World.IsPacked);
         await Click(view.Screen(sign.Pos, .8f));
         Require(Shows(sign), "Clicking a trading post must select it.");
         Require(Named("sell") is { Text: "Sell goods", Icon: null }, "The market must offer a text-only Sell goods button.");

@@ -10,10 +10,10 @@ internal static class WorkerWaterView {
     private static readonly Basis TowardRoof = new(Vector3.Up, -Mathf.Pi / 2);
     private static readonly Vector3 TravelGrip = new(-.34f, .80f, .13f);
 
-    public static void Show(ActorRig rig, Vector2 at, Vector3 target, WorkerWaterAction action, bool roof, float progress, string vessel, bool ground = false, float? facing = null, float rotation = 0) {
+    public static void Show(ActorRig rig, Vector2 at, Vector3 target, WorkerWaterAction action, bool roof, float progress, string vessel, bool filled, bool ground = false, float? facing = null, float rotation = 0) {
         var origin = new Vector3(at.X, 0, at.Y);
         if (roof) {
-            ShowOnCabin(rig, action, progress, vessel);
+            ShowOnCabin(rig, action, progress, vessel, filled);
             rig.Root.Transform = new Transform3D(new Basis(Vector3.Up, -rotation), target) * rig.Root.Transform;
             return;
         }
@@ -21,17 +21,17 @@ internal static class WorkerWaterView {
         float yaw = facing ?? ActorAnimation.Yaw(new Vector2(toward.X, toward.Z), 0);
         rig.Root.Transform = new Transform3D(new Basis(Vector3.Up, yaw), origin);
         var opening = rig.Root.Transform.AffineInverse() * target;
-        WorkAtOpening(rig, vessel, opening, progress, action == WorkerWaterAction.Fill, roof: false, ground);
+        WorkAtOpening(rig, vessel, filled, opening, progress, action == WorkerWaterAction.Fill, roof: false, ground);
     }
 
-    public static void Carry(ActorRig rig, Pose pose, string vessel, bool lit = false) =>
-        rig.HoldWater(pose, vessel, VesselAtGrip(vessel, TravelGrip), TravelGrip, lit: lit);
+    public static void Carry(ActorRig rig, Pose pose, string vessel, bool filled, bool lit = false) =>
+        rig.HoldWater(pose, vessel, VesselAtGrip(vessel, TravelGrip), TravelGrip, lit: lit, filled: filled);
 
-    private static void ShowOnCabin(ActorRig rig, WorkerWaterAction action, float progress, string vessel) {
+    private static void ShowOnCabin(ActorRig rig, WorkerWaterAction action, float progress, string vessel, bool filled) {
         if (action == WorkerWaterAction.Pour) {
             rig.Root.Transform = new Transform3D(TowardRoof, CabinWaterModel.PourStand);
             var opening = TowardRoof.Inverse() * (CabinWaterModel.FillOpening - CabinWaterModel.PourStand);
-            WorkAtOpening(rig, vessel, opening, progress, fill: false, roof: true);
+            WorkAtOpening(rig, vessel, filled, opening, progress, fill: false, roof: true);
             return;
         }
 
@@ -48,7 +48,7 @@ internal static class WorkerWaterView {
             float walk = across * ActorAnimation.Duration(ActorAction.Walk);
             var pose = ActorAnimation.PoseAt(ActorAction.Walk, walk, true);
             float ease = Math.Min(Mathf.SmoothStep(0, .15f, across), 1 - Mathf.SmoothStep(.85f, 1, across));
-            Carry(rig, Pose.Lerp(new Pose(), pose, ease), vessel);
+            Carry(rig, Pose.Lerp(new Pose(), pose, ease), vessel, filled);
             return;
         }
 
@@ -69,7 +69,7 @@ internal static class WorkerWaterView {
                 rightY - atEdge.Y, toeR, lean: 18 * (1 - move));
             var rail = RailGrip() - atEdge;
             var handOff = (TowardRoof.Inverse() * rail).Lerp(new Vector3(.22f, .73f, .07f), Mathf.SmoothStep(.42f, 1, step));
-            rig.HoldWater(mount, vessel, VesselAtGrip(vessel, TravelGrip), TravelGrip, handOff);
+            rig.HoldWater(mount, vessel, VesselAtGrip(vessel, TravelGrip), TravelGrip, handOff, filled: filled);
             return;
         }
 
@@ -97,7 +97,7 @@ internal static class WorkerWaterView {
         var handPoint = HandRung(stepIndex + 2).Lerp(HandRung(stepIndex + 3), reach);
         var hand = TowardRoof.Inverse() * (handPoint - foot - Vector3.Up * height);
         hand.Z -= .075f * MathF.Sin(Mathf.Pi * reach);
-        rig.HoldWater(climbing, vessel, VesselAtGrip(vessel, TravelGrip), TravelGrip, hand);
+        rig.HoldWater(climbing, vessel, VesselAtGrip(vessel, TravelGrip), TravelGrip, hand, filled: filled);
     }
 
     private static float Rung(int index) => index < 0 ? 0 : CabinWaterModel.FirstRung + index * CabinWaterModel.RungSpacing + RungTop;
@@ -120,7 +120,7 @@ internal static class WorkerWaterView {
     private static Transform3D VesselAtGrip(string vessel, Vector3 grip) =>
         new(Basis.Identity, grip - (Bucket.Is(vessel) ? VesselShape.BucketGrip : ActorRig.BottleGrip));
 
-    private static void WorkAtOpening(ActorRig rig, string vessel, Vector3 opening, float progress, bool fill, bool roof, bool ground = false) {
+    private static void WorkAtOpening(ActorRig rig, string vessel, bool filled, Vector3 opening, float progress, bool fill, bool roof, bool ground = false) {
         float extend = Mathf.SmoothStep(0, .30f, progress) * (1 - Mathf.SmoothStep(.72f, 1, progress));
         float tip = Mathf.SmoothStep(.23f, .43f, progress) * (1 - Mathf.SmoothStep(.61f, .79f, progress));
         bool bucket = Bucket.Is(vessel);
@@ -144,7 +144,7 @@ internal static class WorkerWaterView {
             with { Head = 7 + 22 * extend };
         Vector3? support = extend > .1f && (!scooping || bucket)
             ? new Vector3(.22f, .73f, .07f).Lerp(held * left, Mathf.SmoothStep(.1f, .4f, extend)) : null;
-        var correction = rig.HoldWater(Pose.Lerp(new Pose(), squat, Mathf.SmoothStep(0, .25f, extend)), vessel, held, held * grip, support, bail);
+        var correction = rig.HoldWater(Pose.Lerp(new Pose(), squat, Mathf.SmoothStep(0, .25f, extend)), vessel, held, held * grip, support, bail, filled: filled);
         if (!fill && tip > .91f) rig.WaterStream(held * mouth + correction, opening, width: ground ? 1.65f : 1);
         if (tap && tip > .91f) rig.WaterStream(opening, held * mouth + correction);
     }

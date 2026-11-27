@@ -119,7 +119,7 @@ public static class PlumbingChecks {
         world.Tick(1);
         PumpFully(world, pump);
         world.Tick(1);
-        Require(barrel.Inventory[Water.Liquid] == 9 && cabin.Inventory[Barrel.AtFill(5)] == 1,
+        Require(barrel.Inventory[Water.Liquid] == 9 && Vessels.Count(cabin.Inventory, Barrel.Item, Water.Liquid, 5) == 1,
             "The mounted cabin barrel should now share the pump's water.");
     }
 

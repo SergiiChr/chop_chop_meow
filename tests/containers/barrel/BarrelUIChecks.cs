@@ -18,8 +18,7 @@ public partial class Game {
     }
 
     private async Task CheckReorderingBackpackClosesTheBarrel() {
-        string filled = Barrel.AtFill(12);
-        Give(Hosted, filled);
+        string filled = GiveVessel(Hosted, Barrel.Item, Water.Liquid, 12);
         Give(Hosted, Barrel.Item, 4);
         await Frames();
         await OpenBackpackBarrel(filled);
@@ -42,10 +41,10 @@ public partial class Game {
     /// <summary>Four empty barrels share a cell and open independently of the filled barrel beside them.</summary>
     private async Task CheckBackpackAndHotbarOpenTheirOwnBarrel() {
         const int slot = 8;
-        string previous = world.HotbarItem(slot), filled = Barrel.AtFill(12);
+        string previous = world.HotbarItem(slot);
         int previousStack = world.HotbarStack(slot);
         Give(Hosted, Barrel.Item, 4);
-        Give(Hosted, filled);
+        string filled = GiveVessel(Hosted, Barrel.Item, Water.Liquid, 12);
         await Frames();
 
         await OpenBackpackBarrel(filled);
@@ -78,19 +77,19 @@ public partial class Game {
     /// Its water and filter are visible after putting it down.
     /// </summary>
     private async Task CheckBarrelOpensInTheBackpackAndCanBePlacedWithWater() {
-        int full = Drop(Hosted, Water.Full);
+        int full = DropVessels(Hosted, Water.Empty, Water.Liquid, 3);
         int empty = Drop(Hosted, Water.Empty);
-        int oneLiter = Drop(Hosted, Water.OneLiter);
-        int twoLiters = Drop(Hosted, Water.TwoLiters);
+        int oneLiter = DropVessels(Hosted, Water.Empty, Water.Liquid, 1);
+        int twoLiters = DropVessels(Hosted, Water.Empty, Water.Liquid, 2);
         Give(Hosted, Barrel.Item);
-        Give(Hosted, Water.Full);
+        string bottle = GiveWater(Hosted);
         await OpenEmptyBackpackBarrel();
-        await Carry(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(Water.Full))), Named("barrel_water")!);
+        await Carry(BagCellOf(bottle), Named("barrel_water")!);
         await Until(() => Named("barrel_water")?.TooltipText.Contains("3/50 L") == true, "the barrel holding three liters after the bottle is poured", 2);
 
         await Click(Named("barrel_water")!);
-        await Until(() => Named("barrel_water")?.TooltipText.Contains("2/50 L") == true && world.Backpack[Water.OneLiter] == 1, "taking one liter of water from the barrel into the bottle", 2);
-        var spot = await PutDownBackpackBarrel(Barrel.AtFill(2), turn: Key.C);
+        await Until(() => Named("barrel_water")?.TooltipText.Contains("2/50 L") == true && Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 1) == 1, "taking one liter of water from the barrel into the bottle", 2);
+        var spot = await PutDownBackpackBarrel(Vessels.First(world.Backpack, Barrel.Item, Water.Liquid, 2)!, turn: Key.C);
         await Until(() => Hosted.Things.Any(t => t.Kind == ThingKind.Barrel && t.Pos == spot), "putting the barrel down", 2);
         var barrel = Hosted.Things.Single(t => t.Kind == ThingKind.Barrel && t.Pos == spot);
         Require(barrel.Rotation == 3 * Mathf.Pi / 2, "Putting the filled barrel down should turn its spout as chosen.");
@@ -103,7 +102,7 @@ public partial class Game {
             "A barrel containing water must show one filter row naming water, with no add button.");
 
         await Holding(Key.Shift, () => Click(Named("barrel_water")!));
-        await Until(() => Named("barrel_water")?.TooltipText.Contains("0/50 L") == true && world.Backpack[Water.Full] == 1, "drawing the remaining water into the bottle", 2);
+        await Until(() => Named("barrel_water")?.TooltipText.Contains("0/50 L") == true && Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 3) == 1, "drawing the remaining water into the bottle", 2);
         await Click(Named(waterFilter)!);
         await Until(() => Named("filter_add_in") != null, "removing the water filter from the empty barrel", 2);
         await Click(Named("filter_add_in")!);
@@ -111,18 +110,18 @@ public partial class Game {
             && Named("pick_stone") == null, "An empty barrel must offer water and jam, but no solids.");
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == barrel);
-        Drop(Hosted, Water.Full, 1);
-        Give(Hosted, Water.Full, full);
+        DropVessels(Hosted, Water.Empty, Water.Liquid, 3);
+        GiveVessel(Hosted, Water.Empty, Water.Liquid, 3, full);
         Give(Hosted, Water.Empty, empty);
-        Give(Hosted, Water.OneLiter, oneLiter);
-        Give(Hosted, Water.TwoLiters, twoLiters);
+        GiveVessel(Hosted, Water.Empty, Water.Liquid, 1, oneLiter);
+        GiveVessel(Hosted, Water.Empty, Water.Liquid, 2, twoLiters);
         await Frames();
     }
 
     private async Task CheckEmptyBarrelCanBeFilteredForJam() {
         var barrel = Hosted.Add(ThingKind.Barrel, SpotsNearby().First(p =>
             world.CanStand(p) && view.Pick(view.Screen(p, .4f)) == null && Uncovered(view.Screen(p, .4f))));
-        Give(Hosted, BerryJam.Bottle);
+        string jam = GiveVessel(Hosted, Water.Empty, BerryJam.Liquid, 3);
         await Frames();
         await ClickOn(barrel);
         await Until(() => Named("barrel_water") != null, "the empty barrel opening");
@@ -134,22 +133,22 @@ public partial class Game {
         await Until(() => Named(jamFilter) != null, "the selected jam filter appearing", 2);
         await Click(Named(jamFilter)!);
         await Until(() => Named("filter_add_in") != null, "the cleared filter accepting a held item", 2);
-        await Carry(BagCellOf(BerryJam.Bottle), Named("filter_add_in")!);
+        await Carry(BagCellOf(jam), Named("filter_add_in")!);
         await Until(() => Named(jamFilter) != null, "the jam bottle setting the jam filter", 2);
-        Require(barrel.Inventory.Count == 0 && world.Backpack[BerryJam.Bottle] == 1,
+        Require(barrel.Inventory.Count == 0 && Vessels.Count(world.Backpack, Water.Empty, BerryJam.Liquid, 3) == 1,
             "Setting the filter must keep the bottle and jam in the backpack.");
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == barrel);
-        Drop(Hosted, BerryJam.Bottle);
+        Drop(Hosted, jam);
         await Frames();
     }
 
     private async Task CheckCtrlPoursFromAHotbarBoundBucketIntoAPlacedBarrel() {
         const int slot = 8;
-        string previous = world.HotbarItem(slot), filled = Bucket.AtFill(6);
+        string previous = world.HotbarItem(slot);
         int previousStack = world.HotbarStack(slot);
         int emptyBuckets = Drop(Hosted, Bucket.Item);
-        Give(Hosted, filled);
+        string filled = GiveVessel(Hosted, Bucket.Item, Water.Liquid, 6);
         PutOnHotbar(Hosted, SlotOf(Hosted.Backpack, filled), slot);
         var barrel = Hosted.Add(ThingKind.Barrel, SpotsNearby().First(p =>
             world.CanStand(p) && view.Pick(view.Screen(p, .4f)) == null && Uncovered(view.Screen(p, .4f))));
@@ -157,7 +156,7 @@ public partial class Game {
         await ClickOn(barrel);
         await Until(() => Named("barrel_water") != null && world.HotbarItem(slot) == filled, "the barrel page and bound water bucket");
 
-        await Holding(Key.Ctrl, () => Click(BagCell(cell => cell.TooltipText.StartsWith(world.Data.Name(filled)))));
+        await Holding(Key.Ctrl, () => Click(BagCellOf(filled)));
         await Until(() => barrel.Inventory[Water.Liquid] == 6 && world.HotbarItem(slot) == Bucket.Item,
             "Ctrl pouring six liters and leaving the empty bucket bound to the hotbar", 2);
 

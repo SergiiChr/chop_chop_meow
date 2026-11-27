@@ -52,7 +52,7 @@ public static class BuildingPlumbingChecks {
         var (world, pump, _) = PumpAndBarrel(data);
         var table = ExtendSouth(world, ThingKind.Cooktable);
         world.Player = table.Pos + Vector2.Down;
-        Give(world, "flour"); Give(world, Water.Full);
+        Give(world, "flour"); GiveVessel(world, Water.Empty, Water.Liquid, 3);
         world.QueueBatch(table, "dough");
         world.Tick(.1f);
         Require(table.Processing && table.Batches == 0 && table.Inventory[Water.Liquid] == 0, "The last dough batch should have spent its ingredients.");

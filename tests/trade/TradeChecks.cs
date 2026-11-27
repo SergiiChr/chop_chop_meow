@@ -14,6 +14,7 @@ using static EconomySteps;
 public static class TradeChecks {
     public static void Run(GameData data) {
         Test(CheckDonationIsNoSale, data);
+        Test(CheckASaveWithAWaterBottleOnTheWayLoads, data);
         Test(CheckAssignedRunnerFetchesCurrentPrices, data);
         Test(CheckCartDeliversAfterFullTrip, data);
         Test(CheckLooseGoodsNeverSellOrSendACart, data);
@@ -29,6 +30,19 @@ public static class TradeChecks {
     }
 
     /// <summary>A crate of goods the village does not buy goes on the cart as a donation, which is no sale.</summary>
+    private static void CheckASaveWithAWaterBottleOnTheWayLoads(GameData data) {
+        var world = EmptyWorld(data);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
+        world.Player = sign.Pos;
+        SetCoins(world, 100);
+        Require(world.Buy(sign, Water.Full, 1), "the village should sell a water bottle");
+        world.Deserialize(world.Serialize());
+        var post = world.Find(sign.Id)!;
+        SafeTick(world, data.TradeSeconds + .1f);
+        Require(Vessels.Count(post.Output!, Water.Empty, Water.Liquid, Water.Capacity) == 1,
+            "a save made while a bought water bottle is on its way should load, and the bottle arrive full");
+    }
+
     private static void CheckDonationIsNoSale(GameData data) {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
@@ -91,8 +105,8 @@ public static class TradeChecks {
         var box = output.Items.Keys.SingleOrDefault(World.IsCrate);
         Require(world.Orders.Count == 0, "cart should finish the order after delivering");
         Require(box == null, "cart should not leave a box for a refillable bottle");
-        Require(output["water"] == 1, "cart should deliver one refillable bottle directly to the market output");
-        Require(world.Backpack["water"] == 0, "cart should not put the delivered bottle in the backpack");
+        Require(Vessels.Count(output, Water.Empty, Water.Liquid, Water.Capacity) == 1, "cart should deliver one refillable bottle directly to the market output");
+        Require(Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 3) == 0, "cart should not put the delivered bottle in the backpack");
     }
 
     /// <summary>A sale pays when the cart returns and lowers demand, and the price sheet only changes when someone brings news.</summary>
@@ -205,10 +219,10 @@ public static class TradeChecks {
         world.Player = sign.Pos;
         string chisel = PackCrate(world, ("steel_chisel", 1));
         string empty = PackCrate(world);
-        Require(world.CanSell(chisel), "the village should take a crate of goods it does not buy as a donation");
-        Require(!world.CanSell(empty), "the village should not take an empty crate");
-        Require(!world.CanSell("crate"), "the village should not take a bare crate");
-        Require(!world.CanSell("steel_axe"), "the village should not take a loose steel axe");
+        Require(World.CanSell(chisel), "the village should take a crate of goods it does not buy as a donation");
+        Require(!World.CanSell(empty), "the village should not take an empty crate");
+        Require(!World.CanSell("crate"), "the village should not take a bare crate");
+        Require(!World.CanSell("steel_axe"), "the village should not take a loose steel axe");
         string meat = PackCrate(world, ("raw_meat", 6), ("burnt_steak", 6));
         string tools = PackCrate(world, ("steel_hammer", 1), ("steel_pick", 1));
         world.Player = sign.Pos;

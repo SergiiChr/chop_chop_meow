@@ -13,9 +13,13 @@ internal static class BottleShape {
         _ => "293e46",
     }, .3f);
 
-    private static (int Liters, Mark Filled) Contents(string item) {
-        int jam = BerryJam.BottleLiters(item);
-        return jam > 0 ? (jam, Mark.Jam) : (Water.BottleLiters(item), Mark.Water);
+    /// <summary>Whether a look id, as <see cref="Vessels.LookOf"/> gives, shows a bottle at some fill.</summary>
+    internal static bool IsBottle(string look) => System.Array.IndexOf(Water.Looks, look) >= 0 || System.Array.IndexOf(BerryJam.Looks, look) >= 0;
+
+    /// <summary>The liters and liquid a bottle's look shows, such as two of water for <c>water_2</c>.</summary>
+    private static (int Liters, Mark Filled) Contents(string look) {
+        int jam = System.Array.IndexOf(BerryJam.Looks, look);
+        return jam > 0 ? (jam, Mark.Jam) : (System.Math.Max(0, System.Array.IndexOf(Water.Looks, look)), Mark.Water);
     }
 
     public static Node3D Create(string item, bool capped = true, bool adjustable = false) {

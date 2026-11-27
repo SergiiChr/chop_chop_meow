@@ -21,7 +21,7 @@ internal static class BarrelAnimationChecks {
         foreach (int liters in new[] { 0, 1, Barrel.Capacity }) {
             var backpack = new Inventory();
             backpack.Add(Barrel.Item, 4);
-            if (liters > 0) backpack.Add(Barrel.AtFill(liters), 1);
+            if (liters > 0) backpack.Add(Vessels.Holding(Barrel.Item, 1, Barrel.Capacity, Water.Liquid, liters));
             var expected = liters == 0 ? ActorAction.Jog : ActorAction.Walk;
             Require(ActorAnimation.PlayerAction(null, false, true, backpack) == expected,
                 $"the player should use {expected} while carrying a barrel with {liters} L");
@@ -66,7 +66,7 @@ internal static class BarrelAnimationChecks {
             CabinWaterModel.LadderZ + CabinWaterModel.LadderWidth * .28f);
         foreach (float phase in new[] { .23f, .24f }) {
             WorkerWaterView.Show(rig, Vector2.Zero, Vector3.Zero, WorkerWaterAction.ClimbUp, true,
-                phase, Bucket.Item);
+                phase, Bucket.Item, false);
             var fist = rig.Root.Transform * rig.Fist(true);
             Require(fist.DistanceTo(rung) < .035f, $"the left hand should hold a rung as the worker climbs, fist is {fist}");
         }
@@ -76,8 +76,8 @@ internal static class BarrelAnimationChecks {
     private static void CheckBothVesselsPourIntoTheRoofOpening() {
         var rig = new ActorRig(ActorSkin.Worker);
         var stream = rig.Root.GetNode<Node3D>("WaterStream");
-        foreach (string vessel in new[] { Bucket.Item, Water.Full }) {
-            WorkerWaterView.Show(rig, Vector2.Zero, Vector3.Zero, WorkerWaterAction.Pour, true, .5f, vessel);
+        foreach (var (vessel, filled) in new[] { (Bucket.Item, false), (Water.Looks[Water.Capacity], true) }) {
+            WorkerWaterView.Show(rig, Vector2.Zero, Vector3.Zero, WorkerWaterAction.Pour, true, .5f, vessel, filled);
             var inlet = rig.Root.Transform * (stream.Position - stream.Basis.Y * .5f);
             var outlet = rig.Root.Transform * (stream.Position + stream.Basis.Y * .5f);
             Require(stream.Visible && inlet.DistanceTo(CabinWaterModel.FillOpening) < .004f && outlet.Y > inlet.Y,
@@ -94,7 +94,7 @@ internal static class BarrelAnimationChecks {
         const int frames = 120;
         for (int frame = 0; frame <= frames; frame++) {
             WorkerWaterView.Show(rig, Vector2.Zero, soil, WorkerWaterAction.Pour, false,
-                frame / (float)frames, Bucket.AtFill(10), ground: true);
+                frame / (float)frames, Bucket.Item, true, ground: true);
             if (!stream.Visible) continue;
             flowing++;
             var end = rig.Root.Transform * (stream.Position - stream.Basis.Y * .5f);
@@ -111,11 +111,11 @@ internal static class BarrelAnimationChecks {
         var bottle = rig.Root.GetNode<Node3D>("CarriedBottle");
         var parts = ModelKit.FadeParts(rig.Root);
         var blue = new Color("43b9e6");
-        WorkerWaterView.Carry(rig, new Pose(), Water.Full);
+        WorkerWaterView.Carry(rig, new Pose(), Water.Looks[Water.Capacity], true);
         ModelKit.SetFade(parts, .5f);
-        WorkerWaterView.Carry(rig, new Pose(), Water.TwoLiters);
+        WorkerWaterView.Carry(rig, new Pose(), Water.Looks[2], true);
         ModelKit.SetFade(parts, 0);
-        WorkerWaterView.Carry(rig, new Pose(), Water.TwoLiters);
+        WorkerWaterView.Carry(rig, new Pose(), Water.Looks[2], true);
         int lit = bottle.GetChildren().OfType<MeshInstance3D>().Count(mesh =>
             mesh.Visible && mesh.MaterialOverride is StandardMaterial3D gauge && gauge.AlbedoColor == blue);
         Require(lit == 2, $"the bottle should still show two filled marks after the worker returns, found {lit}");
@@ -131,13 +131,13 @@ internal static class BarrelAnimationChecks {
                 var blue = new Color("43b9e6");
                 var poses = new[] { new Pose(), ActorAnimation.PoseAt(ActorAction.Walk, .2f, true) };
                 foreach (var pose in poses) {
-                    WorkerWaterView.Carry(rig, pose, Water.TwoLiters);
+                    WorkerWaterView.Carry(rig, pose, Water.Looks[2], true);
                     Require(bottle.Visible && Bars(blue) == 2 && Bars(jam) == 0, "a held water bottle must show blue");
-                    WorkerWaterView.Carry(rig, pose, BerryJam.Bottles[2]);
+                    WorkerWaterView.Carry(rig, pose, BerryJam.Looks[2], true);
                     Require(bottle.Visible && Bars(jam) == 2 && Bars(blue) == 0, "changing liquids at the same fill must change the color");
                     Require((bottle.Transform * ActorRig.BottleGrip).DistanceTo(rig.Fist(false)) < .001f,
                         "the flask must stay in the fist while the actor walks");
-                    WorkerWaterView.Carry(rig, pose, Water.Empty);
+                    WorkerWaterView.Carry(rig, pose, Water.Empty, false);
                     Require(bottle.Visible && Bars(blue) == 0 && Bars(jam) == 0, "an empty flask must not retain the previous liquid's color");
                 }
 

@@ -74,7 +74,7 @@ public partial class HeldCursor : Control {
         if (now != shown) {
             shown = now;
             Visible = now.Item != null;
-            if (now.Item != null) icon.Texture = Icons.Of(now.Item);
+            if (now.Item != null) icon.Texture = Icons.Of(Vessels.LookOf(world.Data, world.HeldBox, now.Item));
             count.Text = now.Item != null && now.Count > 1 ? now.Count.ToString() : "";
         }
         if (Visible) GlobalPosition = GetGlobalMousePosition();
