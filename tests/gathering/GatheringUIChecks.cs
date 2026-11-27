@@ -269,14 +269,14 @@ public partial class Game {
         Give(Hosted, "steel_pick", 1);
         foreach (var offset in new[] { new Vector2(2, -1), new Vector2(-2.1f, .4f) }) {
             var (rock, press, end) = await WorkUntilBlowHeard(start, ThingKind.Stone, offset, "mine_ore", rig => rig.Holds(ActorRig.PickPoint));
-            float gap = SurfaceGap(view.PropOf(rock.Id)!.Body, end);
+            float gap = RestingGap(view.PropOf(rock.Id)!, end);
             Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away, not {gap:0.00} m off it.");
             // Mined down to its last stones, the rock shrinks, and the pick follows its face in.
             // Ten stones, at two a blow, leave the shrunken rock blows enough for its swing to come round.
             rock.Remaining = 10;
             int soundsBefore = sounds.Played;
             await Until(() => sounds.Heard("mine_ore", soundsBefore), $"the player mining a shrunken rock {offset} away and its blow heard", 8);
-            gap = SurfaceGap(view.PropOf(rock.Id)!.Body, view.PlayerRig.Root.Transform * view.PlayerRig.Holds(ActorRig.PickPoint));
+            gap = RestingGap(view.PropOf(rock.Id)!, view.PlayerRig.Root.Transform * view.PlayerRig.Holds(ActorRig.PickPoint));
             Require(gap < .04f, $"A pick's point must land on the face of the rock {offset} away once it has shrunk, not {gap:0.00} m off it.");
             // Its last piece mined, the rock breaks apart and crumbles away.
             rock.Remaining = 1;
