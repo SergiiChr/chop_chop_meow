@@ -674,7 +674,7 @@ public sealed partial class World {
         S.Things.Add(t); return t;
     }
     public void NewGame() {
-        S = new SaveState(); toolsChanged = true;
+        S = new SaveState(); toolsChanged = true; emptied.Clear();
         S.Backpack.Add("steel_axe", 1); S.Backpack.Add("berries", 10); S.Backpack.Add("wood", 6);
         S.Backpack.Add(Water.Empty, 1);
         foreach (var pair in S.Backpack.Items) Got(pair.Key);
@@ -1696,6 +1696,9 @@ public sealed partial class World {
     internal static bool NamesHolding(string entry, string container, string liquid) =>
         entry.Length == container.Length + 1 + liquid.Length && entry[container.Length] == HoldingMark
         && entry.StartsWith(container, StringComparison.Ordinal) && entry.EndsWith(liquid, StringComparison.Ordinal);
+    /// <summary>Whether storage takes a container holding the liquid an entry from <see cref="HoldingOf"/> names, such as compost a bottle of jam.</summary>
+    public bool HoldsHolding(Thing t, string entry) =>
+        HoldingIn(entry) is var (container, liquid) && FullVessel(container, liquid) is { } full && Holds(t, full.Key, full) && !Nests(t, container);
     /// <summary>Every <see cref="HoldingOf"/> entry: each bottle and bucket with each liquid it can hold, and barrels with every liquid.</summary>
     public List<string> HoldingEntries => holdingEntries ??= Data.Vessels.Select(v => HoldingOf(v.Empty, v.Liquid))
         .Concat(Data.Vessels.Select(v => v.Liquid).Distinct().Select(liquid => HoldingOf(Barrel.Item, liquid))).Distinct().ToList();
@@ -1721,9 +1724,10 @@ public sealed partial class World {
     public static string FilterEntry(string item, Item? unit) =>
         PackedGood(unit) is string good ? good == "" ? MixedCrate : CrateOf(good) : Holding(unit) is var (container, liquid) ? HoldingOf(container, liquid) : item;
     /// <summary>What a filter entry names: an item, a crate of a good, or a crate of mixed goods.</summary>
-    public string FilterName(string entry) => entry == Inventory.Everything ? "Everything" : entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good)))
+    /// <param name="byKind">The filter takes a container by its kind at any fill, as a tool rack's does, so its entry is not named empty.</param>
+    public string FilterName(string entry, bool byKind = false) => entry == Inventory.Everything ? "Everything" : entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good)))
         : HoldingIn(entry) is var (container, liquid) ? Phrase(Data.NameOnMap(container), " of ", Lower(Data.Name(liquid)))
-        : IsContainer(entry) && !Data.Name(entry).StartsWith("Empty", StringComparison.Ordinal) ? Phrase("Empty ", Lower(Data.Name(entry))) : Data.Name(entry);
+        : IsContainer(entry) && !byKind && !Data.Name(entry).StartsWith("Empty", StringComparison.Ordinal) ? Phrase("Empty ", Lower(Data.Name(entry))) : Data.Name(entry);
     /// <summary>
     /// The goods in a packed crate, wherever in the world it is, or null for anything else.
     /// It looks through every box, so code that knows the box holding the crate asks that box instead.
@@ -1761,6 +1765,9 @@ public sealed partial class World {
             return Barrel.Is(item) ? Barrel.Name(Vessels.LitersIn(unit), liquid, Data) : Data.VesselOf(item, liquid)?.Name(Vessels.LitersIn(unit), Data) ?? Data.Name(item);
         return Data.Name(item);
     }
+    /// <summary>An item's name for a status line, made once: a vessel's with its fill, otherwise its kind's, a packed crate's included.</summary>
+    internal string NameIn(Inventory box, string item) =>
+        Holding(box.Object(item)) != null ? Describe(item, box) : Data.Name(item);
     /// <summary>The packed crate with this number in the acting player's backpack, or null once it has gone or been emptied.</summary>
     public string? CarriedCrate(int id) {
         if (id == 0) return null;
@@ -1881,7 +1888,7 @@ public sealed partial class World {
         var tank = Barrels.NewTank();
         tank.Add(liquid, before);
         if (puttingIn) {
-            if (Data.VesselOf(item) is not VesselDef vessel) return 0;
+            if (Data.VesselOf(item, liquid) is not VesselDef vessel) return 0;
             PourVessel(S.Backpack, item, tank, vessel, tank.Room(liquid));
         } else {
             if (FillBlock(tank, S.Backpack, item) is string dry) { Say(dry); return 0; }
@@ -2826,6 +2833,12 @@ public sealed partial class World {
     }
     public string Serialize() => JsonSerializer.Serialize(S, GameData.Json);
     // ---------- Validation of saves and guests ----------
+    /// <summary>Whether an order holds positive counts of known items; one the village is filling may also name a full vessel it sells, such as a water bottle.</summary>
+    private bool ValidOrder(TradeOrder order) {
+        foreach (var (item, count) in order.Goods)
+            if (count <= 0 || !KnownItem(item, true) && !(order.Buying && Data.Items.GetValueOrDefault(item)?.FullOf != null)) return false;
+        return true;
+    }
     /// <summary>
     /// Whether an id names a known item or object, or a packed crate where <paramref name="packedCrates"/> allows one.
     /// </summary>
@@ -2904,7 +2917,7 @@ public sealed partial class World {
         }
         foreach (var w in save.Workers)
             if (w == null || w.DrainingLiquid is string liquid && Data.VesselFor(liquid) == null || w.FarmWaterStop < 0 || w.FarmWaterStop >= BarrelHaul.FarmStops || !ValidJobs(w.Jobs) || !ValidToolSlot(w.ToolSlot) || !ValidInventory(w.Bag, true) || !w.Bag.ValidFor(Inventory.Carrier.Worker)) return false;
-        foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, true)) return false;
+        foreach (var order in save.Orders) if (order?.Goods == null || !ValidOrder(order)) return false;
         return true;
     }
     /// <summary>Whether a worker's tool slot from a save is one slot holding nothing or one tool.</summary>
@@ -2956,7 +2969,7 @@ public sealed partial class World {
         var local = loaded.Actor;
         loaded.Absent.Remove(local.Key);
         local.Id = 1; local.SleepingAt = 0; Forget(local); loaded.Players.Add(local);
-        S = loaded;
+        S = loaded; emptied.Clear();
         toolsChanged = true;
         foreach (var t in S.Things.Of(ThingKind.Toolstation)) WatchTools(t);
         gatherClock = 0; ExploredRevision++; Look();

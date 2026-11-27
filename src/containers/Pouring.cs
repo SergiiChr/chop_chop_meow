@@ -57,11 +57,14 @@ public sealed partial class World {
     }
 
     /// <summary>A full vessel standing for any of its kind, kept to ask where one would go without making a new one; it lies in no box.</summary>
-    internal Item FullVessel(VesselDef v) {
-        if (!fullVessels.TryGetValue(v, out var full)) fullVessels[v] = full = Vessels.Holding(v.Empty, 0, v.Capacity, v.Liquid, v.Capacity);
-        return full;
+    internal Item FullVessel(VesselDef v) => FullVessel(v.Empty, v.Liquid)!;
+    /// <summary>A full container of a liquid, kept as <see cref="FullVessel(VesselDef)"/> is, or null when the container cannot hold that liquid.</summary>
+    internal Item? FullVessel(string container, string liquid) {
+        if (fullVessels.TryGetValue((container, liquid), out var full)) return full;
+        if (Data.CapacityOf(container, liquid) is not int capacity) return null;
+        return fullVessels[(container, liquid)] = Vessels.Holding(container, 0, capacity, liquid, capacity);
     }
-    private readonly Dictionary<VesselDef, Item> fullVessels = new();
+    private readonly Dictionary<(string, string), Item> fullVessels = new();
 
     /// <summary>Whether a cell holds a container like this one: of its kind, holding as many liters of the same liquid, and free to take.</summary>
     private static bool Alike(Inventory.Slot slot, string container, string liquid, int liters) =>
@@ -198,8 +201,27 @@ public sealed partial class World {
             if (!takes && moved > 0) Got(item);
             return moved;
         }
-        if (PoursInto(into, to, item, from.Object(item)) is VesselDef poured) return PourVessel(from, item, to, poured, room);
-        return from.TransferTo(to, item, Math.Min(quantity, room));
+        // Several vessels alike, as a Ctrl move takes them, pour or move together, as one stack of them did.
+        if (PoursInto(into, to, item, from.Object(item)) is VesselDef poured) return PourAlike(from, item, to, poured, quantity, room);
+        return TransferLike(from, to, item, Math.Min(quantity, room), automated: false);
+    }
+
+    /// <summary>Pours a vessel and up to <paramref name="vessels"/> less one like it from a box into another while <paramref name="liters"/> last; returns how many poured.</summary>
+    private int PourAlike(Inventory from, string item, Inventory to, VesselDef v, int vessels, int liters) {
+        var unit = from.Object(item);
+        if (Holding(unit) is not var (container, liquid)) return 0;
+        int held = Vessels.LitersIn(unit), poured = 0;
+        alike.Clear();
+        alike.Add(item);
+        foreach (var slot in from.Layout) if (slot.Item != item && Alike(slot, container, liquid, held)) alike.Add(slot.Item);
+        foreach (string vessel in alike) {
+            if (poured >= vessels || liters <= 0) break;
+            int before = to[v.Liquid];
+            if (PourVessel(from, vessel, to, v, liters) == 0) break;
+            liters -= to[v.Liquid] - before;
+            poured++;
+        }
+        return poured;
     }
 
     /// <summary>Why a liquid cannot leave a box for the backpack or another box now, or null: it goes only into vessels there with room for it.</summary>

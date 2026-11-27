@@ -98,8 +98,13 @@ public sealed class VesselDef {
     /// <summary>The icon and model it shows holding so many liters.</summary>
     public string Look(int liters) => Looks.Count == 0 ? Empty : Looks[Math.Clamp(liters, 0, Looks.Count - 1)];
     /// <summary>Its name holding so many liters.</summary>
-    public string Name(int liters, GameData data) =>
-        liters <= 0 ? data.Items[Empty].Name : liters < Names.Count ? Names[liters] : string.Format(System.Globalization.CultureInfo.InvariantCulture, Named, liters);
+    public string Name(int liters, GameData data) {
+        filled ??= new string[Capacity + 1];
+        int at = Math.Clamp(liters, 0, Capacity);
+        return filled[at] ??= at == 0 ? data.Items[Empty].Name : at < Names.Count ? Names[at] : string.Format(System.Globalization.CultureInfo.InvariantCulture, Named, at);
+    }
+    // Each fill's name, made the first time it is asked for, so status lines built every tick allocate nothing.
+    private string?[]? filled;
 }
 /// <summary>How an item that no recipe makes is come by, for the recipe map.</summary>
 public sealed class SourceDef {

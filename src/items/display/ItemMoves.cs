@@ -13,7 +13,8 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole, HeldCursor cursor)
 
     /// <summary>How many of an item a click moves out of an inventory: all of it with Ctrl, the clicked stack with Shift, otherwise one.</summary>
     public static int Amount(Inventory from, string item) {
-        if (Input.IsKeyPressed(Key.Ctrl)) return from[item];
+        // Vessels holding the same move together, as a stack of them did.
+        if (Input.IsKeyPressed(Key.Ctrl)) return World.FreeLike(from, item, from.Object(item));
         if (!Input.IsKeyPressed(Key.Shift)) return 1;
         int slot = from.PreferredSlot;
         return slot >= 0 && slot < from.Layout.Count && from.Layout[slot].Item == item ? from.Layout[slot].Free : Math.Min(from[item], from.StackOf(item));

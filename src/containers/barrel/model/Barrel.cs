@@ -14,8 +14,14 @@ public static class Barrel {
     /// <summary>The share of a walker's speed left to one carrying a barrel holding so many liters.</summary>
     public static float Speed(int liters) => 1 - .5f * liters / Capacity;
     /// <summary>A barrel's name holding so many liters of a liquid.</summary>
-    public static string Name(int liters, string liquid, GameData data) =>
-        liters <= 0 ? data.Items[Item].Name : liquid == BerryJam.Liquid ? $"{data.Items[Item].Name} ({liters} L berry jam)" : $"{data.Items[Item].Name} ({liters} L)";
+    public static string Name(int liters, string liquid, GameData data) {
+        if (liters <= 0) return data.Items[Item].Name;
+        if (!names.TryGetValue((liters, liquid), out var name))
+            names[(liters, liquid)] = name = liquid == BerryJam.Liquid ? $"{data.Items[Item].Name} ({liters} L berry jam)" : $"{data.Items[Item].Name} ({liters} L)";
+        return name;
+    }
+    // Each fill's name, made once, so text built every tick allocates nothing.
+    private static readonly System.Collections.Generic.Dictionary<(int, string), string> names = new();
 
     public static string? In(Inventory inventory) {
         foreach (var (item, _) in inventory.Items) if (Is(item)) return item;

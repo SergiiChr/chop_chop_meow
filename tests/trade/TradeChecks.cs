@@ -14,6 +14,7 @@ using static EconomySteps;
 public static class TradeChecks {
     public static void Run(GameData data) {
         Test(CheckDonationIsNoSale, data);
+        Test(CheckASaveWithAWaterBottleOnTheWayLoads, data);
         Test(CheckAssignedRunnerFetchesCurrentPrices, data);
         Test(CheckCartDeliversAfterFullTrip, data);
         Test(CheckLooseGoodsNeverSellOrSendACart, data);
@@ -29,6 +30,19 @@ public static class TradeChecks {
     }
 
     /// <summary>A crate of goods the village does not buy goes on the cart as a donation, which is no sale.</summary>
+    private static void CheckASaveWithAWaterBottleOnTheWayLoads(GameData data) {
+        var world = EmptyWorld(data);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
+        world.Player = sign.Pos;
+        SetCoins(world, 100);
+        Require(world.Buy(sign, Water.Full, 1), "the village should sell a water bottle");
+        world.Deserialize(world.Serialize());
+        var post = world.Find(sign.Id)!;
+        SafeTick(world, data.TradeSeconds + .1f);
+        Require(Vessels.Count(post.Output!, Water.Empty, Water.Liquid, Water.Capacity) == 1,
+            "a save made while a bought water bottle is on its way should load, and the bottle arrive full");
+    }
+
     private static void CheckDonationIsNoSale(GameData data) {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));

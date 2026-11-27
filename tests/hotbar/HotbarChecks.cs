@@ -8,6 +8,18 @@ using static WorldSteps;
 public static class HotbarChecks {
     public static void Run(GameData data) {
         Test(CheckABottleStaysBoundThroughSips, data);
+        Test(CheckTheWaterSlotTakesNoBottleOfJam, data);
+    }
+
+    private static void CheckTheWaterSlotTakesNoBottleOfJam(GameData data) {
+        var world = EmptyWorld(data);
+        Drop(world, Water.Empty);
+        string jam = GiveVessel(world, Water.Empty, BerryJam.Liquid, Water.Capacity);
+        world.Tick(.1f);
+        Require(world.HotbarItem(8) != jam, "the water bottle's hotbar slot should not take a bottle of jam");
+        string water = GiveWater(world);
+        world.Tick(.1f);
+        Require(world.HotbarItem(8) == water, "the water bottle's hotbar slot should take a bottle of water");
     }
 
     private static void CheckABottleStaysBoundThroughSips(GameData data) {

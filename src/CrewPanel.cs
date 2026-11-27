@@ -30,9 +30,9 @@ public abstract partial class WorkerPage(PageTools tools) : PagePanel(tools) {
         }, now => {
             var (count, item, carryLook, held, toolLook) = now;
             carry.Icon = carryLook == null ? null : Icons.Of(carryLook); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
-            carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {count} {world.Data.Name(item)}";
+            carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {count} {world.NameIn(w.Bag, item)}";
             tool.Icon = held == "" ? null : Icons.Of(toolLook); tool.Visible = held != "";
-            tool.TooltipText = held == "" ? "No tool in hand" : world.Data.Name(held);
+            tool.TooltipText = held == "" ? "No tool in hand" : world.NameIn(w.ToolSlot, held);
         });
     }
 }

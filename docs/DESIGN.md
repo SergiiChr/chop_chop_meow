@@ -159,11 +159,12 @@ Simulation and data:
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
-| `src/containers/barrel/Barrels.cs`, `src/containers/barrel/model/Barrel.cs` | Portable and placed steel barrels, with a fill encoded in each portable barrel |
+| `src/containers/barrel/Barrels.cs`, `src/containers/barrel/model/Barrel.cs` | Portable and placed steel barrels; a portable barrel holding liquid is an item object with its liters |
 | `src/containers/barrel/model/Bucket.cs`, `src/containers/barrel/BarrelHaul.cs` | Steel buckets, and the Haul job's water work: barrels filled and dry farm plots watered from the worker's tool slot |
 | `src/containers/barrel/model/WorkerWaterAction.cs` | The haul actions sent to the window for rendering |
 | `src/containers/barrel/BedtimeWater.cs` | Cabin water at bedtime and its effect on dawn's needs |
-| `src/containers/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
+| `src/containers/Pouring.cs` | Pouring a vessel's liquid into a station, at any fill, filling vessels with room from it, and setting a container's fill in its cell |
+| `src/containers/model/Vessels.cs` | What a bottle, bucket or barrel holds, read from its object: liters, liquid, look, and counts of alike ones |
 | `src/actors/player/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/network/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
 | `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
@@ -646,7 +647,7 @@ Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the lake shore is a collection target.
 Stations hold water (`Water.Liquid`) and jam (`BerryJam.Liquid`) in liters, with drawn droplet icons.
 Stations and barrels hold liquids loose. The canning station uses one liter of jam and one tin can per batch.
-`GameData.Vessels` lists each refillable vessel with each liquid it holds (`VesselDef`: the empty container's item, the liquid, its liters, and the look and name at each fill), and `src/containers/Vessels.cs` holds the rules for all of them.
+`GameData.Vessels` lists each refillable vessel with each liquid it holds (`VesselDef`: the empty container's item, the liquid, its liters, and the look and name at each fill), and `src/containers/Pouring.cs` holds the rules for all of them.
 An empty bottle, bucket or barrel is a plain item; holding liquid, it is an `Item` object whose `Contents` hold the liters, found by its key such as `steel_bucket#12` (`World.SetFill` changes a fill in its cell, `Vessels` reads it).
 Storage names a container by its empty item, which takes only empty ones, or by a container holding a liquid at any fill (`World.HoldingOf`, shown as "Steel bucket of water"); no storage names a bare liquid, and a tool rack takes its buckets and bottles whatever they hold (`Inventory.ByKind`).
 A vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessel`); loading a batch pours from the least full first (`World.PourLiters`);

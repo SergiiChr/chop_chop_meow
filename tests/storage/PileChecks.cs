@@ -11,6 +11,7 @@ using static PlayerSteps;
 public static class PileChecks {
     public static void Run(GameData data) {
         Test(CheckPilesSnapTogetherHoldOneResourceAndMakeCompost, data);
+        Test(CheckCompostNamesBottlesOfJam, data);
         Test(CheckEmptiedPileKeepsItsFilterWhichChangesOnlyWhileEmpty, data);
         Test(CheckOnlyAnEmptyPileWithNoFilterTurnsIntoCompost, data);
         Test(CheckTenderFeedsCompostWithoutFood, data);
@@ -20,6 +21,19 @@ public static class PileChecks {
     }
 
     /// <summary>Piles snap into grids and hold one resource, the first put in, and compost turns leaves and food into fertilizer.</summary>
+    private static void CheckCompostNamesBottlesOfJam(GameData data) {
+        var world = EmptyWorld(data);
+        var compost = world.Add(ThingKind.Pile, new Vector2(30, 30));
+        world.Player = compost.Pos;
+        world.SetCompost(compost, true);
+        string jam = World.HoldingOf(Water.Empty, BerryJam.Liquid);
+        Require(world.HoldsHolding(compost, jam) && !world.HoldsHolding(compost, World.HoldingOf(Water.Empty, Water.Liquid)),
+            "compost should take bottles of jam, which rot, and no bottle of water");
+        compost.Inventory.ClearFilters();
+        world.SetFilter(compost, jam, false, true);
+        Require(compost.Inventory.InputFilter.Contains(jam), "a compost filter should name bottles of jam again once taken off");
+    }
+
     private static void CheckPilesSnapTogetherHoldOneResourceAndMakeCompost(GameData data) {
         var world = EmptyWorld(data);
         var origin = new Vector2(20, 20);

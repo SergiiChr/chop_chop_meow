@@ -12,6 +12,7 @@ internal static class BarrelChecks {
     public static void Run(GameData data) {
         Test(CheckBenchStacksBarrelsMadeWithSteelHammer, data);
         Test(CheckPileStacksEmptyBarrelsAndKeepsFullBarrelsSeparate, data);
+        Test(CheckACarriedBarrelTakesJamFromABottle, data);
         Test(CheckBackpackCarriesEmptyBarrelsAlongsideOneFilledBarrel, data);
         Test(CheckFillingOneBarrelKeepsItsCell, data);
         Test(CheckFillingABarrelNeedsRoomToSplitTheStack, data);
@@ -65,6 +66,18 @@ internal static class BarrelChecks {
         world.QueueBatch(bench, Bucket.Item);
         CompleteBatches(world, bench, Bucket.Item, 1);
         Require(world.Backpack["steel_sheet"] == 0 && world.Backpack["steel_parts"] == 0 && world.Backpack["wood_parts"] == 0, "one bucket costs three steel sheets, a steel part and a wood part");
+    }
+
+    private static void CheckACarriedBarrelTakesJamFromABottle(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, Barrel.Item);
+        string jam = GiveVessel(world, Water.Empty, BerryJam.Liquid, Water.Capacity);
+        Require(world.MoveInBarrel(Barrel.Item, jam, 1, true) == 3, "an empty carried barrel should take a bottle's three liters of jam");
+        string barrel = Vessels.First(world.Backpack, Barrel.Item, BerryJam.Liquid, 3)!;
+        Require(barrel != null && world.Backpack[Water.Empty] == 1, "the barrel should hold the jam and the bottle be left empty");
+        string more = GiveVessel(world, Water.Empty, BerryJam.Liquid, 2);
+        Require(world.MoveInBarrel(barrel, more, 1, true) == 2 && Vessels.LitersIn(world.Backpack, barrel) == 5,
+            "a carried barrel of jam should take more jam");
     }
 
     private static void CheckPileStacksEmptyBarrelsAndKeepsFullBarrelsSeparate(GameData data) {

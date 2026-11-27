@@ -106,7 +106,7 @@ public sealed partial class World {
             if (intake == null) { dest = takeBack.Nearest(item, w.Pos); w.LookAgain = S.Time + JobListSeconds; }
         }
         if (dest == null || intake is not (Inventory into, int room)) return takeBack.Bring(w, dest, item, dt);
-        w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
+        w.Destination = dest.Id; w.Status = Phrase("Carrying ", NameIn(w.Bag, item), " → ", Data.Name(dest.Kind));
         if (!Walk(w, dest.Pos, dt)) return true;
         // Every vessel carried pours, whatever it holds; the vessels stay in hand, emptier.
         if (PoursInto(dest, into, item, unit) is VesselDef pours) PourLiters(w.Bag, into, pours, room);

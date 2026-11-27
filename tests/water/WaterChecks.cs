@@ -13,6 +13,7 @@ namespace ChopChopMeow.Tests;
 public static class WaterChecks {
     public static void Run(GameData data) {
         Test(CheckBottlesPourTheLitersTheyHold, data);
+        Test(CheckBottlesAlikePourTogether, data);
         Test(CheckBottleStatesAreDefinedInData, data);
         Test(CheckFilledVesselsRevealTheirContents, data);
         Test(CheckBottleGivesThreeLiters, data);
@@ -60,6 +61,15 @@ public static class WaterChecks {
         var chest = TakeEverything(batch, batch.Add(ThingKind.Chest, batch.Player + Vector2.Left));
         string twoLiters = GiveWater(batch, 2);
         Require(batch.Transfer(batch.Backpack, chest.Inventory, twoLiters, 1) == 1 && Vessels.Count(chest.Inventory, Water.Empty, Water.Liquid, 2) == 1, "bottles must store in ordinary storage as they are");
+    }
+
+    private static void CheckBottlesAlikePourTogether(GameData data) {
+        var world = EmptyWorld(data);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        world.SetRecipe(table, "meat_stew");
+        string bottle = GiveWater(world, count: 3);
+        Require(world.Transfer(world.Backpack, table.Inventory, bottle, 3) == 3 && table.Inventory[Water.Liquid] == 9 && world.Backpack[Water.Empty] == 3,
+            "moving three full bottles into a station should pour all three, as a stack of them did");
     }
 
     private static void CheckBottleStatesAreDefinedInData(GameData data) {

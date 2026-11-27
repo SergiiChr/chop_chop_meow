@@ -76,7 +76,8 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             var items = world.Data.ListOrder.Where(Holds);
             if (pile) items = items.Select(id => world.PileEntry(id)).Distinct();
             // Storage names no bare liquid: a container's own entry takes it empty, and one for a liquid takes it holding that liquid at any fill.
-            var holding = world.HoldingEntries.Where(id => world.HoldingIn(id) is var (container, _) && Holds(container));
+            // A tool rack's container entry already takes every fill, so it lists no entry for a liquid.
+            var holding = t.Inventory.ByKind ? [] : world.HoldingEntries.Where(id => world.HoldsHolding(t, id));
             var choices = barrel ? items.Where(id => world.Data.VesselFor(id) != null)
                 : post ? crates : items.Where(id => world.Data.VesselFor(id) == null && world.Data.Items[id].FullOf == null).Concat(holding).Concat(crates);
             if (!single) choices = choices.Prepend(Inventory.Everything);
@@ -107,7 +108,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
     /// <summary>A filter entry's cell: the item, for a crate of a good the good with a small crate in the corner, or the letter A for Everything.</summary>
     private ItemSlot FilterCell(string name, string id, string hint = "") {
         var (cell, _) = ItemSlot.Create(name, 44);
-        cell.TooltipText = world.FilterName(id) + hint;
+        cell.TooltipText = world.FilterName(id, t.Inventory.ByKind) + hint;
         if (id == Inventory.Everything) { Letter(cell, "A", Style.Ink); return cell; }
         kit.LinkRecipeMap(cell, () => id);
         cell.TooltipText += $"\n{RecipeMap.AltClickHint}";
