@@ -63,7 +63,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
 | `--showcase --diary` | Show the player on the lake's shore beside its floating page, with a page lying on the ground and three finds in the diary, two of their days unread; `--diary-fall` drops that page off the oak beside them a second in instead, `--panel` opens the Diary, `--diary-day 45` opens that day large, `--diary-find` shows the pop-up of a page found in leaves and `--diary-first` leaves the diary empty and no page on the ground, so the next find is the first |
 | `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
-| `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
+| `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes in their five stages with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
@@ -509,6 +509,7 @@ The plains have occasional rocks, bushes and berry bushes, and the trees thicken
 Click a resource to see what it yields in read-only item slots with a count for each item.
 The lake shows a water droplet in an unnumbered slot.
 A berry bush holds 24 berries and is full again a day after the first one is picked from it, whether or not it was picked clean.
+It shows fewer berries as they are picked, in five stages: full, three quarters, half, a quarter and bare once picked clean, each stage 6 berries apart.
 A felled tree leaves a stump. Trees grow again from planted acorns. A couple of hundred plain bushes grow about the plains.
 Hold right mouse on a stump or a plain bush with a shovel in your backpack to dig it up: a stump gives 3 wood and a bush 36 leaves, three times what lies under an oak.
 It comes out whole after a few seconds of digging and is gone for good, so the backpack needs room for all of it.
@@ -1481,6 +1482,7 @@ The world reacts too:
 
 - trees shake and topple over the stumps they leave, a tall one slower than a short one;
 - a stump or a bush leans further out of the ground as it is dug at, then is thrown up out of a spray of soil and is gone;
+- a berry bush thins out all around as its berries are picked;
 - deposits shrink and throw chips, and crumble into chips and dust when their last piece is mined;
 - a fire that runs out of work or fuel dies down over half a second;
 - the bellows board travels with each press, and the heat gauge tracks the forge;

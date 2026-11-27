@@ -208,7 +208,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 
 - Tree3D 1.1.0 supplies the baked tree and berry-bush geometry. Preview it with `./build.py play -- --showcase --trees`.
 - `src/Tree3DShape.cs` loads shared tree and berry-bush meshes, and cutout foliage shader materials that sway in the wind (`src/Wind.cs`) and have a blended twin for fading. It also adds the stem under a tree's baked trunk that starts above the ground; a berry bush gets none.
-- Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes`. Berries attach to foliage-card twigs and have their own harvest visibility. The same view shows plain bushes and stumps, one of each half dug out.
+- Preview the berry bushes in their five stages, from full to picked clean, with `./build.py play -- --showcase --bushes`. Berries attach to foliage-card twigs and thin out in stages as they are picked. The same view shows plain bushes and stumps, one of each half dug out.
 - `assets/models/tree3d/` contains the baked meshes, SVG leaf/bark textures, triangle manifest and upstream license notices.
 - Regenerate Tree3D output with `./tools/tree3d.py`. Native authoring binaries stay in ignored `.tools/tree3d` and are not needed to play. See [tree3d/README.md](models/tree3d/README.md).
 - `src/NatureShape.cs` supplies shared meshes for stumps, plain bushes, fruit, rocks, ore deposits and loose ore: vertex-coloured, or for stone and coal smooth with a scan draped over them.

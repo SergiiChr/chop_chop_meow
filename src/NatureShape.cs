@@ -328,8 +328,14 @@ internal static class NatureShape {
         BushLeaves(s, Vector3.Zero, Vector3.One, points, tint, .4f, 7, 2.1f);
     });
 
-    /// <summary>Fruit clusters attached to the stems at the centers of actual Tree3D foliage cards, rather than their transparent edges.</summary>
-    public static Mesh CardBerries(Mesh foliage, int variant) => Cached($"cardberries{variant}", s => {
+    /// <summary>How many clusters of three berries a full berry bush shows.</summary>
+    public const int BerryClusters = 16;
+
+    /// <summary>
+    /// The first <paramref name="clusters"/> fruit clusters of a full bush, attached to the stems at the centers of actual Tree3D foliage cards, rather than their transparent edges.
+    /// Each next cluster turns by the golden angle from the one before, so any first few are spread all around the bush.
+    /// </summary>
+    public static Mesh CardBerries(Mesh foliage, int variant, int clusters) => Cached($"cardberries{variant}_{clusters}", s => {
         var anchors = new List<Vector3>();
         // The pinned Tree3D baker preserves its eight-vertex, two-sided card layout.
         // UV (0.5, 0.5) meets the central twig in our broadleaf cutout.
@@ -341,7 +347,7 @@ internal static class NatureShape {
             }
         }
         Color[] reds = { new("ce3543"), new("a8263c"), new("e14b50") };
-        for (int i = 0; i < 16 && anchors.Count > 0; i++) {
+        for (int i = 0; i < clusters && anchors.Count > 0; i++) {
             float angle = i * 2.39996f + variant, y = .7f - (i % 5) * .25f;
             var direction = new Vector3(MathF.Cos(angle), y, MathF.Sin(angle)).Normalized();
             int best = 0; float score = float.NegativeInfinity;
