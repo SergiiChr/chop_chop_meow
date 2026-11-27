@@ -1730,10 +1730,9 @@ public sealed partial class World {
     public static string FilterEntry(string item, Item? unit) =>
         PackedGood(unit) is string good ? good == "" ? MixedCrate : CrateOf(good) : Holding(unit) is var (container, liquid) ? HoldingOf(container, liquid) : item;
     /// <summary>What a filter entry names: an item, a crate of a good, or a crate of mixed goods.</summary>
-    /// <param name="byKind">The filter takes a container by its kind at any fill, as a tool rack's does, so its entry is not named empty.</param>
-    public string FilterName(string entry, bool byKind = false) => entry == Inventory.Everything ? "Everything" : entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good)))
+    public string FilterName(string entry) => entry == Inventory.Everything ? "Everything" : entry == MixedCrate ? "Mixed crate" : CrateGood(entry) is string good ? Phrase("Crate of ", Lower(Data.Name(good)))
         : HoldingIn(entry) is var (container, liquid) ? Phrase(Data.NameOnMap(container), " of ", Lower(Data.Name(liquid)))
-        : IsContainer(entry) && !byKind && !Data.Name(entry).StartsWith("Empty", StringComparison.Ordinal) ? Phrase("Empty ", Lower(Data.Name(entry))) : Data.Name(entry);
+        : IsContainer(entry) && !Data.Name(entry).StartsWith("Empty", StringComparison.Ordinal) ? Phrase("Empty ", Lower(Data.Name(entry))) : Data.Name(entry);
     /// <summary>
     /// The goods in a packed crate, wherever in the world it is, or null for anything else.
     /// It looks through every box, so code that knows the box holding the crate asks that box instead.
@@ -2067,7 +2066,7 @@ public sealed partial class World {
         }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
-    private enum HoldRefusal { None, NotUsed, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly, TreeWaterOnly, TreeNoWater, AcornsOnly }
+    private enum HoldRefusal { None, NotUsed, ToolsOnly, FilledTool, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly, Barrel, LiquidOnly, BarrelOnly, TreeWaterOnly, TreeNoWater, AcornsOnly }
     /// <summary>A station holds by hand only what its recipe uses or makes, a tool station tools, buckets and bottles, a pile one resource, compost what rots and a campfire wood.</summary>
     private HoldRefusal HoldCheck(Thing t, string item, Item? unit) => t.Kind switch {
         ThingKind.Tree => TreePlanting.NeedsWater(t)
@@ -2080,6 +2079,7 @@ public sealed partial class World {
         ThingKind.Barrel => HoldRefusal.LiquidOnly,
         ThingKind.Hut => HoldRefusal.BarrelOnly,
         ThingKind.Toolstation when ToolKind(item) == "" => HoldRefusal.ToolsOnly,
+        ThingKind.Toolstation when Holding(unit) != null => HoldRefusal.FilledTool,
         _ when IsStation(t.Kind) && !SlotsTake(t, item) => HoldRefusal.NotUsed,
         ThingKind.Pile when t.Compost && !Compostable(item, unit) && item != "fertilizer" => HoldRefusal.CompostOnly,
         ThingKind.Pile when !t.Compost && !PileTakes(t.Inventory, item, unit) => HoldRefusal.OtherResource,
@@ -2103,6 +2103,7 @@ public sealed partial class World {
         HoldRefusal.TreeNoWater => "There is nowhere to put that here.",
         HoldRefusal.AcornsOnly => "The hole only takes acorns.",
         HoldRefusal.ToolsOnly => "The tool station only holds tools, buckets and bottles.",
+        HoldRefusal.FilledTool => "The tool station only holds empty buckets and bottles.",
         HoldRefusal.NotUsed => NotUsedHere(item),
         HoldRefusal.CompostOnly => "The compost takes leaves, grass and food.",
         HoldRefusal.OtherResource => Phrase("This is ", A(PileName(t)!), " pile."),
@@ -2442,7 +2443,11 @@ public sealed partial class World {
         var tool = w.ToolSlot.Object(w.Tool);
         foreach (var t in S.Things.Of(ThingKind.Toolstation))
             if (Holds(t, w.Tool, tool) && t.Inventory.Room(w.Tool) > 0 && t.Inventory.Accepts(w.Tool, tool) && (station == null || t.Pos.DistanceSquaredTo(w.Pos) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(w.Pos); }
-        if (station == null) return true;
+        if (station == null) {
+            // A bucket or bottle that still holds something goes with the worker's loads instead, to storage that takes it.
+            if (Holding(tool) != null && w.Bag.Count == 0) w.ToolSlot.TransferTo(w.Bag, w.Tool, 1);
+            return true;
+        }
         w.Status = Phrase("Putting back the ", Lower(Data.Name(w.Tool)));
         if (!Walk(w, station.Pos, dt)) return false;
         // A tool a player holds on their cursor stays in hand until they let go of it.
@@ -2453,7 +2458,7 @@ public sealed partial class World {
     private bool toolsChanged = true;
     internal void ToolsChanged() => toolsChanged = true;
     /// <summary>Has a tool station's contents and filters report to the tool kinds stations give out.</summary>
-    private void WatchTools(Thing station) { station.Inventory.Changed = ToolsChanged; station.Inventory.ByKind = true; toolsChanged = true; }
+    private void WatchTools(Thing station) { station.Inventory.Changed = ToolsChanged; toolsChanged = true; }
     /// <summary>The rack's best free tool of a kind when its filter lets it out, or null.</summary>
     private string? ToolGivenOut(Thing station, string kind) {
         var items = station.Inventory;

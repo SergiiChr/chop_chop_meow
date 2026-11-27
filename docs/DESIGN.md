@@ -650,7 +650,7 @@ Stations hold water (`Water.Liquid`) and jam (`BerryJam.Liquid`) in liters, with
 Stations and barrels hold liquids loose. The canning station uses one liter of jam and one tin can per batch.
 `GameData.Vessels` lists each refillable vessel with each liquid it holds (`VesselDef`: the empty container's item, the liquid, its liters, and the look and name at each fill), and `src/containers/Pouring.cs` holds the rules for all of them.
 An empty bottle, bucket or barrel is a plain item; holding liquid, it is an `Item` object whose `Contents` hold the liters, found by its key such as `steel_bucket#12` (`World.SetFill` changes a fill in its cell, `Vessels` reads it).
-Storage names a container by its empty item, which takes only empty ones, or by a container holding a liquid at any fill (`World.HoldingOf`, shown as "Steel bucket of water"); no storage names a bare liquid, and a tool rack takes its buckets and bottles whatever they hold (`Inventory.ByKind`).
+Storage names a container by its empty item, which takes only empty ones, or by a container holding a liquid at any fill (`World.HoldingOf`, shown as "Steel bucket of water"); no storage names a bare liquid; a tool rack holds buckets and bottles only empty, and `World.ReturnTool` sends a filled one to storage with the worker's loads.
 A vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessel`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
@@ -1790,7 +1790,9 @@ When a worker cannot reach a group, they sit near where they stopped if there is
 If the fire is missing any instruments, there is a 25% chance of bringing one, with each missing instrument equally likely.
 A campfire holds at most one guitar, one harmonica and one drum.
 A listener who stays seated does not roll when a musician leaves.
-Each instrumentalist at an incomplete trio's fire waits at least five seconds between solo clips.
+Each instrumentalist at an incomplete trio's fire waits two to three seconds after a solo clip ends before the next,
+and before the first one after sitting down.
+Solo clips play 0.8 dB above the music volume, and guitar clips 6.6 dB above it.
 When a fire has all three instruments, one worker on each plays one randomly picked song and its other idle workers nod.
 After the song, each of the three plays solo clips as at an incomplete fire, with no second song until the fire no longer
 has all three instruments.

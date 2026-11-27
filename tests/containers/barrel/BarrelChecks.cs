@@ -29,7 +29,7 @@ internal static class BarrelChecks {
         Test(CheckWorkerFindsShoreAccessAroundACabin, data);
         Test(CheckBlockedToolSwapLetsTheWorkerDoTheirNextJob, data);
         Test(CheckWorkerSwapsABottleForAnAxe, data);
-        Test(CheckRackTakesJamButDoesNotOfferItForWatering, data);
+        Test(CheckRackRefusesJamAndOffersNoneForWatering, data);
         Test(CheckWorkerFetchesABottleFromTheRack, data);
         Test(CheckBlockedBarrelLetsTheWorkerDoTheirNextJob, data);
         Test(CheckWorkerReachesBarrelAroundAChest, data);
@@ -333,23 +333,25 @@ internal static class BarrelChecks {
         var world = EmptyWorld(data);
         var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, world.Player + Vector2.Right));
         var tree = world.Add(ThingKind.Tree, world.Player + Vector2.Left * 2, 10);
-        TakeEverything(world, world.Add(ThingKind.Chest, world.Player + Vector2.Down * 2));
+        var chest = TakeEverything(world, world.Add(ThingKind.Chest, world.Player + Vector2.Down * 2));
         var worker = AddWorker(world, world.Player);
         string bottle = GiveVessel(world, Water.Empty, Water.Liquid, 3);
-        Require(world.Transfer(world.Backpack, rack.Inventory, bottle, 1) == 1, "a rack accepts a filled bottle from the player");
-        Require(world.Transfer(rack.Inventory, worker.ToolSlot, bottle, 1) == 1, "a player can equip a filled bottle from the rack");
+        Require(world.Transfer(world.Backpack, rack.Inventory, bottle, 1) == 0 && world.HoldBlock(rack, bottle) == "The tool station only holds empty buckets and bottles.",
+            "a rack refuses a filled bottle from the player");
+        Require(world.Transfer(world.Backpack, worker.ToolSlot, bottle, 1) == 1, "a player can equip a worker with a filled bottle");
         rack.Inventory.Add("steel_axe", 1);
         world.SetDuty(worker, tree, JobKind.Gather, true);
         Work(world, 10, () => tree.Remaining < 10);
-        Require(tree.Remaining < 10 && Vessels.Count(rack.Inventory, Water.Empty, Water.Liquid, 3) == 1, "the worker puts the full bottle back and uses the axe");
+        Require(tree.Remaining < 10 && Vessels.Count(chest.Inventory, Water.Empty, Water.Liquid, 3) == 1,
+            "the worker stores the full bottle like a load and uses the axe");
     }
 
-    private static void CheckRackTakesJamButDoesNotOfferItForWatering(GameData data) {
+    private static void CheckRackRefusesJamAndOffersNoneForWatering(GameData data) {
         var world = EmptyWorld(data);
         var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, world.Player + Vector2.Right));
         string jam = GiveVessel(world, Water.Empty, BerryJam.Liquid, 3);
-        Require(world.Transfer(world.Backpack, rack.Inventory, jam, 1) == 1,
-            "a tool rack must take the same flask when it holds jam");
+        Require(world.Transfer(world.Backpack, rack.Inventory, jam, 1) == 0,
+            "a tool rack must refuse a flask holding jam, as it holds bottles only empty");
         Require(!world.StationsHold(BarrelHaul.WaterTool), "a jam bottle is not available for a water delivery");
     }
 
@@ -357,15 +359,17 @@ internal static class BarrelChecks {
         var world = EmptyWorld(data);
         var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, world.Player + Vector2.Right));
         var target = world.Add(ThingKind.Barrel, world.Player + Vector2.Left * 3);
-        string bottle = GiveVessel(world, Water.Empty, Water.Liquid, 3);
-        Require(world.Transfer(world.Backpack, rack.Inventory, bottle, 1) == 1, "the only available vessel is the full bottle on the rack");
+        var source = world.Add(ThingKind.Barrel, world.Player + Vector2.Right * 4);
+        source.Inventory.Add(Water.Liquid, Barrel.Capacity);
+        Give(world, Water.Empty);
+        Require(world.Transfer(world.Backpack, rack.Inventory, Water.Empty, 1) == 1, "the only available vessel is the empty bottle on the rack");
         var worker = AddWorker(world, world.Player + Vector2.Down);
         world.SetDuty(worker, target, JobKind.Haul, true);
         Work(world, 6);
         Require(target.Inventory[Water.Liquid] == 0, "a worker hauling for a barrel whose filter does not name water should pour none in");
         world.SetFilter(target, Water.Liquid, false, true);
-        Work(world, 6, () => target.Inventory[Water.Liquid] > 0);
-        Require(target.Inventory[Water.Liquid] == 3 && worker.Tool == Water.Empty, "a worker fetches a bottle and pours its three liters");
+        Work(world, 30, () => target.Inventory[Water.Liquid] > 0);
+        Require(target.Inventory[Water.Liquid] == 3 && worker.Tool == Water.Empty, "a worker fetches a bottle, fills it at the full barrel and pours its three liters");
     }
 
     private static void CheckBlockedBarrelLetsTheWorkerDoTheirNextJob(GameData data) {

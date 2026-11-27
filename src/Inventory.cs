@@ -105,8 +105,6 @@ public sealed class Inventory {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Gated { get; set; }
     /// <summary>The filter entry that names every item; it stands alone in its row.</summary>
     public const string Everything = "everything";
-    /// <summary>Whether a filter entry for a container's kind takes it whatever it holds, as a tool rack's does; elsewhere such an entry takes only empty ones.</summary>
-    [JsonIgnore] public bool ByKind { get; set; }
     /// <summary>A debug chest has room for as many stacks as are put in it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool UnlimitedSlots { get; set; }
     /// <summary>Number of cells. Changing it adds empty cells or moves stacks out of removed ones.</summary>
@@ -450,34 +448,34 @@ public sealed class Inventory {
     public void GateNew() { Gated = true; InputFilter.Clear(); OutputFilter.Clear(); OutputFilter.Add(Everything); }
     /// <param name="unit">The object the item's key finds in the box it comes from, such as a packed crate, whose goods its filter entry depends on.</param>
     public bool Accepts(string item, Item? unit = null) => Passes(InputFilter, item, unit);
-    public bool AllowsWithdrawal(string item) => LetsAll(OutputFilter) || Names(OutputFilter, item, Object(item), ByKind);
+    public bool AllowsWithdrawal(string item) => LetsAll(OutputFilter) || Names(OutputFilter, item, Object(item));
     /// <param name="unit">The object the item's key finds in this box.</param>
     public bool AllowsWithdrawal(string item, Item? unit) => Passes(OutputFilter, item, unit);
     /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over one taking everything.</summary>
     /// <param name="unit">The object the item's key finds in the box it comes from.</param>
-    public bool Wants(string item, Item? unit = null) => Names(InputFilter, item, unit, ByKind);
+    public bool Wants(string item, Item? unit = null) => Names(InputFilter, item, unit);
     /// <summary>Whether a stack takes more of an item: a stack of it, unless its units expire and a player holds part of it, as the held ones must stay in front.</summary>
     private static bool TopsUp(Slot slot, string item) => slot.Item == item && (slot.Held == 0 || !HasUnits(item));
     /// <summary>Whether the input filter names any item, which a chest's hauler fills it with; <see cref="Everything"/> names none.</summary>
     public bool NamesItems => InputFilter.Count > 0 && !InputFilter.Contains(Everything);
-    private bool Passes(FilterList filter, string item, Item? unit) => LetsAll(filter) || Names(filter, item, unit, ByKind);
+    private bool Passes(FilterList filter, string item, Item? unit) => LetsAll(filter) || Names(filter, item, unit);
     /// <summary>
     /// Whether a filter lets every item through: <see cref="Everything"/> in storage, or an empty one elsewhere.
     /// </summary>
     private bool LetsAll(FilterList filter) => Gated ? filter.Contains(Everything) : filter.Count == 0;
     /// <summary>A filter names an item itself, the kind of an object that is always one, such as a lantern, or a packed crate of the good it holds.</summary>
-    private static bool Names(FilterList filter, string item, Item? unit, bool byKind) {
+    private static bool Names(FilterList filter, string item, Item? unit) {
         if (World.PackedGood(unit) is string good) {
             foreach (string named in filter) if (World.NamesCrateOf(named, good)) return true;
             return false;
         }
-        // A container holding a liquid goes under its entry for that liquid, or under its kind where any fill counts, as on a tool rack.
+        // A container holding a liquid goes under its entry for that liquid at any fill, never under its own, which takes it empty.
         if (World.Holding(unit) is var (container, liquid)) {
             foreach (string named in filter) if (World.NamesHolding(named, container, liquid)) return true;
-            return byKind && filter.Contains(container);
+            return false;
         }
         // Only an object that is always one, such as a lantern, goes under its kind: a container holding something has no entry of its own.
-        return filter.Contains(item) || ChopChopMeow.Item.IsKey(item) && filter.Contains(ChopChopMeow.Item.KindOf(item)) && (byKind || ChopChopMeow.Item.IsObject(ChopChopMeow.Item.KindOf(item)));
+        return filter.Contains(item) || ChopChopMeow.Item.IsKey(item) && filter.Contains(ChopChopMeow.Item.KindOf(item)) && ChopChopMeow.Item.IsObject(ChopChopMeow.Item.KindOf(item));
     }
 
     /// <summary>Adds up to <paramref name="quantity"/> units of an item and returns how many fit.</summary>

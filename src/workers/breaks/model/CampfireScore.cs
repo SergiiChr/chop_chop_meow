@@ -8,10 +8,10 @@ internal static class CampfireScore {
     ];
 
     private static readonly CampfireRecording[] Guitar = [
-        new("campfire_guitar", 3.907f, [.012f]),
-        new("campfire_guitar", 3.476f, [.016f]),
-        new("campfire_guitar", 8.039f, [.060f]),
-        new("campfire_guitar", 8.445f, [.110f]),
+        new("campfire_guitar", 2f, [.012f]),
+        new("campfire_guitar", 2f, [.016f]),
+        new("campfire_guitar", 2f, [.060f]),
+        new("campfire_guitar", 2f, [.110f]),
     ];
     private static readonly CampfireRecording[] Drum = [
         new("campfire_drum", .370f, [.010f]),
@@ -20,9 +20,8 @@ internal static class CampfireScore {
         new("campfire_drum", 3.307f, [.016f]),
     ];
     private static readonly float[] Harmonica = [
-        .349f, .168f, .373f, .142f, .205f, .152f, .444f, .274f, .393f, .178f, .373f, .141f,
-        .227f, .130f, .421f, .306f, .355f, .187f, .412f, .148f, .244f, .139f, 3.952f,
-        .482f, 2.282f, .376f, .310f, .151f, 2.526f, 2.493f, .425f, .331f, .181f, .353f, 1.389f,
+        .349f, .168f, .373f, .205f, .444f, .274f, .393f, .178f, .373f, .227f, .421f, .306f, .355f, .187f, .412f, .244f,
+        3.952f, .482f, 2.282f, .376f, .310f, 2.526f, 2.493f, .425f, .331f, .181f, .353f, 1.389f,
     ];
 
     internal static int SongCount => Songs.Length;
