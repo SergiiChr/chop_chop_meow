@@ -136,6 +136,15 @@ public sealed class Thing {
     [JsonIgnore] public bool IsDug => GatherRules.Of(Kind)?.Shape == GatherShape.Dug;
     /// <summary>A creature that moves about in the air: it takes no ground, so anything is built, laid or dug where it is, and no player remembers where one was.</summary>
     [JsonIgnore] public bool Roams => GatherRules.Of(Kind)?.Roams == true;
+    /// <summary>Whether it is a page of the diary lying in the world.</summary>
+    [JsonIgnore] public bool IsPage => Diary.IsPage(Kind);
+    /// <summary>
+    /// Whether it is part of the ground everyone shares: everything but a firebug in the air and a page, which shows to one player.
+    /// Such a thing stops building, laying and growing where it is, marks the ground and is remembered under fog.
+    /// </summary>
+    [JsonIgnore] public bool TakesGround => !Roams && !IsPage;
+    /// <summary>Whether a player takes it in one go once they reach it: a loose piece or a page.</summary>
+    [JsonIgnore] public bool TakenWhole => IsLoose || IsPage;
     [JsonIgnore] public bool IsStorage => Kind is ThingKind.Chest or ThingKind.Grave or ThingKind.Crate or ThingKind.Toolstation or ThingKind.Pile or ThingKind.Barrel;
 }
 /// <summary>Batches of one recipe waiting in the hand's queue.</summary>
@@ -285,7 +294,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 24;
+    public int Version { get; set; } = 25;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -403,6 +412,7 @@ public sealed partial class World {
         Trees = new TreePlanting(this); Replaced += Trees.Reset;
         Nettles = new Nettles(this);
         Firebugs = new Firebugs(this); Replaced += Firebugs.Reset;
+        Diary = new Diary(this); Replaced += Diary.Reset;
         Lanterns = new Lanterns(this);
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         Goals = new Goals(this); glassBlowing = new GlassBlowing(this);
@@ -429,6 +439,7 @@ public sealed partial class World {
     public LeafSpots LeafSpots { get; }
     public Nettles Nettles { get; }
     public Firebugs Firebugs { get; }
+    public Diary Diary { get; }
     public Lanterns Lanterns { get; }
     /// <summary>
     /// While set, no nettle comes up and no firebug comes out at night.
@@ -513,7 +524,7 @@ public sealed partial class World {
     /// <summary>Whether the acting player is taken up by something else, downed or at a cabin door, so they can do nothing else.</summary>
     /// <summary>What the acting player is doing at a cabin's door.</summary>
     public Doorway Door => S.Actor.Door;
-    public bool Occupied => Downed || S.Actor.Door != Doorway.None || Sleep.SleepingAt != 0;
+    public bool Occupied => Downed || S.Actor.Door != Doorway.None || Sleep.SleepingAt != 0 || S.Actor.DiaryFinding != DiaryFind.None;
     public bool Sees(Vector2 p) => p.DistanceTo(Player) <= Data.SightRadius;
     /// <summary>Whether no player can see a spot.</summary>
     internal bool Unseen(Vector2 p) {
@@ -535,7 +546,8 @@ public sealed partial class World {
     /// <summary>Fills <paramref name="known"/> with things as the player knows them: live within sight, as last seen elsewhere, and absent if never seen.</summary>
     public void CollectKnown(List<Thing> known) {
         known.Clear();
-        foreach (var t in S.Things) if (Sees(t.Pos)) known.Add(t);
+        var me = Me;
+        foreach (var t in S.Things) if (Sees(Diary.At(t)) && Diary.ShowsTo(me, t)) known.Add(t);
         foreach (var t in S.Remembered.Values) if (!Sees(t.Pos)) known.Add(t);
     }
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
@@ -543,6 +555,7 @@ public sealed partial class World {
         ThingKind.Water => Terrain.WaterPoint(from),
         ThingKind.Mine => Mines.WorkSpot(t, from),
         ThingKind.LeafSpot => t.Pos + (from - t.Pos).LimitLength(LeafSpots.Radius(t.TreeStage)),
+        ThingKind.FloatingPage => Diary.At(t),
         _ => t.Pos
     };
     /// <summary>How far, in metres, the player reaches to move items in and out of storage and stations.</summary>
@@ -687,6 +700,8 @@ public sealed partial class World {
         LeafSpots.Scatter();
         ScatterLoose();
         GrowBushes();
+        // Last, so every other thing keeps the id its look comes from.
+        Diary.Float();
         Look();
         Replaced?.Invoke();
     }
@@ -735,6 +750,20 @@ public sealed partial class World {
     }
     /// <summary>Whether a player, worker or wolf can stand on a spot: walkable ground with nothing built in the way.</summary>
     public bool CanStand(Vector2 p) => CanStand(p, null);
+    /// <summary>
+    /// A spot to stand on <paramref name="near"/> to <paramref name="far"/> metres from <paramref name="at"/>, in a direction and at a
+    /// distance drawn from <paramref name="rolls"/>, or null when eight tries find none.
+    /// </summary>
+    internal Vector2? StandSpotNear(Random rolls, Vector2 at, float near, float far) {
+        for (int tries = 0; tries < 8; tries++) {
+            float angle = (float)(rolls.NextDouble() * Math.Tau), distance = near + (far - near) * (float)rolls.NextDouble();
+            var spot = at + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * distance;
+            if (CanStand(spot)) return spot;
+        }
+        return null;
+    }
+    /// <summary>Ground to stand on out of the lake's shallows, as the spots a building is worked from need.</summary>
+    public bool CanStandDry(Vector2 p) => CanStand(p) && !Terrain.InLake(p);
 
     internal bool CanStand(Vector2 p, Thing? except) {
         if (!Open(p)) return false;
@@ -743,7 +772,7 @@ public sealed partial class World {
                 if (t != except && Blocks(t, p)) return false;
         return true;
     }
-    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their outcrops.</summary>
+    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water but for the lake's shallows, and clear of cliff walls and their outcrops.</summary>
     internal static bool Open(Vector2 p) {
         if (!Terrain.Open(p)) return false;
         foreach (var c in Cliff.All) if (c.DistanceTo(p) < Cliff.Depth) return false;
@@ -752,7 +781,7 @@ public sealed partial class World {
     /// <summary>Whether a point lies within a cliff's or a den's outcrop of solid rock.</summary>
     private static bool InOutcrop(Vector2 p, float margin = 0) => Mines.InOutcrop(p, margin) || WolfPatrols.InOutcrop(p, margin);
     /// <summary>The kinds that are not resources: buildings, yards and what is left on the ground, such as graves.</summary>
-    public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null);
+    public static readonly ThingKind[] Structures = Array.FindAll(Kinds.All, kind => GatherRules.Of(kind) == null && !Diary.IsPage(kind));
     /// <summary>The kinds that stand in the way; resources, yards, campfires, graves, signposts and mines are walked past.</summary>
     private static readonly ThingKind[] Blockers = Array.FindAll(Structures, kind => !Construction.IsZone(kind) && kind is not (ThingKind.Campfire or ThingKind.StrawBed or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine or ThingKind.Hole or ThingKind.Lantern));
     internal static ReadOnlySpan<ThingKind> WalkBlockers => Blockers;
@@ -861,7 +890,7 @@ public sealed partial class World {
     public void Gather(Thing t, float dt) {
         // A loose piece is a single pick-up; anything else the host works on for as long as the player holds on to it.
         if (Busy()) { ResetGather(); return; }
-        if (t.IsLoose ? Forwarded(Verb.PickUp, t.Id) : Remote) { S.Actor.GatherTarget = t.IsLoose ? 0 : t.Id; return; }
+        if (t.TakenWhole ? Forwarded(Verb.PickUp, t.Id) : Remote) { S.Actor.GatherTarget = t.TakenWhole ? 0 : t.Id; return; }
         // Set again below only while this gather stings.
         S.Actor.Stung = false;
         // A felled tree or a dug up bush is no longer there to work on.
@@ -869,6 +898,7 @@ public sealed partial class World {
         S.Actor.GatherTarget = t.Id;
         playerBusy = true;
         if (!Near(t)) { gatherClock = 0; return; }
+        if (t.IsPage) { Diary.PickUp(t); return; }
         var blocked = GatherBlock(t);
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
@@ -901,6 +931,7 @@ public sealed partial class World {
         Chip(t, tool);
         if (t.Kind == ThingKind.LeafSpot) LeafSpots.Gather(t, S.Backpack);
         Got(item);
+        if (Diary.HiddenIn(t.Kind) is var find and not DiaryFind.None) Diary.Roll(find, t.Pos);
     }
     private void PickUp(Thing t) {
         string item = ResourceItem(t);
@@ -2601,7 +2632,8 @@ public sealed partial class World {
         Lanterns.KeepInHand(S.Actor);
         Swings.Tick(dt);
         if (S.Actor.Id != LocalId) {
-            if (Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
+            // A guest's window sends the gather they hold until word that they are busy, such as with a find's pop-up, reaches it: until then it stops without a word.
+            if (!Occupied && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
             else S.Actor.Stung = false;
         }
         Holes.Work(dt);
@@ -2639,8 +2671,8 @@ public sealed partial class World {
         bool seekOre = !Remote && !Reached(Goals.OreSeen);
         // Only the look is remembered: no inventory, and no fire, heat or work, so nothing out of sight smokes or glows.
         foreach (var t in S.Things) {
-            // A firebug is never where it was last seen, so it leaves no memory.
-            if (!Sees(t.Pos) || t.Roams) continue;
+            // A firebug is never where it was last seen, and a page shows to one player: neither is part of the ground everyone remembers.
+            if (!Sees(t.Pos) || !t.TakesGround) continue;
             if (seekOre && t.IsDeposit && t.Remaining > 0) {
                 S.Milestones.Add(Goals.OreSeen);
                 seekOre = false;
@@ -2770,7 +2802,7 @@ public sealed partial class World {
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage) || !TreePlanting.ValidStage(t) || t.Rotation != 0 && (t.Kind is not (ThingKind.Crate or ThingKind.Barrel or ThingKind.Lantern) && !Data.Buildings.ContainsKey(t.Kind) || !Construction.ValidRotation(t.Kind, t.Rotation)))) throw new InvalidOperationException("Unsupported or incomplete save.");
         if (loaded.Wolves.Any(w => w == null || !WolfCounter.ValidSavedPath(w) || !WolfHunt.ValidSavedReaction(w)))
             throw new InvalidOperationException("This save holds an invalid wolf movement.");
-        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
+        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates) || !Diary.Valid(p, loaded)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;

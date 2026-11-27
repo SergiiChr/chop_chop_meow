@@ -40,6 +40,12 @@ public static class Style {
     public static readonly Font Head = Weighted("res://assets/fonts/Fredoka.ttf", 600);
     public static readonly Font Body = Weighted("res://assets/fonts/Nunito.ttf", 700);
     public static readonly Font Bold = Weighted("res://assets/fonts/Nunito.ttf", 800);
+    /// <summary>Handwriting, for the diary.</summary>
+    public static readonly Font Hand = Weighted("res://assets/fonts/Caveat.ttf", 500), HandBold = Weighted("res://assets/fonts/Caveat.ttf", 700);
+    /// <summary>The diary's ink.</summary>
+    public static readonly Color DiaryInk = new("3f4a5e");
+    /// <summary>The colour of the diary's paper in its cells.</summary>
+    public static readonly Color DiaryPaper = new("f3ead2");
 
     private static Font Weighted(string path, int weight) {
         var font = new FontVariation { BaseFont = GD.Load<FontFile>(path) };
@@ -141,6 +147,14 @@ public static class Style {
         button.AddThemeStyleboxOverride("normal", normal); button.AddThemeStyleboxOverride("hover", hover);
         button.AddThemeStyleboxOverride("pressed", pressed ?? hover); button.AddThemeStyleboxOverride("hover_pressed", pressed ?? hover);
         button.AddThemeStyleboxOverride("disabled", normal); button.AddThemeStyleboxOverride("focus", None);
+    }
+
+    /// <summary>Sets a panel on the enamel board in the middle of the screen, at a size it grows from both ways.</summary>
+    public static void Centered(PanelContainer panel, float width, float height) {
+        panel.AnchorLeft = .5f; panel.AnchorRight = .5f; panel.AnchorTop = .5f; panel.AnchorBottom = .5f;
+        panel.OffsetLeft = -width / 2; panel.OffsetRight = width / 2; panel.OffsetTop = -height / 2; panel.OffsetBottom = height / 2;
+        panel.GrowHorizontal = Control.GrowDirection.Both; panel.GrowVertical = Control.GrowDirection.Both;
+        panel.AddThemeStyleboxOverride("panel", Board);
     }
 
     /// <summary>Gives a button the rounded look of a job or action button in this colour.</summary>

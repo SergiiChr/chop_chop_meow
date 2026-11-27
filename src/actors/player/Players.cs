@@ -184,10 +184,12 @@ public sealed partial class World {
             // A stale move, of a job that has left that place in the list, is dropped rather than moving another job.
             case Verb.MoveJob: if (w != null && JobAt(w, new JobSpot(c.Target, c.Count)) is JobEntry moved && JobKey(moved) == c.Item) MoveJob(w, new JobSpot(c.Target, c.Count), new JobSpot((int)c.At.X, (int)c.At.Y)); break;
             case Verb.Settle: if (w != null) SettleDebt(w); break;
+            case Verb.TakePage: Diary.Take(); break;
+            case Verb.ReadDiary: Diary.Read(c.Count); break;
         }
         if (t == null) return;
         switch (c.Verb) {
-            case Verb.PickUp: if (t.IsLoose) Gather(t, 0); break;
+            case Verb.PickUp: if (t.TakenWhole) Gather(t, 0); break;
             case Verb.Pump: Pump(t); break;
             case Verb.FuelFire: FuelFire(t); break;
             case Verb.SetRecipe: SetRecipe(t, c.Item); break;

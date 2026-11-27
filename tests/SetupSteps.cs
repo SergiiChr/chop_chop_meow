@@ -126,6 +126,17 @@ internal static class SetupSteps {
     /// <summary>Starts one player's respawn timer, for the same reason.</summary>
     public static void SetRespawn(PlayerState player, float seconds) => player.RespawnIn = seconds;
 
+    /// <summary>Puts every part of the diary in a player's diary: two of them wait for the caves, which no play reaches yet.</summary>
+    public static void TakeEveryFind(PlayerState player) {
+        foreach (var def in DiaryFindDef.All) if (!player.DiaryFinds.Contains(def.Find)) player.DiaryFinds.Add(def.Find);
+    }
+
+    /// <summary>Lays a page fallen off a tree for a player: in play one falls one chop in twenty, which a check of the window cannot wait for.</summary>
+    public static Thing DropPage(World world, PlayerState player, Vector2 at) => world.Diary.Drop(player, at);
+
+    /// <summary>Brings up a find's pop-up for a player: in play it turns up one gather in twenty, which a check of the window cannot wait for.</summary>
+    public static void TurnUpFind(PlayerState player, DiaryFind find) => player.DiaryFinding = find;
+
     /// <summary>Marks goals as done: reaching them for real takes a whole playthrough.</summary>
     public static void Achieve(World world, params IEnumerable<string> milestones) => world.S.Milestones.UnionWith(milestones);
 

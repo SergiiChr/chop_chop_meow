@@ -50,6 +50,8 @@ public enum ThingKind {
     Nettle,
     Firebug,
     StrawBed,
+    FloatingPage,
+    FallenPage,
     Lantern,
 }
 
