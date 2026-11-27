@@ -28,6 +28,7 @@ public partial class Game {
         Require(Named("hardhat") != null, "The market must offer a hire button.");
         Require(Named("prices") == null && Named("sheet_close") == null && ShowsChild(panel, "buy_water"),
             "The price sheet must open with the trading post and have no separate toggle or close button.");
+        await ShowBackpack();
         int woodBefore = world.Backpack["wood"];
         await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith("Wood ·"))));
         Require(sign.Inventory.Count == 0 && world.Backpack["wood"] == woodBefore,
@@ -94,11 +95,12 @@ public partial class Game {
 
     private async Task CheckPriceSheetKeepsItsPlaceWhenFiltersOpen() {
         var resolution = GetWindow().ContentScaleSize;
-        // At the smallest supported size, the sheet has more prices than fit at once.
+        // At the smallest supported size, with the backpack open under the post, the sheet has more prices than fit at once.
         ApplyResolution(StartMenu.Resolutions[0]);
         var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
         await ClickOn(sign);
         await Click(Named("coins")!);
+        await ShowBackpack();
         var rows = (ScrollContainer)OnPage("price_rows")!;
         await Until(() => rows.GetVScrollBar().Visible, "the price sheet becoming scrollable", 2);
         await Wheel(rows.GetGlobalTransformWithCanvas() * (rows.Size / 2));

@@ -23,7 +23,13 @@ public abstract partial class PagePanel : VBoxContainer {
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
     }
 
-    public override void _Ready() => Build();
+    public override void _Ready() => BuildWithBackpack();
+
+    /// <summary>Builds the page, and under a page that has no backpack grid of its own a plain one, so the backpack works the same under every page.</summary>
+    private void BuildWithBackpack() {
+        Build();
+        if (!panel.Bag.Filled) BagGrid(null, BagHint);
+    }
 
     /// <summary>Fills the page from the world and what it keeps; runs when it opens and whenever it is drawn again.</summary>
     protected abstract void Build();
@@ -43,7 +49,7 @@ public abstract partial class PagePanel : VBoxContainer {
         live.Clear();
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
         panel.ClearFrame(redrawing: true);
-        Build();
+        BuildWithBackpack();
         Refresh(); panel.Bag.Refresh();
     }
 
@@ -83,9 +89,11 @@ public abstract partial class PagePanel : VBoxContainer {
             else batch(id);
         };
         panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, spared, hint, takes, wanted, BagColumns, use: UseFromBag, put: put, open: panel.OpenLantern));
-        panel.Bag.Visible = !panel.Bag.Dismissed;
+        panel.Bag.ShowIfOpened();
         if (StoresFromHotbar) panel.Bag.Store = batch;
     }
+    /// <summary>Whether opening this page opens the backpack under it: only the backpack's own page and storage, such as a chest or an opened crate, do.</summary>
+    public virtual bool OpensBackpack => false;
     /// <summary>Whether a Ctrl- or Shift-click on the hotbar moves items here as one in the backpack drawer does: true on pages about a building or an opened crate.</summary>
     protected virtual bool StoresFromHotbar => false;
     /// <summary>Whether the page takes the contents of a vessel while the vessel stays in the backpack.</summary>
