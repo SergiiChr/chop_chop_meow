@@ -2712,7 +2712,7 @@ public sealed partial class World {
     /// <summary>Whether a box exists and holds only positive counts of known items or of packed crates in <paramref name="crates"/>.</summary>
     private bool ValidInventory([NotNullWhen(true)] Inventory? box, Dictionary<int, Inventory> crates, bool canGrow = false) =>
         box?.Items != null && (!box.UnlimitedSlots || canGrow && box.Capacity == 0 && box.CarriedBy == Inventory.Carrier.None)
-        && ValidCounts(box.Items, crates) && box.ValidFirebugs();
+        && ValidCounts(box.Items, crates) && box.ValidUnits();
     /// <summary>Whether each packed crate holds positive counts of known items, no other crates, and no more than a crate fits.</summary>
     private bool ValidCrates(Dictionary<int, Inventory> crates) {
         foreach (var box in crates.Values) if (!ValidInventory(box, NoCrates) || box.Count > Data.CrateCapacity || Barrel.In(box) != null) return false;

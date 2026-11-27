@@ -10,6 +10,8 @@ public sealed class Lanterns(World world) {
     public const string Item = "lantern";
     public const string EmptyName = "Empty lantern";
     public const int Capacity = 10;
+    /// <summary>The firebugs a refill takes out of the backpack, kept to take without allocating.</summary>
+    private readonly Item[] refill = new Item[Capacity];
     private const string Prefix = Item + "_";
     private const int NumberLength = 8;
     private static readonly int HeaderLength = Prefix.Length + NumberLength;
@@ -149,8 +151,9 @@ public sealed class Lanterns(World world) {
             at: new Vector2(world.S.Backpack.PreferredSlot, 0))) return true;
         var bag = world.S.Backpack;
         if (placed == null && !bag.Layout.Exists(slot => slot.Item == item && slot.Held == 0)) return false;
-        int moved = bag.TakeFirebugs(expires.Slice(living, room));
+        int moved = bag.TakeUnits(Firebugs.Item, refill.AsSpan(0, room));
         if (moved == 0) { world.Say("No firebugs in your backpack."); return false; }
+        for (int i = 0; i < moved; i++) { expires[living + i] = refill[i].Expires; refill[i] = null!; }
         expires = expires[..(living + moved)];
         expires.Sort();
         var filled = WithFirebugs(id, expires);

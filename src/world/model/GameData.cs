@@ -23,6 +23,8 @@ public sealed class ItemDef {
     public float Thirst { get; set; }
     /// <summary>What the player says of it, shown under its name; empty for an item with nothing said of it.</summary>
     public string Description { get; set; } = "";
+    /// <summary>In-game days each unit lasts from when it is caught, or 0 for one that never expires.</summary>
+    public int LifeDays { get; set; }
 }
 public sealed class BuildingDef {
     public string Name { get; set; } = "";
@@ -245,7 +247,8 @@ public sealed partial class GameData {
         for (int liters = 1; liters <= Barrel.Capacity; liters++)
             data.Items.Add(BerryJam.Barrels[liters], new() { Name = $"Steel barrel ({liters} L berry jam)", Color = data.Items[Barrel.Item].Color });
         data.Validate();
-        Inventory.Unstacked.Clear();
+        Inventory.Unstacked.Clear(); Inventory.Expiring.Clear();
+        foreach (var (id, item) in data.Items) if (item.LifeDays > 0) Inventory.Expiring.Add(id);
         foreach (var (id, item) in data.Items) if (item.Tool != "" && id != Bucket.Item) Inventory.Unstacked.Add(id);
         // Empty buckets stack.
         // Filled vessels and barrels each take a cell.
@@ -290,7 +293,7 @@ public sealed partial class GameData {
         }
         if (Market.CratePrice <= 0 || Market.Goods.Any(p => p.Value.Price <= 0 || p.Value.Sells == null && p.Value.Buys == null))
             throw new InvalidOperationException("Invalid market in GameData: every good it lists has a price and is taken or sold, and the crate has a price.");
-        if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Hunger > 0 && !i.Food) || Market.Goods.Keys.Any(id => !Items.ContainsKey(id) || id == "coins" || id == "crate") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
+        if (Items.Values.Any(i => i.Speed <= 0 || i.LifeDays < 0 || i.Hunger < 0 || i.Thirst < 0 || i.Hunger > 0 && !i.Food) || Market.Goods.Keys.Any(id => !Items.ContainsKey(id) || id == "coins" || id == "crate") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in GameData.");
         if (Mine.Materials.Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Mine.StageWorkdays <= 0 || Mine.Seconds <= 0 || Mine.Workers <= 0 || Goals.DailyProfit <= 0 || Goals.ProfitDays <= 0)
             throw new InvalidOperationException("Invalid mine or goals in GameData.");

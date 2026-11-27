@@ -88,7 +88,7 @@ public sealed partial class GameData {
         ["nettle"] = new() { Name = "Nettle", Color = "5f8f3e", Description = "It stings but my grandma used to make ropes out of it." },
         ["nettle_rope"] = new() { Name = "Nettle rope", Color = "b9b27a" },
         ["bug_net"] = new() { Name = "Bug net", Color = "f4f6f6", Tool = "net", Description = "I can catch all kinds of bugs with this." },
-        ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Short but bright life" },
+        ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Short but bright life", LifeDays = 3 },
         ["coins"] = new() { Name = "Coins", Color = "e3b94a" },
     };
     public Dictionary<ThingKind, BuildingDef> Buildings { get; } = new() {
