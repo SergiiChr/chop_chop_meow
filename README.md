@@ -500,8 +500,10 @@ It opens onto the sea at the bottom of the screen, which cannot be drunk and is 
 Impassable mountain ranges close in from the left and right toward the valley's inland end, and a lake lies in the middle.
 You can wade 2 metres into the lake's shallows, and so can workers and wolves.
 Things can fall into the shallows and sink to the lake bed, except a page, which floats.
-Nothing is built there apart from a pump's intake: a building, a pump's handle, a cabin's ladder and the spots a
-furnace or packing table is worked from need dry ground.
+A building's middle stays 0.8 m back from the shore, so a large one, such as a cabin, may still reach a little over
+the shallows.
+Apart from that only a pump's intake goes in the water: a pump's handle, a cabin's ladder and the spots a furnace or
+packing table is worked from need dry ground.
 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
 Click a resource to see what it yields in read-only item slots with a count for each item.

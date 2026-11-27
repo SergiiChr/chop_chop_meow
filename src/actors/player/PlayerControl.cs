@@ -43,6 +43,8 @@ public sealed class PlayerControl {
     /// <summary>The placement on the cursor, with a turn that stays set while the pointer crosses the interface.</summary>
     private ClickMode? heldPlacement;
     private Thing? gathering;
+    /// <summary>Whether the gather the button holds has gone on past the click that started it.</summary>
+    private bool gatherHeld;
     private int digPress, digAttempt;
     private bool digDismissed;
     /// <summary>The spot under the mouse when this hold started, locked until it ends.</summary>
@@ -225,8 +227,10 @@ public sealed class PlayerControl {
             gathering = null;
             return direction;
         }
+        // A hold under way stops without a word when the player turns busy, such as with a find's pop-up: only a new click is told.
+        if (gatherHeld && world.Occupied) { world.ResetGather(); gathering = null; return direction; }
         // Emptying it shows on the bare bush or raked patch; a target that was already empty or out of reach still says why.
-        bool had = gathering.Remaining > 0; world.Gather(gathering, dt);
+        bool had = gathering.Remaining > 0; world.Gather(gathering, dt); gatherHeld = true;
         // A busy player is told once per click, not every frame the button is held.
         if (world.Occupied) { gathering = null; return direction; }
         if (world.GatherBlock(gathering) is string blocked) { if (!had || gathering.Remaining > 0) kit.Notify(blocked); gathering = null; }
@@ -349,7 +353,7 @@ public sealed class PlayerControl {
         // A firebug in the air takes no ground: a shovel digs the spot it hovers over.
         if (t is { Roams: true } && Mode is ClickMode.Dig) t = null;
         if (t?.IsResource == true || t?.IsPage == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) {
-            gathering = t;
+            gathering = t; gatherHeld = false;
             // A page has no page of its own to mark.
             if (!t.IsPage) panel.Mark(t);
         } else gathering = null;

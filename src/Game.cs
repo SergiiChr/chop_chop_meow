@@ -174,7 +174,7 @@ public partial class Game : Node, IGameFlow {
         };
         ui.AddChild(needsPlate); ui.AddChild(layerButton); ui.AddChild(damageEdges);
         recipeMap = new RecipeMap(kit, panel); panel.Map = recipeMap;
-        sheet = new ReadingSheet(kit); panel.Sheet = sheet;
+        sheet = new ReadingSheet(kit); panel.ReadingSheet = sheet;
         // A find taken opens the day it holds large, the first of them when it holds several, and leaves the diary itself closed.
         findPrompt = new FindPrompt(kit, find => {
             hotbar.StampDiaryOnFirstFind();

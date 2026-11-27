@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
@@ -14,6 +15,7 @@ public partial class Game {
         await TestClean(CheckARightClickWadesToTheLakePage);
         await TestClean(CheckAPageInTheShallowsFloatsOnTheWater);
         await TestClean(CheckTheDiaryGoalCountsPagesAndOpensTheDiary);
+        await TestClean(CheckAFindInAHeldGatherSaysNothingOfBeingBusy);
         await TestClean(CheckTheLastDaysWritingFallsApartWithNoMarkupShowing);
     }
 
@@ -126,5 +128,23 @@ public partial class Game {
         Require(sheet.Visible && sheet.Day == 45 && sheet.Reading.Contains("in the dark. I miss my") && !sheet.Reading.Contains('['),
             $"Day 45 must read on to where its writing falls apart, with no markup showing: \"{sheet.Reading}\".");
         await KeyStroke(Key.Escape); await CloseWithEsc();
+    }
+
+    private async Task CheckAFindInAHeldGatherSaysNothingOfBeingBusy() {
+        await CloseWithEsc();
+        var home = Hosted.Player;
+        var leaves = Hosted.Add(ThingKind.LeafSpot, home + Vector2.Down * 1.25f, World.LeavesPerSpot);
+        await Frames(2);
+        var press = RightPress(leaves.Pos);
+        await Until(() => view.PlayerAnimation == ActorAction.Gather, "holding RMB on the leaves gathering them by hand", 3);
+        TurnUpFind(HostedMe, DiaryFind.Leaves);
+        await Until(() => findPrompt.Visible, "a page turning up in the leaves being gathered", 3);
+        await Frames(6);
+        Require(!messages.Shown.Contains("You are busy."), $"A page turning up while the player holds on to a gather must not tell them they are busy: {string.Join(" | ", messages.Shown)}.");
+        RightRelease(press);
+        await TakeFind(10);
+        await KeyStroke(Key.Escape); await CloseWithEsc();
+        RemoveThings(Hosted, t => t == leaves);
+        Warp(Hosted, home); await Frames(4);
     }
 }

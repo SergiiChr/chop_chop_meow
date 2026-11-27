@@ -85,8 +85,8 @@ public static class Terrain {
     /// <summary>Units out over which the sea floor drops one unit.</summary>
     private const float SeaSlope = 8;
 
-    /// <summary>How far the ground lies below the valley floor: a bowl under the lake and a floor under the sea, each
-    /// falling from where walking stops, so the ground people walk on stays flat; zero everywhere else.</summary>
+    /// <summary>How far the ground lies below the valley floor: a bowl under the lake, falling from its shore, so whoever wades
+    /// its shallows stands a little down, and a floor under the sea, falling from where walking stops; zero everywhere else.</summary>
     public static float BedDepth(Vector2 p) {
         var offset = p - Lake;
         float reach = offset.Length() / Shore(MathF.Atan2(offset.Y, offset.X));

@@ -133,7 +133,7 @@ public partial class Hotbar : PanelContainer {
     private readonly (string Id, int Count, bool Active)?[] shownSlots = new (string, int, bool)?[9];
     public void Refresh() {
         var me = world.Me;
-        bool badgeShown = Diary.Started(me) && !(stampDiary && panel.Sheet.Visible);
+        bool badgeShown = Diary.Started(me) && !(stampDiary && panel.ReadingSheet.Visible);
         if (badgeShown != DiaryBadge.Visible) {
             DiaryBadge.Visible = badgeShown;
             if (badgeShown && stampDiary) Stamp();

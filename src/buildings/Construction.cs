@@ -10,9 +10,9 @@ namespace ChopChopMeow;
 /// or a crate cannot go somewhere, what building spends and what taking down gives back.
 /// </summary>
 public sealed class Construction(World world) {
-    /// <summary>How far back from the lake's shore a building, a yard and a cabin's door keep.</summary>
+    /// <summary>How far back from the lake's shore the middle of a building or a yard keeps, and a cabin's door.</summary>
     internal const float ShoreRoom = .8f;
-    /// <summary>Ground a building, a yard or a cabin's door can go on: open, and <see cref="ShoreRoom"/> back from the lake's shore.</summary>
+    /// <summary>Ground the middle of a building or a yard, or a cabin's door, can go on: open, and <see cref="ShoreRoom"/> back from the lake's shore.</summary>
     internal bool DryOpen(Vector2 p) => world.CanStand(p) && !Terrain.InLake(p, ShoreRoom);
     /// <summary>
     /// The spots each kind of building is worked from, relative to it as placed unturned, each with what refuses a placement that leaves it off dry, open ground:

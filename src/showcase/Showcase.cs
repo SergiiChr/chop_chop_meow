@@ -32,7 +32,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--diary-find")) me.DiaryFinding = DiaryFind.Leaves;
         world.Tick(0); view.Zoom = Launch.Number("--zoom", 1.8f);
         if (Launch.Has("--panel")) panel.Open(Page.Diary); else panel.Close();
-        if (Launch.Value("--diary-day") is string day) panel.Sheet.Open(int.Parse(day), quiet: true);
+        if (Launch.Value("--diary-day") is string day) panel.ReadingSheet.Open(int.Parse(day), quiet: true);
         if (Launch.Has("--hide-ui")) ui.Visible = false;
     }
 

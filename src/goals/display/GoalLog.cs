@@ -86,7 +86,7 @@ public partial class GoalLog : VBoxContainer {
         }
         // The diary's goal shows the diary, which opens as its badge in the bottom bar does.
         if (goal.Id == GoalId.Diary) {
-            var diary = Badge(DiaryPage.Glyph, "Diary", () => { CloseDetails(); leaveMenu(); openDiary(); });
+            var diary = Badge(DiaryPanel.Glyph, "Diary", () => { CloseDetails(); leaveMenu(); openDiary(); });
             diary.Name = "goal_diary";
             diary.AddThemeColorOverride("icon_normal_color", Style.Ink); diary.AddThemeColorOverride("icon_hover_color", Style.Ink); diary.AddThemeColorOverride("icon_pressed_color", Style.Ink);
             diary.AddThemeConstantOverride("icon_max_width", 26);

@@ -3,10 +3,10 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The diary's page in the side panel: a cell for each of its days, in order, that opens the day large to read again.
+/// The Diary in the side panel: a cell for each of the diary's days, in order, that opens the day large to read again.
 /// A day the player has not found shows a question mark on its page, and one they have not opened yet stands out.
 /// </summary>
-public partial class DiaryPage(PageTools tools) : PagePanel(tools) {
+public partial class DiaryPanel(PageTools tools) : PagePanel(tools) {
     public static readonly Texture2D Glyph = GD.Load<Texture2D>("res://assets/ui/line_diary.svg");
 
     protected override void Build() {
@@ -20,7 +20,7 @@ public partial class DiaryPage(PageTools tools) : PagePanel(tools) {
         room.AddChild(grid);
         for (int i = 0; i < DiaryDay.All.Length; i++) {
             int day = DiaryDay.All[i].Number;
-            var cell = new DiaryCell(i + 1, () => panel.Sheet.Open(day)) { Name = $"diary_day_{day}" };
+            var cell = new DiaryCell(i + 1, () => panel.ReadingSheet.Open(day)) { Name = $"diary_day_{day}" };
             grid.AddChild(cell);
             // A cell draws again only when its day is found or read.
             live.Watch(() => !Diary.Has(world.Me, day) ? DiaryCell.Look.Missing : Diary.Unread(world.Me, day) ? DiaryCell.Look.Unread : DiaryCell.Look.Read, cell.ShowAs);

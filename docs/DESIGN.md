@@ -172,7 +172,7 @@ UI and input:
 | `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
 | `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
-| `src/diary/display/DiaryPage.cs`, `src/diary/display/DiaryCell.cs`, `src/diary/display/ReadingSheet.cs`, `src/diary/display/FallingApart.cs`, `src/diary/display/FindPrompt.cs` | The Diary's page of paper cells, a day opened large to read with its writing falling apart where it says so, and the pop-up a find waits behind |
+| `src/diary/display/DiaryPanel.cs`, `src/diary/display/DiaryCell.cs`, `src/diary/display/ReadingSheet.cs`, `src/diary/display/FallingApart.cs`, `src/diary/display/FindPrompt.cs` | The Diary panel of paper cells, a day opened large to read with its writing falling apart where it says so, and the pop-up a find waits behind |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
@@ -1154,7 +1154,7 @@ with the Diary left closed.
 first find opened is open, and stamps it into the row as that day closes, so the stamp shows where the Diary is kept: it
 drops in large, tilted and faint, and settles with a small bounce.
 The badge shows a dot while a found day is unread (`Diary.AnyUnread`).
-`DiaryPage` lays out a `DiaryCell` for each day in order, four to a row: a torn scrap with the page's icon on it.
+`DiaryPanel` lays out a `DiaryCell` for each day in order, four to a row: a torn scrap with the page's icon on it.
 A found day is bright, with its place in the diary in black over the icon and a brick edge while it is not read.
 A day not found is greyed out, sheet and icon, with a faint question mark.
 `ReadingSheet` writes the day in Caveat on a white sheet in the page model's proportions (`PageShape.Tallness`), with
@@ -1177,7 +1177,8 @@ players, workers and wolves walk there, and their feet go down to the lake's bed
 the bed under it.
 Loose pieces and pages can land there: `WorldView` draws everything lying in the shallows on the lake's bed, except a
 page, which floats, a firebug, which flies, and a pump, whose intake is built into the water.
-Building cannot go there: a building keeps `Construction.ShoreRoom` back from the shore, and the spots it is worked
+Building keeps out of them: a building's middle keeps `Construction.ShoreRoom` back from the shore, so a large one's
+footprint may still reach over the shallows, and the spots it is worked
 from (`Construction.WorkSpots`) need `World.CanStandDry`: a pump's handle, a cabin's ladder, a furnace's glass blower
 and bellows spots and a packing table's packer spot.
 
