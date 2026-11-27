@@ -249,7 +249,8 @@ How they are framed:
 
 `ui/` holds hand-written SVG icons:
 
-- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, book, close, filter, stash and so on), tinted in code.
+- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, book, close, filter, stash,
+  the goal popup's trophy and so on), tinted in code.
 - `scribble_word.svg` and `scribble_line.svg`, the scribbles a diary day shows where its writing cannot be read: cursive
   loops and arches drawn by a one-off script, whose line, size and spacing go further wrong letter by letter, as
   writing in the dark does, ending in a stroke trailing down the page.
@@ -272,19 +273,53 @@ All three are variable fonts weighted in code.
 
 `music/` holds the ambient music as 192 kbps MP3.
 
-- `path_to_lake_land.mp3` and `mystic_theme.mp3` play in turn during the day.
-- `forest.mp3` plays at night.
+- Daytime plays `path_to_lake_land.mp3`, `mystic_theme.mp3`, `jazz_jazz_music.mp3`, `jazz_bar.mp3`, `lofi_soul.mp3` and
+  `groove_soul.mp3` in order.
+- Night plays `forest.mp3` and `soft_jazz.mp3` in order.
 
 Every ambient track is normalised to -18 LUFS integrated loudness with true peaks below -1 dBTP, so tracks switch without a jump in volume.
 Measure a new track with ffmpeg's `ebur128` filter, then apply the gain that brings it to the target.
 
 Credits: Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov)) and Augmentality (Brandon Morris).
 
+The following tracks are used under the [Pixabay Content License](https://pixabay.com/service/license-summary/).
+
+- `jazz_jazz_music.mp3` is [Jazz - Jazz Music](https://pixabay.com/music/traditional-jazz-jazz-jazz-music-630211/) by Andrii Hroza (andriih).
+- `jazz_bar.mp3` is [Jazz Bar](https://pixabay.com/music/traditional-jazz-jazz-bar-592657/) by Aurec.
+- `lofi_soul.mp3` is [Lofi Soul](https://pixabay.com/music/lofi-lofi-soul-588903/) by ZephiraMusic.
+- `groove_soul.mp3` is [Groove Soul](https://pixabay.com/music/funk-groove-soul-317798/) by The_Mountain.
+- `soft_jazz.mp3` is [Soft Jazz](https://pixabay.com/music/smooth-jazz-soft-jazz-621606/) by AtlasAudio.
+
+The campfire songs are [American Western Country](https://pixabay.com/music/modern-country-american-western-country-576992/)
+and [Country Music](https://pixabay.com/music/traditional-country-country-music-576986/), both by Monume on Pixabay.
+The full songs are Ogg Vorbis so they can start partway through when a listener comes within earshot.
+Both are normalised to -18 LUFS integrated loudness.
+
 ### Sound effects
 
 `sounds/` holds the sound effects as 320 kbps MP3, apart from the WAV of `sting_groan`, converted from the supplied files
 and peak-normalised.
 Variants of one sound are matched in loudness, and a numbered suffix marks them.
+
+The campfire's solo sounds are mono MP3s with the leading silence cut and short fades at the ends.
+The loudest 400 ms of each cut is brought to -22 LUFS.
+The originals come from Pixabay under the [Pixabay Content License](https://pixabay.com/service/license-summary/):
+
+- `campfire_drum_1` and `campfire_drum_2` are a single kick and the four-kick loop from LazyChillZone's
+  [Simple Drum Kick Loop](https://pixabay.com/sound-effects/musical-simple-drum-kick-loop-230756/).
+- `campfire_drum_3` is the whole [Drum Beat 02](https://pixabay.com/sound-effects/musical-drum-beat-02-36276/)
+  from freesound_community. `campfire_drum_4` is IFM123's
+  [Awesome Kick Drum](https://pixabay.com/sound-effects/musical-awesome-kick-drum-41824/).
+- `campfire_guitar_1` and `campfire_guitar_2` are u_op8btczor7's
+  [Guitar F Strum](https://pixabay.com/sound-effects/musical-guitar-f-strum-508252/) and
+  [Guitar C Strum](https://pixabay.com/sound-effects/musical-guitar-c-strum-504874/).
+- `campfire_guitar_3` and `campfire_guitar_4` are SOUND_GARAGE's
+  [Em Guitar Chord Strum 1](https://pixabay.com/sound-effects/musical-em-guitar-chord-strum-1-309534/) and
+  [Em Guitar Chord Strum 8](https://pixabay.com/sound-effects/musical-em-guitar-chord-strum-8-309539/).
+- `campfire_harmonica_1` through `campfire_harmonica_23` are individual chords from Samuel_Copier_Country's
+  [Cowboy with a Diatonic Harmonica](https://pixabay.com/sound-effects/musical-cowboy-with-a-diatonic-harmonica-267513/).
+  `campfire_harmonica_24` through `campfire_harmonica_35` are chords from the same artist's
+  [Wild West Harmonica](https://pixabay.com/sound-effects/musical-wild-west-harmonica-267552/).
 
 These were made with ffmpeg from Kenney's sounds:
 
@@ -303,6 +338,13 @@ These were made with ffmpeg from Kenney's sounds:
 `bucket_hit` is freefire66's [Bucket Hit](https://freesound.org/people/freefire66/sounds/175948/) from Freesound
 (CC0 1.0), also released on [Pixabay](https://pixabay.com/sound-effects/film-special-effects-bucket-hit-89027/).
 The Freesound preview is mixed to mono, trimmed to the hit and its decay, faded at both ends and peak-normalised.
+
+`goal_new` is universfield's "New notification 040"
+([Pixabay 493469](https://pixabay.com/sound-effects/technology-new-notification-040-493469/)).
+`goal_completed` is universfield's "New notification 067"
+([Pixabay 138695](https://pixabay.com/sound-effects/film-special-effects-new-notification-067-138695/)).
+Both are recordings supplied for this project.
+Each is mixed to mono, has the silence cut from its start, is faded at both ends and peak-normalised.
 
 `dig_earth`, `dig_toss` and `dig_up` are cut with ffmpeg from "Digging with shovel" by freesound_community (Pixabay 63069), a recording supplied for this project: four cuts of the blade going into soil, four of soil thrown off it and one heavy heave of earth for a stump or bush coming out.
 Each cut is faded at both ends, and the cuts of one sound are brought to one mean level.

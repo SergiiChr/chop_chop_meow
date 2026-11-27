@@ -80,6 +80,8 @@ public partial class Sounds : Node {
         ["sting_groan"] = -9,
         ["wolf_hit"] = -5.5f,
         ["bucket_hit"] = -6,
+        [GoalPopup.NewSound] = -3,
+        [GoalPopup.CompletedSound] = -10.5f,
     };
     /// <summary>
     /// Seconds into each variant at which it is loudest, for sounds whose loudest moment is timed onto what makes it, such
@@ -91,7 +93,8 @@ public partial class Sounds : Node {
     };
     private const float MusicDb = -14;
     public const float MusicFadeSeconds = 4;
-    private Track day = null!, night = null!;
+    private Playlist day = null!, night = null!;
+    private CampfireMusicAudio campfireMusic = null!;
     private readonly Dictionary<string, AudioStream[]> variants = new();
     private readonly Dictionary<string, int> previous = new();
     private Random random = new();
@@ -119,12 +122,17 @@ public partial class Sounds : Node {
 
     /// <summary>Music loudness from the options, 0 to 1.</summary>
     public float MusicVolume = 1;
+    internal bool CampfirePaused;
     public bool DayMusicPlaying => day.Player.Playing;
-    public int DayMusicIndex => day.Index;
+    public string DayMusicTrack => day.Name;
+    public float DayMusicPosition => day.Position;
     /// <summary>Jumps the current day track to its last moment, so it plays to its end without the wait.</summary>
-    public void SkipToDayTrackEnd() => day.Player.Seek((float)day.Player.Stream.GetLength() - .1f);
+    public void SkipToDayTrackEnd() => day.SkipToTrackEnd();
     public bool NightMusicPlaying => night.Player.Playing;
+    public string NightMusicTrack => night.Name;
     public float NightMusicPosition => night.Position;
+    /// <summary>Jumps the current night track to its last moment, so it plays to its end without the wait.</summary>
+    public void SkipToNightTrackEnd() => night.SkipToTrackEnd();
 
     // Players made while loading and reused in turn, so a sound instantiates nothing mid-game.
     private readonly List<AudioStreamPlayer> voices = new();
@@ -149,11 +157,16 @@ public partial class Sounds : Node {
             var voice = new AudioStreamPlayer(); AddChild(voice); heldVoices.Add(voice);
             heldPlacedVoices.Add(PlacedVoice());
         }
-        day = new Track(this, "path_to_lake_land", "mystic_theme");
-        night = new Track(this, "forest");
+        day = new Playlist(this, "path_to_lake_land", "mystic_theme",
+            "jazz_jazz_music", "jazz_bar", "lofi_soul", "groove_soul");
+        night = new Playlist(this, "forest", "soft_jazz");
+        campfireMusic = new CampfireMusicAudio(PlacedVoice, Reach);
+        World.Replaced += campfireMusic.Stop;
         // Loading a sound on its first play would stall that frame.
         foreach (string name in Levels.Keys) Variants(name);
     }
+
+    public override void _ExitTree() { if (campfireMusic != null) World.Replaced -= campfireMusic.Stop; }
 
     private AudioStreamPlayer3D PlacedVoice() {
         var voice = new AudioStreamPlayer3D { AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0, DopplerTracking = AudioStreamPlayer3D.DopplerTrackingEnum.Disabled };
@@ -166,12 +179,19 @@ public partial class Sounds : Node {
         UpdateHeld((float)delta);
     }
 
-    /// <summary>Fades the track for the current time of day in and the other out.</summary>
+    /// <summary>Crossfades day and night tracks, and gives nearby campfire songs room to be heard.</summary>
     public void UpdateMusic(float dt) {
         float volume = MusicDb + Db(MusicVolume);
-        day.Update(!World.Night, dt, volume);
-        night.Update(World.Night, dt, volume);
+        float soundtrack = campfireMusic.Update(World, CampfirePaused, MusicVolume, volume);
+        day.Update(World.Night ? 0 : soundtrack, dt, volume);
+        night.Update(World.Night ? soundtrack : 0, dt, volume);
     }
+
+    /// <summary>How far into the song the player hears, or how far the world's clock has reached outside its sound.</summary>
+    internal float CampfireSongTime(int fire, CampfireSong song) => campfireMusic.SongTime(World, fire, song);
+
+    /// <summary>How far into the solo the player hears, or how far the world's clock has reached outside its sound.</summary>
+    internal float CampfireSoloTime(int worker, CampfireSeatMusic seat) => campfireMusic.SoloTime(World, worker, seat);
 
     /// <summary>The inventory sound for moving an item by hand.</summary>
     public static string ForItem(string item) => item switch {
@@ -191,7 +211,8 @@ public partial class Sounds : Node {
     /// </summary>
     private float ReachOf(string name) => IsHowl(name) ? World.Data.HowlRadius : name == "wolf_growl_distance" ? 2 * World.Data.WolfSightRange : Reach;
     // A howl keeps its pitch, so it lasts exactly as long as the wolf holds its howl, and the mortar's, so its tap lands as the pestle comes down.
-    private static bool KeepsPitch(string name) => IsHowl(name) || name == "grind_mortar";
+    // The goal popups' chimes keep theirs, since they are short tunes.
+    private static bool KeepsPitch(string name) => IsHowl(name) || name is "grind_mortar" or GoalPopup.NewSound or GoalPopup.CompletedSound;
     /// <summary>The volume scale of the last sound started, from one at full volume.</summary>
     public float LastFade { get; private set; }
     /// <summary>Whether the last sound started plays from a place in the world, panning with it.</summary>
@@ -367,6 +388,7 @@ public partial class Sounds : Node {
     public void StopAll() {
         silenced = true;
         ProcessMode = ProcessModeEnum.Disabled;
+        campfireMusic.Stop();
         foreach (var player in GetChildren().OfType<AudioStreamPlayer>()) player.Stop();
         foreach (var player in placedVoices) player.Stop();
         foreach (var player in heldPlacedVoices) player.Stop();
@@ -378,29 +400,32 @@ public partial class Sounds : Node {
     /// Its tracks play in order and wrap to the first after the last; a single track loops seamlessly.
     /// It pauses rather than stopping because starting an MP3 partway through decodes it from the beginning, which stalls the frame for longer the further in it starts.
     /// </summary>
-    private sealed class Track {
+    private sealed class Playlist {
         public readonly AudioStreamPlayer Player;
         private readonly AudioStreamMP3[] streams;
         private float level, at;
         private bool started;
-        public int Index { get; private set; }
+        private int index;
+        public string Name => System.IO.Path.GetFileNameWithoutExtension(Player.Stream.ResourcePath);
         public float Position => Player.Playing ? Player.GetPlaybackPosition() : at;
 
-        public Track(Node parent, params string[] names) {
+        public Playlist(Node parent, params string[] names) {
             streams = names.Select(name => GD.Load<AudioStreamMP3>($"res://assets/music/{name}.mp3")).ToArray();
             streams[0].Loop = streams.Length == 1;
             Player = new AudioStreamPlayer { Stream = streams[0] };
             parent.AddChild(Player);
         }
 
-        public void Update(bool wanted, float dt, float volume) {
-            level = Mathf.MoveToward(level, wanted ? 1 : 0, dt / MusicFadeSeconds);
+        public void SkipToTrackEnd() => Player.Seek((float)Player.Stream.GetLength() - .1f);
+
+        public void Update(float wanted, float dt, float volume) {
+            level = Mathf.MoveToward(level, wanted, dt / MusicFadeSeconds);
             if (level > 0) {
                 if (Player.StreamPaused) Player.StreamPaused = false;
                 else if (!Player.Playing) {
                     // A player that has started and is neither playing nor paused has reached the end of its track, so the next one follows.
                     // The player's own finished signal comes too late for this: it fires after this update has already started the track again.
-                    if (started) { Index = (Index + 1) % streams.Length; Player.Stream = streams[Index]; }
+                    if (started) { index = (index + 1) % streams.Length; Player.Stream = streams[index]; }
                     Player.Play(); started = true;
                 }
             } else if (Player.Playing) {

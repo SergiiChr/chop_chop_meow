@@ -165,7 +165,7 @@ public sealed class DoorTug(World world) {
     /// <summary>A wolf holding the acting player's arm bites it once, when its last bite is a second behind it.</summary>
     private void BiteArm(Wolf wolf) {
         if (wolf.SideBitten || wolf.Attack > 0) return;
-        wolf.SideBitten = true; world.S.Actor.Health -= world.Data.WolfBite; world.Play("wolf_bite", world.Player);
+        wolf.SideBitten = true; world.HurtPlayer(world.Data.WolfBite); world.Play("wolf_bite", world.Player);
     }
 
     /// <summary>Whether no wolf can take a side of the acting player: another holds it, or it has no open ground.</summary>

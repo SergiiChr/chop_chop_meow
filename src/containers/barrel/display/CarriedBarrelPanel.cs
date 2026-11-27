@@ -31,7 +31,7 @@ public partial class CarriedBarrelPanel(PageTools tools, int barrelSlot) : PageP
                     world.FromHeldStack(() => world.MoveInBarrel(barrel, stack.Item, Math.Min(units, stack.Count), true, barrelSlot));
             }),
         };
-        BarrelPanel.ShowContents(live, cell, count, () => Barrel.LiquidOf(Unit), () => Barrel.Liters(Unit),
+        BarrelPanel.ShowContents(world.Data, live, cell, count, () => Barrel.LiquidOf(Unit), () => Barrel.Liters(Unit),
             "LMB: take 1 L · Shift or Ctrl: fill backpack vessels");
         Well(new HBoxContainer()).AddChild(cell);
         AddButton("Put it down", () => { if (Item is string barrel) panel.Player.PlaceContainer(barrel, barrelSlot); });

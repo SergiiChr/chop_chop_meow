@@ -14,6 +14,7 @@ using static WorldSteps;
 public static class AllocationChecks {
     public static void Run(GameData data) {
         Test(CheckWalkingAFreshValleyAllocatesNothing, data);
+        Test(FoodEffectChecks.ActiveFoodEffectsAllocateNothing, data);
         Test(CheckHoldingAStackFromAChestAllocatesNothing, data);
         Test(CheckWalkingAGravelPathAllocatesNothing, data);
         Test(PlumbingAllocationChecks.CheckPumpingIntoTwoBarrelsStaysWithinAllocationBudget, data);

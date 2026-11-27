@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The review fixtures behind <c>--showcase</c> and its flags: settled scenes for screenshots, separate from a playable game.</summary>
-public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit) {
+public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit, GoalPopup goalPopup) {
     /// <summary>
     /// Diary review: the player on the lake's shore by its floating page, with a page lying on the ground beside them and three finds in their diary, two of whose days are unread.
     /// <c>--diary-fall</c> drops that page off the oak beside them a second in instead, since a player has one fallen page at a time.
@@ -59,10 +59,27 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     }
     private void Press(string button) => panel.FindChild(button, true, false).EmitSignal(BaseButton.SignalName.Pressed);
 
-    /// <summary>Sets up the scene the flags ask for; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    /// <summary>Sets up the scene the flags ask for, which pops up no goals it sets by hand.</summary>
     public void Run() {
+        Stage();
+        // A scene's goals are set by hand, not reached in play, so they pop up nothing.
+        // With --goal-popup the bench is reached after that: "A start" pops up as completed, then "Road to riches" as new.
+        // The default scene has sold goods already, which would complete Road to riches as it appears.
+        bool popup = Launch.Has("--goal-popup") && world.S.Milestones.Remove("bench");
+        if (popup) world.S.Milestones.Remove("sold");
+        goalPopup.SkipKnownGoals();
+        if (popup) world.S.Milestones.Add("bench");
+    }
+
+    /// <summary>Builds the scene; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    private void Stage() {
         if (Launch.Value("--straw-bed") is string bedPose) { StrawBedScene(bedPose); return; }
+        if (Launch.Value("--campfire-music") is string music) { CampfireMusicScene(music); return; }
         Place();
+        if (Launch.Has("--food-effects")) {
+            world.S.Backpack.Add("meat_stew", 1); world.Consume("meat_stew");
+            world.S.Backpack.Add("canned_jam", 1); world.Consume("canned_jam");
+        }
         view.Zoom = Launch.Number("--zoom", view.Zoom);
         if (Launch.Value("--doorway") is string scene) {
             var cabin = world.Things.First(t => t.Kind == ThingKind.Hut);
@@ -71,6 +88,42 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             if (Launch.Has("--panel")) panel.Select(cabin);
         }
         if (Launch.Value("--wolf-scene") is string wolves) view.AddChild(new WolfReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = wolves });
+    }
+
+    /// <summary>Seats the trio and a listener, or one instrumentalist for a solo with or without its ordinary wait.</summary>
+    private void CampfireMusicScene(string music) {
+        var at = Terrain.Spawn + new Vector2(1, -3);
+        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 12);
+        var fire = world.Add(ThingKind.Campfire, at);
+        world.ClearGround(fire);
+        var post = world.Add(ThingKind.Signpost, at + Vector2.Left * 7);
+        world.S.Backpack.Add(Inventory.Coins, 500);
+        world.Player = post.Pos + Vector2.One;
+        // The solo seeds pick a held harmonica chord, a guitar strum and a four-kick drum loop.
+        world.CampfireMusic.Seed(music switch { "harmonica" => 37, "guitar" or "guitar-perch" => 16, "drum" => 1, _ => 374 });
+        // An even-numbered worker perches so both guitar holds can be seen in close-up.
+        if (music == "guitar-perch" && world.S.NextId % 2 != 0) world.S.NextId++;
+        bool trio = music == "trio";
+        int count = trio ? 4 : 1;
+        for (int i = 0; i < count; i++)
+            if (world.Hire(post, world.Data.HireOffers[1]) is Worker worker)
+                worker.Pos = at + Vector2.FromAngle(i * Mathf.Tau / BreakSeats.FireSeats) * BreakSeats.FireRadius;
+        world.Player = at + new Vector2(3.2f, 3.2f);
+        bool wholeVisit = Launch.Has("--campfire-visit");
+        for (int i = 0; i < 600; i++) {
+            world.Tick(1f / 60);
+            if (trio) {
+                if (world.CampfireMusic.SongAt(fire.Id).Track != 0) break;
+            } else {
+                var seat = world.CampfireMusic.SeatOf(world.Workers[0]);
+                if (wholeVisit ? seat.Fire != 0 : seat.Solo != 0) break;
+            }
+        }
+        if (trio) { view.CameraTurn = 135; view.CameraPitch = 35; }
+        AimAt(trio ? at : world.Workers[0].Pos);
+        view.Zoom = Launch.Number("--zoom", trio ? 2.8f : 4.6f);
+        panel.Close();
+        if (Launch.Has("--hide-ui")) ui.Visible = false;
     }
 
     /// <summary>A straw bed at the game camera, with a model or sleep pose to inspect.</summary>

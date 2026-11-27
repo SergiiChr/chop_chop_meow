@@ -11,8 +11,12 @@ namespace ChopChopMeow;
 /// A swing of a bug net catches those in its sweep and sends the others near it darting.
 /// </summary>
 public sealed class Firebugs(World world) {
-    /// <summary>Firebugs that come out as night falls; one more follows after each hour of the night.</summary>
+    /// <summary>Clusters of firebugs that come out as night falls, with one more after each hour of the night.</summary>
     public const int AtNightfall = 8;
+    /// <summary>The chance a cluster has three firebugs, or else two or one at even odds.</summary>
+    public const float ThreeChance = .25f;
+    /// <summary>Metres from a cluster's first firebug within which the others come out.</summary>
+    public const float ClusterRadius = 1;
     public const string Item = "firebug";
     internal float NewExpiry => world.Time + world.Data.Items[Item].LifeDays * world.Data.DaySeconds;
     private float nextExpiry = float.PositiveInfinity;
@@ -87,7 +91,7 @@ public sealed class Firebugs(World world) {
     private readonly Dictionary<int, Flight> flights = new();
     private readonly List<Thing> caught = new();
     private const int Seed = 2203;
-    /// <summary>More than the firebugs a night lets out, so no two of any nights share a seed.</summary>
+    /// <summary>More than the clusters a night lets out, so no two of any nights share a seed.</summary>
     private const int PerNightSeeds = 64;
     // Which way a startled firebug swerves. Seeded, and started again with each world, so a recording of a night plays the same every time.
     private Random swerves = new(Seed);
@@ -120,11 +124,26 @@ public sealed class Firebugs(World world) {
         }
         if (!world.QuietNights) {
             int due = AtNightfall + (int)((world.DayPhase - world.Data.NightStarts) * 24);
-            // Each firebug's place is seeded by the day and its turn, so a night loaded part way lets the rest out where they would have come anyway, and no night repeats another.
-            for (; s.FirebugsOut < due; s.FirebugsOut++)
-                if (world.UnseenSpot(new Random(Seed + world.Day * PerNightSeeds + s.FirebugsOut), Free) is Vector2 spot) world.Add(ThingKind.Firebug, spot, 1);
+            // Each cluster is seeded by the day and its turn, so a night loaded part way lets the rest out where they would have come anyway, and no night repeats another.
+            for (; s.FirebugsOut < due; s.FirebugsOut++) LetOut(new Random(Seed + world.Day * PerNightSeeds + s.FirebugsOut));
         }
         foreach (var bug in bugs) Fly(bug, dt);
+    }
+
+    /// <summary>
+    /// Lets one cluster out at a random spot: three firebugs at <see cref="ThreeChance"/>, otherwise two or one.
+    /// The others come out within <see cref="ClusterRadius"/> of the first, seen or not, and one whose spot is not
+    /// <see cref="Free"/> is left out.
+    /// </summary>
+    private void LetOut(Random random) {
+        if (world.UnseenSpot(random, Free) is not Vector2 first) return;
+        world.Add(ThingKind.Firebug, first, 1);
+        int size = random.NextDouble() < ThreeChance ? 3 : random.Next(1, 3);
+        for (int i = 1; i < size; i++) {
+            // The square root spreads them evenly over the circle instead of crowding its middle.
+            var spot = first + Vector2.Right.Rotated((float)random.NextDouble() * MathF.Tau) * ClusterRadius * MathF.Sqrt((float)random.NextDouble());
+            if (Free(spot)) world.Add(ThingKind.Firebug, spot, 1);
+        }
     }
 
     /// <summary>Lets no more firebugs out tonight; those already out stay.</summary>

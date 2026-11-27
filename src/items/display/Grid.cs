@@ -120,7 +120,11 @@ public partial class PagePanel {
             cell.AddThemeStyleboxOverride("normal", takes || bound ? Style.SlotWanted : Style.SlotNormal);
             string clicks = open != null && stack is (string itemToOpen, _) && Lanterns.IsItem(itemToOpen)
                 ? "LMB: pick up · RMB: open for refill · Double LMB: take in hand or stow" : hint;
-            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named, held)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}{PageText.FirebugLifeLine(life)}\n{clicks} · {RecipeMap.AltClickHint}" : "";
+            cell.Popup = null;
+            if (stack is not (string named, _)) { cell.TooltipText = ""; return; }
+            string title = contents != null ? world.Describe(named, held) : $"{world.Describe(named, held)} · {held[named]} total";
+            if (FoodDescription.Of(world.Data, named, held) is ItemDef food) FoodDescription.SetTooltip(cell, title, FoodDescription.Eaten(named, held), food);
+            else cell.TooltipText = $"{title}{world.Data.DescriptionLine(named)}{PageText.FirebugLifeLine(life)}\n{clicks} · {RecipeMap.AltClickHint}";
         }
     }
 

@@ -29,6 +29,8 @@ public sealed partial class GameData {
     public MineDef Mine { get; } = new() { Materials = new() { ["wood"] = 50, ["iron_bar"] = 10, ["stone"] = 50 }, StageWorkdays = 1, Seconds = 1.6f, Workers = 3 };
     public FarmDef Farm { get; } = new() { Sow = new() { ["wheat_seeds"] = 1, ["fertilizer"] = 1 }, GrowDays = 3, HarvestWorkdays = 1, Yield = new() { ["wheat"] = 4, ["wheat_seeds"] = 2, ["grass"] = 1 } };
     public GoalsDef Goals { get; } = new() { DailyProfit = 1300, ProfitDays = 7 };
+    private static readonly FoodEffect[] StewFoodEffects = [FoodEffect.WellFed, FoodEffect.ProteinRecovery];
+    private static readonly FoodEffect[] JamFoodEffects = [FoodEffect.Vitamins, FoodEffect.CarbLoad];
     public Dictionary<string, ItemDef> Items { get; } = new() {
         ["wood"] = new() { Name = "Wood", Color = "af8053" },
         ["acorn"] = new() { Name = "Acorn", Color = "a46a36" },
@@ -59,7 +61,7 @@ public sealed partial class GameData {
         [Water.Empty] = new() { Name = "Empty bottle", MapName = "Bottle", Color = "a8bdc3" },
         [Water.Liquid] = new() { Name = "Water", Color = "88cbe0" },
         ["raw_meat"] = new() { Name = "Raw meat", Color = "c4524a", Food = true },
-        ["burnt_steak"] = new() { Name = "Burnt steak", Color = "5e3b25", Food = true, Hunger = 40 },
+        ["burnt_steak"] = new() { Name = "Burnt steak", Color = "5e3b25", Food = true, Hunger = 40, FoodEffects = [FoodEffect.ProteinRecovery] },
         ["tin_ore"] = new() { Name = "Tin ore", Color = "c7c9c2" },
         ["tin_bar"] = new() { Name = "Tin bar", Color = "f1f2ec" },
         ["tin_sheet"] = new() { Name = "Tin sheet", Color = "e4e7e2" },
@@ -74,12 +76,12 @@ public sealed partial class GameData {
         ["wheat"] = new() { Name = "Wheat", Color = "e2c25b", Food = true },
         ["flour"] = new() { Name = "Flour", Color = "f2ece0", Food = true },
         ["dough"] = new() { Name = "Dough", Color = "efdcb0", Food = true },
-        ["bread"] = new() { Name = "Bread", Color = "c98a45", Food = true, Hunger = 12 },
+        ["bread"] = new() { Name = "Bread", Color = "c98a45", Food = true, Hunger = 12, FoodEffects = [FoodEffect.CarbLoad] },
         ["crushed_berries"] = new() { Name = "Crushed berries", Color = "b8434f", Food = true, Hunger = BerryJam.CrushedHunger },
-        [BerryJam.Liquid] = new() { Name = "Berry jam", Color = BerryJam.Color },
-        ["meat_stew"] = new() { Name = "Meat stew", Color = "8f5a33", Food = true, Hunger = 60, Thirst = 15 },
-        ["canned_jam"] = new() { Name = "Canned jam", Color = BerryJam.Color, Food = true, Hunger = BerryJam.CannedHunger },
-        ["canned_meat_stew"] = new() { Name = "Canned meat stew", Color = "a8643a", Food = true, Hunger = 60, Thirst = 15 },
+        [BerryJam.Liquid] = new() { Name = "Berry jam", Color = BerryJam.Color, FoodEffects = JamFoodEffects },
+        ["meat_stew"] = new() { Name = "Meat stew", Color = "8f5a33", Food = true, Hunger = 60, Thirst = 15, FoodEffects = StewFoodEffects },
+        ["canned_jam"] = new() { Name = "Canned jam", Color = BerryJam.Color, Food = true, Hunger = BerryJam.CannedHunger, FoodEffects = JamFoodEffects },
+        ["canned_meat_stew"] = new() { Name = "Canned meat stew", Color = "a8643a", Food = true, Hunger = 60, Thirst = 15, FoodEffects = StewFoodEffects },
         [Barrel.Item] = new() { Name = "Steel barrel", Color = "657e92" },
         [Bucket.Item] = new() { Name = "Steel bucket", Color = "8a9ca5", Tool = Bucket.Item },
         ["crate"] = new() { Name = "Wood crate", Color = "c9a46e" },

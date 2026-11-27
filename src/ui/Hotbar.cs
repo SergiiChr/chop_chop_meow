@@ -161,9 +161,16 @@ public partial class Hotbar : PanelContainer {
             else badge.SetStack(count, bugs);
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(Vessels.LookOf(world.Data, world.S.Backpack, id));
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
-            string clicks = lantern ? "LMB: select · RMB: open for refill · Double LMB: take in hand or stow" : "LMB: select · RMB or Double LMB: use";
-            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Describe(id, world.S.Backpack)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}{PageText.FirebugLifeLine(life)}\n{clicks}";
-            if (!building && id.Length > 0) button.TooltipText += $"\n{RecipeMap.AltClickHint}";
+            string title = $"Hotbar slot {slot + 1}";
+            button.Popup = null;
+            if (id.Length == 0) button.TooltipText = $"{title} · empty · put an item or plan here";
+            else if (FoodDescription.Of(world.Data, id, world.S.Backpack) is ItemDef food)
+                FoodDescription.SetTooltip(button, $"{title} · {world.Describe(id, world.S.Backpack)} · {count} carried", FoodDescription.Eaten(id, world.S.Backpack), food);
+            else {
+                string clicks = lantern ? "LMB: select · RMB: open for refill · Double LMB: take in hand or stow" : "LMB: select · RMB or Double LMB: use";
+                button.TooltipText = $"{title} · {world.Describe(id, world.S.Backpack)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}{PageText.FirebugLifeLine(life)}\n{clicks}";
+                if (!building) button.TooltipText += $"\n{RecipeMap.AltClickHint}";
+            }
             // The selected slot gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.SlotWanted : Style.SlotNormal);

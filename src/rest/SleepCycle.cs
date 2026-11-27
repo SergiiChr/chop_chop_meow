@@ -14,7 +14,8 @@ public sealed class SleepCycle(World world) {
     private const int TargetRate = 12;
     private const float SleepStep = 1f / World.TicksPerSecond;
     private static readonly TimeSpan WorkBudget = TimeSpan.FromMilliseconds(4);
-    private bool speedingUp;
+    /// <summary>Whether ordinary ticks currently have extra steps to reach dawn.</summary>
+    internal bool SpeedingUp { get; private set; }
     /// <summary>Whether the speed-up or the skip to dawn is running steps of its own: they stay silent and do not count as time played.</summary>
     internal bool AdvancingTime { get; private set; }
     internal bool Recovering { get; private set; }
@@ -29,7 +30,7 @@ public sealed class SleepCycle(World world) {
         Math.Max(0, Math.Min((hunger - threshold) / world.Data.HungerPerSecond, (thirst - threshold) / world.Data.ThirstPerSecond));
 
     /// <summary>Needs at the next dawn or at the earlier moment a need runs out, if the player slept now.</summary>
-    public (float Seconds, float Health, float Hunger, float Thirst) Preview(Thing place) {
+    public (float Seconds, float Health, float Hunger, float Thirst, float BonusHealth) Preview(Thing place) {
         var p = world.S.Actor;
         bool cabin = p.Sheltered == place.Id && place.Kind == ThingKind.Hut;
         float seconds = SecondsToDawn;
@@ -39,11 +40,9 @@ public sealed class SleepCycle(World world) {
         float loss = duration * world.Data.ThirstPerSecond;
         float thirstAtWake = cabin ? world.BedtimeWater.Preview(p, loss, duration == seconds || OthersAsleep(p)).Dawn
             : Math.Max(0, thirst - loss);
-        return (duration, Healed(p, duration, thirst), Math.Max(0, p.Hunger - duration * world.Data.HungerPerSecond), thirstAtWake);
+        var (health, bonus) = FoodEffects.HealthAfter(p, duration, Math.Min(duration, SecondsFed(p.Hunger, thirst, FedNeed)));
+        return (duration, health, Math.Max(0, p.Hunger - duration * world.Data.HungerPerSecond), thirstAtWake, bonus);
     }
-
-    private float Healed(PlayerState p, float dt, float thirst) =>
-        Math.Min(100, p.Health + Math.Min(dt, SecondsFed(p.Hunger, thirst, FedNeed)) * HealPerSecond);
 
     /// <summary>Why the acting player cannot go to sleep at this place right now.</summary>
     public string? Block(Thing place) {
@@ -83,9 +82,9 @@ public sealed class SleepCycle(World world) {
         WakeActor("You wake up.");
     }
 
-    internal void Heal(float dt) {
+    internal float HealingSeconds(float dt) {
         var p = world.S.Actor;
-        if (p.SleepingAt != 0 && p.Health < 100) p.Health = Healed(p, dt, p.Thirst);
+        return p.SleepingAt == 0 ? 0 : Math.Min(dt, SecondsFed(p.Hunger, p.Thirst, FedNeed));
     }
 
     internal void WakeActor(string reason) {
@@ -106,7 +105,7 @@ public sealed class SleepCycle(World world) {
         if (dawn) {
             if (!SomeoneAsleep()) return;
             var cabins = world.BedtimeWater.Occupants();
-            if (!speedingUp && !Recovering) world.BedtimeWater.FillBottles(cabins);
+            if (!SpeedingUp && !Recovering) world.BedtimeWater.FillBottles(cabins);
             world.BedtimeWater.ServeThirst(cabins);
             foreach (var p in world.Players) p.SleepingAt = 0;
             AnnounceDawn();
@@ -152,12 +151,12 @@ public sealed class SleepCycle(World world) {
 
     /// <summary>Adds ordinary simulation steps to a frame, leaving time for the next network update or draw.</summary>
     internal void Accelerate(float elapsed) {
-        if (!CanAccelerate()) { speedingUp = false; return; }
+        if (!CanAccelerate()) { SpeedingUp = false; return; }
         if (elapsed <= 0) return;
         long began = Stopwatch.GetTimestamp();
-        if (!speedingUp) {
+        if (!SpeedingUp) {
             world.BedtimeWater.FillBottles(world.BedtimeWater.Occupants());
-            speedingUp = true;
+            SpeedingUp = true;
         }
         // Do not accumulate work during a slow frame: do what fits now and leave the next frame its own budget.
         float extra = Math.Min(elapsed, SleepStep) * (TargetRate - 1);
@@ -172,7 +171,7 @@ public sealed class SleepCycle(World world) {
         } finally {
             AdvancingTime = false;
         }
-        if (!CanAccelerate()) speedingUp = false;
+        if (!CanAccelerate()) SpeedingUp = false;
     }
 
     /// <summary>Advances to dawn from the recovery screen when nobody is able to play.</summary>

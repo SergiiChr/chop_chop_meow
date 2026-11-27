@@ -269,8 +269,10 @@ public partial class RecipeMap : Control {
         string status = building?.Kind == ThingKind.Mine ? "Discovered" : building == null ? "Made before" : "Built before";
         var known = Style.Pill(status, Style.Tag(Style.Sage), Style.SlotFill, 12);
         known.SizeFlagsHorizontal = SizeFlags.ShrinkBegin; identity.AddChild(known);
-        var description = building is MapBuilding plan ? data.Buildings[plan.Kind].Description : data.Items[item].Description;
-        if (description is { Length: > 0 } said) {
+        var description = building is MapBuilding plan ? data.Buildings[plan.Kind].Description : data.DescriptionOf(item);
+        if (building == null && FoodDescription.Of(data, item) is ItemDef food)
+            details.AddChild(FoodDescription.Body(item, food, 14, Style.Ink));
+        else if (description is { Length: > 0 } said) {
             var text = Style.Text(said, 14, Style.Ink, wrap: true); text.Name = "detail_text"; details.AddChild(text);
         }
 

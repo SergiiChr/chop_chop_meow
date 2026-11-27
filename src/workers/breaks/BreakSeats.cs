@@ -12,7 +12,8 @@ namespace ChopChopMeow;
 internal sealed class BreakSeats(World world) {
     internal const int FireSeats = 6;
     private const int GroupSeats = 3;
-    private const float FireRadius = 1.4f, GroupRadius = .8f, SeatGap = .9f;
+    internal const float FireRadius = 1.4f;
+    private const float GroupRadius = .8f, SeatGap = .9f;
     private const int GroundSearch = 8;
 
     private readonly record struct Seat(Vector2 Position, Vector2 Center, Thing? Fire = null);
@@ -211,7 +212,10 @@ internal sealed class BreakSeats(World world) {
             LunchStatus(w);
         }
         w.Pos = seat.Position;
-        if (seat.Fire != null) Kindle(seat.Fire);
+        if (seat.Fire != null) {
+            Kindle(seat.Fire);
+            if (!world.Lunch) world.CampfireMusic.Sit(w, seat.Fire);
+        }
         w.LunchHeading = (seat.Center - seat.Position).Angle();
         w.WorkState = seat.Fire != null && w.Id % 2 == 0 ? WorkerWorkState.Perching : WorkerWorkState.Resting;
     }

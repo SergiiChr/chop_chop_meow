@@ -57,10 +57,13 @@ Play accepts Godot arguments after `--`:
 | --- | --- |
 | `--showcase` | Load a populated review fixture instead of a fresh game |
 | `--showcase --wolves` | Add a night ambush to that fixture |
+| `--showcase --food-effects` | Show all four food effects under the needs plate, with second laps on health and hunger |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
+| `--showcase --campfire-music trio` | Show idle workers playing guitar, harmonica and drum at the same campfire, with a listener. Use `guitar`, `guitar-perch`, `harmonica` or `drum` to see one worker get ready to play alone. Add `--campfire-visit` to include the worker's wait before the first solo |
 | `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
+| `--showcase --goal-popup` | Reach the bench in the default fixture, with no goods sold yet, so **A start** pops up as completed and then **Road to riches** as new |
 | `--showcase --diary` | Show the player on the lake's shore beside its floating page, with a page lying on the ground and three finds in the diary, two of their days unread; `--diary-fall` drops that page off the oak beside them a second in instead, `--panel` opens the Diary, `--diary-day 45` opens that day large, `--diary-find` shows the pop-up of a page found in leaves and `--diary-first` leaves the diary empty and no page on the ground, so the next find is the first |
 | `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes in their five stages with plain bushes, stumps, a tree about to fall and a shovel to dig with |
@@ -232,6 +235,9 @@ Click a target to open its panel.
 
 Health, hunger and thirst are three upright vials in the top-left corner with a heart, a stomach and a droplet under them.
 Each empties as its level falls and turns red at 25% or less.
+Bonus health continues the health bar in a brighter color. Only the part past 100% wraps to the bottom for a second lap.
+Hunger over 100% also wraps to a brighter second lap.
+Active food effects appear in a row below the plate. Hover an effect to see what it does and how long it has left.
 
 Beside them the bank shows the coins in the trading post's wage slot, which has no limit, and the wages due each day, in red when they exceed the bank.
 Under the wages it shows the coins sales brought in since dawn, green once they are above a day's wages and red until then.
@@ -241,7 +247,8 @@ The day dial in the top-right corner shows the sun crossing its arc from sunrise
 A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
 Your stomach growls as food falls under 20%, and again at 15%, 10% and 5%.
 
-Messages stack at the top of the screen, up to four at a time; each fades out after 7 seconds.
+Messages stack at the top middle of the screen, up to four at a time, and each fades out after 7 seconds.
+They stay put when a side panel opens, which may cover their right end.
 A message repeated while it still shows restarts its time instead of stacking again, and a full stack drops the one closest to fading.
 Actions whose result shows by itself, such as gathering, crafting, building or filling a bottle, post no message; warnings, refusals and news do.
 With a side panel open they keep to the space left of it.
@@ -413,6 +420,12 @@ A worker can hold several jobs, at one place or several, and a new job goes to t
 The list is in order: they do the first job that can be done, and after each round of it they read the list from the top again.
 A round is a delivery, a crafted batch, a crate packed full, a furnace batch at the bellows, a piece mined or a harvest.
 With no job that can be done, a worker sits at the nearest campfire they can reach, as at lunch: six to a fire, the rest on the ground nearby in groups of up to three.
+Each time an idle worker takes a seat at the fire, they have a 25% chance of bringing a guitar, harmonica or drum.
+The choice is even among instruments not already there. If the fire already has all three, the worker sits without one.
+With fewer than all three instruments, each musician plays a short sound now and then, with at least five seconds between their clips.
+When all three instruments are at the same fire, one worker on each instrument plays a song and the other idle workers seated there nod to the beat.
+The group plays one song, then each musician goes back to playing short sounds now and then, with no second song until the trio breaks up.
+Workers sitting for lunch do not play or nod.
 A worker who could not reach a fire's seats tries again once a building goes up or comes down.
 With no campfire they wait at the nearest trading post, or in the clearing without one.
 Their status says what their first job lacks.
@@ -462,7 +475,7 @@ Turning a station that holds water to another recipe takes the water into your b
 Taking down a station fills the bottles you carry with its water, and the rest is spilled.
 These rules cover any refillable vessel the game adds (`GameData.Vessels`).
 
-Food and drink restore hunger and thirst but no health: health comes back only in sleep.
+Food and drink restore hunger and thirst. Sleep normally restores health, and some cooked foods also help you recover.
 Sleep at any hour in a cabin or on a straw bed. Enter the cabin first to see its Sleep button.
 You start healing while you sleep, even if other players stay awake, as long as hunger and thirst both stay above 45%.
 A full night can restore about a third of your health. You wake at dawn, if hunger or thirst runs out, or when you choose Wake.
@@ -528,7 +541,9 @@ A picked nettle is gone for good, a backpack with no room for it leaves it stand
 Nettle rope is made at the crafting bench, 1 rope from 1 nettle, and a bug net from 5 rope, 1 wood and 1 wood part ([Crafting bench](#crafting-bench)).
 Whoever makes rope strikes two mallet blows, then twists the fibres by hand, in turn.
 
-Eight firebugs come out as night falls and one more after each hour of the night, at least 25 m from every building and where nobody is looking.
+Firebugs come out in clusters of one to three, eight clusters as night falls and one more after each hour of the night, at least 25 m from every building and where nobody is looking.
+A quarter of the clusters have three firebugs, and the rest two or one at even odds, all within 1 m of the first one.
+A cluster that comes out by water or near a building can be smaller, and one at the edge of sight can show its others coming out.
 All of them are gone at dawn.
 A firebug hovers about its place with a steady glow that grows half as bright again for about a second every 10 seconds.
 When you come within 4 m it darts off 6.55 m, faster than a walk and slower than a sprint, then rests for 1.6 seconds where it stops, whoever comes near.
@@ -628,6 +643,16 @@ It is complete once you have all 11 days of the diary.
 **NEET** requires at least 1,300 coins in profit a day for seven days in a row.
 Profit is the sale coins that came back that day minus wages charged at the next dawn.
 The mines and profit target together show the ending screen with Restart and Keep playing.
+
+A goal that appears during play pops up under the messages at the top of the screen with a chime: a trophy badge pops
+in and a bar opens out of it with **New goal** and the goal's name.
+A completed goal pops up the same way with **Goal completed** and a different chime.
+A goal that appears already done pops up only as completed.
+Each popup stays about five seconds, and goals that change together pop up one after another.
+**A success story** pops up once the diary page you found is closed.
+Click a popup to open the Goal Log on that goal over whatever is open: a held stack goes back and placing a building or
+any other pick is cancelled first.
+The goals a new, loaded or joined game starts with do not pop up.
 
 ### Diary
 
@@ -804,8 +829,21 @@ The canning station (2 steel bars, 8 planks) seals jam or meat stew over one woo
 The village buys canned jam at a base price of 80 coins per can, but does not buy loose or bottled jam.
 Raw meat sells as it is, in crates.
 
-A berry restores 5 hunger, crushed berries restore 55, a liter of jam from a bottle restores 115, and canned jam restores 120.
-Hunger stops at 100.
+A berry restores 5% hunger and crushed berries restore 55%. A liter of bottled jam or a can of jam fills hunger to 100%.
+Hunger stops at 100% unless meat stew fills it past that point.
+
+Cooked food descriptions in item slots and the Recipe map show how much hunger they restore and list their **Effects**:
+
+| Food | Effects |
+| --- | --- |
+| Bread | **Carb load** makes Shift sprinting 25% faster for 4 in-game hours. |
+| Burnt steak | **Protein recovery** restores health at the normal sleep healing rate for 4 in-game hours, even while awake. While you sleep it adds to sleep healing, so you heal twice as fast. |
+| Meat stew | **Well fed** fills hunger to 150% and lasts until it falls back to 100%. The hover countdown shows how long the extra hunger will last at your current pace. Stew also gives **Protein recovery**. |
+| Berry jam | **Vitamins** heals up to 10 normal HP and fills 50 bonus HP for one in-game day. Damage spends bonus HP first. Healing fills normal HP first, then the bonus. Only health above 100 HP is lost when Vitamins wears off. Jam also gives **Carb load**. |
+
+Canned food gives the same effects as the original food.
+Another serving adds each timed effect’s full duration to its time remaining without making it stronger.
+Food effects end when you die.
 
 Both stations, like the stone furnace's food recipes, take wood, coal or charcoal in their fuel slot.
 
@@ -1552,7 +1590,13 @@ Repeated sounds rotate between variants.
 A sound is loudest at your character and fades with distance, to silence 16 metres away, whatever the zoom.
 A wolf's growl as it breaks into its sprint carries 30 metres, and a howl 80.
 
-Day and night have their own music, which crossfades as the time changes and picks up where it stopped last time.
+Day and night each have their own music playlist.
+The music crossfades when the time changes, and each playlist picks up where it left off and wraps after its last track.
+The soundtrack gives way to a campfire song as you approach and comes back as you leave or the song ends.
+The campfire musicians and listeners stay in time with the recording even in a long-running settlement.
+When play pauses, so does the campfire song, and the soundtrack returns until play resumes.
+The soundtrack also plays in place of the campfire recordings while sleep speeds up time.
+The music volume setting also controls campfire songs and solo sounds.
 
 ## Limitations
 
@@ -1577,3 +1621,8 @@ Music credits:
 
 - Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov))
 - Augmentality (Brandon Morris)
+- [Jazz - Jazz Music](https://pixabay.com/music/traditional-jazz-jazz-jazz-music-630211/) by Andrii Hroza (andriih)
+- [Jazz Bar](https://pixabay.com/music/traditional-jazz-jazz-bar-592657/) by Aurec
+- [Lofi Soul](https://pixabay.com/music/lofi-lofi-soul-588903/) by ZephiraMusic
+- [Groove Soul](https://pixabay.com/music/funk-groove-soul-317798/) by The_Mountain
+- [Soft Jazz](https://pixabay.com/music/smooth-jazz-soft-jazz-621606/) by AtlasAudio

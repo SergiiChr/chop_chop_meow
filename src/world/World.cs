@@ -305,7 +305,7 @@ public sealed class SaveState {
     public int DenHours { get; set; }
     /// <summary>Tonight's nettles have come up; cleared by day.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool NettlesUp { get; set; }
-    /// <summary>Firebugs let out tonight, caught or not; back to none by day.</summary>
+    /// <summary>Clusters of firebugs let out tonight, caught or not, back to none by day.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int FirebugsOut { get; set; }
     /// <summary>A wolf has howled tonight.</summary>
     public bool Howled { get; set; }
@@ -321,7 +321,11 @@ public sealed class SaveState {
     public HashSet<string> Obtained { get; set; } = new();
     [JsonIgnore] public float PlayerX { get => Actor.PlayerX; set => Actor.PlayerX = value; }
     [JsonIgnore] public float PlayerY { get => Actor.PlayerY; set => Actor.PlayerY = value; }
-    public float Time { get; set; } = 55;
+    private double time = 55;
+    /// <summary>World seconds as stored in a save or sent in an update.</summary>
+    public float Time { get => (float)time; set => time = value; }
+    /// <summary>Keeps small steps from losing part of their elapsed time in an old settlement.</summary>
+    internal void AdvanceTime(float seconds) => time += seconds;
     [JsonIgnore] public float Health { get => Actor.Health; set => Actor.Health = value; }
     [JsonIgnore] public float Hunger { get => Actor.Hunger; set => Actor.Hunger = value; }
     [JsonIgnore] public float Thirst { get => Actor.Thirst; set => Actor.Thirst = value; }
@@ -414,10 +418,10 @@ public sealed partial class World {
         Lanterns = new Lanterns(this);
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         Goals = new Goals(this); glassBlowing = new GlassBlowing(this);
-        breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset;
+        breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset; Replaced += CampfireMusic.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
-        barrelHaul = new BarrelHaul(this, barrels); BedtimeWater = new BedtimeWater(this); Sleep = new SleepCycle(this);
+        barrelHaul = new BarrelHaul(this, barrels); BedtimeWater = new BedtimeWater(this); Sleep = new SleepCycle(this); FoodEffects = new FoodEffects(this);
         hauling = new Hauling(this, barrelHaul); takeBack = new TakeBack(this); gathering = new Gathering(this); waterGathering = new WaterGathering(this); crafting = new Crafting(this); packCraft = new PackCraft(this);
         stationKinds = Data.Recipes.Values.Select(r => r.Station).OfType<ThingKind>().Distinct().ToArray();
         isStation = Array.ConvertAll(Kinds.All, kind => Array.IndexOf(stationKinds, kind) >= 0);
@@ -446,6 +450,8 @@ public sealed partial class World {
     /// </summary>
     public bool QuietNights { get; set; }
     public Goals Goals { get; }
+    /// <summary>What idle workers play when they sit together at a campfire.</summary>
+    public CampfireMusic CampfireMusic { get; } = new();
     private readonly Barrels barrels;
     internal Barrels Barrels => barrels;
 
@@ -457,6 +463,7 @@ public sealed partial class World {
     private readonly Crafting crafting, packCraft;
     internal BedtimeWater BedtimeWater { get; }
     public SleepCycle Sleep { get; }
+    public FoodEffects FoodEffects { get; }
     private readonly BreakSeats breakSeats;
     /// <summary>Gravel path tiles: laying them, taking them up and how much faster walkers are on them.</summary>
     public GravelPaths GravelPaths { get; }
@@ -579,6 +586,7 @@ public sealed partial class World {
     public InventoryView Backpack => new(S.Backpack);
     public float Time => S.Time;
     public float Health => S.Health;
+    public float BonusHealth => S.Actor.BonusHealth;
     public float Hunger => S.Hunger;
     public float Thirst => S.Thirst;
     public float Torch => S.Torch;
@@ -847,8 +855,14 @@ public sealed partial class World {
     public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
     /// <summary>Tiles a second the acting player moves where they stand: walking or sprinting, and faster on gravel.</summary>
     public bool CanSprint => Barrel.In(S.Backpack) == null;
-    public float PlayerSpeed => (Barrel.FilledIn(S.Backpack) is string barrel ? Data.WalkSpeed * Barrel.Speed(S.Backpack.Object(barrel))
-        : Data.MoveSpeed(S.Actor.Sprinting && CanSprint)) * GravelPaths.SpeedAt(Player);
+    internal float NeedsDrain => Sleep.SleepingAt == 0 && S.Actor.Sprinting && CanSprint ? Data.SprintDrain : 1;
+    public float PlayerSpeed {
+        get {
+            bool sprint = S.Actor.Sprinting && CanSprint;
+            float speed = Barrel.FilledIn(S.Backpack) is string barrel ? Data.WalkSpeed * Barrel.Speed(S.Backpack.Object(barrel)) : Data.MoveSpeed(sprint);
+            return speed * (sprint ? FoodEffects.SprintMultiplier : 1) * GravelPaths.SpeedAt(Player);
+        }
+    }
     public void MovePlayer(Vector2 delta) {
         // Inside a cabin the player stays put until they step outside on purpose.
         if (Occupied || S.Sheltered != 0) return;
@@ -904,7 +918,7 @@ public sealed partial class World {
         string? tool = (rule?.Needs ?? rule?.Helps) is string kind ? BestTool(kind) : null;
         float sting = StingOf(t.Kind);
         S.Actor.Stung = sting > 0;
-        S.Health -= dt * sting;
+        HurtPlayer(dt * sting);
         if (t.IsDug) {
             t.Progress += dt * Speed(tool);
             if (DugOut(t)) Unearth(t, S.Backpack);
@@ -980,7 +994,8 @@ public sealed partial class World {
         var def = Data.Items[item];
         if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
         if (S.Backpack.Remove(item, 1) == 0) { Say($"No {def.Name} in your backpack."); return; }
-        S.Hunger = Math.Min(100, S.Hunger + def.Hunger); S.Thirst = Math.Min(100, S.Thirst + def.Thirst);
+        FoodEffects.Eat(def);
+        S.Thirst = Math.Min(100, S.Thirst + def.Thirst);
         if (def.Food) Play("eat_berry", Player);
     }
     /// <summary>Drinks or eats one liter of what a bottle holds, which stays in its cell, emptier.</summary>
@@ -991,7 +1006,8 @@ public sealed partial class World {
             return;
         }
         if (SetFill(S.Backpack, bottle, liquid, Vessels.LitersIn(unit) - 1) == null) return;
-        S.Hunger = Math.Min(100, S.Hunger + v.Hunger); S.Thirst = Math.Min(100, S.Thirst + v.Thirst);
+        if (v.Hunger > 0) FoodEffects.Eat(v.Hunger, Data.Items[liquid].FoodEffects);
+        S.Thirst = Math.Min(100, S.Thirst + v.Thirst);
         if (v.Hunger > 0) Play("eat_berry", Player);
     }
     public void Pump(Thing t) {
@@ -1464,8 +1480,16 @@ public sealed partial class World {
         if (BestTool("net") == null) { Say("No bug net in your backpack."); return; }
         Swings.Start(ActorAction.NetSwing, StartSwing(ActorAction.NetSwing, aim));
     }
+    /// <summary>Damage spends bonus health before normal health.</summary>
+    internal void HurtPlayer(float damage) {
+        var p = S.Actor;
+        p.BonusHealth = Math.Max(0, p.BonusHealth - damage);
+        p.Health = Math.Min(FoodEffects.NormalLimit + p.BonusHealth, p.Health - damage);
+    }
+
     public void Die() {
         S.Actor.SleepingAt = 0;
+        FoodEffects.Clear();
         Release();
         // After a mauling the box lands past the feet, behind the wolf standing over the player, so the feeding stays visible.
         // The player falls backwards facing the wolf that leapt, so the feet point back the way it came.
@@ -2566,7 +2590,7 @@ public sealed partial class World {
         bool wasDusk = Dusk, wasLunch = Lunch;
         everyone = true;
         float before = S.Time;
-        S.Time += dt;
+        S.AdvanceTime(dt);
         Firebugs.Age();
         Beach.Tick(before);
         if (!sleeping && !Sleep.AdvancingTime) S.PlaySeconds += dt;
@@ -2632,8 +2656,10 @@ public sealed partial class World {
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) CraftTick(dt);
         breakSeats.Prepare();
+        CampfireMusic.Begin();
         crew.Clear(); crew.AddRange(S.Workers);
         foreach (var w in crew) WorkerTick(w, dt);
+        CampfireMusic.Finish(S.Time);
         for (int i = 0; i < S.Workers.Count; i++) for (int j = i + 1; j < S.Workers.Count; j++) {
             var a = S.Workers[i]; var b = S.Workers[j]; var offset = a.Pos - b.Pos;
             // Miners underground are inside the hill, so they never crowd anyone at the entrance; workers on the walk to or from the village keep to their way.
@@ -2733,13 +2759,13 @@ public sealed partial class World {
         }
         Holes.Work(dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
-            float drain = Sleep.SleepingAt == 0 && S.Actor.Sprinting && CanSprint ? Data.SprintDrain : 1, fed = S.Hunger;
-            Sleep.Heal(dt);
+            float drain = NeedsDrain, fed = S.Hunger;
+            FoodEffects.Tick(dt, Sleep.HealingSeconds(dt));
             S.Hunger = Math.Max(0, S.Hunger - dt * drain * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * drain * Data.ThirstPerSecond);
             if (S.Hunger < GameData.GrowlBelow && GrowlsBy(S.Hunger) > GrowlsBy(fed)) Play("stomach_growl", Player);
             if (S.Hunger <= 0 || S.Thirst <= 0) {
                 if (Sleep.SleepingAt != 0) Sleep.WakeActor(S.Hunger <= 0 ? "Hunger wakes you." : "Thirst wakes you.");
-                else S.Health -= dt * 1.4f;
+                else HurtPlayer(dt * 1.4f);
             }
         }
         TorchFlare = Math.Max(0, TorchFlare - dt);
@@ -2819,7 +2845,7 @@ public sealed partial class World {
         if (!float.IsFinite(p.DoorTime) || p.DoorTime < 0 || !p.DoorFrom.IsFinite()
             || !p.DoorBody.IsFinite()) return false;
         // A player who left while dead comes back still waiting to respawn.
-        return (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
+        return FoodEffects.Valid(p) && (p.Health > 0 || p.Health <= 0 && p.RespawnIn > 0) && p.Thirst is >= 0 and <= 100
             && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
     }
     /// <summary>

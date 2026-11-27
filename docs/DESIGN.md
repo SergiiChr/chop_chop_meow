@@ -24,7 +24,9 @@ These came from the user; change them only after asking.
   The bench keeps its one hammer slot. Making it takes turns between mallet blows and twisting by hand.
 - **Bug net:** 5 nettle rope, 1 wood and 1 wood part at the bench with any hammer. It is swung toward the pointer
   like any tool, with a right click on open ground or on a firebug.
-- **Firebugs:** eight come out at nightfall and one more each night hour, away from buildings, and are gone at dawn.
+- **Firebugs:** eight clusters come out at nightfall and one more each night hour, away from buildings, and are gone at
+  dawn.
+  A quarter of the clusters have three firebugs, and the rest two or one at even odds, all within 1 m of the first.
   One drifts and glows, darts off from a player who comes near, faster than a walk and slower than a sprint, then
   rests; a swing lands after a moment, catches what is in its sweep, and a miss sends the bug darting.
   A caught firebug lives for three in-game days. It lights a lantern while inside it and disappears when it dies.
@@ -178,6 +180,7 @@ UI and input:
 | `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
 | `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
+| `src/goals/display/GoalPopup.cs` | The popup at the top of the screen when a goal appears or is completed, with its chime |
 | `src/diary/display/DiaryPanel.cs`, `src/diary/display/DiaryCell.cs`, `src/diary/display/ReadingSheet.cs`, `src/diary/display/FallingApart.cs`, `src/diary/display/FindPrompt.cs` | The Diary panel of paper cells, a day opened large to read with its writing falling apart where it says so, and the pop-up a find waits behind |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
@@ -226,11 +229,16 @@ UI and input:
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, the roof barrel and the shared sleep controls |
+| `src/food/model/FoodEffects.cs`, `src/food/display/FoodEffectRow.cs`, `src/food/display/FoodEffectBadge.cs` | Reusable effects from eating, their live countdown and the active badges under the needs plate |
+| `src/food/display/FoodDescription.cs` | Hunger and food effects in item tooltips and the Recipe map sidebar |
 | `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, accelerated time, outdoor bed expiry and salvage |
 | `src/rest/display/SleepPage.cs`, `src/rest/display/StrawBedPanel.cs` | Shared sleep controls and the straw bed’s remaining life |
 | `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The straw bed and a player lowering onto it or getting up, transferring weight from boots to a palm, then the hip and forearm |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
 | `src/workers/breaks/BreakSeats.cs` | Reserves campfire and ground seats for workers at lunch or with nothing to do, and lights the campfires they sit at |
+| `src/workers/breaks/CampfireMusic.cs`, `src/workers/breaks/model/` | Rolls instruments for idle campfire visits, schedules solo clips and one song per trio, and holds the recording lengths and beat times |
+| `src/workers/breaks/display/CampfireMusicView.cs`, `src/workers/breaks/display/CampfirePerformance.cs`, `src/workers/breaks/display/CampfireInstrumentShape.cs` | Poses the worker's hands on a guitar, harmonica or drum and nods listeners on the recorded beat |
+| `src/workers/breaks/display/CampfireMusicAudio.cs` | Plays campfire recordings from the workers and fires, and gives a nearby song room in the soundtrack |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
 | `src/actors/enemies/wolf/DoorTug.cs` | A wolf tugging a player back out of a cabin's doorway, letting go and handing a badly hurt one to the takedown |
 | `src/actors/enemies/wolf/WolfBodies.cs` | How wolves at a player keep their distance: closing in only to biting reach, and stepping aside from another wolf's body |
@@ -702,13 +710,35 @@ At dawn the wages charged are taken off and the result joins `SaveState.Profits`
 Reaching the streak sets the `profit_week` milestone, which stays reached.
 The open mines and profit milestone together unlock the ending.
 
+`GoalPopup` compares each goal's status with the popups it has shown on every interface refresh, five times a second.
+It queues a new popup for a goal that left `Hidden` and a completed popup for one that reached `Completed`, each at
+most once a game, and shows them in turn.
+A goal that goes from `Hidden` straight to `Completed` gets only the completed popup.
+The diary goal's popup waits while the find pop-up or the reading sheet is open, and later popups go ahead of it.
+`Game.OpenGoalFromPopup` puts back a held stack and ends any click mode or walk to a cabin, then opens the pause menu
+on the goal over whatever is open, the ending screen included.
+It skips the statuses a game already has, with no popups (`GoalPopup.SkipKnownGoals`), once the window has joined a
+game and taken the server's first update (`Net.Joined`): a new game, a load, joining another player's game and
+reconnecting.
+It also skips them whenever the window's world is replaced (`World.Replaced`), so leaving a game for the start menu
+or losing the line to the host drops the popups that game still had waiting.
+The showcase skips them again after setting up its scene by hand.
+
 ### Survival and needs
 
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
 
-- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`) and a `Food` flag; nothing eaten heals.
-- Health comes back only in sleep, `SleepCycle.HealPerSecond` a second while hunger and thirst both stay above `SleepCycle.FedNeed`.
+- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`), a `Food` flag and shared `FoodEffects`.
+- Sleep restores `SleepCycle.HealPerSecond` health a second while hunger and thirst both stay above `SleepCycle.FedNeed`.
   Healing is prorated to the part of the tick before either need falls below the threshold.
+- The server saves and sends each player's remaining time for Carb load, Protein recovery and Vitamins in `PlayerState`.
+  Well fed is the part of hunger above 100%, so its countdown follows hunger drain rather than a separate timer.
+  Protein recovery heals at the sleep rate without the sleep requirement, and adds to sleep healing, so a sleeper heals twice as fast.
+  The sleep forecast includes both kinds of healing and accounts for Vitamins expiring before wake-up.
+  Vitamins fills `PlayerState.BonusHealth`, which is part of total health and takes damage first.
+  Healing fills normal health before the bonus, and expiry only removes total health above 100%.
+  Bonus health continues the normal fill in a brighter color. Only health or hunger above 100% wraps to a second lap.
+  Additional servings add their timed effects’ durations to the time left, without increasing their strength.
 - Food is what wolves eat and compost will take, cooked or not.
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.
@@ -1089,10 +1119,16 @@ Putting nettles into the bench's slots by hand is not refused.
 A recipe marked `RecipeDef.Twists` is worked in rounds (`ActorAnimation.StationAction`): by the batch's `Thing.Progress`,
 `ActorAnimation.TwistRounds` rounds a batch, each a `TwistBlowShare` of mallet blows and then `ActorAction.TwistRope` with empty hands.
 
-`Firebugs` (`src/firebugs/Firebugs.cs`) lets out `Firebugs.AtNightfall` firebugs as night falls and one more for each
-whole hour of the night since (`SaveState.FirebugsOut` counts those let out tonight, caught or not, and day sets it back), each on ground to
-stand on that no player sees, `Firebugs.BuildingRoom` from every building.
-Each firebug's spot is seeded by the day and its turn that night, so a night loaded part way lets the rest out where they would have come.
+`Firebugs` (`src/firebugs/Firebugs.cs`) lets out `Firebugs.AtNightfall` clusters of firebugs as night falls and one
+more for each whole hour of the night since.
+`SaveState.FirebugsOut` counts the clusters let out tonight, caught or not, and day sets it back.
+A cluster's first firebug comes out on ground to stand on that no player sees, `Firebugs.BuildingRoom` from every
+building.
+At `Firebugs.ThreeChance` it has two more, and otherwise one more or none at even odds (`Firebugs.LetOut`).
+Each comes out at a random spot within `Firebugs.ClusterRadius` of the first, even where a player sees it.
+One whose spot has no ground to stand on or is within `Firebugs.BuildingRoom` of a building is left out.
+Each cluster is seeded by the day and its turn that night, so a night loaded part way lets the rest out where they would
+have come.
 By day it removes them all.
 A firebug is a thing of the shape `GatherShape.Caught`, kept at its place: where it is now is `Firebugs.At`, its
 place plus `Firebugs.Hover`, a slow swing by its id and the world's clock, so the host and every window agree on it
@@ -1734,6 +1770,18 @@ Workers on the ground keep their seats when the crew changes, unless they take a
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
 When a worker cannot reach a group, they sit near where they stopped if there is room, or wait standing.
 
+`CampfireMusic` rolls once when an idle worker sits in a campfire seat, and keeps the result until the idle visit ends.
+If the fire is missing any instruments, there is a 25% chance of bringing one, with each missing instrument equally likely.
+A campfire holds at most one guitar, one harmonica and one drum.
+A listener who stays seated does not roll when a musician leaves.
+Each instrumentalist at an incomplete trio's fire waits at least five seconds between solo clips.
+When a fire has all three instruments, one worker on each plays one randomly picked song and its other idle workers nod.
+After the song, each of the three plays solo clips as at an incomplete fire, with no second song until the fire no longer
+has all three instruments.
+Lunch and ground seats do not take part. Songs, solos and visit rolls travel in the live network update, not in saves.
+The guitarist supports the neck from underneath, curls their fingers onto the fretboard and arcs the strumming hand
+away from the body at either end of a stroke.
+
 As dusk begins (`GameData.DuskStarts`, a tenth of a day before night) they walk to the nearest trading post, or the clearing without one.
 Then they walk a cart's trip down the valley at walking pace while fading out, wait out of view for the rest of half a trade trip (`Worker.Commute`, `World.WalkLeg`), and sign out (`Worker.Home`).
 At dawn they walk back the same way, fading in, and return to work; a runner off for prices walks the same way out and back.
@@ -1909,6 +1957,7 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 Sound effects are one-shot MP3s in `assets/sounds`, apart from a held sound's looping WAV (below); `x_1.mp3`, `x_2.mp3`
 and so on are variants of one sound `x`.
 Each play picks a variant other than the previous one with a small random pitch and volume change.
+The wolves' howls, the mortar and the two goal popup chimes keep their pitch (`Sounds.KeepsPitch`).
 
 A held sound loops for as long as its source holds it again each frame (`Sounds.Hold`), one sound a source.
 It starts at a random moment of its recording and fades in and out over 0.15 seconds, so it neither clicks on nor cuts
@@ -1950,12 +1999,24 @@ Both play lower and slower the taller the tree, from a tenth above their recorde
 
 ### Music
 
-Music in `assets/music` crossfades over four seconds between the day music and the night music when night falls or dawn breaks, including during sleep.
-The day plays its tracks one after another and the night loops one.
-
-Each keeps its place for the running session, so music longer than its part of the day carries on next time.
-A track that plays to its end hands over to the next, and the last wraps back to the first.
+Music in `assets/music` crossfades between playlists over four seconds at nightfall and dawn, including during sleep.
+Each playlist keeps its place for the running session, so music longer than its part of the day carries on next time.
+Both playlists play their tracks in order, then wrap back to the first.
 The options screen sets the music volume, stored in the settings file.
+
+Each campfire song and solo starts at a time on the world's clock, so a player approaching a fire or joining a game hears
+the recording already in progress. Playback near the start uses the full recording, and audible poses follow playback.
+The simulation keeps more precision between steps than it writes to saves or updates, so the world clock keeps pace
+with the recording even in a long-running settlement.
+The campfire song takes over the soundtrack inside firelight and fades with distance. When the world pauses, so does the
+campfire song, and the soundtrack returns until play resumes.
+The server reports the pause and sleep speed-up in updates, so a brief gap in updates does not pause a song.
+A late update does not replay audio the listener already heard, and the soundtrack returns when the audible song ends
+even if an update is late.
+Campfire recordings go quiet during the sleep speed-up and resume at the current position if still in progress.
+Songs are Ogg Vorbis so they can start partway through without decoding from the beginning. Solos are shorter MP3 clips.
+The music volume applies to both. `CampfireBeats` times the trio and listeners against measured beats, including tempo
+changes. Solo strikes and strums follow their clips' measured contacts, and a harmonica stays at the lips while it sounds.
 
 ## World map
 

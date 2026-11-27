@@ -18,9 +18,10 @@ public sealed class ItemDef {
     public int Tier { get; set; }
     /// <summary>Wolves eat it and compost takes it, cooked or not; only items that restore hunger or thirst can be eaten.</summary>
     public bool Food { get; set; }
-    /// <summary>What eating or drinking one restores; health comes back only with sleep.</summary>
+    /// <summary>How much hunger or thirst eating or drinking one restores.</summary>
     public float Hunger { get; set; }
     public float Thirst { get; set; }
+    public FoodEffect[] FoodEffects { get; init; } = [];
     /// <summary>What the player says of it, shown under its name; empty for an item with nothing said of it.</summary>
     public string Description { get; set; } = "";
     /// <summary>In-game days each unit lasts from when it is caught, or 0 for one that never expires.</summary>
@@ -447,7 +448,8 @@ public sealed partial class GameData {
     public bool IsConsumable(string item) => Items.TryGetValue(item, out var def) && def.FullOf == null && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>What the player says of an item, as a tooltip line of its own after the name, or nothing.</summary>
-    public string DescriptionLine(string item) => ItemDefinition(item) is { Description.Length: > 0 } def ? "\n" + def.Description : "";
+    public string DescriptionLine(string item) => DescriptionOf(item) is { Length: > 0 } description ? "\n" + description : "";
+    public string DescriptionOf(string item) => ItemDefinition(item)?.Description ?? "";
     /// <summary>An item's definition, or for an object found by its key, such as a lantern, its kind's.</summary>
     private ItemDef? ItemDefinition(string item) => Items.GetValueOrDefault(Item.KindOf(item));
     /// <summary>Whether an id names an item, an object of one included.</summary>
