@@ -110,12 +110,17 @@ public partial class Game {
         // Every cluster is drawn with the same triangles, so the shown fruit's share of a full bush's triangles counts its clusters.
         berryBush.Remaining = 24; await Frames(2);
         int fullBush = Triangles(bushProp.Fruit);
+        var fullSpread = bushProp.Fruit.Mesh.GetAabb().Size;
         foreach (var (berries, clusters) in new[] { (19, 16), (18, 12), (13, 12), (12, 8), (7, 8), (6, 4), (1, 4) }) {
             berryBush.Remaining = berries; await Frames(2);
             int shown = Triangles(bushProp.Fruit) * 16 / fullBush;
             Require(bushProp.Fruit.Visible && shown == clusters, $"A bush with {berries} berries should show {clusters} berry clusters, not {shown}.");
         }
         berryBush.Remaining = 4; await Frames(2);
+        // The berries left are spread all around the bush, not kept to one side.
+        var quarterSpread = bushProp.Fruit.Mesh.GetAabb().Size;
+        Require(quarterSpread.X > fullSpread.X * .6f && quarterSpread.Z > fullSpread.Z * .6f,
+            $"A quarter-full bush's berries should spread across most of the full bush's {fullSpread.X:0.00} by {fullSpread.Z:0.00}, not {quarterSpread.X:0.00} by {quarterSpread.Z:0.00}.");
         var point = view.Screen(berryBush.Pos, .35f);
         Require(view.Pick(point)?.Id == berryBush.Id, "The bush foliage must select its berry resource.");
         await Click(point);

@@ -230,7 +230,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             panel.Close(); return;
         }
         if (Launch.Has("--bushes")) {
-            // A row of berry bushes in their five stages, from full to picked clean, which takes in all three variants.
+            // A row of berry bushes in their five stages, from full to picked clean, with all three variants.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Bush variants are selected from the id; start the row at variant zero and include all three.
