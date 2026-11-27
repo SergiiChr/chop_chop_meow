@@ -952,7 +952,7 @@ A row shows its items in the order they were added.
 The item list that **+** opens shows items in groups, each simplest first: what is gathered, grown or bought, then materials, tools, containers and food, and last crates of goods.
 Bottles, buckets and barrels come among containers twice: empty, which takes only empty ones, and holding each liquid, such as "Steel bucket of water", which takes them at any fill.
 No storage names a bare liquid such as water: placed barrels and stations take liquids.
-A tool station's entry for a bucket or bottle takes it whatever it holds.
+A tool station holds buckets and bottles only empty: a worker done with one that still holds something stores it like a load.
 **Clear** takes everything off both rows, so nothing goes in or out.
 Manual inventory transfers ignore these automation filters, and so does a page's Store all button.
 
