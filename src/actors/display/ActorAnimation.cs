@@ -49,7 +49,16 @@ public enum ActorAction {
     NetSwing,
     /// <summary>Fibres twisted into rope between both hands over a bench; it takes turns with mallet blows.</summary>
     TwistRope,
-    Glassblow
+    Glassblow,
+    PickStrike,
+    ShovelStrike,
+    SteelHammerStrike,
+    MalletStrike,
+    StoneChiselStrike,
+    SteelChiselStrike,
+    RakeStrike,
+    NetStrike,
+    BucketStrike
 }
 
 /// <summary>
@@ -145,7 +154,7 @@ public static class ActorAnimation {
         ActorAction.Dig => 1.1f,
         ActorAction.Rake => RakeStroke.Seconds,
         ActorAction.Glassblow => 1.45f,
-        _ => 1
+        _ => WeaponSwing.Of(action)?.Duration ?? 1
     };
 
     /// <summary>How far an action's clock moves on: a walk's, jog's or run's by the ground covered, so its planted feet keep their place, and the rest by the time passed.</summary>
@@ -161,11 +170,12 @@ public static class ActorAnimation {
         ActorAction.TorchSwing => .3f * Duration(action),
         ActorAction.AxeSwing or ActorAction.SteelAxeSwing or ActorAction.AxeSweep or ActorAction.SteelAxeSweep => .5f * Duration(action),
         ActorAction.NetSwing => NetCatch * Duration(action),
-        _ => 0
+        _ => WeaponSwing.Of(action)?.Contact ?? 0
     };
 
     /// <summary>Seconds left until a swing with <paramref name="remaining"/> seconds still to play lands; zero once it has.</summary>
-    public static float UntilContact(ActorAction action, float remaining) => Math.Max(0, Contact(action) - (Duration(action) - remaining));
+    public static float UntilContact(ActorAction action, float remaining) =>
+        Math.Max(0, (WeaponSwing.Of(action)?.ActiveFrom ?? Contact(action)) - (Duration(action) - remaining));
 
     /// <summary>Position within the current loop, from 0 inclusive to 1 exclusive.</summary>
     public static float Phase(ActorAction action, float elapsed) {
@@ -190,7 +200,7 @@ public static class ActorAnimation {
         ActorAction.Dig => "steel_shovel",
         ActorAction.Rake => "rake",
         ActorAction.NetSwing => "bug_net",
-        _ => null
+        _ => WeaponSwing.Of(action)?.Item
     };
 
     // Standing to work with the left boot ahead and the right behind (StanceFeet), and squatting low on the balls of both feet (SquatFeet).
@@ -362,9 +372,10 @@ public static class ActorAnimation {
     };
     // Cross-legged on the ground with hands on the knees, or on a rock with knees up and forearms on them.
     // Now and then a bite goes up to the mouth.
-    private static readonly (float At, Pose Pose)[] SitKeys = Eating(new Pose(Lean: 6, Head: 2, RaiseL: 30, OutL: 22, ElbowL: 34, RaiseR: 30, OutR: 22, ElbowR: 34,
-        SwingL: 86, KneeL: 150, TurnL: 40, RollL: 90, SwingR: 82, KneeR: 150, TurnR: 40, RollR: 90, Hips: .15f));
-    private static readonly (float At, Pose Pose)[] PerchKeys = Eating(new Pose(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, Hips: .315f));
+    private static readonly Pose SitRest = new(Lean: 6, Head: 2, RaiseL: 30, OutL: 22, ElbowL: 34, RaiseR: 30, OutR: 22, ElbowR: 34,
+        SwingL: 86, KneeL: 150, TurnL: 40, RollL: 90, SwingR: 82, KneeR: 150, TurnR: 40, RollR: 90, Hips: .15f);
+    private static readonly Pose PerchRest = new(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, Hips: .315f);
+    private static readonly (float At, Pose Pose)[] SitKeys = Eating(SitRest), PerchKeys = Eating(PerchRest);
     private static (float At, Pose Pose)[] Eating(Pose seated) {
         var bite = seated with { Head = seated.Head + 6, Lean = seated.Lean + 6, RaiseR = 40, OutR = -24, ElbowR = 140 };
         return new[] { (0, seated), (.55f, seated), (.68f, bite), (.8f, bite), (.92f, seated) };
@@ -527,19 +538,22 @@ public static class ActorAnimation {
     /// A blow that lands on something, chopping, picking, hammering or digging, lands its tool's working end on
     /// <paramref name="aim"/>'s mark, a point in the rig's own frame, when one is given and within reach.
     /// </summary>
-    public static Pose PoseAt(ActorAction action, float elapsed, bool moving, BlowAim? aim = null) {
+    public static Pose PoseAt(ActorAction action, float elapsed, bool moving, BlowAim? aim = null, float eating = 1) {
         if (moving && SwingsOnTheMove(action)) {
             // The swing keeps its own clock, which keeps the jog's pace at the player's speed.
             var legs = PoseAt(ActorAction.Jog, elapsed, true);
-            return Posed(action, elapsed, false, null).WithLegs(legs.Leg(true), legs.Leg(false))
-                with { Sway = legs.Sway, Hips = legs.Hips, SplayL = legs.SplayL, SplayR = legs.SplayR };
+            var upper = Posed(action, elapsed, false, null, eating).WithLegs(legs.Leg(true), legs.Leg(false));
+            // The new weapon paths are anchored to the same grip height even while the legs jog.
+            return WeaponSwing.Of(action) != null ? upper with { SplayL = legs.SplayL, SplayR = legs.SplayR }
+                : upper with { Sway = legs.Sway, Hips = legs.Hips, SplayL = legs.SplayL, SplayR = legs.SplayR };
         }
-        var pose = Posed(action, elapsed, moving, aim);
+        var pose = Posed(action, elapsed, moving, aim, eating);
         return FeetOf(action) is Footing feet ? OnFeet(pose, feet) : pose;
     }
 
     /// <summary>An action's pose before its boots are stood on the ground; an action with a <see cref="Footing"/> gives only its hip height for the legs.</summary>
-    private static Pose Posed(ActorAction action, float elapsed, bool moving, BlowAim? aim) {
+    private static Pose Posed(ActorAction action, float elapsed, bool moving, BlowAim? aim, float eating) {
+        if (WeaponSwing.Of(action) is WeaponSwing weapon) return weapon.PoseAt(elapsed);
         float p = Phase(action, elapsed);
         float wave = MathF.Sin(p * Mathf.Tau);
         if (BlowOf(action)?.Swung is ToolSwing swung)
@@ -647,8 +661,10 @@ public static class ActorAnimation {
                     return Stance with { Lean = 7 - drawn * 3, Head = 4, RaiseR = 104 - drawn * 12, OutR = -6, ElbowR = 30 + drawn * 75 };
                 }
             case ActorAction.Sit or ActorAction.Perch:
-                var eating = Keys(p, action == ActorAction.Sit ? SitKeys : PerchKeys);
-                return eating with { Lean = eating.Lean + wave * 1.2f, Head = eating.Head + wave * 1.5f };
+                var rest = action == ActorAction.Sit ? SitRest : PerchRest;
+                var seated = eating <= 0 ? rest : Keys(p, action == ActorAction.Sit ? SitKeys : PerchKeys);
+                if (eating is > 0 and < 1) seated = Pose.Lerp(rest, seated, Mathf.SmoothStep(0, 1, eating));
+                return seated with { Lean = seated.Lean + wave * 1.2f, Head = seated.Head + wave * 1.5f };
             case ActorAction.FallBack:
                 // A fall happens once: past its end, as while blending out of it, it holds its last pose.
                 return Keys(Math.Min(elapsed / FallBackSeconds, .999f), FallBackKeys);
@@ -802,7 +818,7 @@ public static class ActorAnimation {
         ActorAction.Craft => CraftFeet,
         ActorAction.Perch => PerchFeet,
         ActorAction.PickUp => TogetherFeet,
-        _ => null
+        _ => WeaponSwing.Of(action) != null ? StanceFeet : null
     };
 
     // A standing leg keeps its knee bent at least this much, and its shin leans at most this far over the foot, as far as an ankle bends under the body's weight.
@@ -1009,10 +1025,10 @@ public static class ActorAnimation {
     /// The new action's blows land on <paramref name="aim"/>'s mark and the old one's on <paramref name="fromAim"/>'s.
     /// </summary>
     public static Pose Blended(ActorAction from, float fromTime, bool fromMoving, ActorAction to, float time,
-        bool moving, float blend, BlowAim? aim = null, BlowAim? fromAim = null) {
-        var now = PoseAt(to, time, moving, aim);
+        bool moving, float blend, BlowAim? aim = null, BlowAim? fromAim = null, float eating = 1, float fromEating = 1) {
+        var now = PoseAt(to, time, moving, aim, eating);
         if (blend >= 1) return now;
-        var pose = Pose.Lerp(PoseAt(from, fromTime, fromMoving, fromAim), now, Mathf.SmoothStep(0, 1, blend));
+        var pose = Pose.Lerp(PoseAt(from, fromTime, fromMoving, fromAim, fromEating), now, Mathf.SmoothStep(0, 1, blend));
         return to == ActorAction.Rake ? RakeStroke.PoseAt(Phase(to, time), aim?.Mark, pose) : pose;
     }
 

@@ -15,7 +15,14 @@ public partial class Hotbar : PanelContainer {
     private readonly HeldCursor cursor;
 
     public System.Collections.Generic.List<ItemSlot> Buttons { get; } = new();
-    public System.Collections.Generic.List<Label> Counts { get; } = new();
+    /// <summary>The diary's badge, shown once the player has found part of the diary, with a dot while a day waits to be read.</summary>
+    public Button DiaryBadge { get; }
+    private readonly Panel unread;
+    // Set by the first find taken here, so the badge that comes with it waits behind the day it opened and is stamped into the row as that closes.
+    private bool stampDiary;
+    /// <summary>Seconds the diary's badge takes to be stamped into the row.</summary>
+    private const float StampSeconds = .45f;
+    public System.Collections.Generic.List<Badge> Counts { get; } = new();
 
     public Hotbar(UiKit kit, SidePanel panel, HeldCursor cursor) {
         this.kit = kit; world = kit.World; this.panel = panel; this.cursor = cursor;
@@ -27,8 +34,32 @@ public partial class Hotbar : PanelContainer {
         slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open(Page.Craft), new Color("b08a45"), "C"));
         slots.AddChild(MenuIcon("map", "Recipe map", () => panel.Map.Open(), new Color("7d6488")));
         slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open(Page.Crew), new Color("5f8aa6"), "H"));
+        // The diary's badge waits for the player's first find.
+        DiaryBadge = MenuIcon("diary", "Diary", () => panel.Open(Page.Diary), new Color("8a6a4a"));
+        DiaryBadge.Visible = false;
+        unread = Style.Corner(new Panel { Name = "unread", MouseFilter = MouseFilterEnum.Ignore, CustomMinimumSize = new Vector2(16, 16) }, 1, 0, 2);
+        unread.AddThemeStyleboxOverride("panel", Style.Flat(Style.Brick, 8, 0, Style.Rim, 2));
+        DiaryBadge.AddChild(unread);
+        slots.AddChild(DiaryBadge);
         var divider = new ColorRect { Color = new Color(Style.Beige, .6f), CustomMinimumSize = new Vector2(3, 46), SizeFlagsVertical = SizeFlags.ShrinkCenter }; slots.AddChild(divider);
         for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
+    }
+
+    /// <summary>
+    /// Stamps the diary's badge into the row once the find just taken shows in the world and the day it opened is closed again, if it is the player's first,
+    /// so the stamp shows them where the diary is kept.
+    /// </summary>
+    public void StampDiaryOnFirstFind() => stampDiary = !DiaryBadge.Visible;
+
+    /// <summary>Brings the diary's badge down into the row like a stamp: large, tilted and faint, then hard and flat in its place with a small bounce.</summary>
+    private void Stamp() {
+        DiaryBadge.PivotOffset = DiaryBadge.CustomMinimumSize / 2;
+        DiaryBadge.Modulate = new Color(1, 1, 1, 0);
+        // The row lays its badges out again as this one shows, which sets its size and tilt back, so each step starts from its own value.
+        var tween = DiaryBadge.CreateTween().SetParallel();
+        tween.TweenProperty(DiaryBadge, "scale", Vector2.One, StampSeconds).From(Vector2.One * 2.4f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(DiaryBadge, "rotation_degrees", 0f, StampSeconds).From(-14f).SetTrans(Tween.TransitionType.Quad).SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(DiaryBadge, "modulate:a", 1f, StampSeconds * .4f).From(0f);
     }
 
     /// <summary>A round enamel badge with a line icon and a key cap when it has a shortcut.</summary>
@@ -52,7 +83,7 @@ public partial class Hotbar : PanelContainer {
     private ItemSlot HotbarButton(int slot) {
         var button = new ItemSlot { FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand };
         button.Controls = new SlotInput(cursor) {
-            Takes = held => held.Item is string id && (world.Data.Items.ContainsKey(id) || world.Data.IsBuilding(id)),
+            Takes = held => held.Item is string id && (world.Data.HasItem(id) || world.Data.IsBuilding(id)),
             // A held stack binds itself to the slot (World.BindHeld); a plan is only named there.
             Put = (held, _) => {
                 if (held.Stack is HeldStack stack) world.FromHeldStack(() => world.SetHotbar(slot, stack.Item));
@@ -64,8 +95,9 @@ public partial class Hotbar : PanelContainer {
             Click = () => Select(slot),
             Use = () => Use(slot),
             Batch = () => Store(slot),
-            RightClick = () => Use(slot),
+            RightClick = () => { if (!panel.OpenLantern(world.HotbarItem(slot))) Use(slot); },
         };
+        kit.LinkRecipeMap(button, () => world.HotbarItem(slot));
         button.CustomMinimumSize = new Vector2(56, 56);
         Style.Skin(button, Style.SlotNormal, Style.SlotHover, Style.SlotPressed);
         button.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
@@ -89,8 +121,7 @@ public partial class Hotbar : PanelContainer {
         number.AddThemeColorOverride("font_color", Style.Tan);
         button.AddChild(number);
         // The count sits on a pill at the slot's corner, as on every other slot.
-        var count = Style.Corner(Style.Pill("", Style.CountPill, Style.Rim, 12), 1, 1);
-        count.Visible = false;
+        var count = ItemSlot.CountBadge();
         button.AddChild(count);
         Counts.Add(count);
         Buttons.Add(button);
@@ -98,34 +129,50 @@ public partial class Hotbar : PanelContainer {
     }
 
     // What each slot shows, so a slot is redrawn only when its item, count or selection changes: redrawing builds text and styles.
-    private readonly (string Id, int Count, bool Active)?[] shownSlots = new (string, int, bool)?[9];
+    private readonly (string Id, int Count, bool Active, int Life, int Bugs, int PackedCount)?[] shownSlots = new (string, int, bool, int, int, int)?[9];
     public void Refresh() {
+        var me = world.Me;
+        bool badgeShown = Diary.Started(me) && !(stampDiary && panel.ReadingSheet.Visible);
+        if (badgeShown != DiaryBadge.Visible) {
+            DiaryBadge.Visible = badgeShown;
+            if (badgeShown && stampDiary) Stamp();
+        }
+        if (badgeShown) stampDiary = false;
+        bool waiting = Diary.AnyUnread(me);
+        if (unread.Visible != waiting) unread.Visible = waiting;
         for (int slot = 0; slot < Buttons.Count; slot++) {
             var button = Buttons[slot];
             string id = world.HotbarItem(slot);
             int count = world.HotbarCount(slot);
             bool active = world.InHand == "" && world.ActiveHotbar == slot;
-            var shown = (id, count, active);
+            int life = id == Firebugs.Item && count > 0 ? world.Firebugs.AverageMinutes(world.S.Backpack, world.HotbarStack(slot)) : -1;
+            bool lantern = Lanterns.IsItem(id);
+            int bugs = count > 0 && lantern ? world.Lanterns.BugCount(id) : -1;
+            var shown = (id, count, active, life, bugs, World.IsCrate(id) ? world.Packed(id)?.Count ?? 0 : 0);
             if (shownSlots[slot] == shown) continue;
             shownSlots[slot] = shown;
             bool building = world.Data.IsBuilding(id);
-            Counts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? ""
-                : count == 1 && Barrel.Is(id) ? $"{Barrel.Liters(id)}/{Barrel.Capacity} L"
-                : count == 1 && world.Data.VesselOf(id) is VesselDef vessel ? $"{vessel.LitersIn(id)}/{vessel.Capacity}" : count.ToString();
+            var badge = Counts[slot];
+            if (building || count == 0) badge.SetCount("");
+            else if (count == 1 && Barrel.Is(id)) badge.SetCount($"{Barrel.Liters(id)}/{Barrel.Capacity} L");
+            else if (count == 1 && world.Data.VesselOf(id) is VesselDef vessel)
+                badge.SetCount($"{vessel.LitersIn(id)}/{vessel.Capacity}");
+            else badge.SetStack(count, bugs);
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
-            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}\nLMB: select · RMB or Double LMB: use";
+            string clicks = lantern ? "LMB: select · RMB: open for refill · Double LMB: take in hand or stow" : "LMB: select · RMB or Double LMB: use";
+            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Describe(id)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}{PageText.FirebugLifeLine(life)}\n{clicks}";
+            if (!building && id.Length > 0) button.TooltipText += $"\n{RecipeMap.AltClickHint}";
             // The selected slot gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.SlotWanted : Style.SlotNormal);
-            Counts[slot].Visible = Counts[slot].Text != "";
         }
     }
 
     /// <summary>The item selected: the tool in hand, or else the item on the selected hotbar slot; null for none.</summary>
     public string? ActiveItem() {
         string id = world.InHand != "" ? world.InHand : world.HotbarItem(world.ActiveHotbar);
-        return world.Data.Items.ContainsKey(id) ? id : null;
+        return world.Data.HasItem(id) ? id : null;
     }
 
     /// <summary>The backpack cell the item selected is used from: the stack bound to the selected hotbar slot, or -1 for the tool in hand or a slot bound to none.</summary>
@@ -160,8 +207,11 @@ public partial class Hotbar : PanelContainer {
     /// </summary>
     public bool UseItem(string id, int stack = -1) {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Run(() => { if (stack >= 0) FromStack(stack, () => world.Consume(id)); else world.Consume(id); });
-        else if (id == "torch" && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
-        else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
+        else if (id == World.TorchItem && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
+        else if (Lanterns.IsItem(id)) {
+            panel.Player.Mode = new ClickMode.Normal();
+            world.Lanterns.ToggleInHand(Lanterns.Id(id)); panel.Close(); kit.Refresh();
+        } else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
         else if (Barrel.Is(id)) panel.OpenBarrel(stack >= 0 ? stack : world.S.Backpack.PreferredSlot);
         else return false;
         return true;
@@ -172,7 +222,7 @@ public partial class Hotbar : PanelContainer {
         for (int slot = 0; slot < 9; slot++) if (world.HotbarItem(slot) == tool) { Select(slot); return; }
         panel.Player.Mode = new ClickMode.Normal();
         world.SelectInHand(tool);
-        if (world.InHand == tool && world.ToolKind(tool) == "shovel") SelectDigging();
+        if (world.InHand == tool && world.ToolKind(tool) == GroundHoles.Tool) SelectDigging();
         kit.Refresh();
     }
 
@@ -185,7 +235,7 @@ public partial class Hotbar : PanelContainer {
         if (string.IsNullOrEmpty(id)) kit.Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
         else if (world.Data.TryBuilding(id, out var kind)) { panel.Player.Mode = new ClickMode.Build(kind); panel.Close(); } else if (id == "crate") panel.Player.PlaceContainer(id);
         else if (Barrel.Is(id) && world.HotbarStack(slot) is int barrelSlot and >= 0) panel.Player.PlaceContainer(id, barrelSlot);
-        else if (world.ToolKind(id) == "shovel" && world.HotbarCount(slot) > 0) SelectDigging();
+        else if (world.ToolKind(id) == GroundHoles.Tool && world.HotbarCount(slot) > 0) SelectDigging();
         kit.Refresh();
     }
 
@@ -195,15 +245,18 @@ public partial class Hotbar : PanelContainer {
     }
 
     /// <summary>Whether this item can be eaten, drunk, lit or swung by right-clicking open ground.</summary>
-    private bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || id == "torch"
-        || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer" or "net";
+    private bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || world.IsWeapon(id);
+
+    /// <summary>The selected carried weapon, if there is one.</summary>
+    public string? ActiveWeapon() =>
+        ActiveItem() is string item && world.Backpack[item] > 0 && world.IsWeapon(item) ? item : null;
 
     /// <summary>Uses the item selected on the hotbar toward a point on the ground; items without a use do nothing.</summary>
     public void UseSelected(Vector2 at) {
         if (ActiveItem() is not string id || !HasUse(id)) return;
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) FromStack(ActiveStack(), () => world.Consume(id));
-        else if (id == "torch") world.UseTorch(at - world.Player);
+        else if (id == World.TorchItem) world.UseTorch(at - world.Player);
         else if (world.ToolKind(id) == "net") world.SwingNet(at - world.Player);
-        else world.Attack(at - world.Player);
+        else world.Attack(at - world.Player, id);
     }
 }

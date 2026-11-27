@@ -24,6 +24,7 @@ public static class InspectPage {
             { Kind: ThingKind.Packer } t => new PackerPanel(tools, t),
             { Kind: ThingKind.Crate } t => new CratePanel(tools, t),
             { Kind: ThingKind.Barrel } t => new BarrelPanel(tools, t),
+            { Kind: ThingKind.Lantern } t => new LanternPanel(tools, Lanterns.Id(t.LanternItem), t),
             { Kind: ThingKind.Grave } t => new RecoveryBoxPanel(tools, t),
             { Kind: ThingKind.Toolstation } t => new ToolRackPanel(tools, t),
             { Kind: ThingKind.Pile } t => new PilePanel(tools, t),
@@ -65,15 +66,15 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 8);
             window.AddChild(Style.InWell(row));
-            var slot = stationSlots.Slot(plumbingSlot, "steel_pipe", true,
+            var slot = stationSlots.Slot(plumbingSlot, Plumbing.InstallMaterial, true,
                 count => $"Plumbing · {count}/{Plumbing.InstallCost} steel pipes\n{StationSlots.SlotHint}",
-                takes: held => held.Stack?.Item == "steel_pipe");
+                takes: held => held.Stack?.Item == Plumbing.InstallMaterial);
             slot.Name = "plumbing_slot";
             row.AddChild(slot);
             var label = Style.Text("", 13, Style.Ink, wrap: true);
             label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
             row.AddChild(label);
-            live.Watch(() => plumbingSlot["steel_pipe"], count => label.Text =
+            live.Watch(() => plumbingSlot[Plumbing.InstallMaterial], count => label.Text =
                 count == Plumbing.InstallCost ? "Installed" : $"{count}/{Plumbing.InstallCost} pipes");
         }
         RedrawOnChange(() => (thing.Packs, world.Selected(thing), thing.Compost, FilterCode()));
@@ -126,9 +127,9 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     protected void BagGridWithPlumbingSlot(Action<string> move, string hint, Func<string, bool>? wanted) {
         if (thing.PlumbingSlot is not Inventory plumbingSlot) { BagGrid(move, hint, wanted: wanted); return; }
         BagGrid(item => {
-            if (item == "steel_pipe") moves.Stack(world.S.Backpack, plumbingSlot, item, thing);
+            if (item == Plumbing.InstallMaterial) moves.Stack(world.S.Backpack, plumbingSlot, item, thing);
             else move(item);
-        }, hint, wanted: item => item == "steel_pipe" ? plumbingSlot.Room(item) > 0 : wanted?.Invoke(item) == true);
+        }, hint, wanted: item => item == Plumbing.InstallMaterial ? plumbingSlot.Room(item) > 0 : wanted?.Invoke(item) == true);
     }
 
     /// <summary>The backpack drawer, where Shift and Ctrl load this station.</summary>

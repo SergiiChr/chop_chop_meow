@@ -34,6 +34,10 @@ public sealed class ActorRig {
     /// <summary>What each tool puts in the hands, by its name: one piece, or two for a tool that fills both.</summary>
     private readonly List<(string Name, Node3D Node)> tools = new();
     private readonly Node3D torch;
+    private readonly Dictionary<ActorAction, Node3D>? weaponModels;
+    private Node3D? weaponShown;
+    private readonly Dictionary<CampfireInstrument, Node3D>? campfireInstruments;
+    private Node3D? campfireInstrumentShown;
     private bool torchByBed;
     private Node3D shovel = null!, rake = null!;
     private readonly List<(Skeleton3D Skeleton, Node3D Joint)> limbs = new();
@@ -42,6 +46,9 @@ public sealed class ActorRig {
     /// <summary>The torch flame and its light, animated by the view while the torch burns.</summary>
     public readonly Node3D Flame;
     public readonly OmniLight3D TorchLight;
+    internal const float TorchLightRange = 5, TorchLightAttenuation = 1.4f;
+    internal static float TorchLightEnergy(float night) => .3f + night * 1.3f;
+    internal LanternWear? Lanterns { get; }
     /// <summary>The torso and head, for a film to dress and turn beyond what a <see cref="Pose"/> holds.</summary>
     public Node3D Torso => torso;
     /// <summary>
@@ -98,10 +105,19 @@ public sealed class ActorRig {
         switch (skin) {
             case ActorSkin.Player:
                 Pack = BuildPlayerDetails(worn.Skin, worn.Hair);
+                Lanterns = new LanternWear(Root, hips, torso);
+                weaponModels = BuildWeaponModels();
                 break;
             case ActorSkin.Worker:
                 BuildWorkerDetails(worn.Skin, worn.Hair, worn.Hips);
                 HardHat(head);
+                campfireInstruments = new(3);
+                foreach (var instrument in CampfireInstrumentShape.All) {
+                    var prop = CampfireInstrumentShape.Create(instrument, worn.Skin);
+                    prop.Hide();
+                    Root.AddChild(prop);
+                    campfireInstruments.Add(instrument, prop);
+                }
                 break;
             case ActorSkin.Courier:
                 BuildFace(worn.Skin, worn.Hair);
@@ -245,7 +261,7 @@ public sealed class ActorRig {
         // The flame wraps its own light, so it casts no shadow; everything else around the torch does.
         Post(flame, .07f, 0, .24f, Vector3.Zero, Flat(new Color("ff8a2a", .9f)), 7).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         Post(flame, .045f, 0, .17f, new Vector3(.015f, 0, .01f), Flat(new Color("ffd36a", .95f)), 7).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-        var light = new OmniLight3D { Position = new Vector3(0, .2f, 0), OmniRange = 5, LightColor = new Color("ff9a45"), LightEnergy = 0, ShadowEnabled = true, OmniAttenuation = 1.4f };
+        var light = new OmniLight3D { Position = new Vector3(0, .2f, 0), OmniRange = TorchLightRange, LightColor = new Color("ff9a45"), LightEnergy = 0, ShadowEnabled = true, OmniAttenuation = TorchLightAttenuation };
         flame.AddChild(light);
         return (holder, flame, light);
     }
@@ -600,6 +616,31 @@ public sealed class ActorRig {
         return sign;
     }
 
+    private Dictionary<ActorAction, Node3D> BuildWeaponModels() {
+        var models = new Dictionary<ActorAction, Node3D>();
+        var holder = new Node3D { Name = "WeaponModels" };
+        Root.AddChild(holder);
+        foreach (var move in WeaponSwing.All) {
+            var model = move.IsBucket ? VesselShape.AddBucket(holder, Vector3.Zero) : Tool(move.Item);
+            if (!move.IsBucket) holder.AddChild(model);
+            model.Hide();
+            model.Name = move.Action.ToString();
+            models.Add(move.Action, model);
+        }
+        return models;
+    }
+
+    /// <summary>Shows the swing's working end in the same place the contact check uses.</summary>
+    internal void ShowWeapon(WeaponSwing move, float time) {
+        if (weaponModels == null) return;
+        ToolShown = move.Item;
+        var model = weaponShown = weaponModels[move.Action];
+        model.Transform = move.Held(move.At(time), Fist(false), out var bail);
+        if (move.IsBucket) model.GetChild<Node3D>(1).Transform =
+            new Transform3D(bail, VesselShape.BucketHinge - bail * VesselShape.BucketHinge);
+        model.Show();
+    }
+
     /// <summary>The tool the rig shows in hand, or null for none.</summary>
     public string? ToolShown { get; private set; }
 
@@ -624,6 +665,8 @@ public sealed class ActorRig {
         hips.Position = new Vector3(0, pose.HipHeightFor(build.Shin), pose.HipShift);
         rock.Visible = onRock;
         if (pose.Grip != grip) { grip = pose.Grip; wrist.RotationDegrees = new Vector3(0, grip, 0); }
+        weaponShown?.Hide();
+        weaponShown = null;
         foreach (var (name, node) in tools) node.Visible = name == tool;
         ToolShown = tool;
         if (shovel.Visible) LayShovel();
@@ -650,6 +693,50 @@ public sealed class ActorRig {
     /// <summary>Lowers the hands from where they last held the pump into the next action's arm pose.</summary>
     internal void ReleasePumpHandle(Pose pose, float weight) {
         if (lastPumpGrip is { } grip) ReachPumpGrip(pose, grip.Left, grip.Right, weight);
+    }
+
+    /// <summary>Adds a held instrument and the music's motion over the seated pose, without moving its hips or feet.</summary>
+    internal void AnimateCampfireMusic(CampfireInstrument instrument, float playing, float nodding, float beat) {
+        if (campfireInstruments == null) return;
+        var prop = instrument == CampfireInstrument.None ? null : campfireInstruments[instrument];
+        if (prop != campfireInstrumentShown) {
+            campfireInstrumentShown?.Hide();
+            campfireInstrumentShown = prop;
+            prop?.Show();
+        }
+        if (prop == null && nodding == 0) return;
+
+        float glance = instrument switch {
+            CampfireInstrument.Harmonica => -3 * playing,
+            CampfireInstrument.Guitar => 4 + 5 * playing,
+            CampfireInstrument.Drum => 3 + 7 * playing,
+            _ => 0
+        };
+        head.RotationDegrees += Vector3.Right * (glance + CampfirePerformance.Nod(beat) * nodding);
+        if (prop == null) return;
+        var body = hips.Transform * torso.Transform * chest.Transform;
+        var hold = instrument switch {
+            CampfireInstrument.Guitar => CampfirePerformance.Guitar(hips.Position, rock.Visible, playing, beat),
+            CampfireInstrument.Drum => CampfirePerformance.Drum(hips.Position, rock.Visible, playing, beat),
+            _ => CampfirePerformance.Harmonica(hips.Position, body * head.Transform, playing, beat)
+        };
+        prop.Transform = hold.Prop;
+        var fromRoot = body.AffineInverse();
+        Reach(true, fromRoot * hold.Left);
+        Reach(false, fromRoot * hold.Right, hold.RightPad ? HandPadReach : 0);
+        foreach (var (skeleton, joint) in limbs)
+            skeleton.SetBonePoseRotation(1, joint.Quaternion);
+
+        void Reach(bool left, Vector3 at, float pastFist = 0) {
+            // The guitar's neck is reached from below. The strumming elbow comes round the front of the soundboard.
+            var elbowToward = instrument != CampfireInstrument.Guitar ? new Vector3(left ? .8f : -.8f, -1, -.3f)
+                : left ? new Vector3(1, -.65f, -.1f) : new Vector3(-1, .75f, 1.8f);
+            var (raise, outward, bend, roll) = ArmReach.ArmTo(at, left, elbowToward, Palm,
+                build.Shoulder(left), build.UpperArm, build.Forearm + pastFist);
+            (left ? shoulderL : shoulderR).RotationDegrees = new Vector3(-raise, 0, left ? outward : -outward);
+            (left ? elbowL : elbowR).RotationDegrees = new Vector3(-bend, 0, 0);
+            RollArm(left, roll);
+        }
     }
 
     private void ReachPumpGrip(Pose pose, Vector3 leftGrip, Vector3 rightGrip, float weight) {

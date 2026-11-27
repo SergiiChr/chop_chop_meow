@@ -41,7 +41,8 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
     /// <summary>A slot in the craft row with what one batch takes or makes under it.</summary>
     private VBoxContainer RecipeSlot(string name, string item, string perBatch, float size) {
         var (cell, _) = ItemSlot.Create(name, size); cell.Icon = Icons.Of(item);
-        cell.TooltipText = world.Data.Name(item);
+        kit.LinkRecipeMap(cell, () => item);
+        cell.TooltipText = $"{world.Data.Name(item)}\n{RecipeMap.AltClickHint}";
         return StationSlots.Labelled(cell, perBatch);
     }
 }

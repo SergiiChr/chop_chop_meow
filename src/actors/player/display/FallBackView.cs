@@ -114,7 +114,7 @@ public static class FallBackView {
     /// turns about its feet, so they go where the tipped hips need them.
     /// </summary>
     private static Vector3 FallRoot(Vector2 at, Vector2 forward, float tip, Vector2 hips) =>
-        WorldView.To3(at) + WorldView.To3(forward) * (hips.X + FallHips * MathF.Sin(tip)) + Vector3.Up * (hips.Y - FallHips * MathF.Cos(tip));
+        WorldView.StandsAt(at) + WorldView.To3(forward) * (hips.X + FallHips * MathF.Sin(tip)) + Vector3.Up * (hips.Y - FallHips * MathF.Cos(tip));
 
     /// <summary>Where the throat of a player at <paramref name="at"/> facing <paramref name="toward"/> is, <paramref name="downedFor"/> seconds into being knocked down; it follows FallBack.</summary>
     public static Vector3 Throat(Vector2 at, Vector2 toward, float downedFor) {

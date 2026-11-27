@@ -40,6 +40,7 @@ public sealed partial class GameData {
         ["steel_pipe"] = new() { Name = "Steel pipe", Color = "9cabb3" },
         [GlassBlowing.Item] = new() { Name = "Glass jar", Color = "d5e6e9" },
         ["torch"] = new() { Name = "Torch", Color = "e8913a" },
+        [Lanterns.Item] = new() { Name = "Lantern", Color = "adff76", Description = "Finally a sustainable source of light" },
         ["stone_chisel"] = new() { Name = "Stone chisel", Color = "9aa29f", Tool = "chisel" },
         ["iron_ore"] = new() { Name = "Iron ore", Color = "cc8a60" },
         ["coal"] = new() { Name = "Coal", Color = "81818c" },
@@ -57,7 +58,7 @@ public sealed partial class GameData {
         [Water.Full] = new() { Name = "Water bottle", Color = "88cbe0", Thirst = 33.333336f },
         [Water.TwoLiters] = new() { Name = "Water bottle (2 liters)", Color = "88cbe0", Thirst = 33.333336f },
         [Water.OneLiter] = new() { Name = "Water bottle (1 liter)", Color = "88cbe0", Thirst = 33.333336f },
-        [Water.Empty] = new() { Name = "Empty bottle", Color = "a8bdc3" },
+        [Water.Empty] = new() { Name = "Empty bottle", MapName = "Bottle", Color = "a8bdc3" },
         [Water.Liquid] = new() { Name = "Water", Color = "88cbe0" },
         ["raw_meat"] = new() { Name = "Raw meat", Color = "c4524a", Food = true },
         ["burnt_steak"] = new() { Name = "Burnt steak", Color = "5e3b25", Food = true, Hunger = 40 },
@@ -87,7 +88,7 @@ public sealed partial class GameData {
         ["nettle"] = new() { Name = "Nettle", Color = "5f8f3e", Description = "It stings but my grandma used to make ropes out of it." },
         ["nettle_rope"] = new() { Name = "Nettle rope", Color = "b9b27a" },
         ["bug_net"] = new() { Name = "Bug net", Color = "f4f6f6", Tool = "net", Description = "I can catch all kinds of bugs with this." },
-        ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Glows even after death." },
+        ["firebug"] = new() { Name = "Firebug", Color = "d6ff5a", Description = "Short but bright life" },
         ["coins"] = new() { Name = "Coins", Color = "e3b94a" },
     };
     public Dictionary<ThingKind, BuildingDef> Buildings { get; } = new() {
@@ -116,7 +117,7 @@ public sealed partial class GameData {
         [ThingKind.Signpost] = new() { Name = "Trading post", Cost = new() { ["wood"] = 10, ["stone"] = 4 }, Description = "Trade by cart. Hire and manage neighboring villagers." },
     };
     public Dictionary<string, SourceDef> Sources { get; } = new() {
-        [Inventory.Coins] = new() { How = "Sell goods at the trading post" },
+        [Inventory.Coins] = new() { How = "Sell goods for money" },
         ["wood"] = new() { How = "Chop trees" },
         ["acorn"] = new() { How = "Chop trees or gather leaves" },
         ["stone"] = new() { How = "Pick up or mine" },
@@ -129,8 +130,7 @@ public sealed partial class GameData {
         ["leaves"] = new() { How = "Under oaks or bushes" },
         ["grass"] = new() { How = "From harvest" },
         ["wheat_seeds"] = new() { How = "Buy, or from harvest" },
-        [Water.Full] = new() { How = "Fill at the lake", From = new() { Water.Empty } },
-        [Water.Liquid] = new() { How = "Pour from a water bottle", From = new() { Water.Full } },
+        [Water.Liquid] = new() { How = "Pour from a bottle", From = new() { Water.Empty } },
         ["fertilizer"] = new() { How = "Compost pile", From = new() { "leaves", "grass" } },
         ["nettle"] = new() { How = "Pick; more come up each night" },
         ["firebug"] = new() { How = "Catch with a bug net after dark" },
@@ -144,11 +144,10 @@ public sealed partial class GameData {
     };
     public List<MapRowDef> MapRows { get; } = new() {
         new() { Title = "Wood", Roots = new() { "wood", "acorn" } },
-        new() { Title = "Stone, coal and sand", Roots = new() { "stone", "coal", Beach.Sand } },
-        new() { Title = "Iron and steel", Roots = new() { "iron_ore" } },
-        new() { Title = "Tin", Roots = new() { "tin_ore" } },
-        new() { Title = "Food", Roots = new() { "berries", "raw_meat" } },
-        new() { Title = "Farm", Roots = new() { "leaves", "grass", "wheat_seeds" } },
+        new() { Title = "Big rocks and small rocks", Roots = new() { "stone", Beach.Sand } },
+        new() { Title = "Metals", Roots = new() { "iron_ore", "coal", "tin_ore" } },
+        new() { Title = "Food", Roots = new() { "berries", "raw_meat", "wheat_seeds" } },
+        new() { Title = "Farm", Roots = new() { "leaves", "grass" } },
         new() { Title = "Nettle and firebugs", Roots = new() { "nettle", "firebug" } },
         new() { Title = "Trade", Roots = new() { Inventory.Coins } },
     };
@@ -182,6 +181,7 @@ public sealed partial class GameData {
         ["rake"] = new() { Name = "Rake", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["steel_parts"] = 1, ["wood_parts"] = 2 }, Output = "rake", Amount = 1, Seconds = 10 },
         ["mortar"] = new() { Name = "Mortar and pestle", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = true, Tool = "chisel", Tier = 2, Inputs = new() { ["stone"] = 3 }, Output = "mortar", Amount = 1, Seconds = 10 },
         ["nettle_rope"] = new() { Name = "Nettle rope", Group = RecipeGroup.Materials, Station = ThingKind.Bench, Hand = false, Tool = "hammer", MaxTier = 0, TooHard = "Steel hammer will damage the fibers.", Twists = true, Inputs = new() { ["nettle"] = 1 }, Output = "nettle_rope", Amount = 1, Seconds = 10 },
+        [Lanterns.Item] = new() { Name = "Lantern", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Tool = "hammer", Tier = 2, Inputs = new() { [GlassBlowing.Item] = 1, ["steel_sheet"] = 1, ["wood_parts"] = 1 }, Output = Lanterns.Item, Amount = 1, Seconds = 10 },
         ["bug_net"] = new() { Name = "Bug net", Group = RecipeGroup.Tools, Station = ThingKind.Bench, Hand = false, Tool = "hammer", Inputs = new() { ["nettle_rope"] = 5, ["wood"] = 1, ["wood_parts"] = 1 }, Output = "bug_net", Amount = 1, Seconds = 10 },
         ["bread"] = new() { Name = "Bake bread", Group = RecipeGroup.Food, Station = ThingKind.Furnace, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["dough"] = 1 }, Output = "bread", Amount = 4, Seconds = 8 },
         ["crushed_berries"] = new() { Name = "Crush berries", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Worked = true, Hand = true, Tool = "mortar", Inputs = new() { ["berries"] = BerryJam.BerriesPerCrush }, Output = "crushed_berries", Amount = 1, Seconds = 10 },

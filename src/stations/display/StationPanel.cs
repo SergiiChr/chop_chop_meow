@@ -69,12 +69,15 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         string plainest = world.Data.PlainestTool(tool, slot.Tier, thing.Kind);
         // A slot that asks for a better tool than the plainest of its kind names it.
         string empty = slot.Item != null ? $"Empty {tool} slot\nPut one {world.Data.Name(slot.Item).ToLowerInvariant()} here" : slot.Tier > 0 ? $"{world.Data.Name(plainest)} slot." : $"Empty {tool} slot\nPut a {tool} here from your backpack";
-        moves.TakeCell(cell, thing.Tools!, () => world.BenchTool(thing, tool), thing,
-            held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item) is ItemDef def && slot.Takes(stack.Item, def), (item, _) => world.SlotTool(thing, item));
-        live.Watch(() => world.BenchTool(thing, tool), held => {
+        string? HeldTool() => world.BenchTool(thing, tool);
+        moves.TakeCell(cell, thing.Tools!, HeldTool, thing,
+            held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item) is ItemDef def && slot.Takes(stack.Item, def),
+            (item, _) => world.SlotTool(thing, item), shown: () => HeldTool() ?? plainest);
+        live.Watch(HeldTool, held => {
             cell.Icon = Icons.Of(held ?? plainest);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held != null ? Colors.White : Style.Ghost);
-            cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\n{StationSlots.SlotHint}" : empty;
+            string hint = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\n{StationSlots.SlotHint}" : empty;
+            cell.TooltipText = $"{hint}\n{RecipeMap.AltClickHint}";
         });
         return cell;
     }

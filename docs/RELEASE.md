@@ -20,6 +20,8 @@
      the same files.
    - `./build.py play` in a worktree first replaces its save slots, autosave and settings with the main checkout's.
      The game opens on the player's own saves that way, and what it saves in the worktree is gone on the next launch.
+     Use the [my-playtest skill](../.agents/skills/my-playtest/SKILL.md) to prepare a separate copy with your settings
+     and a single debug chest that grows to hold its supplies.
    - Each run of the checks claims a block of game ports of its own, past the ones a played game takes.
      So checks can run while a game is played or while another checkout runs its own.
 2. Make the change and update the docs it affects in the same commit.
@@ -27,6 +29,8 @@
 4. Review the branch against `main` with the `self-review` skill and apply what improves it.
 5. Run `./build.py build` before opening the pull request.
 6. Open a pull request against `main`. Describe what changed, how it was checked and what was not checked. CI runs `./build.py check` on it.
+7. Once it is merged, run the `post-merge` skill (`.agents/skills/post-merge`), which brings the player's saves forward
+   if it raised the save version and removes the branch's worktree and local branch.
 
 ## Release bundle
 

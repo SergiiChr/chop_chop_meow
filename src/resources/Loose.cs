@@ -25,13 +25,8 @@ public partial class World {
     internal void Chip(Thing source, string? tool) {
         if (tool == null || GatherRules.Of(source.Kind) is not { Chip: ThingKind kind } rule
             || Data.Items[tool].Tool != rule.Needs || chipping.NextDouble() >= GatherRules.ChipChance) return;
-        for (int tries = 0; tries < 8; tries++) {
-            float angle = (float)(chipping.NextDouble() * Math.Tau), distance = GatherRules.ChipReach * (.55f + .45f * (float)chipping.NextDouble());
-            var p = source.Pos + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * distance;
-            if (!CanStand(p)) continue;
-            Add(kind, p, 1); Play("wood_rocks_inventory", p);
-            return;
-        }
+        if (StandSpotNear(chipping, source.Pos, GatherRules.ChipReach * .55f, GatherRules.ChipReach) is not Vector2 p) return;
+        Add(kind, p, 1); Play("wood_rocks_inventory", p);
     }
 
     /// <summary>Whether a worker has a tool of a kind in hand or can take one from a tool station.</summary>

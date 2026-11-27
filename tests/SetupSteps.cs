@@ -19,11 +19,17 @@ internal static class SetupSteps {
     /// <summary>Puts goods in the backpack: gathering or buying each would take a day of ticks, and many goods are not sold.</summary>
     public static int Give(World world, string item, int count = 1) => Give(world.S.Actor, item, count);
 
+    /// <summary>Puts freshly caught firebugs in the backpack, without finding and catching each at night.</summary>
+    public static int GiveFirebugs(World world, int count) => world.Firebugs.Catch(world.S.Backpack, count);
+
     /// <summary>Puts goods in one player's backpack, for the same reason.</summary>
     public static int Give(PlayerState player, string item, int count = 1) => player.Backpack.Add(item, count);
 
     /// <summary>Puts a list of goods in the backpack, such as a building's cost.</summary>
     public static void Give(World world, IReadOnlyDictionary<string, int> goods) { foreach (var (item, count) in goods) Give(world, item, count); }
+
+    /// <summary>Puts newly caught firebugs in a guest's backpack for a network check of what happens after a catch.</summary>
+    public static int GiveFirebugs(World world, PlayerState player, int count) => world.Firebugs.Catch(player.Backpack, count);
 
     /// <summary>Takes goods out of the backpack to clear the ground for the next check: the game can only move them somewhere else.</summary>
     public static int Drop(World world, string item, int count = int.MaxValue) => Drop(world.S.Actor, item, count);
@@ -120,6 +126,17 @@ internal static class SetupSteps {
     /// <summary>Starts one player's respawn timer, for the same reason.</summary>
     public static void SetRespawn(PlayerState player, float seconds) => player.RespawnIn = seconds;
 
+    /// <summary>Puts every part of the diary in a player's diary: two of them wait for the caves, which no play reaches yet.</summary>
+    public static void TakeEveryFind(PlayerState player) {
+        foreach (var def in DiaryFindDef.All) if (!player.DiaryFinds.Contains(def.Find)) player.DiaryFinds.Add(def.Find);
+    }
+
+    /// <summary>Lays a page fallen off a tree for a player: in play one falls one chop in twenty, which a check of the window cannot wait for.</summary>
+    public static Thing DropPage(World world, PlayerState player, Vector2 at) => world.Diary.Drop(player, at);
+
+    /// <summary>Brings up a find's pop-up for a player: in play it turns up one gather in twenty, which a check of the window cannot wait for.</summary>
+    public static void TurnUpFind(PlayerState player, DiaryFind find) => player.DiaryFinding = find;
+
     /// <summary>Marks goals as done: reaching them for real takes a whole playthrough.</summary>
     public static void Achieve(World world, params IEnumerable<string> milestones) => world.S.Milestones.UnionWith(milestones);
 
@@ -129,7 +146,7 @@ internal static class SetupSteps {
     /// <summary>Sets exact market values, so a load that restores them cannot pass on a default.</summary>
     public static void SetMarket(World world, string item, float price, float demand) { world.S.Prices[item] = price; world.S.Demand[item] = demand; }
 
-    /// <summary>Moves the clock without ticks: two real days would refill the market a check is watching, so only the age of the news changes.</summary>
+    /// <summary>Moves the clock without running the settlement, so a check can start at a chosen time.</summary>
     public static void SkipClock(World world, float seconds) => world.S.Time += seconds;
 
     /// <summary>Eats or drinks an item from one backpack cell, as a hotbar slot bound to that stack does.</summary>

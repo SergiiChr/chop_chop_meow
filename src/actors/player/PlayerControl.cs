@@ -10,7 +10,7 @@ public abstract record ClickMode {
     public sealed record Normal : ClickMode;
     /// <summary>A click places a building of this kind.</summary>
     public sealed record Build(ThingKind Kind, PipeShape Shape = PipeShape.Straight) : ClickMode;
-    /// <summary>A click places a crate or barrel, from a specific backpack cell when one is named.</summary>
+    /// <summary>A click places a crate, barrel or lantern, from a specific backpack cell when one is named.</summary>
     public sealed record Container(string Item, int BackpackSlot = -1) : ClickMode;
     /// <summary>Holding right mouse on open ground digs a hole.</summary>
     public sealed record Dig : ClickMode;
@@ -24,7 +24,7 @@ public abstract record ClickMode {
     public float Rotation => QuarterTurns * Mathf.Pi / 2;
 
     /// <summary>The kind being placed, or null when a click places nothing.</summary>
-    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : ThingKind.Crate, Dig => ThingKind.Hole, _ => null };
+    public ThingKind? Placing => this switch { Build build => build.Kind, Container container => Barrel.Is(container.Item) ? ThingKind.Barrel : Lanterns.IsItem(container.Item) ? ThingKind.Lantern : ThingKind.Crate, Dig => ThingKind.Hole, _ => null };
 }
 
 /// <summary>The player in the world: walking, gathering, lifting containers, placing buildings, taking them down and clicking things.</summary>
@@ -43,6 +43,8 @@ public sealed class PlayerControl {
     /// <summary>The placement on the cursor, with a turn that stays set while the pointer crosses the interface.</summary>
     private ClickMode? heldPlacement;
     private Thing? gathering;
+    /// <summary>Whether the gather the button holds has gone on past the click that started it.</summary>
+    private bool gatherHeld;
     private int digPress, digAttempt;
     private bool digDismissed;
     /// <summary>The spot under the mouse when this hold started, locked until it ends.</summary>
@@ -105,7 +107,7 @@ public sealed class PlayerControl {
     /// <summary>Enters placement for a container from the backpack.</summary>
     public void PlaceContainer(string item, int backpackSlot = -1) {
         var container = new ClickMode.Container(item, backpackSlot);
-        if (ContainerCount(container) == 0) { kit.Notify(Barrel.Is(item) ? "No barrel in your backpack." : "No empty crate in your backpack."); return; }
+        if (ContainerCount(container) == 0) { kit.Notify(Barrel.Is(item) ? "No barrel in your backpack." : Lanterns.IsItem(item) ? "No lantern in your backpack." : "No empty crate in your backpack."); return; }
         Mode = container; panel.Close();
     }
 
@@ -154,7 +156,7 @@ public sealed class PlayerControl {
     /// <summary>A container or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>
     private void PlaceHeld(bool overPanel) {
         var plan = cursor.Plan is string id ? Kinds.Parse(id) : null;
-        string? container = cursor.Stack is HeldStack held && (World.IsCrate(held.Item) || Barrel.Is(held.Item)) ? held.Item : null;
+        string? container = cursor.Stack is HeldStack held && (World.IsCrate(held.Item) || Barrel.Is(held.Item) || Lanterns.IsItem(held.Item)) ? held.Item : null;
         var previous = heldPlacement;
         // Built only when it changes, as this runs every frame.
         if (plan is ThingKind kind) {
@@ -207,26 +209,28 @@ public sealed class PlayerControl {
     /// <summary>The ground direction for right <paramref name="x"/> and down <paramref name="y"/> on screen, each -1, 0 or 1 as movement keys give them.</summary>
     public static Vector2 KeyDirection(float x, float y) => new Vector2(x + y * 2, y * 2 - x).Normalized();
 
-    /// <summary>Carries on a gather; a loose piece needs only one click: the player keeps walking to it after the button is released.</summary>
+    /// <summary>Carries on a gather; a loose piece or a page needs only one click: the player keeps walking to it after the button is released.</summary>
     private Vector2 Gather(Vector2 direction, bool right, float dt) {
         // What was being worked on can go: a tree falls and leaves its stump, and a stump or a bush comes out of the ground.
         if (gathering != null && world.Find(gathering.Id) == null) { panel.Deselect(gathering.Id); gathering = null; }
-        if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || cabinApproach.Active || interactionApproach.Active) {
+        if (gathering == null || !right && !gathering.TakenWhole || direction != Vector2.Zero || cabinApproach.Active || interactionApproach.Active) {
             world.ResetGather();
-            if (!right || gathering?.IsLoose == true) gathering = null;
+            if (!right || gathering?.TakenWhole == true) gathering = null;
             return direction;
         }
         // Step in close enough for the tool to reach the model; the lake edge keeps its wider reach.
         if (!world.Near(gathering, gathering.Kind == ThingKind.Water ? 2.5f : 1.35f)) return (world.GatherAt(gathering, world.Player) - world.Player).Normalized();
-        if (gathering.IsLoose) {
+        if (gathering.TakenWhole) {
             world.Gather(gathering, dt);
             if (world.Occupied) { gathering = null; return direction; }
             if (world.Find(gathering.Id) == null) panel.Deselect(gathering.Id);
             gathering = null;
             return direction;
         }
+        // A hold under way stops without a word when the player turns busy, such as with a find's pop-up: only a new click is told.
+        if (gatherHeld && world.Occupied) { world.ResetGather(); gathering = null; return direction; }
         // Emptying it shows on the bare bush or raked patch; a target that was already empty or out of reach still says why.
-        bool had = gathering.Remaining > 0; world.Gather(gathering, dt);
+        bool had = gathering.Remaining > 0; world.Gather(gathering, dt); gatherHeld = true;
         // A busy player is told once per click, not every frame the button is held.
         if (world.Occupied) { gathering = null; return direction; }
         if (world.GatherBlock(gathering) is string blocked) { if (!had || gathering.Remaining > 0) kit.Notify(blocked); gathering = null; }
@@ -290,7 +294,7 @@ public sealed class PlayerControl {
         if (cabinApproach.Active) cabinApproach.Move(move.Length());
         else if (interactionApproach.Active) interactionApproach.Move(move.Length());
         else world.MovePlayer(move);
-        view.GatheringTarget = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f) ? gathering
+        view.GatheringTarget = gathering is { TakenWhole: false } && right && world.Near(gathering, 2.5f) ? gathering
             : digAttempt != 0 ? GroundHoles.AnimationTarget(world.Me) : null;
         view.Gathering = view.GatheringTarget != null;
         // A tool in hand that has left the backpack leaves the hand empty.
@@ -305,7 +309,7 @@ public sealed class PlayerControl {
         else if (GlassBlowing.PumpAtPlayer(world) is Thing glass) world.Pump(glass);
         else {
             var aim = view.FirstPerson ? view.FirstPersonForward : HeldDirection();
-            world.Attack(aim == Vector2.Zero ? walked : aim);
+            world.Attack(aim == Vector2.Zero ? walked : aim, hotbar.ActiveWeapon());
         }
     }
 
@@ -340,6 +344,7 @@ public sealed class PlayerControl {
         if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         if (Layer == Layer.Underground) return;
         var t = view.Pick(at);
+        if (t is { Kind: ThingKind.Lantern }) { gathering = null; lifting = null; panel.Select(t); return; }
         // With a bug net selected a right click on a firebug swings at it, as one on open ground swings toward the pointer.
         if (t is { Kind: ThingKind.Firebug } && Mode is ClickMode.Normal && hotbar.ActiveItem() is string net && world.ToolKind(net) == "net") {
             gathering = null; lifting = null;
@@ -348,7 +353,11 @@ public sealed class PlayerControl {
         }
         // A firebug in the air takes no ground: a shovel digs the spot it hovers over.
         if (t is { Roams: true } && Mode is ClickMode.Dig) t = null;
-        if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
+        if (t?.IsResource == true || t?.IsPage == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) {
+            gathering = t; gatherHeld = false;
+            // A page has no page of its own to mark.
+            if (!t.IsPage) panel.Mark(t);
+        } else gathering = null;
         lifting = t?.Kind is ThingKind.Crate or ThingKind.Barrel ? t : null; liftClock = 0;
         if (t != null) return;
         if (Mode is ClickMode.Dig) {
@@ -361,7 +370,7 @@ public sealed class PlayerControl {
 
     /// <summary>
     /// The second press of a double click on a cabin walks the player to its door and in, wherever the pointer is.
-    /// The first press opened the cabin's page, which moves the world aside under the pointer and can put the page's windows over it.
+    /// The first press opened the cabin's page, which can put the page's windows under the pointer.
     /// So the game hands every left press here before the interface: one that is not such a second press returns false and goes on as usual.
     /// </summary>
     public bool WalkIntoClickedCabin(InputEventMouseButton mouse) {
@@ -414,8 +423,9 @@ public sealed class PlayerControl {
         world.SetDuty(worker, t, JobKind.Gather, true); Mode = new ClickMode.Normal(); panel.Select(worker);
     }
 
-    /// <summary>Opens a thing's page; a cabin's is the one the second press of a double click then walks into.</summary>
+    /// <summary>Opens a thing's page; a cabin's is the one the second press of a double click then walks into. A page lying in the world has none: the player walks over and picks it up.</summary>
     private void ClickThing(Thing t) {
+        if (t.IsPage) { gathering = t; return; }
         if (t.Kind == ThingKind.Hut) clickedCabin = t;
         panel.Select(t);
     }
@@ -446,7 +456,9 @@ public sealed class PlayerControl {
     private void PlaceContainerAt(ClickMode.Container container, Vector2 at) {
         string item = container.Item;
         void Put() {
-            if (Barrel.Is(item)) world.PlaceBarrel(item, at, container.Rotation); else world.PlaceCrate(item, at, container.Rotation);
+            if (Barrel.Is(item)) world.PlaceBarrel(item, at, container.Rotation);
+            else if (Lanterns.IsItem(item)) world.Lanterns.Place(item, at, container.Rotation);
+            else world.PlaceCrate(item, at, container.Rotation);
         }
         if (placingHeld && cursor.Stack?.Item == item) world.FromHeldStack(Put);
         else if (container.BackpackSlot >= 0) hotbar.FromStack(container.BackpackSlot, Put);

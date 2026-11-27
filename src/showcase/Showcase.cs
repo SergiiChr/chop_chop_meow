@@ -5,7 +5,37 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The review fixtures behind <c>--showcase</c> and its flags: settled scenes for screenshots, separate from a playable game.</summary>
-public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit) {
+public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit, GoalPopup goalPopup) {
+    /// <summary>
+    /// Diary review: the player on the lake's shore by its floating page, with a page lying on the ground beside them and three finds in their diary, two of whose days are unread.
+    /// <c>--diary-fall</c> drops that page off the oak beside them a second in instead, since a player has one fallen page at a time.
+    /// <c>--panel</c> opens the diary, <c>--diary-day N</c> opens day N large and <c>--diary-find</c> shows the pop-up of a page found in leaves.
+    /// <c>--diary-first</c> leaves the diary empty and no page on the ground, so the lake's page is the player's first find.
+    /// </summary>
+    private void DiaryReview() {
+        var me = world.Me;
+        world.S.Time = world.Data.DaySeconds * Launch.Number("--day-phase", .2f);
+        var page = world.ThingsOf(ThingKind.FloatingPage)[0];
+        var floating = Diary.FloatAt(page, world.Time);
+        var shore = Terrain.WaterPoint(floating);
+        var inland = (shore - Terrain.Lake).Normalized();
+        world.S.Things.RemoveAll(t => !t.IsPage && t.Pos.DistanceTo(shore) < 8 && t.Kind != ThingKind.Water);
+        world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear(); world.S.Wolves.Clear();
+        world.Player = shore + inland * .6f;
+        var tree = world.Add(ThingKind.Tree, shore + inland * 4.5f + inland.Orthogonal() * 2, World.TreeWood);
+        if (!Launch.Has("--diary-first")) {
+            me.DiaryFinds.AddRange([DiaryFind.Sand, DiaryFind.Berries, DiaryFind.Tree]);
+            me.DiaryRead.AddRange([6, 36]);
+            if (Launch.Has("--diary-fall")) view.GetTree().CreateTimer(1).Timeout += () => world.Diary.Drop(me, tree.Pos - inland * 1.2f);
+            else world.Diary.Drop(me, world.Player + inland.Orthogonal() * 1.4f + inland * .8f);
+        }
+        if (Launch.Has("--diary-find")) me.DiaryFinding = DiaryFind.Leaves;
+        world.Tick(0); view.Zoom = Launch.Number("--zoom", 1.8f);
+        if (Launch.Has("--panel")) panel.Open(Page.Diary); else panel.Close();
+        if (Launch.Value("--diary-day") is string day) panel.ReadingSheet.Open(int.Parse(day), quiet: true);
+        if (Launch.Has("--hide-ui")) ui.Visible = false;
+    }
+
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
         var stage = int.TryParse(Launch.Value("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
@@ -29,9 +59,22 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     }
     private void Press(string button) => panel.FindChild(button, true, false).EmitSignal(BaseButton.SignalName.Pressed);
 
-    /// <summary>Sets up the scene the flags ask for; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    /// <summary>Sets up the scene the flags ask for, which pops up no goals it sets by hand.</summary>
     public void Run() {
+        Stage();
+        // A scene's goals are set by hand, not reached in play, so they pop up nothing.
+        // With --goal-popup the bench is reached after that: "A start" pops up as completed, then "Road to riches" as new.
+        // The default scene has sold goods already, which would complete Road to riches as it appears.
+        bool popup = Launch.Has("--goal-popup") && world.S.Milestones.Remove("bench");
+        if (popup) world.S.Milestones.Remove("sold");
+        goalPopup.SkipKnownGoals();
+        if (popup) world.S.Milestones.Add("bench");
+    }
+
+    /// <summary>Builds the scene; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    private void Stage() {
         if (Launch.Value("--straw-bed") is string bedPose) { StrawBedScene(bedPose); return; }
+        if (Launch.Value("--campfire-music") is string music) { CampfireMusicScene(music); return; }
         Place();
         view.Zoom = Launch.Number("--zoom", view.Zoom);
         if (Launch.Value("--doorway") is string scene) {
@@ -41,6 +84,42 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             if (Launch.Has("--panel")) panel.Select(cabin);
         }
         if (Launch.Value("--wolf-scene") is string wolves) view.AddChild(new WolfReview { World = world, View = view, Cabin = world.Things.First(t => t.Kind == ThingKind.Hut), Scene = wolves });
+    }
+
+    /// <summary>Seats the trio and a listener, or one instrumentalist for a solo with or without its ordinary wait.</summary>
+    private void CampfireMusicScene(string music) {
+        var at = Terrain.Spawn + new Vector2(1, -3);
+        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 12);
+        var fire = world.Add(ThingKind.Campfire, at);
+        world.ClearGround(fire);
+        var post = world.Add(ThingKind.Signpost, at + Vector2.Left * 7);
+        world.S.Backpack.Add(Inventory.Coins, 500);
+        world.Player = post.Pos + Vector2.One;
+        // The solo seeds pick a held harmonica chord, a guitar strum and a four-kick drum loop.
+        world.CampfireMusic.Seed(music switch { "harmonica" => 37, "guitar" or "guitar-perch" => 16, "drum" => 1, _ => 374 });
+        // An even-numbered worker perches so both guitar holds can be seen in close-up.
+        if (music == "guitar-perch" && world.S.NextId % 2 != 0) world.S.NextId++;
+        bool trio = music == "trio";
+        int count = trio ? 4 : 1;
+        for (int i = 0; i < count; i++)
+            if (world.Hire(post, world.Data.HireOffers[1]) is Worker worker)
+                worker.Pos = at + Vector2.FromAngle(i * Mathf.Tau / BreakSeats.FireSeats) * BreakSeats.FireRadius;
+        world.Player = at + new Vector2(3.2f, 3.2f);
+        bool wholeVisit = Launch.Has("--campfire-visit");
+        for (int i = 0; i < 600; i++) {
+            world.Tick(1f / 60);
+            if (trio) {
+                if (world.CampfireMusic.SongAt(fire.Id).Track != 0) break;
+            } else {
+                var seat = world.CampfireMusic.SeatOf(world.Workers[0]);
+                if (wholeVisit ? seat.Fire != 0 : seat.Solo != 0) break;
+            }
+        }
+        if (trio) { view.CameraTurn = 135; view.CameraPitch = 35; }
+        AimAt(trio ? at : world.Workers[0].Pos);
+        view.Zoom = Launch.Number("--zoom", trio ? 2.8f : 4.6f);
+        panel.Close();
+        if (Launch.Has("--hide-ui")) ui.Visible = false;
     }
 
     /// <summary>A straw bed at the game camera, with a model or sleep pose to inspect.</summary>
@@ -171,7 +250,56 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--hide-ui")) ui.Visible = false;
     }
 
+    /// <summary>Reviews the same lantern models drawn on the ground, in the hand or on the belt during play.</summary>
+    private void LanternReview() {
+        var at = Terrain.Spawn + new Vector2(5, 3);
+        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 12);
+        bool night = Launch.Has("--night");
+        world.S.Time = world.Data.DaySeconds * (night ? .76f : .2f);
+        world.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; world.S.DenHours = 24; world.Firebugs.KeepIn();
+        world.SelectHotbar(1);
+        string GiveLantern(int count) {
+            string item = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), count);
+            world.S.Backpack.Add(item, 1);
+            return item;
+        }
+        string? scene = Launch.Value("--lantern");
+        bool carried = scene is "held" or "belt" or "full-wear" or "backpack" or "torch";
+        world.Player = carried ? at : at + new Vector2(-2.2f, -2.2f);
+        if (scene is "belt" or "full-wear") {
+            for (int i = 0; i < (scene == "belt" ? 2 : 9); i++) world.SetHotbar(i, GiveLantern(i == 0 ? 10 : 4));
+            if (Launch.Has("--lantern-motion")) world.Lanterns.ToggleInHand(Lanterns.Id(GiveLantern(10)));
+        } else if (scene == "held") world.Lanterns.ToggleInHand(Lanterns.Id(GiveLantern(10)));
+        else if (scene == "backpack") {
+            GiveLantern(0);
+            world.SetHotbar(0, GiveLantern(4));
+            world.Firebugs.Catch(world.S.Backpack, Lanterns.Capacity);
+        } else if (scene == "torch") { world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); } else _ = world.Lanterns.Place(GiveLantern(scene == "partial" ? 4 : Launch.Has("--dark") ? 0 : 10), at) ?? throw new InvalidOperationException("The lantern review needs open ground.");
+        world.Tick(scene == "torch" ? World.KindleSeconds : 0);
+        AimAt(at);
+        if (carried && Launch.Has("--lantern-motion")) ReviewLanternMotion();
+        view.Zoom = carried ? 3.25f : night ? 1.6f : 4;
+        if (scene == "backpack") panel.Open(Page.Backpack); else panel.Close();
+        ui.Visible = scene == "backpack" && !Launch.Has("--hide-ui");
+    }
+
+    /// <summary>Records the held and worn lanterns from standing through a jog, a sprint and a stop.</summary>
+    private void ReviewLanternMotion() {
+        view.CameraOn = null;
+        var motion = view.CreateTween();
+        motion.TweenInterval(.30);
+        motion.TweenCallback(Callable.From(() => KeyPress(Key.D, true)));
+        motion.TweenInterval(.85);
+        motion.TweenCallback(Callable.From(() => KeyPress(Key.Shift, true)));
+        motion.TweenInterval(.85);
+        motion.TweenCallback(Callable.From(() => { KeyPress(Key.D, false); KeyPress(Key.Shift, false); }));
+
+        static void KeyPress(Key key, bool down) => Input.ParseInputEvent(
+            new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = down });
+    }
+
     private void Place() {
+        if (Launch.Has("--lantern")) { LanternReview(); return; }
         if (Launch.Value("--glassblowing") is string glass) { GlassReview(glass); return; }
         if (Launch.Has("--farm-watering")) { FarmWateringReview(); return; }
         if (Launch.Has("--steel-vessels")) { VesselReview(); return; }
@@ -205,6 +333,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             panel.Close(); ui.Visible = false; kit.HoldWhile(() => true);
             return;
         }
+        if (Launch.Has("--diary")) { DiaryReview(); return; }
         if (Launch.Has("--firebugs")) {
             // A night meadow: three nettles in a row, one of each look, a tool station holding a bug net, and firebugs hovering at several distances from a player who carries a net.
             // The last firebug starts near enough to the player to dart off as the scene opens.
@@ -230,15 +359,13 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             panel.Close(); return;
         }
         if (Launch.Has("--bushes")) {
-            // A clean three-bush comparison row of berry bushes, with one picked-clean bush to show its persistent model.
+            // A row of berry bushes in their five stages, from full to picked clean, with all three variants.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Bush variants are selected from the id; start the row at variant zero and include all three.
             world.S.NextId += (3 - world.S.NextId % 3) % 3;
-            world.Add(ThingKind.Berries, at + new Vector2(-2.25f, 2.25f), 24);
-            world.Add(ThingKind.Berries, at + new Vector2(-.75f, .75f), 24);
-            world.Add(ThingKind.Berries, at + new Vector2(.75f, -.75f), 24);
-            world.Add(ThingKind.Berries, at + new Vector2(2.25f, -2.25f), 0);
+            for (int stage = WorldModels.BerryStages; stage >= 0; stage--)
+                world.Add(ThingKind.Berries, at + new Vector2(-1.5f, 1.5f) * (stage - 2), stage * World.BushBerries / WorldModels.BerryStages);
             // In front of them, three plain bushes, the last half dug out, and a stump beside one half dug out.
             for (int i = 0; i < 3; i++) world.Add(ThingKind.Bush, at + new Vector2(-.5f + i * 1.6f, 3.4f - i * 1.6f), World.BushLeaves).Progress = i == 2 ? GatherRules.DigSeconds * .7f : 0;
             for (int i = 0; i < 2; i++) world.Add(ThingKind.Stump, at + new Vector2(3.4f + i * 1.2f, -.4f - i * 1.2f), World.StumpWood).Progress = i * GatherRules.DigSeconds * .7f;
@@ -247,7 +374,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.S.Backpack.Add("steel_shovel", 1);
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
-            world.Player = at + new Vector2(-1, -.5f);
+            world.Player = at + new Vector2(-1.5f, -1.2f);
             world.Tick(0); view.Zoom = 1.8f;
             panel.Close(); return;
         }
@@ -358,7 +485,10 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.S.Workers.Clear(); world.S.Orders.Clear();
             for (int i = 0; i < goods.Length; i++) {
                 var pile = world.Add(ThingKind.Pile, Spot(i));
-                pile.Inventory.Add(goods[i], Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share)));
+                int amount = Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share));
+                if (goods[i] == Firebugs.Item) world.Firebugs.Catch(pile.Inventory, amount);
+                else if (goods[i] == Lanterns.Item) for (int n = 0; n < amount; n++) pile.Inventory.Add(world.Lanterns.NewEmpty(), 1);
+                else pile.Inventory.Add(goods[i], amount);
             }
             var compost = world.Add(ThingKind.Pile, Spot(goods.Length)); compost.Compost = true;
             compost.Inventory.Add("leaves", (int)(300 * share)); compost.Inventory.Add("grass", (int)(300 * share)); compost.Inventory.Add("fertilizer", (int)(200 * share));

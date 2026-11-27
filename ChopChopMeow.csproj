@@ -8,4 +8,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- The scratch folder tmp/ holds drafts and copies that are not part of the game. -->
+    <Compile Remove="tmp/**" />
+  </ItemGroup>
 </Project>

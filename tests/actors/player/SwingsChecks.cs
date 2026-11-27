@@ -12,6 +12,13 @@ using static WorldSteps;
 /// <summary>Checks for a player's swings at wolves: when a swing lands, what it reaches and how hard it hits.</summary>
 public static class SwingsChecks {
     public static void Run(GameData data) {
+        Test(CheckAToolAttackSwingsTheSelectedTool, data);
+        Test(CheckMortarAndPestleDoesNotAttack, data);
+        Test(CheckNewWeaponsReachTheAimedWolfWithTheirWorkingEnd, data);
+        Test(CheckOneSwingHitsEveryWolfInItsPath, data);
+        Test(CheckBucketOnlyRingsWhenItHits, data);
+        Test(CheckRakeAndBucketComeDownFromOverhead);
+        Test(CheckHammerAndChiselSwingsKeepTheirWorkingEndsUp);
         Test(CheckSteppingIntoACabinStopsAnUnlandedSwing, data);
         Test(CheckAnAxeLandsWhenItComesDownNotWhenItIsSwung, data);
         Test(CheckASwingHitsOnlyWhereItIsAimedAndAsFarAsTheBladeReaches, data);
@@ -23,6 +30,126 @@ public static class SwingsChecks {
         Test(CheckABurntWolfRunsFromThePlayerForAMoment, data);
         Test(CheckSwingShapesFollowThePlayersModel, data);
         Test(CheckTorchSwingScaresOnlyWolvesItIsAimedAt, data);
+    }
+
+    /// <summary>A command swings the carried tool it names, even with a steel axe in the same backpack.</summary>
+    private static void CheckAToolAttackSwingsTheSelectedTool(GameData data) {
+        var world = AxeNight(data);
+        ActorAction shown = ActorAction.Idle;
+        world.PlayerActed += (action, _) => shown = action;
+        foreach (string tool in new[] { "steel_pick", "steel_shovel", "steel_hammer", "wood_hammer", "stone_chisel",
+            "steel_chisel", "rake", "bug_net", Bucket.Item }) {
+            Give(world, tool);
+            world.Run(world.Me, new Command(Verb.Attack, 0, 0, tool, 0, Vector2.Right));
+            Require(ActorAnimation.Tool(shown) == tool, $"Selecting {tool} with an axe carried must swing {tool}, not {shown}.");
+            SnapTick(world, 1.3f);
+            Drop(world, tool);
+        }
+    }
+
+    /// <summary>A named attack with a mortar and pestle does not swing or hurt the wolf.</summary>
+    private static void CheckMortarAndPestleDoesNotAttack(GameData data) {
+        var world = AxeNight(data);
+        Give(world, "mortar");
+        Require(!world.IsWeapon("mortar"), "The Item tree must not classify the mortar and pestle as a weapon.");
+        var wolf = StillWolf(world, Vector2.Right * 1.16f);
+        bool swung = false;
+        world.PlayerActed += (_, _) => swung = true;
+        world.Run(world.Me, new Command(Verb.Attack, 0, 0, "mortar", 0, Vector2.Right));
+        SnapTick(world, .8f);
+        Require(!swung && wolf.Health == data.WolfHealth,
+            "A mortar and pestle must not swing or deal damage, even with an axe in the backpack.");
+    }
+
+    /// <summary>Each new working end lands in front, but never on a distant wolf or one behind the player.</summary>
+    private static void CheckNewWeaponsReachTheAimedWolfWithTheirWorkingEnd(GameData data) {
+        foreach (string tool in new[] { "steel_pick", "steel_shovel", "steel_hammer", "wood_hammer", "stone_chisel",
+            "steel_chisel", "rake", "bug_net", Bucket.Item }) {
+            var world = AxeNight(data);
+            Give(world, tool);
+            var target = StillWolf(world, Vector2.Right * 1.16f);
+            var behind = StillWolf(world, Vector2.Left * 1.16f);
+            var far = StillWolf(world, Vector2.Right * 3);
+            world.Attack(Vector2.Right, tool);
+            SnapTick(world, .22f);
+            Require(target.Health == data.WolfHealth, $"{tool} must not hit while being wound up.");
+            SnapTick(world, .58f);
+            Require(target.Health < data.WolfHealth, $"{tool} must reach the aimed wolf at biting distance.");
+            Require(behind.Health == data.WolfHealth && far.Health == data.WolfHealth,
+                $"{tool} must miss wolves behind the player and beyond the working end.");
+        }
+    }
+
+    /// <summary>Even before receiving network IDs, two wolves in the same swing each take one hit.</summary>
+    private static void CheckOneSwingHitsEveryWolfInItsPath(GameData data) {
+        var world = AxeNight(data);
+        Give(world, Bucket.Item);
+        var first = StillWolf(world, new Vector2(1.16f, -.08f));
+        var second = StillWolf(world, new Vector2(1.16f, .08f));
+        int clangs = 0;
+        world.Sound += (name, _) => { if (name == "bucket_hit") clangs++; };
+        world.Attack(Vector2.Right, Bucket.Item);
+        SnapTick(world, 1.3f);
+        Require(first.Health < data.WolfHealth && second.Health < data.WolfHealth && clangs == 2,
+            $"Each of the two wolves must take one clang. Got {first.Health}, {second.Health} health and {clangs} clangs.");
+    }
+
+    /// <summary>The steel bucket makes its own clang exactly once on a hit, never on a swing that misses.</summary>
+    private static void CheckBucketOnlyRingsWhenItHits(GameData data) {
+        var world = AxeNight(data);
+        Give(world, Bucket.Item);
+        var wolf = StillWolf(world, Vector2.Right * 1.16f);
+        int clangs = 0;
+        world.Sound += (name, _) => { if (name == "bucket_hit") clangs++; };
+        world.Attack(Vector2.Left, Bucket.Item);
+        SnapTick(world, 1.26f);
+        Require(clangs == 0 && wolf.Health == data.WolfHealth, "The bucket must not clang on a miss.");
+        world.Attack(Vector2.Right, Bucket.Item);
+        SnapTick(world, .55f);
+        Require(clangs == 0, "The bucket must not clang before it reaches the wolf.");
+        SnapTick(world, .23f);
+        Require(clangs == 1 && wolf.Health < data.WolfHealth, "A bucket hit must hurt the wolf and play one clang.");
+        SnapTick(world, .55f);
+        Require(clangs == 1, "Follow-through must not hit the same wolf again.");
+    }
+
+    /// <summary>The rake tines and bucket body rise above the head and come down in front.</summary>
+    private static void CheckRakeAndBucketComeDownFromOverhead() {
+        var rig = new ActorRig(ActorSkin.Player);
+        foreach (var (action, end) in new[] {
+            (ActorAction.RakeStrike, new Vector3(0, -1.19f, .01f)), (ActorAction.BucketStrike, new Vector3(0, .12f, 0)) }) {
+            var weapon = WeaponSwing.Of(action)!;
+            var model = rig.Root.GetNode<Node3D>($"WeaponModels/{action}");
+            float peak = float.MinValue;
+            for (int i = 0; i < 60 * weapon.Duration; i++) {
+                float at = i / 60f;
+                rig.Show(ActorAnimation.PoseAt(action, at, false), null, false);
+                rig.ShowWeapon(weapon, at);
+                var working = model.Transform * end;
+                if (at < weapon.ActiveFrom) peak = Math.Max(peak, working.Y);
+                if (at < weapon.Contact || at >= weapon.Contact + 1 / 60f) continue;
+                Require(peak > 1.75f && working.Y < 1 && working.Z > .35f,
+                    $"{action} must bring its end down from above the head into the area in front. Peak {peak:0.00} m, contact {working}.");
+            }
+        }
+        rig.Root.Free();
+    }
+
+    /// <summary>A chisel or hammer may tip forward into its strike but its working end never hangs below its fist.</summary>
+    private static void CheckHammerAndChiselSwingsKeepTheirWorkingEndsUp() {
+        var rig = new ActorRig(ActorSkin.Player);
+        foreach (var action in new[] { ActorAction.SteelHammerStrike, ActorAction.MalletStrike,
+            ActorAction.StoneChiselStrike, ActorAction.SteelChiselStrike }) {
+            var weapon = WeaponSwing.Of(action)!;
+            var model = rig.Root.GetNode<Node3D>($"WeaponModels/{action}");
+            for (int i = 0; i < 60 * weapon.Duration; i++) {
+                float at = i / 60f;
+                rig.Show(ActorAnimation.PoseAt(action, at, false), null, false);
+                rig.ShowWeapon(weapon, at);
+                Require(model.Basis.Y.Y <= .01f, $"The working end of {action} must not hang down at {at:0.00} s.");
+            }
+        }
+        rig.Root.Free();
     }
 
     private static void CheckSteppingIntoACabinStopsAnUnlandedSwing(GameData data) {

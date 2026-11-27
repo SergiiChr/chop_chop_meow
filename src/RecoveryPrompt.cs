@@ -13,10 +13,7 @@ public partial class RecoveryPrompt : PanelContainer {
     public RecoveryPrompt(UiKit kit) {
         world = kit.World;
         Name = "recovery_prompt"; Visible = false;
-        AnchorLeft = .5f; AnchorRight = .5f; AnchorTop = .5f; AnchorBottom = .5f;
-        OffsetLeft = -245; OffsetRight = 245; OffsetTop = -105; OffsetBottom = 105;
-        GrowHorizontal = GrowDirection.Both; GrowVertical = GrowDirection.Both;
-        AddThemeStyleboxOverride("panel", Style.Board);
+        Style.Centered(this, 490, 210);
         var body = new VBoxContainer(); body.AddThemeConstantOverride("separation", 14); AddChild(body);
         body.AddChild(Style.Heading("Skip to morning?", 24));
         reason = Style.Text("", 15, Style.Rim, wrap: true); body.AddChild(reason);

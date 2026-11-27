@@ -16,7 +16,7 @@ public static class SimulationChecks {
         HotbarStackChecks.Run(data);
         ChopChopMeow.Tests.WaterChecks.Run(data);
         ChopChopMeow.Tests.BarrelChecks.Run(data);
-        Test(LakeChecks.Run, data);
+        LakeChecks.Run(data);
         EconomyChecks.Run(data);
         AnimationChecks.Run(data);
         PropMotionChecks.Run();
@@ -34,12 +34,18 @@ public static class SimulationChecks {
         NettleChecks.Run(data);
         NettleRopeChecks.Run(data);
         FirebugChecks.Run(data);
+        DiaryChecks.Run(data);
+        LanternChecks.Run(data);
+        LanternCraftChecks.Run(data);
+        LanternModelChecks.Run(data);
         SandChecks.Run(data);
         GlassJarChecks.Run(data);
         CraftingChecks.Run(data);
         PackingChecks.Run(data);
         LunchChecks.Run(data);
         IdleChecks.Run(data);
+        CampfireMusicChecks.Run(data);
+        CampfireAnimationChecks.Run();
         InventoryChecks.Run(data);
         BuildingChecks.Run(data);
         NeedsChecks.Run(data);
@@ -71,6 +77,7 @@ public static class SimulationChecks {
         CrateChecks.Run(data);
         ToolStationChecks.Run(data);
         PileChecks.Run(data);
+        DebugChestChecks.Run(data);
         FarmChecks.Run(data);
         TradeChecks.Run(data);
         GoalChecks.Run(data);

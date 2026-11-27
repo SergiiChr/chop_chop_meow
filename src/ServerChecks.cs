@@ -19,6 +19,7 @@ public partial class Game {
         try {
             Engine.MaxFps = CheckFrameRate;
             await Frames(4);
+            await Test(CheckServerRefusingASlotSaysWhy);
             await Test(CheckNewGameRunsOnAServerOfItsOwn);
             await Test(CheckPlayerComesBackThroughEveryLoad);
             await Test(CheckSecondGameTakesAnotherPort);
@@ -50,6 +51,15 @@ public partial class Game {
         GD.Print(report);
         Require(bytes <= maxBytesPerFrame * (long)played, $"Allocation budget exceeded: {report}");
     }
+    /// <summary>A server asked to start from a slot it cannot load stops with the reason the slot gave, which its log then shows.</summary>
+    private Task CheckServerRefusingASlotSaysWhy() {
+        Require(!Saves.SlotUsed(Saves.SlotCount), "The check needs the last slot empty.");
+        string refusal = "";
+        try { Server.Load(data, Saves.SlotCount); } catch (InvalidOperationException e) { refusal = e.Message; }
+        Require(refusal.Contains($"{Saves.SlotName(Saves.SlotCount)} is empty."), $"A server refusing an empty slot must say it is empty, not \"{refusal}\".");
+        return Task.CompletedTask;
+    }
+
     private async Task CheckNewGameRunsOnAServerOfItsOwn() {
         await Click(FindButton(startMenu.Screen, "New game")!);
         Require(HasLabel(startMenu.Screen, "STARTING"), "A game must say it is starting while its server comes up.");

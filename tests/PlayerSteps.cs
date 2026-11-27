@@ -43,7 +43,8 @@ internal static class PlayerSteps {
     /// <summary>Fills a crate at the player's feet and picks it up, returning the packed crate item now in the backpack.</summary>
     public static string PackCrate(World world, params (string Item, int Count)[] goods) {
         var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
-        foreach (var (item, count) in goods) Require(crate.Inventory.Add(item, count) == count, $"a crate should take {count} {item}");
+        foreach (var (item, count) in goods)
+            Require((item == Firebugs.Item ? world.Firebugs.Catch(crate.Inventory, count) : crate.Inventory.Add(item, count)) == count, $"a crate should take {count} {item}");
         var before = world.Backpack.Items.Keys.ToHashSet();
         Require(world.PickUpCrate(crate), "a nearby crate should be picked up");
         return world.Backpack.Items.Keys.Single(id => !before.Contains(id));

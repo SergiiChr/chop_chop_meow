@@ -122,6 +122,8 @@ public static class ArmReach {
         var shoulder = left
             ? Basis.FromEuler(new Vector3(Mathf.DegToRad(-pose.RaiseL), 0, Mathf.DegToRad(pose.OutL)))
             : Basis.FromEuler(new Vector3(Mathf.DegToRad(-pose.RaiseR), 0, Mathf.DegToRad(-pose.OutR)));
+        float roll = left ? pose.ArmRollL : pose.ArmRollR;
+        if (roll != 0) shoulder *= new Basis(Vector3.Up, Mathf.DegToRad(roll));
         return (shoulder, shoulder * new Basis(Vector3.Right, Mathf.DegToRad(-(left ? pose.ElbowL : pose.ElbowR))));
     }
 

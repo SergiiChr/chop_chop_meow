@@ -24,10 +24,15 @@ These came from the user; change them only after asking.
   The bench keeps its one hammer slot. Making it takes turns between mallet blows and twisting by hand.
 - **Bug net:** 5 nettle rope, 1 wood and 1 wood part at the bench with any hammer. It is swung toward the pointer
   like any tool, with a right click on open ground or on a firebug.
-- **Firebugs:** eight come out at nightfall and one more each night hour, away from buildings, and are gone at dawn.
+- **Firebugs:** eight clusters come out at nightfall and one more each night hour, away from buildings, and are gone at
+  dawn.
+  A quarter of the clusters have three firebugs, and the rest two or one at even odds, all within 1 m of the first.
   One drifts and glows, darts off from a player who comes near, faster than a walk and slower than a sprint, then
   rests; a swing lands after a moment, catches what is in its sweep, and a miss sends the bug darting.
-  A caught firebug is an item only: nothing is made from it and it gives no light.
+  A caught firebug lives for three in-game days. It lights a lantern while inside it and disappears when it dies.
+- **Lantern:** a glass jar, a steel sheet and a wood part at a crafting bench with a steel hammer make an empty lantern.
+  It takes up to ten firebugs. The brightness follows how many are alive, up to a fifth brighter than a torch.
+  It illuminates the ground when placed, in hand or bound to the hotbar, and does not deter wolves.
 - **Nettle and firebug jobs:** a worker picks nettles with a shovel and catches firebugs with a bug net, each from a
   tool station. Workers still go home at dusk, so the firebug job waits for night work, a later change.
   None of nettle, nettle rope, bug net and firebug is bought or sold, and none has a sound of its own yet, apart from
@@ -101,7 +106,7 @@ Simulation and data:
 | `src/world/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, the lifetime of each caught firebug in its stack, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
 | `src/world/model/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/world/model/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
@@ -130,6 +135,11 @@ Simulation and data:
 | `src/digging/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
 | `src/nettles/Nettles.cs`, `src/nettles/display/NettleShape.cs` | Nettles coming up at nightfall, and the scanned sprigs a nettle plant and its item are made of |
 | `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs`, `src/firebugs/FirebugChase.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow; the showcase's player chasing firebugs for a recording |
+| `src/diary/model/Diary.cs`, `src/diary/model/DiaryDay.cs`, `src/diary/model/DiaryFind.cs`, `src/diary/model/DiaryFindDef.cs` | The diary: its days and their text, where each part of it turns up, each player's finds and read days, and who sees a page lying in the world |
+| `src/diary/display/PageShape.cs`, `src/diary/display/PageProp.cs` | A loose page's model, floating on the lake or fluttering down off a tree |
+| `src/lanterns/Lanterns.cs`, `src/lanterns/display/LanternPanel.cs` | Portable lanterns, filling and placing them, and the page that opens a carried or placed lantern |
+| `src/lanterns/display/LanternShape.cs`, `src/lanterns/display/LanternModel.cs`, `src/lanterns/display/LanternProp.cs` | The jar, wooden frame, steel lid and handle, visible firebugs and green light |
+| `src/lanterns/display/LanternWear.cs` | Lanterns hanging from the player’s hand, belt, backpack or shoulders |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
 | `src/digging/Beach.cs`, `src/digging/display/CoastView.cs` | Beach sand, tide, and the exposed soil after a dig |
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
@@ -170,6 +180,8 @@ UI and input:
 | `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
 | `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
+| `src/goals/display/GoalPopup.cs` | The popup at the top of the screen when a goal appears or is completed, with its chime |
+| `src/diary/display/DiaryPanel.cs`, `src/diary/display/DiaryCell.cs`, `src/diary/display/ReadingSheet.cs`, `src/diary/display/FallingApart.cs`, `src/diary/display/FindPrompt.cs` | The Diary panel of paper cells, a day opened large to read with its writing falling apart where it says so, and the pop-up a find waits behind |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
@@ -185,20 +197,32 @@ UI and input:
 | `src/ProcessRow.cs` | The process row every station shares and the fuel row under its bar |
 | `src/JobRow.cs` | A place's job buttons, their worker lists and what each job is called |
 | `src/storage/display/FilterWindow.cs` | The filter window beside the panel |
-| `src/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
-| `src/Grid.cs` | Draws the icon-slot grids |
-| `src/ItemSlot.cs` | The cream item slot, which tells a click, a right click and a double click apart and shakes on a refusal |
-| `src/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse, and `SlotInput`, what each click does on an item slot |
+| `src/items/display/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
+| `src/items/display/Grid.cs` | Draws the icon-slot grids |
+| `src/items/display/Badge.cs` | The count pill on an item slot, green with the firebug count on a lantern's slot |
+| `src/items/display/ItemSlot.cs` | The cream item slot, which tells plain, right, double and Alt-clicks apart and shakes on a refusal |
+| `src/items/display/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse |
+| `src/items/display/SlotInput.cs` | What a click does on an item slot |
 | `src/HotbarStacks.cs` | `World`'s hotbar slots bound to backpack stacks: binding, waiting slots and reading what a slot shows |
 | `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
 | `src/stations/display/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
 | `src/stations/display/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
-| `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
+| `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout and item details |
+| `src/crafting/display/MapItemLink.cs` | A link to an item or building that hides its identity until discovery |
+| `src/crafting/display/ItemTree.cs` | The Recipe map's Item tree, with branches for direct uses and station recipes |
+| `src/crafting/display/ItemTreeBranches.cs` | The lines from the selected card to each branch and its cards |
+| `src/crafting/model/RecipeItemUse.cs` | The direct roles an item plays in a recipe |
+| `src/crafting/model/MapBuilding.cs` | Buildings, their costs and the material their cards branch from |
+| `src/crafting/model/ItemTreeActions.cs` | The direct actions an item enables outside crafting and construction |
+| `src/crafting/model/RecipeItemRole.cs` | The roles and the order of their branches |
+| `src/crafting/display/MapTree.cs` | The arrows from materials to products in a category |
+| `src/crafting/display/MapNode.cs` | An item card with its icon, source and links to required tools and additional resources |
+| `src/crafting/display/MapSlot.cs` | The filled or dashed icon slot shared by cards, the details panel and the legend |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
-| `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
+| `src/trade/display/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel, with their hands and tool slot |
 | `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
@@ -209,6 +233,9 @@ UI and input:
 | `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The straw bed and a player lowering onto it or getting up, transferring weight from boots to a palm, then the hip and forearm |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
 | `src/workers/breaks/BreakSeats.cs` | Reserves campfire and ground seats for workers at lunch or with nothing to do, and lights the campfires they sit at |
+| `src/workers/breaks/CampfireMusic.cs`, `src/workers/breaks/model/` | Rolls instruments for idle campfire visits, schedules solo clips and one song per trio, and holds the recording lengths and beat times |
+| `src/workers/breaks/display/CampfireMusicView.cs`, `src/workers/breaks/display/CampfirePerformance.cs`, `src/workers/breaks/display/CampfireInstrumentShape.cs` | Poses the worker's hands on a guitar, harmonica or drum and nods listeners on the recorded beat |
+| `src/workers/breaks/display/CampfireMusicAudio.cs` | Plays campfire recordings from the workers and fires, and gives a nearby song room in the soundtrack |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
 | `src/actors/enemies/wolf/DoorTug.cs` | A wolf tugging a player back out of a cabin's doorway, letting go and handing a badly hurt one to the takedown |
 | `src/actors/enemies/wolf/WolfBodies.cs` | How wolves at a player keep their distance: closing in only to biting reach, and stepping aside from another wolf's body |
@@ -221,6 +248,7 @@ UI and input:
 | `src/actors/enemies/wolf/WolfCounter.cs` | A struck wolf's sideways hop, skid, run, bound behind the attacker and pivot |
 | `src/actors/enemies/wolf/WolfFollow.cs`, `src/actors/enemies/wolf/model/FollowStage.cs` | Follow mode: campfire and torch circles, and a torch follower bracing, running or standing its ground |
 | `src/actors/player/Swings.cs`, `src/actors/player/model/Swing.cs`, `src/actors/player/model/SwingShape.cs` | Players' swings at wolves: when a swing lands, the ground its blade, flame or fist passes over, and the wolves it touches |
+| `src/actors/player/model/WeaponSwing.cs` | The motions and contact shapes of tool strikes, including the bucket's loose bail |
 | `src/actors/enemies/wolf/model/Wolf.cs` | `Wolf`, a wolf as the world saves it |
 | `src/actors/enemies/wolf/model/Den.cs` | `Den`, a wolf den's mouth, door and clearance |
 | `src/actors/model/IWalker.cs` | `IWalker`, anything that walks the map on its own, along a route around what blocks it |
@@ -233,8 +261,8 @@ UI and input:
 | `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |
-| `src/PackerPanel.cs` | The packing station panel and its good picker |
-| `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
+| `src/packing/display/PackerPanel.cs` | The packing station panel and its good picker |
+| `src/ui/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/menus/StartMenu.cs` | The main menu and its save, load, options, join and Controls screens |
 | `src/menus/ControlsList.cs` | Key caps and actions on the shared Controls screen |
@@ -314,7 +342,7 @@ Checks and review tools:
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps several features' UI and network checks share, and `Game.TestClean`, which fails a UI check that leaves a mess |
 | `src/RecipeSteps.cs` | Steps that open a fresh station for a recipe, give and load its items and fuel, and expect a batch to start or be refused |
 | `src/showcase/Showcase.cs` | The review scenes behind `--showcase` |
-| `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
+| `src/playtest/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
 | `src/performance/PerformanceRun.cs` | The rendered performance run's window half: sprinting the route by day and night, sampling frames, writing results |
 | `src/performance/PerformanceStage.cs`, `src/performance/PerformanceFixture.cs` | The run's server half, and the staffed camp it plays |
 | `src/performance/PerformanceRoute.cs` | The run's sprint from the beach past the camp and the lake to the valley's top corner |
@@ -425,6 +453,7 @@ Meshes and materials are cached by parameters, so repeated objects share resourc
 `WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, and `WorldView` draws them behind the ground for its first frames, so a building, crate, carcass or wolf that first appears mid-game builds no mesh, material, shader or pipeline; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
 The default camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
+It keeps the player in the middle of the screen, a little below it, and stays put when a side panel opens, so a double click lands on the building the first click picked.
 The first-person preview switches the same camera to a perspective at eye level.
 `FirstPersonCamera` turns the camera from mouse motion and rotates walking directions to match.
 `WorldView` casts the same picking rays from the eye, and shows the sky, distant terrain and live objects without fog.
@@ -676,6 +705,20 @@ At dawn the wages charged are taken off and the result joins `SaveState.Profits`
 Reaching the streak sets the `profit_week` milestone, which stays reached.
 The open mines and profit milestone together unlock the ending.
 
+`GoalPopup` compares each goal's status with the popups it has shown on every interface refresh, five times a second.
+It queues a new popup for a goal that left `Hidden` and a completed popup for one that reached `Completed`, each at
+most once a game, and shows them in turn.
+A goal that goes from `Hidden` straight to `Completed` gets only the completed popup.
+The diary goal's popup waits while the find pop-up or the reading sheet is open, and later popups go ahead of it.
+`Game.OpenGoalFromPopup` puts back a held stack and ends any click mode or walk to a cabin, then opens the pause menu
+on the goal over whatever is open, the ending screen included.
+It skips the statuses a game already has, with no popups (`GoalPopup.SkipKnownGoals`), once the window has joined a
+game and taken the server's first update (`Net.Joined`): a new game, a load, joining another player's game and
+reconnecting.
+It also skips them whenever the window's world is replaced (`World.Replaced`), so leaving a game for the start menu
+or losing the line to the host drops the popups that game still had waiting.
+The showcase skips them again after setting up its scene by hand.
+
 ### Survival and needs
 
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
@@ -800,7 +843,7 @@ Inside a cabin (`SaveState.Sheltered`) the player is out of reach: their hunters
 
 `Doorways` (`src/cabins/Doorways.cs`) runs a cabin's door, which lets one player through at a time into a cabin that holds `Doorways.Places`, and `DoorTug` (`src/actors/enemies/wolf/DoorTug.cs`) a wolf tugging a player out of it; `World` holds one of each (`World.Doorways`, `World.DoorTug`) and ticks the doorway with the acting player.
 A double click on a cabin, or its page's Enter button, starts a `CabinApproach` to `Doorways.DoorPoint`, using the same grid routes workers use to avoid obstacles.
-The click's first press opens the page, which moves the world aside and can put the page's windows under the pointer, so `Game._Input` hands the second press to `PlayerControl.WalkIntoClickedCabin` before the interface sees it.
+The click's first press opens the page, which can put the page's windows under the pointer, so `Game._Input` hands the second press to `PlayerControl.WalkIntoClickedCabin` before the interface sees it.
 `WalkSearch` checks nearby building footprints and spreads long searches across frames.
 If a failed search saw a layout that has changed, the approach tries again with the current buildings.
 The panel highlights Enter while finding a path and during the walk.
@@ -885,7 +928,10 @@ The slam's sound and a chest's or crate's `close_chest` start as far ahead of th
 #### Swings
 
 `Swings` (`src/actors/player/Swings.cs`) runs a player's swings at wolves.
-`World.Attack` swings the best axe carried, or a fist without one, and `World.UseTorch` a lit torch, along the aim the player gives, with `Swings.Cooldown` between swings.
+`World.Attack` swings the selected carried weapon, or the best axe or a fist with no weapon selected.
+The attack command names the weapon, which the host checks against the backpack.
+`World.UseTorch` lights the torch or swings it once lit.
+Space attacks with the selected tool. The shovel and bug net keep their normal jobs on right-click.
 The swing lands `ActorAnimation.Contact` into its animation (`PlayerState.Swing`, a `Swing` counting down), not when it starts, and a player who went down or indoors meanwhile lands nothing.
 It lands on every wolf whose body touches the ground it passes over then, a `SwingShape` seen from above, and that stands as tall as the swing comes low (`SwingShape.Low`):
 
@@ -897,7 +943,12 @@ It lands on every wolf whose body touches the ground it passes over then, a `Swi
 | Bug net | `Swings.Net` | 0.98 to 1.42 m out, from 55° left of the aim to 55° right, where the hoop's slant from behind the right shoulder to the ground at the left crosses the height a firebug flies at | any height | none: it catches firebugs |
 | Punch | `Swings.Punch` | within 0.7 m, 10° to 35° right | any height | 0.4 to 0.6 |
 
-The shapes are where the player's model carries the axe head (`ActorRig.AxeHead`), the flame and the fist through each stroke, which `CheckSwingShapesFollowThePlayersModel` holds them to.
+Those shapes are where the player's model carries the axe head (`ActorRig.AxeHead`), flame and fist through each
+stroke. For the other weapons, `WeaponSwing` moves the grip and turns the tool through a path shared by drawing and
+hit detection. The tool's working end traces a short sweep across the wolf's body between ticks, excluding the handle
+and the wind-up. A wolf reacts at first touch and can be hit only once per swing. The rake and bucket come down from
+overhead. The bucket's body trails the held bail, swings past it, then settles. A confirmed bucket hit plays
+`bucket_hit`, once per wolf struck. Chisels and hammers start and finish on the same upright grip used while carried.
 A wolf's body is `Swings.Touches`' line of round sections from the root of its tail to its nose, the way it faces (`WolfBodies.Body`), as tall as `WolfBodies.Top`: `WolfBodies.StandingTop` on the ground, up to `WolfBodies.LeapRise` more through a leap for the throat, and `WolfBodies.RearedTop` reared up with an arm in its jaws, as its model stands.
 So the sweep passes over a wolf on the ground and catches one in the air or reared up.
 Each wolf touched takes its own roll of the damage, the swing's own give or take its spread (`Swings.AxeDamage` times the axe's speed, `AxeSpread`), and is knocked back and left reeling (`World.Strike`).
@@ -906,6 +957,7 @@ Each wolf touched takes its own roll of the damage, the swing's own give or take
 
 A lit torch (`SaveState.Torch`, burn seconds left) burns as long as one log, only while `SaveState.TorchLit`; it stays in the backpack, burning out removes it, and a backpack with no torch left puts it out.
 Lighting it takes `World.KindleSeconds` (`SaveState.TorchKindling`).
+Taking a lantern in hand puts out the torch and leaves its remaining burn time alone.
 Swings share the axe cooldown and flare the light (`World.TorchFlare`).
 They put the torch out after `World.WildSwings` within `World.WildWindow` seconds.
 
@@ -1012,6 +1064,22 @@ When a player gathers leaves, they also take the acorns that fit in their backpa
 Leaves refill at dawn. Missing acorns refill one at a time, every ten days from the first gather that took one.
 Chopping out all its current wood fells the tree and leaves its stump.
 
+### Lanterns
+
+A lantern has a permanent number and carries its firebugs' expiry times with it as an item, including in a save or an update.
+The placed lantern stores that same item in `Thing.LanternItem` and keeps it when picked up.
+`Lanterns.Refill` moves as many firebugs as fit, shortest life first, without changing any expiry time.
+Only live firebugs show through the glass. Their glow and the point light sit inside the jar.
+The wooden foot blocks direct light beneath a placed lantern.
+With one tenth of a full lantern's light per bug, ten bugs give 120% of torch energy.
+The green light has no part in wolf behavior.
+
+A double click takes it in hand. Work requiring the hand hangs it temporarily on the belt, still lit.
+Hotbar slots 1–6 hang their lanterns from the belt, slot 7 from the backpack, and slots 8 and 9 from the shoulders.
+All light regardless of the selected slot when they contain firebugs. Held and worn lanterns swing about their grips.
+The same lantern shows only once if it is both bound and held in hand.
+Right-click a lantern in the backpack, hotbar or world to see the firebug slot and access placement or pickup.
+
 ### Nettles and firebugs
 
 `Nettles` (`src/nettles/Nettles.cs`) brings up `Nettles.PerNight` nettles once night has fallen (`SaveState.NettlesUp`
@@ -1037,14 +1105,22 @@ Putting nettles into the bench's slots by hand is not refused.
 A recipe marked `RecipeDef.Twists` is worked in rounds (`ActorAnimation.StationAction`): by the batch's `Thing.Progress`,
 `ActorAnimation.TwistRounds` rounds a batch, each a `TwistBlowShare` of mallet blows and then `ActorAction.TwistRope` with empty hands.
 
-`Firebugs` (`src/firebugs/Firebugs.cs`) lets out `Firebugs.AtNightfall` firebugs as night falls and one more for each
-whole hour of the night since (`SaveState.FirebugsOut` counts those let out tonight, caught or not, and day sets it back), each on ground to
-stand on that no player sees, `Firebugs.BuildingRoom` from every building.
-Each firebug's spot is seeded by the day and its turn that night, so a night loaded part way lets the rest out where they would have come.
+`Firebugs` (`src/firebugs/Firebugs.cs`) lets out `Firebugs.AtNightfall` clusters of firebugs as night falls and one
+more for each whole hour of the night since.
+`SaveState.FirebugsOut` counts the clusters let out tonight, caught or not, and day sets it back.
+A cluster's first firebug comes out on ground to stand on that no player sees, `Firebugs.BuildingRoom` from every
+building.
+At `Firebugs.ThreeChance` it has two more, and otherwise one more or none at even odds (`Firebugs.LetOut`).
+Each comes out at a random spot within `Firebugs.ClusterRadius` of the first, even where a player sees it.
+One whose spot has no ground to stand on or is within `Firebugs.BuildingRoom` of a building is left out.
+Each cluster is seeded by the day and its turn that night, so a night loaded part way lets the rest out where they would
+have come.
 By day it removes them all.
 A firebug is a thing of the shape `GatherShape.Caught`, kept at its place: where it is now is `Firebugs.At`, its
 place plus `Firebugs.Hover`, a slow swing by its id and the world's clock, so the host and every window agree on it
 without an update while it hovers.
+A catch adds a three-day expiry to that unit in its stack. The stack shows the average life of its surviving firebugs.
+Expiry follows each firebug through moving, stacking, packing and loading. The world removes dead firebugs from inventories.
 Its flight (`Firebugs.Flight`) is kept only while the world runs:
 
 - **Dart.** A player out in the open within `StartleRadius` sets it darting straight away from them, up to
@@ -1068,8 +1144,8 @@ A worker with the job takes a bug net (`GatherRule.Needs`) and takes the firebug
 is taken (`GatherRule.TakenAtOnce`); no worker is on duty while firebugs are out.
 Held right mouse on a firebug catches nothing: `World.GatherBlock` asks for a swing.
 A nettle blocks building like a berry bush.
-A firebug takes no ground (`Thing.Roams`): buildings, yards, gravel paths, holes and nettles go where one hovers, it
-stays, grass grows under it and the ground takes no contact shade.
+A firebug takes no ground (`Thing.TakesGround`): buildings, yards, gravel paths, holes and nettles go where one hovers,
+it stays, grass grows under it and the ground takes no contact shade.
 A right click with the shovel out goes through a firebug to the ground under it (`PlayerControl.RightPress`).
 `World.QuietNights` keeps nettles and firebugs from coming by themselves; a check session sets it (`Game.StartGame`),
 since each thing takes its look from its id.
@@ -1080,6 +1156,82 @@ It bobs about `FirebugShape.Height` and follows the world's position no faster t
 updates never show.
 
 `ItemDef.Description` is what the player says of an item; `GameData.DescriptionLine` gives it as a tooltip line.
+
+### Diary
+
+`Diary` (`src/diary/model/Diary.cs`) keeps each player's diary in their `PlayerState`: `DiaryFinds`, the finds taken;
+`DiaryRead`, the days opened; `DiaryFinding`, a find whose pop-up waits; and `FallenPage`, the page that fell off a tree
+for them.
+No thing's id is given out twice, so once that page is picked up or cleared away, `FallenPage` names nothing and needs no
+reset.
+`DiaryDay` holds the 11 days and their text, with `DiaryDay.Illegible` and `DiaryDay.Scribbles` where the writing is
+drawn as scribbles and `DiaryDay.FallsApart` where it starts to fall apart, and `DiaryFindDef` the line of each find's
+pop-up and the days it holds.
+`GameData` checks that every day is in exactly one find.
+`DiaryFind.Book`, the diary itself, and `DiaryFind.Ashes`, the page in a cave's ashes, wait for the caves: nothing gives
+them out yet.
+
+- **Lake.** A new game floats one `ThingKind.FloatingPage` on the shore at a seeded spot (`Diary.Float`).
+  Where it is now is `Diary.FloatAt`, a slow drift by the world's clock along the shore and `Diary.FloatsFrom` to
+  `Diary.FloatsTo` metres in from it, so the host and every window agree on it without an update.
+  It stays for the others when one player takes it.
+- **Chance.** Each of a player's own gathers of a tree, a berry bush or a leaf spot (`World.Gather`), and each square
+  of beach sand they dig (`Beach.Strip`), rolls `Diary.FindChance` for the find it hides (`Diary.Roll`) until the
+  player has it; a worker's gathering never does.
+  A tree's page lands as a `ThingKind.FallenPage` on ground to stand on `Diary.FallNear` to `Diary.FallFar` from the
+  trunk, for the chopper alone; any other find comes up in its pop-up at once.
+  The rolls are seeded and start again with each world.
+  `Diary.Quiet` stops them: `WorldSteps.EmptyWorld` and the check session set it, since a pop-up stops its player and a
+  check that gathers would stop with it.
+
+`Diary.ShowsTo` says who sees a page lying in the world: the lake's to every player who has neither taken it nor has its
+pop-up up, and a fallen one to the player whose `FallenPage` it is.
+`World.CollectKnown`, which drawing and picking go through, leaves out the pages hidden from the window's player.
+A page leaves no memory under fog, is not one of `World.Structures`, and takes no ground (`Thing.TakesGround`): grass
+grows under it and its coming and going leaves the ground dressing alone.
+A fallen page keeps its place while its player is away, and they find it there when they come back.
+A building, yard or crate put over it clears it away with the stumps and bushes under it (`World.ClearGround`), so a
+later chop can drop their page again.
+A save is refused when a player's `FallenPage` is an id not given out yet, names a thing that is not such a page, or
+names one while they have its find already (`Diary.Valid`).
+A left or a right click on a page walks the player over to it, as to a loose piece (`Thing.TakenWhole`), and
+`Verb.PickUp` brings up its pop-up (`Diary.PickUp`); a fallen page leaves the ground then.
+`World.Occupied` holds while `DiaryFinding` is set, so the player is busy.
+
+`FindPrompt` shows the find's line and a Take button alone; Esc leaves it up.
+Take (`Verb.TakePage`) turns a page, puts the find in the diary, and opens the `ReadingSheet` on the find's first day,
+with the Diary left closed.
+`Hotbar.StampDiaryOnFirstFind` holds back the diary's badge, which shows once the player has a find, while the day the
+first find opened is open, and stamps it into the row as that day closes, so the stamp shows where the Diary is kept: it
+drops in large, tilted and faint, and settles with a small bounce.
+The badge shows a dot while a found day is unread (`Diary.AnyUnread`).
+`DiaryPanel` lays out a `DiaryCell` for each day in order, four to a row: a torn scrap with the page's icon on it.
+A found day is bright, with its place in the diary in black over the icon and a brick edge while it is not read.
+A day not found is greyed out, sheet and icon, with a faint question mark.
+`ReadingSheet` writes the day in Caveat on a white sheet in the page model's proportions (`PageShape.Tallness`), with
+the scribble glyphs in place of what cannot be read.
+From `DiaryDay.FallsApart` to the paragraph's end, `FallingApart` moves each letter further off the line than the last,
+as if written in the dark.
+Opening a day sends `Verb.ReadDiary`, which a guest sends whatever its copy says: the day a find just taken
+opens on reaches the guest's copy only with a later update.
+The goal **A success story** (`GoalId.Diary`) reads the window's own player (`World.Me`), so each player sees their
+own count, and completes with all 11 days.
+
+`PageShape` draws a page as one cupped sheet with rows of ink.
+On the lake it bobs and turns at the water's level where `Diary.FloatAt` has it.
+A fallen page that appears in front of its player comes down from 3.2 m over `PageShape.FallSeconds`, swinging from
+side to side less and less and tipping into each swing, to land flat where it lies, and rustles as it starts.
+
+The lake's shallows can be waded: `Terrain.Open` counts ground up to `Terrain.Wade` metres in from the shore, so
+players, workers and wolves walk there, and their feet go down to the lake's bed (`Terrain.BedDepth`).
+`WorldView.StandsAt` places every body on it, standing, knocked down, pinning or feeding, and a wolf sets each paw on
+the bed under it.
+Loose pieces and pages can land there: `WorldView` draws everything lying in the shallows on the lake's bed, except a
+page, which floats, a firebug, which flies, and a pump, whose intake is built into the water.
+Building keeps out of them: a building's middle keeps `Construction.ShoreRoom` back from the shore, so a large one's
+footprint may still reach over the shallows, and the spots it is worked
+from (`Construction.WorkSpots`) need `World.CanStandDry`: a pump's handle, a cabin's ladder, a furnace's glass blower
+and bellows spots and a packing table's packer spot.
 
 ### Tools
 
@@ -1159,20 +1311,52 @@ The panel keeps the list's place while the page draws again, so a click on a rec
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 
-The recipe map badge on the bottom bar opens `RecipeMap` over the running game.
-An item link in the Goal Log opens it through `RecipeMap.OpenAt` with that item highlighted and the game still paused.
-Closing the map returns to the goal details.
-`PlayerControl.Update` moves nobody while it shows, and a `MapNode` turns to made before as soon as `World.Had` knows its item.
-`RecipeMap.Place` puts an item on a grid of steps across and lines down: what is made out of it goes one step on, the first on the same line and the rest on lines below, and `MapTree` draws the lines between them.
-A `MapNode` draws a filled slot for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.
-A click on a chip scrolls to that item and lights it (`MapNode.Light`); a click on a slot shows its details, whose button leaves the map through `SidePanel.ShowRecipe`.
+The Recipe map badge on the bottom bar opens `RecipeMap` over the running game.
+`UiKit.LinkRecipeMap` lets Alt-click on an item slot or recipe card look up its item through `RecipeMap.OpenAt` without
+running the slot's usual action, including adding or removing a filter entry.
+A station's fuel or tool slot links to the item it pictures even when that slot is empty.
+An item link in the Goal Log uses the same entry point with the game still paused.
+Closing the map returns to the panel or goal details underneath.
+`PlayerControl.Update` moves nobody while it shows, and a card reveals its name and icon when `World.Had` knows its item or `World.Reached` records its building.
+`RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
+and the rest go on lines below. When a recipe takes a spare root in the same category as a second ingredient, the
+first column can hold that root beside the product, and the main ingredient connects from above.
+`MapBuilding` attaches each building to the material it costs most, including the staged costs of a mine. When
+materials tie, the first one listed is used. Marking a mine reveals its plan without marking it as built.
+`MapTree` draws arrows to the products and highlights those connected to the chosen card.
+A `MapNode` draws a filled icon slot for a discovered item and a question mark in a dashed slot otherwise.
+`MapItemLink` also hides undiscovered names and icons in the Item tree, chips, thumbnails and tooltips.
+Undiscovered entries can still be found on the main map, but neither their details nor their Item trees open until discovery. The details panel shares the dashed badge.
+Chips below a discovered card link to the required tool and extra ingredients or construction materials. A click on a chip scrolls to its item
+and lights it briefly (`MapNode.Light`). A click on a card highlights it and shows its details in a vertical panel to
+the right of the map. The panel's button leaves the map through `SidePanel.ShowRecipe`.
+Alt-click on a discovered item's card, chip or detail thumbnail opens its Item tree within the same board.
+`RecipeItemUse.Of` reads each recipe's inputs, accepted tools, fixed station tools and fuels to find direct uses only.
+`ItemTree` groups recipe products under Fuel, Ingredient and Tool branches. It omits empty branches and shows a
+product under each role the selected item plays in that recipe. The same tree branches to buildings that primarily
+cost that material and lists the item's direct actions. Packing is not listed. `GatherRules` gives the gathering
+actions one name for each kind of work. Digging up stumps, bushes and beach sand shares **Dig up things.**
+Digging a hole stays a separate action because it yields nothing. Surface deposits and open mines share **Mine ores**.
+Digging an entrance and fitting a mine's frame and rails share **Building a mine**.
+`GameData.MapEntryOf` resolves every container fill to its base entry, so every fill of a bottle links to **Bottle**.
+`ItemTreeActions` uses the vessel table to give Bottle and Steel bucket the same **Transport liquids** action.
+Liquids list **Drink** or **Food** based on what their filled vessels provide, not how to fill them.
+Water also lists watering farm plots and saplings.
+Crates and barrels list their uses, not opening or placing. The branch column centers vertically with the root,
+so a single result needs no bend in its line.
+**Weapon** marks the tools that can strike wolves, including Torch and Steel bucket.
+Mortar and pestle appears only as a tool for its recipes.
+A station's Recipes branch reads the recipes assigned to it.
+Clicking a card returns to its place in the main map. Alt-clicking it opens its own item tree.
+The Back button restores the main map at its previous selection and scroll position.
 
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
 `SaveState.Obtained` holds every item the settlement has gathered, grown, bought or started with; with what it made, which is among `SaveState.Milestones`, those are the items the recipe map shows as known (`World.Had`).
-Everything such an item is made of is known with it (`GameData.EndsUpIn`), so no ingredient looks unmade beside its product: a new settlement's steel axe and bottle make their whole chains known.
+Everything such an item is made of is known with it (`GameData.EndsUpIn`), so no ingredient looks unmade beside its product: a new settlement's steel axe and bottle make their whole chains known. A filled vessel also makes the liquid it holds known.
+Plumbing records the liquid when it reaches storage, and drawing liquid into a vessel also records it.
 A save written before `Obtained` existed loads with it empty, so a raw resource it made nothing of shows as not made until it is gathered again.
 `GameData.MadeFrom` gives the item another is made out of: its recipe's first input, or the first `From` of its entry in `GameData.Sources` when no recipe makes it.
-`GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item is on the map once.
+`GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item with its own map entry is on the map once.
 
 #### Tool slots
 
@@ -1348,7 +1532,7 @@ The plan's materials return to the backpack or go in a recovery box through `Con
 ### Storage, filters and automation
 
 Inventories are slot grids with stacks of 64.
-Tools, packed crates and bottles take a slot each everywhere.
+Tools, packed crates, bottles and lanterns take a slot each everywhere.
 The layout is saved and synchronized: removing one stack never shifts unrelated slots.
 Sort is the only action that packs and regroups stacks.
 Item totals change only through `Inventory` methods, which keep them in line with the stacks.
@@ -1360,6 +1544,7 @@ The player moves items in and out of storage and stations within `World.ItemReac
 Input rule for every item slot, in the backpack, storage and stations alike (`SlotInput`):
 
 - LMB picks up the slot's stack onto the cursor, a held stack; RMB picks up half of it.
+  RMB on a carried lantern opens the lantern instead.
 - With a stack held, LMB puts it down on the slot clicked and RMB puts down one; what does not fit stays held.
   On another item's slot in the same inventory the two swap; back on its own slot LMB lets go of it.
 - A held stack lands by the rules of where it is put: each slot sends its own command, the one its Shift- or Ctrl-click sends, with the mark "from held stack" (`World.FromHeldStack`, `Command.Held`, `ItemMoves.PutDown`).
@@ -1379,7 +1564,7 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
   Ctrl batches from the backpack drawer and Store all carry the mark "spares only" (`World.FromSpares`, `Command.Spares`, `Inventory.SparesOnly`), which leaves bound stacks behind.
   Pouring from vessels with Ctrl includes hotbar-bound vessels and preserves their bindings.
 - Esc, a click on open ground or on the interface anywhere but an item slot, or closing the side panel lets go of the held stack (`HeldCursor`).
-- A held crate, barrel or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
+- A held crate, barrel, lantern or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
 - A held stack put on storage clicked in the world goes into it; an item only selected on the hotbar never does.
 - Bulk buttons and recipe batch actions say what they move.
 
@@ -1397,6 +1582,7 @@ Both are boxes a player in reach of the worker (`World.Reaches`) picks up from a
 #### Chests
 
 Chests have separate item allowlists for input and output.
+A debug chest in a playtest save sets the inventory's `UnlimitedSlots` and adds a spare cell whenever the last one fills.
 Storage with a filter window has `Inventory.Gated` set: there an empty list lets nothing through and `Inventory.Everything`, shown as an "A" cell, lets every item through.
 `Inventory.Filter` keeps `Everything` alone in its row.
 `World.Add` gives a chest and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; every crate's contents get the chest's lists when made (`World.NewCrate`), packed or not.
@@ -1570,6 +1756,18 @@ Workers on the ground keep their seats when the crew changes, unless they take a
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
 When a worker cannot reach a group, they sit near where they stopped if there is room, or wait standing.
 
+`CampfireMusic` rolls once when an idle worker sits in a campfire seat, and keeps the result until the idle visit ends.
+If the fire is missing any instruments, there is a 25% chance of bringing one, with each missing instrument equally likely.
+A campfire holds at most one guitar, one harmonica and one drum.
+A listener who stays seated does not roll when a musician leaves.
+Each instrumentalist at an incomplete trio's fire waits at least five seconds between solo clips.
+When a fire has all three instruments, one worker on each plays one randomly picked song and its other idle workers nod.
+After the song, each of the three plays solo clips as at an incomplete fire, with no second song until the fire no longer
+has all three instruments.
+Lunch and ground seats do not take part. Songs, solos and visit rolls travel in the live network update, not in saves.
+The guitarist supports the neck from underneath, curls their fingers onto the fretboard and arcs the strumming hand
+away from the body at either end of a stroke.
+
 As dusk begins (`GameData.DuskStarts`, a tenth of a day before night) they walk to the nearest trading post, or the clearing without one.
 Then they walk a cart's trip down the valley at walking pace while fading out, wait out of view for the rest of half a trade trip (`Worker.Commute`, `World.WalkLeg`), and sign out (`Worker.Home`).
 At dawn they walk back the same way, fading in, and return to work; a runner off for prices walks the same way out and back.
@@ -1589,6 +1787,7 @@ The market accepts any packed crate.
 `Market.Goods` lists every good the village trades with its price: a `Sells` entry for one it takes, a `Buys` lot for one it sells.
 The game gathers them into `Market.Sells` and `Market.Buys` when it starts.
 Goods outside `Market.Sells` are donated: they pay nothing and leave demand alone.
+An empty crate in the market, left when the firebugs packed in it die, is donated as well and pays nothing, not even its crate price.
 The returning cart names them.
 A sale pays for every unit of its contents at the pre-sale price, plus the crates.
 
@@ -1744,6 +1943,7 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 Sound effects are one-shot MP3s in `assets/sounds`, apart from a held sound's looping WAV (below); `x_1.mp3`, `x_2.mp3`
 and so on are variants of one sound `x`.
 Each play picks a variant other than the previous one with a small random pitch and volume change.
+The wolves' howls, the mortar and the two goal popup chimes keep their pitch (`Sounds.KeepsPitch`).
 
 A held sound loops for as long as its source holds it again each frame (`Sounds.Hold`), one sound a source.
 It starts at a random moment of its recording and fades in and out over 0.15 seconds, so it neither clicks on nor cuts
@@ -1789,6 +1989,20 @@ Music in `assets/music` crossfades between playlists over four seconds at nightf
 Each playlist keeps its place for the running session, so music longer than its part of the day carries on next time.
 Both playlists play their tracks in order, then wrap back to the first.
 The options screen sets the music volume, stored in the settings file.
+
+Each campfire song and solo starts at a time on the world's clock, so a player approaching a fire or joining a game hears
+the recording already in progress. Playback near the start uses the full recording, and audible poses follow playback.
+The simulation keeps more precision between steps than it writes to saves or updates, so the world clock keeps pace
+with the recording even in a long-running settlement.
+The campfire song takes over the soundtrack inside firelight and fades with distance. When the world pauses, so does the
+campfire song, and the soundtrack returns until play resumes.
+The server reports the pause and sleep speed-up in updates, so a brief gap in updates does not pause a song.
+A late update does not replay audio the listener already heard, and the soundtrack returns when the audible song ends
+even if an update is late.
+Campfire recordings go quiet during the sleep speed-up and resume at the current position if still in progress.
+Songs are Ogg Vorbis so they can start partway through without decoding from the beginning. Solos are shorter MP3 clips.
+The music volume applies to both. `CampfireBeats` times the trio and listeners against measured beats, including tempo
+changes. Solo strikes and strums follow their clips' measured contacts, and a harmonica stays at the lips while it sounds.
 
 ## World map
 

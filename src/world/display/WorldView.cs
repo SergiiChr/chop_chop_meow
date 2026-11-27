@@ -188,6 +188,15 @@ public partial class WorldView : Node3D {
 
     internal static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
 
+    /// <summary>Where someone or something at <paramref name="p"/> stands, <paramref name="rise"/> above the ground: on the lake bed in its shallows.</summary>
+    internal static Vector3 StandsAt(Vector2 p, float rise = 0) => To3(p, rise - Terrain.BedDepth(p));
+
+    /// <summary>
+    /// Where a thing's model stands: on the lake bed for one lying in the shallows, and on the ground everywhere else.
+    /// A page floats on the water instead, a firebug flies above it and a pump's intake is built into it.
+    /// </summary>
+    private static Vector3 RestsAt(Thing t) => t.IsPage || t.Roams || t.Kind == ThingKind.Pump ? To3(t.Pos) : StandsAt(t.Pos);
+
     public override void _Ready() {
         World.Replaced += () => {
             worldReplaced = true; Footpaths.Clear(); counterHits.Clear(); playerSleep.Clear();
@@ -354,7 +363,8 @@ public partial class WorldView : Node3D {
 
     // ---------- Camera and picking ----------
 
-    public Vector2 Center => GetViewport().GetVisibleRect().Size * new Vector2(PanelOpen ? .38f : .5f, .52f);
+    /// <summary>How far below the middle of the screen the player stands, as a share of the screen's height.</summary>
+    private const float BelowMiddle = .02f;
 
     /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
     private void SyncCamera() {
@@ -374,7 +384,6 @@ public partial class WorldView : Node3D {
             camera.CullMask |= FirstPersonCamera.HeadLayer;
             SetFirstPersonBackground(false);
         }
-        var size = GetViewport().GetVisibleRect().Size;
         camera.Size = (AnimationReview ? (ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : WaterReview != null ? 3.4f : 11) / ReviewZoom : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(AnimationReview ? ReviewPitch : CameraPitch ?? Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         float turn = AnimationReview && WaterReview != null ? CameraTurn - ReviewTurn : CameraTurn;
@@ -384,9 +393,7 @@ public partial class WorldView : Node3D {
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
         camera.Position = target + back * (EnvironmentReview ? EnvironmentCameraDistance : 60);
         if (EnvironmentReview && EnvironmentCameraDistance > 60) sun.DirectionalShadowMaxDistance = EnvironmentCameraDistance + 40;
-        float unitsPerPixel = camera.Size / Math.Max(1, size.Y);
-        camera.HOffset = (.5f - Center.X / Math.Max(1, size.X)) * size.X * unitsPerPixel;
-        camera.VOffset = (Center.Y / Math.Max(1, size.Y) - .5f) * size.Y * unitsPerPixel;
+        camera.VOffset = BelowMiddle * camera.Size;
     }
 
     private void SetFirstPersonBackground(bool show) {
@@ -556,7 +563,7 @@ public partial class WorldView : Node3D {
             bool hit = t.Kind == ThingKind.Farm ? RayFarm(origin, direction, drawn, out float d)
                 : t.Kind == ThingKind.Pump && PropOf(drawn.Id) is WaterPumpProp pump
                     ? RayPump(origin, direction, drawn, pump.Pump, out d)
-                    : RayHits(origin, direction, t.Pos, hits, out d);
+                    : RayHits(origin, direction, World.Diary.At(t), hits, out d);
             if (hit && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
@@ -686,11 +693,10 @@ public partial class WorldView : Node3D {
         : held is "wood_hammer" or "steel_hammer" ? held
         : carried != null && carried["wood_hammer"] > 0 && carried["steel_hammer"] == 0 ? "wood_hammer" : "steel_hammer";
 
-    private static string? HeldTool(string? selected, Inventory backpack) => selected switch {
-        "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
-        "wood_hammer" or "steel_hammer" or "bug_net" when backpack[selected] > 0 => selected,
-        _ => null
-    };
+    private static string? HeldTool(string? selected, Inventory backpack) =>
+        selected != null && backpack[selected] > 0 &&
+        (selected is "steel_axe" or "steel_pick" or "bug_net" || WeaponSwing.ForItem(selected)?.CarriesUpright == true)
+            ? selected : null;
 
     private void AddFooting(ActorRig rig) {
         if (rig.Root.Visible) surfacePeople.Add(rig.Root.GlobalPosition);
@@ -747,9 +753,7 @@ public partial class WorldView : Node3D {
         if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (Carries(player) ? HeldTool(SelectedTool, World.S.Backpack) : null);
-        bool torch = World.Torch > 0 && !World.Dead;
-        if (!playerSleep.Show(playerRig, player, World.Me, World.Find(World.Me.SleepingAt), dt))
-            PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, StationHammer(tool, worked, World.Me) ?? SelectedTool, World.S.Backpack), torch, door, dt);
+        PosePlayer(playerRig, player, World.Me, ref playerArmPull, downedFor, Grade(tool, StationHammer(tool, worked, World.Me) ?? SelectedTool, World.S.Backpack), door, playerSleep, dt);
         if (SwingsSlottedHammer(tool, worked, World.Me)) swung.Add(worked!.Id);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
@@ -771,12 +775,13 @@ public partial class WorldView : Node3D {
                 work = ActorAction.Glassblow; assignment = glassForge;
             }
             if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind or ActorAction.TwistRope && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
+            var campfire = work is ActorAction.Sit or ActorAction.Perch ? CampfireMusicView.At(World, Sounds, worker) : default;
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch ? worker.Pos + Vector2.FromAngle(worker.LunchHeading) : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down.Rotated(assignment.Rotation)
                 : assignment is { Kind: ThingKind.Mine } mine ? Mines.Facing(mine, worker.Pos) : assignment?.Pos ?? worker.Pos;
             bool sameAction = state.Action == work;
-            state.Update(worker.Pos, work, facing, dt);
+            state.Update(worker.Pos, work, facing, dt, eating: campfire.Eating);
             state.Mark = Mark(assignment, state, work);
             bool waterTool = BarrelHaul.Vessel(worker.Tool);
             string? vessel = waterTool || BerryJam.InBottle(worker.Tool) ? worker.Tool : null;
@@ -806,6 +811,7 @@ public partial class WorldView : Node3D {
                     vessel: work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? vessel : null);
                 if (slotted != null) swung.Add(assignment!.Id);
             }
+            entry.Rig.AnimateCampfireMusic(campfire.Instrument, campfire.Playing, campfire.Nodding, campfire.Beat);
             entry.Rig.Root.Visible = DrawsWorker(worker);
             Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest
@@ -833,8 +839,8 @@ public partial class WorldView : Node3D {
     /// action that put it away, such as knocking on a door.
     /// </summary>
     private static bool Carries(ActorState state) =>
-        state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run
-        && (state.Blend >= 1 || state.From is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run || ActorAnimation.Tool(state.From) != null);
+        state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake
+        && (state.Blend >= 1 || state.From is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Brake || ActorAnimation.Tool(state.From) != null);
 
     /// <summary>
     /// A worked station near a player that is processing a batch a player queued with nobody of the crew working it, for an idle player to work at.
@@ -881,8 +887,8 @@ public partial class WorldView : Node3D {
             float slow = Elapsed / 3, flicker = MathF.Sin(slow * 13) * .5f + MathF.Sin(slow * 29 + 1) * .5f; flare /= .5f;
             rig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + Rising(slow * 11) * .3f, 1 - flicker * .1f) * (1 + flare * .25f);
             // A swing fans the flame: the lit circle grows by a fifth and settles back.
-            rig.TorchLight.OmniRange = 5 * (1 + .2f * flare);
-            rig.TorchLight.LightEnergy = (1 + flicker * .25f + flare * .3f) * (.3f + night * 1.3f);
+            rig.TorchLight.OmniRange = ActorRig.TorchLightRange * (1 + .2f * flare);
+            rig.TorchLight.LightEnergy = (1 + flicker * .25f + flare * .3f) * ActorRig.TorchLightEnergy(night);
         }
         // Each strike of steel on flint throws a few sparks onto the torch head.
         if (state.Action == ActorAction.Kindle && (state.Struck(.1875f) || state.Struck(.4375f) || state.Struck(.6875f) || state.Struck(.9375f))) {
@@ -939,10 +945,8 @@ public partial class WorldView : Node3D {
             state.Mark = Mark(subject, state, action);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(Footsteps.Sound(World, p.Pos), p.Pos);
-            bool torch = p.Torch > 0 && p.RespawnIn <= 0;
             string? tool = ActorAnimation.Tool(action) ?? (Carries(state) ? HeldTool(p.Selected, p.Backpack) : null);
-            if (!other.Sleep.Show(other.Rig, state, p, World.Find(p.SleepingAt), dt))
-                PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, StationHammer(tool, worked, p) ?? p.Selected, p.Backpack), torch, door, dt);
+            PosePlayer(other.Rig, state, p, ref other.ArmPull, other.DownedFor, Grade(tool, StationHammer(tool, worked, p) ?? p.Selected, p.Backpack), door, other.Sleep, dt);
             if (SwingsSlottedHammer(tool, worked, p)) swung.Add(worked!.Id);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && DrawsAt(p.Pos);
@@ -974,14 +978,24 @@ public partial class WorldView : Node3D {
 
     /// <summary>A player's arms follow the wolves holding them and ease free as the player stands or falls.</summary>
     private void PosePlayer(ActorRig rig, ActorState state, PlayerState who, ref (float PullL, float PullR) pull,
-        float downed, string? tool, bool torch, DoorShown? door, float dt) {
-        float bedHeight = door == null && downed == 0 ? BedHeightAt(state.Position) : 0;
-        var pose = tugs.PulledArms(downed > 0 ? state.Pose : StandingPose(rig, state, bedHeight), who, ref pull, dt);
-        if (downed > 0) FallBackView.FallBack(rig, state, pose, downed, torch, who.RespawnIn > 0 ? null : HoldingOff(who.Id));
-        else {
-            string? vessel = Carries(state) && ContainerItem.IsBottle(who.Selected) && who.Backpack[who.Selected] > 0 ? who.Selected : null;
-            ShowStanding(rig, state, pose, tool, torch, door, dt, HugsBarrel(state.Action, who.Backpack), vessel);
+        float downed, string? tool, DoorShown? door, StrawBedView sleep, float dt) {
+        string? equipped = Lanterns.InHand(who);
+        bool holdLantern = false;
+        if (!sleep.Show(rig, state, who, World.Find(who.SleepingAt), dt)) {
+            float bedHeight = door == null && downed == 0 ? BedHeightAt(state.Position) : 0;
+            var pose = tugs.PulledArms(downed > 0 ? state.Pose : StandingPose(rig, state, bedHeight), who, ref pull, dt);
+            bool torch = who.Torch > 0 && who.RespawnIn <= 0 && (who.TorchLit || who.TorchKindling > 0 || equipped == null);
+            if (downed > 0) FallBackView.FallBack(rig, state, pose, downed, torch, who.RespawnIn > 0 ? null : HoldingOff(who.Id));
+            else {
+                string? vessel = Carries(state) && ContainerItem.IsBottle(who.Selected) && who.Backpack[who.Selected] > 0 ? who.Selected : null;
+                bool barrel = HugsBarrel(state.Action, who.Backpack);
+                holdLantern = equipped != null && who.Health > 0 && who.Sheltered == 0 && !torch && !barrel && vessel == null
+                    && door == null && pull.PullL <= 0 && Carries(state);
+                if (holdLantern) pose = pose with { RaiseL = 30, OutL = 18, ElbowL = 60 };
+                ShowStanding(rig, state, pose, tool, torch, door, dt, barrel, vessel);
+            }
         }
+        rig.Lanterns?.Sync(World, who, equipped, holdLantern ? rig.Fist(left: true) : null, ActorRig.TorchLightEnergy(night), state);
     }
 
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false, DoorShown? door = null,
@@ -990,7 +1004,7 @@ public partial class WorldView : Node3D {
 
     /// <summary>Places the upright rig so the pose can aim at the actor's mark in its own frame.</summary>
     private static Pose StandingPose(ActorRig rig, ActorState state, float rise = 0) {
-        rig.Root.Position = To3(state.Position, rise);
+        rig.Root.Position = StandsAt(state.Position, rise);
         // The body leans about its feet into a turn, and the head looks ahead of it.
         rig.Root.Rotation = new Vector3(0, state.Yaw, state.Turning.Bank);
         state.MarkInRig = state.Mark is Vector3 mark ? rig.Root.Transform.AffineInverse() * mark : null;
@@ -1021,9 +1035,16 @@ public partial class WorldView : Node3D {
         state.HipHeight = pose.HipHeight;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
-        if (barrel) rig.HugBarrel(pose, torch);
+        if (WeaponSwing.Of(state.Action) is WeaponSwing weapon) {
+            if (weapon.CarriesUpright && state.Blend < 1) pose = weapon.FollowGrip(pose, state.Time);
+            rig.Show(pose, null, false, lit: torch);
+            rig.ShowWeapon(weapon, state.Time);
+        } else if (barrel) rig.HugBarrel(pose, torch);
         else if (vessel != null) WorkerWaterView.Carry(rig, pose, vessel, torch);
-        else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
+        else if (tool != null && Carries(state) && WeaponSwing.ForItem(tool) is { CarriesUpright: true } ready) {
+            rig.Show(ready.FollowGrip(pose, 0), null, false, lit: torch);
+            rig.ShowWeapon(ready, 0);
+        } else rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
         if (state.From == ActorAction.PumpWater && state.Action == ActorAction.Idle && state.Blend < 1 && !barrel && vessel == null)
             rig.ReleasePumpHandle(pose, 1 - Ease(state.Blend));
         if (jamb is Vector3 frame) DoorwayView.HandOnFrame(rig, pose, frame, door!.Value.Grip, tool, torch);
@@ -1190,7 +1211,8 @@ public partial class WorldView : Node3D {
     private void CollectDrawnThings(List<Thing> into, bool everything) {
         if (!everything) { World.CollectKnown(into); return; }
         into.Clear();
-        foreach (var thing in World.Things) into.Add(thing);
+        var me = World.Me;
+        foreach (var thing in World.Things) if (Diary.ShowsTo(me, thing)) into.Add(thing);
     }
 
     private void SyncThings(float dt) {
@@ -1223,7 +1245,7 @@ public partial class WorldView : Node3D {
             var look = (t.Pos, t.Remaining, t.Kind is ThingKind.Tree or ThingKind.LeafSpot ? t.TreeStage : t.Kind is ThingKind.Mine or ThingKind.WolfCorpse || t.IsDug ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
             if (!live && prop.Seen && prop.Look == look) continue;
             Show(prop, true);
-            if (prop.Look.Pos != t.Pos) prop.Root.Position = To3(t.Pos);
+            if (prop.Look.Pos != t.Pos) prop.Root.Position = RestsAt(t);
             // A change plays out only where the player was already watching, not on a thing first seen or seen again this frame.
             bool watched = live && prop.Seen && prop.Look.Live;
             // Preview distant shapes and positions without replacing the small details the overhead view remembers.
@@ -1248,10 +1270,12 @@ public partial class WorldView : Node3D {
         int newest = World.Things.Count > 0 ? World.Things[World.Things.Count - 1].Id : 0;
         if (thingsCounted != World.Things.Count || newestThing != newest) {
             (thingsCounted, newestThing) = (World.Things.Count, newest);
-            // A firebug marks nothing on the ground, so the dressing is drawn again only when something else has come or gone.
+            // A firebug or a diary page marks nothing on the ground, so the dressing is drawn again only when something else has come or gone.
             int last = World.Things.Count - 1;
-            while (last >= 0 && World.Things[last].Roams) last--;
-            int grounded = World.Things.Count - World.ThingsOf(ThingKind.Firebug).Count, newestOnGround = last >= 0 ? World.Things[last].Id : 0;
+            while (last >= 0 && !World.Things[last].TakesGround) last--;
+            int grounded = 0;
+            foreach (var t in World.Things) if (t.TakesGround) grounded++;
+            int newestOnGround = last >= 0 ? World.Things[last].Id : 0;
             if (groundedCounted != grounded || newestGrounded != newestOnGround) {
                 (groundedCounted, newestGrounded) = (grounded, newestOnGround);
                 RefreshDressing();
@@ -1273,21 +1297,23 @@ public partial class WorldView : Node3D {
         if (props.TryGetValue(t.Id, out var prop) && prop.Kind == t.Kind) return prop;
         // A building or crate put down in front of the player lands with a puff of dust; a kind changing in place, such as a dug mine, does not.
         bool appeared = Watched(t.Pos);
-        if (prop == null && appeared && (t.Kind is ThingKind.Crate or ThingKind.Barrel || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
+        if (prop == null && appeared && (t.Kind is ThingKind.Crate or ThingKind.Barrel or ThingKind.Lantern || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
         if (prop != null) prop.Root.QueueFree();
         prop = WorldModels.Build(t);
         scene.AddChild(prop.Root);
         props[t.Id] = prop;
-        prop.Root.Position = To3(t.Pos);
+        prop.Root.Position = RestsAt(t);
         // A fresh carcass keeps the heading of the wolf model it replaces.
         // It also waits for the killing blow to land, and is thrown back from where the wolf stood.
         if (prop is CarcassProp carcass && Dying(t.Pos) is { } dying) {
             prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
-            carcass.From = dying.Root.Position - To3(t.Pos); carcass.HitIn = SwingLands(dying.Last + dying.KnockBack).In;
+            carcass.From = dying.Root.Position - prop.Root.Position; carcass.HitIn = SwingLands(dying.Last + dying.KnockBack).In;
             carcass.Wolf.FallFrom(dying);
         }
         // A chip that appears in front of the player was knocked off the rock beside it, and flies from there.
-        if (prop is LooseProp chip && appeared && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
+        if (prop is LooseProp chip && appeared && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - prop.Root.Position + Vector3.Up * .7f; chip.Flight = 0; }
+        // A page that appears in front of its player has just come off the tree beside it, and flutters down from its crown.
+        if (prop is PageProp page && t.Kind == ThingKind.FallenPage && appeared) { page.Fall = 0; Sounds?.Play("paper_fall", t.Pos); }
         return prop;
     }
 
@@ -1374,6 +1400,9 @@ public partial class WorldView : Node3D {
         float wobble = prop.Shake * MathF.Sin(Elapsed * 34);
         float flicker = MathF.Sin(Elapsed * 13 + t.Id) * .5f + MathF.Sin(Elapsed * 7.3f + t.Id * 3) * .5f;
         switch (prop) {
+            case LanternProp lantern:
+                lantern.Model.Sync(live ? World.Lanterns.BugCount(t.LanternItem) : 0, ActorRig.TorchLightEnergy(night));
+                break;
             case TreeProp tree:
                 bool grew = tree.Stage != t.TreeStage;
                 if (grew) WorldModels.ShowTreeStage(tree, t.TreeStage);
@@ -1391,6 +1420,13 @@ public partial class WorldView : Node3D {
                 float loose = Ease(Math.Clamp(worked / GatherRules.DigSeconds, 0, 1));
                 prop.Body.RotationDegrees = new Vector3(loose * 16 + wobble * 5, dug.Yaw, wobble * 3);
                 prop.Body.Position = dug.Seat + new Vector3(wobble * .02f, loose * .07f, 0);
+                break;
+            case PageProp page when t.Kind == ThingKind.FloatingPage:
+                prop.Root.Position = To3(World.Diary.At(t));
+                PageShape.Float(page, t.Id, Elapsed);
+                break;
+            case PageProp page when page.Fall < PageShape.FallSeconds:
+                PageShape.Fly(page, t.Id, dt);
                 break;
             case LooseProp chip when chip.Flight < WorldModels.ChipFlight + WorldModels.ChipSettle:
                 // An arc under gravity from the rock, spinning steadily round its middle, then a short skid to a stop where it lies.
@@ -1447,7 +1483,9 @@ public partial class WorldView : Node3D {
                 break;
             case BushProp bush:
                 if (still) break;
-                bush.Fruit.Visible = t.Remaining > 0;
+                int berryStage = WorldModels.BerryStage(t);
+                bush.Fruit.Visible = berryStage > 0;
+                if (berryStage > 0) bush.Fruit.Mesh = bush.Stages[berryStage - 1];
                 prop.Body.Scale = new Vector3(1 + wobble * .04f, 1 - wobble * .03f, 1 + wobble * .04f);
                 break;
             case FurnaceProp furnace:
@@ -1890,7 +1928,8 @@ public partial class WorldView : Node3D {
                 || wolf.Follow == FollowStage.Routed) && !backing, wary);
             else if (wolf.Follow == FollowStage.Braced) model.Brace(Elapsed + wolf.Id % 7, dt);
             else model.Stand(Elapsed + wolf.Id % 7, dt, wary);
-            var place = To3(wolf.Pos + model.KnockBack + model.Drift, rise);
+            var stands = wolf.Pos + model.KnockBack + model.Drift;
+            var place = StandsAt(stands, rise);
             if (wolf.Pinning) place = AtTheThroat(model, hunted);
             else model.Toward = Vector2.Zero;
             if (wolf.Feeding && !wolf.Pinning && Fallen(wolf) is var (lying, lyingRig)) place = feeding.Place(wolf, model, lying, lyingRig, dt);
@@ -1914,7 +1953,7 @@ public partial class WorldView : Node3D {
         model.KnockBack = model.Drift = Vector2.Zero;
         model.Struck = false; model.Recoiling = model.Recover = 0; model.Stagger = wolf.Stagger;
         model.Root.Visible = DrawsAt(wolf.Pos);
-        model.Root.Position = To3(wolf.Pos, WolfCounter.Height(wolf));
+        model.Root.Position = StandsAt(wolf.Pos, WolfCounter.Height(wolf));
         model.Yaw = ActorAnimation.Yaw(Vector2.FromAngle(wolf.Heading), model.Yaw);
         model.Turning.Hold(model.Yaw); model.Glance = 0;
         model.Root.Rotation = new Vector3(0, model.Yaw, 0);
@@ -1977,7 +2016,7 @@ public partial class WorldView : Node3D {
     private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted) {
         if (model.Pinned > ActorAnimation.FallBackSeconds) return model.Root.Position;
         var held = FallBackView.Throat(hunted, model.Toward, model.Pinned) - model.Root.Basis * model.Bite;
-        return held with { Y = 0 };
+        return StandsAt(new Vector2(held.X, held.Z));
     }
 
     /// <summary>
@@ -2116,7 +2155,7 @@ public partial class WorldView : Node3D {
         else shown.Root.Rotation = new Vector3(0, -PlacingRotation, 0);
     }
 
-    /// <summary>Builds a hidden, faded ghost of every building, crate and barrel, so picking one in build mode compiles nothing mid-game.</summary>
+    /// <summary>Builds a hidden, faded ghost of every building and placeable item, so picking one in build mode compiles nothing mid-game.</summary>
     private void BuildGhosts() {
         Prop Ghost(ThingKind kind, Vector2 at) {
             var built = kind == ThingKind.Hole ? new Prop() : WorldModels.Build(new Thing { Kind = kind, Pos = at });
@@ -2130,6 +2169,7 @@ public partial class WorldView : Node3D {
         foreach (var kind in World.Data.Buildings.Keys) if (kind != ThingKind.Mine) ghosts[kind] = Ghost(kind, Vector2.Zero);
         ghosts[ThingKind.Crate] = Ghost(ThingKind.Crate, Vector2.Zero);
         ghosts[ThingKind.Barrel] = Ghost(ThingKind.Barrel, Vector2.Zero);
+        ghosts[ThingKind.Lantern] = Ghost(ThingKind.Lantern, Vector2.Zero);
         ghosts[ThingKind.Hole] = Ghost(ThingKind.Hole, Vector2.Zero);
         foreach (var ore in Cliff.Ores) mineGhosts[ore] = Ghost(ThingKind.Mine, Cliff.Of(ore).MineSpot);
     }
@@ -2266,7 +2306,8 @@ public partial class WorldView : Node3D {
         if (hovered != null) {
             float top = 0;
             foreach (var hit in HitsOf(hovered)) top = Math.Max(top, hit.Top);
-            Tag(Screen(hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(Mouse)) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
+            var at = hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(Mouse)) : World.Diary.At(hovered);
+            Tag(Screen(at, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
         }
         foreach (var w in World.Workers) {
             if (!World.Sees(w) || w.Id != HoverWorker && w.Id != Selection.Worker) continue;

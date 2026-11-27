@@ -14,6 +14,7 @@ public static class WaterChecks {
     public static void Run(GameData data) {
         Test(CheckBottlesPourTheLitersTheyHold, data);
         Test(CheckBottleStatesAreDefinedInData, data);
+        Test(CheckFilledVesselsRevealTheirContents, data);
         Test(CheckBottleGivesThreeLiters, data);
         Test(CheckBottleKeepsPartialStateAcrossSave, data);
         Test(CheckBottleRecipeMakesEmptyBottleFromSteelAndWood, data);
@@ -72,6 +73,17 @@ public static class WaterChecks {
         Require(data.IsConsumable("water_2"), "a two-liter bottle should be consumable");
         Require(data.IsConsumable("water_1"), "a one-liter bottle should be consumable");
         Require(!data.IsConsumable("empty_bottle"), "an empty bottle should not be consumable");
+    }
+
+    private static void CheckFilledVesselsRevealTheirContents(GameData data) {
+        var world = new World(data);
+        Require(!world.Had(Water.Liquid), "An empty starter bottle must not reveal water as discovered.");
+        var lake = world.ThingsOf(ThingKind.Water).Single();
+        var shore = Terrain.WaterPoint(world.Player);
+        world.Player = shore + (shore - Terrain.Lake).Normalized() * 1.8f;
+        world.Gather(lake, world.GatherTime(ThingKind.Water, null));
+        Require(world.Backpack[Water.Full] == 1 && world.Had(Water.Liquid),
+            "Filling a bottle should discover the water it contains without needing to cook with it.");
     }
 
     private static void CheckBottleGivesThreeLiters(GameData data) {

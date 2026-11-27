@@ -59,10 +59,13 @@ Play accepts Godot arguments after `--`:
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
+| `--showcase --campfire-music trio` | Show idle workers playing guitar, harmonica and drum at the same campfire, with a listener. Use `guitar`, `guitar-perch`, `harmonica` or `drum` to see one worker get ready to play alone. Add `--campfire-visit` to include the worker's wait before the first solo |
 | `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
+| `--showcase --goal-popup` | Reach the bench in the default fixture, with no goods sold yet, so **A start** pops up as completed and then **Road to riches** as new |
+| `--showcase --diary` | Show the player on the lake's shore beside its floating page, with a page lying on the ground and three finds in the diary, two of their days unread; `--diary-fall` drops that page off the oak beside them a second in instead, `--panel` opens the Diary, `--diary-day 45` opens that day large, `--diary-find` shows the pop-up of a page found in leaves and `--diary-first` leaves the diary empty and no page on the ground, so the next find is the first |
 | `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
-| `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
+| `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes in their five stages with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
@@ -83,7 +86,7 @@ Play accepts Godot arguments after `--`:
 | `--animation-review --animation-clip "worker bucket roof"` | Follow a worker carrying a bucket up the ladder to pour and back down, with `"worker bottle roof"` for a bottle and `"player barrel"` or `"worker barrel"` for carrying a barrel |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
-| `--animation-target 1.3` | Stand what the close-up's blow works, a tree, rock, anvil or stump, this many metres from the actor |
+| `--animation-target 1.3` | Stand what the close-up's blow works, a tree, rock, anvil, stump or wolf, this many metres from the actor |
 | `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
 | `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
 | `--render-intro /absolute/directory --intro-dance` | Save only the solo dance of the catgirl on the hero's screen, as tall as the picture |
@@ -175,12 +178,12 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | WASD or arrow keys | Move in screen directions. Away from hunting wolves, reversing a run brakes, turns and runs back |
 | Shift while moving | Sprint 1.6× as fast; food and drink drain 1.7× as fast; not under 15% food or drink |
 | Walk or sprint on a gravel path | Move 1.2× as fast |
-| Right mouse button on a loose resource | Walk over and pick it up |
+| Right mouse button on a loose resource or a piece of paper | Walk over and pick it up |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate or barrel | Walk over and pick it up with its contents |
 | Right mouse button on open ground | Eat, drink, light a torch, or swing toward the pointer using the hotbar selection |
 | Hold right mouse button on open ground with a shovel selected | Walk over and dig a planting hole or gather sand |
-| Left mouse button | Select a resource, building, crate or worker, or place a selected building. Put a held stack into the storage clicked, or let go of it anywhere else |
+| Left mouse button | Select a resource, building, crate or worker, or place a selected building. Put a held stack into the storage clicked, or let go of it anywhere else. On a piece of paper, walk over and pick it up |
 | B | Open building plans, and the remove selector that takes buildings down |
 | Tab | Open or close the backpack |
 | C / V during placement | Turn a building, crate, barrel or pipe 90° |
@@ -194,9 +197,10 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Space with a reinforced furnace or water pump selected | Walk into position if needed and pump once |
 | Space otherwise | Swing an axe or fist along the held movement keys, the last direction you walked, or where you look in first person |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
-| Escape | Cancel placement, assignment or the walk to a cabin, close a panel, or open the pause menu with the Goal Log, save, load, options, Controls, new game and quit |
+| Escape | Cancel placement, assignment or the walk to a cabin, close a day open in the Diary, close a panel, or open the pause menu with the Goal Log, save, load, options, Controls, new game and quit |
 | Mouse wheel | Zoom in the overhead view |
 | LMB on an item slot | Pick up the entire stack or put down the held stack |
+| Alt-click an item slot or recipe card | Open the Recipe map at that item without moving, using or crafting it |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
 | Double LMB on a cabin | Open its page and walk around obstacles to its door and inside |
@@ -239,7 +243,8 @@ The day dial in the top-right corner shows the sun crossing its arc from sunrise
 A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
 Your stomach growls as food falls under 20%, and again at 15%, 10% and 5%.
 
-Messages stack at the top of the screen, up to four at a time; each fades out after 7 seconds.
+Messages stack at the top middle of the screen, up to four at a time, and each fades out after 7 seconds.
+They stay put when a side panel opens, which may cover their right end.
 A message repeated while it still shows restarts its time instead of stacking again, and a full stack drops the one closest to fading.
 Actions whose result shows by itself, such as gathering, crafting, building or filling a bottle, post no message; warnings, refusals and news do.
 With a side panel open they keep to the space left of it.
@@ -247,6 +252,7 @@ With a side panel open they keep to the space left of it.
 ### Bottom bar and hotbar
 
 The bottom bar holds round badges for building, the backpack, crafting, the recipe map and the crew next to the hotbar.
+Once you find part of the diary, a diary badge is stamped into the row after the crew's ([Diary](#diary)).
 
 Put a held stack or a plan from the building plans on a hotbar slot to assign it.
 A stack put on a slot binds that exact backpack stack to it, which then has the selected hotbar slot's rim in the backpack.
@@ -410,6 +416,12 @@ A worker can hold several jobs, at one place or several, and a new job goes to t
 The list is in order: they do the first job that can be done, and after each round of it they read the list from the top again.
 A round is a delivery, a crafted batch, a crate packed full, a furnace batch at the bellows, a piece mined or a harvest.
 With no job that can be done, a worker sits at the nearest campfire they can reach, as at lunch: six to a fire, the rest on the ground nearby in groups of up to three.
+Each time an idle worker takes a seat at the fire, they have a 25% chance of bringing a guitar, harmonica or drum.
+The choice is even among instruments not already there. If the fire already has all three, the worker sits without one.
+With fewer than all three instruments, each musician plays a short sound now and then, with at least five seconds between their clips.
+When all three instruments are at the same fire, one worker on each instrument plays a song and the other idle workers seated there nod to the beat.
+The group plays one song, then each musician goes back to playing short sounds now and then, with no second song until the trio breaks up.
+Workers sitting for lunch do not play or nod.
 A worker who could not reach a fire's seats tries again once a building goes up or comes down.
 With no campfire they wait at the nearest trading post, or in the clearing without one.
 Their status says what their first job lacks.
@@ -495,11 +507,18 @@ Explored ground and remembered things are kept in saves.
 The world is a fixed 216×216-tile valley.
 It opens onto the sea at the bottom of the screen, which cannot be drunk and is the map's edge.
 Impassable mountain ranges close in from the left and right toward the valley's inland end, and a lake lies in the middle.
+You can wade 2 metres into the lake's shallows, and so can workers and wolves.
+Things can fall into the shallows and sink to the lake bed, except a page, which floats.
+A building's middle stays 0.8 m back from the shore, so a large one, such as a cabin, may still reach a little over
+the shallows.
+Apart from that only a pump's intake goes in the water: a pump's handle, a cabin's ladder and the spots a furnace or
+packing table is worked from need dry ground.
 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
 Click a resource to see what it yields in read-only item slots with a count for each item.
 The lake shows a water droplet in an unnumbered slot.
 A berry bush holds 24 berries and is full again a day after the first one is picked from it, whether or not it was picked clean.
+It shows fewer berries as they are picked, in five stages: full, three quarters, half, a quarter and bare once picked clean, each stage 6 berries apart.
 A felled tree leaves a stump. Trees grow again from planted acorns. A couple of hundred plain bushes grow about the plains.
 Hold right mouse on a stump or a plain bush with a shovel in your backpack to dig it up: a stump gives 3 wood and a bush 36 leaves, three times what lies under an oak.
 It comes out whole after a few seconds of digging and is gone for good, so the backpack needs room for all of it.
@@ -518,15 +537,20 @@ A picked nettle is gone for good, a backpack with no room for it leaves it stand
 Nettle rope is made at the crafting bench, 1 rope from 1 nettle, and a bug net from 5 rope, 1 wood and 1 wood part ([Crafting bench](#crafting-bench)).
 Whoever makes rope strikes two mallet blows, then twists the fibres by hand, in turn.
 
-Eight firebugs come out as night falls and one more after each hour of the night, at least 25 m from every building and where nobody is looking.
+Firebugs come out in clusters of one to three, eight clusters as night falls and one more after each hour of the night, at least 25 m from every building and where nobody is looking.
+A quarter of the clusters have three firebugs, and the rest two or one at even odds, all within 1 m of the first one.
+A cluster that comes out by water or near a building can be smaller, and one at the edge of sight can show its others coming out.
 All of them are gone at dawn.
 A firebug hovers about its place with a steady glow that grows half as bright again for about a second every 10 seconds.
 When you come within 4 m it darts off 6.55 m, faster than a walk and slower than a sprint, then rests for 1.6 seconds where it stops, whoever comes near.
 With the bug net selected, a right click on open ground swings it toward the pointer, down on a slant from behind the right shoulder across the front to the ground at the left, and a right click on a firebug swings it at the firebug.
 The hoop crosses the front 1.0 to 1.4 m from you, within 55° either side of the pointer, and lands 0.4 seconds after the click: it catches each firebug it passes over then, one firebug each into the backpack while it has room.
 A firebug nearer or further than the hoop is missed, and a swing sends every firebug it misses within 5 m darting, resting or not.
+Caught firebugs live for three in-game days, then disappear one by one.
+Hover over a stack to see its average time left.
 
-Nettles, nettle rope, bug nets and firebugs are not bought or sold, and a firebug is not made into anything yet.
+Nettles, nettle rope, bug nets and firebugs are not bought or sold.
+Caught firebugs give a [lantern](#lantern) its light.
 A nettle, a bug net and a firebug each say a line under their name in tooltips and in their details on the recipe map.
 
 ### Sand and tides
@@ -607,10 +631,57 @@ reveals **Steel tools**.
 Getting a steel bar reveals **Too soft**.
 Completing it reveals **Infinite power**.
 
+Your first diary page reveals **A success story**, which is yours alone: it counts the pages you have found, and the
+diary in its details opens your Diary as its badge does.
+It is complete once you have all 11 days of the diary.
+
 **Infinite power** requires an open mine for each ore found in the cliffs.
 **NEET** requires at least 1,300 coins in profit a day for seven days in a row.
 Profit is the sale coins that came back that day minus wages charged at the next dawn.
 The mines and profit target together show the ending screen with Restart and Keep playing.
+
+A goal that appears during play pops up under the messages at the top of the screen with a chime: a trophy badge pops
+in and a bar opens out of it with **New goal** and the goal's name.
+A completed goal pops up the same way with **Goal completed** and a different chime.
+A goal that appears already done pops up only as completed.
+Each popup stays about five seconds, and goals that change together pop up one after another.
+**A success story** pops up once the diary page you found is closed.
+Click a popup to open the Goal Log on that goal over whatever is open: a held stack goes back and placing a building or
+any other pick is cancelled first.
+The goals a new, loaded or joined game starts with do not pop up.
+
+### Diary
+
+Someone lived in the valley before you and kept a diary, and its pages are scattered about.
+Each player finds the pages for themselves, and a page lying in the world shows only to the player it is for.
+
+| Where | What turns up |
+| --- | --- |
+| The lake | A piece of paper drifts in the shallows, there for every player who has not taken it yet: day 2 |
+| Digging beach sand | One dig in twenty turns up a page at once, until you have it: day 6 |
+| Gathering leaves under an oak | One gather in twenty, the same way: day 10 |
+| Picking berries | One pick in twenty, the same way: day 40 |
+| Chopping a tree | One chop in twenty knocks a page off it, which flutters down beside the trunk: days 36 and 37 |
+
+The diary itself, with four more days, and a half burned page with one more cannot be found yet.
+
+Right- or left-click a piece of paper lying in the world to walk over and pick it up.
+A page that fell for you waits where it landed, even while you are out of the game.
+Anything built over it clears it away, and a later chop can knock it off a tree again.
+A find comes up in a pop-up that says where you found it, with a Take button and nothing else.
+Until you take it you are busy: you cannot walk, gather or act.
+Taking it turns a page and opens the day it holds large, the first of them when it holds two.
+After your first find, closing that day stamps the diary's badge into the bottom bar, to show where the Diary is kept.
+
+The Diary shows a cell for each of the diary's 11 days, in order, four to a row.
+Each cell is a scrap of paper torn along one edge, with a loose page lying straight on it.
+A day you have found is bright, with its place in the diary, 1 to 11, written in black over the page.
+A day you have not found is greyed out, with a faint question mark.
+A day you have not read yet has a brick rim, and the badge shows a red dot while one waits.
+Click a cell to open the day large, handwritten on a white sheet shaped like the pages you find.
+The close button, Esc or a click beside the sheet closes it.
+The last day was written in the dark: its writing falls apart into scribbles.
+Opening or closing a day turns a page.
 
 ## Crafting
 
@@ -628,23 +699,38 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 
 The recipe map icon next to Crafting on the bottom bar opens the map over the whole screen.
 Esc or its close button closes it.
-Opening it from the bottom bar lets the game run underneath.
+Alt-click an item slot, recipe card or item in a storage filter to open the map without acting on the item.
+The map scrolls to the item, highlights it and opens its details. Closing the map returns to the panel you came from.
+Opening it from the bottom bar or by Alt-clicking lets the game run underneath.
 Opening it from a goal keeps the pause menu open underneath.
 Movement controls are disabled while the map is open.
-An item first made while the map is open turns to **Made before**.
+An item discovered while the map is open reveals its name and icon without reopening the map.
 
-- The map splits items into rows for wood, stone and coal, iron and steel, tin, food, farm, nettle and firebugs, and trade.
-  In a row each item hangs off the one it is made out of, raw material first.
-- Every item is on the map, with where it is made or come by under its name.
-- An item the settlement has made, gathered, bought or started with has a filled slot, and so has everything that item
-  is made of.
-  Other items have dashed outlines.
-  The stations along the top, with their costs, are outlined until first built.
-- Chips beside an item's slot show the tool its recipe requires (yellow rim) and each additional resource it takes
-  (dark rim).
-  A click on a chip scrolls to that item and lights it up for a moment.
-- A click on an item shows how it is made, what it requires and what it is used for, with a button that opens
-  the nearest station that makes it, or the crafting menu for a recipe made by hand.
+- The map groups items by category. Coal and the iron, steel and tin chains are in **Metals**. The wheat chain is in
+  **Food**. Follow the arrows from a material to what it makes. A building branches from the material it costs most.
+  Discovered cards name where the item is made or found. Marking a mine site reveals its plan.
+- Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
+  Undiscovered items and buildings show as question marks. You can select them on the main map, and the details panel
+  shows the same dashed question-mark badge. Their details and Item trees stay hidden until discovery.
+- Small icons at the foot of a discovered card show a required tool (gold rim) or an additional resource (blue rim).
+  Click one to find that item on the map and light it up briefly.
+- Click anywhere on a card to highlight it and the arrows connected to it. The details panel on the right shows how it
+  is made, what it requires and what it is used for. The button opens the nearest station that makes it or the crafting
+  menu for a recipe made by hand.
+- Alt-click a discovered card to open its Item tree in the same window. Direct recipe products appear under **Fuel**,
+  **Ingredient** or **Tool**, and can appear under more than one use. **Buildings** shows what primarily costs this
+  material. **Actions** shows what the item is for. A shovel separates **Dig up things.** for stumps, bushes and
+  beach sand from **Dig holes** on open ground. The pickaxe lists **Mine ores** for extracting resources.
+  The pickaxe and hammers share **Building a mine** for preparing it.
+  All bottle fills share a single **Bottle** card. Bottle and Steel bucket both show **Transport liquids**.
+  Water shows **Drink**, **Water farm plots** and **Water saplings**. Berry jam shows **Food**.
+  Routine container handling is not listed.
+  When a tree has one result, it connects the item and result on a straight line.
+  Tools that can strike wolves show **Weapon**, including Torch and Steel bucket. Torch also shows **Source of light**.
+  Mortar and pestle is a recipe tool only.
+  Items the village buys say **Can be sold for profit.**
+  A station's tree shows what it makes. Empty branches are hidden. Click a card to highlight it on the main map, or
+  Alt-click a discovered card to open its tree. The upper-left **Recipe map** button returns to the view you left.
 
 ### Crafting bench
 
@@ -668,6 +754,7 @@ Some recipes need a better tool:
 - Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
 - A steel water bottle (1 steel sheet + 1 wood part) needs a steel hammer.
+- An empty lantern (1 glass jar + 1 steel sheet + 1 wood part) needs a steel hammer.
 
 Nettle rope (1 nettle → 1 rope) is the one recipe a better tool spoils: it is made only at the bench and only with a wooden mallet.
 The mallet may be the one in the bench's hammer slot or one in your backpack, whichever hammer the other is.
@@ -1051,6 +1138,7 @@ The village pays for:
 
 Anything else in a crate goes as a donation: the cart takes it and pays nothing for it.
 The returning cart says what was donated.
+A crate whose firebugs have all died stays in the market as an empty crate, and the next cart takes it as a donation too.
 A sale pays for the goods and the crate.
 Load crates, press Sell, and a cart takes them to Bramblewick and returns 30 seconds later with the coins.
 Bought goods also arrive in the output boxes.
@@ -1177,9 +1265,11 @@ A wolf that reaches you stops at biting distance, about a metre off, and waits t
 ### Fighting
 
 A swing keeps the direction you gave it at the start.
-Right-click open ground with an axe, pickaxe, hammer, torch or bug net selected to aim at the pointer.
+Right-click open ground with a weapon selected to aim at the pointer. A shovel still digs and a bug net still catches
+firebugs with right-click. Press Space to attack with either tool, or with any other selected weapon.
 Overhead, Space aims along the held movement keys or, from a stand, the last direction you walked.
-In first person, Space aims where you look.
+In first person, Space aims where you look. With no weapon selected, Space swings the best axe in the backpack, or a
+bare fist if you have no axe.
 You can move during the swing, and near a hunting wolf the movement keys reverse you immediately.
 Starting a doorway action interrupts a swing before it lands.
 A steel axe lands 0.4 seconds into its swing and hits every wolf the blade reaches.
@@ -1190,6 +1280,10 @@ Axe swings take turns:
   It passes over a wolf on the ground, and lands on every wolf in its way that is in the air, leaping for your throat, or reared up on someone's arm.
 
 A steel axe takes 2.2 to 3.2 of a wolf's 8 health a blow, a torch 0.8 to 1.2 and a punch 0.4 to 0.6.
+Each other weapon hits with its working end, such as a pickaxe's point or a hammer's face. The rake and Steel bucket
+swing overhead and come straight down. The bucket takes longer to wind up and follow through, and clangs only on a hit.
+When selected, chisels and hammers stay upright while standing or moving and tip forward to strike.
+A miss and a late swing do not hurt the wolf.
 A torch and a fist reach only a wolf at biting distance: the flame 1 metre, swung low with you bent over, and the fist 0.7 metres and a little to your right.
 A wolf winces, hops sideways and skids if it survives a weapon blow on its first hit. With room, it runs wide and takes a
 second hop behind you, lands on its forepaws and slides its hindquarters round to face you. Only then can it bite again.
@@ -1239,6 +1333,31 @@ Walk at one and it stops and stands braced where it is. Come within 2 metres and
 
 Once five are around you they attack together and swings no longer scare them.
 A torch that lands on a wolf burns it and sends it running for a moment.
+
+### Lantern
+
+Finally a sustainable source of light.
+The crafting bench makes an empty lantern.
+Right-click a lantern in the backpack, on the hotbar or on the ground to open it.
+Put firebugs onto its slot to add as many as fit, or right-click the slot while holding a stack to add one.
+It takes up to ten, shortest lives first.
+Putting a firebug in a lantern does not reset its life.
+The jar glows from inside.
+Its light dims as firebugs die, and you can add more at any time as long as there is room.
+A full lantern is 20% brighter than a torch, with a green hue.
+Lanterns do not scare wolves.
+A green badge at the upper right of a lantern's icon shows how many live firebugs are inside.
+Where a station shows several lanterns in one slot, the green number is for the lantern you can take next.
+
+Double-click a lantern to take it in hand and put out any lit torch.
+Double-click it again to stow it.
+You can still select tools.
+While your hands are needed for work, the lantern hangs from your belt and keeps shining.
+Hotbar lanterns light the way even when they are not selected.
+Slots 1–6 hang from your belt, slot 7 from your backpack, and slots 8 and 9 from your shoulders.
+Held and worn lanterns are the same size and swing more as you run.
+A lantern tucked away in the backpack or storage does not light the way, but its firebugs still age.
+Open a carried lantern and choose **Put it down** to place it, or open a placed one and choose **Pick up**.
 
 ### Straw bed
 
@@ -1400,7 +1519,7 @@ There are three tree types (oak, spruce, birch), from short trees to ones two th
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.
 The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset.
 Daylight shadows meet the ground at boots, tree trunks and the feet of buildings.
-The moon takes the same path at night and waxes and wanes over a cycle of `MoonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by.
+The moon takes the same path at night and waxes and wanes over a cycle of `MoonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches, lanterns and cabin windows to see by.
 Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows.
 Trees in front of the player, a worker or a structure turn see-through.
 
@@ -1414,6 +1533,7 @@ The world reacts too:
 
 - trees shake and topple over the stumps they leave, a tall one slower than a short one;
 - a stump or a bush leans further out of the ground as it is dug at, then is thrown up out of a spray of soil and is gone;
+- a berry bush thins out all around as its berries are picked;
 - deposits shrink and throw chips, and crumble into chips and dust when their last piece is mined;
 - a fire that runs out of work or fuel dies down over half a second;
 - the bellows board travels with each press, and the heat gauge tracks the forge;
@@ -1453,6 +1573,11 @@ A wolf's growl as it breaks into its sprint carries 30 metres, and a howl 80.
 
 Day and night each have their own music playlist.
 The music crossfades when the time changes, and each playlist picks up where it left off and wraps after its last track.
+The soundtrack gives way to a campfire song as you approach and comes back as you leave or the song ends.
+The campfire musicians and listeners stay in time with the recording even in a long-running settlement.
+When play pauses, so does the campfire song, and the soundtrack returns until play resumes.
+The soundtrack also plays in place of the campfire recordings while sleep speeds up time.
+The music volume setting also controls campfire songs and solo sounds.
 
 ## Limitations
 

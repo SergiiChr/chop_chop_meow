@@ -1,11 +1,12 @@
 using System.Collections.Generic;
+using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
 using static SetupSteps;
 using static WorldSteps;
 
-/// <summary>Firebugs in checks: a night with one firebug, and tiring it out.</summary>
+/// <summary>Firebugs in checks: a night with one firebug, tiring it out, swinging at it and the clusters out tonight.</summary>
 internal static class FirebugSteps {
     /// <summary>
     /// A night with no wolves and one firebug hovering ten metres from the player, who carries a bug net.
@@ -55,5 +56,37 @@ internal static class FirebugSteps {
         var toBug = world.Firebugs.At(bug) - world.Player;
         world.SwingNet(aside ? BodySide.Out(toBug, BodySide.Right) : toBug);
         SafeTick(world, ActorAnimation.Contact(ActorAction.NetSwing) + 2 * Frame, Frame);
+    }
+
+    /// <summary>
+    /// The clusters of firebugs out now, in the order they came out, each with its first firebug first.
+    /// A firebug within a metre of the cluster that came out just before it belongs to that cluster, while it has fewer than three.
+    /// </summary>
+    public static List<List<Thing>> Clusters(World world) {
+        var clusters = new List<List<Thing>>();
+        foreach (var bug in world.ThingsOf(ThingKind.Firebug).OrderBy(bug => bug.Id)) {
+            if (clusters.Count > 0 && clusters[^1].Count < 3 && bug.Pos.DistanceTo(clusters[^1][0].Pos) <= 1) clusters[^1].Add(bug);
+            else clusters.Add([bug]);
+        }
+        return clusters;
+    }
+
+    /// <summary>The sizes of <see cref="Clusters"/>, written out for a failure message.</summary>
+    public static string SizesText(List<List<Thing>> clusters) => string.Join(", ", clusters.Select(cluster => cluster.Count));
+
+    /// <summary>
+    /// Runs a night of an empty world and gives the first cluster with more than one firebug that comes out on the hour:
+    /// the hour, its first firebug's place and another's.
+    /// Fails when no such cluster comes out.
+    /// </summary>
+    public static (int Hour, Vector2 First, Vector2 Other) HourlyPair(GameData data) {
+        var world = EmptyWorld(data);
+        for (int hour = 1; hour <= 7; hour++) {
+            RunUntilPhase(world, data.NightStarts + (hour + .1f) / 24);
+            var last = Clusters(world)[^1];
+            if (last.Count > 1) return (hour, last[0].Pos, last[1].Pos);
+        }
+        Require(false, "a cluster of two or three firebugs should come out on one of the night's hours");
+        return default;
     }
 }

@@ -21,6 +21,7 @@ public static class TradeChecks {
         Test(CheckBoughtToolsArriveOneByOneAndSellBackInCrate, data);
         Test(CheckVillageSellsSeedsAndFertilizerByTheCrate, data);
         Test(CheckMarketTakesCratesAndDonations, data);
+        Test(CheckCartTakesACrateWhoseFirebugsDiedAsADonation, data);
         Test(CheckRunnerCarriesDeliveriesIntoStorage, data);
         Test(CheckPostsTakeOnlyAskedForCratesAndSendTheCartWhenFull, data);
         Test(CheckBuyingJinglesTheCoinsPaid, data);
@@ -171,6 +172,31 @@ public static class TradeChecks {
         SafeTick(world, data.TradeSeconds + .1f);
         var bags = sign.Output!.Items.Keys.Where(World.IsCrate).Select(id => world.Packed(id)!).ToList();
         Require(bags.Any(b => b["wheat_seeds"] == data.Market.Buys["wheat_seeds"]) && bags.Any(b => b["fertilizer"] == data.Market.Buys["fertilizer"]), "seeds and fertilizer should arrive by the crate");
+    }
+
+    private static void CheckCartTakesACrateWhoseFirebugsDiedAsADonation(GameData data) {
+        var world = EmptyWorld(data);
+        var byHand = world.Add(ThingKind.Signpost, new Vector2(10, 10));
+        var whenFull = world.Add(ThingKind.Signpost, new Vector2(12, 10));
+        world.Player = new Vector2(11, 11);
+        float caught = world.Time;
+        world.Transfer(world.Backpack, byHand.Inventory, PackCrate(world, (Firebugs.Item, 1)), 1);
+        world.Transfer(world.Backpack, whenFull.Inventory, PackCrate(world, (Firebugs.Item, 1)), 1);
+        for (int i = 2; i < World.MarketSlots; i++) world.Transfer(world.Backpack, whenFull.Inventory, PackCrate(world, ("berries", 12)), 1);
+        world.SetAutoSell(whenFull, true);
+        RunUntil(world, caught + 3 * data.DaySeconds + 1);
+        world.Player = new Vector2(11, 11);
+        Require(byHand.Inventory["crate"] == 1 && whenFull.Inventory["crate"] == 1 && world.Orders.Count == 0,
+            "a crate whose firebugs all died should wait in the market as an empty crate");
+        Require(world.Sell(byHand) && world.Orders.Single().Value == 0 && byHand.Inventory.Count == 0,
+            "a cart should take an empty crate as a donation that pays nothing");
+        world.Transfer(world.Backpack, whenFull.Inventory, PackCrate(world, ("berries", 12)), 1);
+        SafeTick(world, 1);
+        Require(world.Orders.Count == 2 && world.Orders[1].Crates == World.MarketSlots && whenFull.Inventory.Count == 0,
+            "a post set to sell on its own should send its empty crate along once every slot holds a crate");
+        var said = new List<string>(); world.Notify = said.Add;
+        SafeTick(world, data.TradeSeconds + .1f);
+        Require(said.Contains("Cart returned with 0 coins. Donated 1 Wood crate."), "the returning cart should say the empty crate was donated");
     }
 
     private static void CheckMarketTakesCratesAndDonations(GameData data) {

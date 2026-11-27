@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 public partial class GoalLog : VBoxContainer {
     private readonly UiKit kit;
     private readonly RecipeMap map;
-    private readonly Action leaveMenu;
+    private readonly Action leaveMenu, openDiary;
     private readonly World world;
     private readonly VBoxContainer active = new(), completed = new();
     private readonly Label explore;
@@ -20,8 +20,8 @@ public partial class GoalLog : VBoxContainer {
 
     public Control Details { get; }
 
-    public GoalLog(UiKit kit, RecipeMap map, Action leaveMenu) {
-        this.kit = kit; this.map = map; this.leaveMenu = leaveMenu; world = kit.World;
+    public GoalLog(UiKit kit, RecipeMap map, Action leaveMenu, Action openDiary) {
+        this.kit = kit; this.map = map; this.leaveMenu = leaveMenu; this.openDiary = openDiary; world = kit.World;
         AddThemeConstantOverride("separation", 10);
         AddChild(Style.WellLabel("Goal Log"));
         var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
@@ -34,16 +34,8 @@ public partial class GoalLog : VBoxContainer {
         completed.Visible = false; completed.AddThemeConstantOverride("separation", 5); list.AddChild(completed);
 
         Details = new Control { Name = "goal_details", Visible = false };
-        Details.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        var shade = new ColorRect { Color = new Color(Style.Line, .55f) };
-        shade.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); Details.AddChild(shade);
-        var center = new CenterContainer(); center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); Details.AddChild(center);
-        var board = new PanelContainer { CustomMinimumSize = new Vector2(480, 0) };
-        board.AddThemeStyleboxOverride("panel", Style.Board); center.AddChild(board);
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 12); board.AddChild(column);
-        var header = new HBoxContainer(); column.AddChild(header);
-        detailTitle = Style.Heading("", 23); detailTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill; header.AddChild(detailTitle);
-        header.AddChild(kit.HeaderButton("close", "Close · Esc", CloseDetails, Style.CloseRound, "goal_close"));
+        detailTitle = Style.Heading("", 23);
+        var (_, column) = kit.Window(Details, 480, Style.Board, detailTitle, CloseDetails, "goal_close", 12);
         var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); column.AddChild(well);
         var content = new VBoxContainer(); content.AddThemeConstantOverride("separation", 12); well.AddChild(content);
         detailItems = new HBoxContainer(); detailItems.AddThemeConstantOverride("separation", 8); content.AddChild(detailItems);
@@ -84,25 +76,40 @@ public partial class GoalLog : VBoxContainer {
         disclosure.Text = completed.Visible ? "▾  Completed" : "▸  Completed";
     }
 
-    private void ShowDetails(Goal goal) {
+    /// <summary>Opens the window with a goal's details over the log.</summary>
+    public void ShowDetails(Goal goal) {
         detailTitle.Text = goal.Title;
         Clear(detailItems);
         foreach (string item in goal.Items) {
-            var icon = kit.Button("", () => map.OpenAt(item, leaveMenu));
+            var icon = Badge(Icons.Of(item), world.Data.Name(item), () => map.OpenAt(item, leaveMenu));
             icon.Name = $"goal_item_{item}";
-            icon.TooltipText = world.Data.Name(item);
-            icon.CustomMinimumSize = new Vector2(46, 46);
-            icon.Icon = Icons.Of(item);
-            icon.ExpandIcon = true;
-            icon.IconAlignment = HorizontalAlignment.Center;
-            icon.AddThemeConstantOverride("icon_max_width", 34);
-            Style.Skin(icon, Style.SlotNormal, Style.SlotHover, Style.SlotPressed);
             detailItems.AddChild(icon);
         }
-        detailItems.Visible = goal.Items.Length > 0;
+        // The diary's goal shows the diary, which opens as its badge in the bottom bar does.
+        if (goal.Id == GoalId.Diary) {
+            var diary = Badge(DiaryPanel.Glyph, "Diary", () => { CloseDetails(); leaveMenu(); openDiary(); });
+            diary.Name = "goal_diary";
+            diary.AddThemeColorOverride("icon_normal_color", Style.Ink); diary.AddThemeColorOverride("icon_hover_color", Style.Ink); diary.AddThemeColorOverride("icon_pressed_color", Style.Ink);
+            diary.AddThemeConstantOverride("icon_max_width", 26);
+            detailItems.AddChild(diary);
+        }
+        detailItems.Visible = detailItems.GetChildCount() > 0;
         SetDescription(goal);
         progress.Run();
         Details.Show();
+    }
+
+    /// <summary>A slot-like button with a picture, which names it when hovered.</summary>
+    private Button Badge(Texture2D? picture, string name, Action action) {
+        var icon = kit.Button("", action);
+        icon.TooltipText = name;
+        icon.CustomMinimumSize = new Vector2(46, 46);
+        icon.Icon = picture;
+        icon.ExpandIcon = true;
+        icon.IconAlignment = HorizontalAlignment.Center;
+        icon.AddThemeConstantOverride("icon_max_width", 34);
+        Style.Skin(icon, Style.SlotNormal, Style.SlotHover, Style.SlotPressed);
+        return icon;
     }
 
     private void SetDescription(Goal goal) {
@@ -127,6 +134,13 @@ public partial class GoalLog : VBoxContainer {
             return;
         }
         detailBody.AddChild(Style.Text(world.Goals.Description(goal), 16, Style.Ink, wrap: true));
+        if (goal.Id == GoalId.Diary) {
+            var found = Style.Text("", 14, Style.Tan, wrap: true);
+            found.Name = "goal_diary_found";
+            detailBody.AddChild(found);
+            progress.Watch(() => Diary.FoundDays(world.Me), days => found.Text = $"{days} of {DiaryDay.All.Length} pages found");
+            return;
+        }
         if (goal.Id != GoalId.Profit) return;
         var figures = Style.Text("", 14, Style.Tan, wrap: true);
         detailBody.AddChild(figures);

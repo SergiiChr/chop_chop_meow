@@ -43,7 +43,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             row.AddChild(glyph);
             IReadOnlyList<string> entries = pile ? (world.PileFilter(t) is string entry ? [entry] : []) : filter;
             foreach (string item in entries) {
-                var cell = FilterCell($"filter_{(output ? "out" : "in")}_{item}", item); cell.TooltipText = $"{world.FilterName(item)}\nClick to take it off";
+                var cell = FilterCell($"filter_{(output ? "out" : "in")}_{item}", item, "\nClick to take it off");
                 string id = item;
                 cell.Pressed += () => world.SetFilter(t, id, output, false);
                 row.AddChild(cell);
@@ -79,7 +79,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             var choices = barrel ? items.Where(id => world.Data.VesselFor(id) != null) : post ? crates : items.Concat(crates);
             if (!single) choices = choices.Prepend(Inventory.Everything);
             foreach (var id in choices) {
-                var cell = FilterCell($"pick_{id}", id); cell.TooltipText = world.FilterName(id);
+                var cell = FilterCell($"pick_{id}", id);
                 cell.Pressed += () => { world.SetFilter(t, id, state.Output, true); state.Picking = false; redraw(); };
                 picker.AddChild(cell);
             }
@@ -93,7 +93,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             if (barrel) return Barrels.PouredLiquid(world.Data, item) != null;
             if (World.Nests(t, item)) return false;
             var kind = World.PackedKind(item);
-            return !kind.IsEmpty && (pile || !kind.SequenceEqual(World.MixedCrate)) || !post && world.Data.Items.ContainsKey(item);
+            return !kind.IsEmpty && (pile || !kind.SequenceEqual(World.MixedCrate)) || !post && world.Data.HasItem(item);
         }
     }
 
@@ -103,9 +103,12 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
     }
 
     /// <summary>A filter entry's cell: the item, for a crate of a good the good with a small crate in the corner, or the letter A for Everything.</summary>
-    private ItemSlot FilterCell(string name, string id) {
+    private ItemSlot FilterCell(string name, string id, string hint = "") {
         var (cell, _) = ItemSlot.Create(name, 44);
+        cell.TooltipText = world.FilterName(id) + hint;
         if (id == Inventory.Everything) { Letter(cell, "A", Style.Ink); return cell; }
+        kit.LinkRecipeMap(cell, () => id);
+        cell.TooltipText += $"\n{RecipeMap.AltClickHint}";
         string? good = world.CrateGood(id);
         cell.Icon = Icons.Of(good ?? id);
         if (good != null) {

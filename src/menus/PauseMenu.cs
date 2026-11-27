@@ -21,7 +21,7 @@ public partial class PauseMenu : PanelContainer {
     public Button JoinButton { get; }
     public Button SaveButton { get; }
 
-    public PauseMenu(UiKit kit, Net net, StartMenu startMenu, IGameFlow flow, RecipeMap map) {
+    public PauseMenu(UiKit kit, Net net, StartMenu startMenu, IGameFlow flow, RecipeMap map, Action openDiary) {
         this.kit = kit; world = kit.World; this.net = net; this.startMenu = startMenu; this.flow = flow;
         Visible = false; CustomMinimumSize = new Vector2(820, 0);
         AddThemeStyleboxOverride("panel", Style.Board);
@@ -31,7 +31,7 @@ public partial class PauseMenu : PanelContainer {
         var title = Style.Heading("Paused", 28); column.AddChild(title);
         var body = new HBoxContainer(); body.AddThemeConstantOverride("separation", 20); column.AddChild(body);
         var well = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; well.AddThemeStyleboxOverride("panel", Style.Well); body.AddChild(well);
-        goalLog = new GoalLog(kit, map, Close); well.AddChild(goalLog);
+        goalLog = new GoalLog(kit, map, Close, openDiary); well.AddChild(goalLog);
         var side = new VBoxContainer { CustomMinimumSize = new Vector2(220, 0) }; side.AddThemeConstantOverride("separation", 12); body.AddChild(side);
         var resume = kit.BigButton("Resume · Esc", Style.Brick, Close); resume.Name = "resume"; side.AddChild(resume);
         SaveButton = MenuButton("Save", Style.Enamel, () => startMenu.ShowSlots(true, BackToPause)); SaveButton.Name = "save"; side.AddChild(SaveButton);
@@ -63,6 +63,9 @@ public partial class PauseMenu : PanelContainer {
         shownGuests = Guests; netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
         Visible = true;
     }
+
+    /// <summary>Opens the board on one goal's details.</summary>
+    public void OpenGoal(Goal goal) { if (!Visible) Open(); goalLog.ShowDetails(goal); }
 
     public override void _Process(double delta) {
         // Players join and leave while the menu is open.

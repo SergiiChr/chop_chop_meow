@@ -34,7 +34,7 @@ public interface IGameFlow {
 /// What the interface's parts work with: the world, how a player action runs, and the buttons that run one.
 /// Every button runs its action through <see cref="Act"/> and then refreshes the screen.
 /// </summary>
-public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Action refresh) {
+public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Action refresh, Action<string> openRecipeMap) {
     public World World { get; } = world;
     public Sounds Sounds { get; } = sounds;
     private readonly List<Func<bool>> holds = new();
@@ -67,6 +67,11 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
         return result;
     }
 
+    /// <summary>Lets Alt-click look up the item shown by a slot without doing its usual action.</summary>
+    public void LinkRecipeMap(ItemSlot slot, Func<string?> item) {
+        slot.RecipeLink = () => { if (item() is { Length: > 0 } id) openRecipeMap(id); };
+    }
+
     public Button Button(string text, Action action, bool disabled = false) {
         var b = new Button { Text = text, Disabled = disabled, MouseDefaultCursorShape = Control.CursorShape.PointingHand, CustomMinimumSize = new Vector2(0, 34), FocusMode = Control.FocusModeEnum.None };
         b.Pressed += () => Run(action); return b;
@@ -78,6 +83,25 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
         Style.SkinPill(button, color);
         button.AddThemeFontSizeOverride("font_size", 17);
         return button;
+    }
+
+    /// <summary>
+    /// Makes <paramref name="screen"/> a window over the dimmed screen: a box at least <paramref name="width"/> wide and <paramref name="height"/> tall in the
+    /// middle, holding a header of <paramref name="title"/> with a close button, over a column for what the window shows.
+    /// Gives the shade, which a press beside the box lands on, and the column.
+    /// </summary>
+    public (ColorRect Shade, VBoxContainer Column) Window(Control screen, float width, StyleBox box, Label title, Action close, string closeName, int separation, float height = 0) {
+        screen.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        var shade = new ColorRect { Color = new Color(Style.Line, .55f) };
+        shade.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); screen.AddChild(shade);
+        var center = new CenterContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; center.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); screen.AddChild(center);
+        var board = new PanelContainer { CustomMinimumSize = new Vector2(width, height) };
+        board.AddThemeStyleboxOverride("panel", box); center.AddChild(board);
+        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", separation); board.AddChild(column);
+        var header = new HBoxContainer(); column.AddChild(header);
+        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; header.AddChild(title);
+        header.AddChild(HeaderButton("close", "Close · Esc", close, Style.CloseRound, closeName));
+        return (shade, column);
     }
 
     /// <summary>A round button in a panel's header, with a line icon.</summary>

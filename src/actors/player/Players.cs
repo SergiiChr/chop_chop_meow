@@ -143,6 +143,9 @@ public sealed partial class World {
             case Verb.TakeUpPath: GravelPaths.TakeUp(Terrain.TileAt(c.At)); break;
             case Verb.TakeUpPipe: Construction.TakeUpPipe(Terrain.TileAt(c.At)); break;
             case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At, c.Rotation)); break;
+            case Verb.ToggleLanternInHand: Lanterns.ToggleInHand(c.Target); break;
+            case Verb.PlaceLantern: Preferring(S.Backpack, c.Count, () => Lanterns.Place(c.Item, c.At, c.Rotation)); break;
+            case Verb.RefillLantern: if (c.Target == 0 || t != null) Preferring(S.Backpack, (int)c.At.X, () => Lanterns.Refill(c.Other, t, c.Count)); break;
             case Verb.PlaceBarrel: Preferring(S.Backpack, c.Count, () => PlaceBarrel(c.Item, c.At, c.Rotation)); break;
             case Verb.MoveInBarrel:
                 if ((uint)c.Target <= 2 * Barrel.Capacity) {
@@ -153,7 +156,7 @@ public sealed partial class World {
             case Verb.MoveInCrate: MoveInCrate(c.Target, c.Item, c.Count, c.Other != 0); break;
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
             case Verb.Torch: UseTorch(c.At); break;
-            case Verb.Attack: Attack(c.At); break;
+            case Verb.Attack: Attack(c.At, c.Item == "" ? null : c.Item); break;
             case Verb.SwingNet: SwingNet(c.At); break;
             case Verb.Leave: Doorways.Leave(); break;
             case Verb.TurnKey: Doorways.TurnKey(); break;
@@ -181,10 +184,12 @@ public sealed partial class World {
             // A stale move, of a job that has left that place in the list, is dropped rather than moving another job.
             case Verb.MoveJob: if (w != null && JobAt(w, new JobSpot(c.Target, c.Count)) is JobEntry moved && JobKey(moved) == c.Item) MoveJob(w, new JobSpot(c.Target, c.Count), new JobSpot((int)c.At.X, (int)c.At.Y)); break;
             case Verb.Settle: if (w != null) SettleDebt(w); break;
+            case Verb.TakePage: Diary.Take(); break;
+            case Verb.ReadDiary: Diary.Read(c.Count); break;
         }
         if (t == null) return;
         switch (c.Verb) {
-            case Verb.PickUp: if (t.IsLoose) Gather(t, 0); break;
+            case Verb.PickUp: if (t.TakenWhole) Gather(t, 0); break;
             case Verb.Pump: Pump(t); break;
             case Verb.FuelFire: FuelFire(t); break;
             case Verb.SetRecipe: SetRecipe(t, c.Item); break;
@@ -205,6 +210,7 @@ public sealed partial class World {
             case Verb.AutoSell: SetAutoSell(t, c.Count != 0); break;
             case Verb.SetPacking: SetPacking(t, c.Item); break;
             case Verb.Buy: Buy(t, c.Item, Math.Min(c.Count, 5)); break;
+            case Verb.PickUpLantern: Lanterns.PickUp(t); break;
             case Verb.PickUpBarrel: PickUpBarrel(t); break;
             case Verb.PickUpCrate: PickUpCrate(t); break;
             case Verb.Dismantle: Construction.Dismantle(t); break;
@@ -338,6 +344,7 @@ public sealed partial class World {
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
+        item = Lanterns.Kind(item);
         bool pile = IsSingleResourceStore(chest);
         if (chest.Kind == ThingKind.Barrel && Data.VesselFor(item) == null) return;
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null || pile && item == MixedCrate || !pile && item == Inventory.Everything) || Nests(chest, item)) return;

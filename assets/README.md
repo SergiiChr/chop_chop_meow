@@ -188,6 +188,13 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   hoop and a long bag of white netting, seen through, that narrows to a rounded end; the icon, the heap and the
   player's hand show the same model.
 - The firebug item (`ItemShape.Firebug`) is a beetle with dark wing covers and a yellow-green tail.
+- `LanternShape` adds a wooden foot and grip, and steel lid and handle to the glass jar.
+  Its icon, ground and hand models share the jar mesh. Worn and heap models use a lighter version of the same profile.
+  The firebugs light the inside of the jar. When placed, the wooden foot blocks direct light beneath it.
+  Its green light has the reach of a torch, with each live firebug supplying 12% of the torch's baseline light energy.
+  Preview it using `./build.py play -- --showcase --lantern`, with `--night` or `--dark`.
+  Append `held` or `full-wear` directly after `--lantern` to inspect the lanterns on the player.
+  Add `--lantern-motion` to see the lanterns swing while the player starts, jogs, sprints and stops.
 
 - `BackpackShape` — dropped inventory. The body reuses the player's cached six-ring canvas backpack profile through `ActorShape.Backpack`, laid on its back in a ground pose. `BackpackShape` adds ground-resting webbing: slack shoulder straps, a carry loop, a fitted dark opening and a separate curved access flap. The flap animates as the storage lid and has a fog-memory guard.
 - `CartShape` — caches the courier cart's hollow tapered tray with a folded rim, continuous pull frame and hand grip, fitted bed supports and axle, dished wheels and handled payment case. Cart loads reuse a `CrateShape.Cargo` version of the slatted crate, omitting hidden interiors and small hardware at this scale. The six crate slots, loose-goods/cash visibility, wheel pivots and courier animation are independent. The courier uses the shared human rig.
@@ -201,10 +208,14 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   under 2,600 triangles; the item's icon is the tallest sprig, 935 triangles, and a heap is made of the smallest.
   Preview nettles and firebugs with `./build.py play -- --showcase --firebugs`, by day with `--day-phase 0.3`.
 - `src/firebugs/display/FirebugShape.cs` — a firebug in the air: a dark body with a lantern over it and a soft halo.
+- `src/diary/display/PageShape.cs` — a loose diary page: one cupped sheet of aged paper written over in rows of ink,
+  built in code after the sheets of NVIDIA's SimReady "Paper" (`paper_stack_a05`, CC BY 4.0), which served only as a
+  reference; nothing of it is in the game.
+  Preview the floating, lying and falling pages with `./build.py play -- --showcase --diary --diary-fall`.
 
 - Tree3D 1.1.0 supplies the baked tree and berry-bush geometry. Preview it with `./build.py play -- --showcase --trees`.
 - `src/Tree3DShape.cs` loads shared tree and berry-bush meshes, and cutout foliage shader materials that sway in the wind (`src/Wind.cs`) and have a blended twin for fading. It also adds the stem under a tree's baked trunk that starts above the ground; a berry bush gets none.
-- Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes`. Berries attach to foliage-card twigs and have their own harvest visibility. The same view shows plain bushes and stumps, one of each half dug out.
+- Preview the berry bushes in their five stages, from full to picked clean, with `./build.py play -- --showcase --bushes`. Berries attach to foliage-card twigs and thin out in stages as they are picked. The same view shows plain bushes and stumps, one of each half dug out.
 - `assets/models/tree3d/` contains the baked meshes, SVG leaf/bark textures, triangle manifest and upstream license notices.
 - Regenerate Tree3D output with `./tools/tree3d.py`. Native authoring binaries stay in ignored `.tools/tree3d` and are not needed to play. See [tree3d/README.md](models/tree3d/README.md).
 - `src/NatureShape.cs` supplies shared meshes for stumps, plain bushes, fruit, rocks, ore deposits and loose ore: vertex-coloured, or for stone and coal smooth with a scan draped over them.
@@ -220,7 +231,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 The hotbar prefers them over everything else.
 Rerun the command after changing a model.
 
-They cover every item, every building and the workers' hard hat.
+They cover every item, every building, the workers' hard hat and the loose diary page the Diary's cells show.
 
 How they are framed:
 
@@ -238,7 +249,12 @@ How they are framed:
 
 `ui/` holds hand-written SVG icons:
 
-- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, book, close, filter, stash and so on), tinted in code.
+- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, book, close, filter, stash,
+  the goal popup's trophy and so on), tinted in code.
+- `scribble_word.svg` and `scribble_line.svg`, the scribbles a diary day shows where its writing cannot be read: cursive
+  loops and arches drawn by a one-off script, whose line, size and spacing go further wrong letter by letter, as
+  writing in the dark does, ending in a stroke trailing down the page.
+  They are imported at twice their size so they stay sharp.
 - `fresh_water.svg`, the water a full bottle pours into a station: a blue droplet in the shape of the corner's thirst icon, used as the item icon since only stations hold it and it has no model.
 
 ## Fonts
@@ -247,8 +263,9 @@ How they are framed:
 
 - Fredoka for headings.
 - Nunito for text.
+- Caveat for the diary's handwriting.
 
-Both are variable fonts weighted in code.
+All three are variable fonts weighted in code.
 
 ## Sounds
 
@@ -273,11 +290,36 @@ The following tracks are used under the [Pixabay Content License](https://pixaba
 - `groove_soul.mp3` is [Groove Soul](https://pixabay.com/music/funk-groove-soul-317798/) by The_Mountain.
 - `soft_jazz.mp3` is [Soft Jazz](https://pixabay.com/music/smooth-jazz-soft-jazz-621606/) by AtlasAudio.
 
+The campfire songs are [American Western Country](https://pixabay.com/music/modern-country-american-western-country-576992/)
+and [Country Music](https://pixabay.com/music/traditional-country-country-music-576986/), both by Monume on Pixabay.
+The full songs are Ogg Vorbis so they can start partway through when a listener comes within earshot.
+Both are normalised to -18 LUFS integrated loudness.
+
 ### Sound effects
 
 `sounds/` holds the sound effects as 320 kbps MP3, apart from the WAV of `sting_groan`, converted from the supplied files
 and peak-normalised.
 Variants of one sound are matched in loudness, and a numbered suffix marks them.
+
+The campfire's solo sounds are mono MP3s with the leading silence cut and short fades at the ends.
+The loudest 400 ms of each cut is brought to -22 LUFS.
+The originals come from Pixabay under the [Pixabay Content License](https://pixabay.com/service/license-summary/):
+
+- `campfire_drum_1` and `campfire_drum_2` are a single kick and the four-kick loop from LazyChillZone's
+  [Simple Drum Kick Loop](https://pixabay.com/sound-effects/musical-simple-drum-kick-loop-230756/).
+- `campfire_drum_3` is the whole [Drum Beat 02](https://pixabay.com/sound-effects/musical-drum-beat-02-36276/)
+  from freesound_community. `campfire_drum_4` is IFM123's
+  [Awesome Kick Drum](https://pixabay.com/sound-effects/musical-awesome-kick-drum-41824/).
+- `campfire_guitar_1` and `campfire_guitar_2` are u_op8btczor7's
+  [Guitar F Strum](https://pixabay.com/sound-effects/musical-guitar-f-strum-508252/) and
+  [Guitar C Strum](https://pixabay.com/sound-effects/musical-guitar-c-strum-504874/).
+- `campfire_guitar_3` and `campfire_guitar_4` are SOUND_GARAGE's
+  [Em Guitar Chord Strum 1](https://pixabay.com/sound-effects/musical-em-guitar-chord-strum-1-309534/) and
+  [Em Guitar Chord Strum 8](https://pixabay.com/sound-effects/musical-em-guitar-chord-strum-8-309539/).
+- `campfire_harmonica_1` through `campfire_harmonica_23` are individual chords from Samuel_Copier_Country's
+  [Cowboy with a Diatonic Harmonica](https://pixabay.com/sound-effects/musical-cowboy-with-a-diatonic-harmonica-267513/).
+  `campfire_harmonica_24` through `campfire_harmonica_35` are chords from the same artist's
+  [Wild West Harmonica](https://pixabay.com/sound-effects/musical-wild-west-harmonica-267552/).
 
 These were made with ffmpeg from Kenney's sounds:
 
@@ -292,6 +334,17 @@ These were made with ffmpeg from Kenney's sounds:
 - `butcher_carcass`: knife slices pitched lower and muffled, so they read as tearing meat.
 
 `wolf_hit`, `place_building`, `rail_clink` and `buy_coins` are Kenney's punch and wood impacts, metal clinks and coins as they are.
+
+`bucket_hit` is freefire66's [Bucket Hit](https://freesound.org/people/freefire66/sounds/175948/) from Freesound
+(CC0 1.0), also released on [Pixabay](https://pixabay.com/sound-effects/film-special-effects-bucket-hit-89027/).
+The Freesound preview is mixed to mono, trimmed to the hit and its decay, faded at both ends and peak-normalised.
+
+`goal_new` is universfield's "New notification 040"
+([Pixabay 493469](https://pixabay.com/sound-effects/technology-new-notification-040-493469/)).
+`goal_completed` is universfield's "New notification 067"
+([Pixabay 138695](https://pixabay.com/sound-effects/film-special-effects-new-notification-067-138695/)).
+Both are recordings supplied for this project.
+Each is mixed to mono, has the silence cut from its start, is faded at both ends and peak-normalised.
 
 `dig_earth`, `dig_toss` and `dig_up` are cut with ffmpeg from "Digging with shovel" by freesound_community (Pixabay 63069), a recording supplied for this project: four cuts of the blade going into soil, four of soil thrown off it and one heavy heave of earth for a stump or bush coming out.
 Each cut is faded at both ends, and the cuts of one sound are brought to one mean level.
@@ -318,6 +371,12 @@ Each step's loudest 400 ms of heard loudness, counting the silence after it, is 
 from just before the foot lands, with the same fades.
 Each is brought to the grass steps' -23.3 LUFS by the same measure, and plays at the same level in the mix, so a step on
 gravel is no louder than one on grass.
+
+`page_turn` is cut with ffmpeg from "Foley paper handling & page turning SFX" by lenspulse (Pixabay 584919), a
+recording supplied for this project: its three page turns, each cut into its own variant, faded at both ends and brought
+to one mean level.
+`paper_fall` is the first four seconds of "Rustling paper" by freesound_community (Pixabay 46380), a recording supplied
+for this project, faded at both ends and brought up to just under full scale.
 
 `sting_groan` is "Male Groan of Pain" by DRAGON-STUDIO (Pixabay 357971), a recording supplied for this project: mixed
 to mono, since what differs between its two channels is 44 dB quieter than the groan, faded in over 10 ms and out

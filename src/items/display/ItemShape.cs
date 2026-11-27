@@ -51,6 +51,7 @@ internal static class ItemShape {
         ["canned_jam"] = new(f => Can(f, BerryJam.Color, "8f2436"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, BerryJam.Color, null, false))),
         ["canned_meat_stew"] = new(f => Can(f, "c07a48", "7a4a26"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "c07a48", null, false))),
         [GlassBlowing.Item] = new(null, GlassJarShape.Finish),
+        [Lanterns.Item] = new(null, Plain),
         ["grass"] = new(f => Sheaf(f, 20, .5f, .24f, false, "8fae55", "7c9c46", "a3bf63"), Plain, .32f, Rise: .7f),
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
         ["wheat_seeds"] = new(Seeds, Sacking, .36f, Rise: .8f),
@@ -138,7 +139,8 @@ internal static class ItemShape {
     /// None for a model partly drawn as a scan, whose mesh carries a material for each part.
     /// </summary>
     public static StandardMaterial3D? Material(string item, string color) =>
-        item is "iron_bar" or "steel_bar" or "tin_bar" ? ModelKit.Metal(color, .45f, .5f) : looks[item].Scan == null ? looks[item].Material : null;
+        item is "iron_bar" or "steel_bar" or "tin_bar" ? ModelKit.Metal(color, .45f, .5f)
+        : item == Lanterns.Item || looks[item].Scan != null ? null : looks[item].Material;
 
     /// <summary>Builds one of the item as its icon shows it, centred on the origin.</summary>
     public static ArrayMesh Build(string item) {
@@ -152,6 +154,7 @@ internal static class ItemShape {
     /// <summary>Builds the piece a heap of the item is made of, standing on the origin at the size a heap shows it.</summary>
     public static ArrayMesh Piece(string item) {
         if (item == GlassBlowing.Item) return GlassJarShape.Pile;
+        if (item == Lanterns.Item) return LanternShape.Heap;
         var look = looks[item];
         var faces = new List<Face>(); (look.Piece ?? look.Build)!(faces);
         // The game's camera looks down on a heap, so it never sees an underside.

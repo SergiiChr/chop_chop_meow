@@ -10,8 +10,68 @@ namespace ChopChopMeow;
 /// A swing of a bug net catches those in its sweep and sends the others near it darting.
 /// </summary>
 public sealed class Firebugs(World world) {
-    /// <summary>Firebugs that come out as night falls; one more follows after each hour of the night.</summary>
+    /// <summary>Clusters of firebugs that come out as night falls, with one more after each hour of the night.</summary>
     public const int AtNightfall = 8;
+    /// <summary>The chance a cluster has three firebugs, or else two or one at even odds.</summary>
+    public const float ThreeChance = .25f;
+    /// <summary>Metres from a cluster's first firebug within which the others come out.</summary>
+    public const float ClusterRadius = 1;
+    public const string Item = "firebug";
+    private const int LifeDays = 3;
+    internal float NewExpiry => world.Time + LifeDays * world.Data.DaySeconds;
+    private float nextExpiry = float.PositiveInfinity;
+    private readonly List<(int Id, string Name)> changedCrates = new();
+
+    /// <summary>Starts the three-day lifetime of each firebug this inventory can take from a catch.</summary>
+    internal int Catch(Inventory to, int count) {
+        int room = Math.Min(count, to.Room(Item));
+        if (room <= 0) return 0;
+        float expiry = NewExpiry;
+        Span<float> expires = room <= 64 ? stackalloc float[room] : new float[room];
+        expires.Fill(expiry);
+        nextExpiry = Math.Min(nextExpiry, expiry);
+        return to.AddFirebugs(expires);
+    }
+
+    /// <summary>Average game minutes left among the firebugs in one stack, or the whole box when no slot is named.</summary>
+    internal int AverageMinutes(Inventory box, int slot = -1) =>
+        MinutesLeft(slot < 0 ? box.AverageFirebugExpiry() : box.AverageFirebugExpiry(slot));
+
+    /// <summary>The average of some firebugs' death times, or 0 for none.</summary>
+    internal static float Average(ReadOnlySpan<float> expiries) {
+        double total = 0;
+        foreach (float expiry in expiries) total += expiry;
+        return expiries.IsEmpty ? 0 : (float)(total / expiries.Length);
+    }
+
+    internal int MinutesLeft(float expiry) => (int)MathF.Ceiling(Math.Max(0, expiry - world.Time) / world.Data.HourSeconds * 60);
+
+    /// <summary>Clears dead bugs from the inventories that can hold them when the next catch expires.</summary>
+    internal void Age() {
+        float now = world.Time;
+        if (now < nextExpiry) return;
+        nextExpiry = float.PositiveInfinity;
+        changedCrates.Clear();
+        var saved = world.S;
+        foreach (var (id, box) in saved.Crates) {
+            int before = box[Item];
+            Check(box);
+            if (box[Item] != before) changedCrates.Add((id, World.PackedName(box, id)));
+        }
+        foreach (var player in saved.Players) Check(player.Backpack);
+        foreach (var player in saved.Absent.Values) Check(player.Backpack);
+        foreach (var worker in saved.Workers) Check(worker.Bag);
+        foreach (var thing in saved.Things) {
+            Check(thing.Inventory);
+            if (thing.Output is { } output) Check(output);
+        }
+        foreach (var (id, name) in changedCrates) if (name == "crate") saved.Crates.Remove(id);
+
+        void Check(Inventory box) {
+            if (box[Item] > 0) nextExpiry = Math.Min(nextExpiry, box.ExpireFirebugs(now));
+            foreach (var (id, name) in changedCrates) box.RenamePackedCrate(id, name);
+        }
+    }
     /// <summary>Metres a firebug keeps from every building as it comes out.</summary>
     public const float BuildingRoom = 25;
     /// <summary>Metres within which a player sets a firebug darting, unless it rests.</summary>
@@ -40,12 +100,12 @@ public sealed class Firebugs(World world) {
     private readonly Dictionary<int, Flight> flights = new();
     private readonly List<Thing> caught = new();
     private const int Seed = 2203;
-    /// <summary>More than the firebugs a night lets out, so no two of any nights share a seed.</summary>
+    /// <summary>More than the clusters a night lets out, so no two of any nights share a seed.</summary>
     private const int PerNightSeeds = 64;
     // Which way a startled firebug swerves. Seeded, and started again with each world, so a recording of a night plays the same every time.
     private Random swerves = new(Seed);
 
-    internal void Reset() { flights.Clear(); swerves = new Random(Seed); }
+    internal void Reset() { flights.Clear(); swerves = new Random(Seed); nextExpiry = world.Time; }
 
     /// <summary>Where a firebug is now: its place and how far its hovering has carried it from there.</summary>
     public Vector2 At(Thing bug) => bug.Pos + Hover(bug.Id, world.Time);
@@ -73,11 +133,26 @@ public sealed class Firebugs(World world) {
         }
         if (!world.QuietNights) {
             int due = AtNightfall + (int)((world.DayPhase - world.Data.NightStarts) * 24);
-            // Each firebug's place is seeded by the day and its turn, so a night loaded part way lets the rest out where they would have come anyway, and no night repeats another.
-            for (; s.FirebugsOut < due; s.FirebugsOut++)
-                if (world.UnseenSpot(new Random(Seed + world.Day * PerNightSeeds + s.FirebugsOut), Free) is Vector2 spot) world.Add(ThingKind.Firebug, spot, 1);
+            // Each cluster is seeded by the day and its turn, so a night loaded part way lets the rest out where they would have come anyway, and no night repeats another.
+            for (; s.FirebugsOut < due; s.FirebugsOut++) LetOut(new Random(Seed + world.Day * PerNightSeeds + s.FirebugsOut));
         }
         foreach (var bug in bugs) Fly(bug, dt);
+    }
+
+    /// <summary>
+    /// Lets one cluster out at a random spot: three firebugs at <see cref="ThreeChance"/>, otherwise two or one.
+    /// The others come out within <see cref="ClusterRadius"/> of the first, seen or not, and one whose spot is not
+    /// <see cref="Free"/> is left out.
+    /// </summary>
+    private void LetOut(Random random) {
+        if (world.UnseenSpot(random, Free) is not Vector2 first) return;
+        world.Add(ThingKind.Firebug, first, 1);
+        int size = random.NextDouble() < ThreeChance ? 3 : random.Next(1, 3);
+        for (int i = 1; i < size; i++) {
+            // The square root spreads them evenly over the circle instead of crowding its middle.
+            var spot = first + Vector2.Right.Rotated((float)random.NextDouble() * MathF.Tau) * ClusterRadius * MathF.Sqrt((float)random.NextDouble());
+            if (Free(spot)) world.Add(ThingKind.Firebug, spot, 1);
+        }
     }
 
     /// <summary>Lets no more firebugs out tonight; those already out stay.</summary>
@@ -144,7 +219,7 @@ public sealed class Firebugs(World world) {
             else if (at.DistanceTo(world.Player) <= ScareRadius) Startle(bug, FlightOf(bug), world.Player);
         }
         foreach (var bug in caught) {
-            if (s.Backpack.Add(World.ResourceItem(bug), 1) == 0) { world.Say("Backpack full. Store or sell some supplies."); Startle(bug, FlightOf(bug), world.Player); continue; }
+            if (Catch(s.Backpack, 1) == 0) { world.Say("Backpack full. Store or sell some supplies."); Startle(bug, FlightOf(bug), world.Player); continue; }
             s.Things.Remove(bug); flights.Remove(bug.Id); world.Got(World.ResourceItem(bug));
         }
     }
