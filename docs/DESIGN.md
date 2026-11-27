@@ -566,7 +566,7 @@ Each striking work action has an impact moment that shakes its target and spawns
 The axe, pick and hammer land there (`ActorAnimation.ChopStrike`, `MineStrike`, `HammerStrike`), speeding up all the way into the blow; a punch draws the fist back first.
 A dig strikes at `ActorAnimation.DigStrike` and throws its soil off the blade (`ActorRig.ShovelTip`) at `DigToss`.
 
-A blow lands its tool's working end on what is worked, wherever within reach the worker stands (`StrikePoints`, `ActorState.Mark`): the axe's head on the trunk's side, the pick's point where its swing first meets the rock or on the cliff's rock face beside a marked mine's cave mouth (`Mines.DigFace`), the hammer's face on the anvil's or bench's work top, and the shovel's blade in the ground at a stump's or bush's foot.
+A blow lands its tool's working end on what is worked, wherever within reach the worker stands (`StrikePoints`, `ActorState.Mark`): the axe's head on the trunk's side, the pick's point where its swing first meets the rock as it rests, leaving out the shake a blow gives it, or on the cliff's rock face beside a marked mine's cave mouth (`Mines.DigFace`), the hammer's face on the anvil's or bench's work top, and the shovel's blade in the ground at a stump's or bush's foot.
 Chips and soil fly from there.
 Where the blow's own swing meets what is worked, the swing is cut short there (`ActorAnimation.Swing`).
 Where it passes it by, the right arm is solved to reach it with the tool held in line with the forearm (`ArmReach.ArmTo`), the trunk turning to face it and leaning in or back as far as the arm needs; an arm that would have to swing behind the trunk or fold its elbow tight stops where its swing passes nearest instead.
