@@ -697,6 +697,8 @@ most once a game, and shows them in turn.
 A goal that goes from `Hidden` straight to `Completed` gets only the completed popup.
 It takes up the statuses a game already has, with no popups, once the window has joined a game and taken the server's
 first update (`Net.Joined`): a new game, a load, joining another player's game and reconnecting.
+It also takes them up whenever the window's world is replaced (`World.Replaced`), so leaving a game for the start menu
+or losing the line to the host drops the popups that game still had waiting.
 The showcase takes them up again after setting up its scene by hand.
 
 ### Survival and needs

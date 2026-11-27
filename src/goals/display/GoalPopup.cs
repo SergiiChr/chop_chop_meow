@@ -14,7 +14,7 @@ namespace ChopChopMeow;
 /// Clicking it opens the pause menu on that goal's details.
 /// </summary>
 public partial class GoalPopup : Control {
-    public const string NewHeading = "New goal", CompletedHeading = "Goal completed";
+    private const string NewHeading = "New goal", CompletedHeading = "Goal completed";
     public const string NewSound = "goal_new", CompletedSound = "goal_completed";
     // Seconds of each step: the badge pops in, the bar opens, and at the end the bar closes and the badge shrinks away.
     private const float PopSeconds = .3f, OpenSeconds = .4f, CloseSeconds = .35f, ShrinkSeconds = .25f;
@@ -41,6 +41,8 @@ public partial class GoalPopup : Control {
 
     // The goal on screen, and whether it popped up as new or completed.
     private (Goal Goal, GoalStatus Status)? showing;
+    /// <summary>How many popups this window has started.</summary>
+    public int Shown { get; private set; }
     public string Heading => heading.Text;
     public string Title => title.Text;
 
@@ -51,16 +53,20 @@ public partial class GoalPopup : Control {
         clip = new Control { ClipContents = true, MouseFilter = MouseFilterEnum.Ignore }; AddChild(clip);
         heading = Style.Text("", HeadingSize, Style.Beige, Style.Head); clip.AddChild(heading);
         title = Style.Text("", TitleSize, Style.Rim, Style.Head); clip.AddChild(title);
-        // The two lines sit as one block in the bar's middle, with as much room above as below; the title rides up into
-        // the empty room under the heading's letters, which leaves more room between the letters and the bar's edges.
+        // The two lines sit as one block in the bar's middle, with as much room above as below.
+        // The title rides up into the empty room under the heading's letters, which leaves more room between the letters
+        // and the bar's edges.
         float lineStep = heading.GetCombinedMinimumSize().Y - LineOverlap, top = (BadgeSize - lineStep - title.GetCombinedMinimumSize().Y) / 2;
         heading.Position = new Vector2(TextGap, top); title.Position = new Vector2(TextGap, top + lineStep);
         TakeUp();
+        // Leaving a game for the start menu, or losing the line to the host, drops what that game still had to pop up.
+        world.Replaced += TakeUp;
     }
 
     /// <summary>
     /// Notes the goals the game in hand already shows and drops any popup, so only what happens from now on pops up:
     /// the game calls it once the window has joined a game, new, loaded or another player's.
+    /// It also runs whenever the world is replaced.
     /// </summary>
     public void TakeUp() {
         var goals = Goals.Entries;
@@ -72,7 +78,10 @@ public partial class GoalPopup : Control {
         waiting.Clear(); showing = null; Visible = false;
     }
 
-    /// <summary>Lines up a popup for each goal that appeared or was completed since the last refresh; one revealed already done pops up only as completed.</summary>
+    /// <summary>
+    /// Lines up a popup for each goal that appeared or was completed since the last refresh.
+    /// A goal revealed already done pops up only as completed.
+    /// </summary>
     public void Refresh() {
         var goals = Goals.Entries;
         for (int i = 0; i < goals.Length; i++) {
@@ -95,7 +104,7 @@ public partial class GoalPopup : Control {
     }
 
     private void Start((Goal Goal, GoalStatus Status) next) {
-        showing = next; clock = 0;
+        showing = next; clock = 0; Shown++;
         bool completed = next.Status == GoalStatus.Completed;
         heading.Text = completed ? CompletedHeading : NewHeading;
         title.Text = next.Goal.Title;
@@ -108,12 +117,9 @@ public partial class GoalPopup : Control {
 
     /// <summary>Sets the badge's size, the bar's width and the text's fade for the time since this popup started.</summary>
     private void Animate() {
-        float closing = ShowSeconds - ShrinkSeconds - CloseSeconds;
-        badgeScale = clock < PopSeconds ? BackOut(clock / PopSeconds)
-            : clock > ShowSeconds - ShrinkSeconds ? 1 - Smooth((clock - (ShowSeconds - ShrinkSeconds)) / ShrinkSeconds) : 1;
-        float opened = clock < PopSeconds ? 0
-            : clock < PopSeconds + OpenSeconds ? Smooth((clock - PopSeconds) / OpenSeconds)
-            : clock < closing ? 1 : 1 - Smooth((clock - closing) / CloseSeconds);
+        float shrinking = ShowSeconds - ShrinkSeconds, closing = shrinking - CloseSeconds;
+        badgeScale = clock < PopSeconds ? BackOut(clock / PopSeconds) : 1 - Mathf.SmoothStep(shrinking, ShowSeconds, clock);
+        float opened = Mathf.SmoothStep(PopSeconds, PopSeconds + OpenSeconds, clock) - Mathf.SmoothStep(closing, shrinking, clock);
         barWidth = BadgeSize + (openWidth - BadgeSize) * opened;
         clip.Position = new Vector2(BarLeft + BadgeSize, 0);
         clip.Size = new Vector2(Math.Max(0, barWidth - BadgeSize - BarHeight / 2), BadgeSize);
@@ -146,7 +152,6 @@ public partial class GoalPopup : Control {
         open(shown.Goal);
     }
 
-    private static float Smooth(float t) => t * t * (3 - 2 * t);
     // Grows past full size and settles back, the badge's pop.
     private static float BackOut(float t) { const float c = 1.7f; float u = t - 1; return 1 + (c + 1) * u * u * u + c * u * u; }
 }

@@ -46,7 +46,10 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
-    /// <summary>Reaching the bench pops up "A start" as completed, then "Road to riches" as new, each with its sound; a click opens the goal.</summary>
+    /// <summary>
+    /// Reaching the bench pops up "A start" as completed, then "Road to riches" as new, each with its sound.
+    /// A click on the popup opens the goal.
+    /// </summary>
     private async Task CheckReachedGoalsPopUpInTurnAndOpenTheirDetails() {
         Require(!goalPopup.Visible, "A new game must pop up none of the goals it starts with.");
         int before = sounds.Played;
