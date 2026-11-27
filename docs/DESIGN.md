@@ -1995,11 +1995,9 @@ Both play lower and slower the taller the tree, from a tenth above their recorde
 
 ### Music
 
-Music in `assets/music` crossfades over four seconds between the day music and the night music when night falls or dawn breaks, including during sleep.
-The day plays its tracks one after another and the night loops one.
-
-Each keeps its place for the running session, so music longer than its part of the day carries on next time.
-A track that plays to its end hands over to the next, and the last wraps back to the first.
+Music in `assets/music` crossfades between playlists over four seconds at nightfall and dawn, including during sleep.
+Each playlist keeps its place for the running session, so music longer than its part of the day carries on next time.
+Both playlists play their tracks in order, then wrap back to the first.
 The options screen sets the music volume, stored in the settings file.
 
 Each campfire song and solo starts at a time on the world's clock, so a player approaching a fire or joining a game hears

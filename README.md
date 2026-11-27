@@ -1588,7 +1588,8 @@ Repeated sounds rotate between variants.
 A sound is loudest at your character and fades with distance, to silence 16 metres away, whatever the zoom.
 A wolf's growl as it breaks into its sprint carries 30 metres, and a howl 80.
 
-Day and night have their own music, which crossfades as the time changes and picks up where it stopped last time.
+Day and night each have their own music playlist.
+The music crossfades when the time changes, and each playlist picks up where it left off and wraps after its last track.
 The soundtrack gives way to a campfire song as you approach and comes back as you leave or the song ends.
 The campfire musicians and listeners stay in time with the recording even in a long-running settlement.
 When play pauses, so does the campfire song, and the soundtrack returns until play resumes.
@@ -1618,3 +1619,8 @@ Music credits:
 
 - Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov))
 - Augmentality (Brandon Morris)
+- [Jazz - Jazz Music](https://pixabay.com/music/traditional-jazz-jazz-jazz-music-630211/) by Andrii Hroza (andriih)
+- [Jazz Bar](https://pixabay.com/music/traditional-jazz-jazz-bar-592657/) by Aurec
+- [Lofi Soul](https://pixabay.com/music/lofi-lofi-soul-588903/) by ZephiraMusic
+- [Groove Soul](https://pixabay.com/music/funk-groove-soul-317798/) by The_Mountain
+- [Soft Jazz](https://pixabay.com/music/smooth-jazz-soft-jazz-621606/) by AtlasAudio
