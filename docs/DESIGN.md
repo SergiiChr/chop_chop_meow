@@ -27,7 +27,10 @@ These came from the user; change them only after asking.
 - **Firebugs:** eight come out at nightfall and one more each night hour, away from buildings, and are gone at dawn.
   One drifts and glows, darts off from a player who comes near, faster than a walk and slower than a sprint, then
   rests; a swing lands after a moment, catches what is in its sweep, and a miss sends the bug darting.
-  A caught firebug is an item only: nothing is made from it and it gives no light.
+  A caught firebug lives for three in-game days. It lights a lantern while inside it and disappears when it dies.
+- **Lantern:** a glass jar, a steel sheet and a wood part at a crafting bench with a steel hammer make an empty lantern.
+  It takes up to ten firebugs. The brightness follows how many are alive, up to a fifth brighter than a torch.
+  It illuminates the ground when placed, in hand or bound to the hotbar, and does not deter wolves.
 - **Nettle and firebug jobs:** a worker picks nettles with a shovel and catches firebugs with a bug net, each from a
   tool station. Workers still go home at dusk, so the firebug job waits for night work, a later change.
   None of nettle, nettle rope, bug net and firebug is bought or sold, and none has a sound of its own yet, apart from
@@ -101,7 +104,7 @@ Simulation and data:
 | `src/world/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, the lifetime of each caught firebug in its stack, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
 | `src/world/model/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/world/model/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
@@ -130,6 +133,11 @@ Simulation and data:
 | `src/digging/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
 | `src/nettles/Nettles.cs`, `src/nettles/display/NettleShape.cs` | Nettles coming up at nightfall, and the scanned sprigs a nettle plant and its item are made of |
 | `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs`, `src/firebugs/FirebugChase.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow; the showcase's player chasing firebugs for a recording |
+| `src/diary/model/Diary.cs`, `src/diary/model/DiaryDay.cs`, `src/diary/model/DiaryFind.cs`, `src/diary/model/DiaryFindDef.cs` | The diary: its days and their text, where each part of it turns up, each player's finds and read days, and who sees a page lying in the world |
+| `src/diary/display/PageShape.cs`, `src/diary/display/PageProp.cs` | A loose page's model, floating on the lake or fluttering down off a tree |
+| `src/lanterns/Lanterns.cs`, `src/lanterns/display/LanternPanel.cs` | Portable lanterns, filling and placing them, and the page that opens a carried or placed lantern |
+| `src/lanterns/display/LanternShape.cs`, `src/lanterns/display/LanternModel.cs`, `src/lanterns/display/LanternProp.cs` | The jar, wooden frame, steel lid and handle, visible firebugs and green light |
+| `src/lanterns/display/LanternWear.cs` | Lanterns hanging from the player’s hand, belt, backpack or shoulders |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
 | `src/digging/Beach.cs`, `src/digging/display/CoastView.cs` | Beach sand, tide, and the exposed soil after a dig |
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
@@ -170,6 +178,7 @@ UI and input:
 | `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
 | `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
+| `src/diary/display/DiaryPanel.cs`, `src/diary/display/DiaryCell.cs`, `src/diary/display/ReadingSheet.cs`, `src/diary/display/FallingApart.cs`, `src/diary/display/FindPrompt.cs` | The Diary panel of paper cells, a day opened large to read with its writing falling apart where it says so, and the pop-up a find waits behind |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
@@ -187,7 +196,7 @@ UI and input:
 | `src/storage/display/FilterWindow.cs` | The filter window beside the panel |
 | `src/items/display/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
 | `src/items/display/Grid.cs` | Draws the icon-slot grids |
-| `src/items/display/Badge.cs` | The count pill on an item slot |
+| `src/items/display/Badge.cs` | The count pill on an item slot, green with the firebug count on a lantern's slot |
 | `src/items/display/ItemSlot.cs` | The cream item slot, which tells plain, right, double and Alt-clicks apart and shakes on a refusal |
 | `src/items/display/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse |
 | `src/items/display/SlotInput.cs` | What a click does on an item slot |
@@ -931,6 +940,7 @@ Each wolf touched takes its own roll of the damage, the swing's own give or take
 
 A lit torch (`SaveState.Torch`, burn seconds left) burns as long as one log, only while `SaveState.TorchLit`; it stays in the backpack, burning out removes it, and a backpack with no torch left puts it out.
 Lighting it takes `World.KindleSeconds` (`SaveState.TorchKindling`).
+Taking a lantern in hand puts out the torch and leaves its remaining burn time alone.
 Swings share the axe cooldown and flare the light (`World.TorchFlare`).
 They put the torch out after `World.WildSwings` within `World.WildWindow` seconds.
 
@@ -1037,6 +1047,22 @@ When a player gathers leaves, they also take the acorns that fit in their backpa
 Leaves refill at dawn. Missing acorns refill one at a time, every ten days from the first gather that took one.
 Chopping out all its current wood fells the tree and leaves its stump.
 
+### Lanterns
+
+A lantern has a permanent number and carries its firebugs' expiry times with it as an item, including in a save or an update.
+The placed lantern stores that same item in `Thing.LanternItem` and keeps it when picked up.
+`Lanterns.Refill` moves as many firebugs as fit, shortest life first, without changing any expiry time.
+Only live firebugs show through the glass. Their glow and the point light sit inside the jar.
+The wooden foot blocks direct light beneath a placed lantern.
+With one tenth of a full lantern's light per bug, ten bugs give 120% of torch energy.
+The green light has no part in wolf behavior.
+
+A double click takes it in hand. Work requiring the hand hangs it temporarily on the belt, still lit.
+Hotbar slots 1–6 hang their lanterns from the belt, slot 7 from the backpack, and slots 8 and 9 from the shoulders.
+All light regardless of the selected slot when they contain firebugs. Held and worn lanterns swing about their grips.
+The same lantern shows only once if it is both bound and held in hand.
+Right-click a lantern in the backpack, hotbar or world to see the firebug slot and access placement or pickup.
+
 ### Nettles and firebugs
 
 `Nettles` (`src/nettles/Nettles.cs`) brings up `Nettles.PerNight` nettles once night has fallen (`SaveState.NettlesUp`
@@ -1070,6 +1096,8 @@ By day it removes them all.
 A firebug is a thing of the shape `GatherShape.Caught`, kept at its place: where it is now is `Firebugs.At`, its
 place plus `Firebugs.Hover`, a slow swing by its id and the world's clock, so the host and every window agree on it
 without an update while it hovers.
+A catch adds a three-day expiry to that unit in its stack. The stack shows the average life of its surviving firebugs.
+Expiry follows each firebug through moving, stacking, packing and loading. The world removes dead firebugs from inventories.
 Its flight (`Firebugs.Flight`) is kept only while the world runs:
 
 - **Dart.** A player out in the open within `StartleRadius` sets it darting straight away from them, up to
@@ -1093,8 +1121,8 @@ A worker with the job takes a bug net (`GatherRule.Needs`) and takes the firebug
 is taken (`GatherRule.TakenAtOnce`); no worker is on duty while firebugs are out.
 Held right mouse on a firebug catches nothing: `World.GatherBlock` asks for a swing.
 A nettle blocks building like a berry bush.
-A firebug takes no ground (`Thing.Roams`): buildings, yards, gravel paths, holes and nettles go where one hovers, it
-stays, grass grows under it and the ground takes no contact shade.
+A firebug takes no ground (`Thing.TakesGround`): buildings, yards, gravel paths, holes and nettles go where one hovers,
+it stays, grass grows under it and the ground takes no contact shade.
 A right click with the shovel out goes through a firebug to the ground under it (`PlayerControl.RightPress`).
 `World.QuietNights` keeps nettles and firebugs from coming by themselves; a check session sets it (`Game.StartGame`),
 since each thing takes its look from its id.
@@ -1105,6 +1133,82 @@ It bobs about `FirebugShape.Height` and follows the world's position no faster t
 updates never show.
 
 `ItemDef.Description` is what the player says of an item; `GameData.DescriptionLine` gives it as a tooltip line.
+
+### Diary
+
+`Diary` (`src/diary/model/Diary.cs`) keeps each player's diary in their `PlayerState`: `DiaryFinds`, the finds taken;
+`DiaryRead`, the days opened; `DiaryFinding`, a find whose pop-up waits; and `FallenPage`, the page that fell off a tree
+for them.
+No thing's id is given out twice, so once that page is picked up or cleared away, `FallenPage` names nothing and needs no
+reset.
+`DiaryDay` holds the 11 days and their text, with `DiaryDay.Illegible` and `DiaryDay.Scribbles` where the writing is
+drawn as scribbles and `DiaryDay.FallsApart` where it starts to fall apart, and `DiaryFindDef` the line of each find's
+pop-up and the days it holds.
+`GameData` checks that every day is in exactly one find.
+`DiaryFind.Book`, the diary itself, and `DiaryFind.Ashes`, the page in a cave's ashes, wait for the caves: nothing gives
+them out yet.
+
+- **Lake.** A new game floats one `ThingKind.FloatingPage` on the shore at a seeded spot (`Diary.Float`).
+  Where it is now is `Diary.FloatAt`, a slow drift by the world's clock along the shore and `Diary.FloatsFrom` to
+  `Diary.FloatsTo` metres in from it, so the host and every window agree on it without an update.
+  It stays for the others when one player takes it.
+- **Chance.** Each of a player's own gathers of a tree, a berry bush or a leaf spot (`World.Gather`), and each square
+  of beach sand they dig (`Beach.Strip`), rolls `Diary.FindChance` for the find it hides (`Diary.Roll`) until the
+  player has it; a worker's gathering never does.
+  A tree's page lands as a `ThingKind.FallenPage` on ground to stand on `Diary.FallNear` to `Diary.FallFar` from the
+  trunk, for the chopper alone; any other find comes up in its pop-up at once.
+  The rolls are seeded and start again with each world.
+  `Diary.Quiet` stops them: `WorldSteps.EmptyWorld` and the check session set it, since a pop-up stops its player and a
+  check that gathers would stop with it.
+
+`Diary.ShowsTo` says who sees a page lying in the world: the lake's to every player who has neither taken it nor has its
+pop-up up, and a fallen one to the player whose `FallenPage` it is.
+`World.CollectKnown`, which drawing and picking go through, leaves out the pages hidden from the window's player.
+A page leaves no memory under fog, is not one of `World.Structures`, and takes no ground (`Thing.TakesGround`): grass
+grows under it and its coming and going leaves the ground dressing alone.
+A fallen page keeps its place while its player is away, and they find it there when they come back.
+A building, yard or crate put over it clears it away with the stumps and bushes under it (`World.ClearGround`), so a
+later chop can drop their page again.
+A save is refused when a player's `FallenPage` is an id not given out yet, names a thing that is not such a page, or
+names one while they have its find already (`Diary.Valid`).
+A left or a right click on a page walks the player over to it, as to a loose piece (`Thing.TakenWhole`), and
+`Verb.PickUp` brings up its pop-up (`Diary.PickUp`); a fallen page leaves the ground then.
+`World.Occupied` holds while `DiaryFinding` is set, so the player is busy.
+
+`FindPrompt` shows the find's line and a Take button alone; Esc leaves it up.
+Take (`Verb.TakePage`) turns a page, puts the find in the diary, and opens the `ReadingSheet` on the find's first day,
+with the Diary left closed.
+`Hotbar.StampDiaryOnFirstFind` holds back the diary's badge, which shows once the player has a find, while the day the
+first find opened is open, and stamps it into the row as that day closes, so the stamp shows where the Diary is kept: it
+drops in large, tilted and faint, and settles with a small bounce.
+The badge shows a dot while a found day is unread (`Diary.AnyUnread`).
+`DiaryPanel` lays out a `DiaryCell` for each day in order, four to a row: a torn scrap with the page's icon on it.
+A found day is bright, with its place in the diary in black over the icon and a brick edge while it is not read.
+A day not found is greyed out, sheet and icon, with a faint question mark.
+`ReadingSheet` writes the day in Caveat on a white sheet in the page model's proportions (`PageShape.Tallness`), with
+the scribble glyphs in place of what cannot be read.
+From `DiaryDay.FallsApart` to the paragraph's end, `FallingApart` moves each letter further off the line than the last,
+as if written in the dark.
+Opening a day sends `Verb.ReadDiary`, which a guest sends whatever its copy says: the day a find just taken
+opens on reaches the guest's copy only with a later update.
+The goal **A success story** (`GoalId.Diary`) reads the window's own player (`World.Me`), so each player sees their
+own count, and completes with all 11 days.
+
+`PageShape` draws a page as one cupped sheet with rows of ink.
+On the lake it bobs and turns at the water's level where `Diary.FloatAt` has it.
+A fallen page that appears in front of its player comes down from 3.2 m over `PageShape.FallSeconds`, swinging from
+side to side less and less and tipping into each swing, to land flat where it lies, and rustles as it starts.
+
+The lake's shallows can be waded: `Terrain.Open` counts ground up to `Terrain.Wade` metres in from the shore, so
+players, workers and wolves walk there, and their feet go down to the lake's bed (`Terrain.BedDepth`).
+`WorldView.StandsAt` places every body on it, standing, knocked down, pinning or feeding, and a wolf sets each paw on
+the bed under it.
+Loose pieces and pages can land there: `WorldView` draws everything lying in the shallows on the lake's bed, except a
+page, which floats, a firebug, which flies, and a pump, whose intake is built into the water.
+Building keeps out of them: a building's middle keeps `Construction.ShoreRoom` back from the shore, so a large one's
+footprint may still reach over the shallows, and the spots it is worked
+from (`Construction.WorkSpots`) need `World.CanStandDry`: a pump's handle, a cabin's ladder, a furnace's glass blower
+and bellows spots and a packing table's packer spot.
 
 ### Tools
 
@@ -1405,7 +1509,7 @@ The plan's materials return to the backpack or go in a recovery box through `Con
 ### Storage, filters and automation
 
 Inventories are slot grids with stacks of 64.
-Tools, packed crates and bottles take a slot each everywhere.
+Tools, packed crates, bottles and lanterns take a slot each everywhere.
 The layout is saved and synchronized: removing one stack never shifts unrelated slots.
 Sort is the only action that packs and regroups stacks.
 Item totals change only through `Inventory` methods, which keep them in line with the stacks.
@@ -1417,6 +1521,7 @@ The player moves items in and out of storage and stations within `World.ItemReac
 Input rule for every item slot, in the backpack, storage and stations alike (`SlotInput`):
 
 - LMB picks up the slot's stack onto the cursor, a held stack; RMB picks up half of it.
+  RMB on a carried lantern opens the lantern instead.
 - With a stack held, LMB puts it down on the slot clicked and RMB puts down one; what does not fit stays held.
   On another item's slot in the same inventory the two swap; back on its own slot LMB lets go of it.
 - A held stack lands by the rules of where it is put: each slot sends its own command, the one its Shift- or Ctrl-click sends, with the mark "from held stack" (`World.FromHeldStack`, `Command.Held`, `ItemMoves.PutDown`).
@@ -1436,7 +1541,7 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
   Ctrl batches from the backpack drawer and Store all carry the mark "spares only" (`World.FromSpares`, `Command.Spares`, `Inventory.SparesOnly`), which leaves bound stacks behind.
   Pouring from vessels with Ctrl includes hotbar-bound vessels and preserves their bindings.
 - Esc, a click on open ground or on the interface anywhere but an item slot, or closing the side panel lets go of the held stack (`HeldCursor`).
-- A held crate, barrel or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
+- A held crate, barrel, lantern or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
 - A held stack put on storage clicked in the world goes into it; an item only selected on the hotbar never does.
 - Bulk buttons and recipe batch actions say what they move.
 
@@ -1454,6 +1559,7 @@ Both are boxes a player in reach of the worker (`World.Reaches`) picks up from a
 #### Chests
 
 Chests have separate item allowlists for input and output.
+A debug chest in a playtest save sets the inventory's `UnlimitedSlots` and adds a spare cell whenever the last one fills.
 Storage with a filter window has `Inventory.Gated` set: there an empty list lets nothing through and `Inventory.Everything`, shown as an "A" cell, lets every item through.
 `Inventory.Filter` keeps `Everything` alone in its row.
 `World.Add` gives a chest and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; every crate's contents get the chest's lists when made (`World.NewCrate`), packed or not.
@@ -1657,6 +1763,7 @@ The market accepts any packed crate.
 `Market.Goods` lists every good the village trades with its price: a `Sells` entry for one it takes, a `Buys` lot for one it sells.
 The game gathers them into `Market.Sells` and `Market.Buys` when it starts.
 Goods outside `Market.Sells` are donated: they pay nothing and leave demand alone.
+An empty crate in the market, left when the firebugs packed in it die, is donated as well and pays nothing, not even its crate price.
 The returning cart names them.
 A sale pays for every unit of its contents at the pre-sale price, plus the crates.
 

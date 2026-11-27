@@ -172,7 +172,7 @@ public partial class Game {
     /// <summary>How many buildings, crates and boxes stand in the server's world.</summary>
     private int Built() {
         int count = 0;
-        foreach (var t in Hosted.Things) if (t.Kind is ThingKind.Crate or ThingKind.Barrel or ThingKind.Grave || Hosted.Data.Buildings.ContainsKey(t.Kind)) count++;
+        foreach (var t in Hosted.Things) if (t.Kind is ThingKind.Crate or ThingKind.Barrel or ThingKind.Grave or ThingKind.Lantern || Hosted.Data.Buildings.ContainsKey(t.Kind)) count++;
         return count;
     }
 

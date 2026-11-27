@@ -3,13 +3,13 @@ using System.Linq;
 
 namespace ChopChopMeow;
 
-public enum GoalId { Campfire, Cabin, Bench, Furnace, Worker, Profit, Trade, SteelBar, SteelTools, SteelParts, Mines }
+public enum GoalId { Campfire, Cabin, Bench, Furnace, Worker, Profit, Trade, SteelBar, SteelTools, SteelParts, Mines, Diary }
 
 public enum GoalStatus { Hidden, Active, Completed }
 
 public sealed record Goal(GoalId Id, string Title, string Description, params string[] Items);
 
-/// <summary>The settlement's goal log, read from what its players have seen, built, made and traded.</summary>
+/// <summary>The settlement's goal log, read from what its players have seen, built, made and traded; the diary's goal is each player's own.</summary>
 public sealed class Goals(World world) {
     internal const string OreSeen = "ore_seen";
 
@@ -25,6 +25,7 @@ public sealed class Goals(World world) {
         new(GoalId.SteelTools, "Steel tools", "Purchase a hammer and a pickaxe from the trading post.", "steel_hammer", "steel_pick"),
         new(GoalId.SteelParts, "Too soft", "Build an anvil and produce your first steel parts.", "steel_parts"),
         new(GoalId.Mines, "Infinite power", "", Cliff.Ores.Select(World.ResourceItem).ToArray()),
+        new(GoalId.Diary, "A success story", "Find all the diary pages."),
     ];
     public static ReadOnlySpan<Goal> Entries => entries;
 
@@ -36,6 +37,7 @@ public sealed class Goals(World world) {
             GoalId.SteelTools => world.Reached(OreSeen),
             GoalId.SteelParts => world.HadItself("steel_bar"),
             GoalId.Mines => Status(GoalId.SteelParts) == GoalStatus.Completed,
+            GoalId.Diary => Diary.Started(world.Me),
             _ => true,
         };
         if (!unlocked) return GoalStatus.Hidden;
@@ -51,6 +53,7 @@ public sealed class Goals(World world) {
             GoalId.SteelTools => world.HadItself("steel_hammer") && world.HadItself("steel_pick"),
             GoalId.SteelParts => world.Reached("steel_parts"),
             GoalId.Mines => MinesComplete,
+            GoalId.Diary => Diary.FoundDays(world.Me) == DiaryDay.All.Length,
             _ => throw new ArgumentOutOfRangeException(nameof(id)),
         };
         return completed ? GoalStatus.Completed : GoalStatus.Active;

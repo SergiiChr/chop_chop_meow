@@ -26,6 +26,8 @@ public sealed class SlotInput(HeldCursor cursor) {
     public Action? Click { get; init; }
     /// <summary>A right click with nothing held on a slot that has nothing to pick up.</summary>
     public Action? RightClick { get; init; }
+    /// <summary>A right click with nothing held that may open the picked item instead of taking half.</summary>
+    public Func<bool>? Open { get; init; }
 
     private SceneTreeTimer? waiting;
     // Set when a second press comes within the double click's time, for its release to use the item.
@@ -49,6 +51,7 @@ public sealed class SlotInput(HeldCursor cursor) {
             timer.Timeout += () => { if (waiting == timer && GodotObject.IsInstanceValid(cell) && cell.IsInsideTree()) { waiting = null; Single(false); } };
         } else if (button == MouseButton.Right) {
             if (!cursor.Empty) PutDown(cell, 1);
+            else if (Open?.Invoke() == true) return;
             else if (Pick?.Invoke() == null) RightClick?.Invoke();
             else Single(true);
         }

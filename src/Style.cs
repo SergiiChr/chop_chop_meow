@@ -28,6 +28,7 @@ public static class Style {
     /// <summary>On a dark popup: something there and ready, and something the player has that is not where it works for everyone.</summary>
     public static readonly Color Ready = new("8fcf9a"), Held = new("e8c468");
     public static readonly Color Rise = new("4f7a55");
+    public static readonly Color FirebugGreen = new("adff76");
     /// <summary>Modulates: a faint picture of what an empty slot wants, something not ready yet, and what the open page does not take.</summary>
     public static readonly Color Ghost = new(1, 1, 1, .28f), Unready = new(1, 1, 1, .5f), Faded = new(1, 1, 1, .4f);
 
@@ -39,6 +40,12 @@ public static class Style {
     public static readonly Font Head = Weighted("res://assets/fonts/Fredoka.ttf", 600);
     public static readonly Font Body = Weighted("res://assets/fonts/Nunito.ttf", 700);
     public static readonly Font Bold = Weighted("res://assets/fonts/Nunito.ttf", 800);
+    /// <summary>Handwriting, for the diary.</summary>
+    public static readonly Font Hand = Weighted("res://assets/fonts/Caveat.ttf", 500), HandBold = Weighted("res://assets/fonts/Caveat.ttf", 700);
+    /// <summary>The diary's ink.</summary>
+    public static readonly Color DiaryInk = new("3f4a5e");
+    /// <summary>The colour of the diary's paper in its cells.</summary>
+    public static readonly Color DiaryPaper = new("f3ead2");
 
     private static Font Weighted(string path, int weight) {
         var font = new FontVariation { BaseFont = GD.Load<FontFile>(path) };
@@ -80,6 +87,7 @@ public static class Style {
     public static readonly StyleBoxFlat PlateNormal = Flat(SlotFill, 16, 6, Line, 2), PlateHover = Flat(SlotFill, 16, 6, Mustard, 3), PlateKept = Flat(SlotFill, 16, 6, Brick, 6), PlateSelected = Flat(SlotFill, 16, 6, Brick, 3);
     /// <summary>The pill on a slot's corner that counts what it holds.</summary>
     public static readonly StyleBoxFlat CountPill = Flat(Line, 9, 0, Rim, 2, horizontal: 5);
+    public static readonly StyleBoxFlat FirebugCountPill = Flat(new Color("234232"), 9, 0, FirebugGreen, 2, horizontal: 5);
     /// <summary>The count beside a job's name, and a menu badge's key.</summary>
     public static readonly StyleBoxFlat BeigePill = Flat(Beige, 12, 0, horizontal: 6);
     public static readonly StyleBoxFlat KeyPill = Flat(Beige, 9, 0, Line, 2, horizontal: 5);
@@ -139,6 +147,14 @@ public static class Style {
         button.AddThemeStyleboxOverride("normal", normal); button.AddThemeStyleboxOverride("hover", hover);
         button.AddThemeStyleboxOverride("pressed", pressed ?? hover); button.AddThemeStyleboxOverride("hover_pressed", pressed ?? hover);
         button.AddThemeStyleboxOverride("disabled", normal); button.AddThemeStyleboxOverride("focus", None);
+    }
+
+    /// <summary>Sets a panel on the enamel board in the middle of the screen, at a size it grows from both ways.</summary>
+    public static void Centered(PanelContainer panel, float width, float height) {
+        panel.AnchorLeft = .5f; panel.AnchorRight = .5f; panel.AnchorTop = .5f; panel.AnchorBottom = .5f;
+        panel.OffsetLeft = -width / 2; panel.OffsetRight = width / 2; panel.OffsetTop = -height / 2; panel.OffsetBottom = height / 2;
+        panel.GrowHorizontal = Control.GrowDirection.Both; panel.GrowVertical = Control.GrowDirection.Both;
+        panel.AddThemeStyleboxOverride("panel", Board);
     }
 
     /// <summary>Gives a button the rounded look of a job or action button in this colour.</summary>

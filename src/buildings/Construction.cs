@@ -10,8 +10,20 @@ namespace ChopChopMeow;
 /// or a crate cannot go somewhere, what building spends and what taking down gives back.
 /// </summary>
 public sealed class Construction(World world) {
-    /// <summary>Whether a spot is open ground a building can stand on, clear of the lake's edge.</summary>
-    internal bool DryOpen(Vector2 p) => world.CanStand(p) && !Terrain.InLake(p, .8f);
+    /// <summary>How far back from the lake's shore the middle of a building or a yard keeps, and a cabin's door.</summary>
+    internal const float ShoreRoom = .8f;
+    /// <summary>Ground the middle of a building or a yard, or a cabin's door, can go on: open, and <see cref="ShoreRoom"/> back from the lake's shore.</summary>
+    internal bool DryOpen(Vector2 p) => world.CanStand(p) && !Terrain.InLake(p, ShoreRoom);
+    /// <summary>
+    /// The spots each kind of building is worked from, relative to it as placed unturned, each with what refuses a placement that leaves it off dry, open ground:
+    /// only walking reaches into the lake's shallows.
+    /// </summary>
+    private static readonly Dictionary<ThingKind, (Vector2 Spot, string Block)[]> WorkSpots = new() {
+        [ThingKind.Pump] = [(World.BellowsStand, "Turn the handle toward open ground on the bank.")],
+        [ThingKind.Hut] = [(BarrelHaul.LadderApproach, "Leave dry, open ground at the cabin's ladder.")],
+        [ThingKind.Reinforced] = [(World.BellowsStand, "Leave dry, open ground at the furnace's bellows."), (GlassBlowing.BlowStand, "Leave dry, open ground in front of the furnace for the glass blower.")],
+        [ThingKind.Packer] = [(World.PackStand, "Leave dry, open ground where the packer stands.")],
+    };
 
     /// <summary>Square yards laid out on the ground, walkable and snapping edge to edge.</summary>
     public static bool IsZone(ThingKind kind) => kind is ThingKind.Pile or ThingKind.Farm;
@@ -48,7 +60,7 @@ public sealed class Construction(World world) {
     /// Why a building, a container, or a hole cannot go here.
     /// </summary>
     public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null, float rotation = 0, PipeShape pipeShape = PipeShape.Straight) {
-        bool portable = kind is ThingKind.Crate or ThingKind.Barrel;
+        bool portable = kind is ThingKind.Crate or ThingKind.Barrel or ThingKind.Lantern;
         bool digging = kind == ThingKind.Hole;
         if (!portable && !digging && !world.Data.Buildings.ContainsKey(kind)) return "Unknown building.";
         if (!ValidRotation(kind, rotation)) return "That building cannot go up at this angle.";
@@ -73,19 +85,19 @@ public sealed class Construction(World world) {
             return "Leave your feet and the arrival point clear.";
         if (kind == ThingKind.Pump) {
             if (!Terrain.InLake(p)) return "Place the intake in the freshwater lake’s shallows.";
-            if (!world.CanStand(p + World.BellowsStand.Rotated(rotation))) return "Turn the handle toward open ground on the bank.";
         } else if (!DryOpen(p)) return "Choose dry, open ground.";
         if (kind == ThingKind.StrawBed && !StrawBed.Fits(world, p, rotation)) return "Choose dry, open ground for the whole bed.";
         if (digging && world.GravelPaths.Laid(Terrain.TileAt(p))) return "Choose ground clear of gravel.";
         foreach (var t in world.S.Things)
-            if (!t.Roams && (!World.BuiltOver(t.Kind) || digging) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
+            if (t.TakesGround && (!World.BuiltOver(t.Kind) || digging) && (t.Remaining > 0 || t.Kind == ThingKind.Tree || !t.IsResource) && TooClose(t, kind, p))
                 return "Leave room around resources and buildings.";
         if (kind == ThingKind.Hut) {
             var door = p + Doorways.DoorOffset.Rotated(rotation);
-            if (!DryOpen(door) || world.S.Things.Any(t => !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
+            if (!DryOpen(door) || world.S.Things.Any(t => t.TakesGround && !World.BuiltOver(t.Kind) && !t.IsResource && t.Pos.DistanceTo(door) < World.Footprint(t.Kind) + DoorRoom))
                 return "Leave open ground in front of the door.";
-            if (!world.CanStand(p + BarrelHaul.LadderApproach.Rotated(rotation))) return "Leave dry, open ground at the cabin's ladder.";
         }
+        if (WorkSpots.TryGetValue(kind, out var spots))
+            foreach (var (spot, block) in spots) if (!world.CanStandDry(p + spot.Rotated(rotation))) return block;
         foreach (var hut in world.S.Things.Of(ThingKind.Hut)) {
             if (Doorways.DoorPoint(hut).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's door clear.";
             if (hut.ToWorld(BarrelHaul.LadderApproach).DistanceTo(p) < World.Footprint(kind) + DoorRoom) return "Leave the cabin's ladder clear.";
@@ -95,7 +107,11 @@ public sealed class Construction(World world) {
         if (digging) return null;
         if (!portable) return Unaffordable(kind);
         if (item == null || (world.MarkedSource ?? world.S.Backpack)[item] > 0) return null;
-        return kind == ThingKind.Crate ? "That crate is no longer in your backpack." : "That barrel is no longer available.";
+        return kind switch {
+            ThingKind.Crate => "That crate is no longer in your backpack.",
+            ThingKind.Lantern => "That lantern is no longer available.",
+            _ => "That barrel is no longer available."
+        };
     }
     /// <summary>
     /// What refuses a building the acting player's backpack does not hold the cost of, or null when it does.
@@ -129,7 +145,7 @@ public sealed class Construction(World world) {
             }
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in world.S.Things) {
-            if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind) || t.Roams) continue;
+            if (!IsZone(t.Kind) && t.IsResource && t.Kind != ThingKind.Tree && t.Remaining <= 0 || World.BuiltOver(t.Kind) || !t.TakesGround) continue;
             if (t.Kind == ThingKind.Tree && TrunkOverlaps(p - t.Pos, kind, TreePlanting.TrunkRadius(t.Id, t.TreeStage)))
                 return "Leave room around resources and buildings.";
             float margin = IsZone(t.Kind) ? World.Footprint(t.Kind) - .05f : t.IsResource ? YardResourceRoom : World.Footprint(t.Kind) + .2f;
@@ -189,9 +205,11 @@ public sealed class Construction(World world) {
         }
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in world.Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
-        foreach (var box in World.Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
         RemoveBuilding(t);
-        world.Say((GiveBack(back, t.Pos) ? $"The {world.Lower(def.Name)} is down. Everything is back in your backpack." : $"The {world.Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
+        Inventory? rest = null;
+        GiveBack(back, t.Pos, ref rest);
+        foreach (var box in World.Boxes(t)) if (box != null) GiveBack(box, t.Pos, ref rest);
+        world.Say((rest == null ? $"The {world.Lower(def.Name)} is down. Everything is back in your backpack." : $"The {world.Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
         return true;
     }
 
@@ -220,8 +238,8 @@ public sealed class Construction(World world) {
         foreach (var box in World.Boxes(t)) {
             if (box == null) continue;
             world.ReleaseIn(box);
-            foreach (var (item, count) in box.Items)
-                if (world.Data.VesselFor(item) == null) Recover(ref recovery, t.Pos, item, count);
+            foreach (string item in box.Items.Keys.ToArray())
+                if (world.Data.VesselFor(item) == null) Recover(ref recovery, t.Pos, box, item);
         }
         RemoveBuilding(t);
         world.Say($"A growing tree crushed the {world.Lower(world.Data.Name(t.Kind))}.");
@@ -278,18 +296,35 @@ public sealed class Construction(World world) {
     /// </summary>
     internal bool GiveBack(Dictionary<string, int> items, Vector2 at) {
         Inventory? rest = null;
-        foreach (var (item, amount) in items) {
-            int left = amount - world.S.Backpack.Add(item, amount);
-            if (left <= 0) continue;
-            Recover(ref rest, at, item, left);
-        }
+        GiveBack(items, at, ref rest);
         return rest == null;
     }
 
-    private void Recover(ref Inventory? box, Vector2 at, string item, int count) {
+    private void GiveBack(Dictionary<string, int> items, Vector2 at, ref Inventory? rest) {
+        foreach (var (item, amount) in items) {
+            int left = amount - world.S.Backpack.Add(item, amount);
+            if (left > 0) RecoveryRoom(ref rest, at, item, left).Add(item, left);
+        }
+    }
+
+    /// <summary>Moves everything a box holds into the backpack and what does not fit into the recovery box, each firebug keeping its life.</summary>
+    private void GiveBack(Inventory box, Vector2 at, ref Inventory? rest) {
+        foreach (string item in box.Items.Keys.ToArray()) {
+            box.TransferTo(world.S.Backpack, item, box[item]);
+            Recover(ref rest, at, box, item);
+        }
+    }
+
+    /// <summary>Moves what a box still holds of an item into the recovery box, each firebug keeping its life.</summary>
+    private void Recover(ref Inventory? rest, Vector2 at, Inventory box, string item) {
+        int count = box[item];
+        if (count > 0) box.TransferTo(RecoveryRoom(ref rest, at, item, count), item, count);
+    }
+
+    private Inventory RecoveryRoom(ref Inventory? box, Vector2 at, string item, int count) {
         if (box == null) { box = world.Add(ThingKind.Grave, at).Inventory; box.Slots = 0; }
         int stack = box.StackOf(item);
         box.Slots += (count + stack - 1) / stack;
-        box.Add(item, count);
+        return box;
     }
 }

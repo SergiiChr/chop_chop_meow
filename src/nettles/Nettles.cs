@@ -32,7 +32,7 @@ public sealed class Nettles(World world) {
     /// </summary>
     private bool Bare(Vector2 p) {
         if (!world.CanStand(p) || Terrain.Beach(p) || Terrain.InLake(p, Room) || WolfPatrols.NearDen(p, Den.Clearance) || world.GravelPaths.Covers(p)) return false;
-        foreach (var t in world.S.Things) if (!t.Roams && World.Within(t, p, Room)) return false;
+        foreach (var t in world.S.Things) if (t.TakesGround && World.Within(t, p, Room)) return false;
         return true;
     }
 }

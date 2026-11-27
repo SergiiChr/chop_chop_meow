@@ -79,6 +79,7 @@ public sealed class Beach(World world) {
         world.S.StrippedSand.Add(Terrain.TileIndex(Terrain.TileAt(at)));
         world.S.Backpack.Add(Sand, SandPerSquare);
         world.Got(Sand);
+        world.Diary.Roll(DiaryFind.Sand, at);
     }
 
     /// <summary>Refills stripped squares covered by the tide as the world clock advances.</summary>
