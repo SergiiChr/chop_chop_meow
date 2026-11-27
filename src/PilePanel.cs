@@ -27,7 +27,7 @@ public partial class PilePanel(PageTools tools, Thing subject) : ThingPage(tools
             AddChild(new ProcessRow(live, Array.Empty<Control>(), "1 h", () => thing.Progress / world.Data.HourSeconds, new FuelRow("line_leaf", new Color("8fae7e"), item, lasts), main, Array.Empty<Control>()));
             live.Watch(() => {
                 string? rotting = null; int units = 0;
-                foreach (var pair in thing.Inventory.Items) if (world.Compostable(pair.Key)) { rotting ??= pair.Key; units += pair.Value; }
+                foreach (var pair in thing.Inventory.Items) if (world.Compostable(pair.Key, thing.Inventory.Object(pair.Key))) { rotting ??= pair.Key; units += pair.Value; }
                 return (rotting, units / World.CompostBatch);
             }, now => {
                 var (rotting, hours) = now;

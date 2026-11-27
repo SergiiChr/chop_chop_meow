@@ -26,8 +26,9 @@ internal abstract class PlaceHaul {
         new() { Place = place, From = from, To = place, Item = item, Count = count, Rule = have < batch ? 1 : 3, Order = have / (float)batch };
 
     /// <summary>The nearest place that takes a load of an item carried out of a place, and how much of the free units it takes, or null when none does.</summary>
-    protected (Thing To, int Count)? Taker(Thing place, string item, int free) =>
-        world.DepositFor(item, place.Pos, place.Id) is Thing to && Hauling.Takes(world, to, item, free) is > 0 and int count ? (to, count) : null;
+    /// <param name="unit">The object the item's key finds in the place's box, such as a packed crate.</param>
+    protected (Thing To, int Count)? Taker(Thing place, string item, int free, Item? unit) =>
+        world.DepositFor(item, place.Pos, place.Id, unit) is Thing to && Hauling.Takes(world, to, item, free, unit) is > 0 and int count ? (to, count) : null;
 
     /// <summary>A carry that takes an output out of a place: a full one comes under the second rule, otherwise under the fourth, most held first.</summary>
     protected static Carry TakeOut(Thing place, Thing to, CarryBox box, string item, int count, bool full) =>

@@ -40,7 +40,7 @@ internal static class PileShape {
     /// <summary>The heap an item makes; an item without a model heaps as plain blocks of its colour.</summary>
     public static Heap HeapOf(string item, string color) {
         if (World.IsCrate(item)) item = "crate";
-        else item = ContainerItem.Base(item);
+        else item = ChopChopMeow.Item.KindOf(item);
         if (heaps.TryGetValue(item, out var heap)) return heap;
         return heaps[item] = ItemShape.Has(item)
             ? new Heap(ItemShape.Piece(item), ItemShape.Material(item, color), ItemShape.LayOf(item), ItemShape.RiseOf(item))
@@ -63,7 +63,7 @@ internal static class PileShape {
     public static void Stage(Node3D stage, GameData data) {
         // A liquid never lies in a pile: only stations hold it.
         foreach (string item in data.Items.Keys) {
-            if (data.VesselFor(item) != null || ContainerItem.Base(item) != item) continue;
+            if (data.VesselFor(item) != null || ChopChopMeow.Item.KindOf(item) != item) continue;
             new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(item, 1, data);
         }
         new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(ItemShape.Compost, 1, data);

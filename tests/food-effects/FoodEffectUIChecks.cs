@@ -14,15 +14,15 @@ public partial class Game {
     }
 
     private async Task JamShowsAtMostOneFullHungerBar() {
-        Give(Hosted, BerryJam.Bottle);
+        string jam = GiveVessel(Hosted, Water.Empty, BerryJam.Liquid, Water.Capacity);
         Give(Hosted, "canned_jam");
         bool knewJam = Hosted.Had("canned_jam");
         var restoreDiscoveries = TemporarilyDiscover(Hosted, BerryJam.Liquid, "canned_jam");
         await KeyStroke(Key.Tab);
-        await Until(() => world.Backpack[BerryJam.Bottle] > 0 && world.Backpack["canned_jam"] > 0 && world.Had("canned_jam"),
+        await Until(() => world.Backpack[jam] > 0 && world.Backpack["canned_jam"] > 0 && world.Had("canned_jam"),
             "both jams in the backpack and discovered on the map");
         var canned = BagCellOf("canned_jam");
-        Require(BagCellOf(BerryJam.Bottle).TooltipText.Contains("Hunger: +100% per liter\n")
+        Require(BagCellOf(jam).TooltipText.Contains("Hunger: +100% per liter\n")
             && canned.TooltipText.Contains("Hunger: +100%\n"), "both jam tooltips should show a full bar, not the unused amount");
         await Click(canned, alt: true);
         await Until(() => recipeMap.Visible && recipeMap.Chosen == "canned_jam", "the canned jam card highlighted");
@@ -33,7 +33,7 @@ public partial class Game {
         Require(recipeMap.FindChild("food_description", true, false) is RichTextLabel berryDetails
             && berryDetails.Text.Contains("Hunger: +100% per liter\n"), "the berry jam map entry should show a full bar per liter");
         await KeyStroke(Key.Escape);
-        Drop(Hosted, BerryJam.Bottle, 1);
+        Drop(Hosted, jam, 1);
         Drop(Hosted, "canned_jam", 1);
         await CloseWithEsc();
         restoreDiscoveries();

@@ -7,14 +7,11 @@ namespace ChopChopMeow;
 /// <summary>Stable inventory positions, explicit slot moves and player sorting.</summary>
 public static class InventoryLayoutChecks {
     public static void Run(GameData data) {
-        Inventory.Unstacked.Add("water"); Inventory.Unstacked.Add("water_2");
-        Inventory.Unstacked.Add("water_1"); Inventory.Unstacked.Add("empty_bottle");
-        Inventory.Unstacked.Add("steel_axe");
+        Inventory.Unstacked.Add(Water.Empty); Inventory.Unstacked.Add("steel_axe"); Inventory.Unstacked.Add("steel_pick");
         Test(CheckStacksMoveAndSplitToChosenCells);
         Test(CheckMovesBetweenInventoriesKeepEveryUnit);
         Test(CheckMovesAndMergesTakeOnlyTheRoomThereIs);
         Test(CheckReplacedItemKeepsItsCellAndSavesKeepTheLayout);
-        Test(CheckEachBottleKeepsItsOwnCell);
         Test(CheckShrunkSlotLimitKeepsOverflowingStacks);
     }
 
@@ -91,21 +88,6 @@ public static class InventoryLayoutChecks {
         loaded.FillStacks(stacks);
         Require(stacks[0] == ("planks", 3) && stacks[1] == ("wood", 2), "serialized layout should retain positions across load");
         Require(loaded.PreferredSlot == -1, "preferred UI cell should not persist in a save");
-    }
-
-    private static void CheckEachBottleKeepsItsOwnCell() {
-        var bottles = new Inventory { Slots = 4, StackSize = 64 };
-        bottles.Add("water", 2);
-        Require(bottles.UsedSlots == 2, "unstacked bottle states should use two slots");
-        Require(bottles.Layout[0].Count == 1, "the first bottle should sit alone in its cell");
-        Require(bottles.Layout[1].Count == 1, "the second bottle should sit alone in its cell");
-        bottles.PreferredSlot = 1;
-        Require(bottles.Remove("water", 1) == 1, "removal should take one bottle");
-        Require(bottles.Layout[0].Item == "water", "removal should leave the first bottle in its cell");
-        Require(bottles.Layout[1].Item == "", "removal should empty the clicked duplicate's cell");
-        bottles.Add("water_1", 2); bottles.PreferredSlot = 2;
-        Require(bottles.Replace("water_1", "empty_bottle"), "replacement should prefer the clicked matching duplicate stack");
-        Require(bottles.Layout[1].Item == "water_1" && bottles.Layout[2].Item == "empty_bottle", "replacement should preserve the preferred bottle's cell and count");
     }
 
     private static void CheckShrunkSlotLimitKeepsOverflowingStacks() {

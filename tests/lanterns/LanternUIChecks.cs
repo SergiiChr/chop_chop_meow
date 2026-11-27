@@ -18,8 +18,8 @@ public partial class Game {
     }
 
     private async Task CheckLanternBadgesShowLiveFirebugsInsteadOfStackSize() {
-        string empty = Hosted.Lanterns.NewEmpty(), charged = Hosted.Lanterns.NewEmpty();
-        Give(Hosted, empty); Give(Hosted, charged); GiveFirebugs(Hosted, 3);
+        string empty = GiveLantern(Hosted), charged = GiveLantern(Hosted);
+        GiveFirebugs(Hosted, 3);
         Require(Hosted.Lanterns.Refill(Lanterns.Id(charged), count: 3), "three live firebugs should fit in the lantern");
         charged = Hosted.Lanterns.Carried(Lanterns.Id(charged))!;
         string previous = world.HotbarItem(8);
@@ -49,8 +49,8 @@ public partial class Game {
             && world.Construction.PlacementBlock(ThingKind.Lantern, p) == null);
         var packer = Hosted.Add(ThingKind.Packer, at);
         Hosted.SetPacking(packer, Lanterns.Item);
-        string empty = Hosted.Lanterns.NewEmpty(), charged = Hosted.Lanterns.NewEmpty();
-        Give(Hosted, empty); Give(Hosted, charged); GiveFirebugs(Hosted, 4);
+        string empty = GiveLantern(Hosted), charged = GiveLantern(Hosted);
+        GiveFirebugs(Hosted, 4);
         Require(Hosted.Lanterns.Refill(Lanterns.Id(charged), count: 4), "four firebugs should fit in the lantern");
         charged = Hosted.Lanterns.Carried(Lanterns.Id(charged))!;
         Require(Hosted.LoadInput(packer, charged, 1) == 1, "the filled lantern should go into the packing station");
@@ -81,8 +81,7 @@ public partial class Game {
         Hosted.Hold(Hosted.Backpack, SlotOf(Hosted.Backpack, Firebugs.Item), 1);
         Require(GiveFirebugs(Hosted, 1) == 1, "holding the older stack should leave the younger firebug in a separate stack");
         Hosted.Release();
-        string lantern = Hosted.Lanterns.FillForReview(Hosted.Lanterns.NewEmpty(), 9);
-        Give(Hosted, lantern);
+        string lantern = GiveLantern(Hosted, 9);
         await KeyStroke(Key.Tab);
         await RightClick(BagCellOf(lantern));
         var young = BagCell(c => c.TooltipText.Contains("Average life left: 71 h") || c.TooltipText.Contains("Average life left: 72 h"));
@@ -98,8 +97,8 @@ public partial class Game {
     }
 
     private async Task CheckADoubleClickTakesTheLanternInHandAndPutsOutTheTorch() {
-        string empty = Hosted.Lanterns.NewEmpty();
-        Require(Give(Hosted, empty) == 1 && GiveFirebugs(Hosted, 1) == 1, "an empty lantern and a firebug should fit in the backpack");
+        string empty = GiveLantern(Hosted);
+        Require(GiveFirebugs(Hosted, 1) == 1, "an empty lantern and a firebug should fit in the backpack");
         Require(Hosted.Lanterns.Refill(Lanterns.Id(empty), count: 1), "adding a firebug should light the lantern");
         string lantern = Hosted.Lanterns.Carried(Lanterns.Id(empty))!;
         int torch = Give(Hosted, "torch");
@@ -134,9 +133,9 @@ public partial class Game {
     }
 
     private async Task CheckAPlacedLanternOpensWithRightClickAndTakesFirebugsGradually() {
-        string item = Hosted.Lanterns.NewEmpty();
+        string item = GiveLantern(Hosted);
         int bugsBefore = Hosted.Backpack[Firebugs.Item];
-        Require(Give(Hosted, item) == 1 && GiveFirebugs(Hosted, 12) == 12, "an empty lantern and twelve fresh firebugs should fit");
+        Require(GiveFirebugs(Hosted, 12) == 12, "an empty lantern and twelve fresh firebugs should fit");
         await KeyStroke(Key.Tab);
         await RightClick(BagCell(c => c.TooltipText.StartsWith(Lanterns.EmptyName, System.StringComparison.Ordinal)));
         Require(panel.HeadingTitle.Text == "Empty lantern", "opening the carried empty lantern should show its name");
@@ -155,16 +154,16 @@ public partial class Game {
         int heldBefore = cursor.Stack?.Count ?? 0;
         Require(heldBefore >= 12, "the cursor should hold enough firebugs for a fill and an overflow");
         await RightClick(slot);
-        await Until(() => world.Lanterns.BugCount(lantern.LanternItem) == 1 && panel.HeadingTitle.Text == "Lantern", "the first firebug filling and renaming the lantern", 4);
+        await Until(() => Lanterns.BugCount(lantern.Lantern) == 1 && panel.HeadingTitle.Text == "Lantern", "the first firebug filling and renaming the lantern", 4);
         Require(slot.TooltipText.StartsWith("Average life left", System.StringComparison.Ordinal),
             "checking the lantern's firebug stack should show its average remaining life");
         await RightClick(slot);
-        await Until(() => world.Lanterns.BugCount(lantern.LanternItem) == 2 && OnPage("lantern_firebug_count") is Label { Text: "2/10" }, "the second firebug updating the count", 4);
+        await Until(() => Lanterns.BugCount(lantern.Lantern) == 2 && OnPage("lantern_firebug_count") is Label { Text: "2/10" }, "the second firebug updating the count", 4);
         await Click(slot);
-        await Until(() => world.Lanterns.BugCount(lantern.LanternItem) == 10 && world.Backpack[Firebugs.Item] == bugsBefore + 2 && OnPage("lantern_firebug_count") is Label { Text: "10/10" },
+        await Until(() => Lanterns.BugCount(lantern.Lantern) == 10 && world.Backpack[Firebugs.Item] == bugsBefore + 2 && OnPage("lantern_firebug_count") is Label { Text: "10/10" },
             "depositing eight more firebugs and leaving the surplus in the backpack", 4);
         await Click(slot);
-        Require(world.Lanterns.BugCount(lantern.LanternItem) == 10 && cursor.Stack?.Count == heldBefore - 10, "the full lantern should reject the remaining held firebugs");
+        Require(Lanterns.BugCount(lantern.Lantern) == 10 && cursor.Stack?.Count == heldBefore - 10, "the full lantern should reject the remaining held firebugs");
         await Click(FindButton(panel, "Pick up")!);
         await Until(() => world.Find(lantern.Id) == null && world.Lanterns.Carried(Lanterns.Id(item)) != null && !panel.Visible,
             "picking up the filled lantern from its ground panel", 4);

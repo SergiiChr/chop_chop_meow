@@ -55,7 +55,7 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
         row.AddThemeConstantOverride("separation", 12);
         row.AddChild(stationSlots.Slot(thing.Inventory, Water.Liquid, true,
             count => $"Water · {count}/{TreePlanting.WaterNeeded} L",
-            takes: held => held.Stack is { Box: 0 } stack && TreePlanting.NeedsWater(thing) && Barrels.CanPourWater(world.Data, stack.Item)));
+            takes: held => held.Stack is { Box: 0 } stack && TreePlanting.NeedsWater(thing) && Barrels.CanPourWater(world.Data, stack.Item, world.S.Backpack.Object(stack.Item))));
         var need = Style.Text("", 13, Style.Ink, wrap: true);
         need.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         need.SizeFlagsVertical = SizeFlags.ShrinkCenter;
@@ -63,6 +63,6 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
         var water = Style.InWell(row);
         AddChild(water);
         live.Bind(need, line => line.Append("Needs ").Append(TreePlanting.WaterNeeded - thing.Inventory[Water.Liquid]).Append(" L of water to start growing."));
-        StoreBagGrid(item => TreePlanting.NeedsWater(thing) && Barrels.CanPourWater(world.Data, item));
+        StoreBagGrid(item => TreePlanting.NeedsWater(thing) && Barrels.CanPourWater(world.Data, item, world.S.Backpack.Object(item)));
     }
 }

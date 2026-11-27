@@ -20,7 +20,7 @@ public static class FarmSteps {
         return (world, compost!, farm!);
     }
 
-    /// <summary>A growing plot with a hauler, a barrel of water and a bucket on the rack.</summary>
+    /// <summary>A growing plot with a hauler, a barrel of water and a bucket: an empty one on the rack, or one holding water in the hauler's hand.</summary>
     public static (World World, Thing Farm, Thing Source, Worker Worker) FarmWithBucketHauler(GameData data, int liters) {
         var world = EmptyWorld(data);
         var farm = world.Add(ThingKind.Farm, new Vector2(20, 20));
@@ -28,8 +28,9 @@ public static class FarmSteps {
         var source = world.Add(ThingKind.Barrel, new Vector2(15, 18));
         source.Inventory.Add(Water.Liquid, 50);
         var rack = TakeEverything(world, world.Add(ThingKind.Toolstation, new Vector2(14, 20)));
-        rack.Inventory.Add(Bucket.AtFill(liters), 1);
         var worker = AddWorker(world, new Vector2(15, 19));
+        // A rack holds buckets only empty, so one already holding water starts in the hauler's tool slot.
+        StockVessel(world, liters == 0 ? rack.Inventory : worker.ToolSlot, Bucket.Item, Water.Liquid, liters);
         world.SetDuty(worker, farm, JobKind.Haul, true);
         return (world, farm, source, worker);
     }

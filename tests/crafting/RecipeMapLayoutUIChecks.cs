@@ -251,8 +251,7 @@ public partial class Game {
 
     /// <summary>Looking up any bottle fill in the backpack opens the same Bottle entry without moving it.</summary>
     private async Task CheckBottleFillsShareOneRecipeMapEntry() {
-        string[] fills = [Water.Full, Water.TwoLiters, Water.OneLiter, BerryJam.Bottle];
-        foreach (string fill in fills) Give(Hosted, fill);
+        string[] fills = [GiveWater(Hosted), GiveWater(Hosted, 2), GiveWater(Hosted, 1), GiveVessel(Hosted, Water.Empty, BerryJam.Liquid, BerryJam.Looks.Length - 1)];
         await Frames();
         await KeyStroke(Key.Tab);
         foreach (string fill in fills) {
@@ -262,7 +261,7 @@ public partial class Game {
             var details = recipeMap.FindChild("map_details", true, false);
             Require(HasLabel(details, "Bottle") && world.Carried(fill) == count && cursor.Empty,
                 "A fill must open Bottle without changing the inventory.");
-            Require(fills.All(item => recipeMap.NodeOf(item) == null) && recipeMap.NodeOf(Water.Liquid) != null,
+            Require(fills.Concat(Water.Looks[1..]).Concat(BerryJam.Looks[1..]).All(item => recipeMap.NodeOf(item) == null) && recipeMap.NodeOf(Water.Liquid) != null,
                 "Bottle fills must have no cards of their own, and Water must remain on the map.");
             await KeyStroke(Key.Escape);
         }

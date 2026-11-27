@@ -47,6 +47,7 @@ public static class HaulingChecks {
         Test(CheckTheSecondFurnaceWorkerHaulsRecipeInputsAndStoresSteel, data);
         Test(CheckHaulerStocksPackerAndCarriesCratesToStorageAskingForThem, data);
         Test(CheckHaulerFetchesInputsFromTheStationThatMadeThem, data);
+        Test(CheckHaulerCarriesABarrelOfWaterOutOfABenchToAPileOfThem, data);
         Test(CheckHaulerPoursWaterAndStoresTheEmptyBottle, data);
         Test(CheckHaulerTakesLeftoverWaterOutInBottles, data);
     }
@@ -310,7 +311,8 @@ public static class HaulingChecks {
         world.SetFilter(post, crate, false, true);
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 10)));
         var worker = AddWorker(world, new Vector2(15, 12));
-        worker.Bag.Add(PackCrate(world, ("berries", 12)), 1);
+        string packed = PackCrate(world, ("berries", 12));
+        world.Player = worker.Pos; world.Transfer(world.Backpack, worker.Bag, packed, 1);
         world.Tick(.1f);
         Require(worker.Destination == post.Id, "a worker should carry a crate of berries to the trading post asking for it");
         world.ClearFilters(post);
@@ -434,10 +436,10 @@ public static class HaulingChecks {
         // A stack of 64 liters with 58 in it has room for 6: two full bottles of 3 liters.
         table.Inventory.Add(Water.Liquid, 58);
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(14, 10)));
-        chest.Inventory.Add(Water.Full, 5);
+        StockVessel(world, chest.Inventory, Water.Empty, Water.Liquid, Water.Capacity, 5);
         var hauler = Staff(world, chest, JobKind.Haul);
         Work(world, 30, () => hauler.Bag.Count > 0);
-        Require(hauler.Bag[Water.Full] == 2, $"a chest's hauler should take the table two full bottles for its 6 liters of room, not {hauler.Bag[Water.Full]}");
+        Require(Vessels.Count(hauler.Bag, Water.Empty, Water.Liquid, 3) == 2, $"a chest's hauler should take the table two full bottles for its 6 liters of room, not {Vessels.Count(hauler.Bag, Water.Empty, Water.Liquid, 3)}");
     }
 
     /// <summary>A bench hauler only stocks it; the work itself waits for a crafter.</summary>
@@ -574,16 +576,29 @@ public static class HaulingChecks {
         Require(bench.Inventory["steel_parts"] == 6 && anvil.Inventory["steel_parts"] == 0, "the bench's hauler should fetch the steel parts from the anvil's finished goods");
     }
 
+    private static void CheckHaulerCarriesABarrelOfWaterOutOfABenchToAPileOfThem(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, new Vector2(20, 20), Barrel.Item);
+        var pile = world.Add(ThingKind.Pile, new Vector2(26, 20));
+        StockVessel(world, pile.Inventory, Barrel.Item, Water.Liquid, Barrel.Capacity);
+        world.Tick(.1f);
+        Require(world.PileFilter(pile) == World.HoldingOf(Barrel.Item, Water.Liquid), "a pile's first barrel of water should set it to barrels of water");
+        string barrel = StockVessel(world, bench.Inventory, Barrel.Item, Water.Liquid, 20);
+        Staff(world, bench, JobKind.Haul);
+        Work(world, 30, () => pile.Inventory[barrel] == 1);
+        Require(pile.Inventory[barrel] == 1 && bench.Inventory[barrel] == 0, "the bench's hauler should carry a barrel of water out to the pile of them");
+    }
+
     private static void CheckHaulerPoursWaterAndStoresTheEmptyBottle(GameData data) {
         var world = new World(data, false);
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
-        chest.Inventory.Add(Water.Full, 1); chest.Inventory.Add("flour", 4);
+        StockVessel(world, chest.Inventory, Water.Empty, Water.Liquid, Water.Capacity); chest.Inventory.Add("flour", 4);
         var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
         world.SetRecipe(table, "dough");
         var hauler = AddWorker(world, new Vector2(24, 21));
         world.SetDuty(hauler, table, JobKind.Haul, true); world.SetDuty(hauler, table, JobKind.Craft, true);
         SafeTick(world, 40);
-        Require(chest.Inventory["dough"] == 3 && table.Inventory[Water.Full] + table.Inventory[Water.Empty] == 0,
+        Require(chest.Inventory["dough"] == 3 && Vessels.Count(table.Inventory, Water.Empty, Water.Liquid, 3) + table.Inventory[Water.Empty] == 0,
             "a hauler must pour a full bottle into the table for its dough, leaving no bottle there");
         Require(chest.Inventory[Water.Empty] == 1 && hauler.Bag.Count == 0, "a hauler must store the emptied bottle again");
     }
@@ -598,7 +613,7 @@ public static class HaulingChecks {
         world.SetDuty(hauler, table, JobKind.Haul, true);
         SafeTick(world, 40);
         Require(table.Inventory[Water.Liquid] == 0, "a hauler must clear water the table's recipe no longer takes");
-        Require(chest.Inventory[Water.OneLiter] == 1 && chest.Inventory[Water.Empty] == 0 && hauler.Bag.Count == 0,
+        Require(Vessels.Count(chest.Inventory, Water.Empty, Water.Liquid, 1) == 1 && chest.Inventory[Water.Empty] == 0 && hauler.Bag.Count == 0,
             "the leftover liter must go back to storage in the empty bottle the hauler fetched");
     }
 }

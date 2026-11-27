@@ -11,6 +11,7 @@ using static PlayerSteps;
 public static class PileChecks {
     public static void Run(GameData data) {
         Test(CheckPilesSnapTogetherHoldOneResourceAndMakeCompost, data);
+        Test(CheckCompostNamesBottlesOfJam, data);
         Test(CheckEmptiedPileKeepsItsFilterWhichChangesOnlyWhileEmpty, data);
         Test(CheckOnlyAnEmptyPileWithNoFilterTurnsIntoCompost, data);
         Test(CheckTenderFeedsCompostWithoutFood, data);
@@ -20,6 +21,19 @@ public static class PileChecks {
     }
 
     /// <summary>Piles snap into grids and hold one resource, the first put in, and compost turns leaves and food into fertilizer.</summary>
+    private static void CheckCompostNamesBottlesOfJam(GameData data) {
+        var world = EmptyWorld(data);
+        var compost = world.Add(ThingKind.Pile, new Vector2(30, 30));
+        world.Player = compost.Pos;
+        world.SetCompost(compost, true);
+        string jam = World.HoldingOf(Water.Empty, BerryJam.Liquid);
+        Require(world.HoldsHolding(compost, jam) && !world.HoldsHolding(compost, World.HoldingOf(Water.Empty, Water.Liquid)),
+            "compost should take bottles of jam, which rot, and no bottle of water");
+        compost.Inventory.ClearFilters();
+        world.SetFilter(compost, jam, false, true);
+        Require(compost.Inventory.InputFilter.Contains(jam), "a compost filter should name bottles of jam again once taken off");
+    }
+
     private static void CheckPilesSnapTogetherHoldOneResourceAndMakeCompost(GameData data) {
         var world = EmptyWorld(data);
         var origin = new Vector2(20, 20);
@@ -139,14 +153,14 @@ public static class PileChecks {
         var chest = TakeEverything(world, world.Add(ThingKind.Chest, new Vector2(20, 20)));
         var compost = world.Add(ThingKind.Pile, new Vector2(16, 24));
         Require(world.SetCompost(compost, true), "an empty pile should turn into compost");
-        chest.Inventory.Add(BerryJam.Bottle, 1);
-        chest.Inventory.Add(BerryJam.Bottles[2], 1);
+        StockVessel(world, chest.Inventory, Water.Empty, BerryJam.Liquid, 3);
+        StockVessel(world, chest.Inventory, Water.Empty, BerryJam.Liquid, 2);
         chest.Inventory.Add("leaves", 2);
         var tender = AddWorker(world, new Vector2(17, 22));
         world.SetDuty(tender, compost, JobKind.Tend, true);
 
         Work(world, 65, () => compost.Inventory["fertilizer"] == 1);
-        Require(compost.Inventory["fertilizer"] == 1 && compost.Inventory[BerryJam.Bottle] == 0 && compost.Inventory[BerryJam.Bottles[2]] == 0,
+        Require(compost.Inventory["fertilizer"] == 1 && Vessels.Count(compost.Inventory, Water.Empty, BerryJam.Liquid, 3) == 0 && Vessels.Count(compost.Inventory, Water.Empty, BerryJam.Liquid, 2) == 0,
             "the two bottles' jam and two leaves should make one fertilizer");
         world.Player = compost.Pos + Vector2.Down;
         Require(world.Transfer(compost.Inventory, world.Backpack, Water.Empty, 2) == 2,
@@ -158,11 +172,11 @@ public static class PileChecks {
         var world = EmptyWorld(data);
         string crate = PackCrate(world, ("bread", data.CrateCapacity));
         var pile = world.Add(ThingKind.Pile, new Vector2(30, 30));
-        pile.Inventory.Add(crate, 1); Drop(world, crate, 1);
+        world.Player = pile.Pos; world.Transfer(world.Backpack, pile.Inventory, crate, 1);
         world.Tick(.01f);
         string otherBread = PackCrate(world, ("bread", 2)), berryCrate = PackCrate(world, ("berries", 2));
         Require(world.Holds(pile, otherBread), "a pile of bread crates should hold another bread crate");
-        Require(pile.Inventory.Accepts(otherBread),
+        Require(world.Accepts(pile, otherBread),
             "a pile of bread crates should accept another bread crate into its inventory");
         Require(!world.Holds(pile, berryCrate), "a pile of bread crates should not hold a crate of berries");
         Require(!world.Holds(pile, PackCrate(world, ("bread", 1), ("berries", 1))), "a pile of bread crates should not hold a crate of mixed goods");
@@ -173,14 +187,15 @@ public static class PileChecks {
         var world = EmptyWorld(data);
         string first = PackCrate(world, ("bread", 2), ("berries", 2));
         var pile = world.Add(ThingKind.Pile, new Vector2(30, 30));
-        pile.Inventory.Add(first, 1); Drop(world, first, 1);
+        world.Player = pile.Pos; world.Transfer(world.Backpack, pile.Inventory, first, 1);
         world.Tick(.01f);
         Require(world.PileFilter(pile) == World.MixedCrate && world.FilterName(World.MixedCrate) == "Mixed crate", "a crate of mixed goods should set a pile to mixed crates");
         pile.Inventory.Remove(first, 1);
         world.Tick(.01f);
         string other = PackCrate(world, ("wood", 1), ("stone", 1));
-        Require(world.Holds(pile, other) && pile.Inventory.Accepts(other) && pile.Inventory.AllowsWithdrawal(other),
-            "an emptied pile of mixed crates should still take and give any other crate of mixed goods");
+        Require(world.Holds(pile, other) && world.Accepts(pile, other), "an emptied pile of mixed crates should still take any other crate of mixed goods");
+        world.Player = pile.Pos; world.Transfer(world.Backpack, pile.Inventory, other, 1);
+        Require(pile.Inventory.AllowsWithdrawal(other), "a pile of mixed crates should give out any crate of mixed goods it took");
         Require(!world.Holds(pile, PackCrate(world, ("bread", 2))), "a pile of mixed crates should not hold a crate of one good");
     }
 }

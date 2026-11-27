@@ -23,10 +23,10 @@ public static class LakeChecks {
             Give(world, "empty_bottle", 1);
             Require(world.Near(lake) && Terrain.WaterRing(world.Player), "Every part of the lake shore must collect water.");
             world.Gather(lake, data.GatherSeconds / 2);
-            Require(world.Backpack["water"] == 0, "A bottle must take the whole gathering time to fill.");
+            Require(Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 3) == 0, "A bottle must take the whole gathering time to fill.");
             world.Gather(lake, data.GatherSeconds / 2);
-            Require(world.Backpack["water"] == 1 && world.Backpack.Count == 1, "Collecting must fill the existing bottle exactly once.");
-            Drop(world, "water", 1); SetNeeds(world, thirst: 0);
+            Require(Vessels.Count(world.Backpack, Water.Empty, Water.Liquid, 3) == 1 && world.Backpack.Count == 1, "Collecting must fill the existing bottle exactly once.");
+            DropVessels(world, Water.Empty, Water.Liquid, Water.Capacity); SetNeeds(world, thirst: 0);
             world.Gather(lake, data.GatherSeconds / 2);
             Require(world.Thirst == 0, "Direct drinking must take as long as filling a bottle.");
             world.Gather(lake, data.GatherSeconds / 2);

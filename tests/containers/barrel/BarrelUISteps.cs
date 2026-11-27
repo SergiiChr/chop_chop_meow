@@ -13,7 +13,7 @@ public partial class Game {
     private async Task OpenBackpackBarrel(string item) {
         if (panel.Page != Page.Backpack) await KeyStroke(Key.Tab);
         await DoubleClick(BagCellOf(item));
-        await Until(() => panel.Page == Page.Barrel && Named("barrel_water")?.TooltipText.Contains($"{Barrel.Liters(item)}/{Barrel.Capacity} L") == true,
+        await Until(() => panel.Page == Page.Barrel && Named("barrel_water")?.TooltipText.Contains($"{Vessels.LitersIn(world.Backpack, item)}/{Barrel.Capacity} L") == true,
             $"the {world.Data.Name(item)} opening in the backpack", 2);
     }
 

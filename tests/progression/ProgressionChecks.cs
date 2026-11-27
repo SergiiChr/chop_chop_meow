@@ -26,7 +26,7 @@ public static class ProgressionChecks {
     /// </summary>
     private static void CheckEverythingIsReachableFromFreshStart(GameData data) {
         var fresh = new World(data);
-        var have = new HashSet<string>(fresh.Backpack.Items.Keys) { "stone", "berries", "water", "water_1", "water_2", "raw_meat", "nettle" };
+        var have = new HashSet<string>(fresh.Backpack.Items.Keys) { "stone", "berries", Water.Liquid, "raw_meat", "nettle" };
         var built = new HashSet<ThingKind>();
         bool HasTool(string tool, int tier = 0) => have.Any(id => data.Items[id].Tool == tool && data.Items[id].Tier >= tier);
         for (bool grew = true; grew;) {
@@ -38,13 +38,12 @@ public static class ProgressionChecks {
             if (HasTool("rake")) grew |= have.Add("leaves");
             if (HasTool("net")) grew |= have.Add("firebug");
             if (HasTool("shovel")) grew |= have.Add("sand");
-            // Crafting the vessel and reaching its liquid opens every fill state.
-            foreach (var vessel in data.Vessels) {
-                if (have.Contains(vessel.Full)) grew |= have.Add(vessel.Liquid);
-                if (have.Contains(vessel.Empty) && have.Contains(vessel.Liquid)) foreach (string fill in vessel.States) grew |= have.Add(fill);
+            // A full vessel bought pours its liquid, and a vessel filled with its liquid is a full one.
+            foreach (var (id, def) in data.Items) {
+                if (def.FullOf is not string liquid) continue;
+                if (have.Contains(id)) grew |= have.Add(liquid);
+                if (have.Contains(data.VesselFor(liquid)!.Empty) && have.Contains(liquid)) grew |= have.Add(id);
             }
-            if (have.Contains(Barrel.Item) && have.Contains(Water.Liquid)) foreach (string fill in Barrel.Fills) grew |= have.Add(fill);
-            if (have.Contains(Barrel.Item) && have.Contains(BerryJam.Liquid)) foreach (string fill in BerryJam.Barrels) grew |= have.Add(fill);
             foreach (var (id, b) in data.Buildings) if (b.Cost.Keys.All(have.Contains)) grew |= built.Add(id);
             if (built.Contains(ThingKind.Pile) && have.Any(data.IsFood)) grew |= have.Add("fertilizer");
             // Seeds are bought with berry money to start the first plot.

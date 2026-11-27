@@ -103,13 +103,13 @@ public static class JamPlumbingChecks {
         var world = EmptyWorld(data);
         var barrel = world.Add(ThingKind.Barrel, PumpTile);
         world.Player = barrel.Pos + Vector2.Down;
-        Give(world, Water.Full); Give(world, BerryJam.Bottle);
-        Require(world.Transfer(world.Backpack, barrel.Inventory, BerryJam.Bottle, 1) == 1,
+        string water = GiveWater(world), jam = GiveVessel(world, Water.Empty, BerryJam.Liquid, 3);
+        Require(world.Transfer(world.Backpack, barrel.Inventory, jam, 1) == 1,
             "A bottle should pour three liters of jam into an empty barrel.");
-        Require(world.Transfer(world.Backpack, barrel.Inventory, Water.Full, 1) == 0
+        Require(world.Transfer(world.Backpack, barrel.Inventory, water, 1) == 0
             && barrel.Inventory[BerryJam.Liquid] == 3 && barrel.Inventory[Water.Liquid] == 0,
             "A barrel holding jam must refuse water without losing anything.");
-        Require(world.PickUpBarrel(barrel) && world.Backpack[Barrel.AtFill(3, BerryJam.Liquid)] == 1,
+        Require(world.PickUpBarrel(barrel) && Vessels.Count(world.Backpack, Barrel.Item, BerryJam.Liquid, 3) == 1,
             "Picking up the barrel must preserve its contents.");
     }
 

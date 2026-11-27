@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Godot;
 
 namespace ChopChopMeow;
@@ -17,60 +18,43 @@ public sealed class Firebugs(World world) {
     /// <summary>Metres from a cluster's first firebug within which the others come out.</summary>
     public const float ClusterRadius = 1;
     public const string Item = "firebug";
-    private const int LifeDays = 3;
-    internal float NewExpiry => world.Time + LifeDays * world.Data.DaySeconds;
+    internal float NewExpiry => world.Time + world.Data.Items[Item].LifeDays * world.Data.DaySeconds;
     private float nextExpiry = float.PositiveInfinity;
-    private readonly List<(int Id, string Name)> changedCrates = new();
+    private readonly List<ChopChopMeow.Item> catchBuffer = new();
 
     /// <summary>Starts the three-day lifetime of each firebug this inventory can take from a catch.</summary>
     internal int Catch(Inventory to, int count) {
         int room = Math.Min(count, to.Room(Item));
         if (room <= 0) return 0;
         float expiry = NewExpiry;
-        Span<float> expires = room <= 64 ? stackalloc float[room] : new float[room];
-        expires.Fill(expiry);
+        catchBuffer.Clear();
+        for (int i = 0; i < room; i++) catchBuffer.Add(new ChopChopMeow.Item { Kind = Item, Expires = expiry });
         nextExpiry = Math.Min(nextExpiry, expiry);
-        return to.AddFirebugs(expires);
+        return to.AddUnits(CollectionsMarshal.AsSpan(catchBuffer));
     }
 
     /// <summary>Average game minutes left among the firebugs in one stack, or the whole box when no slot is named.</summary>
     internal int AverageMinutes(Inventory box, int slot = -1) =>
-        MinutesLeft(slot < 0 ? box.AverageFirebugExpiry() : box.AverageFirebugExpiry(slot));
-
-    /// <summary>The average of some firebugs' death times, or 0 for none.</summary>
-    internal static float Average(ReadOnlySpan<float> expiries) {
-        double total = 0;
-        foreach (float expiry in expiries) total += expiry;
-        return expiries.IsEmpty ? 0 : (float)(total / expiries.Length);
-    }
+        MinutesLeft(slot < 0 ? box.AverageExpiry(Item) : box.AverageExpiry(slot));
 
     internal int MinutesLeft(float expiry) => (int)MathF.Ceiling(Math.Max(0, expiry - world.Time) / world.Data.HourSeconds * 60);
 
-    /// <summary>Clears dead bugs from the inventories that can hold them when the next catch expires.</summary>
+    /// <summary>Clears dead bugs from the inventories that can hold them, and from the lanterns and crates in them, when the next catch expires.</summary>
     internal void Age() {
         float now = world.Time;
         if (now < nextExpiry) return;
         nextExpiry = float.PositiveInfinity;
-        changedCrates.Clear();
         var saved = world.S;
-        foreach (var (id, box) in saved.Crates) {
-            int before = box[Item];
-            Check(box);
-            if (box[Item] != before) changedCrates.Add((id, World.PackedName(box, id)));
-        }
         foreach (var player in saved.Players) Check(player.Backpack);
         foreach (var player in saved.Absent.Values) Check(player.Backpack);
         foreach (var worker in saved.Workers) Check(worker.Bag);
         foreach (var thing in saved.Things) {
             Check(thing.Inventory);
             if (thing.Output is { } output) Check(output);
+            if (thing.Lantern?.Contents is { } jar) Check(jar);
         }
-        foreach (var (id, name) in changedCrates) if (name == "crate") saved.Crates.Remove(id);
 
-        void Check(Inventory box) {
-            if (box[Item] > 0) nextExpiry = Math.Min(nextExpiry, box.ExpireFirebugs(now));
-            foreach (var (id, name) in changedCrates) box.RenamePackedCrate(id, name);
-        }
+        void Check(Inventory box) => nextExpiry = Math.Min(nextExpiry, box.Expire(now));
     }
     /// <summary>Metres a firebug keeps from every building as it comes out.</summary>
     public const float BuildingRoom = 25;

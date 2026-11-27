@@ -72,7 +72,7 @@ public sealed partial class World {
     private bool JobUses(Worker w, string kind) {
         foreach (var d in w.Duties) {
             if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind is ThingKind.Hut or ThingKind.Barrel && BarrelHaul.Vessel(w.Tool)) return true;
-            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind == ThingKind.Farm && Bucket.Liters(w.Tool) >= 0) return true;
+            if (d.Job == JobKind.Haul && Find(d.Thing)?.Kind == ThingKind.Farm && Bucket.Is(w.Tool)) return true;
             if (Array.IndexOf(Def(d.Job).Tools, kind) >= 0) return true;
             // A woodcutter's job covers trees and stumps, so the spot it is on now counts as well as the kind it was given.
             if (d.Job == JobKind.Gather && (Uses(d.Kind) || Uses(Find(d.Thing)?.Kind))) return true;
@@ -97,19 +97,20 @@ public sealed partial class World {
         var dest = Find(w.Destination);
         if (FillsLeftover(w, dest, item, dt)) return true;
         // Rules are read again every tick, so a filter changed or a slot filled while a load is on its way sends it elsewhere.
-        var intake = dest == null ? null : Intake(dest, item, w.Fueling);
+        var unit = w.Bag.Object(item);
+        var intake = dest == null ? null : Intake(dest, item, w.Fueling, unit);
         // A load with nowhere to go looks for a place again only a few times a second, as a worker with nothing to do reads their list.
         if (intake == null && S.Time >= w.LookAgain) {
-            dest = DepositFor(item, w.Pos); w.Fueling = false;
-            intake = dest == null ? null : Intake(dest, item, false);
+            dest = DepositFor(item, w.Pos, unit: unit); w.Fueling = false;
+            intake = dest == null ? null : Intake(dest, item, false, unit);
             if (intake == null) { dest = takeBack.Nearest(item, w.Pos); w.LookAgain = S.Time + JobListSeconds; }
         }
         if (dest == null || intake is not (Inventory into, int room)) return takeBack.Bring(w, dest, item, dt);
-        w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
+        w.Destination = dest.Id; w.Status = Phrase("Carrying ", NameIn(w.Bag, item), " → ", Data.Name(dest.Kind));
         if (!Walk(w, dest.Pos, dt)) return true;
         // Every vessel carried pours, whatever it holds; the vessels stay in hand, emptier.
-        if (PoursInto(dest, into, item) is VesselDef pours) Carry(w.Bag, into, dest, pours.Liquid, room, room);
-        else if (FuelSplit(dest, item, w.Bag[item]) is (int fuel, int input)) {
+        if (PoursInto(dest, into, item, unit) is VesselDef pours) PourLiters(w.Bag, into, pours, room);
+        else if (FuelSplit(dest, item, w.Bag[item], unit) is (int fuel, int input)) {
             w.Bag.TransferTo(dest.Burner!, item, fuel, true);
             w.Bag.TransferTo(dest.Inventory, item, input, true);
         } else w.Bag.TransferTo(into, item, Math.Min(w.Bag[item], room), true);
@@ -129,23 +130,24 @@ public sealed partial class World {
     /// A vessel's room is the liters its liquid has room for.
     /// </summary>
     /// <param name="fueling">The load was fetched for the fuel slot, so it goes there even when the recipe also takes the item as an input.</param>
-    internal (Inventory Box, int Room)? Intake(Thing dest, string item, bool fueling) {
+    /// <param name="unit">The object the item's key finds in the box it comes from, such as a packed crate, whose goods the filters judge.</param>
+    internal (Inventory Box, int Room)? Intake(Thing dest, string item, bool fueling, Item? unit) {
         int room;
         if (IsStation(dest.Kind)) {
-            if (!fueling && (room = InputRoom(dest, item)) > 0) return (dest.Inventory, room);
+            if (!fueling && (room = InputRoom(dest, item, unit)) > 0) return (dest.Inventory, room);
             return dest.Burner is Inventory burner && Fuels(dest).Contains(item) && FuelTakes(dest, item) && (room = burner.Room(item)) > 0 ? (burner, room) : null;
         }
         room = dest.Kind switch {
             ThingKind.Mine => Mines.Need(dest, item),
             ThingKind.Farm => Farms.SowRoom(dest, item),
-            ThingKind.Barrel when PoursInto(dest, dest.Inventory, item) is VesselDef vessel && dest.Inventory.Accepts(vessel.Liquid)
+            ThingKind.Barrel when PoursInto(dest, dest.Inventory, item, unit) is VesselDef vessel && dest.Inventory.Accepts(vessel.Liquid)
                 => dest.Inventory.Room(vessel.Liquid),
             // A trading post takes only the crates its filter asks for, which is how it asks for goods to sell.
-            ThingKind.Signpost when !dest.Inventory.Accepts(item) => 0,
-            ThingKind.Packer => dest.Inventory.Accepts(item) && Holds(dest, item) ? PackingRoom(dest, item) : 0,
-            _ when dest.Compost && dest.SkipFood && Data.IsFood(item) => 0,
+            ThingKind.Signpost when !dest.Inventory.Accepts(item, unit) => 0,
+            ThingKind.Packer => dest.Inventory.Accepts(item, unit) && Holds(dest, item, unit) ? PackingRoom(dest, item) : 0,
+            _ when dest.Compost && dest.SkipFood && IsFood(item, unit) => 0,
             _ when Nests(dest, item) => 0,
-            _ => dest.Inventory.Accepts(item) && Holds(dest, item) ? dest.Inventory.Room(item) : 0
+            _ => dest.Inventory.Accepts(item, unit) && Holds(dest, item, unit) ? dest.Inventory.Room(item) : 0
         };
         return room > 0 ? (dest.Inventory, room) : null;
     }
@@ -155,11 +157,12 @@ public sealed partial class World {
     /// in proportion to what a batch uses of each, as far as each has room.
     /// Null when the item goes into one slot only.
     /// </summary>
-    private (int Fuel, int Input)? FuelSplit(Thing t, string item, int load) {
+    /// <param name="unit">The object the item's key finds in the box it comes from.</param>
+    private (int Fuel, int Input)? FuelSplit(Thing t, string item, int load, Item? unit) {
         if (!IsStation(t.Kind) || t.Burner is not Inventory burner || !BatchCost(t).TryGetValue(item, out int batch) || !Fuels(t).Contains(item) || !FuelTakes(t, item)) return null;
         int fuelRoom = burner.Room(item);
         // A batch burns one fuel, so of every batch's worth one unit is fuel.
-        int input = Math.Min(load - Math.Min((load + batch) / (batch + 1), fuelRoom), InputRoom(t, item));
+        int input = Math.Min(load - Math.Min((load + batch) / (batch + 1), fuelRoom), InputRoom(t, item, unit));
         return (Math.Min(load - input, fuelRoom), input);
     }
 
@@ -167,8 +170,8 @@ public sealed partial class World {
     /// How many more of an item a station's input slot takes: up to a stack of what the recipe it is on uses.
     /// A vessel counts as the liters of room for the liquid it pours.
     /// </summary>
-    private int InputRoom(Thing t, string item) {
-        string lands = PoursInto(t, t.Inventory, item)?.Liquid ?? item;
+    private int InputRoom(Thing t, string item, Item? unit) {
+        string lands = PoursInto(t, t.Inventory, item, unit)?.Liquid ?? item;
         if (Data.VesselFor(lands) != null && lands == item || !BatchCost(t).ContainsKey(lands)) return 0;
         return Math.Max(0, t.Inventory.SlotRoom(lands));
     }

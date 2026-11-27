@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>
 /// Steps that write the raw save or a player's goods and needs.
@@ -18,6 +19,48 @@ internal static class SetupSteps {
 
     /// <summary>Puts goods in the backpack: gathering or buying each would take a day of ticks, and many goods are not sold.</summary>
     public static int Give(World world, string item, int count = 1) => Give(world.S.Actor, item, count);
+
+    /// <summary>
+    /// Puts a new lantern in the backpack, its jar holding this many freshly caught firebugs, without crafting it at a
+    /// bench or catching each bug at night; returns the key it is found by.
+    /// </summary>
+    public static string GiveLantern(World world, int bugs = 0) => GiveLantern(world, world.S.Actor, bugs);
+
+    public static string GiveLantern(World world, PlayerState player, int bugs = 0) {
+        var lantern = world.Lanterns.NewEmpty();
+        world.Lanterns.FillForReview(lantern, bugs);
+        Require(player.Backpack.Add(lantern), "a backpack with room should take a new lantern");
+        return lantern.Key;
+    }
+
+    /// <summary>
+    /// Puts containers holding liters of a liquid in a player's backpack, such as full water bottles, without filling them at
+    /// the lake or a station; returns the key of the last one, or the plain container for 0 liters.
+    /// </summary>
+    public static string GiveVessel(World world, string container, string liquid, int liters, int count = 1) => GiveVessel(world, world.S.Actor, container, liquid, liters, count);
+
+    public static string GiveVessel(World world, PlayerState player, string container, string liquid, int liters, int count = 1) =>
+        StockVessel(world, player.Backpack, container, liquid, liters, count);
+
+    /// <summary>
+    /// Puts containers holding liters of a liquid in any box, such as a chest a check placed, for the same reason; returns the
+    /// key of the last one, or the plain container for 0 liters.
+    /// Each new container takes its number from the save, as the world numbers every object it makes.
+    /// </summary>
+    public static string StockVessel(World world, Inventory box, string container, string liquid, int liters, int count = 1) {
+        if (liters <= 0) { Require(box.Add(container, count) == count, $"a box with room should take {count} {container}"); return container; }
+        int capacity = world.Data.CapacityOf(container, liquid)!.Value;
+        string key = "";
+        for (int i = 0; i < count; i++) {
+            var vessel = Vessels.Holding(container, world.S.NextId++, capacity, liquid, liters);
+            Require(box.Add(vessel), $"a box with room should take a {container} holding {liters} L of {liquid}");
+            key = vessel.Key;
+        }
+        return key;
+    }
+
+    /// <summary>Puts water bottles holding so many liters in the backpack, full unless told.</summary>
+    public static string GiveWater(World world, int liters = Water.Capacity, int count = 1) => GiveVessel(world, Water.Empty, Water.Liquid, liters, count);
 
     /// <summary>Reveals map entries without crafting a chain and returns how to remove only these fixture discoveries.</summary>
     public static Action TemporarilyDiscover(World world, params string[] items) {
@@ -41,6 +84,14 @@ internal static class SetupSteps {
 
     /// <summary>Takes goods out of the backpack to clear the ground for the next check: the game can only move them somewhere else.</summary>
     public static int Drop(World world, string item, int count = int.MaxValue) => Drop(world.S.Actor, item, count);
+
+    /// <summary>Takes every container holding exactly so many liters of a liquid out of the backpack, for the same reason; returns how many it took.</summary>
+    public static int DropVessels(World world, string container, string liquid, int liters) {
+        if (liters <= 0) return Drop(world, container);
+        int dropped = 0;
+        while (Vessels.First(world.S.Backpack, container, liquid, liters) is string key && Drop(world, key) > 0) dropped++;
+        return dropped;
+    }
 
     /// <summary>Takes goods out of one player's backpack, for the same reason.</summary>
     public static int Drop(PlayerState player, string item, int count = int.MaxValue) => player.Backpack.Remove(item, count);

@@ -1,74 +1,48 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace ChopChopMeow;
 
 /// <summary>The refillable three-liter bottle, and a liter drunk straight from a water source.</summary>
 public static class Water {
     public const string BottleTool = "bottle";
-    /// <summary>The bottle's item ids, full to empty, and the water a full one pours into a station.</summary>
-    public const string Full = "water", TwoLiters = "water_2", OneLiter = "water_1", Empty = "empty_bottle", Liquid = "fresh_water";
+    /// <summary>The empty bottle, the full water bottle the village sells, and the water a bottle pours into a station.</summary>
+    public const string Full = "water", Empty = "empty_bottle", Liquid = "fresh_water";
     public const float LiterThirst = 100f / 3f;
-    /// <summary>The bottle at each fill, from empty to full: the index is the liters it holds.</summary>
-    public static readonly string[] BottleItems = { Empty, OneLiter, TwoLiters, Full };
-    /// <summary>Liters a full bottle holds.</summary>
-    public static int Capacity => BottleItems.Length - 1;
+    public const int Capacity = 3;
+    /// <summary>The bottle's icon at each fill of water, from empty to full.</summary>
+    public static readonly string[] Looks = { Empty, "water_1", "water_2", Full };
 
-    public static bool IsBottle(string item) => BottleLiters(item) >= 0;
+    /// <summary>Whether an item is a bottle, empty or holding something.</summary>
+    public static bool IsBottle(string item) => Item.IsKind(item, Empty);
 
-    /// <summary>Remaining liters, or -1 when the item is not a bottle.</summary>
-    public static int BottleLiters(string item) => Array.IndexOf(BottleItems, item);
+    /// <summary>The liters of water a bottle in a box holds: 0 for an empty one, -1 for anything else, a bottle of jam included.</summary>
+    public static int BottleLiters(Inventory box, string item) => Vessels.LitersOf(box, item, Empty, Liquid);
 
-    /// <summary>The bottle holding so many liters, up to full.</summary>
-    public static string WaterItem(int liters) => BottleItems[Math.Clamp(liters, 0, Capacity)];
-
-    /// <summary>Finds an empty bottle first, then the least-full partial bottle, and a full bottle last, among those no player holds.</summary>
-    public static string? FindBottle(Inventory inventory) {
-        foreach (var item in BottleItems) if (inventory.Free(item) > 0) return item;
-        return null;
-    }
+    /// <summary>Finds a bottle with room for water, an empty one first and then the least full, among those no player holds; null when every bottle is full.</summary>
+    public static string? FindBottle(Inventory inventory) =>
+        inventory.Free(Empty) > 0 ? Empty : Vessels.Roomiest(inventory, Empty, Liquid, Capacity, fullest: false);
 
     /// <summary>Refills an empty bottle first, then a partial bottle. With no bottle, gathering at a source drinks one liter straight from it.</summary>
     public static WaterCollectResult CollectWater(World world, Thing source) {
         if (source.Kind != ThingKind.Water) return WaterCollectResult.NoChange;
         Inventory backpack = world.S.Backpack;
-        string? bottle = FindBottle(backpack);
-        if (bottle != null && bottle != Full) {
-            Replace(backpack, bottle, Full);
+        if (FindBottle(backpack) is string bottle) {
+            if (world.SetFill(backpack, bottle, Liquid, Capacity) == null) throw new System.InvalidOperationException("A bottle refilled where it lay found no room.");
             return WaterCollectResult.RefilledBottle;
         }
-        if (FillBucket(backpack)) return WaterCollectResult.RefilledBottle;
-        if (bottle == Full) return WaterCollectResult.NoChange;
+        if (FillBucket(world, backpack)) return WaterCollectResult.RefilledBottle;
+        // Full bottles carried: nothing to refill, and the player drinks from them rather than from the lake.
+        if (Vessels.Count(backpack, Empty, Liquid, Capacity) > 0) return WaterCollectResult.NoChange;
         world.S.Thirst = System.Math.Min(100, world.Thirst + LiterThirst);
         return WaterCollectResult.SourceLiter;
     }
 
-    internal static bool HasBucketRoom(Inventory backpack) {
-        foreach (var (item, _) in backpack.Items)
-            if (Bucket.Liters(item) is >= 0 and < Bucket.Capacity && backpack.CanReplaceOne(item, Bucket.AtFill(Bucket.Capacity))) return true;
-        return false;
-    }
+    /// <summary>The bucket in the backpack with room for water, the fullest first and an empty one last, or null.</summary>
+    private static string? RoomyBucket(Inventory backpack) =>
+        Vessels.Roomiest(backpack, Bucket.Item, Liquid, Bucket.Capacity, fullest: true) ?? (backpack.RoomForFilled(Bucket.Item) > 0 ? Bucket.Item : null);
 
-    private static bool FillBucket(Inventory backpack) {
-        for (int liters = Bucket.Capacity - 1; liters >= 0; liters--)
-            if (backpack.ReplaceOne(Bucket.AtFill(liters), Bucket.AtFill(Bucket.Capacity))) return true;
-        return false;
-    }
+    internal static bool HasBucketRoom(Inventory backpack) => RoomyBucket(backpack) != null;
 
-    /// <summary>Drinks one liter and preserves the same individual bottle in its next state.</summary>
-    public static bool DrinkLiter(World world, string item) {
-        if (BottleLiters(item) <= 0) return false;
-        Inventory backpack = world.S.Backpack;
-        if (!backpack.Replace(item, WaterItem(BottleLiters(item) - 1))) return false;
-        world.S.Thirst = System.Math.Min(100, world.Thirst + LiterThirst);
-        return true;
-    }
-
-    private static void Replace(Inventory inventory, string oldItem, string newItem) {
-        if (!inventory.Replace(oldItem, newItem))
-            throw new System.InvalidOperationException("Bottle state replacement did not fit in its inventory.");
-    }
+    private static bool FillBucket(World world, Inventory backpack) =>
+        RoomyBucket(backpack) is string bucket && world.SetFill(backpack, bucket, Liquid, Bucket.Capacity) != null;
 }
 
 public enum WaterCollectResult { NoChange, RefilledBottle, SourceLiter }

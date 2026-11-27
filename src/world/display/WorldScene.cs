@@ -207,8 +207,8 @@ public partial class WorldView {
     private static readonly string[] WolfClips = { "wolf idle", "wolf howl", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf turn", "wolf leap", "wolf hit", "wolf feed", "wolf fall", "wolf snap", "wolf brace" };
     private static readonly int ReviewWolfClip = Array.IndexOf(WolfClips, ReviewRequestedClip);
     private static readonly string? WaterReview = ReviewRequestedClip switch {
-        "worker bucket roof" => Bucket.AtFill(Bucket.Capacity),
-        "worker bottle roof" => Water.Full,
+        "worker bucket roof" => Bucket.Item,
+        "worker bottle roof" => Water.Looks[^1],
         _ => null
     };
     private string? ReviewCloseUpName => WaterReview != null ? ReviewRequestedClip : ReviewClip >= 0 ? ReviewClips[ReviewClip].Name : ReviewWolfClip >= 0 ? WolfClips[ReviewWolfClip] : null;
@@ -313,7 +313,7 @@ public partial class WorldView {
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);
         float speed = ReviewClips[ReviewClip].Name == "player barrel"
-            ? World.Data.WalkSpeed * Barrel.Speed(Barrel.AtFill(Barrel.Capacity)) : ReviewSpeed(action);
+            ? World.Data.WalkSpeed * Barrel.Speed(Barrel.Capacity) : ReviewSpeed(action);
         float along = Mathf.PosMod(Elapsed * speed + 20, 40) - 20;
         if (reviewActor.Position.Dot(track) > along + 1) reviewActor.Position -= track * 40;
         reviewActor.Update(track * along, action, track * (along + 1), dt);
@@ -544,9 +544,9 @@ public partial class WorldView {
             _ => Math.Min(1, (time - climb - pour) / climb)
         };
         var rigShown = reviewRigs[0];
-        if (action == WorkerWaterAction.ClimbDown || action == WorkerWaterAction.Pour && progress > .60f)
-            vessel = Bucket.Is(vessel) ? Bucket.Item : Water.Empty;
-        WorkerWaterView.Show(rigShown, Vector2.Zero, Vector3.Zero, action, roof: true, progress, vessel);
+        bool filled = !(action == WorkerWaterAction.ClimbDown || action == WorkerWaterAction.Pour && progress > .60f);
+        if (!filled) vessel = Bucket.Is(vessel) ? Bucket.Item : Water.Empty;
+        WorkerWaterView.Show(rigShown, Vector2.Zero, Vector3.Zero, action, roof: true, progress, vessel, filled);
         var at = rigShown.Root.Position;
         reviewActor.Position = new Vector2(at.X, at.Z);
         reviewActor.Lift = at.Y;

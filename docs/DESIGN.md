@@ -106,7 +106,7 @@ Simulation and data:
 | `src/world/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers, the lifetime of each caught firebug in its stack, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, the units of a stack that carry properties of their own, such as each firebug's time, and objects found by their key, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
 | `src/world/model/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/world/model/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
@@ -159,12 +159,12 @@ Simulation and data:
 | `src/terrain/Terrain.cs` | The fixed valley map, with the beds under the lake and the sea |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
-| `src/containers/ContainerItem.cs` | The base item shared by every fill of a steel bucket or barrel |
-| `src/containers/barrel/Barrels.cs`, `src/containers/barrel/model/Barrel.cs` | Portable and placed steel barrels, with a fill encoded in each portable barrel |
+| `src/containers/barrel/Barrels.cs`, `src/containers/barrel/model/Barrel.cs` | Portable and placed steel barrels; a portable barrel holding liquid is an item object with its liters |
 | `src/containers/barrel/model/Bucket.cs`, `src/containers/barrel/BarrelHaul.cs` | Steel buckets, and the Haul job's water work: barrels filled and dry farm plots watered from the worker's tool slot |
 | `src/containers/barrel/model/WorkerWaterAction.cs` | The haul actions sent to the window for rendering |
 | `src/containers/barrel/BedtimeWater.cs` | Cabin water at bedtime and its effect on dawn's needs |
-| `src/containers/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
+| `src/containers/Pouring.cs` | Pouring a vessel's liquid into a station, at any fill, filling vessels with room from it, and setting a container's fill in its cell |
+| `src/containers/model/Vessels.cs` | What a bottle, bucket or barrel holds, read from its object: liters, liquid, look, and counts of alike ones |
 | `src/actors/player/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/network/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
 | `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
@@ -199,6 +199,7 @@ UI and input:
 | `src/storage/display/FilterWindow.cs` | The filter window beside the panel |
 | `src/items/display/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
 | `src/items/display/Grid.cs` | Draws the icon-slot grids |
+| `src/items/model/Item.cs` | One unit with properties of its own: its kind, the key an object is found by, when it expires and what it holds |
 | `src/items/display/Badge.cs` | The count pill on an item slot, green with the firebug count on a lantern's slot |
 | `src/items/display/ItemSlot.cs` | The cream item slot, which tells plain, right, double and Alt-clicks apart and shakes on a refusal |
 | `src/items/display/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse |
@@ -646,8 +647,10 @@ Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the lake shore is a collection target.
 Stations hold water (`Water.Liquid`) and jam (`BerryJam.Liquid`) in liters, with drawn droplet icons.
 Stations and barrels hold liquids loose. The canning station uses one liter of jam and one tin can per batch.
-`GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/containers/Vessels.cs` holds the rules for all of them:
-a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
+`GameData.Vessels` lists each refillable vessel with each liquid it holds (`VesselDef`: the empty container's item, the liquid, its liters, and the look and name at each fill), and `src/containers/Pouring.cs` holds the rules for all of them.
+An empty bottle, bucket or barrel is a plain item; holding liquid, it is an `Item` object whose `Contents` hold the liters, found by its key such as `steel_bucket#12` (`World.SetFill` changes a fill in its cell, `Vessels` reads it).
+Storage names a container by its empty item, which takes only empty ones, or by a container holding a liquid at any fill (`World.HoldingOf`, shown as "Steel bucket of water"); no storage names a bare liquid; a tool rack holds buckets and bottles only empty, and `World.ReturnTool` sends a filled one to storage with the worker's loads.
+A vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessel`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move of a liquid or a vessel between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
 Loading a station by hand and a worker's delivery pass it what the input slot has left (`Inventory.SlotRoom`).
@@ -657,8 +660,9 @@ No hand recipe takes a liquid, which `GameData` checks.
 #### Steel barrels and buckets
 
 A barrel holds up to 50 liters of one liquid, water or jam.
-Its item id records its fill, so moving it between a player, a worker,
-the ground and a pile preserves its liquid without a separate packed inventory. A cabin can only use a water barrel.
+Holding liquid, it is an object whose contents keep the liters, so it keeps its liquid as it moves between a player, a
+worker, the ground and a pile.
+A cabin can only use a water barrel.
 The ground barrel uses a one-slot tank and the same filter rules as a plain pile.
 A cabin's only storage slot holds the actual barrel item.
 The Roof barrel window sits beside the cabin page in `SidePanel.Aside`, like a station's tool window.
@@ -1076,8 +1080,9 @@ Chopping out all its current wood fells the tree and leaves its stump.
 
 ### Lanterns
 
-A lantern has a permanent number and carries its firebugs' expiry times with it as an item, including in a save or an update.
-The placed lantern stores that same item in `Thing.LanternItem` and keeps it when picked up.
+A lantern is an `Item` object with a permanent number, found by its key such as `lantern#17`.
+Its jar, the item's `Contents`, holds its firebugs, each with the time it dies, including in a save or an update.
+The placed lantern keeps that same object in `Thing.Lantern` and gives it back when picked up.
 `Lanterns.Refill` moves as many firebugs as fit, shortest life first, without changing any expiry time.
 Only live firebugs show through the glass. Their glow and the point light sit inside the jar.
 The wooden foot blocks direct light beneath a placed lantern.
@@ -1609,7 +1614,7 @@ Manual transfers ignore those filters.
 A filter is a `FilterList`: its entries in the order they were named, each once, which the filter window's rows show.
 The window's item list runs in `GameData.ListOrder`, with crates of goods after the items in their goods' order.
 `GameData.Create` works `ListOrder` out once: what is gathered, grown or bought comes first, then materials, tools, containers and food, by the recipe that makes each item.
-An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel bucket or barrel at any fill stands with the empty one (`ContainerItem.Base`), and a part-drunk bottle with the full one.
+An item no recipe makes goes with the item it comes out of, so water goes with the empty bottle; a steel bucket or barrel at any fill stands with the empty one (`Item.KindOf`), and a part-drunk bottle with the full one.
 In each group fewer making steps come first, and recipe map order breaks ties.
 Making steps count the longest way through a recipe's inputs, or the items a source comes out of and also takes, from items that take no other item, such as wood.
 Gathered water used to grow wheat adds no making steps.
@@ -1638,11 +1643,11 @@ It keeps the player's filters rather than setting its own, and `Thing.SkipFood` 
 #### Crates
 
 A wood crate holds `CrateCapacity` (12) units.
-A picked-up crate becomes an item `crate_<n>` whose contents live in `SaveState.Crates`; an empty one is the stackable item `crate`.
-Those contents have an update entry of their own (`EntryKey.Crates`), sent only when a packed crate changes.
-`World.MoveInCrate` moves items between a packed crate in the backpack and the backpack, and renames the crate after what it then holds under the same number; emptied, it becomes a plain `crate`.
-A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
-`World.PackedKind` gives `World.MixedCrate` for a crate of mixed goods, which only a pile's filter can name.
+A picked-up crate becomes an `Item` object found by its key, such as `crate#17`, whose `Contents` hold its goods; an empty one is the stackable item `crate`.
+The object travels inside the box that holds it, in a save or an update alike.
+`World.MoveInCrate` moves items between a packed crate in the backpack and the backpack; emptied, it becomes a plain `crate` in the same cell (`Inventory.Unpack`), as it does when the firebugs packed in it all die.
+Filters name the kind of crate by its good (`World.CrateOf`), worked out from the crate's goods (`World.PackedGood`): routing hands the crate object to `Inventory.Accepts` and `Inventory.Wants` along with its key.
+A crate of mixed goods stands under `World.MixedCrate`, which only a pile's filter can name.
 A pile of crates holds crates of one good, or crates of mixed goods.
 A placed crate takes part in automation like a chest, and its filters stay with its contents while it is packed.
 No worker carries a crate into one, and its filters name none (`World.Nests`).

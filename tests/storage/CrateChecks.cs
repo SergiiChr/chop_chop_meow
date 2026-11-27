@@ -13,6 +13,17 @@ public static class CrateChecks {
         Test(CheckPlayerMovesItemsInAndOutOfACarriedCrate, data);
         Test(CheckCratesShowOneSlotPerItemTheyCanHold, data);
         Test(CheckAPackedCrateKeepsItsFiltersWhenPutDownAgain, data);
+        Test(CheckAnEmptyCratePacksOnlyTheHeldUnits, data);
+    }
+
+    private static void CheckAnEmptyCratePacksOnlyTheHeldUnits(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, "crate", 1); Give(world, "wood", 10);
+        world.Hold(world.Backpack, SlotOf(world.Backpack, "wood"), 5);
+        world.FromHeldStack(() => world.MoveInCrate(0, "wood", int.MaxValue, true));
+        string packed = world.Backpack.Items.Keys.Single(World.IsPacked);
+        Require(world.Packed(packed)!["wood"] == 5 && world.Backpack["wood"] == 5 && world.Held == null,
+            "five held wood put on an empty crate should pack just those five");
     }
 
     private static void CheckPlayerMovesItemsInAndOutOfACarriedCrate(GameData data) {
@@ -22,13 +33,13 @@ public static class CrateChecks {
         var placed = world.PlaceCrate("crate", world.Player + new Vector2(0, 2))!;
         world.Transfer(world.Backpack, placed.Inventory, "berries", 12);
         Require(world.PickUpCrate(placed), "the filled crate should be picked up");
-        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        string packed = world.Backpack.Items.Keys.Single(World.IsPacked);
         int id = World.PackedId(packed);
 
         Require(world.MoveInCrate(id, "berries", 3, packing: false) == 3 && world.Backpack["berries"] == 3, "taking 3 berries out of a carried crate should put them in the backpack");
-        Require(world.CarriedCrate(id) == World.CrateOf("berries") + $"_{id}" && world.Packed(world.CarriedCrate(id)!)!["berries"] == 9, "a crate of berries should stay one with 9 left");
+        Require(world.CarriedCrate(id) is string berries && world.FilterEntryOf(berries) == World.CrateOf("berries") && world.Packed(berries)!["berries"] == 9, "a crate of berries should stay one with 9 left");
         Require(world.MoveInCrate(id, "wood", 2, packing: true) == 2 && world.Backpack["wood"] == 0, "packing 2 wood into the carried crate should take them from the backpack");
-        Require(world.CarriedCrate(id) == World.PackedPrefix + id, "a crate of berries and wood should be named as a mixed crate");
+        Require(world.CarriedCrate(id) is string mixed && world.FilterEntryOf(mixed) == World.MixedCrate, "a crate of berries and wood should count as a mixed crate");
         Require(world.MoveInCrate(id, "crate", 1, packing: true) == 0 && world.Backpack["crate"] == 1, "a crate should never go into a crate");
         world.MoveInCrate(id, "berries", 9, packing: false); world.MoveInCrate(id, "wood", 2, packing: false);
         Require(world.CarriedCrate(id) == null && world.Backpack["crate"] == 2 && world.Packed(packed) == null, "an emptied crate should become a plain empty crate");
@@ -46,7 +57,7 @@ public static class CrateChecks {
         crate.Remove("berries", cap / 2);
         Require(crate.ShownSlots == 1 + cap - cap / 2, "half a stack leaves one single-item slot per free unit");
         crate.Remove("berries", cap);
-        foreach (var item in new[] { "wood", "stone", "berries", "water", "coal", "iron_ore", "planks", "wood_parts", "iron_bar", "steel_bar", "tin_bar", "steel_parts" }.Take(cap)) crate.Add(item, 1);
+        foreach (var item in new[] { "wood", "stone", "berries", "flour", "coal", "iron_ore", "planks", "wood_parts", "iron_bar", "steel_bar", "tin_bar", "steel_parts" }.Take(cap)) crate.Add(item, 1);
         Require(crate.UsedSlots == cap, "a crate should give each different item its own slot");
         Require(crate.Count == cap, "a crate should count as many different single items as it holds");
         Require(crate.Room("raw_meat") == 0, "a crate full of single items should have no room for more");
@@ -80,7 +91,7 @@ public static class CrateChecks {
         crate.Inventory.Add("wood", 3);
         world.SetFilter(crate, "wood", false, true); world.SetFilter(crate, "stone", true, true);
         Require(world.PickUpCrate(crate), "a nearby crate should be picked up");
-        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        string packed = world.Backpack.Items.Keys.Single(World.IsPacked);
         var placed = world.PlaceCrate(packed, world.Player + new Vector2(2, 0))!;
         Require(placed.Inventory.InputFilter.SequenceEqual(new[] { "wood" }) && placed.Inventory.OutputFilter.SequenceEqual(new[] { "stone" }),
             "a crate of goods put down again should keep the filters it had");

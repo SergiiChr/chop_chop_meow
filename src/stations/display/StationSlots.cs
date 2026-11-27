@@ -24,7 +24,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         live.Watch(() => {
             int held = box[item];
             int life = item == Firebugs.Item && held > 0 ? world.Firebugs.AverageMinutes(box) : -1;
-            int bugs = lantern && held > 0 ? world.Lanterns.BugCount(item) : -1;
+            int bugs = lantern && held > 0 ? Lanterns.BugCount(box, item) : -1;
             return (Held: held, Life: life, Bugs: bugs);
         }, shown => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, shown.Held > 0 ? Colors.White : Style.Ghost);
@@ -124,7 +124,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
             : product ? $"{SlotHint} · put {world.Lower(world.Data.Name(item))} from your backpack back here"
             : !input ? SlotHint : vessel != null ? $"{SlotHint} · put a filled vessel here to pour what it holds" : $"{SlotHint} · put a backpack stack here to load";
         // A liquid's input slot takes the vessels that hold some of it, at any fill.
-        Func<HeldCursor, bool>? takes = input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || world.Data.VesselOf(stack.Item) is VesselDef heldVessel && heldVessel.Liquid == item && heldVessel.LitersIn(stack.Item) > 0)
+        Func<HeldCursor, bool>? takes = input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || world.Data.VesselOf(stack.Item) != null && Vessels.LiquidIn(world.S.Backpack.Object(stack.Item)) == item)
             : product && vessel == null ? held => held.Stack is { Box: 0 } stack && stack.Item == item : null;
         // The product goes back as into storage; an input loads through the station's own rules.
         var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}{(vessel == null ? "" : " L")}\n{hint}", size, takes: takes,
@@ -132,7 +132,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         return Labelled(cell, perBatch);
     }
 
-    /// <summary>Shows lanterns together but takes one at a time, keeping the charge of each lantern.</summary>
+    /// <summary>Shows lanterns together but takes one at a time, each lantern keeping its own firebugs.</summary>
     private VBoxContainer LanternSlot(bool input, string perBatch, float size) {
         var box = t.Inventory;
         var (cell, count) = ItemSlot.Create($"{(input ? "input" : "output")}_{Lanterns.Item}", size);
@@ -141,10 +141,10 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         cell.AddChild(firebugs);
         cell.Icon = Icons.Of(Lanterns.Item);
         if (!input) cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
-        moves.TakeCell(cell, box, () => box.FirstLantern(), t,
+        moves.TakeCell(cell, box, () => box.FirstOfKind(Lanterns.Item), t,
             held => held.Stack is { Box: 0 } stack && Lanterns.IsItem(stack.Item),
             input ? (item, units) => world.LoadInput(t, item, units) : null);
-        live.Watch(() => (Count: box.CountOfKind(Lanterns.Item), Bugs: box.FirstLantern() is string item ? world.Lanterns.BugCount(item) : -1), now => {
+        live.Watch(() => (Count: box.CountOfKind(Lanterns.Item), Bugs: box.FirstOfKind(Lanterns.Item) is string item ? Lanterns.BugCount(box, item) : -1), now => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, now.Count > 0 ? Colors.White : Style.Ghost);
             count.SetStack(now.Count, -1);
             firebugs.SetStack(0, now.Bugs);

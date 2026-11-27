@@ -18,7 +18,6 @@ public static class HeldStackChecks {
         Test(CheckAStationInputTakesOnlyWhatItsRecipeUses, data);
         Test(CheckAHeldStackIsLetGoOutOfReachAndOnLeaving, data);
         Test(CheckAHeldBottleStaysOutOfGatheringWater, data);
-        Test(CheckAnEmptyCratePacksOnlyTheHeldUnits, data);
         Test(CheckAHeldStackIsLetGoOnceItsCrateIsPutDown, data);
         Test(CheckCompostMakesNothingWhileAStackInItIsHeld, data);
         Test(CheckACrateHeldFromAChestIsPlacedFromThere, data);
@@ -83,16 +82,6 @@ public static class HeldStackChecks {
         SetNeeds(world, thirst: 25);
         Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceLiter && world.Held?.Item == Water.Empty,
             "with the only bottle held, gathering water should drink from the source and leave the bottle held");
-    }
-
-    private static void CheckAnEmptyCratePacksOnlyTheHeldUnits(GameData data) {
-        var world = EmptyWorld(data);
-        Give(world, "crate", 1); Give(world, "wood", 10);
-        world.Hold(world.Backpack, SlotOf(world.Backpack, "wood"), 5);
-        world.FromHeldStack(() => world.MoveInCrate(0, "wood", int.MaxValue, true));
-        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
-        Require(world.Packed(packed)!["wood"] == 5 && world.Backpack["wood"] == 5 && world.Held == null,
-            "five held wood put on an empty crate should pack just those five");
     }
 
     private static void CheckAHeldStackIsLetGoOnceItsCrateIsPutDown(GameData data) {

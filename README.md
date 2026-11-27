@@ -871,7 +871,7 @@ A crafting bench with a steel hammer makes a barrel from five steel sheets and t
 It makes a bucket from three steel sheets, a steel part and a wood part.
 The barrel recipe takes 30 seconds of base work before the bench and hammer speed bonuses.
 Barrels stack in the bench output.
-A pile can store barrels at every fill level together.
+A pile stores empty barrels together, or barrels of one liquid at any fill, such as "Steel barrel of water".
 You can carry stacks of empty barrels alongside one barrel containing water or jam.
 Workers carry a single barrel in both arms and keep their tool slot free.
 Carrying a barrel prevents sprinting.
@@ -927,7 +927,7 @@ Set the filter on an empty pile, or put a first resource in by hand and the filt
 From then on workers store and take only that, and anything else is refused, by hand too: "This is a wood pile."
 The filter stays when the pile is emptied.
 It can be taken off or changed only while the pile is empty, and a new resource goes on only once the old one is off.
-Water is one resource at any fill, so a water pile holds full and part-full bottles; empty bottles go on a pile of their own.
+A bottle, bucket or barrel of one liquid is one resource at any fill, so a "Bottle of water" pile holds full and part-full bottles; empty bottles go on a pile of their own.
 Crates of one good are one resource per good, and crates of mixed goods are one resource, "Mixed crate".
 
 Piles are walkable and snap edge to edge to a pile beside them, so they line up in neat grids.
@@ -951,7 +951,9 @@ A trading post with A asks for every kind of packed crate, and compost with A ta
 Piles and barrels name one resource and have no A.
 A row shows its items in the order they were added.
 The item list that **+** opens shows items in groups, each simplest first: what is gathered, grown or bought, then materials, tools, containers and food, and last crates of goods.
-Bottles, buckets and barrels come among containers at any fill.
+Bottles, buckets and barrels come among containers twice: empty, which takes only empty ones, and holding each liquid, such as "Steel bucket of water", which takes them at any fill.
+No storage names a bare liquid such as water: placed barrels and stations take liquids.
+A tool station holds buckets and bottles only empty: a worker done with one that still holds something stores it like a load.
 **Clear** takes everything off both rows, so nothing goes in or out.
 Manual inventory transfers ignore these automation filters, and so does a page's Store all button.
 

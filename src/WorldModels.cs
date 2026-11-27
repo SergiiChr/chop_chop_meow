@@ -193,7 +193,10 @@ public sealed class PackerProp : Prop {
 public sealed class RackProp : Prop {
     /// <summary>One peg per tool slot, each with a hanging tool of every kind it can show; the view shows the one its slot holds.</summary>
     public readonly Dictionary<string, Node3D>[] Pegs = new Dictionary<string, Node3D>[World.ToolSlots];
-    public readonly string?[] BottleItems = new string?[World.ToolSlots];
+    /// <summary>
+    /// The look each peg's bottle gauge shows, such as <c>water_2</c>, so a gauge is set again only when it changes.
+    /// </summary>
+    public readonly string?[] BottleLooks = new string?[World.ToolSlots];
 }
 
 public sealed class SignpostProp : Prop {
@@ -418,7 +421,7 @@ public static class WorldModels {
         }
         // A liquid has no model: only a station holds it, and its icon is drawn (assets/ui).
         if (data.VesselFor(id) != null) return null;
-        switch (ContainerItem.Base(id)) {
+        switch (Item.KindOf(id)) {
             case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
             case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer" or "bug_net": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
@@ -428,7 +431,7 @@ public static class WorldModels {
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
             case Barrel.Item: return Build(new Thing { Kind = ThingKind.Barrel }).Root;
             case Bucket.Item: { var root = new Node3D(); VesselShape.AddBucket(root, Vector3.Zero); return root; }
-            case var bottle when ContainerItem.IsBottle(bottle): return BottleShape.Create(bottle);
+            case var bottle when BottleShape.IsBottle(bottle): return BottleShape.Create(bottle);
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
             case "leaves": return Build(new Thing { Kind = ThingKind.LeafSpot }).Root;
@@ -812,11 +815,13 @@ public static class WorldModels {
     /// A pile heaps up the good it holds, more of it the fuller the pile is; a compost pile shows one mound of soil that swells with all it holds.
     /// </summary>
     public static void SyncPile(PileProp prop, Thing t, GameData data) {
-        string item = t.Compost ? ItemShape.Compost : ""; int count = 0, room = 0;
+        string item = t.Compost ? ItemShape.Compost : "", kind = ""; int count = 0, room = 0;
         foreach (var (id, held) in t.Inventory.Items) {
-            if (t.Compost) { count += held; room = t.Inventory.Slots * t.Inventory.StackSize; }
+            if (t.Compost) { count += held; room = t.Inventory.Slots * t.Inventory.StackSize; continue; }
+            // Objects of one kind, such as barrels of water, each in a cell of its own, heap together.
+            if (Item.KindOf(id) == kind) { count += held; continue; }
             // A pile holds one good; should it ever hold more, the most plentiful shows.
-            else if (held > count) { item = id; count = held; room = t.Inventory.Slots * t.Inventory.StackOf(id); }
+            if (held > count) { item = id; kind = Item.KindOf(id); count = held; room = t.Inventory.Slots * t.Inventory.StackOf(id); }
         }
         prop.Stock.Fill(item, room > 0 ? count / (float)room : 0, data);
     }

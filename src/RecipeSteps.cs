@@ -38,8 +38,8 @@ public partial class Game {
     /// <summary>Puts units of a recipe input in the backpack: a liquid in full vessels, with what is left over in one part-full vessel.</summary>
     private void GiveInput(string item, int amount) {
         if (world.Data.VesselFor(item) is not VesselDef v) { Give(Hosted, item, amount); return; }
-        if (amount / v.Capacity > 0) Give(Hosted, v.Full, amount / v.Capacity);
-        if (amount % v.Capacity > 0) Give(Hosted, v.States[amount % v.Capacity]);
+        if (amount / v.Capacity > 0) GiveVessel(Hosted, v.Empty, v.Liquid, v.Capacity, amount / v.Capacity);
+        if (amount % v.Capacity > 0) GiveVessel(Hosted, v.Empty, v.Liquid, amount % v.Capacity);
     }
 
     /// <summary>Puts one batch of every input of a recipe in the backpack.</summary>
@@ -52,7 +52,7 @@ public partial class Game {
     private void GiveFuel(RecipeDef r) => Give(Hosted, FuelFor(r));
 
     /// <summary>The backpack cell that holds an item, found by the name its tooltip starts with.</summary>
-    private ItemSlot BagCellOf(string item) => BagCell(c => c.TooltipText.StartsWith(world.Data.Name(item) + " ·", StringComparison.Ordinal));
+    private ItemSlot BagCellOf(string item) => BagCell(c => c.TooltipText.StartsWith(world.Describe(item, world.Backpack.Inventory) + " ·", StringComparison.Ordinal));
 
     /// <summary>Waits for a station to begin a batch of the recipe: everything it takes was in it, so the next tick started it.</summary>
     private async Task ExpectStarts(Thing station, string recipe, string how) =>
@@ -100,7 +100,7 @@ public partial class Game {
         }
         foreach (var (item, amount) in r.Inputs) {
             GiveInput(item, amount); await Frames(2);
-            string carried = world.Data.VesselFor(item) is VesselDef v ? v.States[Math.Min(amount, v.Capacity)] : item;
+            string carried = world.Data.VesselFor(item) is VesselDef v ? Vessels.First(world.Backpack, v.Empty, v.Liquid, Math.Min(amount, v.Capacity))! : item;
             await Carry(BagCellOf(carried), Named($"input_{item}")!);
             await Until(() => cursor.Empty, $"{carried} put on the input slot of {id}", 2);
         }

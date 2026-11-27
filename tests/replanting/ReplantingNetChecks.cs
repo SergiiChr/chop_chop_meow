@@ -10,7 +10,8 @@ namespace ChopChopMeow;
 public partial class Game {
     private static readonly Vector2 GuestTree = Terrain.Spawn + new Vector2(14, 14);
     private static readonly Vector2 GuestDigsFrom = GuestTree + new Vector2(2, 0);
-    private static readonly string GuestWater = Bucket.AtFill(5);
+    /// <summary>The liters of water in the bucket the guest waters their tree with.</summary>
+    private const int GuestWater = 5;
 
     private NetScene ReplantingNetScene => new("replanting", null, HostSeesTheGuestsTreeGrow, GuestPlantsAndWatersATree);
 
@@ -18,7 +19,7 @@ public partial class Game {
         var before = guest.Pos;
         RemoveThings(Hosted, t => t.Pos.DistanceTo(GuestTree) < 10);
         Warp(guest, GuestDigsFrom);
-        Give(guest, "acorn"); Give(guest, "steel_shovel"); Give(guest, GuestWater);
+        Give(guest, "acorn"); Give(guest, "steel_shovel"); GiveVessel(Hosted, guest, Bucket.Item, Water.Liquid, GuestWater);
         Thing? tree = null;
         await Until(() => {
             tree = Hosted.ThingsOf(ThingKind.Tree).FirstOrDefault(t => t.Pos == GuestTree);
@@ -39,12 +40,12 @@ public partial class Game {
         await CloseWithEsc();
         int previousSlot = world.ActiveHotbar;
         string previousTool = world.InHand;
-        await Until(() => world.Player.DistanceTo(GuestDigsFrom) < .1f && world.Backpack[GuestWater] == 1,
+        await Until(() => world.Player.DistanceTo(GuestDigsFrom) < .1f && Vessels.Count(world.Backpack, Bucket.Item, Water.Liquid, GuestWater) == 1,
             "the guest reaching the planting site with water");
         await KeyStroke(Key.Tab);
         await DoubleClick(BagCell(c => c.TooltipText.StartsWith("Steel shovel")));
         var hole = await DigHole(GuestTree);
-        var tree = await PlantAndWater(hole, GuestWater);
+        var tree = await PlantAndWater(hole, Vessels.First(world.Backpack, Bucket.Item, Water.Liquid, GuestWater)!);
         await Until(() => tree.Remaining == 4 && ShowsResourceStock("wood", "4") && ShowsTreeStatus("Growing"),
             "the guest's tree panel updating its wood count after a day of growth");
         await Until(() => world.Player.DistanceTo(GuestTree) > 8, "the guest back near the clearing");

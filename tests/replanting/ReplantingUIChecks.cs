@@ -15,9 +15,8 @@ public partial class Game {
 
     private async Task CheckDiggingWithAShovelComesBeforePlantingAndWatering() {
         var home = Hosted.Player;
-        string bucket = Bucket.AtFill(5);
         Give(Hosted, "steel_shovel");
-        Give(Hosted, bucket);
+        string bucket = GiveVessel(Hosted, Bucket.Item, Water.Liquid, 5);
         await Frames();
         await KeyStroke(Key.Tab);
         var at = Enumerable.Range(0, 16)
