@@ -403,7 +403,7 @@ public sealed partial class World {
         Firebugs = new Firebugs(this); Replaced += Firebugs.Reset;
         LeafSpots = new LeafSpots(this); Replaced += LeafSpots.Reset;
         Goals = new Goals(this); glassBlowing = new GlassBlowing(this);
-        breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset;
+        breakSeats = new BreakSeats(this); Replaced += breakSeats.Reset; Replaced += CampfireMusic.Reset;
         walkSearch = new WalkSearch(this);
         barrels = new Barrels(this); plumbing = new Plumbing(this, barrels);
         barrelHaul = new BarrelHaul(this, barrels); BedtimeWater = new BedtimeWater(this); Sleep = new SleepCycle(this);
@@ -433,6 +433,8 @@ public sealed partial class World {
     /// </summary>
     public bool QuietNights { get; set; }
     public Goals Goals { get; }
+    /// <summary>What idle workers play when they sit together at a campfire.</summary>
+    public CampfireMusic CampfireMusic { get; } = new();
     private readonly Barrels barrels;
 
     private readonly BarrelHaul barrelHaul;
@@ -2471,8 +2473,10 @@ public sealed partial class World {
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) CraftTick(dt);
         breakSeats.Prepare();
+        CampfireMusic.Begin();
         crew.Clear(); crew.AddRange(S.Workers);
         foreach (var w in crew) WorkerTick(w, dt);
+        CampfireMusic.Finish(S.Time);
         for (int i = 0; i < S.Workers.Count; i++) for (int j = i + 1; j < S.Workers.Count; j++) {
             var a = S.Workers[i]; var b = S.Workers[j]; var offset = a.Pos - b.Pos;
             // Miners underground are inside the hill, so they never crowd anyone at the entrance; workers on the walk to or from the village keep to their way.

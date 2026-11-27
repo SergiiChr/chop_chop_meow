@@ -15,7 +15,7 @@ namespace ChopChopMeow;
 public partial class Game {
     private static readonly Vector2 NetOre = Terrain.Spawn + new Vector2(2.5f, 2), NetCoal = Terrain.Spawn + new Vector2(-1.5f, 3.5f), NetChest = Terrain.Spawn + new Vector2(.5f, 3), NetAnvil = Terrain.Spawn + new Vector2(1.2f, -.6f);
     /// <summary>The session's scenes in the order both sides play them: a feature adds its own here.</summary>
-    private NetScene[] NetScenes => [SwingsNetScene, GravelPathNetScene, SteelPipeNetScene, StorageNetScene, BarrelNetScene, ReplantingNetScene, FirebugNetScene, NettleNetScene, SandNetScene, CabinNetScene];
+    private NetScene[] NetScenes => [CampfireMusicNetScene, SwingsNetScene, GravelPathNetScene, SteelPipeNetScene, StorageNetScene, BarrelNetScene, ReplantingNetScene, FirebugNetScene, NettleNetScene, SandNetScene, CabinNetScene];
 
     private async void RunNetCheck(bool hosting) {
         try {

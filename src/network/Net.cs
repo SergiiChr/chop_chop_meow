@@ -47,7 +47,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 36;
+    private const int Protocol = 37;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -579,6 +579,11 @@ public partial class Net : Node {
         Sync(s.Wolves, EntryKey.Wolf, static w => w.Id, entries, true, null);
         Sync(s.Orders, EntryKey.Order, static o => o.Id, entries, false, null);
         if (Changed(entries, new EntryKey(EntryKey.Work, 0)) is byte[] working) work = WorldUpdates.Read<Dictionary<int, WorkerWorkState>>(working);
+        if (Changed(entries, new EntryKey(EntryKey.CampfireMusic, 0)) is byte[] campfireMusic) {
+            var playing = WorldUpdates.Read<CampfireMusicState>(campfireMusic);
+            if (!playing.Valid()) throw new JsonException("Invalid campfire music.");
+            World.CampfireMusic.State = playing;
+        }
         if (Changed(entries, new EntryKey(EntryKey.Paths, 0)) is byte[] paths) s.GravelPaths = WorldUpdates.Read<List<int>>(paths);
         if (Changed(entries, new EntryKey(EntryKey.Sand, 0)) is byte[] sand) {
             var squares = WorldUpdates.Read<HashSet<int>>(sand);

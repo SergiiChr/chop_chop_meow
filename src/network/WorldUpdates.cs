@@ -13,7 +13,7 @@ namespace ChopChopMeow;
 
 /// <summary>Names one entry of a world update: a thing, worker, wolf, trade order or player by its id, or one entry shared by all players.</summary>
 public readonly record struct EntryKey(byte Prefix, int Id) {
-    public const byte Thing = (byte)'t', Worker = (byte)'w', Wolf = (byte)'f', Order = (byte)'o', Player = (byte)'p', State = (byte)'s', Work = (byte)'k', Paths = (byte)'g', Pipes = (byte)'u', PipeWater = (byte)'v', PipeJam = (byte)'j', Crates = (byte)'c', Sand = (byte)'b';
+    public const byte Thing = (byte)'t', Worker = (byte)'w', Wolf = (byte)'f', Order = (byte)'o', Player = (byte)'p', State = (byte)'s', Work = (byte)'k', Paths = (byte)'g', Pipes = (byte)'u', PipeWater = (byte)'v', PipeJam = (byte)'j', Crates = (byte)'c', Sand = (byte)'b', CampfireMusic = (byte)'m';
     /// <summary>A changed entry that carries only its changed fields is named with this in front.</summary>
     public const byte Patched = (byte)'~';
     /// <summary>Longest name: a patch mark, a prefix, a colon and an int.</summary>
@@ -107,6 +107,7 @@ public sealed class WorldUpdates {
         }
         entryWriter.WriteEndObject();
         Keep(snapshot, new EntryKey(EntryKey.Work, 0));
+        Write(snapshot, new EntryKey(EntryKey.CampfireMusic, 0), world.CampfireMusic.State, UpdateJson.Default.CampfireMusicState);
         // The state entry is written again on every update, as time moves: the tiles and crates, which seldom change, stay out of it.
         entry.ResetWrittenCount(); entryWriter.Reset(entry);
         entryWriter.WriteStartArray();

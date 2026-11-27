@@ -221,6 +221,9 @@ UI and input:
 | `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The straw bed and a player lowering onto it or getting up, transferring weight from boots to a palm, then the hip and forearm |
 | `src/cabins/CabinApproach.cs`, `src/cabins/Doorways.cs` | The walk to a cabin door, stepping in and out, following, knocking, standing aside and the key |
 | `src/workers/breaks/BreakSeats.cs` | Reserves campfire and ground seats for workers at lunch or with nothing to do, and lights the campfires they sit at |
+| `src/workers/breaks/CampfireMusic.cs`, `src/workers/breaks/model/` | Rolls instruments for idle campfire visits, schedules solo clips and one song per trio, and holds the recording lengths and beat times |
+| `src/workers/breaks/display/CampfireMusicView.cs`, `src/workers/breaks/display/CampfirePerformance.cs`, `src/workers/breaks/display/CampfireInstrumentShape.cs` | Poses the worker's hands on a guitar, harmonica or drum and nods listeners on the recorded beat |
+| `src/workers/breaks/display/CampfireMusicAudio.cs` | Plays campfire recordings from the workers and fires, and gives a nearby song room in the soundtrack |
 | `src/actors/enemies/wolf/DoorCheck.cs`, `src/actors/enemies/wolf/model/DoorCheckStage.cs` | A wolf at the door of a cabin with someone inside: scratching, going away from a locked door, forcing an unlocked one and taking a player out |
 | `src/actors/enemies/wolf/DoorTug.cs` | A wolf tugging a player back out of a cabin's doorway, letting go and handing a badly hurt one to the takedown |
 | `src/actors/enemies/wolf/WolfBodies.cs` | How wolves at a player keep their distance: closing in only to biting reach, and stepping aside from another wolf's body |
@@ -1624,6 +1627,17 @@ Workers on the ground keep their seats when the crew changes, unless they take a
 Workers without a fire seat sit on open ground in groups of up to three and face the center of their group.
 When a worker cannot reach a group, they sit near where they stopped if there is room, or wait standing.
 
+`CampfireMusic` rolls once when an idle worker sits in a campfire seat, and keeps the result until the idle visit ends.
+If the fire is missing any instruments, there is a 25% chance of bringing one, with each missing instrument equally likely.
+A campfire holds at most one guitar, one harmonica and one drum.
+A listener who stays seated does not roll when a musician leaves.
+Each instrumentalist at an incomplete trio's fire waits at least five seconds between solo clips.
+When a fire has all three instruments, one worker on each plays one randomly picked song and its other idle workers nod.
+The gathering stays quiet after the song until it no longer has all three instruments.
+Lunch and ground seats do not take part. Songs, solos and visit rolls travel in the live network update, not in saves.
+The guitarist supports the neck from underneath, curls their fingers onto the fretboard and arcs the strumming hand
+away from the body at either end of a stroke.
+
 As dusk begins (`GameData.DuskStarts`, a tenth of a day before night) they walk to the nearest trading post, or the clearing without one.
 Then they walk a cart's trip down the valley at walking pace while fading out, wait out of view for the rest of half a trade trip (`Worker.Commute`, `World.WalkLeg`), and sign out (`Worker.Home`).
 At dawn they walk back the same way, fading in, and return to work; a runner off for prices walks the same way out and back.
@@ -1845,6 +1859,12 @@ The day plays its tracks one after another and the night loops one.
 Each keeps its place for the running session, so music longer than its part of the day carries on next time.
 A track that plays to its end hands over to the next, and the last wraps back to the first.
 The options screen sets the music volume, stored in the settings file.
+
+Each campfire song and solo starts at a time on the world's clock, so a player approaching a fire or joining a game hears
+the recording already in progress. The campfire song takes over the soundtrack inside firelight and fades with distance.
+Songs are Ogg Vorbis so they can start partway through without decoding from the beginning. Solos are shorter MP3 clips.
+The music volume applies to both. `CampfireBeats` times the trio and listeners against measured beats, including tempo
+changes. Solo strikes and strums follow their clips' measured contacts, and a harmonica stays at the lips while it sounds.
 
 ## World map
 

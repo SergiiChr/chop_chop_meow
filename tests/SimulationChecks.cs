@@ -40,6 +40,8 @@ public static class SimulationChecks {
         PackingChecks.Run(data);
         LunchChecks.Run(data);
         IdleChecks.Run(data);
+        CampfireMusicChecks.Run(data);
+        CampfireAnimationChecks.Run();
         InventoryChecks.Run(data);
         BuildingChecks.Run(data);
         NeedsChecks.Run(data);

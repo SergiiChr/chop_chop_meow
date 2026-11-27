@@ -90,6 +90,7 @@ public partial class Sounds : Node {
     private const float MusicDb = -14;
     public const float MusicFadeSeconds = 4;
     private Track day = null!, night = null!;
+    private CampfireMusicAudio campfireMusic = null!;
     private readonly Dictionary<string, AudioStream[]> variants = new();
     private readonly Dictionary<string, int> previous = new();
     private Random random = new();
@@ -117,6 +118,7 @@ public partial class Sounds : Node {
 
     /// <summary>Music loudness from the options, 0 to 1.</summary>
     public float MusicVolume = 1;
+    internal bool CampfirePaused;
     public bool DayMusicPlaying => day.Player.Playing;
     public int DayMusicIndex => day.Index;
     /// <summary>Jumps the current day track to its last moment, so it plays to its end without the wait.</summary>
@@ -149,9 +151,13 @@ public partial class Sounds : Node {
         }
         day = new Track(this, "path_to_lake_land", "mystic_theme");
         night = new Track(this, "forest");
+        campfireMusic = new CampfireMusicAudio(PlacedVoice, Reach);
+        World.Replaced += campfireMusic.Stop;
         // Loading a sound on its first play would stall that frame.
         foreach (string name in Levels.Keys) Variants(name);
     }
+
+    public override void _ExitTree() { if (campfireMusic != null) World.Replaced -= campfireMusic.Stop; }
 
     private AudioStreamPlayer3D PlacedVoice() {
         var voice = new AudioStreamPlayer3D { AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0, DopplerTracking = AudioStreamPlayer3D.DopplerTrackingEnum.Disabled };
@@ -164,12 +170,16 @@ public partial class Sounds : Node {
         UpdateHeld((float)delta);
     }
 
-    /// <summary>Fades the track for the current time of day in and the other out.</summary>
+    /// <summary>Crossfades day and night tracks, and gives nearby campfire songs room to be heard.</summary>
     public void UpdateMusic(float dt) {
         float volume = MusicDb + Db(MusicVolume);
-        day.Update(!World.Night, dt, volume);
-        night.Update(World.Night, dt, volume);
+        float soundtrack = campfireMusic.Update(World, dt, CampfirePaused, MusicVolume, volume);
+        day.Update(World.Night ? 0 : soundtrack, dt, volume);
+        night.Update(World.Night ? soundtrack : 0, dt, volume);
     }
+
+    /// <summary>How far into the song the player hears, or how far the world's clock has reached outside its sound.</summary>
+    internal float CampfireSongTime(int fire, CampfireSong song) => campfireMusic.SongTime(World, fire, song);
 
     /// <summary>The inventory sound for moving an item by hand.</summary>
     public static string ForItem(string item) => item switch {
@@ -365,6 +375,7 @@ public partial class Sounds : Node {
     public void StopAll() {
         silenced = true;
         ProcessMode = ProcessModeEnum.Disabled;
+        campfireMusic.Stop();
         foreach (var player in GetChildren().OfType<AudioStreamPlayer>()) player.Stop();
         foreach (var player in placedVoices) player.Stop();
         foreach (var player in heldPlacedVoices) player.Stop();
@@ -391,8 +402,8 @@ public partial class Sounds : Node {
             parent.AddChild(Player);
         }
 
-        public void Update(bool wanted, float dt, float volume) {
-            level = Mathf.MoveToward(level, wanted ? 1 : 0, dt / MusicFadeSeconds);
+        public void Update(float wanted, float dt, float volume) {
+            level = Mathf.MoveToward(level, wanted, dt / MusicFadeSeconds);
             if (level > 0) {
                 if (Player.StreamPaused) Player.StreamPaused = false;
                 else if (!Player.Playing) {

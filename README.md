@@ -59,6 +59,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
+| `--showcase --campfire-music trio` | Show idle workers playing guitar, harmonica and drum at the same campfire, with a listener. Use `guitar`, `guitar-perch`, `harmonica` or `drum` to see one worker get ready to play alone. Add `--campfire-visit` to include the worker's wait before the first solo |
 | `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
 | `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
@@ -411,6 +412,12 @@ A worker can hold several jobs, at one place or several, and a new job goes to t
 The list is in order: they do the first job that can be done, and after each round of it they read the list from the top again.
 A round is a delivery, a crafted batch, a crate packed full, a furnace batch at the bellows, a piece mined or a harvest.
 With no job that can be done, a worker sits at the nearest campfire they can reach, as at lunch: six to a fire, the rest on the ground nearby in groups of up to three.
+Each time an idle worker takes a seat at the fire, they have a 25% chance of bringing a guitar, harmonica or drum.
+The choice is even among instruments not already there. If the fire already has all three, the worker sits without one.
+With fewer than all three instruments, each musician plays a short sound now and then, with at least five seconds between their clips.
+When all three instruments are at the same fire, one worker on each instrument plays a song and the other idle workers seated there nod to the beat.
+The group plays one song and then sits quietly until the trio breaks up.
+Workers sitting for lunch do not play or nod.
 A worker who could not reach a fire's seats tries again once a building goes up or comes down.
 With no campfire they wait at the nearest trading post, or in the clearing without one.
 Their status says what their first job lacks.
@@ -1474,6 +1481,8 @@ A sound is loudest at your character and fades with distance, to silence 16 metr
 A wolf's growl as it breaks into its sprint carries 30 metres, and a howl 80.
 
 Day and night have their own music, which crossfades as the time changes and picks up where it stopped last time.
+The soundtrack gives way to a campfire song as you approach and comes back as you leave or the song ends.
+The music volume setting also controls campfire songs and solo sounds.
 
 ## Limitations
 

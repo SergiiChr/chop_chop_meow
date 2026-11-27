@@ -438,6 +438,7 @@ public partial class Game : Node, IGameFlow {
             needsPlate.DamageFlash(health - world.Health, runTime); shownHealth = world.Health;
         }
         view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection;
+        if (sounds != null) sounds.CampfirePaused = !running;
         view.Placing = overInterface && player.Mode is ClickMode.Dig ? null : player.Mode.Placing;
         view.PlacingRotation = player.Mode.Rotation;
         view.DiggingAt = player.DiggingAt;
