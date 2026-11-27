@@ -17,6 +17,19 @@ Do it without asking first.
    `git grep -o "int Version { get; set; } = [0-9]*" <merge>^ <merge> -- src`.
 4. [Clean up](#clean-up).
 
+## Small steps for deleting and stopping
+
+A long command that deletes or stops something gets blocked, so split those steps up:
+
+- Each command deletes or stops one small batch and does nothing else: one worktree, one branch, one server, or a few
+  files named in full.
+  Never join it to other steps with `&&` or `;`, never put it in a loop, and never build its target from `$(...)`.
+- First look at what you will remove in a command of its own, such as `git -C <worktree> status --short` or
+  `cat tmp/server-<n>-<try>.pid`.
+  Then remove it in the next command, with the path or process id written out.
+- Never use `rm -rf`, `git worktree remove --force` or `git branch -D`.
+- Give each run's scratch files new names instead of deleting the last run's.
+
 ## Bring the saves forward
 
 A save holds `SaveState.Version`, and `World.Deserialize` refuses any other version.
@@ -91,25 +104,35 @@ main's other changes.
 A worktree's `./build.py play` copies the player's saves in first, so the test loads the real slot as it is now, and a
 server's autosave never reaches the real slots.
 
+Test one slot at a time, each in its own commands.
+`<try>` counts the runs of that slot, starting at 1, so every run writes new files and none has to be deleted first.
+Start the server in the background:
+
 ```sh
-rm -f tmp/port.txt
-TMPDIR=$PWD/tmp ./build.py play -- --server --slot <n> --port-file $PWD/tmp/port.txt > tmp/server.log 2>&1 &
-echo $! > tmp/server.pid
-timeout 900 bash -c 'until [ -s tmp/port.txt ] || grep -q "ERROR\|Exception" tmp/server.log; do sleep 1; done'
+TMPDIR=$PWD/tmp ./build.py play -- --server --slot <n> --port-file $PWD/tmp/port-<n>-<try>.txt > tmp/server-<n>-<try>.log 2>&1 &
+echo $! > tmp/server-<n>-<try>.pid
 ```
 
-`build.py` turns into the game it starts, so `tmp/server.pid` holds the server's process id.
+Then wait for it in the next command:
+
+```sh
+timeout 900 bash -c 'until [ -s tmp/port-<n>-<try>.txt ] || grep -q "ERROR\|Exception" tmp/server-<n>-<try>.log; do sleep 1; done'
+```
+
+`build.py` turns into the game it starts, so `tmp/server-<n>-<try>.pid` holds the server's process id.
 With `--server`, `./build.py play` starts the game without a window, as the game starts its own server.
 The first run in a fresh worktree builds and exports the game first; a `timeout` exit of 124 means it took longer than
-15 minutes, so look at `tmp/server.log` before trying again.
+15 minutes, so look at `tmp/server-<n>-<try>.log` before trying again.
 
-The slot loaded once the server writes its port to `tmp/port.txt`.
+The slot loaded once the server writes its port to `tmp/port-<n>-<try>.txt`.
 This shows only that the slot loads: with nobody joined, the server does not run the world, and it ends by itself
 after 30 seconds.
 Wait for that process to end and check its log for errors.
 
 `Cannot load slot <n>.` in the log means the slot was refused, and the rest of that line says why.
-A refused server keeps running: stop it with `kill $(cat tmp/server.pid)`.
+A refused server keeps running.
+Read its process id with `cat tmp/server-<n>-<try>.pid`, then stop it in a command of its own with the number written
+out, such as `kill 12345`.
 Never stop a server found by its name alone, since the player's own game and its server run under the same name.
 
 When the reason is `This save holds unknown items or values out of range`, find the check that refused it.
@@ -147,20 +170,26 @@ Fix the cause in the conversion script, convert again from the backup and test a
 ## Clean up
 
 Run every command from the main checkout.
+Remove one thing a command, as [small steps](#small-steps-for-deleting-and-stopping) says.
 
-1. If the saves were brought forward, once every slot loads:
-   - Stop any server of this run still running: `kill $(cat tmp/server.pid)`.
-   - Remove the test worktree with its scratch files and clear git's record of it:
-     `git worktree remove ../worktrees/chop_chop_meow-saves`, then `git worktree prune`.
+1. If you made the test worktree, once every slot loads:
+   - Stop any server of this run still running: read its process id from its `tmp/server-<n>-<try>.pid`, then `kill`
+     that number.
+   - Remove the test worktree with its scratch files: `git worktree remove ../worktrees/chop_chop_meow-saves`.
    - Keep the backups beside the slots.
-2. Remove the merged branch's worktree, with the scratch files in its `tmp/`, and its local branch, only when
-   `git merge-base --is-ancestor <branch> main` says it is merged.
+2. Check that the merged branch is merged: `git merge-base --is-ancestor <branch> main`.
+   Only then, each in a command of its own:
+   - Look at the branch's worktree: `git -C <worktree> status --short`.
+   - Remove it, with the scratch files in its `tmp/`: `git worktree remove <worktree>`.
+   - Remove the local branch: `git branch -d <branch>`.
+
    `git worktree remove` refuses a worktree with changes: stop and ask when it or the merge test refuses, never force
    them.
-   Then `git branch -d <branch>` and `git worktree prune`.
 3. Remove any other worktree the merged branch's session made, such as a frozen review copy, once nothing in it is
    uncommitted work.
+   Look at and remove each one in its own commands, as in step 2.
    Remove only what belongs to the merge this run is for, never another session's.
+4. Clear git's record of removed worktrees: `git worktree prune`.
 
 ## Report
 
