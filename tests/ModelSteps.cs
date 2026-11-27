@@ -64,6 +64,8 @@ internal static class ModelSteps {
             var units = new Item[count];
             for (int i = 0; i < count; i++) units[i] = new Item { Kind = Firebugs.Item, Expires = 2520 };
             thing.Inventory.AddUnits(units);
+        } else if (item == Lanterns.Item) {
+            for (int id = 1; id <= count; id++) thing.Inventory.Add(Lanterns.Empty(id));
         } else thing.Inventory.Add(item, count);
         WorldModels.SyncPile(pile, thing, data);
         return pile.Stock.Piece!;

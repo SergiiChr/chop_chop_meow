@@ -24,8 +24,8 @@ public sealed class Thing {
     /// <summary>A building's turn in radians from its original direction, positive from X toward Y on the ground.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public float Rotation { get; init; }
     public int Remaining { get; set; }
-    /// <summary>The item a placed lantern becomes when lifted, including its charge.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? LanternItem { get; set; }
+    /// <summary>A placed lantern's own item, with the firebugs in its jar, which goes back into a backpack when lifted.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public Item? Lantern { get; set; }
     /// <summary>One plus a tree's age in days, or zero at the starting adult size. Stumps and leaf spots keep their tree's stage.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int TreeStage { get; set; }
     /// <summary>World time of the next growth stage, or zero for an acorn waiting for water.</summary>
@@ -1199,8 +1199,8 @@ public sealed partial class World {
     }
     /// <summary>What the recipe a station is on makes, or empty for a thing that makes nothing.</summary>
     internal string Product(Thing t) => Data.Recipes.TryGetValue(Selected(t), out var r) ? r.Output : "";
-    /// <summary>Whether an item is a recipe's product, including a lantern with its own charge.</summary>
-    internal static bool IsProduct(string product, string item) => item == product || Lanterns.Kind(item) == product;
+    /// <summary>Whether an item is a recipe's product, an object of it included, such as a lantern.</summary>
+    internal static bool IsProduct(string product, string item) => Item.IsKind(item, product);
     private void Unload(Inventory box, Func<string, bool> leaves) { foreach (string item in box.Items.Keys.ToArray()) if (leaves(item)) Carry(box, S.Backpack, null, item, box[item]); }
     private static readonly Dictionary<string, int> NoCost = new();
     /// <summary>
@@ -1691,14 +1691,15 @@ public sealed partial class World {
     internal static string PackedName(Inventory contents, int id) {
         string? good = null;
         foreach (var pair in contents.Items) {
-            string kind = Lanterns.Kind(pair.Key);
+            string kind = Item.KindOf(pair.Key);
             if (good != null && good != kind) return PackedPrefix + id;
             good = kind;
         }
         return good == null ? "crate" : $"{PackedPrefix}{good}_{id}";
     }
     /// <summary>An item's name, with what a packed crate holds.</summary>
-    public string Describe(string item) => Packed(item) is Inventory contents ? $"{Data.Name("crate")} of {Goods(contents.Items)}" : Lanterns.IsItem(item) ? Lanterns.Name(Lanterns.BugCount(item)) : Data.Name(item);
+    /// <param name="box">The box holding it, where an object such as a lantern keeps what it says of itself.</param>
+    public string Describe(string item, Inventory? box = null) => Packed(item) is Inventory contents ? $"{Data.Name("crate")} of {Goods(contents.Items)}" : Lanterns.IsItem(item) ? Lanterns.Name(Lanterns.BugCount(box?.Object(item))) : Data.Name(item);
     /// <summary>The packed crate with this number in the acting player's backpack, or null once it has gone or been emptied.</summary>
     public string? CarriedCrate(int id) {
         foreach (var pair in S.Backpack.Items) if (PackedId(pair.Key) == id) return pair.Key;
@@ -2122,7 +2123,7 @@ public sealed partial class World {
         void Nearer(ThingKind kind, bool station) {
             foreach (var t in S.Things.Of(kind)) {
                 if (t.Id == exclude) continue;
-                string? stocked = item == Lanterns.Item ? t.Inventory.FirstLantern(free: true, withdrawal: true) : item;
+                string? stocked = Item.IsObject(item) ? t.Inventory.FirstOfKind(item, free: true, withdrawal: true) : item;
                 if (stocked == null || t.Inventory[stocked] <= 0 || !t.Inventory.AllowsWithdrawal(stocked) || station && Pending(t, stocked)) continue;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || distance < bestDistance) { best = t; bestItem = stocked; bestDistance = distance; }
@@ -2611,8 +2612,9 @@ public sealed partial class World {
     /// <summary>Moves a finished batch into its output slot once there is room.</summary>
     internal void FinishStationBatch(Thing t, RecipeDef recipe) {
         if (t.Inventory.SlotRoom(recipe.Output) < recipe.Amount) return;
-        string item = recipe.Output == Lanterns.Item ? Lanterns.NewEmpty() : recipe.Output;
-        t.Inventory.Add(item, recipe.Amount); t.Processing = false; t.Making = ""; t.Progress = 0; t.Rounds++; stillBurning.Add(t.Id);
+        if (recipe.Output == Lanterns.Item) for (int i = 0; i < recipe.Amount; i++) t.Inventory.Add(Lanterns.NewEmpty());
+        else t.Inventory.Add(recipe.Output, recipe.Amount);
+        t.Processing = false; t.Making = ""; t.Progress = 0; t.Rounds++; stillBurning.Add(t.Id);
         S.Milestones.Add(recipe.Output);
     }
     private List<Thing> Ticking(ThingKind kind) {
@@ -2701,7 +2703,7 @@ public sealed partial class World {
     public string Serialize() => JsonSerializer.Serialize(S, GameData.Json);
     // ---------- Validation of saves and guests ----------
     /// <summary>Whether an id names a known item, or a packed crate whose contents are in <paramref name="crates"/>.</summary>
-    private bool KnownItem(string item, Dictionary<int, Inventory> crates) => item.StartsWith(PackedPrefix) ? crates.ContainsKey(PackedId(item)) : (item != Lanterns.Item && Data.Items.ContainsKey(item)) || Lanterns.ValidItem(item);
+    private bool KnownItem(string item, Dictionary<int, Inventory> crates) => item.StartsWith(PackedPrefix) ? crates.ContainsKey(PackedId(item)) : Item.IsKey(item) ? Item.IdOf(item) > 0 && Item.IsObject(Item.KindOf(item)) && Data.Items.ContainsKey(Item.KindOf(item)) : !Item.IsObject(item) && Data.Items.ContainsKey(item);
     /// <summary>No packed crates, for checking what a crate holds: a crate inside a crate is not a known item.</summary>
     private static readonly Dictionary<int, Inventory> NoCrates = new();
     /// <summary>Whether every entry is a positive count of a known item or of a packed crate in <paramref name="crates"/>.</summary>
@@ -2712,7 +2714,9 @@ public sealed partial class World {
     /// <summary>Whether a box exists and holds only positive counts of known items or of packed crates in <paramref name="crates"/>.</summary>
     private bool ValidInventory([NotNullWhen(true)] Inventory? box, Dictionary<int, Inventory> crates, bool canGrow = false) =>
         box?.Items != null && (!box.UnlimitedSlots || canGrow && box.Capacity == 0 && box.CarriedBy == Inventory.Carrier.None)
-        && ValidCounts(box.Items, crates) && box.ValidUnits();
+        && ValidCounts(box.Items, crates) && box.ValidUnits(ValidObject);
+    /// <summary>Whether an object in a box is whole: a lantern whose jar holds only firebugs.</summary>
+    private static bool ValidObject(Item unit) => unit.Kind == Lanterns.Item && Lanterns.Valid(unit);
     /// <summary>Whether each packed crate holds positive counts of known items, no other crates, and no more than a crate fits.</summary>
     private bool ValidCrates(Dictionary<int, Inventory> crates) {
         foreach (var box in crates.Values) if (!ValidInventory(box, NoCrates) || box.Count > Data.CrateCapacity || Barrel.In(box) != null) return false;

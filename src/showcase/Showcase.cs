@@ -210,9 +210,10 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; world.S.DenHours = 24; world.Firebugs.KeepIn();
         world.SelectHotbar(1);
         string GiveLantern(int count) {
-            string item = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), count);
-            world.S.Backpack.Add(item, 1);
-            return item;
+            var lantern = world.Lanterns.NewEmpty();
+            world.Lanterns.FillForReview(lantern, count);
+            world.S.Backpack.Add(lantern);
+            return lantern.Key;
         }
         string? scene = Launch.Value("--lantern");
         bool carried = scene is "held" or "belt" or "full-wear" or "backpack" or "torch";
@@ -438,7 +439,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
                 var pile = world.Add(ThingKind.Pile, Spot(i));
                 int amount = Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share));
                 if (goods[i] == Firebugs.Item) world.Firebugs.Catch(pile.Inventory, amount);
-                else if (goods[i] == Lanterns.Item) for (int n = 0; n < amount; n++) pile.Inventory.Add(world.Lanterns.NewEmpty(), 1);
+                else if (goods[i] == Lanterns.Item) for (int n = 0; n < amount; n++) pile.Inventory.Add(world.Lanterns.NewEmpty());
                 else pile.Inventory.Add(goods[i], amount);
             }
             var compost = world.Add(ThingKind.Pile, Spot(goods.Length)); compost.Compost = true;

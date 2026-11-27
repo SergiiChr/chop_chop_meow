@@ -31,7 +31,7 @@ public sealed partial class World {
         PackingItem(t) != null && (t.Output!.First() is string crate ? OpenCrate(t, crate) : t.Inventory.Free("crate") > 0);
 
     /// <summary>The good ready to pack, which may be a particular lantern from the input.</summary>
-    private static string? PackingItem(Thing t) => t.Packs == Lanterns.Item ? t.Inventory.FirstLantern(free: true)
+    private static string? PackingItem(Thing t) => t.Packs == Lanterns.Item ? t.Inventory.FirstOfKind(Lanterns.Item, free: true)
         : t.Packs != "" && t.Inventory.Free(t.Packs) > 0 ? t.Packs : null;
 
     /// <summary>

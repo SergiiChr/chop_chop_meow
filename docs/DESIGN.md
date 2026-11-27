@@ -104,7 +104,7 @@ Simulation and data:
 | `src/world/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers, the lifetime of each caught firebug in its stack, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, the units of a stack that carry properties of their own, such as each firebug's time, and objects found by their key, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
 | `src/world/model/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/world/model/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
@@ -196,6 +196,7 @@ UI and input:
 | `src/storage/display/FilterWindow.cs` | The filter window beside the panel |
 | `src/items/display/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
 | `src/items/display/Grid.cs` | Draws the icon-slot grids |
+| `src/items/model/Item.cs` | One unit with properties of its own: its kind, the key an object is found by, when it expires and what it holds |
 | `src/items/display/Badge.cs` | The count pill on an item slot, green with the firebug count on a lantern's slot |
 | `src/items/display/ItemSlot.cs` | The cream item slot, which tells plain, right, double and Alt-clicks apart and shakes on a refusal |
 | `src/items/display/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse |
@@ -1046,8 +1047,9 @@ Chopping out all its current wood fells the tree and leaves its stump.
 
 ### Lanterns
 
-A lantern has a permanent number and carries its firebugs' expiry times with it as an item, including in a save or an update.
-The placed lantern stores that same item in `Thing.LanternItem` and keeps it when picked up.
+A lantern is an `Item` object with a permanent number, found by its key such as `lantern#17`.
+Its jar, the item's `Contents`, holds its firebugs, each with the time it dies, including in a save or an update.
+The placed lantern keeps that same object in `Thing.Lantern` and gives it back when picked up.
 `Lanterns.Refill` moves as many firebugs as fit, shortest life first, without changing any expiry time.
 Only live firebugs show through the glass. Their glow and the point light sit inside the jar.
 The wooden foot blocks direct light beneath a placed lantern.

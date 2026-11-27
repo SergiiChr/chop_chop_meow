@@ -93,7 +93,7 @@ internal sealed class LanternWear {
         Basis? swing = null;
         if (held) {
             Suspend(Hand, fist.GetValueOrDefault(), GaitSwing());
-            Hand.Sync(world.Lanterns.BugCount(equipped), energy);
+            Hand.Sync(Lanterns.BugCount(who.Backpack, equipped), energy);
         }
         int shown = 0;
         if (who.Health > 0 && who.Sheltered == 0) {
@@ -124,7 +124,7 @@ internal sealed class LanternWear {
             var body = index < BeltSlots || index == SpareBeltHook ? hips.Basis : hips.Basis * torso.Basis;
             // The hook follows the body, but the lantern hangs down rather than leaning with the torso.
             Suspend(lantern, Vector3.Zero, (body * heading).Transposed() * GaitSwing() * heading);
-            lantern.Sync(world.Lanterns.BugCount(item), energy);
+            lantern.Sync(Lanterns.BugCount(who.Backpack, item), energy);
         }
     }
 }

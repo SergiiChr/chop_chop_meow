@@ -88,7 +88,7 @@ public partial class PagePanel {
                 stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
                 bool bound = i < held.Layout.Count && held.Layout[i].Hotbar != 0;
                 var looks = stacks[i] is (string item, int n)
-                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) ? world.Lanterns.BugCount(item) : -1, world.Packed(item)?.Count ?? 0)
+                    ? (item, n, held[item], bound, item == Firebugs.Item ? world.Firebugs.AverageMinutes(held, i) : -1, Lanterns.IsItem(item) ? Lanterns.BugCount(held, item) : -1, world.Packed(item)?.Count ?? 0)
                     : ((string?)null, 0, 0, false, -1, -1, 0);
                 if (first || looks != drawn[i]) {
                     drawn[i] = looks;
@@ -119,7 +119,7 @@ public partial class PagePanel {
             cell.AddThemeStyleboxOverride("normal", takes || bound ? Style.SlotWanted : Style.SlotNormal);
             string clicks = open != null && stack is (string itemToOpen, _) && Lanterns.IsItem(itemToOpen)
                 ? "LMB: pick up · RMB: open for refill · Double LMB: take in hand or stow" : hint;
-            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}{PageText.FirebugLifeLine(life)}\n{clicks} · {RecipeMap.AltClickHint}" : "";
+            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named, held)}{(contents != null ? "" : $" · {held[named]} total")}{world.Data.DescriptionLine(named)}{PageText.FirebugLifeLine(life)}\n{clicks} · {RecipeMap.AltClickHint}" : "";
         }
     }
 

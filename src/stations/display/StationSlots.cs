@@ -23,7 +23,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         live.Watch(() => {
             int held = box[item];
             int life = item == Firebugs.Item && held > 0 ? world.Firebugs.AverageMinutes(box) : -1;
-            int bugs = lantern && held > 0 ? world.Lanterns.BugCount(item) : -1;
+            int bugs = lantern && held > 0 ? Lanterns.BugCount(box, item) : -1;
             return (Held: held, Life: life, Bugs: bugs);
         }, shown => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, shown.Held > 0 ? Colors.White : Style.Ghost);
@@ -134,10 +134,10 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         cell.AddChild(firebugs);
         cell.Icon = Icons.Of(Lanterns.Item);
         if (!input) cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
-        moves.TakeCell(cell, box, () => box.FirstLantern(), t,
+        moves.TakeCell(cell, box, () => box.FirstOfKind(Lanterns.Item), t,
             held => held.Stack is { Box: 0 } stack && Lanterns.IsItem(stack.Item),
             input ? (item, units) => world.LoadInput(t, item, units) : null);
-        live.Watch(() => (Count: box.CountOfKind(Lanterns.Item), Bugs: box.FirstLantern() is string item ? world.Lanterns.BugCount(item) : -1), now => {
+        live.Watch(() => (Count: box.CountOfKind(Lanterns.Item), Bugs: box.FirstOfKind(Lanterns.Item) is string item ? Lanterns.BugCount(box, item) : -1), now => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, now.Count > 0 ? Colors.White : Style.Ghost);
             count.SetStack(now.Count, -1);
             firebugs.SetStack(0, now.Bugs);

@@ -1399,7 +1399,7 @@ public partial class WorldView : Node3D {
         float flicker = MathF.Sin(Elapsed * 13 + t.Id) * .5f + MathF.Sin(Elapsed * 7.3f + t.Id * 3) * .5f;
         switch (prop) {
             case LanternProp lantern:
-                lantern.Model.Sync(live ? World.Lanterns.BugCount(t.LanternItem) : 0, ActorRig.TorchLightEnergy(night));
+                lantern.Model.Sync(live ? Lanterns.BugCount(t.Lantern) : 0, ActorRig.TorchLightEnergy(night));
                 break;
             case TreeProp tree:
                 bool grew = tree.Stage != t.TreeStage;

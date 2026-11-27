@@ -63,9 +63,8 @@ internal static class LanternModelChecks {
 
     private static void CheckHotbarAndHandLanternsKeepTheirOwnLight(GameData data) {
         var world = new World(data, false);
-        string first = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 10),
-            second = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 4);
-        Give(world, first); Give(world, second);
+        string first = GiveLantern(world, 10),
+            second = GiveLantern(world, 4);
         world.SetHotbar(0, first); world.SetHotbar(1, second); world.Tick(0);
         var rig = new ActorRig(ActorSkin.Player);
         var wear = rig.Lanterns!;
@@ -95,9 +94,8 @@ internal static class LanternModelChecks {
 
     private static void CheckLanternsSwingFartherWhenRunningWithoutLosingTheirGrip(GameData data) {
         var world = new World(data, false);
-        string belt = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 4);
-        string hand = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 4);
-        Give(world, belt); Give(world, hand);
+        string belt = GiveLantern(world, 4);
+        string hand = GiveLantern(world, 4);
         world.SetHotbar(0, belt); world.Tick(0);
         world.Lanterns.ToggleInHand(Lanterns.Id(hand));
         var rig = new ActorRig(ActorSkin.Player);
@@ -127,13 +125,11 @@ internal static class LanternModelChecks {
     private static void CheckAllHotbarLanternsHaveRoomForTheHandLantern(GameData data) {
         var world = new World(data, false);
         for (int slot = 0; slot < 9; slot++) {
-            string item = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 10);
-            Give(world, item);
+            string item = GiveLantern(world, 10);
             world.SetHotbar(slot, item);
         }
         world.Tick(0);
-        string extra = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), 10);
-        Give(world, extra);
+        string extra = GiveLantern(world, 10);
         world.Lanterns.ToggleInHand(Lanterns.Id(extra));
         var rig = new ActorRig(ActorSkin.Player);
         var wear = rig.Lanterns!;

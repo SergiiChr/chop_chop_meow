@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>
 /// Steps that write the raw save or a player's goods and needs.
@@ -18,6 +19,19 @@ internal static class SetupSteps {
 
     /// <summary>Puts goods in the backpack: gathering or buying each would take a day of ticks, and many goods are not sold.</summary>
     public static int Give(World world, string item, int count = 1) => Give(world.S.Actor, item, count);
+
+    /// <summary>
+    /// Puts a new lantern in the backpack, its jar holding this many freshly caught firebugs, without crafting it at a
+    /// bench or catching each bug at night; returns the key it is found by.
+    /// </summary>
+    public static string GiveLantern(World world, int bugs = 0) => GiveLantern(world, world.S.Actor, bugs);
+
+    public static string GiveLantern(World world, PlayerState player, int bugs = 0) {
+        var lantern = world.Lanterns.NewEmpty();
+        world.Lanterns.FillForReview(lantern, bugs);
+        Require(player.Backpack.Add(lantern), "a backpack with room should take a new lantern");
+        return lantern.Key;
+    }
 
     /// <summary>Puts freshly caught firebugs in the backpack, without finding and catching each at night.</summary>
     public static int GiveFirebugs(World world, int count) => world.Firebugs.Catch(world.S.Backpack, count);

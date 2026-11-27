@@ -43,7 +43,7 @@ public sealed class Firebugs(World world) {
 
     internal int MinutesLeft(float expiry) => (int)MathF.Ceiling(Math.Max(0, expiry - world.Time) / world.Data.HourSeconds * 60);
 
-    /// <summary>Clears dead bugs from the inventories that can hold them when the next catch expires.</summary>
+    /// <summary>Clears dead bugs from the inventories that can hold them, and from the lanterns in them, when the next catch expires.</summary>
     internal void Age() {
         float now = world.Time;
         if (now < nextExpiry) return;
@@ -61,11 +61,12 @@ public sealed class Firebugs(World world) {
         foreach (var thing in saved.Things) {
             Check(thing.Inventory);
             if (thing.Output is { } output) Check(output);
+            if (thing.Lantern?.Contents is { } jar) Check(jar);
         }
         foreach (var (id, name) in changedCrates) if (name == "crate") saved.Crates.Remove(id);
 
         void Check(Inventory box) {
-            if (box[Item] > 0) nextExpiry = Math.Min(nextExpiry, box.Expire(now));
+            nextExpiry = Math.Min(nextExpiry, box.Expire(now));
             foreach (var (id, name) in changedCrates) box.RenamePackedCrate(id, name);
         }
     }

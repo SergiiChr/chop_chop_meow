@@ -174,20 +174,22 @@ public sealed class Inventory {
     public static readonly HashSet<string> Unstacked = new();
     /// <summary>Kinds whose units each keep the time they expire, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Expiring = new();
+    /// <summary>Whether a cell of this item keeps its units as objects: units that expire, or an object found by its key.</summary>
+    private static bool HasUnits(string item) => Expiring.Contains(item) || ChopChopMeow.Item.IsObject(item);
     /// <summary>Coins use the container's coin stack, while packed crates, tools and lanterns each take a cell.</summary>
-    public int StackOf(string item) => item == Coins ? CoinStack : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) || Lanterns.Kind(item) == Lanterns.Item ? 1 : StackSize;
-    /// <summary>Units of an item in this box, counting a lantern of any charge as a lantern.</summary>
+    public int StackOf(string item) => item == Coins ? CoinStack : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) || ChopChopMeow.Item.IsObject(item) ? 1 : StackSize;
+    /// <summary>Units of a kind in this box, its objects included, such as every lantern.</summary>
     internal int CountOfKind(string kind) {
         int count = 0;
-        foreach (var pair in items) if (Lanterns.Kind(pair.Key) == kind) count += pair.Value;
+        foreach (var pair in items) if (ChopChopMeow.Item.IsKind(pair.Key, kind)) count += pair.Value;
         return count;
     }
-    /// <summary>One of this box's lanterns, preferring one that is not held.</summary>
-    internal string? FirstLantern(bool free = false, bool withdrawal = false) {
+    /// <summary>One of this box's items of a kind, its objects included, preferring one that is not held.</summary>
+    internal string? FirstOfKind(string kind, bool free = false, bool withdrawal = false) {
         if (items.Count == 0) return null;
         string? held = null;
         foreach (var slot in Layout) {
-            if (!Lanterns.IsItem(slot.Item) || withdrawal && !AllowsWithdrawal(slot.Item)) continue;
+            if (slot.Item == "" || !ChopChopMeow.Item.IsKind(slot.Item, kind) || withdrawal && !AllowsWithdrawal(slot.Item)) continue;
             if (slot.Free > 0) return slot.Item;
             held ??= slot.Item;
         }
@@ -440,13 +442,13 @@ public sealed class Inventory {
     /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over one taking everything.</summary>
     public bool Wants(string item) => Names(InputFilter, item);
     /// <summary>Whether a stack takes more of an item: a stack of it, unless its units expire and a player holds part of it, as the held ones must stay in front.</summary>
-    private static bool TopsUp(Slot slot, string item) => slot.Item == item && (slot.Held == 0 || !Expiring.Contains(item));
+    private static bool TopsUp(Slot slot, string item) => slot.Item == item && (slot.Held == 0 || !HasUnits(item));
     /// <summary>Whether the input filter names any item, which a chest's hauler fills it with; <see cref="Everything"/> names none.</summary>
     public bool NamesItems => InputFilter.Count > 0 && !InputFilter.Contains(Everything);
     private bool Passes(FilterList filter, string item) => (Gated ? filter.Contains(Everything) : filter.Count == 0) || Names(filter, item);
-    /// <summary>A filter names an item itself, a lantern of any charge, or a packed crate of its named good.</summary>
+    /// <summary>A filter names an item itself, the kind of an object such as a lantern, or a packed crate of its named good.</summary>
     private static bool Names(FilterList filter, string item) {
-        if (filter.Contains(item) || filter.Contains(Lanterns.Kind(item))) return true;
+        if (filter.Contains(item) || ChopChopMeow.Item.IsKey(item) && filter.Contains(ChopChopMeow.Item.KindOf(item))) return true;
         var kind = World.PackedKind(item);
         if (kind.IsEmpty) return false;
         foreach (string named in filter) if (kind.SequenceEqual(named)) return true;
@@ -454,9 +456,25 @@ public sealed class Inventory {
     }
 
     /// <summary>Adds up to <paramref name="quantity"/> units of an item and returns how many fit.</summary>
-    /// <exception cref="ArgumentException">For a kind that expires, whose units need their own times: add those with <see cref="AddUnits"/> or <see cref="TransferTo"/>.</exception>
+    /// <exception cref="ArgumentException">For units that are objects of their own: add those with <see cref="AddUnits"/>, <see cref="Add(ChopChopMeow.Item)"/> or <see cref="TransferTo"/>.</exception>
     public int Add(string item, int quantity) =>
-        Expiring.Contains(item) ? throw new ArgumentException($"Each {item} needs its own time to expire: add them as units.", nameof(item)) : Add(item, quantity, default);
+        HasUnits(item) ? throw new ArgumentException($"Each {item} is an object of its own: add them as units.", nameof(item)) : Add(item, quantity, default);
+
+    /// <summary>Adds an object found by its key, such as a lantern, and returns whether it fit.</summary>
+    internal bool Add(Item unit) => Add(unit.Key, 1, new ReadOnlySpan<Item>(ref unit)) == 1;
+
+    /// <summary>The object a cell holding this key keeps, or null for a plain item or one not here.</summary>
+    internal Item? Object(string key) {
+        if (!ChopChopMeow.Item.IsKey(key) || !items.ContainsKey(key)) return null;
+        foreach (var slot in Layout) if (slot.Item == key) return slot.Units![0];
+        return null;
+    }
+
+    /// <summary>Takes out the object found by this key, unless a player holds it.</summary>
+    internal Item? TakeObject(string key) {
+        Span<Item> taken = [null!];
+        return TakeUnits(key, 1, taken, true) == 1 ? taken[0] : null;
+    }
 
     /// <summary>Adds units of one kind that expires, each keeping its own time, and returns how many fit.</summary>
     internal int AddUnits(ReadOnlySpan<Item> units) => units.IsEmpty ? 0 : Add(units[0].Kind, units.Length, units);
@@ -499,7 +517,7 @@ public sealed class Inventory {
 
     /// <summary>Takes out units nobody holds, from <see cref="PreferredSlot"/> first; a bound stack <paramref name="spent"/> to nothing is noted in <see cref="UsedUp"/>.</summary>
     private int Take(string item, int quantity, bool spent) {
-        if (Expiring.Contains(item)) return TakeUnits(item, quantity, default, spent);
+        if (HasUnits(item)) return TakeUnits(item, quantity, default, spent);
         int amount = Math.Min(Math.Max(0, quantity), Free(item));
         if (amount == this[item]) items.Remove(item);
         else items[item] -= amount;
@@ -521,7 +539,7 @@ public sealed class Inventory {
     /// <summary>Changes the first matching stack to another item while keeping that exact cell and its quantity.</summary>
     public bool Replace(string oldItem, string newItem) {
         if (oldItem == newItem) return this[oldItem] > 0;
-        if (Expiring.Contains(oldItem) || Expiring.Contains(newItem)) return false;
+        if (HasUnits(oldItem) || HasUnits(newItem)) return false;
         int slotIndex = (uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == oldItem && Layout[PreferredSlot].Held == 0 ? PreferredSlot : -1;
         if (slotIndex < 0) for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item == oldItem && Layout[i].Held == 0) { slotIndex = i; break; }
         if (slotIndex < 0) return false;
@@ -618,7 +636,7 @@ public sealed class Inventory {
     public int TransferTo(Inventory destination, string item, int quantity, bool automated = false) {
         if (automated && (!AllowsWithdrawal(item) || !destination.Accepts(item))) return 0;
         int amount = Math.Min(Free(item), Math.Min(Math.Max(0, quantity), destination.Room(item)));
-        if (Expiring.Contains(item)) {
+        if (HasUnits(item)) {
             var units = ArrayPool<Item>.Shared.Rent(amount);
             try {
                 int taken = TakeUnits(item, amount, units, false);
@@ -704,8 +722,9 @@ public sealed class Inventory {
         units.RemoveRange(0, count);
     }
 
-    /// <summary>Removes the units that have expired, returning the next time any in this inventory does.</summary>
+    /// <summary>Removes the units that have expired, those inside the objects here included, returning the next time any in this inventory does.</summary>
     internal float Expire(float now) {
+        if (items.Count == 0) return float.PositiveInfinity;
         bool changed = false;
         float next = float.PositiveInfinity;
         foreach (var slot in Layout) {
@@ -713,10 +732,11 @@ public sealed class Inventory {
             int keep = 0, held = 0;
             for (int i = 0; i < units.Count; i++) {
                 var unit = units[i];
-                if (unit.Expires <= now) continue;
+                if (unit.Contents != null) next = Math.Min(next, unit.Contents.Expire(now));
+                if (unit.Expires != 0 && unit.Expires <= now) continue;
                 units[keep++] = unit;
                 if (i < slot.Held) held++;
-                next = Math.Min(next, unit.Expires);
+                if (unit.Expires != 0) next = Math.Min(next, unit.Expires);
             }
             int gone = units.Count - keep;
             if (gone == 0) continue;
@@ -737,19 +757,24 @@ public sealed class Inventory {
         return next;
     }
 
-    /// <summary>Every saved unit of a kind that expires has one valid, finite time in its own stack, and no plain stack keeps units.</summary>
-    internal bool ValidUnits() {
-        int expiring = 0;
-        foreach (var (item, count) in items) if (Expiring.Contains(item)) expiring += count;
-        if (layout == null) return expiring == 0;
+    /// <summary>
+    /// Every saved unit of a kind that expires has one valid, finite time in its own stack, every object sits alone in the
+    /// cell its key names with valid contents, and no plain stack keeps units.
+    /// </summary>
+    internal bool ValidUnits(Func<Item, bool> validObject) {
+        int kept = 0;
+        foreach (var (item, count) in items) if (HasUnits(item)) kept += count;
+        if (layout == null) return kept == 0;
         int found = 0;
         foreach (var slot in Layout) {
-            if (!Expiring.Contains(slot.Item)) { if (slot.Units != null) return false; continue; }
+            if (slot.Item == "" || !HasUnits(slot.Item)) { if (slot.Units != null) return false; continue; }
             if (slot.Units is not { } units || units.Count != slot.Count) return false;
-            foreach (var unit in units) if (unit == null || unit.Kind != slot.Item || !float.IsFinite(unit.Expires) || unit.Expires <= 0) return false;
+            if (ChopChopMeow.Item.IsKey(slot.Item)) {
+                if (slot.Count != 1 || units[0] is not { } unit || unit.Key != slot.Item || unit.Expires != 0 || !validObject(unit)) return false;
+            } else foreach (var unit in units) if (unit == null || unit.Kind != slot.Item || unit.Id != 0 || unit.Contents != null || !float.IsFinite(unit.Expires) || unit.Expires <= 0) return false;
             found += slot.Count;
         }
-        return found == expiring;
+        return found == kept;
     }
 
     /// <summary>Changes a packed crate's item name after something in it expires, preserving its cell and any hold on it.</summary>

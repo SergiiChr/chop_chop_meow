@@ -147,7 +147,7 @@ public partial class Hotbar : PanelContainer {
             bool active = world.InHand == "" && world.ActiveHotbar == slot;
             int life = id == Firebugs.Item && count > 0 ? world.Firebugs.AverageMinutes(world.S.Backpack, world.HotbarStack(slot)) : -1;
             bool lantern = Lanterns.IsItem(id);
-            int bugs = count > 0 && lantern ? world.Lanterns.BugCount(id) : -1;
+            int bugs = count > 0 && lantern ? Lanterns.BugCount(world.S.Backpack, id) : -1;
             var shown = (id, count, active, life, bugs, World.IsCrate(id) ? world.Packed(id)?.Count ?? 0 : 0);
             if (shownSlots[slot] == shown) continue;
             shownSlots[slot] = shown;
@@ -161,7 +161,7 @@ public partial class Hotbar : PanelContainer {
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             string clicks = lantern ? "LMB: select · RMB: open for refill · Double LMB: take in hand or stow" : "LMB: select · RMB or Double LMB: use";
-            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Describe(id)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}{PageText.FirebugLifeLine(life)}\n{clicks}";
+            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Describe(id, world.S.Backpack)} · {(building ? "building plan" : $"{count} carried")}{world.Data.DescriptionLine(id)}{PageText.FirebugLifeLine(life)}\n{clicks}";
             if (!building && id.Length > 0) button.TooltipText += $"\n{RecipeMap.AltClickHint}";
             // The selected slot gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
