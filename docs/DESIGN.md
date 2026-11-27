@@ -1862,6 +1862,8 @@ The options screen sets the music volume, stored in the settings file.
 
 Each campfire song and solo starts at a time on the world's clock, so a player approaching a fire or joining a game hears
 the recording already in progress. Playback near the start uses the full recording, and audible poses follow playback.
+The simulation keeps more precision between steps than it writes to saves or updates, so the world clock keeps pace
+with the recording even in a long-running settlement.
 The campfire song takes over the soundtrack inside firelight and fades with distance. When the world pauses, so does the
 campfire song, and the soundtrack returns until play resumes.
 Songs are Ogg Vorbis so they can start partway through without decoding from the beginning. Solos are shorter MP3 clips.

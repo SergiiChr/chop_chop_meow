@@ -7,8 +7,10 @@ using static WorldSteps;
 
 internal static class CampfireMusicSteps {
     /// <summary>Seats three instrumentalists and a listener from a reproducible run of visit rolls.</summary>
-    public static (World World, Thing Fire, Worker Guitar, Worker Drum, Worker Harmonica, Worker Listener) SeatCampfireTrio(GameData data) {
+    public static (World World, Thing Fire, Worker Guitar, Worker Drum, Worker Harmonica, Worker Listener) SeatCampfireTrio(
+        GameData data, int days = 0) {
         var world = FundedWorld(data);
+        if (days > 0) SkipClock(world, days * data.DaySeconds);
         var fire = world.Add(ThingKind.Campfire, new Vector2(20, 20));
         var (guitar, drum, harmonica, listener) = AddCampfireCrew(world, fire);
         Work(world, .5f);

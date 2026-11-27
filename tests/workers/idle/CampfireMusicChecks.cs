@@ -1,3 +1,4 @@
+using System;
 using ChopChopMeow;
 using Godot;
 using static CampfireMusicSteps;
@@ -11,6 +12,7 @@ internal static class CampfireMusicChecks {
         Test(CheckArrivingWorkersPickOnlyInstrumentsMissingFromTheirCampfire, data);
         Test(CheckSeparateCampfiresCanEachHaveAGuitar, data);
         Test(CheckTheThreeInstrumentsAtOneCampfirePlayOneSong, data);
+        Test(CheckACampfireSongKeepsTimeInAnOldSettlement, data);
         Test(CheckInstrumentsAtDifferentCampfiresNeverStartASongTogether, data);
         Test(CheckOneInstrumentWaitsBeforePlayingAndStopsWhenTheWorkerLeaves, data);
         Test(CheckLunchingWorkersDoNotPlayCampfireMusic, data);
@@ -68,6 +70,19 @@ internal static class CampfireMusicChecks {
         var nextDrummer = AddAtFire(world, fire, 1);
         Work(world, 2, () => music.SongAt(fire.Id).Track > 0);
         Require(music.SongAt(fire.Id).Plays(nextDrummer.Id), "the musicians should play another song when a new trio gathers");
+    }
+
+    private static void CheckACampfireSongKeepsTimeInAnOldSettlement(GameData data) {
+        var (world, fire, _, _, _, _) = SeatCampfireTrio(data, days: 48);
+        var song = world.CampfireMusic.SongAt(fire.Id);
+        Require(song.Track > 0, "the old settlement's trio should have a song to play");
+        Work(world, 1, () => world.Time >= song.StartsAt);
+        float elapsed = world.Time - song.StartsAt;
+        Require(elapsed >= 0, "the old settlement's trio should have started its song");
+
+        for (int frame = 0; frame < 480; frame++) world.Tick(1f / 60);
+        float played = world.Time - song.StartsAt - elapsed;
+        Require(Math.Abs(played - 8) < 1f / 60, $"eight seconds of playback should pass on the world's clock, got {played:F3}s");
     }
 
     private static void CheckInstrumentsAtDifferentCampfiresNeverStartASongTogether(GameData data) {

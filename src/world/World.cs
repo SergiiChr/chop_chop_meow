@@ -310,7 +310,11 @@ public sealed class SaveState {
     public HashSet<string> Obtained { get; set; } = new();
     [JsonIgnore] public float PlayerX { get => Actor.PlayerX; set => Actor.PlayerX = value; }
     [JsonIgnore] public float PlayerY { get => Actor.PlayerY; set => Actor.PlayerY = value; }
-    public float Time { get; set; } = 55;
+    private double time = 55;
+    /// <summary>World seconds as stored in a save or sent in an update.</summary>
+    public float Time { get => (float)time; set => time = value; }
+    /// <summary>Keeps small steps from losing part of their elapsed time in an old settlement.</summary>
+    internal void AdvanceTime(float seconds) => time += seconds;
     [JsonIgnore] public float Health { get => Actor.Health; set => Actor.Health = value; }
     [JsonIgnore] public float Hunger { get => Actor.Hunger; set => Actor.Hunger = value; }
     [JsonIgnore] public float Thirst { get => Actor.Thirst; set => Actor.Thirst = value; }
@@ -2408,7 +2412,7 @@ public sealed partial class World {
         bool wasDusk = Dusk, wasLunch = Lunch;
         everyone = true;
         float before = S.Time;
-        S.Time += dt;
+        S.AdvanceTime(dt);
         Beach.Tick(before);
         if (!sleeping && !Sleep.AdvancingTime) S.PlaySeconds += dt;
         // A wolf whose player left the game goes back to patrolling.
