@@ -30,7 +30,7 @@ public partial class ItemSlot : Button {
 
     /// <summary>A count pill for a corner of a slot: 0 or 1 for left or right, top or bottom.</summary>
     public static Badge CountBadge(float x = 1, float y = 1) {
-        var count = new Badge { MouseFilter = MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center, Visible = false };
+        var count = new Badge { Name = "count", MouseFilter = MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center, Visible = false };
         count.AddThemeStyleboxOverride("normal", Style.CountPill);
         count.AddThemeFontOverride("font", Style.Bold); count.AddThemeFontSizeOverride("font_size", 12); count.AddThemeColorOverride("font_color", Style.Rim);
         return Style.Corner(count, x, y);

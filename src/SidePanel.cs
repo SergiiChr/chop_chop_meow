@@ -17,13 +17,15 @@ public sealed class PageMemory {
     public int CarriedCrate;
     /// <summary>The backpack cell of the open steel barrel.</summary>
     public int CarriedBarrelSlot = -1;
+    /// <summary>The number of the lantern opened from the backpack.</summary>
+    public int CarriedLantern;
 }
 
 /// <summary>What every page is built with.</summary>
 public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory, HeldCursor Cursor);
 
 /// <summary>The pages of the side panel.</summary>
-public enum Page { None, Welcome, Build, Backpack, Crew, Craft, Inspect, Crate, Barrel, Diary }
+public enum Page { None, Welcome, Build, Backpack, Crew, Craft, Inspect, Crate, Barrel, Diary, Lantern }
 
 /// <summary>What the side panel inspects: a thing, a worker, a pipe or nothing.</summary>
 public readonly record struct Selection {
@@ -56,6 +58,7 @@ public partial class SidePanel : MovableWindow {
         ("Wood crate", (tools, _) => new CarriedCratePanel(tools, tools.Memory.CarriedCrate)),
         ("Steel barrel", (tools, _) => new CarriedBarrelPanel(tools, tools.Memory.CarriedBarrelSlot)),
         ("Diary", (tools, _) => new DiaryPanel(tools)),
+        ("Lantern", (tools, _) => new LanternPanel(tools, tools.Memory.CarriedLantern)),
     };
     private readonly World world;
     private readonly UiKit kit;
@@ -222,6 +225,16 @@ public partial class SidePanel : MovableWindow {
         if (tools.Memory.CarriedCrate != crate) Page = Page.None;
         tools.Memory.CarriedCrate = crate;
         Open(Page.Crate);
+    }
+
+    /// <summary>Opens this lantern from the backpack without taking it in hand.</summary>
+    public bool OpenLantern(string item) {
+        int id = Lanterns.Id(item);
+        if (id == 0 || world.Backpack[item] == 0) return false;
+        if (tools.Memory.CarriedLantern != id) Page = Page.None;
+        tools.Memory.CarriedLantern = id;
+        Open(Page.Lantern);
+        return true;
     }
 
     /// <summary>Opens the barrel in the given backpack cell.</summary>

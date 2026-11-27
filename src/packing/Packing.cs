@@ -28,7 +28,11 @@ public sealed partial class World {
 
     /// <summary>Whether the station has a good and somewhere to put it: an open crate, or an empty one to start.</summary>
     public bool CanPack(Thing t) =>
-        t.Packs != "" && t.Inventory[t.Packs] > 0 && (t.Output!.First() is string crate ? OpenCrate(t, crate) : t.Inventory["crate"] > 0);
+        PackingItem(t) != null && (t.Output!.First() is string crate ? OpenCrate(t, crate) : t.Inventory.Free("crate") > 0);
+
+    /// <summary>The good ready to pack, which may be a particular lantern from the input.</summary>
+    private static string? PackingItem(Thing t) => t.Packs == Lanterns.Item ? t.Inventory.FirstLantern(free: true)
+        : t.Packs != "" && t.Inventory.Free(t.Packs) > 0 ? t.Packs : null;
 
     /// <summary>
     /// Packs one item every <see cref="GameData.PackSeconds"/> while the player or a paid worker works the station.
@@ -40,14 +44,15 @@ public sealed partial class World {
         t.Progress += dt;
         if (t.Progress < Data.PackSeconds) return;
         t.Progress = 0;
-        t.Inventory.Remove(t.Packs, 1);
-        if (t.Output!.First() is string crate) {
-            Packed(crate)!.Add(t.Packs, 1);
+        string item = PackingItem(t)!;
+        string? crate = t.Output!.First();
+        var box = crate == null ? NewCrate() : Packed(crate)!;
+        if (t.Inventory.TransferTo(box, item, 1) == 0) return;
+        if (crate != null) {
             if (!OpenCrate(t, crate)) t.Rounds++;
-            return;
+        } else {
+            t.Inventory.Remove("crate", 1);
+            t.Output.Add(Pack(box), 1);
         }
-        t.Inventory.Remove("crate", 1);
-        var box = NewCrate(); box.Add(t.Packs, 1);
-        t.Output.Add(Pack(box), 1);
     }
 }

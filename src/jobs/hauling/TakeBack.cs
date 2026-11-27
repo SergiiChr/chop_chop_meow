@@ -58,7 +58,7 @@ internal sealed class TakeBack(World world) {
 
     /// <summary>A building's output filter: the one set on storage, which also has to hold the item, or for a building with output slots what it outputs.</summary>
     private Inventory? Outbox(Thing t, string item) => t.Kind switch {
-        _ when world.IsStation(t.Kind) => world.Product(t) == item ? t.Inventory : null,
+        _ when world.IsStation(t.Kind) => World.IsProduct(world.Product(t), item) ? t.Inventory : null,
         ThingKind.Farm => world.Data.Farm.Yield.ContainsKey(item) ? t.Output : null,
         // A mine's output shows on its page only once the mine opens.
         ThingKind.Mine => t.MineStage == MineStage.Open && (item == Mines.Ore(t) || item == "stone") ? t.Output : null,

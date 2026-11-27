@@ -61,6 +61,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
 | `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
+| `--showcase --goal-popup` | Reach the bench in the default fixture, with no goods sold yet, so **A start** pops up as completed and then **Road to riches** as new |
 | `--showcase --diary` | Show the player on the lake's shore beside its floating page, with a page lying on the ground and three finds in the diary, two of their days unread; `--diary-fall` drops that page off the oak beside them a second in instead, `--panel` opens the Diary, `--diary-day 45` opens that day large, `--diary-find` shows the pop-up of a page found in leaves and `--diary-first` leaves the diary empty and no page on the ground, so the next find is the first |
 | `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes in their five stages with plain bushes, stumps, a tree about to fall and a shovel to dig with |
@@ -241,7 +242,8 @@ The day dial in the top-right corner shows the sun crossing its arc from sunrise
 A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
 Your stomach growls as food falls under 20%, and again at 15%, 10% and 5%.
 
-Messages stack at the top of the screen, up to four at a time; each fades out after 7 seconds.
+Messages stack at the top middle of the screen, up to four at a time, and each fades out after 7 seconds.
+They stay put when a side panel opens, which may cover their right end.
 A message repeated while it still shows restarts its time instead of stacking again, and a full stack drops the one closest to fading.
 Actions whose result shows by itself, such as gathering, crafting, building or filling a bottle, post no message; warnings, refusals and news do.
 With a side panel open they keep to the space left of it.
@@ -537,8 +539,11 @@ When you come within 4 m it darts off 6.55 m, faster than a walk and slower than
 With the bug net selected, a right click on open ground swings it toward the pointer, down on a slant from behind the right shoulder across the front to the ground at the left, and a right click on a firebug swings it at the firebug.
 The hoop crosses the front 1.0 to 1.4 m from you, within 55° either side of the pointer, and lands 0.4 seconds after the click: it catches each firebug it passes over then, one firebug each into the backpack while it has room.
 A firebug nearer or further than the hoop is missed, and a swing sends every firebug it misses within 5 m darting, resting or not.
+Caught firebugs live for three in-game days, then disappear one by one.
+Hover over a stack to see its average time left.
 
-Nettles, nettle rope, bug nets and firebugs are not bought or sold, and a firebug is not made into anything yet.
+Nettles, nettle rope, bug nets and firebugs are not bought or sold.
+Caught firebugs give a [lantern](#lantern) its light.
 A nettle, a bug net and a firebug each say a line under their name in tooltips and in their details on the recipe map.
 
 ### Sand and tides
@@ -627,6 +632,16 @@ It is complete once you have all 11 days of the diary.
 **NEET** requires at least 1,300 coins in profit a day for seven days in a row.
 Profit is the sale coins that came back that day minus wages charged at the next dawn.
 The mines and profit target together show the ending screen with Restart and Keep playing.
+
+A goal that appears during play pops up under the messages at the top of the screen with a chime: a trophy badge pops
+in and a bar opens out of it with **New goal** and the goal's name.
+A completed goal pops up the same way with **Goal completed** and a different chime.
+A goal that appears already done pops up only as completed.
+Each popup stays about five seconds, and goals that change together pop up one after another.
+**A success story** pops up once the diary page you found is closed.
+Click a popup to open the Goal Log on that goal over whatever is open: a held stack goes back and placing a building or
+any other pick is cancelled first.
+The goals a new, loaded or joined game starts with do not pop up.
 
 ### Diary
 
@@ -732,6 +747,7 @@ Some recipes need a better tool:
 - Crush rocks (1 stone → 1 gravel) needs a steel hammer, and is made only at the bench.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
 - A steel water bottle (1 steel sheet + 1 wood part) needs a steel hammer.
+- An empty lantern (1 glass jar + 1 steel sheet + 1 wood part) needs a steel hammer.
 
 Nettle rope (1 nettle → 1 rope) is the one recipe a better tool spoils: it is made only at the bench and only with a wooden mallet.
 The mallet may be the one in the bench's hammer slot or one in your backpack, whichever hammer the other is.
@@ -1115,6 +1131,7 @@ The village pays for:
 
 Anything else in a crate goes as a donation: the cart takes it and pays nothing for it.
 The returning cart says what was donated.
+A crate whose firebugs have all died stays in the market as an empty crate, and the next cart takes it as a donation too.
 A sale pays for the goods and the crate.
 Load crates, press Sell, and a cart takes them to Bramblewick and returns 30 seconds later with the coins.
 Bought goods also arrive in the output boxes.
@@ -1310,6 +1327,31 @@ Walk at one and it stops and stands braced where it is. Come within 2 metres and
 Once five are around you they attack together and swings no longer scare them.
 A torch that lands on a wolf burns it and sends it running for a moment.
 
+### Lantern
+
+Finally a sustainable source of light.
+The crafting bench makes an empty lantern.
+Right-click a lantern in the backpack, on the hotbar or on the ground to open it.
+Put firebugs onto its slot to add as many as fit, or right-click the slot while holding a stack to add one.
+It takes up to ten, shortest lives first.
+Putting a firebug in a lantern does not reset its life.
+The jar glows from inside.
+Its light dims as firebugs die, and you can add more at any time as long as there is room.
+A full lantern is 20% brighter than a torch, with a green hue.
+Lanterns do not scare wolves.
+A green badge at the upper right of a lantern's icon shows how many live firebugs are inside.
+Where a station shows several lanterns in one slot, the green number is for the lantern you can take next.
+
+Double-click a lantern to take it in hand and put out any lit torch.
+Double-click it again to stow it.
+You can still select tools.
+While your hands are needed for work, the lantern hangs from your belt and keeps shining.
+Hotbar lanterns light the way even when they are not selected.
+Slots 1–6 hang from your belt, slot 7 from your backpack, and slots 8 and 9 from your shoulders.
+Held and worn lanterns are the same size and swing more as you run.
+A lantern tucked away in the backpack or storage does not light the way, but its firebugs still age.
+Open a carried lantern and choose **Put it down** to place it, or open a placed one and choose **Pick up**.
+
 ### Straw bed
 
 “Not the best sleep score.”
@@ -1470,7 +1512,7 @@ There are three tree types (oak, spruce, birch), from short trees to ones two th
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.
 The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset.
 Daylight shadows meet the ground at boots, tree trunks and the feet of buildings.
-The moon takes the same path at night and waxes and wanes over a cycle of `MoonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by.
+The moon takes the same path at night and waxes and wanes over a cycle of `MoonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches, lanterns and cabin windows to see by.
 Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows.
 Trees in front of the player, a worker or a structure turn see-through.
 

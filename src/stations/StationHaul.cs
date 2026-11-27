@@ -15,7 +15,7 @@ internal sealed class StationHaul : PlaceHaul {
             int free = t.Inventory.Free(item);
             if (free == 0 || world.Pending(t, item)) continue;
             // What another recipe left keeps the station from starting a batch, so it leaves as a full output does.
-            bool full = recipe != null && (item != recipe.Output || t.Inventory.SlotRoom(item) < recipe.Amount);
+            bool full = recipe != null && (!World.IsProduct(recipe.Output, item) || t.Inventory.SlotRoom(recipe.Output) < recipe.Amount);
             if (data.VesselFor(item) is VesselDef v) {
                 // A liquid leaves in vessels with room for it, which the hauler brings, fills here and stores.
                 if (world.DepositFor(v.Full, t.Pos, t.Id) == null || RoomySource(v, w.Pos) is not (string roomy, Thing holder)) continue;

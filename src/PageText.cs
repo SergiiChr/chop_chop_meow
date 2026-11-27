@@ -20,6 +20,10 @@ public static class PageText {
         return text.Append(minutes / 60).Append(" h ").Append(minutes % 60).Append(" min");
     }
 
+    internal static string FirebugLife(int minutes) => $"Average life left: {minutes / 60} h {minutes % 60} min";
+    /// <summary>The firebugs' average life left on a line of its own, or nothing for a negative number, which stands for no firebugs.</summary>
+    internal static string FirebugLifeLine(int minutes) => minutes < 0 ? "" : "\n" + FirebugLife(minutes);
+
     /// <summary>Each input with how many the backpack holds of how many are needed, a liquid in liters across its vessels.</summary>
     public static void AppendNeeds(World world, StringBuilder text, Dictionary<string, int> cost) {
         bool first = true;

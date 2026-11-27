@@ -11,7 +11,7 @@ public partial class CampfirePanel(PageTools tools, Thing subject) : ThingPage(t
         live.Bind(light, text => PageText.AppendGameHours(world, text, thing.Burn).Append(" of light · wolves keep 5 tiles off"));
         var (wood, count) = ItemSlot.Create("fire_wood"); wood.Icon = Icons.Of("wood"); row.AddChild(wood);
         moves.TakeCell(wood, thing.Inventory, "wood", thing, held => held.Stack is { Box: 0, Item: "wood" });
-        live.Watch(() => thing.Inventory["wood"], held => { count.Text = held > 0 ? held.ToString() : ""; wood.TooltipText = $"Wood · {held}\n{StationSlots.SlotHint} · put wood here from your backpack"; });
+        live.Watch(() => thing.Inventory["wood"], held => { count.SetStack(held, -1); wood.TooltipText = $"Wood · {held}\n{StationSlots.SlotHint} · put wood here from your backpack"; });
         AddButton($"Feed · 1 wood · +{world.Data.CampfireHours:0} h", () => world.FuelFire(thing));
         StoreBagGrid(id => id == "wood");
         JobButtons();

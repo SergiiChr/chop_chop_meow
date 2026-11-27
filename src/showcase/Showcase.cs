@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The review fixtures behind <c>--showcase</c> and its flags: settled scenes for screenshots, separate from a playable game.</summary>
-public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit) {
+public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit, GoalPopup goalPopup) {
     /// <summary>
     /// Diary review: the player on the lake's shore by its floating page, with a page lying on the ground beside them and three finds in their diary, two of whose days are unread.
     /// <c>--diary-fall</c> drops that page off the oak beside them a second in instead, since a player has one fallen page at a time.
@@ -59,8 +59,20 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     }
     private void Press(string button) => panel.FindChild(button, true, false).EmitSignal(BaseButton.SignalName.Pressed);
 
-    /// <summary>Sets up the scene the flags ask for; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    /// <summary>Sets up the scene the flags ask for, which pops up no goals it sets by hand.</summary>
     public void Run() {
+        Stage();
+        // A scene's goals are set by hand, not reached in play, so they pop up nothing.
+        // With --goal-popup the bench is reached after that: "A start" pops up as completed, then "Road to riches" as new.
+        // The default scene has sold goods already, which would complete Road to riches as it appears.
+        bool popup = Launch.Has("--goal-popup") && world.S.Milestones.Remove("bench");
+        if (popup) world.S.Milestones.Remove("sold");
+        goalPopup.SkipKnownGoals();
+        if (popup) world.S.Milestones.Add("bench");
+    }
+
+    /// <summary>Builds the scene; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    private void Stage() {
         if (Launch.Value("--straw-bed") is string bedPose) { StrawBedScene(bedPose); return; }
         Place();
         view.Zoom = Launch.Number("--zoom", view.Zoom);
@@ -201,7 +213,56 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--hide-ui")) ui.Visible = false;
     }
 
+    /// <summary>Reviews the same lantern models drawn on the ground, in the hand or on the belt during play.</summary>
+    private void LanternReview() {
+        var at = Terrain.Spawn + new Vector2(5, 3);
+        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 12);
+        bool night = Launch.Has("--night");
+        world.S.Time = world.Data.DaySeconds * (night ? .76f : .2f);
+        world.S.DensOut = (1 << WolfPatrols.Dens.Length) - 1; world.S.DenHours = 24; world.Firebugs.KeepIn();
+        world.SelectHotbar(1);
+        string GiveLantern(int count) {
+            string item = world.Lanterns.FillForReview(world.Lanterns.NewEmpty(), count);
+            world.S.Backpack.Add(item, 1);
+            return item;
+        }
+        string? scene = Launch.Value("--lantern");
+        bool carried = scene is "held" or "belt" or "full-wear" or "backpack" or "torch";
+        world.Player = carried ? at : at + new Vector2(-2.2f, -2.2f);
+        if (scene is "belt" or "full-wear") {
+            for (int i = 0; i < (scene == "belt" ? 2 : 9); i++) world.SetHotbar(i, GiveLantern(i == 0 ? 10 : 4));
+            if (Launch.Has("--lantern-motion")) world.Lanterns.ToggleInHand(Lanterns.Id(GiveLantern(10)));
+        } else if (scene == "held") world.Lanterns.ToggleInHand(Lanterns.Id(GiveLantern(10)));
+        else if (scene == "backpack") {
+            GiveLantern(0);
+            world.SetHotbar(0, GiveLantern(4));
+            world.Firebugs.Catch(world.S.Backpack, Lanterns.Capacity);
+        } else if (scene == "torch") { world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); } else _ = world.Lanterns.Place(GiveLantern(scene == "partial" ? 4 : Launch.Has("--dark") ? 0 : 10), at) ?? throw new InvalidOperationException("The lantern review needs open ground.");
+        world.Tick(scene == "torch" ? World.KindleSeconds : 0);
+        AimAt(at);
+        if (carried && Launch.Has("--lantern-motion")) ReviewLanternMotion();
+        view.Zoom = carried ? 3.25f : night ? 1.6f : 4;
+        if (scene == "backpack") panel.Open(Page.Backpack); else panel.Close();
+        ui.Visible = scene == "backpack" && !Launch.Has("--hide-ui");
+    }
+
+    /// <summary>Records the held and worn lanterns from standing through a jog, a sprint and a stop.</summary>
+    private void ReviewLanternMotion() {
+        view.CameraOn = null;
+        var motion = view.CreateTween();
+        motion.TweenInterval(.30);
+        motion.TweenCallback(Callable.From(() => KeyPress(Key.D, true)));
+        motion.TweenInterval(.85);
+        motion.TweenCallback(Callable.From(() => KeyPress(Key.Shift, true)));
+        motion.TweenInterval(.85);
+        motion.TweenCallback(Callable.From(() => { KeyPress(Key.D, false); KeyPress(Key.Shift, false); }));
+
+        static void KeyPress(Key key, bool down) => Input.ParseInputEvent(
+            new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = down });
+    }
+
     private void Place() {
+        if (Launch.Has("--lantern")) { LanternReview(); return; }
         if (Launch.Value("--glassblowing") is string glass) { GlassReview(glass); return; }
         if (Launch.Has("--farm-watering")) { FarmWateringReview(); return; }
         if (Launch.Has("--steel-vessels")) { VesselReview(); return; }
@@ -387,7 +448,10 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.S.Workers.Clear(); world.S.Orders.Clear();
             for (int i = 0; i < goods.Length; i++) {
                 var pile = world.Add(ThingKind.Pile, Spot(i));
-                pile.Inventory.Add(goods[i], Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share)));
+                int amount = Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share));
+                if (goods[i] == Firebugs.Item) world.Firebugs.Catch(pile.Inventory, amount);
+                else if (goods[i] == Lanterns.Item) for (int n = 0; n < amount; n++) pile.Inventory.Add(world.Lanterns.NewEmpty(), 1);
+                else pile.Inventory.Add(goods[i], amount);
             }
             var compost = world.Add(ThingKind.Pile, Spot(goods.Length)); compost.Compost = true;
             compost.Inventory.Add("leaves", (int)(300 * share)); compost.Inventory.Add("grass", (int)(300 * share)); compost.Inventory.Add("fertilizer", (int)(200 * share));

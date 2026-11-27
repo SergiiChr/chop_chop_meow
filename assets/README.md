@@ -188,6 +188,13 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
   hoop and a long bag of white netting, seen through, that narrows to a rounded end; the icon, the heap and the
   player's hand show the same model.
 - The firebug item (`ItemShape.Firebug`) is a beetle with dark wing covers and a yellow-green tail.
+- `LanternShape` adds a wooden foot and grip, and steel lid and handle to the glass jar.
+  Its icon, ground and hand models share the jar mesh. Worn and heap models use a lighter version of the same profile.
+  The firebugs light the inside of the jar. When placed, the wooden foot blocks direct light beneath it.
+  Its green light has the reach of a torch, with each live firebug supplying 12% of the torch's baseline light energy.
+  Preview it using `./build.py play -- --showcase --lantern`, with `--night` or `--dark`.
+  Append `held` or `full-wear` directly after `--lantern` to inspect the lanterns on the player.
+  Add `--lantern-motion` to see the lanterns swing while the player starts, jogs, sprints and stops.
 
 - `BackpackShape` — dropped inventory. The body reuses the player's cached six-ring canvas backpack profile through `ActorShape.Backpack`, laid on its back in a ground pose. `BackpackShape` adds ground-resting webbing: slack shoulder straps, a carry loop, a fitted dark opening and a separate curved access flap. The flap animates as the storage lid and has a fog-memory guard.
 - `CartShape` — caches the courier cart's hollow tapered tray with a folded rim, continuous pull frame and hand grip, fitted bed supports and axle, dished wheels and handled payment case. Cart loads reuse a `CrateShape.Cargo` version of the slatted crate, omitting hidden interiors and small hardware at this scale. The six crate slots, loose-goods/cash visibility, wheel pivots and courier animation are independent. The courier uses the shared human rig.
@@ -242,7 +249,8 @@ How they are framed:
 
 `ui/` holds hand-written SVG icons:
 
-- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, book, close, filter, stash and so on), tinted in code.
+- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, book, close, filter, stash,
+  the goal popup's trophy and so on), tinted in code.
 - `scribble_word.svg` and `scribble_line.svg`, the scribbles a diary day shows where its writing cannot be read: cursive
   loops and arches drawn by a one-off script, whose line, size and spacing go further wrong letter by letter, as
   writing in the dark does, ending in a stroke trailing down the page.
@@ -296,6 +304,13 @@ These were made with ffmpeg from Kenney's sounds:
 `bucket_hit` is freefire66's [Bucket Hit](https://freesound.org/people/freefire66/sounds/175948/) from Freesound
 (CC0 1.0), also released on [Pixabay](https://pixabay.com/sound-effects/film-special-effects-bucket-hit-89027/).
 The Freesound preview is mixed to mono, trimmed to the hit and its decay, faded at both ends and peak-normalised.
+
+`goal_new` is universfield's "New notification 040"
+([Pixabay 493469](https://pixabay.com/sound-effects/technology-new-notification-040-493469/)).
+`goal_completed` is universfield's "New notification 067"
+([Pixabay 138695](https://pixabay.com/sound-effects/film-special-effects-new-notification-067-138695/)).
+Both are recordings supplied for this project.
+Each is mixed to mono, has the silence cut from its start, is faded at both ends and peak-normalised.
 
 `dig_earth`, `dig_toss` and `dig_up` are cut with ffmpeg from "Digging with shovel" by freesound_community (Pixabay 63069), a recording supplied for this project: four cuts of the blade going into soil, four of soil thrown off it and one heavy heave of earth for a stump or bush coming out.
 Each cut is faded at both ends, and the cuts of one sound are brought to one mean level.

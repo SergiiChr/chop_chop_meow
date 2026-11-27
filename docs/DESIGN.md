@@ -29,7 +29,10 @@ These came from the user; change them only after asking.
   A quarter of the clusters have three firebugs, and the rest two or one at even odds, all within 1 m of the first.
   One drifts and glows, darts off from a player who comes near, faster than a walk and slower than a sprint, then
   rests; a swing lands after a moment, catches what is in its sweep, and a miss sends the bug darting.
-  A caught firebug is an item only: nothing is made from it and it gives no light.
+  A caught firebug lives for three in-game days. It lights a lantern while inside it and disappears when it dies.
+- **Lantern:** a glass jar, a steel sheet and a wood part at a crafting bench with a steel hammer make an empty lantern.
+  It takes up to ten firebugs. The brightness follows how many are alive, up to a fifth brighter than a torch.
+  It illuminates the ground when placed, in hand or bound to the hotbar, and does not deter wolves.
 - **Nettle and firebug jobs:** a worker picks nettles with a shovel and catches firebugs with a bug net, each from a
   tool station. Workers still go home at dusk, so the firebug job waits for night work, a later change.
   None of nettle, nettle rope, bug net and firebug is bought or sold, and none has a sound of its own yet, apart from
@@ -103,7 +106,7 @@ Simulation and data:
 | `src/world/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, the lifetime of each caught firebug in its stack, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView`, and `FilterList`, a filter's entries in the order named |
 | `src/world/model/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/world/model/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/buildings/Construction.cs` | Putting buildings and yards up and taking buildings down: where a plan snaps to, why it or a crate cannot go somewhere, what it costs and what comes back |
@@ -134,6 +137,9 @@ Simulation and data:
 | `src/firebugs/Firebugs.cs`, `src/firebugs/display/FirebugShape.cs`, `src/firebugs/display/FirebugProp.cs`, `src/firebugs/FirebugChase.cs` | Firebugs coming out at night, their flight from players and a net's catch; a firebug's model and its glow; the showcase's player chasing firebugs for a recording |
 | `src/diary/model/Diary.cs`, `src/diary/model/DiaryDay.cs`, `src/diary/model/DiaryFind.cs`, `src/diary/model/DiaryFindDef.cs` | The diary: its days and their text, where each part of it turns up, each player's finds and read days, and who sees a page lying in the world |
 | `src/diary/display/PageShape.cs`, `src/diary/display/PageProp.cs` | A loose page's model, floating on the lake or fluttering down off a tree |
+| `src/lanterns/Lanterns.cs`, `src/lanterns/display/LanternPanel.cs` | Portable lanterns, filling and placing them, and the page that opens a carried or placed lantern |
+| `src/lanterns/display/LanternShape.cs`, `src/lanterns/display/LanternModel.cs`, `src/lanterns/display/LanternProp.cs` | The jar, wooden frame, steel lid and handle, visible firebugs and green light |
+| `src/lanterns/display/LanternWear.cs` | Lanterns hanging from the player’s hand, belt, backpack or shoulders |
 | `src/digging/GroundHoles.cs`, `src/digging/display/HolePanel.cs` | Held shovel work, empty holes and the hole's input slot |
 | `src/digging/Beach.cs`, `src/digging/display/CoastView.cs` | Beach sand, tide, and the exposed soil after a dig |
 | `src/trees/TreePlanting.cs`, `src/trees/LeafSpots.cs`, `src/trees/display/TreePlantingShape.cs` | Tree planting and growth, leaf spots and their acorns, and the dig outline, hole and nub |
@@ -174,6 +180,7 @@ UI and input:
 | `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
 | `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
+| `src/goals/display/GoalPopup.cs` | The popup at the top of the screen when a goal appears or is completed, with its chime |
 | `src/diary/display/DiaryPanel.cs`, `src/diary/display/DiaryCell.cs`, `src/diary/display/ReadingSheet.cs`, `src/diary/display/FallingApart.cs`, `src/diary/display/FindPrompt.cs` | The Diary panel of paper cells, a day opened large to read with its writing falling apart where it says so, and the pop-up a find waits behind |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
@@ -192,7 +199,7 @@ UI and input:
 | `src/storage/display/FilterWindow.cs` | The filter window beside the panel |
 | `src/items/display/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
 | `src/items/display/Grid.cs` | Draws the icon-slot grids |
-| `src/items/display/Badge.cs` | The count pill on an item slot |
+| `src/items/display/Badge.cs` | The count pill on an item slot, green with the firebug count on a lantern's slot |
 | `src/items/display/ItemSlot.cs` | The cream item slot, which tells plain, right, double and Alt-clicks apart and shakes on a refusal |
 | `src/items/display/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse |
 | `src/items/display/SlotInput.cs` | What a click does on an item slot |
@@ -695,6 +702,20 @@ At dawn the wages charged are taken off and the result joins `SaveState.Profits`
 Reaching the streak sets the `profit_week` milestone, which stays reached.
 The open mines and profit milestone together unlock the ending.
 
+`GoalPopup` compares each goal's status with the popups it has shown on every interface refresh, five times a second.
+It queues a new popup for a goal that left `Hidden` and a completed popup for one that reached `Completed`, each at
+most once a game, and shows them in turn.
+A goal that goes from `Hidden` straight to `Completed` gets only the completed popup.
+The diary goal's popup waits while the find pop-up or the reading sheet is open, and later popups go ahead of it.
+`Game.OpenGoalFromPopup` puts back a held stack and ends any click mode or walk to a cabin, then opens the pause menu
+on the goal over whatever is open, the ending screen included.
+It skips the statuses a game already has, with no popups (`GoalPopup.SkipKnownGoals`), once the window has joined a
+game and taken the server's first update (`Net.Joined`): a new game, a load, joining another player's game and
+reconnecting.
+It also skips them whenever the window's world is replaced (`World.Replaced`), so leaving a game for the start menu
+or losing the line to the host drops the popups that game still had waiting.
+The showcase skips them again after setting up its scene by hand.
+
 ### Survival and needs
 
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
@@ -933,6 +954,7 @@ Each wolf touched takes its own roll of the damage, the swing's own give or take
 
 A lit torch (`SaveState.Torch`, burn seconds left) burns as long as one log, only while `SaveState.TorchLit`; it stays in the backpack, burning out removes it, and a backpack with no torch left puts it out.
 Lighting it takes `World.KindleSeconds` (`SaveState.TorchKindling`).
+Taking a lantern in hand puts out the torch and leaves its remaining burn time alone.
 Swings share the axe cooldown and flare the light (`World.TorchFlare`).
 They put the torch out after `World.WildSwings` within `World.WildWindow` seconds.
 
@@ -1039,6 +1061,22 @@ When a player gathers leaves, they also take the acorns that fit in their backpa
 Leaves refill at dawn. Missing acorns refill one at a time, every ten days from the first gather that took one.
 Chopping out all its current wood fells the tree and leaves its stump.
 
+### Lanterns
+
+A lantern has a permanent number and carries its firebugs' expiry times with it as an item, including in a save or an update.
+The placed lantern stores that same item in `Thing.LanternItem` and keeps it when picked up.
+`Lanterns.Refill` moves as many firebugs as fit, shortest life first, without changing any expiry time.
+Only live firebugs show through the glass. Their glow and the point light sit inside the jar.
+The wooden foot blocks direct light beneath a placed lantern.
+With one tenth of a full lantern's light per bug, ten bugs give 120% of torch energy.
+The green light has no part in wolf behavior.
+
+A double click takes it in hand. Work requiring the hand hangs it temporarily on the belt, still lit.
+Hotbar slots 1–6 hang their lanterns from the belt, slot 7 from the backpack, and slots 8 and 9 from the shoulders.
+All light regardless of the selected slot when they contain firebugs. Held and worn lanterns swing about their grips.
+The same lantern shows only once if it is both bound and held in hand.
+Right-click a lantern in the backpack, hotbar or world to see the firebug slot and access placement or pickup.
+
 ### Nettles and firebugs
 
 `Nettles` (`src/nettles/Nettles.cs`) brings up `Nettles.PerNight` nettles once night has fallen (`SaveState.NettlesUp`
@@ -1078,6 +1116,8 @@ By day it removes them all.
 A firebug is a thing of the shape `GatherShape.Caught`, kept at its place: where it is now is `Firebugs.At`, its
 place plus `Firebugs.Hover`, a slow swing by its id and the world's clock, so the host and every window agree on it
 without an update while it hovers.
+A catch adds a three-day expiry to that unit in its stack. The stack shows the average life of its surviving firebugs.
+Expiry follows each firebug through moving, stacking, packing and loading. The world removes dead firebugs from inventories.
 Its flight (`Firebugs.Flight`) is kept only while the world runs:
 
 - **Dart.** A player out in the open within `StartleRadius` sets it darting straight away from them, up to
@@ -1489,7 +1529,7 @@ The plan's materials return to the backpack or go in a recovery box through `Con
 ### Storage, filters and automation
 
 Inventories are slot grids with stacks of 64.
-Tools, packed crates and bottles take a slot each everywhere.
+Tools, packed crates, bottles and lanterns take a slot each everywhere.
 The layout is saved and synchronized: removing one stack never shifts unrelated slots.
 Sort is the only action that packs and regroups stacks.
 Item totals change only through `Inventory` methods, which keep them in line with the stacks.
@@ -1501,6 +1541,7 @@ The player moves items in and out of storage and stations within `World.ItemReac
 Input rule for every item slot, in the backpack, storage and stations alike (`SlotInput`):
 
 - LMB picks up the slot's stack onto the cursor, a held stack; RMB picks up half of it.
+  RMB on a carried lantern opens the lantern instead.
 - With a stack held, LMB puts it down on the slot clicked and RMB puts down one; what does not fit stays held.
   On another item's slot in the same inventory the two swap; back on its own slot LMB lets go of it.
 - A held stack lands by the rules of where it is put: each slot sends its own command, the one its Shift- or Ctrl-click sends, with the mark "from held stack" (`World.FromHeldStack`, `Command.Held`, `ItemMoves.PutDown`).
@@ -1520,7 +1561,7 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
   Ctrl batches from the backpack drawer and Store all carry the mark "spares only" (`World.FromSpares`, `Command.Spares`, `Inventory.SparesOnly`), which leaves bound stacks behind.
   Pouring from vessels with Ctrl includes hotbar-bound vessels and preserves their bindings.
 - Esc, a click on open ground or on the interface anywhere but an item slot, or closing the side panel lets go of the held stack (`HeldCursor`).
-- A held crate, barrel or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
+- A held crate, barrel, lantern or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
 - A held stack put on storage clicked in the world goes into it; an item only selected on the hotbar never does.
 - Bulk buttons and recipe batch actions say what they move.
 
@@ -1538,6 +1579,7 @@ Both are boxes a player in reach of the worker (`World.Reaches`) picks up from a
 #### Chests
 
 Chests have separate item allowlists for input and output.
+A debug chest in a playtest save sets the inventory's `UnlimitedSlots` and adds a spare cell whenever the last one fills.
 Storage with a filter window has `Inventory.Gated` set: there an empty list lets nothing through and `Inventory.Everything`, shown as an "A" cell, lets every item through.
 `Inventory.Filter` keeps `Everything` alone in its row.
 `World.Add` gives a chest and tool station an empty input list and `Everything` as output (`Inventory.GateNew`), and a pile, barrel and trading post empty lists; every crate's contents get the chest's lists when made (`World.NewCrate`), packed or not.
@@ -1730,6 +1772,7 @@ The market accepts any packed crate.
 `Market.Goods` lists every good the village trades with its price: a `Sells` entry for one it takes, a `Buys` lot for one it sells.
 The game gathers them into `Market.Sells` and `Market.Buys` when it starts.
 Goods outside `Market.Sells` are donated: they pay nothing and leave demand alone.
+An empty crate in the market, left when the firebugs packed in it die, is donated as well and pays nothing, not even its crate price.
 The returning cart names them.
 A sale pays for every unit of its contents at the pre-sale price, plus the crates.
 
@@ -1885,6 +1928,7 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 Sound effects are one-shot MP3s in `assets/sounds`, apart from a held sound's looping WAV (below); `x_1.mp3`, `x_2.mp3`
 and so on are variants of one sound `x`.
 Each play picks a variant other than the previous one with a small random pitch and volume change.
+The wolves' howls, the mortar and the two goal popup chimes keep their pitch (`Sounds.KeepsPitch`).
 
 A held sound loops for as long as its source holds it again each frame (`Sounds.Hold`), one sound a source.
 It starts at a random moment of its recording and fades in and out over 0.15 seconds, so it neither clicks on nor cuts

@@ -16,6 +16,62 @@ public sealed class Firebugs(World world) {
     public const float ThreeChance = .25f;
     /// <summary>Metres from a cluster's first firebug within which the others come out.</summary>
     public const float ClusterRadius = 1;
+    public const string Item = "firebug";
+    private const int LifeDays = 3;
+    internal float NewExpiry => world.Time + LifeDays * world.Data.DaySeconds;
+    private float nextExpiry = float.PositiveInfinity;
+    private readonly List<(int Id, string Name)> changedCrates = new();
+
+    /// <summary>Starts the three-day lifetime of each firebug this inventory can take from a catch.</summary>
+    internal int Catch(Inventory to, int count) {
+        int room = Math.Min(count, to.Room(Item));
+        if (room <= 0) return 0;
+        float expiry = NewExpiry;
+        Span<float> expires = room <= 64 ? stackalloc float[room] : new float[room];
+        expires.Fill(expiry);
+        nextExpiry = Math.Min(nextExpiry, expiry);
+        return to.AddFirebugs(expires);
+    }
+
+    /// <summary>Average game minutes left among the firebugs in one stack, or the whole box when no slot is named.</summary>
+    internal int AverageMinutes(Inventory box, int slot = -1) =>
+        MinutesLeft(slot < 0 ? box.AverageFirebugExpiry() : box.AverageFirebugExpiry(slot));
+
+    /// <summary>The average of some firebugs' death times, or 0 for none.</summary>
+    internal static float Average(ReadOnlySpan<float> expiries) {
+        double total = 0;
+        foreach (float expiry in expiries) total += expiry;
+        return expiries.IsEmpty ? 0 : (float)(total / expiries.Length);
+    }
+
+    internal int MinutesLeft(float expiry) => (int)MathF.Ceiling(Math.Max(0, expiry - world.Time) / world.Data.HourSeconds * 60);
+
+    /// <summary>Clears dead bugs from the inventories that can hold them when the next catch expires.</summary>
+    internal void Age() {
+        float now = world.Time;
+        if (now < nextExpiry) return;
+        nextExpiry = float.PositiveInfinity;
+        changedCrates.Clear();
+        var saved = world.S;
+        foreach (var (id, box) in saved.Crates) {
+            int before = box[Item];
+            Check(box);
+            if (box[Item] != before) changedCrates.Add((id, World.PackedName(box, id)));
+        }
+        foreach (var player in saved.Players) Check(player.Backpack);
+        foreach (var player in saved.Absent.Values) Check(player.Backpack);
+        foreach (var worker in saved.Workers) Check(worker.Bag);
+        foreach (var thing in saved.Things) {
+            Check(thing.Inventory);
+            if (thing.Output is { } output) Check(output);
+        }
+        foreach (var (id, name) in changedCrates) if (name == "crate") saved.Crates.Remove(id);
+
+        void Check(Inventory box) {
+            if (box[Item] > 0) nextExpiry = Math.Min(nextExpiry, box.ExpireFirebugs(now));
+            foreach (var (id, name) in changedCrates) box.RenamePackedCrate(id, name);
+        }
+    }
     /// <summary>Metres a firebug keeps from every building as it comes out.</summary>
     public const float BuildingRoom = 25;
     /// <summary>Metres within which a player sets a firebug darting, unless it rests.</summary>
@@ -49,7 +105,7 @@ public sealed class Firebugs(World world) {
     // Which way a startled firebug swerves. Seeded, and started again with each world, so a recording of a night plays the same every time.
     private Random swerves = new(Seed);
 
-    internal void Reset() { flights.Clear(); swerves = new Random(Seed); }
+    internal void Reset() { flights.Clear(); swerves = new Random(Seed); nextExpiry = world.Time; }
 
     /// <summary>Where a firebug is now: its place and how far its hovering has carried it from there.</summary>
     public Vector2 At(Thing bug) => bug.Pos + Hover(bug.Id, world.Time);
@@ -163,7 +219,7 @@ public sealed class Firebugs(World world) {
             else if (at.DistanceTo(world.Player) <= ScareRadius) Startle(bug, FlightOf(bug), world.Player);
         }
         foreach (var bug in caught) {
-            if (s.Backpack.Add(World.ResourceItem(bug), 1) == 0) { world.Say("Backpack full. Store or sell some supplies."); Startle(bug, FlightOf(bug), world.Player); continue; }
+            if (Catch(s.Backpack, 1) == 0) { world.Say("Backpack full. Store or sell some supplies."); Startle(bug, FlightOf(bug), world.Player); continue; }
             s.Things.Remove(bug); flights.Remove(bug.Id); world.Got(World.ResourceItem(bug));
         }
     }

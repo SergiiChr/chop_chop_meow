@@ -30,6 +30,7 @@ public static class FirebugChecks {
         Test(CheckFirebugTakesNoGround, data);
         Test(CheckFirebugJobNeedsANetAtAToolStation, data);
         Test(CheckFirebugsAndNettlesComeBackFromASave, data);
+        FirebugRecoveryChecks.Run(data);
     }
 
     private static void CheckRopeWoodAndAWoodPartMakeABugNetWithEitherHammer(GameData data) {

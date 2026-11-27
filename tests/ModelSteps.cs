@@ -59,7 +59,11 @@ internal static class ModelSteps {
 
     /// <summary>The piece a pile heaps up once it holds nothing but the given number of the item, a stack unless told.</summary>
     public static Mesh Piled(PileProp pile, Thing thing, string item, GameData data, int count = 64) {
-        thing.Inventory.Clear(); thing.Inventory.Add(item, count);
+        thing.Inventory.Clear();
+        if (item == Firebugs.Item) {
+            var expiry = new float[count]; Array.Fill(expiry, 2520);
+            thing.Inventory.AddFirebugs(expiry);
+        } else thing.Inventory.Add(item, count);
         WorldModels.SyncPile(pile, thing, data);
         return pile.Stock.Piece!;
     }

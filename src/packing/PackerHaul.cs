@@ -9,12 +9,14 @@ internal sealed class PackerHaul : PlaceHaul {
             Offer(ref best, TakeOut(t, shelf, CarryBox.Output, crate, 1, true));
         foreach (var (item, _) in t.Inventory.Items) {
             int free = t.Inventory.Free(item);
-            if (free > 0 && item != t.Packs && item != "crate" && Taker(t, item, free) is (Thing store, int count)) Offer(ref best, TakeOut(t, store, CarryBox.Inventory, item, count, false));
+            if (free > 0 && !World.IsProduct(t.Packs, item) && item != "crate" && Taker(t, item, free) is (Thing store, int count)) Offer(ref best, TakeOut(t, store, CarryBox.Inventory, item, count, false));
         }
         if (t.Packs == "") return;
         // A batch is one crate: a crate's worth of the good and one empty crate.
-        if (World.PackingRoom(t, t.Packs) is > 0 and int room && world.SourceFor(t.Packs, w.Pos, t.Id) is Thing goods)
-            Offer(ref best, Bring(t, goods, t.Packs, room, t.Inventory[t.Packs], world.Data.CrateCapacity));
+        if (World.PackingRoom(t, t.Packs) is > 0 and int room && world.SourceForItem(t.Packs, w.Pos, t.Id) is (Thing goods, string stockItem)) {
+            int stocked = t.Inventory.CountOfKind(t.Packs);
+            Offer(ref best, Bring(t, goods, stockItem, room, stocked, world.Data.CrateCapacity));
+        }
         if (World.PackingRoom(t, "crate") is > 0 and int crates && world.SourceFor("crate", w.Pos, t.Id) is Thing stack)
             Offer(ref best, Bring(t, stack, "crate", crates, t.Inventory["crate"], 1));
     }

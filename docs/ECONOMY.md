@@ -8,7 +8,10 @@ To tune: change the data, run the tests, and read those lines before and after.
 One steel bar makes one stackable steel pipe at the anvil with a steel hammer in 10 base seconds.
 A pipe tile costs one steel pipe.
 A building takes ten steel pipes in its Plumbing slot.
-The pump costs four steel bars, ten stone and four wood parts. A reusable bottle takes one steel sheet and one wood part at a bench with a steel hammer.
+The pump costs four steel bars, ten stone and four wood parts.
+A reusable bottle takes one steel sheet and one wood part at a bench with a steel hammer.
+An empty lantern takes one glass jar, one steel sheet and one wood part at a bench with a steel hammer.
+Up to ten caught firebugs fit inside.
 
 ## 1. Prices and whole chains
 
