@@ -61,6 +61,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
 | `--showcase --tools` | Show the camp's tool station; `--panel` opens its page, and `--filters` opens its filter window too |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
+| `--showcase --goal-popup` | Reach the bench in that fixture, so **A start** pops up as completed and then **Road to riches** as new |
 | `--showcase --firebugs` | Show a night meadow with three nettles, a tool station holding a bug net, firebugs hovering round a player who carries a bug net, and one firebug darting off; `--day-phase 0.3` shows the nettles by day, and `--chase` has the player run the firebugs down and net them |
 | `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
@@ -607,6 +608,14 @@ The bench reveals **Road to riches**, the stone furnace reveals **Hotter than fi
 reveals **Steel tools**.
 Getting a steel bar reveals **Too soft**.
 Completing it reveals **Infinite power**.
+
+A goal that appears during play pops up under the messages at the top of the screen with a chime: a trophy badge pops
+in and a bar opens out of it with **New goal** and the goal's name.
+A completed goal pops up the same way with **Goal completed** and a different chime.
+A goal that appears already done pops up only as completed.
+Each popup stays about five seconds, and goals that change together pop up one after another.
+Click a popup to open the Goal Log on that goal.
+The goals a new, loaded or joined game starts with do not pop up.
 
 **Infinite power** requires an open mine for each ore found in the cliffs.
 **NEET** requires at least 1,300 coins in profit a day for seven days in a row.

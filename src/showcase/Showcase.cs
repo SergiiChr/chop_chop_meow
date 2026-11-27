@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The review fixtures behind <c>--showcase</c> and its flags: settled scenes for screenshots, separate from a playable game.</summary>
-public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit) {
+public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit, GoalPopup goalPopup) {
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
         var stage = int.TryParse(Launch.Value("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
@@ -29,8 +29,18 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     }
     private void Press(string button) => panel.FindChild(button, true, false).EmitSignal(BaseButton.SignalName.Pressed);
 
-    /// <summary>Sets up the scene the flags ask for; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    /// <summary>Sets up the scene the flags ask for, which pops up no goals it sets by hand.</summary>
     public void Run() {
+        Stage();
+        // A scene's goals are set by hand, not reached in play, so they pop up nothing.
+        // With --goal-popup the bench is reached after that: "A start" pops up as completed, then "Road to riches" as new.
+        bool popup = Launch.Has("--goal-popup") && world.S.Milestones.Remove("bench");
+        goalPopup.TakeUp();
+        if (popup) world.S.Milestones.Add("bench");
+    }
+
+    /// <summary>Builds the scene; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    private void Stage() {
         if (Launch.Value("--straw-bed") is string bedPose) { StrawBedScene(bedPose); return; }
         Place();
         view.Zoom = Launch.Number("--zoom", view.Zoom);

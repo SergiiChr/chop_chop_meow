@@ -7,10 +7,13 @@ using static WorldSteps;
 namespace ChopChopMeow;
 
 public partial class Game {
-    /// <summary>Checks goal discovery in a fresh game, then completion and the ending after the other progression checks.</summary>
-    private Task RunGoalUIChecks(bool freshGame) => freshGame
-        ? TestClean(CheckFreshGoalLogHidesUnknownGoalsAndLinksItems)
-        : TestClean(CheckEndGoalsShowInThePauseMenuAndTheEndingOnce);
+    /// <summary>Checks goal discovery and its popups in a fresh game, then completion and the ending after the other progression checks.</summary>
+    private async Task RunGoalUIChecks(bool freshGame) {
+        if (!freshGame) { await TestClean(CheckEndGoalsShowInThePauseMenuAndTheEndingOnce); return; }
+        await TestClean(CheckFreshGoalLogHidesUnknownGoalsAndLinksItems);
+        await TestClean(CheckReachedGoalsPopUpInTurnAndOpenTheirDetails);
+        await TestClean(CheckGoalRevealedAlreadyDonePopsUpOnlyAsCompleted);
+    }
 
     private async Task CheckFreshGoalLogHidesUnknownGoalsAndLinksItems() {
         await KeyStroke(Key.Escape);
@@ -41,6 +44,36 @@ public partial class Game {
         Require(!recipeMap.Visible && menu.GoalDetails.Visible && view.Paused, "Closing the map should return to the paused goal details.");
         await KeyStroke(Key.Escape);
         await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>Reaching the bench pops up "A start" as completed, then "Road to riches" as new, each with its sound; a click opens the goal.</summary>
+    private async Task CheckReachedGoalsPopUpInTurnAndOpenTheirDetails() {
+        Require(!goalPopup.Visible, "A new game must pop up none of the goals it starts with.");
+        int before = sounds.Played;
+        Achieve(Hosted, "bench");
+        await Until(() => goalPopup.Visible && goalPopup.Title == "A start", "the bench's goal popping up", 2);
+        Require(goalPopup.Heading == "Goal completed", $"A goal reached must pop up as completed, not as \"{goalPopup.Heading}\".");
+        Require(sounds.Heard("goal_completed", before), "A completed goal's popup must play its sound.");
+        Require(!sounds.Heard("goal_new", before), "The goal the bench reveals must wait until the completed one has gone.");
+        await Until(() => goalPopup.Title == "Road to riches", "the goal the bench reveals popping up next", 7);
+        Require(goalPopup.Heading == "New goal", $"A revealed goal must pop up as new, not as \"{goalPopup.Heading}\".");
+        Require(sounds.Heard("goal_new", before), "A new goal's popup must play its sound.");
+        await Click(goalPopup);
+        Require(menu.Visible && menu.GoalDetails.Visible && HasLabel(menu.GoalDetails, "Build a trading post and sell a crate of goods."),
+            "Clicking the popup must open the pause menu on that goal's details.");
+        await KeyStroke(Key.Escape);
+        await KeyStroke(Key.Escape);
+        Require(!menu.Visible, "Escape must close the goal's details and then the pause menu.");
+    }
+
+    /// <summary>Seeing ore with the steel hammer and pickaxe already bought pops up "Steel tools" once, as completed only.</summary>
+    private async Task CheckGoalRevealedAlreadyDonePopsUpOnlyAsCompleted() {
+        await Until(() => !goalPopup.Visible, "the last goal popup closing", 6);
+        int before = sounds.Played;
+        Achieve(Hosted, "steel_hammer", "steel_pick", Goals.OreSeen);
+        await Until(() => goalPopup.Visible && goalPopup.Title == "Steel tools", "the steel tools goal popping up", 2);
+        Require(goalPopup.Heading == "Goal completed", $"A goal revealed already done must pop up as completed, not as \"{goalPopup.Heading}\".");
+        Require(!sounds.Heard("goal_new", before), "A goal revealed already done must not pop up as new as well.");
     }
 
     /// <summary>Building the mines and meeting the profit target shows the ending once, with a choice to keep playing.</summary>

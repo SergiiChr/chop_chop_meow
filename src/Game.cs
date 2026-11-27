@@ -23,6 +23,7 @@ public partial class Game : Node, IGameFlow {
     private CanvasLayer layer = null!;
     private Corner corner = null!;
     private MessageStack messages = null!;
+    private GoalPopup goalPopup = null!;
     private NeedsPlate needsPlate = null!;
     private Button layerButton = null!;
     private DamageEdges damageEdges = null!;
@@ -110,7 +111,7 @@ public partial class Game : Node, IGameFlow {
             if (!review) Engine.MaxFps = Settings.FrameLimit;
             BuildHud();
             Settings.ApplyAntiAliasing(GetViewport(), Settings.AntiAliasing);
-            if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
+            if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit, goalPopup).Run();
             else if (!Launch.Has("--animation-review") && introFolder == null) startMenu.ShowStart();
             if (Launch.Value("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
             // The game opens on the intro film, over the start menu; review runs, checks and a screenshot of the menu open without it.
@@ -157,6 +158,8 @@ public partial class Game : Node, IGameFlow {
         ui.AddChild(hotbar);
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
+        // The menus and pages added after it cover it.
+        goalPopup = new GoalPopup(world, sounds, goal => menu.OpenGoal(goal)); ui.AddChild(goalPopup);
         ui.AddChild(panel.Aside); ui.AddChild(panel); ui.AddChild(bag);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -191,7 +194,7 @@ public partial class Game : Node, IGameFlow {
         corner.Refresh(); deathLabel.Refresh(); modeLabel.Refresh(); recovery.Refresh();
         float messagesTop = Math.Max(56, modeLabel.OffsetTop + modeLabel.GetCombinedMinimumSize().Y + 10);
         if (messages.OffsetTop != messagesTop) messages.OffsetTop = messagesTop;
-        menu.RefreshGoalLog();
+        menu.RefreshGoalLog(); goalPopup.Refresh();
         panel.Refresh();
         hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
         bool below = player.Layer == Layer.Underground;
@@ -233,6 +236,8 @@ public partial class Game : Node, IGameFlow {
 
     private void OnJoined(bool back) {
         ending.Joined(back);
+        // The world the window joined is complete only now, after the server's first update.
+        goalPopup.TakeUp();
         shownHealth = world.Health;
         if (session is Session.Starting starting) Begin(starting.Slot);
         else if (session is Session.Returning returning) Notify($"{returning.Note} You are back in your game.");
@@ -466,6 +471,13 @@ public partial class Game : Node, IGameFlow {
         // The needs plate grows with the bank count, and an open side panel would cover the messages' right end.
         float messagesLeft = needsPlate.GetRect().End.X + 24, messagesRight = panel.Visible ? SidePanel.Left - 16 : -messagesLeft;
         if (messages.OffsetLeft != messagesLeft || messages.OffsetRight != messagesRight) { messages.OffsetLeft = messagesLeft; messages.OffsetRight = messagesRight; }
+        // The goal popup sits under the messages, across the same strip, and glides rather than jumps when a line comes or goes above it.
+        float popupTop = messages.GetRect().End.Y + 8;
+        if (goalPopup.Visible) popupTop = Mathf.MoveToward(goalPopup.OffsetTop, popupTop, 240 * dt);
+        if (goalPopup.OffsetTop != popupTop || goalPopup.OffsetLeft != messagesLeft || goalPopup.OffsetRight != messagesRight) {
+            goalPopup.OffsetLeft = messagesLeft; goalPopup.OffsetRight = messagesRight;
+            goalPopup.OffsetTop = popupTop; goalPopup.OffsetBottom = popupTop + GoalPopup.Height;
+        }
         if (smokeTest && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
         if (screenshotPath != null && runTime > shotDelay && !capturing) { capturing = true; Capture(screenshotPath); }
         if (performanceRun != null) EndPerformanceRun(performanceRun.Sample());

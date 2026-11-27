@@ -170,6 +170,7 @@ UI and input:
 | `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
 | `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
+| `src/goals/display/GoalPopup.cs` | The popup at the top of the screen when a goal appears or is completed, with its chime |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
@@ -689,6 +690,14 @@ NEET is complete after `GoalsDef.ProfitDays` consecutive days of at least `Goals
 At dawn the wages charged are taken off and the result joins `SaveState.Profits`.
 Reaching the streak sets the `profit_week` milestone, which stays reached.
 The open mines and profit milestone together unlock the ending.
+
+`GoalPopup` compares each goal's status with the popups it has shown on every interface refresh, five times a second.
+It queues a new popup for a goal that left `Hidden` and a completed popup for one that reached `Completed`, each at
+most once a game, and shows them in turn.
+A goal that goes from `Hidden` straight to `Completed` gets only the completed popup.
+It takes up the statuses a game already has, with no popups, once the window has joined a game and taken the server's
+first update (`Net.Joined`): a new game, a load, joining another player's game and reconnecting.
+The showcase takes them up again after setting up its scene by hand.
 
 ### Survival and needs
 
