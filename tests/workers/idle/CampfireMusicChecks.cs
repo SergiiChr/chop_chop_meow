@@ -14,8 +14,24 @@ internal static class CampfireMusicChecks {
         Test(CheckTheThreeInstrumentsAtOneCampfirePlayOneSong, data);
         Test(CheckACampfireSongKeepsTimeInAnOldSettlement, data);
         Test(CheckInstrumentsAtDifferentCampfiresNeverStartASongTogether, data);
-        Test(CheckOneInstrumentWaitsBeforePlayingAndStopsWhenTheWorkerLeaves, data);
+        Test(CheckOneInstrumentPlaysTwoToThreeSecondsAfterEachSoundAndStopsWhenTheWorkerLeaves, data);
         Test(CheckLunchingWorkersDoNotPlayCampfireMusic, data);
+        Test(CheckEveryGuitarStrumLastsTwoSeconds);
+        Test(CheckEveryHarmonicaSoundLastsLongerThanASixthOfASecond);
+    }
+
+    private static void CheckEveryGuitarStrumLastsTwoSeconds() {
+        for (int solo = 1; solo <= CampfireScore.SoloCount(CampfireInstrument.Guitar); solo++) {
+            float duration = CampfireScore.Solo(CampfireInstrument.Guitar, solo).Duration;
+            Require(Math.Abs(duration - 2) < .01f, $"guitar strum {solo} should last two seconds, got {duration:F2}s");
+        }
+    }
+
+    private static void CheckEveryHarmonicaSoundLastsLongerThanASixthOfASecond() {
+        for (int solo = 1; solo <= CampfireScore.SoloCount(CampfireInstrument.Harmonica); solo++) {
+            float duration = CampfireScore.Solo(CampfireInstrument.Harmonica, solo).Duration;
+            Require(duration > .16f, $"harmonica sound {solo} should last longer than 0.16s, got {duration:F2}s");
+        }
     }
 
     private static void CheckArrivingWorkersPickOnlyInstrumentsMissingFromTheirCampfire(GameData data) {
@@ -68,8 +84,7 @@ internal static class CampfireMusicChecks {
         world.Fire(drum);
         Work(world, .5f);
         Require(music.SongAt(fire.Id).Track == 0, "an incomplete trio should end the gathering");
-        music.Seed(1);
-        var nextDrummer = AddAtFire(world, fire, 1);
+        var nextDrummer = SeatUntilOneBrings(world, fire, 1, CampfireInstrument.Drum);
         Work(world, 2, () => music.SongAt(fire.Id).Track > 0);
         Require(music.SongAt(fire.Id).Plays(nextDrummer.Id), "the musicians should play another song when a new trio gathers");
     }
@@ -102,19 +117,21 @@ internal static class CampfireMusicChecks {
             "instruments at separate campfires should not form a trio");
     }
 
-    private static void CheckOneInstrumentWaitsBeforePlayingAndStopsWhenTheWorkerLeaves(GameData data) {
+    private static void CheckOneInstrumentPlaysTwoToThreeSecondsAfterEachSoundAndStopsWhenTheWorkerLeaves(GameData data) {
         var world = FundedWorld(data);
         var fire = world.Add(ThingKind.Campfire, new Vector2(20, 20));
         world.CampfireMusic.Seed(374);
         var guitarist = AddAtFire(world, fire, 0);
-        Work(world, 4.9f);
+        Work(world, 1.9f);
         Require(world.CampfireMusic.SeatOf(guitarist) is { Instrument: CampfireInstrument.Guitar, Solo: 0 },
-            "the guitarist should wait at least five seconds before the first strum");
-        Work(world, 10, () => world.CampfireMusic.SeatOf(guitarist).Solo > 0);
+            "the guitarist should wait at least two seconds before the first strum");
+        Work(world, 1.5f, () => world.CampfireMusic.SeatOf(guitarist).Solo > 0);
         var first = world.CampfireMusic.SeatOf(guitarist);
-        Require(first.Solo > 0, "a guitarist without a trio should eventually strum");
+        Require(first.Solo > 0, "the guitarist should strum within about three seconds of sitting down");
+        float firstEnds = first.SoloAt + CampfireScore.Solo(CampfireInstrument.Guitar, first.Solo).Duration;
         Work(world, 20, () => world.CampfireMusic.SeatOf(guitarist).SoloAt > first.SoloAt);
-        Require(world.CampfireMusic.SeatOf(guitarist).SoloAt >= first.SoloAt + 5, "a second strum should leave at least five seconds between plays");
+        float gap = world.CampfireMusic.SeatOf(guitarist).SoloAt - firstEnds;
+        Require(gap is >= 2 and <= 3.3f, $"the next strum should start two to three seconds after the first has finished, got {gap:F2}s");
         world.Fire(guitarist);
         Work(world, .2f);
         Require(world.CampfireMusic.SeatOf(guitarist).Fire == 0, "a worker who has left the campfire should no longer play there");
