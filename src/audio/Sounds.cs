@@ -80,6 +80,8 @@ public partial class Sounds : Node {
         ["sting_groan"] = -9,
         ["wolf_hit"] = -5.5f,
         ["bucket_hit"] = -6,
+        [GoalPopup.NewSound] = -3,
+        [GoalPopup.CompletedSound] = -10.5f,
     };
     /// <summary>
     /// Seconds into each variant at which it is loudest, for sounds whose loudest moment is timed onto what makes it, such
@@ -204,7 +206,8 @@ public partial class Sounds : Node {
     /// </summary>
     private float ReachOf(string name) => IsHowl(name) ? World.Data.HowlRadius : name == "wolf_growl_distance" ? 2 * World.Data.WolfSightRange : Reach;
     // A howl keeps its pitch, so it lasts exactly as long as the wolf holds its howl, and the mortar's, so its tap lands as the pestle comes down.
-    private static bool KeepsPitch(string name) => IsHowl(name) || name == "grind_mortar";
+    // The goal popups' chimes keep theirs, since they are short tunes.
+    private static bool KeepsPitch(string name) => IsHowl(name) || name is "grind_mortar" or GoalPopup.NewSound or GoalPopup.CompletedSound;
     /// <summary>The volume scale of the last sound started, from one at full volume.</summary>
     public float LastFade { get; private set; }
     /// <summary>Whether the last sound started plays from a place in the world, panning with it.</summary>

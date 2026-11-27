@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The review fixtures behind <c>--showcase</c> and its flags: settled scenes for screenshots, separate from a playable game.</summary>
-public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit) {
+public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit, GoalPopup goalPopup) {
     /// <summary>
     /// Diary review: the player on the lake's shore by its floating page, with a page lying on the ground beside them and three finds in their diary, two of whose days are unread.
     /// <c>--diary-fall</c> drops that page off the oak beside them a second in instead, since a player has one fallen page at a time.
@@ -59,8 +59,20 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     }
     private void Press(string button) => panel.FindChild(button, true, false).EmitSignal(BaseButton.SignalName.Pressed);
 
-    /// <summary>Sets up the scene the flags ask for; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    /// <summary>Sets up the scene the flags ask for, which pops up no goals it sets by hand.</summary>
     public void Run() {
+        Stage();
+        // A scene's goals are set by hand, not reached in play, so they pop up nothing.
+        // With --goal-popup the bench is reached after that: "A start" pops up as completed, then "Road to riches" as new.
+        // The default scene has sold goods already, which would complete Road to riches as it appears.
+        bool popup = Launch.Has("--goal-popup") && world.S.Milestones.Remove("bench");
+        if (popup) world.S.Milestones.Remove("sold");
+        goalPopup.SkipKnownGoals();
+        if (popup) world.S.Milestones.Add("bench");
+    }
+
+    /// <summary>Builds the scene; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    private void Stage() {
         if (Launch.Value("--straw-bed") is string bedPose) { StrawBedScene(bedPose); return; }
         if (Launch.Value("--campfire-music") is string music) { CampfireMusicScene(music); return; }
         Place();

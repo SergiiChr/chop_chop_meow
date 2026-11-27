@@ -64,6 +64,9 @@ public partial class PauseMenu : PanelContainer {
         Visible = true;
     }
 
+    /// <summary>Opens the board on one goal's details.</summary>
+    public void OpenGoal(Goal goal) { if (!Visible) Open(); goalLog.ShowDetails(goal); }
+
     public override void _Process(double delta) {
         // Players join and leave while the menu is open.
         if (Visible && Guests != shownGuests) { shownGuests = Guests; netLine.Text = NetStatus(); }

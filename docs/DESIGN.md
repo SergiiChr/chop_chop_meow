@@ -178,6 +178,7 @@ UI and input:
 | `src/menus/PauseMenu.cs` | The pause menu with the Goal Log, Controls and hosting |
 | `src/goals/model/Goals.cs` | Goal names, details and the conditions that reveal and complete each goal |
 | `src/goals/display/GoalLog.cs` | The active and completed goals, their details and item links to the recipe map |
+| `src/goals/display/GoalPopup.cs` | The popup at the top of the screen when a goal appears or is completed, with its chime |
 | `src/diary/display/DiaryPanel.cs`, `src/diary/display/DiaryCell.cs`, `src/diary/display/ReadingSheet.cs`, `src/diary/display/FallingApart.cs`, `src/diary/display/FindPrompt.cs` | The Diary panel of paper cells, a day opened large to read with its writing falling apart where it says so, and the pop-up a find waits behind |
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
@@ -701,6 +702,20 @@ NEET is complete after `GoalsDef.ProfitDays` consecutive days of at least `Goals
 At dawn the wages charged are taken off and the result joins `SaveState.Profits`.
 Reaching the streak sets the `profit_week` milestone, which stays reached.
 The open mines and profit milestone together unlock the ending.
+
+`GoalPopup` compares each goal's status with the popups it has shown on every interface refresh, five times a second.
+It queues a new popup for a goal that left `Hidden` and a completed popup for one that reached `Completed`, each at
+most once a game, and shows them in turn.
+A goal that goes from `Hidden` straight to `Completed` gets only the completed popup.
+The diary goal's popup waits while the find pop-up or the reading sheet is open, and later popups go ahead of it.
+`Game.OpenGoalFromPopup` puts back a held stack and ends any click mode or walk to a cabin, then opens the pause menu
+on the goal over whatever is open, the ending screen included.
+It skips the statuses a game already has, with no popups (`GoalPopup.SkipKnownGoals`), once the window has joined a
+game and taken the server's first update (`Net.Joined`): a new game, a load, joining another player's game and
+reconnecting.
+It also skips them whenever the window's world is replaced (`World.Replaced`), so leaving a game for the start menu
+or losing the line to the host drops the popups that game still had waiting.
+The showcase skips them again after setting up its scene by hand.
 
 ### Survival and needs
 
@@ -1919,6 +1934,7 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 Sound effects are one-shot MP3s in `assets/sounds`, apart from a held sound's looping WAV (below); `x_1.mp3`, `x_2.mp3`
 and so on are variants of one sound `x`.
 Each play picks a variant other than the previous one with a small random pitch and volume change.
+The wolves' howls, the mortar and the two goal popup chimes keep their pitch (`Sounds.KeepsPitch`).
 
 A held sound loops for as long as its source holds it again each frame (`Sounds.Hold`), one sound a source.
 It starts at a random moment of its recording and fades in and out over 0.15 seconds, so it neither clicks on nor cuts
