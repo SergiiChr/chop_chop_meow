@@ -1481,7 +1481,9 @@ public partial class WorldView : Node3D {
                 break;
             case BushProp bush:
                 if (still) break;
-                bush.Fruit.Visible = t.Remaining > 0;
+                int berryStage = WorldModels.BerryStage(t);
+                bush.Fruit.Visible = berryStage > 0;
+                if (berryStage > 0) bush.Fruit.Mesh = bush.Stages[berryStage - 1];
                 prop.Body.Scale = new Vector3(1 + wobble * .04f, 1 - wobble * .03f, 1 + wobble * .04f);
                 break;
             case FurnaceProp furnace:

@@ -1,16 +1,30 @@
 ---
-name: update-saves
-description: Bring the player's own save slots up to the save version on main and fix whatever stops them loading, testing each on a headless server. Use after merging a branch that raises the save version, or when the player's save will not load on main.
+name: post-merge
+description: After a branch is merged into main, bring the player's own save slots up to main's save version when the merge raised it, testing each on a headless server, then remove the merged branch's worktree, local branch and leftover files. Use after any merge into main, or when the player's save will not load on main.
 ---
 
-# Update saves
+# Post-merge
+
+Run this after any branch is merged into main, for that one merge.
+Do it without asking first.
+
+1. Fast-forward main as [docs/RELEASE.md](../../../docs/RELEASE.md) says.
+2. Find the merged branch: a pull request's merge commit names it, as in `Merge pull request #133 from
+   SergiiChr/claude/diary`.
+3. [Bring the saves forward](#bring-the-saves-forward) if the merge raised the save version, or the player's save will
+   not load on main.
+   The merge raised it when its first parent holds a lower one:
+   `git grep -o "int Version { get; set; } = [0-9]*" <merge>^ <merge> -- src`.
+4. [Clean up](#clean-up).
+
+## Bring the saves forward
 
 A save holds `SaveState.Version`, and `World.Deserialize` refuses any other version.
 The game holds no code that converts an old save ([CODING.md](../../../CODING.md)), so the player's saves are brought
 forward by hand once a branch that raises the version is merged into main.
-Do it without asking first, and never commit the conversion.
+Never commit the conversion.
 
-## Find the slots
+### Find the slots
 
 The player's slots are in the main checkout's user data, `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/`:
 `autosave.json` is slot 0, `settlement.json` slot 1, and `settlement-<n>.json` slot n.
@@ -18,8 +32,7 @@ Files named `backup-*`, `net-check-*`, `server-check-*`, `performance-*` and `pl
 
 Run every command from the main checkout until the test worktree is made, and the clean up from it again.
 
-1. Fast-forward main as [docs/RELEASE.md](../../../docs/RELEASE.md) says, and read its version:
-   `git grep -h -o "int Version { get; set; } = [0-9]*" main -- src`.
+1. Read main's version: `git grep -h -o "int Version { get; set; } = [0-9]*" main -- src`.
 2. Make a test worktree of main and work from it, so that the scratch files and the test servers stay out of the main
    checkout.
    Its `tmp/` must be ignored: the list `git rev-parse --git-path info/exclude` names holds `tmp/` for every worktree.
@@ -39,7 +52,7 @@ Run every command from the main checkout until the test worktree is made, and th
    Never write over an existing backup.
    Always convert from the backup, so a second try never starts from a half-converted file.
 
-## Find what changed
+### Find what changed
 
 List where main's save version went up, starting a few days before the slot was written:
 
@@ -71,7 +84,7 @@ It reads the backup and writes the result over the real slot in the main checkou
 First check that the slot's time is still the one you read, so a game the player saved since is never written over.
 Name copies of C# code saved in `tmp/` `*.cs.txt`: the build compiles every C# file in the worktree, `tmp/` included.
 
-## Test each slot on a server
+### Test each slot on a server
 
 Load each slot in the test worktree, never in the main checkout or in the merged branch's worktree, which may lack
 main's other changes.
@@ -133,20 +146,23 @@ Fix the cause in the conversion script, convert again from the backup and test a
 
 ## Clean up
 
-Once every slot loads:
+Run every command from the main checkout.
 
-1. Stop any server of this run still running: `kill $(cat tmp/server.pid)`.
-2. From the main checkout, remove the test worktree with its scratch files and clear git's record of it:
-   `git worktree remove ../worktrees/chop_chop_meow-saves`, then `git worktree prune`.
-3. Remove the merged branch's worktree and its local branch, only when `git merge-base --is-ancestor <branch> main`
-   says it is merged.
+1. If the saves were brought forward, once every slot loads:
+   - Stop any server of this run still running: `kill $(cat tmp/server.pid)`.
+   - Remove the test worktree with its scratch files and clear git's record of it:
+     `git worktree remove ../worktrees/chop_chop_meow-saves`, then `git worktree prune`.
+   - Keep the backups beside the slots.
+2. Remove the merged branch's worktree, with the scratch files in its `tmp/`, and its local branch, only when
+   `git merge-base --is-ancestor <branch> main` says it is merged.
    `git worktree remove` refuses a worktree with changes: stop and ask when it or the merge test refuses, never force
    them.
    Then `git branch -d <branch>` and `git worktree prune`.
-   Remove only the worktree and branch of the merge this run is for, never another session's.
-4. Keep the backups beside the slots.
+3. Remove any other worktree the merged branch's session made, such as a frozen review copy, once nothing in it is
+   uncommitted work.
+   Remove only what belongs to the merge this run is for, never another session's.
 
 ## Report
 
-For each slot, give its version before and after, each change made to it, and its backup's file name.
+For each slot brought forward, give its version before and after, each change made to it, and its backup's file name.
 Name any slot left alone and why, and what the clean up removed.

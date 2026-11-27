@@ -310,15 +310,13 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             panel.Close(); return;
         }
         if (Launch.Has("--bushes")) {
-            // A clean three-bush comparison row of berry bushes, with one picked-clean bush to show its persistent model.
+            // A row of berry bushes in their five stages, from full to picked clean, with all three variants.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Bush variants are selected from the id; start the row at variant zero and include all three.
             world.S.NextId += (3 - world.S.NextId % 3) % 3;
-            world.Add(ThingKind.Berries, at + new Vector2(-2.25f, 2.25f), 24);
-            world.Add(ThingKind.Berries, at + new Vector2(-.75f, .75f), 24);
-            world.Add(ThingKind.Berries, at + new Vector2(.75f, -.75f), 24);
-            world.Add(ThingKind.Berries, at + new Vector2(2.25f, -2.25f), 0);
+            for (int stage = WorldModels.BerryStages; stage >= 0; stage--)
+                world.Add(ThingKind.Berries, at + new Vector2(-1.5f, 1.5f) * (stage - 2), stage * World.BushBerries / WorldModels.BerryStages);
             // In front of them, three plain bushes, the last half dug out, and a stump beside one half dug out.
             for (int i = 0; i < 3; i++) world.Add(ThingKind.Bush, at + new Vector2(-.5f + i * 1.6f, 3.4f - i * 1.6f), World.BushLeaves).Progress = i == 2 ? GatherRules.DigSeconds * .7f : 0;
             for (int i = 0; i < 2; i++) world.Add(ThingKind.Stump, at + new Vector2(3.4f + i * 1.2f, -.4f - i * 1.2f), World.StumpWood).Progress = i * GatherRules.DigSeconds * .7f;
@@ -327,7 +325,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.S.Backpack.Add("steel_shovel", 1);
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
-            world.Player = at + new Vector2(-1, -.5f);
+            world.Player = at + new Vector2(-1.5f, -1.2f);
             world.Tick(0); view.Zoom = 1.8f;
             panel.Close(); return;
         }
