@@ -132,7 +132,7 @@ public sealed class WolfHunt(World world) {
         if (world.S.Mauled && !world.Dead) {
             int feeding = 0;
             foreach (var w in hunters) if (w.Feeding) feeding++;
-            world.S.Health -= dt * (16 + 8 * feeding);
+            world.HurtPlayer(dt * (16 + 8 * feeding));
         }
     }
     /// <summary>What a torch or a lit campfire by its player makes a hunting wolf do this tick.</summary>

@@ -18,9 +18,10 @@ public sealed class ItemDef {
     public int Tier { get; set; }
     /// <summary>Wolves eat it and compost takes it, cooked or not; only items that restore hunger or thirst can be eaten.</summary>
     public bool Food { get; set; }
-    /// <summary>What eating or drinking one restores; health comes back only with sleep.</summary>
+    /// <summary>How much hunger or thirst eating or drinking one restores.</summary>
     public float Hunger { get; set; }
     public float Thirst { get; set; }
+    public FoodEffect[] FoodEffects { get; init; } = [];
     /// <summary>What the player says of it, shown under its name; empty for an item with nothing said of it.</summary>
     public string Description { get; set; } = "";
 }
@@ -239,7 +240,7 @@ public sealed partial class GameData {
         for (int liters = 1; liters <= Bucket.Capacity; liters++)
             data.Items.Add(Bucket.AtFill(liters), new() { Name = $"Steel bucket ({liters} L)", Color = data.Items[Bucket.Item].Color, Tool = Bucket.Item });
         for (int liters = 1; liters < BerryJam.Bottles.Length; liters++)
-            data.Items.Add(BerryJam.Bottles[liters], new() { Name = $"Berry jam bottle ({liters} L)", Color = BerryJam.Color, Food = true, Hunger = BerryJam.HungerPerLiter });
+            data.Items.Add(BerryJam.Bottles[liters], new() { Name = $"Berry jam bottle ({liters} L)", Color = BerryJam.Color, Food = true, Hunger = BerryJam.HungerPerLiter, FoodEffects = JamFoodEffects });
         for (int liters = 1; liters <= Bucket.Capacity; liters++)
             data.Items.Add(BerryJam.Buckets[liters], new() { Name = $"Steel bucket ({liters} L berry jam)", Color = data.Items[Bucket.Item].Color });
         for (int liters = 1; liters <= Barrel.Capacity; liters++)
@@ -434,7 +435,8 @@ public sealed partial class GameData {
     public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>What the player says of an item, as a tooltip line of its own after the name, or nothing.</summary>
-    public string DescriptionLine(string item) => ItemDefinition(item) is { Description.Length: > 0 } def ? "\n" + def.Description : "";
+    public string DescriptionLine(string item) => DescriptionOf(item) is { Length: > 0 } description ? "\n" + description : "";
+    public string DescriptionOf(string item) => ItemDefinition(item)?.Description ?? "";
     /// <summary>An item or, for a lantern with a charge of its own, the shared recipe item.</summary>
     private ItemDef? ItemDefinition(string item) => Items.GetValueOrDefault(Lanterns.Kind(item));
     /// <summary>Whether an id names an item, a lantern of any charge included.</summary>

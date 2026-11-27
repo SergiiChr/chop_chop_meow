@@ -17,7 +17,7 @@ public partial class Game {
     /// <summary>The session's scenes in the order both sides play them: a feature adds its own here.</summary>
     private NetScene[] NetScenes => [
         GoalNetScene, CampfireMusicNetScene, SwingsNetScene, GravelPathNetScene, SteelPipeNetScene, StorageNetScene, BarrelNetScene,
-        ReplantingNetScene, FirebugNetScene, NettleNetScene, SandNetScene, LanternNetScene, DiaryNetScene, CabinNetScene,
+        ReplantingNetScene, FirebugNetScene, NettleNetScene, SandNetScene, LanternNetScene, DiaryNetScene, CabinNetScene, FoodEffectNetScene,
     ];
 
     private async void RunNetCheck(bool hosting) {

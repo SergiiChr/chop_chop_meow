@@ -197,7 +197,7 @@ public sealed class DoorCheck(World world) {
         }
         using (world.ActAs(victim)) {
             victim.Sheltered = 0; world.Player = Doorways.DoorPoint(cabin); victim.Warp++;
-            victim.Health -= world.Data.WolfBite;
+            world.HurtPlayer(world.Data.WolfBite);
             world.Play("wolf_bite", world.Player);
             world.DoorTug.Begin(wolf, Doorway.Tugged, cabin.Id);
             victim.DoorFrom = victim.Pos + DoorwayPath.IntoCabin.Rotated(cabin.Rotation);

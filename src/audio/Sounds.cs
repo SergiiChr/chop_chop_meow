@@ -93,7 +93,7 @@ public partial class Sounds : Node {
     };
     private const float MusicDb = -14;
     public const float MusicFadeSeconds = 4;
-    private Track day = null!, night = null!;
+    private Playlist day = null!, night = null!;
     private CampfireMusicAudio campfireMusic = null!;
     private readonly Dictionary<string, AudioStream[]> variants = new();
     private readonly Dictionary<string, int> previous = new();
@@ -124,11 +124,15 @@ public partial class Sounds : Node {
     public float MusicVolume = 1;
     internal bool CampfirePaused;
     public bool DayMusicPlaying => day.Player.Playing;
-    public int DayMusicIndex => day.Index;
+    public string DayMusicTrack => day.Name;
+    public float DayMusicPosition => day.Position;
     /// <summary>Jumps the current day track to its last moment, so it plays to its end without the wait.</summary>
-    public void SkipToDayTrackEnd() => day.Player.Seek((float)day.Player.Stream.GetLength() - .1f);
+    public void SkipToDayTrackEnd() => day.SkipToTrackEnd();
     public bool NightMusicPlaying => night.Player.Playing;
+    public string NightMusicTrack => night.Name;
     public float NightMusicPosition => night.Position;
+    /// <summary>Jumps the current night track to its last moment, so it plays to its end without the wait.</summary>
+    public void SkipToNightTrackEnd() => night.SkipToTrackEnd();
 
     // Players made while loading and reused in turn, so a sound instantiates nothing mid-game.
     private readonly List<AudioStreamPlayer> voices = new();
@@ -153,8 +157,9 @@ public partial class Sounds : Node {
             var voice = new AudioStreamPlayer(); AddChild(voice); heldVoices.Add(voice);
             heldPlacedVoices.Add(PlacedVoice());
         }
-        day = new Track(this, "path_to_lake_land", "mystic_theme");
-        night = new Track(this, "forest");
+        day = new Playlist(this, "path_to_lake_land", "mystic_theme",
+            "jazz_jazz_music", "jazz_bar", "lofi_soul", "groove_soul");
+        night = new Playlist(this, "forest", "soft_jazz");
         campfireMusic = new CampfireMusicAudio(PlacedVoice, Reach);
         World.Replaced += campfireMusic.Stop;
         // Loading a sound on its first play would stall that frame.
@@ -395,20 +400,23 @@ public partial class Sounds : Node {
     /// Its tracks play in order and wrap to the first after the last; a single track loops seamlessly.
     /// It pauses rather than stopping because starting an MP3 partway through decodes it from the beginning, which stalls the frame for longer the further in it starts.
     /// </summary>
-    private sealed class Track {
+    private sealed class Playlist {
         public readonly AudioStreamPlayer Player;
         private readonly AudioStreamMP3[] streams;
         private float level, at;
         private bool started;
-        public int Index { get; private set; }
+        private int index;
+        public string Name => System.IO.Path.GetFileNameWithoutExtension(Player.Stream.ResourcePath);
         public float Position => Player.Playing ? Player.GetPlaybackPosition() : at;
 
-        public Track(Node parent, params string[] names) {
+        public Playlist(Node parent, params string[] names) {
             streams = names.Select(name => GD.Load<AudioStreamMP3>($"res://assets/music/{name}.mp3")).ToArray();
             streams[0].Loop = streams.Length == 1;
             Player = new AudioStreamPlayer { Stream = streams[0] };
             parent.AddChild(Player);
         }
+
+        public void SkipToTrackEnd() => Player.Seek((float)Player.Stream.GetLength() - .1f);
 
         public void Update(float wanted, float dt, float volume) {
             level = Mathf.MoveToward(level, wanted, dt / MusicFadeSeconds);
@@ -417,7 +425,7 @@ public partial class Sounds : Node {
                 else if (!Player.Playing) {
                     // A player that has started and is neither playing nor paused has reached the end of its track, so the next one follows.
                     // The player's own finished signal comes too late for this: it fires after this update has already started the track again.
-                    if (started) { Index = (Index + 1) % streams.Length; Player.Stream = streams[Index]; }
+                    if (started) { index = (index + 1) % streams.Length; Player.Stream = streams[index]; }
                     Player.Play(); started = true;
                 }
             } else if (Player.Playing) {
