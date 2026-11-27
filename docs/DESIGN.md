@@ -1775,7 +1775,9 @@ When a worker cannot reach a group, they sit near where they stopped if there is
 If the fire is missing any instruments, there is a 25% chance of bringing one, with each missing instrument equally likely.
 A campfire holds at most one guitar, one harmonica and one drum.
 A listener who stays seated does not roll when a musician leaves.
-Each instrumentalist at an incomplete trio's fire waits at least five seconds between solo clips.
+Each instrumentalist at an incomplete trio's fire waits two to three seconds after a solo clip ends before the next,
+and before the first one after sitting down.
+Solo clips play 0.8 dB above the music volume, and guitar clips 6.6 dB above it.
 When a fire has all three instruments, one worker on each plays one randomly picked song and its other idle workers nod.
 After the song, each of the three plays solo clips as at an incomplete fire, with no second song until the fire no longer
 has all three instruments.

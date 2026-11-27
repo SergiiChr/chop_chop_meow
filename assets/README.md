@@ -303,6 +303,12 @@ Variants of one sound are matched in loudness, and a numbered suffix marks them.
 
 The campfire's solo sounds are mono MP3s with the leading silence cut and short fades at the ends.
 The loudest 400 ms of each cut is brought to -22 LUFS.
+`campfire_drum_1`, `campfire_drum_2` and `campfire_drum_4` were almost all bass under 100 Hz, which small speakers do
+not play. They are brightened with ffmpeg first, `highshelf=f=300:g=12,equalizer=f=2000:t=o:w=2:g=6`, and limited to
+-2 dB peaks after levelling.
+`campfire_drum_4` has little above 500 Hz to raise, so it stays the dullest of the four.
+Each `campfire_guitar` strum is cut to 2 s, fading out over its last half second.
+The harmonica chords of 0.15 s or less were left out.
 The originals come from Pixabay under the [Pixabay Content License](https://pixabay.com/service/license-summary/):
 
 - `campfire_drum_1` and `campfire_drum_2` are a single kick and the four-kick loop from LazyChillZone's
@@ -316,9 +322,9 @@ The originals come from Pixabay under the [Pixabay Content License](https://pixa
 - `campfire_guitar_3` and `campfire_guitar_4` are SOUND_GARAGE's
   [Em Guitar Chord Strum 1](https://pixabay.com/sound-effects/musical-em-guitar-chord-strum-1-309534/) and
   [Em Guitar Chord Strum 8](https://pixabay.com/sound-effects/musical-em-guitar-chord-strum-8-309539/).
-- `campfire_harmonica_1` through `campfire_harmonica_23` are individual chords from Samuel_Copier_Country's
+- `campfire_harmonica_1` through `campfire_harmonica_17` are individual chords from Samuel_Copier_Country's
   [Cowboy with a Diatonic Harmonica](https://pixabay.com/sound-effects/musical-cowboy-with-a-diatonic-harmonica-267513/).
-  `campfire_harmonica_24` through `campfire_harmonica_35` are chords from the same artist's
+  `campfire_harmonica_18` through `campfire_harmonica_28` are chords from the same artist's
   [Wild West Harmonica](https://pixabay.com/sound-effects/musical-wild-west-harmonica-267552/).
 
 These were made with ffmpeg from Kenney's sounds:

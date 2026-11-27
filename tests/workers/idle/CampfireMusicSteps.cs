@@ -30,6 +30,19 @@ internal static class CampfireMusicSteps {
         world.CampfireMusic.SeatOf(first).Solo > 0 || world.CampfireMusic.SeatOf(second).Solo > 0 ||
         world.CampfireMusic.SeatOf(third).Solo > 0;
 
+    /// <summary>Seats newcomers one at a time, sending away each who brings nothing, until one brings the instrument.</summary>
+    public static Worker SeatUntilOneBrings(World world, Thing fire, int seat, CampfireInstrument instrument) {
+        Worker? bringing = null;
+        for (int visit = 0; visit < 60 && bringing == null; visit++) {
+            var worker = AddAtFire(world, fire, seat);
+            Work(world, 1, () => world.CampfireMusic.SeatOf(worker).Fire != 0);
+            if (world.CampfireMusic.SeatOf(worker).Instrument == instrument) bringing = worker;
+            else { world.Fire(worker); Work(world, .1f); }
+        }
+        Require(bringing != null, $"a newcomer should bring the {instrument} within 60 visits");
+        return bringing!;
+    }
+
     /// <summary>Seats a newcomer whose visit roll would choose guitar with all three instruments available.</summary>
     public static Worker SeatOnTheSameSuccessfulRoll(World world, Thing fire, int seat) {
         world.CampfireMusic.Seed(16);

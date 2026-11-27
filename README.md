@@ -422,7 +422,8 @@ A round is a delivery, a crafted batch, a crate packed full, a furnace batch at 
 With no job that can be done, a worker sits at the nearest campfire they can reach, as at lunch: six to a fire, the rest on the ground nearby in groups of up to three.
 Each time an idle worker takes a seat at the fire, they have a 25% chance of bringing a guitar, harmonica or drum.
 The choice is even among instruments not already there. If the fire already has all three, the worker sits without one.
-With fewer than all three instruments, each musician plays a short sound now and then, with at least five seconds between their clips.
+With fewer than all three instruments, each musician plays a short sound, then waits two to three seconds after it has finished before the next.
+These sounds play a little above the music volume, and guitar strums a good deal louder.
 When all three instruments are at the same fire, one worker on each instrument plays a song and the other idle workers seated there nod to the beat.
 The group plays one song, then each musician goes back to playing short sounds now and then, with no second song until the trio breaks up.
 Workers sitting for lunch do not play or nod.
