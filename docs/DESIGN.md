@@ -212,7 +212,7 @@ UI and input:
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/crafting/display/RecipeMap.cs` | The Recipe map overlay, category layout and item details |
 | `src/crafting/display/MapItemLink.cs` | A link to an item or building that hides its identity until discovery and greys it until made |
-| `src/crafting/model/MapDiscovery.cs` | Which map entries are made, shown by a station or goal but not made yet, or undiscovered |
+| `src/crafting/model/MapDiscovery.cs` | Which map entries are made, seen by the player but not made yet, or undiscovered |
 | `src/crafting/display/ItemTree.cs` | The Recipe map's Item tree, with branches for direct uses and station recipes |
 | `src/crafting/display/ItemTreeBranches.cs` | The lines from the selected card to each branch and its cards |
 | `src/crafting/model/RecipeItemUse.cs` | The direct roles an item plays in a recipe |
@@ -1338,12 +1338,13 @@ Closing the map returns to the panel or goal details underneath.
 `PlayerControl.Update` moves nobody while it shows.
 `MapDiscovery.Of` gives each entry one of three `MapState`s.
 It is made when `World.Had` knows its item or `World.Reached` records its building.
-Otherwise it is not made yet when a station's chain or the chain of a goal in the Goal Log holds it, and undiscovered
-when none does.
+Otherwise it is not made yet when the chain of something the player can see holds it, and undiscovered when none does.
 A chain is the entry and, followed all the way down, its build cost, recipe ingredients, fuels and plainest tool, or the
 `From` and `Also` items of its source.
-Every station some recipe is made at has its chain shown from a new game.
-Every recipe in the Tools group has its chain shown once the settlement has built a crafting bench.
+The player sees every building, since the build menu lists them all, and every recipe made by hand, from a new game.
+They also see what a built station makes, what their backpack holds, what a goal in the Goal Log names, and what is
+gathered from things the settlement remembers, things in sight it does not remember such as firebugs, and explored
+beach sand.
 `RecipeMap.Place` lays out each category's chain from left to right. The first item made from another goes on its line
 and the rest go on lines below. When a recipe takes a spare root in the same category as a second ingredient, the
 first column can hold that root beside the product, and the main ingredient connects from above.

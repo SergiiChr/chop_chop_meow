@@ -715,8 +715,8 @@ An item discovered while the map is open reveals its name and icon without reope
   **Food**. Follow the arrows from a material to what it makes. A building branches from the material it costs most.
   Discovered cards name where the item is made or found. Marking a mine site reveals its plan.
 - Items the settlement has made, gathered, bought or started with have a filled icon slot, as do their materials.
-  Every station shows from the start, and each goal in the Goal Log shows the buildings and items it names.
-  Once a crafting bench is built, every tool on the crafting menu's Tools list shows too.
+  Anything you can see elsewhere in the game shows too: every building in the build menu, everything made by hand,
+  what a built station makes, what you hold, what a goal in the Goal Log names, and the resources you have seen.
   Everything needed to make those shows with them: build costs, ingredients, fuels and tools, all the way down.
   Until someone makes or builds one, its picture is greyed and its details say **Not made yet** or **Not built yet**.
   Undiscovered items and buildings show as question marks. You can select them on the main map, and the details panel

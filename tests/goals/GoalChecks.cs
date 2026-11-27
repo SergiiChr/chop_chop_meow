@@ -110,11 +110,8 @@ public static class GoalChecks {
     /// <summary>A goal that appears in the Goal Log shows its buildings and items on the map, with what they are made of and the tools they take.</summary>
     private static void CheckAGoalInTheLogShowsWhatItNamesAndEverythingNeededToMakeIt(GameData data) {
         var world = EmptyWorld(data);
-        Require(world.MapDiscovery.Of("signpost") == MapState.NotMade, "the trading post that a starting goal names should show on the map");
-        Require(world.MapDiscovery.Of("steel_parts") == MapState.Undiscovered && world.MapDiscovery.Of("steel_hammer") == MapState.Undiscovered,
-            "steel parts and the steel hammer should stay undiscovered while no goal in the log needs them");
-        Achieve(world, "steel_bar");
-        Require(world.MapDiscovery.Of("steel_parts") == MapState.NotMade, "Too soft appearing should show the steel parts it names");
-        Require(world.MapDiscovery.Of("steel_hammer") == MapState.NotMade, "the steel hammer that steel parts are made with should show with them");
+        Require(world.MapDiscovery.Of("steel_pick") == MapState.Undiscovered, "a steel pickaxe should stay undiscovered while no goal in the log names it");
+        Achieve(world, Goals.OreSeen);
+        Require(world.MapDiscovery.Of("steel_pick") == MapState.NotMade, "Steel tools appearing should show the steel pickaxe it names");
     }
 }

@@ -272,29 +272,29 @@ public partial class Game {
     /// <summary>Undiscovered entries on the map and in its details remain anonymous and do not open an Item tree.</summary>
     private async Task CheckUndiscoveredMapItemsStayAnonymous() {
         await OpenRecipeMap();
-        var barrel = (ItemSlot)RecipeMapCard("steel_barrel");
-        Require(HasLabel(barrel, "?") && !HasLabel(barrel, "Steel barrel") && !ShowsIcon(barrel) &&
-            !barrel.TooltipText.Contains("Steel barrel"),
+        var jam = (ItemSlot)RecipeMapCard("canned_jam");
+        Require(HasLabel(jam, "?") && !HasLabel(jam, "Canned jam") && !ShowsIcon(jam) &&
+            !jam.TooltipText.Contains("Canned jam"),
             "An undiscovered entry must show a question mark without a name or icon.");
-        Require(recipeMap.NodeOf("steel_barrel")!.FindChild("also_steel_parts", true, false) == null,
+        Require(recipeMap.NodeOf("canned_jam")!.FindChild("also_tin_can", true, false) == null,
             "An undiscovered recipe must not expose ingredients as map chips.");
-        await Click(barrel);
+        await Click(jam);
         var details = recipeMap.FindChild("map_details", true, false);
         Require(details.FindChild("detail_item", true, false) is MapSlot { State: MapState.Undiscovered } && HasLabel(details, "?") &&
             !HasLabel(details, "Made at") && details.FindChild("map_show", true, false) == null,
             "Selecting the question mark must not reveal the undiscovered item's recipe.");
-        await Click(barrel, alt: true);
-        Require(recipeMap.FindChild("item_tree", true, false) == null && recipeMap.Chosen == "steel_barrel",
+        await Click(jam, alt: true);
+        Require(recipeMap.FindChild("item_tree", true, false) == null && recipeMap.Chosen == "canned_jam",
             "Alt-clicking an undiscovered card must stay on the main map.");
-        Require(!barrel.TooltipText.Contains(RecipeMap.ItemTreeHint), "An undiscovered card must not offer the Item tree.");
-        var sheet = RecipeMapCard("steel_sheet");
-        await Click(sheet);
-        var thumbnail = (ItemSlot)details.FindChild("use_steel_barrel", true, false);
+        Require(!jam.TooltipText.Contains(RecipeMap.ItemTreeHint), "An undiscovered card must not offer the Item tree.");
+        var can = RecipeMapCard("tin_can");
+        await Click(can);
+        var thumbnail = (ItemSlot)details.FindChild("use_canned_jam", true, false);
         Require(thumbnail.Icon == null && thumbnail.FindChild("undiscovered_badge", true, false) is MapSlot { Visible: true } &&
-            !thumbnail.TooltipText.Contains("Steel barrel"),
+            !thumbnail.TooltipText.Contains("Canned jam"),
             "A detail thumbnail must show the question-mark badge without revealing an undiscovered product.");
         await Click(thumbnail);
-        Require(recipeMap.NodeOf("steel_barrel")!.Lit,
+        Require(recipeMap.NodeOf("canned_jam")!.Lit,
             "A regular click on an undiscovered detail thumbnail must still find it on the main map.");
         await Click(thumbnail, alt: true);
         Require(recipeMap.FindChild("item_tree", true, false) == null,
@@ -305,27 +305,27 @@ public partial class Game {
     /// <summary>An open Item tree hides an undiscovered product and shows it once the product is discovered.</summary>
     private async Task CheckDiscoveryRevealsAProductInTheOpenItemTree() {
         await OpenRecipeMap();
-        await Click(RecipeMapCard("steel_sheet"), alt: true);
-        await ItemTreeShows("steel_sheet");
-        var product = (ItemSlot)ItemTreeCard("steel_barrel")!;
-        var bottle = ItemTreeCard("empty_bottle")!;
-        Require(HasLabel(product, "?") && !product.TooltipText.Contains("Steel barrel") && !ShowsIcon(product) &&
-            HasLabel(bottle, "Bottle"),
+        await Click(RecipeMapCard("tin_can"), alt: true);
+        await ItemTreeShows("tin_can");
+        var product = (ItemSlot)ItemTreeCard("canned_jam")!;
+        var can = (Control)recipeMap.FindChild("item_tree_root_tin_can", true, false);
+        Require(HasLabel(product, "?") && !product.TooltipText.Contains("Canned jam") && !ShowsIcon(product) &&
+            HasLabel(can, "Tin can"),
             "The Item tree must distinguish undiscovered products from known ones.");
         var tree = recipeMap.FindChild("item_tree", true, false);
         await Click(product, alt: true);
         Require(recipeMap.FindChild("item_tree", true, false) == tree,
             "Alt-clicking an undiscovered product must stay in the current Item tree.");
-        Achieve(Hosted, "steel_barrel");
-        await Until(() => HasLabel(product, "Steel barrel") && ShowsIcon(product),
-            "the newly discovered barrel showing its name and icon in the open Item tree", 2);
+        Achieve(Hosted, "canned_jam");
+        await Until(() => HasLabel(product, "Canned jam") && ShowsIcon(product),
+            "the newly discovered jam showing its name and icon in the open Item tree", 2);
         await Click(product, alt: true);
-        await ItemTreeShows("steel_barrel");
-        await Click((Control)recipeMap.FindChild("item_tree_root_steel_barrel", true, false));
+        await ItemTreeShows("canned_jam");
+        await Click((Control)recipeMap.FindChild("item_tree_root_canned_jam", true, false));
         var details = recipeMap.FindChild("map_details", true, false);
-        await Until(() => recipeMap.Chosen == "steel_barrel" && HasLabel(details, "Steel barrel") && HasLabel(details, "Made at"),
-            "the discovered barrel's recipe appearing in the main map", 2);
-        Require(recipeMap.NodeOf("steel_barrel")!.FindChild("also_steel_parts", true, false) is Button { Icon: not null },
+        await Until(() => recipeMap.Chosen == "canned_jam" && HasLabel(details, "Canned jam") && HasLabel(details, "Made at"),
+            "the discovered jam's recipe appearing in the main map", 2);
+        Require(recipeMap.NodeOf("canned_jam")!.FindChild("also_tin_can", true, false) is Button { Icon: not null },
             "Discovery must also reveal the recipe's additional resources on the map card.");
         await KeyStroke(Key.Escape);
     }
