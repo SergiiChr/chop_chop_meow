@@ -93,8 +93,9 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
     }
 
     private void HireOffers() {
+        var heading = Style.Heading("Hire a worker", 19); heading.Name = "hire_heading"; AddChild(heading);
         foreach (var offer in world.Data.HireOffers) {
-            var hire = kit.Button($"Hire a worker for {offer.Wage:0} coins/day.\n{offer.Upfront:0} coins downpayment.", () => world.Hire(thing, offer));
+            var hire = kit.Button($"{offer.Wage:0} coins/day.\n{offer.Upfront:0} coins downpayment.", () => world.Hire(thing, offer));
             hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = Icons.Of("hardhat"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
             hire.CustomMinimumSize = new Vector2(0, 64); hire.Alignment = HorizontalAlignment.Left;
             hire.AutowrapMode = TextServer.AutowrapMode.WordSmart;

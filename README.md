@@ -1204,6 +1204,7 @@ Buying costs a fixed 1.25× the base price, so a buy-and-resell loop never profi
 ## Workers
 
 The Workers tab at the trading post offers several hiring deals: a larger downpayment means a lower daily wage.
+Under the heading Hire a worker, each deal shows its daily wage on one line and its downpayment on the next.
 Workers are individual entities with assignments, wages, cargo and visible work status.
 There are at most forty workers.
 

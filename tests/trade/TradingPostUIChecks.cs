@@ -77,8 +77,9 @@ public partial class Game {
         Require(world.Orders.Count == 1 && world.Orders[0].Buying, "Buy on the price sheet must order goods.");
         await Click(Named("hardhat")!);
         Require(ShowsChild(panel, "buy_water"), "The price sheet must stay visible while hiring.");
-        Require(Named("hire_60")?.Text.Replace('\n', ' ') == "Hire a worker for 18 coins/day. 60 coins downpayment.",
-            "A hiring offer must state its daily wage first, then its downpayment.");
+        Require(OnPage("hire_heading") is Label { Text: "Hire a worker" }, "The Workers tab must head its offers with Hire a worker.");
+        Require(Named("hire_60")?.Text == "18 coins/day.\n60 coins downpayment.",
+            "A hiring offer must state its daily wage on one line, then its downpayment on the next.");
         var dear = world.Data.HireOffers.OrderBy(o => o.Upfront).Last();
         await Click(Named($"hire_{dear.Upfront:0}")!);
         var hired = Hosted.Workers.LastOrDefault();
