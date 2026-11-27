@@ -228,6 +228,8 @@ UI and input:
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/farms/display/FarmPanel.cs` | A farm plot's stages, input column, harvest row and fill bars |
 | `src/cabins/display/CabinPanel.cs` | A cabin: its door and key, the roof barrel and the shared sleep controls |
+| `src/food/model/FoodEffects.cs`, `src/food/display/FoodEffectRow.cs`, `src/food/display/FoodEffectBadge.cs` | Reusable effects from eating, their live countdown and the active badges under the needs plate |
+| `src/food/display/FoodDescription.cs` | Hunger and food effects in item tooltips and the Recipe map sidebar |
 | `src/rest/SleepCycle.cs`, `src/rest/StrawBed.cs` | Individual sleep, accelerated time, outdoor bed expiry and salvage |
 | `src/rest/display/SleepPage.cs`, `src/rest/display/StrawBedPanel.cs` | Shared sleep controls and the straw bed’s remaining life |
 | `src/rest/display/StrawBedModel.cs`, `src/rest/display/StrawBedView.cs` | The straw bed and a player lowering onto it or getting up, transferring weight from boots to a palm, then the hip and forearm |
@@ -723,9 +725,17 @@ The showcase skips them again after setting up its scene by hand.
 
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
 
-- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`) and a `Food` flag; nothing eaten heals.
-- Health comes back only in sleep, `SleepCycle.HealPerSecond` a second while hunger and thirst both stay above `SleepCycle.FedNeed`.
+- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`), a `Food` flag and shared `FoodEffects`.
+- Sleep restores `SleepCycle.HealPerSecond` health a second while hunger and thirst both stay above `SleepCycle.FedNeed`.
   Healing is prorated to the part of the tick before either need falls below the threshold.
+- The server saves and sends each player's remaining time for Carb load, Protein recovery and Vitamins in `PlayerState`.
+  Well fed is the part of hunger above 100%, so its countdown follows hunger drain rather than a separate timer.
+  Protein recovery heals at the sleep rate without the sleep requirement, and adds to sleep healing, so a sleeper heals twice as fast.
+  The sleep forecast includes both kinds of healing and accounts for Vitamins expiring before wake-up.
+  Vitamins fills `PlayerState.BonusHealth`, which is part of total health and takes damage first.
+  Healing fills normal health before the bonus, and expiry only removes total health above 100%.
+  Bonus health continues the normal fill in a brighter color. Only health or hunger above 100% wraps to a second lap.
+  Additional servings add their timed effects’ durations to the time left, without increasing their strength.
 - Food is what wolves eat and compost will take, cooked or not.
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.

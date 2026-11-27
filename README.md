@@ -57,6 +57,7 @@ Play accepts Godot arguments after `--`:
 | --- | --- |
 | `--showcase` | Load a populated review fixture instead of a fresh game |
 | `--showcase --wolves` | Add a night ambush to that fixture |
+| `--showcase --food-effects` | Show all four food effects under the needs plate, with second laps on health and hunger |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --idle` | Show the crew with their jobs taken off, sitting at a campfire that has no wood and burns while they sit |
 | `--showcase --campfire-music trio` | Show idle workers playing guitar, harmonica and drum at the same campfire, with a listener. Use `guitar`, `guitar-perch`, `harmonica` or `drum` to see one worker get ready to play alone. Add `--campfire-visit` to include the worker's wait before the first solo |
@@ -234,6 +235,9 @@ Click a target to open its panel.
 
 Health, hunger and thirst are three upright vials in the top-left corner with a heart, a stomach and a droplet under them.
 Each empties as its level falls and turns red at 25% or less.
+Bonus health continues the health bar in a brighter color. Only the part past 100% wraps to the bottom for a second lap.
+Hunger over 100% also wraps to a brighter second lap.
+Active food effects appear in a row below the plate. Hover an effect to see what it does and how long it has left.
 
 Beside them the bank shows the coins in the trading post's wage slot, which has no limit, and the wages due each day, in red when they exceed the bank.
 Under the wages it shows the coins sales brought in since dawn, green once they are above a day's wages and red until then.
@@ -471,7 +475,7 @@ Turning a station that holds water to another recipe takes the water into your b
 Taking down a station fills the bottles you carry with its water, and the rest is spilled.
 These rules cover any refillable vessel the game adds (`GameData.Vessels`).
 
-Food and drink restore hunger and thirst but no health: health comes back only in sleep.
+Food and drink restore hunger and thirst. Sleep normally restores health, and some cooked foods also help you recover.
 Sleep at any hour in a cabin or on a straw bed. Enter the cabin first to see its Sleep button.
 You start healing while you sleep, even if other players stay awake, as long as hunger and thirst both stay above 45%.
 A full night can restore about a third of your health. You wake at dawn, if hunger or thirst runs out, or when you choose Wake.
@@ -825,8 +829,21 @@ The canning station (2 steel bars, 8 planks) seals jam or meat stew over one woo
 The village buys canned jam at a base price of 80 coins per can, but does not buy loose or bottled jam.
 Raw meat sells as it is, in crates.
 
-A berry restores 5 hunger, crushed berries restore 55, a liter of jam from a bottle restores 115, and canned jam restores 120.
-Hunger stops at 100.
+A berry restores 5% hunger and crushed berries restore 55%. A liter of bottled jam or a can of jam fills hunger to 100%.
+Hunger stops at 100% unless meat stew fills it past that point.
+
+Cooked food descriptions in item slots and the Recipe map show how much hunger they restore and list their **Effects**:
+
+| Food | Effects |
+| --- | --- |
+| Bread | **Carb load** makes Shift sprinting 25% faster for 4 in-game hours. |
+| Burnt steak | **Protein recovery** restores health at the normal sleep healing rate for 4 in-game hours, even while awake. While you sleep it adds to sleep healing, so you heal twice as fast. |
+| Meat stew | **Well fed** fills hunger to 150% and lasts until it falls back to 100%. The hover countdown shows how long the extra hunger will last at your current pace. Stew also gives **Protein recovery**. |
+| Berry jam | **Vitamins** heals up to 10 normal HP and fills 50 bonus HP for one in-game day. Damage spends bonus HP first. Healing fills normal HP first, then the bonus. Only health above 100 HP is lost when Vitamins wears off. Jam also gives **Carb load**. |
+
+Canned food gives the same effects as the original food.
+Another serving adds each timed effect’s full duration to its time remaining without making it stronger.
+Food effects end when you die.
 
 Both stations, like the stone furnace's food recipes, take wood, coal or charcoal in their fuel slot.
 

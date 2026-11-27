@@ -25,6 +25,7 @@ public partial class Game : Node, IGameFlow {
     private MessageStack messages = null!;
     private GoalPopup goalPopup = null!;
     private NeedsPlate needsPlate = null!;
+    private FoodEffectRow foodEffectRow = null!;
     private Button layerButton = null!;
     private DamageEdges damageEdges = null!;
     private ModeLabel modeLabel = null!;
@@ -171,11 +172,18 @@ public partial class Game : Node, IGameFlow {
         layerButton.ToggleMode = true;
         Style.Skin(layerButton, Style.TabRound.Normal, Style.TabRound.Hover, Style.TabActive.Normal);
         needsPlate = new NeedsPlate(kit, moves, damageEdges, cursor);
-        needsPlate.ItemRectChanged += () => {
+        foodEffectRow = new FoodEffectRow(world);
+        needsPlate.ItemRectChanged += PlaceBelowNeeds;
+        foodEffectRow.ItemRectChanged += PlaceBelowNeeds;
+        foodEffectRow.VisibilityChanged += PlaceBelowNeeds;
+        ui.AddChild(needsPlate); ui.AddChild(foodEffectRow); ui.AddChild(layerButton); ui.AddChild(damageEdges);
+
+        void PlaceBelowNeeds() {
             var status = needsPlate.GetRect();
-            layerButton.Position = new Vector2(status.Position.X + 12, status.End.Y + 8);
-        };
-        ui.AddChild(needsPlate); ui.AddChild(layerButton); ui.AddChild(damageEdges);
+            var below = new Vector2(status.Position.X + 12, status.End.Y + 8);
+            if (foodEffectRow.Position != below) foodEffectRow.Position = below;
+            layerButton.Position = below + Vector2.Down * (foodEffectRow.Visible ? foodEffectRow.Size.Y + 8 : 0);
+        }
         recipeMap = new RecipeMap(kit, panel); panel.Map = recipeMap;
         sheet = new ReadingSheet(kit); panel.ReadingSheet = sheet;
         // A find taken opens the day it holds large, the first of them when it holds several, and leaves the diary itself closed.
@@ -213,7 +221,7 @@ public partial class Game : Node, IGameFlow {
         if (messages.OffsetTop != messagesTop) messages.OffsetTop = messagesTop;
         menu.RefreshGoalLog(); goalPopup.Refresh();
         panel.Refresh();
-        hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
+        hotbar.Refresh(); needsPlate.Refresh(); foodEffectRow.Refresh(); bag.Refresh();
         bool below = player.Layer == Layer.Underground;
         if (layerButton.ButtonPressed != below) layerButton.SetPressedNoSignal(below);
     }
@@ -459,7 +467,9 @@ public partial class Game : Node, IGameFlow {
             // A world not on a server is one of the review fixtures', which runs here.
             if (!world.Remote) world.Tick(dt);
             ending.ShowOnce();
-            needsPlate.DamageFlash(health - world.Health, runTime); shownHealth = world.Health;
+            // Vitamins wearing off clears excess health without flashing the damage edges.
+            needsPlate.DamageFlash(Math.Min(health, world.FoodEffects.HealthLimit) - world.Health, runTime);
+            shownHealth = world.Health;
         }
         view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection;
         if (sounds != null) sounds.CampfirePaused = !running;

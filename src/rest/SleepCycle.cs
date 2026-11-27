@@ -30,7 +30,7 @@ public sealed class SleepCycle(World world) {
         Math.Max(0, Math.Min((hunger - threshold) / world.Data.HungerPerSecond, (thirst - threshold) / world.Data.ThirstPerSecond));
 
     /// <summary>Needs at the next dawn or at the earlier moment a need runs out, if the player slept now.</summary>
-    public (float Seconds, float Health, float Hunger, float Thirst) Preview(Thing place) {
+    public (float Seconds, float Health, float Hunger, float Thirst, float BonusHealth) Preview(Thing place) {
         var p = world.S.Actor;
         bool cabin = p.Sheltered == place.Id && place.Kind == ThingKind.Hut;
         float seconds = SecondsToDawn;
@@ -40,11 +40,9 @@ public sealed class SleepCycle(World world) {
         float loss = duration * world.Data.ThirstPerSecond;
         float thirstAtWake = cabin ? world.BedtimeWater.Preview(p, loss, duration == seconds || OthersAsleep(p)).Dawn
             : Math.Max(0, thirst - loss);
-        return (duration, Healed(p, duration, thirst), Math.Max(0, p.Hunger - duration * world.Data.HungerPerSecond), thirstAtWake);
+        var (health, bonus) = FoodEffects.HealthAfter(p, duration, Math.Min(duration, SecondsFed(p.Hunger, thirst, FedNeed)));
+        return (duration, health, Math.Max(0, p.Hunger - duration * world.Data.HungerPerSecond), thirstAtWake, bonus);
     }
-
-    private float Healed(PlayerState p, float dt, float thirst) =>
-        Math.Min(100, p.Health + Math.Min(dt, SecondsFed(p.Hunger, thirst, FedNeed)) * HealPerSecond);
 
     /// <summary>Why the acting player cannot go to sleep at this place right now.</summary>
     public string? Block(Thing place) {
@@ -84,9 +82,9 @@ public sealed class SleepCycle(World world) {
         WakeActor("You wake up.");
     }
 
-    internal void Heal(float dt) {
+    internal float HealingSeconds(float dt) {
         var p = world.S.Actor;
-        if (p.SleepingAt != 0 && p.Health < 100) p.Health = Healed(p, dt, p.Thirst);
+        return p.SleepingAt == 0 ? 0 : Math.Min(dt, SecondsFed(p.Hunger, p.Thirst, FedNeed));
     }
 
     internal void WakeActor(string reason) {

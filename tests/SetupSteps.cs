@@ -19,6 +19,14 @@ internal static class SetupSteps {
     /// <summary>Puts goods in the backpack: gathering or buying each would take a day of ticks, and many goods are not sold.</summary>
     public static int Give(World world, string item, int count = 1) => Give(world.S.Actor, item, count);
 
+    /// <summary>Reveals map entries without crafting a chain and returns how to remove only these fixture discoveries.</summary>
+    public static Action TemporarilyDiscover(World world, params string[] items) {
+        var known = world.S.Obtained;
+        var added = new List<string>(items.Length);
+        foreach (string item in items) if (known.Add(item)) added.Add(item);
+        return () => { foreach (string item in added) known.Remove(item); };
+    }
+
     /// <summary>Puts freshly caught firebugs in the backpack, without finding and catching each at night.</summary>
     public static int GiveFirebugs(World world, int count) => world.Firebugs.Catch(world.S.Backpack, count);
 

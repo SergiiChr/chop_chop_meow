@@ -49,6 +49,7 @@ public static class SimulationChecks {
         InventoryChecks.Run(data);
         BuildingChecks.Run(data);
         NeedsChecks.Run(data);
+        FoodEffectChecks.Run(data);
         CampfireChecks.Run(data);
         HiringChecks.Run(data);
         WageChecks.Run(data);

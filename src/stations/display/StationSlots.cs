@@ -20,6 +20,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         moves.TakeCell(cell, box, item, t, takes, put);
         // Redrawn only when the amount held or the firebugs' count or time left changes.
         bool lantern = Lanterns.IsItem(item);
+        var food = FoodDescription.Of(world.Data, item);
         live.Watch(() => {
             int held = box[item];
             int life = item == Firebugs.Item && held > 0 ? world.Firebugs.AverageMinutes(box) : -1;
@@ -29,7 +30,13 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
             cell.AddThemeColorOverride(ItemSlot.IconNormal, shown.Held > 0 ? Colors.White : Style.Ghost);
             count.SetStack(shown.Held, shown.Bugs);
             string hint = tooltip(shown.Held);
-            cell.TooltipText = $"{hint}{PageText.FirebugLifeLine(shown.Life)}\n{RecipeMap.AltClickHint}";
+            if (shown.Held > 0 && food != null) {
+                int lineEnd = hint.IndexOf('\n');
+                FoodDescription.SetTooltip(cell, lineEnd < 0 ? hint : hint[..lineEnd], item, food);
+            } else {
+                cell.Popup = null;
+                cell.TooltipText = $"{hint}{PageText.FirebugLifeLine(shown.Life)}\n{RecipeMap.AltClickHint}";
+            }
         });
         return cell;
     }
