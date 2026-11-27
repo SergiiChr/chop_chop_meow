@@ -185,6 +185,7 @@ UI and input:
 | `src/ui/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/ui/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
+| `src/ui/ToolsWindow.cs` | The Tools window beside a building's page, which unrolls from a roll |
 | `src/ui/DayDial.cs` | The sun and moon on the clock's arc, with the next tide forecast on the moon |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
@@ -206,7 +207,7 @@ UI and input:
 | `src/items/display/SlotInput.cs` | What a click does on an item slot |
 | `src/HotbarStacks.cs` | `World`'s hotbar slots bound to backpack stacks: binding, waiting slots and reading what a slot shows |
 | `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
-| `src/stations/display/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
+| `src/stations/display/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in the Tools window beside it |
 | `src/stations/display/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
 | `src/crafting/display/CraftPanel.cs` | The crafting menu |
 | `src/stations/display/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
@@ -375,10 +376,23 @@ Keep rendering and input separate from state transitions, so headless checks can
 Health, hunger and thirst are HUD icons.
 Coins are a backpack item that stacks to 1000.
 
-Every page that works with the backpack shows it in one place, a drawer above the hotbar (`PagePanel.BagGrid`).
+Every page shows the backpack in one place, a drawer above the hotbar, while the player has it open
+(`BackpackDrawer.Opened`).
+A page that works with the backpack fills the drawer with its own grid (`PagePanel.BagGrid`), and any other gets a plain
+one, so the backpack works the same under every page.
+`Opened` is the only state that says whether the player wants it: the drawer shows while it is set and the page fills
+the drawer, unless a list picked from by click takes the drawer's room (`BackpackDrawer.Crowded`).
+A new page opens the backpack when `PagePanel.OpensBackpack` says so: only the backpack's own page, storage
+(`Thing.IsStorage`) and a crate or barrel opened from the backpack.
+So a click on a station or a worker, or the crafting menu, leaves the backpack as it was, and a click on a chest
+opens it.
+Tab shows or hides the drawer under the open page and keeps the page (`SidePanel.ToggleBackpack`).
+Over a list that hid the drawer, Tab shows it again and the list makes room above it.
+With no page open, Tab opens or closes the backpack's own page.
+Closing the panel closes the backpack.
 On a page about a building or an opened crate (`PagePanel.StoresFromHotbar`), the drawer's Ctrl- and Shift-click (`BackpackDrawer.Store`) also runs for one on a hotbar slot.
 The stacks that page takes are rimmed in brick and the rest are faded.
-A close button hides the drawer until another page or building opens.
+The drawer's close button closes the backpack, so the next building opens without it, unless that building is storage.
 The side panel only shows the building and sizes itself to what it holds.
 
 ### Multiplayer
@@ -665,7 +679,7 @@ worker, the ground and a pile.
 A cabin can only use a water barrel.
 The ground barrel uses a one-slot tank and the same filter rules as a plain pile.
 A cabin's only storage slot holds the actual barrel item.
-The Roof barrel window sits beside the cabin page in `SidePanel.Aside`, like a station's tool window.
+The Roof barrel slot sits beside the cabin page in the Tools window (`ToolsWindow`), like a station's tool slots.
 Refills update that item in place.
 A backpack stacks empty barrels and carries up to one filled barrel. How full it is determines how much it slows the player.
 Pouring into an empty stack keeps the barrel being filled in its original cell and requires room for the remaining empty barrels.
@@ -1324,7 +1338,13 @@ The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.Clos
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
 The panel keeps the list's place while the page draws again, so a click on a recipe leaves the list where it was scrolled to.
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
-A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
+A station's tool slots are drawn in the Tools window, which follows the panel (`StationPanel.ToolSlots`).
+`ToolsWindow` stands level with the page under the panel's title and opens rolled up: a roll of the blue board with an
+arrow and "Tools" written up its side.
+A click on the roll unrolls it (`ToolsWindow.Unrolled`): the roll moves left and the board appears behind it, with the
+tools still in their places.
+At the end the roll flattens into the board's left edge, which keeps the arrow and the word.
+Each new page rolls it up again (`ToolsWindow.RollUp`).
 
 The Recipe map badge on the bottom bar opens `RecipeMap` over the running game.
 `UiKit.LinkRecipeMap` lets Alt-click on an item slot or recipe card look up its item through `RecipeMap.OpenAt` without

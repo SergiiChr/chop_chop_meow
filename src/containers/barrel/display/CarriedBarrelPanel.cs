@@ -5,6 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>The water slot of an opened backpack barrel.</summary>
 public partial class CarriedBarrelPanel(PageTools tools, int barrelSlot) : PagePanel(tools) {
+    public override bool OpensBackpack => true;
     private string? Item {
         get {
             var layout = world.Backpack.Layout;

@@ -101,6 +101,34 @@ public partial class Game {
     /// <summary>A cell of the backpack drawer, whatever grids the open page has.</summary>
     private ItemSlot BagCell(Func<ItemSlot, bool> match) => bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(match);
 
+    /// <summary>Shows the backpack under the open page with Tab, as a player does before moving items from it.</summary>
+    private async Task ShowBackpack() {
+        if (bag.Visible) return;
+        var shown = panel.Page;
+        await KeyStroke(Key.Tab);
+        Require(bag.Visible && (shown == Page.None || panel.Page == shown), $"Tab must show the backpack under the {ShownPage()} page and keep that page open.");
+    }
+
+    /// <summary>Unrolls the open page's Tools window with a click on its roll, so its slots take clicks.</summary>
+    private async Task UnrollTools() {
+        var window = panel.ToolsWindow;
+        if (!window.Unrolled) await Click(ToolsRoll);
+        await Until(() => window.Size.X >= window.UnrolledWidth && window.GetGlobalRect().Encloses(window.Content.GetGlobalRect()), "a click on the Tools roll unrolling its window all the way", 2);
+    }
+
+    /// <summary>Rolls the open page's Tools window back up with a click on its roll.</summary>
+    private async Task RollUpTools() {
+        var window = panel.ToolsWindow;
+        if (window.Unrolled) await Click(ToolsRoll);
+        await Until(() => window.Size.X <= ToolsRolledWidth, "a click on the Tools roll rolling its window back up", 2);
+    }
+
+    /// <summary>The roll of the open page's Tools window, which a click unrolls or rolls back up.</summary>
+    private Control ToolsRoll => (Control)panel.ToolsWindow.FindChild("tools_roll", true, false)!;
+
+    /// <summary>The widest the Tools window is while rolled up.</summary>
+    private const float ToolsRolledWidth = 60;
+
     /// <summary>Waits until a grid shows a matching cell, for what changes on the game's own refresh, and returns the cell.</summary>
     private async Task<ItemSlot> Showing(int grid, Func<ItemSlot, bool> match) {
         await Until(() => Cells(grid).Any(match), "a matching cell showing", 2);

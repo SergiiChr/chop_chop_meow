@@ -39,6 +39,7 @@ public partial class Game {
         Require(water.Icon == Icons.Of(Water.Liquid) && level.Value == 0, "the farm starts with an empty water bar and droplet slot");
         var earth = view.PropOf(farm.Id)!.Root.FindChild("TilledSoil", true, false) as MeshInstance3D;
         Require(earth != null && earth.MaterialOverride.NextPass == null, "The dry tilled rows should show their original earth.");
+        await ShowBackpack();
         await Carry(BagCellOf(bucket), water);
         await Until(() => level.Value > 4.9 && world.Backpack[Bucket.Item] > 0, "pouring the bucket into the plot fills its water bar", 2);
         await Until(() => earth!.MaterialOverride.NextPass is ShaderMaterial wet

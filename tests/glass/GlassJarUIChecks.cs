@@ -90,9 +90,10 @@ public partial class Game {
         Require(Named($"job_{JobKind.BlowGlass.Id()}") is Button job
             && job.FindChildren("*", "Label", true, false).OfType<Label>().Any(label => label.Text == "Glass blower"),
             "The furnace should show the separate Glass blower job.");
+        await ShowBackpack();
         await Holding(Key.Shift, () => Click(BagCellOf("steel_pipe")));
         await Until(() => world.Backpack["steel_pipe"] == pipes + 1
-            && panel.Aside.FindChild($"tool_{GlassBlowing.Tool}", true, false) is ItemSlot { TooltipText: var tip } && tip.StartsWith("Steel pipe"),
+            && panel.ToolsWindow.FindChild($"tool_{GlassBlowing.Tool}", true, false) is ItemSlot { TooltipText: var tip } && tip.StartsWith("Steel pipe"),
             "installing just one steel pipe from the held stack into the Glass blowing pipe slot", 2);
 
         var blocker = Hosted.Add(ThingKind.Hut, furnace.ToWorld(World.BellowsStand) + new Vector2(0, -.8f));
@@ -113,8 +114,8 @@ public partial class Game {
 
         Warp(Hosted, home);
         await Until(() => world.Player.DistanceTo(home) < .1f, "returning to the clearing", 2);
-        await ClickOn(furnace);
-        await Click((ItemSlot)panel.Aside.FindChild($"tool_{GlassBlowing.Tool}", true, false));
+        await ClickOn(furnace); await UnrollTools(); await ShowBackpack();
+        await Click((ItemSlot)panel.ToolsWindow.FindChild($"tool_{GlassBlowing.Tool}", true, false));
         await Click(BagCell(c => c.TooltipText == ""));
         await Until(() => world.Backpack["steel_pipe"] == pipes + 2 && cursor.Empty, "the slotted pipe going back into the backpack", 2);
         Hosted.Fire(blower);

@@ -12,6 +12,70 @@ public partial class Game {
         await TestClean(CheckPanelPagesRefreshWithoutAllocating);
         await TestClean(CheckMouseWheelOverPanelDoesNotZoom);
         await TestClean(CheckOpeningAPageLeavesTheViewStill);
+        await TestClean(CheckBuildingClicksLeaveTheBackpackAsItWas);
+        await TestClean(CheckToolsWindowUnrollsFromItsRoll);
+        await TestClean(CheckTabShowsTheBackpackOverAFilterList);
+    }
+
+    /// <summary>A click on a building or a worker, or the crafting menu, leaves the backpack open or closed as it was, storage opens it, and Tab shows or hides it under the open page.</summary>
+    private async Task CheckBuildingClicksLeaveTheBackpackAsItWas() {
+        await CloseWithEsc();
+        var bench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1.5f, 0));
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(1.5f, 0));
+        await ClickOn(bench);
+        Require(Shows(bench) && !bag.Visible, "A station's page must open without the backpack.");
+        await KeyStroke(Key.C);
+        Require(panel.Page == Page.Craft && !bag.Visible, "The crafting menu must open without the backpack.");
+        var worker = AddWorker(Hosted, world.Player + new Vector2(-2, 2));
+        await Frames(); await Click(view.Screen(worker.Pos, 1));
+        Require(view.Selection.Worker == worker.Id && !bag.Visible, "A worker's page must open without the backpack.");
+        Hosted.Fire(worker);
+        await ClickOn(bench);
+        await KeyStroke(Key.Tab);
+        Require(Shows(bench) && bag.Visible, "Tab must show the backpack under a station's page and keep the page open.");
+        await KeyStroke(Key.Tab);
+        Require(Shows(bench) && !bag.Visible, "Tab must hide the backpack again and keep the station's page open.");
+        await ClickOn(chest);
+        Require(Shows(chest) && bag.Visible, "A chest's page must open the backpack.");
+        await ClickOn(bench);
+        Require(Shows(bench) && bag.Visible, "A station opened while the backpack is open must keep it open.");
+        await KeyStroke(Key.H);
+        Require(panel.Page == Page.Crew && bag.Visible, "The crew page, which moves no items, must keep the backpack open under it.");
+        await KeyStroke(Key.Tab);
+        Require(panel.Page == Page.Crew && !bag.Visible, "Tab must hide the backpack under the crew page and keep the page open.");
+        RemoveThings(Hosted, t => t == bench || t == chest); await CloseWithEsc();
+    }
+
+    /// <summary>A building's Tools window opens rolled up below the page's title, a click on the roll unrolls it and another rolls it back, and each building opens it rolled up.</summary>
+    private async Task CheckToolsWindowUnrollsFromItsRoll() {
+        await CloseWithEsc();
+        var first = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1.5f, 0));
+        var second = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(1.5f, 0));
+        await ClickOn(first);
+        var window = panel.ToolsWindow;
+        await Until(() => window.Visible && window.Size.X <= ToolsRolledWidth, "a station's Tools window opening rolled up", 2);
+        Require(window.GetGlobalRect().Position.Y >= panel.HeadingTitle.GetGlobalRect().End.Y, "The Tools window must start below the page's title.");
+        await UnrollTools();
+        var roll = ToolsRoll;
+        Require(window.Size.X > ToolsRolledWidth && roll.GetGlobalRect().Position.X - window.GetGlobalRect().Position.X < 10, "The Tools roll must stay on the unrolled window's left edge.");
+        Require(window.GetGlobalRect().End.X <= panel.GetGlobalRect().Position.X, "The unrolled Tools window must stand left of the page.");
+        await RollUpTools();
+        await UnrollTools();
+        await ClickOn(second);
+        await Until(() => Shows(second) && window.Visible, "the second station's page opening", 2);
+        Require(!window.Unrolled && window.Size.X <= ToolsRolledWidth, "The next station must open its Tools window rolled up.");
+        RemoveThings(Hosted, t => t == first || t == second); await CloseWithEsc();
+    }
+
+    /// <summary>A chest's item list hides the backpack, and Tab shows it again with the list made shorter to end above it, keeping the filter window open.</summary>
+    private async Task CheckTabShowsTheBackpackOverAFilterList() {
+        var chest = await OpenFilters(ThingKind.Chest);
+        await Click(Named("filter_add_in")!);
+        await Until(() => OnPage("item_list") != null && !bag.Visible, "the chest's item list opening and hiding the backpack", 2);
+        await KeyStroke(Key.Tab);
+        await Until(() => bag.Visible && OnPage("item_list") is Control list && list.GetGlobalRect().End.Y <= bag.GetGlobalRect().Position.Y,
+            "Tab showing the backpack with the item list ending above it", 2);
+        RemoveThings(Hosted, t => t == chest); await CloseWithEsc();
     }
 
     /// <summary>

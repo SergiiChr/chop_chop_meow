@@ -41,6 +41,7 @@ public partial class CratePanel(PageTools tools, Thing subject) : ThingPage(tool
 /// An empty crate opens with number 0; the first goods packed into it make it a packed crate, which the page then shows.
 /// </summary>
 public partial class CarriedCratePanel(PageTools tools, int crate) : PagePanel(tools) {
+    public override bool OpensBackpack => true;
     // An empty crate's page lasts while one is carried, and until it turns to the crate its goods made; a crate picked up onto the cursor closes its page.
     public override bool Current => crate == 0 ? (world.Backpack["crate"] > 0 || NewlyPacked() > 0) && world.Held?.Item != "crate" : world.CarriedCrate(crate) is string item && world.Held?.Item != item;
     // An emptied, placed or dropped crate leaves the backpack, and its page gives way to the backpack's.
