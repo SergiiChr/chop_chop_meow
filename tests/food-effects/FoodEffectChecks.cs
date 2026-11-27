@@ -12,6 +12,7 @@ public static class FoodEffectChecks {
         Test(AnotherServingExtendsCarbLoadWithoutStackingSpeed, data);
         Test(SteakHealsTheAwakePlayerForFourHours, data);
         Test(StewExtendsProteinRecoveryWithoutStackingHealing, data);
+        Test(SleepAndProteinRecoveryHealTogether, data);
         Test(FreshAndCannedStewFillTheSecondLapAndStartRecovery, data);
         Test(JamHealsAndFillsTheRaisedLimit, data);
         Test(VitaminsProtectThePlayerAndDoNotTakeAwayHealthBelowOneHundred, data);
@@ -66,6 +67,19 @@ public static class FoodEffectChecks {
         Require(world.FoodEffects.SecondsLeft(FoodEffect.ProteinRecovery) == 280, "stew should add four hours to the steak's recovery");
         world.Tick(50, sleeping: true);
         Require(world.Health == 56, "two servings should heal at the same rate as one");
+    }
+
+    private static void SleepAndProteinRecoveryHealTogether(GameData data) {
+        var world = EmptyWorld(data);
+        SetNeeds(world, health: 10);
+        Give(world, "burnt_steak"); world.Consume("burnt_steak");
+        SkipClock(world, world.Sleep.SecondsToDawn - 100);
+        var bed = world.Add(ThingKind.StrawBed, world.Player + Vector2.Right);
+        Require(Math.Abs(world.Sleep.Preview(bed).Health - 34) < .01f, "the sleep forecast should add sleep healing and Protein recovery");
+        world.Sleep.Start(bed);
+        Require(world.Sleep.SleepingAt == bed.Id, "the player should lie down before testing sleep healing");
+        world.Tick(50, sleeping: true);
+        Require(Math.Abs(world.Health - 22) < .01f, "sleeping with Protein recovery should heal at twice the sleep rate");
     }
 
     private static void FreshAndCannedStewFillTheSecondLapAndStartRecovery(GameData data) {

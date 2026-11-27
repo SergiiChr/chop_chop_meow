@@ -59,8 +59,8 @@ public sealed class FoodEffects(World world) {
     /// <summary>Health and its bonus after healing for part of the interval, under the limit in force at its end.</summary>
     internal static (float Health, float Bonus) HealthAfter(PlayerState p, float seconds, float sleepHealingSeconds) {
         float recovery = (float)Math.Min(seconds, p.ProteinRecoveryLeft);
-        // Either sleep or Protein recovery can heal at any given moment, but they do not heal twice.
-        float health = Math.Min(HealthLimitAt(p, seconds), p.Health + Math.Max(sleepHealingSeconds, recovery) * SleepCycle.HealPerSecond);
+        // Sleep and Protein recovery each heal at the sleep rate, so together they heal twice as fast.
+        float health = Math.Min(HealthLimitAt(p, seconds), p.Health + (sleepHealingSeconds + recovery) * SleepCycle.HealPerSecond);
         if (p.VitaminsLeft <= seconds) return (health, 0);
         // Healing fills normal health first. Any health above its limit is part of the bonus.
         return (health, Math.Max(p.BonusHealth, health - NormalLimit));

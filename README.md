@@ -838,7 +838,7 @@ Cooked food descriptions in item slots and the Recipe map show how much hunger t
 | Food | Effects |
 | --- | --- |
 | Bread | **Carb load** makes Shift sprinting 25% faster for 4 in-game hours. |
-| Burnt steak | **Protein recovery** restores health at the normal sleep healing rate for 4 in-game hours, even while awake. It does not heal twice as fast during sleep. |
+| Burnt steak | **Protein recovery** restores health at the normal sleep healing rate for 4 in-game hours, even while awake. While you sleep it adds to sleep healing, so you heal twice as fast. |
 | Meat stew | **Well fed** fills hunger to 150% and lasts until it falls back to 100%. The hover countdown shows how long the extra hunger will last at your current pace. Stew also gives **Protein recovery**. |
 | Berry jam | **Vitamins** heals up to 10 normal HP and fills 50 bonus HP for one in-game day. Damage spends bonus HP first. Healing fills normal HP first, then the bonus. Only health above 100 HP is lost when Vitamins wears off. Jam also gives **Carb load**. |
 
@@ -1592,7 +1592,8 @@ Repeated sounds rotate between variants.
 A sound is loudest at your character and fades with distance, to silence 16 metres away, whatever the zoom.
 A wolf's growl as it breaks into its sprint carries 30 metres, and a howl 80.
 
-Day and night have their own music, which crossfades as the time changes and picks up where it stopped last time.
+Day and night each have their own music playlist.
+The music crossfades when the time changes, and each playlist picks up where it left off and wraps after its last track.
 The soundtrack gives way to a campfire song as you approach and comes back as you leave or the song ends.
 The campfire musicians and listeners stay in time with the recording even in a long-running settlement.
 When play pauses, so does the campfire song, and the soundtrack returns until play resumes.
@@ -1622,3 +1623,8 @@ Music credits:
 
 - Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov))
 - Augmentality (Brandon Morris)
+- [Jazz - Jazz Music](https://pixabay.com/music/traditional-jazz-jazz-jazz-music-630211/) by Andrii Hroza (andriih)
+- [Jazz Bar](https://pixabay.com/music/traditional-jazz-jazz-bar-592657/) by Aurec
+- [Lofi Soul](https://pixabay.com/music/lofi-lofi-soul-588903/) by ZephiraMusic
+- [Groove Soul](https://pixabay.com/music/funk-groove-soul-317798/) by The_Mountain
+- [Soft Jazz](https://pixabay.com/music/smooth-jazz-soft-jazz-621606/) by AtlasAudio

@@ -730,7 +730,7 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
   Healing is prorated to the part of the tick before either need falls below the threshold.
 - The server saves and sends each player's remaining time for Carb load, Protein recovery and Vitamins in `PlayerState`.
   Well fed is the part of hunger above 100%, so its countdown follows hunger drain rather than a separate timer.
-  Protein recovery heals at the sleep rate without the sleep requirement, and does not double the rate during sleep.
+  Protein recovery heals at the sleep rate without the sleep requirement, and adds to sleep healing, so a sleeper heals twice as fast.
   The sleep forecast includes both kinds of healing and accounts for Vitamins expiring before wake-up.
   Vitamins fills `PlayerState.BonusHealth`, which is part of total health and takes damage first.
   Healing fills normal health before the bonus, and expiry only removes total health above 100%.
@@ -1997,11 +1997,9 @@ Both play lower and slower the taller the tree, from a tenth above their recorde
 
 ### Music
 
-Music in `assets/music` crossfades over four seconds between the day music and the night music when night falls or dawn breaks, including during sleep.
-The day plays its tracks one after another and the night loops one.
-
-Each keeps its place for the running session, so music longer than its part of the day carries on next time.
-A track that plays to its end hands over to the next, and the last wraps back to the first.
+Music in `assets/music` crossfades between playlists over four seconds at nightfall and dawn, including during sleep.
+Each playlist keeps its place for the running session, so music longer than its part of the day carries on next time.
+Both playlists play their tracks in order, then wrap back to the first.
 The options screen sets the music volume, stored in the settings file.
 
 Each campfire song and solo starts at a time on the world's clock, so a player approaching a fire or joining a game hears
